@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
+import { FIRST_PARTY_IMAGE_SQL_REGEX } from "@/lib/first-party-image-rules";
 
 export const runtime = "nodejs";
 
@@ -41,7 +42,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const rows = await sql<Array<{
+  const [rows, externalImageRows] = await Promise.all([
+    sql<Array<{
     created_at: Date | string;
     diagnostics: unknown;
     exclusions: unknown;
@@ -66,8 +68,17 @@ export async function GET(request: Request) {
     where plan_id = ${planId}::uuid
     order by generated_at desc
     limit 1
-  `;
+  `,
+    sql<Array<{ count: string | number }>>`
+      select count(*) as count
+      from public.products
+      where image_url is not null
+        and btrim(image_url) <> ''
+        and image_url !~ ${FIRST_PARTY_IMAGE_SQL_REGEX}
+    `
+  ]);
   const row = rows[0];
+  const externalProductImageUrlCount = Number(externalImageRows[0]?.count ?? 0) || 0;
 
   return NextResponse.json(
     {
@@ -75,6 +86,7 @@ export async function GET(request: Request) {
       exclusions: row?.exclusions ?? [],
       foodCoveragePercent: row ? Number(row.food_coverage_percent) || 0 : 0,
       generatedAt: row ? new Date(row.created_at).toISOString() : null,
+      externalProductImageUrlCount,
       planId,
       recommendationRunId: row?.id ?? null,
       stackCoveragePercent: row ? Number(row.stack_coverage_percent) || 0 : 0,
@@ -86,4 +98,3 @@ export async function GET(request: Request) {
     { headers: { "Cache-Control": "no-store" } }
   );
 }
-

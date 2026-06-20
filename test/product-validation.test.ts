@@ -21,7 +21,7 @@ describe("product validation", () => {
           unit: "mcg"
         }
       ],
-      imageUrl: "https://example.com/d3.jpg",
+      imageUrl: "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/d3.jpg",
       labelStatus: "parsed",
       productUrl: "https://example.com/d3"
     });
@@ -42,7 +42,7 @@ describe("product validation", () => {
           unit: "mg"
         }
       ],
-      imageUrl: "https://example.com/fish-oil.jpg",
+      imageUrl: "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/fish-oil.jpg",
       labelStatus: "parsed",
       productUrl: "https://example.com/products/lecithin",
       title: "Swisse Odourless Fish Oil 1000 mg"
@@ -63,7 +63,7 @@ describe("product validation", () => {
           unit: "IU"
         }
       ],
-      imageUrl: "https://example.com/d3.jpg",
+      imageUrl: "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/d3.jpg",
       labelStatus: "parsed",
       productUrl: "https://example.com/d3"
     });
@@ -93,7 +93,7 @@ describe("product validation", () => {
           unit: "mg"
         }
       ],
-      imageUrl: "https://example.com/curcumin.jpg",
+      imageUrl: "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/curcumin.jpg",
       labelStatus: "parsed",
       productUrl: "https://example.com/curcumin"
     });
@@ -116,7 +116,7 @@ describe("product validation", () => {
           unit: "mg"
         }
       ],
-      imageUrl: "https://example.com/vistra-lysine.jpg",
+      imageUrl: "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/vistra-lysine.jpg",
       labelStatus: "parsed",
       productUrl: "https://example.com/vistra-lysine"
     });
@@ -156,6 +156,26 @@ describe("product validation", () => {
     assert.equal(validation.reasons.includes("missing_image"), true);
   });
 
+  it("requires runtime image URLs to be first-party before approval can pass", () => {
+    const validation = validateProduct({
+      facts: [
+        {
+          amount: 100,
+          itemType: "supplement",
+          name: "CoQ10",
+          supplementId,
+          unit: "mg"
+        }
+      ],
+      imageUrl: "https://images.unsplash.com/photo-123.jpg",
+      labelStatus: "parsed",
+      productUrl: "https://example.com/coq10"
+    });
+
+    assert.equal(validation.status, "needs_review");
+    assert.equal(validation.reasons.includes("external_image_url"), true);
+  });
+
   it("treats canonical vitamin E IU as a usable dosed fact", () => {
     const validation = validateProduct({
       facts: [
@@ -170,7 +190,7 @@ describe("product validation", () => {
           unit: "IU"
         }
       ],
-      imageUrl: "https://example.com/vitamin-e.jpg",
+      imageUrl: "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/vitamin-e.jpg",
       labelStatus: "failed",
       productUrl: "https://example.com/vitamin-e"
     });
@@ -193,7 +213,7 @@ describe("product validation", () => {
           unit: "billion CFU"
         }
       ],
-      imageUrl: "https://example.com/probiotics.jpg",
+      imageUrl: "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/probiotics.jpg",
       labelStatus: "failed",
       productUrl: "https://example.com/probiotics"
     });
@@ -245,7 +265,7 @@ describe("product validation", () => {
           unit: "mg"
         }
       ],
-      imageUrl: "https://example.com/b6.jpg",
+      imageUrl: "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/b6.jpg",
       labelStatus: "parsed",
       productUrl: "https://example.com/b6"
     });

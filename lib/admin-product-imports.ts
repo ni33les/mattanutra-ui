@@ -1,6 +1,7 @@
 import { getSql } from "@/lib/db";
 import { defaultProductCountryCode } from "@/lib/product-countries";
 import { toJsonValue } from "@/lib/assessment-store";
+import { mirrorImageUrlListToFirstParty } from "@/lib/first-party-image-mirror";
 import {
   normalizeProductKey,
   normalizeProductFactKey
@@ -32,6 +33,8 @@ export {
   normalizedFactsForStorage,
   supplementIdsForFacts
 };
+
+const randomUUID = () => globalThis.crypto.randomUUID();
 
 export async function startProductImportRun(input: StartProductImportRunInput) {
   const sql = getSql();
@@ -308,7 +311,7 @@ export async function stageProductImport(input: StageProductImportInput) {
   const normalizedBrandName = normalizeProductKey(brandName);
   const normalizedProductTitle = normalizeProductKey(productTitle);
   const parsedFacts = normalizedFactsForStorage(input.parsedFacts);
-  const imageUrls = [...new Set((input.imageUrls ?? [])
+  const sourceImageUrls = [...new Set((input.imageUrls ?? [])
     .map((url) => url.trim())
     .filter(Boolean))].slice(0, 12);
 
@@ -333,8 +336,41 @@ export async function stageProductImport(input: StageProductImportInput) {
       ...(input.duplicateProductIds ?? []).filter(isUuidValue)
     ])
   ];
+  const existingImportRows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.product_imports
+    where normalized_brand_name = ${normalizedBrandName}
+      and normalized_product_title = ${normalizedProductTitle}
+      and source_url = ${sourceUrl}
+    limit 1
+  `;
+  const importIdForStorage = existingImportRows[0]?.id ?? randomUUID();
+  const mirroredImages = await mirrorImageUrlListToFirstParty({
+    entityId: importIdForStorage,
+    evidenceUrl: sourceUrl,
+    imageUrls: sourceImageUrls,
+    namespace: "product-imports",
+    source: "product_imports.image_urls"
+  });
+  const imageUrls = mirroredImages.urls;
+  const rawSnapshot = {
+    ...(input.rawSnapshot ?? {}),
+    ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
+    ...(titleEn ? { titleEn } : {}),
+    ...(titleTh ? { titleTh } : {}),
+    ...(titleZhCn ? { titleZhCn } : {}),
+    ...(description ? { description } : {}),
+    ...(descriptionEn ? { descriptionEn } : {}),
+    ...(descriptionTh ? { descriptionTh } : {}),
+    ...(descriptionZhCn ? { descriptionZhCn } : {}),
+    ...(input.translations ? { translations: input.translations } : {}),
+    ...(mirroredImages.metadata.length > 0
+      ? { productImageMirrors: mirroredImages.metadata }
+      : {})
+  };
   const importRows = await sql<Array<{ id: string }>>`
     insert into public.product_imports (
+      id,
       import_run_id,
       brand_name,
       normalized_brand_name,
@@ -353,6 +389,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       updated_at
     )
     values (
+      ${importIdForStorage}::uuid,
       ${isUuidValue(input.importRunId) ? input.importRunId : null}::uuid,
       ${brandName},
       ${normalizedBrandName},
@@ -363,18 +400,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       ${imageUrls}::text[],
       ${cleanNullableText(input.fdaApprovalNumber, 100)},
       ${sql.json(toJsonValue(parsedFacts))}::jsonb,
-      ${sql.json(toJsonValue({
-        ...(input.rawSnapshot ?? {}),
-        ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
-        ...(titleEn ? { titleEn } : {}),
-        ...(titleTh ? { titleTh } : {}),
-        ...(titleZhCn ? { titleZhCn } : {}),
-        ...(description ? { description } : {}),
-        ...(descriptionEn ? { descriptionEn } : {}),
-        ...(descriptionTh ? { descriptionTh } : {}),
-        ...(descriptionZhCn ? { descriptionZhCn } : {}),
-        ...(input.translations ? { translations: input.translations } : {})
-      }))}::jsonb,
+      ${sql.json(toJsonValue(rawSnapshot))}::jsonb,
       ${duplicateProductIds}::uuid[],
       ${input.parseConfidence ?? "moderate"},
       'pending_review',
@@ -431,16 +457,8 @@ export async function stageProductImport(input: StageProductImportInput) {
       replaceFacts: true,
       source: "manufacturer_import",
       sourceSnapshot: {
-        ...(input.rawSnapshot ?? {}),
-        ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
-        ...(titleEn ? { titleEn } : {}),
-        ...(titleTh ? { titleTh } : {}),
-        ...(titleZhCn ? { titleZhCn } : {}),
-        ...(description ? { description } : {}),
-        ...(descriptionEn ? { descriptionEn } : {}),
-        ...(descriptionTh ? { descriptionTh } : {}),
-        ...(descriptionZhCn ? { descriptionZhCn } : {}),
-        ...(input.translations ? { translations: input.translations } : {})
+        ...rawSnapshot,
+        productImportId: importId
       },
       title: productTitle,
       titleEn,

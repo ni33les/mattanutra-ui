@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { getSql } from "@/lib/db";
 import {
+  mirrorImageToFirstParty,
+  type FirstPartyImageMirrorMetadata
+} from "@/lib/first-party-image-mirror";
+import {
   defaultLocale,
   isLocale,
   localeHtmlLang,
@@ -162,6 +166,39 @@ function toMetadata(
   }
 
   return fallback;
+}
+
+function metadataRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function jsonValue(value: unknown): postgres.JSONValue {
+  const serialized = JSON.stringify(value);
+
+  return serialized ? JSON.parse(serialized) as postgres.JSONValue : {};
+}
+
+function mergeImageMirrorMetadata(
+  metadata: postgres.JSONValue,
+  key: string,
+  mirror: FirstPartyImageMirrorMetadata | null
+): postgres.JSONValue {
+  if (!mirror) {
+    return metadata;
+  }
+
+  const record = metadataRecord(metadata);
+  const mirrors = metadataRecord(record.imageMirrors);
+
+  return jsonValue({
+    ...record,
+    imageMirrors: {
+      ...mirrors,
+      [key]: mirror
+    }
+  });
 }
 
 function toBody(value: unknown): BlogArticleBody {
@@ -630,6 +667,42 @@ function normalizePostInput(input: BlogPostInput, existing?: BlogPostRow) {
   };
 }
 
+type NormalizedPostInput = ReturnType<typeof normalizePostInput>;
+
+async function mirrorBlogPostImages(post: NormalizedPostInput) {
+  const image = await mirrorImageToFirstParty({
+    entityId: post.id,
+    evidenceUrl: post.sourceRef,
+    imageUrl: post.imageUrl,
+    namespace: "blog-posts",
+    source: "blog_posts.image_url"
+  });
+  let metadata = mergeImageMirrorMetadata(
+    post.metadata,
+    "imageUrl",
+    image.metadata
+  );
+  const socialImage = await mirrorImageToFirstParty({
+    entityId: post.id,
+    evidenceUrl: post.sourceRef,
+    imageUrl: post.socialImageUrl,
+    namespace: "blog-posts",
+    source: "blog_posts.social_image_url"
+  });
+  metadata = mergeImageMirrorMetadata(
+    metadata,
+    "socialImageUrl",
+    socialImage.metadata
+  );
+
+  return {
+    ...post,
+    imageUrl: image.url,
+    metadata,
+    socialImageUrl: socialImage.url
+  };
+}
+
 async function findTranslationGroupForInput(
   input: BlogPostInput,
   post: ReturnType<typeof normalizePostInput>
@@ -727,7 +800,7 @@ export async function createBlogPost(input: BlogPostInput) {
     throw new Error("Database is not configured");
   }
 
-  const post = normalizePostInput(input);
+  const post = await mirrorBlogPostImages(normalizePostInput(input));
   const translationGroupId = await findTranslationGroupForInput(input, post);
 
   if (!post.title || !post.slug || !post.excerpt) {
@@ -833,7 +906,7 @@ export async function updateBlogPost(
     return null;
   }
 
-  const post = normalizePostInput(input, existing);
+  const post = await mirrorBlogPostImages(normalizePostInput(input, existing));
 
   const rows = await sql<BlogPostRow[]>`
     update public.blog_posts
@@ -919,6 +992,28 @@ function normalizeTestimonialInput(
       toOptionalString(input.translationGroupId ?? input.translation_group_id) ??
       existing?.translation_group_id ??
       randomUUID()
+  };
+}
+
+type NormalizedTestimonialInput = ReturnType<typeof normalizeTestimonialInput>;
+
+async function mirrorTestimonialImage(testimonial: NormalizedTestimonialInput) {
+  const image = await mirrorImageToFirstParty({
+    entityId: testimonial.id,
+    evidenceUrl: testimonial.authorHandle,
+    imageUrl: testimonial.authorImageUrl,
+    namespace: "testimonials",
+    source: "testimonials.author_image_url"
+  });
+
+  return {
+    ...testimonial,
+    authorImageUrl: image.url,
+    metadata: mergeImageMirrorMetadata(
+      testimonial.metadata,
+      "authorImageUrl",
+      image.metadata
+    )
   };
 }
 
@@ -1111,7 +1206,9 @@ export async function createTestimonial(input: BlogTestimonialInput) {
     throw new Error("Database is not configured");
   }
 
-  const testimonial = normalizeTestimonialInput(input);
+  const testimonial = await mirrorTestimonialImage(
+    normalizeTestimonialInput(input)
+  );
 
   if (!testimonial.quote || !testimonial.authorName) {
     throw new Error("Testimonial requires quote and authorName");
@@ -1177,7 +1274,9 @@ export async function updateTestimonial(
     return null;
   }
 
-  const testimonial = normalizeTestimonialInput(input, existing);
+  const testimonial = await mirrorTestimonialImage(
+    normalizeTestimonialInput(input, existing)
+  );
   const rows = await sql<TestimonialRow[]>`
     update public.testimonials
     set

@@ -45,6 +45,7 @@
     "import:delight-manufacturer-coverage": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/import-delight-manufacturer-coverage.ts",
     "backfill:delight-product-images": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/backfill-delight-product-images.ts",
     "products:images:repair": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/repair-product-images.ts",
+    "images:mirror:first-party": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/mirror-first-party-images.ts",
     "products:validation-consistency": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/check-product-validation-consistency.ts",
     "coverage:explain": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/explain-product-coverage.ts",
     "assessment:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-assessment-schema.ts",

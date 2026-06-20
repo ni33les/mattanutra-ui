@@ -10,6 +10,10 @@
 
 import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
+import {
+  mirrorImageToFirstParty,
+  type FirstPartyImageMirrorMetadata
+} from "@/lib/first-party-image-mirror";
 import { clearProductRecommendationCandidateCache } from "./admin-product-search.ts";
 import {
   loadAdminProductRow,
@@ -83,6 +87,24 @@ import {
 } from "./admin-product-countries.ts";
 import type { ProductCountryCode } from "./admin-product-types.ts";
 import { sameProductCountryCodes } from "./admin-product-helpers.ts";
+
+function recordFromUnknown(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function textFromRecord(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function productImageMirrorSnapshotPatch(
+  metadata: FirstPartyImageMirrorMetadata | null
+) {
+  return metadata ? { productImageMirror: metadata } : {};
+}
 
 // ---------------------------------------------------------------------------
 // Internal write helpers (moved from the god file)
@@ -1049,7 +1071,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     input.description ?? descriptionEn ?? descriptionTh ?? descriptionZhCn,
     4000
   );
-  const sourceSnapshot = {
+  const baseSourceSnapshot = {
     ...(input.sourceSnapshot ?? {}),
     ...(rawTitle !== title ? { originalProductTitle: rawTitle } : {}),
     ...(titleEn ? { titleEn } : {}),
@@ -1064,6 +1086,26 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   if (!title || !productUrl) {
     throw new Error("Product title and URL are required");
   }
+
+  const normalizedProductUrl = normalizedUrl(productUrl);
+  const existingProductRows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.products
+    where normalized_url = ${normalizedProductUrl}
+    limit 1
+  `;
+  const productIdForStorage = existingProductRows[0]?.id ?? randomUUID();
+  const mirroredImage = await mirrorImageToFirstParty({
+    entityId: productIdForStorage,
+    evidenceUrl: cleanNullableText(input.sourceUrl) ?? productUrl,
+    imageUrl: cleanNullableText(input.imageUrl, 2000),
+    namespace: "products",
+    source: "products.image_url"
+  });
+  const sourceSnapshot = {
+    ...baseSourceSnapshot,
+    ...productImageMirrorSnapshotPatch(mirroredImage.metadata)
+  };
 
 	  const facts = input.facts ?? [];
 	  const supplementMatchesByFactName = await supplementIdsForFacts(sql, facts);
@@ -1128,6 +1170,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	  }
 	  const productRows = await sql<Array<{ id: string }>>`
     insert into public.products (
+      id,
       platform,
       region,
       external_product_id,
@@ -1154,6 +1197,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       updated_at
     )
     values (
+      ${productIdForStorage}::uuid,
       ${input.platform},
       ${input.region?.trim() || "TH"},
       ${cleanNullableText(input.externalProductId, 300)},
@@ -1162,9 +1206,9 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	      ${brandId}::uuid,
       ${brandName},
       ${normalizedBrandName},
-      ${cleanNullableText(input.imageUrl)},
+      ${mirroredImage.url},
       ${productUrl},
-      ${normalizedUrl(productUrl)},
+      ${normalizedProductUrl},
       ${description},
       ${cleanNullableText(input.sourceUrl) ?? productUrl},
       ${sql.json(toJsonValue(sourceSnapshot))}::jsonb,
@@ -1370,7 +1414,8 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
   const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
   const descriptionZhCn = cleanNullableText(input.descriptionZhCn, 4000);
-  const localizedSnapshot = {
+  const beforePayload = recordFromUnknown(beforeRows[0].before_payload);
+  const localizedSnapshotBase = {
     ...(input.sourceSnapshotPatch ?? {}),
     ...(input.titleEn !== undefined ? { titleEn } : {}),
     ...(input.titleTh !== undefined ? { titleTh } : {}),
@@ -1379,6 +1424,22 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     ...(input.descriptionTh !== undefined ? { descriptionTh } : {}),
     ...(input.descriptionZhCn !== undefined ? { descriptionZhCn } : {}),
     ...(input.translations !== undefined ? { translations: input.translations } : {})
+  };
+  const mirroredImage = input.imageUrl === undefined
+    ? null
+    : await mirrorImageToFirstParty({
+        entityId: input.id,
+        evidenceUrl:
+          productUrl ??
+          textFromRecord(beforePayload, "source_url") ??
+          textFromRecord(beforePayload, "product_url"),
+        imageUrl,
+        namespace: "products",
+        source: "products.image_url"
+      });
+  const localizedSnapshot = {
+    ...localizedSnapshotBase,
+    ...productImageMirrorSnapshotPatch(mirroredImage?.metadata ?? null)
   };
   let brandRows: Array<{ id: string }> = [];
 
@@ -1469,7 +1530,9 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   const brandNameParam = brandName ?? null;
   const normalizedBrandNameParam = normalizedBrandName ?? null;
   const brandIdParam = brandId ?? null;
-  const imageUrlParam = imageUrl ?? null;
+  const imageUrlParam = input.imageUrl === undefined
+    ? null
+    : mirroredImage?.url ?? null;
   const productUrlParam = productUrl ?? null;
   const normalizedProductUrlParam = productUrl ? normalizedUrl(productUrl) : null;
 

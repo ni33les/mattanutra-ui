@@ -161,17 +161,29 @@ describe("image hardening", () => {
 
   it("enables Next image optimization with declared remote hosts", () => {
     const config = readFileSync(path.join(repoRoot, "next.config.ts"), "utf8");
+    const rules = readFileSync(
+      path.join(repoRoot, "lib/first-party-image-rules.ts"),
+      "utf8"
+    );
 
     assert.doesNotMatch(config, /images:\s*\{[\s\S]*?unoptimized:\s*true/);
     assert.match(config, /remotePatterns:\s*imageRemotePatterns/);
+    assert.match(config, /firstPartyImageHosts/);
 
     for (const host of [
       "dev.mattanutra.com",
       "uat.mattanutra.com",
       "mattanutra.com",
       "www.mattanutra.com",
-      "images.contentstack.io",
+      "mattanutra.sgp1.cdn.digitaloceanspaces.com",
+      "mattanutra.sgp1.digitaloceanspaces.com"
+    ]) {
+      assert.match(rules, new RegExp(`"${host.replace(/\./g, "\\.")}"`));
+    }
+
+    for (const externalHost of [
       "images.unsplash.com",
+      "images.contentstack.io",
       "swisse.co.th",
       "www.blackmores.co.th",
       "www.dhc.co.jp",
@@ -180,8 +192,13 @@ describe("image hardening", () => {
       "i0.wp.com",
       "www.vistra.co.th"
     ]) {
-      assert.match(config, new RegExp(`hostname:\\s*"${host.replace(/\./g, "\\.")}"`));
+      assert.doesNotMatch(
+        rules,
+        new RegExp(`"${externalHost.replace(/\./g, "\\.")}"`)
+      );
     }
+
+    assert.doesNotMatch(config, /img-src 'self' data: blob: https:/);
   });
 
   it("keeps per-image unoptimized usage limited to QR and local public assets", () => {
@@ -225,8 +242,7 @@ describe("image hardening", () => {
 
     assert.match(source, /value\.startsWith\("http:\/\/"\)/);
     assert.match(source, /`https:\/\/\$\{value\.slice\("http:\/\/"\.length\)\}`/);
-    assert.match(source, /www\.megawecare\.co\.th\/wp-content\/uploads/);
-    assert.match(source, /i0\.wp\.com\/www\.megawecare\.co\.th\/wp-content\/uploads/);
+    assert.match(source, /firstPartyImageHosts/);
     assert.match(source, /nextOptimizedImageHosts/);
     assert.match(source, /canUseNextImageOptimizer/);
     assert.match(source, /unoptimized=\{unoptimized \?\? !canUseNextImageOptimizer\(normalizedSrc\)\}/);

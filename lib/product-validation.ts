@@ -9,12 +9,14 @@ import {
   normalizeProductFactName,
   productFactLooksLikeConcentration
 } from "@/lib/product-recommendations";
+import { isFirstPartyImageUrl } from "@/lib/first-party-image-rules";
 
 export type ValidationStatus = "failed" | "needs_review" | "pass";
 
 export type ValidationReason =
   | "concentration_only"
   | "dirty_name"
+  | "external_image_url"
   | "missing_image"
   | "missing_source_url"
   | "no_canonical_match"
@@ -307,6 +309,10 @@ function validationSummary(
     return "Missing product image.";
   }
 
+  if (reasons.includes("external_image_url")) {
+    return "Product image must be mirrored to first-party storage.";
+  }
+
   if (reasons.includes("no_dosed_facts")) {
     return "No usable per-serving product facts.";
   }
@@ -425,6 +431,8 @@ export function validateProduct(input: ValidationInput): ValidationResult {
 
   if (!hasUsableText(input.imageUrl)) {
     reasons.add("missing_image");
+  } else if (!isFirstPartyImageUrl(input.imageUrl)) {
+    reasons.add("external_image_url");
   }
 
   if (!hasUsableText(input.productUrl) && !hasUsableText(input.sourceUrl)) {

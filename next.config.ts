@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { localeRoutePattern } from "./lib/i18n";
+import { firstPartyImageHosts } from "./lib/first-party-image-rules";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 const skipBuildTypecheck = process.env.NEXT_BUILD_SKIP_TYPECHECK === "1";
@@ -22,22 +23,10 @@ const noStoreHeaders = [
 ];
 
 const imageRemotePatterns = [
-  {
-    protocol: "https",
-    hostname: "dev.mattanutra.com"
-  },
-  {
-    protocol: "https",
-    hostname: "uat.mattanutra.com"
-  },
-  {
-    protocol: "https",
-    hostname: "mattanutra.com"
-  },
-  {
-    protocol: "https",
-    hostname: "www.mattanutra.com"
-  },
+  ...firstPartyImageHosts.map((hostname) => ({
+    protocol: "https" as const,
+    hostname
+  })),
   {
     protocol: "http",
     hostname: "localhost"
@@ -45,44 +34,11 @@ const imageRemotePatterns = [
   {
     protocol: "http",
     hostname: "127.0.0.1"
-  },
-  {
-    protocol: "https",
-    hostname: "images.contentstack.io"
-  },
-  {
-    protocol: "https",
-    hostname: "images.unsplash.com"
-  },
-  {
-    protocol: "https",
-    hostname: "swisse.co.th"
-  },
-  {
-    protocol: "https",
-    hostname: "www.blackmores.co.th"
-  },
-  {
-    protocol: "https",
-    hostname: "www.dhc.co.jp"
-  },
-  {
-    protocol: "https",
-    hostname: "www.megawecare.co.th"
-  },
-  {
-    protocol: "https",
-    hostname: "cdn.megawecare.com"
-  },
-  {
-    protocol: "https",
-    hostname: "i0.wp.com"
-  },
-  {
-    protocol: "https",
-    hostname: "www.vistra.co.th"
   }
 ] satisfies NonNullable<NextConfig["images"]>["remotePatterns"];
+const firstPartyImageSources = firstPartyImageHosts.map(
+  (hostname) => `https://${hostname}`
+);
 
 const securityHeaders = [
   {
@@ -97,7 +53,7 @@ const securityHeaders = [
       "form-action 'self'",
       "frame-ancestors 'none'",
       "frame-src 'self' https://checkout.stripe.com https://hooks.stripe.com https://js.stripe.com",
-      "img-src 'self' data: blob: https:",
+      `img-src 'self' data: blob: ${firstPartyImageSources.join(" ")}`,
       "manifest-src 'self'",
       "object-src 'none'",
       isDevelopment

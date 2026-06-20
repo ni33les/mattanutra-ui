@@ -3,6 +3,7 @@
 import Image, { type ImageProps } from "next/image";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { firstPartyImageHosts } from "@/lib/first-party-image-rules";
 
 type SafeImageProps = Omit<ImageProps, "alt" | "src"> & Readonly<{
   alt: string;
@@ -10,36 +11,13 @@ type SafeImageProps = Omit<ImageProps, "alt" | "src"> & Readonly<{
   src?: string | null;
 }>;
 
-const nextOptimizedImageHosts = new Set([
-  "dev.mattanutra.com",
-  "uat.mattanutra.com",
-  "mattanutra.com",
-  "www.mattanutra.com",
-  "images.contentstack.io",
-  "images.unsplash.com",
-  "swisse.co.th",
-  "www.blackmores.co.th",
-  "www.dhc.co.jp",
-  "www.megawecare.co.th",
-  "cdn.megawecare.com",
-  "i0.wp.com",
-  "www.vistra.co.th"
-]);
+const nextOptimizedImageHosts = new Set<string>(firstPartyImageHosts);
 
 function normalizeImageSrc(src: string | null | undefined) {
   const value = src?.trim();
 
   if (!value) {
     return null;
-  }
-
-  if (value.startsWith("https://www.megawecare.co.th/wp-content/uploads/")) {
-    const separator = value.includes("?") ? "&" : "?";
-
-    return value.replace(
-      "https://www.megawecare.co.th/wp-content/uploads/",
-      "https://i0.wp.com/www.megawecare.co.th/wp-content/uploads/"
-    ) + `${separator}ssl=1`;
   }
 
   if (value.startsWith("/")) {
