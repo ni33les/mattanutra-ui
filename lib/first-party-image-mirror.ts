@@ -355,7 +355,7 @@ export async function fetchAndValidateFirstPartyImage(input: Readonly<{
     const contentTypeHeader = response.headers.get("content-type");
     const headerExtension = extensionFromContentType(contentTypeHeader);
 
-    if (!headerExtension) {
+    if (contentTypeHeader && !headerExtension) {
       return {
         detail: `Unsupported image content type: ${contentTypeHeader ?? "unknown"}.`,
         ok: false,
@@ -387,6 +387,15 @@ export async function fetchAndValidateFirstPartyImage(input: Readonly<{
 
     const extension =
       extensionFromSharpFormat(metadata.format) ?? headerExtension;
+
+    if (!extension) {
+      return {
+        detail: `Unsupported image content type: ${contentTypeHeader ?? "unknown"}.`,
+        ok: false,
+        reason: "invalid_mime"
+      };
+    }
+
     const contentType = contentTypeFromExtension(extension);
 
     return {

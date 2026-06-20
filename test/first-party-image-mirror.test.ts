@@ -22,16 +22,20 @@ async function tinyPng() {
   }).png().toBuffer();
 }
 
-function imageResponse(bytes: Buffer, contentType = "image/png") {
+function imageResponse(bytes: Buffer, contentType: string | null = "image/png") {
   const body = new Uint8Array(bytes.length);
+  const headers = new Headers({
+    "content-length": String(bytes.length)
+  });
 
   body.set(bytes);
 
+  if (contentType) {
+    headers.set("content-type", contentType);
+  }
+
   return new Response(body.buffer, {
-    headers: {
-      "content-length": String(bytes.length),
-      "content-type": contentType
-    },
+    headers,
     status: 200
   });
 }
@@ -59,6 +63,18 @@ describe("first-party image mirroring", () => {
     assert.equal(result.height, 3);
     assert.equal(result.width, 2);
     assert.match(result.sha256, /^[a-f0-9]{64}$/);
+  });
+
+  it("accepts a missing MIME type when Sharp can decode the image", async () => {
+    const bytes = await tinyPng();
+    const result = await fetchAndValidateFirstPartyImage({
+      fetcher: async () => imageResponse(bytes, null),
+      imageUrl: "https://source.example/no-content-type"
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.contentType, "image/png");
+    assert.equal(result.extension, "png");
   });
 
   it("rejects oversized images before downloading when content-length is too large", async () => {
