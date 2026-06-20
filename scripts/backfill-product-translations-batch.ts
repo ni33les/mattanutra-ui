@@ -105,6 +105,7 @@ async function translateBatch(products: readonly ProductRow[], locale: string) {
         role: "system",
         content: [
           `Translate product catalogue display copy to ${locale}.`,
+          "For th, use natural Thai product-catalogue wording and include Thai script in both title and description. Preserve brand names, but translate or transliterate the product type/key ingredient enough that the title is not English-only.",
           "For zh-CN, use Simplified Chinese with natural spacing and product-catalogue wording.",
           "Return JSON only: an array of objects with id, title, description, notes.",
           "Keep product IDs unchanged.",

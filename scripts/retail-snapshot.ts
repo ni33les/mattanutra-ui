@@ -1,12 +1,30 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+
 import { getSql } from "@/lib/db";
-import { validateCuratedMasterSnapshot } from "@/lib/catalogue-master-validation";
-import {
-  CATALOGUE_SNAPSHOT_TABLES,
-  catalogueSnapshotSelectSql,
-  catalogueSnapshotTableNames
-} from "@/lib/catalogue-snapshot-tables";
+
+const RETAIL_SNAPSHOT_TABLES = [
+  {
+    name: "retail_sellable_products",
+    selectSql: `
+      select sellable.*
+      from public.retail_sellable_products sellable
+      join public.organisations organisation on organisation.id = sellable.organisation_id
+      where organisation.slug in ('delight-pharmacy', 'enchanted-pharmacy')
+      order by sellable.organisation_id, sellable.product_id
+    `
+  },
+  {
+    name: "retail_product_stock",
+    selectSql: `
+      select stock.*
+      from public.retail_product_stock stock
+      join public.organisations organisation on organisation.id = stock.organisation_id
+      where organisation.slug in ('delight-pharmacy', 'enchanted-pharmacy')
+      order by stock.organisation_id, stock.product_id
+    `
+  }
+] as const;
 
 function argValue(name: string, fallback: string | null = null) {
   const prefix = `--${name}=`;
@@ -24,7 +42,7 @@ function timestampSlug() {
 }
 
 function backupSchemaName(slug: string) {
-  return `catalogue_snapshot_${slug.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`;
+  return `retail_snapshot_${slug.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`;
 }
 
 const sql = getSql();
@@ -35,16 +53,10 @@ if (!sql) {
 
 const slug = timestampSlug();
 const outputPath = resolve(
-  argValue("out", `/private/tmp/mattanutra-catalogue-snapshot-${slug}.json`) ??
-    `/private/tmp/mattanutra-catalogue-snapshot-${slug}.json`
+  argValue("out", `/private/tmp/mattanutra-retail-snapshot-${slug}.json`) ??
+    `/private/tmp/mattanutra-retail-snapshot-${slug}.json`
 );
 const includeDbBackup = !hasArg("no-db-backup");
-const strictMasterData =
-  hasArg("strict-master-data") ||
-  process.env.MATTANUTRA_STRICT_MASTER_SNAPSHOT === "true";
-const skipValidation =
-  hasArg("skip-validation") ||
-  process.env.MATTANUTRA_SKIP_MASTER_SNAPSHOT_VALIDATION === "true";
 const schemaName = backupSchemaName(argValue("schema", slug) ?? slug);
 const tables: Record<string, unknown[]> = {};
 const counts: Record<string, number> = {};
@@ -53,49 +65,28 @@ if (includeDbBackup) {
   await sql`create schema if not exists ${sql(schemaName)}`;
 }
 
-for (const table of CATALOGUE_SNAPSHOT_TABLES) {
+for (const table of RETAIL_SNAPSHOT_TABLES) {
   const tableIdentifier = sql(table.name);
-  const rows = await sql.unsafe(catalogueSnapshotSelectSql(table.name));
+  const rows = await sql.unsafe(table.selectSql);
 
   tables[table.name] = rows;
   counts[table.name] = rows.length;
 
   if (includeDbBackup) {
     await sql`drop table if exists ${sql(schemaName)}.${tableIdentifier}`;
-    await sql.unsafe(
-      `create table "${schemaName}"."${table.name}" as ${catalogueSnapshotSelectSql(table.name)}`
-    );
+    await sql.unsafe(`create table "${schemaName}"."${table.name}" as ${table.selectSql}`);
   }
-}
-
-const validation = skipValidation
-  ? { errors: [], ok: true }
-  : validateCuratedMasterSnapshot(tables, { strict: strictMasterData });
-
-if (!validation.ok) {
-  throw new Error(
-    `Curated master snapshot validation failed: ${validation.errors.join("; ")}`
-  );
 }
 
 const payload = {
   createdAt: new Date().toISOString(),
   dbBackupSchema: includeDbBackup ? schemaName : null,
   formatVersion: 1,
-  requiredTables: catalogueSnapshotTableNames(),
+  organisationSlugs: ["delight-pharmacy", "enchanted-pharmacy"],
   source: {
     database: "DB_URL",
-    script: "catalogue:snapshot"
+    script: "retail:snapshot"
   },
-  tableDescriptions: Object.fromEntries(
-    CATALOGUE_SNAPSHOT_TABLES.map((table) => [
-      table.name,
-      {
-        description: table.description,
-        requiredForReload: table.requiredForReload
-      }
-    ])
-  ),
   tables
 };
 
@@ -107,7 +98,5 @@ console.log(JSON.stringify({
   counts,
   dbBackupSchema: includeDbBackup ? schemaName : null,
   outputPath,
-  skipValidation,
-  strictMasterData,
   status: "ok"
 }, null, 2));
