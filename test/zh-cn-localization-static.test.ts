@@ -155,43 +155,27 @@ describe("zh-CN localization guardrails", () => {
     );
     assert.match(
       productImportModal,
-      /"zh-CN":\s*\{[\s\S]*?description:\s*descriptionZhCn/
+      /"zh-CN":\s*\{[\s\S]*?description:\s*zhCnDescription/
     );
     assert.match(
       source("../app/api/admin/review-tasks/[id]/route.ts"),
-      /descriptionZhCn:\s*body\.descriptionZhCn/
+      /normalizeProductTranslationRequest/
     );
     assert.match(
       source("../app/api/admin/review-tasks/[id]/route.ts"),
-      /titleZhCn:\s*body\.titleZhCn/
-    );
-    assert.match(
-      source("../app/api/admin/review-tasks/[id]/route.ts"),
-      /translations:\s*translationsFromBody\(body\.translations\)/
+      /translations:\s*translationRequest\.translations/
     );
     assert.match(
       source("../app/api/admin/products/[id]/route.ts"),
-      /descriptionZhCn:\s*body\.descriptionZhCn/
+      /normalizeProductTranslationRequest/
     );
     assert.match(
       source("../app/api/admin/products/imports/route.ts"),
-      /translations:\s*translationsFromBody\(body\.translations\)/
+      /translations:\s*translationRequest\.translations/
     );
     assert.match(
-      source("../lib/admin-product-writes.ts"),
-      /\["zh-CN", input\.titleZhCn, input\.descriptionZhCn\]/
-    );
-    assert.match(
-      source("../lib/admin-products.ts"),
-      /\["zh-CN", legacy\.titleZhCn, legacy\.descriptionZhCn\]/
-    );
-    assert.match(
-      source("../lib/admin-products.ts"),
-      /descriptionZhCn[\s\S]*titleZhCn[\s\S]*update public\.product_imports/
-    );
-    assert.match(
-      source("../lib/admin-product-imports.ts"),
-      /descriptionZhCn/
+      source("../lib/product-translation-input.ts"),
+      /locale: "zh-CN"/
     );
     assert.match(
       source("../scripts/scrape-manufacturer-products.ts"),

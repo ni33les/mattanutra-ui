@@ -454,8 +454,6 @@ export function AdminReviewQueueView({
       unit: string | null;
     }>,
     description?: string | null,
-    descriptionEn?: string | null,
-    descriptionTh?: string | null,
     translations?: Record<
       string,
       {
@@ -474,8 +472,6 @@ export function AdminReviewQueueView({
           accessToken,
           action,
           description,
-          descriptionEn,
-          descriptionTh,
           mergeProductId,
           parsedFacts,
           reviewerNote,
@@ -919,8 +915,6 @@ export function AdminReviewQueueView({
             reviewerNote,
             parsedFacts,
             description,
-            descriptionEn,
-            descriptionTh,
             translations,
           ) =>
             void decideProductImportReview(
@@ -930,8 +924,6 @@ export function AdminReviewQueueView({
               reviewerNote,
               parsedFacts,
               description,
-              descriptionEn,
-              descriptionTh,
               translations,
             )
           }

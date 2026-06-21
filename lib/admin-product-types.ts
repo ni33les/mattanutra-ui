@@ -103,8 +103,6 @@ export type AdminProductRow = Readonly<{
   category: string | null;
   currency: string;
   description: string | null;
-  descriptionEn: string | null;
-  descriptionTh: string | null;
   displayDescription: string | null;
   displayTitle: string;
   facts: AdminProductFact[];
@@ -145,8 +143,6 @@ export type AdminProductRow = Readonly<{
     sourceUrl: string | null;
   };
   title: string;
-  titleEn: string | null;
-  titleTh: string | null;
   translations: Record<string, AdminProductTranslation>;
   updatedAt: string;
 }>;
@@ -220,9 +216,6 @@ export type StageProductImportInput = Readonly<{
   actor?: string | null;
   brandName: string;
   description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
-  descriptionZhCn?: string | null;
   duplicateProductIds?: readonly string[];
   fdaApprovalNumber?: string | null;
   identifiers?: readonly ProductIdentifierInput[];
@@ -234,9 +227,6 @@ export type StageProductImportInput = Readonly<{
   rawSnapshot?: Record<string, unknown> | null;
   source?: string | null;
   sourceUrl: string;
-  titleEn?: string | null;
-  titleTh?: string | null;
-  titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
 }>;
 
@@ -247,9 +237,6 @@ export type ResolveProductImportReviewInput = Readonly<{
   countryPricing?: readonly ProductCountryPricing[];
   brandName?: string | null;
   description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
-  descriptionZhCn?: string | null;
   fdaApprovalNumber?: string | null;
   imageUrl?: string | null;
   identifiers?: readonly ProductIdentifierInput[];
@@ -263,9 +250,6 @@ export type ResolveProductImportReviewInput = Readonly<{
   returnRow?: boolean;
   taskId: string;
   title?: string | null;
-  titleEn?: string | null;
-  titleTh?: string | null;
-  titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
 }>;
 
@@ -280,9 +264,6 @@ export type CreateAdminProductInput = Readonly<{
   manufacturerCountryCodes?: readonly string[];
   currency?: string | null;
   description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
-  descriptionZhCn?: string | null;
   facts?: readonly ProductImportFactInput[];
   imageUrl?: string | null;
   fdaApprovalNumber?: string | null;
@@ -300,9 +281,6 @@ export type CreateAdminProductInput = Readonly<{
   sourceSnapshot?: Record<string, unknown> | null;
   sourceUrl?: string | null;
   title: string;
-  titleEn?: string | null;
-  titleTh?: string | null;
-  titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
 }>;
 
@@ -316,9 +294,6 @@ export type UpdateAdminProductInput = Readonly<{
   manufacturerCountryCodes?: readonly string[];
   changeNote?: string | null;
   description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
-  descriptionZhCn?: string | null;
   facts?: readonly ProductImportFactInput[];
   factsSource?: string | null;
   fdaApprovalNumber?: string | null;
@@ -333,9 +308,6 @@ export type UpdateAdminProductInput = Readonly<{
   regulatoryApprovals?: readonly ProductRegulatoryApprovalInput[];
   sourceSnapshotPatch?: Record<string, unknown> | null;
   title?: string | null;
-  titleEn?: string | null;
-  titleTh?: string | null;
-  titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
 }>;
 
@@ -391,8 +363,6 @@ export type ProductDbRow = Readonly<{
   currency: string;
   current_version: string | number | null;
   description: string | null;
-  description_en: string | null;
-  description_th: string | null;
   facts: unknown;
   history_average_product_coverage_percent: string | number | null;
   history_average_stack_coverage_percent: string | number | null;
@@ -424,8 +394,6 @@ export type ProductDbRow = Readonly<{
   source_url: string | null;
   shop_availability: unknown;
   title: string;
-  title_en: string | null;
-  title_th: string | null;
   translations: unknown;
   updated_at: Date | string;
 }>;
@@ -437,8 +405,6 @@ export type ProductRecommendationDbRow = Readonly<{
   brand_status: ProductStatus | null;
   currency: string;
   description: string | null;
-  description_en: string | null;
-  description_th: string | null;
   facts: unknown;
   id: string;
   image_url: string | null;
@@ -453,8 +419,6 @@ export type ProductRecommendationDbRow = Readonly<{
   region: string;
   source_url: string | null;
   title: string;
-  title_en: string | null;
-  title_th: string | null;
 }>;
 
 export type FactDbPayload = Readonly<{

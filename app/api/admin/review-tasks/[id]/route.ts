@@ -25,6 +25,7 @@ import {
 } from "@/lib/product-countries";
 import { productIdentifiersFromBody } from "@/lib/product-identifiers";
 import { productRegulatoryApprovalsFromPayload } from "@/lib/product-regulatory-approvals";
+import { normalizeProductTranslationRequest } from "@/lib/product-translation-input";
 
 export const runtime = "nodejs";
 
@@ -88,40 +89,6 @@ function productImportFactsFromBody(value: unknown): ProductImportFactInput[] | 
       unit: textOrNull(record.unit)
     }];
   });
-}
-
-function translationsFromBody(value: unknown) {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([locale, item]) => {
-        const record =
-          item && typeof item === "object" && !Array.isArray(item)
-            ? item as Record<string, unknown>
-            : {};
-        const status = record.status === "complete" ||
-          record.status === "missing"
-          ? record.status
-          : "draft";
-
-        return [
-          locale,
-          {
-            description: textOrNull(record.description),
-            status,
-            title: textOrNull(record.title)
-          }
-        ] as const;
-      })
-      .filter(([locale]) => /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(locale))
-  );
 }
 
 function localizedTextValue(value: unknown): AdminReviewLocalizedText | null {
@@ -339,6 +306,11 @@ export async function PATCH(
     );
   }
 
+  const translationRequest = normalizeProductTranslationRequest({
+    body,
+    translations: body.translations
+  });
+
   try {
     const result =
       action === "approve_product" ||
@@ -360,15 +332,6 @@ export async function PATCH(
             description: body.description === undefined
               ? undefined
               : textOrNull(body.description),
-            descriptionEn: body.descriptionEn === undefined
-              ? undefined
-              : textOrNull(body.descriptionEn),
-            descriptionTh: body.descriptionTh === undefined
-              ? undefined
-              : textOrNull(body.descriptionTh),
-            descriptionZhCn: body.descriptionZhCn === undefined
-              ? undefined
-              : textOrNull(body.descriptionZhCn),
             fdaApprovalNumber: body.fdaApprovalNumber === undefined
               ? undefined
               : textOrNull(body.fdaApprovalNumber),
@@ -389,10 +352,7 @@ export async function PATCH(
             reviewerNote: textOrNull(body.reviewerNote),
             taskId: id,
             title: body.title === undefined ? undefined : textOrNull(body.title),
-            titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn),
-            titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh),
-            titleZhCn: body.titleZhCn === undefined ? undefined : textOrNull(body.titleZhCn),
-            translations: translationsFromBody(body.translations)
+            translations: translationRequest.translations
           })
         : action === "complete_human_task"
         ? await completeGenericHumanReviewTask({
@@ -433,7 +393,12 @@ export async function PATCH(
           });
 
     return NextResponse.json(
-      { result },
+      {
+        result,
+        ...(translationRequest.warnings.length > 0
+          ? { warnings: translationRequest.warnings }
+          : {})
+      },
       {
         headers: {
           "Cache-Control": "no-store"

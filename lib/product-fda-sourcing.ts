@@ -36,8 +36,7 @@ type SourceableProductRow = Readonly<{
   source_snapshot: unknown;
   source_url: string | null;
   title: string;
-  title_en: string | null;
-  title_th: string | null;
+  translated_titles: string[] | null;
 }>;
 
 const thaiFdaOryorApiBaseUrl = "https://api.oryor.com";
@@ -220,8 +219,9 @@ export function thaiFdaOryorSearchTermsForProduct(row: SourceableProductRow) {
   addIdentifierSearchTerms(terms, row.ean13_identifiers, 2);
   addIdentifierSearchTerms(terms, row.manufacturer_sku_identifiers, 2);
   addSearchTerm(terms, row.title, { brandName: row.brand_name });
-  addSearchTerm(terms, row.title_en, { brandName: row.brand_name });
-  addSearchTerm(terms, row.title_th, { brandName: row.brand_name });
+  for (const title of row.translated_titles ?? []) {
+    addSearchTerm(terms, title, { brandName: row.brand_name });
+  }
 
   return terms.slice(0, 6);
 }
@@ -354,8 +354,7 @@ function candidateBestScore(
 
   const productNames = [
     row.title,
-    row.title_en,
-    row.title_th
+    ...(row.translated_titles ?? [])
   ].filter((value): value is string => Boolean(cleanText(value, 500)));
   const brandTokens = productSearchTokens(row.brand_name);
   let bestScore = candidateIdentifierScore(row, candidate);
@@ -688,8 +687,7 @@ export async function sourceProductFdaApprovalNumbers(input: Readonly<{
     source_snapshot: unknown;
     source_url: string | null;
     title: string;
-    title_en: string | null;
-    title_th: string | null;
+    translated_titles: string[] | null;
   }>>`
     select
       products.brand_name,
@@ -712,13 +710,20 @@ export async function sourceProductFdaApprovalNumbers(input: Readonly<{
       products.source_url,
       products.source_snapshot,
       products.title,
-      products.title_en,
-      products.title_th
+      coalesce(
+        array_agg(distinct product_translations.title order by product_translations.title) filter (
+          where product_translations.status <> 'missing'
+            and nullif(product_translations.title, '') is not null
+        ),
+        array[]::text[]
+      ) as translated_titles
     from public.products
     left join public.product_identifiers
       on product_identifiers.product_id = products.id
       and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
       and product_identifiers.status = 'active'
+    left join public.product_translations
+      on product_translations.product_id = products.id
     where ${input.productId ? sql`products.id = ${input.productId}::uuid` : sql`true`}
       and not exists (
         select 1

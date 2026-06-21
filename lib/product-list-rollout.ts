@@ -70,8 +70,8 @@ export type ProductListRolloutRow = Readonly<{
   sourceUrl: string;
   status: ProductStatus;
   title: string;
-  titleEn: string | null;
-  titleTh: string | null;
+  englishTitle: string | null;
+  thaiTitle: string | null;
 }>;
 
 export type ProductListRolloutSummary = Readonly<{
@@ -386,8 +386,8 @@ export function parseProductListRolloutCsv(text: string) {
       sourceUrl,
       status: normalizeStatus(record.product_status),
       title,
-      titleEn: cleanText(record.title_en, 500),
-      titleTh: cleanText(record.title_th, 500)
+      englishTitle: cleanText(record.title_en, 500),
+      thaiTitle: cleanText(record.title_th, 500)
     } satisfies ProductListRolloutRow;
   });
 
@@ -882,8 +882,6 @@ async function upsertProduct(input: Readonly<{
       availability_status,
       currency,
       source,
-      title_en,
-      title_th,
       created_at,
       updated_at
     )
@@ -909,8 +907,6 @@ async function upsertProduct(input: Readonly<{
       'unknown',
       ${input.row.currency},
       ${ROLLOUT_SOURCE},
-      ${input.row.titleEn},
-      ${input.row.titleTh},
       now(),
       now()
     )
@@ -929,8 +925,6 @@ async function upsertProduct(input: Readonly<{
       status = excluded.status,
       label_status = excluded.label_status,
       currency = excluded.currency,
-      title_en = coalesce(excluded.title_en, public.products.title_en),
-      title_th = coalesce(excluded.title_th, public.products.title_th),
       updated_at = now()
     returning id::text, (xmax = 0) as created
   `;
@@ -971,12 +965,12 @@ async function upsertProduct(input: Readonly<{
       updated_at = now()
   `;
 
-  if (input.row.titleEn) {
-    await upsertTranslation(productId, "en", input.row.titleEn);
+  if (input.row.englishTitle) {
+    await upsertTranslation(productId, "en", input.row.englishTitle);
   }
 
-  if (input.row.titleTh) {
-    await upsertTranslation(productId, "th", input.row.titleTh);
+  if (input.row.thaiTitle) {
+    await upsertTranslation(productId, "th", input.row.thaiTitle);
   }
 
   if (input.row.facts.length > 0 && input.row.isNewAddition) {

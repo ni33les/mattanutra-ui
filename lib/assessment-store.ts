@@ -1631,13 +1631,7 @@ export async function getStoredFormulationResult(
             'name',
               coalesce(
                 nullif(btrim(product_translation_locale.title), ''),
-                case
-                  when ${resultLocale} = 'th'
-                    then nullif(btrim(products.title_th), '')
-                  else null
-                end,
                 nullif(btrim(product_translation_default.title), ''),
-                nullif(btrim(products.title_en), ''),
                 products.title
               ),
             'price',
@@ -1790,13 +1784,7 @@ export async function getStoredFormulationResult(
               'name',
                 coalesce(
                   nullif(btrim(product_translation_locale.title), ''),
-                  case
-                    when ${resultLocale} = 'th'
-                      then nullif(btrim(products.title_th), '')
-                    else null
-                  end,
                   nullif(btrim(product_translation_default.title), ''),
-                  nullif(btrim(products.title_en), ''),
                   products.title
                 ),
               'price',

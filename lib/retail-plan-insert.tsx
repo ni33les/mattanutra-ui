@@ -119,12 +119,6 @@ type OrderLineRow = Readonly<{
   quantity_ordered: number | string;
 }>;
 
-function objectValue(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -254,13 +248,7 @@ async function loadOrderLineRows(sql: Db, orderId: string, locale: Locale) {
       products.image_url,
       coalesce(
         nullif(btrim(product_translation_locale.title), ''),
-        case
-          when ${locale} = 'th'
-            then nullif(btrim(products.title_th), '')
-          else null
-        end,
         nullif(btrim(product_translation_default.title), ''),
-        nullif(btrim(products.title_en), ''),
         products.title
       ) as product_title
     from public.retail_customer_order_lines

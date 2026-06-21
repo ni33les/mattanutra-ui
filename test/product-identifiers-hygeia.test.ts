@@ -109,8 +109,7 @@ describe("product identifiers and Hygeia files", () => {
         source_snapshot: {},
         source_url: null,
         title: "Blackmores Bio C 1000 150 Tablets",
-        title_en: "BLACKMORES BIO C 1000",
-        title_th: null
+        translated_titles: ["BLACKMORES BIO C 1000"]
       }),
       [
         "Blackmores Bio C 1000",
@@ -130,8 +129,7 @@ describe("product identifiers and Hygeia files", () => {
         source_snapshot: {},
         source_url: null,
         title: "Blackmores Bio C 1000 150 Tablets",
-        title_en: "BLACKMORES BIO C 1000",
-        title_th: null
+        translated_titles: ["BLACKMORES BIO C 1000"]
       }),
       [
         "9300807325698",
@@ -151,8 +149,7 @@ describe("product identifiers and Hygeia files", () => {
       source_snapshot: {},
       source_url: null,
       title: "VISTRA GLUTA COMPLEX 600",
-      title_en: null,
-      title_th: null
+      translated_titles: []
     };
 
     assert.deepEqual(

@@ -23,16 +23,19 @@ import {
 type ProductForCorrection = Readonly<{
   brandName: string | null;
   description: string | null;
-  descriptionEn: string | null;
-  descriptionTh: string | null;
   facts: unknown;
   id: string | null;
   productAudience: ProductAudience;
   productUrl: string;
   sourceSnapshot: unknown;
   title: string;
-  titleEn: string | null;
-  titleTh: string | null;
+  translations: Record<string, ProductTranslationValue>;
+}>;
+
+type ProductTranslationValue = Readonly<{
+  description?: string | null;
+  status?: "complete" | "draft" | "missing";
+  title?: string | null;
 }>;
 
 type CanonicalSupplementForCorrection = Readonly<{
@@ -62,14 +65,11 @@ export type ProductFactCorrectionDraftInput = Readonly<{
   brandName?: string | null;
   currentFacts?: unknown;
   description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
   productTitle: string;
-  productTitleEn?: string | null;
-  productTitleTh?: string | null;
   productUrl: string;
   productAudience?: ProductAudience | null;
   sourceSnapshot?: unknown;
+  translations?: Record<string, ProductTranslationValue>;
 }>;
 
 export type ProductFactCorrectionDraftResult = Readonly<{
@@ -83,28 +83,19 @@ export type ProductCatalogueEnrichmentDraftInput = Readonly<{
   brandName?: string | null;
   currentFacts?: unknown;
   description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
   imageUrls?: readonly string[];
   productTitle: string;
-  productTitleEn?: string | null;
-  productTitleTh?: string | null;
   productUrl: string;
   productAudience?: ProductAudience | null;
   sourceSnapshot?: unknown;
+  translations?: Record<string, ProductTranslationValue>;
 }>;
 
 export type ProductCatalogueEnrichmentDraftResult = Readonly<{
-  descriptionEn: string | null;
-  descriptionTh: string | null;
-  descriptionZhCn: string | null;
   facts: ProductImportFactInput[];
   notes: string | null;
   productAudience: ProductAudience;
   responseId?: string;
-  titleEn: string | null;
-  titleTh: string | null;
-  titleZhCn: string | null;
   warnings: string[];
 }>;
 
@@ -219,17 +210,30 @@ async function loadProduct(
     select
       products.id::text,
       products.title,
-      products.title_en as "titleEn",
-      products.title_th as "titleTh",
       products.brand_name as "brandName",
       coalesce(to_jsonb(products) ->> 'product_audience', 'both') as "productAudience",
       products.product_url as "productUrl",
       products.description,
-      products.description_en as "descriptionEn",
-      products.description_th as "descriptionTh",
       products.source_snapshot as "sourceSnapshot",
-      coalesce(fact_rows.facts, '[]'::jsonb) as facts
+      coalesce(fact_rows.facts, '[]'::jsonb) as facts,
+      coalesce(product_translation_rows.translations, '{}'::jsonb) as translations
     from public.products
+    left join lateral (
+      select coalesce(
+        jsonb_object_agg(
+          product_translations.locale,
+          jsonb_build_object(
+            'description', product_translations.description,
+            'status', product_translations.status,
+            'title', product_translations.title
+          )
+          order by product_translations.locale
+        ),
+        '{}'::jsonb
+      ) as translations
+      from public.product_translations
+      where product_translations.product_id = products.id
+    ) product_translation_rows on true
     left join lateral (
       select coalesce(
         jsonb_agg(
@@ -262,16 +266,13 @@ async function loadProduct(
   return {
     brandName: row.brandName,
     description: row.description,
-    descriptionEn: row.descriptionEn,
-    descriptionTh: row.descriptionTh,
     facts: row.facts,
     id: row.id,
     productAudience: productAudienceValue(row.productAudience),
     productUrl: row.productUrl,
     sourceSnapshot: row.sourceSnapshot,
     title: row.title,
-    titleEn: row.titleEn,
-    titleTh: row.titleTh
+    translations: row.translations
   };
 }
 
@@ -527,11 +528,8 @@ async function callGrok(input: Readonly<{
                   currentProductAudience: input.product.productAudience,
                   currentFacts: input.product.facts,
                   description: input.product.description,
-                  descriptionEn: input.product.descriptionEn,
-                  descriptionTh: input.product.descriptionTh,
                   productTitle: input.product.title,
-                  productTitleEn: input.product.titleEn,
-                  productTitleTh: input.product.titleTh,
+                  translations: input.product.translations,
                   productUrl: input.product.productUrl,
                   sourceSnapshot: compactJson(input.product.sourceSnapshot)
                 }
@@ -620,13 +618,10 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
       product: {
         brandName: input.product.brandName,
         currentDescription: input.product.description,
-        currentDescriptionEn: input.product.descriptionEn,
-        currentDescriptionTh: input.product.descriptionTh,
         currentFacts: input.product.facts,
         currentProductAudience: input.product.productAudience,
         currentTitle: input.product.title,
-        currentTitleEn: input.product.titleEn,
-        currentTitleTh: input.product.titleTh,
+        currentTranslations: input.product.translations,
         imageUrls: input.imageUrls,
         productUrl: input.product.productUrl,
         sourceSnapshot: compactJson(input.product.sourceSnapshot, 26_000)
@@ -727,16 +722,13 @@ export async function enrichDraftProductCatalogueWithAi(
   const product: ProductForCorrection = {
     brandName: input.brandName ?? null,
     description: input.description ?? null,
-    descriptionEn: input.descriptionEn ?? null,
-    descriptionTh: input.descriptionTh ?? null,
     facts: input.currentFacts ?? [],
     id: null,
     productAudience: input.productAudience ?? "both",
     productUrl: input.productUrl,
     sourceSnapshot: input.sourceSnapshot ?? null,
     title: input.productTitle,
-    titleEn: input.productTitleEn ?? null,
-    titleTh: input.productTitleTh ?? null
+    translations: input.translations ?? {}
   };
   const completion = await callGrokCatalogueEnrichment({
     catalogue,
@@ -747,16 +739,10 @@ export async function enrichDraftProductCatalogueWithAi(
   const facts = sanitizedFacts(parsed, catalogue);
 
   return {
-    descriptionEn: null,
-    descriptionTh: null,
-    descriptionZhCn: null,
     facts,
     notes: textOrNull(parsed.notes, 1000),
     productAudience: productAudienceValue(parsed.productAudience),
     responseId: completion.id,
-    titleEn: null,
-    titleTh: null,
-    titleZhCn: null,
     warnings: warningsValue(parsed.warnings)
   };
 }
@@ -774,16 +760,13 @@ export async function correctDraftProductFactsWithAi(
   const product: ProductForCorrection = {
     brandName: input.brandName ?? null,
     description: input.description ?? null,
-    descriptionEn: input.descriptionEn ?? null,
-    descriptionTh: input.descriptionTh ?? null,
     facts: input.currentFacts ?? [],
     id: null,
     productAudience: input.productAudience ?? "both",
     productUrl: input.productUrl,
     sourceSnapshot: input.sourceSnapshot ?? null,
     title: input.productTitle,
-    titleEn: input.productTitleEn ?? null,
-    titleTh: input.productTitleTh ?? null
+    translations: input.translations ?? {}
   };
   const completion = await callGrok({ catalogue, product });
   const parsed = parseJsonObject(completion.choices?.[0]?.message?.content);
@@ -814,16 +797,13 @@ export async function recoverDraftProductFactsWithAi(
   const product: ProductForCorrection = {
     brandName: input.brandName ?? null,
     description: input.description ?? null,
-    descriptionEn: input.descriptionEn ?? null,
-    descriptionTh: input.descriptionTh ?? null,
     facts: input.currentFacts ?? [],
     id: null,
     productAudience: input.productAudience ?? "both",
     productUrl: input.productUrl,
     sourceSnapshot: input.sourceSnapshot ?? null,
     title: input.productTitle,
-    titleEn: input.productTitleEn ?? null,
-    titleTh: input.productTitleTh ?? null
+    translations: input.translations ?? {}
   };
   const completion = await callGrok({
     allowPublicKnowledgeFallback: true,

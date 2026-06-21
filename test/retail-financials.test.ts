@@ -19,6 +19,10 @@ const stock = readFileSync(
   new URL("../lib/admin-retail-stock.ts", import.meta.url),
   "utf8"
 );
+const customerOrders = readFileSync(
+  new URL("../lib/admin-retail-customer-orders.ts", import.meta.url),
+  "utf8"
+);
 const financialsView = readFileSync(
   new URL("../components/admin/financials-view.tsx", import.meta.url),
   "utf8"
@@ -72,10 +76,12 @@ describe("retail financial settlements", () => {
   });
 
   it("moves settlements due on shipment and review or void on exception paths", () => {
-    assert.match(stock, /markRetailOrderSettlementDue/);
-    assert.match(stock, /input\.action === "mark_shipped"[\s\S]*markRetailOrderSettlementDue/);
-    assert.match(stock, /voidPendingRetailOrderSettlement/);
-    assert.match(stock, /markRetailOrderSettlementNeedsReview/);
+    assert.match(financials, /export async function markRetailOrderSettlementDue/);
+    assert.match(customerOrders, /markRetailOrderSettlementDue/);
+    assert.match(customerOrders, /input\.action === "mark_shipped"[\s\S]*markRetailOrderSettlementDue/);
+    assert.match(customerOrders, /voidPendingRetailOrderSettlement/);
+    assert.match(customerOrders, /markRetailOrderSettlementNeedsReview/);
+    assert.doesNotMatch(stock, /markRetailOrderSettlementDue/);
   });
 
   it("records BPM, audit, and useful organisation notifications for settlement changes", () => {

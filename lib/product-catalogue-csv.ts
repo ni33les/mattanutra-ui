@@ -18,6 +18,7 @@ import {
   type ProductIdentifierInput,
 } from "@/lib/product-identifiers";
 import type { ProductRegulatoryApprovalInput } from "@/lib/product-regulatory-approvals";
+import { normalizeLegacyProductTranslationFields } from "@/lib/product-translation-input";
 import { normalizeProductKey } from "@/lib/product-recommendations";
 import type {
   ProductAudience,
@@ -837,8 +838,8 @@ export async function buildProductCatalogueCsv(
       products.id::text as product_id,
       products.brand_name,
       products.title,
-      products.title_en,
-      products.title_th,
+      product_translation_en.title as title_en,
+      product_translation_th.title as title_th,
       products.product_url,
       products.image_url,
       products.product_kind,
@@ -929,6 +930,14 @@ export async function buildProductCatalogueCsv(
       on product_identifiers.product_id = products.id
       and product_identifiers.status = 'active'
       and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
+    left join public.product_translations product_translation_en
+      on product_translation_en.product_id = products.id
+      and product_translation_en.locale = 'en'
+      and product_translation_en.status <> 'missing'
+    left join public.product_translations product_translation_th
+      on product_translation_th.product_id = products.id
+      and product_translation_th.locale = 'th'
+      and product_translation_th.status <> 'missing'
     left join public.product_regulatory_approvals
       on product_regulatory_approvals.product_id = products.id
     where products.status <> 'ignored'
@@ -953,8 +962,8 @@ export async function buildProductCatalogueCsv(
       products.id,
       products.brand_name,
       products.title,
-      products.title_en,
-      products.title_th,
+      product_translation_en.title,
+      product_translation_th.title,
       products.product_url,
       products.image_url,
       products.product_kind,
@@ -1070,8 +1079,12 @@ export async function applyProductCatalogueCsvImport(
       );
       const productUrl = cleanText(column(row, ["product url", "url"]), 2000);
       const imageUrl = cleanText(column(row, ["image url", "image"]), 2000);
-      const titleEn = cleanText(column(row, ["english name", "title en"]), 500);
-      const titleTh = cleanText(column(row, ["thai name", "title th"]), 500);
+      const englishTitle = cleanText(column(row, ["english name", "title en"]), 500);
+      const thaiTitle = cleanText(column(row, ["thai name", "title th"]), 500);
+      const translationRequest = normalizeLegacyProductTranslationFields({
+        ...(englishTitle !== null ? { englishTitle } : {}),
+        ...(thaiTitle !== null ? { thaiTitle } : {}),
+      });
       const currency = normalizeCurrencyCode(
         column(row, ["currency", "ccy"]),
         "THB",
@@ -1130,8 +1143,7 @@ export async function applyProductCatalogueCsvImport(
             productStatusFromColumn(column(row, ["status"])) ??
             "pending_review",
           title,
-          titleEn,
-          titleTh,
+          translations: translationRequest.translations,
         });
 
         productId = created.id;
@@ -1175,8 +1187,12 @@ export async function applyProductCatalogueCsvImport(
           regulatoryApprovals: approvals(existing),
           status: productStatusFromColumn(column(row, ["status"])),
           title: title === null ? undefined : title,
-          titleEn: titleEn === null ? undefined : titleEn,
-          titleTh: titleTh === null ? undefined : titleTh,
+          translations: translationRequest.translations
+            ? {
+                ...existing.translations,
+                ...translationRequest.translations,
+              }
+            : undefined,
         });
         registerProductMatch(matches, {
           brandName: brandName ?? existing.brandName,

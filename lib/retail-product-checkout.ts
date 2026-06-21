@@ -346,13 +346,21 @@ async function latestRecommendations(
       product_recommendation_items.rank,
       product_recommendation_items.price_amount,
       product_recommendation_items.currency,
-      coalesce(products.title_en, products.title) as title,
+      coalesce(
+        nullif(product_translation_en.title, ''),
+        nullif(products.title, ''),
+        'Product'
+      ) as title,
       coalesce(products.image_url, product_recommendation_items.image_url) as image_url
     from public.product_recommendation_items
     join public.product_recommendation_runs
       on product_recommendation_runs.id = product_recommendation_items.run_id
     join public.products
       on products.id = product_recommendation_items.product_id
+    left join public.product_translations product_translation_en
+      on product_translation_en.product_id = products.id
+      and product_translation_en.locale = 'en'
+      and product_translation_en.status <> 'missing'
     where product_recommendation_runs.plan_id = ${planId}::uuid
       and product_recommendation_items.run_id = (
         select candidate_runs.id

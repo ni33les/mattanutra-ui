@@ -70,8 +70,6 @@ export type DelightBrandSourcePolicy = Readonly<{
 export type DelightImportedProductCandidate = Readonly<{
   brandName: string;
   description: string | null;
-  descriptionEn: string | null;
-  descriptionTh: string | null;
   evidenceQuality: "official" | "fallback";
   fdaApprovalNumber: string | null;
   imageUrls: readonly string[];
@@ -80,8 +78,11 @@ export type DelightImportedProductCandidate = Readonly<{
   rawSnapshot: Record<string, unknown>;
   source: string;
   sourceUrl: string;
-  titleEn: string | null;
-  titleTh: string | null;
+  translations: Record<string, {
+    description?: string | null;
+    status?: "complete" | "draft" | "missing";
+    title?: string | null;
+  }>;
 }>;
 
 export type DelightExistingProduct = Readonly<{
@@ -393,10 +394,6 @@ export const DELIGHT_BRAND_SOURCE_POLICIES: readonly DelightBrandSourcePolicy[] 
     sources: []
   }
 ];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
 
 function cleanText(value: unknown, max = 2000) {
   if (typeof value !== "string" && typeof value !== "number") {
@@ -778,8 +775,6 @@ async function scrapeOfficialProduct(
   return {
     brandName,
     description,
-    descriptionEn: /[A-Za-z]/.test(description ?? "") ? description : null,
-    descriptionTh: /[ก-๙]/.test(description ?? "") ? description : null,
     evidenceQuality: source.sourceKind === "manufacturer" || source.sourceKind === "brand"
       ? "official"
       : "fallback",
@@ -804,8 +799,26 @@ async function scrapeOfficialProduct(
       ? "delight_manufacturer_coverage"
       : "delight_fallback_coverage",
     sourceUrl: productUrl,
-    titleEn: /[A-Za-z]/.test(title) ? title : null,
-    titleTh: /[ก-๙]/.test(title) ? title : null
+    translations: {
+      ...(/[A-Za-z]/.test(title) || /[A-Za-z]/.test(description ?? "")
+        ? {
+            en: {
+              description: /[A-Za-z]/.test(description ?? "") ? description : null,
+              status: "draft" as const,
+              title: /[A-Za-z]/.test(title) ? title : null
+            }
+          }
+        : {}),
+      ...(/[ก-๙]/.test(title) || /[ก-๙]/.test(description ?? "")
+        ? {
+            th: {
+              description: /[ก-๙]/.test(description ?? "") ? description : null,
+              status: "draft" as const,
+              title: /[ก-๙]/.test(title) ? title : null
+            }
+          }
+        : {})
+    }
   };
 }
 
@@ -1076,8 +1089,6 @@ export function fallbackCandidateForSheetRow(row: DelightSheetProductRow): Delig
   return {
     brandName: row.brandName,
     description: null,
-    descriptionEn: null,
-    descriptionTh: null,
     evidenceQuality: "fallback",
     fdaApprovalNumber: row.registerNumber,
     imageUrls: [],
@@ -1101,8 +1112,26 @@ export function fallbackCandidateForSheetRow(row: DelightSheetProductRow): Delig
     },
     source: "delight_sheet_fallback",
     sourceUrl: internalSheetSourceUrl(row),
-    titleEn: /[A-Za-z]/.test(row.productName) ? row.productName : null,
-    titleTh: /[ก-๙]/.test(row.productName) ? row.productName : null
+    translations: {
+      ...(/[A-Za-z]/.test(row.productName)
+        ? {
+            en: {
+              description: null,
+              status: "draft" as const,
+              title: row.productName
+            }
+          }
+        : {}),
+      ...(/[ก-๙]/.test(row.productName)
+        ? {
+            th: {
+              description: null,
+              status: "draft" as const,
+              title: row.productName
+            }
+          }
+        : {})
+    }
   };
 }
 
@@ -1238,8 +1267,6 @@ async function stageCandidateProducts(input: Readonly<{
           actor: "delight_manufacturer_coverage",
           brandName: candidate.brandName,
           description: candidate.description,
-          descriptionEn: candidate.descriptionEn,
-          descriptionTh: candidate.descriptionTh,
           fdaApprovalNumber: candidate.fdaApprovalNumber,
           imageUrls: candidate.imageUrls,
           importRunId,
@@ -1249,8 +1276,7 @@ async function stageCandidateProducts(input: Readonly<{
           rawSnapshot: candidate.rawSnapshot,
           source: candidate.source,
           sourceUrl: candidate.sourceUrl,
-          titleEn: candidate.titleEn,
-          titleTh: candidate.titleTh
+          translations: candidate.translations
         });
         staged += 1;
       } catch (error) {

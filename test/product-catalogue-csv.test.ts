@@ -85,8 +85,6 @@ describe("product catalogue CSV", () => {
       ],
       currency: "THB",
       description: "Canonical description",
-      descriptionEn: "Legacy English description",
-      descriptionTh: "Legacy Thai description",
       displayDescription: "Canonical description",
       displayTitle: "Product A",
       facts: [
@@ -152,8 +150,6 @@ describe("product catalogue CSV", () => {
       },
       status: "approved",
       title: "Product A",
-      titleEn: "Legacy English title",
-      titleTh: "Legacy Thai title",
       translations: {
         th: {
           description: "Translated Thai description",

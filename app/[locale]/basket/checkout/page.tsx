@@ -60,7 +60,7 @@ async function selectedProductsForCheckout(
     select distinct on (product_recommendation_items.product_id)
       product_recommendation_items.product_id::text,
       coalesce(
-        nullif(products.title_en, ''),
+        nullif(product_translation_en.title, ''),
         nullif(products.title, ''),
         'Product'
       ) as title,
@@ -70,6 +70,10 @@ async function selectedProductsForCheckout(
       on product_recommendation_runs.id = product_recommendation_items.run_id
     join public.products
       on products.id = product_recommendation_items.product_id
+    left join public.product_translations product_translation_en
+      on product_translation_en.product_id = products.id
+      and product_translation_en.locale = 'en'
+      and product_translation_en.status <> 'missing'
     where product_recommendation_runs.plan_id = ${planId}::uuid
       and product_recommendation_items.product_id = any(${selectedItemIds}::uuid[])
     order by product_recommendation_items.product_id,

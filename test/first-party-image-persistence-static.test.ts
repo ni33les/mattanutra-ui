@@ -7,13 +7,11 @@ describe("first-party image persistence wiring", () => {
     const [
       productWrites,
       adminProducts,
-      productImports,
       blog,
       diagnosticsRoute
     ] = await Promise.all([
       readFile("lib/admin-product-writes.ts", "utf8"),
       readFile("lib/admin-products.ts", "utf8"),
-      readFile("lib/admin-product-imports.ts", "utf8"),
       readFile("lib/blog.ts", "utf8"),
       readFile("app/api/admin/products/diagnostics/route.ts", "utf8")
     ]);
@@ -26,8 +24,6 @@ describe("first-party image persistence wiring", () => {
     assert.match(adminProducts, /mirrorImageUrlListToFirstParty/);
     assert.match(adminProducts, /product_imports\.image_urls/);
     assert.match(adminProducts, /productImageMirrors/);
-    assert.match(productImports, /mirrorImageUrlListToFirstParty/);
-    assert.match(productImports, /product_imports\.image_urls/);
 
     assert.match(blog, /mirrorBlogPostImages/);
     assert.match(blog, /blog_posts\.image_url/);

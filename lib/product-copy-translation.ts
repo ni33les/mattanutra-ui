@@ -16,39 +16,29 @@ import { normalizeLocaleCode, type LocaleCode } from "@/lib/i18n";
 type ProductForCopyTranslation = Readonly<{
   brandName: string | null;
   description: string | null;
-  descriptionEn: string | null;
-  descriptionTh: string | null;
   id: string | null;
   productUrl: string;
   sourceSnapshot: unknown;
   title: string;
-  titleEn: string | null;
-  titleTh: string | null;
+  translations: Record<string, ProductCopyTranslationValue>;
 }>;
 
 export type ProductCopyTranslationDraftInput = Readonly<{
   brandName?: string | null;
   description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
   productTitle: string;
-  productTitleEn?: string | null;
-  productTitleTh?: string | null;
   productUrl: string;
   sourceSnapshot?: unknown;
   targetLocale?: LocaleCode | null;
+  translations?: Record<string, ProductCopyTranslationValue>;
 }>;
 
 export type ProductCopyTranslationResult = Readonly<{
   description: string | null;
-  descriptionEn: string | null;
-  descriptionTh: string | null;
   locale: LocaleCode;
   notes: string | null;
   responseId?: string;
   title: string | null;
-  titleEn: string | null;
-  titleTh: string | null;
 }>;
 
 export type ProductCopyTranslationUpdateResult = Readonly<{
@@ -58,6 +48,12 @@ export type ProductCopyTranslationUpdateResult = Readonly<{
 
 const DEFAULT_REASONING_EFFORT = "low";
 const REQUEST_TIMEOUT_MS = 120_000;
+
+type ProductCopyTranslationValue = Readonly<{
+  description?: string | null;
+  status?: "complete" | "draft" | "missing";
+  title?: string | null;
+}>;
 
 function config() {
   return {
@@ -143,15 +139,28 @@ async function loadProduct(
     select
       products.id::text,
       products.title,
-      products.title_en as "titleEn",
-      products.title_th as "titleTh",
       products.brand_name as "brandName",
       products.product_url as "productUrl",
       products.description,
-      products.description_en as "descriptionEn",
-      products.description_th as "descriptionTh",
-      products.source_snapshot as "sourceSnapshot"
+      products.source_snapshot as "sourceSnapshot",
+      coalesce(product_translation_rows.translations, '{}'::jsonb) as translations
     from public.products
+    left join lateral (
+      select coalesce(
+        jsonb_object_agg(
+          product_translations.locale,
+          jsonb_build_object(
+            'description', product_translations.description,
+            'status', product_translations.status,
+            'title', product_translations.title
+          )
+          order by product_translations.locale
+        ),
+        '{}'::jsonb
+      ) as translations
+      from public.product_translations
+      where product_translations.product_id = products.id
+    ) product_translation_rows on true
     where products.id = ${productId}::uuid
     limit 1
   `;
@@ -171,14 +180,11 @@ function productFromDraft(
   return {
     brandName: input.brandName ?? null,
     description: input.description ?? null,
-    descriptionEn: input.descriptionEn ?? null,
-    descriptionTh: input.descriptionTh ?? null,
     id: null,
     productUrl: input.productUrl,
     sourceSnapshot: input.sourceSnapshot ?? null,
     title: input.productTitle,
-    titleEn: input.productTitleEn ?? null,
-    titleTh: input.productTitleTh ?? null
+    translations: input.translations ?? {}
   };
 }
 
@@ -192,14 +198,10 @@ function resultFromParsed(
 
   return {
     description,
-    descriptionEn: locale === "en" ? description : null,
-    descriptionTh: locale === "th" ? description : null,
     locale,
     notes: textOrNull(parsed.notes, 1000),
     responseId: completion.id,
-    title,
-    titleEn: locale === "en" ? title : null,
-    titleTh: locale === "th" ? title : null
+    title
   };
 }
 
@@ -252,11 +254,8 @@ async function callGrok(input: Readonly<{
                 product: {
                   brandName: input.product.brandName,
                   currentDescription: input.product.description,
-                  currentDescriptionEn: input.product.descriptionEn,
-                  currentDescriptionTh: input.product.descriptionTh,
                   currentTitle: input.product.title,
-                  currentTitleEn: input.product.titleEn,
-                  currentTitleTh: input.product.titleTh,
+                  currentTranslations: input.product.translations,
                   productUrl: input.product.productUrl,
                   sourceSnapshot: compactJson(input.product.sourceSnapshot)
                 }
@@ -320,24 +319,13 @@ export async function translateProductCopyWithAi(input: Readonly<{
   const completion = await callGrok({ product, targetLocale });
   const parsed = parseJsonObject(completion.choices?.[0]?.message?.content);
   const copy = resultFromParsed(parsed, completion, targetLocale);
-  const usesLegacyFields = targetLocale === "en" || targetLocale === "th";
-  const translatedTitle =
-    copy.title ??
-    (usesLegacyFields && targetLocale === "en" ? copy.titleEn : null) ??
-    (usesLegacyFields && targetLocale === "th" ? copy.titleTh : null);
+  const existingTranslation = product.translations[targetLocale] ?? {};
+  const translatedTitle = copy.title ?? existingTranslation.title ?? null;
   const translatedDescription =
-    copy.description ??
-    (usesLegacyFields && targetLocale === "en" ? copy.descriptionEn : null) ??
-    (usesLegacyFields && targetLocale === "th" ? copy.descriptionTh : null);
+    copy.description ?? existingTranslation.description ?? null;
   const row = await updateAdminProduct({
     actor: input.actor ?? "product_copy_translation",
     changeNote: "product_copy_translation",
-    descriptionEn: targetLocale === "en"
-      ? copy.description ?? copy.descriptionEn ?? product.descriptionEn
-      : copy.descriptionEn ?? product.descriptionEn,
-    descriptionTh: targetLocale === "th"
-      ? copy.description ?? copy.descriptionTh ?? product.descriptionTh
-      : copy.descriptionTh ?? product.descriptionTh,
     id: input.productId,
     sourceSnapshotPatch: {
       aiCopyTranslation: {
@@ -348,13 +336,8 @@ export async function translateProductCopyWithAi(input: Readonly<{
         }
       }
     },
-    titleEn: targetLocale === "en"
-      ? copy.title ?? copy.titleEn ?? product.titleEn
-      : copy.titleEn ?? product.titleEn,
-    titleTh: targetLocale === "th"
-      ? copy.title ?? copy.titleTh ?? product.titleTh
-      : copy.titleTh ?? product.titleTh,
     translations: {
+      ...product.translations,
       [targetLocale]: {
         description: translatedDescription,
         status: translatedTitle && translatedDescription

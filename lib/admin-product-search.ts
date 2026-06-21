@@ -77,8 +77,14 @@ function productSearchTerms(value: string) {
 function productSearchIndex(row: AdminProductRow) {
   const fields = [
     row.title,
-    row.titleEn,
-    row.titleTh,
+    row.displayTitle,
+    row.displayDescription,
+    ...Object.values(row.translations ?? {}).flatMap((translation) => [
+      translation.locale,
+      translation.status,
+      translation.title,
+      translation.description
+    ]),
     row.brandName,
     row.category,
     ...(row.regulatoryApprovals ?? []).flatMap((approval) => [

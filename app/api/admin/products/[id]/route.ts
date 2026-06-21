@@ -20,6 +20,7 @@ import {
 import { productIdentifiersFromBody } from "@/lib/product-identifiers";
 import { productRegulatoryApprovalsFromPayload } from "@/lib/product-regulatory-approvals";
 import { isUuid } from "@/lib/assessment-store";
+import { normalizeProductTranslationRequest } from "@/lib/product-translation-input";
 
 export const runtime = "nodejs";
 
@@ -99,40 +100,6 @@ function countryPricingFromBody(value: unknown): ProductCountryPricing[] | undef
           }]
         : [];
     });
-}
-
-function translationsFromBody(value: unknown) {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([locale, item]) => {
-        const record =
-          item && typeof item === "object" && !Array.isArray(item)
-            ? item as Record<string, unknown>
-            : {};
-        const status = record.status === "complete" ||
-          record.status === "missing"
-          ? record.status
-          : "draft";
-
-        return [
-          locale,
-          {
-            description: textOrNull(record.description, 4000),
-            status,
-            title: textOrNull(record.title, 500)
-          }
-        ] as const;
-      })
-      .filter(([locale]) => /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(locale))
-  );
 }
 
 function parseProductKind(value: unknown): ProductKind | undefined {
@@ -245,6 +212,11 @@ export async function PATCH(
     );
   }
 
+  const translationRequest = normalizeProductTranslationRequest({
+    body,
+    translations: body.translations
+  });
+
   try {
     const row = await updateAdminProduct({
       actor: "admin_dashboard",
@@ -259,15 +231,6 @@ export async function PATCH(
       description: body.description === undefined
         ? undefined
         : textOrNull(body.description, 4000),
-      descriptionEn: body.descriptionEn === undefined
-        ? undefined
-        : textOrNull(body.descriptionEn, 4000),
-      descriptionTh: body.descriptionTh === undefined
-        ? undefined
-        : textOrNull(body.descriptionTh, 4000),
-      descriptionZhCn: body.descriptionZhCn === undefined
-        ? undefined
-        : textOrNull(body.descriptionZhCn, 4000),
       facts: factsFromBody(body.facts),
       id,
       imageUrl: body.imageUrl === undefined
@@ -285,17 +248,20 @@ export async function PATCH(
         ? undefined
         : productRegulatoryApprovalsFromPayload(body.regulatoryApprovals),
       title,
-      titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn, 500),
-      titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh, 500),
-      titleZhCn: body.titleZhCn === undefined ? undefined : textOrNull(body.titleZhCn, 500),
-      translations: translationsFromBody(body.translations)
+      translations: translationRequest.translations
     });
     const rows = body.manufacturerCountryCodes !== undefined && row.brandId
       ? await loadAdminProductRowsForBrand(row.brandId)
       : [row];
 
     return NextResponse.json(
-      { row, rows },
+      {
+        row,
+        rows,
+        ...(translationRequest.warnings.length > 0
+          ? { warnings: translationRequest.warnings }
+          : {})
+      },
       {
         headers: {
           "Cache-Control": "no-store"

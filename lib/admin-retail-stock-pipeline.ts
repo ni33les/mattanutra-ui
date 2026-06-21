@@ -243,14 +243,11 @@ export function localizedProductTitleExpression(
   sql: StockDb,
   locale: Locale
 ) {
+  void locale;
+
   return sql`
     coalesce(
       nullif(product_translations.title, ''),
-      case
-        when ${locale} = 'th' then nullif(products.title_th, '')
-        when ${locale} = 'en' then nullif(products.title_en, '')
-        else null
-      end,
       nullif(products.title, ''),
       'Untitled product'
     )

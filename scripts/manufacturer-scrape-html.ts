@@ -354,20 +354,20 @@ export function localizedProductNamesFromText(text: string) {
 
   if (pairedMatch) {
     return {
-      titleEn: cleanHtmlText(pairedMatch[2]).slice(0, 500) || null,
-      titleTh: cleanHtmlText(pairedMatch[1]).slice(0, 500) || null
+      englishTitle: cleanHtmlText(pairedMatch[2]).slice(0, 500) || null,
+      thaiTitle: cleanHtmlText(pairedMatch[1]).slice(0, 500) || null
     };
   }
 
   return {
-    titleEn:
+    englishTitle:
       compact
         .match(/ชื่อผลิตภัณฑ์\s*\(อังกฤษ\)\s*[:：]\s*(.+?)(?=\s+(?:เลขทะเบียน|รูปแบบ|ส่วนประกอบ|คุณสมบัติ|วิธีรับประทาน|คำเตือน|$))/i)?.[1]
         ? cleanHtmlText(
           compact.match(/ชื่อผลิตภัณฑ์\s*\(อังกฤษ\)\s*[:：]\s*(.+?)(?=\s+(?:เลขทะเบียน|รูปแบบ|ส่วนประกอบ|คุณสมบัติ|วิธีรับประทาน|คำเตือน|$))/i)?.[1] ?? ""
         ).slice(0, 500)
         : null,
-    titleTh:
+    thaiTitle:
       compact
         .match(/ชื่อผลิตภัณฑ์\s*\(ไทย\)\s*[:：]\s*(.+?)(?=\s+(?:ชื่อผลิตภัณฑ์|เลขทะเบียน|รูปแบบ|ส่วนประกอบ|คุณสมบัติ|วิธีรับประทาน|คำเตือน|$))/i)?.[1]
         ? cleanHtmlText(

@@ -79,8 +79,6 @@ export type AdminReviewTaskRow = Readonly<{
   taskType: string;
   productImport: {
     description: string | null;
-    descriptionEn: string | null;
-    descriptionTh: string | null;
     translations: Record<string, {
       description: string | null;
       status: string;
@@ -370,8 +368,6 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
     productImport: itemType === "product"
       ? {
           description: textOrNull(payload.description),
-          descriptionEn: textOrNull(payload.descriptionEn),
-          descriptionTh: textOrNull(payload.descriptionTh),
           translations: productImportTranslations,
           duplicateProductIds: textArray(payload.duplicateProductIds),
           fdaApprovalNumber: textOrNull(payload.fdaApprovalNumber),

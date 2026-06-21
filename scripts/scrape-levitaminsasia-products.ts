@@ -586,11 +586,7 @@ async function correctProductWithAi(
       brandName: BRAND_NAME,
       currentFacts: productFactsForAi(product),
       description: product.description,
-      descriptionEn: product.description,
-      descriptionTh: null,
       productTitle: product.title,
-      productTitleEn: product.title,
-      productTitleTh: null,
       productUrl: product.canonicalUrl,
       sourceSnapshot: {
         benefits: product.benefits,
@@ -602,6 +598,13 @@ async function correctProductWithAi(
         otherIngredients: product.otherIngredients,
         rawServingSize: product.rawServingSize,
         sku: product.sku
+      },
+      translations: {
+        en: {
+          description: product.description,
+          status: "draft",
+          title: product.title
+        }
       }
     });
 
@@ -713,7 +716,14 @@ async function applyProducts(products: readonly ScrapedProduct[]) {
         sku: product.sku
       },
       source: SOURCE,
-      sourceUrl: product.canonicalUrl
+      sourceUrl: product.canonicalUrl,
+      translations: {
+        en: {
+          description: product.description,
+          status: "draft",
+          title: product.title
+        }
+      }
     });
     importedOrUpdated += 1;
   }

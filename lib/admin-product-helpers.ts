@@ -158,14 +158,14 @@ export function productTitleLooksEnglish(value: string): boolean {
 }
 
 export function preferredProductTitle(input: Readonly<{
+  englishTitle?: string | null;
   title: string;
-  titleEn?: string | null;
 }>) {
   const title = input.title.trim();
-  const titleEn = cleanNullableText(input.titleEn, 500);
+  const englishTitle = cleanNullableText(input.englishTitle, 500);
 
-  if (titleEn && !productTitleLooksEnglish(title)) {
-    return titleEn;
+  if (englishTitle && !productTitleLooksEnglish(title)) {
+    return englishTitle;
   }
 
   return title;

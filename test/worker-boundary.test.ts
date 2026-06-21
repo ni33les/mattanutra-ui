@@ -351,6 +351,10 @@ describe("external worker boundaries", () => {
     );
     const adminSseSource = await readFile("lib/admin-sse.ts", "utf8");
     const taskWorkerSource = await readFile("lib/task-worker.ts", "utf8");
+    const productRecommendationFreshnessSource = await readFile(
+      "lib/product-recommendation-freshness.ts",
+      "utf8",
+    );
     const taskResultApplierSource = await readFile(
       "lib/task-result-applier.ts",
       "utf8",
@@ -514,8 +518,13 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       taskWorkerSource,
-      /product_recommendation_runs[\s\S]*generated_at >= greatest/,
+      /loadProductRecommendationFreshnessSnapshot[\s\S]*!forceNew && row\.formulationVersion >= 1 && !row\.reason[\s\S]*return null;/,
       "late product-matching enqueue points must not create duplicate runs when current recommendations already exist",
+    );
+    assert.match(
+      productRecommendationFreshnessSource,
+      /product_recommendation_runs[\s\S]*productRecommendationRefreshReason\(\{[\s\S]*generatedAt: snapshot\.generatedAt/,
+      "product freshness should compare the latest recommendation run to current formulation and catalogue state",
     );
     assert.doesNotMatch(
       taskResultApplierSource,

@@ -39,8 +39,6 @@ export function ProductImportReviewModal({
       unit: string | null;
     }>,
     description?: string | null,
-    descriptionEn?: string | null,
-    descriptionTh?: string | null,
     translations?: Record<
       string,
       {
@@ -60,13 +58,15 @@ export function ProductImportReviewModal({
   const [description, setDescription] = useState(
     row.productImport?.description ?? "",
   );
-  const [descriptionEn, setDescriptionEn] = useState(
-    row.productImport?.descriptionEn ?? row.productImport?.description ?? "",
+  const [enDescription, setEnDescription] = useState(
+    row.productImport?.translations.en?.description ??
+      row.productImport?.description ??
+      "",
   );
-  const [descriptionTh, setDescriptionTh] = useState(
-    row.productImport?.descriptionTh ?? "",
+  const [thDescription, setThDescription] = useState(
+    row.productImport?.translations.th?.description ?? "",
   );
-  const [descriptionZhCn, setDescriptionZhCn] = useState(
+  const [zhCnDescription, setZhCnDescription] = useState(
     row.productImport?.translations["zh-CN"]?.description ?? "",
   );
   const [facts, setFacts] = useState<ProductImportFactDraft[]>(() =>
@@ -166,26 +166,26 @@ export function ProductImportReviewModal({
             <textarea
               className={classNames(inputClass, "min-h-24 resize-y")}
               onChange={(event) => {
-                setDescriptionEn(event.target.value);
+                setEnDescription(event.target.value);
                 setDescription(event.target.value);
               }}
-              value={descriptionEn}
+              value={enDescription}
             />
           </label>
           <label className="grid gap-2 text-sm font-medium text-gray-700">
             Description TH
             <textarea
               className={classNames(inputClass, "min-h-24 resize-y")}
-              onChange={(event) => setDescriptionTh(event.target.value)}
-              value={descriptionTh}
+              onChange={(event) => setThDescription(event.target.value)}
+              value={thDescription}
             />
           </label>
           <label className="grid gap-2 text-sm font-medium text-gray-700">
             Description 中文
             <textarea
               className={classNames(inputClass, "min-h-24 resize-y")}
-              onChange={(event) => setDescriptionZhCn(event.target.value)}
-              value={descriptionZhCn}
+              onChange={(event) => setZhCnDescription(event.target.value)}
+              value={zhCnDescription}
             />
           </label>
         </div>
@@ -400,26 +400,24 @@ export function ProductImportReviewModal({
                   reviewerNote.trim() || null,
                   parsedFacts,
                   description.trim() ||
-                    descriptionEn.trim() ||
-                    descriptionTh.trim() ||
-                    descriptionZhCn.trim() ||
+                    enDescription.trim() ||
+                    thDescription.trim() ||
+                    zhCnDescription.trim() ||
                     null,
-                  descriptionEn.trim() || null,
-                  descriptionTh.trim() || null,
                   {
                     en: {
-                      description: descriptionEn.trim() || null,
-                      status: descriptionEn.trim() ? "draft" : "missing",
+                      description: enDescription.trim() || null,
+                      status: enDescription.trim() ? "draft" : "missing",
                       title: null,
                     },
                     th: {
-                      description: descriptionTh.trim() || null,
-                      status: descriptionTh.trim() ? "draft" : "missing",
+                      description: thDescription.trim() || null,
+                      status: thDescription.trim() ? "draft" : "missing",
                       title: null,
                     },
                     "zh-CN": {
-                      description: descriptionZhCn.trim() || null,
-                      status: descriptionZhCn.trim() ? "draft" : "missing",
+                      description: zhCnDescription.trim() || null,
+                      status: zhCnDescription.trim() ? "draft" : "missing",
                       title: null,
                     },
                   },

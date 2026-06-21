@@ -933,20 +933,10 @@ export function productTranslationLocales(row: AdminProductRow) {
 export function productTranslationFor(row: AdminProductRow, locale: string) {
   return (
     row.translations?.[locale] ?? {
-      description:
-        locale === "en"
-          ? (row.descriptionEn ?? row.description)
-          : locale === "th"
-            ? row.descriptionTh
-            : null,
+      description: locale === "en" ? row.description : null,
       locale,
       status: "missing" as const,
-      title:
-        locale === "en"
-          ? (row.titleEn ?? row.title)
-          : locale === "th"
-            ? row.titleTh
-            : null,
+      title: locale === "en" ? row.title : null,
       updatedAt: null,
     }
   );

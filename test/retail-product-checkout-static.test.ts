@@ -34,6 +34,9 @@ const revealCopy = readFileSync(
   new URL("../components/formulation-reveal-copy.ts", import.meta.url),
   "utf8"
 );
+const revealCopyMessages = JSON.parse(
+  readFileSync(new URL("../content/i18n/source/en.json", import.meta.url), "utf8")
+) as Record<string, { defaultMessage?: string }>;
 const adminProductSearch = readFileSync(
   new URL("../lib/admin-product-search.ts", import.meta.url),
   "utf8"
@@ -46,6 +49,10 @@ const assessmentStore = readFileSync(
   new URL("../lib/assessment-store.ts", import.meta.url),
   "utf8"
 );
+
+function defaultMessage(id: string) {
+  return revealCopyMessages[id]?.defaultMessage ?? "";
+}
 
 describe("retail product checkout static contracts", () => {
   it("keeps order-number and legacy token tracking compatibility", () => {
@@ -97,10 +104,17 @@ describe("retail product checkout static contracts", () => {
     assert.match(revealFinalPage, /fastestRetailerOrganisationId/);
     assert.match(revealFinalPage, /finalCopy\.bestValue/);
     assert.match(revealFinalPage, /finalCopy\.fastest/);
-    assert.match(revealCopy, /bestValue: "Best value"/);
-    assert.match(revealCopy, /fastest: "Fastest"/);
-    assert.match(revealCopy, /deliveryNote: "Express delivery · Pharmacy dispatch"/);
-    assert.match(revealCopy, /deliveryNoteTemplate: "Express delivery · \{dispatchCity\} dispatch"/);
+    assert.match(revealCopy, /getNamespace<RevealCopy>\(locale, "customer\.revealFinalCopy"\)/);
+    assert.equal(defaultMessage("customer.revealFinalCopy.bestValue"), "Best value");
+    assert.equal(defaultMessage("customer.revealFinalCopy.fastest"), "Fastest");
+    assert.equal(
+      defaultMessage("customer.revealFinalCopy.deliveryNote"),
+      "Express delivery · Pharmacy dispatch"
+    );
+    assert.equal(
+      defaultMessage("customer.revealFinalCopy.deliveryNoteTemplate"),
+      "Express delivery · {dispatchCity} dispatch"
+    );
     assert.match(adminProductSearch, /organisations\.metadata as organisation_metadata/);
     assert.match(adminProductSearch, /dispatchCity: organisationDispatchCity/);
     assert.match(taskExecution, /dispatchCity: input\.candidateSet\.dispatchCity/);

@@ -233,14 +233,6 @@ async function replaceProductFacts(
 }
 
 function normalizedTranslationEntries(input: Readonly<{
-  description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
-  descriptionZhCn?: string | null;
-  title?: string | null;
-  titleEn?: string | null;
-  titleTh?: string | null;
-  titleZhCn?: string | null;
   translations?: CreateAdminProductInput["translations"] | UpdateAdminProductInput["translations"];
 }>) {
   const translations = new Map<string, {
@@ -271,31 +263,6 @@ function normalizedTranslationEntries(input: Readonly<{
     });
   }
 
-  const legacy: Array<[string, string | null | undefined, string | null | undefined]> = [
-    ["en", input.titleEn ?? input.title, input.descriptionEn ?? input.description],
-    ["th", input.titleTh, input.descriptionTh],
-    ["zh-CN", input.titleZhCn, input.descriptionZhCn]
-  ];
-
-  for (const [locale, legacyTitle, legacyDescription] of legacy) {
-    if (translations.has(locale)) {
-      continue;
-    }
-
-    const title = cleanNullableText(legacyTitle, 500);
-    const description = cleanNullableText(legacyDescription, 4000);
-
-    if (!title && !description) {
-      continue;
-    }
-
-    translations.set(locale, {
-      description,
-      status: title && description ? "complete" : "draft",
-      title
-    });
-  }
-
   return [...translations].map(([locale, value]) => ({
     locale,
     ...value
@@ -306,15 +273,7 @@ async function replaceProductTranslations(
   sql: NonNullable<ReturnType<typeof getSql>>,
   productId: string,
   input: Readonly<{
-    description?: string | null;
-    descriptionEn?: string | null;
-    descriptionTh?: string | null;
-    descriptionZhCn?: string | null;
     source?: string | null;
-    title?: string | null;
-    titleEn?: string | null;
-    titleTh?: string | null;
-    titleZhCn?: string | null;
     translations?: CreateAdminProductInput["translations"] | UpdateAdminProductInput["translations"];
   }>
 ) {
@@ -389,16 +348,12 @@ async function recordProductVersion(
         reason,
         source,
         title,
-        title_en,
-        title_th,
         brand_name,
         normalized_brand_name,
         image_url,
         product_url,
         normalized_url,
         description,
-        description_en,
-        description_th,
         fda_approval_number,
         product_kind,
         product_audience,
@@ -425,16 +380,12 @@ async function recordProductVersion(
         ${input.changeNote},
         'admin_products',
         next_product.title,
-        next_product.title_en,
-        next_product.title_th,
         next_product.brand_name,
         next_product.normalized_brand_name,
         next_product.image_url,
         next_product.product_url,
         next_product.normalized_url,
         next_product.description,
-        next_product.description_en,
-        next_product.description_th,
         next_product.fda_approval_number,
         next_product.product_kind,
         coalesce(to_jsonb(next_product) ->> 'product_audience', 'both'),
@@ -1059,27 +1010,22 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   }
 
   const rawTitle = input.title.trim();
-  const titleEn = cleanNullableText(input.titleEn, 500);
-  const titleTh = cleanNullableText(input.titleTh, 500);
-  const titleZhCn = cleanNullableText(input.titleZhCn, 500);
-  const title = preferredProductTitle({ title: rawTitle, titleEn });
+  const translations = input.translations ?? {};
+  const title = preferredProductTitle({
+    englishTitle: translations.en?.title,
+    title: rawTitle
+  });
   const productUrl = input.productUrl.trim();
-  const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
-  const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
-  const descriptionZhCn = cleanNullableText(input.descriptionZhCn, 4000);
   const description = cleanNullableText(
-    input.description ?? descriptionEn ?? descriptionTh ?? descriptionZhCn,
+    input.description ??
+      translations.en?.description ??
+      translations.th?.description ??
+      translations["zh-CN"]?.description,
     4000
   );
   const baseSourceSnapshot = {
     ...(input.sourceSnapshot ?? {}),
     ...(rawTitle !== title ? { originalProductTitle: rawTitle } : {}),
-    ...(titleEn ? { titleEn } : {}),
-    ...(titleTh ? { titleTh } : {}),
-    ...(titleZhCn ? { titleZhCn } : {}),
-    ...(descriptionEn ? { descriptionEn } : {}),
-    ...(descriptionTh ? { descriptionTh } : {}),
-    ...(descriptionZhCn ? { descriptionZhCn } : {}),
     ...(input.translations ? { translations: input.translations } : {})
   };
 
@@ -1285,15 +1231,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   }
 
   await replaceProductTranslations(sql, productId, {
-    description,
-    descriptionEn,
-    descriptionTh,
-    descriptionZhCn,
     source: input.source ?? "admin",
-    title,
-    titleEn,
-    titleTh,
-    titleZhCn,
     translations: input.translations
   });
 
@@ -1385,9 +1323,6 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     throw new Error("Product not found");
   }
   const title = input.title === undefined ? undefined : cleanNullableText(input.title, 500);
-  const titleEn = input.titleEn === undefined ? undefined : cleanNullableText(input.titleEn, 500);
-  const titleTh = input.titleTh === undefined ? undefined : cleanNullableText(input.titleTh, 500);
-  const titleZhCn = input.titleZhCn === undefined ? undefined : cleanNullableText(input.titleZhCn, 500);
   const brandName = input.brandName === undefined
     ? undefined
     : cleanNullableText(input.brandName, 200);
@@ -1411,18 +1346,9 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     throw new Error("Product URL is required");
   }
 
-  const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
-  const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
-  const descriptionZhCn = cleanNullableText(input.descriptionZhCn, 4000);
   const beforePayload = recordFromUnknown(beforeRows[0].before_payload);
   const localizedSnapshotBase = {
     ...(input.sourceSnapshotPatch ?? {}),
-    ...(input.titleEn !== undefined ? { titleEn } : {}),
-    ...(input.titleTh !== undefined ? { titleTh } : {}),
-    ...(input.titleZhCn !== undefined ? { titleZhCn } : {}),
-    ...(input.descriptionEn !== undefined ? { descriptionEn } : {}),
-    ...(input.descriptionTh !== undefined ? { descriptionTh } : {}),
-    ...(input.descriptionZhCn !== undefined ? { descriptionZhCn } : {}),
     ...(input.translations !== undefined ? { translations: input.translations } : {})
   };
   const mirroredImage = input.imageUrl === undefined
@@ -1630,25 +1556,11 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 
   if (
     input.translations !== undefined ||
-    input.titleEn !== undefined ||
-    input.titleTh !== undefined ||
-    input.titleZhCn !== undefined ||
-    input.descriptionEn !== undefined ||
-    input.descriptionTh !== undefined ||
-    input.descriptionZhCn !== undefined ||
     input.title !== undefined ||
     input.description !== undefined
   ) {
     await replaceProductTranslations(sql, input.id, {
-      description: input.description,
-      descriptionEn,
-      descriptionTh,
-      descriptionZhCn,
       source: "admin",
-      title,
-      titleEn,
-      titleTh,
-      titleZhCn,
       translations: input.translations
     });
   }
@@ -1695,9 +1607,6 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	        brandName: input.brandName,
 	        changeNote: input.changeNote,
         description: input.description,
-        descriptionEn: input.descriptionEn,
-        descriptionTh: input.descriptionTh,
-        descriptionZhCn: input.descriptionZhCn,
         facts: input.facts,
 	        factsSource: input.factsSource,
 	        imageUrl: input.imageUrl,
@@ -1715,9 +1624,6 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         productUrl: input.productUrl,
         sourceSnapshotPatch: toJsonValue(input.sourceSnapshotPatch ?? null),
         title: input.title,
-        titleEn: input.titleEn,
-        titleTh: input.titleTh,
-        titleZhCn: input.titleZhCn,
         translations: input.translations,
         version
       })}::jsonb

@@ -200,7 +200,7 @@ export function validationCacheStatusForRow(
 export function validationForRow(
   row: Pick<
     ProductDbRow,
-    "image_url" | "label_status" | "product_url" | "source_url" | "title" | "title_en"
+    "image_url" | "label_status" | "product_url" | "source_url" | "title"
   >,
   facts: readonly AdminProductFact[],
   rawFacts: unknown
@@ -233,7 +233,7 @@ export function validationForRow(
     labelStatus: row.label_status,
     productUrl: row.product_url,
     sourceUrl: row.source_url,
-    title: row.title_en ?? row.title
+    title: row.title
   });
 }
 
@@ -280,41 +280,6 @@ function normalizeTranslations(row: ProductDbRow) {
           ? record.updatedAt
           : null
       )
-    };
-  }
-
-  const legacyRows: Array<{
-    description: string | null;
-    locale: string;
-    title: string | null;
-  }> = [
-    {
-      description: row.description_en ?? row.description,
-      locale: "en",
-      title: row.title_en ?? row.title
-    },
-    {
-      description: row.description_th,
-      locale: "th",
-      title: row.title_th
-    }
-  ];
-
-  for (const legacy of legacyRows) {
-    if (translations[legacy.locale]) {
-      continue;
-    }
-
-    if (!legacy.title && !legacy.description) {
-      continue;
-    }
-
-    translations[legacy.locale] = {
-      description: legacy.description,
-      locale: legacy.locale,
-      status: legacy.title && legacy.description ? "complete" : "draft",
-      title: legacy.title,
-      updatedAt: isoOrNull(row.updated_at)
     };
   }
 
@@ -413,8 +378,6 @@ export function rowFromDb(
     category: row.category,
     currency: row.currency || "THB",
     description: row.description,
-    descriptionEn: row.description_en,
-    descriptionTh: row.description_th,
     displayDescription,
     displayTitle,
     facts,
@@ -435,11 +398,7 @@ export function rowFromDb(
         ? row.product_audience
         : productAudienceFromText(
             row.title,
-            row.title_en,
-            row.title_th,
             row.description,
-            row.description_en,
-            row.description_th,
             ...Object.values(translations).flatMap((translation) => [
               translation.title,
               translation.description
@@ -478,8 +437,6 @@ export function rowFromDb(
       sourceUrl: row.source_url ?? row.product_url
     },
     title: row.title,
-    titleEn: row.title_en,
-    titleTh: row.title_th,
     translations,
     updatedAt: new Date(row.updated_at).toISOString()
   };

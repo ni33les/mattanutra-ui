@@ -50,8 +50,7 @@ function product(input: Readonly<{
     ],
     status: "approved",
     title: input.title ?? "Test Product",
-    titleEn: null,
-    titleTh: null,
+    translations: {},
     validationLabel: "Approved"
   } as unknown as AdminProductRow;
 }

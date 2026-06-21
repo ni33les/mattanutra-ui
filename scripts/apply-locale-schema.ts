@@ -207,23 +207,16 @@ cross join lateral (
   values
     (
       'en',
-      coalesce(to_jsonb(products) ->> 'title_en', products.title),
+      coalesce(products.source_snapshot -> 'translations' -> 'en' ->> 'title', products.title),
       coalesce(
-        to_jsonb(products) ->> 'description_en',
-        products.description,
-        products.source_snapshot ->> 'descriptionEn'
+        products.source_snapshot -> 'translations' -> 'en' ->> 'description',
+        products.description
       )
     ),
     (
       'th',
-      coalesce(
-        to_jsonb(products) ->> 'title_th',
-        products.source_snapshot ->> 'titleTh'
-      ),
-      coalesce(
-        to_jsonb(products) ->> 'description_th',
-        products.source_snapshot ->> 'descriptionTh'
-      )
+      products.source_snapshot -> 'translations' -> 'th' ->> 'title',
+      products.source_snapshot -> 'translations' -> 'th' ->> 'description'
     ),
     (
       'zh-CN',
@@ -323,26 +316,18 @@ cross join lateral (
     (
       'en',
       coalesce(
-        to_jsonb(product_imports) ->> 'title_en',
-        product_imports.raw_snapshot ->> 'titleEn',
+        product_imports.raw_snapshot -> 'translations' -> 'en' ->> 'title',
         product_imports.product_title
       ),
       coalesce(
-        to_jsonb(product_imports) ->> 'description_en',
-        product_imports.raw_snapshot ->> 'descriptionEn',
+        product_imports.raw_snapshot -> 'translations' -> 'en' ->> 'description',
         product_imports.raw_snapshot ->> 'description'
       )
     ),
     (
       'th',
-      coalesce(
-        to_jsonb(product_imports) ->> 'title_th',
-        product_imports.raw_snapshot ->> 'titleTh'
-      ),
-      coalesce(
-        to_jsonb(product_imports) ->> 'description_th',
-        product_imports.raw_snapshot ->> 'descriptionTh'
-      )
+      product_imports.raw_snapshot -> 'translations' -> 'th' ->> 'title',
+      product_imports.raw_snapshot -> 'translations' -> 'th' ->> 'description'
     ),
     (
       'zh-CN',

@@ -111,16 +111,12 @@ const execFileAsync = promisify(execFile);
 type ScrapedManufacturerProduct = Readonly<{
   brandName: string;
   description: string | null;
-  descriptionEn: string | null;
-  descriptionTh: string | null;
   fdaApprovalNumber: string | null;
   imageUrls: string[];
   parsedFacts: readonly ProductImportFactInput[];
   productTitle: string;
   skipReason?: string | null;
-  titleEn: string | null;
-  titleTh: string | null;
-  translations?: Record<string, {
+  translations: Record<string, {
     description?: string | null;
     status?: "complete" | "draft" | "missing";
     title?: string | null;
@@ -128,6 +124,55 @@ type ScrapedManufacturerProduct = Readonly<{
   rawSnapshot: Record<string, unknown>;
   sourceUrl: string;
 }>;
+
+type ScrapedProductTranslations = ScrapedManufacturerProduct["translations"];
+
+function translationMap(input: Readonly<{
+  enDescription?: string | null;
+  enTitle?: string | null;
+  thDescription?: string | null;
+  thTitle?: string | null;
+  zhCnDescription?: string | null;
+  zhCnTitle?: string | null;
+}>): ScrapedProductTranslations {
+  const rows = [
+    ["en", input.enTitle, input.enDescription],
+    ["th", input.thTitle, input.thDescription],
+    ["zh-CN", input.zhCnTitle, input.zhCnDescription]
+  ] as const;
+
+  return Object.fromEntries(
+    rows.flatMap(([locale, title, description]) => {
+      const cleanTitle = typeof title === "string" && title.trim()
+        ? title.trim()
+        : null;
+      const cleanDescription = typeof description === "string" && description.trim()
+        ? description.trim()
+        : null;
+
+      return cleanTitle || cleanDescription
+        ? [[
+            locale,
+            {
+              description: cleanDescription,
+              status: cleanTitle && cleanDescription ? "complete" : "draft",
+              title: cleanTitle
+            }
+          ] as const]
+        : [];
+    })
+  );
+}
+
+function translationText(
+  product: ScrapedManufacturerProduct,
+  locale: string,
+  key: "description" | "title"
+) {
+  const value = product.translations[locale]?.[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 
 function trustedIdentifiersForScrapedProduct(
   product: ScrapedManufacturerProduct
@@ -217,8 +262,6 @@ async function scrapeMegaWeCareProduct(url: string, brandName: string) {
   return {
     brandName,
     description,
-    descriptionEn: null,
-    descriptionTh: description,
     fdaApprovalNumber: fdaNumberFromText(sourceText),
     imageUrls: [...new Set(imageUrls)].slice(0, 8),
     parsedFacts,
@@ -227,7 +270,6 @@ async function scrapeMegaWeCareProduct(url: string, brandName: string) {
       activeIngredientCount: parsedFacts.length,
       apiSource: "megawecare_wordpress_product_v1",
       description,
-      descriptionTh: description,
       extractedText: sourceText.slice(0, 20_000),
       labelImageUrls,
       localizedNames,
@@ -240,8 +282,11 @@ async function scrapeMegaWeCareProduct(url: string, brandName: string) {
       yoastDescription
     },
     sourceUrl: typeof record.link === "string" ? record.link : url,
-    titleEn: localizedNames.titleEn ?? title,
-    titleTh: localizedNames.titleTh
+    translations: translationMap({
+      enTitle: localizedNames.englishTitle ?? title,
+      thDescription: description,
+      thTitle: localizedNames.thaiTitle
+    })
   } satisfies ScrapedManufacturerProduct;
 }
 
@@ -283,8 +328,6 @@ async function scrapeSwisseProduct(url: string, brandName: string) {
   return {
     brandName,
     description,
-    descriptionEn: description,
-    descriptionTh: null,
     fdaApprovalNumber: fdaNumberFromText(text),
     imageUrls,
     parsedFacts,
@@ -293,7 +336,6 @@ async function scrapeSwisseProduct(url: string, brandName: string) {
       activeIngredientCount: parsedFacts.length,
       benefits,
       description,
-      descriptionEn: description,
       directionsWarnings,
       extractedText: sourceText.slice(0, 20_000),
       importSkipReason: skipReason,
@@ -310,8 +352,10 @@ async function scrapeSwisseProduct(url: string, brandName: string) {
     },
     skipReason,
     sourceUrl: normalizedUrlWithoutHash(url, new URL(url)),
-    titleEn: title || null,
-    titleTh: null
+    translations: translationMap({
+      enDescription: description,
+      enTitle: title || null
+    })
   } satisfies ScrapedManufacturerProduct;
 }
 
@@ -338,14 +382,12 @@ async function scrapeVistraProduct(url: string, brandName: string) {
   const labelImageUrls = imageUrls.filter((imageUrl) =>
     /label|supplement|nutrition|fact|ingredient|vistra|product/i.test(imageUrl)
   );
-  const titleTh = vistraThaiTitleFromText(title, sourceText);
+  const thaiTitle = vistraThaiTitleFromText(title, sourceText);
   const categoryTags = vistraCategoryTagsFromText(sourceText);
 
   return {
     brandName,
     description,
-    descriptionEn: null,
-    descriptionTh: description,
     fdaApprovalNumber: extractVistraFdaNumber(sourceText) ?? fdaNumberFromText(sourceText),
     imageUrls,
     parsedFacts,
@@ -354,7 +396,6 @@ async function scrapeVistraProduct(url: string, brandName: string) {
       activeIngredientCount: parsedFacts.length,
       categoryTags,
       description,
-      descriptionTh: description,
       extractedText: sourceText.slice(0, 20_000),
       htmlHash: productEvidenceHash(html),
       importScope: "vistra_health_wellness",
@@ -368,8 +409,11 @@ async function scrapeVistraProduct(url: string, brandName: string) {
       supplementFactsUrl: supplementFactsUrlFromHtml(html, canonicalUrl)
     },
     sourceUrl: canonicalUrl,
-    titleEn: title || null,
-    titleTh
+    translations: translationMap({
+      enTitle: title || null,
+      thDescription: description,
+      thTitle: thaiTitle
+    })
   } satisfies ScrapedManufacturerProduct;
 }
 
@@ -418,8 +462,6 @@ async function scrapeDhcProduct(url: string, brandName: string) {
   return {
     brandName,
     description,
-    descriptionEn: null,
-    descriptionTh: null,
     fdaApprovalNumber: fdaNumberFromText(sourceText),
     imageUrls: [...new Set(imageUrls)].slice(0, 8),
     parsedFacts,
@@ -443,8 +485,7 @@ async function scrapeDhcProduct(url: string, brandName: string) {
     },
     skipReason,
     sourceUrl: canonicalUrl,
-    titleEn: null,
-    titleTh: null
+    translations: {}
   } satisfies ScrapedManufacturerProduct;
 }
 
@@ -579,7 +620,7 @@ async function scrapeProduct(url: string, brandName: string) {
   const locale = languageFromUrl(url) ?? languageFromHtml(html);
   const localizedNames = normalizedBrand === "mega we care"
     ? localizedProductNamesFromText(text)
-    : { titleEn: null, titleTh: null };
+    : { englishTitle: null, thaiTitle: null };
   const supplementFactsUrl = normalizedBrand === "centrum"
     ? await centrumSupplementFactsUrl({ html, productTitle: title, sourceUrl: url })
     : supplementFactsUrlFromHtml(html, url);
@@ -594,8 +635,6 @@ async function scrapeProduct(url: string, brandName: string) {
   return {
     brandName,
     description,
-    descriptionEn: locale === "en" ? description : null,
-    descriptionTh: locale === "th" ? description : null,
     fdaApprovalNumber: fdaNumberFromText(text),
     imageUrls: imageUrlsFromHtml(html, url),
     parsedFacts,
@@ -608,8 +647,6 @@ async function scrapeProduct(url: string, brandName: string) {
           : null,
       dosage: dosageFromText(text),
       description,
-      descriptionEn: locale === "en" ? description : null,
-      descriptionTh: locale === "th" ? description : null,
       extractedLabelText: labelText,
       extractedText: sourceText.slice(0, 20_000),
       htmlLength: html.length,
@@ -628,8 +665,12 @@ async function scrapeProduct(url: string, brandName: string) {
       supplementFactsUrl
     },
     sourceUrl: url,
-    titleEn: localizedNames.titleEn ?? (locale === "en" ? title : null),
-    titleTh: localizedNames.titleTh ?? (locale === "th" ? title : null)
+    translations: translationMap({
+      enDescription: locale === "en" ? description : null,
+      enTitle: localizedNames.englishTitle ?? (locale === "en" ? title : null),
+      thDescription: locale === "th" ? description : null,
+      thTitle: localizedNames.thaiTitle ?? (locale === "th" ? title : null)
+    })
   } satisfies ScrapedManufacturerProduct;
 }
 
@@ -684,10 +725,10 @@ function hasThaiText(value: string | null | undefined) {
 
 function hasBilingualDisplay(product: ScrapedManufacturerProduct) {
   return Boolean(
-    product.titleEn?.trim() &&
-    product.titleTh?.trim() &&
-    product.descriptionEn?.trim() &&
-    product.descriptionTh?.trim()
+    translationText(product, "en", "title") &&
+    translationText(product, "th", "title") &&
+    translationText(product, "en", "description") &&
+    translationText(product, "th", "description")
   );
 }
 
@@ -698,11 +739,14 @@ function qualityDisplayBlockers(product: ScrapedManufacturerProduct) {
     blockers.push("missing_bilingual_copy");
   }
 
-  if (product.titleTh?.trim() && !hasThaiText(product.titleTh)) {
+  const thaiTitle = translationText(product, "th", "title");
+  const thaiDescription = translationText(product, "th", "description");
+
+  if (thaiTitle && !hasThaiText(thaiTitle)) {
     blockers.push("thai_title_not_localized");
   }
 
-  if (product.descriptionTh?.trim() && !hasThaiText(product.descriptionTh)) {
+  if (thaiDescription && !hasThaiText(thaiDescription)) {
     blockers.push("thai_description_not_localized");
   }
 
@@ -746,75 +790,81 @@ async function translateProductCopyForImport(
     const enCopy = await translateDraftProductCopyWithAi({
       brandName: product.brandName,
       description: product.description,
-      descriptionEn: product.descriptionEn,
-      descriptionTh: product.descriptionTh,
       productTitle: product.productTitle,
-      productTitleEn: product.titleEn,
-      productTitleTh: product.titleTh,
       productUrl: product.sourceUrl,
       sourceSnapshot: product.rawSnapshot,
-      targetLocale: "en"
+      targetLocale: "en",
+      translations: product.translations
     });
+    const withEnglish = {
+      ...product.translations,
+      en: {
+        description: enCopy.description ?? translationText(product, "en", "description"),
+        status: enCopy.title && enCopy.description ? "complete" as const : "draft" as const,
+        title: enCopy.title ?? translationText(product, "en", "title")
+      }
+    };
     const thCopy = await translateDraftProductCopyWithAi({
       brandName: product.brandName,
       description: product.description,
-      descriptionEn: enCopy.description ?? product.descriptionEn,
-      descriptionTh: product.descriptionTh,
       productTitle: product.productTitle,
-      productTitleEn: enCopy.title ?? product.titleEn,
-      productTitleTh: product.titleTh,
       productUrl: product.sourceUrl,
       sourceSnapshot: product.rawSnapshot,
-      targetLocale: "th"
+      targetLocale: "th",
+      translations: withEnglish
     });
+    const withThai = {
+      ...withEnglish,
+      th: {
+        description: thCopy.description ?? translationText(product, "th", "description"),
+        status: thCopy.title && thCopy.description ? "complete" as const : "draft" as const,
+        title: thCopy.title ?? translationText(product, "th", "title")
+      }
+    };
     const zhCopy = await translateDraftProductCopyWithAi({
       brandName: product.brandName,
       description: product.description,
-      descriptionEn: enCopy.description ?? product.descriptionEn,
-      descriptionTh: thCopy.description ?? product.descriptionTh,
       productTitle: product.productTitle,
-      productTitleEn: enCopy.title ?? product.titleEn,
-      productTitleTh: thCopy.title ?? product.titleTh,
       productUrl: product.sourceUrl,
       sourceSnapshot: product.rawSnapshot,
-      targetLocale: "zh-CN"
+      targetLocale: "zh-CN",
+      translations: withThai
     });
-    const titleEn = enCopy.title ?? product.titleEn;
-    const descriptionEn = enCopy.description ?? product.descriptionEn;
-    const titleTh = thCopy.title ?? product.titleTh;
-    const descriptionTh = thCopy.description ?? product.descriptionTh;
     const zhTitle = zhCopy.title;
     const zhDescription = zhCopy.description;
+    const translations = {
+      ...withThai,
+      "zh-CN": {
+        description: zhDescription,
+        status: zhTitle && zhDescription ? "complete" as const : "draft" as const,
+        title: zhTitle
+      }
+    };
 
     return {
       failed: false,
       product: {
         ...product,
-        descriptionEn,
-        descriptionTh,
         rawSnapshot: {
           ...product.rawSnapshot,
           aiCopyTranslation: {
-            en: {
-              description: descriptionEn,
-              notes: enCopy.notes,
-              responseId: enCopy.responseId ?? null,
-              title: titleEn
+            locales: {
+              en: {
+                ...translations.en,
+                notes: enCopy.notes,
+                responseId: enCopy.responseId ?? null
+              },
+              th: {
+                ...translations.th,
+                notes: thCopy.notes,
+                responseId: thCopy.responseId ?? null
+              },
+              "zh-CN": {
+                ...translations["zh-CN"],
+                notes: zhCopy.notes,
+                responseId: zhCopy.responseId ?? null
+              }
             },
-            th: {
-              description: descriptionTh,
-              notes: thCopy.notes,
-              responseId: thCopy.responseId ?? null,
-              title: titleTh
-            },
-            "zh-CN": {
-              description: zhDescription,
-              notes: zhCopy.notes,
-              responseId: zhCopy.responseId ?? null,
-              title: zhTitle
-            },
-            descriptionEn,
-            descriptionTh,
             notes: [enCopy.notes, thCopy.notes, zhCopy.notes].filter(Boolean).join(" | ") || null,
             outputLocaleMode: "single_display_locale",
             responseIds: {
@@ -822,31 +872,10 @@ async function translateProductCopyForImport(
               th: thCopy.responseId ?? null,
               "zh-CN": zhCopy.responseId ?? null
             },
-            titleEn,
-            titleTh,
             translatedAt: new Date().toISOString()
           }
         },
-        translations: {
-          ...(product.translations ?? {}),
-          en: {
-            description: descriptionEn,
-            status: titleEn && descriptionEn ? "complete" : "draft",
-            title: titleEn
-          },
-          th: {
-            description: descriptionTh,
-            status: titleTh && descriptionTh ? "complete" : "draft",
-            title: titleTh
-          },
-          "zh-CN": {
-            description: zhDescription,
-            status: zhTitle && zhDescription ? "complete" : zhTitle || zhDescription ? "draft" : "missing",
-            title: zhTitle
-          }
-        },
-        titleEn,
-        titleTh
+        translations
       },
       translated: true
     };
@@ -936,8 +965,8 @@ async function canAutoApproveProduct(product: ScrapedManufacturerProduct) {
     labelStatus: product.parsedFacts.length > 0 ? "parsed" : "missing",
     productUrl: product.sourceUrl,
     sourceUrl: product.sourceUrl,
-    title: product.productTitle,
-    titleEn: product.titleEn
+    englishTitle: translationText(product, "en", "title"),
+    title: product.productTitle
   });
 
   return validation.status === "pass" &&
@@ -947,8 +976,15 @@ async function canAutoApproveProduct(product: ScrapedManufacturerProduct) {
 
 async function importCleanApprovedProduct(product: ScrapedManufacturerProduct) {
   const productTitle = decodeEntities(product.productTitle);
-  const titleEn = product.titleEn ? decodeEntities(product.titleEn) : null;
-  const titleTh = product.titleTh ? decodeEntities(product.titleTh) : null;
+  const translations = Object.fromEntries(
+    Object.entries(product.translations).map(([locale, translation]) => [
+      locale,
+      {
+        ...translation,
+        title: translation.title ? decodeEntities(translation.title) : translation.title
+      }
+    ])
+  );
 
   const row = await createAdminProduct({
     actor: "manufacturer_scraper_clean_import",
@@ -956,8 +992,6 @@ async function importCleanApprovedProduct(product: ScrapedManufacturerProduct) {
     brandStatus: "approved",
     brandName: product.brandName,
     description: product.description,
-    descriptionEn: product.descriptionEn,
-    descriptionTh: product.descriptionTh,
     facts: product.parsedFacts,
     fdaApprovalNumber: product.fdaApprovalNumber,
     imageUrl: product.imageUrls[0] ?? null,
@@ -978,8 +1012,7 @@ async function importCleanApprovedProduct(product: ScrapedManufacturerProduct) {
     },
     sourceUrl: product.sourceUrl,
     title: productTitle,
-    titleEn,
-    titleTh
+    translations
   });
 
   if (row.validation.status !== "pass") {
@@ -1020,14 +1053,11 @@ async function correctProductWithAi(
       brandName: product.brandName,
       currentFacts: product.parsedFacts,
       description: product.description,
-      descriptionEn: product.descriptionEn,
-      descriptionTh: product.descriptionTh,
       productTitle: product.productTitle,
-      productTitleEn: product.titleEn,
-      productTitleTh: product.titleTh,
       productUrl: product.sourceUrl,
       productAudience: productAudienceFromRawSnapshot(product.rawSnapshot),
-      sourceSnapshot: product.rawSnapshot
+      sourceSnapshot: product.rawSnapshot,
+      translations: product.translations
     });
 
     return {
@@ -1060,14 +1090,11 @@ async function correctProductWithAi(
           brandName: product.brandName,
           currentFacts: product.parsedFacts,
           description: product.description,
-          descriptionEn: product.descriptionEn,
-          descriptionTh: product.descriptionTh,
           productTitle: product.productTitle,
-          productTitleEn: product.titleEn,
-          productTitleTh: product.titleTh,
           productUrl: product.sourceUrl,
           productAudience: productAudienceFromRawSnapshot(product.rawSnapshot),
-          sourceSnapshot: product.rawSnapshot
+          sourceSnapshot: product.rawSnapshot,
+          translations: product.translations
         });
 
         return {
@@ -1180,8 +1207,7 @@ function qualityEvidenceHash(product: ScrapedManufacturerProduct) {
     imageUrls: product.imageUrls,
     productTitle: product.productTitle,
     sourceUrl: product.sourceUrl,
-    titleEn: product.titleEn,
-    titleTh: product.titleTh,
+    translations: product.translations,
     evidence: {
       extractedText: product.rawSnapshot.extractedText,
       labelImageUrls: product.rawSnapshot.labelImageUrls,
@@ -1285,23 +1311,18 @@ async function enrichQualityProduct(
       brandName: product.brandName,
       currentFacts: product.parsedFacts,
       description: product.description,
-      descriptionEn: product.descriptionEn,
-      descriptionTh: product.descriptionTh,
       imageUrls: [...new Set([...qualityLabelImageUrls(product), ...product.imageUrls])],
       productTitle: product.productTitle,
-      productTitleEn: product.titleEn,
-      productTitleTh: product.titleTh,
       productUrl: product.sourceUrl,
       productAudience: productAudienceFromRawSnapshot(product.rawSnapshot),
-      sourceSnapshot: product.rawSnapshot
+      sourceSnapshot: product.rawSnapshot,
+      translations: product.translations
     });
 
     return {
       failed: false,
       product: {
         ...product,
-        descriptionEn: enrichment.descriptionEn ?? product.descriptionEn,
-        descriptionTh: enrichment.descriptionTh ?? product.descriptionTh,
         parsedFacts: enrichment.facts,
         rawSnapshot: {
           ...product.rawSnapshot,
@@ -1312,28 +1333,9 @@ async function enrichQualityProduct(
             notes: enrichment.notes,
             productAudience: enrichment.productAudience,
             responseId: enrichment.responseId ?? null,
-            titleZhCn: enrichment.titleZhCn,
-            descriptionZhCn: enrichment.descriptionZhCn,
             warnings: enrichment.warnings
           }
-        },
-        translations: {
-          ...(product.translations ?? {}),
-          ...(enrichment.titleZhCn || enrichment.descriptionZhCn
-            ? {
-                "zh-CN": {
-                  description: enrichment.descriptionZhCn,
-                  status:
-                    enrichment.titleZhCn && enrichment.descriptionZhCn
-                      ? "complete" as const
-                      : "draft" as const,
-                  title: enrichment.titleZhCn
-                }
-              }
-            : {})
-        },
-        titleEn: enrichment.titleEn ?? product.titleEn,
-        titleTh: enrichment.titleTh ?? product.titleTh
+        }
       },
       reused: false,
       skipped: false
@@ -1458,8 +1460,8 @@ async function validateProductsForQualityImport(
       labelStatus: product.parsedFacts.length > 0 ? "parsed" : "missing",
       productUrl: product.sourceUrl,
       sourceUrl: product.sourceUrl,
-      title: product.productTitle,
-      titleEn: product.titleEn
+      englishTitle: translationText(product, "en", "title"),
+      title: product.productTitle
     });
     const displayBlockers = qualityDisplayBlockers(product);
     const reasons = [...new Set([...validation.reasons, ...displayBlockers])];
@@ -1592,38 +1594,15 @@ function applyQualityCache(
 
     return {
       ...product,
-      descriptionEn: cached.descriptionEn ?? product.descriptionEn,
-      descriptionTh: cached.descriptionTh ?? product.descriptionTh,
       parsedFacts: cached.parsedFacts,
       rawSnapshot: {
         ...product.rawSnapshot,
         qualityEnrichment: cachedEnrichment
       },
       translations: {
-        ...(product.translations ?? {}),
-        ...(typeof cachedEnrichment.titleZhCn === "string" ||
-        typeof cachedEnrichment.descriptionZhCn === "string"
-          ? {
-              "zh-CN": {
-                description:
-                  typeof cachedEnrichment.descriptionZhCn === "string"
-                    ? cachedEnrichment.descriptionZhCn
-                    : null,
-                status:
-                  typeof cachedEnrichment.titleZhCn === "string" &&
-                  typeof cachedEnrichment.descriptionZhCn === "string"
-                    ? "complete" as const
-                    : "draft" as const,
-                title:
-                  typeof cachedEnrichment.titleZhCn === "string"
-                    ? cachedEnrichment.titleZhCn
-                    : null
-              }
-            }
-          : {})
-      },
-      titleEn: cached.titleEn ?? product.titleEn,
-      titleTh: cached.titleTh ?? product.titleTh
+        ...product.translations,
+        ...cached.translations
+      }
     };
   });
 }
@@ -2167,8 +2146,6 @@ async function main() {
           actor: "manufacturer_scraper",
           brandName: product.brandName,
           description: product.description,
-          descriptionEn: product.descriptionEn,
-          descriptionTh: product.descriptionTh,
           fdaApprovalNumber: product.fdaApprovalNumber,
           identifiers,
           imageUrls: product.imageUrls,
@@ -2182,8 +2159,6 @@ async function main() {
           },
           source: "manufacturer_scrape",
           sourceUrl: product.sourceUrl,
-          titleEn: product.titleEn,
-          titleTh: product.titleTh,
           translations: product.translations
         });
         stagedCount += 1;

@@ -26,8 +26,6 @@ function productSearchTerms(value: string) {
 function productSearchIndex(row: AdminProductRow) {
   const fields = [
     row.title,
-    row.titleEn,
-    row.titleTh,
     row.displayTitle,
     row.displayDescription,
     ...Object.values(row.translations ?? {}).flatMap((translation) => [

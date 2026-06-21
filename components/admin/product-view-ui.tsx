@@ -1184,14 +1184,6 @@ export function ProductTranslationEditor({
       ...(locale === "en"
         ? {
             description: translations.en?.description ?? draft.description,
-            descriptionEn: translations.en?.description ?? null,
-            titleEn: translations.en?.title ?? null,
-          }
-        : {}),
-      ...(locale === "th"
-        ? {
-            descriptionTh: translations.th?.description ?? null,
-            titleTh: translations.th?.title ?? null,
           }
         : {}),
     };
