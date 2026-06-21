@@ -14,6 +14,18 @@ const copy = readFileSync(
   new URL("../components/formulation-reveal-copy.ts", import.meta.url),
   "utf8",
 );
+const i18nSource = readFileSync(
+  new URL("../content/i18n/source/en.json", import.meta.url),
+  "utf8",
+);
+const i18nThai = readFileSync(
+  new URL("../content/i18n/locales/th.json", import.meta.url),
+  "utf8",
+);
+const i18nChinese = readFileSync(
+  new URL("../content/i18n/locales/zh-CN.json", import.meta.url),
+  "utf8",
+);
 const css = readFileSync(
   new URL("../app/customer.css", import.meta.url),
   "utf8",
@@ -77,6 +89,29 @@ describe("final reveal UX", () => {
     assert.doesNotMatch(reveal, /mn-reveal-brand-word/);
     assert.doesNotMatch(reveal, /mn-reveal-brand-tagline/);
     assert.match(reveal, /min-h-\[calc\(100vh-70px\)\]/);
+  });
+
+  it("routes missing and unpaid plans before entering paid reveal polling", () => {
+    const gateStart = route.indexOf(
+      "const assessment = await getStoredAssessmentPrefill(planId);",
+    );
+    const refreshStart = route.indexOf(
+      "await ensureFreshProductRecommendationsForReveal",
+    );
+    const gate = route.slice(gateStart, refreshStart);
+
+    assert.ok(gateStart > -1, "reveal route should load the assessment gate");
+    assert.ok(
+      refreshStart > gateStart,
+      "assessment gate should run before reveal product refresh work",
+    );
+    assert.match(route, /import \{ notFound, redirect \} from "next\/navigation"/);
+    assert.match(route, /nutritionHealthScorePath/);
+    assert.match(gate, /if \(!assessment\) \{[\s\S]*notFound\(\);[\s\S]*\}/);
+    assert.match(
+      gate,
+      /if \(!assessment\.plan\) \{[\s\S]*redirect\(nutritionHealthScorePath\(locale, planId\)\);[\s\S]*\}/,
+    );
   });
 
   it("keeps the final handoff section order", () => {
@@ -183,12 +218,13 @@ describe("final reveal UX", () => {
     assert.match(reveal, /className="ink-section mn-reveal-pharmacist/);
     assert.match(reveal, /finalCopy\.khunName/);
     assert.match(reveal, /finalCopy\.khunRole/);
-    assert.match(copy, /khunAlt: "Khun Dream/);
-    assert.match(copy, /khunAlt: "คุณดรีม/);
-    assert.match(copy, /khunAlt: "Khun Dream，/);
-    assert.match(copy, /khunRole: "Licensed Pharmacist/);
-    assert.match(copy, /khunRole: "เภสัชกร/);
-    assert.match(copy, /khunRole: "执业药师/);
+    assert.match(copy, /getNamespace<RevealCopy>\(locale, "customer\.revealFinalCopy"\)/);
+    assert.match(i18nSource, /"customer\.revealFinalCopy\.khunAlt"[\s\S]*"defaultMessage": "Khun Dream/);
+    assert.match(i18nThai, /"customer\.revealFinalCopy\.khunAlt": "คุณดรีม/);
+    assert.match(i18nChinese, /"customer\.revealFinalCopy\.khunAlt": "Khun Dream，/);
+    assert.match(i18nSource, /"customer\.revealFinalCopy\.khunRole"[\s\S]*"defaultMessage": "Licensed Pharmacist/);
+    assert.match(i18nThai, /"customer\.revealFinalCopy\.khunRole": "เภสัชกร/);
+    assert.match(i18nChinese, /"customer\.revealFinalCopy\.khunRole": "执业药师/);
   });
 
   it("uses compact food-gap cards and keeps safety separate from closing", () => {
@@ -212,8 +248,8 @@ describe("final reveal UX", () => {
     assert.match(reveal, /finalCopy\.panyaByline/);
     assert.match(reveal, /finalCopy\.panyaWisdomBody/);
     assert.match(reveal, /connect\?\.code/);
-    assert.match(copy, /panyaByline: "Your guide/);
-    assert.match(copy, /panyaWisdomBody:/);
+    assert.match(i18nSource, /"customer\.revealFinalCopy\.panyaByline"[\s\S]*"defaultMessage": "Your guide/);
+    assert.match(i18nSource, /"customer\.revealFinalCopy\.panyaWisdomBody"/);
     assert.doesNotMatch(reveal, /panyaSection\}\s*<\/div>[\s\S]{0,120}mn-reveal-final-label-number/);
     assert.match(reveal, /source: "reveal_panya_support"/);
     assert.match(reveal, /\/api\/assessment\/\$\{encodeURIComponent\(planId\)\}\/line-connect/);
@@ -289,17 +325,17 @@ describe("final reveal UX", () => {
     assert.match(reveal, /finalCopy\.nutrientDecision/);
     assert.match(reveal, /mn-reveal-nutrient-detail/);
     assert.doesNotMatch(reveal, /mn-reveal-nutrient-drawer-card/);
-    assert.match(copy, /nutrientWhy: "Why this is for you"/);
-    assert.doesNotMatch(copy, /nutrientForYou/);
-    assert.match(copy, /nutrientDecision: "Decision"/);
+    assert.match(i18nSource, /"customer\.revealFinalCopy\.nutrientWhy"[\s\S]*"defaultMessage": "Why this is for you"/);
+    assert.doesNotMatch(i18nSource, /"customer\.revealFinalCopy\.nutrientForYou"/);
+    assert.match(i18nSource, /"customer\.revealFinalCopy\.nutrientDecision"[\s\S]*"defaultMessage": "Decision"/);
     assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-nutrient-drawer-card/);
   });
 
   it("keeps product coverage grammar from duplicating the total", () => {
     assert.doesNotMatch(reveal, /function countOfText/);
     assert.match(reveal, /coveredProductNeedText/);
-    assert.match(copy, /productsPartialTitleTemplate:\s*"\{productSelectedText\} bottles\. \{coveredProductNeedText\} of \{supplementSelectedTextLower\} nutrients\."/);
-    assert.doesNotMatch(copy, /productsPartialTitleTemplate:\s*"\{productSelectedText\}[^"]*\{coveredText\}/);
+    assert.match(i18nSource, /"customer\.revealCopy\.productsPartialTitleTemplate"[\s\S]*"defaultMessage": "\{productSelectedText\} bottles\. \{coveredProductNeedText\} of \{supplementSelectedTextLower\} nutrients\."/);
+    assert.doesNotMatch(i18nSource, /"customer\.revealCopy\.productsPartialTitleTemplate"[\s\S]*"defaultMessage": "\{productSelectedText\}[^"]*\{coveredText\}/);
   });
 
   it("matches the handoff product shelf instead of the old dark reveal band", () => {

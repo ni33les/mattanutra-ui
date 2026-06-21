@@ -1,14 +1,21 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FormulationResults } from "@/components/formulation-results";
 import { PublicNutritionShell } from "@/components/nutrition-flow/public-nutrition-shell";
 import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
-import { getStoredFormulationResult, isUuid } from "@/lib/assessment-store";
+import {
+  getStoredAssessmentPrefill,
+  getStoredFormulationResult,
+  isUuid
+} from "@/lib/assessment-store";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
-import { nutritionRevealPath } from "@/lib/nutrition-paths";
+import {
+  nutritionHealthScorePath,
+  nutritionRevealPath
+} from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { ensureFreshProductRecommendationsForReveal } from "@/lib/task-worker";
 
@@ -91,6 +98,16 @@ export default async function NutritionRevealPage({
         <SiteFooter content={dictionary.footer} locale={locale} />
       </main>
     );
+  }
+
+  const assessment = await getStoredAssessmentPrefill(planId);
+
+  if (!assessment) {
+    notFound();
+  }
+
+  if (!assessment.plan) {
+    redirect(nutritionHealthScorePath(locale, planId));
   }
 
   await ensureFreshProductRecommendationsForReveal(
