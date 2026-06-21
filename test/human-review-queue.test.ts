@@ -26,8 +26,16 @@ const reviewRoute = readFileSync(
   new URL("../app/api/admin/review-tasks/[id]/route.ts", import.meta.url),
   "utf8"
 );
-const retailStock = readFileSync(
-  new URL("../lib/admin-retail-stock.ts", import.meta.url),
+const retailStockReorderAdvice = readFileSync(
+  new URL("../lib/admin-retail-stock-reorder-advice.ts", import.meta.url),
+  "utf8"
+);
+const retailOperationTasks = readFileSync(
+  new URL("../lib/admin-retail-operation-tasks.ts", import.meta.url),
+  "utf8"
+);
+const retailStockSideEffects = readFileSync(
+  new URL("../lib/admin-retail-stock-side-effects.ts", import.meta.url),
   "utf8"
 );
 const panyaTaskApplier = readFileSync(
@@ -66,12 +74,12 @@ describe("human review queue coverage", () => {
   });
 
   it("keeps stockout review medium priority with a three-day expiry", () => {
-    assert.match(retailStock, /function humanReviewDueAt\(days = 3\)/);
-    assert.match(retailStock, /taskType: "retail_stock_low_stock_review"/);
-    assert.match(retailStock, /title: "Review retail stockout"/);
-    assert.match(retailStock, /priorityScore: 360/);
-    assert.match(retailStock, /riskLevel === "out_of_stock"[\s\S]*\? 360/);
-    assert.match(retailStock, /scheduledFor: new Date\(\)/);
+    assert.match(retailOperationTasks, /function humanReviewDueAt\(days = 3\)/);
+    assert.match(retailStockSideEffects, /taskType: "retail_stock_low_stock_review"/);
+    assert.match(retailStockSideEffects, /title: "Review retail stockout"/);
+    assert.match(retailStockSideEffects, /priorityScore: 360/);
+    assert.match(retailStockReorderAdvice, /riskLevel === "out_of_stock"[\s\S]*\? 360/);
+    assert.match(retailOperationTasks, /scheduledFor: new Date\(\)/);
     assert.match(panyaTaskApplier, /dueAt: new Date\(Date\.now\(\) \+ 3 \* 24 \* 60 \* 60 \* 1000\)[\s\S]*taskType: "customer_chat_escalation"/);
   });
 });

@@ -78,6 +78,58 @@ const adminRetailStockService = readFileSync(
   new URL("../lib/admin-retail-stock.ts", import.meta.url),
   "utf8"
 );
+const adminRetailStockAccess = readFileSync(
+  new URL("../lib/admin-retail-stock-access.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailAgentSession = readFileSync(
+  new URL("../lib/admin-retail-agent-session.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailOrderBpmEvents = readFileSync(
+  new URL("../lib/admin-retail-order-bpm-events.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailCustomerOrders = readFileSync(
+  new URL("../lib/admin-retail-customer-orders.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailOperationTasks = readFileSync(
+  new URL("../lib/admin-retail-operation-tasks.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockTables = readFileSync(
+  new URL("../lib/admin-retail-stock-tables.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockSideEffects = readFileSync(
+  new URL("../lib/admin-retail-stock-side-effects.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockReorderAdvice = readFileSync(
+  new URL("../lib/admin-retail-stock-reorder-advice.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockAllocationIntegrity = readFileSync(
+  new URL("../lib/admin-retail-stock-allocation-integrity.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockMutations = readFileSync(
+  new URL("../lib/admin-retail-stock-mutations.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockOrganisations = readFileSync(
+  new URL("../lib/admin-retail-stock-organisations.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockData = readFileSync(
+  new URL("../lib/admin-retail-stock-data.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockTypes = readFileSync(
+  new URL("../lib/admin-retail-stock-types.ts", import.meta.url),
+  "utf8"
+);
 const adminRetailStockCodecs = readFileSync(
   new URL("../lib/admin-retail-stock-codecs.ts", import.meta.url),
   "utf8"
@@ -374,9 +426,230 @@ describe("codebase cleanup guardrails", () => {
 
   it("keeps retail stock cleanup hotspots visible until they are split", () => {
     assert.ok(
-      lineCount(adminRetailStockService) <= 6_650,
+      lineCount(adminRetailStockService) <= 950,
       "admin retail stock service must not grow before it is decomposed"
     );
+    assert.ok(
+      lineCount(adminRetailCustomerOrders) <= 1_900,
+      "admin retail customer orders service must not grow before it is decomposed further"
+    );
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-types/);
+    assert.doesNotMatch(adminRetailStockService, /\bexport type AdminRetailStockData\b/);
+    assert.match(adminRetailStockTypes, /\bexport type AdminRetailStockData\b/);
+    assert.match(adminRetailStockTypes, /\bexport type StockDb\b/);
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-access/);
+    assert.doesNotMatch(adminRetailStockService, /\bfunction canWriteRetailStock\b/);
+    assert.match(adminRetailStockAccess, /\bexport function canWriteRetailStock\b/);
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-tables/);
+    assert.doesNotMatch(adminRetailStockService, /\bfunction operationalStockTablesAvailable\b/);
+    assert.match(
+      adminRetailStockTables,
+      /\bexport async function operationalStockTablesAvailable\b/
+    );
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-agent-session/);
+    assert.doesNotMatch(adminRetailStockService, /\bfunction retailAgentSessionContext\b/);
+    assert.match(
+      adminRetailAgentSession,
+      /\bexport async function retailAgentSessionContext\b/
+    );
+    assert.doesNotMatch(
+      adminRetailStockService,
+      /@\/lib\/admin-retail-order-bpm-events/
+    );
+    assert.match(adminRetailCustomerOrders, /@\/lib\/admin-retail-order-bpm-events/);
+    assert.doesNotMatch(adminRetailStockService, /\bfunction recordRetailOrderBpmEvent\b/);
+    assert.match(
+      adminRetailOrderBpmEvents,
+      /\bexport async function recordRetailOrderBpmEvent\b/
+    );
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-operation-tasks/);
+    assert.match(adminRetailStockService, /\bensureOrderWorkflowTask\b/);
+    for (const forbidden of [
+      /\bfunction retailCommandIdForTaskType\b/,
+      /\bfunction humanReviewDueAt\b/,
+      /\bfunction queueRetailOperationTask\b/,
+      /\bfunction completeOrderWorkflowTask\b/,
+      /\bfunction assertOrderWorkflowTaskClaimable\b/,
+      /\bfunction cancelStaleOrderWorkflowTasks\b/
+    ]) {
+      assert.doesNotMatch(
+        adminRetailStockService,
+        forbidden,
+        `retail stock service must not reintroduce ${forbidden}`
+      );
+    }
+    for (const required of [
+      /\bexport function retailCommandIdForTaskType\b/,
+      /\bexport function humanReviewDueAt\b/,
+      /\bexport async function queueRetailOperationTask\b/,
+      /\bexport async function completeOrderWorkflowTask\b/,
+      /\bexport async function assertOrderWorkflowTaskClaimable\b/,
+      /\bexport async function ensureOrderWorkflowTask\b/,
+      /\bexport async function cancelStaleOrderWorkflowTasks\b/
+    ]) {
+      assert.match(
+        adminRetailOperationTasks,
+        required,
+        `retail operation task module must provide ${required}`
+      );
+    }
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-side-effects/);
+    for (const forbidden of [
+      /\bfunction recordRetailStockSnapshot\b/,
+      /\bfunction queueRetailStockIntelligenceRefresh\b/,
+      /\bfunction queueStockReviewTasks\b/,
+      /retail_product_stock_snapshots \(/,
+      /taskType: "retail_stock_forecast_refresh"/
+    ]) {
+      assert.doesNotMatch(
+        adminRetailStockService,
+        forbidden,
+        `retail stock service must not reintroduce side-effect detail ${forbidden}`
+      );
+    }
+    for (const required of [
+      /\bexport async function recordRetailStockSnapshot\b/,
+      /\bexport async function queueRetailStockIntelligenceRefresh\b/,
+      /\bexport async function queueStockReviewTasks\b/,
+      /retail_product_stock_snapshots \(/,
+      /taskType: "retail_stock_forecast_refresh"/,
+      /taskType: "retail_stock_low_stock_review"/
+    ]) {
+      assert.match(
+        adminRetailStockSideEffects,
+        required,
+        `retail stock side-effect module must provide ${required}`
+      );
+    }
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-reorder-advice/);
+    assert.match(adminRetailStockService, /\brefreshRetailStockReorderAdvice\b/);
+    assert.doesNotMatch(
+      adminRetailStockService,
+      /\bexport async function refreshRetailStockReorderAdvice\b/
+    );
+    for (const required of [
+      /\bexport async function refreshRetailStockReorderAdvice\b/,
+      /insert into public\.retail_stock_reorder_advice/,
+      /taskType:\s*riskLevel === "out_of_stock"/,
+      /retail_stock_reorder_review/
+    ]) {
+      assert.match(
+        adminRetailStockReorderAdvice,
+        required,
+        `retail stock reorder-advice module must provide ${required}`
+      );
+    }
+    assert.match(
+      adminRetailStockService,
+      /@\/lib\/admin-retail-stock-allocation-integrity/
+    );
+    for (const forbidden of [
+      /\bfunction ensureRetailStockRow\b/,
+      /\bexport async function ensureRetailOrderShortagesInReorderAdvice\b/,
+      /\bfunction orderPipelineFullyBacked\b/,
+      /\bfunction repairRetailStockAllocationIntegrity\b/,
+      /\bfunction repairCustomerOrderAllocationIntegrity\b/,
+      /\bexport async function repairRetailCustomerOrderAllocationIntegrityForSystem\b/
+    ]) {
+      assert.doesNotMatch(
+        adminRetailStockService,
+        forbidden,
+        `retail stock service must not reintroduce allocation-integrity detail ${forbidden}`
+      );
+    }
+    for (const required of [
+      /\bexport async function ensureRetailStockRow\b/,
+      /\bexport async function ensureRetailOrderShortagesInReorderAdvice\b/,
+      /\bexport async function repairRetailStockAllocationIntegrity\b/,
+      /\bexport async function releaseRetailStockOverAllocationsAfterStockCount\b/,
+      /\bexport async function repairCustomerOrderAllocationIntegrity\b/,
+      /\bexport async function repairRetailCustomerOrderAllocationIntegrityForSystem\b/,
+      /admin\.retail_stock_allocations_released/,
+      /admin\.retail_reorder_advice_shortages_reconciled/
+    ]) {
+      assert.match(
+        adminRetailStockAllocationIntegrity,
+        required,
+        `retail stock allocation-integrity module must provide ${required}`
+      );
+    }
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-mutations/);
+    for (const forbidden of [
+      /\bexport async function upsertRetailStockItem\b/,
+      /\bfunction stockRowForMovement\b/,
+      /\bexport async function recordRetailStockMovement\b/,
+      /\bexport async function voidRetailStockMovement\b/,
+      /\bexport async function setRetailStockStatus\b/,
+      /admin\.stock_movement_recorded/,
+      /taskType: "retail_stock_movement_review"/
+    ]) {
+      assert.doesNotMatch(
+        adminRetailStockService,
+        forbidden,
+        `retail stock service must not reintroduce stock mutation detail ${forbidden}`
+      );
+    }
+    for (const required of [
+      /\bexport async function upsertRetailStockItem\b/,
+      /\bexport async function recordRetailStockMovement\b/,
+      /\bexport async function voidRetailStockMovement\b/,
+      /\bexport async function setRetailStockStatus\b/,
+      /admin\.stock_created/,
+      /admin\.stock_movement_recorded/,
+      /admin\.stock_movement_voided/,
+      /admin\.stock_status_updated/,
+      /taskType: "retail_stock_movement_review"/
+    ]) {
+      assert.match(
+        adminRetailStockMutations,
+        required,
+        `retail stock mutation module must provide ${required}`
+      );
+    }
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-organisations/);
+    for (const forbidden of [
+      /\bfunction loadRetailOrganisations\b/,
+      /\bfunction productApproved\b/,
+      /\bfunction organisationForStockWrite\b/
+    ]) {
+      assert.doesNotMatch(
+        adminRetailStockService,
+        forbidden,
+        `retail stock service must not reintroduce organisation helper ${forbidden}`
+      );
+    }
+    for (const required of [
+      /\bexport async function loadRetailOrganisations\b/,
+      /\bexport async function productApproved\b/,
+      /\bexport async function organisationForStockWrite\b/,
+      /canAccessRetailOrganisation/,
+      /normalizeProductCountryCode/
+    ]) {
+      assert.match(
+        adminRetailStockOrganisations,
+        required,
+        `retail stock organisation module must provide ${required}`
+      );
+    }
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-data/);
+    assert.match(
+      adminRetailStockService,
+      /export \{\s*emptyAdminRetailStockData,\s*getAdminRetailStockData\s*\}/
+    );
+    assert.doesNotMatch(
+      adminRetailStockService,
+      /\bexport async function getAdminRetailStockData\b/
+    );
+    assert.match(
+      adminRetailStockData,
+      /\bexport async function getAdminRetailStockData\b/
+    );
+    assert.match(
+      adminRetailStockData,
+      /\bexport function emptyAdminRetailStockData\b/
+    );
+    assert.match(adminRetailStockData, /@\/lib\/admin-retail-stock-read-model/);
+    assert.match(adminRetailStockData, /@\/lib\/admin-retail-order-read-model/);
     assert.ok(
       lineCount(adminRetailStockView) <= 4_700,
       "admin retail stock view must not grow before it is decomposed"
@@ -431,13 +704,38 @@ describe("codebase cleanup guardrails", () => {
     );
     assert.match(adminRetailStockControls, /export function ProductThumbnail/);
     assert.match(adminRetailStockControls, /export function StockNumberInput/);
-    assert.match(adminRetailStockService, /\bexport async function getAdminRetailStockData\b/);
-    assert.match(adminRetailStockService, /\bexport async function advanceRetailCustomerOrder\b/);
-    assert.match(adminRetailStockService, /\bexport async function recordRetailCustomerOrderPickupBooked\b/);
+    assert.match(adminRetailStockService, /\bgetAdminRetailStockData\b/);
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-customer-orders/);
+    for (const requiredCustomerOrderExport of [
+      /\bexport async function createRetailCustomerOrder\b/,
+      /\bexport async function allocateRetailCustomerOrder\b/,
+      /\bexport async function advanceRetailCustomerOrder\b/,
+      /\bexport async function recordRetailCustomerOrderPickupBooked\b/,
+      /\bexport async function reconcileRetailOrderLifecycle\b/
+    ]) {
+      assert.match(
+        adminRetailCustomerOrders,
+        requiredCustomerOrderExport,
+        `retail customer-order module must provide ${requiredCustomerOrderExport}`
+      );
+      assert.doesNotMatch(
+        adminRetailStockService,
+        requiredCustomerOrderExport,
+        `retail stock service must not reintroduce ${requiredCustomerOrderExport}`
+      );
+    }
+    assert.match(
+      adminRetailCustomerOrders,
+      /\bfunction customerOrderPickupInProgressFromShipmentTable\b/
+    );
+    assert.doesNotMatch(
+      adminRetailStockService,
+      /\bfunction customerOrderPickupInProgressFromShipmentTable\b/
+    );
     assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-codecs/);
     assert.match(adminRetailStockService, /@\/lib\/admin-retail-order-read-model/);
     assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-pipeline/);
-    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-read-model/);
+    assert.doesNotMatch(adminRetailStockService, /@\/lib\/admin-retail-stock-read-model/);
     assert.match(
       adminRetailStockService,
       /export \{ getRetailCustomerOrderActionStates \}/
@@ -507,7 +805,8 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminRetailStockPipeline, /export function retailStockPipelineKey/);
     assert.match(adminRetailStockPipeline, /export async function getRetailStockPipeline/);
     assert.match(adminRetailStockPipeline, /export function localizedProductTitleExpression/);
-    assert.match(adminRetailStockService, /@\/lib\/retail-order-workflow-rules/);
+    assert.doesNotMatch(adminRetailStockService, /@\/lib\/retail-order-workflow-rules/);
+    assert.match(adminRetailCustomerOrders, /@\/lib\/retail-order-workflow-rules/);
     assert.doesNotMatch(adminRetailStockService, /\bfunction workflowStageForStatus\b/);
     assert.doesNotMatch(adminRetailStockService, /\bfunction retailOrderWorkflowTaskDetails\b/);
     assert.match(retailOrderWorkflowRules, /\bexport function workflowStageForStatus\b/);

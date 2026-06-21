@@ -244,6 +244,34 @@ describe("retail stock and FX infrastructure", () => {
 	      "utf8"
 	    );
 	    const service = readFileSync("lib/admin-retail-stock.ts", "utf8");
+	    const customerOrders = readFileSync(
+	      "lib/admin-retail-customer-orders.ts",
+	      "utf8"
+	    );
+	    const operationTasks = readFileSync(
+	      "lib/admin-retail-operation-tasks.ts",
+	      "utf8"
+	    );
+	    const stockSideEffects = readFileSync(
+	      "lib/admin-retail-stock-side-effects.ts",
+	      "utf8"
+	    );
+	    const stockReorderAdvice = readFileSync(
+	      "lib/admin-retail-stock-reorder-advice.ts",
+	      "utf8"
+	    );
+	    const stockAllocationIntegrity = readFileSync(
+	      "lib/admin-retail-stock-allocation-integrity.ts",
+	      "utf8"
+	    );
+	    const stockMutations = readFileSync(
+	      "lib/admin-retail-stock-mutations.ts",
+	      "utf8"
+	    );
+	    const stockData = readFileSync(
+	      "lib/admin-retail-stock-data.ts",
+	      "utf8"
+	    );
 	    const orderReadModel = readFileSync(
 	      "lib/admin-retail-order-read-model.ts",
 	      "utf8"
@@ -258,6 +286,10 @@ describe("retail stock and FX infrastructure", () => {
 	    );
 	    const stockCodecs = readFileSync(
 	      "lib/admin-retail-stock-codecs.ts",
+	      "utf8"
+	    );
+	    const stockTypes = readFileSync(
+	      "lib/admin-retail-stock-types.ts",
 	      "utf8"
 	    );
 	    const workflowRules = readFileSync(
@@ -835,7 +867,7 @@ describe("retail stock and FX infrastructure", () => {
 			    assert.doesNotMatch(route, /action === "receive_purchase_order_line"[\s\S]*expiresAt: null/);
 			    assert.doesNotMatch(route, /action === "mark_purchase_order_line_missing"/);
 		    assert.doesNotMatch(route, /action === "build_purchase_order_from_backorder_task"/);
-	    assert.match(service, /export type AdminRetailStockPipelineRow/);
+	    assert.match(stockTypes, /export type AdminRetailStockPipelineRow/);
 	    assert.match(service, /export \{ getRetailStockPipeline \}/);
 	    assert.match(stockPipeline, /export async function getRetailStockPipeline/);
 		    assert.match(stockPipeline, /customerDemandUnits[\s\S]*allocatedUnits[\s\S]*availableNowUnits[\s\S]*unorderedNeedUnits/);
@@ -852,22 +884,23 @@ describe("retail stock and FX infrastructure", () => {
 		    assert.doesNotMatch(service, /export async function buildPurchaseOrderDraftFromBackorderTask/);
 		    assert.doesNotMatch(service, /retail_purchase_order_place_order/);
 	    assert.match(orderReadModel, /No live stock is available to allocate/);
-	    assert.match(service, /export type AdminRetailCustomerOrderActionStates/);
+	    assert.match(stockTypes, /export type AdminRetailCustomerOrderActionStates/);
 	    assert.match(orderReadModel, /export function getRetailCustomerOrderActionStates/);
 	    assert.match(service, /export \{ getRetailCustomerOrderActionStates \}/);
-	    assert.match(service, /export async function ensureOrderWorkflowTask/);
-	    assert.match(service, /admin\.retail_order_workflow_task_repaired/);
-	    assert.match(service, /retail_order_task_repaired/);
+	    assert.match(service, /\bensureOrderWorkflowTask\b/);
+	    assert.match(operationTasks, /export async function ensureOrderWorkflowTask/);
+	    assert.match(operationTasks, /admin\.retail_order_workflow_task_repaired/);
+	    assert.match(operationTasks, /retail_order_task_repaired/);
 	    assert.doesNotMatch(service, /Missing open \$\{nextExpectedTaskType\} task for \$\{workflowStage\}/);
 	    assert.doesNotMatch(service, /Build a draft purchase order before completing this task/);
 		    assert.doesNotMatch(service, /select distinct\s+retail_customer_orders\.id::text[\s\S]*retail_customer_orders\.due_at/);
 				    assert.match(service, /retail_customer_orders\.organisation_id = \$\{list\.organisation_id\}::uuid[\s\S]*retail_customer_order_lines\.product_id = any\(\$\{changedProductIds\}::uuid\[\]\)[\s\S]*allocateRetailCustomerOrder\(context/);
 			    assert.match(service, /releaseRetailStockOverAllocationsAfterStockCount/);
-			    assert.match(service, /shopping_list_stock_count_reduced/);
-			    assert.match(service, /status = 'cancelled'/);
-			    assert.match(service, /quantity_allocated = greatest\(0, quantity_allocated - \$\{releaseUnits\}\)/);
-			    assert.match(service, /set status = 'awaiting_stock'/);
-			    assert.match(service, /admin\.retail_stock_allocations_released/);
+			    assert.match(stockAllocationIntegrity, /shopping_list_stock_count_reduced/);
+			    assert.match(stockAllocationIntegrity, /status = 'cancelled'/);
+			    assert.match(stockAllocationIntegrity, /quantity_allocated = greatest\(0, quantity_allocated - \$\{releaseUnits\}\)/);
+			    assert.match(stockAllocationIntegrity, /set status = 'awaiting_stock'/);
+				    assert.match(stockAllocationIntegrity, /admin\.retail_stock_allocations_released/);
 					    assert.doesNotMatch(view, /labels\.stock\.receiveAll/);
 			    assert.doesNotMatch(view, /labels\.stock\.receiveQuantityError/);
 			    assert.doesNotMatch(view, /openReceiveEditor\(order, lines\)/);
@@ -932,45 +965,45 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(route, /async record_stock_movement\(context, body\)/);
 	    assert.match(route, /async void_stock_movement\(context, body\)/);
 		    assert.doesNotMatch(route, /action === "void_purchase_order"/);
-    assert.match(service, /products[\s\S]*status = 'approved'/);
-    assert.match(service, /lower\(coalesce\(products\.normalized_brand_name, products\.brand_name, ''\)\) in \('dhc', 'dmc'\)/);
-    assert.match(service, /coalesce\(products\.source_url, ''\) ilike '%dhc\.co\.jp%'/);
+    assert.match(stockData, /products[\s\S]*status = 'approved'/);
+    assert.match(stockData, /lower\(coalesce\(products\.normalized_brand_name, products\.brand_name, ''\)\) in \('dhc', 'dmc'\)/);
+    assert.match(stockData, /coalesce\(products\.source_url, ''\) ilike '%dhc\.co\.jp%'/);
     assert.match(service, /retail_sellable_products/);
-    assert.match(service, /getRetailCartLineAvailability/);
-    assert.match(service, /resolveUsdRateForCurrency/);
-    assert.match(service, /pricingSnapshot/);
-    assert.match(service, /fulfillmentPromise/);
-    assert.match(service, /Master List country RRP is required before checkout/);
+    assert.match(customerOrders, /getRetailCartLineAvailability/);
+    assert.match(customerOrders, /resolveUsdRateForCurrency/);
+    assert.match(customerOrders, /pricingSnapshot/);
+    assert.match(customerOrders, /fulfillmentPromise/);
+    assert.match(customerOrders, /Master List country RRP is required before checkout/);
     assert.doesNotMatch(service, /taskType: "retail_purchase_order_review"/);
-	    assert.doesNotMatch(service, /tasks\.task_type <> 'retail_purchase_order_review'/);
-    assert.match(service, /claimedByDisplayName/);
-    assert.match(service, /claimed_people\.display_name/);
+    assert.doesNotMatch(service, /tasks\.task_type <> 'retail_purchase_order_review'/);
+    assert.match(customerOrders, /claimedByDisplayName/);
+    assert.match(stockData, /claimed_people\.display_name/);
     assert.doesNotMatch(service, /completedReviewTaskIds/);
     assert.doesNotMatch(service, /completedByAction: "mark_purchase_order_ordered"/);
     assert.doesNotMatch(service, /Task must be claimed before it can be completed/);
 	    assert.doesNotMatch(service, /voidRetailPurchaseOrder/);
 	    assert.doesNotMatch(service, /admin\.retail_purchase_order_voided/);
     assert.match(service, /awaiting_stock/);
-    assert.match(service, /currency = excluded\.currency/);
+    assert.match(stockMutations, /currency = excluded\.currency/);
     assert.match(service, /status <> 'deleted'/);
     assert.match(service, /recordAdminAudit/);
-    assert.match(service, /AdminRetailAuditEvent/);
-    assert.match(service, /admin_audit_events/);
-    assert.match(service, /task_events/);
-    assert.match(service, /auditEvents/);
-    assert.match(service, /admin\.stock_created/);
-    assert.match(service, /admin\.stock_updated/);
-    assert.match(service, /admin\.stock_status_updated/);
-    assert.match(service, /recordRetailStockSnapshot/);
-    assert.match(service, /retail_product_stock_snapshots/);
+    assert.match(stockTypes, /AdminRetailAuditEvent/);
+    assert.match(stockData, /admin_audit_events/);
+    assert.match(stockData, /task_events/);
+    assert.match(stockData, /auditEvents/);
+    assert.match(stockMutations, /admin\.stock_created/);
+    assert.match(stockMutations, /admin\.stock_updated/);
+    assert.match(stockMutations, /admin\.stock_status_updated/);
+    assert.match(stockMutations, /recordRetailStockSnapshot/);
+    assert.match(stockSideEffects, /retail_product_stock_snapshots/);
     assert.doesNotMatch(service, /retail_product_stock\.expires_at/);
     assert.doesNotMatch(service, /sourceEntityType: "retail_product_stock"[\s\S]*retail_stock_expiry_review/);
-	    assert.match(service, /case when tasks\.status in \('completed', 'cancelled', 'skipped'\) then 1 else 0 end/);
-	    assert.match(service, /priorityReason: "Refresh stock forecast after stock changed\."[\s\S]*taskType: "retail_stock_forecast_refresh"/);
+	    assert.match(stockData, /case when tasks\.status in \('completed', 'cancelled', 'skipped'\) then 1 else 0 end/);
+	    assert.match(stockSideEffects, /priorityReason: "Refresh stock forecast after stock changed\."[\s\S]*taskType: "retail_stock_forecast_refresh"/);
 	    assert.doesNotMatch(service, /tasks\.task_type <> 'retail_stock_forecast_refresh'/);
-	    assert.match(service, /tasks\.actor_type/);
-	    assert.match(service, /reserved_agents\.name as agent_name/);
-	    assert.match(service, /isAgentTask/);
+	    assert.match(stockData, /tasks\.actor_type/);
+	    assert.match(stockData, /reserved_agents\.name as agent_name/);
+	    assert.match(stockData, /isAgentTask/);
 	    assert.match(service, /recordRetailStockMovement/);
 		    assert.doesNotMatch(service, /export type RetailPurchaseOrderShortfallResolution/);
 		    assert.doesNotMatch(service, /export async function reconcileRetailPurchaseOrderLineShortfall/);
@@ -980,64 +1013,68 @@ describe("retail stock and FX infrastructure", () => {
 		    assert.doesNotMatch(service, /retail_purchase_order_shortfall_reopened_demand/);
 			    assert.doesNotMatch(service, /reconcileRetailerShoppingListShortages/);
 				    assert.match(service, /ensureRetailOrderShortagesInReorderAdvice/);
-				    assert.match(service, /admin\.retail_reorder_advice_shortages_reconciled/);
-				    assert.match(service, /expectedTaskType === "retail_shopping_list_review"[\s\S]*ensureRetailOrderShortagesInReorderAdvice/);
-				    assert.match(service, /reorderAdviceShortageUnits/);
-				    assert.match(service, /shopping_list_receiving/);
+				    assert.match(stockAllocationIntegrity, /admin\.retail_reorder_advice_shortages_reconciled/);
+				    assert.match(customerOrders, /expectedTaskType === "retail_shopping_list_review"[\s\S]*ensureRetailOrderShortagesInReorderAdvice/);
+				    assert.match(customerOrders, /reorderAdviceShortageUnits/);
+				    assert.match(stockAllocationIntegrity, /shopping_list_receiving/);
 		    assert.match(service, /voidRetailStockMovement/);
 			    assert.match(service, /refreshRetailStockReorderAdvice/);
-		    assert.match(service, /ensureRetailStockRow\(context,[\s\S]*source: "retail_order_shortage_reorder_advice"/);
+			    assert.match(stockReorderAdvice, /export async function refreshRetailStockReorderAdvice/);
+			    assert.match(stockReorderAdvice, /insert into public\.retail_stock_reorder_advice/);
+			    assert.match(stockReorderAdvice, /retail_stock_reorder_review/);
+		    assert.match(stockAllocationIntegrity, /ensureRetailStockRow\(context,[\s\S]*source: "retail_order_shortage_reorder_advice"/);
 		    assert.doesNotMatch(
-		      service,
+		      stockAllocationIntegrity,
 		      /function ensureRetailOrderShortagesInReorderAdvice[\s\S]*insert into public\.retail_shopping_lists/
 		    );
-	    assert.match(service, /retail_stock_reorder_advice\.risk_level <> 'ok'/);
-    assert.match(service, /retail_stock_reorder_advice\.suggested_order_quantity > 0/);
+	    assert.match(stockData, /retail_stock_reorder_advice\.risk_level <> 'ok'/);
+    assert.match(stockData, /retail_stock_reorder_advice\.suggested_order_quantity > 0/);
     assert.match(service, /queueRetailStockIntelligenceRefresh/);
-    assert.match(service, /retail_stock_movements/);
-    assert.match(service, /retail_stock_lots/);
+    assert.match(stockSideEffects, /export async function queueRetailStockIntelligenceRefresh/);
+    assert.match(stockMutations, /retail_stock_movements/);
+    assert.match(stockMutations, /retail_stock_lots/);
     assert.match(service, /retail_stock_reorder_advice/);
 	    assert.doesNotMatch(service, /createRetailPurchaseOrder/);
 	    assert.match(service, /createRetailCustomerOrder/);
 	    assert.match(stockCodecs, /if \(value === null \|\| value === undefined \|\| value === ""\)/);
-	    assert.match(service, /resolveRegionalBasketAvailability/);
-    assert.match(service, /regionalRouting/);
-	    assert.match(service, /selectedRetailerOrganisationId/);
-	    assert.match(service, /shippingCountry/);
-	    assert.match(service, /completeOrderWorkflowTask/);
-	    assert.match(service, /recordRetailCustomerOrderPickupBooked/);
-	    assert.match(service, /action: "book_pickup"/);
-	    assert.match(service, /workflowAction: "book_pickup"/);
-	    assert.match(service, /bookPickup: AdminRetailCustomerOrderActionState/);
-	    assert.match(service, /taskType: "retail_order_pack"/);
-	    assert.match(service, /idempotencyKey: `\$\{order\.id\}:pack`/);
-	    assert.match(service, /expectedTaskTypes: \["retail_order_ship"\]/);
-	    assert.doesNotMatch(service, /action: "book_pickup"[\s\S]*completeOrderWorkflowTask/);
+	    assert.match(customerOrders, /resolveRegionalBasketAvailability/);
+    assert.match(customerOrders, /regionalRouting/);
+	    assert.match(customerOrders, /selectedRetailerOrganisationId/);
+	    assert.match(customerOrders, /shippingCountry/);
+	    assert.match(operationTasks, /completeOrderWorkflowTask/);
+	    assert.match(customerOrders, /recordRetailCustomerOrderPickupBooked/);
+	    assert.match(customerOrders, /action: "book_pickup"/);
+	    assert.match(customerOrders, /workflowAction: "book_pickup"/);
+	    assert.match(stockTypes, /bookPickup: AdminRetailCustomerOrderActionState/);
+	    assert.match(customerOrders, /taskType: "retail_order_pack"/);
+	    assert.match(customerOrders, /idempotencyKey: `\$\{order\.id\}:pack`/);
+	    assert.match(customerOrders, /expectedTaskTypes: \["retail_order_ship"\]/);
+	    assert.doesNotMatch(customerOrders, /action: "book_pickup"[\s\S]*completeOrderWorkflowTask/);
 	    assert.match(orderReadModel, /customerOrderPickupInProgress\(status, shipment\)/);
-	    assert.match(service, /customerOrderPickupInProgressFromShipmentTable/);
-	    assert.match(service, /reason: "pickup_in_progress"/);
-	    assert.match(service, /pickupInProgress: true/);
+	    assert.match(customerOrders, /customerOrderPickupInProgressFromShipmentTable/);
+	    assert.match(customerOrders, /reason: "pickup_in_progress"/);
+	    assert.match(customerOrders, /pickupInProgress: true/);
 	    assert.match(orderReadModel, /shipment\?\.pickupBookedAt \?\?[\s\S]*customerOrderPickupInProgress\(status, shipment\) \? updatedAt : null/);
-	    assert.match(service, /assertOrderWorkflowTaskClaimable/);
-	    assert.match(service, /reconcileRetailOrderLifecycle/);
-	    assert.match(service, /admin\.retail_order_lifecycle_reconciled/);
-	    assert.match(service, /AdminRetailCustomerOrderWorkflowTimeline/);
+	    assert.match(operationTasks, /assertOrderWorkflowTaskClaimable/);
+	    assert.match(customerOrders, /reconcileRetailOrderLifecycle/);
+	    assert.match(customerOrders, /admin\.retail_order_lifecycle_reconciled/);
+	    assert.match(stockTypes, /AdminRetailCustomerOrderWorkflowTimeline/);
 	    assert.match(orderReadModel, /customerOrderWorkflowTimeline/);
 	    assert.match(orderReadModel, /workflowTimeline: customerOrderWorkflowTimeline/);
 	    assert.match(orderReadModel, /workflowEventStatus/);
-	    assert.match(service, /transitionRetailCustomerOrder/);
-	    assert.match(service, /recordRetailOrderWorkflowBpm/);
-	    assert.match(service, /sendRetailOrderWorkflowEmail/);
+	    assert.match(customerOrders, /transitionRetailCustomerOrder/);
+	    assert.match(customerOrders, /recordRetailOrderBpmEvent/);
+	    assert.match(customerOrders, /sendRetailOrderWorkflowEmail/);
 	    assert.match(workflowService, /queueRetailOrderWorkflowEmail/);
 	    assert.match(workflowService, /send_retail_order_workflow_email/);
 	    assert.match(workflowService, /RETAIL_ORDER_EMAIL_TASK_PRIORITY = 220/);
-	    assert.match(service, /workflowTaskTypeForAction/);
+	    assert.match(customerOrders, /workflowTaskTypeForAction/);
 		    assert.match(stockReadModel, /ean13: row\.ean13/);
 		    assert.match(stockReadModel, /manufacturerSku: row\.manufacturer_sku/);
-	    assert.match(service, /product_identifiers\.identifier_type = 'ean13'/);
-	    assert.match(service, /product_identifiers\.identifier_type = 'manufacturer_sku'/);
+	    assert.match(stockData, /product_identifiers\.identifier_type = 'ean13'/);
+	    assert.match(stockData, /product_identifiers\.identifier_type = 'manufacturer_sku'/);
 	    assert.doesNotMatch(service, /internalSku: row\.internal_sku/);
-	    assert.doesNotMatch(service, /product_identifiers\.identifier_type = 'internal_sku'/);
+	    assert.doesNotMatch(stockData, /product_identifiers\.identifier_type = 'internal_sku'/);
 	    const hygeiaExportRoute = readFileSync("app/api/admin/products/hygeia/export/route.ts", "utf8");
 	    assert.match(hygeiaExportRoute, /buildRetailHygeiaStockExportCsv/);
 	    assert.match(hygeiaExportRoute, /scope !== "retail"/);
@@ -1046,11 +1083,11 @@ describe("retail stock and FX infrastructure", () => {
 	    const retailStockRoute = readFileSync("app/api/admin/retail-stock/route.ts", "utf8");
 	    assert.match(retailStockRoute, /export async function GET/);
 	    assert.match(retailStockRoute, /hasAdminPermission\(context, "stock\.read"\)/);
-	    assert.match(service, /retailOrderWorkflowTaskDetails/);
-	    assert.match(service, /@\/lib\/retail-order-workflow-rules/);
+	    assert.match(customerOrders, /retailOrderWorkflowTaskDetails/);
+	    assert.match(customerOrders, /@\/lib\/retail-order-workflow-rules/);
 	    assert.match(workflowRules, /status === "shipped"[\s\S]*return "deliver"/);
-	    assert.match(service, /taskType: "retail_order_ship"/);
-	    assert.match(service, /taskType: actionTaskType/);
+	    assert.match(customerOrders, /taskType: "retail_order_ship"/);
+	    assert.match(customerOrders, /taskType: actionTaskType/);
 	    assert.match(workflowRules, /retail_order_delivery_confirm/);
 	    assert.match(workflowRules, /retail_order_cancel_review/);
 	    assert.match(workflowRules, /retail_order_return_review/);
@@ -1058,8 +1095,8 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(workflowRules, /title: "Confirm customer delivery"/);
 	    assert.match(workflowRules, /title: "Review customer order cancellation"/);
 	    assert.match(workflowRules, /title: "Review customer order return"/);
-	    assert.match(service, /source: "one_click_ship"/);
-	    assert.match(service, /shipmentMetadata/);
+	    assert.match(customerOrders, /source: "one_click_ship"/);
+	    assert.match(customerOrders, /shipmentMetadata/);
 	    assert.match(view, /const grabCarrierName = "Grab"/);
 	    assert.match(view, /const shipmentCarrierOptions = \[kexCarrierName, grabCarrierName\] as const/);
 	    const carrierService = readFileSync("lib/retail-carrier-shipments.ts", "utf8");
@@ -1137,12 +1174,12 @@ describe("retail stock and FX infrastructure", () => {
     assert.match(cartService, /selectedRetailerOrganisationId/);
     assert.match(cartService, /organisations\.country_code = \$\{shippingCountry\}/);
     assert.doesNotMatch(cartService, /products\.region = \$\{shippingCountry\}/);
-    assert.match(service, /queueRetailOperationTask/);
+    assert.match(operationTasks, /queueRetailOperationTask/);
 	    assert.doesNotMatch(service, /admin\.retail_purchase_order_created/);
-    assert.match(service, /admin\.retail_customer_order_created/);
-    assert.match(service, /admin\.stock_movement_recorded/);
-    assert.match(service, /admin\.stock_movement_voided/);
-    assert.match(service, /"status_changed"/);
+    assert.match(customerOrders, /admin\.retail_customer_order_created/);
+    assert.match(stockMutations, /admin\.stock_movement_recorded/);
+    assert.match(stockMutations, /admin\.stock_movement_voided/);
+    assert.match(stockMutations, /"status_changed"/);
     assert.match(agents, /retailStockForecast: "retail_stock_forecast"/);
     assert.match(agents, /retailStockPlanner/);
     assert.match(agents, /retail_stock_forecast_refresh: "retailStockPlanner"/);

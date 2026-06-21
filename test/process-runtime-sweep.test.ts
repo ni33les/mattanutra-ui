@@ -82,10 +82,17 @@ describe("process runtime technical debt sweep", () => {
   });
 
   it("keeps no-stock allocation repairing reorder advice without auto-creating shopping lists", async () => {
-    const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
-    const allocate = functionBody(stock, "allocateRetailCustomerOrder");
+    const customerOrders = await readFile(
+      "lib/admin-retail-customer-orders.ts",
+      "utf8"
+    );
+    const allocationIntegrity = await readFile(
+      "lib/admin-retail-stock-allocation-integrity.ts",
+      "utf8"
+    );
+    const allocate = functionBody(customerOrders, "allocateRetailCustomerOrder");
     const adviceRepair = functionBody(
-      stock,
+      allocationIntegrity,
       "ensureRetailOrderShortagesInReorderAdvice"
     );
 
@@ -114,6 +121,10 @@ describe("process runtime technical debt sweep", () => {
 
   it("keeps shopping-list saves as stock movement deltas and retries retailer allocation", async () => {
     const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
+    const stockMutations = await readFile(
+      "lib/admin-retail-stock-mutations.ts",
+      "utf8"
+    );
     const route = await readFile("app/api/admin/retail-stock/route.ts", "utf8");
     const view = await readFile("components/admin/retail-stock-view.tsx", "utf8");
     const modal = await readFile(
@@ -121,8 +132,15 @@ describe("process runtime technical debt sweep", () => {
       "utf8"
     );
     const updateList = functionBody(stock, "updateRetailShoppingList");
-    const movementRecorder = functionBody(stock, "recordRetailStockMovement");
-    const allocate = functionBody(stock, "allocateRetailCustomerOrder");
+    const movementRecorder = functionBody(
+      stockMutations,
+      "recordRetailStockMovement"
+    );
+    const customerOrders = await readFile(
+      "lib/admin-retail-customer-orders.ts",
+      "utf8"
+    );
+    const allocate = functionBody(customerOrders, "allocateRetailCustomerOrder");
 
     assert.match(updateList, /const delta = actualQuantity - stockedQuantity/);
     assert.match(updateList, /movementType: delta > 0 \? "receive" : "adjustment"/);
@@ -163,7 +181,19 @@ describe("process runtime technical debt sweep", () => {
   });
 
   it("repairs stale allocations before orders can be packed or shipped", async () => {
-    const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
+    const customerOrders = await readFile(
+      "lib/admin-retail-customer-orders.ts",
+      "utf8"
+    );
+    const stockMutations = await readFile(
+      "lib/admin-retail-stock-mutations.ts",
+      "utf8"
+    );
+    const allocationIntegrity = await readFile(
+      "lib/admin-retail-stock-allocation-integrity.ts",
+      "utf8"
+    );
+    const stockTypes = await readFile("lib/admin-retail-stock-types.ts", "utf8");
     const stockPipeline = await readFile(
       "lib/admin-retail-stock-pipeline.ts",
       "utf8"
@@ -182,16 +212,25 @@ describe("process runtime technical debt sweep", () => {
       orderReadModel,
       "getRetailCustomerOrderActionStates"
     );
-    const stockRepair = functionBody(stock, "repairRetailStockAllocationIntegrity");
-    const orderRepair = functionBody(stock, "repairCustomerOrderAllocationIntegrity");
-    const movementRecorder = functionBody(stock, "recordRetailStockMovement");
-    const upsertStock = functionBody(stock, "upsertRetailStockItem");
-    const setStatus = functionBody(stock, "setRetailStockStatus");
-    const reconcile = functionBody(stock, "reconcileRetailOrderLifecycle");
-    const advance = functionBody(stock, "advanceRetailCustomerOrder");
+    const stockRepair = functionBody(
+      allocationIntegrity,
+      "repairRetailStockAllocationIntegrity"
+    );
+    const orderRepair = functionBody(
+      allocationIntegrity,
+      "repairCustomerOrderAllocationIntegrity"
+    );
+    const movementRecorder = functionBody(
+      stockMutations,
+      "recordRetailStockMovement"
+    );
+    const upsertStock = functionBody(stockMutations, "upsertRetailStockItem");
+    const setStatus = functionBody(stockMutations, "setRetailStockStatus");
+    const reconcile = functionBody(customerOrders, "reconcileRetailOrderLifecycle");
+    const advance = functionBody(customerOrders, "advanceRetailCustomerOrder");
     const carrierShip = functionBody(carrier, "markOrderShippedFromCarrierEvent");
 
-    assert.match(stock, /backedAllocatedUnits: number/);
+    assert.match(stockTypes, /backedAllocatedUnits: number/);
     assert.match(pipeline, /const otherActiveAllocatedUnits = Math\.max/);
     assert.match(pipeline, /const stockPotentiallyBackingThisLine = Math\.max/);
     assert.match(pipeline, /const backedAllocatedUnits = Math\.min\(/);
@@ -223,8 +262,11 @@ describe("process runtime technical debt sweep", () => {
 
   it("keeps shipping one-click while preserving legacy pick-pack cleanup", async () => {
     const workflow = await readFile("lib/retail-order-workflow.ts", "utf8");
-    const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
-    const advance = functionBody(stock, "advanceRetailCustomerOrder");
+    const customerOrders = await readFile(
+      "lib/admin-retail-customer-orders.ts",
+      "utf8"
+    );
+    const advance = functionBody(customerOrders, "advanceRetailCustomerOrder");
 
     assert.match(
       workflow,
@@ -268,11 +310,19 @@ describe("process runtime technical debt sweep", () => {
   });
 
   it("cancels stale order workflow tasks during lifecycle reconciliation", async () => {
-    const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
-    const reconcile = functionBody(stock, "reconcileRetailOrderLifecycle");
+    const customerOrders = await readFile(
+      "lib/admin-retail-customer-orders.ts",
+      "utf8"
+    );
+    const operationTasks = await readFile(
+      "lib/admin-retail-operation-tasks.ts",
+      "utf8"
+    );
+    const reconcile = functionBody(customerOrders, "reconcileRetailOrderLifecycle");
 
-    assert.match(stock, /cancelStaleOrderWorkflowTasks/);
-    assert.match(stock, /retail_order_stale_workflow_task_cancelled/);
+    assert.match(customerOrders, /cancelStaleOrderWorkflowTasks/);
+    assert.match(operationTasks, /export async function cancelStaleOrderWorkflowTasks/);
+    assert.match(operationTasks, /retail_order_stale_workflow_task_cancelled/);
     assert.match(reconcile, /const staleCancelledCount = await cancelStaleOrderWorkflowTasks/);
     assert.match(reconcile, /staleCancelledCount > 0 \? "repaired" : "on_track"/);
   });
