@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { UserCircleIcon } from "@heroicons/react/24/outline";
+import { startRegistration } from "@simplewebauthn/browser";
 import type {
   AdminClientSessionContext,
   AdminSettingsData
@@ -21,6 +22,12 @@ type SaveProfileResponse = Readonly<{
   session?: AdminClientSessionContext;
   settingsData?: AdminSettingsData;
   updated?: boolean;
+}>;
+
+type PasskeyRegistrationOptionsResponse = Readonly<{
+  challengeId: string;
+  error?: string;
+  options: Parameters<typeof startRegistration>[0]["optionsJSON"];
 }>;
 
 const roleLabels = {
@@ -102,6 +109,26 @@ async function saveSettings(body: Record<string, unknown>) {
 
   if (!response.ok) {
     throw new Error(json.error);
+  }
+
+  return json;
+}
+
+async function postPasskey<T>(url: string, body: Record<string, unknown>) {
+  const response = await fetch(url, {
+    body: JSON.stringify(body),
+    credentials: "same-origin",
+    headers: {
+      "content-type": "application/json"
+    },
+    method: "POST"
+  });
+  const json = (await response.json().catch(() => ({}))) as T & {
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(json.error || "Passkey request failed");
   }
 
   return json;
@@ -241,6 +268,39 @@ export function AdminSettingsView({
     }
   }
 
+  async function addPasskey() {
+    if (!canSave) {
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
+    setError("");
+
+    try {
+      const { challengeId, options } =
+        await postPasskey<PasskeyRegistrationOptionsResponse>(
+          "/api/admin/auth/passkey/add/options",
+          {}
+        );
+      const response = await startRegistration({ optionsJSON: options });
+
+      await postPasskey<{ ok: boolean }>(
+        "/api/admin/auth/passkey/add/verify",
+        {
+          challengeId,
+          response
+        }
+      );
+
+      setMessage(labels.settings.passkeyAdded);
+    } catch {
+      setError(labels.settings.passkeyAddError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.8fr)]">
       <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
@@ -307,16 +367,30 @@ export function AdminSettingsView({
           ) : null}
 
           <div>
-            <button
-              className={classNames(
-                "inline-flex items-center justify-center rounded-md bg-[#20343A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#16252A] disabled:cursor-not-allowed disabled:opacity-60",
-                adminLocaleTextClass(locale, "label")
-              )}
-              disabled={!canSave || busy}
-              type="submit"
-            >
-              {labels.settings.save}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className={classNames(
+                  "inline-flex items-center justify-center rounded-md bg-[#20343A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#16252A] disabled:cursor-not-allowed disabled:opacity-60",
+                  adminLocaleTextClass(locale, "label")
+                )}
+                disabled={!canSave || busy}
+                type="submit"
+              >
+                {labels.settings.save}
+              </button>
+              <button
+                className={classNames(
+                  "inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60",
+                  adminLocaleTextClass(locale, "label")
+                )}
+                disabled={!canSave || busy}
+                onClick={addPasskey}
+                title={labels.settings.addPasskeyHint}
+                type="button"
+              >
+                {labels.settings.addPasskey}
+              </button>
+            </div>
           </div>
         </form>
       </section>

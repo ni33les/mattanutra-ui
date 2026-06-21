@@ -310,6 +310,7 @@ export function AdminAccessView({
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
   const canManageOwners = context.actorMembership.role === "platform_owner";
+  const canRecoverPasskeys = !context.isLegacy && canManageOwners;
   const canAddMembership =
     canWrite &&
     (context.actorMembership.role === "platform_owner" ||
@@ -705,6 +706,17 @@ export function AdminAccessView({
       action: "rotate_agent_credential",
       credentialId,
       label: "rotated"
+    });
+  }
+
+  function recoverPasskey(personId: string) {
+    if (!window.confirm(labels.access.recoverPasskeyConfirm)) {
+      return;
+    }
+
+    void mutate({
+      action: "recover_passkey",
+      personId
     });
   }
 
@@ -1143,7 +1155,7 @@ export function AdminAccessView({
 
                 return (
                   <form
-                    className="grid gap-3 py-4 lg:grid-cols-[1.3fr_1.5fr_0.9fr_0.9fr_auto]"
+                    className="grid gap-3 py-4 lg:grid-cols-[1.2fr_1.4fr_0.8fr_0.8fr_0.9fr_auto]"
                     key={person.id}
                     onSubmit={savePerson}
                   >
@@ -1192,14 +1204,40 @@ export function AdminAccessView({
                         <option value="invited">{labels.access.pending}</option>
                       </select>
                     </label>
-                    {canWrite ? (
-                      <button
-                        className={classNames("self-end", actionButtonClass("save"))}
-                        disabled={busy || personProtected}
-                        type="submit"
-                      >
-                        {labels.access.save}
-                      </button>
+                    <div className="grid gap-1 text-xs font-semibold text-gray-500">
+                      {labels.access.activePasskeys}
+                      <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
+                        {person.activePasskeyCount}
+                        {person.lastPasskeyUsedAt ? (
+                          <span className="block text-xs text-gray-500">
+                            {labels.access.lastPasskeyUsedAt}:{" "}
+                            {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    {canWrite || canRecoverPasskeys ? (
+                      <div className="flex flex-wrap items-end gap-2 self-end">
+                        {canWrite ? (
+                          <button
+                            className={actionButtonClass("save")}
+                            disabled={busy || personProtected}
+                            type="submit"
+                          >
+                            {labels.access.save}
+                          </button>
+                        ) : null}
+                        {canRecoverPasskeys && person.id !== context.actorPerson.id ? (
+                          <button
+                            className={actionButtonClass("delete")}
+                            disabled={busy || person.status !== "active"}
+                            onClick={() => recoverPasskey(person.id)}
+                            type="button"
+                          >
+                            {labels.access.recoverPasskey}
+                          </button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </form>
                 );
@@ -1256,6 +1294,7 @@ export function AdminAccessView({
 	                    ) : null}
 	                    <th className="py-2 pr-4">{labels.access.role}</th>
 	                    <th className="py-2 pr-4">{labels.access.status}</th>
+                    <th className="py-2 pr-4">{labels.access.activePasskeys}</th>
                     <th className="py-2">{labels.contentPages.actions}</th>
                   </tr>
                 </thead>
@@ -1324,6 +1363,14 @@ export function AdminAccessView({
                             ) : null}
                           </select>
                         </td>
+                        <td className="py-3 pr-4 text-gray-600">
+                          {person?.activePasskeyCount ?? 0}
+                          {person?.lastPasskeyUsedAt ? (
+                            <span className="block text-xs text-gray-500">
+                              {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
+                            </span>
+                          ) : null}
+                        </td>
                         <td className="py-3">
                           <form id={membershipFormId} onSubmit={saveMembership}>
                             <input
@@ -1359,6 +1406,18 @@ export function AdminAccessView({
                                 type="button"
                               >
                                 {labels.access.assume}
+                              </button>
+                            ) : null}
+                            {canRecoverPasskeys &&
+                            person &&
+                            person.id !== context.actorPerson.id ? (
+                              <button
+                                className={actionButtonClass("delete")}
+                                disabled={busy || person.status !== "active"}
+                                onClick={() => recoverPasskey(person.id)}
+                                type="button"
+                              >
+                                {labels.access.recoverPasskey}
                               </button>
                             ) : null}
                           </div>

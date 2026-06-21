@@ -22,9 +22,11 @@ export type AdminOrganisation = Readonly<{
 }>;
 
 export type AdminPerson = Readonly<{
+  activePasskeyCount: number;
   displayName: string;
   email: string;
   id: string;
+  lastPasskeyUsedAt: string | null;
   preferredLocale: Locale;
   status: AdminAccessStatus;
 }>;

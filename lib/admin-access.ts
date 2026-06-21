@@ -108,12 +108,15 @@ type CredentialRow = Readonly<{
   device_type: string | null;
   id: string;
   person_id: string;
+  revoked_at?: string | null;
+  status?: string;
   transports: AuthenticatorTransportFuture[];
 }>;
 
 const registrationChallengeMinutes = 10;
 const loginChallengeMinutes = 5;
 const inviteDays = 7;
+const recoveryInviteMinutes = 60;
 const defaultPlatformOrgSlug = "mattanutra";
 
 function normalizeEmail(email: string) {
@@ -357,16 +360,22 @@ function platformBootstrapEmail() {
 }
 
 function person(row: {
+  active_passkey_count?: number | string | null;
   display_name: string;
   email: string;
   id: string;
+  last_passkey_used_at?: Date | string | null;
   preferred_locale: string;
   status: string;
 }): AdminPerson {
   return {
+    activePasskeyCount: Number(row.active_passkey_count ?? 0) || 0,
     displayName: row.display_name,
     email: row.email,
     id: row.id,
+    lastPasskeyUsedAt: row.last_passkey_used_at
+      ? new Date(row.last_passkey_used_at).toISOString()
+      : null,
     preferredLocale: localeValue(row.preferred_locale),
     status:
       row.status === "active" || row.status === "disabled" || row.status === "invited"
@@ -733,9 +742,13 @@ async function credentialsForPerson(personId: string) {
       counter,
       transports,
       device_type,
-      backed_up
+      backed_up,
+      status,
+      revoked_at::text
     from public.admin_passkey_credentials
     where person_id = ${personId}::uuid
+      and status = 'active'
+      and revoked_at is null
     order by updated_at desc
   `;
 }
@@ -772,6 +785,7 @@ export async function createRegistrationOptions({
     const inviteRows = await sql<Array<{
       email: string;
       id: string;
+      metadata: unknown;
       organisation_id: string;
       organisation_type: string;
       preferred_locale: string;
@@ -783,7 +797,8 @@ export async function createRegistrationOptions({
         organisations.organisation_type,
         admin_invitations.email,
         admin_invitations.role,
-        admin_invitations.preferred_locale
+        admin_invitations.preferred_locale,
+        admin_invitations.metadata
       from public.admin_invitations
       join public.organisations
         on organisations.id = admin_invitations.organisation_id
@@ -798,12 +813,15 @@ export async function createRegistrationOptions({
       throw new Error("This invite is not valid for that email address");
     }
 
+    const inviteMetadata = metadataRecord(invite.metadata);
     metadata = {
       ...metadata,
       invitationId: invite.id,
       locale: localeValue(invite.preferred_locale),
       mode: "invite",
       organisationId: invite.organisation_id,
+      reason: inviteMetadata.reason,
+      recoveryPersonId: inviteMetadata.personId,
       role: roleValue(
         invite.role,
         invite.organisation_type === "tenant" ? "tenant" : "platform"
@@ -989,6 +1007,60 @@ async function upsertPersonAndMembership({
   return person(savedPerson);
 }
 
+async function insertAdminPasskeyCredential({
+  backedUp,
+  counter,
+  credentialId,
+  deviceType,
+  label,
+  personId,
+  publicKey,
+  transports
+}: Readonly<{
+  backedUp: boolean;
+  counter: number;
+  credentialId: string;
+  deviceType: string;
+  label: string;
+  personId: string;
+  publicKey: Uint8Array | Buffer;
+  transports: readonly AuthenticatorTransportFuture[];
+}>) {
+  const sql = await sqlOrThrow();
+  const credentialRows = await sql<Array<{ id: string }>>`
+    insert into public.admin_passkey_credentials (
+      person_id,
+      credential_id,
+      credential_public_key,
+      counter,
+      transports,
+      device_type,
+      backed_up,
+      status,
+      label
+    )
+    values (
+      ${personId}::uuid,
+      ${credentialId},
+      ${base64Url(publicKey)},
+      ${counter},
+      ${transports},
+      ${deviceType},
+      ${backedUp},
+      'active',
+      ${label}
+    )
+    on conflict (credential_id) do nothing
+    returning id::text
+  `;
+
+  if (!credentialRows[0]) {
+    throw new Error("This passkey is already registered or was previously revoked");
+  }
+
+  return credentialRows[0].id;
+}
+
 export async function verifyRegistrationAndCreateSession({
   challengeId,
   request,
@@ -1021,6 +1093,7 @@ export async function verifyRegistrationAndCreateSession({
   const displayName = String(challenge.metadata.displayName || displayNameFromEmail(email));
   const locale = localeValue(challenge.metadata.locale);
   const organisationId = String(challenge.metadata.organisationId || "");
+  const recoveryPersonId = String(challenge.metadata.recoveryPersonId || "");
   const role = roleValue(challenge.metadata.role);
 
   if (!email || !organisationId) {
@@ -1054,35 +1127,24 @@ export async function verifyRegistrationAndCreateSession({
     role
   });
 
-  await sql`
-    insert into public.admin_passkey_credentials (
-      person_id,
-      credential_id,
-      credential_public_key,
-      counter,
-      transports,
-      device_type,
-      backed_up,
-      label
-    )
-    values (
-      ${savedPerson.id}::uuid,
-      ${info.credential.id},
-      ${base64Url(info.credential.publicKey)},
-      ${info.credential.counter},
-      ${response.response.transports ?? []},
-      ${info.credentialDeviceType},
-      ${info.credentialBackedUp},
-      'Passkey'
-    )
-    on conflict (credential_id) do update set
-      credential_public_key = excluded.credential_public_key,
-      counter = excluded.counter,
-      transports = excluded.transports,
-      device_type = excluded.device_type,
-      backed_up = excluded.backed_up,
-      updated_at = now()
-  `;
+  if (
+    challenge.metadata.reason === "passkey_recovery" &&
+    recoveryPersonId &&
+    recoveryPersonId !== savedPerson.id
+  ) {
+    throw new Error("Recovery invite does not match this admin person");
+  }
+
+  await insertAdminPasskeyCredential({
+    backedUp: info.credentialBackedUp,
+    counter: info.credential.counter,
+    credentialId: info.credential.id,
+    deviceType: info.credentialDeviceType,
+    label: "Passkey",
+    personId: savedPerson.id,
+    publicKey: info.credential.publicKey,
+    transports: response.response.transports ?? []
+  });
 
   if (challenge.metadata.invitationId) {
     const acceptedInvitations = await sql<Array<{ id: string }>>`
@@ -1100,14 +1162,134 @@ export async function verifyRegistrationAndCreateSession({
   }
 
   await recordAdminAudit({
-    action: "admin.passkey_registered",
+    action: challenge.metadata.reason === "passkey_recovery"
+      ? "admin.passkey_recovery_accepted"
+      : "admin.passkey_registered",
     actorPersonId: savedPerson.id,
     organisationId,
     resourceId: savedPerson.id,
-    resourceType: "person"
+    resourceType: "person",
+    metadata: {
+      invitationId: challenge.metadata.invitationId ?? null,
+      reason: challenge.metadata.reason ?? null
+    }
   });
 
   return createAdminSession({ organisationId, personId: savedPerson.id });
+}
+
+export async function createAdditionalPasskeyRegistrationOptions({
+  context,
+  request
+}: Readonly<{
+  context: AdminSessionContext;
+  request: Request;
+}>) {
+  if (context.isLegacy) {
+    throw new Error("A passkey session is required to add another passkey");
+  }
+
+  const existingCredentials = await credentialsForPerson(context.actorPerson.id);
+  const options = await generateRegistrationOptions({
+    attestationType: "none",
+    authenticatorSelection: {
+      residentKey: "preferred",
+      userVerification: "required"
+    },
+    excludeCredentials: existingCredentials.map((credential) => ({
+      id: credential.credential_id,
+      transports: credential.transports
+    })),
+    rpID: requestRpId(request),
+    rpName: "MattaNutra Admin",
+    timeout: 60_000,
+    userDisplayName: context.actorPerson.displayName,
+    userID: Buffer.from(context.actorPerson.email),
+    userName: context.actorPerson.email
+  });
+  const challengeId = await createChallenge({
+    challenge: options.challenge,
+    challengeType: "registration",
+    email: context.actorPerson.email,
+    expiresInMinutes: registrationChallengeMinutes,
+    metadata: {
+      displayName: context.actorPerson.displayName,
+      email: context.actorPerson.email,
+      locale: context.actorPerson.preferredLocale,
+      mode: "add_passkey",
+      organisationId: context.actorOrganisation.id,
+      personId: context.actorPerson.id,
+      role: context.actorMembership.role
+    },
+    personId: context.actorPerson.id
+  });
+
+  if (!challengeId) {
+    throw new Error("Unable to create registration challenge");
+  }
+
+  return { challengeId, options };
+}
+
+export async function verifyAdditionalPasskeyRegistration({
+  challengeId,
+  context,
+  request,
+  response
+}: Readonly<{
+  challengeId: string;
+  context: AdminSessionContext;
+  request: Request;
+  response: RegistrationResponseJSON;
+}>) {
+  if (context.isLegacy) {
+    throw new Error("A passkey session is required to add another passkey");
+  }
+
+  const challenge = await consumeChallenge(challengeId, "registration");
+
+  if (
+    !challenge ||
+    challenge.metadata.mode !== "add_passkey" ||
+    challenge.person_id !== context.actorPerson.id
+  ) {
+    throw new Error("Registration challenge expired");
+  }
+
+  const verified = await verifyRegistrationResponse({
+    expectedChallenge: challenge.challenge,
+    expectedOrigin: allowedOrigins(request),
+    expectedRPID: requestRpId(request),
+    requireUserVerification: true,
+    response
+  });
+
+  if (!verified.verified) {
+    throw new Error("Passkey registration could not be verified");
+  }
+
+  const info = verified.registrationInfo;
+
+  await insertAdminPasskeyCredential({
+    backedUp: info.credentialBackedUp,
+    counter: info.credential.counter,
+    credentialId: info.credential.id,
+    deviceType: info.credentialDeviceType,
+    label: "Passkey",
+    personId: context.actorPerson.id,
+    publicKey: info.credential.publicKey,
+    transports: response.response.transports ?? []
+  });
+
+  await recordAdminAudit({
+    action: "admin.passkey_added",
+    actorPersonId: context.actorPerson.id,
+    organisationId: context.actorOrganisation.id,
+    resourceId: context.actorPerson.id,
+    resourceType: "person"
+  });
+
+  return { ok: true };
 }
 
 export async function createAuthenticationOptions({
@@ -1179,10 +1361,14 @@ async function credentialById(credentialId: string, personId: string | null) {
       counter,
       transports,
       device_type,
-      backed_up
+      backed_up,
+      status,
+      revoked_at::text
     from public.admin_passkey_credentials
     where credential_id = ${credentialId}
       and (${personId}::uuid is null or person_id = ${personId}::uuid)
+      and status = 'active'
+      and revoked_at is null
     limit 1
   `;
 
@@ -1643,9 +1829,11 @@ export async function legacyAdminContext(accessToken: string | null | undefined)
   const sql = await sqlOrThrow();
   const org = await platformOrganisation(sql);
   const fallbackPerson: AdminPerson = {
+    activePasskeyCount: 0,
     displayName: "Legacy admin",
     email: "legacy-admin@mattanutra.local",
     id: "00000000-0000-4000-8000-000000000001",
+    lastPasskeyUsedAt: null,
     preferredLocale: "en",
     status: "active"
   };
@@ -1778,14 +1966,32 @@ export async function getAdminAccessData(
         order by organisation_type asc, lower(name) asc
       `,
       sql<Array<{
+        active_passkey_count: number | string;
         display_name: string;
         email: string;
         id: string;
+        last_passkey_used_at: Date | string | null;
         preferred_locale: string;
         status: string;
       }>>`
-        select people.id::text, people.email, people.display_name, people.preferred_locale, people.status
+        select
+          people.id::text,
+          people.email,
+          people.display_name,
+          people.preferred_locale,
+          people.status,
+          coalesce(passkeys.active_passkey_count, 0) as active_passkey_count,
+          passkeys.last_passkey_used_at
         from public.people
+        left join lateral (
+          select
+            count(*)::int as active_passkey_count,
+            max(last_used_at) as last_passkey_used_at
+          from public.admin_passkey_credentials credentials
+          where credentials.person_id = people.id
+            and credentials.status = 'active'
+            and credentials.revoked_at is null
+        ) passkeys on true
         ${peopleScope}
         order by lower(display_name), lower(email)
       `,
@@ -3243,6 +3449,190 @@ export async function updateEffectiveOrganisationSettings({
   } satisfies AdminSessionContext;
 }
 
+export async function createAdminPasskeyRecovery({
+  actor,
+  personId,
+  source = "admin_ui"
+}: Readonly<{
+  actor: AdminSessionContext;
+  personId: string;
+  source?: "admin_ui" | "break_glass_cli";
+}>) {
+  if (actor.isLegacy) {
+    throw new Error("A passkey session is required to recover passkeys");
+  }
+
+  if (actor.actorMembership.role !== "platform_owner") {
+    throw new Error("Only platform owners can recover passkeys");
+  }
+
+  if (actor.actorPerson.id === personId) {
+    throw new Error("You cannot recover your own passkeys from an active session");
+  }
+
+  const sql = await sqlOrThrow();
+  const token = randomAdminToken();
+  const recoveryRows = await sql<Array<{
+    email: string;
+    expires_at: Date | string;
+    id: string;
+    organisation_id: string;
+    organisation_type: string;
+    person_id: string;
+    preferred_locale: string;
+    role: string;
+  }>>`
+    with target as (
+      select
+        people.id::text as person_id,
+        people.email,
+        people.preferred_locale,
+        organisations.id::text as organisation_id,
+        organisations.organisation_type,
+        organisation_memberships.role
+      from public.people
+      join public.organisation_memberships
+        on organisation_memberships.person_id = people.id
+      join public.organisations
+        on organisations.id = organisation_memberships.organisation_id
+      where people.id = ${personId}::uuid
+        and people.status = 'active'
+        and organisations.status = 'active'
+        and organisation_memberships.principal_type = 'person'
+        and organisation_memberships.status = 'active'
+      order by
+        case organisation_memberships.role
+          when 'platform_owner' then 0
+          when 'platform_admin' then 1
+          else 2
+        end,
+        organisation_memberships.created_at asc
+      limit 1
+    ),
+    revoked_recovery_invites as (
+      update public.admin_invitations
+      set status = 'revoked', updated_at = now()
+      from target
+      where admin_invitations.email = target.email
+        and status = 'pending'
+        and metadata->>'reason' = 'passkey_recovery'
+      returning admin_invitations.id
+    ),
+    invite as (
+      insert into public.admin_invitations (
+        organisation_id,
+        email,
+        role,
+        invited_by_person_id,
+        token_hash,
+        preferred_locale,
+        status,
+        metadata,
+        expires_at
+      )
+      select
+        target.organisation_id::uuid,
+        target.email,
+        target.role,
+        ${actor.actorPerson.id}::uuid,
+        ${hashAdminToken(token)},
+        target.preferred_locale,
+        'pending',
+        jsonb_build_object(
+          'personId', target.person_id,
+          'reason', 'passkey_recovery',
+          'revokedByPersonId', ${actor.actorPerson.id},
+          'source', ${source}
+        ),
+        now() + (${recoveryInviteMinutes}::text || ' minutes')::interval
+      from target
+      returning id::text, organisation_id::text, email, role, preferred_locale, expires_at
+    ),
+    revoked_passkeys as (
+      update public.admin_passkey_credentials
+      set
+        status = 'revoked',
+        revoked_at = coalesce(revoked_at, now()),
+        revoked_by_person_id = ${actor.actorPerson.id}::uuid,
+        revoked_invitation_id = invite.id::uuid,
+        metadata = metadata || jsonb_build_object(
+          'recoveryInvitationId', invite.id,
+          'revokedReason', 'passkey_recovery',
+          'revokedSource', ${source}
+        ),
+        updated_at = now()
+      from target, invite
+      where admin_passkey_credentials.person_id = target.person_id::uuid
+        and admin_passkey_credentials.status = 'active'
+        and admin_passkey_credentials.revoked_at is null
+      returning admin_passkey_credentials.id
+    ),
+    revoked_sessions as (
+      update public.admin_sessions
+      set revoked_at = coalesce(revoked_at, now())
+      from target
+      where admin_sessions.person_id = target.person_id::uuid
+        and admin_sessions.revoked_at is null
+      returning admin_sessions.id
+    )
+    select
+      invite.id,
+      invite.organisation_id,
+      invite.email,
+      invite.role,
+      invite.preferred_locale,
+      invite.expires_at,
+      target.person_id,
+      target.organisation_type
+    from invite
+    join target on true
+  `;
+  const recovery = recoveryRows[0];
+
+  if (!recovery) {
+    throw new Error("Active admin person not found");
+  }
+
+  const preferredLocale = localeValue(recovery.preferred_locale);
+  const inviteUrl = `${siteBaseUrl()}/${preferredLocale}/admin/login?invite=${encodeURIComponent(token)}&email=${encodeURIComponent(recovery.email)}`;
+  const delivery = await sendTransactionalEmail({
+    html: `<p>Your MattaNutra Admin passkeys have been reset.</p><p><a href="${inviteUrl}">Create a new admin passkey</a></p><p>This recovery link expires in ${recoveryInviteMinutes} minutes.</p>`,
+    subject: "Recover your MattaNutra Admin passkey",
+    to: recovery.email
+  });
+
+  await recordAdminAudit({
+    action: "admin.passkey_recovery_started",
+    actorPersonId: actor.actorPerson.id,
+    organisationId: recovery.organisation_id,
+    resourceId: recovery.person_id,
+    resourceType: "person",
+    metadata: {
+      invitationId: recovery.id,
+      reason: delivery.reason,
+      sent: delivery.sent,
+      source
+    }
+  });
+
+  return {
+    invite: {
+      email: recovery.email,
+      expiresAt: new Date(recovery.expires_at).toISOString(),
+      id: recovery.id,
+      organisationId: recovery.organisation_id,
+      preferredLocale,
+      role: roleValue(
+        recovery.role,
+        recovery.organisation_type === "tenant" ? "tenant" : "platform"
+      ),
+      status: "pending" as const
+    },
+    inviteUrl,
+    sent: delivery.sent
+  };
+}
+
 export async function createAdminInvitation({
   actor,
   email,
@@ -3307,6 +3697,8 @@ export async function createAdminInvitation({
       select count(*)::int as passkey_count
       from public.admin_passkey_credentials credentials
       where credentials.person_id = people.id
+        and credentials.status = 'active'
+        and credentials.revoked_at is null
     ) passkeys on true
     where organisations.id = ${organisationId}::uuid
     limit 1

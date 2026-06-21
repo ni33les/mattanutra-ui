@@ -241,6 +241,7 @@ export type AdminContent = Readonly<{
     accessControl: string;
     accepted: string;
     active: string;
+    activePasskeys: string;
     actor: string;
     addAgent: string;
     addAgentAssociation: string;
@@ -298,9 +299,12 @@ export type AdminContent = Readonly<{
     apiKey: string;
     keyShownOnce: string;
     lastUsedAt: string;
+    lastPasskeyUsedAt: string;
     reasoningLevel: string;
     role: string;
     revoked: string;
+    recoverPasskey: string;
+    recoverPasskeyConfirm: string;
     revokeKey: string;
     rotateKey: string;
     save: string;
@@ -313,12 +317,16 @@ export type AdminContent = Readonly<{
   };
   settings: {
     account: string;
+    addPasskey: string;
+    addPasskeyHint: string;
     currency: string;
     customerMargin: string;
     displayName: string;
     email: string;
     language: string;
     logoutHint: string;
+    passkeyAdded: string;
+    passkeyAddError: string;
     profile: string;
     save: string;
     saved: string;
@@ -948,6 +956,7 @@ const baseContent = {
       accessControl: "Access control",
       accepted: "Accepted",
       active: "Active",
+      activePasskeys: "Active passkeys",
       actor: "Signed in as",
       addAgent: "Invite agent",
       addAgentAssociation: "Associate Agent",
@@ -1005,9 +1014,12 @@ const baseContent = {
       apiKey: "API key",
       keyShownOnce: "This key is shown once. Store it in the worker or integration secret store now.",
       lastUsedAt: "Last used",
+      lastPasskeyUsedAt: "Last passkey use",
       reasoningLevel: "Reasoning",
       role: "Role",
       revoked: "Revoked",
+      recoverPasskey: "Recover passkey",
+      recoverPasskeyConfirm: "This will immediately revoke this person's current passkeys and admin sessions, then send a one-time recovery invite. Continue?",
       revokeKey: "Revoke key",
       rotateKey: "Rotate key",
       save: "Save",
@@ -1020,12 +1032,16 @@ const baseContent = {
     },
     settings: {
       account: "Account",
+      addPasskey: "Add passkey",
+      addPasskeyHint: "Register another device or security key for this admin account.",
       currency: "Currency",
       customerMargin: "MattaNutra margin %",
       displayName: "Name",
       email: "Email",
       language: "Language",
       logoutHint: "End this admin session on this device.",
+      passkeyAdded: "Passkey added.",
+      passkeyAddError: "Could not add passkey.",
       profile: "Profile",
       save: "Save",
       saved: "Settings saved.",
@@ -1803,6 +1819,7 @@ const baseContent = {
       accessControl: "การควบคุมสิทธิ์",
       accepted: "ตอบรับแล้ว",
       active: "ใช้งาน",
+      activePasskeys: "Passkey ที่ใช้งานอยู่",
       actor: "เข้าสู่ระบบเป็น",
       addAgent: "เชิญเอเจนต์",
       addAgentAssociation: "เชื่อมโยงเอเจนต์",
@@ -1860,9 +1877,12 @@ const baseContent = {
       apiKey: "API key",
       keyShownOnce: "คีย์นี้จะแสดงครั้งเดียว โปรดเก็บไว้ใน secret store ของ worker หรือ integration ตอนนี้",
       lastUsedAt: "ใช้ล่าสุด",
+      lastPasskeyUsedAt: "ใช้ passkey ล่าสุด",
       reasoningLevel: "ระดับ reasoning",
       role: "บทบาท",
       revoked: "ยกเลิกแล้ว",
+      recoverPasskey: "กู้คืน passkey",
+      recoverPasskeyConfirm: "การดำเนินการนี้จะยกเลิก passkey และเซสชันแอดมินปัจจุบันของผู้ใช้นี้ทันที แล้วส่งลิงก์กู้คืนแบบใช้ครั้งเดียว ต้องการดำเนินการต่อหรือไม่",
       revokeKey: "ยกเลิกคีย์",
       rotateKey: "หมุนคีย์",
       save: "บันทึก",
@@ -1875,12 +1895,16 @@ const baseContent = {
     },
     settings: {
       account: "บัญชี",
+      addPasskey: "เพิ่ม passkey",
+      addPasskeyHint: "ลงทะเบียนอุปกรณ์หรือ security key เพิ่มสำหรับบัญชีแอดมินนี้",
       currency: "สกุลเงิน",
       customerMargin: "มาร์จิน MattaNutra %",
       displayName: "ชื่อ",
       email: "อีเมล",
       language: "ภาษา",
       logoutHint: "ออกจากเซสชันแอดมินบนอุปกรณ์นี้",
+      passkeyAdded: "เพิ่ม passkey แล้ว",
+      passkeyAddError: "ไม่สามารถเพิ่ม passkey ได้",
       profile: "โปรไฟล์",
       save: "บันทึก",
       saved: "บันทึกการตั้งค่าแล้ว",

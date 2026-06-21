@@ -56,9 +56,11 @@ export async function retailAgentSessionContext(
     type: row.organisation_type === "platform" ? "platform" : "tenant"
   };
   const actorPerson: AdminPerson = {
+    activePasskeyCount: 0,
     displayName: "Retail workflow agent",
     email: "retail-agent@mattanutra.local",
     id: "00000000-0000-4000-8000-000000000003",
+    lastPasskeyUsedAt: null,
     preferredLocale: organisation.defaultLocale,
     status: "active"
   };

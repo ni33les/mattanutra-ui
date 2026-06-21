@@ -69,6 +69,7 @@
     "product-offers:schema:remove": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-remove-product-offers-schema.ts",
     "retail-stock:agent:seed": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/seed-retail-stock-planner-agent.ts",
     "admin-access:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-admin-access-schema.ts",
+    "admin:passkey:recover": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/create-admin-passkey-recovery.ts",
     "versions:core:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-core-versioned-model-schema.ts",
     "thai-tax:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-thai-tax-schema.ts",
     "versions:core:check": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/check-core-versioned-model-consistency.ts",

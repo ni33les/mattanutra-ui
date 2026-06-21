@@ -411,9 +411,15 @@ CREATE TABLE public.admin_passkey_credentials (
     device_type text,
     backed_up boolean DEFAULT false NOT NULL,
     label text,
+    status text DEFAULT 'active'::text NOT NULL,
+    revoked_at timestamp with time zone,
+    revoked_by_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    revoked_invitation_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     last_used_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT admin_passkey_credentials_status_check CHECK ((status = ANY (ARRAY['active'::text, 'revoked'::text])))
 );
 
 
@@ -476,6 +482,10 @@ CREATE TABLE public.admin_invitations (
     CONSTRAINT admin_invitations_role_check CHECK ((role = ANY (ARRAY['platform_owner'::text, 'platform_admin'::text, 'retail_admin'::text, 'retail_agent'::text, 'retail_assistant'::text]))),
     CONSTRAINT admin_invitations_status_check CHECK ((status = ANY (ARRAY['accepted'::text, 'expired'::text, 'pending'::text, 'revoked'::text])))
 );
+
+ALTER TABLE public.admin_passkey_credentials
+    ADD CONSTRAINT admin_passkey_credentials_revoked_invitation_fk
+    FOREIGN KEY (revoked_invitation_id) REFERENCES public.admin_invitations(id) ON DELETE SET NULL;
 
 
 --
@@ -4165,6 +4175,8 @@ CREATE UNIQUE INDEX admin_passkey_credentials_credential_idx ON public.admin_pas
 
 
 CREATE INDEX admin_passkey_credentials_person_idx ON public.admin_passkey_credentials USING btree (person_id, updated_at DESC);
+
+CREATE INDEX admin_passkey_credentials_person_active_idx ON public.admin_passkey_credentials USING btree (person_id, updated_at DESC) WHERE ((status = 'active'::text) AND (revoked_at IS NULL));
 
 
 CREATE UNIQUE INDEX admin_sessions_hash_idx ON public.admin_sessions USING btree (session_hash);

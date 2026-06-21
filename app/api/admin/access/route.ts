@@ -7,6 +7,7 @@ import {
   addAdminMembership,
   clientAdminSessionContext,
   createAdminInvitation,
+  createAdminPasskeyRecovery,
   createOrganisation,
   deleteAdminInvitation,
   deleteAdminMembership,
@@ -341,6 +342,26 @@ export async function POST(request: NextRequest) {
       });
 
       return accessResponse(request, context, invitationResult);
+    }
+
+    if (action === "recover_passkey") {
+      if (context.isLegacy) {
+        return NextResponse.json(
+          { error: "A passkey session is required to recover passkeys" },
+          { status: 400 }
+        );
+      }
+
+      if (context.actorMembership.role !== "platform_owner") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const recoveryResult = await createAdminPasskeyRecovery({
+        actor: context,
+        personId: text(body.personId)
+      });
+
+      return accessResponse(request, context, recoveryResult);
     }
 
     if (action === "add_membership") {

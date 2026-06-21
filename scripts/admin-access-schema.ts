@@ -101,16 +101,51 @@ create table if not exists public.admin_passkey_credentials (
   device_type text,
   backed_up boolean not null default false,
   label text,
+  status text not null default 'active',
+  revoked_at timestamptz,
+  revoked_by_person_id uuid references public.people(id) on delete set null,
+  revoked_invitation_id uuid,
+  metadata jsonb not null default '{}'::jsonb,
   last_used_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint admin_passkey_credentials_status_check check (status in ('active', 'revoked'))
 );
+
+alter table public.admin_passkey_credentials
+  add column if not exists status text not null default 'active';
+
+alter table public.admin_passkey_credentials
+  add column if not exists revoked_at timestamptz;
+
+alter table public.admin_passkey_credentials
+  add column if not exists revoked_by_person_id uuid references public.people(id) on delete set null;
+
+alter table public.admin_passkey_credentials
+  add column if not exists revoked_invitation_id uuid;
+
+alter table public.admin_passkey_credentials
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+update public.admin_passkey_credentials
+set status = 'active'
+where status is null or status not in ('active', 'revoked');
+
+alter table public.admin_passkey_credentials
+  drop constraint if exists admin_passkey_credentials_status_check;
+
+alter table public.admin_passkey_credentials
+  add constraint admin_passkey_credentials_status_check check (status in ('active', 'revoked'));
 
 create unique index if not exists admin_passkey_credentials_credential_idx
   on public.admin_passkey_credentials (credential_id);
 
 create index if not exists admin_passkey_credentials_person_idx
   on public.admin_passkey_credentials (person_id, updated_at desc);
+
+create index if not exists admin_passkey_credentials_person_active_idx
+  on public.admin_passkey_credentials (person_id, updated_at desc)
+  where status = 'active' and revoked_at is null;
 
 create table if not exists public.admin_auth_challenges (
   id uuid primary key default gen_random_uuid(),
@@ -180,6 +215,21 @@ create unique index if not exists admin_invitations_token_idx
 
 create index if not exists admin_invitations_org_status_idx
   on public.admin_invitations (organisation_id, status, created_at desc);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'admin_passkey_credentials_revoked_invitation_fk'
+  ) then
+    alter table public.admin_passkey_credentials
+      add constraint admin_passkey_credentials_revoked_invitation_fk
+      foreign key (revoked_invitation_id)
+      references public.admin_invitations(id)
+      on delete set null;
+  end if;
+end $$;
 
 alter table public.organisation_memberships
   add column if not exists principal_type text not null default 'person';

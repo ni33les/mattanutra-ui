@@ -230,9 +230,11 @@ function agentPrincipalFromRow(
     permissions: [...permissionsForAgentRole(role)],
     person: row.person_id
       ? {
+          activePasskeyCount: 0,
           displayName: row.person_display_name ?? row.person_email ?? row.agent_name,
           email: row.person_email ?? "",
           id: row.person_id,
+          lastPasskeyUsedAt: null,
           preferredLocale:
             row.person_preferred_locale === "th" ||
             row.person_preferred_locale === "zh-CN"
@@ -476,9 +478,11 @@ function sessionPrincipalFromRequest(
         type: "platform"
       },
       actorPerson: {
+        activePasskeyCount: 0,
         displayName: "",
         email: "",
         id: session.personId,
+        lastPasskeyUsedAt: null,
         preferredLocale: "en",
         status: "active"
       },
@@ -505,9 +509,11 @@ function sessionPrincipalFromRequest(
         type: "platform"
       },
       effectivePerson: {
+        activePasskeyCount: 0,
         displayName: "",
         email: "",
         id: session.assumedPersonId ?? session.personId,
+        lastPasskeyUsedAt: null,
         preferredLocale: "en",
         status: "active"
       },
