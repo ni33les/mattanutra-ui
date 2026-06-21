@@ -283,7 +283,6 @@ export type AdminContent = Readonly<{
     memberships: string;
     membershipAdded: string;
     membershipDeleted: string;
-    managePasskeys: string;
     model: string;
     name: string;
     noCredentials: string;
@@ -293,7 +292,6 @@ export type AdminContent = Readonly<{
     owner: string;
     people: string;
     pending: string;
-    passkeysFor: string;
     passkeyRecoveryWarning: string;
     passkeySummary: string;
     platform: string;
@@ -307,10 +305,7 @@ export type AdminContent = Readonly<{
     reasoningLevel: string;
     role: string;
     revoked: string;
-    recoveryUnavailableInactive: string;
-    recoveryUnavailableLegacy: string;
-    recoveryUnavailableRole: string;
-    recoveryUnavailableSelf: string;
+    recoverPasskey: string;
     revokeKey: string;
     rotateKey: string;
     save: string;
@@ -1005,7 +1000,6 @@ const baseContent = {
       memberships: "Memberships",
       membershipAdded: "Existing person found. Organisation access was added without creating a new passkey invite.",
       membershipDeleted: "Membership deleted.",
-      managePasskeys: "Manage passkeys",
       model: "Model",
       name: "Name",
       noCredentials: "No active credentials yet.",
@@ -1015,9 +1009,8 @@ const baseContent = {
       owner: "Owner",
       people: "People",
       pending: "Pending",
-      passkeysFor: "Passkeys for {name}",
       passkeyRecoveryWarning:
-        "Recovery immediately revokes this person's current passkeys and admin sessions, then sends a one-time invite to create a new passkey.",
+        "Revokes current passkeys and admin sessions immediately.",
       passkeySummary: "{count} active",
       platform: "Platform",
       preferredLocale: "Preferred language",
@@ -1030,10 +1023,7 @@ const baseContent = {
       reasoningLevel: "Reasoning",
       role: "Role",
       revoked: "Revoked",
-      recoveryUnavailableInactive: "Recovery is available only for active people.",
-      recoveryUnavailableLegacy: "Sign in with a passkey session to recover another person's passkeys.",
-      recoveryUnavailableRole: "Only platform owners can recover passkeys.",
-      recoveryUnavailableSelf: "You cannot recover your own passkeys from this screen.",
+      recoverPasskey: "Recover",
       revokeKey: "Revoke key",
       rotateKey: "Rotate key",
       save: "Save",
@@ -1876,7 +1866,6 @@ const baseContent = {
       memberships: "สมาชิก",
       membershipAdded: "พบผู้ใช้เดิมแล้ว เพิ่มสิทธิ์เข้าองค์กรโดยไม่สร้างคำเชิญ passkey ใหม่",
       membershipDeleted: "ลบสมาชิกแล้ว",
-      managePasskeys: "จัดการ passkey",
       model: "โมเดล",
       name: "ชื่อ",
       noCredentials: "ยังไม่มีคีย์ที่ใช้งานอยู่",
@@ -1886,9 +1875,8 @@ const baseContent = {
       owner: "เจ้าของ",
       people: "ผู้ใช้",
       pending: "รอดำเนินการ",
-      passkeysFor: "Passkey ของ {name}",
       passkeyRecoveryWarning:
-        "การกู้คืนจะยกเลิก passkey และเซสชันแอดมินปัจจุบันของผู้ใช้นี้ทันที จากนั้นส่งคำเชิญแบบใช้ครั้งเดียวเพื่อสร้าง passkey ใหม่",
+        "จะยกเลิก passkey และเซสชันแอดมินปัจจุบันทันที",
       passkeySummary: "{count} ใช้งานอยู่",
       platform: "แพลตฟอร์ม",
       preferredLocale: "ภาษาที่ต้องการ",
@@ -1901,10 +1889,7 @@ const baseContent = {
       reasoningLevel: "ระดับ reasoning",
       role: "บทบาท",
       revoked: "ยกเลิกแล้ว",
-      recoveryUnavailableInactive: "กู้คืนได้เฉพาะผู้ใช้ที่เปิดใช้งานอยู่",
-      recoveryUnavailableLegacy: "เข้าสู่ระบบด้วย passkey session เพื่อกู้คืน passkey ของผู้อื่น",
-      recoveryUnavailableRole: "เฉพาะเจ้าของแพลตฟอร์มเท่านั้นที่กู้คืน passkey ได้",
-      recoveryUnavailableSelf: "ไม่สามารถกู้คืน passkey ของตัวเองจากหน้าจอนี้ได้",
+      recoverPasskey: "กู้คืน",
       revokeKey: "ยกเลิกคีย์",
       rotateKey: "หมุนคีย์",
       save: "บันทึก",

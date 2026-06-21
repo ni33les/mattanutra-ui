@@ -10,14 +10,9 @@ function source(path: string) {
 }
 
 const passkeyRecoveryLabels = [
-  "managePasskeys",
-  "passkeysFor",
   "passkeyRecoveryWarning",
   "passkeySummary",
-  "recoveryUnavailableInactive",
-  "recoveryUnavailableLegacy",
-  "recoveryUnavailableRole",
-  "recoveryUnavailableSelf",
+  "recoverPasskey",
   "sendRecoveryInvite"
 ] as const;
 
@@ -69,23 +64,22 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   assert.match(view, /recover_passkey/);
   assert.doesNotMatch(view, /window\.confirm/);
   assert.doesNotMatch(view, /recoverPasskeyConfirm/);
-  assert.match(view, /selectedPasskeyPersonId/);
-  assert.match(view, /selectedPasskeyPerson \? \([\s\S]*<AdminModal/);
-  assert.match(view, /labels\.access\.passkeysFor/);
-  assert.match(view, /labels\.access\.managePasskeys/);
+  assert.doesNotMatch(view, /selectedPasskeyPerson/);
+  assert.doesNotMatch(view, /labels\.access\.managePasskeys/);
+  assert.doesNotMatch(view, /labels\.access\.passkeysFor/);
+  assert.doesNotMatch(view, /recoveryUnavailableReason/);
+  assert.match(view, /passkeyRecoveryPersonId/);
+  assert.match(view, /canStartPasskeyRecovery/);
+  assert.match(view, /renderPasskeyControls/);
+  assert.match(view, /labels\.access\.recoverPasskey/);
   assert.match(view, /labels\.access\.passkeyRecoveryWarning/);
   assert.match(view, /labels\.access\.sendRecoveryInvite/);
-  assert.match(view, /recoveryUnavailableReason/);
-  assert.match(view, /labels\.access\.recoveryUnavailableSelf/);
-  assert.match(view, /labels\.access\.recoveryUnavailableInactive/);
-  assert.match(view, /labels\.access\.recoveryUnavailableLegacy/);
-  assert.match(view, /labels\.access\.recoveryUnavailableRole/);
   assert.match(view, /activePasskeyCount/);
   assert.match(view, /lastPasskeyUsedAt/);
   assert.match(view, /passkeySummary\(person\)/);
   assert.equal(
-    [...view.matchAll(/setSelectedPasskeyPersonId\(person\.id\)/g)].length,
-    2
+    [...view.matchAll(/setPasskeyRecoveryPersonId\(person\.id\)/g)].length,
+    1
   );
   assert.doesNotMatch(
     view,
@@ -93,7 +87,7 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   );
 });
 
-test("passkey recovery modal copy is localized for admin access views", () => {
+test("passkey recovery inline copy is localized for admin access views", () => {
   const content = source("components/admin/dashboard-content.tsx");
   const zh = JSON.parse(source("components/admin/dashboard-content.zh-CN.json")) as {
     access?: Record<string, unknown>;
@@ -105,9 +99,10 @@ test("passkey recovery modal copy is localized for admin access views", () => {
   }
 
   assert.doesNotMatch(content, /recoverPasskeyConfirm/);
+  assert.doesNotMatch(content, /managePasskeys|passkeysFor|recoveryUnavailable/);
   assert.doesNotMatch(
     source("components/admin/access-view.tsx"),
-    /labels\.access\.recoverPasskey/
+    /labels\.access\.managePasskeys|labels\.access\.passkeysFor|recoveryUnavailable/
   );
 });
 

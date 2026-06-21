@@ -298,7 +298,7 @@ export function AdminAccessView({
   const [invitePersonOpen, setInvitePersonOpen] = useState(false);
   const [membershipFilterOrganisationId, setMembershipFilterOrganisationId] =
     useState("");
-  const [selectedPasskeyPersonId, setSelectedPasskeyPersonId] =
+  const [passkeyRecoveryPersonId, setPasskeyRecoveryPersonId] =
     useState<string | null>(null);
   const [agentFilterOrganisationId, setAgentFilterOrganisationId] = useState("");
   const [selectedAgentMembershipId, setSelectedAgentMembershipId] =
@@ -444,18 +444,6 @@ export function AdminAccessView({
         : null,
     [accessData.agents, selectedAgentMembershipId]
   );
-  const selectedPasskeyPerson = selectedPasskeyPersonId
-    ? personById.get(selectedPasskeyPersonId) ?? null
-    : null;
-  const selectedPasskeyMemberships = useMemo(
-    () =>
-      selectedPasskeyPersonId
-        ? accessData.memberships.filter(
-            (membership) => membership.personId === selectedPasskeyPersonId
-          )
-        : [],
-    [accessData.memberships, selectedPasskeyPersonId]
-  );
   const selectedAgentOrganisation = selectedAgent?.organisationId
     ? organisationById.get(selectedAgent.organisationId) ?? null
     : null;
@@ -476,24 +464,74 @@ export function AdminAccessView({
     });
   }
 
-  function recoveryUnavailableReason(person: { id: string; status: string }) {
-    if (context.isLegacy) {
-      return labels.access.recoveryUnavailableLegacy;
-    }
+  function canStartPasskeyRecovery(person: { id: string; status: string }) {
+    return (
+      !context.isLegacy &&
+      canManageOwners &&
+      person.id !== context.actorPerson.id &&
+      person.status === "active"
+    );
+  }
 
-    if (!canManageOwners) {
-      return labels.access.recoveryUnavailableRole;
-    }
+  function renderPasskeyControls(person: {
+    activePasskeyCount: number;
+    id: string;
+    lastPasskeyUsedAt?: string | null;
+    status: string;
+  }) {
+    const recoveryOpen = passkeyRecoveryPersonId === person.id;
+    const showRecovery = canStartPasskeyRecovery(person);
 
-    if (person.id === context.actorPerson.id) {
-      return labels.access.recoveryUnavailableSelf;
-    }
-
-    if (person.status !== "active") {
-      return labels.access.recoveryUnavailableInactive;
-    }
-
-    return "";
+    return (
+      <div className="mt-1 space-y-1 text-xs font-normal">
+        <div className="text-gray-500">
+          {passkeySummary(person)}
+          {person.lastPasskeyUsedAt ? (
+            <>
+              {" · "}
+              {labels.access.lastPasskeyUsedAt}:{" "}
+              {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
+            </>
+          ) : null}
+          {showRecovery ? (
+            <>
+              {" · "}
+              <button
+                className="font-semibold text-red-700 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
+                disabled={busy}
+                onClick={() => setPasskeyRecoveryPersonId(person.id)}
+                type="button"
+              >
+                {labels.access.recoverPasskey}
+              </button>
+            </>
+          ) : null}
+        </div>
+        {recoveryOpen ? (
+          <div className="max-w-md rounded-md bg-red-50 px-2.5 py-2 text-red-900 ring-1 ring-red-100">
+            <p>{labels.access.passkeyRecoveryWarning}</p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button
+                className="font-semibold text-red-700 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
+                disabled={busy}
+                onClick={() => void recoverPasskey(person.id)}
+                type="button"
+              >
+                {labels.access.sendRecoveryInvite}
+              </button>
+              <button
+                className="font-semibold text-gray-600 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
+                disabled={busy}
+                onClick={() => setPasskeyRecoveryPersonId(null)}
+                type="button"
+              >
+                {labels.contentPages.cancel}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   async function mutate(body: Record<string, unknown>) {
@@ -766,7 +804,7 @@ export function AdminAccessView({
     });
 
     if (updated) {
-      setSelectedPasskeyPersonId(null);
+      setPasskeyRecoveryPersonId(null);
     }
   }
 
@@ -1205,7 +1243,7 @@ export function AdminAccessView({
 
                 return (
                   <form
-                    className="grid gap-3 py-4 lg:grid-cols-[1.3fr_1.5fr_0.9fr_0.9fr_auto]"
+                    className="grid gap-3 py-4 lg:grid-cols-[1.25fr_1.7fr_0.9fr_0.9fr_auto]"
                     key={person.id}
                     onSubmit={savePerson}
                   >
@@ -1224,16 +1262,7 @@ export function AdminAccessView({
                       {labels.access.email}
                       <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
                         {person.email}
-                        <span className="block text-xs text-gray-500">
-                          {passkeySummary(person)}
-                          {person.lastPasskeyUsedAt ? (
-                            <>
-                              {" · "}
-                              {labels.access.lastPasskeyUsedAt}:{" "}
-                              {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
-                            </>
-                          ) : null}
-                        </span>
+                        {renderPasskeyControls(person)}
                       </div>
                     </div>
                     <label className="grid gap-1 text-xs font-semibold text-gray-500">
@@ -1264,8 +1293,8 @@ export function AdminAccessView({
                         <option value="invited">{labels.access.pending}</option>
                       </select>
                     </label>
-                    <div className="flex flex-wrap items-end gap-2 self-end">
-                      {canWrite ? (
+                    {canWrite ? (
+                      <div className="flex items-end self-end">
                         <button
                           className={actionButtonClass("save")}
                           disabled={busy || personProtected}
@@ -1273,16 +1302,8 @@ export function AdminAccessView({
                         >
                           {labels.access.save}
                         </button>
-                      ) : null}
-                      <button
-                        className={actionButtonClass("save")}
-                        disabled={busy}
-                        onClick={() => setSelectedPasskeyPersonId(person.id)}
-                        type="button"
-                      >
-                        {labels.access.managePasskeys}
-                      </button>
-                    </div>
+                      </div>
+                    ) : null}
                   </form>
                 );
               })}
@@ -1411,13 +1432,8 @@ export function AdminAccessView({
                         </td>
                         <td className="py-3 pr-4 text-gray-600">
                           {person
-                            ? passkeySummary(person)
+                            ? renderPasskeyControls(person)
                             : passkeySummary({ activePasskeyCount: 0 })}
-                          {person?.lastPasskeyUsedAt ? (
-                            <span className="block text-xs text-gray-500">
-                              {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
-                            </span>
-                          ) : null}
                         </td>
                         <td className="py-3">
                           <form id={membershipFormId} onSubmit={saveMembership}>
@@ -1454,16 +1470,6 @@ export function AdminAccessView({
                                 type="button"
                               >
                                 {labels.access.assume}
-                              </button>
-                            ) : null}
-                            {person ? (
-                              <button
-                                className={actionButtonClass("save")}
-                                disabled={busy}
-                                onClick={() => setSelectedPasskeyPersonId(person.id)}
-                                type="button"
-                              >
-                                {labels.access.managePasskeys}
                               </button>
                             ) : null}
                           </div>
@@ -2388,137 +2394,6 @@ export function AdminAccessView({
                 type="button"
               >
                 {labels.contentPages.cancel}
-              </button>
-            </div>
-          </div>
-        </AdminModal>
-      ) : null}
-
-      {selectedPasskeyPerson ? (
-        <AdminModal
-          closeDisabled={busy}
-          closeLabel={labels.contentPages.cancel}
-          description={selectedPasskeyPerson.email}
-          label={labels.access.managePasskeys}
-          onClose={() => setSelectedPasskeyPersonId(null)}
-          size="lg"
-          title={
-            <span className={adminLocaleTextClass(locale, "heading")}>
-              {localizedTemplate(labels.access.passkeysFor, {
-                name: selectedPasskeyPerson.displayName
-              })}
-            </span>
-          }
-        >
-          <div className="space-y-5 p-6">
-            <dl className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs font-semibold text-gray-500">
-                  {labels.access.status}
-                </dt>
-                <dd className="mt-1">
-                  <span
-                    className={classNames(
-                      "rounded-full px-2 py-1 text-xs font-medium ring-1",
-                      statusClass(selectedPasskeyPerson.status)
-                    )}
-                  >
-                    {statusLabel(labels, selectedPasskeyPerson.status)}
-                  </span>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold text-gray-500">
-                  {labels.access.activePasskeys}
-                </dt>
-                <dd className="mt-1 text-sm font-medium text-gray-900">
-                  {passkeySummary(selectedPasskeyPerson)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold text-gray-500">
-                  {labels.access.lastPasskeyUsedAt}
-                </dt>
-                <dd className="mt-1 text-sm text-gray-700">
-                  {selectedPasskeyPerson.lastPasskeyUsedAt
-                    ? formatGeneratedAt(
-                        selectedPasskeyPerson.lastPasskeyUsedAt,
-                        locale
-                      )
-                    : "-"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold text-gray-500">
-                  {labels.access.email}
-                </dt>
-                <dd className="mt-1 break-all text-sm text-gray-700">
-                  {selectedPasskeyPerson.email}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-100">
-              {labels.access.passkeyRecoveryWarning}
-            </div>
-
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">
-                {labels.access.memberships}
-              </h3>
-              <div className="mt-2 divide-y divide-gray-100 rounded-md ring-1 ring-gray-200">
-                {selectedPasskeyMemberships.map((membership) => {
-                  const organisation = organisationById.get(membership.organisationId);
-
-                  return (
-                    <div
-                      className="grid gap-2 px-3 py-2 text-sm sm:grid-cols-[1.2fr_0.9fr_0.7fr]"
-                      key={membership.id}
-                    >
-                      <div className="text-gray-900">
-                        {organisation?.name ?? labels.access.organisation}
-                      </div>
-                      <div className="text-gray-600">
-                        {roleLabels[locale][membership.role]}
-                      </div>
-                      <div>
-                        <span
-                          className={classNames(
-                            "rounded-full px-2 py-1 text-xs font-medium ring-1",
-                            statusClass(membership.status)
-                          )}
-                        >
-                          {statusLabel(labels, membership.status)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {recoveryUnavailableReason(selectedPasskeyPerson) ? (
-              <p className="text-sm font-medium text-gray-600">
-                {recoveryUnavailableReason(selectedPasskeyPerson)}
-              </p>
-            ) : null}
-
-            <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
-              <button
-                className={actionButtonClass("save")}
-                disabled={busy}
-                onClick={() => setSelectedPasskeyPersonId(null)}
-                type="button"
-              >
-                {labels.contentPages.cancel}
-              </button>
-              <button
-                className={actionButtonClass("delete")}
-                disabled={busy || Boolean(recoveryUnavailableReason(selectedPasskeyPerson))}
-                onClick={() => void recoverPasskey(selectedPasskeyPerson.id)}
-                type="button"
-              >
-                {labels.access.sendRecoveryInvite}
               </button>
             </div>
           </div>
