@@ -9,6 +9,18 @@ function source(path: string) {
   return readFileSync(join(root, path), "utf8");
 }
 
+const passkeyRecoveryLabels = [
+  "managePasskeys",
+  "passkeysFor",
+  "passkeyRecoveryWarning",
+  "passkeySummary",
+  "recoveryUnavailableInactive",
+  "recoveryUnavailableLegacy",
+  "recoveryUnavailableRole",
+  "recoveryUnavailableSelf",
+  "sendRecoveryInvite"
+] as const;
+
 test("admin passkey schema supports revocation without deleting credentials", () => {
   const schema = source("scripts/admin-access-schema.ts");
   const rebuild = source("db-schema.sql");
@@ -55,9 +67,48 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   assert.match(route, /context\.isLegacy/);
   assert.match(route, /context\.actorMembership\.role !== "platform_owner"/);
   assert.match(view, /recover_passkey/);
-  assert.match(view, /recoverPasskeyConfirm/);
+  assert.doesNotMatch(view, /window\.confirm/);
+  assert.doesNotMatch(view, /recoverPasskeyConfirm/);
+  assert.match(view, /selectedPasskeyPersonId/);
+  assert.match(view, /selectedPasskeyPerson \? \([\s\S]*<AdminModal/);
+  assert.match(view, /labels\.access\.passkeysFor/);
+  assert.match(view, /labels\.access\.managePasskeys/);
+  assert.match(view, /labels\.access\.passkeyRecoveryWarning/);
+  assert.match(view, /labels\.access\.sendRecoveryInvite/);
+  assert.match(view, /recoveryUnavailableReason/);
+  assert.match(view, /labels\.access\.recoveryUnavailableSelf/);
+  assert.match(view, /labels\.access\.recoveryUnavailableInactive/);
+  assert.match(view, /labels\.access\.recoveryUnavailableLegacy/);
+  assert.match(view, /labels\.access\.recoveryUnavailableRole/);
   assert.match(view, /activePasskeyCount/);
   assert.match(view, /lastPasskeyUsedAt/);
+  assert.match(view, /passkeySummary\(person\)/);
+  assert.equal(
+    [...view.matchAll(/setSelectedPasskeyPersonId\(person\.id\)/g)].length,
+    2
+  );
+  assert.doesNotMatch(
+    view,
+    /Recover passkey|Send recovery invite|Passkeys for|Recovery immediately revokes/
+  );
+});
+
+test("passkey recovery modal copy is localized for admin access views", () => {
+  const content = source("components/admin/dashboard-content.tsx");
+  const zh = JSON.parse(source("components/admin/dashboard-content.zh-CN.json")) as {
+    access?: Record<string, unknown>;
+  };
+
+  for (const label of passkeyRecoveryLabels) {
+    assert.match(content, new RegExp(`\\b${label}:`));
+    assert.equal(typeof zh.access?.[label], "string", `${label} is missing zh-CN copy`);
+  }
+
+  assert.doesNotMatch(content, /recoverPasskeyConfirm/);
+  assert.doesNotMatch(
+    source("components/admin/access-view.tsx"),
+    /labels\.access\.recoverPasskey/
+  );
 });
 
 test("admins can add an extra passkey only from an existing passkey session", () => {

@@ -29,6 +29,7 @@ import {
   adminLocaleTextClass,
   classNames,
   formatGeneratedAt,
+  formatNumber,
   readableToken
 } from "@/components/admin/dashboard-shared";
 import { AdminModal } from "@/components/admin/ui";
@@ -210,6 +211,16 @@ function actionButtonClass(intent: "assume" | "delete" | "primary" | "save") {
   return classNames(base, "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50");
 }
 
+function localizedTemplate(
+  template: string,
+  values: Record<string, string | number>
+) {
+  return Object.entries(values).reduce(
+    (text, [key, value]) => text.replaceAll(`{${key}}`, String(value)),
+    template
+  );
+}
+
 async function postAccess(body: Record<string, unknown>) {
   const response = await fetch("/api/admin/access", {
     body: JSON.stringify(body),
@@ -287,6 +298,8 @@ export function AdminAccessView({
   const [invitePersonOpen, setInvitePersonOpen] = useState(false);
   const [membershipFilterOrganisationId, setMembershipFilterOrganisationId] =
     useState("");
+  const [selectedPasskeyPersonId, setSelectedPasskeyPersonId] =
+    useState<string | null>(null);
   const [agentFilterOrganisationId, setAgentFilterOrganisationId] = useState("");
   const [selectedAgentMembershipId, setSelectedAgentMembershipId] =
     useState<string | null>(null);
@@ -310,7 +323,6 @@ export function AdminAccessView({
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
   const canManageOwners = context.actorMembership.role === "platform_owner";
-  const canRecoverPasskeys = !context.isLegacy && canManageOwners;
   const canAddMembership =
     canWrite &&
     (context.actorMembership.role === "platform_owner" ||
@@ -432,6 +444,18 @@ export function AdminAccessView({
         : null,
     [accessData.agents, selectedAgentMembershipId]
   );
+  const selectedPasskeyPerson = selectedPasskeyPersonId
+    ? personById.get(selectedPasskeyPersonId) ?? null
+    : null;
+  const selectedPasskeyMemberships = useMemo(
+    () =>
+      selectedPasskeyPersonId
+        ? accessData.memberships.filter(
+            (membership) => membership.personId === selectedPasskeyPersonId
+          )
+        : [],
+    [accessData.memberships, selectedPasskeyPersonId]
+  );
   const selectedAgentOrganisation = selectedAgent?.organisationId
     ? organisationById.get(selectedAgent.organisationId) ?? null
     : null;
@@ -445,6 +469,32 @@ export function AdminAccessView({
     selectedAgent && !selectedAgentRoles.includes(selectedAgent.role)
       ? [selectedAgent.role, ...selectedAgentRoles]
       : selectedAgentRoles;
+
+  function passkeySummary(person: { activePasskeyCount: number }) {
+    return localizedTemplate(labels.access.passkeySummary, {
+      count: formatNumber(person.activePasskeyCount, locale)
+    });
+  }
+
+  function recoveryUnavailableReason(person: { id: string; status: string }) {
+    if (context.isLegacy) {
+      return labels.access.recoveryUnavailableLegacy;
+    }
+
+    if (!canManageOwners) {
+      return labels.access.recoveryUnavailableRole;
+    }
+
+    if (person.id === context.actorPerson.id) {
+      return labels.access.recoveryUnavailableSelf;
+    }
+
+    if (person.status !== "active") {
+      return labels.access.recoveryUnavailableInactive;
+    }
+
+    return "";
+  }
 
   async function mutate(body: Record<string, unknown>) {
     setBusy(true);
@@ -709,15 +759,15 @@ export function AdminAccessView({
     });
   }
 
-  function recoverPasskey(personId: string) {
-    if (!window.confirm(labels.access.recoverPasskeyConfirm)) {
-      return;
-    }
-
-    void mutate({
+  async function recoverPasskey(personId: string) {
+    const updated = await mutate({
       action: "recover_passkey",
       personId
     });
+
+    if (updated) {
+      setSelectedPasskeyPersonId(null);
+    }
   }
 
   return (
@@ -1155,7 +1205,7 @@ export function AdminAccessView({
 
                 return (
                   <form
-                    className="grid gap-3 py-4 lg:grid-cols-[1.2fr_1.4fr_0.8fr_0.8fr_0.9fr_auto]"
+                    className="grid gap-3 py-4 lg:grid-cols-[1.3fr_1.5fr_0.9fr_0.9fr_auto]"
                     key={person.id}
                     onSubmit={savePerson}
                   >
@@ -1174,6 +1224,16 @@ export function AdminAccessView({
                       {labels.access.email}
                       <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
                         {person.email}
+                        <span className="block text-xs text-gray-500">
+                          {passkeySummary(person)}
+                          {person.lastPasskeyUsedAt ? (
+                            <>
+                              {" · "}
+                              {labels.access.lastPasskeyUsedAt}:{" "}
+                              {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
+                            </>
+                          ) : null}
+                        </span>
                       </div>
                     </div>
                     <label className="grid gap-1 text-xs font-semibold text-gray-500">
@@ -1204,41 +1264,25 @@ export function AdminAccessView({
                         <option value="invited">{labels.access.pending}</option>
                       </select>
                     </label>
-                    <div className="grid gap-1 text-xs font-semibold text-gray-500">
-                      {labels.access.activePasskeys}
-                      <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
-                        {person.activePasskeyCount}
-                        {person.lastPasskeyUsedAt ? (
-                          <span className="block text-xs text-gray-500">
-                            {labels.access.lastPasskeyUsedAt}:{" "}
-                            {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
-                          </span>
-                        ) : null}
-                      </div>
+                    <div className="flex flex-wrap items-end gap-2 self-end">
+                      {canWrite ? (
+                        <button
+                          className={actionButtonClass("save")}
+                          disabled={busy || personProtected}
+                          type="submit"
+                        >
+                          {labels.access.save}
+                        </button>
+                      ) : null}
+                      <button
+                        className={actionButtonClass("save")}
+                        disabled={busy}
+                        onClick={() => setSelectedPasskeyPersonId(person.id)}
+                        type="button"
+                      >
+                        {labels.access.managePasskeys}
+                      </button>
                     </div>
-                    {canWrite || canRecoverPasskeys ? (
-                      <div className="flex flex-wrap items-end gap-2 self-end">
-                        {canWrite ? (
-                          <button
-                            className={actionButtonClass("save")}
-                            disabled={busy || personProtected}
-                            type="submit"
-                          >
-                            {labels.access.save}
-                          </button>
-                        ) : null}
-                        {canRecoverPasskeys && person.id !== context.actorPerson.id ? (
-                          <button
-                            className={actionButtonClass("delete")}
-                            disabled={busy || person.status !== "active"}
-                            onClick={() => recoverPasskey(person.id)}
-                            type="button"
-                          >
-                            {labels.access.recoverPasskey}
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </form>
                 );
               })}
@@ -1325,15 +1369,17 @@ export function AdminAccessView({
                           <div className="font-medium text-gray-900">
                             {person?.displayName ?? labels.access.people}
                           </div>
-	                          <div className="text-xs text-gray-500">{person?.email}</div>
-	                        </td>
-	                        {showOrganisationContext ? (
-	                          <td className="py-3 pr-4 text-gray-600">
-	                            {organisation?.name ?? labels.access.organisation}
-	                          </td>
-	                        ) : null}
-	                        <td className="py-3 pr-4">
-	                          <select
+                          <div className="text-xs text-gray-500">
+                            {person?.email}
+                          </div>
+                        </td>
+                        {showOrganisationContext ? (
+                          <td className="py-3 pr-4 text-gray-600">
+                            {organisation?.name ?? labels.access.organisation}
+                          </td>
+                        ) : null}
+                        <td className="py-3 pr-4">
+                          <select
                             className="rounded-md bg-white px-2 py-1 text-sm ring-1 ring-inset ring-gray-300"
                             defaultValue={membership.role}
                             disabled={!canWrite || busy || membershipProtected}
@@ -1364,7 +1410,9 @@ export function AdminAccessView({
                           </select>
                         </td>
                         <td className="py-3 pr-4 text-gray-600">
-                          {person?.activePasskeyCount ?? 0}
+                          {person
+                            ? passkeySummary(person)
+                            : passkeySummary({ activePasskeyCount: 0 })}
                           {person?.lastPasskeyUsedAt ? (
                             <span className="block text-xs text-gray-500">
                               {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
@@ -1408,16 +1456,14 @@ export function AdminAccessView({
                                 {labels.access.assume}
                               </button>
                             ) : null}
-                            {canRecoverPasskeys &&
-                            person &&
-                            person.id !== context.actorPerson.id ? (
+                            {person ? (
                               <button
-                                className={actionButtonClass("delete")}
-                                disabled={busy || person.status !== "active"}
-                                onClick={() => recoverPasskey(person.id)}
+                                className={actionButtonClass("save")}
+                                disabled={busy}
+                                onClick={() => setSelectedPasskeyPersonId(person.id)}
                                 type="button"
                               >
-                                {labels.access.recoverPasskey}
+                                {labels.access.managePasskeys}
                               </button>
                             ) : null}
                           </div>
@@ -2342,6 +2388,137 @@ export function AdminAccessView({
                 type="button"
               >
                 {labels.contentPages.cancel}
+              </button>
+            </div>
+          </div>
+        </AdminModal>
+      ) : null}
+
+      {selectedPasskeyPerson ? (
+        <AdminModal
+          closeDisabled={busy}
+          closeLabel={labels.contentPages.cancel}
+          description={selectedPasskeyPerson.email}
+          label={labels.access.managePasskeys}
+          onClose={() => setSelectedPasskeyPersonId(null)}
+          size="lg"
+          title={
+            <span className={adminLocaleTextClass(locale, "heading")}>
+              {localizedTemplate(labels.access.passkeysFor, {
+                name: selectedPasskeyPerson.displayName
+              })}
+            </span>
+          }
+        >
+          <div className="space-y-5 p-6">
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-semibold text-gray-500">
+                  {labels.access.status}
+                </dt>
+                <dd className="mt-1">
+                  <span
+                    className={classNames(
+                      "rounded-full px-2 py-1 text-xs font-medium ring-1",
+                      statusClass(selectedPasskeyPerson.status)
+                    )}
+                  >
+                    {statusLabel(labels, selectedPasskeyPerson.status)}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold text-gray-500">
+                  {labels.access.activePasskeys}
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-gray-900">
+                  {passkeySummary(selectedPasskeyPerson)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold text-gray-500">
+                  {labels.access.lastPasskeyUsedAt}
+                </dt>
+                <dd className="mt-1 text-sm text-gray-700">
+                  {selectedPasskeyPerson.lastPasskeyUsedAt
+                    ? formatGeneratedAt(
+                        selectedPasskeyPerson.lastPasskeyUsedAt,
+                        locale
+                      )
+                    : "-"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold text-gray-500">
+                  {labels.access.email}
+                </dt>
+                <dd className="mt-1 break-all text-sm text-gray-700">
+                  {selectedPasskeyPerson.email}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-100">
+              {labels.access.passkeyRecoveryWarning}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                {labels.access.memberships}
+              </h3>
+              <div className="mt-2 divide-y divide-gray-100 rounded-md ring-1 ring-gray-200">
+                {selectedPasskeyMemberships.map((membership) => {
+                  const organisation = organisationById.get(membership.organisationId);
+
+                  return (
+                    <div
+                      className="grid gap-2 px-3 py-2 text-sm sm:grid-cols-[1.2fr_0.9fr_0.7fr]"
+                      key={membership.id}
+                    >
+                      <div className="text-gray-900">
+                        {organisation?.name ?? labels.access.organisation}
+                      </div>
+                      <div className="text-gray-600">
+                        {roleLabels[locale][membership.role]}
+                      </div>
+                      <div>
+                        <span
+                          className={classNames(
+                            "rounded-full px-2 py-1 text-xs font-medium ring-1",
+                            statusClass(membership.status)
+                          )}
+                        >
+                          {statusLabel(labels, membership.status)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {recoveryUnavailableReason(selectedPasskeyPerson) ? (
+              <p className="text-sm font-medium text-gray-600">
+                {recoveryUnavailableReason(selectedPasskeyPerson)}
+              </p>
+            ) : null}
+
+            <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+              <button
+                className={actionButtonClass("save")}
+                disabled={busy}
+                onClick={() => setSelectedPasskeyPersonId(null)}
+                type="button"
+              >
+                {labels.contentPages.cancel}
+              </button>
+              <button
+                className={actionButtonClass("delete")}
+                disabled={busy || Boolean(recoveryUnavailableReason(selectedPasskeyPerson))}
+                onClick={() => void recoverPasskey(selectedPasskeyPerson.id)}
+                type="button"
+              >
+                {labels.access.sendRecoveryInvite}
               </button>
             </div>
           </div>
