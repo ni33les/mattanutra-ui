@@ -717,13 +717,6 @@ export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow)
     },
     id: row.id,
     identifiers: row.identifiers,
-    identifierCandidates: row.identifierCandidates,
-    importReview: {
-      duplicateProductIds: row.productImportDuplicateProductIds,
-      id: row.productImportId,
-      reviewTaskId: row.importReviewTaskId,
-      status: row.importStatus,
-    },
     ingredients: row.facts.map((fact) => ({
       aliases: fact.aliasKeys ?? [],
       amount: fact.amount,
@@ -750,10 +743,8 @@ export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow)
     productAudience: row.productAudience,
     productKind: row.productKind,
     productUrl: row.productUrl,
-    recommendationHistory: row.recommendationHistory,
     region: row.region,
     regulatoryApprovals: row.regulatoryApprovals,
-    sourceEvidence: row.sourceEvidence,
     status: row.status,
     titles: {
       canonical: row.title,
@@ -761,12 +752,6 @@ export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow)
     },
     translations: row.translations,
     updatedAt: row.updatedAt,
-    validation: {
-      cacheStatus: row.validationCacheStatus,
-      cacheStaleReasons: row.validationCacheStaleReasons,
-      label: row.validationLabel,
-      result: row.validation,
-    },
   };
 }
 

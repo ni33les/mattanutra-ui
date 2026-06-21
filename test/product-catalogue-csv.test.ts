@@ -67,7 +67,7 @@ describe("product catalogue CSV", () => {
     assert.equal(rows[0]?.columns.quantity_in_stock, "4");
   });
 
-  it("exports platform products as admin JSON without retail or price fields", () => {
+  it("exports platform products as focused admin JSON without retail, price, or runtime metadata", () => {
     const exported = platformProductCatalogueJsonProductFromRow({
       availabilityStatus: "in_stock",
       availableCountryCodes: ["TH"],
@@ -182,7 +182,7 @@ describe("product catalogue CSV", () => {
     ]);
     assert.doesNotMatch(
       [...deepKeys(exported)].sort().join("\n"),
-      /backorder|descriptionEn|descriptionTh|price|retail|rrp|stock|titleEn|titleTh|wholesale/i,
+      /backorder|descriptionEn|descriptionTh|identifierCandidates|importReview|price|recommendationHistory|retail|rrp|sourceEvidence|stock|titleEn|titleTh|validation|wholesale/i,
     );
   });
 
