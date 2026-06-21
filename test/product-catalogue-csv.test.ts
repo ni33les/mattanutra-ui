@@ -85,8 +85,8 @@ describe("product catalogue CSV", () => {
       ],
       currency: "THB",
       description: "Canonical description",
-      descriptionEn: null,
-      descriptionTh: null,
+      descriptionEn: "Legacy English description",
+      descriptionTh: "Legacy Thai description",
       displayDescription: "Canonical description",
       displayTitle: "Product A",
       facts: [
@@ -152,9 +152,17 @@ describe("product catalogue CSV", () => {
       },
       status: "approved",
       title: "Product A",
-      titleEn: null,
-      titleTh: null,
-      translations: {},
+      titleEn: "Legacy English title",
+      titleTh: "Legacy Thai title",
+      translations: {
+        th: {
+          description: "Translated Thai description",
+          locale: "th",
+          status: "complete",
+          title: "Translated Thai title",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      },
       updatedAt: "2026-01-01T00:00:00.000Z",
       validation: { status: "pass" },
       validationCacheStatus: "fresh",
@@ -167,9 +175,18 @@ describe("product catalogue CSV", () => {
       "https://cdn.mattanutra.com/products/product-a.webp",
     );
     assert.equal(exported.ingredients[0]?.name, "Vitamin C");
+    assert.equal(exported.translations.th?.title, "Translated Thai title");
+    assert.deepEqual(Object.keys(exported.titles).sort(), [
+      "canonical",
+      "display",
+    ]);
+    assert.deepEqual(Object.keys(exported.descriptions).sort(), [
+      "canonical",
+      "display",
+    ]);
     assert.doesNotMatch(
       [...deepKeys(exported)].sort().join("\n"),
-      /backorder|price|retail|rrp|stock|wholesale/i,
+      /backorder|descriptionEn|descriptionTh|price|retail|rrp|stock|titleEn|titleTh|wholesale/i,
     );
   });
 

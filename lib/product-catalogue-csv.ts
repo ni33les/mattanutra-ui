@@ -713,9 +713,6 @@ export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow)
     descriptions: {
       canonical: row.description,
       display: row.displayDescription,
-      en: row.descriptionEn,
-      th: row.descriptionTh,
-      translations: row.translations,
     },
     id: row.id,
     identifiers: row.identifiers,
@@ -760,10 +757,8 @@ export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow)
     titles: {
       canonical: row.title,
       display: row.displayTitle,
-      en: row.titleEn,
-      th: row.titleTh,
-      translations: row.translations,
     },
+    translations: row.translations,
     updatedAt: row.updatedAt,
     validation: {
       cacheStatus: row.validationCacheStatus,
