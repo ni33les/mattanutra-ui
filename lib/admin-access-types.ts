@@ -27,8 +27,18 @@ export type AdminPerson = Readonly<{
   email: string;
   id: string;
   lastPasskeyUsedAt: string | null;
+  passkeys: AdminPasskeyCredentialSummary[];
   preferredLocale: Locale;
   status: AdminAccessStatus;
+}>;
+
+export type AdminPasskeyCredentialSummary = Readonly<{
+  createdAt: string;
+  displayId: string;
+  id: string;
+  label: string | null;
+  lastUsedAt: string | null;
+  status: "active" | "revoked";
 }>;
 
 export type AdminMembership = Readonly<{

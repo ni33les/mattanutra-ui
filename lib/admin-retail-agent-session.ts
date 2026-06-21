@@ -61,6 +61,7 @@ export async function retailAgentSessionContext(
     email: "retail-agent@mattanutra.local",
     id: "00000000-0000-4000-8000-000000000003",
     lastPasskeyUsedAt: null,
+    passkeys: [],
     preferredLocale: organisation.defaultLocale,
     status: "active"
   };

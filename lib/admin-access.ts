@@ -57,6 +57,7 @@ import type {
   AdminAccessData,
   AdminAccessStatus,
   AdminClientSessionContext,
+  AdminPasskeyCredentialSummary,
   AgentCredentialCreated,
   AgentCredentialSummary,
   AdminMembership,
@@ -355,6 +356,50 @@ function roleValue(
     : normalizeAdminRole(null, organisationType);
 }
 
+function isoDateValue(value: unknown) {
+  return value ? new Date(String(value)).toISOString() : null;
+}
+
+function passkeyDisplayId(value: unknown) {
+  const credentialId = typeof value === "string" ? value : "";
+
+  if (credentialId.length <= 14) {
+    return credentialId || "passkey";
+  }
+
+  return `${credentialId.slice(0, 8)}...${credentialId.slice(-6)}`;
+}
+
+function passkeyCredentialSummary(
+  value: unknown
+): AdminPasskeyCredentialSummary | null {
+  const row = metadataRecord(value);
+  const id = typeof row.id === "string" ? row.id : "";
+
+  if (!id) {
+    return null;
+  }
+
+  return {
+    createdAt: isoDateValue(row.createdAt) ?? new Date(0).toISOString(),
+    displayId: passkeyDisplayId(row.credentialId),
+    id,
+    label: typeof row.label === "string" && row.label.trim()
+      ? row.label.trim()
+      : null,
+    lastUsedAt: isoDateValue(row.lastUsedAt),
+    status: row.status === "revoked" ? "revoked" : "active"
+  };
+}
+
+function passkeyCredentialSummaries(value: unknown) {
+  return Array.isArray(value)
+    ? value
+        .map(passkeyCredentialSummary)
+        .filter((item): item is AdminPasskeyCredentialSummary => Boolean(item))
+    : [];
+}
+
 function platformBootstrapEmail() {
   return normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "");
 }
@@ -365,6 +410,7 @@ function person(row: {
   email: string;
   id: string;
   last_passkey_used_at?: Date | string | null;
+  passkeys?: unknown;
   preferred_locale: string;
   status: string;
 }): AdminPerson {
@@ -376,6 +422,7 @@ function person(row: {
     lastPasskeyUsedAt: row.last_passkey_used_at
       ? new Date(row.last_passkey_used_at).toISOString()
       : null,
+    passkeys: passkeyCredentialSummaries(row.passkeys),
     preferredLocale: localeValue(row.preferred_locale),
     status:
       row.status === "active" || row.status === "disabled" || row.status === "invited"
@@ -1834,6 +1881,7 @@ export async function legacyAdminContext(accessToken: string | null | undefined)
     email: "legacy-admin@mattanutra.local",
     id: "00000000-0000-4000-8000-000000000001",
     lastPasskeyUsedAt: null,
+    passkeys: [],
     preferredLocale: "en",
     status: "active"
   };
@@ -1971,6 +2019,7 @@ export async function getAdminAccessData(
         email: string;
         id: string;
         last_passkey_used_at: Date | string | null;
+        passkeys: unknown;
         preferred_locale: string;
         status: string;
       }>>`
@@ -1981,16 +2030,39 @@ export async function getAdminAccessData(
           people.preferred_locale,
           people.status,
           coalesce(passkeys.active_passkey_count, 0) as active_passkey_count,
-          passkeys.last_passkey_used_at
+          passkeys.last_passkey_used_at,
+          coalesce(passkeys.credentials, '[]'::jsonb) as passkeys
         from public.people
         left join lateral (
           select
-            count(*)::int as active_passkey_count,
-            max(last_used_at) as last_passkey_used_at
+            count(*) filter (
+              where credentials.status = 'active'
+                and credentials.revoked_at is null
+            )::int as active_passkey_count,
+            max(last_used_at) filter (
+              where credentials.status = 'active'
+                and credentials.revoked_at is null
+            ) as last_passkey_used_at,
+            jsonb_agg(
+              jsonb_build_object(
+                'createdAt', credentials.created_at,
+                'credentialId', credentials.credential_id,
+                'id', credentials.id::text,
+                'label', credentials.label,
+                'lastUsedAt', credentials.last_used_at,
+                'status', credentials.status
+              )
+              order by
+                case
+                  when credentials.status = 'active'
+                    and credentials.revoked_at is null
+                  then 0
+                  else 1
+                end,
+                credentials.updated_at desc
+            ) filter (where credentials.id is not null) as credentials
           from public.admin_passkey_credentials credentials
           where credentials.person_id = people.id
-            and credentials.status = 'active'
-            and credentials.revoked_at is null
         ) passkeys on true
         ${peopleScope}
         order by lower(display_name), lower(email)
@@ -3541,8 +3613,8 @@ export async function createAdminPasskeyRecovery({
         jsonb_build_object(
           'personId', target.person_id,
           'reason', 'passkey_recovery',
-          'revokedByPersonId', ${actor.actorPerson.id},
-          'source', ${source}
+          'revokedByPersonId', ${actor.actorPerson.id}::text,
+          'source', ${source}::text
         ),
         now() + (${recoveryInviteMinutes}::text || ' minutes')::interval
       from target
@@ -3558,7 +3630,7 @@ export async function createAdminPasskeyRecovery({
         metadata = metadata || jsonb_build_object(
           'recoveryInvitationId', invite.id,
           'revokedReason', 'passkey_recovery',
-          'revokedSource', ${source}
+          'revokedSource', ${source}::text
         ),
         updated_at = now()
       from target, invite

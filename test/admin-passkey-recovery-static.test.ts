@@ -51,6 +51,9 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   assert.match(access, /actor\.actorMembership\.role !== "platform_owner"/);
   assert.match(access, /actor\.actorPerson\.id === personId/);
   assert.match(access, /metadata->>'reason' = 'passkey_recovery'/);
+  assert.match(access, /'revokedByPersonId', \$\{actor\.actorPerson\.id\}::text/);
+  assert.match(access, /'source', \$\{source\}::text/);
+  assert.match(access, /'revokedSource', \$\{source\}::text/);
   assert.match(access, /status = 'revoked'[\s\S]*revoked_invitation_id = invite\.id::uuid/);
   assert.match(access, /with target as \(/);
   assert.match(access, /update public\.admin_sessions[\s\S]*set revoked_at = coalesce\(revoked_at, now\(\)\)/);
@@ -73,13 +76,21 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   assert.match(view, /openPersonDetails/);
   assert.match(view, /accessData\.people\.map\(\(person\) => \(\s*<tr[\s\S]*role="button"/);
   assert.match(view, /selectedPerson \? \([\s\S]*<AdminModal/);
-  assert.match(view, /<form className="space-y-5 p-6" onSubmit=\{savePerson\}/);
+  assert.match(
+    view,
+    /<form className="space-y-5 p-6" key=\{selectedPerson\.id\} onSubmit=\{savePerson\}/
+  );
   assert.match(view, /passkeyRecoveryPersonId/);
   assert.match(view, /canStartPasskeyRecovery/);
   assert.match(view, /labels\.access\.recoverPasskey/);
   assert.match(view, /labels\.access\.passkeyRecoveryWarning/);
   assert.match(view, /labels\.access\.sendRecoveryInvite/);
+  assert.match(view, /selectedPersonActivePasskeys/);
+  assert.match(view, /selectedPersonActivePasskeys\.map/);
+  assert.match(view, /actionButtonClass\("delete"\)[\s\S]*labels\.access\.recoverPasskey/);
+  assert.match(view, /actionButtonClass\("delete"\)[\s\S]*labels\.access\.sendRecoveryInvite/);
   assert.match(view, /activePasskeyCount/);
+  assert.match(view, /passkeys/);
   assert.match(view, /lastPasskeyUsedAt/);
   assert.match(view, /passkeySummary\(person\)/);
   assert.equal(

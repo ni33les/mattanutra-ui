@@ -324,6 +324,9 @@ export function AdminAccessView({
   const selectedPerson = selectedPersonId
     ? personById.get(selectedPersonId) ?? null
     : null;
+  const selectedPersonActivePasskeys =
+    selectedPerson?.passkeys.filter((passkey) => passkey.status === "active") ??
+    [];
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
   const canManageOwners = context.actorMembership.role === "platform_owner";
@@ -2356,7 +2359,7 @@ export function AdminAccessView({
             </span>
           }
         >
-          <form className="space-y-5 p-6" onSubmit={savePerson}>
+          <form className="space-y-5 p-6" key={selectedPerson.id} onSubmit={savePerson}>
             <input type="hidden" name="personId" value={selectedPerson.id} />
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1 text-xs font-semibold text-gray-500">
@@ -2405,63 +2408,88 @@ export function AdminAccessView({
               </label>
             </div>
 
-            <div className="grid gap-3 border-t border-gray-100 pt-5 sm:grid-cols-2">
-              <div>
-                <div className="text-xs font-semibold text-gray-500">
+            <div className="border-t border-gray-100 pt-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="text-sm font-semibold text-gray-900">
                   {labels.access.activePasskeys}
-                </div>
-                <div className="mt-1 text-sm text-gray-900">
-                  {passkeySummary(selectedPerson)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-gray-500">
-                  {labels.access.lastPasskeyUsedAt}
-                </div>
-                <div className="mt-1 text-sm text-gray-700">
-                  {selectedPerson.lastPasskeyUsedAt
-                    ? formatGeneratedAt(selectedPerson.lastPasskeyUsedAt, locale)
-                    : "-"}
-                </div>
-              </div>
-            </div>
-
-            {canStartPasskeyRecovery(selectedPerson) ? (
-              <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-100">
-                {passkeyRecoveryPersonId === selectedPerson.id ? (
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p>{labels.access.passkeyRecoveryWarning}</p>
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        className="font-semibold text-red-700 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
-                        disabled={busy}
-                        onClick={() => void recoverPasskey(selectedPerson.id)}
-                        type="button"
-                      >
-                        {labels.access.sendRecoveryInvite}
-                      </button>
-                      <button
-                        className="font-semibold text-gray-600 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
-                        disabled={busy}
-                        onClick={() => setPasskeyRecoveryPersonId(null)}
-                        type="button"
-                      >
-                        {labels.contentPages.cancel}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
+                </h3>
+                {canStartPasskeyRecovery(selectedPerson) &&
+                passkeyRecoveryPersonId !== selectedPerson.id ? (
                   <button
-                    className="font-semibold text-red-700 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
+                    className={actionButtonClass("delete")}
                     disabled={busy}
                     onClick={() => setPasskeyRecoveryPersonId(selectedPerson.id)}
                     type="button"
                   >
                     {labels.access.recoverPasskey}
                   </button>
-                )}
+                ) : null}
               </div>
-            ) : null}
+              {selectedPersonActivePasskeys.length > 0 ? (
+                <div className="mt-3 overflow-x-auto rounded-md ring-1 ring-gray-200">
+                  <table className="min-w-full divide-y divide-gray-100 text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-semibold text-gray-500">
+                        <th className="px-3 py-2">{labels.access.keyLabel}</th>
+                        <th className="px-3 py-2">{labels.access.createdAt}</th>
+                        <th className="px-3 py-2">
+                          {labels.access.lastPasskeyUsedAt}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {selectedPersonActivePasskeys.map((passkey) => (
+                        <tr key={passkey.id}>
+                          <td className="px-3 py-2 text-gray-900">
+                            {passkey.label ?? passkey.displayId}
+                            {passkey.label ? (
+                              <span className="block text-xs text-gray-500">
+                                {passkey.displayId}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">
+                            {formatGeneratedAt(passkey.createdAt, locale)}
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">
+                            {passkey.lastUsedAt
+                              ? formatGeneratedAt(passkey.lastUsedAt, locale)
+                              : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-gray-600">
+                  {labels.access.noCredentials}
+                </p>
+              )}
+              {passkeyRecoveryPersonId === selectedPerson.id ? (
+                <div className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-100">
+                  <p>{labels.access.passkeyRecoveryWarning}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className={actionButtonClass("delete")}
+                      disabled={busy}
+                      onClick={() => void recoverPasskey(selectedPerson.id)}
+                      type="button"
+                    >
+                      {labels.access.sendRecoveryInvite}
+                    </button>
+                    <button
+                      className={actionButtonClass("save")}
+                      disabled={busy}
+                      onClick={() => setPasskeyRecoveryPersonId(null)}
+                      type="button"
+                    >
+                      {labels.contentPages.cancel}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
               <button

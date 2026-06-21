@@ -235,6 +235,7 @@ function agentPrincipalFromRow(
           email: row.person_email ?? "",
           id: row.person_id,
           lastPasskeyUsedAt: null,
+          passkeys: [],
           preferredLocale:
             row.person_preferred_locale === "th" ||
             row.person_preferred_locale === "zh-CN"
@@ -483,6 +484,7 @@ function sessionPrincipalFromRequest(
         email: "",
         id: session.personId,
         lastPasskeyUsedAt: null,
+        passkeys: [],
         preferredLocale: "en",
         status: "active"
       },
@@ -514,6 +516,7 @@ function sessionPrincipalFromRequest(
         email: "",
         id: session.assumedPersonId ?? session.personId,
         lastPasskeyUsedAt: null,
+        passkeys: [],
         preferredLocale: "en",
         status: "active"
       },
