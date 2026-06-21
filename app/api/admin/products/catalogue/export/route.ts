@@ -1,8 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import {
+  adminCsrfCookieName,
+  adminSessionCookieName,
+  resolveAdminSession,
+} from "@/lib/admin-access";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
+import { canAccessRetailOrganisation } from "@/lib/admin-retail-stock-access";
+import { hasAdminPermission } from "@/lib/admin-rbac";
+import { isUuidValue } from "@/lib/admin-product-helpers";
 import {
   buildPlatformProductCatalogueJson,
-  buildProductCatalogueCsv,
+  buildRetailProductCatalogueJson,
   type ProductCatalogueCsvScope
 } from "@/lib/product-catalogue-csv";
 
@@ -22,29 +30,80 @@ function csvScope(value: unknown): ProductCatalogueCsvScope {
   return value === "retail" ? "retail" : "platform";
 }
 
-export async function GET(request: Request) {
+async function resolveRetailExport(request: NextRequest, organisationId: string | null) {
+  if (!organisationId || !isUuidValue(organisationId)) {
+    return {
+      error: NextResponse.json(
+        { message: "Retail organisation is required for product catalogue export" },
+        {
+          headers: {
+            "Cache-Control": "no-store"
+          },
+          status: 400
+        }
+      )
+    };
+  }
+
+  const context = await resolveAdminSession({
+    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
+    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
+  });
+
+  if (!context || !hasAdminPermission(context, "stock.read")) {
+    return {
+      error: NextResponse.json(
+        { message: "Unauthorized" },
+        {
+          headers: {
+            "Cache-Control": "no-store"
+          },
+          status: 401
+        }
+      )
+    };
+  }
+
+  if (!canAccessRetailOrganisation(context, organisationId)) {
+    return {
+      error: NextResponse.json(
+        { message: "Forbidden" },
+        {
+          headers: {
+            "Cache-Control": "no-store"
+          },
+          status: 403
+        }
+      )
+    };
+  }
+
+  return { error: null };
+}
+
+export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const accessToken =
     request.headers.get("x-admin-dashboard-token") ??
     textOrNull(url.searchParams.get("access_token"));
-
-  if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
-    return NextResponse.json(
-      { message: "Not found" },
-      {
-        headers: {
-          "Cache-Control": "no-store"
-        },
-        status: 404
-      }
-    );
-  }
 
   try {
     const scope = csvScope(url.searchParams.get("scope"));
     const organisationId = textOrNull(url.searchParams.get("organisationId"), 80);
 
     if (scope === "platform") {
+      if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
+        return NextResponse.json(
+          { message: "Not found" },
+          {
+            headers: {
+              "Cache-Control": "no-store"
+            },
+            status: 404
+          }
+        );
+      }
+
       const payload = await buildPlatformProductCatalogueJson();
 
       return new Response(JSON.stringify(payload, null, 2) + "\n", {
@@ -56,20 +115,20 @@ export async function GET(request: Request) {
       });
     }
 
-    const csv = await buildProductCatalogueCsv({
-      organisationId,
-      scope
-    });
-    const filename =
-      organisationId
-        ? `retail-product-catalogue-${organisationId}.csv`
-        : "retail-product-catalogue.csv";
+    const retailExport = await resolveRetailExport(request, organisationId);
 
-    return new Response(csv, {
+    if (retailExport.error) {
+      return retailExport.error;
+    }
+
+    const payload = await buildRetailProductCatalogueJson({ organisationId });
+    const filename = `retail-product-catalogue-${organisationId}.json`;
+
+    return new Response(JSON.stringify(payload, null, 2) + "\n", {
       headers: {
         "Cache-Control": "no-store",
         "Content-Disposition": `attachment; filename="${filename}"`,
-        "Content-Type": "text/csv; charset=utf-8"
+        "Content-Type": "application/json; charset=utf-8"
       }
     });
   } catch (error) {

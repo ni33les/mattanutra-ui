@@ -9,6 +9,10 @@ import {
 import { isUuidValue } from "@/lib/admin-product-helpers";
 import { getSql } from "@/lib/db";
 import {
+  isFirstPartyImageUrl,
+  normalizeRuntimeImageUrl,
+} from "@/lib/first-party-image-rules";
+import {
   normalizeCurrencyCode,
   normalizeProductCountryCode,
   type ProductCountryPricing,
@@ -45,6 +49,20 @@ export type PlatformProductCatalogueJson = Readonly<{
   };
 }>;
 
+export type RetailProductCatalogueJson = Readonly<{
+  generatedAt: string;
+  organisation: {
+    countryCode: string | null;
+    currency: string;
+    id: string;
+    name: string;
+  };
+  productCount: number;
+  products: ReturnType<typeof retailProductCatalogueJsonProductFromRow>[];
+  schemaVersion: 1;
+  scope: "retail";
+}>;
+
 type CsvRow = Readonly<{
   columns: Record<string, string>;
   rowNumber: number;
@@ -56,6 +74,32 @@ type ProductMatch = Readonly<{
   normalizedBrandName: string | null;
   normalizedTitle: string | null;
   productId: string;
+}>;
+
+type ProductImportSourceImageRow = Readonly<{
+  id: string;
+  image_urls: string[] | null;
+  product_id: string | null;
+  raw_snapshot: unknown;
+  updated_at: Date | string;
+}>;
+
+type RetailProductCatalogueJsonRow = Readonly<{
+  backorder_policy: string | null;
+  barcode: string | null;
+  currency: string | null;
+  lead_time_days: string | number | null;
+  manufacturer: string | null;
+  manufacturer_sku: string | null;
+  name: string;
+  product_id: string;
+  retail_price_amount: string | number | null;
+  retail_sellable_product_id: string | null;
+  status: string | null;
+  stock_id: string | null;
+  stock_quantity: string | number | null;
+  updated_at: Date | string;
+  wholesale_price_amount: string | number | null;
 }>;
 
 const PLATFORM_IMPORT_RETAIL_ONLY_COLUMNS = [
@@ -123,6 +167,72 @@ function cleanText(value: unknown, max = 2000) {
   const trimmed = String(value).replace(/\s+/g, " ").trim();
 
   return trimmed ? trimmed.slice(0, max) : null;
+}
+
+function numberOrNull(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function integerOrDefault(value: unknown, fallback = 0) {
+  const parsed = numberOrNull(value);
+
+  return parsed === null ? fallback : Math.max(0, Math.round(parsed));
+}
+
+function isoDateTime(value: Date | string | null | undefined) {
+  const date = value instanceof Date ? value : new Date(value ?? "");
+
+  return Number.isNaN(date.getTime())
+    ? new Date(0).toISOString()
+    : date.toISOString();
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function externalImageUrl(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = normalizeRuntimeImageUrl(value);
+
+  return normalized && !isFirstPartyImageUrl(normalized) ? normalized : null;
+}
+
+function productImportSourceImageUrl(row: ProductImportSourceImageRow) {
+  const snapshot = objectRecord(row.raw_snapshot);
+
+  for (const item of arrayValue(snapshot.productImageMirrors)) {
+    const originalUrl = externalImageUrl(objectRecord(item).originalUrl);
+
+    if (originalUrl) {
+      return originalUrl;
+    }
+  }
+
+  for (const imageUrl of row.image_urls ?? []) {
+    const sourceImageUrl = externalImageUrl(imageUrl);
+
+    if (sourceImageUrl) {
+      return sourceImageUrl;
+    }
+  }
+
+  return null;
 }
 
 function normalizeColumnName(value: string) {
@@ -688,7 +798,56 @@ function countrySettingsFromRow(
   ];
 }
 
-export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow) {
+async function platformProductSourceImageUrls(
+  rows: readonly AdminProductRow[],
+) {
+  const sql = getSql();
+
+  if (!sql || rows.length < 1) {
+    return new Map<string, string | null>();
+  }
+
+  const productIds = rows.map((row) => row.id).filter(isUuidValue);
+  const importIds = rows
+    .map((row) => row.productImportId)
+    .filter((id): id is string => Boolean(id && isUuidValue(id)));
+  const productIdByImportId = new Map(
+    rows
+      .filter((row) => row.productImportId)
+      .map((row) => [row.productImportId as string, row.id]),
+  );
+  const importRows = await sql<ProductImportSourceImageRow[]>`
+    select
+      product_imports.id::text,
+      product_imports.product_id::text,
+      product_imports.image_urls,
+      product_imports.raw_snapshot,
+      product_imports.updated_at
+    from public.product_imports
+    where product_imports.product_id = any(${productIds}::uuid[])
+      or product_imports.id = any(${importIds}::uuid[])
+    order by product_imports.updated_at desc
+  `;
+  const sourceImageUrls = new Map<string, string | null>();
+
+  for (const importRow of importRows) {
+    const productId =
+      importRow.product_id ?? productIdByImportId.get(importRow.id) ?? null;
+
+    if (!productId || sourceImageUrls.has(productId)) {
+      continue;
+    }
+
+    sourceImageUrls.set(productId, productImportSourceImageUrl(importRow));
+  }
+
+  return sourceImageUrls;
+}
+
+export function platformProductCatalogueJsonProductFromRow(
+  row: AdminProductRow,
+  sourceImageUrl: string | null = null,
+) {
   return {
     availabilityStatus: row.availabilityStatus,
     brand: {
@@ -745,6 +904,7 @@ export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow)
     productUrl: row.productUrl,
     region: row.region,
     regulatoryApprovals: row.regulatoryApprovals,
+    sourceImageUrl,
     status: row.status,
     titles: {
       canonical: row.title,
@@ -757,14 +917,170 @@ export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow)
 
 export async function buildPlatformProductCatalogueJson(): Promise<PlatformProductCatalogueJson> {
   const data = await getAdminProductsData();
+  const sourceImageUrls = await platformProductSourceImageUrls(data.rows);
 
   return {
     generatedAt: data.generatedAt,
     productCount: data.rows.length,
-    products: data.rows.map(platformProductCatalogueJsonProductFromRow),
+    products: data.rows.map((row) =>
+      platformProductCatalogueJsonProductFromRow(
+        row,
+        sourceImageUrls.get(row.id) ?? null,
+      ),
+    ),
     schemaVersion: 1,
     scope: "platform",
     summary: data.summary,
+  };
+}
+
+export function retailProductCatalogueJsonProductFromRow(
+  row: RetailProductCatalogueJsonRow,
+) {
+  return {
+    backorderPolicy: row.backorder_policy === "deny" ? "deny" : "allow",
+    barcode: row.barcode,
+    currency: normalizeCurrencyCode(row.currency, "THB"),
+    leadTimeDays: integerOrDefault(row.lead_time_days, 0),
+    manufacturer: row.manufacturer,
+    manufacturerSku: row.manufacturer_sku,
+    name: row.name,
+    productId: row.product_id,
+    retailPriceAmount: numberOrNull(row.retail_price_amount),
+    retailSellableProductId: row.retail_sellable_product_id,
+    status:
+      row.status === "disabled" || row.status === "deleted"
+        ? row.status
+        : "active",
+    stockId: row.stock_id,
+    stockQuantity: integerOrDefault(row.stock_quantity, 0),
+    updatedAt: isoDateTime(row.updated_at),
+    wholesalePriceAmount: numberOrNull(row.wholesale_price_amount),
+  };
+}
+
+export async function buildRetailProductCatalogueJson(
+  input: Readonly<{ organisationId?: string | null }>,
+): Promise<RetailProductCatalogueJson> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const organisationId = cleanText(input.organisationId, 80);
+
+  if (!organisationId || !isUuidValue(organisationId)) {
+    throw new Error("Retail organisation is required for product catalogue export");
+  }
+
+  const organisationRows = await sql<Array<{
+    country_code: string | null;
+    currency: string | null;
+    id: string;
+    name: string;
+  }>>`
+    select id::text, name, currency, country_code
+    from public.organisations
+    where id = ${organisationId}::uuid
+      and organisation_type = 'tenant'
+      and status = 'active'
+    limit 1
+  `;
+  const organisation = organisationRows[0];
+
+  if (!organisation) {
+    throw new Error("Retail organisation not found");
+  }
+
+  const rows = await sql<RetailProductCatalogueJsonRow[]>`
+    with retail_products as (
+      select product_id
+      from public.retail_product_stock
+      where organisation_id = ${organisationId}::uuid
+        and status <> 'deleted'
+      union
+      select product_id
+      from public.retail_sellable_products
+      where organisation_id = ${organisationId}::uuid
+        and status <> 'deleted'
+    )
+    select
+      products.id::text as product_id,
+      retail_product_stock.id::text as stock_id,
+      retail_sellable_products.id::text as retail_sellable_product_id,
+      products.title as name,
+      products.brand_name as manufacturer,
+      identifiers.manufacturer_sku,
+      identifiers.barcode,
+      coalesce(retail_sellable_products.status, retail_product_stock.status, 'active') as status,
+      coalesce(retail_product_stock.stock_quantity, 0) as stock_quantity,
+      coalesce(
+        retail_sellable_products.currency,
+        retail_product_stock.currency,
+        ${organisation.currency ?? "THB"},
+        products.currency,
+        'THB'
+      ) as currency,
+      coalesce(
+        retail_sellable_products.rrp_price_amount,
+        retail_product_stock.retail_price_amount
+      ) as retail_price_amount,
+      coalesce(
+        retail_sellable_products.wholesale_price_amount,
+        retail_product_stock.wholesale_price_amount
+      ) as wholesale_price_amount,
+      coalesce(
+        retail_sellable_products.lead_time_days,
+        retail_product_stock.lead_time_days,
+        0
+      ) as lead_time_days,
+      coalesce(retail_sellable_products.backorder_policy, 'allow') as backorder_policy,
+      greatest(
+        coalesce(retail_sellable_products.updated_at, 'epoch'::timestamptz),
+        coalesce(retail_product_stock.updated_at, 'epoch'::timestamptz),
+        products.updated_at
+      ) as updated_at
+    from retail_products
+    join public.products
+      on products.id = retail_products.product_id
+    left join public.retail_product_stock
+      on retail_product_stock.organisation_id = ${organisationId}::uuid
+      and retail_product_stock.product_id = products.id
+      and retail_product_stock.status <> 'deleted'
+    left join public.retail_sellable_products
+      on retail_sellable_products.organisation_id = ${organisationId}::uuid
+      and retail_sellable_products.product_id = products.id
+      and retail_sellable_products.status <> 'deleted'
+    left join lateral (
+      select
+        max(product_identifiers.identifier_value) filter (
+          where product_identifiers.identifier_type = 'manufacturer_sku'
+        ) as manufacturer_sku,
+        max(product_identifiers.identifier_value) filter (
+          where product_identifiers.identifier_type = 'ean13'
+        ) as barcode
+      from public.product_identifiers
+      where product_identifiers.product_id = products.id
+        and product_identifiers.status = 'active'
+        and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
+    ) identifiers on true
+    where products.status <> 'ignored'
+    order by lower(coalesce(products.brand_name, '')), lower(products.title)
+  `;
+
+  return {
+    generatedAt: new Date().toISOString(),
+    organisation: {
+      countryCode: organisation.country_code,
+      currency: normalizeCurrencyCode(organisation.currency, "THB"),
+      id: organisation.id,
+      name: organisation.name,
+    },
+    productCount: rows.length,
+    products: rows.map(retailProductCatalogueJsonProductFromRow),
+    schemaVersion: 1,
+    scope: "retail",
   };
 }
 

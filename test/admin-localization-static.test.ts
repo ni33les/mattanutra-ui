@@ -348,6 +348,7 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
   assert.equal(zh.stock?.backorderPolicy, "缺货预订策略");
   assert.equal(zh.stock?.orderItems, "订购项目");
   assert.equal(zh.stock?.exportCsv, "导出 CSV");
+  assert.equal(zh.stock?.exportJson, "导出 JSON");
   assert.equal(zh.stock?.exportPdf, "导出 PDF");
   assert.equal(zh.stock?.updateStockCounts, "更新库存数量");
   assert.equal(zh.stock?.inStock, "库存正常");

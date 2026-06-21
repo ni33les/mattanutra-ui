@@ -378,6 +378,7 @@ export type AdminContent = Readonly<{
     expiresAt: string;
     editStock: string;
     exportCsv: string;
+    exportJson: string;
     exportPdf: string;
     expectedAt: string;
     event: string;
@@ -1100,6 +1101,7 @@ const baseContent = {
       expiresAt: "Expiry",
       editStock: "Edit sellable product",
       exportCsv: "Export CSV",
+      exportJson: "Export JSON",
       exportPdf: "Export PDF",
       expectedAt: "Expected",
       event: "Event",
@@ -1966,6 +1968,7 @@ const baseContent = {
       expiresAt: "วันหมดอายุ",
       editStock: "แก้ไขสินค้าที่ขายได้",
       exportCsv: "ส่งออก CSV",
+      exportJson: "ส่งออก JSON",
       exportPdf: "ส่งออก PDF",
       expectedAt: "วันที่คาดว่าจะถึง",
       event: "เหตุการณ์",

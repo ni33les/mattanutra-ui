@@ -264,6 +264,7 @@
     "expiresAt": "有效期",
     "editStock": "编辑可售产品",
     "exportCsv": "导出 CSV",
+    "exportJson": "导出 JSON",
     "exportPdf": "导出 PDF",
     "expectedAt": "预计日期",
     "event": "事件",

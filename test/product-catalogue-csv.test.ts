@@ -5,6 +5,7 @@ import {
   PRODUCT_CATALOGUE_CSV_HEADERS,
   parseProductCatalogueCsv,
   platformProductCatalogueJsonProductFromRow,
+  retailProductCatalogueJsonProductFromRow,
 } from "@/lib/product-catalogue-csv";
 import type { AdminProductRow } from "@/lib/admin-products";
 
@@ -164,11 +165,15 @@ describe("product catalogue CSV", () => {
       validationCacheStatus: "fresh",
       validationCacheStaleReasons: [],
       validationLabel: "Approved",
-    } as unknown as AdminProductRow);
+    } as unknown as AdminProductRow, "https://manufacturer.example/product-a.png");
 
     assert.equal(
       exported.canonicalImageUrl,
       "https://cdn.mattanutra.com/products/product-a.webp",
+    );
+    assert.equal(
+      exported.sourceImageUrl,
+      "https://manufacturer.example/product-a.png",
     );
     assert.equal(exported.ingredients[0]?.name, "Vitamin C");
     assert.equal(exported.translations.th?.title, "Translated Thai title");
@@ -183,6 +188,48 @@ describe("product catalogue CSV", () => {
     assert.doesNotMatch(
       [...deepKeys(exported)].sort().join("\n"),
       /backorder|descriptionEn|descriptionTh|identifierCandidates|importReview|price|recommendationHistory|retail|rrp|sourceEvidence|stock|titleEn|titleTh|validation|wholesale/i,
+    );
+  });
+
+  it("exports retail products as lean agent JSON with stock and prices", () => {
+    const exported = retailProductCatalogueJsonProductFromRow({
+      backorder_policy: "allow",
+      barcode: "8851234567890",
+      currency: "THB",
+      lead_time_days: 2,
+      manufacturer: "Brand A",
+      manufacturer_sku: "MSKU-1",
+      name: "Product A",
+      product_id: "00000000-0000-4000-8000-000000000001",
+      retail_price_amount: "1200",
+      retail_sellable_product_id: "sellable-1",
+      status: "active",
+      stock_id: "stock-1",
+      stock_quantity: "4",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      wholesale_price_amount: "800",
+    });
+
+    assert.deepEqual(exported, {
+      backorderPolicy: "allow",
+      barcode: "8851234567890",
+      currency: "THB",
+      leadTimeDays: 2,
+      manufacturer: "Brand A",
+      manufacturerSku: "MSKU-1",
+      name: "Product A",
+      productId: "00000000-0000-4000-8000-000000000001",
+      retailPriceAmount: 1200,
+      retailSellableProductId: "sellable-1",
+      status: "active",
+      stockId: "stock-1",
+      stockQuantity: 4,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      wholesalePriceAmount: 800,
+    });
+    assert.doesNotMatch(
+      [...deepKeys(exported)].sort().join("\n"),
+      /canonicalImage|countries|description|ingredients|platform|productKind|productUrl|recommendation|regulatory|source|translation|validation/i,
     );
   });
 
@@ -207,11 +254,18 @@ describe("product catalogue CSV", () => {
       retailView,
       /\/api\/admin\/products\/catalogue\/export\?scope=retail/,
     );
+    assert.match(retailView, /labels\.stock\.exportJson/);
     assert.match(retailView, /importRetailProductCatalogueFile/);
     assert.match(exportRoute, /buildPlatformProductCatalogueJson/);
+    assert.match(exportRoute, /buildRetailProductCatalogueJson/);
+    assert.match(exportRoute, /resolveAdminSession/);
+    assert.match(exportRoute, /hasAdminPermission\(context, "stock\.read"\)/);
+    assert.match(exportRoute, /canAccessRetailOrganisation/);
     assert.match(exportRoute, /platform-product-catalogue\.json/);
+    assert.match(exportRoute, /retail-product-catalogue-\$\{organisationId\}\.json/);
     assert.match(exportRoute, /application\/json/);
-    assert.match(exportRoute, /buildProductCatalogueCsv/);
+    assert.doesNotMatch(exportRoute, /buildProductCatalogueCsv/);
+    assert.doesNotMatch(exportRoute, /text\/csv/);
     assert.match(importRoute, /applyProductCatalogueCsvImport/);
     assert.match(service, /createAdminProduct/);
     assert.match(service, /updateAdminProduct/);

@@ -2145,11 +2145,11 @@ export function AdminRetailStockView({
 	                className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865]"
 	                href={productCatalogueExportHref}
 	              >
-	                {labels.stock.exportCsv}
+	                {labels.stock.exportJson}
 	              </a>
 	            ) : (
 	              <AdminButton disabled>
-	                {labels.stock.exportCsv}
+	                {labels.stock.exportJson}
 	              </AdminButton>
 	            )}
 	            {data.canWrite ? (
