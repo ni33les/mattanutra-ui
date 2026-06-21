@@ -11,6 +11,11 @@ export type AdminLocalizedText = Readonly<{
   value: string;
 }>;
 
+type LocalizableProductText = Pick<
+  AdminProductRow,
+  "description" | "title" | "translations"
+>;
+
 function cleanText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -74,7 +79,10 @@ function localizedText(
   };
 }
 
-export function adminLocalizedProductText(row: AdminProductRow, locale: Locale) {
+export function adminLocalizedProductText(
+  row: LocalizableProductText,
+  locale: Locale
+) {
   const titleValues = Object.fromEntries(
     Object.entries(row.translations ?? {}).map(([code, translation]) => [
       code,

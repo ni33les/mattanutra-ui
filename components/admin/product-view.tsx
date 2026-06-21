@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import type { AdminProductRow, AdminProductsData } from "@/lib/admin-products";
+import type {
+  AdminProductDetailData,
+  AdminProductMergeOption,
+  AdminProductRow,
+  AdminProductsData
+} from "@/lib/admin-products";
 import {
   adminLocalizedFallbackLabel,
   adminLocalizedProductText,
@@ -117,8 +122,22 @@ function normalizeProductDetailRow(row: AdminProductRow): AdminProductRow {
   };
 }
 
-function normalizeProductDetailRows(rows: readonly AdminProductRow[]) {
-  return rows.map(normalizeProductDetailRow);
+function normalizeProductMergeOption(
+  option: AdminProductMergeOption
+): AdminProductMergeOption {
+  return {
+    ...option,
+    translations:
+      option.translations && typeof option.translations === "object"
+        ? option.translations
+        : {}
+  };
+}
+
+function normalizeProductMergeOptions(
+  options: readonly AdminProductMergeOption[]
+) {
+  return options.map(normalizeProductMergeOption);
 }
 
 function regulatoryApprovalsForSave(row: AdminProductRow) {
@@ -301,14 +320,16 @@ export function AdminProductDetailView({
   productId,
 }: Readonly<{
   accessToken: string;
-  data: AdminProductsData;
+  data: AdminProductDetailData;
   locale: Locale;
   productId: string;
 }>) {
-  const initialRows = normalizeProductDetailRows(data.rows);
-  const [rows, setRows] = useState(initialRows);
+  const initialRow = normalizeProductDetailRow(data.row);
+  const [mergeOptions] = useState(
+    normalizeProductMergeOptions(data.mergeOptions),
+  );
   const [draft, setDraftState] = useState<AdminProductRow | null>(
-    initialRows.find((row) => row.id === productId) ?? null,
+    initialRow.id === productId ? initialRow : null,
   );
   const [savingId, setSavingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -364,28 +385,13 @@ export function AdminProductDetailView({
 
       const payload = (await response.json()) as {
         row?: AdminProductRow;
-        rows?: AdminProductRow[];
       };
       const savedRow = normalizeProductDetailRow(
         payload.row
           ? { ...payload.row, decisionStats: row.decisionStats }
           : row,
       );
-      const updatedRows = new Map(
-        (payload.rows && payload.rows.length > 0
-          ? normalizeProductDetailRows(payload.rows)
-          : [savedRow]
-        ).map((item) => [
-          item.id,
-          item.id === row.id
-            ? { ...item, decisionStats: row.decisionStats }
-            : item,
-        ]),
-      );
 
-      setRows((currentRows) =>
-        currentRows.map((item) => updatedRows.get(item.id) ?? item),
-      );
       setDraft(savedRow);
       return true;
     } catch (error) {
@@ -434,11 +440,6 @@ export function AdminProductDetailView({
         throw new Error("AI correction did not return a product row");
       }
 
-      setRows((currentRows) =>
-        currentRows.map((item) =>
-          item.id === correctedRow.id ? correctedRow : item,
-        ),
-      );
       setDraft(correctedRow);
 
       return correctedRow;
@@ -489,7 +490,6 @@ export function AdminProductDetailView({
 
       const payload = (await response.json()) as {
         row?: AdminProductRow;
-        rows?: AdminProductRow[];
       };
       const savedRow = payload.row
         ? normalizeProductDetailRow(payload.row)
@@ -499,16 +499,6 @@ export function AdminProductDetailView({
         throw new Error("Safety limit update did not return a product row");
       }
 
-      const updatedRows = new Map(
-        (payload.rows && payload.rows.length > 0
-          ? normalizeProductDetailRows(payload.rows)
-          : [savedRow]
-        ).map((item) => [item.id, item]),
-      );
-
-      setRows((currentRows) =>
-        currentRows.map((item) => updatedRows.get(item.id) ?? item),
-      );
       setDraft(savedRow);
 
       return true;
@@ -600,21 +590,6 @@ export function AdminProductDetailView({
         payload.result?.row ?? fallbackRow,
       );
 
-      setRows((currentRows) => {
-        const nextRows = currentRows.map((item) =>
-          item.id === row.id
-            ? savedRow.id === row.id
-              ? savedRow
-              : fallbackRow
-            : item.id === savedRow.id
-              ? savedRow
-              : item,
-        );
-
-        return nextRows.some((item) => item.id === savedRow.id)
-          ? nextRows
-          : [savedRow, ...nextRows];
-      });
       setDraft(savedRow.id === row.id ? savedRow : null);
 
       return true;
@@ -658,7 +633,7 @@ export function AdminProductDetailView({
         window.location.href = backHref;
       }}
       onSave={saveProduct}
-      products={rows}
+      mergeOptions={mergeOptions}
       saving={savingId === draft.id}
       setDraft={setDraft}
     />
@@ -676,7 +651,7 @@ function ProductDetailPanel({
   onIncreaseSafetyLimit,
   onClose,
   onSave,
-  products,
+  mergeOptions,
   saving,
   setDraft,
 }: Readonly<{
@@ -701,7 +676,7 @@ function ProductDetailPanel({
     row: AdminProductRow,
     options?: Readonly<{ changeNote?: string | null }>
   ) => Promise<boolean>;
-  products: AdminProductRow[];
+  mergeOptions: AdminProductMergeOption[];
   saving: boolean;
   setDraft: (row: AdminProductRow) => void;
 }>) {
@@ -715,20 +690,11 @@ function ProductDetailPanel({
     draft.validation.status !== "pass"
       ? `Approval is blocked until validation passes: ${draft.validation.summary}`
       : null;
-  const duplicateOptions = products.filter(
-    (product) =>
-      draft.productImportDuplicateProductIds.includes(product.id) &&
-      product.id !== draft.id,
-  );
   const currentBusinessState = productBusinessState(draft);
   const approveDisabled =
     saving ||
     currentBusinessState === "approved" ||
     Boolean(approvalBlockedMessage);
-  const mergeOptions =
-    duplicateOptions.length > 0
-      ? duplicateOptions
-      : products.filter((product) => product.id !== draft.id).slice(0, 80);
   const manufacturerCountryCodes = normalizedProductCountryCodes(
     draft.manufacturerCountryCodes,
   );

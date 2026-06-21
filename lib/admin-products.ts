@@ -56,6 +56,8 @@ export {
 } from "./admin-product-types.ts";
 export type {
   AdminProductFact,
+  AdminProductDetailData,
+  AdminProductMergeOption,
   AdminProductRow,
   AdminProductShopAvailability,
   AdminProductsData,
@@ -92,7 +94,13 @@ export {
   increaseProductFactSafetyLimit
 } from "./admin-product-writes.ts";
 
-export { loadProductRows, loadAdminProductRow, loadAdminProductRowsForBrand, getAdminProductsData } from "./admin-product-read-model.ts";
+export {
+  getAdminProductDetailData,
+  getAdminProductsData,
+  loadAdminProductRow,
+  loadAdminProductRowsForBrand,
+  loadProductRows
+} from "./admin-product-read-model.ts";
 export {
   getProductRecommendationCandidates,
   getRetailerAwareProductRecommendationCandidateSets,

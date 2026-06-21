@@ -40,6 +40,7 @@ import type {
   AdminFoodsData
 } from "@/lib/admin-foods";
 import type {
+  AdminProductDetailData,
   AdminProductsData
 } from "@/lib/admin-products";
 import type {
@@ -227,6 +228,7 @@ function adminViewDatabaseAvailable({
   flowData,
   leadsData,
   panyaData,
+  productDetailData,
   productsData,
   retailFinancialsData,
   retailStockData,
@@ -250,6 +252,7 @@ function adminViewDatabaseAvailable({
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   panyaData: AdminPanyaData;
+  productDetailData?: AdminProductDetailData | null;
   productsData: AdminProductsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
@@ -337,7 +340,7 @@ function adminViewDatabaseAvailable({
   }
 
   if (view === "products") {
-    return productsData.databaseAvailable;
+    return productDetailData?.databaseAvailable ?? productsData.databaseAvailable;
   }
 
   if (
@@ -391,6 +394,7 @@ export function AdminDashboard({
   locale,
   panyaData,
   panyaSection,
+  productDetailData,
   productDetailId,
   productsData,
   retailFinancialsData,
@@ -424,6 +428,7 @@ export function AdminDashboard({
   locale: Locale;
   panyaData: AdminPanyaData;
   panyaSection: "configuration" | "conversations";
+  productDetailData?: AdminProductDetailData | null;
   productDetailId?: string | null;
   productsData: AdminProductsData;
   retailFinancialsData: AdminRetailFinancialsData;
@@ -516,6 +521,7 @@ export function AdminDashboard({
     flowData,
     leadsData,
     panyaData,
+    productDetailData,
     productsData,
     retailFinancialsData,
     retailStockData,
@@ -815,10 +821,10 @@ export function AdminDashboard({
               locale={locale}
             />
           ) : view === "products" ? (
-            productDetailId ? (
+            productDetailId && productDetailData ? (
               <AdminProductDetailView
                 accessToken={accessToken}
-                data={productsData}
+                data={productDetailData}
                 locale={locale}
                 productId={productDetailId}
               />

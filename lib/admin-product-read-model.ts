@@ -1,7 +1,10 @@
 import {
   emptyAdminProductsData,
+  type AdminProductDetailData,
+  type AdminProductMergeOption,
   type AdminProductsData,
-  type AdminProductRow
+  type AdminProductRow,
+  type AdminProductTranslation
 } from "./admin-product-types.ts";
 import { rowFromDb } from "./admin-product-mappers.ts";
 import { isUuidValue } from "./admin-product-helpers.ts";
@@ -12,12 +15,21 @@ import { getProductDecisionStatsByProduct } from "@/lib/admin-recommendation-ins
 
 // Read model helpers and queries extracted as part of Sprint 2 refactor.
 
-export async function loadProductRows(productId?: string | null) {
+type LoadProductRowsOptions = Readonly<{
+  brandId?: string | null;
+}>;
+
+export async function loadProductRows(
+  productId?: string | null,
+  options: LoadProductRowsOptions = {}
+) {
   const sql = getSql();
 
   if (!sql) {
     return null;
   }
+
+  const brandId = isUuidValue(options.brandId) ? options.brandId : null;
 
   return sql<ProductDbRow[]>`
     select
@@ -303,6 +315,7 @@ export async function loadProductRows(productId?: string | null) {
       where product_recommendation_items.product_id = products.id
     ) history on true
     where (${productId ?? null}::uuid is null or products.id = ${productId ?? null}::uuid)
+      and (${brandId}::uuid is null or products.brand_id = ${brandId}::uuid)
     order by products.updated_at desc, products.title asc
   `;
 }
@@ -358,11 +371,167 @@ export async function loadAdminProductRowsForBrand(brandId: string) {
     return [];
   }
 
-  const rows = await loadProductRows();
+  const rows = await loadProductRows(null, { brandId });
 
-  return rows
-    ? rows.map((row) => rowFromDb(row)).filter((row) => row.brandId === brandId)
-    : [];
+  return rows ? rows.map((row) => rowFromDb(row)) : [];
+}
+
+type ProductMergeOptionDbRow = Readonly<{
+  brand_name: string | null;
+  description: string | null;
+  id: string;
+  title: string;
+  translations: unknown;
+}>;
+
+function mergeTranslationsFromDb(rawTranslations: unknown) {
+  const translations: Record<string, AdminProductTranslation> = {};
+  const raw = rawTranslations && typeof rawTranslations === "object"
+    ? rawTranslations as Record<string, unknown>
+    : {};
+
+  for (const [locale, value] of Object.entries(raw)) {
+    const record = value && typeof value === "object"
+      ? value as Record<string, unknown>
+      : {};
+    const status: AdminProductTranslation["status"] =
+      record.status === "complete" || record.status === "missing"
+        ? record.status
+        : "draft";
+    const title = typeof record.title === "string" && record.title.trim()
+      ? record.title.trim()
+      : null;
+    const description =
+      typeof record.description === "string" && record.description.trim()
+        ? record.description.trim()
+        : null;
+
+    translations[locale] = {
+      description,
+      locale,
+      status,
+      title,
+      updatedAt: typeof record.updatedAt === "string"
+        ? record.updatedAt
+        : null
+    };
+  }
+
+  return translations;
+}
+
+function mergeOptionFromDb(
+  row: ProductMergeOptionDbRow
+): AdminProductMergeOption {
+  return {
+    brandName: row.brand_name,
+    description: row.description,
+    id: row.id,
+    title: row.title,
+    translations: mergeTranslationsFromDb(row.translations)
+  };
+}
+
+async function loadAdminProductMergeOptions(input: Readonly<{
+  duplicateProductIds: readonly string[];
+  productId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql || !isUuidValue(input.productId)) {
+    return [];
+  }
+
+  const duplicateProductIds = [
+    ...new Set(
+      input.duplicateProductIds
+        .filter(isUuidValue)
+        .filter((id) => id !== input.productId)
+    )
+  ];
+
+  const useDuplicateIds = duplicateProductIds.length > 0;
+  const limit = useDuplicateIds ? duplicateProductIds.length : 80;
+  const rows = await sql<ProductMergeOptionDbRow[]>`
+    select
+      products.id::text,
+      products.title,
+      products.brand_name,
+      products.description,
+      coalesce(product_translation_rows.translations, '{}'::jsonb) as translations
+    from public.products
+    left join lateral (
+      select coalesce(
+        jsonb_object_agg(
+          product_translations.locale,
+          jsonb_build_object(
+            'locale', product_translations.locale,
+            'title', product_translations.title,
+            'description', product_translations.description,
+            'status', product_translations.status,
+            'updatedAt', product_translations.updated_at
+          )
+          order by product_translations.locale
+        ),
+        '{}'::jsonb
+      ) as translations
+      from public.product_translations
+      where product_translations.product_id = products.id
+    ) product_translation_rows on true
+    where (
+      ${useDuplicateIds}::boolean
+      and products.id = any(${duplicateProductIds}::uuid[])
+    ) or (
+      not ${useDuplicateIds}::boolean
+      and products.id <> ${input.productId}::uuid
+    )
+    order by
+      case
+        when ${useDuplicateIds}::boolean
+          then array_position(${duplicateProductIds}::uuid[], products.id)
+        else null
+      end asc nulls last,
+      products.updated_at desc,
+      products.title asc
+    limit ${limit}
+  `;
+
+  return rows.map(mergeOptionFromDb);
+}
+
+export async function getAdminProductDetailData(
+  productId: string,
+  range: AdminDashboardRange = "all"
+): Promise<AdminProductDetailData | null> {
+  if (!isUuidValue(productId)) {
+    return null;
+  }
+
+  try {
+    const rows = await loadProductRows(productId);
+    const sourceRow = rows?.[0];
+
+    if (!sourceRow) {
+      return null;
+    }
+
+    const decisionStats = await getProductDecisionStatsByProduct(range);
+    const row = rowFromDb(sourceRow, decisionStats.get(sourceRow.id));
+    const mergeOptions = await loadAdminProductMergeOptions({
+      duplicateProductIds: row.productImportDuplicateProductIds,
+      productId: row.id
+    });
+
+    return {
+      databaseAvailable: true,
+      generatedAt: new Date().toISOString(),
+      mergeOptions,
+      row
+    };
+  } catch (error) {
+    console.error("Unable to load product detail", error);
+    return null;
+  }
 }
 
 export async function getAdminProductsData(

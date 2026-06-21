@@ -147,6 +147,14 @@ export type AdminProductRow = Readonly<{
   updatedAt: string;
 }>;
 
+export type AdminProductMergeOption = Readonly<{
+  brandName: string | null;
+  description: string | null;
+  id: string;
+  title: string;
+  translations: Record<string, AdminProductTranslation>;
+}>;
+
 export type AdminProductsData = Readonly<{
   databaseAvailable: boolean;
   generatedAt: string;
@@ -161,6 +169,13 @@ export type AdminProductsData = Readonly<{
     total: number;
     approved: number;
   };
+}>;
+
+export type AdminProductDetailData = Readonly<{
+  databaseAvailable: boolean;
+  generatedAt: string;
+  mergeOptions: AdminProductMergeOption[];
+  row: AdminProductRow;
 }>;
 
 export type ProductImportRunRow = Readonly<{

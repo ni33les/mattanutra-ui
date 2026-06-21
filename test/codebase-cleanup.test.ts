@@ -70,6 +70,10 @@ const adminProductsService = readFileSync(
   new URL("../lib/admin-products.ts", import.meta.url),
   "utf8"
 );
+const adminProductReadModel = readFileSync(
+  new URL("../lib/admin-product-read-model.ts", import.meta.url),
+  "utf8"
+);
 const adminRetailFinancialsService = readFileSync(
   new URL("../lib/admin-retail-financials.ts", import.meta.url),
   "utf8"
@@ -856,8 +860,13 @@ describe("codebase cleanup guardrails", () => {
   it("keeps product admin editing on a detail page instead of the old modal", () => {
     assert.match(adminProductDetailRoute, /AdminDashboard/);
     assert.match(adminProductDetailRoute, /productDetailId=\{productId\}/);
+    assert.match(adminProductDetailRoute, /\bgetAdminProductDetailData\b/);
+    assert.doesNotMatch(adminProductDetailRoute, /\bgetAdminProductsData\b/);
+    assert.match(adminProductDetailRoute, /productDetailData=\{productDetailData\}/);
     assert.match(adminProductView, /\/admin\/products\/\$\{row\.id\}/);
     assert.match(adminProductView, /\bfunction normalizeProductDetailRow\b/);
+    assert.match(adminProductView, /\bAdminProductDetailData\b/);
+    assert.match(adminProductView, /\bmergeOptions\b/);
     assert.match(adminProductView, /validationCacheStaleReasons: safeArray/);
     assert.doesNotMatch(adminProductView, /sourceProductFdaNumbersFromEvidence/);
     assert.doesNotMatch(adminProductView, /sourceProductIdentifiersFromEvidence/);
@@ -886,6 +895,22 @@ describe("codebase cleanup guardrails", () => {
     assert.doesNotMatch(adminProductView, /draft\.fdaApprovalNumber/);
     assert.doesNotMatch(adminProductView, /\bProductOffersEditor\b/);
     assert.doesNotMatch(adminProductView, /\bAdminModal\b/);
+  });
+
+  it("keeps product detail and brand refreshes off full catalogue reads", () => {
+    assert.match(adminProductReadModel, /\bgetAdminProductDetailData\b/);
+    assert.match(adminProductReadModel, /\bloadAdminProductMergeOptions\b/);
+    assert.match(
+      adminProductReadModel,
+      /const rows = await loadProductRows\(null, \{ brandId \}\);/
+    );
+
+    const brandHelper = adminProductReadModel.match(
+      /export async function loadAdminProductRowsForBrand[\s\S]*?^}/m
+    )?.[0] ?? "";
+
+    assert.doesNotMatch(brandHelper, /\bloadProductRows\(\s*\)/);
+    assert.match(brandHelper, /\bbrandId\b/);
   });
 
   it("keeps product offer runtime objects removed", () => {

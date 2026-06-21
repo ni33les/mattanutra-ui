@@ -32,7 +32,7 @@ import { emptyFlow } from "@/lib/admin-flow-data";
 import { emptyFinancials } from "@/lib/admin-financials";
 import { emptyAdminRetailFinancialsData } from "@/lib/admin-retail-financials";
 import { emptyAdminFoodsData } from "@/lib/admin-foods";
-import { getAdminProductsData } from "@/lib/admin-products";
+import { getAdminProductDetailData } from "@/lib/admin-products";
 import { emptyAdminRetailStockData } from "@/lib/admin-retail-stock";
 import {
   emptyAdminSupplementImprovementInsightsData
@@ -135,15 +135,29 @@ export default async function ProductDetailPage({
     redirect(`/${locale}/admin/dashboard?view=glance`);
   }
 
-  const productsData = await getAdminProductsData(
-    normalizeAdminDashboardRange(query.range)
-  );
+  const range = normalizeAdminDashboardRange(query.range);
+  const productDetailData = await getAdminProductDetailData(productId, range);
 
-  if (!productsData.rows.some((row) => row.id === productId)) {
+  if (!productDetailData) {
     notFound();
   }
-  const range = normalizeAdminDashboardRange(query.range);
+
   const data = emptyAdminDashboardData(range);
+  const productsData = {
+    databaseAvailable: true,
+    generatedAt: productDetailData.generatedAt,
+    platforms: [],
+    rows: [],
+    summary: {
+      approved: 0,
+      dirtyData: 0,
+      ignored: 0,
+      missingFacts: 0,
+      missingImage: 0,
+      pendingReview: 0,
+      total: 0
+    }
+  };
   const filters = normalizeAdminDashboardFilters(query);
   const accessData: AdminAccessData | null = null;
   const settingsData: AdminSettingsData | null = null;
@@ -169,6 +183,7 @@ export default async function ProductDetailPage({
       locale={locale}
       panyaData={emptyAdminPanyaData()}
       panyaSection="conversations"
+      productDetailData={productDetailData}
       productsData={productsData}
       productDetailId={productId}
       retailFinancialsData={emptyAdminRetailFinancialsData(range)}
