@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
+  buildPlatformProductCatalogueJson,
   buildProductCatalogueCsv,
   type ProductCatalogueCsvScope
 } from "@/lib/product-catalogue-csv";
@@ -42,14 +43,27 @@ export async function GET(request: Request) {
   try {
     const scope = csvScope(url.searchParams.get("scope"));
     const organisationId = textOrNull(url.searchParams.get("organisationId"), 80);
+
+    if (scope === "platform") {
+      const payload = await buildPlatformProductCatalogueJson();
+
+      return new Response(JSON.stringify(payload, null, 2) + "\n", {
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Disposition": 'attachment; filename="platform-product-catalogue.json"',
+          "Content-Type": "application/json; charset=utf-8"
+        }
+      });
+    }
+
     const csv = await buildProductCatalogueCsv({
       organisationId,
       scope
     });
     const filename =
-      scope === "retail" && organisationId
+      organisationId
         ? `retail-product-catalogue-${organisationId}.csv`
-        : "platform-product-catalogue.csv";
+        : "retail-product-catalogue.csv";
 
     return new Response(csv, {
       headers: {
@@ -59,14 +73,14 @@ export async function GET(request: Request) {
       }
     });
   } catch (error) {
-    console.error("Unable to export product catalogue CSV", error);
+    console.error("Unable to export product catalogue", error);
 
     return NextResponse.json(
       {
         message:
           error instanceof Error
             ? error.message
-            : "Unable to export product catalogue CSV"
+            : "Unable to export product catalogue"
       },
       {
         headers: {

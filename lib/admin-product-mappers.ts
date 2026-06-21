@@ -453,7 +453,6 @@ export function rowFromDb(
     ),
     countryPricing,
     platform: row.platform,
-    priceAmount: numberOrNull(row.price_amount),
     productImportDuplicateProductIds: row.import_duplicate_product_ids ?? [],
     productImportId: row.import_id,
     productKind: row.product_kind ?? "supplement",

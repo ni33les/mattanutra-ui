@@ -1,6 +1,7 @@
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   createAdminProduct,
+  getAdminProductsData,
   loadAdminProductRow,
   updateAdminProduct,
   type AdminProductRow,
@@ -25,6 +26,23 @@ import type {
 } from "@/lib/product-recommendations";
 
 export type ProductCatalogueCsvScope = "platform" | "retail";
+
+export type PlatformProductCatalogueJson = Readonly<{
+  generatedAt: string;
+  productCount: number;
+  products: ReturnType<typeof platformProductCatalogueJsonProductFromRow>[];
+  schemaVersion: 1;
+  scope: "platform";
+  summary: {
+    approved: number;
+    dirtyData: number;
+    ignored: number;
+    missingFacts: number;
+    missingImage: number;
+    pendingReview: number;
+    total: number;
+  };
+}>;
 
 type CsvRow = Readonly<{
   columns: Record<string, string>;
@@ -646,6 +664,115 @@ function countryPricingFromRow(
   ];
 }
 
+export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow) {
+  return {
+    availabilityStatus: row.availabilityStatus,
+    brand: {
+      id: row.brandId,
+      manufacturerCountryCodes: row.manufacturerCountryCodes,
+      name: row.brandName,
+      status: row.brandStatus,
+    },
+    canonicalImageUrl: row.imageUrl,
+    category: row.category,
+    countries: row.availableCountryCodes.map((countryCode) => {
+      const country = row.countryPricing.find(
+        (item) => item.countryCode === countryCode,
+      );
+
+      return {
+        countryCode,
+        currency: country?.currency ?? row.currency,
+        effectiveRegulatoryApprovals:
+          country?.effectiveRegulatoryApprovals ?? [],
+      };
+    }),
+    descriptions: {
+      canonical: row.description,
+      display: row.displayDescription,
+      en: row.descriptionEn,
+      th: row.descriptionTh,
+      translations: row.translations,
+    },
+    id: row.id,
+    identifiers: row.identifiers,
+    identifierCandidates: row.identifierCandidates,
+    importReview: {
+      duplicateProductIds: row.productImportDuplicateProductIds,
+      id: row.productImportId,
+      reviewTaskId: row.importReviewTaskId,
+      status: row.importStatus,
+    },
+    ingredients: row.facts.map((fact) => ({
+      aliases: fact.aliasKeys ?? [],
+      amount: fact.amount,
+      confidence: fact.confidence,
+      foodId: fact.foodId ?? null,
+      id: fact.id,
+      itemType: fact.itemType,
+      maxAmount: fact.maxAmount ?? null,
+      maxUnit: fact.maxUnit ?? null,
+      name: fact.name,
+      normalizedName: fact.normalizedName,
+      nutrientId: fact.nutrientId ?? null,
+      safetyFlags: fact.safetyFlags ?? [],
+      servingLabel: fact.servingLabel ?? null,
+      source: fact.source,
+      sourceText: fact.sourceText,
+      sourceUrl: fact.sourceUrl,
+      supplementAudience: fact.supplementAudience ?? null,
+      supplementId: fact.supplementId ?? null,
+      supplementStatus: fact.supplementStatus,
+      unit: fact.unit,
+    })),
+    platform: row.platform,
+    productAudience: row.productAudience,
+    productKind: row.productKind,
+    productUrl: row.productUrl,
+    recommendationHistory: row.recommendationHistory,
+    region: row.region,
+    regulatoryApprovals: row.regulatoryApprovals,
+    retailAvailability: row.shopAvailability.map((availability) => ({
+      backorderPolicy: availability.backorderPolicy,
+      currency: availability.currency,
+      leadTimeDays: availability.leadTimeDays,
+      organisationId: availability.organisationId,
+      organisationName: availability.organisationName,
+      status: availability.status,
+      stockQuantity: availability.stockQuantity,
+    })),
+    sourceEvidence: row.sourceEvidence,
+    status: row.status,
+    titles: {
+      canonical: row.title,
+      display: row.displayTitle,
+      en: row.titleEn,
+      th: row.titleTh,
+      translations: row.translations,
+    },
+    updatedAt: row.updatedAt,
+    validation: {
+      cacheStatus: row.validationCacheStatus,
+      cacheStaleReasons: row.validationCacheStaleReasons,
+      label: row.validationLabel,
+      result: row.validation,
+    },
+  };
+}
+
+export async function buildPlatformProductCatalogueJson(): Promise<PlatformProductCatalogueJson> {
+  const data = await getAdminProductsData();
+
+  return {
+    generatedAt: data.generatedAt,
+    productCount: data.rows.length,
+    products: data.rows.map(platformProductCatalogueJsonProductFromRow),
+    schemaVersion: 1,
+    scope: "platform",
+    summary: data.summary,
+  };
+}
+
 export async function buildProductCatalogueCsv(
   input: Readonly<{
     organisationId?: string | null;
@@ -708,7 +835,7 @@ export async function buildProductCatalogueCsv(
       products.product_kind,
       products.status,
       coalesce(organisation_rows.country_code, 'TH') as country_code,
-      coalesce(product_country.rrp_price_amount, products.price_amount) as rrp_price_amount,
+      product_country.rrp_price_amount,
       coalesce(product_country.currency, products.currency, organisation_rows.currency, 'THB') as currency,
       organisation_rows.name as organisation_name,
       coalesce(stock_rows.stock_quantity, 0) as stock_quantity,

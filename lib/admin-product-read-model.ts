@@ -43,7 +43,6 @@ export async function loadProductRows(productId?: string | null) {
 	      coalesce(product_country_rows.country_codes, array[upper(coalesce(nullif(products.region, ''), 'TH'))]) as available_country_codes,
 	      coalesce(product_country_rows.country_pricing, '[]'::jsonb) as country_pricing,
 	      coalesce(products.availability_status, 'unknown') as availability_status,
-      products.price_amount,
       products.currency,
       products.current_version,
       products.product_data_expires_at,

@@ -249,7 +249,7 @@ export function AdminProductsView({
             className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
             href={exportHref}
           >
-            {viewLabels.exportCsv}
+            {viewLabels.exportJson}
           </a>
           <label
             className={classNames(

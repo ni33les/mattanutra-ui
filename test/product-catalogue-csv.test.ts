@@ -4,7 +4,30 @@ import { describe, it } from "node:test";
 import {
   PRODUCT_CATALOGUE_CSV_HEADERS,
   parseProductCatalogueCsv,
+  platformProductCatalogueJsonProductFromRow,
 } from "@/lib/product-catalogue-csv";
+import type { AdminProductRow } from "@/lib/admin-products";
+
+function deepKeys(value: unknown, keys = new Set<string>()) {
+  if (!value || typeof value !== "object") {
+    return keys;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      deepKeys(item, keys);
+    }
+
+    return keys;
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    keys.add(key);
+    deepKeys(child, keys);
+  }
+
+  return keys;
+}
 
 describe("product catalogue CSV", () => {
   it("uses one round-trip sheet for product identity, regulation, stock, and backorders", () => {
@@ -44,6 +67,112 @@ describe("product catalogue CSV", () => {
     assert.equal(rows[0]?.columns.quantity_in_stock, "4");
   });
 
+  it("exports platform products as admin JSON without platform price fields", () => {
+    const exported = platformProductCatalogueJsonProductFromRow({
+      availabilityStatus: "in_stock",
+      availableCountryCodes: ["TH"],
+      brandId: "brand-1",
+      brandName: "Brand A",
+      brandStatus: "approved",
+      category: "Supplement",
+      countryPricing: [
+        {
+          countryCode: "TH",
+          currency: "THB",
+          priceUpdatedAt: "2026-01-01T00:00:00.000Z",
+          rrpPriceAmount: 990,
+        },
+      ],
+      currency: "THB",
+      description: "Canonical description",
+      descriptionEn: null,
+      descriptionTh: null,
+      displayDescription: "Canonical description",
+      displayTitle: "Product A",
+      facts: [
+        {
+          aliasKeys: ["vitamin_c"],
+          amount: 500,
+          confidence: "high",
+          id: "fact-1",
+          itemType: "supplement",
+          maxAmount: null,
+          maxUnit: null,
+          name: "Vitamin C",
+          normalizedName: "vitamin c",
+          safetyFlags: [],
+          servingLabel: "per tablet",
+          source: "label",
+          sourceText: "Vitamin C 500 mg",
+          sourceUrl: "https://example.com/label",
+          supplementStatus: "active",
+          unit: "mg",
+        },
+      ],
+      id: "00000000-0000-4000-8000-000000000001",
+      imageUrl: "https://cdn.mattanutra.com/products/product-a.webp",
+      importReviewTaskId: null,
+      importStatus: null,
+      identifierCandidates: [],
+      identifiers: [],
+      labelStatus: "parsed",
+      manufacturerCountryCodes: ["TH"],
+      platform: "manual",
+      productAudience: "both",
+      productImportDuplicateProductIds: [],
+      productImportId: null,
+      productKind: "supplement",
+      productUrl: "https://example.com/product-a",
+      recommendationHistory: {
+        averageProductCoveragePercent: null,
+        averageStackCoveragePercent: null,
+        chosenCount: 0,
+        lastRecommendedAt: null,
+      },
+      region: "TH",
+      regulatoryApprovals: [],
+      shopAvailability: [
+        {
+          backorderPolicy: "allow",
+          currency: "THB",
+          leadTimeDays: 2,
+          organisationId: "org-1",
+          organisationName: "Retail Shop",
+          retailPriceAmount: 1200,
+          status: "active",
+          stockQuantity: 4,
+          wholesalePriceAmount: 800,
+        },
+      ],
+      sourceEvidence: {
+        importId: null,
+        importReviewTaskId: null,
+        importStatus: null,
+        sourceUrl: "https://example.com/source",
+      },
+      status: "approved",
+      title: "Product A",
+      titleEn: null,
+      titleTh: null,
+      translations: {},
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      validation: { status: "pass" },
+      validationCacheStatus: "fresh",
+      validationCacheStaleReasons: [],
+      validationLabel: "Approved",
+    } as unknown as AdminProductRow);
+
+    assert.equal(
+      exported.canonicalImageUrl,
+      "https://cdn.mattanutra.com/products/product-a.webp",
+    );
+    assert.equal(exported.ingredients[0]?.name, "Vitamin C");
+    assert.doesNotMatch(
+      [...deepKeys(exported)].sort().join("\n"),
+      /price|rrp|wholesale/i,
+    );
+  });
+
   it("wires product and retail admin import/export controls", async () => {
     const [productView, retailView, exportRoute, importRoute, service] =
       await Promise.all([
@@ -58,12 +187,16 @@ describe("product catalogue CSV", () => {
       productView,
       /\/api\/admin\/products\/catalogue\/export\?scope=platform/,
     );
+    assert.match(productView, /exportJson/);
     assert.match(productView, /\/api\/admin\/products\/catalogue\/import/);
     assert.match(
       retailView,
       /\/api\/admin\/products\/catalogue\/export\?scope=retail/,
     );
     assert.match(retailView, /importRetailProductCatalogueFile/);
+    assert.match(exportRoute, /buildPlatformProductCatalogueJson/);
+    assert.match(exportRoute, /platform-product-catalogue\.json/);
+    assert.match(exportRoute, /application\/json/);
     assert.match(exportRoute, /buildProductCatalogueCsv/);
     assert.match(importRoute, /applyProductCatalogueCsvImport/);
     assert.match(service, /createAdminProduct/);

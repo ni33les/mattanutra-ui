@@ -1273,11 +1273,7 @@ export async function loadMasterSupplementAvailabilityInsights(
           and product_countries.product_id is not null
           and organisations.id is not null
           and retail_sellable_products.status = 'active'
-          and coalesce(
-            retail_sellable_products.rrp_price_amount,
-            product_countries.rrp_price_amount,
-            products.price_amount
-          ) is not null
+          and retail_sellable_products.rrp_price_amount is not null
           and (
             coalesce(retail_product_stock.stock_quantity, 0) > coalesce(allocation_state.allocated_quantity, 0)
             or retail_sellable_products.backorder_policy = 'allow'
@@ -1288,22 +1284,14 @@ export async function loadMasterSupplementAvailabilityInsights(
           and products.validation_status = 'pass'
           and product_countries.product_id is not null
           and retail_sellable_products.status = 'active'
-          and coalesce(
-            retail_sellable_products.rrp_price_amount,
-            product_countries.rrp_price_amount,
-            products.price_amount
-          ) is not null
+          and retail_sellable_products.rrp_price_amount is not null
       )::int as active_retailer_count,
       count(distinct organisations.id) filter (
         where products.status = 'approved'
           and products.validation_status = 'pass'
           and product_countries.product_id is not null
           and retail_sellable_products.status = 'active'
-          and coalesce(
-            retail_sellable_products.rrp_price_amount,
-            product_countries.rrp_price_amount,
-            products.price_amount
-          ) is not null
+          and retail_sellable_products.rrp_price_amount is not null
           and coalesce(retail_product_stock.stock_quantity, 0) > coalesce(allocation_state.allocated_quantity, 0)
       )::int as available_retailer_count,
       count(distinct organisations.id) filter (
@@ -1311,11 +1299,7 @@ export async function loadMasterSupplementAvailabilityInsights(
           and products.validation_status = 'pass'
           and product_countries.product_id is not null
           and retail_sellable_products.status = 'active'
-          and coalesce(
-            retail_sellable_products.rrp_price_amount,
-            product_countries.rrp_price_amount,
-            products.price_amount
-          ) is not null
+          and retail_sellable_products.rrp_price_amount is not null
           and coalesce(retail_product_stock.stock_quantity, 0) <= coalesce(allocation_state.allocated_quantity, 0)
           and retail_sellable_products.backorder_policy = 'allow'
       )::int as backorder_retailer_count

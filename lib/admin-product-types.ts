@@ -124,7 +124,6 @@ export type AdminProductRow = Readonly<{
   validationLabel: string;
   productAudience: ProductAudience;
   platform: ProductPlatform;
-  priceAmount: number | null;
   productImportDuplicateProductIds: string[];
   productImportId: string | null;
   productKind: ProductKind;
@@ -292,7 +291,6 @@ export type CreateAdminProductInput = Readonly<{
   status?: ProductStatus;
   externalProductId?: string | null;
   platform: ProductPlatform;
-  priceAmount?: number | null;
   productAudience?: ProductAudience;
   productKind?: ProductKind;
   productUrl: string;
@@ -329,7 +327,6 @@ export type UpdateAdminProductInput = Readonly<{
   identifiers?: readonly ProductIdentifierInput[];
   labelStatus?: ProductLabelStatus;
   status?: ProductStatus;
-  priceAmount?: number | null;
   productAudience?: ProductAudience;
   productKind?: ProductKind;
   productUrl?: string | null;
@@ -413,7 +410,6 @@ export type ProductDbRow = Readonly<{
   manufacturer_country_codes: string[] | null;
   status: ProductStatus;
   platform: ProductPlatform;
-  price_amount: string | number | null;
   product_audience: ProductAudience | null;
   product_kind: ProductKind;
   product_data_expires_at: Date | string | null;
