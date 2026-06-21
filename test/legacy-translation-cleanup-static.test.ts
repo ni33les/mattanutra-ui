@@ -73,4 +73,34 @@ describe("legacy product translation cleanup", () => {
 
     assert.deepEqual(offenders, []);
   });
+
+  it("preserves existing translation rows and version snapshots during cleanup", () => {
+    const cleanup = source("scripts/apply-legacy-translation-cleanup-schema.ts");
+
+    assert.match(
+      cleanup,
+      /on conflict \(product_id, locale\) do nothing/,
+      "existing product_translations rows must not be updated during UAT cleanup"
+    );
+    assert.match(
+      cleanup,
+      /on conflict \(import_id, locale\) do nothing/,
+      "existing product_import_translations rows must not be updated during UAT cleanup"
+    );
+    assert.doesNotMatch(
+      cleanup,
+      /product_translations[\s\S]*on conflict \(product_id, locale\) do update/,
+      "cleanup must never overwrite UAT product translation text, status, metadata, or timestamps"
+    );
+    assert.match(
+      cleanup,
+      /not \(coalesce\(product_versions\.snapshot, '\{\}'::jsonb\) \? 'translations'\)/,
+      "product_versions snapshots should only be backfilled when translations are missing"
+    );
+    assert.match(
+      cleanup,
+      /process\.argv\.includes\("--require-owner"\)/,
+      "owner-only UAT cleanup must be enforceable from the runbook"
+    );
+  });
 });

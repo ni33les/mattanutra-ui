@@ -95,20 +95,7 @@ async function main() {
       ) as translation(locale, title, description)
       where translation.title is not null
         or translation.description is not null
-      on conflict (product_id, locale) do update set
-        title = coalesce(public.product_translations.title, excluded.title),
-        description = coalesce(public.product_translations.description, excluded.description),
-        status = case
-          when coalesce(public.product_translations.title, excluded.title) is not null
-            and coalesce(public.product_translations.description, excluded.description) is not null
-            then 'complete'
-          when coalesce(public.product_translations.title, excluded.title) is not null
-            or coalesce(public.product_translations.description, excluded.description) is not null
-            then 'draft'
-          else public.product_translations.status
-        end,
-        metadata = public.product_translations.metadata || excluded.metadata,
-        updated_at = now()
+      on conflict (product_id, locale) do nothing
     `;
 
     await tx`
@@ -169,20 +156,7 @@ async function main() {
       ) as translation(locale, title, description)
       where translation.title is not null
         or translation.description is not null
-      on conflict (import_id, locale) do update set
-        title = coalesce(public.product_import_translations.title, excluded.title),
-        description = coalesce(public.product_import_translations.description, excluded.description),
-        status = case
-          when coalesce(public.product_import_translations.title, excluded.title) is not null
-            and coalesce(public.product_import_translations.description, excluded.description) is not null
-            then 'complete'
-          when coalesce(public.product_import_translations.title, excluded.title) is not null
-            or coalesce(public.product_import_translations.description, excluded.description) is not null
-            then 'draft'
-          else public.product_import_translations.status
-        end,
-        metadata = public.product_import_translations.metadata || excluded.metadata,
-        updated_at = now()
+      on conflict (import_id, locale) do nothing
     `;
   });
 
@@ -234,6 +208,7 @@ async function main() {
       ) legacy_translation_rows
       where product_versions.product_id = legacy_translation_rows.product_id
         and product_versions.version = legacy_translation_rows.version
+        and not (coalesce(product_versions.snapshot, '{}'::jsonb) ? 'translations')
         and legacy_translation_rows.translations <> '{}'::jsonb
     `;
     await tx`alter table public.product_versions enable trigger user`;
