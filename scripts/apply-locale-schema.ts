@@ -232,12 +232,7 @@ cross join lateral (
 ) as locale_rows(locale, title, description)
 where nullif(locale_rows.title, '') is not null
    or nullif(locale_rows.description, '') is not null
-on conflict (product_id, locale) do update set
-  title = coalesce(excluded.title, public.product_translations.title),
-  description = coalesce(excluded.description, public.product_translations.description),
-  status = excluded.status,
-  source = excluded.source,
-  updated_at = now();
+on conflict (product_id, locale) do nothing;
 
 create table if not exists public.product_import_translations (
   import_id uuid not null references public.product_imports(id) on delete cascade,
@@ -343,12 +338,7 @@ cross join lateral (
 ) as locale_rows(locale, title, description)
 where nullif(locale_rows.title, '') is not null
    or nullif(locale_rows.description, '') is not null
-on conflict (import_id, locale) do update set
-  title = coalesce(excluded.title, public.product_import_translations.title),
-  description = coalesce(excluded.description, public.product_import_translations.description),
-  status = excluded.status,
-  source = excluded.source,
-  updated_at = now();
+on conflict (import_id, locale) do nothing;
 
 create table if not exists public.supplement_translations (
   supplement_id uuid not null references public.supplements(id) on delete cascade,

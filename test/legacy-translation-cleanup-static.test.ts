@@ -103,4 +103,29 @@ describe("legacy product translation cleanup", () => {
       "owner-only UAT cleanup must be enforceable from the runbook"
     );
   });
+
+  it("keeps locale schema product translation backfills insert-only", () => {
+    const localeSchema = source("scripts/apply-locale-schema.ts");
+
+    assert.match(
+      localeSchema,
+      /on conflict \(product_id, locale\) do nothing/,
+      "locale schema must not overwrite existing product_translations rows"
+    );
+    assert.match(
+      localeSchema,
+      /on conflict \(import_id, locale\) do nothing/,
+      "locale schema must not overwrite existing product_import_translations rows"
+    );
+    assert.doesNotMatch(
+      localeSchema,
+      /product_translations[\s\S]*on conflict \(product_id, locale\) do update/,
+      "locale schema must preserve existing UAT product translation rows"
+    );
+    assert.doesNotMatch(
+      localeSchema,
+      /product_import_translations[\s\S]*on conflict \(import_id, locale\) do update/,
+      "locale schema must preserve existing UAT import translation rows"
+    );
+  });
 });
