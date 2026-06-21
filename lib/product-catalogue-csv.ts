@@ -57,6 +57,27 @@ type ProductMatch = Readonly<{
   productId: string;
 }>;
 
+const PLATFORM_IMPORT_RETAIL_ONLY_COLUMNS = [
+  "rrp",
+  "master rrp",
+  "retail price",
+  "retail",
+  "wholesale price",
+  "wholesale",
+  "unit cost",
+  "quantity in stock",
+  "stock quantity",
+  "stock",
+  "quantity",
+  "backorder demand",
+  "backorder policy",
+  "backorder",
+  "lead time days",
+  "lead time",
+  "retail status",
+  "organisation",
+] as const;
+
 export type ProductCatalogueImportResult = {
   createdProducts: number;
   invalidRows: Array<{ reason: string; rowNumber: number }>;
@@ -183,6 +204,10 @@ function column(row: CsvRow, names: readonly string[]) {
   }
 
   return null;
+}
+
+function platformImportRetailOnlyColumns(row: CsvRow) {
+  return PLATFORM_IMPORT_RETAIL_ONLY_COLUMNS.filter((name) => column(row, [name]));
 }
 
 function numberFromColumn(row: CsvRow, names: readonly string[]) {
@@ -644,13 +669,11 @@ function mergedApprovals(
   return [...byKey.values()];
 }
 
-function countryPricingFromRow(
+function countrySettingsFromRow(
   row: CsvRow,
   countryCode: NonNullable<ReturnType<typeof normalizeProductCountryCode>>,
 ): ProductCountryPricing[] | undefined {
-  const rrpPriceAmount = numberFromColumn(row, ["rrp", "master rrp"]);
-
-  if (rrpPriceAmount === null && !column(row, ["currency"])) {
+  if (!column(row, ["currency", "ccy"])) {
     return undefined;
   }
 
@@ -659,7 +682,7 @@ function countryPricingFromRow(
       countryCode,
       currency: normalizeCurrencyCode(column(row, ["currency", "ccy"]), "THB"),
       priceUpdatedAt: null,
-      rrpPriceAmount,
+      rrpPriceAmount: null,
     },
   ];
 }
@@ -732,15 +755,6 @@ export function platformProductCatalogueJsonProductFromRow(row: AdminProductRow)
     recommendationHistory: row.recommendationHistory,
     region: row.region,
     regulatoryApprovals: row.regulatoryApprovals,
-    retailAvailability: row.shopAvailability.map((availability) => ({
-      backorderPolicy: availability.backorderPolicy,
-      currency: availability.currency,
-      leadTimeDays: availability.leadTimeDays,
-      organisationId: availability.organisationId,
-      organisationName: availability.organisationName,
-      status: availability.status,
-      stockQuantity: availability.stockQuantity,
-    })),
     sourceEvidence: row.sourceEvidence,
     status: row.status,
     titles: {
@@ -1036,6 +1050,17 @@ export async function applyProductCatalogueCsvImport(
 
   for (const row of rows) {
     try {
+      const retailOnlyColumns =
+        input.scope === "platform" ? platformImportRetailOnlyColumns(row) : [];
+
+      if (retailOnlyColumns.length > 0) {
+        result.invalidRows.push({
+          reason: `Platform catalogue import cannot include retail-only columns: ${retailOnlyColumns.join(", ")}`,
+          rowNumber: row.rowNumber,
+        });
+        continue;
+      }
+
       const matched = matchRowProduct(row, matches);
       const countryCode: NonNullable<
         ReturnType<typeof normalizeProductCountryCode>
@@ -1087,7 +1112,7 @@ export async function applyProductCatalogueCsvImport(
           actor: "product_catalogue_csv",
           availableCountryCodes: [countryCode],
           brandName,
-          countryPricing: countryPricingFromRow(row, countryCode),
+          countryPricing: countrySettingsFromRow(row, countryCode),
           currency,
           imageUrl,
           identifiers: mergedIdentifiers(null, {
@@ -1138,7 +1163,7 @@ export async function applyProductCatalogueCsvImport(
           actor: "product_catalogue_csv",
           brandName: brandName === null ? undefined : brandName,
           changeNote: "product_catalogue_csv_import",
-          countryPricing: countryPricingFromRow(row, countryCode),
+          countryPricing: countrySettingsFromRow(row, countryCode),
           id: productId,
           imageUrl: imageUrl === null ? undefined : imageUrl,
           identifiers: identifiers(existing),

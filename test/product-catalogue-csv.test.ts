@@ -67,7 +67,7 @@ describe("product catalogue CSV", () => {
     assert.equal(rows[0]?.columns.quantity_in_stock, "4");
   });
 
-  it("exports platform products as admin JSON without platform price fields", () => {
+  it("exports platform products as admin JSON without retail or price fields", () => {
     const exported = platformProductCatalogueJsonProductFromRow({
       availabilityStatus: "in_stock",
       availableCountryCodes: ["TH"],
@@ -169,7 +169,7 @@ describe("product catalogue CSV", () => {
     assert.equal(exported.ingredients[0]?.name, "Vitamin C");
     assert.doesNotMatch(
       [...deepKeys(exported)].sort().join("\n"),
-      /price|rrp|wholesale/i,
+      /backorder|price|retail|rrp|stock|wholesale/i,
     );
   });
 
@@ -201,6 +201,13 @@ describe("product catalogue CSV", () => {
     assert.match(importRoute, /applyProductCatalogueCsvImport/);
     assert.match(service, /createAdminProduct/);
     assert.match(service, /updateAdminProduct/);
+    assert.match(service, /PLATFORM_IMPORT_RETAIL_ONLY_COLUMNS/);
+    assert.match(
+      service,
+      /Platform catalogue import cannot include retail-only columns/,
+    );
+    assert.match(service, /countrySettingsFromRow/);
+    assert.doesNotMatch(service, /function countryPricingFromRow/);
     assert.match(service, /"internal sku"/);
     assert.match(service, /byFingerprint/);
     assert.match(service, /productRowFingerprint/);
