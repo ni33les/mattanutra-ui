@@ -65,12 +65,17 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   assert.doesNotMatch(view, /window\.confirm/);
   assert.doesNotMatch(view, /recoverPasskeyConfirm/);
   assert.doesNotMatch(view, /selectedPasskeyPerson/);
+  assert.doesNotMatch(view, /renderPasskeyControls/);
   assert.doesNotMatch(view, /labels\.access\.managePasskeys/);
   assert.doesNotMatch(view, /labels\.access\.passkeysFor/);
   assert.doesNotMatch(view, /recoveryUnavailableReason/);
+  assert.doesNotMatch(view, /accessData\.people\.map\(\(person\) => \(\s*<form/);
+  assert.match(view, /openPersonDetails/);
+  assert.match(view, /accessData\.people\.map\(\(person\) => \(\s*<tr[\s\S]*role="button"/);
+  assert.match(view, /selectedPerson \? \([\s\S]*<AdminModal/);
+  assert.match(view, /<form className="space-y-5 p-6" onSubmit=\{savePerson\}/);
   assert.match(view, /passkeyRecoveryPersonId/);
   assert.match(view, /canStartPasskeyRecovery/);
-  assert.match(view, /renderPasskeyControls/);
   assert.match(view, /labels\.access\.recoverPasskey/);
   assert.match(view, /labels\.access\.passkeyRecoveryWarning/);
   assert.match(view, /labels\.access\.sendRecoveryInvite/);
@@ -78,7 +83,7 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   assert.match(view, /lastPasskeyUsedAt/);
   assert.match(view, /passkeySummary\(person\)/);
   assert.equal(
-    [...view.matchAll(/setPasskeyRecoveryPersonId\(person\.id\)/g)].length,
+    [...view.matchAll(/setPasskeyRecoveryPersonId\(selectedPerson\.id\)/g)].length,
     1
   );
   assert.doesNotMatch(
@@ -87,7 +92,7 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   );
 });
 
-test("passkey recovery inline copy is localized for admin access views", () => {
+test("passkey recovery modal copy is localized for admin access views", () => {
   const content = source("components/admin/dashboard-content.tsx");
   const zh = JSON.parse(source("components/admin/dashboard-content.zh-CN.json")) as {
     access?: Record<string, unknown>;

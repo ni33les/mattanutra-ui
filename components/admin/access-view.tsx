@@ -298,6 +298,7 @@ export function AdminAccessView({
   const [invitePersonOpen, setInvitePersonOpen] = useState(false);
   const [membershipFilterOrganisationId, setMembershipFilterOrganisationId] =
     useState("");
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [passkeyRecoveryPersonId, setPasskeyRecoveryPersonId] =
     useState<string | null>(null);
   const [agentFilterOrganisationId, setAgentFilterOrganisationId] = useState("");
@@ -320,9 +321,15 @@ export function AdminAccessView({
     () => new Map(accessData.people.map((person) => [person.id, person])),
     [accessData.people]
   );
+  const selectedPerson = selectedPersonId
+    ? personById.get(selectedPersonId) ?? null
+    : null;
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
   const canManageOwners = context.actorMembership.role === "platform_owner";
+  const selectedPersonProtected = selectedPerson
+    ? ownerPersonIds.has(selectedPerson.id) && !canManageOwners
+    : false;
   const canAddMembership =
     canWrite &&
     (context.actorMembership.role === "platform_owner" ||
@@ -464,73 +471,22 @@ export function AdminAccessView({
     });
   }
 
+  function openPersonDetails(personId: string) {
+    setPasskeyRecoveryPersonId(null);
+    setSelectedPersonId(personId);
+  }
+
+  function closePersonDetails() {
+    setPasskeyRecoveryPersonId(null);
+    setSelectedPersonId(null);
+  }
+
   function canStartPasskeyRecovery(person: { id: string; status: string }) {
     return (
       !context.isLegacy &&
       canManageOwners &&
       person.id !== context.actorPerson.id &&
       person.status === "active"
-    );
-  }
-
-  function renderPasskeyControls(person: {
-    activePasskeyCount: number;
-    id: string;
-    lastPasskeyUsedAt?: string | null;
-    status: string;
-  }) {
-    const recoveryOpen = passkeyRecoveryPersonId === person.id;
-    const showRecovery = canStartPasskeyRecovery(person);
-
-    return (
-      <div className="mt-1 space-y-1 text-xs font-normal">
-        <div className="text-gray-500">
-          {passkeySummary(person)}
-          {person.lastPasskeyUsedAt ? (
-            <>
-              {" · "}
-              {labels.access.lastPasskeyUsedAt}:{" "}
-              {formatGeneratedAt(person.lastPasskeyUsedAt, locale)}
-            </>
-          ) : null}
-          {showRecovery ? (
-            <>
-              {" · "}
-              <button
-                className="font-semibold text-red-700 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
-                disabled={busy}
-                onClick={() => setPasskeyRecoveryPersonId(person.id)}
-                type="button"
-              >
-                {labels.access.recoverPasskey}
-              </button>
-            </>
-          ) : null}
-        </div>
-        {recoveryOpen ? (
-          <div className="max-w-md rounded-md bg-red-50 px-2.5 py-2 text-red-900 ring-1 ring-red-100">
-            <p>{labels.access.passkeyRecoveryWarning}</p>
-            <div className="mt-2 flex flex-wrap gap-3">
-              <button
-                className="font-semibold text-red-700 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
-                disabled={busy}
-                onClick={() => void recoverPasskey(person.id)}
-                type="button"
-              >
-                {labels.access.sendRecoveryInvite}
-              </button>
-              <button
-                className="font-semibold text-gray-600 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
-                disabled={busy}
-                onClick={() => setPasskeyRecoveryPersonId(null)}
-                type="button"
-              >
-                {labels.contentPages.cancel}
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </div>
     );
   }
 
@@ -640,17 +596,21 @@ export function AdminAccessView({
     });
   }
 
-  function savePerson(event: FormEvent<HTMLFormElement>) {
+  async function savePerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
 
-    void mutate({
+    const updated = await mutate({
       action: "update_person",
       displayName: String(form.get("displayName") ?? ""),
       personId: String(form.get("personId") ?? ""),
       preferredLocale: String(form.get("preferredLocale") ?? "en"),
       status: String(form.get("status") ?? "active")
     });
+
+    if (updated) {
+      closePersonDetails();
+    }
   }
 
   async function invitePerson(event: FormEvent<HTMLFormElement>) {
@@ -805,6 +765,7 @@ export function AdminAccessView({
 
     if (updated) {
       setPasskeyRecoveryPersonId(null);
+      setSelectedPersonId(null);
     }
   }
 
@@ -1237,76 +1198,57 @@ export function AdminAccessView({
           ) : null}
 
           <Panel title={labels.access.people}>
-            <div className="divide-y divide-gray-100">
-              {accessData.people.map((person) => {
-                const personProtected = ownerPersonIds.has(person.id) && !canManageOwners;
-
-                return (
-                  <form
-                    className="grid gap-3 py-4 lg:grid-cols-[1.25fr_1.7fr_0.9fr_0.9fr_auto]"
-                    key={person.id}
-                    onSubmit={savePerson}
-                  >
-                    <input type="hidden" name="personId" value={person.id} />
-                    <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                      {labels.access.name}
-                      <input
-                        className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                        defaultValue={person.displayName}
-                        disabled={!canWrite || busy || personProtected}
-                        name="displayName"
-                        required={true}
-                      />
-                    </label>
-                    <div className="grid gap-1 text-xs font-semibold text-gray-500">
-                      {labels.access.email}
-                      <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
-                        {person.email}
-                        {renderPasskeyControls(person)}
-                      </div>
-                    </div>
-                    <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                      {labels.access.preferredLocale}
-                      <select
-                        className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                        defaultValue={person.preferredLocale}
-                        disabled={!canWrite || busy || personProtected}
-                        name="preferredLocale"
-                      >
-                        {publicLocales.map((localeCode) => (
-                          <option key={localeCode} value={localeCode}>
-                            {localeLabels[localeCode]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                      {labels.access.status}
-                      <select
-                        className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                        defaultValue={person.status}
-                        disabled={!canWrite || busy || personProtected}
-                        name="status"
-                      >
-                        <option value="active">{labels.access.active}</option>
-                        <option value="disabled">{labels.access.disabled}</option>
-                        <option value="invited">{labels.access.pending}</option>
-                      </select>
-                    </label>
-                    {canWrite ? (
-                      <div className="flex items-end self-end">
-                        <button
-                          className={actionButtonClass("save")}
-                          disabled={busy || personProtected}
-                          type="submit"
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-semibold text-gray-500">
+                    <th className="py-2 pr-4">{labels.access.name}</th>
+                    <th className="py-2 pr-4">{labels.access.email}</th>
+                    <th className="py-2 pr-4">{labels.access.preferredLocale}</th>
+                    <th className="py-2 pr-4">{labels.access.status}</th>
+                    <th className="py-2">{labels.access.activePasskeys}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {accessData.people.map((person) => (
+                    <tr
+                      aria-label={`${labels.access.details}: ${person.displayName}`}
+                      className="cursor-pointer transition hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                      key={person.id}
+                      onClick={() => openPersonDetails(person.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openPersonDetails(person.id);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <td className="py-3 pr-4 font-medium text-gray-900">
+                        {person.displayName}
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">{person.email}</td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {localeLabels[person.preferredLocale]}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span
+                          className={classNames(
+                            "rounded-full px-2 py-1 text-xs font-medium ring-1",
+                            statusClass(person.status)
+                          )}
                         >
-                          {labels.access.save}
-                        </button>
-                      </div>
-                    ) : null}
-                  </form>
-                );
-              })}
+                          {statusLabel(labels, person.status)}
+                        </span>
+                      </td>
+                      <td className="py-3 text-gray-600">
+                        {passkeySummary(person)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Panel>
         </>
@@ -1352,13 +1294,13 @@ export function AdminAccessView({
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead>
-	                  <tr className="text-left text-xs font-semibold text-gray-500">
-	                    <th className="py-2 pr-4">{labels.access.name}</th>
-	                    {showOrganisationContext ? (
-	                      <th className="py-2 pr-4">{labels.access.organisation}</th>
-	                    ) : null}
-	                    <th className="py-2 pr-4">{labels.access.role}</th>
-	                    <th className="py-2 pr-4">{labels.access.status}</th>
+                  <tr className="text-left text-xs font-semibold text-gray-500">
+                    <th className="py-2 pr-4">{labels.access.name}</th>
+                    {showOrganisationContext ? (
+                      <th className="py-2 pr-4">{labels.access.organisation}</th>
+                    ) : null}
+                    <th className="py-2 pr-4">{labels.access.role}</th>
+                    <th className="py-2 pr-4">{labels.access.status}</th>
                     <th className="py-2 pr-4">{labels.access.activePasskeys}</th>
                     <th className="py-2">{labels.contentPages.actions}</th>
                   </tr>
@@ -1432,7 +1374,7 @@ export function AdminAccessView({
                         </td>
                         <td className="py-3 pr-4 text-gray-600">
                           {person
-                            ? renderPasskeyControls(person)
+                            ? passkeySummary(person)
                             : passkeySummary({ activePasskeyCount: 0 })}
                         </td>
                         <td className="py-3">
@@ -2397,6 +2339,150 @@ export function AdminAccessView({
               </button>
             </div>
           </div>
+        </AdminModal>
+      ) : null}
+
+      {selectedPerson ? (
+        <AdminModal
+          closeDisabled={busy}
+          closeLabel={labels.contentPages.cancel}
+          description={selectedPerson.email}
+          label={labels.access.details}
+          onClose={closePersonDetails}
+          size="lg"
+          title={
+            <span className={adminLocaleTextClass(locale, "heading")}>
+              {selectedPerson.displayName}
+            </span>
+          }
+        >
+          <form className="space-y-5 p-6" onSubmit={savePerson}>
+            <input type="hidden" name="personId" value={selectedPerson.id} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                {labels.access.name}
+                <input
+                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                  defaultValue={selectedPerson.displayName}
+                  disabled={!canWrite || busy || selectedPersonProtected}
+                  name="displayName"
+                  required={true}
+                />
+              </label>
+              <div className="grid gap-1 text-xs font-semibold text-gray-500">
+                {labels.access.email}
+                <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
+                  {selectedPerson.email}
+                </div>
+              </div>
+              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                {labels.access.preferredLocale}
+                <select
+                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                  defaultValue={selectedPerson.preferredLocale}
+                  disabled={!canWrite || busy || selectedPersonProtected}
+                  name="preferredLocale"
+                >
+                  {publicLocales.map((localeCode) => (
+                    <option key={localeCode} value={localeCode}>
+                      {localeLabels[localeCode]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                {labels.access.status}
+                <select
+                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                  defaultValue={selectedPerson.status}
+                  disabled={!canWrite || busy || selectedPersonProtected}
+                  name="status"
+                >
+                  <option value="active">{labels.access.active}</option>
+                  <option value="disabled">{labels.access.disabled}</option>
+                  <option value="invited">{labels.access.pending}</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="grid gap-3 border-t border-gray-100 pt-5 sm:grid-cols-2">
+              <div>
+                <div className="text-xs font-semibold text-gray-500">
+                  {labels.access.activePasskeys}
+                </div>
+                <div className="mt-1 text-sm text-gray-900">
+                  {passkeySummary(selectedPerson)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-gray-500">
+                  {labels.access.lastPasskeyUsedAt}
+                </div>
+                <div className="mt-1 text-sm text-gray-700">
+                  {selectedPerson.lastPasskeyUsedAt
+                    ? formatGeneratedAt(selectedPerson.lastPasskeyUsedAt, locale)
+                    : "-"}
+                </div>
+              </div>
+            </div>
+
+            {canStartPasskeyRecovery(selectedPerson) ? (
+              <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-100">
+                {passkeyRecoveryPersonId === selectedPerson.id ? (
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p>{labels.access.passkeyRecoveryWarning}</p>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        className="font-semibold text-red-700 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
+                        disabled={busy}
+                        onClick={() => void recoverPasskey(selectedPerson.id)}
+                        type="button"
+                      >
+                        {labels.access.sendRecoveryInvite}
+                      </button>
+                      <button
+                        className="font-semibold text-gray-600 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
+                        disabled={busy}
+                        onClick={() => setPasskeyRecoveryPersonId(null)}
+                        type="button"
+                      >
+                        {labels.contentPages.cancel}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="font-semibold text-red-700 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-70"
+                    disabled={busy}
+                    onClick={() => setPasskeyRecoveryPersonId(selectedPerson.id)}
+                    type="button"
+                  >
+                    {labels.access.recoverPasskey}
+                  </button>
+                )}
+              </div>
+            ) : null}
+
+            <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+              <button
+                className={actionButtonClass("save")}
+                disabled={busy}
+                onClick={closePersonDetails}
+                type="button"
+              >
+                {labels.contentPages.cancel}
+              </button>
+              {canWrite ? (
+                <button
+                  className={actionButtonClass("primary")}
+                  disabled={busy || selectedPersonProtected}
+                  type="submit"
+                >
+                  {labels.access.save}
+                </button>
+              ) : null}
+            </div>
+          </form>
         </AdminModal>
       ) : null}
 
