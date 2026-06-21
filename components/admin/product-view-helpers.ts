@@ -142,8 +142,6 @@ export const productViewLabels = {
     identifierType: "Type",
     identifierValue: "Value",
     inheritedApproval: "Inherited",
-    importCsv: "Import CSV",
-    importCsvError: "Could not import product CSV.",
     importReview: "Import review",
     importReviewHint:
       "This draft has an open review task. Use these actions to finish the review and update the catalogue.",
@@ -254,8 +252,6 @@ export const productViewLabels = {
     identifierType: "ประเภท",
     identifierValue: "ค่า",
     inheritedApproval: "สืบทอด",
-    importCsv: "นำเข้า CSV",
-    importCsvError: "ไม่สามารถนำเข้าไฟล์สินค้า CSV ได้",
     importReview: "รีวิวนำเข้า",
     importReviewHint:
       "ร่างนี้มีงานรีวิวที่เปิดอยู่ ใช้ปุ่มเหล่านี้เพื่อจบการรีวิวและอัปเดตแคตตาล็อก",
@@ -365,8 +361,6 @@ export const productViewLabels = {
     identifierType: "类型",
     identifierValue: "值",
     inheritedApproval: "继承",
-    importCsv: "导入 CSV",
-    importCsvError: "无法导入产品 CSV。",
     importReview: "导入审核",
     importReviewHint:
       "此草稿有待处理审核任务。使用这些操作完成审核并更新目录。",

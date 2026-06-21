@@ -201,7 +201,8 @@ describe("product catalogue CSV", () => {
       /\/api\/admin\/products\/catalogue\/export\?scope=platform/,
     );
     assert.match(productView, /exportJson/);
-    assert.match(productView, /\/api\/admin\/products\/catalogue\/import/);
+    assert.doesNotMatch(productView, /\/api\/admin\/products\/catalogue\/import/);
+    assert.doesNotMatch(productView, /importProductCsv/);
     assert.match(
       retailView,
       /\/api\/admin\/products\/catalogue\/export\?scope=retail/,
