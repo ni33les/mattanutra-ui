@@ -102,6 +102,9 @@ type RetailProductCatalogueJsonRow = Readonly<{
   wholesale_price_amount: string | number | null;
 }>;
 
+const TEMPORARY_PLATFORM_EXPORT_PRICE_AMOUNT = 1234;
+const TEMPORARY_PLATFORM_EXPORT_PRICE_CURRENCY = "THB";
+
 const PLATFORM_IMPORT_RETAIL_ONLY_COLUMNS = [
   "rrp",
   "master rrp",
@@ -233,6 +236,29 @@ function productImportSourceImageUrl(row: ProductImportSourceImageRow) {
   }
 
   return null;
+}
+
+function temporaryPlatformExportPrice(row: AdminProductRow) {
+  const pricedAvailability = row.shopAvailability.find(
+    (availability) => numberOrNull(availability.retailPriceAmount) !== null,
+  );
+
+  if (!pricedAvailability) {
+    return {
+      amount: TEMPORARY_PLATFORM_EXPORT_PRICE_AMOUNT,
+      currency: TEMPORARY_PLATFORM_EXPORT_PRICE_CURRENCY,
+    };
+  }
+
+  return {
+    amount:
+      numberOrNull(pricedAvailability.retailPriceAmount) ??
+      TEMPORARY_PLATFORM_EXPORT_PRICE_AMOUNT,
+    currency: normalizeCurrencyCode(
+      pricedAvailability.currency,
+      TEMPORARY_PLATFORM_EXPORT_PRICE_CURRENCY,
+    ),
+  };
 }
 
 function normalizeColumnName(value: string) {
@@ -899,6 +925,7 @@ export function platformProductCatalogueJsonProductFromRow(
       unit: fact.unit,
     })),
     platform: row.platform,
+    price: temporaryPlatformExportPrice(row),
     productAudience: row.productAudience,
     productKind: row.productKind,
     productUrl: row.productUrl,

@@ -68,8 +68,8 @@ describe("product catalogue CSV", () => {
     assert.equal(rows[0]?.columns.quantity_in_stock, "4");
   });
 
-  it("exports platform products as focused admin JSON without retail, price, or runtime metadata", () => {
-    const exported = platformProductCatalogueJsonProductFromRow({
+  it("exports platform products as focused admin JSON with a temporary lifted retail price", () => {
+    const platformRow = {
       availabilityStatus: "in_stock",
       availableCountryCodes: ["TH"],
       brandId: "brand-1",
@@ -165,7 +165,11 @@ describe("product catalogue CSV", () => {
       validationCacheStatus: "fresh",
       validationCacheStaleReasons: [],
       validationLabel: "Approved",
-    } as unknown as AdminProductRow, "https://manufacturer.example/product-a.png");
+    } as unknown as AdminProductRow;
+    const exported = platformProductCatalogueJsonProductFromRow(
+      platformRow,
+      "https://manufacturer.example/product-a.png",
+    );
 
     assert.equal(
       exported.canonicalImageUrl,
@@ -174,6 +178,14 @@ describe("product catalogue CSV", () => {
     assert.equal(
       exported.sourceImageUrl,
       "https://manufacturer.example/product-a.png",
+    );
+    assert.deepEqual(exported.price, { amount: 1200, currency: "THB" });
+    assert.deepEqual(
+      platformProductCatalogueJsonProductFromRow({
+        ...platformRow,
+        shopAvailability: [],
+      }).price,
+      { amount: 1234, currency: "THB" },
     );
     assert.equal(exported.ingredients[0]?.name, "Vitamin C");
     assert.equal(exported.translations.th?.title, "Translated Thai title");
@@ -187,7 +199,7 @@ describe("product catalogue CSV", () => {
     ]);
     assert.doesNotMatch(
       [...deepKeys(exported)].sort().join("\n"),
-      /backorder|descriptionEn|descriptionTh|identifierCandidates|importReview|price|recommendationHistory|retail|rrp|sourceEvidence|stock|titleEn|titleTh|validation|wholesale/i,
+      /backorder|descriptionEn|descriptionTh|identifierCandidates|importReview|recommendationHistory|retail|rrp|sourceEvidence|stock|titleEn|titleTh|validation|wholesale/i,
     );
   });
 
