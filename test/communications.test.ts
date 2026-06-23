@@ -7,6 +7,7 @@ import {
   selectBestCommunicationChannel,
   type CommunicationChannelCandidate
 } from "../lib/communication-channel-utils.ts";
+import { applyAdminNotificationContext } from "../lib/communications.ts";
 import { formatOutboundLineMessage } from "../lib/line-message-format.ts";
 
 type TestChannel = CommunicationChannelCandidate & { id: string };
@@ -96,6 +97,71 @@ describe("communications channel selection", () => {
 
       process.env.MATTANUTRA_ENV = "prd";
       assert.equal(formatOutboundLineMessage("Order ready"), "Order ready");
+    } finally {
+      if (originalEnvironment === undefined) {
+        delete process.env.MATTANUTRA_ENV;
+      } else {
+        process.env.MATTANUTRA_ENV = originalEnvironment;
+      }
+    }
+  });
+
+  it("adds environment and useful details to admin notification copy", () => {
+    const originalEnvironment = process.env.MATTANUTRA_ENV;
+
+    try {
+      process.env.MATTANUTRA_ENV = "uat";
+      const copy = applyAdminNotificationContext({
+        body: "Payment was received.",
+        eventKey: "platform_revenue_received",
+        metadata: {
+          amountMicros: 1_234_000_000,
+          currency: "THB",
+          orderNumber: "MN-1001",
+          paymentStatus: "paid",
+          source: "retail_product_checkout"
+        },
+        resourceId: "payment-123",
+        resourceType: "payment",
+        subject: "Platform revenue received"
+      });
+
+      assert.equal(copy.subject, "[UAT] Platform revenue received");
+      assert.match(copy.body, /Environment: UAT/);
+      assert.match(copy.body, /Amount: 1,234 THB/);
+      assert.match(copy.body, /Order: MN-1001/);
+      assert.match(copy.body, /Status: paid/);
+      assert.match(copy.body, /Source: retail_product_checkout/);
+      assert.doesNotMatch(copy.body, /Reference:/);
+    } finally {
+      if (originalEnvironment === undefined) {
+        delete process.env.MATTANUTRA_ENV;
+      } else {
+        process.env.MATTANUTRA_ENV = originalEnvironment;
+      }
+    }
+  });
+
+  it("omits production environment labels from admin notification copy", () => {
+    const originalEnvironment = process.env.MATTANUTRA_ENV;
+
+    try {
+      process.env.MATTANUTRA_ENV = "prd";
+      const copy = applyAdminNotificationContext({
+        body: "Payment was received.",
+        eventKey: "platform_revenue_received",
+        metadata: {
+          amountMicros: 1_234_000_000,
+          currency: "THB",
+          paymentStatus: "paid"
+        },
+        subject: "Platform revenue received"
+      });
+
+      assert.equal(copy.subject, "Platform revenue received");
+      assert.doesNotMatch(copy.body, /Environment:/);
+      assert.match(copy.body, /Amount: 1,234 THB/);
+      assert.match(copy.body, /Status: paid/);
     } finally {
       if (originalEnvironment === undefined) {
         delete process.env.MATTANUTRA_ENV;

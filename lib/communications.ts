@@ -266,6 +266,286 @@ function optionalText(value: unknown) {
   return trimmed || null;
 }
 
+const NOTIFICATION_AMOUNT_MICROS_PER_UNIT = 1_000_000;
+type NotificationEnvironment = "dev" | "prd" | "uat";
+
+const NOTIFICATION_ENVIRONMENT_ALIASES: Record<string, NotificationEnvironment> = {
+  dev: "dev",
+  development: "dev",
+  local: "dev",
+  prd: "prd",
+  prod: "prd",
+  production: "prd",
+  stage: "uat",
+  staging: "uat",
+  uat: "uat"
+};
+
+function normalizeNotificationEnvironment(value: unknown) {
+  return NOTIFICATION_ENVIRONMENT_ALIASES[cleanText(value).toLowerCase()] ?? null;
+}
+
+function inferNotificationEnvironmentFromUrl(value: unknown) {
+  const first = cleanText(value).split(",")[0]?.trim();
+
+  if (!first) {
+    return null;
+  }
+
+  try {
+    const host = new URL(first.includes("://") ? first : `https://${first}`)
+      .hostname
+      .toLowerCase();
+
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+      return "dev";
+    }
+
+    if (host === "mattanutra.com" || host === "www.mattanutra.com") {
+      return "prd";
+    }
+
+    if (/(^|[.-])uat($|[.-])/.test(host)) {
+      return "uat";
+    }
+
+    return /(^|[.-])dev($|[.-])/.test(host) ? "dev" : null;
+  } catch {
+    return null;
+  }
+}
+
+function notificationEnvironmentCode(
+  metadata: Record<string, unknown> = {}
+): NotificationEnvironment {
+  const explicit =
+    normalizeNotificationEnvironment(process.env.MATTANUTRA_ENV) ??
+    normalizeNotificationEnvironment(metadata.mattanutraEnv);
+
+  if (explicit) {
+    return explicit;
+  }
+
+  for (const candidate of [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.APP_BASE_URL,
+    process.env.MATTANUTRA_API_BASE_URL,
+    process.env.VERCEL_URL,
+    process.env.RENDER_EXTERNAL_URL
+  ]) {
+    const inferred = inferNotificationEnvironmentFromUrl(candidate);
+
+    if (inferred) {
+      return inferred;
+    }
+  }
+
+  return process.env.NODE_ENV === "production" ? "prd" : "dev";
+}
+
+export function adminNotificationEnvironmentLabel(
+  metadata: Record<string, unknown> = {}
+) {
+  const environment = notificationEnvironmentCode(metadata);
+
+  return environment === "prd" ? null : environment.toUpperCase();
+}
+
+function notificationText(value: unknown, maxLength = 140) {
+  const text =
+    typeof value === "number" || typeof value === "bigint"
+      ? String(value)
+      : cleanText(value);
+
+  return !text
+    ? null
+    : text.length > maxLength
+      ? `${text.slice(0, maxLength - 3)}...`
+      : text;
+}
+
+function firstNotificationText(
+  metadata: Record<string, unknown>,
+  keys: readonly string[],
+  maxLength?: number
+) {
+  for (const key of keys) {
+    const value = notificationText(metadata[key], maxLength);
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function notificationNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function firstNotificationNumber(
+  metadata: Record<string, unknown>,
+  keys: readonly string[]
+) {
+  for (const key of keys) {
+    const value = notificationNumber(metadata[key]);
+
+    if (value !== null) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function formatNotificationAmount(amount: number, currency: string) {
+  return `${amount.toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0
+  })}${currency ? ` ${currency}` : ""}`;
+}
+
+function notificationAmountLine(metadata: Record<string, unknown>) {
+  const currency = firstNotificationText(
+    metadata,
+    ["currency", "settlementCurrency"],
+    10
+  )?.toUpperCase() ?? "";
+
+  for (const [key, label] of [
+    ["amountMicros", "Amount"],
+    ["grossCustomerAmountMicros", "Gross amount"],
+    ["retailerPayableAmountMicros", "Retailer payable"],
+    ["mattanutraMarginAmountMicros", "MattaNutra margin"],
+    ["paidAmountMicros", "Paid amount"],
+    ["totalAmountMicros", "Total"]
+  ] as const) {
+    const amountMicros = notificationNumber(metadata[key]);
+
+    if (amountMicros !== null) {
+      return `${label}: ${formatNotificationAmount(
+        amountMicros / NOTIFICATION_AMOUNT_MICROS_PER_UNIT,
+        currency
+      )}`;
+    }
+  }
+
+  const majorAmount = firstNotificationNumber(metadata, [
+    "totalAmount",
+    "retailerPayableAmount",
+    "grossCustomerAmount"
+  ]);
+
+  return majorAmount === null || !currency
+    ? null
+    : `Amount: ${formatNotificationAmount(majorAmount, currency)}`;
+}
+
+function positiveCountLine(label: string, count: number | null) {
+  return count !== null && count > 0 ? `${label}: ${count}` : null;
+}
+
+function adminNotificationDetailLines(input: Readonly<{
+  metadata?: Record<string, unknown>;
+  resourceId?: string | null;
+  resourceType?: string | null;
+}>) {
+  const metadata = input.metadata ?? {};
+  const order = firstNotificationText(metadata, ["orderNumber"], 80);
+  const payment = firstNotificationText(
+    metadata,
+    [
+      "checkoutPaymentId",
+      "paymentId",
+      "stripePaymentIntentId",
+      "stripeCheckoutSessionId",
+      "stripePayoutId"
+    ],
+    120
+  );
+  const retailer = firstNotificationText(
+    metadata,
+    ["organisationName", "retailerName", "organisationId", "targetOrganisationId"],
+    120
+  );
+  const reference =
+    !order && !payment && !retailer && input.resourceType && input.resourceId
+      ? `${input.resourceType}/${input.resourceId}`
+      : null;
+  const status = firstNotificationText(
+    metadata,
+    ["paymentStatus", "stripePayoutStatus", "status", "toStatus"],
+    80
+  );
+  const reason = firstNotificationText(metadata, ["reason", "errorMessage", "error"]);
+  const source = firstNotificationText(
+    metadata,
+    ["source", "sourceSurface", "stripeMode"],
+    100
+  );
+
+  const environment = adminNotificationEnvironmentLabel(metadata);
+
+  return [
+    environment ? `Environment: ${environment}` : null,
+    notificationAmountLine(metadata),
+    order ? `Order: ${order}` : null,
+    payment ? `Payment: ${payment}` : null,
+    retailer ? `Retailer: ${retailer}` : null,
+    status ? `Status: ${status}` : null,
+    reason ? `Reason: ${reason}` : null,
+    positiveCountLine(
+      "Items",
+      firstNotificationNumber(metadata, ["lineCount", "selectedItemCount"])
+    ),
+    positiveCountLine("Stock gap", notificationNumber(metadata.gapUnits)),
+    source ? `Source: ${source}` : null,
+    reference ? `Reference: ${reference}` : null
+  ].filter((line): line is string => Boolean(line));
+}
+
+function environmentSubject(subject: string, environment: string | null) {
+  return !environment || /^\[[A-Z]+\]\s/.test(subject)
+    ? subject
+    : `[${environment}] ${subject}`;
+}
+
+export function applyAdminNotificationContext(input: Readonly<{
+  body: string;
+  eventKey: AdminCommunicationEventKey;
+  metadata?: Record<string, unknown>;
+  resourceId?: string | null;
+  resourceType?: string | null;
+  subject: string;
+}>) {
+  const metadata = input.metadata ?? {};
+  const environment = adminNotificationEnvironmentLabel(metadata);
+  const subject = environmentSubject(input.subject, environment);
+
+  if (/^Environment:\s*[A-Z]+$/im.test(input.body)) {
+    return {
+      body: input.body,
+      subject
+    };
+  }
+
+  const details = adminNotificationDetailLines(input);
+
+  return {
+    body: details.length > 0
+      ? `${input.body.trim()}\n\n${details.join("\n")}`
+      : input.body.trim(),
+    subject
+  };
+}
+
 function normalizeAdminCommunicationEventKey(
   value: unknown
 ): AdminCommunicationEventKey | null {
@@ -1951,6 +2231,7 @@ function platformEventCopy(eventKey: AdminCommunicationEventKey) {
 async function adminCommunicationCopy(input: Readonly<{
   body?: string | null;
   eventKey: AdminCommunicationEventKey;
+  metadata?: Record<string, unknown>;
   resourceId?: string | null;
   resourceType?: string | null;
   subject?: string | null;
@@ -1960,7 +2241,14 @@ async function adminCommunicationCopy(input: Readonly<{
   const body = optionalText(input.body);
 
   if (subject && body) {
-    return { body, subject };
+    return applyAdminNotificationContext({
+      body,
+      eventKey: input.eventKey,
+      metadata: input.metadata,
+      resourceId: input.resourceId,
+      resourceType: input.resourceType,
+      subject
+    });
   }
 
   const resourceId = input.resourceId ?? null;
@@ -1998,19 +2286,27 @@ async function adminCommunicationCopy(input: Readonly<{
       status: row?.status ?? null
     });
 
-    return {
+    return applyAdminNotificationContext({
       body: body ?? copy.body,
+      eventKey: input.eventKey,
+      metadata: input.metadata,
+      resourceId: input.resourceId,
+      resourceType: input.resourceType,
       subject: subject ?? copy.subject
-    };
+    });
   }
 
   if (input.eventKey.startsWith("platform_")) {
     const copy = platformEventCopy(input.eventKey);
 
-    return {
+    return applyAdminNotificationContext({
       body: body ?? copy.body,
+      eventKey: input.eventKey,
+      metadata: input.metadata,
+      resourceId: input.resourceId,
+      resourceType: input.resourceType,
       subject: subject ?? copy.subject
-    };
+    });
   }
 
   const copy = orderEventCopy({
@@ -2021,10 +2317,14 @@ async function adminCommunicationCopy(input: Readonly<{
     status: null
   });
 
-  return {
+  return applyAdminNotificationContext({
     body: body ?? copy.body,
+    eventKey: input.eventKey,
+    metadata: input.metadata,
+    resourceId: input.resourceId,
+    resourceType: input.resourceType,
     subject: subject ?? copy.subject
-  };
+  });
 }
 
 export async function routeAdminCommunication(input: Readonly<{
@@ -2052,6 +2352,7 @@ export async function routeAdminCommunication(input: Readonly<{
   const copy = await adminCommunicationCopy({
     body: input.body,
     eventKey: input.eventKey,
+    metadata: input.metadata,
     resourceId: input.resourceId,
     resourceType: input.resourceType,
     sql,
