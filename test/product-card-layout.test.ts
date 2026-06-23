@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 describe("product admin card layout", () => {
   it("keeps brand, markets, regulatory approval, and source in distinct card areas", async () => {
     const view = await readFile("components/admin/product-view-ui.tsx", "utf8");
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
     const productCard = view.slice(
       view.indexOf("export function ProductCard"),
       view.indexOf("export function ProductFactsEditor"),
@@ -41,6 +42,13 @@ describe("product admin card layout", () => {
     assert.match(view, /border-t border-gray-100 pt-3/);
     assert.match(view, /sourceTitle/);
     assert.match(view, /decisionSummary/);
+    assert.match(view, /function productImageFallbackText/);
+    assert.match(view, /ProductImagePreview/);
+    assert.match(view, /ProductImageFallback/);
+    assert.match(view, /<ProductImagePreview row=\{row\} \/>/);
+    assert.match(detailView, /ProductImagePreview/);
+    assert.match(detailView, /<ProductImagePreview alt=\{localized\.title\.value\} row=\{draft\} size="lg" \/>/);
+    assert.doesNotMatch(productCard, /row\.platform\.toUpperCase\(\)/);
     assert.doesNotMatch(view, /productStatusLabel\(row\.productKind, locale\)/);
     assert.match(productCard, /viewLabels\.translations/);
     assert.match(productCard, /size-1\.5 rounded-full/);

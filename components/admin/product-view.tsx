@@ -52,6 +52,7 @@ import {
   ProductCard,
   ProductCountryManager,
   ProductFactsEditor,
+  ProductImagePreview,
   ProductIdentifiersEditor,
   ProductInsightStat,
   ProductTranslationEditor,
@@ -853,48 +854,51 @@ function ProductDetailPanel({
         {viewLabels.backToProducts}
       </a>
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold leading-8 text-gray-900">
-                {localized.title.value}
-              </h2>
-              <LocalizedFallbackBadge label={fallbackLabel} />
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-4">
+            <ProductImagePreview alt={localized.title.value} row={draft} size="lg" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-xl font-semibold leading-8 text-gray-900">
+                    {localized.title.value}
+                  </h2>
+                  <LocalizedFallbackBadge label={fallbackLabel} />
+                </div>
+                <span
+                  className={classNames(
+                    "rounded-full border px-2.5 py-1 text-xs font-medium",
+                    productBusinessStateClass(currentBusinessState),
+                  )}
+                >
+                  {productBusinessStateLabel(currentBusinessState, locale)}
+                </span>
+              </div>
+              {localized.title.canonicalValue &&
+              localized.title.canonicalValue !== localized.title.value ? (
+                <p className="mt-1 text-xs text-gray-400">
+                  {viewLabels.sourceTitle}: {localized.title.canonicalValue}
+                </p>
+              ) : null}
+              <p className="mt-1 text-sm text-gray-500">
+                {[
+                  draft.brandName,
+                  productStatusLabel(draft.productKind, locale),
+                  draft.productAudience === "both"
+                    ? null
+                    : productStatusLabel(draft.productAudience, locale),
+                  safeProductCountryCodes.length > 0
+                    ? `${viewLabels.markets} ${safeProductCountryCodes.join(", ")}`
+                    : draft.region,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </div>
-            <span
-              className={classNames(
-                "rounded-full border px-2.5 py-1 text-xs font-medium",
-                productBusinessStateClass(currentBusinessState),
-              )}
-            >
-              {productBusinessStateLabel(currentBusinessState, locale)}
-            </span>
           </div>
-          {localized.title.canonicalValue &&
-          localized.title.canonicalValue !== localized.title.value ? (
-            <p className="mt-1 text-xs text-gray-400">
-              {viewLabels.sourceTitle}: {localized.title.canonicalValue}
-            </p>
-          ) : null}
-          <p className="mt-1 text-sm text-gray-500">
-            {[
-              draft.brandName,
-              productStatusLabel(draft.productKind, locale),
-              draft.productAudience === "both"
-                ? null
-                : productStatusLabel(draft.productAudience, locale),
-              safeProductCountryCodes.length > 0
-                ? `${viewLabels.markets} ${safeProductCountryCodes.join(", ")}`
-                : draft.region,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
         </div>
-      </div>
 
-      <div className="mt-5 grid gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+        <div className="mt-5 grid gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
         {draft.decisionStats ? (
           <div>
             <p className="font-semibold text-gray-900">

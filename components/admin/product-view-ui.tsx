@@ -64,6 +64,78 @@ function regulatoryApprovalSummary(
   return active.length > 2 ? `${summary} +${active.length - 2}` : summary;
 }
 
+function productImageFallbackText(
+  row: Pick<AdminProductRow, "brandName" | "platform" | "title">,
+) {
+  const source = row.brandName?.trim() || row.title.trim() || row.platform;
+  const asciiParts = source.match(/[A-Za-z0-9]+/g);
+  const initials =
+    asciiParts && asciiParts.length > 1
+      ? asciiParts
+          .slice(0, 2)
+          .map((part) => part[0])
+          .join("")
+          .toUpperCase()
+      : asciiParts?.[0]?.slice(0, 2).toUpperCase();
+
+  return initials || [...source.replace(/\s+/g, "")].slice(0, 2).join("") || "MN";
+}
+
+export function ProductImageFallback({
+  row,
+  size = "md",
+}: Readonly<{
+  row: Pick<AdminProductRow, "brandName" | "platform" | "title">;
+  size?: "md" | "lg";
+}>) {
+  return (
+    <div
+      className={classNames(
+        "flex shrink-0 items-center justify-center bg-[linear-gradient(135deg,#F8FAFC_0%,#ECFDF5_100%)] font-semibold text-[#126B4F] ring-1 ring-gray-200",
+        size === "lg"
+          ? "size-24 rounded-xl text-lg"
+          : "size-20 rounded-lg text-sm",
+      )}
+    >
+      <span className="px-2 text-center leading-none">
+        {productImageFallbackText(row)}
+      </span>
+    </div>
+  );
+}
+
+export function ProductImagePreview({
+  alt = "",
+  row,
+  size = "md",
+}: Readonly<{
+  alt?: string;
+  row: Pick<AdminProductRow, "brandName" | "imageUrl" | "platform" | "title">;
+  size?: "md" | "lg";
+}>) {
+  const fallback = <ProductImageFallback row={row} size={size} />;
+
+  if (!row.imageUrl) {
+    return fallback;
+  }
+
+  return (
+    <SafeImage
+      alt={alt}
+      className={classNames(
+        "shrink-0 object-cover ring-1 ring-gray-200",
+        size === "lg"
+          ? "size-24 rounded-xl"
+          : "size-20 rounded-lg",
+      )}
+      fallback={fallback}
+      height={size === "lg" ? 96 : 80}
+      src={row.imageUrl}
+      width={size === "lg" ? 96 : 80}
+    />
+  );
+}
+
 type ProductCountryApprovalPatch = Readonly<{
   agencyCode?: string;
   agencyName?: string;
@@ -735,24 +807,7 @@ export function ProductCard({
   const content = (
     <>
       <div className="flex gap-4">
-        {row.imageUrl ? (
-          <SafeImage
-            alt=""
-            className="size-20 rounded-lg object-cover ring-1 ring-gray-200"
-            fallback={
-              <div className="flex size-20 items-center justify-center rounded-lg bg-gray-50 text-xs font-semibold text-gray-400 ring-1 ring-gray-200">
-                {row.platform.toUpperCase()}
-              </div>
-            }
-            height={80}
-            src={row.imageUrl}
-            width={80}
-          />
-        ) : (
-          <div className="flex size-20 items-center justify-center rounded-lg bg-gray-50 text-xs font-semibold text-gray-400 ring-1 ring-gray-200">
-            {row.platform.toUpperCase()}
-          </div>
-        )}
+        <ProductImagePreview row={row} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div>

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import type { AdminReviewTaskRow } from "@/lib/admin-review-queue";
 import type { AdminProductsData } from "@/lib/admin-products";
 import { adminLocalizedProductText } from "@/lib/admin-localized-display";
 import type { Locale } from "@/lib/i18n";
+import { SafeImage } from "@/components/safe-image";
 import { productDoseUnitSelectOptions } from "@/components/admin/product-view-helpers";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import { classNames } from "@/components/admin/dashboard-shared";
@@ -130,9 +130,14 @@ export function ProductImportReviewModal({
       <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
         <div className="flex gap-4">
           {imageUrl ? (
-            <Image
+            <SafeImage
               alt=""
               className="size-24 rounded-xl object-cover ring-1 ring-gray-200"
+              fallback={
+                <div className="flex size-24 items-center justify-center rounded-xl bg-gray-50 text-xs font-semibold text-gray-400 ring-1 ring-gray-200">
+                  Product
+                </div>
+              }
               height={96}
               src={imageUrl}
               width={96}

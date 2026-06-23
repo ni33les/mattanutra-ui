@@ -147,6 +147,11 @@ export function ProductThumbnail({
   title: string;
 }>) {
   const fallback = title.trim().slice(0, 2) || "MN";
+  const fallbackNode = (
+    <span className="px-1 text-center text-xs font-semibold text-gray-500">
+      {fallback}
+    </span>
+  );
 
   return (
     <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-100 ring-1 ring-gray-200">
@@ -156,13 +161,12 @@ export function ProductThumbnail({
           className="size-full object-cover"
           height={56}
           loading="lazy"
+          fallback={fallbackNode}
           src={imageUrl}
           width={56}
         />
       ) : (
-        <span className="px-1 text-center text-xs font-semibold text-gray-500">
-          {fallback}
-        </span>
+        fallbackNode
       )}
     </div>
   );
