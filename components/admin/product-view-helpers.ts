@@ -16,6 +16,7 @@ import {
 } from "@/lib/dose-conversion";
 import { siteLocaleRegistry, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n-messages";
+import { productForms as productFormValues } from "@/lib/product-form";
 import { productFactObservableIssueMessages } from "@/lib/product-validation";
 import { supplementDoseUnits } from "@/lib/supplement-dose-units";
 import {
@@ -26,6 +27,7 @@ import {
 import { safetyMetric } from "@/components/admin/safety-view-helpers";
 
 export const productKinds = ["supplement", "multi", "food", "other"] as const;
+export const productForms = productFormValues;
 export const productAudiences = ["both", "female", "male"] as const;
 export const productBusinessStates = [
   "pending_review",
@@ -175,6 +177,7 @@ export const productViewLabels = {
     productIdentifiers: "Product identifiers",
     productIdentifiersHint:
       "Approved identifiers are used for Hygeia files, barcode matching, and retail shopping lists.",
+    productForm: "Form",
     productType: "Product type",
     productUrl: "Product URL",
     recommendationDecisions: "Recommendation decisions",
@@ -288,6 +291,7 @@ export const productViewLabels = {
     productIdentifiers: "รหัสสินค้า",
     productIdentifiersHint:
       "รหัสที่อนุมัติใช้กับไฟล์ Hygeia การจับคู่บาร์โค้ด และรายการซื้อของร้านค้า",
+    productForm: "รูปแบบสินค้า",
     productType: "ประเภทสินค้า",
     productUrl: "URL สินค้า",
     recommendationDecisions: "ข้อมูลการเลือกสินค้า",
@@ -400,6 +404,7 @@ export const productViewLabels = {
     productIdentifiers: "产品标识",
     productIdentifiersHint:
       "已批准的标识用于 Hygeia 文件、条码匹配和零售采购清单。",
+    productForm: "剂型",
     productType: "产品类型",
     productUrl: "产品 URL",
     recommendationDecisions: "推荐决策",

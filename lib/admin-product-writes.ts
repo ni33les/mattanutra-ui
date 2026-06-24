@@ -52,6 +52,7 @@ import {
   PRODUCT_IDENTIFIER_TYPES,
   replaceApprovedProductIdentifiers
 } from "@/lib/product-identifiers";
+import { inferProductFormFromTextParts } from "@/lib/product-form";
 import {
   replaceProductRegulatoryApprovals,
   thaiFdaApprovalInput
@@ -1048,8 +1049,24 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     namespace: "products",
     source: "products.image_url"
   });
+  const productForm = input.productForm ?? inferProductFormFromTextParts(
+    [
+      rawTitle,
+      title,
+      description,
+      input.productKind,
+      input.sourceSnapshot,
+      input.facts,
+      ...Object.values(translations).flatMap((translation) => [
+        translation.title,
+        translation.description
+      ])
+    ],
+    { productKind: input.productKind }
+  );
   const sourceSnapshot = {
     ...baseSourceSnapshot,
+    productForm,
     ...productImageMirrorSnapshotPatch(mirroredImage.metadata)
   };
 
@@ -1273,6 +1290,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	        availableCountryCodes: productCountryCodes,
 	        manufacturerCountryCodes,
 	        platform: input.platform,
+        productForm,
         identifiers: input.identifiers,
         regulatoryApprovals: toJsonValue(regulatoryApprovals),
         productUrl,
@@ -1349,6 +1367,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   const beforePayload = recordFromUnknown(beforeRows[0].before_payload);
   const localizedSnapshotBase = {
     ...(input.sourceSnapshotPatch ?? {}),
+    ...(input.productForm !== undefined ? { productForm: input.productForm } : {}),
     ...(input.translations !== undefined ? { translations: input.translations } : {})
   };
   const mirroredImage = input.imageUrl === undefined
@@ -1620,6 +1639,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	        status: input.status,
         validation: validation.validation,
         productAudience: input.productAudience,
+        productForm: input.productForm,
         productKind: input.productKind,
         productUrl: input.productUrl,
         sourceSnapshotPatch: toJsonValue(input.sourceSnapshotPatch ?? null),

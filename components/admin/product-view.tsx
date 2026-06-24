@@ -39,6 +39,7 @@ import {
   productBusinessStateClass,
   productBusinessStateLabel,
   productFactPayloads,
+  productForms,
   productKinds,
   productManufacturerKey,
   productManufacturerStats,
@@ -99,6 +100,7 @@ function normalizeProductDetailRow(
     identifierCandidates: safeArray(row.identifierCandidates),
     identifiers: safeArray(row.identifiers),
     manufacturerCountryCodes: safeArray(row.manufacturerCountryCodes),
+    productForm: row.productForm ?? "unknown",
     productImportDuplicateProductIds: safeArray(
       row.productImportDuplicateProductIds,
     ),
@@ -474,6 +476,7 @@ export function AdminProductDetailView({
           manufacturerCountryCodes: row.manufacturerCountryCodes,
           status: row.status,
           productAudience: row.productAudience,
+          productForm: row.productForm,
           productKind: row.productKind,
           productUrl: row.productUrl,
           regulatoryApprovals: regulatoryApprovalsForSave(row),
@@ -1309,6 +1312,26 @@ function ProductDetailPanel({
             value={draft.productKind}
           >
             {productKinds.map((item) => (
+              <option key={item} value={item}>
+                {productStatusLabel(item, locale)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium text-gray-700">
+          {viewLabels.productForm}
+          <select
+            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                productForm: event.target
+                  .value as AdminProductDetailRow["productForm"],
+              })
+            }
+            value={draft.productForm}
+          >
+            {productForms.map((item) => (
               <option key={item} value={item}>
                 {productStatusLabel(item, locale)}
               </option>

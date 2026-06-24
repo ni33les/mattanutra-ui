@@ -73,6 +73,7 @@ export type {
   FinishProductImportRunInput,
   ProductDbRow,
   ProductFactSupplementStatus,
+  ProductForm,
   ProductImportFactInput,
   ProductImportRunRow,
   ProductLabelStatus,
@@ -83,6 +84,10 @@ export type {
   StartProductImportRunInput,
   UpdateAdminProductInput
 } from "./admin-product-types.ts";
+export {
+  isProductForm,
+  productForms
+} from "@/lib/product-form";
 export { createAdminProduct, updateAdminProduct } from "./admin-product-writes.ts";
 import {
   loadAdminProductRow,

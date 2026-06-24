@@ -42,6 +42,10 @@ import {
 import { normalizeDoseUnit, comparableDoseAmount, parseDoseLimit, doseExceedsLimit } from "@/lib/dose-conversion";
 import { validateProduct, validationCacheMismatchReasons } from "@/lib/product-validation";
 import { defaultLocale, resolveLocalizedText } from "@/lib/i18n";
+import {
+  inferProductFormFromTextParts,
+  normalizeProductForm
+} from "@/lib/product-form";
 
 // Pure mapping / transformation functions extracted as part of Sprint 2 god-module split.
 
@@ -412,6 +416,24 @@ export function rowFromDb(
   const regulatoryApprovals = productRegulatoryApprovalsFromPayload(
     row.regulatory_approvals
   );
+  const persistedProductForm = normalizeProductForm(row.product_form);
+  const productForm =
+    persistedProductForm
+      ? persistedProductForm
+      : inferProductFormFromTextParts(
+          [
+            row.title,
+            row.description,
+            row.category,
+            row.source_snapshot,
+            row.facts,
+            ...Object.values(translations).flatMap((translation) => [
+              translation.title,
+              translation.description
+            ])
+          ],
+          { productKind: row.product_kind }
+        );
   const countryPricing = arrayPayload(row.country_pricing)
     .map((item): ProductCountryPricing | null => {
       const record = item && typeof item === "object"
@@ -484,6 +506,7 @@ export function rowFromDb(
     platform: row.platform,
     productImportDuplicateProductIds: row.import_duplicate_product_ids ?? [],
     productImportId: row.import_id,
+    productForm,
     productKind: row.product_kind ?? "supplement",
     productUrl: row.product_url,
     recommendationHistory: {

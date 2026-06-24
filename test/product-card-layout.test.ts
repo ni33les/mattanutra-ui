@@ -119,4 +119,26 @@ describe("product admin card layout", () => {
     assert.match(mapper, /validationLabel\(validation, row\.image_url\)/);
     assert.match(mapper, /!hasProductImageUrl\(imageUrl\)[\s\S]*return "Missing Image"/);
   });
+
+  it("keeps product form editable on the product detail page", async () => {
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
+    const route = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
+    const readModel = await readFile("lib/admin-product-read-model.ts", "utf8");
+    const mapper = await readFile("lib/admin-product-mappers.ts", "utf8");
+    const writes = await readFile("lib/admin-product-writes.ts", "utf8");
+
+    assert.match(helpers, /export const productForms = productFormValues/);
+    assert.match(helpers, /productForm: "Form"/);
+    assert.match(detailView, /productForm: row\.productForm/);
+    assert.match(detailView, /value=\{draft\.productForm\}/);
+    assert.match(detailView, /productForms\.map/);
+    assert.match(route, /parseProductForm\(body\.productForm\)/);
+    assert.match(route, /body\.productForm !== undefined && !productForm/);
+    assert.match(readModel, /products\.source_snapshot ->> 'productForm'/);
+    assert.match(mapper, /productForm,/);
+    assert.match(writes, /productForm,/);
+    assert.match(writes, /input\.productForm !== undefined \? \{ productForm: input\.productForm \} : \{\}/);
+    assert.doesNotMatch(writes, /product_form =/);
+  });
 });

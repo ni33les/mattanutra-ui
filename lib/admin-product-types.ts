@@ -22,8 +22,10 @@ import type {
   ProductRegulatoryApproval,
   ProductRegulatoryApprovalInput
 } from "@/lib/product-regulatory-approvals";
+import type { ProductForm } from "@/lib/product-form";
 
 export type { ProductCountryCode } from "@/lib/product-countries";
+export type { ProductForm } from "@/lib/product-form";
 export type {
   ProductIdentifier,
   ProductIdentifierCandidate,
@@ -128,6 +130,7 @@ export type AdminProductRow = Readonly<{
   platform: ProductPlatform;
   productImportDuplicateProductIds: string[];
   productImportId: string | null;
+  productForm: ProductForm;
   productKind: ProductKind;
   productUrl: string;
   recommendationHistory: {
@@ -372,6 +375,7 @@ export type CreateAdminProductInput = Readonly<{
   externalProductId?: string | null;
   platform: ProductPlatform;
   productAudience?: ProductAudience;
+  productForm?: ProductForm;
   productKind?: ProductKind;
   productUrl: string;
   region?: string | null;
@@ -402,6 +406,7 @@ export type UpdateAdminProductInput = Readonly<{
   labelStatus?: ProductLabelStatus;
   status?: ProductStatus;
   productAudience?: ProductAudience;
+  productForm?: ProductForm;
   productKind?: ProductKind;
   productUrl?: string | null;
   regulatoryApprovals?: readonly ProductRegulatoryApprovalInput[];
@@ -514,6 +519,7 @@ export type ProductDbRow = Readonly<{
   status: ProductStatus;
   platform: ProductPlatform;
   product_audience: ProductAudience | null;
+  product_form: ProductForm | null;
   product_kind: ProductKind;
   product_data_expires_at: Date | string | null;
   product_url: string;

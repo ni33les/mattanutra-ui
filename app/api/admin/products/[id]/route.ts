@@ -17,6 +17,7 @@ import {
   normalizeProductCountryCode,
   type ProductCountryPricing
 } from "@/lib/product-countries";
+import { normalizeProductForm, type ProductForm } from "@/lib/product-form";
 import { productIdentifiersFromBody } from "@/lib/product-identifiers";
 import { productRegulatoryApprovalsFromPayload } from "@/lib/product-regulatory-approvals";
 import { isUuid } from "@/lib/assessment-store";
@@ -113,6 +114,10 @@ function parseProductKind(value: unknown): ProductKind | undefined {
     : undefined;
 }
 
+function parseProductForm(value: unknown): ProductForm | undefined {
+  return normalizeProductForm(value) ?? undefined;
+}
+
 function parseProductAudience(value: unknown): ProductAudience | undefined {
   const normalized = normalizedKey(value);
 
@@ -195,6 +200,7 @@ export async function PATCH(
   const status = normalizedKey(body.status);
   const labelStatus = normalizedKey(body.labelStatus);
   const productKind = parseProductKind(body.productKind);
+  const productForm = parseProductForm(body.productForm);
   const productAudience = parseProductAudience(body.productAudience);
   const title = body.title === undefined ? undefined : textOrNull(body.title, 500);
   const productUrl = body.productUrl === undefined
@@ -207,6 +213,7 @@ export async function PATCH(
     (body.status !== undefined && !isProductStatus(status)) ||
     (body.labelStatus !== undefined && !isProductLabelStatus(labelStatus)) ||
     (body.productKind !== undefined && !productKind) ||
+    (body.productForm !== undefined && !productForm) ||
     (body.productAudience !== undefined && !productAudience)
   ) {
     return NextResponse.json(
@@ -250,6 +257,7 @@ export async function PATCH(
       manufacturerCountryCodes: countryCodesFromBody(body.manufacturerCountryCodes),
       status: isProductStatus(status) ? status : undefined,
       productAudience,
+      productForm,
       productKind,
       productUrl,
       regulatoryApprovals: body.regulatoryApprovals === undefined
