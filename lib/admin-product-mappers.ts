@@ -147,8 +147,15 @@ export function roundedDoseAmount(value: number) {
   return Math.ceil(value * 1_000_000) / 1_000_000;
 }
 
-export function validationLabel(validation: ValidationResult) {
-  if (validation.reasons.includes("missing_image")) {
+function hasProductImageUrl(value: string | null | undefined) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+export function validationLabel(
+  validation: ValidationResult,
+  imageUrl?: string | null
+) {
+  if (!hasProductImageUrl(imageUrl)) {
     return "Missing Image";
   }
 
@@ -455,7 +462,7 @@ export function rowFromDb(
     validation,
     validationCacheStatus: validationCache.status,
     validationCacheStaleReasons: validationCache.staleReasons,
-    validationLabel: validationLabel(validation),
+    validationLabel: validationLabel(validation, row.image_url),
     productAudience:
       row.product_audience && row.product_audience !== "both"
         ? row.product_audience

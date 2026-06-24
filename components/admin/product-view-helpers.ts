@@ -549,7 +549,7 @@ export function productMatchesMetricFilter(
   }
 
   if (metric === "productsMissingImages") {
-    return row.validationLabel === "Missing Image";
+    return !row.imageUrl?.trim();
   }
 
   if (metric === "productsRegulatoryApproved") {
@@ -655,7 +655,7 @@ export function productSummaryCounts(
       counts.total += 1;
       counts.dirtyData += row.validationLabel === "Dirty Data" ? 1 : 0;
       counts.missingFacts += row.validationLabel === "Missing Facts" ? 1 : 0;
-      counts.missingImage += row.validationLabel === "Missing Image" ? 1 : 0;
+      counts.missingImage += !row.imageUrl?.trim() ? 1 : 0;
       counts.approved += state === "approved" ? 1 : 0;
       counts.ignored += state === "ignored" ? 1 : 0;
       counts.pendingReview += state === "pending_review" ? 1 : 0;

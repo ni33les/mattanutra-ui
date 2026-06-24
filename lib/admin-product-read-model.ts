@@ -610,7 +610,7 @@ export async function getAdminProductListData(
           coalesce(product_translation_rows.display_description, products.description) as display_description,
           product_regulatory_rows.has_regulatory_approval,
           case
-            when coalesce(products.validation_reasons, '{}'::text[]) && array['missing_image']::text[] then 'Missing Image'
+            when products.image_url is null or btrim(products.image_url) = '' then 'Missing Image'
             when products.label_status <> 'parsed'
               or coalesce(products.validation_reasons, '{}'::text[]) && array['no_dosed_facts', 'no_canonical_match']::text[] then 'Missing Facts'
             when coalesce(products.validation_reasons, '{}'::text[]) && array['dirty_name', 'concentration_only', 'source_conflict']::text[] then 'Dirty Data'
@@ -829,7 +829,7 @@ export async function getAdminProductListData(
         with product_list_stats_base as (
           select
             case
-              when coalesce(products.validation_reasons, '{}'::text[]) && array['missing_image']::text[] then 'Missing Image'
+              when products.image_url is null or btrim(products.image_url) = '' then 'Missing Image'
               when products.label_status <> 'parsed'
                 or coalesce(products.validation_reasons, '{}'::text[]) && array['no_dosed_facts', 'no_canonical_match']::text[] then 'Missing Facts'
               when coalesce(products.validation_reasons, '{}'::text[]) && array['dirty_name', 'concentration_only', 'source_conflict']::text[] then 'Dirty Data'

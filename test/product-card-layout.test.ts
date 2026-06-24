@@ -100,8 +100,23 @@ describe("product admin card layout", () => {
     assert.match(listQuery, /from filtered_products\s*\)/);
     assert.match(listQuery, /summary_total/);
     assert.match(listQuery, /total: numberOrNull\(stats\?\.summary_total\) \?\? 0/);
+    assert.match(
+      listQuery,
+      /products\.image_url is null or btrim\(products\.image_url\) = '' then 'Missing Image'/,
+    );
+    assert.doesNotMatch(listQuery, /validation_reasons[\s\S]{0,120}missing_image/);
     assert.doesNotMatch(listQuery, /summary_approved[\s\S]{0,120}over\(\)/);
     assert.match(listQuery, /if \(!stats\)/);
     assert.match(listQuery, /product_list_stats_base as \(/);
+  });
+
+  it("keeps product image metrics based on the image URL field", async () => {
+    const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
+    const mapper = await readFile("lib/admin-product-mappers.ts", "utf8");
+
+    assert.match(helpers, /metric === "productsMissingImages"[\s\S]*!row\.imageUrl\?\.trim\(\)/);
+    assert.match(helpers, /counts\.missingImage \+= !row\.imageUrl\?\.trim\(\) \? 1 : 0/);
+    assert.match(mapper, /validationLabel\(validation, row\.image_url\)/);
+    assert.match(mapper, /!hasProductImageUrl\(imageUrl\)[\s\S]*return "Missing Image"/);
   });
 });
