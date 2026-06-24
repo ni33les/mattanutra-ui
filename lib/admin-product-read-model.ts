@@ -404,6 +404,7 @@ type ProductListDbRow = Readonly<{
   region: string;
   search_text: string;
   status: AdminProductListRow["status"];
+  summary_total: string | number;
   summary_approved: string | number;
   summary_dirty_data: string | number;
   summary_ignored: string | number;
@@ -416,6 +417,18 @@ type ProductListDbRow = Readonly<{
   translations: unknown;
   updated_at: Date | string;
   validation_label: string;
+}>;
+
+type ProductListStatsDbRow = Readonly<{
+  total_rows: string | number;
+  summary_total: string | number;
+  summary_approved: string | number;
+  summary_dirty_data: string | number;
+  summary_ignored: string | number;
+  summary_missing_facts: string | number;
+  summary_missing_image: string | number;
+  summary_pending_review: string | number;
+  summary_regulatory_approved: string | number;
 }>;
 
 function cleanListText(value: unknown, max = 200) {
@@ -764,18 +777,37 @@ export async function getAdminProductListData(
             or (${normalized.metric} = 'productsMissingImages' and validation_label = 'Missing Image')
             or (${normalized.metric} = 'productsRegulatoryApproved' and has_regulatory_approval)
           )
+      ),
+      product_summary as (
+        select
+          count(*) as summary_total,
+          count(*) filter (where business_state = 'approved') as summary_approved,
+          count(*) filter (where business_state = 'pending_review') as summary_pending_review,
+          count(*) filter (where business_state = 'ignored') as summary_ignored,
+          count(*) filter (where validation_label = 'Missing Facts') as summary_missing_facts,
+          count(*) filter (where validation_label = 'Missing Image') as summary_missing_image,
+          count(*) filter (where validation_label = 'Dirty Data') as summary_dirty_data,
+          count(*) filter (where has_regulatory_approval) as summary_regulatory_approved
+        from product_list_base
+      ),
+      filtered_count as (
+        select count(*) as total_rows
+        from filtered_products
       )
       select
-        *,
-        count(*) over() as total_rows,
-        count(*) filter (where business_state = 'approved') over() as summary_approved,
-        count(*) filter (where business_state = 'pending_review') over() as summary_pending_review,
-        count(*) filter (where business_state = 'ignored') over() as summary_ignored,
-        count(*) filter (where validation_label = 'Missing Facts') over() as summary_missing_facts,
-        count(*) filter (where validation_label = 'Missing Image') over() as summary_missing_image,
-        count(*) filter (where validation_label = 'Dirty Data') over() as summary_dirty_data,
-        count(*) filter (where has_regulatory_approval) over() as summary_regulatory_approved
+        filtered_products.*,
+        filtered_count.total_rows,
+        product_summary.summary_total,
+        product_summary.summary_approved,
+        product_summary.summary_pending_review,
+        product_summary.summary_ignored,
+        product_summary.summary_missing_facts,
+        product_summary.summary_missing_image,
+        product_summary.summary_dirty_data,
+        product_summary.summary_regulatory_approved
       from filtered_products
+      cross join filtered_count
+      cross join product_summary
       order by updated_at desc, title asc
       limit ${normalized.limit}
       offset ${offset}
@@ -790,8 +822,134 @@ export async function getAdminProductListData(
       order by total desc, label asc
       limit 200
     `;
-    const first = rows[0];
-    const totalRows = numberOrNull(first?.total_rows) ?? 0;
+    let stats: ProductListDbRow | ProductListStatsDbRow | undefined = rows[0];
+
+    if (!stats) {
+      const statsRows = await sql<ProductListStatsDbRow[]>`
+        with product_list_stats_base as (
+          select
+            case
+              when coalesce(products.validation_reasons, '{}'::text[]) && array['missing_image']::text[] then 'Missing Image'
+              when products.label_status <> 'parsed'
+                or coalesce(products.validation_reasons, '{}'::text[]) && array['no_dosed_facts', 'no_canonical_match']::text[] then 'Missing Facts'
+              when coalesce(products.validation_reasons, '{}'::text[]) && array['dirty_name', 'concentration_only', 'source_conflict']::text[] then 'Dirty Data'
+              when products.validation_status = 'pass' then 'Approved'
+              else 'Needs Review'
+            end as validation_label,
+            case
+              when import_review.id is not null then 'pending_review'
+              when products.status = 'approved' and coalesce(products.validation_status, 'failed') <> 'pass' then 'pending_review'
+              when products.status = 'approved' then 'approved'
+              when products.status = 'ignored' then 'ignored'
+              else 'pending_review'
+            end as business_state,
+            coalesce(nullif(lower(trim(products.brand_name)), ''), '__unknown_manufacturer__') as manufacturer_key,
+            product_regulatory_rows.has_regulatory_approval,
+            lower(concat_ws(
+              ' ',
+              products.title,
+              products.brand_name,
+              products.category,
+              products.status,
+              products.label_status,
+              products.product_kind,
+              products.platform,
+              products.region,
+              coalesce(product_translation_rows.search_text, ''),
+              coalesce(fact_rows.search_text, ''),
+              coalesce(identifier_rows.search_text, ''),
+              coalesce(product_regulatory_rows.search_text, '')
+            )) as search_text
+          from public.products
+          left join lateral (
+            select product_imports.id
+            from public.product_imports
+            where product_imports.product_id = products.id
+              and product_imports.status = 'pending_review'
+            order by product_imports.updated_at desc
+            limit 1
+          ) import_review on true
+          left join lateral (
+            select string_agg(concat_ws(' ', product_translations.locale, product_translations.title, product_translations.description), ' ') as search_text
+            from public.product_translations
+            where product_translations.product_id = products.id
+          ) product_translation_rows on true
+          left join lateral (
+            select string_agg(product_facts.name, ' ') as search_text
+            from public.product_facts
+            where product_facts.product_id = products.id
+          ) fact_rows on true
+          left join lateral (
+            select string_agg(concat_ws(' ', product_identifiers.identifier_type, product_identifiers.identifier_value, product_identifiers.normalized_value), ' ') as search_text
+            from public.product_identifiers
+            where product_identifiers.product_id = products.id
+              and product_identifiers.status = 'active'
+          ) identifier_rows on true
+          left join lateral (
+            select
+              bool_or(product_regulatory_approvals.status in ('verified', 'sourced')) as has_regulatory_approval,
+              string_agg(concat_ws(' ', product_regulatory_approvals.agency_code, product_regulatory_approvals.agency_name, product_regulatory_approvals.approval_number), ' ') as search_text
+            from public.product_regulatory_approvals
+            where product_regulatory_approvals.product_id = products.id
+          ) product_regulatory_rows on true
+        ),
+        filtered_products as (
+          select *
+          from product_list_stats_base
+          where (
+            not ${hasSearch}::boolean
+            or not exists (
+              select 1
+              from unnest(${searchTerms}::text[]) as term(value)
+              where position(term.value in product_list_stats_base.search_text) = 0
+            )
+          )
+            and (${normalized.brand} = '' or manufacturer_key = ${normalized.brand})
+            and (
+              ${normalized.metric} = ''
+              or ${normalized.metric} = 'productsTotal'
+              or (${normalized.metric} = 'productsApproved' and business_state = 'approved')
+              or (${normalized.metric} = 'productsPendingReview' and business_state = 'pending_review')
+              or (${normalized.metric} = 'productsIgnored' and business_state = 'ignored')
+              or (${normalized.metric} = 'productsMissingFacts' and validation_label = 'Missing Facts')
+              or (${normalized.metric} = 'productsMissingImages' and validation_label = 'Missing Image')
+              or (${normalized.metric} = 'productsRegulatoryApproved' and has_regulatory_approval)
+            )
+        ),
+        product_summary as (
+          select
+            count(*) as summary_total,
+            count(*) filter (where business_state = 'approved') as summary_approved,
+            count(*) filter (where business_state = 'pending_review') as summary_pending_review,
+            count(*) filter (where business_state = 'ignored') as summary_ignored,
+            count(*) filter (where validation_label = 'Missing Facts') as summary_missing_facts,
+            count(*) filter (where validation_label = 'Missing Image') as summary_missing_image,
+            count(*) filter (where validation_label = 'Dirty Data') as summary_dirty_data,
+            count(*) filter (where has_regulatory_approval) as summary_regulatory_approved
+          from product_list_stats_base
+        ),
+        filtered_count as (
+          select count(*) as total_rows
+          from filtered_products
+        )
+        select
+          filtered_count.total_rows,
+          product_summary.summary_total,
+          product_summary.summary_approved,
+          product_summary.summary_pending_review,
+          product_summary.summary_ignored,
+          product_summary.summary_missing_facts,
+          product_summary.summary_missing_image,
+          product_summary.summary_dirty_data,
+          product_summary.summary_regulatory_approved
+        from filtered_count
+        cross join product_summary
+      `;
+
+      stats = statsRows[0];
+    }
+
+    const totalRows = numberOrNull(stats?.total_rows) ?? 0;
     const pageSize = normalized.limit;
 
     return {
@@ -811,14 +969,14 @@ export async function getAdminProductListData(
       },
       rows: rows.map(productListRowFromDb),
       summary: {
-        approved: numberOrNull(first?.summary_approved) ?? 0,
-        dirtyData: numberOrNull(first?.summary_dirty_data) ?? 0,
-        ignored: numberOrNull(first?.summary_ignored) ?? 0,
-        missingFacts: numberOrNull(first?.summary_missing_facts) ?? 0,
-        missingImage: numberOrNull(first?.summary_missing_image) ?? 0,
-        pendingReview: numberOrNull(first?.summary_pending_review) ?? 0,
-        regulatoryApproved: numberOrNull(first?.summary_regulatory_approved) ?? 0,
-        total: totalRows
+        approved: numberOrNull(stats?.summary_approved) ?? 0,
+        dirtyData: numberOrNull(stats?.summary_dirty_data) ?? 0,
+        ignored: numberOrNull(stats?.summary_ignored) ?? 0,
+        missingFacts: numberOrNull(stats?.summary_missing_facts) ?? 0,
+        missingImage: numberOrNull(stats?.summary_missing_image) ?? 0,
+        pendingReview: numberOrNull(stats?.summary_pending_review) ?? 0,
+        regulatoryApproved: numberOrNull(stats?.summary_regulatory_approved) ?? 0,
+        total: numberOrNull(stats?.summary_total) ?? 0
       },
       totalPages: Math.ceil(totalRows / pageSize),
       totalRows

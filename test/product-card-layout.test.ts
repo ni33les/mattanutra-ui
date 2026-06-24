@@ -86,4 +86,22 @@ describe("product admin card layout", () => {
     assert.match(detailView, /<ProductImageDropzone/);
     assert.match(detailView, /imageCandidates: \[/);
   });
+
+  it("keeps product list metric counts independent from active filters", async () => {
+    const readModel = await readFile("lib/admin-product-read-model.ts", "utf8");
+    const listQuery = readModel.slice(
+      readModel.indexOf("export async function getAdminProductListData"),
+      readModel.indexOf("export async function loadAdminProductRow"),
+    );
+
+    assert.match(listQuery, /product_summary as \(/);
+    assert.match(listQuery, /from product_list_base\s*\)/);
+    assert.match(listQuery, /filtered_count as \(/);
+    assert.match(listQuery, /from filtered_products\s*\)/);
+    assert.match(listQuery, /summary_total/);
+    assert.match(listQuery, /total: numberOrNull\(stats\?\.summary_total\) \?\? 0/);
+    assert.doesNotMatch(listQuery, /summary_approved[\s\S]{0,120}over\(\)/);
+    assert.match(listQuery, /if \(!stats\)/);
+    assert.match(listQuery, /product_list_stats_base as \(/);
+  });
 });
