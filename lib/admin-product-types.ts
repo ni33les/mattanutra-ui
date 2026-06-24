@@ -43,8 +43,7 @@ const productStatuses = new Set<ProductStatus>([
 const productPlatforms = new Set<ProductPlatform>([
   "lazada",
   "manual",
-  "shopee",
-  "wholesale_pharmacy_import"
+  "shopee"
 ]);
 const productLabelStatuses = new Set<ProductLabelStatus>([
   "failed",
