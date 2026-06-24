@@ -40,7 +40,12 @@ const productStatuses = new Set<ProductStatus>([
   "ignored",
   "pending_review"
 ]);
-const productPlatforms = new Set<ProductPlatform>(["lazada", "manual", "shopee"]);
+const productPlatforms = new Set<ProductPlatform>([
+  "lazada",
+  "manual",
+  "shopee",
+  "wholesale_pharmacy_import"
+]);
 const productLabelStatuses = new Set<ProductLabelStatus>([
   "failed",
   "missing",
@@ -142,9 +147,51 @@ export type AdminProductRow = Readonly<{
     importStatus: string | null;
     sourceUrl: string | null;
   };
+  sourceSnapshot: unknown;
   title: string;
   translations: Record<string, AdminProductTranslation>;
   updatedAt: string;
+}>;
+
+export type AdminProductDetailRow = Omit<AdminProductRow, "sourceSnapshot"> &
+  Readonly<{
+    imageCandidates: string[];
+  }>;
+
+export type AdminProductListFact = Readonly<{
+  amount: number | null;
+  id: string;
+  name: string;
+  unit: string | null;
+}>;
+
+export type AdminProductListRow = Readonly<{
+  availableCountryCodes: ProductCountryCode[];
+  brandName: string | null;
+  countryPricing: ProductCountryPricing[];
+  description: string | null;
+  displayDescription: string | null;
+  displayTitle: string;
+  facts: AdminProductListFact[];
+  id: string;
+  imageUrl: string | null;
+  importReviewTaskId: string | null;
+  labelStatus: ProductLabelStatus;
+  platform: ProductPlatform;
+  productAudience: ProductAudience;
+  productKind: ProductKind;
+  productUrl: string;
+  recommendationHistory: {
+    averageProductCoveragePercent: number | null;
+    chosenCount: number;
+  };
+  region: string;
+  regulatoryApprovals: ProductRegulatoryApproval[];
+  searchText: string;
+  status: ProductStatus;
+  title: string;
+  translations: Record<string, AdminProductTranslation>;
+  validationLabel: string;
 }>;
 
 export type AdminProductMergeOption = Readonly<{
@@ -171,11 +218,49 @@ export type AdminProductsData = Readonly<{
   };
 }>;
 
+export type AdminProductListQuery = Readonly<{
+  brand?: string | null;
+  limit?: number;
+  metric?: string | null;
+  page?: number;
+  search?: string | null;
+}>;
+
+export type AdminProductListData = Readonly<{
+  databaseAvailable: boolean;
+  generatedAt: string;
+  page: number;
+  pageSize: number;
+  query: {
+    brand: string;
+    metric: string;
+    search: string;
+  };
+  rows: AdminProductListRow[];
+  summary: {
+    approved: number;
+    dirtyData: number;
+    ignored: number;
+    missingFacts: number;
+    missingImage: number;
+    pendingReview: number;
+    regulatoryApproved: number;
+    total: number;
+  };
+  totalRows: number;
+  totalPages: number;
+  manufacturerOptions: Array<{
+    key: string;
+    label: string;
+    total: number;
+  }>;
+}>;
+
 export type AdminProductDetailData = Readonly<{
   databaseAvailable: boolean;
   generatedAt: string;
   mergeOptions: AdminProductMergeOption[];
-  row: AdminProductRow;
+  row: AdminProductDetailRow;
 }>;
 
 export type ProductImportRunRow = Readonly<{
@@ -366,6 +451,39 @@ export function emptyAdminProductsData(): AdminProductsData {
   };
 }
 
+export function emptyAdminProductListData(
+  query: AdminProductListQuery = {}
+): AdminProductListData {
+  const page = Math.max(1, Math.floor(Number(query.page ?? 1)) || 1);
+  const pageSize = Math.max(1, Math.floor(Number(query.limit ?? 48)) || 48);
+
+  return {
+    databaseAvailable: false,
+    generatedAt: new Date().toISOString(),
+    manufacturerOptions: [],
+    page,
+    pageSize,
+    query: {
+      brand: typeof query.brand === "string" ? query.brand : "",
+      metric: typeof query.metric === "string" ? query.metric : "",
+      search: typeof query.search === "string" ? query.search : ""
+    },
+    rows: [],
+    summary: {
+      approved: 0,
+      dirtyData: 0,
+      ignored: 0,
+      missingFacts: 0,
+      missingImage: 0,
+      pendingReview: 0,
+      regulatoryApproved: 0,
+      total: 0
+    },
+    totalPages: 0,
+    totalRows: 0
+  };
+}
+
 // Internal DB row shapes (moved from god file as part of the split)
 export type ProductDbRow = Readonly<{
   availability_status: ProductAvailabilityStatus;
@@ -389,6 +507,7 @@ export type ProductDbRow = Readonly<{
   identifiers: unknown;
   import_duplicate_product_ids: string[] | null;
   import_id: string | null;
+  import_image_urls: string[] | null;
   import_review_task_id: string | null;
   import_status: string | null;
   label_status: ProductLabelStatus;

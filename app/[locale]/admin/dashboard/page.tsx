@@ -163,6 +163,28 @@ export default async function LocalizedAdminDashboardPage({
   const range = normalizeAdminDashboardRange(query.range);
   const rawView = firstParam(query.view);
   const view = isAdminDashboardView(rawView) ? rawView : "glance";
+
+  if (view === "products") {
+    const productParams = new URLSearchParams();
+
+    Object.entries(query).forEach(([key, value]) => {
+      if (key === "view") {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        value.forEach((item) => productParams.append(key, item));
+        return;
+      }
+
+      if (value !== undefined) {
+        productParams.set(key, value);
+      }
+    });
+
+    redirect(`/${locale}/admin/products${productParams.size > 0 ? `?${productParams.toString()}` : ""}`);
+  }
+
   const filters = normalizeAdminDashboardFilters(query);
   const selectedReviewTaskId = firstParam(query.review);
   const selectedTaskId = firstParam(query.task);
@@ -276,8 +298,6 @@ export default async function LocalizedAdminDashboardPage({
     foodsData = await getAdminFoodsData();
   } else if (view === "leads") {
     leadsData = await getAdminLeadsData(range, filters);
-  } else if (view === "products") {
-    productsData = await getAdminProductsData(range);
   } else if (
     view === "stock" ||
     view === "retail-audit" ||

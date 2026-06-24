@@ -47,6 +47,7 @@ export {
   preferredProductTitle
 } from "./admin-product-helpers.ts";
 export {
+  emptyAdminProductListData,
   emptyAdminProductsData,
   isProductAudience,
   isProductAvailabilityStatus,
@@ -57,6 +58,10 @@ export {
 export type {
   AdminProductFact,
   AdminProductDetailData,
+  AdminProductDetailRow,
+  AdminProductListData,
+  AdminProductListQuery,
+  AdminProductListRow,
   AdminProductMergeOption,
   AdminProductRow,
   AdminProductShopAvailability,
@@ -96,6 +101,7 @@ export {
 
 export {
   getAdminProductDetailData,
+  getAdminProductListData,
   getAdminProductsData,
   loadAdminProductRow,
   loadAdminProductRowsForBrand,

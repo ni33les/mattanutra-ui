@@ -954,11 +954,21 @@ export async function getSupplementSelectionStatsBySupplement(
 }
 
 export async function getProductDecisionStatsByProduct(
-  range: AdminDashboardRange
+  range: AdminDashboardRange,
+  options: Readonly<{ productIds?: readonly string[] }> = {}
 ) {
   const sql = getSql();
 
   if (!sql) {
+    return new Map<string, AdminProductDecisionStats>();
+  }
+
+  const productIds = [...new Set((options.productIds ?? []).filter((id) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+  ))];
+  const restrictProducts = options.productIds !== undefined;
+
+  if (restrictProducts && productIds.length < 1) {
     return new Map<string, AdminProductDecisionStats>();
   }
 
@@ -1000,6 +1010,10 @@ export async function getProductDecisionStatsByProduct(
     where product_recommendation_decisions.is_current = true
       and assessments.selected_plan is not null
       and (${start}::timestamptz is null or product_recommendation_decisions.generated_at >= ${start})
+      and (
+        not ${restrictProducts}::boolean
+        or product_recommendation_decisions.product_id = any(${productIds}::uuid[])
+      )
     group by product_recommendation_decisions.product_id
   `;
   const servingRows = await sql<Array<{
@@ -1018,6 +1032,10 @@ export async function getProductDecisionStatsByProduct(
       and product_recommendation_decisions.outcome = 'chosen'
       and assessments.selected_plan is not null
       and (${start}::timestamptz is null or product_recommendation_decisions.generated_at >= ${start})
+      and (
+        not ${restrictProducts}::boolean
+        or product_recommendation_decisions.product_id = any(${productIds}::uuid[])
+      )
     group by
       product_recommendation_decisions.product_id,
       product_recommendation_decisions.serving_multiplier
@@ -1039,6 +1057,10 @@ export async function getProductDecisionStatsByProduct(
       and product_recommendation_decisions.outcome = 'rejected'
       and assessments.selected_plan is not null
       and (${start}::timestamptz is null or product_recommendation_decisions.generated_at >= ${start})
+      and (
+        not ${restrictProducts}::boolean
+        or product_recommendation_decisions.product_id = any(${productIds}::uuid[])
+      )
     group by
       product_recommendation_decisions.product_id,
       product_recommendation_decisions.reason

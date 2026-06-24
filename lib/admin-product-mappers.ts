@@ -2,6 +2,7 @@ import type {
   AdminProductFact,
   AdminProductTranslation,
   AdminProductTranslationStatus,
+  AdminProductDetailRow,
   AdminProductRow,
   ProductValidationCacheStatus
 } from "./admin-product-types.ts";
@@ -286,6 +287,68 @@ function normalizeTranslations(row: ProductDbRow) {
   return translations;
 }
 
+function textArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function validImageCandidate(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("http://")
+  ) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+function imageCandidatesFromSnapshot(value: unknown) {
+  const snapshot = value && typeof value === "object"
+    ? value as Record<string, unknown>
+    : {};
+  const candidates: string[] = [];
+
+  for (const key of ["imageUrls", "labelImageUrls", "images"]) {
+    candidates.push(...textArray(snapshot[key]));
+  }
+
+  for (const item of Array.isArray(snapshot.productImageMirrors)
+    ? snapshot.productImageMirrors
+    : []) {
+    const record = item && typeof item === "object"
+      ? item as Record<string, unknown>
+      : {};
+
+    candidates.push(...[
+      record.url,
+      record.originalUrl
+    ].flatMap((candidate) => typeof candidate === "string" ? [candidate] : []));
+  }
+
+  return candidates;
+}
+
+export function imageCandidatesFromProductRow(row: ProductDbRow) {
+  const candidates = [
+    row.image_url,
+    ...textArray(row.import_image_urls),
+    ...imageCandidatesFromSnapshot(row.source_snapshot)
+  ]
+    .map(validImageCandidate)
+    .filter((candidate): candidate is string => Boolean(candidate));
+
+  return [...new Set(candidates)].slice(0, 12);
+}
+
 export function rowFromDb(
   row: ProductDbRow,
   decisionStats?: AdminProductDecisionStats
@@ -436,8 +499,24 @@ export function rowFromDb(
       importStatus: row.import_status,
       sourceUrl: row.source_url ?? row.product_url
     },
+    sourceSnapshot: row.source_snapshot,
     title: row.title,
     translations,
     updatedAt: new Date(row.updated_at).toISOString()
+  };
+}
+
+export function detailRowFromDb(
+  row: ProductDbRow,
+  decisionStats?: AdminProductDecisionStats
+): AdminProductDetailRow {
+  const fullRow = rowFromDb(row, decisionStats);
+  const { sourceSnapshot, ...detailRow } = fullRow;
+
+  void sourceSnapshot;
+
+  return {
+    ...detailRow,
+    imageCandidates: imageCandidatesFromProductRow(row)
   };
 }

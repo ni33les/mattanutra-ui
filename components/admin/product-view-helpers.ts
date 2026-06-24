@@ -1,4 +1,8 @@
-import type { AdminProductRow } from "@/lib/admin-products";
+import type {
+  AdminProductDetailRow,
+  AdminProductListRow,
+  AdminProductRow
+} from "@/lib/admin-products";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCode,
@@ -38,6 +42,12 @@ export type ProductMetricFilter =
   | "productsMissingImages"
   | "productsPendingReview"
   | "productsTotal";
+
+export type ProductCardRow =
+  | AdminProductDetailRow
+  | AdminProductListRow
+  | AdminProductRow;
+type ProductEditableRow = AdminProductRow | AdminProductDetailRow;
 
 export function productMetricForBusinessState(
   state: ProductBusinessState | "",
@@ -148,6 +158,9 @@ export const productViewLabels = {
     increaseLimit: "Increase limit",
     ingredient: "Ingredient",
     mattaNutraSku: "MattaNutra SKU",
+    imageCandidates: "Image candidates",
+    imageDropHint: "Drop image URL or choose a candidate",
+    imageFileDropUnsupported: "File upload is not available yet. Drop an image URL.",
     imageUrl: "Image URL",
     manufacturerCountries: "Manufacturer countries",
     manufacturerSku: "Manufacturer SKU",
@@ -258,6 +271,9 @@ export const productViewLabels = {
     increaseLimit: "เพิ่มขีดจำกัด",
     ingredient: "ส่วนผสม",
     mattaNutraSku: "MattaNutra SKU",
+    imageCandidates: "ตัวเลือกรูปภาพ",
+    imageDropHint: "วาง URL รูปภาพ หรือเลือกตัวเลือก",
+    imageFileDropUnsupported: "ยังไม่รองรับการอัปโหลดไฟล์ ให้วาง URL รูปภาพแทน",
     imageUrl: "URL รูปภาพ",
     manufacturerCountries: "ประเทศผู้ผลิต",
     manufacturerSku: "SKU ผู้ผลิต",
@@ -367,6 +383,9 @@ export const productViewLabels = {
     increaseLimit: "提高上限",
     ingredient: "成分",
     mattaNutraSku: "MattaNutra SKU",
+    imageCandidates: "图片候选",
+    imageDropHint: "拖放图片 URL 或选择候选图片",
+    imageFileDropUnsupported: "暂不支持文件上传。请拖放图片 URL。",
     imageUrl: "图片 URL",
     manufacturerCountries: "制造商国家",
     manufacturerSku: "制造商 SKU",
@@ -437,7 +456,7 @@ export function productStatusLabel(status: string, locale: Locale) {
 }
 
 export function productBusinessState(
-  productOrStatus: AdminProductRow | AdminProductRow["status"],
+  productOrStatus: ProductCardRow | AdminProductRow["status"],
 ): ProductBusinessState {
   if (typeof productOrStatus !== "string") {
     if (productOrStatus.importReviewTaskId) {
@@ -487,13 +506,14 @@ export function productBusinessStateClass(state: ProductBusinessState) {
   return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
-export function productDecisionSummary(row: AdminProductRow, locale: Locale) {
+export function productDecisionSummary(row: ProductCardRow, locale: Locale) {
   const formatter = new Intl.NumberFormat(
     locale === "th" ? "th-TH" : locale === "zh-CN" ? "zh-CN" : "en",
   );
+  const decisionStats = "decisionStats" in row ? row.decisionStats : undefined;
   const chosen =
-    row.decisionStats?.chosenPlanCount ?? row.recommendationHistory.chosenCount;
-  const nearMisses = row.decisionStats?.nearMissCount ?? 0;
+    decisionStats?.chosenPlanCount ?? row.recommendationHistory.chosenCount;
+  const nearMisses = decisionStats?.nearMissCount ?? 0;
 
   const formattedChosen = formatter.format(chosen);
   const formattedNearMisses = formatter.format(nearMisses);
@@ -509,7 +529,7 @@ export function productDecisionSummary(row: AdminProductRow, locale: Locale) {
 }
 
 export function productMatchesMetricFilter(
-  row: AdminProductRow,
+  row: ProductCardRow,
   metric: ProductMetricFilter,
 ) {
   if (metric === "productsApproved") {
@@ -563,17 +583,17 @@ type ProductSummaryCounts = {
   total: number;
 };
 
-function hasEffectiveRegulatoryApproval(row: AdminProductRow) {
+function hasEffectiveRegulatoryApproval(row: ProductCardRow) {
   return (row.regulatoryApprovals ?? []).some((approval) =>
     approval.status === "verified" || approval.status === "sourced"
   );
 }
 
-export function productManufacturerLabel(row: AdminProductRow) {
+export function productManufacturerLabel(row: ProductCardRow) {
   return row.brandName?.trim() || unknownProductManufacturerLabel;
 }
 
-export function productManufacturerKey(row: AdminProductRow) {
+export function productManufacturerKey(row: ProductCardRow) {
   const label = productManufacturerLabel(row);
 
   return label === unknownProductManufacturerLabel
@@ -597,7 +617,7 @@ export function productManufacturerKeyFromMetricId(id: string) {
   }
 }
 
-export function productManufacturerStats(rows: readonly AdminProductRow[]) {
+export function productManufacturerStats(rows: readonly ProductCardRow[]) {
   const stats = new Map<string, ProductManufacturerStat>();
 
   for (const row of rows) {
@@ -626,7 +646,7 @@ export function productManufacturerStats(rows: readonly AdminProductRow[]) {
 }
 
 export function productSummaryCounts(
-  rows: readonly AdminProductRow[],
+  rows: readonly ProductCardRow[],
 ): ProductSummaryCounts {
   return rows.reduce(
     (counts, row) => {
@@ -662,7 +682,7 @@ export function productMetricCards({
   viewLabels,
 }: Readonly<{
   locale: Locale;
-  rows: readonly AdminProductRow[];
+  rows: readonly ProductCardRow[];
   viewLabels: (typeof productViewLabels)[Locale];
 }>): BusinessMetric[] {
   const summary = productSummaryCounts(rows);
@@ -720,7 +740,69 @@ export function productMetricCards({
   ];
 }
 
-export function productFactPayloads(row: AdminProductRow) {
+export function productMetricCardsFromSummary({
+  locale,
+  summary,
+  viewLabels,
+}: Readonly<{
+  locale: Locale;
+  summary: ProductSummaryCounts;
+  viewLabels: (typeof productViewLabels)[Locale];
+}>): BusinessMetric[] {
+  return [
+    safetyMetric({
+      color: businessMetricColors.total,
+      id: "productsTotal",
+      label: viewLabels.products,
+      locale,
+      value: summary.total,
+    }),
+    safetyMetric({
+      color: businessMetricColors.succeeded,
+      id: "productsApproved",
+      label: viewLabels.approved,
+      locale,
+      value: summary.approved,
+    }),
+    safetyMetric({
+      color: businessMetricColors.pendingReviews,
+      id: "productsPendingReview",
+      label: viewLabels.pendingReview,
+      locale,
+      value: summary.pendingReview,
+    }),
+    safetyMetric({
+      color: businessMetricColors.offline,
+      id: "productsIgnored",
+      label: viewLabels.ignored,
+      locale,
+      value: summary.ignored,
+    }),
+    safetyMetric({
+      color: businessMetricColors.failed,
+      id: "productsMissingFacts",
+      label: viewLabels.missingFacts,
+      locale,
+      value: summary.missingFacts,
+    }),
+    safetyMetric({
+      color: businessMetricColors.medium,
+      id: "productsMissingImages",
+      label: viewLabels.missingImages,
+      locale,
+      value: summary.missingImage,
+    }),
+    safetyMetric({
+      color: businessMetricColors.active,
+      id: "productsRegulatoryApproved",
+      label: viewLabels.regulatoryApproved,
+      locale,
+      value: summary.regulatoryApproved,
+    }),
+  ];
+}
+
+export function productFactPayloads(row: ProductEditableRow) {
   return row.facts.map((fact) => ({
     amount: fact.amount,
     confidence: fact.confidence,
@@ -911,7 +993,9 @@ export function productLocaleMeta(locale: string) {
   );
 }
 
-export function productTranslationLocales(row: AdminProductRow) {
+export function productTranslationLocales(
+  row: Pick<ProductCardRow, "translations">
+) {
   const registeredCodes = new Set<string>(
     siteLocaleRegistry.map((item) => item.code),
   );
@@ -924,7 +1008,10 @@ export function productTranslationLocales(row: AdminProductRow) {
   );
 }
 
-export function productTranslationFor(row: AdminProductRow, locale: string) {
+export function productTranslationFor(
+  row: Pick<ProductCardRow, "description" | "title" | "translations">,
+  locale: string
+) {
   return (
     row.translations?.[locale] ?? {
       description: locale === "en" ? row.description : null,

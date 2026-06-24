@@ -62,6 +62,10 @@ const adminProductDetailRoute = readFileSync(
   new URL("../app/[locale]/admin/products/[productId]/page.tsx", import.meta.url),
   "utf8"
 );
+const adminProductListRoute = readFileSync(
+  new URL("../app/[locale]/admin/products/page.tsx", import.meta.url),
+  "utf8"
+);
 const adminProductUpdateRoute = readFileSync(
   new URL("../app/api/admin/products/[id]/route.ts", import.meta.url),
   "utf8"
@@ -858,14 +862,17 @@ describe("codebase cleanup guardrails", () => {
   });
 
   it("keeps product admin editing on a detail page instead of the old modal", () => {
-    assert.match(adminProductDetailRoute, /AdminDashboard/);
-    assert.match(adminProductDetailRoute, /productDetailId=\{productId\}/);
+    assert.match(adminProductDetailRoute, /ProductAdminShell/);
+    assert.doesNotMatch(adminProductDetailRoute, /from "@\/components\/admin-dashboard"|<AdminDashboard/);
+    assert.match(adminProductDetailRoute, /AdminProductDetailView/);
     assert.match(adminProductDetailRoute, /\bgetAdminProductDetailData\b/);
     assert.doesNotMatch(adminProductDetailRoute, /\bgetAdminProductsData\b/);
-    assert.match(adminProductDetailRoute, /productDetailData=\{productDetailData\}/);
+    assert.match(adminProductListRoute, /\bgetAdminProductListData\b/);
+    assert.match(adminProductListRoute, /AdminProductListView/);
     assert.match(adminProductView, /\/admin\/products\/\$\{row\.id\}/);
     assert.match(adminProductView, /\bfunction normalizeProductDetailRow\b/);
     assert.match(adminProductView, /\bAdminProductDetailData\b/);
+    assert.match(adminProductView, /\bAdminProductListData\b/);
     assert.match(adminProductView, /\bmergeOptions\b/);
     assert.match(adminProductView, /validationCacheStaleReasons: safeArray/);
     assert.doesNotMatch(adminProductView, /sourceProductFdaNumbersFromEvidence/);
@@ -895,6 +902,17 @@ describe("codebase cleanup guardrails", () => {
     assert.doesNotMatch(adminProductView, /draft\.fdaApprovalNumber/);
     assert.doesNotMatch(adminProductView, /\bProductOffersEditor\b/);
     assert.doesNotMatch(adminProductView, /\bAdminModal\b/);
+  });
+
+  it("keeps product list payloads lightweight for the admin grid", () => {
+    const productListHelper = adminProductReadModel.match(
+      /export async function getAdminProductListData[\s\S]*?^}/m
+    )?.[0] ?? "";
+
+    assert.match(adminProductReadModel, /\bAdminProductListRow\b/);
+    assert.match(productListHelper, /limit \$\{normalized\.limit\}/);
+    assert.doesNotMatch(productListHelper, /source_snapshot/);
+    assert.match(adminProductUpdateRoute, /\bproductResponseRow\b/);
   });
 
   it("keeps product detail and brand refreshes off full catalogue reads", () => {

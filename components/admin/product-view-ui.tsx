@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { AdminProductRow } from "@/lib/admin-products";
+import type {
+  AdminProductDetailRow,
+  AdminProductRow
+} from "@/lib/admin-products";
 import {
   adminLocalizedFallbackLabel,
   adminLocalizedProductText,
@@ -38,6 +41,7 @@ import {
   productTranslationLocales,
   productTranslationStatusClass,
   productTranslationStatusLabel,
+  type ProductCardRow,
 } from "@/components/admin/product-view-helpers";
 
 function regulatoryApprovalSummary(
@@ -133,6 +137,154 @@ export function ProductImagePreview({
       src={row.imageUrl}
       width={size === "lg" ? 96 : 80}
     />
+  );
+}
+
+function droppedImageUrl(dataTransfer: DataTransfer) {
+  const uriList = dataTransfer
+    .getData("text/uri-list")
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("#"));
+  const plainText = dataTransfer.getData("text/plain").trim();
+  const value = uriList || plainText;
+
+  if (!value) {
+    return null;
+  }
+
+  if (
+    value.startsWith("/") ||
+    value.startsWith("https://") ||
+    value.startsWith("http://")
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+export function ProductImageDropzone({
+  onImageUrlChange,
+  row,
+  viewLabels,
+}: Readonly<{
+  onImageUrlChange: (imageUrl: string | null) => void;
+  row: Pick<
+    AdminProductRow,
+    "brandName" | "imageUrl" | "platform" | "title"
+  > & {
+    imageCandidates?: readonly string[];
+  };
+  viewLabels: Readonly<Record<string, string>>;
+}>) {
+  const [dragging, setDragging] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
+  const imageCandidates = [...new Set(row.imageCandidates ?? [])].filter(
+    (url) => url && url !== row.imageUrl
+  );
+
+  return (
+    <div className="grid gap-3 text-sm font-medium text-gray-700">
+      <span>{viewLabels.imageUrl}</span>
+      <div
+        className={classNames(
+          "grid gap-3 rounded-xl border border-dashed bg-white p-3 transition sm:grid-cols-[auto_minmax(0,1fr)]",
+          dragging
+            ? "border-[#1FA77A] bg-emerald-50/60"
+            : "border-gray-200"
+        )}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setDragging(false);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+
+          if (event.dataTransfer.files.length > 0) {
+            setDropError(viewLabels.imageFileDropUnsupported);
+            return;
+          }
+
+          const imageUrl = droppedImageUrl(event.dataTransfer);
+
+          if (!imageUrl) {
+            setDropError(viewLabels.imageDropHint);
+            return;
+          }
+
+          setDropError(null);
+          onImageUrlChange(imageUrl);
+        }}
+      >
+        <ProductImagePreview alt="" row={row} size="lg" />
+        <div className="min-w-0">
+          <input
+            className="block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            onChange={(event) =>
+              onImageUrlChange(event.target.value.trim() || null)
+            }
+            placeholder={viewLabels.imageDropHint}
+            type="url"
+            value={row.imageUrl ?? ""}
+          />
+          {dropError ? (
+            <p className="mt-2 text-xs font-medium text-amber-700">
+              {dropError}
+            </p>
+          ) : null}
+          {imageCandidates.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                {viewLabels.imageCandidates}
+              </p>
+              <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                {imageCandidates.map((imageUrl) => (
+                  <button
+                    className="rounded-lg ring-1 ring-gray-200 transition hover:ring-[#1FA77A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+                    draggable={true}
+                    key={imageUrl}
+                    onClick={() => {
+                      setDropError(null);
+                      onImageUrlChange(imageUrl);
+                    }}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData("text/uri-list", imageUrl);
+                      event.dataTransfer.setData("text/plain", imageUrl);
+                      event.dataTransfer.effectAllowed = "copy";
+                    }}
+                    title={imageUrl}
+                    type="button"
+                  >
+                    <SafeImage
+                      alt=""
+                      className="size-14 rounded-lg object-cover"
+                      fallback={
+                        <div className="flex size-14 items-center justify-center rounded-lg bg-gray-50 text-[10px] font-semibold text-gray-400">
+                          Image
+                        </div>
+                      }
+                      height={56}
+                      src={imageUrl}
+                      width={56}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -594,7 +746,10 @@ export function ProductCountryManager({
 
 type ProductIdentifierType = AdminProductRow["identifiers"][number]["type"];
 
-function identifierValue(row: AdminProductRow, type: ProductIdentifierType) {
+function identifierValue(
+  row: Pick<AdminProductDetailRow, "identifiers">,
+  type: ProductIdentifierType
+) {
   const identifiers = Array.isArray(row.identifiers) ? row.identifiers : [];
 
   return (
@@ -623,8 +778,8 @@ export function ProductIdentifiersEditor({
   setDraft,
   viewLabels,
 }: Readonly<{
-  draft: AdminProductRow;
-  setDraft: (row: AdminProductRow) => void;
+  draft: AdminProductDetailRow;
+  setDraft: (row: AdminProductDetailRow) => void;
   viewLabels: Readonly<Record<string, string>>;
 }>) {
   const identifiers = Array.isArray(draft.identifiers) ? draft.identifiers : [];
@@ -777,14 +932,15 @@ export function ProductCard({
   href?: string;
   locale: Locale;
   onSelect?: () => void;
-  row: AdminProductRow;
+  row: ProductCardRow;
   viewLabels: Readonly<Record<string, string>>;
 }>) {
   const localized = adminLocalizedProductText(row, locale);
   const fallbackLabel = adminLocalizedFallbackLabel(localized.title, locale);
   const state = productBusinessState(row);
+  const decisionStats = "decisionStats" in row ? row.decisionStats : undefined;
   const coveragePercent =
-    row.decisionStats?.averageProductCoveragePercent ??
+    decisionStats?.averageProductCoveragePercent ??
     row.recommendationHistory.averageProductCoveragePercent;
   const readyCountryPrice = row.countryPricing.find(
     (item) => item.rrpPriceAmount !== null && item.rrpPriceAmount > 0,
@@ -971,16 +1127,16 @@ export function ProductFactsEditor({
   setDraft,
   viewLabels,
 }: Readonly<{
-  draft: AdminProductRow;
+  draft: AdminProductDetailRow;
   onIncreaseSafetyLimit: (
-    row: AdminProductRow,
+    row: AdminProductDetailRow,
     factId: string,
   ) => Promise<boolean>;
   saving: boolean;
-  setDraft: (row: AdminProductRow) => void;
+  setDraft: (row: AdminProductDetailRow) => void;
   viewLabels: Readonly<Record<string, string>>;
 }>) {
-  type ProductFact = AdminProductRow["facts"][number];
+  type ProductFact = AdminProductDetailRow["facts"][number];
 
   function updateFact(index: number, patch: Partial<ProductFact>) {
     setDraft({
@@ -1185,9 +1341,9 @@ export function ProductTranslationEditor({
   setDraft,
   viewLabels,
 }: Readonly<{
-  draft: AdminProductRow;
+  draft: AdminProductDetailRow;
   locale: Locale;
-  setDraft: (row: AdminProductRow) => void;
+  setDraft: (row: AdminProductDetailRow) => void;
   viewLabels: Readonly<Record<string, string>>;
 }>) {
   const [selectedTranslationLocale, setSelectedTranslationLocale] =
@@ -1233,7 +1389,7 @@ export function ProductTranslationEditor({
         title: nextTranslation.title?.trim() || null,
       },
     };
-    const nextDraft: AdminProductRow = {
+    const nextDraft: AdminProductDetailRow = {
       ...draft,
       translations,
       ...(locale === "en"

@@ -151,6 +151,14 @@ function factsFromBody(value: unknown) {
     .filter((item) => item.name);
 }
 
+function productResponseRow<T extends { sourceSnapshot?: unknown }>(row: T) {
+  const { sourceSnapshot, ...responseRow } = row;
+
+  void sourceSnapshot;
+
+  return responseRow;
+}
+
 export async function PATCH(
   request: Request,
   { params }: AdminProductRouteProps
@@ -256,8 +264,8 @@ export async function PATCH(
 
     return NextResponse.json(
       {
-        row,
-        rows,
+        row: productResponseRow(row),
+        rows: rows.map(productResponseRow),
         ...(translationRequest.warnings.length > 0
           ? { warnings: translationRequest.warnings }
           : {})

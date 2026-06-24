@@ -67,4 +67,23 @@ describe("product admin card layout", () => {
       /row\.brandName,[\s\S]*regulatoryApprovalSummary\(row\.regulatoryApprovals\)[\s\S]*viewLabels\.markets/,
     );
   });
+
+  it("keeps product image drag-and-drop URL based for v1", async () => {
+    const view = await readFile("components/admin/product-view-ui.tsx", "utf8");
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const dropzone = view.slice(
+      view.indexOf("export function ProductImageDropzone"),
+      view.indexOf("type ProductCountryApprovalPatch"),
+    );
+
+    assert.match(view, /getData\("text\/uri-list"\)/);
+    assert.match(view, /getData\("text\/plain"\)/);
+    assert.match(dropzone, /event\.dataTransfer\.files\.length > 0/);
+    assert.match(dropzone, /viewLabels\.imageFileDropUnsupported/);
+    assert.match(dropzone, /draggable=\{true\}/);
+    assert.match(dropzone, /event\.dataTransfer\.setData\("text\/uri-list", imageUrl\)/);
+    assert.match(dropzone, /viewLabels\.imageCandidates/);
+    assert.match(detailView, /<ProductImageDropzone/);
+    assert.match(detailView, /imageCandidates: \[/);
+  });
 });

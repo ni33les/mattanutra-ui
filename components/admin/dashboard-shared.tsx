@@ -65,6 +65,16 @@ export function adminHref(
     taskId?: string | null;
   }>
 ) {
+  if (view === "products") {
+    const productParams = new URLSearchParams();
+
+    if (accessToken) {
+      productParams.set("access_token", accessToken);
+    }
+
+    return `/${locale}/admin/products${productParams.size > 0 ? `?${productParams.toString()}` : ""}`;
+  }
+
   const params = new URLSearchParams({
     range,
     view

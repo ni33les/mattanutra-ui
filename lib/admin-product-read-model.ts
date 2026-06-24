@@ -1,17 +1,36 @@
 import {
+  emptyAdminProductListData,
   emptyAdminProductsData,
   type AdminProductDetailData,
+  type AdminProductListData,
+  type AdminProductListQuery,
+  type AdminProductListRow,
   type AdminProductMergeOption,
   type AdminProductsData,
   type AdminProductRow,
   type AdminProductTranslation
 } from "./admin-product-types.ts";
-import { rowFromDb } from "./admin-product-mappers.ts";
-import { isUuidValue } from "./admin-product-helpers.ts";
+import { detailRowFromDb, rowFromDb } from "./admin-product-mappers.ts";
+import {
+  arrayPayload,
+  isUuidValue,
+  isoOrNull,
+  numberOrNull,
+  productCountryCodesFromDb
+} from "./admin-product-helpers.ts";
 import { getSql } from "@/lib/db";
 import type { ProductDbRow } from "./admin-product-types.ts";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import { getProductDecisionStatsByProduct } from "@/lib/admin-recommendation-insights";
+import {
+  normalizeCurrencyCode,
+  normalizeProductCountryCode,
+  type ProductCountryPricing
+} from "@/lib/product-countries";
+import {
+  effectiveRegulatoryApprovalsForCountry,
+  productRegulatoryApprovalsFromPayload
+} from "@/lib/product-regulatory-approvals";
 
 // Read model helpers and queries extracted as part of Sprint 2 refactor.
 
@@ -61,6 +80,7 @@ export async function loadProductRows(
       products.updated_at,
       import_review.id::text as import_id,
       import_review.status as import_status,
+      import_review.image_urls as import_image_urls,
       import_review.review_task_id::text as import_review_task_id,
       import_review.duplicate_product_ids::text[] as import_duplicate_product_ids,
 	      product_brands.id::text as brand_id,
@@ -103,6 +123,7 @@ export async function loadProductRows(
       select
         product_imports.id,
         product_imports.status,
+        product_imports.image_urls,
         product_imports.review_task_id,
         product_imports.duplicate_product_ids
       from public.product_imports
@@ -360,6 +381,454 @@ export function summaryFromRows(rows: AdminProductRow[]) {
   );
 }
 
+type ProductListDbRow = Readonly<{
+  available_country_codes: string[] | null;
+  brand_name: string | null;
+  country_pricing: unknown;
+  description: string | null;
+  display_description: string | null;
+  display_title: string | null;
+  facts: unknown;
+  has_regulatory_approval: boolean;
+  history_average_product_coverage_percent: string | number | null;
+  history_chosen_count: string | number | null;
+  id: string;
+  image_url: string | null;
+  import_review_task_id: string | null;
+  label_status: AdminProductListRow["labelStatus"];
+  platform: AdminProductListRow["platform"];
+  product_audience: AdminProductListRow["productAudience"] | null;
+  product_kind: AdminProductListRow["productKind"];
+  product_url: string;
+  regulatory_approvals: unknown;
+  region: string;
+  search_text: string;
+  status: AdminProductListRow["status"];
+  summary_approved: string | number;
+  summary_dirty_data: string | number;
+  summary_ignored: string | number;
+  summary_missing_facts: string | number;
+  summary_missing_image: string | number;
+  summary_pending_review: string | number;
+  summary_regulatory_approved: string | number;
+  title: string;
+  total_rows: string | number;
+  translations: unknown;
+  updated_at: Date | string;
+  validation_label: string;
+}>;
+
+function cleanListText(value: unknown, max = 200) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function productListSearchTerms(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(" ")
+    .map((term) => term.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizeProductListQuery(
+  query: AdminProductListQuery
+): Required<Pick<AdminProductListQuery, "limit" | "page">> & {
+  brand: string;
+  metric: string;
+  search: string;
+} {
+  const page = Math.max(1, Math.floor(Number(query.page ?? 1)) || 1);
+  const limit = Math.min(
+    96,
+    Math.max(12, Math.floor(Number(query.limit ?? 48)) || 48)
+  );
+
+  return {
+    brand: cleanListText(query.brand, 300).toLowerCase(),
+    limit,
+    metric: cleanListText(query.metric, 80),
+    page,
+    search: cleanListText(query.search, 300)
+  };
+}
+
+function listCountryPricingFromPayload(
+  payload: unknown,
+  regulatoryApprovals: AdminProductListRow["regulatoryApprovals"],
+  fallbackCurrency = "THB"
+): ProductCountryPricing[] {
+  return arrayPayload(payload)
+    .map((item): ProductCountryPricing | null => {
+      const record = item && typeof item === "object"
+        ? item as Record<string, unknown>
+        : {};
+      const countryCode = normalizeProductCountryCode(record.countryCode);
+
+      return countryCode
+        ? {
+            countryCode,
+            currency: normalizeCurrencyCode(record.currency, fallbackCurrency),
+            effectiveRegulatoryApprovals: effectiveRegulatoryApprovalsForCountry(
+              regulatoryApprovals,
+              countryCode
+            ),
+            priceUpdatedAt: isoOrNull(record.priceUpdatedAt),
+            rrpPriceAmount: numberOrNull(record.rrpPriceAmount)
+          }
+        : null;
+    })
+    .filter((item): item is ProductCountryPricing => Boolean(item));
+}
+
+function productListRowFromDb(row: ProductListDbRow): AdminProductListRow {
+  const regulatoryApprovals = productRegulatoryApprovalsFromPayload(
+    row.regulatory_approvals
+  );
+
+  return {
+    availableCountryCodes: productCountryCodesFromDb(
+      row.available_country_codes,
+      [row.region]
+    ),
+    brandName: row.brand_name,
+    countryPricing: listCountryPricingFromPayload(
+      row.country_pricing,
+      regulatoryApprovals
+    ),
+    description: row.description,
+    displayDescription: row.display_description ?? row.description,
+    displayTitle: row.display_title ?? row.title,
+    facts: arrayPayload(row.facts)
+      .map((item): AdminProductListRow["facts"][number] | null => {
+        const record = item && typeof item === "object"
+          ? item as Record<string, unknown>
+          : {};
+        const id = typeof record.id === "string" ? record.id : "";
+        const name = typeof record.name === "string" ? record.name : "";
+
+        return id && name
+          ? {
+              amount: numberOrNull(record.amount),
+              id,
+              name,
+              unit: typeof record.unit === "string" ? record.unit : null
+            }
+          : null;
+      })
+      .filter((item): item is AdminProductListRow["facts"][number] => Boolean(item)),
+    id: row.id,
+    imageUrl: row.image_url,
+    importReviewTaskId: row.import_review_task_id,
+    labelStatus: row.label_status,
+    platform: row.platform,
+    productAudience: row.product_audience ?? "both",
+    productKind: row.product_kind ?? "supplement",
+    productUrl: row.product_url,
+    recommendationHistory: {
+      averageProductCoveragePercent: numberOrNull(
+        row.history_average_product_coverage_percent
+      ),
+      chosenCount: Math.max(
+        0,
+        Math.round(numberOrNull(row.history_chosen_count) ?? 0)
+      )
+    },
+    region: row.region,
+    regulatoryApprovals,
+    searchText: row.search_text,
+    status: row.status,
+    title: row.title,
+    translations: mergeTranslationsFromDb(row.translations),
+    validationLabel: row.validation_label
+  };
+}
+
+type ProductListManufacturerRow = Readonly<{
+  key: string;
+  label: string;
+  total: string | number;
+}>;
+
+export async function getAdminProductListData(
+  query: AdminProductListQuery = {}
+): Promise<AdminProductListData> {
+  const sql = getSql();
+  const normalized = normalizeProductListQuery(query);
+
+  if (!sql) {
+    return emptyAdminProductListData(normalized);
+  }
+
+  const searchTerms = productListSearchTerms(normalized.search);
+  const hasSearch = searchTerms.length > 0;
+  const offset = (normalized.page - 1) * normalized.limit;
+
+  try {
+    const rows = await sql<ProductListDbRow[]>`
+      with product_list_base as (
+        select
+          products.id::text,
+          products.title,
+          products.brand_name,
+          products.image_url,
+          products.product_url,
+          products.description,
+          products.region,
+          products.status,
+          products.label_status,
+          products.platform,
+          coalesce(to_jsonb(products) ->> 'product_audience', 'both') as product_audience,
+          products.product_kind,
+          products.updated_at,
+          import_review.review_task_id::text as import_review_task_id,
+          coalesce(product_country_rows.country_codes, array[upper(coalesce(nullif(products.region, ''), 'TH'))]) as available_country_codes,
+          coalesce(product_country_rows.country_pricing, '[]'::jsonb) as country_pricing,
+          coalesce(fact_rows.facts, '[]'::jsonb) as facts,
+          coalesce(product_translation_rows.translations, '{}'::jsonb) as translations,
+          coalesce(product_regulatory_rows.regulatory_approvals, '[]'::jsonb) as regulatory_approvals,
+          coalesce(history.chosen_count, 0) as history_chosen_count,
+          history.average_product_coverage_percent as history_average_product_coverage_percent,
+          coalesce(product_translation_rows.display_title, products.title) as display_title,
+          coalesce(product_translation_rows.display_description, products.description) as display_description,
+          product_regulatory_rows.has_regulatory_approval,
+          case
+            when coalesce(products.validation_reasons, '{}'::text[]) && array['missing_image']::text[] then 'Missing Image'
+            when products.label_status <> 'parsed'
+              or coalesce(products.validation_reasons, '{}'::text[]) && array['no_dosed_facts', 'no_canonical_match']::text[] then 'Missing Facts'
+            when coalesce(products.validation_reasons, '{}'::text[]) && array['dirty_name', 'concentration_only', 'source_conflict']::text[] then 'Dirty Data'
+            when products.validation_status = 'pass' then 'Approved'
+            else 'Needs Review'
+          end as validation_label,
+          case
+            when import_review.id is not null then 'pending_review'
+            when products.status = 'approved' and coalesce(products.validation_status, 'failed') <> 'pass' then 'pending_review'
+            when products.status = 'approved' then 'approved'
+            when products.status = 'ignored' then 'ignored'
+            else 'pending_review'
+          end as business_state,
+          coalesce(nullif(lower(trim(products.brand_name)), ''), '__unknown_manufacturer__') as manufacturer_key,
+          coalesce(nullif(products.brand_name, ''), 'Unknown manufacturer') as manufacturer_label,
+          lower(concat_ws(
+            ' ',
+            products.title,
+            products.brand_name,
+            products.category,
+            products.status,
+            products.label_status,
+            products.product_kind,
+            products.platform,
+            products.region,
+            coalesce(product_translation_rows.search_text, ''),
+            coalesce(fact_rows.search_text, ''),
+            coalesce(identifier_rows.search_text, ''),
+            coalesce(product_regulatory_rows.search_text, '')
+          )) as search_text
+        from public.products
+        left join lateral (
+          select
+            array_agg(product_countries.country_code order by product_countries.country_code) as country_codes,
+            jsonb_agg(
+              jsonb_build_object(
+                'countryCode', product_countries.country_code,
+                'currency', product_countries.currency,
+                'priceUpdatedAt', coalesce(product_countries.price_updated_at, product_countries.updated_at),
+                'rrpPriceAmount', product_countries.rrp_price_amount
+              )
+              order by product_countries.country_code
+            ) as country_pricing
+          from public.product_countries
+          where product_countries.product_id = products.id
+        ) product_country_rows on true
+        left join lateral (
+          select
+            product_imports.id,
+            product_imports.review_task_id
+          from public.product_imports
+          where product_imports.product_id = products.id
+            and product_imports.status = 'pending_review'
+          order by product_imports.updated_at desc
+          limit 1
+        ) import_review on true
+        left join lateral (
+          select
+            coalesce(
+              jsonb_object_agg(
+                product_translations.locale,
+                jsonb_build_object(
+                  'locale', product_translations.locale,
+                  'title', product_translations.title,
+                  'description', product_translations.description,
+                  'status', product_translations.status,
+                  'updatedAt', product_translations.updated_at
+                )
+                order by product_translations.locale
+              ),
+              '{}'::jsonb
+            ) as translations,
+            max(product_translations.title) filter (where product_translations.locale = 'en') as display_title,
+            max(product_translations.description) filter (where product_translations.locale = 'en') as display_description,
+            string_agg(concat_ws(' ', product_translations.locale, product_translations.title, product_translations.description), ' ') as search_text
+          from public.product_translations
+          where product_translations.product_id = products.id
+        ) product_translation_rows on true
+        left join lateral (
+          select
+            coalesce(
+              jsonb_agg(
+                jsonb_build_object(
+                  'id', product_facts.id,
+                  'name', product_facts.name,
+                  'amount', product_facts.amount,
+                  'unit', product_facts.unit
+                )
+                order by product_facts.created_at asc
+              ) filter (where fact_rank <= 6),
+              '[]'::jsonb
+            ) as facts,
+            string_agg(product_facts.name, ' ') as search_text
+          from (
+            select
+              product_facts.*,
+              row_number() over (partition by product_facts.product_id order by product_facts.created_at asc) as fact_rank
+            from public.product_facts
+            where product_facts.product_id = products.id
+          ) product_facts
+        ) fact_rows on true
+        left join lateral (
+          select string_agg(concat_ws(' ', product_identifiers.identifier_type, product_identifiers.identifier_value, product_identifiers.normalized_value), ' ') as search_text
+          from public.product_identifiers
+          where product_identifiers.product_id = products.id
+            and product_identifiers.status = 'active'
+        ) identifier_rows on true
+        left join lateral (
+          select
+            coalesce(
+              jsonb_agg(
+                jsonb_build_object(
+                  'id', product_regulatory_approvals.id,
+                  'productId', product_regulatory_approvals.product_id,
+                  'scopeType', product_regulatory_approvals.scope_type,
+                  'scopeCode', product_regulatory_approvals.scope_code,
+                  'agencyCode', product_regulatory_approvals.agency_code,
+                  'agencyName', product_regulatory_approvals.agency_name,
+                  'approvalType', product_regulatory_approvals.approval_type,
+                  'approvalNumber', product_regulatory_approvals.approval_number,
+                  'status', product_regulatory_approvals.status,
+                  'source', product_regulatory_approvals.source,
+                  'evidenceUrl', product_regulatory_approvals.evidence_url,
+                  'metadata', product_regulatory_approvals.metadata,
+                  'createdAt', product_regulatory_approvals.created_at,
+                  'updatedAt', product_regulatory_approvals.updated_at
+                )
+                order by product_regulatory_approvals.scope_type, product_regulatory_approvals.scope_code
+              ),
+              '[]'::jsonb
+            ) as regulatory_approvals,
+            bool_or(product_regulatory_approvals.status in ('verified', 'sourced')) as has_regulatory_approval,
+            string_agg(concat_ws(' ', product_regulatory_approvals.agency_code, product_regulatory_approvals.agency_name, product_regulatory_approvals.approval_number), ' ') as search_text
+          from public.product_regulatory_approvals
+          where product_regulatory_approvals.product_id = products.id
+        ) product_regulatory_rows on true
+        left join lateral (
+          select
+            count(*)::int as chosen_count,
+            avg(product_recommendation_items.product_coverage_percent) as average_product_coverage_percent
+          from public.product_recommendation_items
+          where product_recommendation_items.product_id = products.id
+        ) history on true
+      ),
+      filtered_products as (
+        select *
+        from product_list_base
+        where (
+          not ${hasSearch}::boolean
+          or not exists (
+            select 1
+            from unnest(${searchTerms}::text[]) as term(value)
+            where position(term.value in product_list_base.search_text) = 0
+          )
+        )
+          and (${normalized.brand} = '' or manufacturer_key = ${normalized.brand})
+          and (
+            ${normalized.metric} = ''
+            or ${normalized.metric} = 'productsTotal'
+            or (${normalized.metric} = 'productsApproved' and business_state = 'approved')
+            or (${normalized.metric} = 'productsPendingReview' and business_state = 'pending_review')
+            or (${normalized.metric} = 'productsIgnored' and business_state = 'ignored')
+            or (${normalized.metric} = 'productsMissingFacts' and validation_label = 'Missing Facts')
+            or (${normalized.metric} = 'productsMissingImages' and validation_label = 'Missing Image')
+            or (${normalized.metric} = 'productsRegulatoryApproved' and has_regulatory_approval)
+          )
+      )
+      select
+        *,
+        count(*) over() as total_rows,
+        count(*) filter (where business_state = 'approved') over() as summary_approved,
+        count(*) filter (where business_state = 'pending_review') over() as summary_pending_review,
+        count(*) filter (where business_state = 'ignored') over() as summary_ignored,
+        count(*) filter (where validation_label = 'Missing Facts') over() as summary_missing_facts,
+        count(*) filter (where validation_label = 'Missing Image') over() as summary_missing_image,
+        count(*) filter (where validation_label = 'Dirty Data') over() as summary_dirty_data,
+        count(*) filter (where has_regulatory_approval) over() as summary_regulatory_approved
+      from filtered_products
+      order by updated_at desc, title asc
+      limit ${normalized.limit}
+      offset ${offset}
+    `;
+    const manufacturerRows = await sql<ProductListManufacturerRow[]>`
+      select
+        coalesce(nullif(lower(trim(products.brand_name)), ''), '__unknown_manufacturer__') as key,
+        coalesce(nullif(products.brand_name, ''), 'Unknown manufacturer') as label,
+        count(*) as total
+      from public.products
+      group by key, label
+      order by total desc, label asc
+      limit 200
+    `;
+    const first = rows[0];
+    const totalRows = numberOrNull(first?.total_rows) ?? 0;
+    const pageSize = normalized.limit;
+
+    return {
+      databaseAvailable: true,
+      generatedAt: new Date().toISOString(),
+      manufacturerOptions: manufacturerRows.map((row) => ({
+        key: row.key,
+        label: row.label,
+        total: numberOrNull(row.total) ?? 0
+      })),
+      page: normalized.page,
+      pageSize,
+      query: {
+        brand: normalized.brand,
+        metric: normalized.metric,
+        search: normalized.search
+      },
+      rows: rows.map(productListRowFromDb),
+      summary: {
+        approved: numberOrNull(first?.summary_approved) ?? 0,
+        dirtyData: numberOrNull(first?.summary_dirty_data) ?? 0,
+        ignored: numberOrNull(first?.summary_ignored) ?? 0,
+        missingFacts: numberOrNull(first?.summary_missing_facts) ?? 0,
+        missingImage: numberOrNull(first?.summary_missing_image) ?? 0,
+        pendingReview: numberOrNull(first?.summary_pending_review) ?? 0,
+        regulatoryApproved: numberOrNull(first?.summary_regulatory_approved) ?? 0,
+        total: totalRows
+      },
+      totalPages: Math.ceil(totalRows / pageSize),
+      totalRows
+    };
+  } catch (error) {
+    console.error("Unable to load product list", error);
+    return emptyAdminProductListData(normalized);
+  }
+}
+
 
 export async function loadAdminProductRow(productId: string) {
   const rows = await loadProductRows(productId);
@@ -515,8 +984,10 @@ export async function getAdminProductDetailData(
       return null;
     }
 
-    const decisionStats = await getProductDecisionStatsByProduct(range);
-    const row = rowFromDb(sourceRow, decisionStats.get(sourceRow.id));
+    const decisionStats = await getProductDecisionStatsByProduct(range, {
+      productIds: [sourceRow.id]
+    });
+    const row = detailRowFromDb(sourceRow, decisionStats.get(sourceRow.id));
     const mergeOptions = await loadAdminProductMergeOptions({
       duplicateProductIds: row.productImportDuplicateProductIds,
       productId: row.id

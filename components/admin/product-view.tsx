@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type {
   AdminProductDetailData,
+  AdminProductDetailRow,
+  AdminProductListData,
   AdminProductMergeOption,
   AdminProductRow,
   AdminProductsData
@@ -42,6 +44,7 @@ import {
   productManufacturerStats,
   productMatchesMetricFilter,
   productMetricCards,
+  productMetricCardsFromSummary,
   productStatusLabel,
   productViewLabels,
   removeProductCountryCode,
@@ -52,6 +55,7 @@ import {
   ProductCard,
   ProductCountryManager,
   ProductFactsEditor,
+  ProductImageDropzone,
   ProductImagePreview,
   ProductIdentifiersEditor,
   ProductInsightStat,
@@ -62,9 +66,16 @@ function safeArray<T>(value: readonly T[] | null | undefined) {
   return Array.isArray(value) ? [...value] : [];
 }
 
-function normalizeProductDetailRow(row: AdminProductRow): AdminProductRow {
+function normalizeProductDetailRow(
+  row: AdminProductDetailRow | AdminProductRow
+): AdminProductDetailRow {
+  const { sourceSnapshot, ...baseRow } = row as AdminProductRow &
+    Partial<AdminProductDetailRow>;
+
+  void sourceSnapshot;
+
   return {
-    ...row,
+    ...baseRow,
     availableCountryCodes: safeArray(row.availableCountryCodes),
     countryPricing: safeArray(row.countryPricing).map((item) => ({
       ...item,
@@ -82,6 +93,9 @@ function normalizeProductDetailRow(row: AdminProductRow): AdminProductRow {
         }
       : undefined,
     facts: safeArray(row.facts),
+    imageCandidates: safeArray(
+      "imageCandidates" in row ? row.imageCandidates : row.imageUrl ? [row.imageUrl] : []
+    ),
     identifierCandidates: safeArray(row.identifierCandidates),
     identifiers: safeArray(row.identifiers),
     manufacturerCountryCodes: safeArray(row.manufacturerCountryCodes),
@@ -141,7 +155,9 @@ function normalizeProductMergeOptions(
   return options.map(normalizeProductMergeOption);
 }
 
-function regulatoryApprovalsForSave(row: AdminProductRow) {
+function regulatoryApprovalsForSave(
+  row: Pick<AdminProductDetailRow, "regulatoryApprovals">
+) {
   return row.regulatoryApprovals
     .filter((approval) => approval.approvalNumber.trim())
     .map((approval) =>
@@ -245,6 +261,167 @@ export function AdminProductsView({
   );
 }
 
+export function AdminProductListView({
+  accessToken,
+  data,
+  locale,
+}: Readonly<{
+  accessToken: string;
+  data: AdminProductListData;
+  locale: Locale;
+}>) {
+  const [search, setSearch] = useState(data.query.search);
+  const [manufacturerFilter, setManufacturerFilter] = useState(data.query.brand);
+  const viewLabels = productViewLabels[locale];
+  const metrics = productMetricCardsFromSummary({
+    locale,
+    summary: data.summary,
+    viewLabels
+  });
+
+  function productListHref(
+    patch: Readonly<{
+      brand?: string;
+      metric?: string;
+      page?: number;
+      search?: string;
+    }> = {}
+  ) {
+    const params = new URLSearchParams();
+    const nextSearch = patch.search ?? data.query.search;
+    const nextBrand = patch.brand ?? data.query.brand;
+    const nextMetric = patch.metric ?? data.query.metric;
+    const nextPage = patch.page ?? data.page;
+
+    if (accessToken) {
+      params.set("access_token", accessToken);
+    }
+
+    if (nextSearch) {
+      params.set("search", nextSearch);
+    }
+
+    if (nextBrand) {
+      params.set("brand", nextBrand);
+    }
+
+    if (nextMetric && nextMetric !== "productsTotal") {
+      params.set("metric", nextMetric);
+    }
+
+    if (nextPage > 1) {
+      params.set("page", String(nextPage));
+    }
+
+    return `/${locale}/admin/products${params.size > 0 ? `?${params.toString()}` : ""}`;
+  }
+
+  function handleMetricSelect(metricId: BusinessMetric["id"]) {
+    window.location.href = productListHref({
+      metric: metricId as string,
+      page: 1
+    });
+  }
+
+  return (
+    <section className="mt-8 space-y-6">
+      <BusinessStatsGrid
+        metrics={metrics}
+        onMetricSelect={handleMetricSelect}
+        selectedMetricId={data.query.metric || "productsTotal"}
+      />
+
+      <form
+        action={`/${locale}/admin/products`}
+        className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200"
+      >
+        {accessToken ? (
+          <input name="access_token" type="hidden" value={accessToken} />
+        ) : null}
+        {data.query.metric ? (
+          <input name="metric" type="hidden" value={data.query.metric} />
+        ) : null}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto]">
+          <input
+            aria-label={viewLabels.search}
+            className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
+            name="search"
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={viewLabels.searchPlaceholder}
+            type="search"
+            value={search}
+          />
+          <select
+            aria-label={viewLabels.brand}
+            className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            name="brand"
+            onChange={(event) => setManufacturerFilter(event.target.value)}
+            value={manufacturerFilter}
+          >
+            <option value="">{viewLabels.allBrands}</option>
+            {data.manufacturerOptions.map((manufacturer) => (
+              <option key={manufacturer.key} value={manufacturer.key}>
+                {manufacturer.label} ({manufacturer.total})
+              </option>
+            ))}
+          </select>
+          <button
+            className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
+            type="submit"
+          >
+            {viewLabels.search}
+          </button>
+        </div>
+      </form>
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {data.rows.map((row) => (
+          <ProductCard
+            href={`/${locale}/admin/products/${row.id}${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`}
+            key={row.id}
+            locale={locale}
+            row={row}
+            viewLabels={viewLabels}
+          />
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 text-sm text-gray-600 ring-1 ring-gray-200 sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          {data.totalRows} {viewLabels.products}
+          {data.totalPages > 0 ? ` · ${data.page}/${data.totalPages}` : ""}
+        </span>
+        <div className="flex gap-2">
+          <a
+            aria-disabled={data.page <= 1}
+            className={classNames(
+              "rounded-md px-3 py-2 font-semibold ring-1 ring-gray-200",
+              data.page <= 1
+                ? "pointer-events-none bg-gray-50 text-gray-300"
+                : "bg-white text-gray-700 hover:bg-gray-50"
+            )}
+            href={productListHref({ page: Math.max(1, data.page - 1) })}
+          >
+            Previous
+          </a>
+          <a
+            aria-disabled={data.page >= data.totalPages}
+            className={classNames(
+              "rounded-md px-3 py-2 font-semibold ring-1 ring-gray-200",
+              data.page >= data.totalPages
+                ? "pointer-events-none bg-gray-50 text-gray-300"
+                : "bg-white text-gray-700 hover:bg-gray-50"
+            )}
+            href={productListHref({ page: data.page + 1 })}
+          >
+            Next
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function AdminProductDetailView({
   accessToken,
   data,
@@ -260,21 +437,21 @@ export function AdminProductDetailView({
   const [mergeOptions] = useState(
     normalizeProductMergeOptions(data.mergeOptions),
   );
-  const [draft, setDraftState] = useState<AdminProductRow | null>(
+  const [draft, setDraftState] = useState<AdminProductDetailRow | null>(
     initialRow.id === productId ? initialRow : null,
   );
   const [savingId, setSavingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const viewLabels = productViewLabels[locale];
-  const backHref = `/${locale}/admin/dashboard?view=products${accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : ""}`;
+  const backHref = `/${locale}/admin/products${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`;
 
-  function setDraft(row: AdminProductRow | null) {
+  function setDraft(row: AdminProductDetailRow | AdminProductRow | null) {
     setDraftState(row ? normalizeProductDetailRow(row) : null);
   }
 
   async function saveProduct(
-    row: AdminProductRow,
+    row: AdminProductDetailRow,
     options: Readonly<{ changeNote?: string | null }> = {}
   ) {
     setSavingId(row.id);
@@ -320,7 +497,11 @@ export function AdminProductDetailView({
       };
       const savedRow = normalizeProductDetailRow(
         payload.row
-          ? { ...payload.row, decisionStats: row.decisionStats }
+          ? {
+              ...payload.row,
+              decisionStats: row.decisionStats,
+              imageCandidates: row.imageCandidates
+            }
           : row,
       );
 
@@ -337,7 +518,7 @@ export function AdminProductDetailView({
     }
   }
 
-  async function correctProductFacts(row: AdminProductRow) {
+  async function correctProductFacts(row: AdminProductDetailRow) {
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
@@ -365,7 +546,10 @@ export function AdminProductDetailView({
 
       const payload = (await response.json()) as { row?: AdminProductRow };
       const correctedRow = payload.row
-        ? normalizeProductDetailRow(payload.row)
+        ? normalizeProductDetailRow({
+            ...payload.row,
+            imageCandidates: row.imageCandidates
+          })
         : null;
 
       if (!correctedRow) {
@@ -389,7 +573,7 @@ export function AdminProductDetailView({
   }
 
   async function increaseProductSafetyLimit(
-    row: AdminProductRow,
+    row: AdminProductDetailRow,
     factId: string,
   ) {
     setSavingId(row.id);
@@ -424,7 +608,10 @@ export function AdminProductDetailView({
         row?: AdminProductRow;
       };
       const savedRow = payload.row
-        ? normalizeProductDetailRow(payload.row)
+        ? normalizeProductDetailRow({
+            ...payload.row,
+            imageCandidates: row.imageCandidates
+          })
         : null;
 
       if (!savedRow) {
@@ -448,7 +635,7 @@ export function AdminProductDetailView({
   }
 
   async function decideProductImportFromProduct(
-    row: AdminProductRow,
+    row: AdminProductDetailRow,
     action: "approve_product" | "ignore_import" | "merge_product",
     mergeProductId: string | null,
     reviewerNote: string | null,
@@ -502,7 +689,7 @@ export function AdminProductDetailView({
           row?: AdminProductRow | null;
         };
       };
-      const fallbackRow: AdminProductRow = {
+      const fallbackRow: AdminProductDetailRow = {
         ...row,
         importReviewTaskId: null,
         importStatus:
@@ -519,7 +706,12 @@ export function AdminProductDetailView({
               : row.status,
       };
       const savedRow = normalizeProductDetailRow(
-        payload.result?.row ?? fallbackRow,
+        payload.result?.row
+          ? {
+              ...payload.result.row,
+              imageCandidates: row.imageCandidates
+            }
+          : fallbackRow,
       );
 
       setDraft(savedRow.id === row.id ? savedRow : null);
@@ -588,29 +780,29 @@ function ProductDetailPanel({
   setDraft,
 }: Readonly<{
   backHref: string;
-  draft: AdminProductRow;
+  draft: AdminProductDetailRow;
   error: boolean;
   errorMessage: string | null;
   locale: Locale;
   onImportDecision: (
-    row: AdminProductRow,
+    row: AdminProductDetailRow,
     action: "approve_product" | "ignore_import" | "merge_product",
     mergeProductId: string | null,
     reviewerNote: string | null,
   ) => Promise<boolean>;
-  onCorrectFacts: (row: AdminProductRow) => Promise<AdminProductRow | null>;
+  onCorrectFacts: (row: AdminProductDetailRow) => Promise<AdminProductDetailRow | null>;
   onIncreaseSafetyLimit: (
-    row: AdminProductRow,
+    row: AdminProductDetailRow,
     factId: string,
   ) => Promise<boolean>;
   onClose: () => void;
   onSave: (
-    row: AdminProductRow,
+    row: AdminProductDetailRow,
     options?: Readonly<{ changeNote?: string | null }>
   ) => Promise<boolean>;
   mergeOptions: AdminProductMergeOption[];
   saving: boolean;
-  setDraft: (row: AdminProductRow) => void;
+  setDraft: (row: AdminProductDetailRow) => void;
 }>) {
   const [mergeProductId, setMergeProductId] = useState(
     draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? "",
@@ -779,7 +971,7 @@ function ProductDetailPanel({
       )
     );
 
-    const nextDraft: AdminProductRow = {
+    const nextDraft: AdminProductDetailRow = {
       ...draft,
       regulatoryApprovals: keepDraftRow
         ? [
@@ -813,7 +1005,7 @@ function ProductDetailPanel({
 
   function updateCountryPricing(
     countryCode: string,
-    patch: Partial<AdminProductRow["countryPricing"][number]>,
+    patch: Partial<AdminProductDetailRow["countryPricing"][number]>,
   ) {
     const normalizedCountryCode = normalizeProductCountryCode(countryCode);
 
@@ -1087,20 +1279,22 @@ function ProductDetailPanel({
             value={draft.productUrl}
           />
         </label>
-        <label className="text-sm font-medium text-gray-700">
-          {viewLabels.imageUrl}
-          <input
-            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) =>
-              setDraft({
-                ...draft,
-                imageUrl: event.target.value.trim() || null,
-              })
-            }
-            type="url"
-            value={draft.imageUrl ?? ""}
-          />
-        </label>
+        <ProductImageDropzone
+          onImageUrlChange={(imageUrl) =>
+            setDraft({
+              ...draft,
+              imageCandidates: [
+                ...new Set([
+                  ...(imageUrl ? [imageUrl] : []),
+                  ...draft.imageCandidates,
+                ]),
+              ],
+              imageUrl,
+            })
+          }
+          row={draft}
+          viewLabels={viewLabels}
+        />
         <label className="text-sm font-medium text-gray-700">
           {viewLabels.productType}
           <select
@@ -1109,7 +1303,7 @@ function ProductDetailPanel({
               setDraft({
                 ...draft,
                 productKind: event.target
-                  .value as AdminProductRow["productKind"],
+                  .value as AdminProductDetailRow["productKind"],
               })
             }
             value={draft.productKind}
@@ -1129,7 +1323,7 @@ function ProductDetailPanel({
               setDraft({
                 ...draft,
                 productAudience: event.target
-                  .value as AdminProductRow["productAudience"],
+                  .value as AdminProductDetailRow["productAudience"],
               })
             }
             value={draft.productAudience}
@@ -1325,7 +1519,7 @@ function ProductDetailPanel({
               className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={saving || currentBusinessState === "ignored"}
               onClick={async () => {
-                const ignoredDraft: AdminProductRow = {
+                const ignoredDraft: AdminProductDetailRow = {
                   ...draft,
                   status: "ignored",
                 };
@@ -1357,7 +1551,7 @@ function ProductDetailPanel({
               className="relative -ml-px inline-flex items-center rounded-r-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={approveDisabled}
               onClick={async () => {
-                const approvedDraft: AdminProductRow = {
+                const approvedDraft: AdminProductDetailRow = {
                   ...draft,
                   labelStatus:
                     draft.facts.length > 0 ? "parsed" : draft.labelStatus,

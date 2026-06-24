@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ProductAdminShell } from "@/components/admin/product-admin-shell";
-import { AdminProductDetailView } from "@/components/admin/product-view";
+import { AdminProductListView } from "@/components/admin/product-view";
 import { content } from "@/components/admin/dashboard-content";
 import {
   adminCsrfCookieName,
@@ -13,10 +13,9 @@ import {
 } from "@/lib/admin-access";
 import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import { normalizeAdminDashboardRange } from "@/lib/admin-dashboard-data";
-import { getAdminProductDetailData } from "@/lib/admin-products";
+import { getAdminProductListData } from "@/lib/admin-products";
 import { adminViewAllowed } from "@/lib/admin-rbac";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { isUuid } from "@/lib/assessment-store";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +27,9 @@ export const metadata: Metadata = {
   title: "MattaNutra Product Admin"
 };
 
-type ProductDetailPageProps = Readonly<{
+type ProductListPageProps = Readonly<{
   params: Promise<{
     locale: string;
-    productId: string;
   }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>;
@@ -40,9 +38,8 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function productDetailUrl(
+function productListUrl(
   locale: Locale,
-  productId: string,
   query: Record<string, string | string[] | undefined>
 ) {
   const params = new URLSearchParams();
@@ -58,19 +55,25 @@ function productDetailUrl(
     }
   });
 
-  return `/${locale}/admin/products/${productId}${params.size > 0 ? `?${params.toString()}` : ""}`;
+  return `/${locale}/admin/products${params.size > 0 ? `?${params.toString()}` : ""}`;
 }
 
-export default async function ProductDetailPage({
+function numberParam(value: string | string[] | undefined) {
+  const parsed = Number(firstParam(value));
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export default async function ProductListPage({
   params,
   searchParams
-}: ProductDetailPageProps) {
-  const [{ locale: rawLocale, productId }, query] = await Promise.all([
+}: ProductListPageProps) {
+  const [{ locale: rawLocale }, query] = await Promise.all([
     params,
     searchParams
   ]);
 
-  if (!isLocale(rawLocale) || !isUuid(productId)) {
+  if (!isLocale(rawLocale)) {
     notFound();
   }
 
@@ -88,7 +91,7 @@ export default async function ProductDetailPage({
 
   if (!adminContext) {
     const loginParams = new URLSearchParams({
-      next: productDetailUrl(locale, productId, query)
+      next: productListUrl(locale, query)
     });
 
     if (accessToken) {
@@ -106,11 +109,13 @@ export default async function ProductDetailPage({
     redirect(`/${locale}/admin/dashboard?view=glance`);
   }
 
-  const productDetailData = await getAdminProductDetailData(productId, range);
-
-  if (!productDetailData) {
-    notFound();
-  }
+  const productsData = await getAdminProductListData({
+    brand: firstParam(query.brand),
+    limit: numberParam(query.limit),
+    metric: firstParam(query.metric),
+    page: numberParam(query.page),
+    search: firstParam(query.search)
+  });
 
   return (
     <ProductAdminShell
@@ -121,11 +126,10 @@ export default async function ProductDetailPage({
       pageTitle={content[locale].pageTitles.products}
       range={range}
     >
-      <AdminProductDetailView
+      <AdminProductListView
         accessToken={accessToken ?? ""}
-        data={productDetailData}
+        data={productsData}
         locale={locale}
-        productId={productId}
       />
     </ProductAdminShell>
   );
