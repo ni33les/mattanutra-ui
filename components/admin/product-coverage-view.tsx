@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowTopRightOnSquareIcon,
   ChevronDownIcon,
@@ -403,6 +403,34 @@ function loadSavedSimulationState(inputKey: string) {
   }
 }
 
+function savedSimulationReplayTarget(inputKey: string) {
+  try {
+    const raw = window.localStorage.getItem(SIMULATOR_STORAGE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
+
+    if (
+      parsed.version !== 2 ||
+      parsed.inputKey === inputKey ||
+      typeof parsed.sampleSize !== "number" ||
+      parsed.sampleSize < 1
+    ) {
+      return null;
+    }
+
+    return Math.min(
+      ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
+      Math.max(0, Math.floor(parsed.sampleSize))
+    );
+  } catch {
+    return null;
+  }
+}
+
 function simulationDisplaySnapshotFromRunner(
   runner: AdminPlanCoverageSimulationRunner
 ) {
@@ -484,6 +512,25 @@ function initialSimulationDataWithCachedDisplay(
   data: AdminPlanCoverageSimulationData
 ) {
   return loadSavedSimulationDisplayData(data.countryCode) ?? initialSimulationData(data);
+}
+
+function waitForNextSample() {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 24);
+  });
+}
+
+function runnerWithDemandProfiles(
+  runner: AdminPlanCoverageSimulationRunner,
+  profiles: readonly AdminPlanCoverageDemandProfile[]
+): AdminPlanCoverageSimulationRunner {
+  return {
+    ...runner,
+    input: {
+      ...runner.input,
+      demandProfiles: profiles
+    }
+  };
 }
 
 function productDetailHref(
@@ -1517,6 +1564,7 @@ export function AdminPlanCoverageSimulatorView({
   >([]);
   const [demandGenerating, setDemandGenerating] = useState(false);
   const [demandError, setDemandError] = useState<string | null>(null);
+  const [inputRefreshNonce, setInputRefreshNonce] = useState(0);
   const activeArchetypes = useMemo(
     () => [
       ...(syntheticArchetypes.length > 0
@@ -1549,6 +1597,7 @@ export function AdminPlanCoverageSimulatorView({
   const runnerRef = useRef<AdminPlanCoverageSimulationRunner | null>(null);
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
+  const runningRef = useRef(false);
   const progressPercent =
     (Math.max(simulationData.sampleSize, demandProfiles.length) /
       ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) * 100;
@@ -1586,6 +1635,94 @@ export function AdminPlanCoverageSimulatorView({
   const nextMovesCleared =
     nextMoveRows.length > 0 && nextMovesClearedKey === nextMovesKey;
   const visibleNextMoveRows = nextMovesCleared ? [] : nextMoveRows;
+
+  const replayCachedDemandProfiles = useCallback(async (
+    runToken: number,
+    targetSampleSize: number
+  ) => {
+    const profiles = [...demandProfiles].sort(
+      (first, second) => first.sampleIndex - second.sampleIndex
+    );
+
+    if (profiles.length < 1 || !activeInputData.databaseAvailable) {
+      return;
+    }
+
+    let runner = createAdminPlanCoverageSimulationRunner({
+      ...activeInputData.input,
+      demandProfiles: profiles
+    });
+    const target = Math.min(
+      ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
+      profiles.length,
+      Math.max(1, Math.floor(targetSampleSize))
+    );
+
+    runnerRef.current = runner;
+    setDemandError(null);
+    setDemandGenerating(false);
+    setRunning(true);
+    setHydrated(true);
+
+    try {
+      while (runToken === runTokenRef.current && runner.sampleSize < target) {
+        const nextData = runNextAdminPlanCoverageSimulationSample(runner);
+
+        if (runToken !== runTokenRef.current) {
+          break;
+        }
+
+        runner = runnerWithDemandProfiles(runner, profiles);
+        runnerRef.current = runner;
+        setSimulationData(nextData);
+        saveSimulationState(inputKey, runner);
+
+        if (
+          runner.sampleSize >= target ||
+          runner.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES
+        ) {
+          break;
+        }
+
+        if (runner.sampleSize % 8 === 0) {
+          await waitForNextSample();
+        }
+      }
+    } finally {
+      if (runToken === runTokenRef.current) {
+        setRunning(false);
+      }
+    }
+  }, [activeInputData, demandProfiles, inputKey]);
+
+  useEffect(() => {
+    runningRef.current = running || demandGenerating;
+  }, [demandGenerating, running]);
+
+  useEffect(() => {
+    const refreshInput = () => {
+      if (runningRef.current) {
+        return;
+      }
+
+      setInputRefreshNonce((value) => value + 1);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        refreshInput();
+      }
+    };
+
+    window.addEventListener("focus", refreshInput);
+    window.addEventListener("pageshow", refreshInput);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.removeEventListener("focus", refreshInput);
+      window.removeEventListener("pageshow", refreshInput);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1646,7 +1783,7 @@ export function AdminPlanCoverageSimulatorView({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [accessToken, data, range]);
+  }, [accessToken, data, inputRefreshNonce, range]);
 
   useEffect(() => {
     if (inputStatus !== "ready") {
@@ -1710,8 +1847,20 @@ export function AdminPlanCoverageSimulatorView({
         runnerRef.current = savedRunner;
         setSimulationData(adminPlanCoverageSimulationDataFromRunner(savedRunner));
       } else {
+        const replayTarget = savedSimulationReplayTarget(inputKey);
+
         runnerRef.current = createAdminPlanCoverageSimulationRunner(activeInputData.input);
         setSimulationData(initialSimulationData(activeInputData));
+
+        if (
+          replayTarget !== null &&
+          activeInputData.input.demandProfiles.length > 0
+        ) {
+          runTokenRef.current += 1;
+          setNextMovesClearedKey(null);
+          void replayCachedDemandProfiles(runTokenRef.current, replayTarget);
+          return;
+        }
       }
 
       setRunning(false);
@@ -1722,7 +1871,14 @@ export function AdminPlanCoverageSimulatorView({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [activeInputData, demandGenerating, inputKey, inputStatus, running]);
+  }, [
+    activeInputData,
+    demandGenerating,
+    inputKey,
+    inputStatus,
+    replayCachedDemandProfiles,
+    running
+  ]);
 
   function nextDemandProfiles(
     profiles: readonly AdminPlanCoverageDemandProfile[],
@@ -1732,25 +1888,6 @@ export function AdminPlanCoverageSimulatorView({
       ...profiles.filter((item) => item.sampleIndex !== profile.sampleIndex),
       profile
     ].sort((first, second) => first.sampleIndex - second.sampleIndex);
-  }
-
-  function waitForNextSample() {
-    return new Promise<void>((resolve) => {
-      window.setTimeout(resolve, 24);
-    });
-  }
-
-  function runnerWithDemandProfiles(
-    runner: AdminPlanCoverageSimulationRunner,
-    profiles: readonly AdminPlanCoverageDemandProfile[]
-  ): AdminPlanCoverageSimulationRunner {
-    return {
-      ...runner,
-      input: {
-        ...runner.input,
-        demandProfiles: profiles
-      }
-    };
   }
 
   async function fetchDemandProfileForSample(
@@ -1950,7 +2087,8 @@ export function AdminPlanCoverageSimulatorView({
           <h2 className="text-lg font-bold text-slate-950">Plan coverage projection</h2>
           <p className="text-sm text-slate-500">
             {simulationData.countryCode} catalogue · seed {simulationData.seed} ·{" "}
-            currency {simulationData.summary.currency}
+            currency {simulationData.summary.currency} ·{" "}
+            {numberText(activeInputData.input.candidates.length)} eligible products
           </p>
           {inputError ? (
             <p className="mt-1 text-sm font-semibold text-rose-700">{inputError}</p>

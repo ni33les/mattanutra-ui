@@ -516,6 +516,12 @@ describe("product coverage workflow", () => {
     assert.match(view, /displayData: simulationDisplaySnapshotFromRunner/);
     assert.match(view, /loadSavedSimulationDisplayData/);
     assert.match(view, /cachedSimulationData \?\? initialSimulationData/);
+    assert.match(view, /savedSimulationReplayTarget/);
+    assert.match(view, /replayCachedDemandProfiles/);
+    assert.match(view, /window\.addEventListener\("focus"/);
+    assert.match(view, /window\.addEventListener\("pageshow"/);
+    assert.match(view, /visibilitychange/);
+    assert.match(view, /eligible products/);
     assert.match(view, /\/api\/admin\/product-coverage\/demand-profile/);
     assert.doesNotMatch(view, /Simulation assumptions/);
     assert.match(view, /SimulationProgressPanel/);
