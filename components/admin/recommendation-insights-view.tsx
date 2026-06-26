@@ -53,13 +53,6 @@ const productOutcomeClasses: Record<ProductRecommendationInsightOutcome, string>
   rejected: "bg-rose-50 text-rose-700 ring-rose-200"
 };
 
-const productOutcomeColors: Record<ProductRecommendationInsightOutcome, string> = {
-  near_miss: "#0EA5E9",
-  not_evaluated: "#6B7280",
-  recommended: "#126B4F",
-  rejected: "#DC2626"
-};
-
 type ProductInsightFilter = ProductRecommendationInsightOutcome | "all" | "stale";
 
 const productInsightFilters: Array<{
@@ -274,54 +267,60 @@ function ProductOutcomePill({
   );
 }
 
-function ProductInsightDistributionBar({
-  data,
-  locale
+function ProductChosenHistogram({
+  locale,
+  rows
 }: Readonly<{
-  data: AdminProductRecommendationInsightsData;
+  rows: readonly AdminProductRecommendationInsightRow[];
   locale: Locale;
 }>) {
-  const total = Math.max(1, data.summary.totalProducts);
-  const segments: Array<{
-    id: ProductRecommendationInsightOutcome;
-    value: number;
-  }> = [
-    { id: "recommended", value: data.summary.recommendedProducts },
-    { id: "near_miss", value: data.summary.nearMissProducts },
-    { id: "rejected", value: data.summary.rejectedProducts },
-    { id: "not_evaluated", value: data.summary.notEvaluatedProducts }
-  ];
+  const max = Math.max(1, ...rows.map((row) => row.chosenCount));
+  const notChosenCount = rows.filter((row) => row.chosenCount < 1).length;
+  const chosenRows = [...rows]
+    .filter((row) => row.chosenCount > 0)
+    .sort((left, right) =>
+      right.chosenCount === left.chosenCount
+        ? left.title.localeCompare(right.title)
+        : right.chosenCount - left.chosenCount
+    );
 
   return (
-    <Section eyebrow="Outcome mix" title="Product recommendation distribution">
-      <div className="h-5 overflow-hidden rounded-full bg-gray-100">
-        <div className="flex h-full">
-          {segments.map((segment) =>
-            segment.value > 0 ? (
-              <div
-                className="h-full"
-                key={segment.id}
-                style={{
-                  backgroundColor: productOutcomeColors[segment.id],
-                  width: `${(segment.value / total) * 100}%`
-                }}
-                title={`${productOutcomeLabels[segment.id]}: ${formatNumber(segment.value, locale)}`}
-              />
-            ) : null
-          )}
+    <Section eyebrow="Chosen frequency" title="How Often Products Are Chosen">
+      {chosenRows.length > 0 ? (
+        <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
+          {chosenRows.map((row) => (
+            <div
+              className="grid grid-cols-[minmax(10rem,18rem)_minmax(8rem,1fr)_4rem] items-center gap-3"
+              key={row.id}
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-gray-900">
+                  {row.title}
+                </p>
+                <p className="truncate text-xs font-medium text-gray-500">
+                  {row.brandName || "Unknown brand"}
+                </p>
+              </div>
+              <div className="h-4 overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className="h-full rounded-full bg-[#126B4F]"
+                  style={{
+                    width: `${Math.max(3, (row.chosenCount / max) * 100)}%`
+                  }}
+                />
+              </div>
+              <p className="text-right text-sm font-semibold tabular-nums text-gray-800">
+                {formatNumber(row.chosenCount, locale)}
+              </p>
+            </div>
+          ))}
         </div>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-gray-600">
-        {segments.map((segment) => (
-          <span className="inline-flex items-center gap-2" key={segment.id}>
-            <span
-              className="size-2 rounded-full"
-              style={{ backgroundColor: productOutcomeColors[segment.id] }}
-            />
-            {productOutcomeLabels[segment.id]} {formatNumber(segment.value, locale)}
-          </span>
-        ))}
-      </div>
+      ) : (
+        <EmptyState label="No products were chosen in this timeframe." />
+      )}
+      <p className="mt-4 text-xs font-semibold text-gray-500">
+        Zero chosen decisions: {formatNumber(notChosenCount, locale)}
+      </p>
     </Section>
   );
 }
@@ -377,7 +376,7 @@ const productInsightColumns: TableColumn<AdminProductRecommendationInsightRow>[]
   { label: "chosen", value: (row) => String(row.chosenCount) },
   { label: "near_miss", value: (row) => String(row.nearMissCount) },
   { label: "rejected", value: (row) => String(row.rejectedCount) },
-  { label: "affected_plans", value: (row) => String(row.affectedPlanCount) },
+  { label: "evaluated_plans", value: (row) => String(row.affectedPlanCount) },
   { label: "average_coverage", value: (row) => String(row.averageCoveragePercent ?? "") },
   { label: "stale", value: (row) => String(row.isStale) },
   { label: "reason", value: (row) => row.primaryReason },
@@ -440,6 +439,11 @@ function ProductInsightRow({
           <p className="mt-2 max-w-2xl text-sm text-gray-600">
             {row.primaryReason}
           </p>
+          {row.chosenCount < 1 && row.affectedPlanCount > 0 ? (
+            <p className="mt-1 text-xs font-semibold text-gray-500">
+              Evaluated in {formatNumber(row.affectedPlanCount, locale)} plan{row.affectedPlanCount === 1 ? "" : "s"}; chosen in 0.
+            </p>
+          ) : null}
           {row.isStale ? (
             <p className="mt-1 text-xs font-medium text-amber-800">
               Product or validation changed after the latest recommendation decision.
@@ -453,7 +457,7 @@ function ProductInsightRow({
           ["Chosen", formatNumber(row.chosenCount, locale)],
           ["Near Miss", formatNumber(row.nearMissCount, locale)],
           ["Rejected", formatNumber(row.rejectedCount, locale)],
-          ["Plans", formatNumber(row.affectedPlanCount, locale)],
+          ["Evaluated Plans", formatNumber(row.affectedPlanCount, locale)],
           ["Coverage", formatPercent(row.averageCoveragePercent)],
           ["Last", formatDate(row.lastDecisionAt, locale)]
         ].map(([label, value]) => (
@@ -550,7 +554,7 @@ export function AdminProductRecommendationInsightsView({
   return (
     <div className="mt-8 space-y-6">
       <BusinessStatsGrid metrics={metrics} />
-      <ProductInsightDistributionBar data={data} locale={locale} />
+      <ProductChosenHistogram rows={data.rows} locale={locale} />
 
       <Section
         action={

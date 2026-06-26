@@ -127,4 +127,30 @@ describe("product recommendation insights", () => {
     assert.match(loader, /outcome = 'near_miss'/);
     assert.match(loader, /outcome = 'rejected'/);
   });
+
+  it("shows chosen frequency instead of the old outcome mix and labels evaluated plans clearly", async () => {
+    const view = await readFile("components/admin/recommendation-insights-view.tsx", "utf8");
+    const productView = view.slice(
+      view.indexOf("export function AdminProductRecommendationInsightsView"),
+      view.indexOf("const supplementColumns")
+    );
+    const productRow = view.slice(
+      view.indexOf("function ProductInsightRow"),
+      view.indexOf("export function AdminProductRecommendationInsightsView")
+    );
+
+    assert.match(view, /function ProductChosenHistogram/);
+    assert.match(view, /Chosen frequency/);
+    assert.match(view, /How Often Products Are Chosen/);
+    assert.match(view, /Zero chosen decisions/);
+    assert.match(productView, /<ProductChosenHistogram rows=\{data\.rows\} locale=\{locale\} \/>/);
+    assert.doesNotMatch(view, /ProductInsightDistributionBar/);
+    assert.doesNotMatch(view, /Outcome mix/);
+    assert.doesNotMatch(view, /Product recommendation distribution/);
+    assert.match(productRow, /Evaluated Plans/);
+    assert.match(productRow, /Evaluated in/);
+    assert.doesNotMatch(productRow, /\["Plans"/);
+    assert.match(view, /evaluated_plans/);
+    assert.doesNotMatch(view, /affected_plans/);
+  });
 });
