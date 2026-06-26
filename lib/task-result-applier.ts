@@ -1936,10 +1936,15 @@ function productSnapshotPayload(value: unknown): ProductSnapshot[] {
     const title = payloadText(record, "title");
 
     if (
-      (platform !== "lazada" && platform !== "manual" && platform !== "shopee") ||
-      !productUrl ||
-      !title
+      platform !== "lazada" &&
+      platform !== "manual" &&
+      platform !== "shopee" &&
+      platform !== "wholesale_pharmacy_import"
     ) {
+      return [];
+    }
+
+    if (!productUrl || !title) {
       return [];
     }
 
@@ -1973,7 +1978,12 @@ function productDiagnosticsPayload(value: unknown): MarketplaceSearchDiagnostic[
     const platform = payloadText(record, "platform");
     const query = payloadText(record, "query");
 
-    if (platform !== "lazada" && platform !== "manual" && platform !== "shopee") {
+    if (
+      platform !== "lazada" &&
+      platform !== "manual" &&
+      platform !== "shopee" &&
+      platform !== "wholesale_pharmacy_import"
+    ) {
       return [];
     }
 

@@ -117,12 +117,16 @@ const missingTables = catalogueSnapshotTableNames().filter((table) => !(table in
 const strictMasterData =
   hasArg("strict-master-data") ||
   process.env.MATTANUTRA_STRICT_MASTER_SNAPSHOT === "true";
+const allowIncompleteTranslations =
+  hasArg("allow-incomplete-translations") ||
+  process.env.MATTANUTRA_ALLOW_INCOMPLETE_TRANSLATIONS === "true";
 
 if (missingTables.length > 0) {
   fail(`Snapshot is missing required tables: ${missingTables.join(", ")}`);
 }
 
 const validation = validateCuratedMasterSnapshot(tables, {
+  allowIncompleteTranslations,
   strict: strictMasterData
 });
 
@@ -171,6 +175,7 @@ await sql.end({ timeout: 1 });
 
 console.log(JSON.stringify({
   counts,
+  allowIncompleteTranslations,
   inputPath,
   strictMasterData,
   status: "ok"

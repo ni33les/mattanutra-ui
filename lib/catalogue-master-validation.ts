@@ -95,7 +95,10 @@ function validateLocaleCoverage(
 
 export function validateCuratedMasterSnapshot(
   tables: SnapshotTables,
-  options: Readonly<{ strict?: boolean }> = {}
+  options: Readonly<{
+    allowIncompleteTranslations?: boolean;
+    strict?: boolean;
+  }> = {}
 ) {
   const errors: string[] = [];
 
@@ -133,21 +136,23 @@ export function validateCuratedMasterSnapshot(
     }
   }
 
-  validateLocaleCoverage(errors, {
-    entityLabel: "product",
-    entityName: (row) => textValue(row.title) || textValue(row.name) || textValue(row.id),
-    idColumn: "product_id",
-    rows: rowsFor("products", tables),
-    translations: rowsFor("product_translations", tables)
-  });
+  if (!options.allowIncompleteTranslations) {
+    validateLocaleCoverage(errors, {
+      entityLabel: "product",
+      entityName: (row) => textValue(row.title) || textValue(row.name) || textValue(row.id),
+      idColumn: "product_id",
+      rows: rowsFor("products", tables),
+      translations: rowsFor("product_translations", tables)
+    });
 
-  validateLocaleCoverage(errors, {
-    entityLabel: "supplement",
-    entityName: (row) => textValue(row.name) || textValue(row.id),
-    idColumn: "supplement_id",
-    rows: rowsFor("supplements", tables),
-    translations: rowsFor("supplement_translations", tables)
-  });
+    validateLocaleCoverage(errors, {
+      entityLabel: "supplement",
+      entityName: (row) => textValue(row.name) || textValue(row.id),
+      idColumn: "supplement_id",
+      rows: rowsFor("supplements", tables),
+      translations: rowsFor("supplement_translations", tables)
+    });
+  }
 
   const translationLocalesByFood = localeCoverageById(translations, "food_id");
 
@@ -170,9 +175,11 @@ export function validateCuratedMasterSnapshot(
 
     const locales = translationLocalesByFood.get(textValue(food.id));
 
-    for (const locale of publicLocales) {
-      if (!locales?.has(locale)) {
-        errors.push(`whitelisted food ${normalizedName} is missing ${locale} translation`);
+    if (!options.allowIncompleteTranslations) {
+      for (const locale of publicLocales) {
+        if (!locales?.has(locale)) {
+          errors.push(`whitelisted food ${normalizedName} is missing ${locale} translation`);
+        }
       }
     }
   }

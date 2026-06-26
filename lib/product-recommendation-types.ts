@@ -6,7 +6,11 @@ export type ProductStatus =
   | "ignored"
   | "pending_review";
 
-export type ProductPlatform = "lazada" | "manual" | "shopee";
+export type ProductPlatform =
+  | "lazada"
+  | "manual"
+  | "shopee"
+  | "wholesale_pharmacy_import";
 export type ProductKind = "food" | "multi" | "other" | "supplement";
 export type ProductAudience = "both" | "female" | "male";
 export type ProductClientSex = "female" | "male";

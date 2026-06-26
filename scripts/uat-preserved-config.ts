@@ -45,10 +45,27 @@ const preservedTables: readonly PreserveTable[] = [
   },
   {
     conflictColumns: ["id"],
+    name: "testimonials",
+    query: "select * from public.testimonials order by created_at, id",
+    requireNonEmpty: true,
+  },
+  {
+    conflictColumns: ["id"],
+    name: "blog_posts",
+    query: "select * from public.blog_posts order by created_at, id",
+    requireNonEmpty: true,
+  },
+  {
+    conflictColumns: ["id"],
     name: "organisation_memberships",
     query:
       "select * from public.organisation_memberships order by created_at, id",
     requireNonEmpty: true,
+  },
+  {
+    conflictColumns: ["id"],
+    name: "admin_invitations",
+    query: "select * from public.admin_invitations order by created_at, id",
   },
   {
     conflictColumns: ["id"],
@@ -353,13 +370,52 @@ async function restoreTable(
   ].join(" ");
 
   for (const row of rows) {
+    const restorableRow = await rowWithRestorableForeignKeys(
+      sql,
+      table.name,
+      row,
+    );
+
     await sql.unsafe(
       sqlText,
-      insertColumns.map((column: string) => preservedSqlValue(row[column])),
+      insertColumns.map((column: string) =>
+        preservedSqlValue(restorableRow[column]),
+      ),
     );
   }
 
   return rows.length;
+}
+
+async function rowWithRestorableForeignKeys(
+  sql: Db,
+  tableName: string,
+  row: Record<string, unknown>,
+) {
+  if (tableName !== "admin_passkey_credentials") {
+    return row;
+  }
+
+  if (!row.revoked_invitation_id) {
+    return row;
+  }
+
+  const rows = await sql<Array<{ exists: boolean }>>`
+    select exists (
+      select 1
+      from public.admin_invitations
+      where id::text = ${String(row.revoked_invitation_id)}
+    ) as exists
+  `;
+
+  if (rows[0]?.exists) {
+    return row;
+  }
+
+  return {
+    ...row,
+    revoked_invitation_id: null,
+  };
 }
 
 async function deleteNaturalKeyConflicts(
@@ -399,6 +455,54 @@ async function deleteNaturalKeyConflicts(
       await sql`
         delete from public.agents
         where lower(name) = lower(${String(row.name)})
+          and id::text <> ${String(row.id)}
+      `;
+      continue;
+    }
+
+    if (tableName === "admin_invitations" && row.token_hash && row.id) {
+      await sql`
+        delete from public.admin_invitations
+        where token_hash = ${String(row.token_hash)}
+          and id::text <> ${String(row.id)}
+      `;
+      continue;
+    }
+
+    if (
+      tableName === "testimonials" &&
+      row.translation_group_id &&
+      row.locale &&
+      row.id
+    ) {
+      await sql`
+        delete from public.testimonials
+        where translation_group_id::text = ${String(row.translation_group_id)}
+          and locale = ${String(row.locale)}
+          and id::text <> ${String(row.id)}
+      `;
+      continue;
+    }
+
+    if (tableName === "blog_posts" && row.locale && row.slug && row.id) {
+      await sql`
+        delete from public.blog_posts
+        where locale = ${String(row.locale)}
+          and slug = ${String(row.slug)}
+          and id::text <> ${String(row.id)}
+      `;
+    }
+
+    if (
+      tableName === "blog_posts" &&
+      row.translation_group_id &&
+      row.locale &&
+      row.id
+    ) {
+      await sql`
+        delete from public.blog_posts
+        where translation_group_id::text = ${String(row.translation_group_id)}
+          and locale = ${String(row.locale)}
           and id::text <> ${String(row.id)}
       `;
     }

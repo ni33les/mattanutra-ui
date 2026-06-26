@@ -526,6 +526,9 @@ test("admin DB object titles are rendered through localized translation helpers"
   const reviewQueueHelpers = source("components/admin/review-queue-helpers.ts");
   const insights = source("lib/admin-recommendation-insights.ts");
   const dashboardPage = source("app/[locale]/admin/dashboard/page.tsx");
+  const simulationInputRoute = source(
+    "app/api/admin/product-coverage/simulation-input/route.ts"
+  );
   const dashboard = source("components/admin-dashboard.tsx");
 
   assert.match(displayHelper, /export function adminLocalizedProductText/);
@@ -540,6 +543,10 @@ test("admin DB object titles are rendered through localized translation helpers"
   assert.match(supplementView, /adminLocalizedSupplementText\(row, locale\)/);
   assert.match(supplementView, /adminLocalizedSupplementText\(draft, locale\)/);
   assert.match(supplementView, /supplementSearchText\(labels, row, locale\)/);
+  assert.match(supplementView, /exportSupplementsCsv/);
+  assert.match(supplementView, /exportSupplementsJson/);
+  assert.match(supplementView, /labels\.supplements\.exportCsv/);
+  assert.match(supplementView, /labels\.supplements\.exportJson/);
 
   assert.match(foodView, /adminLocalizedFoodText\(row, locale\)/);
   assert.match(foodView, /adminLocalizedFoodText\(draft, locale\)/);
@@ -553,7 +560,8 @@ test("admin DB object titles are rendered through localized translation helpers"
   assert.match(dashboard, /foodsData=\{foodsData\}/);
 
   assert.match(dashboardPage, /getAdminProductCoverageData/);
-  assert.match(dashboardPage, /getAdminPlanCoverageSimulationData/);
+  assert.doesNotMatch(dashboardPage, /getAdminPlanCoverageSimulationData/);
+  assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
   assert.doesNotMatch(dashboardPage, /getAdminSupplementImprovementInsightsData/);
   assert.doesNotMatch(dashboardPage, /getAdminProductImprovementInsightsData\(range,\s*locale\)/);
   assert.doesNotMatch(dashboardPage, /getAdminFoodImprovementInsightsData\(range,\s*locale\)/);

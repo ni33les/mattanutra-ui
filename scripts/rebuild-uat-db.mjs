@@ -96,6 +96,7 @@ async function terminateTargetSessions(env) {
       from pg_stat_activity
       where pid <> pg_backend_pid()
         and datname = current_database()
+        and backend_type = 'client backend'
     `;
 
     if (summary.terminated > 0) {
@@ -272,12 +273,26 @@ await runNpmScript("uat:seed:minimal-runtime", {
   MATTANUTRA_UAT_PRESERVE_CONFIG: preserveConfig ? "true" : "false",
 });
 
+await terminateTargetSessions(rebuildEnv);
+await runNpmScript("uat:sync-retail-inventory", {
+  ...rebuildEnv,
+  MATTANUTRA_CONFIRM_UAT_RETAIL_SYNC: "sync",
+});
+
 if (preserveConfig) {
+  await runTsScript(
+    "scripts/uat-preserved-config.ts",
+    ["restore", `--snapshot=${preserveSnapshot}`],
+    rebuildEnv,
+  );
+
   await runTsScript(
     "scripts/uat-preserved-config.ts",
     ["verify", `--snapshot=${preserveSnapshot}`],
     rebuildEnv,
   );
+
+  await runNpmScript("uat:workers:repair", rebuildEnv);
 }
 
 await grantMnAccess(rebuildEnv);

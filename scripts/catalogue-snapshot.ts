@@ -42,6 +42,9 @@ const includeDbBackup = !hasArg("no-db-backup");
 const strictMasterData =
   hasArg("strict-master-data") ||
   process.env.MATTANUTRA_STRICT_MASTER_SNAPSHOT === "true";
+const allowIncompleteTranslations =
+  hasArg("allow-incomplete-translations") ||
+  process.env.MATTANUTRA_ALLOW_INCOMPLETE_TRANSLATIONS === "true";
 const skipValidation =
   hasArg("skip-validation") ||
   process.env.MATTANUTRA_SKIP_MASTER_SNAPSHOT_VALIDATION === "true";
@@ -70,7 +73,10 @@ for (const table of CATALOGUE_SNAPSHOT_TABLES) {
 
 const validation = skipValidation
   ? { errors: [], ok: true }
-  : validateCuratedMasterSnapshot(tables, { strict: strictMasterData });
+  : validateCuratedMasterSnapshot(tables, {
+      allowIncompleteTranslations,
+      strict: strictMasterData
+    });
 
 if (!validation.ok) {
   throw new Error(
@@ -105,6 +111,7 @@ await sql.end({ timeout: 1 });
 
 console.log(JSON.stringify({
   counts,
+  allowIncompleteTranslations,
   dbBackupSchema: includeDbBackup ? schemaName : null,
   outputPath,
   skipValidation,

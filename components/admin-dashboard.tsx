@@ -133,6 +133,19 @@ const sessionRoleLabels = {
   }
 } satisfies Record<Locale, Record<AdminRole, string>>;
 
+const pageDescriptions: Partial<Record<AdminDashboardView, Record<Locale, string>>> = {
+  "plan-coverage-simulator": {
+    en: "Run synthetic customer plans against the current eligible catalogue. Results appear one sample at a time, improve as the run grows, and never write recommendation runs, tasks, BPM events, or customer records.",
+    th: "จำลองแผนลูกค้ากับแคตตาล็อกที่พร้อมจับคู่ในปัจจุบัน ผลลัพธ์จะเพิ่มทีละตัวอย่างและไม่เขียน recommendation runs, tasks, BPM events หรือข้อมูลลูกค้า",
+    "zh-CN": "用当前可匹配目录运行合成客户方案模拟。结果会逐个样本更新，并且不会写入推荐运行、任务、BPM 事件或客户记录。"
+  },
+  "product-coverage": {
+    en: "Shows every active supplement and whether the master product catalogue has clean, approved, retail-available products that can match it. Open a supplement to see which products need cleanup.",
+    th: "แสดงอาหารเสริมที่ใช้งานทั้งหมดและดูว่าแคตตาล็อกสินค้ามีสินค้าที่สะอาด อนุมัติแล้ว และพร้อมขายสำหรับจับคู่หรือไม่ เปิดรายการเพื่อดูสินค้าที่ต้องแก้ไข",
+    "zh-CN": "显示每个启用中的补充剂，以及主产品目录中是否有干净、已批准且可零售匹配的产品。展开补充剂可查看需要清理的产品。"
+  }
+};
+
 function AdminSessionBar({
   context,
   labels,
@@ -442,6 +455,7 @@ export function AdminDashboard({
   view: AdminDashboardView;
 }>) {
   const labels = content[locale];
+  const pageDescription = pageDescriptions[view]?.[locale];
   const allowedViews = allowedAdminViews(
     adminContext,
     adminContext.effectiveOrganisation.type
@@ -613,6 +627,11 @@ export function AdminDashboard({
                   {labels.generated}: {formatGeneratedAt(data.generatedAt, locale)}
                 </p>
               ) : null}
+              {pageDescription ? (
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500">
+                  {pageDescription}
+                </p>
+              ) : null}
             </div>
             <div className="hidden items-center gap-3 lg:flex lg:justify-end">
               <AdminLocaleSwitcher
@@ -778,6 +797,7 @@ export function AdminDashboard({
               accessToken={accessToken}
               data={planCoverageSimulationData}
               locale={locale}
+              range={data.range}
             />
           ) : view === "agents" ? (
             <AdminAgentsView

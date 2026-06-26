@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { shouldRedirectToHttps } from "../lib/https-redirect.ts";
 
@@ -36,6 +37,17 @@ describe("https redirect policy", () => {
         xForwardedProto: "http"
       }),
       false
+    );
+  });
+
+  it("does not upgrade local dev assets to https", async () => {
+    const config = await readFile("next.config.ts", "utf8");
+    const occurrences = config.match(/"upgrade-insecure-requests"/g) ?? [];
+
+    assert.equal(occurrences.length, 1);
+    assert.match(
+      config,
+      /\.\.\.\(isDevelopment \? \[\] : \["upgrade-insecure-requests"\]\)/
     );
   });
 });

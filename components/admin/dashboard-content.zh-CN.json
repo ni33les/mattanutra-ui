@@ -684,7 +684,7 @@
       "view": "customer-insights"
     },
     {
-      "name": "产品覆盖",
+      "name": "补充剂覆盖",
       "view": "product-coverage"
     },
     {
@@ -734,7 +734,7 @@
     "people": "人员",
     "panya": "Panya",
     "plan-coverage-simulator": "方案覆盖模拟器",
-    "product-coverage": "产品覆盖",
+    "product-coverage": "补充剂覆盖",
     "products": "产品",
     "retail-customer-orders": "客户订单",
     "retail-audit": "审计",
@@ -886,6 +886,8 @@
     "details": "详情",
     "dose": "最大剂量",
     "empty": "无补充剂匹配这些筛选条件。",
+    "exportCsv": "导出 CSV",
+    "exportJson": "导出 JSON",
     "maxAmount": "数量",
     "maxUnit": "单位",
     "name": "名称",

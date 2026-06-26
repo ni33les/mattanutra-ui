@@ -36,6 +36,10 @@ describe("continuous improvement insights", () => {
     );
     const dashboard = readFileSync("components/admin-dashboard.tsx", "utf8");
     const page = readFileSync("app/[locale]/admin/dashboard/page.tsx", "utf8");
+    const simulationInputRoute = readFileSync(
+      "app/api/admin/product-coverage/simulation-input/route.ts",
+      "utf8"
+    );
 
     assert.match(dashboardContent, /"customer-insights"/);
     assert.match(dashboardContent, /"product-coverage"/);
@@ -55,7 +59,8 @@ describe("continuous improvement insights", () => {
     assert.doesNotMatch(dashboard, /AdminFoodImprovementInsightsView/);
     assert.doesNotMatch(page, /getAdminSupplementAvailabilityMatrixData/);
     assert.match(page, /getAdminProductCoverageData/);
-    assert.match(page, /getAdminPlanCoverageSimulationData/);
+    assert.doesNotMatch(page, /getAdminPlanCoverageSimulationData/);
+    assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
     assert.doesNotMatch(page, /getAdminProductRecommendationInsightsData/);
     assert.doesNotMatch(page, /getAdminSupplementImprovementInsightsData/);
     assert.doesNotMatch(page, /getAdminProductImprovementInsightsData/);

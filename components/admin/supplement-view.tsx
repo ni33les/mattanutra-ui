@@ -64,6 +64,101 @@ function LocalizedFallbackBadge({
   ) : null;
 }
 
+function csvCell(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  const text = Array.isArray(value)
+    ? value.join("; ")
+    : typeof value === "object"
+      ? JSON.stringify(value)
+      : String(value);
+
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function supplementExportRow(row: AdminSupplementRow) {
+  return {
+    aliases: row.aliases.map((alias) => alias.name),
+    category: row.category,
+    confidence: row.confidence,
+    id: row.id,
+    ingredientType: row.ingredientType ?? "",
+    listStatus: row.listStatus,
+    maxAmount: row.maxAmount,
+    maxUnit: row.maxUnit,
+    name: row.name,
+    primaryUseCase: row.primaryUseCase ?? "",
+    safetyFlags: row.safetyFlags,
+    safetyNotes: row.safetyNotes ?? "",
+    selectionChosenPlanCount: row.selectionStats?.chosenPlanCount ?? 0,
+    selectionLastSelectedAt: row.selectionStats?.lastSelectedAt ?? "",
+    selectionSafetyHiddenCount: row.selectionStats?.safetyHiddenCount ?? 0,
+    selectionTopDoses: row.selectionStats?.topDoses.map((dose) =>
+      `${dose.label} (${dose.count})`
+    ) ?? [],
+    sourceStatus: row.sourceStatus,
+    translations: row.translations,
+    updatedAt: row.updatedAt
+  };
+}
+
+function supplementRowsToCsv(rows: readonly AdminSupplementRow[]) {
+  const headers = [
+    "id",
+    "name",
+    "category",
+    "ingredientType",
+    "primaryUseCase",
+    "sourceStatus",
+    "listStatus",
+    "confidence",
+    "maxAmount",
+    "maxUnit",
+    "safetyFlags",
+    "safetyNotes",
+    "aliases",
+    "selectionChosenPlanCount",
+    "selectionSafetyHiddenCount",
+    "selectionLastSelectedAt",
+    "selectionTopDoses",
+    "translations",
+    "updatedAt"
+  ] as const;
+  const lines = rows.map((row) => {
+    const exportRow = supplementExportRow(row);
+
+    return headers.map((header) => csvCell(exportRow[header])).join(",");
+  });
+
+  return [
+    headers.join(","),
+    ...lines
+  ].join("\n");
+}
+
+function downloadTextFile(input: Readonly<{
+  content: string;
+  filename: string;
+  type: string;
+}>) {
+  const blob = new Blob([input.content], { type: input.type });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = input.filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+function exportDateStamp() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function AdminSupplementsView({
   accessToken,
   data,
@@ -108,6 +203,23 @@ export function AdminSupplementsView({
 
     return matchesSearch && matchesCategory && matchesStatus;
   });
+  const exportRows = filteredRows;
+
+  function exportSupplementsCsv() {
+    downloadTextFile({
+      content: supplementRowsToCsv(exportRows),
+      filename: `supplements-${exportDateStamp()}.csv`,
+      type: "text/csv;charset=utf-8"
+    });
+  }
+
+  function exportSupplementsJson() {
+    downloadTextFile({
+      content: JSON.stringify(exportRows.map(supplementExportRow), null, 2),
+      filename: `supplements-${exportDateStamp()}.json`,
+      type: "application/json;charset=utf-8"
+    });
+  }
 
   function syncRow(row: AdminSupplementRow) {
     setRows((currentRows) =>
@@ -369,17 +481,33 @@ export function AdminSupplementsView({
               </option>
             ))}
           </select>
-          <button
-            aria-label={labels.supplements.addSupplement}
-            className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
-            onClick={() => {
-              setCreateOpen(true);
-              setCreateError(false);
-            }}
-            type="button"
-          >
-            {labels.supplements.addSupplement}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
+              onClick={exportSupplementsCsv}
+              type="button"
+            >
+              {labels.supplements.exportCsv}
+            </button>
+            <button
+              className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
+              onClick={exportSupplementsJson}
+              type="button"
+            >
+              {labels.supplements.exportJson}
+            </button>
+            <button
+              aria-label={labels.supplements.addSupplement}
+              className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
+              onClick={() => {
+                setCreateOpen(true);
+                setCreateError(false);
+              }}
+              type="button"
+            >
+              {labels.supplements.addSupplement}
+            </button>
+          </div>
         </div>
       </div>
 

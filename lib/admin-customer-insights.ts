@@ -1456,7 +1456,8 @@ export function buildCustomerInsightArchetypes(
 }
 
 export async function getAdminCustomerInsightsData(
-  range: AdminDashboardRange
+  range: AdminDashboardRange,
+  options: Readonly<{ enrichSegments?: boolean }> = {}
 ): Promise<AdminCustomerInsightsData> {
   const sql = getSql();
 
@@ -1490,7 +1491,12 @@ export async function getAdminCustomerInsightsData(
     });
     const built = buildCustomerInsightSegments(drafts);
     const archetypes = buildCustomerInsightArchetypes(built.customers);
-    const enriched = await enrichCustomerInsightSegments(built.segments);
+    const enriched = options.enrichSegments === false
+      ? {
+          aiStatus: "disabled" as const,
+          segments: built.segments
+        }
+      : await enrichCustomerInsightSegments(built.segments);
 
     return {
       aiStatus: enriched.aiStatus,

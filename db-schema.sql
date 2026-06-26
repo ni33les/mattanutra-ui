@@ -26,6 +26,7 @@ drop table if exists
   public.assessment_events,
   public.assessment_example_requests,
   public.assessment_formulations,
+  public.assessment_resume_drafts,
   public.assessment_submissions,
   public.assessment_versions,
   public.assessments,
@@ -94,6 +95,8 @@ drop table if exists
   public.products,
   public.rays,
   public.recommendations,
+  public.retail_checkout_payment_versions,
+  public.retail_checkout_payments,
   public.retail_order_allocations,
   public.retail_customer_order_lines,
   public.retail_customer_orders,
@@ -128,6 +131,7 @@ drop table if exists
   public.task_reservations,
   public.tasks,
   public.testimonials,
+  public.thai_tax_rates,
   public.worker_sessions
 cascade;
 
@@ -2026,7 +2030,7 @@ CREATE TABLE public.products (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT products_availability_status_check CHECK ((availability_status = ANY (ARRAY['in_stock'::text, 'out_of_stock'::text, 'unavailable'::text, 'unknown'::text]))),
     CONSTRAINT products_label_status_check CHECK ((label_status = ANY (ARRAY['failed'::text, 'missing'::text, 'parsed'::text, 'stale'::text]))),
-    CONSTRAINT products_platform_check CHECK ((platform = ANY (ARRAY['lazada'::text, 'manual'::text, 'shopee'::text]))),
+    CONSTRAINT products_platform_check CHECK ((platform = ANY (ARRAY['lazada'::text, 'manual'::text, 'shopee'::text, 'wholesale_pharmacy_import'::text]))),
     CONSTRAINT products_product_audience_check CHECK ((product_audience = ANY (ARRAY['both'::text, 'female'::text, 'male'::text]))),
     CONSTRAINT products_product_kind_check CHECK ((product_kind = ANY (ARRAY['food'::text, 'multi'::text, 'other'::text, 'supplement'::text]))),
     CONSTRAINT products_status_check CHECK ((status = ANY (ARRAY['approved'::text, 'ignored'::text, 'pending_review'::text]))),

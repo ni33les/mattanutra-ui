@@ -61,7 +61,7 @@ const securityHeaders = [
         : "script-src 'self' 'unsafe-inline' https://js.stripe.com",
       "style-src 'self' 'unsafe-inline'",
       "worker-src 'self' blob:",
-      "upgrade-insecure-requests"
+      ...(isDevelopment ? [] : ["upgrade-insecure-requests"])
     ].join("; ")
   },
   {

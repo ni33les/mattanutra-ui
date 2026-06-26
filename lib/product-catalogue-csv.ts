@@ -29,6 +29,11 @@ import type {
   ProductKind,
   ProductStatus,
 } from "@/lib/product-recommendations";
+import {
+  V9_PRODUCT_MASTER_SCHEMA,
+  v9MasterListMetadataFromSourceSnapshot,
+  v9MasterListProductFromSourceSnapshot,
+} from "@/lib/v9-product-master";
 
 export type ProductCatalogueCsvScope = "platform" | "retail";
 
@@ -36,17 +41,9 @@ export type PlatformProductCatalogueJson = Readonly<{
   generatedAt: string;
   productCount: number;
   products: ReturnType<typeof platformProductCatalogueJsonProductFromRow>[];
-  schemaVersion: 1;
-  scope: "platform";
-  summary: {
-    approved: number;
-    dirtyData: number;
-    ignored: number;
-    missingFacts: number;
-    missingImage: number;
-    pendingReview: number;
-    total: number;
-  };
+  schema: typeof V9_PRODUCT_MASTER_SCHEMA;
+  scope: string;
+  summary: unknown;
 }>;
 
 export type RetailProductCatalogueJson = Readonly<{
@@ -874,6 +871,29 @@ export function platformProductCatalogueJsonProductFromRow(
   row: AdminProductRow,
   sourceImageUrl: string | null = null,
 ) {
+  const v9Product = v9MasterListProductFromSourceSnapshot(row.sourceSnapshot);
+
+  if (v9Product) {
+    return {
+      ...v9Product,
+      canonicalImageUrl: Object.hasOwn(v9Product, "canonicalImageUrl")
+        ? v9Product.canonicalImageUrl
+        : row.imageUrl,
+      price: Object.hasOwn(v9Product, "price")
+        ? v9Product.price
+        : temporaryPlatformExportPrice(row),
+      productUrl: Object.hasOwn(v9Product, "productUrl")
+        ? v9Product.productUrl
+        : row.productUrl,
+      sourceImageUrl: Object.hasOwn(v9Product, "sourceImageUrl")
+        ? v9Product.sourceImageUrl
+        : sourceImageUrl,
+      updatedAt: Object.hasOwn(v9Product, "updatedAt")
+        ? v9Product.updatedAt
+        : row.updatedAt,
+    };
+  }
+
   return {
     availabilityStatus: row.availabilityStatus,
     brand: {
@@ -945,19 +965,23 @@ export function platformProductCatalogueJsonProductFromRow(
 export async function buildPlatformProductCatalogueJson(): Promise<PlatformProductCatalogueJson> {
   const data = await getAdminProductsData();
   const sourceImageUrls = await platformProductSourceImageUrls(data.rows);
+  const metadata = data.rows
+    .map((row) => v9MasterListMetadataFromSourceSnapshot(row.sourceSnapshot))
+    .find(Boolean);
+  const products = data.rows.map((row) =>
+    platformProductCatalogueJsonProductFromRow(
+      row,
+      sourceImageUrls.get(row.id) ?? null,
+    ),
+  );
 
   return {
-    generatedAt: data.generatedAt,
-    productCount: data.rows.length,
-    products: data.rows.map((row) =>
-      platformProductCatalogueJsonProductFromRow(
-        row,
-        sourceImageUrls.get(row.id) ?? null,
-      ),
-    ),
-    schemaVersion: 1,
-    scope: "platform",
-    summary: data.summary,
+    generatedAt: metadata?.generatedAt ?? data.generatedAt,
+    productCount: products.length,
+    products,
+    schema: V9_PRODUCT_MASTER_SCHEMA,
+    scope: metadata?.scope ?? "platform",
+    summary: metadata?.summary ?? data.summary,
   };
 }
 

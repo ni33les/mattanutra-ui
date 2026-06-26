@@ -788,6 +788,8 @@ export type AdminContent = Readonly<{
     details: string;
     dose: string;
     empty: string;
+    exportCsv: string;
+    exportJson: string;
     maxAmount: string;
     maxUnit: string;
     name: string;
@@ -1464,7 +1466,7 @@ const baseContent = {
     retailSellingTitle: "Orders",
     insights: [
       { icon: UserGroupIcon, name: "Customer Intelligence", view: "customer-insights" },
-      { icon: BeakerIcon, name: "Product Coverage", view: "product-coverage" },
+      { icon: BeakerIcon, name: "Supplement Coverage", view: "product-coverage" },
       { icon: FunnelIcon, name: "Plan Simulator", view: "plan-coverage-simulator" }
     ],
     insightsTitle: "Insights",
@@ -1497,7 +1499,7 @@ const baseContent = {
       people: "People",
       panya: "Panya",
       "plan-coverage-simulator": "Plan Coverage Simulator",
-      "product-coverage": "Product Coverage",
+      "product-coverage": "Supplement Coverage",
       products: "Products",
       "retail-customer-orders": "Customer Orders",
       "retail-audit": "Audit",
@@ -1650,6 +1652,8 @@ const baseContent = {
       details: "Details",
       dose: "Max dose",
       empty: "No supplements match these filters.",
+      exportCsv: "Export CSV",
+      exportJson: "Export JSON",
       maxAmount: "Amount",
       maxUnit: "Unit",
       name: "Name",
@@ -2331,7 +2335,7 @@ const baseContent = {
     retailSellingTitle: "คำสั่งซื้อ",
     insights: [
       { icon: UserGroupIcon, name: "ข้อมูลลูกค้า", view: "customer-insights" },
-      { icon: BeakerIcon, name: "ความครอบคลุมสินค้า", view: "product-coverage" },
+      { icon: BeakerIcon, name: "ความครอบคลุมอาหารเสริม", view: "product-coverage" },
       { icon: FunnelIcon, name: "จำลองความครอบคลุม", view: "plan-coverage-simulator" }
     ],
     insightsTitle: "อินไซต์",
@@ -2364,7 +2368,7 @@ const baseContent = {
       people: "ผู้ใช้",
       panya: "Panya",
       "plan-coverage-simulator": "จำลองความครอบคลุมแผน",
-      "product-coverage": "ความครอบคลุมสินค้า",
+      "product-coverage": "ความครอบคลุมอาหารเสริม",
       products: "สินค้า",
       "retail-customer-orders": "คำสั่งซื้อลูกค้า",
       "retail-audit": "บันทึกเหตุการณ์",
@@ -2517,6 +2521,8 @@ const baseContent = {
       details: "รายละเอียด",
       dose: "ขนาดสูงสุด",
       empty: "ไม่พบอาหารเสริมตามตัวกรองนี้",
+      exportCsv: "ส่งออก CSV",
+      exportJson: "ส่งออก JSON",
       maxAmount: "ปริมาณ",
       maxUnit: "หน่วย",
       name: "ชื่อ",

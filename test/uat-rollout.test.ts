@@ -361,6 +361,19 @@ describe("UAT destructive rebuild master data guardrails", () => {
       /product product-1 is missing zh-CN translation/,
     );
 
+    assert.deepEqual(
+      validateCuratedMasterSnapshot(
+        sampleSnapshotTables({
+          product_translations: [
+            { product_id: "product-1", locale: "en" },
+            { product_id: "product-1", locale: "th" },
+          ],
+        }),
+        { allowIncompleteTranslations: true, strict: true },
+      ).errors,
+      [],
+    );
+
     assert.match(
       validateCuratedMasterSnapshot(
         sampleSnapshotTables({

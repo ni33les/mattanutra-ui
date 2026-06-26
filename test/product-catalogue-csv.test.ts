@@ -8,6 +8,7 @@ import {
   retailProductCatalogueJsonProductFromRow,
 } from "@/lib/product-catalogue-csv";
 import type { AdminProductRow } from "@/lib/admin-products";
+import { V9_PRODUCT_MASTER_SCHEMA } from "@/lib/v9-product-master";
 
 function deepKeys(value: unknown, keys = new Set<string>()) {
   if (!value || typeof value !== "object") {
@@ -169,7 +170,7 @@ describe("product catalogue CSV", () => {
     const exported = platformProductCatalogueJsonProductFromRow(
       platformRow,
       "https://manufacturer.example/product-a.png",
-    );
+    ) as Record<string, unknown>;
 
     assert.equal(
       exported.canonicalImageUrl,
@@ -181,19 +182,24 @@ describe("product catalogue CSV", () => {
     );
     assert.deepEqual(exported.price, { amount: 1200, currency: "THB" });
     assert.deepEqual(
-      platformProductCatalogueJsonProductFromRow({
+      (platformProductCatalogueJsonProductFromRow({
         ...platformRow,
         shopAvailability: [],
-      }).price,
+      } as AdminProductRow) as Record<string, unknown>).price,
       { amount: 1234, currency: "THB" },
     );
-    assert.equal(exported.ingredients[0]?.name, "Vitamin C");
-    assert.equal(exported.translations.th?.title, "Translated Thai title");
-    assert.deepEqual(Object.keys(exported.titles).sort(), [
+    const ingredients = exported.ingredients as Array<Record<string, unknown>>;
+    const translations = exported.translations as Record<string, Record<string, unknown>>;
+    const titles = exported.titles as Record<string, unknown>;
+    const descriptions = exported.descriptions as Record<string, unknown>;
+
+    assert.equal(ingredients[0]?.name, "Vitamin C");
+    assert.equal(translations.th?.title, "Translated Thai title");
+    assert.deepEqual(Object.keys(titles).sort(), [
       "canonical",
       "display",
     ]);
-    assert.deepEqual(Object.keys(exported.descriptions).sort(), [
+    assert.deepEqual(Object.keys(descriptions).sort(), [
       "canonical",
       "display",
     ]);
@@ -201,6 +207,71 @@ describe("product catalogue CSV", () => {
       [...deepKeys(exported)].sort().join("\n"),
       /backorder|descriptionEn|descriptionTh|identifierCandidates|importReview|recommendationHistory|retail|rrp|sourceEvidence|stock|titleEn|titleTh|validation|wholesale/i,
     );
+  });
+
+  it("preserves v9 master product records for exact platform re-export", () => {
+    const masterListProduct = {
+      id: "SCR-0001",
+      status: "pending_review",
+      brand: { name: "Artrofort" },
+      productKind: "supplement",
+      category: null,
+      platform: "wholesale_pharmacy_import",
+      productAudience: "both",
+      region: "TH",
+      titles: { canonical: "ARTROFORT 30's (GLUCOSAMINE+CHONDRITIN)" },
+      translations: {
+        en: {
+          title: "ARTROFORT 30's (GLUCOSAMINE+CHONDRITIN)",
+          status: "complete",
+        },
+        th: { title: null, status: "missing" },
+      },
+      ingredients: [{ name: "Glucosamine", amount: null }],
+      regulatoryApprovals: [],
+      identifiers: [{ type: "mattanutra_sku", value: "SCR-0001" }],
+      countries: [{ countryCode: "TH", currency: "THB" }],
+      price: { amount: 782, currency: "THB" },
+      canonicalImageUrl: null,
+      sourceImageUrl: null,
+      productUrl: null,
+      sourceUrl: null,
+      descriptions: {
+        display:
+          "Added from wholesale pharmacy screenshot (sorpharmacy); RRP = wholesale 665/0.85; facts & photo pending",
+      },
+      availabilityStatus: "unknown",
+      identifiedActive: "Glucosamine",
+      enrichmentState: "needs_dose_only",
+      updatedAt: "2026-06-23T09:08:33.007059+00:00",
+    };
+    const exported = platformProductCatalogueJsonProductFromRow({
+      id: "18b1cb7e-75fa-5159-b086-b65c6bc63e0a",
+      imageUrl: "https://cdn.mattanutra.com/products/fallback.webp",
+      productUrl: "manual://v9-master-list/SCR-0001",
+      shopAvailability: [],
+      sourceSnapshot: {
+        masterListGeneratedAt: "2026-06-23T09:10:00.000Z",
+        masterListId: "SCR-0001",
+        masterListProduct,
+        masterListSchema: V9_PRODUCT_MASTER_SCHEMA,
+        masterListScope: "FULL master (platform + additions) - full REPLACE of dashboard product list",
+        masterListSummary: { total: 686 },
+      },
+      updatedAt: "2026-06-23T09:20:00.000Z",
+    } as unknown as AdminProductRow) as Record<string, unknown>;
+    const ingredients = exported.ingredients as Array<Record<string, unknown>>;
+
+    assert.equal(exported.id, "SCR-0001");
+    assert.equal(exported.platform, "wholesale_pharmacy_import");
+    assert.equal(exported.productUrl, null);
+    assert.equal(exported.sourceUrl, null);
+    assert.deepEqual(exported.price, { amount: 782, currency: "THB" });
+    assert.equal(ingredients[0]?.name, "Glucosamine");
+    assert.equal(exported.enrichmentState, "needs_dose_only");
+    assert.deepEqual(exported.identifiers, [
+      { type: "mattanutra_sku", value: "SCR-0001" },
+    ]);
   });
 
   it("exports retail products as lean agent JSON with stock and prices", () => {

@@ -1,5 +1,11 @@
 import { getSql } from "@/lib/db";
 import {
+  getAdminCustomerInsightsData,
+  type AdminCustomerInsightsData,
+  type CustomerInsightProfile
+} from "@/lib/admin-customer-insights";
+import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
+import {
   defaultProductCountryCode,
   normalizeProductCountryCode
 } from "@/lib/product-countries";
@@ -9,16 +15,49 @@ import {
 } from "@/lib/admin-product-search";
 import {
   exclusionReason,
-  factComparableAmount,
-  safePercent
+  factComparableAmount
 } from "@/lib/product-recommendation-metrics";
 import {
-  recommendProductStackFullBeam,
   type ProductCandidate,
-  type ProductCandidateFact,
-  type ProductClientSex,
-  type ProductRecommendationNeed
+  type ProductCandidateFact
 } from "@/lib/product-recommendations";
+import {
+  emptyAdminPlanCoverageSimulationData,
+  productPrice,
+  targetComparableAmountBySupplement,
+  type AdminPlanCoverageSimulationData,
+  type AdminPlanCoverageSimulationSupplement,
+  type AdminSimulationReviewProductRow,
+  type SyntheticPlanArchetype
+} from "@/lib/admin-product-coverage-simulation";
+
+export {
+  ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
+  DEFAULT_SIMULATION_SAMPLE_SIZE,
+  DEFAULT_SIMULATION_SEED,
+  SIMULATION_ARCHETYPES,
+  adminPlanCoverageSimulationDataFromRunner,
+  buildSimulationNextMoveRows,
+  createAdminPlanCoverageSimulationRunner,
+  emptyAdminPlanCoverageSimulationData,
+  normalizeDemandProfiles,
+  normalizeSyntheticPlanArchetypes,
+  normalizeSimulationSampleSize,
+  runAdminPlanCoverageSimulation,
+  runNextAdminPlanCoverageSimulationSample
+} from "@/lib/admin-product-coverage-simulation";
+export type {
+  AdminPlanCoverageDemandProfile,
+  AdminPlanCoverageSimulationData,
+  AdminPlanCoverageSimulationInput,
+  AdminPlanCoverageSimulationProductStats,
+  AdminPlanCoverageSimulationRunner,
+  AdminPlanCoverageSimulationSupplement,
+  AdminSimulationNextMoveRow,
+  AdminSimulationReviewProductRow,
+  AdminSimulationProductUsefulnessRow,
+  SyntheticPlanArchetype
+} from "@/lib/admin-product-coverage-simulation";
 
 export type SupplementCoverageState =
   | "covered"
@@ -74,50 +113,6 @@ export type AdminProductCoverageData = Readonly<{
   };
 }>;
 
-export type SyntheticPlanArchetype = Readonly<{
-  clientSex: ProductClientSex | null;
-  id: string;
-  name: string;
-  needCount: number;
-}>;
-
-export type AdminPlanCoverageSimulationData = Readonly<{
-  countryCode: string;
-  databaseAvailable: boolean;
-  generatedAt: string;
-  sampleSize: number;
-  seed: string;
-  summary: {
-    averageCoveragePercent: number;
-    medianCoveragePercent: number;
-    p10CoveragePercent: number;
-    percentAbove50: number;
-    percentAbove75: number;
-    percentAbove90: number;
-    expectedCostAmount: number | null;
-    currency: string;
-  };
-  archetypes: readonly SyntheticPlanArchetype[];
-  compactCatalog: readonly AdminSimulationProductUsefulnessRow[];
-  mostUsefulProducts: readonly AdminSimulationProductUsefulnessRow[];
-  unmetSupplements: ReadonlyArray<Readonly<{
-    count: number;
-    name: string;
-    percent: number;
-  }>>;
-}>;
-
-export type AdminSimulationProductUsefulnessRow = Readonly<{
-  averageProductCoveragePercent: number;
-  averageStackContributionPercent: number;
-  brandName: string | null;
-  chosenCount: number;
-  expectedPriceAmount: number | null;
-  id: string;
-  rank: number;
-  title: string;
-}>;
-
 type SupplementRow = Readonly<{
   category: string | null;
   id: string;
@@ -125,24 +120,7 @@ type SupplementRow = Readonly<{
   normalized_name: string;
 }>;
 
-type CoverageSupplementInput = Readonly<{
-  category: string | null;
-  id: string;
-  name: string;
-  normalizedName: string;
-  targetComparableAmount: number | null;
-}>;
-
-const DEFAULT_SIMULATION_SAMPLE_SIZE = 64;
-const DEFAULT_SIMULATION_SEED = "mattanutra-product-coverage-v1";
-const SIMULATION_ARCHETYPES: readonly SyntheticPlanArchetype[] = [
-  { clientSex: null, id: "general-wellness", name: "General wellness", needCount: 4 },
-  { clientSex: null, id: "active-recovery", name: "Active recovery", needCount: 5 },
-  { clientSex: null, id: "stress-sleep", name: "Stress and sleep", needCount: 4 },
-  { clientSex: null, id: "healthy-ageing", name: "Healthy ageing", needCount: 6 },
-  { clientSex: "female", id: "female-support", name: "Female support", needCount: 5 },
-  { clientSex: "male", id: "male-support", name: "Male support", needCount: 5 }
-];
+type CoverageSupplementInput = AdminPlanCoverageSimulationSupplement;
 
 function emptyProductCoverageData(countryCode = defaultProductCountryCode): AdminProductCoverageData {
   return {
@@ -167,115 +145,15 @@ export function emptyAdminProductCoverageData(
   return emptyProductCoverageData(countryCode);
 }
 
-export function emptyAdminPlanCoverageSimulationData(
-  input: Readonly<{
-    countryCode?: string | null;
-    sampleSize?: number | null;
-    seed?: string | null;
-  }> = {}
-): AdminPlanCoverageSimulationData {
-  return {
-    archetypes: SIMULATION_ARCHETYPES,
-    compactCatalog: [],
-    countryCode: normalizeCoverageCountryCode(input.countryCode),
-    databaseAvailable: false,
-    generatedAt: new Date().toISOString(),
-    mostUsefulProducts: [],
-    sampleSize: normalizeSimulationSampleSize(input.sampleSize),
-    seed: input.seed?.trim() || DEFAULT_SIMULATION_SEED,
-    summary: {
-      averageCoveragePercent: 0,
-      currency: "THB",
-      expectedCostAmount: null,
-      medianCoveragePercent: 0,
-      p10CoveragePercent: 0,
-      percentAbove50: 0,
-      percentAbove75: 0,
-      percentAbove90: 0
-    },
-    unmetSupplements: []
-  };
-}
-
 function normalizeCoverageCountryCode(value: string | null | undefined) {
   return normalizeProductCountryCode(value ?? defaultProductCountryCode) ??
     defaultProductCountryCode;
-}
-
-export function normalizeSimulationSampleSize(value: unknown) {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed)
-    ? Math.min(256, Math.max(8, Math.round(parsed)))
-    : DEFAULT_SIMULATION_SAMPLE_SIZE;
 }
 
 function positiveNumberOrNull(value: unknown) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function median(values: readonly number[]) {
-  const sorted = [...values].filter(Number.isFinite).sort((a, b) => a - b);
-
-  if (sorted.length < 1) {
-    return 0;
-  }
-
-  const middle = Math.floor(sorted.length / 2);
-
-  return sorted.length % 2
-    ? sorted[middle] ?? 0
-    : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
-}
-
-function percentile(values: readonly number[], percentileRank: number) {
-  const sorted = [...values].filter(Number.isFinite).sort((a, b) => a - b);
-
-  if (sorted.length < 1) {
-    return 0;
-  }
-
-  const index = Math.max(
-    0,
-    Math.min(sorted.length - 1, Math.floor((percentileRank / 100) * sorted.length))
-  );
-
-  return sorted[index] ?? 0;
-}
-
-function average(values: readonly number[]) {
-  return values.length > 0
-    ? values.reduce((total, value) => total + value, 0) / values.length
-    : 0;
-}
-
-function hashSeed(value: string) {
-  let hash = 2166136261;
-
-  for (const char of value) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return hash >>> 0;
-}
-
-function seededRandom(seed: string) {
-  let state = hashSeed(seed) || 1;
-
-  return () => {
-    state = Math.imul(state ^ (state >>> 15), 1 | state);
-    state ^= state + Math.imul(state ^ (state >>> 7), 61 | state);
-
-    return ((state ^ (state >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function productPrice(product: ProductCandidate) {
-  return positiveNumberOrNull(product.unitPriceAmount) ??
-    positiveNumberOrNull(product.priceAmount);
 }
 
 function moneyLabel(amount: number | null, currency: string) {
@@ -478,34 +356,285 @@ function supplementInputs(
   rows: readonly SupplementRow[],
   candidates: readonly ProductCandidate[]
 ): CoverageSupplementInput[] {
-  const comparableAmountsBySupplement = new Map<string, number[]>();
-
-  for (const product of candidates) {
-    for (const fact of product.facts) {
-      if (!fact.supplementId) {
-        continue;
-      }
-
-      const comparableAmount = factComparableAmount(fact);
-
-      if (comparableAmount === null) {
-        continue;
-      }
-
-      const list = comparableAmountsBySupplement.get(fact.supplementId) ?? [];
-      list.push(comparableAmount);
-      comparableAmountsBySupplement.set(fact.supplementId, list);
-    }
-  }
+  const comparableAmountBySupplement =
+    targetComparableAmountBySupplement(candidates);
 
   return rows.map((row) => ({
     category: row.category,
     id: row.id,
     name: row.name,
     normalizedName: row.normalized_name,
-    targetComparableAmount:
-      median(comparableAmountsBySupplement.get(row.id) ?? []) || 1000
+    targetComparableAmount: comparableAmountBySupplement.get(row.id) ?? 1000
   }));
+}
+
+function productPassesSimulationCandidateGate(product: ProductCandidate) {
+  return product.status === "approved" &&
+    product.brandStatus === "approved" &&
+    product.validation?.status === "pass" &&
+    product.automatedSafetyPassed;
+}
+
+const realCustomerProfileLimit = 256;
+const reviewPriorityProductLimit = 250;
+
+function uniqueList(values: readonly string[], max = 8) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const text = value.trim();
+    const key = text.toLowerCase();
+
+    if (!text || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(text);
+
+    if (result.length >= max) {
+      break;
+    }
+  }
+
+  return result;
+}
+
+function ageFromBand(ageBand: string | null): number | null {
+  if (ageBand === "18-25") {
+    return 22;
+  }
+
+  if (ageBand === "26-35") {
+    return 31;
+  }
+
+  if (ageBand === "36-45") {
+    return 41;
+  }
+
+  if (ageBand === "46-55") {
+    return 51;
+  }
+
+  if (ageBand === "56-65") {
+    return 61;
+  }
+
+  if (ageBand === "66+") {
+    return 70;
+  }
+
+  return null;
+}
+
+function clientSexFromCustomer(customer: CustomerInsightProfile) {
+  return customer.demographics.sex === "female" || customer.demographics.sex === "male"
+    ? customer.demographics.sex
+    : null;
+}
+
+function realCustomerNeedCount(input: Readonly<{
+  goals: readonly string[];
+  preferredSupplementNames: readonly string[];
+}>) {
+  const signalCount =
+    input.preferredSupplementNames.length > 0
+      ? input.preferredSupplementNames.length
+      : Math.max(4, input.goals.length + 2);
+
+  return Math.max(1, Math.min(8, signalCount));
+}
+
+function customerProfileDescription(customer: CustomerInsightProfile) {
+  return [
+    customer.profile,
+    customer.demographics.ageLabel,
+    customer.demographics.lifeStage,
+    customer.entitlementLabel,
+    customer.goals.length > 0 ? `Goals: ${customer.goals.slice(0, 3).join(", ")}` : null,
+    customer.constraints.length > 0
+      ? `Constraints: ${customer.constraints.slice(0, 3).join(", ")}`
+      : null
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function simulationCustomerProfilesFromInsights(
+  data: AdminCustomerInsightsData
+) {
+  return data.customers
+    .slice()
+    .sort((first, second) =>
+      second.lastActivityAt.localeCompare(first.lastActivityAt)
+    )
+    .slice(0, realCustomerProfileLimit)
+    .map((customer, index): SyntheticPlanArchetype => {
+      const preferredSupplementNames = uniqueList(
+        customer.supplementInterests,
+        8
+      );
+      const goals = uniqueList(customer.goals, 8);
+
+      return {
+        age: ageFromBand(customer.demographics.ageBand),
+        clientSex: clientSexFromCustomer(customer),
+        customerCount: 1,
+        description: customerProfileDescription(customer),
+        goals,
+        id: `real-customer-${customer.planId}`,
+        medications: [],
+        name: customer.firstName
+          ? `${customer.firstName} · ${customer.archetypeLabel}`
+          : `Customer ${index + 1} · ${customer.archetypeLabel}`,
+        needCount: realCustomerNeedCount({ goals, preferredSupplementNames }),
+        preferredSupplementNames,
+        source: "customer_profile"
+      };
+    });
+}
+
+export function simulationCustomerArchetypesFromInsights(
+  data: AdminCustomerInsightsData
+) {
+  const groups = data.customers.reduce<Map<string, CustomerInsightProfile[]>>(
+    (map, customer) => {
+      const group = map.get(customer.archetypeId) ?? [];
+
+      group.push(customer);
+      map.set(customer.archetypeId, group);
+
+      return map;
+    },
+    new Map()
+  );
+
+  return [...groups.entries()]
+    .map(([id, group]): SyntheticPlanArchetype => {
+      const first = group[0];
+      const goals = uniqueList(group.flatMap((customer) => customer.goals), 8);
+      const preferredSupplementNames = uniqueList(
+        group.flatMap((customer) => customer.supplementInterests),
+        10
+      );
+      const femaleCount = group.filter(
+        (customer) => customer.demographics.sex === "female"
+      ).length;
+      const maleCount = group.filter(
+        (customer) => customer.demographics.sex === "male"
+      ).length;
+      const ages = group
+        .map((customer) => ageFromBand(customer.demographics.ageBand))
+        .filter((age): age is number => age !== null);
+      const averageAge =
+        ages.length > 0
+          ? Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length)
+          : null;
+
+      return {
+        age: averageAge,
+        clientSex:
+          femaleCount > maleCount ? "female" : maleCount > femaleCount ? "male" : null,
+        customerCount: group.length,
+        description: [
+          `${group.length} real customer${group.length === 1 ? "" : "s"}`,
+          first?.entitlementLabel,
+          ...goals.slice(0, 3),
+          ...preferredSupplementNames.slice(0, 3)
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        goals,
+        id: `real-archetype-${id.replace(/[^a-z0-9]+/gi, "-")}`,
+        medications: [],
+        name: first?.archetypeLabel ?? "Real customer archetype",
+        needCount: realCustomerNeedCount({ goals, preferredSupplementNames }),
+        preferredSupplementNames,
+        source: "customer_archetype"
+      };
+    })
+    .sort(
+      (first, second) =>
+        (second.customerCount ?? 0) - (first.customerCount ?? 0) ||
+        first.name.localeCompare(second.name)
+    )
+    .slice(0, 48);
+}
+
+export function buildReviewPriorityProductRows(input: Readonly<{
+  candidates: readonly ProductCandidate[];
+  eligibleCandidates: readonly ProductCandidate[];
+  supplements: readonly AdminPlanCoverageSimulationSupplement[];
+}>): AdminSimulationReviewProductRow[] {
+  const eligibleCountBySupplement = new Map<string, number>();
+
+  for (const supplement of input.supplements) {
+    eligibleCountBySupplement.set(
+      supplement.id,
+      input.eligibleCandidates.filter((product) =>
+        productCoversSupplementForMatching(product, supplement.id)
+      ).length
+    );
+  }
+
+  return input.candidates
+    .flatMap((product): AdminSimulationReviewProductRow[] => {
+      const blockedReason = exclusionReason(product);
+
+      if (!blockedReason) {
+        return [];
+      }
+
+      const coveredSupplements = input.supplements.filter((supplement) =>
+        productCoversSupplementForMatching(product, supplement.id)
+      );
+
+      if (coveredSupplements.length < 1) {
+        return [];
+      }
+
+      const gapSupplementCount = coveredSupplements.filter((supplement) =>
+        (eligibleCountBySupplement.get(supplement.id) ?? 0) < 1
+      ).length;
+      const scarceSupplementCount = coveredSupplements.filter((supplement) =>
+        (eligibleCountBySupplement.get(supplement.id) ?? 0) === 1
+      ).length;
+      const reviewScore =
+        gapSupplementCount * 5 +
+        scarceSupplementCount * 2 +
+        coveredSupplements.length;
+
+      return [{
+        blockedReason,
+        brandName: product.brandName ?? null,
+        brandStatus: product.brandStatus ?? null,
+        coveredSupplementNames: coveredSupplements
+          .map((supplement) => supplement.name)
+          .sort((first, second) => first.localeCompare(second))
+          .slice(0, 6),
+        currency: product.currency,
+        expectedPriceAmount: productPrice(product),
+        gapSupplementCount,
+        id: product.id,
+        matchableSupplementCount: coveredSupplements.length,
+        productStatus: product.status,
+        rank: 0,
+        reviewScore,
+        title: product.title
+      }];
+    })
+    .sort((first, second) =>
+      second.reviewScore - first.reviewScore ||
+      second.gapSupplementCount - first.gapSupplementCount ||
+      second.matchableSupplementCount - first.matchableSupplementCount ||
+      (first.expectedPriceAmount ?? Number.MAX_SAFE_INTEGER) -
+        (second.expectedPriceAmount ?? Number.MAX_SAFE_INTEGER) ||
+      first.title.localeCompare(second.title)
+    )
+    .slice(0, reviewPriorityProductLimit)
+    .map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
 async function loadRetailAvailableProductIds(countryCode: string) {
@@ -585,213 +714,9 @@ export async function getAdminProductCoverageData(input: Readonly<{
   }
 }
 
-function buildSyntheticNeeds(input: Readonly<{
-  archetype: SyntheticPlanArchetype;
-  random: () => number;
-  sampleIndex: number;
-  supplements: readonly CoverageSupplementInput[];
-}>) {
-  const needs: ProductRecommendationNeed[] = [];
-  const used = new Set<string>();
-  const needCount = Math.min(input.archetype.needCount, input.supplements.length);
-  const start = Math.floor(input.random() * Math.max(1, input.supplements.length));
-
-  for (let index = 0; index < input.supplements.length && needs.length < needCount; index += 1) {
-    const supplement =
-      input.supplements[(start + index * 7 + input.sampleIndex * 3) % input.supplements.length];
-
-    if (!supplement || used.has(supplement.id)) {
-      continue;
-    }
-
-    used.add(supplement.id);
-    needs.push({
-      category: supplement.category ?? "Supplement",
-      displayName: supplement.name,
-      id: `synthetic:${input.sampleIndex}:${supplement.id}`,
-      itemType: "supplement",
-      normalizedName: supplement.normalizedName,
-      sourceId: supplement.id,
-      targetComparableAmount: supplement.targetComparableAmount ?? 1000,
-      targetDose: null,
-      targetText: null,
-      weight: Math.max(1, 8 - needs.length)
-    });
-  }
-
-  return needs;
-}
-
-function productUsefulnessRows(
-  productStats: ReadonlyMap<string, {
-    brandName: string | null;
-    coverageTotal: number;
-    priceTotal: number;
-    pricedCount: number;
-    stackContributionTotal: number;
-    title: string;
-    chosenCount: number;
-  }>,
-  sampleSize: number
-) {
-  return [...productStats.entries()]
-    .map(([id, stats]) => ({
-      averageProductCoveragePercent: safePercent(
-        stats.coverageTotal / Math.max(1, stats.chosenCount)
-      ),
-      averageStackContributionPercent: safePercent(
-        stats.stackContributionTotal / Math.max(1, stats.chosenCount)
-      ),
-      brandName: stats.brandName,
-      chosenCount: stats.chosenCount,
-      expectedPriceAmount:
-        stats.pricedCount > 0 ? Math.round(stats.priceTotal / stats.pricedCount) : null,
-      id,
-      rank: 0,
-      title: stats.title
-    }))
-    .sort((first, second) =>
-      second.averageStackContributionPercent - first.averageStackContributionPercent ||
-      second.chosenCount - first.chosenCount ||
-      (first.expectedPriceAmount ?? Number.MAX_SAFE_INTEGER) -
-        (second.expectedPriceAmount ?? Number.MAX_SAFE_INTEGER) ||
-      first.title.localeCompare(second.title)
-    )
-    .map((row, index) => ({
-      ...row,
-      chosenCount: Math.min(row.chosenCount, sampleSize),
-      rank: index + 1
-    }));
-}
-
-export function runAdminPlanCoverageSimulation(input: Readonly<{
-  candidates: readonly ProductCandidate[];
-  countryCode?: string | null;
-  sampleSize?: number | null;
-  seed?: string | null;
-  supplements: readonly CoverageSupplementInput[];
-}>): AdminPlanCoverageSimulationData {
-  const countryCode = normalizeCoverageCountryCode(input.countryCode);
-  const sampleSize = normalizeSimulationSampleSize(input.sampleSize);
-  const seed = input.seed?.trim() || DEFAULT_SIMULATION_SEED;
-  const random = seededRandom(seed);
-  const coverageValues: number[] = [];
-  const costValues: number[] = [];
-  const unmetCounts = new Map<string, number>();
-  const productStats = new Map<string, {
-    brandName: string | null;
-    coverageTotal: number;
-    priceTotal: number;
-    pricedCount: number;
-    stackContributionTotal: number;
-    title: string;
-    chosenCount: number;
-  }>();
-
-  for (let sampleIndex = 0; sampleIndex < sampleSize; sampleIndex += 1) {
-    const archetype = SIMULATION_ARCHETYPES[sampleIndex % SIMULATION_ARCHETYPES.length]!;
-    const needs = buildSyntheticNeeds({
-      archetype,
-      random,
-      sampleIndex,
-      supplements: input.supplements
-    });
-    const result = recommendProductStackFullBeam({
-      candidates: [...input.candidates],
-      clientSex: archetype.clientSex,
-      countryCode,
-      maxProducts: 6,
-      needs,
-      stackPreference: "balanced"
-    });
-    const coverage = safePercent(result.supplementProductCoveragePercent);
-    const selectedCost = result.recommendations.reduce(
-      (total, item) =>
-        total + (productPrice(item.product) ?? 0),
-      0
-    );
-
-    coverageValues.push(coverage);
-    costValues.push(selectedCost);
-
-    for (const need of result.diagnostics.unmatchedNeeds) {
-      unmetCounts.set(need.displayName, (unmetCounts.get(need.displayName) ?? 0) + 1);
-    }
-
-    for (const item of result.recommendations) {
-      const current = productStats.get(item.product.id) ?? {
-        brandName: item.product.brandName ?? null,
-        chosenCount: 0,
-        coverageTotal: 0,
-        priceTotal: 0,
-        pricedCount: 0,
-        stackContributionTotal: 0,
-        title: item.product.title
-      };
-      const price = productPrice(item.product);
-
-      current.chosenCount += 1;
-      current.coverageTotal += item.productCoveragePercent;
-      current.stackContributionTotal += item.stackContributionPercent;
-
-      if (price !== null) {
-        current.priceTotal += price;
-        current.pricedCount += 1;
-      }
-
-      productStats.set(item.product.id, current);
-    }
-  }
-
-  const mostUsefulProducts = productUsefulnessRows(productStats, sampleSize);
-  const compactCatalog = mostUsefulProducts
-    .filter((row) =>
-      row.averageStackContributionPercent > 0 &&
-      row.chosenCount / Math.max(1, sampleSize) >= 0.02
-    )
-    .slice(0, 24)
-    .map((row, index) => ({ ...row, rank: index + 1 }));
-
-  return {
-    archetypes: SIMULATION_ARCHETYPES,
-    compactCatalog,
-    countryCode,
-    databaseAvailable: true,
-    generatedAt: new Date().toISOString(),
-    mostUsefulProducts: mostUsefulProducts.slice(0, 24),
-    sampleSize,
-    seed,
-    summary: {
-      averageCoveragePercent: safePercent(average(coverageValues)),
-      currency: input.candidates.find((candidate) => candidate.currency)?.currency ?? "THB",
-      expectedCostAmount:
-        costValues.some((value) => value > 0) ? Math.round(average(costValues)) : null,
-      medianCoveragePercent: safePercent(median(coverageValues)),
-      p10CoveragePercent: safePercent(percentile(coverageValues, 10)),
-      percentAbove50: safePercent(
-        (coverageValues.filter((value) => value >= 50).length / Math.max(1, sampleSize)) * 100
-      ),
-      percentAbove75: safePercent(
-        (coverageValues.filter((value) => value >= 75).length / Math.max(1, sampleSize)) * 100
-      ),
-      percentAbove90: safePercent(
-        (coverageValues.filter((value) => value >= 90).length / Math.max(1, sampleSize)) * 100
-      )
-    },
-    unmetSupplements: [...unmetCounts.entries()]
-      .map(([name, count]) => ({
-        count,
-        name,
-        percent: safePercent((count / Math.max(1, sampleSize)) * 100)
-      }))
-      .sort((first, second) => second.count - first.count || first.name.localeCompare(second.name))
-      .slice(0, 24)
-  };
-}
-
 export async function getAdminPlanCoverageSimulationData(input: Readonly<{
   countryCode?: string | null;
-  sampleSize?: number | null;
+  range?: AdminDashboardRange | null;
   seed?: string | null;
 }> = {}): Promise<AdminPlanCoverageSimulationData> {
   const countryCode = normalizeCoverageCountryCode(input.countryCode);
@@ -806,24 +731,41 @@ export async function getAdminPlanCoverageSimulationData(input: Readonly<{
       return emptyAdminPlanCoverageSimulationData({ ...input, countryCode });
     }
 
-    const [supplementRows, candidates] = await Promise.all([
+    const [supplementRows, allCandidates, customerInsights] = await Promise.all([
       loadActiveSupplements(sql),
       getProductRecommendationCandidates({
         countryCode,
-        includeIneligible: false
+        includeIneligible: true
+      }),
+      getAdminCustomerInsightsData(input.range ?? "month", {
+        enrichSegments: false
       })
     ]);
+    const candidates = allCandidates.filter(productPassesSimulationCandidateGate);
     const supplements = supplementInputs(supplementRows, candidates);
+    const realCustomerProfiles =
+      simulationCustomerProfilesFromInsights(customerInsights);
+    const realCustomerArchetypes =
+      simulationCustomerArchetypesFromInsights(customerInsights);
+    const reviewPriorityProducts = buildReviewPriorityProductRows({
+      candidates: allCandidates,
+      eligibleCandidates: candidates,
+      supplements
+    });
 
-    return runAdminPlanCoverageSimulation({
+    return emptyAdminPlanCoverageSimulationData({
       candidates,
       countryCode,
-      sampleSize: input.sampleSize,
+      databaseAvailable: true,
+      realCustomerArchetypes,
+      realCustomerProfileCount: customerInsights.summary.totalCustomers,
+      realCustomerProfiles,
+      reviewPriorityProducts,
       seed: input.seed,
       supplements
     });
   } catch (error) {
-    console.error("Failed to run plan coverage simulation", error);
+    console.error("Failed to load plan coverage simulation inputs", error);
     return emptyAdminPlanCoverageSimulationData({ ...input, countryCode });
   }
 }
