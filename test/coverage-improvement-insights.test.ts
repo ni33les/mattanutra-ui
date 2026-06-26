@@ -45,7 +45,7 @@ function plan(overrides: Record<string, unknown> = {}) {
 }
 
 describe("product coverage improvement insights", () => {
-  it("wires the coverage improvement dashboard view and marketing permission", () => {
+  it("retires the old coverage improvement dashboard view", () => {
     const dashboardContent = readFileSync(
       "components/admin/dashboard-content.tsx",
       "utf8"
@@ -57,13 +57,19 @@ describe("product coverage improvement insights", () => {
       "utf8"
     );
 
-    assert.match(dashboardContent, /"coverage-improvement-insights"/);
-    assert.match(dashboardContent, /Coverage Improvement/);
-    assert.match(zhContent, /覆盖改进/);
-    assert.match(dashboard, /AdminCoverageImprovementInsightsView/);
-    assert.match(page, /getAdminCoverageImprovementInsightsData\(range, locale\)/);
+    assert.doesNotMatch(dashboardContent, /"coverage-improvement-insights"/);
+    assert.doesNotMatch(dashboardContent, /Coverage Improvement/);
+    assert.doesNotMatch(zhContent, /覆盖改进/);
+    assert.doesNotMatch(dashboard, /AdminCoverageImprovementInsightsView/);
+    assert.doesNotMatch(page, /getAdminCoverageImprovementInsightsData\(range, locale\)/);
+    assert.match(dashboardContent, /"product-coverage"/);
+    assert.match(dashboardContent, /"plan-coverage-simulator"/);
     assert.equal(
-      adminViewPermission("coverage-improvement-insights"),
+      adminViewPermission("product-coverage"),
+      "marketing.read"
+    );
+    assert.equal(
+      adminViewPermission("plan-coverage-simulator"),
       "marketing.read"
     );
   });

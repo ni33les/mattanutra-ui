@@ -11,8 +11,9 @@ import type {
   AdminCustomerInsightsData
 } from "@/lib/admin-customer-insights";
 import type {
-  AdminCoverageImprovementInsightsData
-} from "@/lib/admin-coverage-improvement-insights";
+  AdminPlanCoverageSimulationData,
+  AdminProductCoverageData
+} from "@/lib/admin-product-coverage";
 import type {
   AdminAgentsData,
   AdminTaskVisibilityData
@@ -46,10 +47,6 @@ import type {
 import type {
   AdminRetailStockData
 } from "@/lib/admin-retail-stock";
-import type {
-  AdminProductRecommendationInsightsData,
-  AdminSupplementImprovementInsightsData
-} from "@/lib/admin-recommendation-insights";
 import type {
   AdminCampaignsData,
   AdminContentInventoryData,
@@ -87,7 +84,10 @@ import { AdminAgentsView } from "@/components/admin/agents-view";
 import { AdminCampaignsView } from "@/components/admin/marketing-campaigns";
 import { AdminLeadsView } from "@/components/admin/marketing-leads";
 import { AdminCustomerInsightsView } from "@/components/admin/customer-insights-view";
-import { AdminCoverageImprovementInsightsView } from "@/components/admin/coverage-improvement-insights-view";
+import {
+  AdminPlanCoverageSimulatorView,
+  AdminProductCoverageView
+} from "@/components/admin/product-coverage-view";
 import { AdminCommunicationsView } from "@/components/admin/communications-view";
 import { AdminPanyaView } from "@/components/admin/panya-view";
 import { AdminTechnicalAlertsView } from "@/components/admin/technical-alerts-view";
@@ -107,10 +107,6 @@ import {
   AdminProductsView
 } from "@/components/admin/product-view";
 import { AdminVisibilityView } from "@/components/admin/visibility-view";
-import {
-  AdminProductRecommendationInsightsView,
-  AdminSupplementImprovementInsightsView
-} from "@/components/admin/recommendation-insights-view";
 import { AdminDrawer } from "@/components/admin/ui";
 
 const sessionRoleLabels = {
@@ -221,7 +217,6 @@ function adminViewDatabaseAvailable({
   agentsData,
   campaignsData,
   contentData,
-  coverageImprovementInsightsData,
   customerInsightsData,
   communicationsData,
   data,
@@ -229,15 +224,15 @@ function adminViewDatabaseAvailable({
   foodsData,
   flowData,
   leadsData,
+  planCoverageSimulationData,
   panyaData,
   productDetailData,
+  productCoverageData,
   productsData,
-  productRecommendationInsightsData,
   retailFinancialsData,
   retailStockData,
   reviewQueueData,
   supplementsData,
-  supplementImprovementInsightsData,
   visibilityData,
   view
 }: Readonly<{
@@ -246,7 +241,6 @@ function adminViewDatabaseAvailable({
   agentsData: AdminAgentsData;
   campaignsData: AdminCampaignsData;
   contentData: AdminContentInventoryData;
-  coverageImprovementInsightsData: AdminCoverageImprovementInsightsData;
   customerInsightsData: AdminCustomerInsightsData;
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
@@ -254,15 +248,15 @@ function adminViewDatabaseAvailable({
   foodsData: AdminFoodsData;
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
+  planCoverageSimulationData: AdminPlanCoverageSimulationData;
   panyaData: AdminPanyaData;
   productDetailData?: AdminProductDetailData | null;
+  productCoverageData: AdminProductCoverageData;
   productsData: AdminProductsData;
-  productRecommendationInsightsData: AdminProductRecommendationInsightsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
-  supplementImprovementInsightsData: AdminSupplementImprovementInsightsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
 }>) {
@@ -307,10 +301,6 @@ function adminViewDatabaseAvailable({
     return customerInsightsData.databaseAvailable;
   }
 
-  if (view === "coverage-improvement-insights") {
-    return coverageImprovementInsightsData.databaseAvailable;
-  }
-
   if (view === "blogs" || view === "content" || view === "testimonials") {
     return contentData.databaseAvailable;
   }
@@ -347,8 +337,12 @@ function adminViewDatabaseAvailable({
     return productDetailData?.databaseAvailable ?? productsData.databaseAvailable;
   }
 
-  if (view === "product-insights") {
-    return productRecommendationInsightsData.databaseAvailable;
+  if (view === "plan-coverage-simulator") {
+    return planCoverageSimulationData.databaseAvailable;
+  }
+
+  if (view === "product-coverage") {
+    return productCoverageData.databaseAvailable;
   }
 
   if (
@@ -361,10 +355,6 @@ function adminViewDatabaseAvailable({
     view === "retail-reorder"
   ) {
     return retailStockData.databaseAvailable;
-  }
-
-  if (view === "supplement-insights") {
-    return supplementImprovementInsightsData.databaseAvailable;
   }
 
   if (view === "reviews") {
@@ -390,7 +380,6 @@ export function AdminDashboard({
   agentsData,
   campaignsData,
   contentData,
-  coverageImprovementInsightsData,
   customerInsightsData,
   communicationsData,
   data,
@@ -400,12 +389,13 @@ export function AdminDashboard({
   flowData,
   leadsData,
   locale,
+  planCoverageSimulationData,
   panyaData,
   panyaSection,
   productDetailData,
   productDetailId,
+  productCoverageData,
   productsData,
-  productRecommendationInsightsData,
   retailFinancialsData,
   retailStockData,
   reviewQueueData,
@@ -414,7 +404,6 @@ export function AdminDashboard({
   selectedTaskId,
   settingsData,
   supplementsData,
-  supplementImprovementInsightsData,
   visibilityData,
   view
 }: Readonly<{
@@ -425,7 +414,6 @@ export function AdminDashboard({
   agentsData: AdminAgentsData;
   campaignsData: AdminCampaignsData;
   contentData: AdminContentInventoryData;
-  coverageImprovementInsightsData: AdminCoverageImprovementInsightsData;
   customerInsightsData: AdminCustomerInsightsData;
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
@@ -435,12 +423,13 @@ export function AdminDashboard({
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   locale: Locale;
+  planCoverageSimulationData: AdminPlanCoverageSimulationData;
   panyaData: AdminPanyaData;
   panyaSection: "configuration" | "conversations";
   productDetailData?: AdminProductDetailData | null;
   productDetailId?: string | null;
+  productCoverageData: AdminProductCoverageData;
   productsData: AdminProductsData;
-  productRecommendationInsightsData: AdminProductRecommendationInsightsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   reviewQueueData: AdminReviewQueueData;
@@ -449,7 +438,6 @@ export function AdminDashboard({
   selectedTaskId?: string | null;
   settingsData: AdminSettingsData | null;
   supplementsData: AdminSupplementsData;
-  supplementImprovementInsightsData: AdminSupplementImprovementInsightsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
 }>) {
@@ -467,17 +455,14 @@ export function AdminDashboard({
       view === "alerts" ||
       view === "campaigns" ||
       view === "communications" ||
-      view === "coverage-improvement-insights" ||
       view === "customer-insights" ||
       view === "financials" ||
       view === "flow" ||
       view === "glance" ||
       view === "leads" ||
       view === "panya" ||
-      view === "product-insights" ||
       view === "retail-financials" ||
       view === "settlements" ||
-      view === "supplement-insights" ||
       view === "visibility");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [visibilityHeartbeatAt, setVisibilityHeartbeatAt] = useState(0);
@@ -523,7 +508,6 @@ export function AdminDashboard({
     agentsData: liveAgentsData,
     campaignsData,
     contentData,
-    coverageImprovementInsightsData,
     customerInsightsData,
     communicationsData,
     data,
@@ -531,15 +515,15 @@ export function AdminDashboard({
     foodsData,
     flowData,
     leadsData,
+    planCoverageSimulationData,
     panyaData,
     productDetailData,
+    productCoverageData,
     productsData,
-    productRecommendationInsightsData,
     retailFinancialsData,
     retailStockData,
     reviewQueueData,
     supplementsData,
-    supplementImprovementInsightsData,
     visibilityData: liveVisibilityData,
     view
   });
@@ -783,15 +767,16 @@ export function AdminDashboard({
               data={customerInsightsData}
               locale={locale}
             />
-          ) : view === "coverage-improvement-insights" ? (
-            <AdminCoverageImprovementInsightsView
-              data={coverageImprovementInsightsData}
+          ) : view === "product-coverage" ? (
+            <AdminProductCoverageView
+              accessToken={accessToken}
+              data={productCoverageData}
               locale={locale}
             />
-          ) : view === "product-insights" ? (
-            <AdminProductRecommendationInsightsView
+          ) : view === "plan-coverage-simulator" ? (
+            <AdminPlanCoverageSimulatorView
               accessToken={accessToken}
-              data={productRecommendationInsightsData}
+              data={planCoverageSimulationData}
               locale={locale}
             />
           ) : view === "agents" ? (
@@ -869,11 +854,6 @@ export function AdminDashboard({
               range={data.range}
               selectedRetailCustomerOrderId={selectedRetailCustomerOrderId}
               view={view}
-            />
-          ) : view === "supplement-insights" ? (
-            <AdminSupplementImprovementInsightsView
-              data={supplementImprovementInsightsData}
-              locale={locale}
             />
           ) : view === "supplements" ? (
             <AdminSupplementsView

@@ -38,7 +38,6 @@ export type AdminDashboardView =
   | "blogs"
   | "campaigns"
   | "content"
-  | "coverage-improvement-insights"
   | "customer-insights"
   | "communications"
   | "financials"
@@ -50,7 +49,8 @@ export type AdminDashboardView =
   | "organisations"
   | "people"
   | "panya"
-  | "product-insights"
+  | "plan-coverage-simulator"
+  | "product-coverage"
   | "products"
   | "reviews"
   | "retail-customer-orders"
@@ -63,7 +63,6 @@ export type AdminDashboardView =
   | "settings"
   | "settlements"
   | "stock"
-  | "supplement-insights"
   | "supplements"
   | "testimonials"
   | "visibility";
@@ -1465,9 +1464,8 @@ const baseContent = {
     retailSellingTitle: "Orders",
     insights: [
       { icon: UserGroupIcon, name: "Customer Intelligence", view: "customer-insights" },
-      { icon: FunnelIcon, name: "Coverage Improvement", view: "coverage-improvement-insights" },
-      { icon: ShoppingBagIcon, name: "Products", view: "product-insights" },
-      { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" }
+      { icon: BeakerIcon, name: "Product Coverage", view: "product-coverage" },
+      { icon: FunnelIcon, name: "Plan Simulator", view: "plan-coverage-simulator" }
     ],
     insightsTitle: "Insights",
     openSidebar: "Open sidebar",
@@ -1487,7 +1485,6 @@ const baseContent = {
       blogs: "Blogs",
       campaigns: "Campaigns",
       content: "Content",
-      "coverage-improvement-insights": "Coverage Improvement",
       "customer-insights": "Customer Intelligence",
       communications: "Communications",
       financials: "Financials",
@@ -1499,7 +1496,8 @@ const baseContent = {
       organisations: "Organisations",
       people: "People",
       panya: "Panya",
-      "product-insights": "Product Insights",
+      "plan-coverage-simulator": "Plan Coverage Simulator",
+      "product-coverage": "Product Coverage",
       products: "Products",
       "retail-customer-orders": "Customer Orders",
       "retail-audit": "Audit",
@@ -1512,7 +1510,6 @@ const baseContent = {
       settings: "Settings",
       settlements: "Settlements",
       stock: "Stock",
-      "supplement-insights": "Supplement Insights",
       supplements: "Supplements",
       testimonials: "Testimonials",
       visibility: "Tasks"
@@ -2334,9 +2331,8 @@ const baseContent = {
     retailSellingTitle: "คำสั่งซื้อ",
     insights: [
       { icon: UserGroupIcon, name: "ข้อมูลลูกค้า", view: "customer-insights" },
-      { icon: FunnelIcon, name: "ปรับปรุงความครอบคลุม", view: "coverage-improvement-insights" },
-      { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" },
-      { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" }
+      { icon: BeakerIcon, name: "ความครอบคลุมสินค้า", view: "product-coverage" },
+      { icon: FunnelIcon, name: "จำลองความครอบคลุม", view: "plan-coverage-simulator" }
     ],
     insightsTitle: "อินไซต์",
     openSidebar: "เปิดแถบเมนู",
@@ -2356,7 +2352,6 @@ const baseContent = {
       blogs: "บทความ",
       campaigns: "แคมเปญ",
       content: "คอนเทนต์",
-      "coverage-improvement-insights": "ปรับปรุงความครอบคลุม",
       "customer-insights": "ข้อมูลลูกค้า",
       communications: "การสื่อสาร",
       financials: "การเงิน",
@@ -2368,7 +2363,8 @@ const baseContent = {
       organisations: "องค์กร",
       people: "ผู้ใช้",
       panya: "Panya",
-      "product-insights": "ข้อมูลสินค้า",
+      "plan-coverage-simulator": "จำลองความครอบคลุมแผน",
+      "product-coverage": "ความครอบคลุมสินค้า",
       products: "สินค้า",
       "retail-customer-orders": "คำสั่งซื้อลูกค้า",
       "retail-audit": "บันทึกเหตุการณ์",
@@ -2381,7 +2377,6 @@ const baseContent = {
       settings: "การตั้งค่า",
       settlements: "การชำระร้านค้า",
       stock: "สต็อก",
-      "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",
       testimonials: "คำรับรอง",
       visibility: "งาน"

@@ -684,16 +684,12 @@
       "view": "customer-insights"
     },
     {
-      "name": "覆盖改进",
-      "view": "coverage-improvement-insights"
+      "name": "产品覆盖",
+      "view": "product-coverage"
     },
     {
-      "name": "产品",
-      "view": "product-insights"
-    },
-    {
-      "name": "补充剂",
-      "view": "supplement-insights"
+      "name": "方案模拟器",
+      "view": "plan-coverage-simulator"
     }
   ],
   "insightsTitle": "洞察",
@@ -726,7 +722,6 @@
     "blogs": "博客",
     "campaigns": "营销活动",
     "content": "内容",
-    "coverage-improvement-insights": "覆盖改进",
     "customer-insights": "客户洞察",
     "communications": "通信",
     "financials": "财务",
@@ -738,7 +733,8 @@
     "organisations": "组织",
     "people": "人员",
     "panya": "Panya",
-    "product-insights": "产品洞察",
+    "plan-coverage-simulator": "方案覆盖模拟器",
+    "product-coverage": "产品覆盖",
     "products": "产品",
     "retail-customer-orders": "客户订单",
     "retail-audit": "审计",
@@ -751,7 +747,6 @@
     "settlements": "结算",
     "settings": "设置",
     "stock": "库存",
-    "supplement-insights": "补充剂洞察",
     "supplements": "补充剂",
     "testimonials": "见证",
     "visibility": "任务"

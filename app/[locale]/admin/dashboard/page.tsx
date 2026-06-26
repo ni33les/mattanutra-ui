@@ -23,9 +23,12 @@ import {
   getAdminCustomerInsightsData
 } from "@/lib/admin-customer-insights";
 import {
-  emptyAdminCoverageImprovementInsightsData,
-  getAdminCoverageImprovementInsightsData
-} from "@/lib/admin-coverage-improvement-insights";
+  emptyAdminPlanCoverageSimulationData,
+  emptyAdminProductCoverageData,
+  getAdminPlanCoverageSimulationData,
+  getAdminProductCoverageData,
+  normalizeSimulationSampleSize
+} from "@/lib/admin-product-coverage";
 import {
   emptyCommunicationsData,
   getAdminCommunicationsData
@@ -59,12 +62,6 @@ import {
   emptyAdminRetailStockData,
   getAdminRetailStockData
 } from "@/lib/admin-retail-stock";
-import {
-  emptyAdminProductRecommendationInsightsData,
-  emptyAdminSupplementImprovementInsightsData,
-  getAdminProductRecommendationInsightsData,
-  getAdminSupplementImprovementInsightsData
-} from "@/lib/admin-recommendation-insights";
 import {
   emptyCampaignsData,
   emptyContentData,
@@ -115,6 +112,10 @@ function firstParam(value: string | string[] | undefined) {
 
 function panyaSectionParam(value: string | string[] | undefined) {
   return firstParam(value) === "configuration" ? "configuration" : "conversations";
+}
+
+function countryCodeParam(value: string | string[] | undefined) {
+  return firstParam(value) ?? "TH";
 }
 
 function dashboardUrl(
@@ -192,6 +193,8 @@ export default async function LocalizedAdminDashboardPage({
   const selectedTaskId = firstParam(query.task);
   const selectedRetailCustomerOrderId = firstParam(query.order);
   const panyaSection = panyaSectionParam(query.section);
+  const coverageCountryCode = countryCodeParam(query.country);
+  const simulatorSampleSize = normalizeSimulationSampleSize(firstParam(query.samples));
   const cookieStore = await cookies();
   const sessionContext = await resolveAdminSession({
     csrfToken: cookieStore.get(adminCsrfCookieName)?.value,
@@ -233,8 +236,6 @@ export default async function LocalizedAdminDashboardPage({
   let agentsData = emptyAgentsData();
   let campaignsData = emptyCampaignsData();
   let contentData = emptyContentData();
-  let coverageImprovementInsightsData =
-    emptyAdminCoverageImprovementInsightsData(range);
   let customerInsightsData = emptyAdminCustomerInsightsData(range);
   let communicationsData = emptyCommunicationsData();
   let data = emptyAdminDashboardData(range);
@@ -244,15 +245,16 @@ export default async function LocalizedAdminDashboardPage({
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
-  let productRecommendationInsightsData =
-    emptyAdminProductRecommendationInsightsData(range);
+  let planCoverageSimulationData = emptyAdminPlanCoverageSimulationData({
+    countryCode: coverageCountryCode,
+    sampleSize: simulatorSampleSize
+  });
   let panyaData = emptyAdminPanyaData();
+  let productCoverageData = emptyAdminProductCoverageData(coverageCountryCode);
   let retailStockData = emptyAdminRetailStockData();
   let reviewQueueData = emptyAdminReviewQueueData();
   let settingsData: AdminSettingsData | null = null;
   let supplementsData = emptyAdminSupplementsData();
-  let supplementImprovementInsightsData =
-    emptyAdminSupplementImprovementInsightsData(range);
   let visibilityData = emptyVisibilityData();
 
   if (
@@ -317,15 +319,15 @@ export default async function LocalizedAdminDashboardPage({
     } else {
       retailStockData = await getAdminRetailStockData(adminContext, locale);
     }
-  } else if (view === "supplement-insights") {
-    supplementImprovementInsightsData =
-      await getAdminSupplementImprovementInsightsData(range, locale);
-  } else if (view === "product-insights") {
-    productRecommendationInsightsData =
-      await getAdminProductRecommendationInsightsData(range);
-  } else if (view === "coverage-improvement-insights") {
-    coverageImprovementInsightsData =
-      await getAdminCoverageImprovementInsightsData(range, locale);
+  } else if (view === "product-coverage") {
+    productCoverageData = await getAdminProductCoverageData({
+      countryCode: coverageCountryCode
+    });
+  } else if (view === "plan-coverage-simulator") {
+    planCoverageSimulationData = await getAdminPlanCoverageSimulationData({
+      countryCode: coverageCountryCode,
+      sampleSize: simulatorSampleSize
+    });
   } else if (view === "customer-insights") {
     customerInsightsData = await getAdminCustomerInsightsData(range);
   } else if (view === "reviews") {
@@ -348,7 +350,6 @@ export default async function LocalizedAdminDashboardPage({
       agentsData={agentsData}
       campaignsData={campaignsData}
       contentData={contentData}
-      coverageImprovementInsightsData={coverageImprovementInsightsData}
       customerInsightsData={customerInsightsData}
       communicationsData={communicationsData}
       data={data}
@@ -358,8 +359,9 @@ export default async function LocalizedAdminDashboardPage({
       flowData={flowData}
       leadsData={leadsData}
       locale={locale}
+      planCoverageSimulationData={planCoverageSimulationData}
+      productCoverageData={productCoverageData}
       productsData={productsData}
-      productRecommendationInsightsData={productRecommendationInsightsData}
       panyaData={panyaData}
       panyaSection={panyaSection}
       retailFinancialsData={retailFinancialsData}
@@ -370,7 +372,6 @@ export default async function LocalizedAdminDashboardPage({
       selectedTaskId={selectedTaskId}
       settingsData={settingsData}
       supplementsData={supplementsData}
-      supplementImprovementInsightsData={supplementImprovementInsightsData}
       visibilityData={visibilityData}
       view={view}
     />
