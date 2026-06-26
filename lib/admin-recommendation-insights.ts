@@ -213,6 +213,51 @@ export type AdminProductImprovementInsightsData = Readonly<{
   supplementAvailability: MasterSupplementAvailabilityInsight[];
 }>;
 
+export type ProductRecommendationInsightOutcome =
+  | "near_miss"
+  | "not_evaluated"
+  | "recommended"
+  | "rejected";
+
+export type AdminProductRecommendationInsightRow = Readonly<{
+  affectedPlanCount: number;
+  averageCoveragePercent: number | null;
+  brandName: string | null;
+  chosenCount: number;
+  id: string;
+  imageUrl: string | null;
+  isStale: boolean;
+  lastDecisionAt: string | null;
+  nearMissCount: number;
+  primaryOutcome: ProductRecommendationInsightOutcome;
+  primaryReason: string;
+  productKind: string;
+  productStatus: string;
+  rejectedCount: number;
+  title: string;
+  updatedAt: string | null;
+  validationCheckedAt: string | null;
+  validationStatus: string | null;
+  validationSummary: string | null;
+}>;
+
+export type AdminProductRecommendationInsightsData = Readonly<{
+  databaseAvailable: boolean;
+  generatedAt: string;
+  range: AdminDashboardRange;
+  rows: AdminProductRecommendationInsightRow[];
+  summary: {
+    currentDecisionProducts: number;
+    nearMissProducts: number;
+    notEvaluatedProducts: number;
+    recommendedProducts: number;
+    rejectedProducts: number;
+    staleProducts: number;
+    totalProducts: number;
+  };
+  topReasons: InsightBucketRow[];
+}>;
+
 export type AdminFoodImprovementInsightsData = Readonly<{
   databaseAvailable: boolean;
   foodOpportunities: FoodOpportunityInsight[];
@@ -264,6 +309,16 @@ const emptyProductSummary = {
   weakSupplementCount: 0
 };
 
+const emptyProductRecommendationSummary = {
+  currentDecisionProducts: 0,
+  nearMissProducts: 0,
+  notEvaluatedProducts: 0,
+  recommendedProducts: 0,
+  rejectedProducts: 0,
+  staleProducts: 0,
+  totalProducts: 0
+};
+
 const emptyFoodSummary = {
   blockedFoodRecommendations: 0,
   foodsRecommended: 0,
@@ -304,6 +359,20 @@ export function emptyAdminProductImprovementInsightsData(
     reviewOpportunities: [],
     summary: emptyProductSummary,
     supplementAvailability: []
+  };
+}
+
+export function emptyAdminProductRecommendationInsightsData(
+  range: AdminDashboardRange,
+  databaseAvailable = false
+): AdminProductRecommendationInsightsData {
+  return {
+    databaseAvailable,
+    generatedAt: new Date().toISOString(),
+    range,
+    rows: [],
+    summary: emptyProductRecommendationSummary,
+    topReasons: []
   };
 }
 
@@ -425,6 +494,87 @@ function optionalNumber(value: number | string | null | undefined) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function productRecommendationInsightOutcome(input: Readonly<{
+  chosenCount: number;
+  nearMissCount: number;
+  rejectedCount: number;
+}>): ProductRecommendationInsightOutcome {
+  if (input.chosenCount > 0) {
+    return "recommended";
+  }
+
+  if (input.nearMissCount > 0) {
+    return "near_miss";
+  }
+
+  if (input.rejectedCount > 0) {
+    return "rejected";
+  }
+
+  return "not_evaluated";
+}
+
+export function productRecommendationDecisionIsStale(
+  productUpdatedAt: Date | string | null | undefined,
+  validationCheckedAt: Date | string | null | undefined,
+  lastDecisionAt: Date | string | null | undefined
+) {
+  if (!lastDecisionAt) {
+    return false;
+  }
+
+  const decisionTime = new Date(lastDecisionAt).getTime();
+
+  if (!Number.isFinite(decisionTime)) {
+    return false;
+  }
+
+  return [productUpdatedAt, validationCheckedAt].some((value) => {
+    if (!value) {
+      return false;
+    }
+
+    const timestamp = new Date(value).getTime();
+
+    return Number.isFinite(timestamp) && timestamp > decisionTime;
+  });
+}
+
+export function productRecommendationInsightReason(input: Readonly<{
+  chosenCount: number;
+  nearMissCount: number;
+  nearMissReason?: string | null;
+  outcome: ProductRecommendationInsightOutcome;
+  rejectedCount: number;
+  rejectedReason?: string | null;
+}>) {
+  if (input.outcome === "recommended") {
+    return input.chosenCount === 1
+      ? "Recommended in 1 current decision."
+      : `Recommended in ${input.chosenCount} current decisions.`;
+  }
+
+  if (input.outcome === "near_miss") {
+    return (
+      input.nearMissReason?.trim() ||
+      (input.nearMissCount === 1
+        ? "Near miss in 1 current decision."
+        : `Near miss in ${input.nearMissCount} current decisions.`)
+    );
+  }
+
+  if (input.outcome === "rejected") {
+    return (
+      input.rejectedReason?.trim() ||
+      (input.rejectedCount === 1
+        ? "Rejected in 1 current decision."
+        : `Rejected in ${input.rejectedCount} current decisions.`)
+    );
+  }
+
+  return "No current recommendation decisions in this timeframe.";
 }
 
 function boundedPercent(value: number) {
@@ -1112,6 +1262,275 @@ export async function getProductDecisionStatsByProduct(
       }
     ])
   );
+}
+
+type ProductRecommendationInsightDbRow = Readonly<{
+  affected_plan_count: number | string;
+  average_coverage_percent: number | string | null;
+  brand_name: string | null;
+  chosen_count: number | string;
+  id: string;
+  image_url: string | null;
+  last_decision_at: Date | string | null;
+  near_miss_count: number | string;
+  near_miss_reason: string | null;
+  product_kind: string | null;
+  product_status: string | null;
+  rejected_count: number | string;
+  rejected_reason: string | null;
+  title: string;
+  updated_at: Date | string | null;
+  validation_checked_at: Date | string | null;
+  validation_status: string | null;
+  validation_summary: string | null;
+}>;
+
+function productRecommendationInsightSummary(
+  rows: readonly AdminProductRecommendationInsightRow[]
+): AdminProductRecommendationInsightsData["summary"] {
+  const summary = { ...emptyProductRecommendationSummary };
+
+  for (const row of rows) {
+    summary.totalProducts += 1;
+
+    if (row.chosenCount + row.nearMissCount + row.rejectedCount > 0) {
+      summary.currentDecisionProducts += 1;
+    }
+
+    if (row.isStale) {
+      summary.staleProducts += 1;
+    }
+
+    if (row.primaryOutcome === "recommended") {
+      summary.recommendedProducts += 1;
+    } else if (row.primaryOutcome === "near_miss") {
+      summary.nearMissProducts += 1;
+    } else if (row.primaryOutcome === "rejected") {
+      summary.rejectedProducts += 1;
+    } else {
+      summary.notEvaluatedProducts += 1;
+    }
+  }
+
+  return summary;
+}
+
+function productRecommendationInsightTopReasons(
+  rows: readonly AdminProductRecommendationInsightRow[]
+) {
+  const counts = new Map<string, number>();
+
+  for (const row of rows) {
+    if (row.primaryOutcome === "recommended") {
+      continue;
+    }
+
+    counts.set(row.primaryReason, (counts.get(row.primaryReason) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([label, count]) => ({ count, label }))
+    .sort((left, right) =>
+      right.count === left.count
+        ? left.label.localeCompare(right.label)
+        : right.count - left.count
+    )
+    .slice(0, 8);
+}
+
+function mapProductRecommendationInsightRows(
+  rows: readonly ProductRecommendationInsightDbRow[]
+): AdminProductRecommendationInsightRow[] {
+  return rows.map((row) => {
+    const chosenCount = numberValue(row.chosen_count);
+    const nearMissCount = numberValue(row.near_miss_count);
+    const rejectedCount = numberValue(row.rejected_count);
+    const primaryOutcome = productRecommendationInsightOutcome({
+      chosenCount,
+      nearMissCount,
+      rejectedCount
+    });
+
+    return {
+      affectedPlanCount: numberValue(row.affected_plan_count),
+      averageCoveragePercent: optionalNumber(row.average_coverage_percent),
+      brandName: row.brand_name,
+      chosenCount,
+      id: row.id,
+      imageUrl: row.image_url,
+      isStale: productRecommendationDecisionIsStale(
+        row.updated_at,
+        row.validation_checked_at,
+        row.last_decision_at
+      ),
+      lastDecisionAt: isoOrNull(row.last_decision_at),
+      nearMissCount,
+      primaryOutcome,
+      primaryReason: productRecommendationInsightReason({
+        chosenCount,
+        nearMissCount,
+        nearMissReason: row.near_miss_reason,
+        outcome: primaryOutcome,
+        rejectedCount,
+        rejectedReason: row.rejected_reason
+      }),
+      productKind: row.product_kind || "unknown",
+      productStatus: row.product_status || "unknown",
+      rejectedCount,
+      title: row.title,
+      updatedAt: isoOrNull(row.updated_at),
+      validationCheckedAt: isoOrNull(row.validation_checked_at),
+      validationStatus: row.validation_status,
+      validationSummary: row.validation_summary
+    };
+  });
+}
+
+export async function getAdminProductRecommendationInsightsData(
+  range: AdminDashboardRange
+): Promise<AdminProductRecommendationInsightsData> {
+  const sql = getSql();
+
+  if (!sql) {
+    return emptyAdminProductRecommendationInsightsData(range);
+  }
+
+  try {
+    const availability = await recommendationInsightsSchemaAvailable(sql);
+
+    if (!availability.products) {
+      return emptyAdminProductRecommendationInsightsData(range);
+    }
+
+    const start = rangeStartParam(range);
+    const rows = availability.assessments && availability.productDecisions
+      ? await sql<ProductRecommendationInsightDbRow[]>`
+          with current_decisions as (
+            select product_recommendation_decisions.*
+            from public.product_recommendation_decisions
+            join public.assessments
+              on assessments.plan_id = product_recommendation_decisions.plan_id
+            where product_recommendation_decisions.is_current = true
+              and assessments.selected_plan is not null
+              and (${start}::timestamptz is null or product_recommendation_decisions.generated_at >= ${start})
+          ),
+          decision_stats as (
+            select
+              current_decisions.product_id,
+              count(distinct current_decisions.plan_id) as affected_plan_count,
+              count(*) filter (where current_decisions.outcome = 'chosen') as chosen_count,
+              count(*) filter (where current_decisions.outcome = 'near_miss') as near_miss_count,
+              count(*) filter (where current_decisions.outcome = 'rejected') as rejected_count,
+              avg(current_decisions.product_coverage_percent) filter (
+                where current_decisions.product_coverage_percent is not null
+              ) as average_coverage_percent,
+              max(current_decisions.generated_at) as last_decision_at
+            from current_decisions
+            group by current_decisions.product_id
+          ),
+          reason_counts as (
+            select
+              current_decisions.product_id,
+              current_decisions.outcome,
+              nullif(btrim(current_decisions.reason), '') as reason,
+              count(*) as count
+            from current_decisions
+            where current_decisions.outcome in ('near_miss', 'rejected')
+              and nullif(btrim(current_decisions.reason), '') is not null
+            group by
+              current_decisions.product_id,
+              current_decisions.outcome,
+              nullif(btrim(current_decisions.reason), '')
+          ),
+          ranked_reasons as (
+            select
+              reason_counts.*,
+              row_number() over (
+                partition by reason_counts.product_id, reason_counts.outcome
+                order by reason_counts.count desc, reason_counts.reason asc
+              ) as reason_rank
+            from reason_counts
+          )
+          select
+            products.id::text,
+            products.title,
+            products.brand_name,
+            products.image_url,
+            products.status as product_status,
+            products.product_kind,
+            products.validation_status,
+            products.validation_summary,
+            products.updated_at,
+            products.validation_checked_at,
+            coalesce(decision_stats.affected_plan_count, 0) as affected_plan_count,
+            coalesce(decision_stats.chosen_count, 0) as chosen_count,
+            coalesce(decision_stats.near_miss_count, 0) as near_miss_count,
+            coalesce(decision_stats.rejected_count, 0) as rejected_count,
+            decision_stats.average_coverage_percent,
+            decision_stats.last_decision_at,
+            near_miss_reasons.reason as near_miss_reason,
+            rejected_reasons.reason as rejected_reason
+          from public.products
+          left join decision_stats
+            on decision_stats.product_id = products.id
+          left join ranked_reasons as near_miss_reasons
+            on near_miss_reasons.product_id = products.id
+           and near_miss_reasons.outcome = 'near_miss'
+           and near_miss_reasons.reason_rank = 1
+          left join ranked_reasons as rejected_reasons
+            on rejected_reasons.product_id = products.id
+           and rejected_reasons.outcome = 'rejected'
+           and rejected_reasons.reason_rank = 1
+          order by
+            case
+              when coalesce(decision_stats.chosen_count, 0) > 0 then 0
+              when coalesce(decision_stats.near_miss_count, 0) > 0 then 1
+              when coalesce(decision_stats.rejected_count, 0) > 0 then 2
+              else 3
+            end,
+            coalesce(decision_stats.chosen_count, 0) desc,
+            coalesce(decision_stats.near_miss_count, 0) desc,
+            coalesce(decision_stats.rejected_count, 0) desc,
+            products.updated_at desc,
+            products.title asc
+        `
+      : await sql<ProductRecommendationInsightDbRow[]>`
+          select
+            products.id::text,
+            products.title,
+            products.brand_name,
+            products.image_url,
+            products.status as product_status,
+            products.product_kind,
+            products.validation_status,
+            products.validation_summary,
+            products.updated_at,
+            products.validation_checked_at,
+            0 as affected_plan_count,
+            0 as chosen_count,
+            0 as near_miss_count,
+            0 as rejected_count,
+            null::numeric as average_coverage_percent,
+            null::timestamptz as last_decision_at,
+            null::text as near_miss_reason,
+            null::text as rejected_reason
+          from public.products
+          order by products.updated_at desc, products.title asc
+        `;
+    const mappedRows = mapProductRecommendationInsightRows(rows);
+
+    return {
+      databaseAvailable: true,
+      generatedAt: new Date().toISOString(),
+      range,
+      rows: mappedRows,
+      summary: productRecommendationInsightSummary(mappedRows),
+      topReasons: productRecommendationInsightTopReasons(mappedRows)
+    };
+  } catch (error) {
+    console.error("Unable to load product recommendation insights", error);
+    return emptyAdminProductRecommendationInsightsData(range);
+  }
 }
 
 export async function getAdminSupplementImprovementInsightsData(

@@ -15,7 +15,6 @@ import {
   parseDoseLimit,
 } from "@/lib/dose-conversion";
 import { siteLocaleRegistry, type Locale } from "@/lib/i18n";
-import { t } from "@/lib/i18n-messages";
 import { productForms as productFormValues } from "@/lib/product-form";
 import { productFactObservableIssueMessages } from "@/lib/product-validation";
 import { supplementDoseUnits } from "@/lib/supplement-dose-units";
@@ -111,7 +110,6 @@ export const productViewLabels = {
     status: "Status",
     translationStatus: "Translation status",
     noParsedFacts: "No parsed label facts yet.",
-    averageClientFit: "avg client fit",
     backToProducts: "Back to products",
     backorderPolicy: "Backorder",
     add: "Add",
@@ -123,7 +121,6 @@ export const productViewLabels = {
     approve: "Approve",
     audience: "Audience",
     brand: "Brand",
-    chosen: "Chosen",
     close: "Close",
     confidenceHigh: "High",
     confidenceLow: "Low",
@@ -167,7 +164,6 @@ export const productViewLabels = {
     manufacturerCountries: "Manufacturer countries",
     manufacturerSku: "Manufacturer SKU",
     markDuplicate: "Mark duplicate",
-    nearMisses: "Near misses",
     translations: "Translations",
     noShopAvailability: "No retail shop currently sells this product.",
     parsedFacts: "Parsed facts",
@@ -180,8 +176,6 @@ export const productViewLabels = {
     productForm: "Form",
     productType: "Product type",
     productUrl: "Product URL",
-    recommendationDecisions: "Recommendation decisions",
-    rejected: "Rejected",
     remove: "Remove",
     reviewerNote: "Reviewer note",
     retailPrice: "Retail price",
@@ -225,7 +219,6 @@ export const productViewLabels = {
     status: "สถานะ",
     translationStatus: "สถานะคำแปล",
     noParsedFacts: "ยังไม่มีข้อมูลฉลากที่อ่านได้",
-    averageClientFit: "ความเหมาะสมเฉลี่ย",
     backToProducts: "กลับไปที่สินค้า",
     backorderPolicy: "สั่งย้อนหลัง",
     add: "เพิ่ม",
@@ -237,7 +230,6 @@ export const productViewLabels = {
     approve: "อนุมัติ",
     audience: "กลุ่มผู้ใช้",
     brand: "แบรนด์",
-    chosen: "ถูกเลือก",
     close: "ปิด",
     confidenceHigh: "สูง",
     confidenceLow: "ต่ำ",
@@ -281,7 +273,6 @@ export const productViewLabels = {
     manufacturerCountries: "ประเทศผู้ผลิต",
     manufacturerSku: "SKU ผู้ผลิต",
     markDuplicate: "ทำเครื่องหมายว่าซ้ำ",
-    nearMisses: "เกือบถูกเลือก",
     translations: "คำแปล",
     noShopAvailability: "ยังไม่มีร้านค้าปลีกขายสินค้านี้",
     parsedFacts: "ข้อมูลที่อ่านจากฉลาก",
@@ -294,8 +285,6 @@ export const productViewLabels = {
     productForm: "รูปแบบสินค้า",
     productType: "ประเภทสินค้า",
     productUrl: "URL สินค้า",
-    recommendationDecisions: "ข้อมูลการเลือกสินค้า",
-    rejected: "ไม่ผ่าน",
     remove: "ลบ",
     reviewerNote: "หมายเหตุผู้รีวิว",
     retailPrice: "ราคาขายปลีก",
@@ -339,7 +328,6 @@ export const productViewLabels = {
     status: "状态",
     translationStatus: "翻译状态",
     noParsedFacts: "尚无已解析标签资料。",
-    averageClientFit: "平均客户匹配度",
     backToProducts: "返回产品列表",
     backorderPolicy: "缺货预订",
     add: "添加",
@@ -351,7 +339,6 @@ export const productViewLabels = {
     approve: "批准",
     audience: "适用人群",
     brand: "品牌",
-    chosen: "已选择",
     close: "关闭",
     confidenceHigh: "高",
     confidenceLow: "低",
@@ -394,7 +381,6 @@ export const productViewLabels = {
     manufacturerCountries: "制造商国家",
     manufacturerSku: "制造商 SKU",
     markDuplicate: "标记为重复",
-    nearMisses: "接近入选",
     translations: "翻译",
     noShopAvailability: "暂无零售店销售此产品。",
     parsedFacts: "已解析资料",
@@ -407,8 +393,6 @@ export const productViewLabels = {
     productForm: "剂型",
     productType: "产品类型",
     productUrl: "产品 URL",
-    recommendationDecisions: "推荐决策",
-    rejected: "已排除",
     remove: "移除",
     reviewerNote: "审核备注",
     retailPrice: "零售价",
@@ -509,28 +493,6 @@ export function productBusinessStateClass(state: ProductBusinessState) {
   }
 
   return "border-amber-200 bg-amber-50 text-amber-700";
-}
-
-export function productDecisionSummary(row: ProductCardRow, locale: Locale) {
-  const formatter = new Intl.NumberFormat(
-    locale === "th" ? "th-TH" : locale === "zh-CN" ? "zh-CN" : "en",
-  );
-  const decisionStats = "decisionStats" in row ? row.decisionStats : undefined;
-  const chosen =
-    decisionStats?.chosenPlanCount ?? row.recommendationHistory.chosenCount;
-  const nearMisses = decisionStats?.nearMissCount ?? 0;
-
-  const formattedChosen = formatter.format(chosen);
-  const formattedNearMisses = formatter.format(nearMisses);
-
-  return nearMisses > 0
-    ? t(locale, "admin.productDecisionSummary.chosenNearMisses", {
-        chosen: formattedChosen,
-        nearMisses: formattedNearMisses
-      })
-    : t(locale, "admin.productDecisionSummary.chosen", {
-        chosen: formattedChosen
-      });
 }
 
 export function productMatchesMetricFilter(

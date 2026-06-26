@@ -59,7 +59,6 @@ import {
   ProductImageDropzone,
   ProductImagePreview,
   ProductIdentifiersEditor,
-  ProductInsightStat,
   ProductTranslationEditor,
 } from "@/components/admin/product-view-ui";
 
@@ -84,15 +83,6 @@ function normalizeProductDetailRow(
         item.effectiveRegulatoryApprovals
       )
     })),
-    decisionStats: row.decisionStats
-      ? {
-          ...row.decisionStats,
-          topRejectionReasons: safeArray(row.decisionStats.topRejectionReasons),
-          topServingMultipliers: safeArray(
-            row.decisionStats.topServingMultipliers,
-          ),
-        }
-      : undefined,
     facts: safeArray(row.facts),
     imageCandidates: safeArray(
       "imageCandidates" in row ? row.imageCandidates : row.imageUrl ? [row.imageUrl] : []
@@ -502,7 +492,6 @@ export function AdminProductDetailView({
         payload.row
           ? {
               ...payload.row,
-              decisionStats: row.decisionStats,
               imageCandidates: row.imageCandidates
             }
           : row,
@@ -1094,43 +1083,6 @@ function ProductDetailPanel({
         </div>
 
         <div className="mt-5 grid gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
-        {draft.decisionStats ? (
-          <div>
-            <p className="font-semibold text-gray-900">
-              {viewLabels.recommendationDecisions}
-            </p>
-            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <ProductInsightStat
-                label={viewLabels.chosen}
-                value={draft.decisionStats.chosenPlanCount}
-              />
-              <ProductInsightStat
-                label={viewLabels.nearMisses}
-                value={draft.decisionStats.nearMissCount}
-              />
-              <ProductInsightStat
-                label={viewLabels.rejected}
-                value={draft.decisionStats.rejectedCount}
-              />
-            </div>
-            {draft.decisionStats.topServingMultipliers.length > 0 ||
-            draft.decisionStats.topRejectionReasons.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {[
-                  ...draft.decisionStats.topServingMultipliers,
-                  ...draft.decisionStats.topRejectionReasons,
-                ].map((item) => (
-                  <span
-                    className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700"
-                    key={`${item.label}:${item.count}`}
-                  >
-                    {item.label} · {item.count}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
         {draft.validationCacheStatus === "stale" ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-800">

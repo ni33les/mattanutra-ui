@@ -21,7 +21,6 @@ import {
 import { getSql } from "@/lib/db";
 import type { ProductDbRow } from "./admin-product-types.ts";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
-import { getProductDecisionStatsByProduct } from "@/lib/admin-recommendation-insights";
 import {
   normalizeCurrencyCode,
   normalizeProductCountryCode,
@@ -1154,7 +1153,7 @@ async function loadAdminProductMergeOptions(input: Readonly<{
 
 export async function getAdminProductDetailData(
   productId: string,
-  range: AdminDashboardRange = "all"
+  _range: AdminDashboardRange = "all"
 ): Promise<AdminProductDetailData | null> {
   if (!isUuidValue(productId)) {
     return null;
@@ -1168,10 +1167,7 @@ export async function getAdminProductDetailData(
       return null;
     }
 
-    const decisionStats = await getProductDecisionStatsByProduct(range, {
-      productIds: [sourceRow.id]
-    });
-    const row = detailRowFromDb(sourceRow, decisionStats.get(sourceRow.id));
+    const row = detailRowFromDb(sourceRow);
     const mergeOptions = await loadAdminProductMergeOptions({
       duplicateProductIds: row.productImportDuplicateProductIds,
       productId: row.id
@@ -1190,7 +1186,7 @@ export async function getAdminProductDetailData(
 }
 
 export async function getAdminProductsData(
-  range: AdminDashboardRange = "all"
+  _range: AdminDashboardRange = "all"
 ): Promise<AdminProductsData> {
   try {
     const rows = await loadProductRows();
@@ -1199,10 +1195,7 @@ export async function getAdminProductsData(
       return emptyAdminProductsData();
     }
 
-    const decisionStats = await getProductDecisionStatsByProduct(range);
-    const mappedRows = rows.map((row) =>
-      rowFromDb(row, decisionStats.get(row.id))
-    );
+    const mappedRows = rows.map((row) => rowFromDb(row));
 
     return {
       databaseAvailable: true,

@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   candidateSnapshotMatchesGap,
   classifySupplementAvailability,
+  emptyAdminProductRecommendationInsightsData,
   emptyAdminSupplementImprovementInsightsData,
   productOpportunitySearchPhrase,
   supplementAvailabilitySearchPhrase,
@@ -28,7 +29,7 @@ const opportunity: ProductOpportunityInsight = {
 };
 
 describe("continuous improvement insights", () => {
-  it("keeps the Insights menu focused on customer, coverage, and supplement pages", () => {
+  it("keeps the Insights menu focused on customer, coverage, product, and supplement pages", () => {
     const dashboardContent = readFileSync(
       "components/admin/dashboard-content.tsx",
       "utf8"
@@ -38,22 +39,25 @@ describe("continuous improvement insights", () => {
 
     assert.match(dashboardContent, /"customer-insights"/);
     assert.match(dashboardContent, /"coverage-improvement-insights"/);
+    assert.match(dashboardContent, /"product-insights"/);
     assert.match(dashboardContent, /"supplement-insights"/);
     assert.doesNotMatch(dashboardContent, /"supplement-availability-matrix"/);
-    assert.doesNotMatch(dashboardContent, /"product-insights"/);
     assert.doesNotMatch(dashboardContent, /"food-insights"/);
     assert.doesNotMatch(dashboardContent, /"out-of-catalog-insights"/);
+    assert.match(dashboard, /AdminProductRecommendationInsightsView/);
     assert.match(dashboard, /AdminSupplementImprovementInsightsView/);
     assert.doesNotMatch(dashboard, /AdminSupplementAvailabilityMatrixView/);
     assert.doesNotMatch(dashboard, /AdminProductImprovementInsightsView/);
     assert.doesNotMatch(dashboard, /AdminFoodImprovementInsightsView/);
     assert.doesNotMatch(page, /getAdminSupplementAvailabilityMatrixData/);
+    assert.match(page, /getAdminProductRecommendationInsightsData/);
     assert.match(page, /getAdminSupplementImprovementInsightsData/);
     assert.doesNotMatch(page, /getAdminProductImprovementInsightsData/);
     assert.doesNotMatch(page, /getAdminFoodImprovementInsightsData/);
+    assert.equal(adminViewPermission("product-insights"), "marketing.read");
     assert.equal(adminViewPermission("supplement-insights"), "marketing.read");
     assert.equal(isAdminDashboardView("supplement-availability-matrix"), false);
-    assert.equal(isAdminDashboardView("product-insights"), false);
+    assert.equal(isAdminDashboardView("product-insights"), true);
     assert.equal(isAdminDashboardView("food-insights"), false);
   });
 
@@ -61,6 +65,14 @@ describe("continuous improvement insights", () => {
     const data = emptyAdminSupplementImprovementInsightsData("week");
 
     assert.equal(data.databaseAvailable, false);
+  });
+
+  it("keeps safe empty data for product recommendation insights", () => {
+    const data = emptyAdminProductRecommendationInsightsData("week");
+
+    assert.equal(data.databaseAvailable, false);
+    assert.equal(data.summary.totalProducts, 0);
+    assert.deepEqual(data.rows, []);
   });
 
   it("renders managed-list supplement sections without the outside-master-list empty section", () => {

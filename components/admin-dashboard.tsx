@@ -47,6 +47,7 @@ import type {
   AdminRetailStockData
 } from "@/lib/admin-retail-stock";
 import type {
+  AdminProductRecommendationInsightsData,
   AdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import type {
@@ -107,6 +108,7 @@ import {
 } from "@/components/admin/product-view";
 import { AdminVisibilityView } from "@/components/admin/visibility-view";
 import {
+  AdminProductRecommendationInsightsView,
   AdminSupplementImprovementInsightsView
 } from "@/components/admin/recommendation-insights-view";
 import { AdminDrawer } from "@/components/admin/ui";
@@ -230,6 +232,7 @@ function adminViewDatabaseAvailable({
   panyaData,
   productDetailData,
   productsData,
+  productRecommendationInsightsData,
   retailFinancialsData,
   retailStockData,
   reviewQueueData,
@@ -254,6 +257,7 @@ function adminViewDatabaseAvailable({
   panyaData: AdminPanyaData;
   productDetailData?: AdminProductDetailData | null;
   productsData: AdminProductsData;
+  productRecommendationInsightsData: AdminProductRecommendationInsightsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   reviewQueueData: AdminReviewQueueData;
@@ -343,6 +347,10 @@ function adminViewDatabaseAvailable({
     return productDetailData?.databaseAvailable ?? productsData.databaseAvailable;
   }
 
+  if (view === "product-insights") {
+    return productRecommendationInsightsData.databaseAvailable;
+  }
+
   if (
     view === "stock" ||
     view === "retail-audit" ||
@@ -397,6 +405,7 @@ export function AdminDashboard({
   productDetailData,
   productDetailId,
   productsData,
+  productRecommendationInsightsData,
   retailFinancialsData,
   retailStockData,
   reviewQueueData,
@@ -431,6 +440,7 @@ export function AdminDashboard({
   productDetailData?: AdminProductDetailData | null;
   productDetailId?: string | null;
   productsData: AdminProductsData;
+  productRecommendationInsightsData: AdminProductRecommendationInsightsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   reviewQueueData: AdminReviewQueueData;
@@ -464,6 +474,7 @@ export function AdminDashboard({
       view === "glance" ||
       view === "leads" ||
       view === "panya" ||
+      view === "product-insights" ||
       view === "retail-financials" ||
       view === "settlements" ||
       view === "supplement-insights" ||
@@ -523,6 +534,7 @@ export function AdminDashboard({
     panyaData,
     productDetailData,
     productsData,
+    productRecommendationInsightsData,
     retailFinancialsData,
     retailStockData,
     reviewQueueData,
@@ -774,6 +786,12 @@ export function AdminDashboard({
           ) : view === "coverage-improvement-insights" ? (
             <AdminCoverageImprovementInsightsView
               data={coverageImprovementInsightsData}
+              locale={locale}
+            />
+          ) : view === "product-insights" ? (
+            <AdminProductRecommendationInsightsView
+              accessToken={accessToken}
+              data={productRecommendationInsightsData}
               locale={locale}
             />
           ) : view === "agents" ? (

@@ -48,8 +48,9 @@ describe("recommendation selection projections", () => {
     assert.match(applyScript, /add column if not exists selected_retailer_organisation_id uuid/);
     assert.match(dashboardContent, /insightsTitle/);
     assert.match(dashboardContent, /supplement-insights/);
-    assert.doesNotMatch(dashboardContent, /product-insights/);
+    assert.match(dashboardContent, /product-insights/);
     assert.doesNotMatch(dashboardContent, /food-insights/);
+    assert.match(adminDashboard, /AdminProductRecommendationInsightsView/);
     assert.match(adminDashboard, /AdminSupplementImprovementInsightsView/);
     assert.doesNotMatch(adminDashboard, /AdminProductImprovementInsightsView/);
     assert.doesNotMatch(adminDashboard, /AdminFoodImprovementInsightsView/);

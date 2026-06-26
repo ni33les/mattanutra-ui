@@ -30,7 +30,6 @@ import {
   productBusinessState,
   productBusinessStateClass,
   productBusinessStateLabel,
-  productDecisionSummary,
   productDoseUnitSelectOptions,
   productFactIssueMessages,
   productFactIssueSeverity,
@@ -323,21 +322,6 @@ function approvalDisplayLabel(
   return approval
     ? `${approval.agencyName}: ${approval.approvalNumber}`
     : fallback;
-}
-
-export function ProductInsightStat({
-  label,
-  value,
-}: Readonly<{
-  label: string;
-  value: number;
-}>) {
-  return (
-    <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200">
-      <p className="text-xs font-medium text-gray-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-gray-900">{value}</p>
-    </div>
-  );
 }
 
 export function LocalizedFallbackBadge({
@@ -938,10 +922,6 @@ export function ProductCard({
   const localized = adminLocalizedProductText(row, locale);
   const fallbackLabel = adminLocalizedFallbackLabel(localized.title, locale);
   const state = productBusinessState(row);
-  const decisionStats = "decisionStats" in row ? row.decisionStats : undefined;
-  const coveragePercent =
-    decisionStats?.averageProductCoveragePercent ??
-    row.recommendationHistory.averageProductCoveragePercent;
   const readyCountryPrice = row.countryPricing.find(
     (item) => item.rrpPriceAmount !== null && item.rrpPriceAmount > 0,
   );
@@ -951,14 +931,6 @@ export function ProductCard({
     localized.title.canonicalValue !== localized.title.value
       ? localized.title.canonicalValue
       : "";
-  const decisionSummary = [
-    productDecisionSummary(row, locale),
-    coveragePercent
-      ? `${viewLabels.averageClientFit} ${Math.round(coveragePercent)}%`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
   const content = (
     <>
@@ -1097,12 +1069,11 @@ export function ProductCard({
           )}
         </div>
       </div>
-      <div className="mt-4 flex items-end justify-between gap-4 border-t border-gray-100 pt-3 text-xs leading-5 text-gray-400">
-        <span className="min-w-0 truncate">{sourceTitle}</span>
-        <span className="shrink-0 text-right font-medium text-gray-500">
-          {decisionSummary}
-        </span>
-      </div>
+      {sourceTitle ? (
+        <div className="mt-4 border-t border-gray-100 pt-3 text-xs leading-5 text-gray-400">
+          <span className="block min-w-0 truncate">{sourceTitle}</span>
+        </div>
+      ) : null}
     </>
   );
 

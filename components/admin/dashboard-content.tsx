@@ -50,6 +50,7 @@ export type AdminDashboardView =
   | "organisations"
   | "people"
   | "panya"
+  | "product-insights"
   | "products"
   | "reviews"
   | "retail-customer-orders"
@@ -1465,6 +1466,7 @@ const baseContent = {
     insights: [
       { icon: UserGroupIcon, name: "Customer Intelligence", view: "customer-insights" },
       { icon: FunnelIcon, name: "Coverage Improvement", view: "coverage-improvement-insights" },
+      { icon: ShoppingBagIcon, name: "Products", view: "product-insights" },
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" }
     ],
     insightsTitle: "Insights",
@@ -1497,6 +1499,7 @@ const baseContent = {
       organisations: "Organisations",
       people: "People",
       panya: "Panya",
+      "product-insights": "Product Insights",
       products: "Products",
       "retail-customer-orders": "Customer Orders",
       "retail-audit": "Audit",
@@ -2332,6 +2335,7 @@ const baseContent = {
     insights: [
       { icon: UserGroupIcon, name: "ข้อมูลลูกค้า", view: "customer-insights" },
       { icon: FunnelIcon, name: "ปรับปรุงความครอบคลุม", view: "coverage-improvement-insights" },
+      { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" },
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" }
     ],
     insightsTitle: "อินไซต์",
@@ -2364,6 +2368,7 @@ const baseContent = {
       organisations: "องค์กร",
       people: "ผู้ใช้",
       panya: "Panya",
+      "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
       "retail-customer-orders": "คำสั่งซื้อลูกค้า",
       "retail-audit": "บันทึกเหตุการณ์",

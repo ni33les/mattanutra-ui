@@ -41,7 +41,11 @@ describe("product admin card layout", () => {
     );
     assert.match(view, /border-t border-gray-100 pt-3/);
     assert.match(view, /sourceTitle/);
-    assert.match(view, /decisionSummary/);
+    assert.doesNotMatch(view, /decisionSummary/);
+    assert.doesNotMatch(view, /productDecisionSummary/);
+    assert.doesNotMatch(view, /averageClientFit/);
+    assert.doesNotMatch(detailView, /recommendationDecisions/);
+    assert.doesNotMatch(detailView, /ProductInsightStat/);
     assert.match(view, /function productImageFallbackText/);
     assert.match(view, /ProductImagePreview/);
     assert.match(view, /ProductImageFallback/);
@@ -108,6 +112,23 @@ describe("product admin card layout", () => {
     assert.doesNotMatch(listQuery, /summary_approved[\s\S]{0,120}over\(\)/);
     assert.match(listQuery, /if \(!stats\)/);
     assert.match(listQuery, /product_list_stats_base as \(/);
+  });
+
+  it("keeps recommendation telemetry out of product admin surfaces", async () => {
+    const view = await readFile("components/admin/product-view-ui.tsx", "utf8");
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
+    const readModel = await readFile("lib/admin-product-read-model.ts", "utf8");
+    const detailReadPath = readModel.slice(
+      readModel.indexOf("export async function getAdminProductDetailData"),
+      readModel.indexOf("export async function getAdminProductsData")
+    );
+
+    assert.doesNotMatch(view, /ProductInsightStat/);
+    assert.doesNotMatch(view, /chosenPlanCount|nearMissCount|averageProductCoveragePercent/);
+    assert.doesNotMatch(detailView, /Recommendation decisions|decisionStats/);
+    assert.doesNotMatch(helpers, /productDecisionSummary|averageClientFit|nearMisses/);
+    assert.doesNotMatch(detailReadPath, /getProductDecisionStatsByProduct|decisionStats/);
   });
 
   it("keeps product image metrics based on the image URL field", async () => {

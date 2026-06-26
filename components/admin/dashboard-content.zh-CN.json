@@ -688,6 +688,10 @@
       "view": "coverage-improvement-insights"
     },
     {
+      "name": "产品",
+      "view": "product-insights"
+    },
+    {
       "name": "补充剂",
       "view": "supplement-insights"
     }
@@ -734,6 +738,7 @@
     "organisations": "组织",
     "people": "人员",
     "panya": "Panya",
+    "product-insights": "产品洞察",
     "products": "产品",
     "retail-customer-orders": "客户订单",
     "retail-audit": "审计",

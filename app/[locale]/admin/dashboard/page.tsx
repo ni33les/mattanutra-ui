@@ -60,7 +60,9 @@ import {
   getAdminRetailStockData
 } from "@/lib/admin-retail-stock";
 import {
+  emptyAdminProductRecommendationInsightsData,
   emptyAdminSupplementImprovementInsightsData,
+  getAdminProductRecommendationInsightsData,
   getAdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import {
@@ -242,6 +244,8 @@ export default async function LocalizedAdminDashboardPage({
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
+  let productRecommendationInsightsData =
+    emptyAdminProductRecommendationInsightsData(range);
   let panyaData = emptyAdminPanyaData();
   let retailStockData = emptyAdminRetailStockData();
   let reviewQueueData = emptyAdminReviewQueueData();
@@ -316,6 +320,9 @@ export default async function LocalizedAdminDashboardPage({
   } else if (view === "supplement-insights") {
     supplementImprovementInsightsData =
       await getAdminSupplementImprovementInsightsData(range, locale);
+  } else if (view === "product-insights") {
+    productRecommendationInsightsData =
+      await getAdminProductRecommendationInsightsData(range);
   } else if (view === "coverage-improvement-insights") {
     coverageImprovementInsightsData =
       await getAdminCoverageImprovementInsightsData(range, locale);
@@ -352,6 +359,7 @@ export default async function LocalizedAdminDashboardPage({
       leadsData={leadsData}
       locale={locale}
       productsData={productsData}
+      productRecommendationInsightsData={productRecommendationInsightsData}
       panyaData={panyaData}
       panyaSection={panyaSection}
       retailFinancialsData={retailFinancialsData}
