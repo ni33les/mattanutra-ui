@@ -403,10 +403,6 @@ export async function replaceProductFacts(
           : null;
       const supplementId = explicitSupplementId ?? supplementMatch?.id ?? null;
 
-      if (!supplementId) {
-        return null;
-      }
-
       return {
         amount: numberOrNull(fact.amount),
         confidence: fact.confidence ?? "moderate",
