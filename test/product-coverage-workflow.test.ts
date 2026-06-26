@@ -516,6 +516,9 @@ describe("product coverage workflow", () => {
     assert.match(view, /displayData: simulationDisplaySnapshotFromRunner/);
     assert.match(view, /loadSavedSimulationDisplayData/);
     assert.match(view, /cachedSimulationData \?\? initialSimulationData/);
+    assert.match(view, /productResultRows/);
+    assert.match(view, /visibleProductResultRows/);
+    assert.match(view, /Eligible product results/);
     assert.match(view, /savedSimulationReplayTarget/);
     assert.match(view, /replayCachedDemandProfiles/);
     assert.match(view, /window\.addEventListener\("focus"/);

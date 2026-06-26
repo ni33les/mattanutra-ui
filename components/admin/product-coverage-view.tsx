@@ -514,6 +514,39 @@ function initialSimulationDataWithCachedDisplay(
   return loadSavedSimulationDisplayData(data.countryCode) ?? initialSimulationData(data);
 }
 
+function productResultRows(
+  data: AdminPlanCoverageSimulationData,
+  candidates: AdminPlanCoverageSimulationData["input"]["candidates"]
+) {
+  const rowsById = new Map(data.mostUsefulProducts.map((row) => [row.id, row]));
+  const rows = [
+    ...data.mostUsefulProducts,
+    ...candidates
+      .filter((candidate) => !rowsById.has(candidate.id))
+      .map((candidate): AdminSimulationProductUsefulnessRow => ({
+        averageProductCoveragePercent: 0,
+        averageStackContributionPercent: 0,
+        brandName: candidate.brandName ?? null,
+        chosenCount: 0,
+        expectedPriceAmount: candidate.priceAmount ?? candidate.unitPriceAmount ?? null,
+        id: candidate.id,
+        rank: 0,
+        title: candidate.title
+      }))
+  ];
+
+  return rows
+    .sort((first, second) =>
+      second.chosenCount - first.chosenCount ||
+      second.averageStackContributionPercent -
+        first.averageStackContributionPercent ||
+      (first.expectedPriceAmount ?? Number.MAX_SAFE_INTEGER) -
+        (second.expectedPriceAmount ?? Number.MAX_SAFE_INTEGER) ||
+      first.title.localeCompare(second.title)
+    )
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
 function waitForNextSample() {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, 24);
@@ -828,7 +861,10 @@ function ProductUsefulnessBar({
 }: Readonly<{
   row: AdminSimulationProductUsefulnessRow;
 }>) {
-  const width = Math.max(4, Math.min(100, row.averageStackContributionPercent));
+  const width =
+    row.averageStackContributionPercent > 0
+      ? Math.max(4, Math.min(100, row.averageStackContributionPercent))
+      : 0;
 
   return (
     <div className="grid gap-3 border-t border-slate-200 py-4 md:grid-cols-[44px_minmax(0,1fr)_120px_120px] md:items-center">
@@ -838,7 +874,10 @@ function ProductUsefulnessBar({
         <p className="mt-1 text-xs text-slate-500">{row.brandName ?? "No brand"}</p>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full rounded-full bg-[#1FA77A]"
+            className={classNames(
+              "h-full rounded-full",
+              row.chosenCount > 0 ? "bg-[#1FA77A]" : "bg-slate-300"
+            )}
             style={{ width: `${width}%` }}
           />
         </div>
@@ -1635,6 +1674,10 @@ export function AdminPlanCoverageSimulatorView({
   const nextMovesCleared =
     nextMoveRows.length > 0 && nextMovesClearedKey === nextMovesKey;
   const visibleNextMoveRows = nextMovesCleared ? [] : nextMoveRows;
+  const visibleProductResultRows = useMemo(
+    () => productResultRows(simulationData, activeInputData.input.candidates),
+    [activeInputData.input.candidates, simulationData]
+  );
 
   const replayCachedDemandProfiles = useCallback(async (
     runToken: number,
@@ -2132,17 +2175,17 @@ export function AdminPlanCoverageSimulatorView({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
         <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-bold text-slate-950">Most useful products</h2>
-            <Badge>{percentText(simulationData.summary.percentAbove90)} above 90%</Badge>
+            <h2 className="text-lg font-bold text-slate-950">Eligible product results</h2>
+            <Badge>{numberText(visibleProductResultRows.length)} eligible</Badge>
           </div>
           <div className="mt-2">
-            {simulationData.mostUsefulProducts.length > 0 ? (
-              simulationData.mostUsefulProducts.map((row) => (
+            {visibleProductResultRows.length > 0 ? (
+              visibleProductResultRows.map((row) => (
                 <ProductUsefulnessBar key={row.id} row={row} />
               ))
             ) : (
               <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
-                No eligible products were selected by the simulation.
+                No eligible products are available for this simulation.
               </p>
             )}
           </div>
