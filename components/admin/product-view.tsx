@@ -451,6 +451,7 @@ export function AdminProductDetailView({
     setErrorMessage(null);
 
     try {
+      const englishTitle = row.translations?.en?.title?.trim() || row.title;
       const response = await fetch(`/api/admin/products/${row.id}`, {
         body: JSON.stringify({
           accessToken,
@@ -470,7 +471,7 @@ export function AdminProductDetailView({
           productKind: row.productKind,
           productUrl: row.productUrl,
           regulatoryApprovals: regulatoryApprovalsForSave(row),
-          title: row.title,
+          title: englishTitle,
           translations: row.translations,
         }),
         headers: {
@@ -1058,12 +1059,6 @@ function ProductDetailPanel({
                   {productBusinessStateLabel(currentBusinessState, locale)}
                 </span>
               </div>
-              {localized.title.canonicalValue &&
-              localized.title.canonicalValue !== localized.title.value ? (
-                <p className="mt-1 text-xs text-gray-400">
-                  {viewLabels.sourceTitle}: {localized.title.canonicalValue}
-                </p>
-              ) : null}
               <p className="mt-1 text-sm text-gray-500">
                 {[
                   draft.brandName,
@@ -1119,21 +1114,6 @@ function ProductDetailPanel({
               {viewLabels.aiNotes}:{" "}
             </span>
             {draft.aiCorrectionNotes}
-          </p>
-        ) : null}
-        {draft.sourceEvidence.sourceUrl ? (
-          <p>
-            <span className="font-semibold text-gray-900">
-              {viewLabels.source}:{" "}
-            </span>
-            <a
-              className="text-[#2563EB] hover:text-[#1D4ED8]"
-              href={draft.sourceEvidence.sourceUrl}
-              rel="noreferrer"
-              target="_blank"
-            >
-              {draft.sourceEvidence.sourceUrl}
-            </a>
           </p>
         ) : null}
       </div>
@@ -1192,20 +1172,6 @@ function ProductDetailPanel({
       />
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-medium text-gray-700">
-          {viewLabels.productName}
-          <input
-            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) =>
-              setDraft({
-                ...draft,
-                title: event.target.value,
-              })
-            }
-            type="text"
-            value={draft.title}
-          />
-        </label>
         <label className="text-sm font-medium text-gray-700">
           {viewLabels.brand}
           <input

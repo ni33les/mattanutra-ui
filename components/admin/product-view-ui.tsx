@@ -926,12 +926,6 @@ export function ProductCard({
     (item) => item.rrpPriceAmount !== null && item.rrpPriceAmount > 0,
   );
   const approvalSummary = regulatoryApprovalSummary(row.regulatoryApprovals);
-  const sourceTitle =
-    localized.title.canonicalValue &&
-    localized.title.canonicalValue !== localized.title.value
-      ? localized.title.canonicalValue
-      : "";
-
   const content = (
     <>
       <div className="flex gap-4">
@@ -1069,11 +1063,6 @@ export function ProductCard({
           )}
         </div>
       </div>
-      {sourceTitle ? (
-        <div className="mt-4 border-t border-gray-100 pt-3 text-xs leading-5 text-gray-400">
-          <span className="block min-w-0 truncate">{sourceTitle}</span>
-        </div>
-      ) : null}
     </>
   );
 
@@ -1337,7 +1326,11 @@ export function ProductTranslationEditor({
 
   function updateTranslation(
     locale: string,
-    patch: Readonly<{ description?: string | null; title?: string | null }>,
+    patch: Readonly<{
+      description?: string | null;
+      status?: AdminProductDetailRow["translations"][string]["status"];
+      title?: string | null;
+    }>,
   ) {
     const current = translationFor(locale);
     const nextTranslation = {
@@ -1346,26 +1339,32 @@ export function ProductTranslationEditor({
     };
     const hasTitle = Boolean(nextTranslation.title?.trim());
     const hasDescription = Boolean(nextTranslation.description?.trim());
+    const inferredStatus =
+      hasTitle && hasDescription
+        ? ("complete" as const)
+        : hasTitle || hasDescription
+          ? ("draft" as const)
+          : ("missing" as const);
+    const nextStatus =
+      patch.status ??
+      (current.status === "complete" && hasTitle ? "complete" : inferredStatus);
     const translations = {
       ...(draft.translations ?? {}),
       [locale]: {
         ...nextTranslation,
         description: nextTranslation.description?.trim() || null,
-        status:
-          hasTitle && hasDescription
-            ? ("complete" as const)
-            : hasTitle || hasDescription
-              ? ("draft" as const)
-              : ("missing" as const),
+        status: nextStatus,
         title: nextTranslation.title?.trim() || null,
       },
     };
+    const englishTitle = translations.en?.title?.trim();
     const nextDraft: AdminProductDetailRow = {
       ...draft,
       translations,
       ...(locale === "en"
         ? {
             description: translations.en?.description ?? draft.description,
+            ...(englishTitle ? { title: englishTitle } : {}),
           }
         : {}),
     };
@@ -1422,6 +1421,23 @@ export function ProductTranslationEditor({
         })}
       </div>
       <div className="mt-4 grid gap-4">
+        <label className="text-sm font-medium text-gray-700">
+          {viewLabels.translationStatus} · {activeTranslationMeta.nativeLabel}
+          <select
+            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            onChange={(event) =>
+              updateTranslation(activeTranslationLocale, {
+                status: event.target
+                  .value as AdminProductDetailRow["translations"][string]["status"],
+              })
+            }
+            value={activeTranslation.status}
+          >
+            <option value="complete">{viewLabels.complete}</option>
+            <option value="draft">{viewLabels.draft}</option>
+            <option value="missing">{viewLabels.missing}</option>
+          </select>
+        </label>
         <label className="text-sm font-medium text-gray-700">
           {viewLabels.title} · {activeTranslationMeta.nativeLabel}
           <input

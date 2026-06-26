@@ -249,7 +249,9 @@ function normalizedTranslationEntries(input: Readonly<{
 
     const title = cleanNullableText(value.title, 500);
     const description = cleanNullableText(value.description, 4000);
-    const status = value.status === "complete" || value.status === "missing"
+    const status = value.status === "complete" ||
+      value.status === "draft" ||
+      value.status === "missing"
       ? value.status
       : title && description
         ? "complete"

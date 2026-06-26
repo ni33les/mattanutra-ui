@@ -3,9 +3,11 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 describe("product admin card layout", () => {
-  it("keeps brand, markets, regulatory approval, and source in distinct card areas", async () => {
+  it("keeps brand, markets, and regulatory approval in distinct card areas", async () => {
     const view = await readFile("components/admin/product-view-ui.tsx", "utf8");
     const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const route = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
+    const writes = await readFile("lib/admin-product-writes.ts", "utf8");
     const productCard = view.slice(
       view.indexOf("export function ProductCard"),
       view.indexOf("export function ProductFactsEditor"),
@@ -39,8 +41,16 @@ describe("product admin card layout", () => {
       view,
       /overflow-hidden rounded-lg ring-1 ring-gray-200/,
     );
-    assert.match(view, /border-t border-gray-100 pt-3/);
-    assert.match(view, /sourceTitle/);
+    assert.doesNotMatch(productCard, /sourceTitle/);
+    assert.doesNotMatch(detailView, /sourceEvidence\.sourceUrl/);
+    assert.doesNotMatch(detailView, /viewLabels\.sourceTitle/);
+    assert.doesNotMatch(detailView, /viewLabels\.productName/);
+    assert.match(detailView, /const englishTitle = row\.translations\?\.en\?\.title\?\.trim\(\) \|\| row\.title/);
+    assert.match(view, /status: event\.target[\s\S]*AdminProductDetailRow\["translations"\]\[string\]\["status"\]/);
+    assert.match(view, /englishTitle \? \{ title: englishTitle \} : \{\}/);
+    assert.match(route, /englishTranslationTitle/);
+    assert.match(route, /title: effectiveTitle/);
+    assert.match(writes, /value\.status === "draft"/);
     assert.doesNotMatch(view, /decisionSummary/);
     assert.doesNotMatch(view, /productDecisionSummary/);
     assert.doesNotMatch(view, /averageClientFit/);

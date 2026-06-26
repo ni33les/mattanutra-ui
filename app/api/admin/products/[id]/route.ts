@@ -206,9 +206,18 @@ export async function PATCH(
   const productUrl = body.productUrl === undefined
     ? undefined
     : textOrNull(body.productUrl, 2000);
+  const translationRequest = normalizeProductTranslationRequest({
+    body,
+    translations: body.translations
+  });
+  const englishTranslationTitle = textOrNull(
+    translationRequest.translations?.en?.title,
+    500
+  );
+  const effectiveTitle = englishTranslationTitle ?? title;
 
   if (
-    (body.title !== undefined && !title) ||
+    (body.title !== undefined && !effectiveTitle) ||
     (body.productUrl !== undefined && !productUrl) ||
     (body.status !== undefined && !isProductStatus(status)) ||
     (body.labelStatus !== undefined && !isProductLabelStatus(labelStatus)) ||
@@ -226,11 +235,6 @@ export async function PATCH(
       }
     );
   }
-
-  const translationRequest = normalizeProductTranslationRequest({
-    body,
-    translations: body.translations
-  });
 
   try {
     const row = await updateAdminProduct({
@@ -263,7 +267,7 @@ export async function PATCH(
       regulatoryApprovals: body.regulatoryApprovals === undefined
         ? undefined
         : productRegulatoryApprovalsFromPayload(body.regulatoryApprovals),
-      title,
+      title: effectiveTitle,
       translations: translationRequest.translations
     });
     const rows = body.manufacturerCountryCodes !== undefined && row.brandId
