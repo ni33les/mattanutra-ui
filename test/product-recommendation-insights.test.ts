@@ -188,7 +188,7 @@ describe("product recommendation insights", () => {
     assert.match(loader, /outcome = 'rejected'/);
   });
 
-  it("shows usefulness score histogram instead of chosen frequency or outcome mix", async () => {
+  it("shows a product-level usefulness histogram instead of chosen frequency, buckets, or outcome mix", async () => {
     const view = await readFile("components/admin/recommendation-insights-view.tsx", "utf8");
     const productView = view.slice(
       view.indexOf("export function AdminProductRecommendationInsightsView"),
@@ -202,14 +202,22 @@ describe("product recommendation insights", () => {
     assert.match(view, /function ProductUsefulnessHistogram/);
     assert.match(view, /Usefulness score/);
     assert.match(view, /Product Usefulness Histogram/);
-    assert.match(view, /Strong/);
-    assert.match(view, /Useful/);
-    assert.match(view, /Useless/);
-    assert.match(productView, /<ProductUsefulnessHistogram rows=\{data\.rows\} locale=\{locale\} \/>/);
+    assert.match(view, /const histogramRows = \[\.\.\.rows\]\.sort/);
+    assert.match(view, /histogramRows\.map\(\(row\)/);
+    assert.match(view, /productDetailHref\(row, locale, accessToken\)/);
+    assert.match(view, /row\.title/);
+    assert.match(view, /row\.brandName/);
+    assert.match(view, /row\.usefulnessScore/);
+    assert.match(view, /style=\{\{ width: `\$\{width\}%` \}\}/);
+    assert.match(productView, /<ProductUsefulnessHistogram/);
+    assert.match(productView, /accessToken=\{accessToken\}/);
+    assert.match(productView, /rows=\{data\.rows\}/);
     assert.doesNotMatch(view, /ProductChosenHistogram/);
     assert.doesNotMatch(view, /Chosen frequency/);
     assert.doesNotMatch(view, /How Often Products Are Chosen/);
     assert.doesNotMatch(view, /Zero chosen decisions/);
+    assert.doesNotMatch(view, /productUsefulnessBands/);
+    assert.doesNotMatch(view, /Never evaluated/);
     assert.doesNotMatch(view, /ProductInsightDistributionBar/);
     assert.doesNotMatch(view, /Outcome mix/);
     assert.doesNotMatch(view, /Product recommendation distribution/);

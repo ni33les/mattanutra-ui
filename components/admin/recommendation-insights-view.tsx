@@ -54,22 +54,14 @@ const productOutcomeClasses: Record<ProductRecommendationInsightOutcome, string>
   rejected: "bg-rose-50 text-rose-700 ring-rose-200"
 };
 
-const productUsefulnessBands: Array<{
-  id: ProductRecommendationUsefulnessBand;
-  label: string;
-  range: string;
-}> = [
-  { id: "strong", label: "Strong", range: "80-100" },
-  { id: "useful", label: "Useful", range: "60-79" },
-  { id: "mixed", label: "Mixed", range: "40-59" },
-  { id: "weak", label: "Weak", range: "20-39" },
-  { id: "useless", label: "Useless", range: "0-19" },
-  { id: "unknown", label: "Unknown", range: "Never evaluated" }
-];
-
-const productUsefulnessLabels = Object.fromEntries(
-  productUsefulnessBands.map((band) => [band.id, band.label])
-) as Record<ProductRecommendationUsefulnessBand, string>;
+const productUsefulnessLabels: Record<ProductRecommendationUsefulnessBand, string> = {
+  mixed: "Mixed",
+  strong: "Strong",
+  unknown: "Unknown",
+  useful: "Useful",
+  useless: "Useless",
+  weak: "Weak"
+};
 
 const productUsefulnessBadgeClasses: Record<ProductRecommendationUsefulnessBand, string> = {
   mixed: "bg-sky-50 text-sky-700 ring-sky-200",
@@ -328,81 +320,87 @@ function ProductUsefulnessPill({
 }
 
 function ProductUsefulnessHistogram({
+  accessToken,
   locale,
   rows
 }: Readonly<{
+  accessToken: string;
   rows: readonly AdminProductRecommendationInsightRow[];
   locale: Locale;
 }>) {
-  const counts = Object.fromEntries(
-    productUsefulnessBands.map((band) => [band.id, 0])
-  ) as Record<ProductRecommendationUsefulnessBand, number>;
-  const scoredRows = rows.filter((row) => row.usefulnessScore !== null);
-  const lowSampleCount = rows.filter((row) => row.usefulnessSample === "low").length;
-  const averageScore = scoredRows.length > 0
-    ? Math.round(
-        scoredRows.reduce((sum, row) => sum + (row.usefulnessScore ?? 0), 0) /
-        scoredRows.length
-      )
-    : null;
+  const histogramRows = [...rows].sort((left, right) => {
+    if (left.usefulnessScore === null && right.usefulnessScore !== null) {
+      return 1;
+    }
 
-  for (const row of rows) {
-    counts[row.usefulnessBand] += 1;
-  }
+    if (left.usefulnessScore !== null && right.usefulnessScore === null) {
+      return -1;
+    }
 
-  const max = Math.max(1, ...productUsefulnessBands.map((band) => counts[band.id]));
+    const scoreDifference = (left.usefulnessScore ?? 101) - (right.usefulnessScore ?? 101);
+
+    return scoreDifference === 0
+      ? left.title.localeCompare(right.title)
+      : scoreDifference;
+  });
 
   return (
     <Section eyebrow="Usefulness score" title="Product Usefulness Histogram">
       {rows.length > 0 ? (
-        <div className="space-y-4">
-          <div className="space-y-3">
-            {productUsefulnessBands.map((band) => (
-              <div
-                className="grid grid-cols-[minmax(7rem,10rem)_minmax(8rem,1fr)_4rem] items-center gap-3"
-                key={band.id}
+        <div className="max-h-[34rem] divide-y divide-gray-100 overflow-y-auto pr-1">
+          {histogramRows.map((row) => {
+            const href = productDetailHref(row, locale, accessToken);
+            const score = row.usefulnessScore;
+            const width = score === null ? 4 : Math.max(4, score);
+
+            return (
+              <a
+                className="grid gap-2 py-3 transition hover:bg-gray-50 sm:grid-cols-[minmax(12rem,22rem)_minmax(10rem,1fr)_minmax(5rem,7rem)] sm:items-center"
+                href={href}
+                key={row.id}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900">
-                    {band.label}
-                  </p>
-                  <p className="truncate text-xs font-medium text-gray-500">
-                    {band.range}
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-gray-900">
+                      {row.title}
+                    </p>
+                    {row.usefulnessSample === "low" ? (
+                      <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[0.7rem] font-semibold text-amber-800 ring-1 ring-amber-200">
+                        Low sample
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 truncate text-xs font-medium text-gray-500">
+                    {[
+                      row.brandName || "Unknown brand",
+                      `${formatNumber(row.affectedPlanCount, locale)} evaluated`,
+                      `coverage ${formatPercent(row.averageCoveragePercent)}`
+                    ].join(" · ")}
                   </p>
                 </div>
                 <div className="h-5 overflow-hidden rounded-full bg-gray-100">
                   <div
                     className={classNames(
                       "h-full rounded-full",
-                      productUsefulnessBarClasses[band.id]
+                      productUsefulnessBarClasses[row.usefulnessBand]
                     )}
-                    style={{
-                      width: `${Math.max(4, (counts[band.id] / max) * 100)}%`
-                    }}
+                    style={{ width: `${width}%` }}
                   />
                 </div>
-                <p className="text-right text-sm font-semibold tabular-nums text-gray-800">
-                  {formatNumber(counts[band.id], locale)}
-                </p>
-              </div>
-            ))}
-          </div>
-          <dl className="grid gap-3 border-t border-gray-100 pt-4 text-xs font-semibold text-gray-500 sm:grid-cols-3">
-            <div
-              className="flex items-center justify-between gap-3"
-            >
-              <dt>Average score</dt>
-              <dd className="text-gray-900">{averageScore === null ? "-" : averageScore}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt>Low sample</dt>
-              <dd className="text-gray-900">{formatNumber(lowSampleCount, locale)}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt>Unknown</dt>
-              <dd className="text-gray-900">{formatNumber(counts.unknown, locale)}</dd>
-            </div>
-          </dl>
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <span className={classNames(
+                    "inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1",
+                    productUsefulnessBadgeClasses[row.usefulnessBand]
+                  )}>
+                    {productUsefulnessLabels[row.usefulnessBand]}
+                  </span>
+                  <span className="min-w-8 text-right text-sm font-semibold tabular-nums text-gray-800">
+                    {score === null ? "-" : formatNumber(score, locale)}
+                  </span>
+                </div>
+              </a>
+            );
+          })}
         </div>
       ) : (
         <EmptyState label="No products are available for this timeframe." />
@@ -650,7 +648,11 @@ export function AdminProductRecommendationInsightsView({
   return (
     <div className="mt-8 space-y-6">
       <BusinessStatsGrid metrics={metrics} />
-      <ProductUsefulnessHistogram rows={data.rows} locale={locale} />
+      <ProductUsefulnessHistogram
+        accessToken={accessToken}
+        locale={locale}
+        rows={data.rows}
+      />
 
       <Section
         action={
