@@ -45,6 +45,9 @@ describe("product admin card layout", () => {
     assert.doesNotMatch(detailView, /sourceEvidence\.sourceUrl/);
     assert.doesNotMatch(detailView, /viewLabels\.sourceTitle/);
     assert.doesNotMatch(detailView, /viewLabels\.productName/);
+    assert.doesNotMatch(detailView, /viewLabels\.validationBlockers/);
+    assert.doesNotMatch(detailView, /draft\.aiCorrectionNotes/);
+    assert.doesNotMatch(detailView, /readableToken\(reason\)/);
     assert.match(detailView, /const englishTitle = row\.translations\?\.en\?\.title\?\.trim\(\) \|\| row\.title/);
     assert.match(view, /status: event\.target[\s\S]*AdminProductDetailRow\["translations"\]\[string\]\["status"\]/);
     assert.match(view, /englishTitle \? \{ title: englishTitle \} : \{\}/);
@@ -82,9 +85,17 @@ describe("product admin card layout", () => {
     );
   });
 
-  it("keeps product image drag-and-drop URL based for v1", async () => {
+  it("mirrors dropped product image URLs and supports uploads", async () => {
     const view = await readFile("components/admin/product-view-ui.tsx", "utf8");
     const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const resolveRoute = await readFile(
+      "app/api/admin/products/[id]/image/resolve/route.ts",
+      "utf8",
+    );
+    const uploadRoute = await readFile(
+      "app/api/admin/products/[id]/image/upload/route.ts",
+      "utf8",
+    );
     const dropzone = view.slice(
       view.indexOf("export function ProductImageDropzone"),
       view.indexOf("type ProductCountryApprovalPatch"),
@@ -93,12 +104,25 @@ describe("product admin card layout", () => {
     assert.match(view, /getData\("text\/uri-list"\)/);
     assert.match(view, /getData\("text\/plain"\)/);
     assert.match(dropzone, /event\.dataTransfer\.files\.length > 0/);
-    assert.match(dropzone, /viewLabels\.imageFileDropUnsupported/);
+    assert.match(dropzone, /uploadImageFile\(file\)/);
+    assert.match(dropzone, /image\/resolve/);
+    assert.match(dropzone, /image\/upload/);
+    assert.match(dropzone, /type="file"/);
+    assert.match(dropzone, /viewLabels\.imageUpload/);
+    assert.match(dropzone, /viewLabels\.imageUseUrl/);
+    assert.doesNotMatch(dropzone, /imageFileDropUnsupported/);
     assert.match(dropzone, /draggable=\{true\}/);
     assert.match(dropzone, /event\.dataTransfer\.setData\("text\/uri-list", imageUrl\)/);
     assert.match(dropzone, /viewLabels\.imageCandidates/);
     assert.match(detailView, /<ProductImageDropzone/);
+    assert.match(detailView, /accessToken=\{accessToken\}/);
+    assert.match(detailView, /productId=\{draft\.id\}/);
     assert.match(detailView, /imageCandidates: \[/);
+    assert.match(resolveRoute, /mirrorImageToFirstParty/);
+    assert.match(resolveRoute, /namespace: "products"/);
+    assert.match(resolveRoute, /source: "admin_product_image_dropzone"/);
+    assert.match(uploadRoute, /uploadContentImage/);
+    assert.match(uploadRoute, /maxUploadBytes = 6 \* 1024 \* 1024/);
   });
 
   it("keeps product list metric counts independent from active filters", async () => {

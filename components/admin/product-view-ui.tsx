@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState, type ChangeEvent } from "react";
+import { Upload } from "lucide-react";
 import type {
   AdminProductDetailRow,
   AdminProductRow
@@ -164,11 +165,15 @@ function droppedImageUrl(dataTransfer: DataTransfer) {
 }
 
 export function ProductImageDropzone({
+  accessToken,
   onImageUrlChange,
+  productId,
   row,
   viewLabels,
 }: Readonly<{
+  accessToken: string;
   onImageUrlChange: (imageUrl: string | null) => void;
+  productId: string;
   row: Pick<
     AdminProductRow,
     "brandName" | "imageUrl" | "platform" | "title"
@@ -177,11 +182,116 @@ export function ProductImageDropzone({
   };
   viewLabels: Readonly<Record<string, string>>;
 }>) {
+  const uploadInputId = useId();
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const [busyAction, setBusyAction] = useState<"upload" | "url" | null>(null);
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
   const imageCandidates = [...new Set(row.imageCandidates ?? [])].filter(
     (url) => url && url !== row.imageUrl
   );
+  const busy = busyAction !== null;
+
+  async function resultMessage(response: Response, fallback: string) {
+    const result = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      url?: string;
+    };
+
+    return {
+      message: result.message ?? fallback,
+      url: typeof result.url === "string" ? result.url : null,
+    };
+  }
+
+  async function applyImageUrl(nextImageUrl: string | null) {
+    const imageUrl = nextImageUrl?.trim() ?? "";
+
+    if (!imageUrl) {
+      setDropError(null);
+      onImageUrlChange(null);
+      return;
+    }
+
+    setBusyAction("url");
+    setDropError(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/products/${encodeURIComponent(productId)}/image/resolve`,
+        {
+          body: JSON.stringify({
+            accessToken,
+            imageUrl,
+          }),
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {}),
+          },
+          method: "POST",
+        },
+      );
+      const result = await resultMessage(response, viewLabels.imageMirrorError);
+
+      if (!response.ok || !result.url) {
+        throw new Error(result.message);
+      }
+
+      onImageUrlChange(result.url);
+    } catch (error) {
+      setDropError(
+        error instanceof Error ? error.message : viewLabels.imageMirrorError,
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function uploadImageFile(file: File) {
+    setBusyAction("upload");
+    setDropError(null);
+
+    try {
+      const formData = new FormData();
+
+      formData.set("accessToken", accessToken);
+      formData.set("file", file);
+
+      const response = await fetch(
+        `/api/admin/products/${encodeURIComponent(productId)}/image/upload`,
+        {
+          body: formData,
+          headers: accessToken
+            ? { "x-admin-dashboard-token": accessToken }
+            : undefined,
+          method: "POST",
+        },
+      );
+      const result = await resultMessage(response, viewLabels.imageUploadError);
+
+      if (!response.ok || !result.url) {
+        throw new Error(result.message);
+      }
+
+      onImageUrlChange(result.url);
+    } catch (error) {
+      setDropError(
+        error instanceof Error ? error.message : viewLabels.imageUploadError,
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  function uploadSelectedImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (file) {
+      void uploadImageFile(file);
+    }
+
+    event.target.value = "";
+  }
 
   return (
     <div className="grid gap-3 text-sm font-medium text-gray-700">
@@ -210,7 +320,12 @@ export function ProductImageDropzone({
           setDragging(false);
 
           if (event.dataTransfer.files.length > 0) {
-            setDropError(viewLabels.imageFileDropUnsupported);
+            const file = event.dataTransfer.files.item(0);
+
+            if (file) {
+              void uploadImageFile(file);
+            }
+
             return;
           }
 
@@ -222,25 +337,71 @@ export function ProductImageDropzone({
           }
 
           setDropError(null);
-          onImageUrlChange(imageUrl);
+          void applyImageUrl(imageUrl);
         }}
       >
         <ProductImagePreview alt="" row={row} size="lg" />
         <div className="min-w-0">
-          <input
-            className="block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) =>
-              onImageUrlChange(event.target.value.trim() || null)
-            }
-            placeholder={viewLabels.imageDropHint}
-            type="url"
-            value={row.imageUrl ?? ""}
-          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              className="block min-w-0 flex-1 rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:bg-gray-50"
+              defaultValue={row.imageUrl ?? ""}
+              disabled={busy}
+              key={row.imageUrl ?? ""}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void applyImageUrl(urlInputRef.current?.value ?? "");
+                }
+              }}
+              placeholder={viewLabels.imageDropHint}
+              ref={urlInputRef}
+              type="url"
+            />
+            <div className="flex shrink-0 gap-2">
+              <button
+                className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={busy}
+                onClick={() =>
+                  void applyImageUrl(urlInputRef.current?.value ?? "")
+                }
+                type="button"
+              >
+                {busyAction === "url"
+                  ? viewLabels.imageResolving
+                  : viewLabels.imageUseUrl}
+              </button>
+              <input
+                accept="image/gif,image/jpeg,image/png,image/webp"
+                className="sr-only"
+                disabled={busy}
+                id={uploadInputId}
+                onChange={uploadSelectedImage}
+                type="file"
+              />
+              <label
+                className={classNames(
+                  "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50",
+                  busy ? "pointer-events-none opacity-60" : "",
+                )}
+                htmlFor={uploadInputId}
+              >
+                <Upload aria-hidden={true} className="size-4" strokeWidth={2.25} />
+                {busyAction === "upload"
+                  ? viewLabels.imageUploading
+                  : viewLabels.imageUpload}
+              </label>
+            </div>
+          </div>
           {dropError ? (
             <p className="mt-2 text-xs font-medium text-amber-700">
               {dropError}
             </p>
-          ) : null}
+          ) : (
+            <p className="mt-2 text-xs font-medium text-gray-500">
+              {viewLabels.imageUploadHint}
+            </p>
+          )}
           {imageCandidates.length > 0 ? (
             <div className="mt-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -254,7 +415,7 @@ export function ProductImageDropzone({
                     key={imageUrl}
                     onClick={() => {
                       setDropError(null);
-                      onImageUrlChange(imageUrl);
+                      void applyImageUrl(imageUrl);
                     }}
                     onDragStart={(event) => {
                       event.dataTransfer.setData("text/uri-list", imageUrl);

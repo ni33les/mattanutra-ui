@@ -27,7 +27,6 @@ import { type Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
   classNames,
-  readableToken,
   type BusinessMetric,
 } from "@/components/admin/dashboard-shared";
 import {
@@ -738,6 +737,7 @@ export function AdminProductDetailView({
 
   return (
     <ProductDetailPanel
+      accessToken={accessToken}
       backHref={backHref}
       draft={draft}
       error={errorId === draft.id}
@@ -758,6 +758,7 @@ export function AdminProductDetailView({
 }
 
 function ProductDetailPanel({
+  accessToken,
   backHref,
   draft,
   error,
@@ -772,6 +773,7 @@ function ProductDetailPanel({
   saving,
   setDraft,
 }: Readonly<{
+  accessToken: string;
   backHref: string;
   draft: AdminProductDetailRow;
   error: boolean;
@@ -1077,93 +1079,52 @@ function ProductDetailPanel({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
-        {draft.validationCacheStatus === "stale" ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-800">
-              {viewLabels.staleValidation}
-            </span>
-            <span className="text-xs text-gray-500">
-              {viewLabels.staleValidationHint}
-            </span>
+        <div className="mt-5 space-y-4">
+          <div className="max-w-xl">
+            <ProductCountryManager
+              addCountryLabel={viewLabels.addCountry}
+              countryCodes={manufacturerCountryCodes}
+              label={viewLabels.manufacturerCountries}
+              onAdd={addManufacturerCountry}
+              onRemove={removeManufacturerCountry}
+              removeLabel={viewLabels.remove}
+              variant="compact"
+            />
           </div>
-        ) : null}
-        {draft.validation.status !== "pass" ? (
-          <div>
-            <p className="font-semibold text-gray-900">
-              {viewLabels.validationBlockers}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {draft.validation.reasons.map((reason) => (
-                <span
-                  className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-800"
-                  key={reason}
-                >
-                  {readableToken(reason)}
-                </span>
-              ))}
-            </div>
-            <p className="mt-2 text-sm text-gray-600">
-              {draft.validation.summary}
-            </p>
-          </div>
-        ) : null}
-        {draft.aiCorrectionNotes ? (
-          <p>
-            <span className="font-semibold text-gray-900">
-              {viewLabels.aiNotes}:{" "}
-            </span>
-            {draft.aiCorrectionNotes}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="mt-5 space-y-4">
-        <div className="max-w-xl">
           <ProductCountryManager
             addCountryLabel={viewLabels.addCountry}
-            countryCodes={manufacturerCountryCodes}
-            label={viewLabels.manufacturerCountries}
-            onAdd={addManufacturerCountry}
-            onRemove={removeManufacturerCountry}
+            allowedCountryCodes={manufacturerCountryCodes}
+            countryCodes={safeProductCountryCodes}
+            countryPricing={draft.countryPricing}
+            disabledReason={
+              manufacturerCountryCodes.length < 1
+                ? viewLabels.addManufacturerCountryFirst
+                : null
+            }
+            label={viewLabels.productCountries}
+            onAdd={addAvailableCountry}
+            onPricingChange={updateCountryPricing}
+            onRegulatoryApprovalChange={updateCountryRegulatoryApproval}
+            onRemove={removeAvailableCountry}
+            pricingLabels={{
+              agency: viewLabels.agency,
+              approvalNumber: viewLabels.approvalNumber,
+              associateApproval: viewLabels.associateApproval,
+              authority: viewLabels.authority,
+              cancel: viewLabels.close,
+              country: viewLabels.country,
+              currency: viewLabels.currency,
+              evidenceUrl: viewLabels.evidenceUrl,
+              inheritedApproval: viewLabels.inheritedApproval ?? "Inherited",
+              notAvailable: viewLabels.notAvailable,
+              priceUpdated: viewLabels.priceUpdated,
+              rrp: viewLabels.rrp,
+              saveAssociation: viewLabels.saveAssociation,
+            }}
+            regulatoryApprovals={draft.regulatoryApprovals}
             removeLabel={viewLabels.remove}
-            variant="compact"
           />
         </div>
-        <ProductCountryManager
-          addCountryLabel={viewLabels.addCountry}
-          allowedCountryCodes={manufacturerCountryCodes}
-          countryCodes={safeProductCountryCodes}
-          countryPricing={draft.countryPricing}
-          disabledReason={
-            manufacturerCountryCodes.length < 1
-              ? viewLabels.addManufacturerCountryFirst
-              : null
-          }
-          label={viewLabels.productCountries}
-          onAdd={addAvailableCountry}
-          onPricingChange={updateCountryPricing}
-          onRegulatoryApprovalChange={updateCountryRegulatoryApproval}
-          onRemove={removeAvailableCountry}
-          pricingLabels={{
-            agency: viewLabels.agency,
-            approvalNumber: viewLabels.approvalNumber,
-            associateApproval: viewLabels.associateApproval,
-            authority: viewLabels.authority,
-            cancel: viewLabels.close,
-            country: viewLabels.country,
-            currency: viewLabels.currency,
-            evidenceUrl: viewLabels.evidenceUrl,
-            inheritedApproval: viewLabels.inheritedApproval ?? "Inherited",
-            notAvailable: viewLabels.notAvailable,
-            priceUpdated: viewLabels.priceUpdated,
-            rrp: viewLabels.rrp,
-            saveAssociation: viewLabels.saveAssociation,
-          }}
-          regulatoryApprovals={draft.regulatoryApprovals}
-          removeLabel={viewLabels.remove}
-        />
-      </div>
 
       <ProductIdentifiersEditor
         draft={draft}
@@ -1201,6 +1162,7 @@ function ProductDetailPanel({
           />
         </label>
         <ProductImageDropzone
+          accessToken={accessToken}
           onImageUrlChange={(imageUrl) =>
             setDraft({
               ...draft,
@@ -1213,6 +1175,7 @@ function ProductDetailPanel({
               imageUrl,
             })
           }
+          productId={draft.id}
           row={draft}
           viewLabels={viewLabels}
         />
