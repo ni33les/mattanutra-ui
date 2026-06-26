@@ -188,7 +188,7 @@ describe("product recommendation insights", () => {
     assert.match(loader, /outcome = 'rejected'/);
   });
 
-  it("shows a product-level usefulness histogram instead of chosen frequency, buckets, or outcome mix", async () => {
+  it("shows useful products as a descending product-level score graph", async () => {
     const view = await readFile("components/admin/recommendation-insights-view.tsx", "utf8");
     const productView = view.slice(
       view.indexOf("export function AdminProductRecommendationInsightsView"),
@@ -201,14 +201,17 @@ describe("product recommendation insights", () => {
 
     assert.match(view, /function ProductUsefulnessHistogram/);
     assert.match(view, /Usefulness score/);
-    assert.match(view, /Product Usefulness Histogram/);
-    assert.match(view, /const histogramRows = \[\.\.\.rows\]\.sort/);
-    assert.match(view, /histogramRows\.map\(\(row\)/);
+    assert.match(view, /Useful Products/);
+    assert.match(view, /row\.usefulnessBand !== "unknown"/);
+    assert.match(view, /row\.usefulnessBand !== "useless"/);
+    assert.match(view, /const scoreDifference = \(right\.usefulnessScore \?\? 0\) - \(left\.usefulnessScore \?\? 0\)/);
+    assert.match(view, /histogramRows\.map\(\(row, index\)/);
     assert.match(view, /productDetailHref\(row, locale, accessToken\)/);
     assert.match(view, /row\.title/);
     assert.match(view, /row\.brandName/);
     assert.match(view, /row\.usefulnessScore/);
     assert.match(view, /style=\{\{ width: `\$\{width\}%` \}\}/);
+    assert.doesNotMatch(view, /histogramRows\.indexOf/);
     assert.match(productView, /<ProductUsefulnessHistogram/);
     assert.match(productView, /accessToken=\{accessToken\}/);
     assert.match(productView, /rows=\{data\.rows\}/);

@@ -328,82 +328,92 @@ function ProductUsefulnessHistogram({
   rows: readonly AdminProductRecommendationInsightRow[];
   locale: Locale;
 }>) {
-  const histogramRows = [...rows].sort((left, right) => {
-    if (left.usefulnessScore === null && right.usefulnessScore !== null) {
-      return 1;
-    }
+  const histogramRows = [...rows]
+    .filter((row) =>
+      row.usefulnessScore !== null &&
+      row.usefulnessBand !== "unknown" &&
+      row.usefulnessBand !== "useless"
+    )
+    .sort((left, right) => {
+      const scoreDifference = (right.usefulnessScore ?? 0) - (left.usefulnessScore ?? 0);
 
-    if (left.usefulnessScore !== null && right.usefulnessScore === null) {
-      return -1;
-    }
-
-    const scoreDifference = (left.usefulnessScore ?? 101) - (right.usefulnessScore ?? 101);
-
-    return scoreDifference === 0
-      ? left.title.localeCompare(right.title)
-      : scoreDifference;
-  });
+      return scoreDifference === 0
+        ? left.title.localeCompare(right.title)
+        : scoreDifference;
+    });
 
   return (
-    <Section eyebrow="Usefulness score" title="Product Usefulness Histogram">
-      {rows.length > 0 ? (
-        <div className="max-h-[34rem] divide-y divide-gray-100 overflow-y-auto pr-1">
-          {histogramRows.map((row) => {
-            const href = productDetailHref(row, locale, accessToken);
-            const score = row.usefulnessScore;
-            const width = score === null ? 4 : Math.max(4, score);
+    <Section eyebrow="Usefulness score" title="Useful Products">
+      {histogramRows.length > 0 ? (
+        <div className="overflow-x-auto">
+          <div className="min-w-[46rem]">
+            <div className="grid grid-cols-[2.5rem_minmax(14rem,22rem)_minmax(18rem,1fr)_4rem] items-end gap-3 border-b border-gray-200 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <span>Rank</span>
+              <span>Product</span>
+              <div className="grid grid-cols-5 text-center">
+                {[0, 25, 50, 75, 100].map((tick) => (
+                  <span key={tick}>{tick}</span>
+                ))}
+              </div>
+              <span className="text-right">Score</span>
+            </div>
+            <div className="max-h-[34rem] divide-y divide-gray-100 overflow-y-auto pr-1">
+              {histogramRows.map((row, index) => {
+                const href = productDetailHref(row, locale, accessToken);
+                const score = row.usefulnessScore ?? 0;
+                const width = Math.max(4, score);
 
-            return (
-              <a
-                className="grid gap-2 py-3 transition hover:bg-gray-50 sm:grid-cols-[minmax(12rem,22rem)_minmax(10rem,1fr)_minmax(5rem,7rem)] sm:items-center"
-                href={href}
-                key={row.id}
-              >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-gray-900">
-                      {row.title}
-                    </p>
-                    {row.usefulnessSample === "low" ? (
-                      <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[0.7rem] font-semibold text-amber-800 ring-1 ring-amber-200">
-                        Low sample
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 truncate text-xs font-medium text-gray-500">
-                    {[
-                      row.brandName || "Unknown brand",
-                      `${formatNumber(row.affectedPlanCount, locale)} evaluated`,
-                      `coverage ${formatPercent(row.averageCoveragePercent)}`
-                    ].join(" · ")}
-                  </p>
-                </div>
-                <div className="h-5 overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    className={classNames(
-                      "h-full rounded-full",
-                      productUsefulnessBarClasses[row.usefulnessBand]
-                    )}
-                    style={{ width: `${width}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-2 sm:justify-end">
-                  <span className={classNames(
-                    "inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1",
-                    productUsefulnessBadgeClasses[row.usefulnessBand]
-                  )}>
-                    {productUsefulnessLabels[row.usefulnessBand]}
-                  </span>
-                  <span className="min-w-8 text-right text-sm font-semibold tabular-nums text-gray-800">
-                    {score === null ? "-" : formatNumber(score, locale)}
-                  </span>
-                </div>
-              </a>
-            );
-          })}
+                return (
+                  <a
+                    className="grid grid-cols-[2.5rem_minmax(14rem,22rem)_minmax(18rem,1fr)_4rem] items-center gap-3 py-3 transition hover:bg-gray-50"
+                    href={href}
+                    key={row.id}
+                  >
+                    <span className="text-sm font-semibold tabular-nums text-gray-400">
+                      {formatNumber(index + 1, locale)}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-gray-900">
+                          {row.title}
+                        </p>
+                        {row.usefulnessSample === "low" ? (
+                          <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[0.7rem] font-semibold text-amber-800 ring-1 ring-amber-200">
+                            Low sample
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 truncate text-xs font-medium text-gray-500">
+                        {[
+                          row.brandName || "Unknown brand",
+                          `${formatNumber(row.affectedPlanCount, locale)} evaluated`,
+                          `coverage ${formatPercent(row.averageCoveragePercent)}`
+                        ].join(" · ")}
+                      </p>
+                    </div>
+                    <div className="relative h-8 rounded-md bg-gray-50 ring-1 ring-gray-100">
+                      <div className="absolute inset-y-0 left-1/4 w-px bg-gray-200" />
+                      <div className="absolute inset-y-0 left-1/2 w-px bg-gray-200" />
+                      <div className="absolute inset-y-0 left-3/4 w-px bg-gray-200" />
+                      <div
+                        className={classNames(
+                          "absolute inset-y-1 left-0 rounded-r-md",
+                          productUsefulnessBarClasses[row.usefulnessBand]
+                        )}
+                        style={{ width: `${width}%` }}
+                      />
+                    </div>
+                    <span className="text-right text-sm font-semibold tabular-nums text-gray-800">
+                      {formatNumber(score, locale)}
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
-        <EmptyState label="No products are available for this timeframe." />
+        <EmptyState label="No useful products are available for this timeframe." />
       )}
     </Section>
   );
