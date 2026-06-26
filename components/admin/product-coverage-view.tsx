@@ -1500,7 +1500,6 @@ export function AdminPlanCoverageSimulatorView({
     inputStatus === "ready" &&
     activeInputData.databaseAvailable &&
     simulationData.sampleSize < ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES &&
-    activeInputData.input.candidates.length > 0 &&
     activeInputData.input.supplements.length > 0 &&
     activeInputData.input.archetypes.length > 0;
   const nextMoveRows = useMemo(

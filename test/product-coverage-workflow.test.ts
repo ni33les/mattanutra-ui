@@ -283,6 +283,23 @@ describe("product coverage workflow", () => {
     assert.equal(result.unmetSupplements.length, 0);
   });
 
+  it("runs simulations with no approved product candidates", () => {
+    const result = runAdminPlanCoverageSimulation({
+      candidates: [],
+      countryCode: "TH",
+      demandProfiles: [demandProfile()],
+      sampleSize: 8,
+      seed: "fixed",
+      supplements: []
+    });
+
+    assert.equal(result.sampleSize, 8);
+    assert.equal(result.summary.averageCoveragePercent, 0);
+    assert.equal(result.mostUsefulProducts.length, 0);
+    assert.equal(result.unmetSupplements[0]?.name, "CoQ10");
+    assert.equal(result.unmetSupplements[0]?.count, 8);
+  });
+
   it("ranks blocked products by review opportunity without adding them to simulation", () => {
     const blockedProduct = product({
       facts: [
@@ -499,6 +516,7 @@ describe("product coverage workflow", () => {
     assert.match(view, /Generating questionnaire/);
     assert.match(view, /Running simulation/);
     assert.match(view, /SimulatorActionBar/);
+    assert.doesNotMatch(view, /input\.candidates\.length > 0/);
     assert.match(view, /value="results"/);
     assert.match(view, /value="profiles"/);
     assert.match(view, /value="all"/);
