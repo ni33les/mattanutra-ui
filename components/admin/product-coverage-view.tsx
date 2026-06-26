@@ -62,6 +62,7 @@ type ArchetypeDraft = Readonly<{
 type SavedSimulationState = Readonly<{
   costValues: number[];
   coverageValues: number[];
+  displayData?: AdminPlanCoverageSimulationData;
   generatedAt: string;
   inputKey: string;
   productStats: Array<[string, AdminPlanCoverageSimulationProductStats]>;
@@ -340,6 +341,7 @@ function savedStateFromRunner(
   return {
     costValues: runner.costValues,
     coverageValues: runner.coverageValues,
+    displayData: simulationDisplaySnapshotFromRunner(runner),
     generatedAt: runner.generatedAt,
     inputKey,
     productStats: [...runner.productStats.entries()],
@@ -401,6 +403,55 @@ function loadSavedSimulationState(inputKey: string) {
   }
 }
 
+function simulationDisplaySnapshotFromRunner(
+  runner: AdminPlanCoverageSimulationRunner
+) {
+  const data = adminPlanCoverageSimulationDataFromRunner(runner);
+
+  return {
+    ...data,
+    archetypes: [],
+    input: {
+      ...data.input,
+      archetypes: [],
+      candidates: [],
+      demandProfiles: [],
+      supplements: []
+    },
+    realCustomerArchetypes: [],
+    realCustomerProfiles: [],
+    reviewPriorityProducts: []
+  };
+}
+
+function loadSavedSimulationDisplayData(countryCode: string) {
+  try {
+    const raw = window.localStorage.getItem(SIMULATOR_STORAGE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
+    const displayData = parsed.displayData;
+
+    if (
+      parsed.version !== 2 ||
+      !displayData ||
+      displayData.countryCode !== countryCode ||
+      typeof displayData.sampleSize !== "number" ||
+      !Array.isArray(displayData.mostUsefulProducts) ||
+      !Array.isArray(displayData.unmetSupplements)
+    ) {
+      return null;
+    }
+
+    return displayData;
+  } catch {
+    return null;
+  }
+}
+
 function runnerFromSavedState(
   data: AdminPlanCoverageSimulationData,
   saved: SavedSimulationState
@@ -427,6 +478,12 @@ function initialSimulationData(data: AdminPlanCoverageSimulationData) {
     realCustomerProfiles: data.realCustomerProfiles,
     reviewPriorityProducts: data.reviewPriorityProducts
   });
+}
+
+function initialSimulationDataWithCachedDisplay(
+  data: AdminPlanCoverageSimulationData
+) {
+  return loadSavedSimulationDisplayData(data.countryCode) ?? initialSimulationData(data);
 }
 
 function productDetailHref(
@@ -1482,7 +1539,7 @@ export function AdminPlanCoverageSimulatorView({
     [activeInputData]
   );
   const [simulationData, setSimulationData] = useState(() =>
-    initialSimulationData(data)
+    initialSimulationDataWithCachedDisplay(data)
   );
   const [hydrated, setHydrated] = useState(false);
   const [running, setRunning] = useState(false);
@@ -1540,16 +1597,19 @@ export function AdminPlanCoverageSimulatorView({
       setInputStatus("loading");
       setInputError(null);
       setInputData(data);
-      setSimulationData(initialSimulationData(data));
-      setHydrated(false);
+      const cachedSimulationData = loadSavedSimulationDisplayData(data.countryCode);
+      setSimulationData(cachedSimulationData ?? initialSimulationData(data));
+      setHydrated(Boolean(cachedSimulationData));
       setRunning(false);
       runnerRef.current = null;
 
       fetch(simulatorInputHref(data.countryCode, accessToken, range), {
+        cache: "no-store",
         credentials: "same-origin",
-        headers: accessToken
-          ? { "x-admin-dashboard-token": accessToken }
-          : undefined
+        headers: {
+          "Cache-Control": "no-store",
+          ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
+        }
       })
         .then(async (response) => {
           if (!response.ok) {
@@ -1589,6 +1649,10 @@ export function AdminPlanCoverageSimulatorView({
   }, [accessToken, data, range]);
 
   useEffect(() => {
+    if (inputStatus !== "ready") {
+      return;
+    }
+
     let cancelled = false;
     const timeoutId = window.setTimeout(() => {
       if (cancelled) {
@@ -1612,7 +1676,7 @@ export function AdminPlanCoverageSimulatorView({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [demandKey]);
+  }, [demandKey, inputStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1627,9 +1691,7 @@ export function AdminPlanCoverageSimulatorView({
 
       if (inputStatus === "loading") {
         runnerRef.current = null;
-        setSimulationData(initialSimulationData(activeInputData));
         setRunning(false);
-        setHydrated(false);
         return;
       }
 

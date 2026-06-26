@@ -501,6 +501,7 @@ describe("product coverage workflow", () => {
     assert.match(simulationModel, /buildSimulationNextMoveRows/);
     assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
     assert.match(simulationInputRoute, /adminViewAllowed/);
+    assert.match(simulationInputRoute, /"Cache-Control": "no-store"/);
     assert.match(demandProfileRoute, /generateAdminPlanCoverageDemandProfile/);
     assert.match(demandProfileRoute, /adminViewAllowed/);
     assert.match(demandGeneration, /analyzeFormulationWithGrok/);
@@ -510,6 +511,11 @@ describe("product coverage workflow", () => {
     assert.match(view, /SIMULATOR_STORAGE_KEY/);
     assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
     assert.match(view, /\/api\/admin\/product-coverage\/simulation-input/);
+    assert.match(view, /cache: "no-store"/);
+    assert.match(view, /inputStatus !== "ready"/);
+    assert.match(view, /displayData: simulationDisplaySnapshotFromRunner/);
+    assert.match(view, /loadSavedSimulationDisplayData/);
+    assert.match(view, /cachedSimulationData \?\? initialSimulationData/);
     assert.match(view, /\/api\/admin\/product-coverage\/demand-profile/);
     assert.doesNotMatch(view, /Simulation assumptions/);
     assert.match(view, /SimulationProgressPanel/);

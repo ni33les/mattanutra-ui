@@ -12,6 +12,10 @@ import { adminViewAllowed } from "@/lib/admin-rbac";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const noStoreHeaders = {
+  "Cache-Control": "no-store"
+};
+
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -39,7 +43,10 @@ export async function GET(request: NextRequest) {
   const context = await adminContext(request);
 
   if (!context) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { headers: noStoreHeaders, status: 401 }
+    );
   }
 
   if (
@@ -49,7 +56,10 @@ export async function GET(request: NextRequest) {
       context.effectiveOrganisation.type
     )
   ) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Forbidden" },
+      { headers: noStoreHeaders, status: 403 }
+    );
   }
 
   const url = new URL(request.url);
@@ -58,6 +68,7 @@ export async function GET(request: NextRequest) {
     await getAdminPlanCoverageSimulationData({
       countryCode: url.searchParams.get("country"),
       range: normalizeAdminDashboardRange(url.searchParams.get("range") ?? undefined)
-    })
+    }),
+    { headers: noStoreHeaders }
   );
 }
