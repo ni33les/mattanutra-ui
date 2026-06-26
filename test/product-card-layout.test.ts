@@ -96,6 +96,10 @@ describe("product admin card layout", () => {
       "app/api/admin/products/[id]/image/upload/route.ts",
       "utf8",
     );
+    const localUploadRoute = await readFile(
+      "app/uploads/[...path]/route.ts",
+      "utf8",
+    );
     const dropzone = view.slice(
       view.indexOf("export function ProductImageDropzone"),
       view.indexOf("type ProductCountryApprovalPatch"),
@@ -127,6 +131,9 @@ describe("product admin card layout", () => {
     assert.match(uploadRoute, /nonProductionUploadFallbackAllowed/);
     assert.match(uploadRoute, /InvalidAccessKeyId/);
     assert.match(uploadRoute, /maxUploadBytes = 6 \* 1024 \* 1024/);
+    assert.match(localUploadRoute, /"public"[\s\S]*"uploads"/);
+    assert.match(localUploadRoute, /filePath\.startsWith\(rootPrefix\)/);
+    assert.match(localUploadRoute, /uploadCacheControl/);
   });
 
   it("keeps product list metric counts independent from active filters", async () => {
