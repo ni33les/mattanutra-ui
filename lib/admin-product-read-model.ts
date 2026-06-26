@@ -236,7 +236,7 @@ export async function loadProductRows(
           jsonb_build_object(
             'id', product_facts.id,
             'itemType', product_facts.item_type,
-            'supplementId', product_facts.supplement_id,
+            'supplementId', coalesce(product_facts.supplement_id, supplement_match_rows.supplement_id),
             'foodId', product_facts.food_id,
             'nutrientId', product_facts.nutrient_id,
             'name', product_facts.name,
@@ -282,17 +282,38 @@ export async function loadProductRows(
         '[]'::jsonb
       ) as facts
       from public.product_facts
+      left join lateral (
+        select matched_supplements.supplement_id
+        from (
+          select supplements.id as supplement_id, count(*) over () as match_count
+          from public.supplements
+          left join public.supplement_aliases
+            on supplement_aliases.supplement_id = supplements.id
+          where product_facts.supplement_id is null
+            and product_facts.item_type = 'supplement'
+            and product_facts.normalized_name is not null
+            and product_facts.normalized_name <> ''
+            and coalesce(supplements.list_status, 'active') <> 'ignored'
+            and (
+              supplements.normalized_name = product_facts.normalized_name
+              or supplement_aliases.normalized_alias = product_facts.normalized_name
+            )
+          group by supplements.id
+        ) matched_supplements
+        where matched_supplements.match_count = 1
+        limit 1
+      ) supplement_match_rows on true
       left join public.supplements
-        on supplements.id = product_facts.supplement_id
+        on supplements.id = coalesce(product_facts.supplement_id, supplement_match_rows.supplement_id)
       left join lateral (
         select jsonb_agg(supplement_aliases.normalized_alias order by supplement_aliases.normalized_alias) as aliases
         from public.supplement_aliases
-        where supplement_aliases.supplement_id = product_facts.supplement_id
+        where supplement_aliases.supplement_id = coalesce(product_facts.supplement_id, supplement_match_rows.supplement_id)
       ) supplement_alias_rows on true
       left join lateral (
         select max_amount, max_unit, safety_flags
         from public.supplement_safety_limits
-        where supplement_safety_limits.supplement_id = product_facts.supplement_id
+        where supplement_safety_limits.supplement_id = coalesce(product_facts.supplement_id, supplement_match_rows.supplement_id)
         order by version desc
         limit 1
       ) supplement_safety_limits on true
