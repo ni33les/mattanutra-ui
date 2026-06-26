@@ -12,6 +12,7 @@ import type {
   AdminSupplementImprovementInsightsData,
   ImprovementListStatus,
   ProductRecommendationInsightOutcome,
+  ProductRecommendationUsefulnessBand,
   SupplementDemandInsight
 } from "@/lib/admin-recommendation-insights";
 import {
@@ -51,6 +52,41 @@ const productOutcomeClasses: Record<ProductRecommendationInsightOutcome, string>
   not_evaluated: "bg-gray-100 text-gray-700 ring-gray-200",
   recommended: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   rejected: "bg-rose-50 text-rose-700 ring-rose-200"
+};
+
+const productUsefulnessBands: Array<{
+  id: ProductRecommendationUsefulnessBand;
+  label: string;
+  range: string;
+}> = [
+  { id: "strong", label: "Strong", range: "80-100" },
+  { id: "useful", label: "Useful", range: "60-79" },
+  { id: "mixed", label: "Mixed", range: "40-59" },
+  { id: "weak", label: "Weak", range: "20-39" },
+  { id: "useless", label: "Useless", range: "0-19" },
+  { id: "unknown", label: "Unknown", range: "Never evaluated" }
+];
+
+const productUsefulnessLabels = Object.fromEntries(
+  productUsefulnessBands.map((band) => [band.id, band.label])
+) as Record<ProductRecommendationUsefulnessBand, string>;
+
+const productUsefulnessBadgeClasses: Record<ProductRecommendationUsefulnessBand, string> = {
+  mixed: "bg-sky-50 text-sky-700 ring-sky-200",
+  strong: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  unknown: "bg-gray-100 text-gray-700 ring-gray-200",
+  useful: "bg-teal-50 text-teal-700 ring-teal-200",
+  useless: "bg-rose-50 text-rose-700 ring-rose-200",
+  weak: "bg-amber-50 text-amber-800 ring-amber-200"
+};
+
+const productUsefulnessBarClasses: Record<ProductRecommendationUsefulnessBand, string> = {
+  mixed: "bg-sky-500",
+  strong: "bg-emerald-600",
+  unknown: "bg-gray-400",
+  useful: "bg-teal-600",
+  useless: "bg-rose-600",
+  weak: "bg-amber-500"
 };
 
 type ProductInsightFilter = ProductRecommendationInsightOutcome | "all" | "stale";
@@ -112,6 +148,8 @@ function productInsightSearchText(row: AdminProductRecommendationInsightRow) {
     row.brandName,
     row.productKind,
     row.productStatus,
+    row.usefulnessBand,
+    row.usefulnessSample,
     row.validationStatus,
     row.validationSummary,
     row.primaryReason
@@ -267,60 +305,108 @@ function ProductOutcomePill({
   );
 }
 
-function ProductChosenHistogram({
+function formatProductUsefulnessScore(row: AdminProductRecommendationInsightRow) {
+  return row.usefulnessScore === null
+    ? "Unknown"
+    : String(row.usefulnessScore);
+}
+
+function ProductUsefulnessPill({
+  row
+}: Readonly<{
+  row: AdminProductRecommendationInsightRow;
+}>) {
+  return (
+    <span className={classNames(
+      "inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1",
+      productUsefulnessBadgeClasses[row.usefulnessBand]
+    )}>
+      {productUsefulnessLabels[row.usefulnessBand]}
+      {row.usefulnessScore === null ? "" : ` ${row.usefulnessScore}`}
+    </span>
+  );
+}
+
+function ProductUsefulnessHistogram({
   locale,
   rows
 }: Readonly<{
   rows: readonly AdminProductRecommendationInsightRow[];
   locale: Locale;
 }>) {
-  const max = Math.max(1, ...rows.map((row) => row.chosenCount));
-  const notChosenCount = rows.filter((row) => row.chosenCount < 1).length;
-  const chosenRows = [...rows]
-    .filter((row) => row.chosenCount > 0)
-    .sort((left, right) =>
-      right.chosenCount === left.chosenCount
-        ? left.title.localeCompare(right.title)
-        : right.chosenCount - left.chosenCount
-    );
+  const counts = Object.fromEntries(
+    productUsefulnessBands.map((band) => [band.id, 0])
+  ) as Record<ProductRecommendationUsefulnessBand, number>;
+  const scoredRows = rows.filter((row) => row.usefulnessScore !== null);
+  const lowSampleCount = rows.filter((row) => row.usefulnessSample === "low").length;
+  const averageScore = scoredRows.length > 0
+    ? Math.round(
+        scoredRows.reduce((sum, row) => sum + (row.usefulnessScore ?? 0), 0) /
+        scoredRows.length
+      )
+    : null;
+
+  for (const row of rows) {
+    counts[row.usefulnessBand] += 1;
+  }
+
+  const max = Math.max(1, ...productUsefulnessBands.map((band) => counts[band.id]));
 
   return (
-    <Section eyebrow="Chosen frequency" title="How Often Products Are Chosen">
-      {chosenRows.length > 0 ? (
-        <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
-          {chosenRows.map((row) => (
+    <Section eyebrow="Usefulness score" title="Product Usefulness Histogram">
+      {rows.length > 0 ? (
+        <div className="space-y-4">
+          <div className="space-y-3">
+            {productUsefulnessBands.map((band) => (
+              <div
+                className="grid grid-cols-[minmax(7rem,10rem)_minmax(8rem,1fr)_4rem] items-center gap-3"
+                key={band.id}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {band.label}
+                  </p>
+                  <p className="truncate text-xs font-medium text-gray-500">
+                    {band.range}
+                  </p>
+                </div>
+                <div className="h-5 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    className={classNames(
+                      "h-full rounded-full",
+                      productUsefulnessBarClasses[band.id]
+                    )}
+                    style={{
+                      width: `${Math.max(4, (counts[band.id] / max) * 100)}%`
+                    }}
+                  />
+                </div>
+                <p className="text-right text-sm font-semibold tabular-nums text-gray-800">
+                  {formatNumber(counts[band.id], locale)}
+                </p>
+              </div>
+            ))}
+          </div>
+          <dl className="grid gap-3 border-t border-gray-100 pt-4 text-xs font-semibold text-gray-500 sm:grid-cols-3">
             <div
-              className="grid grid-cols-[minmax(10rem,18rem)_minmax(8rem,1fr)_4rem] items-center gap-3"
-              key={row.id}
+              className="flex items-center justify-between gap-3"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-gray-900">
-                  {row.title}
-                </p>
-                <p className="truncate text-xs font-medium text-gray-500">
-                  {row.brandName || "Unknown brand"}
-                </p>
-              </div>
-              <div className="h-4 overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full bg-[#126B4F]"
-                  style={{
-                    width: `${Math.max(3, (row.chosenCount / max) * 100)}%`
-                  }}
-                />
-              </div>
-              <p className="text-right text-sm font-semibold tabular-nums text-gray-800">
-                {formatNumber(row.chosenCount, locale)}
-              </p>
+              <dt>Average score</dt>
+              <dd className="text-gray-900">{averageScore === null ? "-" : averageScore}</dd>
             </div>
-          ))}
+            <div className="flex items-center justify-between gap-3">
+              <dt>Low sample</dt>
+              <dd className="text-gray-900">{formatNumber(lowSampleCount, locale)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt>Unknown</dt>
+              <dd className="text-gray-900">{formatNumber(counts.unknown, locale)}</dd>
+            </div>
+          </dl>
         </div>
       ) : (
-        <EmptyState label="No products were chosen in this timeframe." />
+        <EmptyState label="No products are available for this timeframe." />
       )}
-      <p className="mt-4 text-xs font-semibold text-gray-500">
-        Zero chosen decisions: {formatNumber(notChosenCount, locale)}
-      </p>
     </Section>
   );
 }
@@ -378,6 +464,9 @@ const productInsightColumns: TableColumn<AdminProductRecommendationInsightRow>[]
   { label: "rejected", value: (row) => String(row.rejectedCount) },
   { label: "evaluated_plans", value: (row) => String(row.affectedPlanCount) },
   { label: "average_coverage", value: (row) => String(row.averageCoveragePercent ?? "") },
+  { label: "usefulness_score", value: (row) => String(row.usefulnessScore ?? "") },
+  { label: "usefulness_band", value: (row) => row.usefulnessBand },
+  { label: "usefulness_sample", value: (row) => row.usefulnessSample },
   { label: "stale", value: (row) => String(row.isStale) },
   { label: "reason", value: (row) => row.primaryReason },
   { label: "last_decision_at", value: (row) => row.lastDecisionAt ?? "" }
@@ -417,6 +506,12 @@ function ProductInsightRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <ProductOutcomePill outcome={row.primaryOutcome} />
+            <ProductUsefulnessPill row={row} />
+            {row.usefulnessSample === "low" ? (
+              <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                Low sample
+              </span>
+            ) : null}
             {row.isStale ? (
               <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
                 Stale
@@ -454,6 +549,7 @@ function ProductInsightRow({
 
       <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
         {[
+          ["Usefulness", formatProductUsefulnessScore(row)],
           ["Chosen", formatNumber(row.chosenCount, locale)],
           ["Near Miss", formatNumber(row.nearMissCount, locale)],
           ["Rejected", formatNumber(row.rejectedCount, locale)],
@@ -554,7 +650,7 @@ export function AdminProductRecommendationInsightsView({
   return (
     <div className="mt-8 space-y-6">
       <BusinessStatsGrid metrics={metrics} />
-      <ProductChosenHistogram rows={data.rows} locale={locale} />
+      <ProductUsefulnessHistogram rows={data.rows} locale={locale} />
 
       <Section
         action={

@@ -4,7 +4,8 @@ import { describe, it } from "node:test";
 import {
   productRecommendationDecisionIsStale,
   productRecommendationInsightOutcome,
-  productRecommendationInsightReason
+  productRecommendationInsightReason,
+  productRecommendationUsefulness
 } from "../lib/admin-recommendation-insights.ts";
 
 describe("product recommendation insights", () => {
@@ -75,6 +76,65 @@ describe("product recommendation insights", () => {
     );
   });
 
+  it("scores product usefulness from chosen rate, coverage, near misses, and rejections", () => {
+    assert.deepEqual(
+      productRecommendationUsefulness({
+        affectedPlanCount: 5,
+        averageCoveragePercent: 95,
+        chosenCount: 5,
+        nearMissCount: 0,
+        rejectedCount: 0
+      }),
+      {
+        band: "strong",
+        sample: "standard",
+        score: 89
+      }
+    );
+    assert.deepEqual(
+      productRecommendationUsefulness({
+        affectedPlanCount: 3,
+        averageCoveragePercent: 90,
+        chosenCount: 0,
+        nearMissCount: 0,
+        rejectedCount: 3
+      }),
+      {
+        band: "useless",
+        sample: "standard",
+        score: 2
+      }
+    );
+    assert.deepEqual(
+      productRecommendationUsefulness({
+        affectedPlanCount: 1,
+        averageCoveragePercent: 80,
+        chosenCount: 0,
+        nearMissCount: 1,
+        rejectedCount: 0
+      }),
+      {
+        band: "weak",
+        sample: "low",
+        score: 34
+      }
+    );
+    assert.deepEqual(
+      productRecommendationUsefulness({
+        affectedPlanCount: 0,
+        averageCoveragePercent: null,
+        chosenCount: 0,
+        nearMissCount: 0,
+        rejectedCount: 0
+      }),
+      {
+        band: "unknown",
+        sample: "none",
+        score: null
+      }
+    );
+  });
+
   it("marks decisions stale only when product or validation changed after the latest decision", () => {
     assert.equal(
       productRecommendationDecisionIsStale(
@@ -128,7 +188,7 @@ describe("product recommendation insights", () => {
     assert.match(loader, /outcome = 'rejected'/);
   });
 
-  it("shows chosen frequency instead of the old outcome mix and labels evaluated plans clearly", async () => {
+  it("shows usefulness score histogram instead of chosen frequency or outcome mix", async () => {
     const view = await readFile("components/admin/recommendation-insights-view.tsx", "utf8");
     const productView = view.slice(
       view.indexOf("export function AdminProductRecommendationInsightsView"),
@@ -139,17 +199,29 @@ describe("product recommendation insights", () => {
       view.indexOf("export function AdminProductRecommendationInsightsView")
     );
 
-    assert.match(view, /function ProductChosenHistogram/);
-    assert.match(view, /Chosen frequency/);
-    assert.match(view, /How Often Products Are Chosen/);
-    assert.match(view, /Zero chosen decisions/);
-    assert.match(productView, /<ProductChosenHistogram rows=\{data\.rows\} locale=\{locale\} \/>/);
+    assert.match(view, /function ProductUsefulnessHistogram/);
+    assert.match(view, /Usefulness score/);
+    assert.match(view, /Product Usefulness Histogram/);
+    assert.match(view, /Strong/);
+    assert.match(view, /Useful/);
+    assert.match(view, /Useless/);
+    assert.match(productView, /<ProductUsefulnessHistogram rows=\{data\.rows\} locale=\{locale\} \/>/);
+    assert.doesNotMatch(view, /ProductChosenHistogram/);
+    assert.doesNotMatch(view, /Chosen frequency/);
+    assert.doesNotMatch(view, /How Often Products Are Chosen/);
+    assert.doesNotMatch(view, /Zero chosen decisions/);
     assert.doesNotMatch(view, /ProductInsightDistributionBar/);
     assert.doesNotMatch(view, /Outcome mix/);
     assert.doesNotMatch(view, /Product recommendation distribution/);
+    assert.match(productRow, /ProductUsefulnessPill/);
+    assert.match(productRow, /Low sample/);
+    assert.match(productRow, /Usefulness/);
     assert.match(productRow, /Evaluated Plans/);
     assert.match(productRow, /Evaluated in/);
     assert.doesNotMatch(productRow, /\["Plans"/);
+    assert.match(view, /usefulness_score/);
+    assert.match(view, /usefulness_band/);
+    assert.match(view, /usefulness_sample/);
     assert.match(view, /evaluated_plans/);
     assert.doesNotMatch(view, /affected_plans/);
   });

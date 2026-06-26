@@ -219,6 +219,19 @@ export type ProductRecommendationInsightOutcome =
   | "recommended"
   | "rejected";
 
+export type ProductRecommendationUsefulnessBand =
+  | "mixed"
+  | "strong"
+  | "unknown"
+  | "useful"
+  | "useless"
+  | "weak";
+
+export type ProductRecommendationUsefulnessSample =
+  | "low"
+  | "none"
+  | "standard";
+
 export type AdminProductRecommendationInsightRow = Readonly<{
   affectedPlanCount: number;
   averageCoveragePercent: number | null;
@@ -236,6 +249,9 @@ export type AdminProductRecommendationInsightRow = Readonly<{
   rejectedCount: number;
   title: string;
   updatedAt: string | null;
+  usefulnessBand: ProductRecommendationUsefulnessBand;
+  usefulnessSample: ProductRecommendationUsefulnessSample;
+  usefulnessScore: number | null;
   validationCheckedAt: string | null;
   validationStatus: string | null;
   validationSummary: string | null;
@@ -579,6 +595,56 @@ export function productRecommendationInsightReason(input: Readonly<{
 
 function boundedPercent(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+export function productRecommendationUsefulness(input: Readonly<{
+  affectedPlanCount: number;
+  averageCoveragePercent: number | null;
+  chosenCount: number;
+  nearMissCount: number;
+  rejectedCount: number;
+}>): Readonly<{
+  band: ProductRecommendationUsefulnessBand;
+  sample: ProductRecommendationUsefulnessSample;
+  score: number | null;
+}> {
+  const decisionCount = input.chosenCount + input.nearMissCount + input.rejectedCount;
+
+  if (decisionCount < 1) {
+    return {
+      band: "unknown",
+      sample: "none",
+      score: null
+    };
+  }
+
+  const coveragePercent = input.averageCoveragePercent === null
+    ? 0
+    : Math.max(0, Math.min(100, input.averageCoveragePercent));
+  const chosenRate = input.chosenCount / decisionCount;
+  const nearMissRate = input.nearMissCount / decisionCount;
+  const rejectedRate = input.rejectedCount / decisionCount;
+  const score = boundedPercent(
+    (chosenRate * 60) +
+    ((coveragePercent / 100) * 30) +
+    (nearMissRate * 10) -
+    (rejectedRate * 25)
+  );
+  const band: ProductRecommendationUsefulnessBand = score >= 80
+    ? "strong"
+    : score >= 60
+      ? "useful"
+      : score >= 40
+        ? "mixed"
+        : score >= 20
+          ? "weak"
+          : "useless";
+
+  return {
+    band,
+    sample: input.affectedPlanCount < 3 ? "low" : "standard",
+    score
+  };
 }
 
 function uniqueStrings(values: readonly (string | null | undefined)[], limit = 8) {
@@ -1342,18 +1408,27 @@ function mapProductRecommendationInsightRows(
   rows: readonly ProductRecommendationInsightDbRow[]
 ): AdminProductRecommendationInsightRow[] {
   return rows.map((row) => {
+    const affectedPlanCount = numberValue(row.affected_plan_count);
     const chosenCount = numberValue(row.chosen_count);
     const nearMissCount = numberValue(row.near_miss_count);
     const rejectedCount = numberValue(row.rejected_count);
+    const averageCoveragePercent = optionalNumber(row.average_coverage_percent);
     const primaryOutcome = productRecommendationInsightOutcome({
+      chosenCount,
+      nearMissCount,
+      rejectedCount
+    });
+    const usefulness = productRecommendationUsefulness({
+      affectedPlanCount,
+      averageCoveragePercent,
       chosenCount,
       nearMissCount,
       rejectedCount
     });
 
     return {
-      affectedPlanCount: numberValue(row.affected_plan_count),
-      averageCoveragePercent: optionalNumber(row.average_coverage_percent),
+      affectedPlanCount,
+      averageCoveragePercent,
       brandName: row.brand_name,
       chosenCount,
       id: row.id,
@@ -1379,6 +1454,9 @@ function mapProductRecommendationInsightRows(
       rejectedCount,
       title: row.title,
       updatedAt: isoOrNull(row.updated_at),
+      usefulnessBand: usefulness.band,
+      usefulnessSample: usefulness.sample,
+      usefulnessScore: usefulness.score,
       validationCheckedAt: isoOrNull(row.validation_checked_at),
       validationStatus: row.validation_status,
       validationSummary: row.validation_summary
