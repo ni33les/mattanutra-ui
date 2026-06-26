@@ -123,6 +123,24 @@ export function ProductImagePreview({
     return fallback;
   }
 
+  if (row.imageUrl.startsWith("blob:")) {
+    return (
+      <div
+        aria-label={alt || undefined}
+        className={classNames(
+          "shrink-0 bg-cover bg-center ring-1 ring-gray-200",
+          size === "lg"
+            ? "size-24 rounded-xl"
+            : "size-20 rounded-lg",
+        )}
+        role={alt ? "img" : undefined}
+        style={{
+          backgroundImage: `url("${row.imageUrl.replace(/["\\]/g, "\\$&")}")`,
+        }}
+      />
+    );
+  }
+
   return (
     <SafeImage
       alt={alt}
@@ -167,12 +185,15 @@ function droppedImageUrl(dataTransfer: DataTransfer) {
 export function ProductImageDropzone({
   accessToken,
   onImageUrlChange,
+  onPreviewImageUrlChange,
   productId,
   row,
+  storedImageUrl,
   viewLabels,
 }: Readonly<{
   accessToken: string;
   onImageUrlChange: (imageUrl: string | null) => void;
+  onPreviewImageUrlChange?: (imageUrl: string | null) => void;
   productId: string;
   row: Pick<
     AdminProductRow,
@@ -180,6 +201,7 @@ export function ProductImageDropzone({
   > & {
     imageCandidates?: readonly string[];
   };
+  storedImageUrl?: string | null;
   viewLabels: Readonly<Record<string, string>>;
 }>) {
   const uploadInputId = useId();
@@ -187,8 +209,9 @@ export function ProductImageDropzone({
   const [busyAction, setBusyAction] = useState<"upload" | "url" | null>(null);
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
+  const editableImageUrl = storedImageUrl ?? row.imageUrl ?? "";
   const imageCandidates = [...new Set(row.imageCandidates ?? [])].filter(
-    (url) => url && url !== row.imageUrl
+    (url) => url && url !== editableImageUrl
   );
   const busy = busyAction !== null;
 
@@ -209,12 +232,14 @@ export function ProductImageDropzone({
 
     if (!imageUrl) {
       setDropError(null);
+      onPreviewImageUrlChange?.(null);
       onImageUrlChange(null);
       return;
     }
 
     setBusyAction("url");
     setDropError(null);
+    onPreviewImageUrlChange?.(null);
 
     try {
       const response = await fetch(
@@ -248,6 +273,9 @@ export function ProductImageDropzone({
   }
 
   async function uploadImageFile(file: File) {
+    const previewUrl = URL.createObjectURL(file);
+
+    onPreviewImageUrlChange?.(previewUrl);
     setBusyAction("upload");
     setDropError(null);
 
@@ -275,6 +303,7 @@ export function ProductImageDropzone({
 
       onImageUrlChange(result.url);
     } catch (error) {
+      onPreviewImageUrlChange?.(null);
       setDropError(
         error instanceof Error ? error.message : viewLabels.imageUploadError,
       );
@@ -345,9 +374,9 @@ export function ProductImageDropzone({
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
               className="block min-w-0 flex-1 rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:bg-gray-50"
-              defaultValue={row.imageUrl ?? ""}
+              defaultValue={editableImageUrl}
               disabled={busy}
-              key={row.imageUrl ?? ""}
+              key={editableImageUrl}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();

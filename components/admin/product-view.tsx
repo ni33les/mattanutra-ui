@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type {
   AdminProductDetailData,
@@ -803,6 +803,7 @@ function ProductDetailPanel({
     draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? "",
   );
   const [reviewerNote, setReviewerNote] = useState("");
+  const [localImagePreviewUrl, setLocalImagePreviewUrl] = useState<string | null>(null);
   const viewLabels = productViewLabels[locale];
   const hasOpenImportReview = Boolean(draft.importReviewTaskId);
   const approvalBlockedMessage =
@@ -827,6 +828,21 @@ function ProductDetailPanel({
       : [manufacturerCountryCodes[0] ?? defaultProductCountryCode];
   const localized = adminLocalizedProductText(draft, locale);
   const fallbackLabel = adminLocalizedFallbackLabel(localized.title, locale);
+  const previewDraft = localImagePreviewUrl
+    ? {
+        ...draft,
+        imageUrl: localImagePreviewUrl,
+      }
+    : draft;
+
+  useEffect(
+    () => () => {
+      if (localImagePreviewUrl) {
+        URL.revokeObjectURL(localImagePreviewUrl);
+      }
+    },
+    [localImagePreviewUrl],
+  );
 
   function addManufacturerCountry(countryCode: string) {
     setDraft({
@@ -1043,7 +1059,7 @@ function ProductDetailPanel({
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
-            <ProductImagePreview alt={localized.title.value} row={draft} size="lg" />
+            <ProductImagePreview alt={localized.title.value} row={previewDraft} size="lg" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex flex-col gap-1">
@@ -1175,8 +1191,10 @@ function ProductDetailPanel({
               imageUrl,
             })
           }
+          onPreviewImageUrlChange={setLocalImagePreviewUrl}
           productId={draft.id}
-          row={draft}
+          row={previewDraft}
+          storedImageUrl={draft.imageUrl}
           viewLabels={viewLabels}
         />
         <label className="text-sm font-medium text-gray-700">

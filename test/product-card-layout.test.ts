@@ -64,7 +64,9 @@ describe("product admin card layout", () => {
     assert.match(view, /ProductImageFallback/);
     assert.match(view, /<ProductImagePreview row=\{row\} \/>/);
     assert.match(detailView, /ProductImagePreview/);
-    assert.match(detailView, /<ProductImagePreview alt=\{localized\.title\.value\} row=\{draft\} size="lg" \/>/);
+    assert.match(detailView, /localImagePreviewUrl/);
+    assert.match(detailView, /URL\.revokeObjectURL\(localImagePreviewUrl\)/);
+    assert.match(detailView, /<ProductImagePreview alt=\{localized\.title\.value\} row=\{previewDraft\} size="lg" \/>/);
     assert.doesNotMatch(productCard, /row\.platform\.toUpperCase\(\)/);
     assert.doesNotMatch(view, /productStatusLabel\(row\.productKind, locale\)/);
     assert.match(productCard, /viewLabels\.translations/);
@@ -114,6 +116,9 @@ describe("product admin card layout", () => {
     assert.match(dropzone, /type="file"/);
     assert.match(dropzone, /viewLabels\.imageUpload/);
     assert.match(dropzone, /viewLabels\.imageUseUrl/);
+    assert.match(dropzone, /URL\.createObjectURL\(file\)/);
+    assert.match(dropzone, /onPreviewImageUrlChange\?\.\(previewUrl\)/);
+    assert.match(view, /row\.imageUrl\.startsWith\("blob:"\)/);
     assert.doesNotMatch(dropzone, /imageFileDropUnsupported/);
     assert.match(dropzone, /draggable=\{true\}/);
     assert.match(dropzone, /event\.dataTransfer\.setData\("text\/uri-list", imageUrl\)/);
@@ -121,6 +126,9 @@ describe("product admin card layout", () => {
     assert.match(detailView, /<ProductImageDropzone/);
     assert.match(detailView, /accessToken=\{accessToken\}/);
     assert.match(detailView, /productId=\{draft\.id\}/);
+    assert.match(detailView, /onPreviewImageUrlChange=\{setLocalImagePreviewUrl\}/);
+    assert.match(detailView, /row=\{previewDraft\}/);
+    assert.match(detailView, /storedImageUrl=\{draft\.imageUrl\}/);
     assert.match(detailView, /imageCandidates: \[/);
     assert.match(resolveRoute, /mirrorImageToFirstParty/);
     assert.match(resolveRoute, /This image host blocks direct imports/);
