@@ -245,6 +245,7 @@ describe("image hardening", () => {
     assert.match(source, /firstPartyImageHosts/);
     assert.match(source, /nextOptimizedImageHosts/);
     assert.match(source, /canUseNextImageOptimizer/);
+    assert.match(source, /src\.startsWith\("\/uploads\/"\)/);
     assert.match(source, /unoptimized=\{unoptimized \?\? !canUseNextImageOptimizer\(normalizedSrc\)\}/);
     assert.match(source, /failedSrc === normalizedSrc/);
     assert.match(source, /onError=\{\(event\) => \{/);

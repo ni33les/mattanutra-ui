@@ -36,6 +36,10 @@ function normalizeImageSrc(src: string | null | undefined) {
 }
 
 function canUseNextImageOptimizer(src: string) {
+  if (src.startsWith("/uploads/")) {
+    return false;
+  }
+
   if (src.startsWith("/")) {
     return true;
   }
