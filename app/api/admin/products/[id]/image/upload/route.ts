@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import { isUuid } from "@/lib/assessment-store";
-import { uploadContentImage } from "@/lib/content-image-storage";
+import {
+  uploadContentImage,
+  uploadLocalContentImage,
+} from "@/lib/content-image-storage";
 
 export const runtime = "nodejs";
 
@@ -63,6 +66,32 @@ function errorDetails(error: unknown) {
   };
 }
 
+function nonProductionUploadFallbackAllowed() {
+  const environment = (
+    process.env.MATTANUTRA_ENV?.trim() ||
+    (process.env.NODE_ENV === "production" ? "prd" : "dev")
+  ).toLowerCase();
+
+  return [
+    "dev",
+    "development",
+    "local",
+    "stage",
+    "staging",
+    "uat",
+  ].includes(environment);
+}
+
+function cloudUploadCredentialFailure(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /AccessDenied|CredentialsProviderError|InvalidAccessKeyId|SignatureDoesNotMatch/i.test(
+    `${error.name} ${error.message}`,
+  );
+}
+
 export async function POST(
   request: Request,
   { params }: ProductImageUploadRouteProps,
@@ -107,17 +136,36 @@ export async function POST(
   }
 
   try {
-    const upload = await uploadContentImage({
+    const uploadInput = {
       bytes: Buffer.from(await file.arrayBuffer()),
       contentType: file.type,
       extension,
       originalFileName: file.name,
-    });
+    };
+    let upload: Awaited<ReturnType<typeof uploadContentImage>>;
+
+    try {
+      upload = await uploadContentImage(uploadInput);
+    } catch (cloudError) {
+      if (
+        !nonProductionUploadFallbackAllowed() ||
+        !cloudUploadCredentialFailure(cloudError)
+      ) {
+        throw cloudError;
+      }
+
+      console.warn(
+        "Admin product image cloud upload failed; using non-production local fallback",
+        errorDetails(cloudError),
+      );
+      upload = await uploadLocalContentImage(uploadInput);
+    }
 
     return NextResponse.json(
       {
         cacheControl: upload.cacheControl,
         contentType: file.type,
+        fallbackStorage: upload.storage === "local",
         fileName: file.name,
         key: upload.key,
         size: file.size,

@@ -119,9 +119,13 @@ describe("product admin card layout", () => {
     assert.match(detailView, /productId=\{draft\.id\}/);
     assert.match(detailView, /imageCandidates: \[/);
     assert.match(resolveRoute, /mirrorImageToFirstParty/);
+    assert.match(resolveRoute, /This image host blocks direct imports/);
     assert.match(resolveRoute, /namespace: "products"/);
     assert.match(resolveRoute, /source: "admin_product_image_dropzone"/);
     assert.match(uploadRoute, /uploadContentImage/);
+    assert.match(uploadRoute, /uploadLocalContentImage/);
+    assert.match(uploadRoute, /nonProductionUploadFallbackAllowed/);
+    assert.match(uploadRoute, /InvalidAccessKeyId/);
     assert.match(uploadRoute, /maxUploadBytes = 6 \* 1024 \* 1024/);
   });
 

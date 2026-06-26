@@ -219,7 +219,7 @@ async function uploadCloudContentImage(
   };
 }
 
-async function uploadLocalContentImage(input: ContentImageUploadInput) {
+export async function uploadLocalContentImage(input: ContentImageUploadInput) {
   const key = contentImageStorageKey(input);
   const uploadPath = join(process.cwd(), "public", "uploads", key);
 

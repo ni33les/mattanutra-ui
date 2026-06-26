@@ -45,6 +45,19 @@ function badRequest(message: string) {
   );
 }
 
+function imageMirrorErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+
+  if (/http_status \(HTTP 403\)|HTTP 403/i.test(message)) {
+    return "This image host blocks direct imports. Download the image and use Upload instead.";
+  }
+
+  return (
+    message ||
+    "Could not fetch this image. Upload the file or use a public image URL."
+  );
+}
+
 export async function POST(
   request: Request,
   { params }: ProductImageResolveRouteProps,
@@ -94,10 +107,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Could not fetch this image. Upload the file or use a public image URL.",
+        message: imageMirrorErrorMessage(error),
       },
       {
         headers: noStoreHeaders,
