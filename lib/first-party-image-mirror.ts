@@ -71,6 +71,20 @@ export type FirstPartyImageValidationResult =
         | "unsupported_protocol";
     }>;
 
+export type FirstPartyImageStoredBytesResult = Readonly<{
+  cacheControl: string;
+  contentType: string;
+  dimensions: {
+    height: number | null;
+    width: number | null;
+  };
+  key: string;
+  metadata: FirstPartyImageMirrorMetadata;
+  mirrored: true;
+  storage: "cloud";
+  url: string;
+}>;
+
 type Fetcher = (
   url: string,
   init?: RequestInit
@@ -152,6 +166,65 @@ function contentTypeFromExtension(extension: string) {
   if (extension === "gif") return "image/gif";
 
   return "application/octet-stream";
+}
+
+export async function validateFirstPartyImageBytes(input: Readonly<{
+  bytes: Buffer;
+  contentType?: string | null;
+  maxBytes?: number;
+}>): Promise<FirstPartyImageValidationResult> {
+  const maxBytes = input.maxBytes ?? DEFAULT_MAX_IMAGE_BYTES;
+  const contentTypeHeader = input.contentType ?? null;
+  const headerExtension = extensionFromContentType(contentTypeHeader);
+
+  if (input.bytes.length > maxBytes) {
+    return {
+      detail: `Image is too large: ${input.bytes.length} bytes.`,
+      ok: false,
+      reason: "image_too_large"
+    };
+  }
+
+  if (contentTypeHeader && !headerExtension) {
+    return {
+      detail: `Unsupported image content type: ${contentTypeHeader ?? "unknown"}.`,
+      ok: false,
+      reason: "invalid_mime"
+    };
+  }
+
+  const metadata = await sharp(input.bytes).metadata().catch((error: unknown) => ({
+    decodeError: error instanceof Error ? error.message : String(error)
+  }));
+
+  if ("decodeError" in metadata) {
+    return {
+      detail: metadata.decodeError,
+      ok: false,
+      reason: "decode_failed"
+    };
+  }
+
+  const extension =
+    extensionFromSharpFormat(metadata.format) ?? headerExtension;
+
+  if (!extension) {
+    return {
+      detail: `Unsupported image content type: ${contentTypeHeader ?? "unknown"}.`,
+      ok: false,
+      reason: "invalid_mime"
+    };
+  }
+
+  return {
+    bytes: input.bytes,
+    contentType: contentTypeFromExtension(extension),
+    extension,
+    height: metadata.height ?? null,
+    ok: true,
+    sha256: createHash("sha256").update(input.bytes).digest("hex"),
+    width: metadata.width ?? null
+  };
 }
 
 function digitalOceanEndpointConfig(value: string) {
@@ -352,61 +425,13 @@ export async function fetchAndValidateFirstPartyImage(input: Readonly<{
       };
     }
 
-    const contentTypeHeader = response.headers.get("content-type");
-    const headerExtension = extensionFromContentType(contentTypeHeader);
-
-    if (contentTypeHeader && !headerExtension) {
-      return {
-        detail: `Unsupported image content type: ${contentTypeHeader ?? "unknown"}.`,
-        ok: false,
-        reason: "invalid_mime"
-      };
-    }
-
     const bytes = Buffer.from(await response.arrayBuffer());
 
-    if (bytes.length > maxBytes) {
-      return {
-        detail: `Image is too large: ${bytes.length} bytes.`,
-        ok: false,
-        reason: "image_too_large"
-      };
-    }
-
-    const metadata = await sharp(bytes).metadata().catch((error: unknown) => ({
-      decodeError: error instanceof Error ? error.message : String(error)
-    }));
-
-    if ("decodeError" in metadata) {
-      return {
-        detail: metadata.decodeError,
-        ok: false,
-        reason: "decode_failed"
-      };
-    }
-
-    const extension =
-      extensionFromSharpFormat(metadata.format) ?? headerExtension;
-
-    if (!extension) {
-      return {
-        detail: `Unsupported image content type: ${contentTypeHeader ?? "unknown"}.`,
-        ok: false,
-        reason: "invalid_mime"
-      };
-    }
-
-    const contentType = contentTypeFromExtension(extension);
-
-    return {
+    return validateFirstPartyImageBytes({
       bytes,
-      contentType,
-      extension,
-      height: metadata.height ?? null,
-      ok: true,
-      sha256: createHash("sha256").update(bytes).digest("hex"),
-      width: metadata.width ?? null
-    };
+      contentType: response.headers.get("content-type"),
+      maxBytes
+    });
   } catch (error) {
     return {
       detail: error instanceof Error ? error.message : String(error),
@@ -451,6 +476,100 @@ async function uploadFirstPartyImageToSpaces(
   return {
     key: input.key,
     url: `${input.config.publicBaseUrl}/${input.key}`
+  };
+}
+
+export async function storeFirstPartyImageBytes(input: Readonly<{
+  config?: FirstPartyImageStorageConfig | null;
+  entityId: string;
+  environment?: string;
+  evidenceUrl?: string | null;
+  bytes: Buffer;
+  contentType?: string | null;
+  maxBytes?: number;
+  namespace: string;
+  originalUrl?: string | null;
+  required?: boolean;
+  source?: string | null;
+  uploader?: Uploader;
+}>): Promise<FirstPartyImageStoredBytesResult> {
+  const validated = await validateFirstPartyImageBytes({
+    bytes: input.bytes,
+    contentType: input.contentType,
+    maxBytes: input.maxBytes
+  });
+
+  if (!validated.ok) {
+    throw new Error(
+      `Unable to store image upload: ${validated.reason} (${validated.detail})`
+    );
+  }
+
+  const config = input.config ?? firstPartyImageStorageConfigFromEnv();
+  const required = input.required ?? firstPartyImageMirroringRequired();
+
+  if (!config) {
+    if (required) {
+      throw new Error(
+        "First-party image storage is not configured. Set DO_SPACES_ENDPOINT, DO_SPACES_KEY, and DO_SPACES_CDN_ENDPOINT."
+      );
+    }
+
+    throw new Error("First-party image storage is not configured.");
+  }
+
+  const environment = firstPartyImageStorageEnvironment(input.environment);
+  const key = firstPartyImageStorageKey({
+    entityId: input.entityId,
+    environment,
+    extension: validated.extension,
+    namespace: input.namespace,
+    sha256: validated.sha256
+  });
+  const stored = await (input.uploader ?? ((uploadInput) =>
+    uploadFirstPartyImageToSpaces({
+      ...uploadInput,
+      config
+    })) )({
+      bytes: validated.bytes,
+      cacheControl: contentImageCacheControl,
+      contentType: validated.contentType,
+      key
+    });
+  const mirroredAt = new Date().toISOString();
+  const originalUrl =
+    input.originalUrl?.trim() ||
+    `upload:${input.namespace}:${input.entityId}:${validated.sha256}`;
+
+  return {
+    cacheControl: contentImageCacheControl,
+    contentType: validated.contentType,
+    dimensions: {
+      height: validated.height,
+      width: validated.width
+    },
+    key: stored.key,
+    metadata: {
+      byteSize: validated.bytes.length,
+      cacheControl: contentImageCacheControl,
+      contentType: validated.contentType,
+      dimensions: {
+        height: validated.height,
+        width: validated.width
+      },
+      environment,
+      evidenceUrl: input.evidenceUrl ?? null,
+      hash: validated.sha256,
+      mirroredAt,
+      mirroredUrl: stored.url,
+      originalHost: imageUrlHost(originalUrl),
+      originalUrl,
+      source: input.source ?? null,
+      storedKey: stored.key
+    },
+    mirrored: true,
+    storage: "cloud",
+    url: stored.url
   };
 }
 

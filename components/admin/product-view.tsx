@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import type {
   AdminProductDetailData,
@@ -1011,6 +1012,7 @@ function ProductDetailPanel({
   saving: boolean;
   setDraft: (update: ProductDraftUpdate) => void;
 }>) {
+  const router = useRouter();
   const [mergeProductId, setMergeProductId] = useState(
     draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? "",
   );
@@ -1076,6 +1078,37 @@ function ProductDetailPanel({
     setLocalImagePreview((current) =>
       current?.targetImageUrl === imageUrl ? null : current
     );
+  }
+
+  function handlePersistedImageChange(
+    imageUrl: string | null,
+    savedRow?: AdminProductRow | null,
+  ) {
+    setDraft((currentDraft) => {
+      const imageCandidates = [
+        ...new Set([
+          ...(imageUrl ? [imageUrl] : []),
+          ...currentDraft.imageCandidates,
+        ]),
+      ];
+
+      if (savedRow) {
+        return normalizeProductDetailRow({
+          ...savedRow,
+          imageCandidates,
+        });
+      }
+
+      return {
+        ...currentDraft,
+        imageCandidates,
+        imageUrl,
+      };
+    });
+
+    if (savedRow) {
+      router.refresh();
+    }
   }
 
   function addManufacturerCountry(countryCode: string) {
@@ -1421,18 +1454,7 @@ function ProductDetailPanel({
         </label>
         <ProductImageDropzone
           accessToken={accessToken}
-          onImageUrlChange={(imageUrl) =>
-            setDraft((currentDraft) => ({
-              ...currentDraft,
-              imageCandidates: [
-                ...new Set([
-                  ...(imageUrl ? [imageUrl] : []),
-                  ...currentDraft.imageCandidates,
-                ]),
-              ],
-              imageUrl,
-            }))
-          }
+          onImageUrlChange={handlePersistedImageChange}
           onPreviewImageLoad={handleSavedImageLoad}
           onPreviewImageUrlChange={handleLocalImagePreviewChange}
           previewImageUrl={localImagePreviewUrl}

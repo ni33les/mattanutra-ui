@@ -7,7 +7,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { Sparkles, Upload } from "lucide-react";
+import { ImageOff, Sparkles, Upload } from "lucide-react";
 import type {
   AdminProductDetailRow,
   AdminProductRow
@@ -116,6 +116,31 @@ export function ProductImageFallback({
   );
 }
 
+function ProductImageBrokenFallback({
+  row,
+  size = "md",
+}: Readonly<{
+  row: Pick<AdminProductRow, "brandName" | "platform" | "title">;
+  size?: "md" | "lg";
+}>) {
+  return (
+    <div
+      className={classNames(
+        "flex shrink-0 flex-col items-center justify-center gap-1 bg-amber-50 text-center font-semibold text-amber-800 ring-1 ring-amber-200",
+        size === "lg"
+          ? "size-24 rounded-xl text-[11px]"
+          : "size-20 rounded-lg text-[10px]",
+      )}
+      title="Saved image could not be loaded"
+    >
+      <ImageOff aria-hidden={true} className="size-4" strokeWidth={2.25} />
+      <span className="px-2 leading-tight">
+        {productImageFallbackText(row)}
+      </span>
+    </div>
+  );
+}
+
 export function AddProductFromUrlModal({
   error,
   onClose,
@@ -198,10 +223,16 @@ export function ProductImagePreview({
   alt?: string;
   onImageLoad?: (imageUrl: string) => void;
   previewImageUrl?: string | null;
-  row: Pick<AdminProductRow, "brandName" | "imageUrl" | "platform" | "title">;
+  row: Pick<
+    AdminProductRow,
+    "brandName" | "imageUrl" | "platform" | "title"
+  > & {
+    updatedAt?: string | null;
+  };
   size?: "md" | "lg";
 }>) {
   const fallback = <ProductImageFallback row={row} size={size} />;
+  const brokenFallback = <ProductImageBrokenFallback row={row} size={size} />;
   const preview = previewImageUrl ? (
     <ProductImageBlobPreview
       alt={alt}
@@ -223,6 +254,7 @@ export function ProductImagePreview({
       />
     );
   }
+  const imageSrc = productImageRenderSrc(row.imageUrl, row.updatedAt);
 
   return (
     <SafeImage
@@ -233,13 +265,28 @@ export function ProductImagePreview({
           ? "size-24 rounded-xl"
           : "size-20 rounded-lg",
       )}
-      fallback={preview ?? fallback}
+      fallback={preview ?? brokenFallback}
       height={size === "lg" ? 96 : 80}
       onLoad={() => onImageLoad?.(row.imageUrl!)}
-      src={row.imageUrl}
+      src={imageSrc}
       width={size === "lg" ? 96 : 80}
     />
   );
+}
+
+function productImageRenderSrc(
+  imageUrl: string,
+  updatedAt: string | null | undefined,
+) {
+  const version = updatedAt ? Date.parse(updatedAt) : NaN;
+
+  if (!Number.isFinite(version)) {
+    return imageUrl;
+  }
+
+  return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(
+    String(version),
+  )}`;
 }
 
 function ProductImageBlobPreview({
@@ -304,7 +351,10 @@ export function ProductImageDropzone({
   viewLabels,
 }: Readonly<{
   accessToken: string;
-  onImageUrlChange: (imageUrl: string | null) => void;
+  onImageUrlChange: (
+    imageUrl: string | null,
+    row?: AdminProductRow | null,
+  ) => void;
   onPreviewImageLoad?: (imageUrl: string) => void;
   onPreviewImageUrlChange?: (
     imageUrl: string | null,
@@ -334,12 +384,19 @@ export function ProductImageDropzone({
 
   async function resultMessage(response: Response, fallback: string) {
     const result = (await response.json().catch(() => ({}))) as {
+      image?: {
+        reason?: string;
+        status?: "ready" | "failed";
+      };
       message?: string;
+      row?: AdminProductRow;
       url?: string;
     };
 
     return {
+      image: result.image ?? null,
       message: result.message ?? fallback,
+      row: result.row ?? null,
       url: typeof result.url === "string" ? result.url : null,
     };
   }
@@ -379,7 +436,7 @@ export function ProductImageDropzone({
         throw new Error(result.message);
       }
 
-      onImageUrlChange(result.url);
+      onImageUrlChange(result.url, result.row);
     } catch (error) {
       setDropError(
         error instanceof Error ? error.message : viewLabels.imageMirrorError,
@@ -419,7 +476,7 @@ export function ProductImageDropzone({
       }
 
       onPreviewImageUrlChange?.(previewUrl, result.url);
-      onImageUrlChange(result.url);
+      onImageUrlChange(result.url, result.row);
     } catch (error) {
       onPreviewImageUrlChange?.(null);
       setDropError(
@@ -551,9 +608,22 @@ export function ProductImageDropzone({
               {dropError}
             </p>
           ) : (
-            <p className="mt-2 text-xs font-medium text-gray-500">
-              {viewLabels.imageUploadHint}
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="text-xs font-medium text-gray-500">
+                {viewLabels.imageUploadHint}
+              </p>
+              {editableImageUrl ? (
+                <a
+                  className="block truncate text-[11px] font-medium text-[#126B4F] underline-offset-2 hover:underline"
+                  href={editableImageUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                  title={editableImageUrl}
+                >
+                  {editableImageUrl}
+                </a>
+              ) : null}
+            </div>
           )}
           {imageCandidates.length > 0 ? (
             <div className="mt-3">

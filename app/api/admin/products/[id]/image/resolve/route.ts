@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
-import { updateAdminProduct } from "@/lib/admin-products";
+import {
+  AdminProductImageError,
+  persistVerifiedAdminProductImageUrl,
+} from "@/lib/admin-product-images";
 import { isUuid } from "@/lib/assessment-store";
 import { mirrorImageToFirstParty } from "@/lib/first-party-image-mirror";
 
@@ -99,18 +102,27 @@ export async function POST(
       return badRequest("Image URL could not be resolved");
     }
 
-    await updateAdminProduct({
+    const result = await persistVerifiedAdminProductImageUrl({
       actor: "admin_dashboard",
+      byteSize: mirrored.metadata?.byteSize ?? null,
+      cacheControl: mirrored.metadata?.cacheControl ?? null,
       changeNote: "product_image_url_resolved",
-      id,
+      contentType: mirrored.metadata?.contentType ?? null,
+      dimensions: mirrored.metadata?.dimensions ?? null,
       imageUrl: mirrored.url,
+      key: mirrored.metadata?.storedKey ?? null,
+      productId: id,
+      source: "url",
+      storage: mirrored.mirrored ? "cloud" : "existing",
     });
 
     return NextResponse.json(
       {
+        image: result.image,
         mirrored: mirrored.mirrored,
+        row: result.row,
         skippedReason: mirrored.skippedReason,
-        url: mirrored.url,
+        url: result.url,
       },
       { headers: noStoreHeaders },
     );
@@ -119,11 +131,21 @@ export async function POST(
 
     return NextResponse.json(
       {
-        message: imageMirrorErrorMessage(error),
+        image:
+          error instanceof AdminProductImageError
+            ? {
+                reason: error.code,
+                status: "failed",
+              }
+            : undefined,
+        message:
+          error instanceof AdminProductImageError
+            ? error.message
+            : imageMirrorErrorMessage(error),
       },
       {
         headers: noStoreHeaders,
-        status: 400,
+        status: error instanceof AdminProductImageError ? error.status : 400,
       },
     );
   }

@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
-import { updateAdminProduct } from "@/lib/admin-products";
-import { isUuid } from "@/lib/assessment-store";
 import {
-  uploadContentImage,
-  uploadLocalContentImage,
-} from "@/lib/content-image-storage";
+  AdminProductImageError,
+  uploadAdminProductImage,
+} from "@/lib/admin-product-images";
+import { isUuid } from "@/lib/assessment-store";
 
 export const runtime = "nodejs";
 
@@ -67,32 +66,6 @@ function errorDetails(error: unknown) {
   };
 }
 
-function nonProductionUploadFallbackAllowed() {
-  const environment = (
-    process.env.MATTANUTRA_ENV?.trim() ||
-    (process.env.NODE_ENV === "production" ? "prd" : "dev")
-  ).toLowerCase();
-
-  return [
-    "dev",
-    "development",
-    "local",
-    "stage",
-    "staging",
-    "uat",
-  ].includes(environment);
-}
-
-function cloudUploadCredentialFailure(error: unknown) {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return /AccessDenied|CredentialsProviderError|InvalidAccessKeyId|SignatureDoesNotMatch/i.test(
-    `${error.name} ${error.message}`,
-  );
-}
-
 export async function POST(
   request: Request,
   { params }: ProductImageUploadRouteProps,
@@ -137,47 +110,26 @@ export async function POST(
   }
 
   try {
-    const uploadInput = {
+    const result = await uploadAdminProductImage({
+      actor: "admin_dashboard",
       bytes: Buffer.from(await file.arrayBuffer()),
       contentType: file.type,
-      extension,
       originalFileName: file.name,
-    };
-    let upload: Awaited<ReturnType<typeof uploadContentImage>>;
-
-    try {
-      upload = await uploadContentImage(uploadInput);
-    } catch (cloudError) {
-      if (
-        !nonProductionUploadFallbackAllowed() ||
-        !cloudUploadCredentialFailure(cloudError)
-      ) {
-        throw cloudError;
-      }
-
-      console.warn(
-        "Admin product image cloud upload failed; using non-production local fallback",
-        errorDetails(cloudError),
-      );
-      upload = await uploadLocalContentImage(uploadInput);
-    }
-    await updateAdminProduct({
-      actor: "admin_dashboard",
-      changeNote: "product_image_uploaded",
-      id,
-      imageUrl: upload.url,
+      productId: id,
     });
 
     return NextResponse.json(
       {
-        cacheControl: upload.cacheControl,
+        cacheControl: result.image.cacheControl,
         contentType: file.type,
-        fallbackStorage: upload.storage === "local",
+        fallbackStorage: result.image.storage === "local",
         fileName: file.name,
-        key: upload.key,
+        image: result.image,
+        key: result.image.key,
+        row: result.row,
         size: file.size,
-        storage: upload.storage,
-        url: upload.url,
+        storage: result.image.storage,
+        url: result.url,
       },
       { headers: noStoreHeaders },
     );
@@ -185,10 +137,20 @@ export async function POST(
     console.error("Admin product image upload failed", errorDetails(error));
 
     return NextResponse.json(
-      { message: "Could not upload this image" },
+      {
+        image: {
+          reason:
+            error instanceof AdminProductImageError ? error.code : "failed",
+          status: "failed",
+        },
+        message:
+          error instanceof AdminProductImageError
+            ? error.message
+            : "Could not upload this image",
+      },
       {
         headers: noStoreHeaders,
-        status: 500,
+        status: error instanceof AdminProductImageError ? error.status : 500,
       },
     );
   }

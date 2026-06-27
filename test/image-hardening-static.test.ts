@@ -247,8 +247,11 @@ describe("image hardening", () => {
     assert.match(source, /canUseNextImageOptimizer/);
     assert.match(source, /src\.startsWith\("\/uploads\/"\)/);
     assert.match(source, /unoptimized=\{unoptimized \?\? !canUseNextImageOptimizer\(normalizedSrc\)\}/);
-    assert.match(source, /failedSrc === normalizedSrc/);
+    assert.match(source, /defaultRetryDelaysMs/);
+    assert.match(source, /activeFailure\?\.final/);
+    assert.match(source, /key=\{`\$\{normalizedSrc\}:\$\{activeFailure\?\.retryToken \?\? 0\}`\}/);
     assert.match(source, /onError=\{\(event\) => \{/);
-    assert.match(source, /setFailedSrc\(normalizedSrc\)/);
+    assert.match(source, /setFailure\(\(current\) =>/);
+    assert.match(source, /retryToken: current\.retryToken \+ 1/);
   });
 });

@@ -582,6 +582,7 @@ function productListRowFromDb(row: ProductListDbRow): AdminProductListRow {
     status: row.status,
     title: row.title,
     translations: mergeTranslationsFromDb(row.translations),
+    updatedAt: new Date(row.updated_at).toISOString(),
     validationLabel: row.validation_label
   };
 }

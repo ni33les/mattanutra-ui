@@ -193,6 +193,7 @@ export type AdminProductListRow = Readonly<{
   status: ProductStatus;
   title: string;
   translations: Record<string, AdminProductTranslation>;
+  updatedAt: string;
   validationLabel: string;
 }>;
 
