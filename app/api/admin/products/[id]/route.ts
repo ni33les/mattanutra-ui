@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
+  deleteIgnoredAdminProduct,
   isProductAudience,
   isProductLabelStatus,
   isProductStatus,
@@ -164,6 +165,10 @@ function productResponseRow<T extends { sourceSnapshot?: unknown }>(row: T) {
   return responseRow;
 }
 
+const noStoreHeaders = {
+  "Cache-Control": "no-store"
+};
+
 export async function PATCH(
   request: Request,
   { params }: AdminProductRouteProps
@@ -177,9 +182,7 @@ export async function PATCH(
     return NextResponse.json(
       { message: "Not found" },
       {
-        headers: {
-          "Cache-Control": "no-store"
-        },
+        headers: noStoreHeaders,
         status: 404
       }
     );
@@ -189,9 +192,7 @@ export async function PATCH(
     return NextResponse.json(
       { message: "Product not found" },
       {
-        headers: {
-          "Cache-Control": "no-store"
-        },
+        headers: noStoreHeaders,
         status: 404
       }
     );
@@ -228,9 +229,7 @@ export async function PATCH(
     return NextResponse.json(
       { message: "Invalid product governance payload" },
       {
-        headers: {
-          "Cache-Control": "no-store"
-        },
+        headers: noStoreHeaders,
         status: 400
       }
     );
@@ -283,9 +282,7 @@ export async function PATCH(
           : {})
       },
       {
-        headers: {
-          "Cache-Control": "no-store"
-        }
+        headers: noStoreHeaders
       }
     );
   } catch (error) {
@@ -297,10 +294,67 @@ export async function PATCH(
     return NextResponse.json(
       { message },
       {
-        headers: {
-          "Cache-Control": "no-store"
-        },
+        headers: noStoreHeaders,
         status: blocked ? 400 : 500
+      }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: AdminProductRouteProps
+) {
+  const { id } = await params;
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const accessToken =
+    request.headers.get("x-admin-dashboard-token") ?? textOrNull(body.accessToken);
+
+  if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
+    return NextResponse.json(
+      { message: "Not found" },
+      {
+        headers: noStoreHeaders,
+        status: 404
+      }
+    );
+  }
+
+  if (!isUuid(id)) {
+    return NextResponse.json(
+      { message: "Product not found" },
+      {
+        headers: noStoreHeaders,
+        status: 404
+      }
+    );
+  }
+
+  try {
+    const result = await deleteIgnoredAdminProduct({
+      actor: "admin_dashboard",
+      productId: id
+    });
+
+    return NextResponse.json(
+      { result },
+      {
+        headers: noStoreHeaders
+      }
+    );
+  } catch (error) {
+    console.error("Unable to delete product", error);
+    const message =
+      error instanceof Error ? error.message : "Unable to delete product";
+    const blocked =
+      message.startsWith("Only ignored products") ||
+      message.startsWith("Product cannot be deleted");
+
+    return NextResponse.json(
+      { message },
+      {
+        headers: noStoreHeaders,
+        status: message === "Product not found" ? 404 : blocked ? 409 : 500
       }
     );
   }

@@ -215,4 +215,29 @@ describe("product admin card layout", () => {
     assert.match(writes, /input\.productForm !== undefined \? \{ productForm: input\.productForm \} : \{\}/);
     assert.doesNotMatch(writes, /product_form =/);
   });
+
+  it("only allows hard deleting ignored products from the admin detail page", async () => {
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
+    const route = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
+    const barrel = await readFile("lib/admin-products.ts", "utf8");
+    const writes = await readFile("lib/admin-product-writes.ts", "utf8");
+
+    assert.match(route, /export async function DELETE/);
+    assert.match(route, /deleteIgnoredAdminProduct/);
+    assert.match(barrel, /deleteIgnoredAdminProduct/);
+    assert.match(detailView, /method: "DELETE"/);
+    assert.match(detailView, /currentBusinessState === "ignored"/);
+    assert.match(detailView, /window\.confirm\(viewLabels\.deleteIgnoredConfirm\)/);
+    assert.match(detailView, /viewLabels\.deleteAction/);
+    assert.match(helpers, /deleteIgnoredConfirm/);
+    assert.match(writes, /export async function deleteIgnoredAdminProduct/);
+    assert.match(writes, /target\.status = 'ignored'/);
+    assert.match(writes, /delete from public\.products/);
+    assert.match(writes, /product_recommendation_items/);
+    assert.match(writes, /product_recommendation_decisions/);
+    assert.match(writes, /retail_customer_order_lines/);
+    assert.match(writes, /retail_order_allocations/);
+    assert.doesNotMatch(writes, /delete from public\.product_versions/);
+  });
 });

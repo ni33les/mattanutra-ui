@@ -1662,4 +1662,234 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 
   return row;
 }
+
+export type DeleteIgnoredAdminProductResult = Readonly<{
+  deleted: true;
+  productId: string;
+  title: string | null;
+}>;
+
+export async function deleteIgnoredAdminProduct(input: Readonly<{
+  actor?: string | null;
+  productId: string;
+}>): Promise<DeleteIgnoredAdminProductResult> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  if (!isUuidValue(input.productId)) {
+    throw new Error("Product not found");
+  }
+
+  const rows = await sql<Array<{
+    blocked_references: string[] | null;
+    deleted_id: string | null;
+    product_exists: boolean;
+    product_status: string | null;
+    product_title: string | null;
+  }>>`
+    with target as (
+      select
+        products.id,
+        products.brand_id,
+        products.status,
+        products.title,
+        to_jsonb(products.*) as before_payload
+      from public.products
+      where products.id = ${input.productId}::uuid
+      limit 1
+    ),
+    blockers as (
+      select array_remove(array[
+        case
+          when exists (
+            select 1
+            from public.product_recommendation_items
+            where product_recommendation_items.product_id = ${input.productId}::uuid
+            limit 1
+          ) then 'recommendation history'
+        end,
+        case
+          when exists (
+            select 1
+            from public.product_recommendation_decisions
+            where product_recommendation_decisions.product_id = ${input.productId}::uuid
+            limit 1
+          ) then 'recommendation decisions'
+        end,
+        case
+          when exists (
+            select 1
+            from public.retail_customer_order_lines
+            where retail_customer_order_lines.product_id = ${input.productId}::uuid
+            limit 1
+          ) then 'customer order lines'
+        end,
+        case
+          when exists (
+            select 1
+            from public.retail_order_allocations
+            where retail_order_allocations.product_id = ${input.productId}::uuid
+            limit 1
+          ) then 'retail order allocations'
+        end
+      ], null) as names
+    ),
+    eligible as (
+      select target.*
+      from target, blockers
+      where target.status = 'ignored'
+        and cardinality(blockers.names) = 0
+    ),
+    deleted_shopping_lines as (
+      delete from public.retail_shopping_list_lines
+      where retail_shopping_list_lines.product_id in (select eligible.id from eligible)
+      returning 1
+    ),
+    shopping_step as (
+      select eligible.*
+      from eligible
+      left join (select count(*) as deleted_count from deleted_shopping_lines) deleted on true
+    ),
+    deleted_reorder_advice as (
+      delete from public.retail_stock_reorder_advice
+      where retail_stock_reorder_advice.product_id in (select shopping_step.id from shopping_step)
+      returning 1
+    ),
+    reorder_step as (
+      select shopping_step.*
+      from shopping_step
+      left join (select count(*) as deleted_count from deleted_reorder_advice) deleted on true
+    ),
+    deleted_movements as (
+      delete from public.retail_stock_movements
+      where retail_stock_movements.product_id in (select reorder_step.id from reorder_step)
+      returning 1
+    ),
+    movements_step as (
+      select reorder_step.*
+      from reorder_step
+      left join (select count(*) as deleted_count from deleted_movements) deleted on true
+    ),
+    deleted_lots as (
+      delete from public.retail_stock_lots
+      where retail_stock_lots.product_id in (select movements_step.id from movements_step)
+      returning 1
+    ),
+    lots_step as (
+      select movements_step.*
+      from movements_step
+      left join (select count(*) as deleted_count from deleted_lots) deleted on true
+    ),
+    deleted_snapshots as (
+      delete from public.retail_product_stock_snapshots
+      where retail_product_stock_snapshots.product_id in (select lots_step.id from lots_step)
+      returning 1
+    ),
+    snapshots_step as (
+      select lots_step.*
+      from lots_step
+      left join (select count(*) as deleted_count from deleted_snapshots) deleted on true
+    ),
+    deleted_stock as (
+      delete from public.retail_product_stock
+      where retail_product_stock.product_id in (select snapshots_step.id from snapshots_step)
+      returning 1
+    ),
+    stock_step as (
+      select snapshots_step.*
+      from snapshots_step
+      left join (select count(*) as deleted_count from deleted_stock) deleted on true
+    ),
+    deleted_sellables as (
+      delete from public.retail_sellable_products
+      where retail_sellable_products.product_id in (select stock_step.id from stock_step)
+      returning 1
+    ),
+    sellables_step as (
+      select stock_step.*
+      from stock_step
+      left join (select count(*) as deleted_count from deleted_sellables) deleted on true
+    ),
+    deleted_countries as (
+      delete from public.product_countries
+      where product_countries.product_id in (select sellables_step.id from sellables_step)
+      returning 1
+    ),
+    countries_step as (
+      select sellables_step.*
+      from sellables_step
+      left join (select count(*) as deleted_count from deleted_countries) deleted on true
+    ),
+    deleted_audit as (
+      insert into public.product_admin_audit (
+        product_id,
+        brand_id,
+        actor,
+        action,
+        before_payload,
+        after_payload
+      )
+      select
+        null,
+        countries_step.brand_id,
+        ${input.actor ?? "admin_dashboard"},
+        'ignored_product_deleted',
+        countries_step.before_payload,
+        jsonb_build_object(
+          'deletedAt', now(),
+          'productId', countries_step.id::text,
+          'status', countries_step.status,
+          'title', countries_step.title
+        )
+      from countries_step
+      returning 1
+    ),
+    audit_step as (
+      select countries_step.*
+      from countries_step
+      left join (select count(*) as deleted_count from deleted_audit) deleted on true
+    ),
+    deleted_product as (
+      delete from public.products
+      where products.id in (select audit_step.id from audit_step)
+      returning products.id::text, products.title
+    )
+    select
+      exists(select 1 from target) as product_exists,
+      (select target.status from target) as product_status,
+      (select target.title from target) as product_title,
+      (select blockers.names from blockers) as blocked_references,
+      (select deleted_product.id from deleted_product) as deleted_id
+  `;
+  const row = rows[0];
+
+  if (!row?.product_exists) {
+    throw new Error("Product not found");
+  }
+
+  if (row.product_status !== "ignored") {
+    throw new Error("Only ignored products can be deleted");
+  }
+
+  if (row.blocked_references?.length) {
+    throw new Error(
+      `Product cannot be deleted because it has ${row.blocked_references.join(", ")}.`
+    );
+  }
+
+  if (!row.deleted_id) {
+    throw new Error("Product was not deleted");
+  }
+
+  clearProductRecommendationCandidateCache();
+
+  return {
+    deleted: true,
+    productId: row.deleted_id,
+    title: row.product_title
+  };
+}
 export {};

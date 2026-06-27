@@ -88,7 +88,11 @@ export {
   isProductForm,
   productForms
 } from "@/lib/product-form";
-export { createAdminProduct, updateAdminProduct } from "./admin-product-writes.ts";
+export {
+  createAdminProduct,
+  deleteIgnoredAdminProduct,
+  updateAdminProduct
+} from "./admin-product-writes.ts";
 import {
   loadAdminProductRow,
   loadAdminProductRowsForBrand

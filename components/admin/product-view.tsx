@@ -510,6 +510,41 @@ export function AdminProductDetailView({
     }
   }
 
+  async function deleteProduct(row: AdminProductDetailRow) {
+    setSavingId(row.id);
+    setErrorId(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/products/${row.id}`, {
+        body: JSON.stringify({
+          accessToken,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await adminResponseErrorMessage(response, viewLabels.deleteError),
+        );
+      }
+
+      setDraft(null);
+      return true;
+    } catch (error) {
+      setErrorId(row.id);
+      setErrorMessage(
+        error instanceof Error ? error.message : viewLabels.deleteError,
+      );
+      return false;
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   async function correctProductFacts(row: AdminProductDetailRow) {
     setSavingId(row.id);
     setErrorId(null);
@@ -749,6 +784,7 @@ export function AdminProductDetailView({
       onClose={() => {
         window.location.href = backHref;
       }}
+      onDelete={deleteProduct}
       onSave={saveProduct}
       mergeOptions={mergeOptions}
       saving={savingId === draft.id}
@@ -768,6 +804,7 @@ function ProductDetailPanel({
   onCorrectFacts,
   onIncreaseSafetyLimit,
   onClose,
+  onDelete,
   onSave,
   mergeOptions,
   saving,
@@ -791,6 +828,7 @@ function ProductDetailPanel({
     factId: string,
   ) => Promise<boolean>;
   onClose: () => void;
+  onDelete: (row: AdminProductDetailRow) => Promise<boolean>;
   onSave: (
     row: AdminProductDetailRow,
     options?: Readonly<{ changeNote?: string | null }>
@@ -1418,6 +1456,24 @@ function ProductDetailPanel({
           </button>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {currentBusinessState === "ignored" ? (
+            <button
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={saving}
+              onClick={async () => {
+                if (!window.confirm(viewLabels.deleteIgnoredConfirm)) {
+                  return;
+                }
+
+                if (await onDelete(draft)) {
+                  onClose();
+                }
+              }}
+              type="button"
+            >
+              {viewLabels.deleteAction}
+            </button>
+          ) : null}
           <span className="isolate inline-flex rounded-md shadow-xs">
             <button
               className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
