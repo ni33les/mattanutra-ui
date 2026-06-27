@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
+import { ArrowLeft, Plus, Sparkles, X } from "lucide-react";
 import type {
   AdminProductDetailData,
   AdminProductDetailRow,
@@ -263,6 +263,10 @@ export function AdminProductListView({
 }>) {
   const [search, setSearch] = useState(data.query.search);
   const [manufacturerFilter, setManufacturerFilter] = useState(data.query.brand);
+  const [addProductOpen, setAddProductOpen] = useState(false);
+  const [addProductUrl, setAddProductUrl] = useState("");
+  const [addProductSaving, setAddProductSaving] = useState(false);
+  const [addProductError, setAddProductError] = useState<string | null>(null);
   const viewLabels = productViewLabels[locale];
   const metrics = productMetricCardsFromSummary({
     locale,
@@ -307,6 +311,10 @@ export function AdminProductListView({
     return `/${locale}/admin/products${params.size > 0 ? `?${params.toString()}` : ""}`;
   }
 
+  function productDetailHref(productId: string) {
+    return `/${locale}/admin/products/${productId}${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`;
+  }
+
   function handleMetricSelect(metricId: BusinessMetric["id"]) {
     window.location.href = productListHref({
       metric: metricId as string,
@@ -314,8 +322,139 @@ export function AdminProductListView({
     });
   }
 
+  async function handleAddProductSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAddProductSaving(true);
+    setAddProductError(null);
+
+    try {
+      const response = await fetch("/api/admin/products/from-url", {
+        body: JSON.stringify({
+          accessToken,
+          productUrl: addProductUrl
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await adminResponseErrorMessage(response, viewLabels.addProductError)
+        );
+      }
+
+      const payload = (await response.json()) as {
+        row?: { id?: string | null };
+      };
+      const productId = payload.row?.id;
+
+      if (!productId) {
+        throw new Error(viewLabels.addProductError);
+      }
+
+      window.location.href = productDetailHref(productId);
+    } catch (error) {
+      setAddProductError(
+        error instanceof Error ? error.message : viewLabels.addProductError
+      );
+    } finally {
+      setAddProductSaving(false);
+    }
+  }
+
   return (
     <section className="mt-8 space-y-6">
+      <div className="flex justify-end">
+        <button
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
+          onClick={() => {
+            setAddProductError(null);
+            setAddProductOpen(true);
+          }}
+          type="button"
+        >
+          <Plus aria-hidden="true" className="size-4" />
+          {viewLabels.addProduct}
+        </button>
+      </div>
+
+      {addProductOpen ? (
+        <div
+          aria-labelledby="add-product-from-url-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"
+          role="dialog"
+        >
+          <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl ring-1 ring-gray-200">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles aria-hidden="true" className="size-4 text-[#1FA77A]" />
+                  <h2
+                    className="text-base font-semibold text-gray-950"
+                    id="add-product-from-url-title"
+                  >
+                    {viewLabels.addProductFromUrl}
+                  </h2>
+                </div>
+              </div>
+              <button
+                aria-label={viewLabels.close}
+                className="inline-flex size-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+                onClick={() => {
+                  if (!addProductSaving) {
+                    setAddProductOpen(false);
+                  }
+                }}
+                type="button"
+              >
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            </div>
+
+            <form className="mt-5 space-y-4" onSubmit={handleAddProductSubmit}>
+              <label className="block space-y-2 text-sm font-medium text-gray-700">
+                <span>{viewLabels.productUrl}</span>
+                <input
+                  className="w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
+                  onChange={(event) => setAddProductUrl(event.target.value)}
+                  placeholder="https://"
+                  required
+                  type="url"
+                  value={addProductUrl}
+                />
+              </label>
+
+              {addProductError ? (
+                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+                  {addProductError}
+                </p>
+              ) : null}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={addProductSaving}
+                  onClick={() => setAddProductOpen(false)}
+                  type="button"
+                >
+                  {viewLabels.close}
+                </button>
+                <button
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={addProductSaving}
+                  type="submit"
+                >
+                  {addProductSaving ? viewLabels.creatingProduct : viewLabels.createDraft}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       <BusinessStatsGrid
         metrics={metrics}
         onMetricSelect={handleMetricSelect}
@@ -368,7 +507,7 @@ export function AdminProductListView({
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {data.rows.map((row) => (
           <ProductCard
-            href={`/${locale}/admin/products/${row.id}${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`}
+            href={productDetailHref(row.id)}
             key={row.id}
             locale={locale}
             row={row}
