@@ -104,22 +104,52 @@ function digitalOceanCredentialPair(value: string) {
   const separator = value.includes(":") ? ":" : value.includes("|") ? "|" : "";
 
   if (!separator) {
+    throw new Error(
+      "DO_SPACES_KEY must include both access and secret values as access:secret or access|secret."
+    );
+  }
+
+  const separatorIndex = value.indexOf(separator);
+  const accessKeyId = value.slice(0, separatorIndex).trim();
+  const secretAccessKey = value.slice(separatorIndex + 1).trim();
+
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error(
+      "DO_SPACES_KEY must include both access and secret values as access:secret or access|secret."
+    );
+  }
+
+  return { accessKeyId, secretAccessKey };
+}
+
+function digitalOceanCredentialsFromEnv() {
+  const explicitAccessKeyId = envValue(
+    "DO_SPACES_ACCESS_KEY_ID",
+    "DO_SPACES_ACCESS_KEY"
+  );
+  const explicitSecretAccessKey = envValue(
+    "DO_SPACES_SECRET_ACCESS_KEY",
+    "DO_SPACES_SECRET_KEY"
+  );
+
+  if (explicitAccessKeyId || explicitSecretAccessKey) {
+    if (!explicitAccessKeyId || !explicitSecretAccessKey) {
+      throw new Error(
+        "Set both DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY for DigitalOcean Spaces storage."
+      );
+    }
+
     return {
-      accessKeyId: value,
-      secretAccessKey: value
+      accessKeyId: explicitAccessKeyId,
+      secretAccessKey: explicitSecretAccessKey
     };
   }
 
-  const [accessKeyId, secretAccessKey] = value
-    .split(separator)
-    .map((part) => part.trim());
+  const legacyCredential = envValue("DO_SPACES_KEY");
 
-  return accessKeyId && secretAccessKey
-    ? { accessKeyId, secretAccessKey }
-    : {
-        accessKeyId: value,
-        secretAccessKey: value
-      };
+  return legacyCredential
+    ? digitalOceanCredentialPair(legacyCredential)
+    : null;
 }
 
 function safeFileStem(fileName: string) {
@@ -139,14 +169,13 @@ function cloudStorageConfig(): CloudStorageConfig | null {
   const doEndpointConfig = digitalOceanEndpointConfig(
     envValue("DO_SPACES_ENDPOINT")
   );
-  const doCredential = envValue("DO_SPACES_KEY");
+  const doCredential = digitalOceanCredentialsFromEnv();
 
   if (!doEndpointConfig || !doCredential) {
     return null;
   }
 
-  const { accessKeyId, secretAccessKey } =
-    digitalOceanCredentialPair(doCredential);
+  const { accessKeyId, secretAccessKey } = doCredential;
   const publicBaseUrl =
     envValue(
       "DO_SPACES_CDN_ENDPOINT",
@@ -243,7 +272,7 @@ export async function uploadContentImage(input: ContentImageUploadInput) {
 
   if (process.env.NODE_ENV === "production") {
     throw new Error(
-      "Content image storage is not configured. Set DO_SPACES_ENDPOINT and DO_SPACES_KEY."
+      "Content image storage is not configured. Set DO_SPACES_ENDPOINT, DO_SPACES_ACCESS_KEY_ID, and DO_SPACES_SECRET_ACCESS_KEY."
     );
   }
 

@@ -74,6 +74,37 @@ async function runSmokeUntilActive() {
   );
 }
 
+async function runImageStorageProbeIfConfigured() {
+  const required = process.env.UAT_IMAGE_STORAGE_PROBE_REQUIRED === "true";
+  const hasEndpoint = Boolean(process.env.DO_SPACES_ENDPOINT?.trim());
+  const hasExplicitCredentials = Boolean(
+    (
+      process.env.DO_SPACES_ACCESS_KEY_ID?.trim() ||
+      process.env.DO_SPACES_ACCESS_KEY?.trim()
+    ) &&
+      (
+        process.env.DO_SPACES_SECRET_ACCESS_KEY?.trim() ||
+        process.env.DO_SPACES_SECRET_KEY?.trim()
+      )
+  );
+  const hasLegacyCredentials = Boolean(process.env.DO_SPACES_KEY?.trim());
+
+  if (!hasEndpoint || (!hasExplicitCredentials && !hasLegacyCredentials)) {
+    const message =
+      "[deploy:uat] Skipping image storage probe because local Spaces credentials are not configured.";
+
+    if (required) {
+      throw new Error(message);
+    }
+
+    console.warn(message);
+    return;
+  }
+
+  console.log("[deploy:uat] Running image storage probe...");
+  await run(npmCommand, ["run", "uat:images:storage:probe"]);
+}
+
 async function main() {
   const branch = await runCapture("git", ["branch", "--show-current"]);
   const dirty = await runCapture("git", ["status", "--porcelain"]);
@@ -88,6 +119,7 @@ async function main() {
   console.log(`[deploy:uat] Commit: ${commit}`);
   await run("git", ["push", "origin", `HEAD:uat`]);
   await runSmokeUntilActive();
+  await runImageStorageProbeIfConfigured();
   console.log("[deploy:uat] UAT deployment accepted.");
 }
 

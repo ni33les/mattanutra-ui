@@ -260,22 +260,52 @@ function digitalOceanCredentialPair(value: string) {
   const separator = value.includes(":") ? ":" : value.includes("|") ? "|" : "";
 
   if (!separator) {
+    throw new Error(
+      "DO_SPACES_KEY must include both access and secret values as access:secret or access|secret."
+    );
+  }
+
+  const separatorIndex = value.indexOf(separator);
+  const accessKeyId = value.slice(0, separatorIndex).trim();
+  const secretAccessKey = value.slice(separatorIndex + 1).trim();
+
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error(
+      "DO_SPACES_KEY must include both access and secret values as access:secret or access|secret."
+    );
+  }
+
+  return { accessKeyId, secretAccessKey };
+}
+
+function digitalOceanCredentialsFromEnv() {
+  const explicitAccessKeyId = envValue(
+    "DO_SPACES_ACCESS_KEY_ID",
+    "DO_SPACES_ACCESS_KEY"
+  );
+  const explicitSecretAccessKey = envValue(
+    "DO_SPACES_SECRET_ACCESS_KEY",
+    "DO_SPACES_SECRET_KEY"
+  );
+
+  if (explicitAccessKeyId || explicitSecretAccessKey) {
+    if (!explicitAccessKeyId || !explicitSecretAccessKey) {
+      throw new Error(
+        "Set both DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY for DigitalOcean Spaces storage."
+      );
+    }
+
     return {
-      accessKeyId: value,
-      secretAccessKey: value
+      accessKeyId: explicitAccessKeyId,
+      secretAccessKey: explicitSecretAccessKey
     };
   }
 
-  const [accessKeyId, secretAccessKey] = value
-    .split(separator)
-    .map((part) => part.trim());
+  const legacyCredential = envValue("DO_SPACES_KEY");
 
-  return accessKeyId && secretAccessKey
-    ? { accessKeyId, secretAccessKey }
-    : {
-        accessKeyId: value,
-        secretAccessKey: value
-      };
+  return legacyCredential
+    ? digitalOceanCredentialPair(legacyCredential)
+    : null;
 }
 
 export function firstPartyImageStorageEnvironment(
@@ -301,13 +331,13 @@ export function firstPartyImageStorageConfigFromEnv():
   | FirstPartyImageStorageConfig
   | null {
   const endpointConfig = digitalOceanEndpointConfig(envValue("DO_SPACES_ENDPOINT"));
-  const credential = envValue("DO_SPACES_KEY");
+  const credential = digitalOceanCredentialsFromEnv();
 
   if (!endpointConfig || !credential) {
     return null;
   }
 
-  const { accessKeyId, secretAccessKey } = digitalOceanCredentialPair(credential);
+  const { accessKeyId, secretAccessKey } = credential;
   const publicBaseUrl =
     envValue(
       "DO_SPACES_CDN_ENDPOINT",
@@ -511,7 +541,7 @@ export async function storeFirstPartyImageBytes(input: Readonly<{
   if (!config) {
     if (required) {
       throw new Error(
-        "First-party image storage is not configured. Set DO_SPACES_ENDPOINT, DO_SPACES_KEY, and DO_SPACES_CDN_ENDPOINT."
+        "First-party image storage is not configured. Set DO_SPACES_ENDPOINT, DO_SPACES_ACCESS_KEY_ID, DO_SPACES_SECRET_ACCESS_KEY, and DO_SPACES_CDN_ENDPOINT."
       );
     }
 
@@ -617,7 +647,7 @@ export async function mirrorImageToFirstParty(input: Readonly<{
   if (!config) {
     if (required) {
       throw new Error(
-        "First-party image mirroring requires DO_SPACES_ENDPOINT, DO_SPACES_KEY, and DO_SPACES_CDN_ENDPOINT."
+        "First-party image mirroring requires DO_SPACES_ENDPOINT, DO_SPACES_ACCESS_KEY_ID, DO_SPACES_SECRET_ACCESS_KEY, and DO_SPACES_CDN_ENDPOINT."
       );
     }
 

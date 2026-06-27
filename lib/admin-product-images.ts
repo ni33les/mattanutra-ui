@@ -75,11 +75,7 @@ export function localProductImageFallbackAllowed(
 ) {
   const normalizedEnvironment = runtimeImageEnvironment(environment);
 
-  return (
-    normalizedEnvironment !== "prd" &&
-    normalizedEnvironment !== "prod" &&
-    nodeEnvironment !== "test"
-  );
+  return normalizedEnvironment === "dev" && nodeEnvironment !== "production" && nodeEnvironment !== "test";
 }
 
 function storageFallbackEligible(error: unknown) {
@@ -87,9 +83,27 @@ function storageFallbackEligible(error: unknown) {
     return false;
   }
 
-  return /storage is not configured|AccessDenied|CredentialsProviderError|InvalidAccessKeyId|SignatureDoesNotMatch/i.test(
+  return /storage is not configured|AccessDenied|CredentialsProviderError|InvalidAccessKeyId|SignatureDoesNotMatch|DO_SPACES_KEY|DO_SPACES_ACCESS_KEY_ID|DO_SPACES_SECRET_ACCESS_KEY/i.test(
     `${error.name} ${error.message}`,
   );
+}
+
+function storageCredentialError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /AccessDenied|CredentialsProviderError|InvalidAccessKeyId|SignatureDoesNotMatch|DO_SPACES_KEY|DO_SPACES_ACCESS_KEY_ID|DO_SPACES_SECRET_ACCESS_KEY/i.test(
+    `${error.name} ${error.message}`,
+  );
+}
+
+function storageUnavailableMessage(error: unknown) {
+  if (storageCredentialError(error)) {
+    return "Product image storage credentials are invalid. Check DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY, or legacy DO_SPACES_KEY=access:secret.";
+  }
+
+  return "Product image storage is not configured correctly for this environment.";
 }
 
 function errorDetails(error: unknown) {
@@ -225,8 +239,10 @@ async function storeUploadedProductImage(input: Readonly<{
     ) {
       if (storageFallbackEligible(error)) {
         throw new AdminProductImageError(
-          "image_storage_unavailable",
-          "Product image storage is not configured correctly for this environment.",
+          storageCredentialError(error)
+            ? "image_storage_credentials_invalid"
+            : "image_storage_unavailable",
+          storageUnavailableMessage(error),
           502,
           { cause: error },
         );
@@ -236,7 +252,7 @@ async function storeUploadedProductImage(input: Readonly<{
     }
 
     console.warn(
-      "Admin product image cloud upload unavailable; using local dev fallback",
+      "Admin product image cloud upload unavailable; using local workstation fallback",
       errorDetails(error),
     );
 
@@ -358,8 +374,18 @@ export async function persistVerifiedAdminProductImageUrl(input: Readonly<{
   source: "upload" | "url";
   storage?: ProductImageStorage;
 }>): Promise<AdminProductImageUpdateResult> {
+  const imageUrl = input.imageUrl.trim();
+
+  if (imageUrl.startsWith("/uploads/") && !localProductImageFallbackAllowed()) {
+    throw new AdminProductImageError(
+      "non_durable_image_url",
+      "Local upload URLs cannot be saved in this environment. Uploads must be stored on durable image storage.",
+      400,
+    );
+  }
+
   const verification = await verifyProductImageUrl({
-    imageUrl: input.imageUrl,
+    imageUrl,
   });
   const verifiedAt = new Date().toISOString();
   const dimensions = input.dimensions ?? {
@@ -376,21 +402,21 @@ export async function persistVerifiedAdminProductImageUrl(input: Readonly<{
     source: input.source,
     status: "ready",
     storage: input.storage ?? "existing",
-    url: input.imageUrl,
+    url: imageUrl,
     verifiedAt,
   };
   const row = await updateAdminProduct({
     actor: input.actor ?? "admin_dashboard",
     changeNote: input.changeNote,
     id: input.productId,
-    imageUrl: input.imageUrl,
+    imageUrl,
     sourceSnapshotPatch: productImageSnapshot(image),
   });
 
   return {
     image,
     row,
-    url: row.imageUrl ?? input.imageUrl,
+    url: row.imageUrl ?? imageUrl,
   };
 }
 

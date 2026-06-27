@@ -179,6 +179,39 @@ async function checkDigitalOceanDeployment() {
           : "DB_URL configured at app level"
         : "DB_URL missing from app spec",
     );
+    const hasSpacesEndpoint = envKeys.has("DO_SPACES_ENDPOINT");
+    const hasSpacesCdn =
+      envKeys.has("DO_SPACES_CDN_ENDPOINT") ||
+      envKeys.has("DO_SPACES_CDN_URL") ||
+      envKeys.has("DO_SPACES_PUBLIC_BASE_URL");
+    const hasExplicitSpacesCredentials =
+      (envKeys.has("DO_SPACES_ACCESS_KEY_ID") ||
+        envKeys.has("DO_SPACES_ACCESS_KEY")) &&
+      (envKeys.has("DO_SPACES_SECRET_ACCESS_KEY") ||
+        envKeys.has("DO_SPACES_SECRET_KEY"));
+    const hasLegacySpacesCredentials = envKeys.has("DO_SPACES_KEY");
+    const imageStorageReady =
+      hasSpacesEndpoint &&
+      hasSpacesCdn &&
+      (hasExplicitSpacesCredentials || hasLegacySpacesCredentials);
+
+    record(
+      "DigitalOcean image storage env",
+      imageStorageReady,
+      imageStorageReady
+        ? hasExplicitSpacesCredentials
+          ? "Spaces endpoint, CDN endpoint, and explicit access/secret keys configured"
+          : "Spaces endpoint, CDN endpoint, and legacy DO_SPACES_KEY configured; run npm run uat:images:storage:probe to validate the hidden value"
+        : `missing ${[
+            hasSpacesEndpoint ? null : "DO_SPACES_ENDPOINT",
+            hasSpacesCdn
+              ? null
+              : "DO_SPACES_CDN_ENDPOINT or DO_SPACES_CDN_URL",
+            hasExplicitSpacesCredentials || hasLegacySpacesCredentials
+              ? null
+              : "DO_SPACES_ACCESS_KEY_ID + DO_SPACES_SECRET_ACCESS_KEY or DO_SPACES_KEY",
+          ].filter(Boolean).join(", ")}`,
+    );
     if (serviceEnvKeys.has(retiredDatabaseUrlKey)) {
       record(
         "DigitalOcean retired DB env",

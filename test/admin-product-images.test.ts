@@ -6,6 +6,8 @@ import sharp from "sharp";
 import {
   AdminProductImageError,
   localProductImageFallbackAllowed,
+  persistVerifiedAdminProductImageUrl,
+  uploadAdminProductImage,
   verifyProductImageUrl,
 } from "@/lib/admin-product-images";
 import { storeFirstPartyImageBytes } from "@/lib/first-party-image-mirror";
@@ -118,9 +120,112 @@ describe("admin product images", () => {
 
   it("keeps local upload fallback limited to non-production environments", () => {
     assert.equal(localProductImageFallbackAllowed("dev", "development"), true);
-    assert.equal(localProductImageFallbackAllowed("dev", "production"), true);
-    assert.equal(localProductImageFallbackAllowed("uat", "production"), true);
+    assert.equal(localProductImageFallbackAllowed("dev", "production"), false);
+    assert.equal(localProductImageFallbackAllowed("uat", "production"), false);
     assert.equal(localProductImageFallbackAllowed("prd", "production"), false);
     assert.equal(localProductImageFallbackAllowed("production", "production"), false);
+  });
+
+  it("rejects non-durable local upload URLs outside local development", async () => {
+    const env = process.env as Record<string, string | undefined>;
+    const previousMattaNutraEnv = env.MATTANUTRA_ENV;
+    const previousNodeEnv = env.NODE_ENV;
+
+    env.MATTANUTRA_ENV = "uat";
+    env.NODE_ENV = "production";
+
+    try {
+      await assert.rejects(
+        () =>
+          persistVerifiedAdminProductImageUrl({
+            changeNote: "test",
+            imageUrl: "/uploads/uat/products/product-123/image.png",
+            productId: "00000000-0000-4000-8000-000000000001",
+            source: "upload",
+            storage: "local",
+          }),
+        (error: unknown) => {
+          assert.equal(error instanceof AdminProductImageError, true);
+          assert.equal((error as AdminProductImageError).code, "non_durable_image_url");
+          assert.equal((error as AdminProductImageError).status, 400);
+
+          return true;
+        },
+      );
+    } finally {
+      if (previousMattaNutraEnv === undefined) {
+        delete env.MATTANUTRA_ENV;
+      } else {
+        env.MATTANUTRA_ENV = previousMattaNutraEnv;
+      }
+
+      if (previousNodeEnv === undefined) {
+        delete env.NODE_ENV;
+      } else {
+        env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("surfaces malformed Spaces credentials as a storage configuration error", async () => {
+    const env = process.env as Record<string, string | undefined>;
+    const previousEnv = new Map<string, string | undefined>();
+
+    for (const key of [
+      "DO_SPACES_ACCESS_KEY",
+      "DO_SPACES_ACCESS_KEY_ID",
+      "DO_SPACES_CDN_ENDPOINT",
+      "DO_SPACES_ENDPOINT",
+      "DO_SPACES_KEY",
+      "DO_SPACES_SECRET_ACCESS_KEY",
+      "DO_SPACES_SECRET_KEY",
+      "MATTANUTRA_ENV",
+      "NODE_ENV",
+    ]) {
+      previousEnv.set(key, env[key]);
+    }
+
+    delete env.DO_SPACES_ACCESS_KEY;
+    delete env.DO_SPACES_ACCESS_KEY_ID;
+    env.DO_SPACES_CDN_ENDPOINT = "https://cdn.example.com";
+    env.DO_SPACES_ENDPOINT = "https://mattanutra.sgp1.digitaloceanspaces.com";
+    env.DO_SPACES_KEY = "only-one-half";
+    delete env.DO_SPACES_SECRET_ACCESS_KEY;
+    delete env.DO_SPACES_SECRET_KEY;
+    env.MATTANUTRA_ENV = "uat";
+    env.NODE_ENV = "production";
+
+    try {
+      await assert.rejects(
+        async () =>
+          uploadAdminProductImage({
+            bytes: await tinyPng(),
+            contentType: "image/png",
+            originalFileName: "product.png",
+            productId: "00000000-0000-4000-8000-000000000001",
+          }),
+        (error: unknown) => {
+          assert.equal(error instanceof AdminProductImageError, true);
+          assert.equal(
+            (error as AdminProductImageError).code,
+            "image_storage_credentials_invalid",
+          );
+          assert.match(
+            (error as AdminProductImageError).message,
+            /storage credentials are invalid/i,
+          );
+
+          return true;
+        },
+      );
+    } finally {
+      for (const [key, value] of previousEnv) {
+        if (value === undefined) {
+          delete env[key];
+        } else {
+          env[key] = value;
+        }
+      }
+    }
   });
 });

@@ -5,6 +5,7 @@ import sharp from "sharp";
 
 import {
   fetchAndValidateFirstPartyImage,
+  firstPartyImageStorageConfigFromEnv,
   firstPartyImageStorageKey,
   mirrorImageToFirstParty,
   type FirstPartyImageStorageConfig
@@ -48,6 +49,35 @@ const fakeSpacesConfig: FirstPartyImageStorageConfig = {
   region: "sgp1",
   secretAccessKey: "secret"
 };
+
+function withEnv<T>(
+  patch: Readonly<Record<string, string | undefined>>,
+  fn: () => T
+) {
+  const previous = new Map<string, string | undefined>();
+
+  for (const key of Object.keys(patch)) {
+    previous.set(key, process.env[key]);
+
+    if (patch[key] === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = patch[key];
+    }
+  }
+
+  try {
+    return fn();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
 
 describe("first-party image mirroring", () => {
   it("validates a real image with dimensions, hash, and content type", async () => {
@@ -205,6 +235,46 @@ describe("first-party image mirroring", () => {
     assert.equal(
       key,
       `uat/product-imports/abc-123/${"a".repeat(64)}.webp`
+    );
+  });
+
+  it("loads explicit DigitalOcean Spaces credentials from env", () => {
+    const config = withEnv(
+      {
+        DO_SPACES_ACCESS_KEY: undefined,
+        DO_SPACES_ACCESS_KEY_ID: "explicit-access",
+        DO_SPACES_CDN_ENDPOINT: "https://cdn.example.com",
+        DO_SPACES_ENDPOINT: "https://mattanutra.sgp1.digitaloceanspaces.com",
+        DO_SPACES_KEY: undefined,
+        DO_SPACES_SECRET_KEY: undefined,
+        DO_SPACES_SECRET_ACCESS_KEY: "explicit-secret"
+      },
+      () => firstPartyImageStorageConfigFromEnv()
+    );
+
+    assert.equal(config?.accessKeyId, "explicit-access");
+    assert.equal(config?.secretAccessKey, "explicit-secret");
+    assert.equal(config?.bucket, "mattanutra");
+    assert.equal(config?.endpoint, "https://sgp1.digitaloceanspaces.com");
+    assert.equal(config?.publicBaseUrl, "https://cdn.example.com");
+  });
+
+  it("rejects malformed legacy DigitalOcean Spaces credentials", () => {
+    assert.throws(
+      () =>
+        withEnv(
+          {
+            DO_SPACES_ACCESS_KEY: undefined,
+            DO_SPACES_ACCESS_KEY_ID: undefined,
+            DO_SPACES_CDN_ENDPOINT: "https://cdn.example.com",
+            DO_SPACES_ENDPOINT: "https://mattanutra.sgp1.digitaloceanspaces.com",
+            DO_SPACES_KEY: "only-one-half",
+            DO_SPACES_SECRET_KEY: undefined,
+            DO_SPACES_SECRET_ACCESS_KEY: undefined
+          },
+          () => firstPartyImageStorageConfigFromEnv()
+        ),
+      /DO_SPACES_KEY must include both access and secret/
     );
   });
 });
