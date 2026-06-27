@@ -21,6 +21,7 @@ type NondurableImageRow = Readonly<{
   brand_name: string | null;
   status: string | null;
   image_url: string | null;
+  upload_url: string | null;
   updated_at: string | null;
 }>;
 
@@ -68,9 +69,11 @@ async function main() {
         brand_name,
         status,
         image_url,
+        source_snapshot->'productImageUpload'->>'url' as upload_url,
         updated_at::text
       from public.products
       where image_url like '/uploads/uat/%'
+        or source_snapshot->'productImageUpload'->>'url' like '/uploads/uat/%'
       order by updated_at desc nulls last, title
     `;
     const report = {
@@ -95,9 +98,12 @@ async function main() {
       await sql`
         update public.products
         set
-          image_url = null,
+          image_url = case
+            when image_url like '/uploads/uat/%' then null
+            else image_url
+          end,
           source_snapshot = jsonb_set(
-            coalesce(source_snapshot, '{}'::jsonb),
+            coalesce(source_snapshot, '{}'::jsonb) - 'productImageUpload',
             '{productImageRepair}',
             coalesce(source_snapshot->'productImageRepair', '{}'::jsonb) ||
               jsonb_build_object(
