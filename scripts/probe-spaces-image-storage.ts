@@ -2,6 +2,10 @@ import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 
 import {
+  adminProductImageErrorDetails,
+  adminProductImageStorageDiagnostics
+} from "@/lib/admin-product-images";
+import {
   firstPartyImageStorageConfigFromEnv,
   firstPartyImageStorageEnvironment,
   storeFirstPartyImageBytes
@@ -11,6 +15,30 @@ const retryDelaysMs = [0, 500, 1500, 3000, 5000] as const;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function readinessForError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const name = error instanceof Error ? error.name : "";
+  const text = `${name} ${message}`;
+
+  if (/not configured|missing/i.test(text)) {
+    return "missing";
+  }
+
+  if (/DO_SPACES_KEY|DO_SPACES_ACCESS_KEY_ID|DO_SPACES_SECRET_ACCESS_KEY|Set both/i.test(text)) {
+    return "malformed";
+  }
+
+  if (/InvalidAccessKeyId|SignatureDoesNotMatch|AccessDenied|CredentialsProviderError/i.test(text)) {
+    return "auth-failed";
+  }
+
+  if (/publicly readable|CDN|HTTP 403|HTTP 404|content-type/i.test(text)) {
+    return "cdn-not-readable";
+  }
+
+  return "failed";
 }
 
 async function tinyPng() {
@@ -130,12 +158,18 @@ async function main() {
       environment,
       key: stored.key,
       publicRead,
+      readiness: "ready",
+      storage: adminProductImageStorageDiagnostics(),
       url: stored.url
     }, null, 2));
   }
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
+  console.error(JSON.stringify({
+    error: adminProductImageErrorDetails(error),
+    readiness: readinessForError(error),
+    storage: adminProductImageStorageDiagnostics()
+  }, null, 2));
   process.exit(1);
 });

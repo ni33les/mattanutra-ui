@@ -51,6 +51,7 @@
     "products:images:repair-nondurable": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/repair-nondurable-product-images.ts",
     "images:storage:probe": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/probe-spaces-image-storage.ts",
     "uat:images:storage:probe": "MATTANUTRA_ENV=uat node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/probe-spaces-image-storage.ts",
+    "uat:images:storage:probe:app": "node --env-file-if-exists=.env.local scripts/probe-uat-app-image-storage.mjs",
     "uat:product-image-upload-smoke": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/uat-product-image-upload-smoke.ts",
     "product-list:rollout": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/product-list-rollout.ts",
     "product-list:validate": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/product-list-rollout-validate.ts",

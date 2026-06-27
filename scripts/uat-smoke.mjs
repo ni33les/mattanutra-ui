@@ -201,7 +201,7 @@ async function checkDigitalOceanDeployment() {
       imageStorageReady
         ? hasExplicitSpacesCredentials
           ? "Spaces endpoint, CDN endpoint, and explicit access/secret keys configured"
-          : "Spaces endpoint, CDN endpoint, and legacy DO_SPACES_KEY configured; run npm run uat:images:storage:probe to validate the hidden value"
+          : "Spaces endpoint, CDN endpoint, and legacy DO_SPACES_KEY configured; run npm run uat:images:storage:probe:app to validate the hidden value"
         : `missing ${[
             hasSpacesEndpoint ? null : "DO_SPACES_ENDPOINT",
             hasSpacesCdn

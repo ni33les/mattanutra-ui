@@ -94,10 +94,16 @@ async function runImageStorageProbeIfConfigured() {
       "[deploy:uat] Skipping image storage probe because local Spaces credentials are not configured.";
 
     if (required) {
-      throw new Error(message);
+      if (process.env.DIGITALOCEAN_ACCESS_TOKEN?.trim()) {
+        console.log("[deploy:uat] Running UAT app image storage probe...");
+        await run(npmCommand, ["run", "uat:images:storage:probe:app"]);
+        return;
+      }
+
+      throw new Error(`${message} Set DIGITALOCEAN_ACCESS_TOKEN or local Spaces envs.`);
     }
 
-    console.warn(message);
+    console.warn(`${message} Run npm run uat:images:storage:probe:app to validate the deployed app env.`);
     return;
   }
 

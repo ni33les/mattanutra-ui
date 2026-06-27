@@ -1,6 +1,10 @@
+import { randomUUID } from "node:crypto";
+
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
+  adminProductImageErrorDetails,
+  adminProductImageStorageDiagnostics,
   AdminProductImageError,
   uploadAdminProductImage,
 } from "@/lib/admin-product-images";
@@ -35,46 +39,43 @@ function textOrNull(value: unknown, limit = 4000) {
   return trimmed ? trimmed.slice(0, limit) : null;
 }
 
-function unauthorized() {
+function routeHeaders(requestId: string) {
+  return {
+    ...noStoreHeaders,
+    "x-request-id": requestId,
+  };
+}
+
+function unauthorizedWithRequestId(requestId: string) {
   return NextResponse.json(
-    { message: "Not found" },
+    { message: "Not found", requestId },
     {
-      headers: noStoreHeaders,
+      headers: routeHeaders(requestId),
       status: 404,
     },
   );
 }
 
-function badRequest(message: string) {
+function badRequest(message: string, requestId: string) {
   return NextResponse.json(
-    { message },
+    { message, requestId },
     {
-      headers: noStoreHeaders,
+      headers: routeHeaders(requestId),
       status: 400,
     },
   );
-}
-
-function errorDetails(error: unknown) {
-  if (!(error instanceof Error)) {
-    return error;
-  }
-
-  return {
-    message: error.message,
-    name: error.name,
-  };
 }
 
 export async function POST(
   request: Request,
   { params }: ProductImageUploadRouteProps,
 ) {
+  const requestId = randomUUID();
   const { id } = await params;
   const formData = await request.formData().catch(() => null);
 
   if (!formData) {
-    return badRequest("Image upload requires multipart form data");
+    return badRequest("Image upload requires multipart form data", requestId);
   }
 
   const accessToken =
@@ -82,32 +83,41 @@ export async function POST(
     textOrNull(formData.get("accessToken"));
 
   if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
-    return unauthorized();
+    return unauthorizedWithRequestId(requestId);
   }
 
   if (!isUuid(id)) {
-    return badRequest("Product not found");
+    return badRequest("Product not found", requestId);
   }
 
   const file = formData.get("file");
 
   if (!(file instanceof File)) {
-    return badRequest("Image file is required");
+    return badRequest("Image file is required", requestId);
   }
 
   if (file.size <= 0) {
-    return badRequest("Image file is empty");
+    return badRequest("Image file is empty", requestId);
   }
 
   if (file.size > maxUploadBytes) {
-    return badRequest("Image file must be 6 MB or smaller");
+    return badRequest("Image file must be 6 MB or smaller", requestId);
   }
 
   const extension = uploadMimeTypes.get(file.type);
 
   if (!extension) {
-    return badRequest("Upload a JPG, PNG, WebP, or GIF image");
+    return badRequest("Upload a JPG, PNG, WebP, or GIF image", requestId);
   }
+
+  console.info("Admin product image upload started", {
+    contentType: file.type,
+    fileName: file.name,
+    productId: id,
+    requestId,
+    size: file.size,
+    storage: adminProductImageStorageDiagnostics()
+  });
 
   try {
     const result = await uploadAdminProductImage({
@@ -116,6 +126,14 @@ export async function POST(
       contentType: file.type,
       originalFileName: file.name,
       productId: id,
+      requestId,
+    });
+
+    console.info("Admin product image upload completed", {
+      productId: id,
+      requestId,
+      storage: result.image.storage,
+      url: result.url,
     });
 
     return NextResponse.json(
@@ -126,19 +144,28 @@ export async function POST(
         fileName: file.name,
         image: result.image,
         key: result.image.key,
+        requestId,
         row: result.row,
         size: file.size,
         storage: result.image.storage,
         url: result.url,
       },
-      { headers: noStoreHeaders },
+      { headers: routeHeaders(requestId) },
     );
   } catch (error) {
-    console.error("Admin product image upload failed", errorDetails(error));
+    console.error("Admin product image upload failed", {
+      error: adminProductImageErrorDetails(error),
+      fileName: file.name,
+      productId: id,
+      requestId,
+      size: file.size,
+      storage: adminProductImageStorageDiagnostics()
+    });
 
     return NextResponse.json(
       {
         image: {
+          requestId,
           reason:
             error instanceof AdminProductImageError ? error.code : "failed",
           status: "failed",
@@ -147,9 +174,10 @@ export async function POST(
           error instanceof AdminProductImageError
             ? error.message
             : "Could not upload this image",
+        requestId,
       },
       {
-        headers: noStoreHeaders,
+        headers: routeHeaders(requestId),
         status: error instanceof AdminProductImageError ? error.status : 500,
       },
     );

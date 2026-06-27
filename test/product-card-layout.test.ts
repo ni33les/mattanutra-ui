@@ -118,6 +118,13 @@ describe("product admin card layout", () => {
     assert.match(dropzone, /type="file"/);
     assert.match(dropzone, /viewLabels\.imageUpload/);
     assert.match(dropzone, /viewLabels\.imageUseUrl/);
+    assert.match(dropzone, /response\.text\(\)/);
+    assert.match(dropzone, /x-request-id/);
+    assert.match(dropzone, /failureMessage/);
+    assert.match(dropzone, /request \$\{result\.requestId\}/);
+    assert.match(dropzone, /lastFailedImageFile/);
+    assert.match(dropzone, /lastFailedImageUrl/);
+    assert.match(dropzone, /viewLabels\.retry \?\? "Retry"/);
     assert.match(dropzone, /URL\.createObjectURL\(file\)/);
     assert.match(dropzone, /onPreviewImageUrlChange\?\.\(previewUrl\)/);
     assert.match(dropzone, /onPreviewImageUrlChange\?\.\(previewUrl, result\.url\);[\s\S]*onImageUrlChange\(result\.url, result\.row\)/);

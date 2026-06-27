@@ -376,6 +376,8 @@ export function ProductImageDropzone({
   const [busyAction, setBusyAction] = useState<"upload" | "url" | null>(null);
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
+  const [lastFailedImageFile, setLastFailedImageFile] = useState<File | null>(null);
+  const [lastFailedImageUrl, setLastFailedImageUrl] = useState<string | null>(null);
   const editableImageUrl = storedImageUrl ?? row.imageUrl ?? "";
   const imageCandidates = [...new Set(row.imageCandidates ?? [])].filter(
     (url) => url && url !== editableImageUrl
@@ -383,22 +385,63 @@ export function ProductImageDropzone({
   const busy = busyAction !== null;
 
   async function resultMessage(response: Response, fallback: string) {
-    const result = (await response.json().catch(() => ({}))) as {
+    const rawText = await response.text().catch(() => "");
+    const result = (rawText
+      ? (() => {
+          try {
+            return JSON.parse(rawText) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })()
+      : {}) as {
       image?: {
+        requestId?: string;
         reason?: string;
         status?: "ready" | "failed";
       };
       message?: string;
+      requestId?: string;
       row?: AdminProductRow;
       url?: string;
     };
+    const requestId =
+      typeof result.requestId === "string"
+        ? result.requestId
+        : typeof result.image?.requestId === "string"
+          ? result.image.requestId
+          : response.headers.get("x-request-id");
+    const message =
+      typeof result.message === "string" && result.message.trim()
+        ? result.message.trim()
+        : rawText && !rawText.trim().startsWith("<")
+          ? rawText.trim().slice(0, 240)
+          : fallback;
 
     return {
       image: result.image ?? null,
-      message: result.message ?? fallback,
+      message,
+      reason: result.image?.reason ?? null,
+      requestId,
       row: result.row ?? null,
       url: typeof result.url === "string" ? result.url : null,
     };
+  }
+
+  function failureMessage(
+    result: Awaited<ReturnType<typeof resultMessage>>,
+    fallback: string,
+  ) {
+    const headline = fallback.replace(/\.$/, "");
+    const parts = [
+      result.message,
+      result.reason && result.reason !== "failed"
+        ? result.reason.replaceAll("_", " ")
+        : null,
+      result.requestId ? `request ${result.requestId}` : null,
+    ].filter(Boolean);
+
+    return `${headline}: ${parts.join(" · ")}`;
   }
 
   async function applyImageUrl(nextImageUrl: string | null) {
@@ -413,6 +456,8 @@ export function ProductImageDropzone({
 
     setBusyAction("url");
     setDropError(null);
+    setLastFailedImageFile(null);
+    setLastFailedImageUrl(null);
     onPreviewImageUrlChange?.(null);
 
     try {
@@ -433,11 +478,14 @@ export function ProductImageDropzone({
       const result = await resultMessage(response, viewLabels.imageMirrorError);
 
       if (!response.ok || !result.url) {
-        throw new Error(result.message);
+        throw new Error(failureMessage(result, viewLabels.imageMirrorError));
       }
 
+      setLastFailedImageFile(null);
+      setLastFailedImageUrl(null);
       onImageUrlChange(result.url, result.row);
     } catch (error) {
+      setLastFailedImageUrl(imageUrl);
       setDropError(
         error instanceof Error ? error.message : viewLabels.imageMirrorError,
       );
@@ -452,6 +500,8 @@ export function ProductImageDropzone({
     onPreviewImageUrlChange?.(previewUrl);
     setBusyAction("upload");
     setDropError(null);
+    setLastFailedImageFile(null);
+    setLastFailedImageUrl(null);
 
     try {
       const formData = new FormData();
@@ -472,12 +522,15 @@ export function ProductImageDropzone({
       const result = await resultMessage(response, viewLabels.imageUploadError);
 
       if (!response.ok || !result.url) {
-        throw new Error(result.message);
+        throw new Error(failureMessage(result, viewLabels.imageUploadError));
       }
 
+      setLastFailedImageFile(null);
+      setLastFailedImageUrl(null);
       onPreviewImageUrlChange?.(previewUrl, result.url);
       onImageUrlChange(result.url, result.row);
     } catch (error) {
+      setLastFailedImageFile(file);
       onPreviewImageUrlChange?.(null);
       setDropError(
         error instanceof Error ? error.message : viewLabels.imageUploadError,
@@ -604,9 +657,29 @@ export function ProductImageDropzone({
             </div>
           </div>
           {dropError ? (
-            <p className="mt-2 text-xs font-medium text-amber-700">
-              {dropError}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-xs font-medium text-amber-700">
+                {dropError}
+              </p>
+              {!busy && lastFailedImageFile ? (
+                <button
+                  className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100"
+                  onClick={() => void uploadImageFile(lastFailedImageFile)}
+                  type="button"
+                >
+                  {viewLabels.retry ?? "Retry"}
+                </button>
+              ) : null}
+              {!busy && lastFailedImageUrl ? (
+                <button
+                  className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100"
+                  onClick={() => void applyImageUrl(lastFailedImageUrl)}
+                  type="button"
+                >
+                  {viewLabels.retry ?? "Retry"}
+                </button>
+              ) : null}
+            </div>
           ) : (
             <div className="mt-2 space-y-1">
               <p className="text-xs font-medium text-gray-500">

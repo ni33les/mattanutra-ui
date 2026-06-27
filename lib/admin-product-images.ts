@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { contentImageCacheControl } from "@/lib/content-image-storage";
 import {
   fetchAndValidateFirstPartyImage,
+  firstPartyImageStorageConfigFromEnv,
   firstPartyImageStorageEnvironment,
   firstPartyImageStorageKey,
   storeFirstPartyImageBytes,
@@ -56,6 +57,13 @@ export class AdminProductImageError extends Error {
 
 const maxProductImageUploadBytes = 6 * 1024 * 1024;
 const productImageVerificationRetryDelaysMs = [0, 300, 900, 1800] as const;
+const storageCredentialEnvKeys = [
+  "DO_SPACES_ACCESS_KEY",
+  "DO_SPACES_ACCESS_KEY_ID",
+  "DO_SPACES_SECRET_ACCESS_KEY",
+  "DO_SPACES_SECRET_KEY",
+  "DO_SPACES_KEY"
+] as const;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -106,14 +114,155 @@ function storageUnavailableMessage(error: unknown) {
   return "Product image storage is not configured correctly for this environment.";
 }
 
-function errorDetails(error: unknown) {
+function storageEnvPresent(name: string) {
+  return Boolean(process.env[name]?.trim());
+}
+
+function storageCredentialMode() {
+  const hasExplicitAccess =
+    storageEnvPresent("DO_SPACES_ACCESS_KEY_ID") ||
+    storageEnvPresent("DO_SPACES_ACCESS_KEY");
+  const hasExplicitSecret =
+    storageEnvPresent("DO_SPACES_SECRET_ACCESS_KEY") ||
+    storageEnvPresent("DO_SPACES_SECRET_KEY");
+
+  if (hasExplicitAccess || hasExplicitSecret) {
+    return hasExplicitAccess && hasExplicitSecret
+      ? "explicit"
+      : "partial_explicit";
+  }
+
+  return storageEnvPresent("DO_SPACES_KEY") ? "legacy" : "missing";
+}
+
+function safeUrlSummary(value: string | null | undefined) {
+  const text = value?.trim();
+
+  if (!text) {
+    return null;
+  }
+
+  if (text.startsWith("/")) {
+    return {
+      host: null,
+      path: text
+    };
+  }
+
+  try {
+    const url = new URL(text);
+
+    return {
+      host: url.host,
+      path: url.pathname
+    };
+  } catch {
+    return {
+      host: null,
+      path: "invalid_url"
+    };
+  }
+}
+
+function metadataDetails(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const metadata = value as Record<string, unknown>;
+
+  return {
+    attempts: metadata.attempts,
+    extendedRequestId: metadata.extendedRequestId,
+    httpStatusCode: metadata.httpStatusCode,
+    requestId: metadata.requestId,
+    totalRetryDelay: metadata.totalRetryDelay
+  };
+}
+
+export function adminProductImageErrorDetails(error: unknown, depth = 0): unknown {
   if (!(error instanceof Error)) {
     return error;
   }
 
+  const record = error as Error & {
+    $metadata?: unknown;
+    cause?: unknown;
+    code?: unknown;
+    Code?: unknown;
+  };
+
   return {
+    cause:
+      record.cause && depth < 2
+        ? adminProductImageErrorDetails(record.cause, depth + 1)
+        : undefined,
+    code: record.code ?? record.Code,
     message: error.message,
+    metadata: metadataDetails(record.$metadata),
     name: error.name,
+  };
+}
+
+export function adminProductImageStorageDiagnostics() {
+  const envKeyPresence = Object.fromEntries(
+    storageCredentialEnvKeys.map((key) => [key, storageEnvPresent(key)])
+  );
+  const diagnostics = {
+    cdnEndpointConfigured:
+      storageEnvPresent("DO_SPACES_CDN_ENDPOINT") ||
+      storageEnvPresent("DO_SPACES_CDN_URL") ||
+      storageEnvPresent("DO_SPACES_PUBLIC_BASE_URL"),
+    credentialMode: storageCredentialMode(),
+    endpointConfigured: storageEnvPresent("DO_SPACES_ENDPOINT"),
+    envKeyPresence,
+    environment: runtimeImageEnvironment(),
+    fallbackAllowed: localProductImageFallbackAllowed(),
+    readiness: "missing" as "configured" | "malformed" | "missing",
+    storage: null as null | {
+      bucket: string;
+      endpoint: ReturnType<typeof safeUrlSummary>;
+      publicBaseUrl: ReturnType<typeof safeUrlSummary>;
+      region: string;
+    },
+    storageError: null as unknown
+  };
+
+  try {
+    const config = firstPartyImageStorageConfigFromEnv();
+
+    if (!config) {
+      return diagnostics;
+    }
+
+    return {
+      ...diagnostics,
+      readiness: "configured" as const,
+      storage: {
+        bucket: config.bucket,
+        endpoint: safeUrlSummary(config.endpoint),
+        publicBaseUrl: safeUrlSummary(config.publicBaseUrl),
+        region: config.region
+      }
+    };
+  } catch (error) {
+    return {
+      ...diagnostics,
+      readiness: "malformed" as const,
+      storageError: adminProductImageErrorDetails(error)
+    };
+  }
+}
+
+function imageUploadLogContext(input: Readonly<{
+  productId: string;
+  requestId?: string | null;
+}>) {
+  return {
+    environment: runtimeImageEnvironment(),
+    fallbackAllowed: localProductImageFallbackAllowed(),
+    productId: input.productId,
+    requestId: input.requestId ?? null
   };
 }
 
@@ -128,6 +277,7 @@ async function uploadLocalProductImage(input: Readonly<{
   contentType: string;
   originalFileName: string;
   productId: string;
+  requestId?: string | null;
 }>) {
   const validated = await validateFirstPartyImageBytes({
     bytes: input.bytes,
@@ -209,7 +359,18 @@ async function storeUploadedProductImage(input: Readonly<{
   contentType: string;
   originalFileName: string;
   productId: string;
+  requestId?: string | null;
 }>) {
+  const logContext = imageUploadLogContext(input);
+
+  console.info("Admin product image storage attempt", {
+    ...logContext,
+    contentType: input.contentType,
+    originalFileName: input.originalFileName,
+    size: input.bytes.length,
+    storage: adminProductImageStorageDiagnostics()
+  });
+
   try {
     const stored = await storeFirstPartyImageBytes({
       bytes: input.bytes,
@@ -220,6 +381,16 @@ async function storeUploadedProductImage(input: Readonly<{
       originalUrl: productUploadOriginalUrl(input.originalFileName),
       required: true,
       source: "admin_product_image_upload",
+    });
+
+    console.info("Admin product image storage succeeded", {
+      ...logContext,
+      byteSize: stored.metadata.byteSize,
+      contentType: stored.contentType,
+      dimensions: stored.dimensions,
+      key: stored.key,
+      storage: stored.storage,
+      url: safeUrlSummary(stored.url)
     });
 
     return {
@@ -233,6 +404,12 @@ async function storeUploadedProductImage(input: Readonly<{
       url: stored.url,
     };
   } catch (error) {
+    console.error("Admin product image storage failed", {
+      ...logContext,
+      error: adminProductImageErrorDetails(error),
+      storage: adminProductImageStorageDiagnostics()
+    });
+
     if (
       !localProductImageFallbackAllowed() ||
       !storageFallbackEligible(error)
@@ -253,7 +430,10 @@ async function storeUploadedProductImage(input: Readonly<{
 
     console.warn(
       "Admin product image cloud upload unavailable; using local workstation fallback",
-      errorDetails(error),
+      {
+        ...logContext,
+        error: adminProductImageErrorDetails(error)
+      },
     );
 
     return uploadLocalProductImage(input);
@@ -371,10 +551,12 @@ export async function persistVerifiedAdminProductImageUrl(input: Readonly<{
   imageUrl: string;
   key?: string | null;
   productId: string;
+  requestId?: string | null;
   source: "upload" | "url";
   storage?: ProductImageStorage;
 }>): Promise<AdminProductImageUpdateResult> {
   const imageUrl = input.imageUrl.trim();
+  const logContext = imageUploadLogContext(input);
 
   if (imageUrl.startsWith("/uploads/") && !localProductImageFallbackAllowed()) {
     throw new AdminProductImageError(
@@ -384,8 +566,35 @@ export async function persistVerifiedAdminProductImageUrl(input: Readonly<{
     );
   }
 
-  const verification = await verifyProductImageUrl({
-    imageUrl,
+  console.info("Admin product image verification attempt", {
+    ...logContext,
+    imageUrl: safeUrlSummary(imageUrl),
+    storage: input.storage ?? "existing"
+  });
+
+  let verification: Awaited<ReturnType<typeof verifyProductImageUrl>>;
+
+  try {
+    verification = await verifyProductImageUrl({
+      imageUrl,
+    });
+  } catch (error) {
+    console.error("Admin product image verification failed", {
+      ...logContext,
+      error: adminProductImageErrorDetails(error),
+      imageUrl: safeUrlSummary(imageUrl)
+    });
+    throw error;
+  }
+
+  console.info("Admin product image verification succeeded", {
+    ...logContext,
+    contentType: verification.contentType,
+    dimensions: {
+      height: verification.height,
+      width: verification.width
+    },
+    imageUrl: safeUrlSummary(imageUrl)
   });
   const verifiedAt = new Date().toISOString();
   const dimensions = input.dimensions ?? {
@@ -405,12 +614,29 @@ export async function persistVerifiedAdminProductImageUrl(input: Readonly<{
     url: imageUrl,
     verifiedAt,
   };
-  const row = await updateAdminProduct({
-    actor: input.actor ?? "admin_dashboard",
-    changeNote: input.changeNote,
-    id: input.productId,
-    imageUrl,
-    sourceSnapshotPatch: productImageSnapshot(image),
+  let row: AdminProductRow;
+
+  try {
+    row = await updateAdminProduct({
+      actor: input.actor ?? "admin_dashboard",
+      changeNote: input.changeNote,
+      id: input.productId,
+      imageUrl,
+      sourceSnapshotPatch: productImageSnapshot(image),
+    });
+  } catch (error) {
+    console.error("Admin product image persistence failed", {
+      ...logContext,
+      error: adminProductImageErrorDetails(error),
+      imageUrl: safeUrlSummary(imageUrl)
+    });
+    throw error;
+  }
+
+  console.info("Admin product image persistence succeeded", {
+    ...logContext,
+    imageUrl: safeUrlSummary(row.imageUrl ?? imageUrl),
+    storage: image.storage
   });
 
   return {
@@ -426,6 +652,7 @@ export async function uploadAdminProductImage(input: Readonly<{
   contentType: string;
   originalFileName: string;
   productId: string;
+  requestId?: string | null;
 }>): Promise<AdminProductImageUpdateResult> {
   const stored = await storeUploadedProductImage(input);
 
@@ -439,6 +666,7 @@ export async function uploadAdminProductImage(input: Readonly<{
     imageUrl: stored.url,
     key: stored.key,
     productId: input.productId,
+    requestId: input.requestId,
     source: "upload",
     storage: stored.storage,
   });

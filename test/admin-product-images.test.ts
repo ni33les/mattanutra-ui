@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import sharp from "sharp";
 
 import {
+  adminProductImageStorageDiagnostics,
   AdminProductImageError,
   localProductImageFallbackAllowed,
   persistVerifiedAdminProductImageUrl,
@@ -218,6 +219,52 @@ describe("admin product images", () => {
           return true;
         },
       );
+    } finally {
+      for (const [key, value] of previousEnv) {
+        if (value === undefined) {
+          delete env[key];
+        } else {
+          env[key] = value;
+        }
+      }
+    }
+  });
+
+  it("reports storage diagnostics without exposing credential values", () => {
+    const env = process.env as Record<string, string | undefined>;
+    const previousEnv = new Map<string, string | undefined>();
+
+    for (const key of [
+      "DO_SPACES_ACCESS_KEY",
+      "DO_SPACES_ACCESS_KEY_ID",
+      "DO_SPACES_CDN_ENDPOINT",
+      "DO_SPACES_ENDPOINT",
+      "DO_SPACES_KEY",
+      "DO_SPACES_SECRET_ACCESS_KEY",
+      "DO_SPACES_SECRET_KEY",
+      "MATTANUTRA_ENV",
+      "NODE_ENV",
+    ]) {
+      previousEnv.set(key, env[key]);
+    }
+
+    env.DO_SPACES_ACCESS_KEY_ID = "access-value";
+    env.DO_SPACES_CDN_ENDPOINT = "https://cdn.example.com";
+    env.DO_SPACES_ENDPOINT = "https://mattanutra.sgp1.digitaloceanspaces.com";
+    delete env.DO_SPACES_KEY;
+    delete env.DO_SPACES_SECRET_ACCESS_KEY;
+    delete env.DO_SPACES_SECRET_KEY;
+    env.MATTANUTRA_ENV = "uat";
+    env.NODE_ENV = "production";
+
+    try {
+      const diagnostics = adminProductImageStorageDiagnostics();
+      const text = JSON.stringify(diagnostics);
+
+      assert.equal(diagnostics.readiness, "malformed");
+      assert.equal(diagnostics.credentialMode, "partial_explicit");
+      assert.match(text, /DO_SPACES_ACCESS_KEY_ID/);
+      assert.doesNotMatch(text, /access-value/);
     } finally {
       for (const [key, value] of previousEnv) {
         if (value === undefined) {
