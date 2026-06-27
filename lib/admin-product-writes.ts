@@ -1362,6 +1362,8 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   }
 
   const beforePayload = recordFromUnknown(beforeRows[0].before_payload);
+  const effectiveProductStatus =
+    input.status ?? textFromRecord(beforePayload, "status");
   const localizedSnapshotBase = {
     ...(input.sourceSnapshotPatch ?? {}),
     ...(input.productForm !== undefined ? { productForm: input.productForm } : {}),
@@ -1597,6 +1599,22 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     );
   }
 
+  let brandAutoApproved = false;
+
+  if (effectiveProductStatus === "approved" && effectiveBrandId) {
+    const brandApprovalRows = await sql<Array<{ id: string }>>`
+      update public.product_brands
+      set
+        status = 'approved',
+        updated_at = now()
+      where id = ${effectiveBrandId}::uuid
+        and status = 'pending_review'
+      returning id::text
+    `;
+
+    brandAutoApproved = brandApprovalRows.length > 0;
+  }
+
   const version = await recordProductVersion(sql, {
     actor: input.actor,
     changeNote: input.changeNote?.trim() || "product_admin_save",
@@ -1621,6 +1639,8 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	          ? undefined
 	          : productCountryCodes,
 	        brandName: input.brandName,
+        brandAutoApproved,
+        brandId: effectiveBrandId,
 	        changeNote: input.changeNote,
         description: input.description,
         facts: input.facts,

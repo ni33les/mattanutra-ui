@@ -240,4 +240,18 @@ describe("product admin card layout", () => {
     assert.match(writes, /retail_order_allocations/);
     assert.doesNotMatch(writes, /delete from public\.product_versions/);
   });
+
+  it("keeps approved products matchable by approving pending brands", async () => {
+    const writes = await readFile("lib/admin-product-writes.ts", "utf8");
+    const search = await readFile("lib/admin-product-search.ts", "utf8");
+    const coverage = await readFile("lib/admin-product-coverage.ts", "utf8");
+
+    assert.match(search, /candidate\.brandStatus === "approved"/);
+    assert.match(coverage, /product\.brandStatus === "approved"/);
+    assert.match(writes, /const effectiveProductStatus =/);
+    assert.match(writes, /effectiveProductStatus === "approved"/);
+    assert.match(writes, /update public\.product_brands/);
+    assert.match(writes, /and status = 'pending_review'/);
+    assert.match(writes, /brandAutoApproved/);
+  });
 });
