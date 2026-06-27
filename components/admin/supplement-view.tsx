@@ -29,7 +29,6 @@ import {
   supplementDoseSuggestionTimeoutMs,
   type AdminContent
 } from "@/components/admin/dashboard-content";
-import { CreateSupplementModal } from "@/components/admin/supplement-create-modal";
 import {
   BusinessStatsGrid,
   businessMetricColors,
@@ -51,6 +50,8 @@ import {
   toggleSupplementSafetyFlag
 } from "@/components/admin/safety-view-helpers";
 import { ChevronDownIcon as ChevronDownSolidIcon } from "@heroicons/react/20/solid";
+
+const newSupplementDraftId = "__new_supplement__";
 
 function LocalizedFallbackBadge({
   label
@@ -173,12 +174,8 @@ export function AdminSupplementsView({
   const [rows, setRows] = useState(data.rows);
   const [addingAliasForId, setAddingAliasForId] = useState<string | null>(null);
   const [category, setCategory] = useState("");
-  const [createCategory, setCreateCategory] = useState("");
-  const [createError, setCreateError] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [deletingAliasId, setDeletingAliasId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AdminSupplementRow | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -234,6 +231,30 @@ export function AdminSupplementsView({
     );
   }
 
+  function newSupplementDraft(): AdminSupplementRow {
+    return {
+      aliases: [],
+      category: category || categories[0] || "Manual",
+      confidence: "low",
+      id: newSupplementDraftId,
+      ingredientType: null,
+      listStatus: "active",
+      maxAmount: null,
+      maxUnit: "",
+      name: "",
+      primaryUseCase: null,
+      safetyFlags: [],
+      safetyNotes: null,
+      sourceStatus: "recommended_add",
+      translations: {},
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  function isNewSupplement(row: AdminSupplementRow) {
+    return row.id === newSupplementDraftId;
+  }
+
   function selectSupplementMetric(metricId: BusinessMetric["id"]) {
     if (metricId === "supplementsActive") {
       setStatus("active");
@@ -257,10 +278,13 @@ export function AdminSupplementsView({
       const response = await fetch(`/api/admin/supplements/${row.id}`, {
         body: JSON.stringify({
           accessToken,
+          category: row.category,
           confidence: row.confidence,
           listStatus: row.listStatus,
           maxAmount: row.maxAmount,
           maxUnit: row.maxUnit,
+          name: row.name,
+          primaryUseCase: row.primaryUseCase,
           safetyFlags: row.safetyFlags,
           safetyNotes: row.safetyNotes
         }),
@@ -295,6 +319,111 @@ export function AdminSupplementsView({
       return false;
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function createSupplementFromDraft(row: AdminSupplementRow): Promise<boolean> {
+    const name = row.name.trim();
+
+    if (!name || savingId === row.id) {
+      return false;
+    }
+
+    setSavingId(row.id);
+    setErrorId(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/supplements", {
+        body: JSON.stringify({
+          accessToken,
+          category: row.category,
+          confidence: row.confidence,
+          listStatus: row.listStatus,
+          maxAmount: row.maxAmount,
+          maxUnit: row.maxUnit,
+          name,
+          primaryUseCase: row.primaryUseCase,
+          safetyFlags: row.safetyFlags,
+          safetyNotes: row.safetyNotes
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+
+        throw new Error(errorPayload?.message ?? labels.supplements.createError);
+      }
+
+      const payload = (await response.json()) as { row?: AdminSupplementRow };
+
+      if (!payload.row) {
+        throw new Error("Supplement create response was empty");
+      }
+
+      syncRow(payload.row);
+      return true;
+    } catch (createError) {
+      setErrorId(row.id);
+      setErrorMessage(
+        createError instanceof Error
+          ? createError.message
+          : labels.supplements.createError
+      );
+      return false;
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function deleteSupplement(row: AdminSupplementRow): Promise<boolean> {
+    if (isNewSupplement(row)) {
+      setDraft(null);
+      return true;
+    }
+
+    setDeletingId(row.id);
+    setErrorId(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/supplements/${row.id}`, {
+        body: JSON.stringify({ accessToken }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+
+        throw new Error(
+          errorPayload?.message ?? labels.supplements.deleteSupplementError
+        );
+      }
+
+      setRows((currentRows) => currentRows.filter((item) => item.id !== row.id));
+      setDraft(null);
+      return true;
+    } catch (deleteError) {
+      setErrorId(row.id);
+      setErrorMessage(
+        deleteError instanceof Error
+          ? deleteError.message
+          : labels.supplements.deleteSupplementError
+      );
+      return false;
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -362,54 +491,6 @@ export function AdminSupplementsView({
       return false;
     } finally {
       setAddingAliasForId(null);
-    }
-  }
-
-  async function createSupplement(): Promise<boolean> {
-    const name = createName.trim();
-
-    if (!name || creating) {
-      return false;
-    }
-
-    setCreating(true);
-    setCreateError(false);
-    setErrorId(null);
-
-    try {
-      const response = await fetch("/api/admin/supplements", {
-        body: JSON.stringify({
-          accessToken,
-          category: createCategory,
-          name
-        }),
-        headers: {
-          "Content-Type": "application/json"
-        },
-        method: "POST"
-      });
-
-      if (!response.ok) {
-        throw new Error("Unable to create supplement");
-      }
-
-      const payload = (await response.json()) as { row?: AdminSupplementRow };
-
-      if (!payload.row) {
-        throw new Error("Supplement create response was empty");
-      }
-
-      syncRow(payload.row);
-      setDraft(payload.row);
-      setCreateName("");
-      setCreateCategory("");
-      setCreateOpen(false);
-      return true;
-    } catch {
-      setCreateError(true);
-      return false;
-    } finally {
-      setCreating(false);
     }
   }
 
@@ -500,8 +581,9 @@ export function AdminSupplementsView({
               aria-label={labels.supplements.addSupplement}
               className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
               onClick={() => {
-                setCreateOpen(true);
-                setCreateError(false);
+                setDraft(newSupplementDraft());
+                setErrorId(null);
+                setErrorMessage(null);
               }}
               type="button"
             >
@@ -631,35 +713,25 @@ export function AdminSupplementsView({
           }}
           onAddAssociation={(alias) => addAssociation(draft, alias)}
           onDeleteAssociation={(aliasId) => void deleteAssociation(draft, aliasId)}
+          onDeleteSupplement={() => {
+            void deleteSupplement(draft);
+          }}
           onSave={() => {
-            void saveRow(draft).then((saved) => {
+            const save = isNewSupplement(draft)
+              ? createSupplementFromDraft(draft)
+              : saveRow(draft);
+
+            void save.then((saved) => {
               if (saved) {
                 setDraft(null);
               }
             });
           }}
-          saving={savingId === draft.id}
+          saving={savingId === draft.id || deletingId === draft.id}
+          categories={categories}
           addingAssociation={addingAliasForId === draft.id}
           deletingAssociationId={deletingAliasId}
-        />
-      ) : null}
-      {createOpen ? (
-        <CreateSupplementModal
-          category={createCategory}
-          categories={categories}
-          error={createError}
-          labels={labels}
-          name={createName}
-          onCategoryChange={setCreateCategory}
-          onClose={() => {
-            if (!creating) {
-              setCreateOpen(false);
-              setCreateError(false);
-            }
-          }}
-          onCreate={() => void createSupplement()}
-          onNameChange={setCreateName}
-          saving={creating}
+          isNew={isNewSupplement(draft)}
         />
       ) : null}
     </section>
@@ -726,11 +798,13 @@ export function SupplementDetailsModal({
   addingAssociation,
   associatedSupplementId,
   associationOptions,
+  categories,
   deletingAssociationId,
   draft,
   error,
   errorMessage,
   headerNote,
+  isNew,
   labels,
   locale,
   onAssociateSupplement,
@@ -738,6 +812,7 @@ export function SupplementDetailsModal({
   onChange,
   onClose,
   onDeleteAssociation,
+  onDeleteSupplement,
   onSave,
   saving
 }: Readonly<{
@@ -745,11 +820,13 @@ export function SupplementDetailsModal({
   addingAssociation?: boolean;
   associatedSupplementId?: string;
   associationOptions?: AdminSupplementRow[];
+  categories?: string[];
   deletingAssociationId?: string | null;
   draft: AdminSupplementRow;
   error: boolean;
   errorMessage?: string | null;
   headerNote?: string | null;
+  isNew?: boolean;
   labels: AdminContent;
   locale: Locale;
   onAssociateSupplement?: (supplementId: string) => void;
@@ -757,6 +834,7 @@ export function SupplementDetailsModal({
   onChange: (patch: Partial<AdminSupplementRow>) => void;
   onClose: () => void;
   onDeleteAssociation?: (aliasId: string) => void;
+  onDeleteSupplement?: () => void;
   onSave: () => void;
   saving: boolean;
 }>) {
@@ -783,6 +861,12 @@ export function SupplementDetailsModal({
   const trimmedNewAlias = newAlias.trim();
   const localized = adminLocalizedSupplementText(draft, locale);
   const fallbackLabel = adminLocalizedFallbackLabel(localized.name, locale);
+  const categoryListId = `supplement-category-options-${draft.id}`;
+  const canSave =
+    draft.name.trim().length > 0 &&
+    !saving &&
+    !suggestingDose &&
+    (associationLocked || doseValid);
   const supplementSelectionCopy = {
     chosenPlans: t(locale, "admin.supplementSelectionSummary.chosenPlans"),
     lastChosen: t(locale, "admin.supplementSelectionSummary.lastChosen"),
@@ -839,10 +923,12 @@ export function SupplementDetailsModal({
 
       const payload = (await response.json()) as {
         suggestion?: {
+          category?: string;
           confidence?: SupplementConfidence;
           listStatus?: SupplementListStatus;
           maxAmount?: number | null;
           maxUnit?: string;
+          primaryUseCase?: string;
           safetyFlags?: SupplementSafetyFlag[];
           safetyNotes?: string;
         };
@@ -872,6 +958,10 @@ export function SupplementDetailsModal({
       }
 
       onChange({
+        category:
+          typeof suggestion.category === "string" && suggestion.category.trim()
+            ? suggestion.category.trim()
+            : draft.category,
         confidence: suggestion.confidence ?? draft.confidence,
         listStatus: suggestedStatus,
         maxAmount:
@@ -884,6 +974,11 @@ export function SupplementDetailsModal({
           typeof suggestedMaxUnit === "string"
             ? suggestedMaxUnit
             : draft.maxUnit,
+        primaryUseCase:
+          typeof suggestion.primaryUseCase === "string" &&
+          suggestion.primaryUseCase.trim()
+            ? suggestion.primaryUseCase.trim()
+            : draft.primaryUseCase,
         safetyFlags: Array.isArray(suggestion.safetyFlags)
           ? suggestion.safetyFlags
           : draft.safetyFlags,
@@ -907,12 +1002,14 @@ export function SupplementDetailsModal({
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 pr-14">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {localized.name.value}
+                {isNew ? labels.supplements.newSupplement : localized.name.value}
               </h2>
               <LocalizedFallbackBadge label={fallbackLabel} />
-              <p className="mt-1 text-sm text-gray-500">
-                {draft.ingredientType ?? localized.category.value}
-              </p>
+              {!isNew ? (
+                <p className="mt-1 text-sm text-gray-500">
+                  {draft.ingredientType ?? localized.category.value}
+                </p>
+              ) : null}
               {localized.name.canonicalValue &&
               localized.name.canonicalValue !== localized.name.value ? (
                 <p className="mt-1 text-xs text-gray-400">
@@ -1070,6 +1167,45 @@ export function SupplementDetailsModal({
               )}
               disabled={associationLocked}
             >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium text-gray-700">
+                  {labels.supplements.name}
+                  <input
+                    autoFocus={isNew}
+                    className={inputClass}
+                    onChange={(event) => onChange({ name: event.target.value })}
+                    value={draft.name}
+                  />
+                </label>
+
+                <label className="grid gap-2 text-sm font-medium text-gray-700">
+                  {labels.supplements.category}
+                  <input
+                    className={inputClass}
+                    list={categoryListId}
+                    onChange={(event) => onChange({ category: event.target.value })}
+                    placeholder={labels.supplements.categoryPlaceholder}
+                    value={draft.category}
+                  />
+                  <datalist id={categoryListId}>
+                    {(categories ?? []).map((item) => (
+                      <option key={item} value={item} />
+                    ))}
+                  </datalist>
+                </label>
+              </div>
+
+              <label className="grid gap-2 text-sm font-medium text-gray-700">
+                {labels.supplements.primaryUseCase}
+                <input
+                  className={inputClass}
+                  onChange={(event) =>
+                    onChange({ primaryUseCase: event.target.value })
+                  }
+                  value={draft.primaryUseCase ?? ""}
+                />
+              </label>
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="grid gap-2 text-sm font-medium text-gray-700">
                   {labels.supplements.status}
@@ -1233,7 +1369,7 @@ export function SupplementDetailsModal({
               <button
                 aria-label={labels.supplements.suggestDose}
                 className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#3A7BD5] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2F67B8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3A7BD5] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={suggestingDose || associationLocked}
+                disabled={suggestingDose || associationLocked || !draft.name.trim()}
                 onClick={() => void suggestDose()}
                 title={labels.supplements.suggestDose}
                 type="button"
@@ -1257,6 +1393,20 @@ export function SupplementDetailsModal({
               ) : null}
             </div>
             <div className="flex gap-3">
+              {!isNew && onDeleteSupplement ? (
+                <button
+                  className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saving || suggestingDose}
+                  onClick={() => {
+                    if (window.confirm(labels.supplements.deleteSupplementConfirm)) {
+                      onDeleteSupplement();
+                    }
+                  }}
+                  type="button"
+                >
+                  {labels.supplements.deleteSupplement}
+                </button>
+              ) : null}
               <button
                 className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
                 onClick={onClose}
@@ -1266,15 +1416,11 @@ export function SupplementDetailsModal({
               </button>
               <button
                 className="rounded-md bg-[#1FA77A] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={
-                  saving ||
-                  suggestingDose ||
-                  (!associationLocked && !doseValid)
-                }
+                disabled={!canSave}
                 onClick={onSave}
                 type="button"
               >
-                {saving ? "..." : labels.supplements.save}
+                {saving ? "..." : isNew ? labels.supplements.create : labels.supplements.save}
               </button>
             </div>
           </div>

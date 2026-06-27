@@ -6,6 +6,7 @@ import {
   type SupplementConfidence,
   type AdminSupplementTranslationInput,
   type SupplementListStatus,
+  deleteAdminSupplement,
   updateAdminSupplement
 } from "@/lib/admin-supplements";
 import { isUuid } from "@/lib/assessment-store";
@@ -120,7 +121,12 @@ function supplementErrorStatus(message: string) {
     return 404;
   }
 
+  if (message === "Supplement name already exists") {
+    return 409;
+  }
+
   if (
+    message === "Supplement name is required" ||
     message === "Invalid supplement list status" ||
     message === "Invalid supplement confidence"
   ) {
@@ -169,6 +175,7 @@ export async function PATCH(
   const listStatus = parseListStatus(body.listStatus);
   const confidence = parseConfidence(body.confidence);
   const safetyFlags = normalizeSupplementSafetyFlags(body.safetyFlags);
+  const name = body.name === undefined ? undefined : textOrNull(body.name);
 
   if (!listStatus) {
     return NextResponse.json(
@@ -194,14 +201,33 @@ export async function PATCH(
     );
   }
 
+  if (body.name !== undefined && !name) {
+    return NextResponse.json(
+      { message: "Supplement name is required" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 400
+      }
+    );
+  }
+
   try {
     const row = await updateAdminSupplement({
       actor: "admin_dashboard",
+      category: body.category === undefined
+        ? undefined
+        : textOrNull(body.category),
       confidence,
       id,
       listStatus,
       maxAmount: amountValue(body.maxAmount),
       maxUnit: textOrNull(body.maxUnit) ?? "",
+      name,
+      primaryUseCase: body.primaryUseCase === undefined
+        ? undefined
+        : textOrNull(body.primaryUseCase),
       safetyFlags,
       safetyNotes: textOrNull(body.safetyNotes),
       translations: parseTranslations(body.translations)
@@ -221,6 +247,82 @@ export async function PATCH(
     const status = supplementErrorStatus(message);
 
     console.error("Unable to update supplement", {
+      error: errorDetails(error),
+      supplementId: id
+    });
+
+    return NextResponse.json(
+      {
+        details:
+          process.env.NODE_ENV === "production" ? undefined : errorDetails(error),
+        message
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status
+      }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: AdminSupplementRouteProps
+) {
+  const { id } = await params;
+  const body = (await request.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  const accessToken =
+    request.headers.get("x-admin-dashboard-token") ?? textOrNull(body.accessToken);
+
+  if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
+    return NextResponse.json(
+      { message: "Not found" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 404
+      }
+    );
+  }
+
+  if (!isUuid(id)) {
+    return NextResponse.json(
+      { message: "Supplement not found" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 404
+      }
+    );
+  }
+
+  try {
+    const result = await deleteAdminSupplement({
+      actor: "admin_dashboard",
+      id
+    });
+
+    return NextResponse.json(
+      { result },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        }
+      }
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to delete supplement";
+    const status = supplementErrorStatus(message);
+
+    console.error("Unable to delete supplement", {
       error: errorDetails(error),
       supplementId: id
     });

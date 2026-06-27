@@ -82,6 +82,7 @@ type SupplementDbRow = Readonly<{
   max_amount: number | string | null;
   max_unit: string;
   name: string;
+  normalized_name: string;
   primary_use_case: string | null;
   safety_flags: string[] | null;
   safety_notes: string | null;
@@ -102,11 +103,14 @@ export type AdminSupplementTranslationInput = Readonly<{
 
 export type UpdateAdminSupplementInput = Readonly<{
   actor?: string | null;
+  category?: string | null;
   confidence: SupplementConfidence;
   id: string;
   listStatus: SupplementListStatus;
   maxAmount: number | null;
   maxUnit: string;
+  name?: string | null;
+  primaryUseCase?: string | null;
   safetyFlags: SupplementSafetyFlag[];
   safetyNotes: string | null;
   translations?: ReadonlyArray<AdminSupplementTranslationInput> | null;
@@ -120,9 +124,21 @@ export type CreateAdminSupplementInput = Readonly<{
   maxAmount?: number | null;
   maxUnit?: string | null;
   name: string;
+  primaryUseCase?: string | null;
   safetyFlags?: SupplementSafetyFlag[] | null;
   safetyNotes?: string | null;
   translations?: ReadonlyArray<AdminSupplementTranslationInput> | null;
+}>;
+
+export type DeleteAdminSupplementInput = Readonly<{
+  actor?: string | null;
+  id: string;
+}>;
+
+export type DeleteAdminSupplementResult = Readonly<{
+  deleted: true;
+  orphanedProductIds: string[];
+  supplementId: string;
 }>;
 
 export type DeleteAdminSupplementAliasInput = Readonly<{
@@ -410,6 +426,7 @@ export async function getAdminSupplementsData(
       select
         supplements.id::text,
         supplements.name,
+        supplements.normalized_name,
         supplements.category,
         supplements.source_status,
         supplements.ingredient_type,
@@ -499,6 +516,7 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     select
       supplements.id::text,
       supplements.name,
+      supplements.normalized_name,
       supplements.category,
       supplements.source_status,
       supplements.ingredient_type,
@@ -565,15 +583,53 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     throw new Error("Supplement not found");
   }
 
+  const nextName = input.name === undefined
+    ? before.name
+    : input.name?.trim().slice(0, 200) ?? "";
+  const nextNormalizedName = normalizeAlias(nextName);
+  const nextCategory = input.category === undefined
+    ? before.category
+    : input.category?.trim().slice(0, 120) || "Manual";
+  const nextPrimaryUseCase = input.primaryUseCase === undefined
+    ? before.primary_use_case
+    : textOrNull(input.primaryUseCase, 500);
+
+  if (!nextName || !nextNormalizedName) {
+    throw new Error("Supplement name is required");
+  }
+
+  const duplicateNameRows = await sql<{ id: string }[]>`
+    select duplicate_ids.id
+    from (
+      select supplements.id::text
+      from public.supplements supplements
+      where supplements.normalized_name = ${nextNormalizedName}
+        and supplements.id <> ${input.id}::uuid
+      union all
+      select supplement_aliases.supplement_id::text as id
+      from public.supplement_aliases supplement_aliases
+      where supplement_aliases.normalized_alias = ${nextNormalizedName}
+        and supplement_aliases.supplement_id <> ${input.id}::uuid
+    ) duplicate_ids
+    limit 1
+  `;
+
+  if (duplicateNameRows[0]) {
+    throw new Error("Supplement name already exists");
+  }
+
   await appendSupplementVersion(sql, {
     action: "updated",
     actor: input.actor,
     afterPayload: {
       ...rowFromDb(before),
+      category: nextCategory,
       confidence: input.confidence,
       listStatus: input.listStatus,
       maxAmount: input.maxAmount,
       maxUnit: input.maxUnit,
+      name: nextName,
+      primaryUseCase: nextPrimaryUseCase,
       safetyFlags: input.safetyFlags,
       safetyNotes: input.safetyNotes
     },
@@ -586,11 +642,72 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
   await sql`
     update public.supplements
     set
+      category = ${nextCategory},
       is_active = ${input.listStatus === "active"},
       list_status = ${input.listStatus},
+      name = ${nextName},
+      normalized_name = ${nextNormalizedName},
+      primary_use_case = ${nextPrimaryUseCase},
       updated_at = now()
     where id = ${input.id}::uuid
   `;
+
+  if (nextNormalizedName !== before.normalized_name) {
+    const existingAliasRows = await sql<{
+      alias: string;
+      id: string;
+      normalized_alias: string;
+      supplement_id: string;
+    }[]>`
+      select
+        supplement_aliases.id::text,
+        supplement_aliases.supplement_id::text,
+        supplement_aliases.alias,
+        supplement_aliases.normalized_alias
+      from public.supplement_aliases supplement_aliases
+      where supplement_aliases.normalized_alias = ${nextNormalizedName}
+      limit 1
+    `;
+    const existingAlias = existingAliasRows[0] ?? null;
+    const aliasId = existingAlias?.id ?? randomUUID();
+
+    await appendSupplementAliasVersion(sql, {
+      action: existingAlias ? "alias_updated" : "alias_added",
+      actor: input.actor,
+      afterPayload: {
+        alias: nextName,
+        aliasId,
+        normalizedAlias: nextNormalizedName,
+        supplementId: input.id
+      },
+      aliasId,
+      beforePayload: existingAlias ?? {},
+      changeReason: "supplement_canonical_name_updated",
+      normalizedAlias: nextNormalizedName,
+      source: "admin_dashboard",
+      supplementId: input.id
+    });
+
+    await sql`
+      insert into public.supplement_aliases (
+        id,
+        supplement_id,
+        alias,
+        normalized_alias,
+        created_at
+      )
+      values (
+        ${aliasId}::uuid,
+        ${input.id}::uuid,
+        ${nextName},
+        ${nextNormalizedName},
+        now()
+      )
+      on conflict (normalized_alias) do update set
+        supplement_id = excluded.supplement_id,
+        alias = excluded.alias
+    `;
+  }
 
   await appendSupplementSafetyLimitVersion(sql, {
     confidence: input.confidence,
@@ -620,10 +737,15 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     values (
       ${randomUUID()}::uuid,
       ${input.id}::uuid,
-      ${"updated"},
+	        ${"updated"},
       ${input.actor ?? "admin_dashboard"},
       ${sql.json(rowFromDb(before))},
-      ${sql.json(input)}
+      ${sql.json({
+        ...input,
+        category: nextCategory,
+        name: nextName,
+        primaryUseCase: nextPrimaryUseCase
+      })}
     )
   `;
 
@@ -652,6 +774,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
   const listStatus = input.listStatus ?? "active";
   const confidence = input.confidence ?? "low";
   const maxUnit = input.maxUnit?.trim().slice(0, 80) ?? "";
+  const primaryUseCase = textOrNull(input.primaryUseCase, 500);
   const safetyFlags = normalizeSupplementSafetyFlags(input.safetyFlags);
 
   if (!sql) {
@@ -707,6 +830,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
     normalizedName,
     safetyFlags,
     safetyNotes: input.safetyNotes?.trim() || null,
+    primaryUseCase,
     sourceStatus: "recommended_add",
     translations: input.translations ?? []
   };
@@ -762,7 +886,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
       ${category},
       'recommended_add',
       null,
-      null,
+      ${primaryUseCase},
       null,
       ${listStatus},
       ${listStatus === "active"},
@@ -837,6 +961,82 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
   }
 
   return row;
+}
+
+export async function deleteAdminSupplement(
+  input: DeleteAdminSupplementInput
+): Promise<DeleteAdminSupplementResult> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const data = await getAdminSupplementsData();
+  const before = data.rows.find((row) => row.id === input.id);
+
+  if (!before) {
+    throw new Error("Supplement not found");
+  }
+
+  const { productIdsUsingSupplement, refreshAndPersistProductValidations } =
+    await import("@/lib/admin-product-writes");
+  const orphanedProductIds = await productIdsUsingSupplement(sql, input.id);
+
+  await appendSupplementVersion(sql, {
+    action: "deleted",
+    actor: input.actor,
+    afterPayload: {
+      deleted: true,
+      orphanedProductIds,
+      supplementId: input.id
+    },
+    beforePayload: before,
+    changeReason: "supplement_admin_delete",
+    source: "admin_dashboard",
+    supplementId: input.id
+  });
+
+  await sql`
+    insert into public.supplement_admin_audit (
+      id,
+      supplement_id,
+      action,
+      actor,
+      before_payload,
+      after_payload
+    )
+    values (
+      ${randomUUID()}::uuid,
+      null,
+      ${"deleted"},
+      ${input.actor ?? "admin_dashboard"},
+      ${sql.json(before)},
+      ${sql.json({
+        deleted: true,
+        orphanedProductIds,
+        supplementId: input.id
+      })}
+    )
+  `;
+
+  const deletedRows = await sql<{ id: string }[]>`
+    delete from public.supplements
+    where id = ${input.id}::uuid
+    returning id::text
+  `;
+
+  if (deletedRows.length === 0) {
+    throw new Error("Supplement not found");
+  }
+
+  await refreshAndPersistProductValidations(sql, orphanedProductIds);
+
+  return {
+    deleted: true,
+    orphanedProductIds,
+    supplementId: input.id
+  };
 }
 
 export async function deleteAdminSupplementAlias(

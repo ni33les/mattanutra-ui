@@ -785,6 +785,9 @@ export type AdminContent = Readonly<{
     close: string;
     create: string;
     createError: string;
+    deleteSupplement: string;
+    deleteSupplementConfirm: string;
+    deleteSupplementError: string;
     details: string;
     dose: string;
     empty: string;
@@ -796,6 +799,7 @@ export type AdminContent = Readonly<{
     newSupplement: string;
     newSupplementHint: string;
     none: string;
+    primaryUseCase: string;
     safetyFlag: string;
     safetyFlagOptions: Record<SupplementSafetyFlag, string>;
     safetyNotes: string;
@@ -1649,6 +1653,10 @@ const baseContent = {
       close: "Close",
       create: "Create",
       createError: "Could not create this supplement.",
+      deleteSupplement: "Delete",
+      deleteSupplementConfirm:
+        "Delete this supplement? Product facts using it will be kept but marked as needing a new canonical match.",
+      deleteSupplementError: "Could not delete this supplement.",
       details: "Details",
       dose: "Max dose",
       empty: "No supplements match these filters.",
@@ -1659,8 +1667,9 @@ const baseContent = {
       name: "Name",
       newSupplement: "New supplement",
       newSupplementHint:
-        "Create the canonical supplement, then add dose, safety notes and associations.",
+        "Type the supplement name, use AI to suggest details, then review and save.",
       none: "None",
+      primaryUseCase: "Primary use case",
       safetyFlag: "Safety flags",
       safetyFlagOptions: {
         allergy_caution: "Allergy caution",
@@ -2518,6 +2527,10 @@ const baseContent = {
       close: "ปิด",
       create: "สร้าง",
       createError: "ไม่สามารถสร้างอาหารเสริมนี้ได้",
+      deleteSupplement: "ลบ",
+      deleteSupplementConfirm:
+        "ลบอาหารเสริมนี้หรือไม่? ข้อมูลสินค้าเดิมจะยังอยู่ แต่ต้องจับคู่ supplement ใหม่",
+      deleteSupplementError: "ไม่สามารถลบอาหารเสริมนี้ได้",
       details: "รายละเอียด",
       dose: "ขนาดสูงสุด",
       empty: "ไม่พบอาหารเสริมตามตัวกรองนี้",
@@ -2528,8 +2541,9 @@ const baseContent = {
       name: "ชื่อ",
       newSupplement: "อาหารเสริมใหม่",
       newSupplementHint:
-        "สร้างอาหารเสริมหลักก่อน จากนั้นเพิ่มขนาด หมายเหตุความปลอดภัย และชื่อเชื่อมโยง",
+        "กรอกชื่ออาหารเสริม ใช้ AI แนะนำรายละเอียด แล้วตรวจสอบก่อนบันทึก",
       none: "ไม่มี",
+      primaryUseCase: "การใช้งานหลัก",
       safetyFlag: "ธงความปลอดภัย",
       safetyFlagOptions: {
         allergy_caution: "ข้อควรระวังเรื่องแพ้",

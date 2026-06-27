@@ -147,6 +147,7 @@ export async function POST(request: Request) {
       maxAmount: amountValue(body.maxAmount),
       maxUnit: textOrNull(body.maxUnit, 80),
       name,
+      primaryUseCase: textOrNull(body.primaryUseCase),
       safetyFlags: normalizeSupplementSafetyFlags(body.safetyFlags),
       safetyNotes: textOrNull(body.safetyNotes),
       translations: parseTranslations(body.translations)

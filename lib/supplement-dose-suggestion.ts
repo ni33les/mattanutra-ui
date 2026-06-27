@@ -34,10 +34,12 @@ export type SupplementDoseSuggestionInput = Readonly<{
 }>;
 
 export type SupplementDoseSuggestion = Readonly<{
+  category: string;
   confidence: SupplementConfidence;
   listStatus: SupplementListStatus;
   maxAmount: number | null;
   maxUnit: SupplementDoseUnit | "";
+  primaryUseCase: string;
   responseId?: string;
   safetyFlags: SupplementSafetyFlag[];
   safetyNotes: string;
@@ -112,6 +114,16 @@ function numberOrNull(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function cleanText(value: unknown, fallback: string, maxLength = 500) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed ? trimmed.slice(0, maxLength) : fallback;
+}
+
 function parseJsonObject(content: string | null | undefined) {
   if (!content) {
     throw new Error("Model returned empty content");
@@ -165,8 +177,10 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
               "You prepare conservative supplement safety drafts for MattaNutra admin review.",
               "This is internal safety support, not medical advice.",
               "Return JSON only. No markdown, no prose outside JSON.",
-              "Return exactly one root JSON object with only these keys: listStatus, confidence, maxAmount, maxUnit, safetyFlags, safetyNotes.",
+              "Return exactly one root JSON object with only these keys: category, primaryUseCase, listStatus, confidence, maxAmount, maxUnit, safetyFlags, safetyNotes.",
               "Do not echo the request, allowedUnits, contract, supplement, or schema.",
+              "Set category to a short catalogue category, such as Vitamin, Mineral, Botanical, Amino acid, Probiotic, Fatty acid, Sports nutrition, or Other.",
+              "Set primaryUseCase to one short admin-facing phrase describing mainstream use.",
               "Use one maxUnit from allowedUnits exactly.",
               "Use only safetyFlags from allowedSafetyFlags.",
               "Choose listStatus from active or blocked.",
@@ -187,10 +201,12 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
                 allowedUnits: supplementDoseUnits,
                 allowedSafetyFlags: supplementSafetyFlags,
                 output: {
+                  category: "short catalogue category",
                   confidence: "high | moderate | low",
                   listStatus: "active | blocked",
                   maxAmount: "positive number, or null for blocked",
                   maxUnit: "one allowedUnits value",
+                  primaryUseCase: "short mainstream use-case phrase",
                   safetyFlags: ["zero or more allowedSafetyFlags values"],
                   safetyNotes: "short admin-facing notes"
                 },
@@ -241,6 +257,12 @@ export async function suggestSupplementDose(
   const maxAmount = numberOrNull(parsed.maxAmount);
   const maxUnit = normalizeUnit(parsed.maxUnit);
   const doseRequired = listStatus === "active";
+  const category = cleanText(parsed.category, input.category?.trim() || "Manual", 120);
+  const primaryUseCase = cleanText(
+    parsed.primaryUseCase,
+    input.primaryUseCase?.trim() || "",
+    500
+  );
 
   if (doseRequired && (!maxAmount || maxAmount <= 0 || !maxUnit)) {
     throw new Error("Model returned an invalid dose suggestion");
@@ -254,10 +276,12 @@ export async function suggestSupplementDose(
         : "Conservative AI-suggested supplement safety draft.";
 
   return {
+    category,
     confidence: confidenceValue(parsed.confidence),
     listStatus,
     maxAmount,
     maxUnit: maxUnit ?? "",
+    primaryUseCase,
     responseId: response.id,
     safetyFlags: normalizeSupplementSafetyFlags(parsed.safetyFlags),
     safetyNotes
