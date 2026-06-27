@@ -400,7 +400,6 @@ export async function replaceProductFacts(
       }
       const supplementMatch =
         input.supplementMatchesByFactName.get(normalizeProductFactKey(factName));
-      const canonicalName = supplementMatch?.name ?? factName;
       const explicitSupplementId =
         isUuidValue(fact.supplementId) && existingSupplementIds.has(fact.supplementId)
           ? fact.supplementId
@@ -411,8 +410,8 @@ export async function replaceProductFacts(
         amount: numberOrNull(fact.amount),
         confidence: fact.confidence ?? "moderate",
         item_type: fact.itemType ?? "supplement",
-        name: canonicalName,
-        normalized_name: normalizeProductFactKey(canonicalName),
+        name: factName,
+        normalized_name: normalizeProductFactKey(factName),
         serving_label: cleanNullableText(fact.servingLabel, 200),
         source: input.source,
         source_text: cleanNullableText(fact.sourceText, 1000),
@@ -677,7 +676,7 @@ export async function validateProductImportForApproval(input: Readonly<{
       itemType: fact.itemType,
       maxAmount: supplementRow?.max_amount ?? null,
       maxUnit: supplementRow?.max_unit ?? null,
-      name: supplementMatch?.name ?? fact.name,
+      name: fact.name,
       sourceText: fact.sourceText,
       supplementId,
       supplementStatus: supplementRow?.list_status ?? null,

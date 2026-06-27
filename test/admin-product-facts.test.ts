@@ -68,7 +68,7 @@ describe("admin product facts", () => {
     });
   });
 
-  it("preserves named product facts that do not have a canonical supplement id", async () => {
+  it("preserves submitted product fact names while linking canonical supplement ids", async () => {
     const factMatcher = await readFile("lib/admin-product-facts.ts", "utf8");
 
     assert.match(factMatcher, /from public\.supplements\s+left join public\.supplement_aliases/);
@@ -83,6 +83,10 @@ describe("admin product facts", () => {
 
       assert.doesNotMatch(helper, /if\s*\(!supplementId\)\s*{\s*return null;\s*}/);
       assert.match(helper, /supplement_id:\s*supplementId/);
+      assert.match(helper, /name:\s*factName/);
+      assert.match(helper, /normalized_name:\s*normalizeProductFactKey\(factName\)/);
+      assert.doesNotMatch(helper, /canonicalName/);
+      assert.doesNotMatch(helper, /name:\s*supplementMatch\?\.name/);
     }
   });
 });

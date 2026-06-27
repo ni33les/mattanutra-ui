@@ -145,7 +145,6 @@ async function replaceProductFacts(
       }
       const supplementMatch =
         input.supplementMatchesByFactName.get(normalizeProductFactKey(factName));
-      const canonicalName = supplementMatch?.name ?? factName;
       const explicitSupplementId =
         isUuidValue(fact.supplementId) && existingSupplementIds.has(fact.supplementId)
           ? fact.supplementId
@@ -156,8 +155,8 @@ async function replaceProductFacts(
         amount: numberOrNull(fact.amount),
         confidence: fact.confidence ?? "moderate",
         item_type: fact.itemType ?? "supplement",
-        name: canonicalName,
-        normalized_name: normalizeProductFactKey(canonicalName),
+        name: factName,
+        normalized_name: normalizeProductFactKey(factName),
         serving_label: cleanNullableText(fact.servingLabel, 200),
         source: input.source,
         source_text: cleanNullableText(fact.sourceText, 1000),
