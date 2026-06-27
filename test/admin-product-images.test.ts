@@ -116,9 +116,11 @@ describe("admin product images", () => {
     );
   });
 
-  it("keeps local upload fallback out of UAT and production", () => {
+  it("keeps local upload fallback limited to non-production environments", () => {
     assert.equal(localProductImageFallbackAllowed("dev", "development"), true);
-    assert.equal(localProductImageFallbackAllowed("uat", "development"), false);
-    assert.equal(localProductImageFallbackAllowed("dev", "production"), false);
+    assert.equal(localProductImageFallbackAllowed("dev", "production"), true);
+    assert.equal(localProductImageFallbackAllowed("uat", "production"), true);
+    assert.equal(localProductImageFallbackAllowed("prd", "production"), false);
+    assert.equal(localProductImageFallbackAllowed("production", "production"), false);
   });
 });

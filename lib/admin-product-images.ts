@@ -73,9 +73,12 @@ export function localProductImageFallbackAllowed(
     (process.env.NODE_ENV === "production" ? "prd" : "dev"),
   nodeEnvironment = process.env.NODE_ENV,
 ) {
+  const normalizedEnvironment = runtimeImageEnvironment(environment);
+
   return (
-    nodeEnvironment !== "production" &&
-    runtimeImageEnvironment(environment) === "dev"
+    normalizedEnvironment !== "prd" &&
+    normalizedEnvironment !== "prod" &&
+    nodeEnvironment !== "test"
   );
 }
 
@@ -220,6 +223,15 @@ async function storeUploadedProductImage(input: Readonly<{
       !localProductImageFallbackAllowed() ||
       !storageFallbackEligible(error)
     ) {
+      if (storageFallbackEligible(error)) {
+        throw new AdminProductImageError(
+          "image_storage_unavailable",
+          "Product image storage is not configured correctly for this environment.",
+          502,
+          { cause: error },
+        );
+      }
+
       throw error;
     }
 
