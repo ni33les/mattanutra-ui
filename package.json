@@ -55,6 +55,7 @@
     "products:master:pending-review": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/products-master-pending-review.ts",
     "images:mirror:first-party": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/mirror-first-party-images.ts",
     "products:validation-consistency": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/check-product-validation-consistency.ts",
+    "catalogue:admin-sweep": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/audit-product-admin-sweep.ts",
     "coverage:explain": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/explain-product-coverage.ts",
     "assessment:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-assessment-schema.ts",
     "foods:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-food-schema.ts",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
+import { updateAdminProduct } from "@/lib/admin-products";
 import { isUuid } from "@/lib/assessment-store";
 import { mirrorImageToFirstParty } from "@/lib/first-party-image-mirror";
 
@@ -92,6 +93,17 @@ export async function POST(
       imageUrl,
       namespace: "products",
       source: "admin_product_image_dropzone",
+    });
+
+    if (!mirrored.url) {
+      return badRequest("Image URL could not be resolved");
+    }
+
+    await updateAdminProduct({
+      actor: "admin_dashboard",
+      changeNote: "product_image_url_resolved",
+      id,
+      imageUrl: mirrored.url,
     });
 
     return NextResponse.json(

@@ -1,7 +1,13 @@
 "use client";
 
-import { useId, useRef, useState, type ChangeEvent } from "react";
-import { Upload } from "lucide-react";
+import {
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import { Sparkles, Upload } from "lucide-react";
 import type {
   AdminProductDetailRow,
   AdminProductRow
@@ -42,7 +48,9 @@ import {
   productTranslationStatusClass,
   productTranslationStatusLabel,
   type ProductCardRow,
+  type ProductViewLabels,
 } from "@/components/admin/product-view-helpers";
+import { AdminModal } from "@/components/admin/ui";
 
 function regulatoryApprovalSummary(
   approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = [],
@@ -105,6 +113,78 @@ export function ProductImageFallback({
         {productImageFallbackText(row)}
       </span>
     </div>
+  );
+}
+
+export function AddProductFromUrlModal({
+  error,
+  onClose,
+  onProductUrlChange,
+  onSubmit,
+  productUrl,
+  saving,
+  viewLabels,
+}: Readonly<{
+  error: string | null;
+  onClose: () => void;
+  onProductUrlChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  productUrl: string;
+  saving: boolean;
+  viewLabels: ProductViewLabels;
+}>) {
+  return (
+    <AdminModal
+      closeDisabled={saving}
+      closeLabel={viewLabels.close}
+      onClose={onClose}
+      panelClassName="max-w-lg"
+      title={
+        <span className="flex items-center gap-2">
+          <Sparkles aria-hidden="true" className="size-4 text-[#1FA77A]" />
+          {viewLabels.addProductFromUrl}
+        </span>
+      }
+    >
+      <form className="space-y-4 p-5" onSubmit={onSubmit}>
+        <label className="block space-y-2 text-sm font-medium text-gray-700">
+          <span>{viewLabels.productUrl}</span>
+          <input
+            className="w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
+            disabled={saving}
+            onChange={(event) => onProductUrlChange(event.target.value)}
+            placeholder="https://"
+            required
+            type="url"
+            value={productUrl}
+          />
+        </label>
+
+        {error ? (
+          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={saving}
+            onClick={onClose}
+            type="button"
+          >
+            {viewLabels.close}
+          </button>
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={saving}
+            type="submit"
+          >
+            {saving ? viewLabels.creatingProduct : viewLabels.createDraft}
+          </button>
+        </div>
+      </form>
+    </AdminModal>
   );
 }
 
@@ -301,6 +381,7 @@ export function ProductImageDropzone({
         throw new Error(result.message);
       }
 
+      onPreviewImageUrlChange?.(null);
       onImageUrlChange(result.url);
     } catch (error) {
       onPreviewImageUrlChange?.(null);

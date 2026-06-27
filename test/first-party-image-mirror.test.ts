@@ -172,6 +172,27 @@ describe("first-party image mirroring", () => {
     assert.equal(isFirstPartyImageUrl(first.url), true);
   });
 
+  it("keeps already-uploaded runtime image URLs without fetching or remirroring", async () => {
+    const result = await mirrorImageToFirstParty({
+      entityId: "product-123",
+      fetcher: async () => {
+        throw new Error("already-uploaded images should not be fetched");
+      },
+      imageUrl: "/uploads/dev/content/product.webp",
+      namespace: "products",
+      uploader: async () => {
+        throw new Error("already-uploaded images should not be uploaded");
+      }
+    });
+
+    assert.deepEqual(result, {
+      metadata: null,
+      mirrored: false,
+      skippedReason: "first_party",
+      url: "/uploads/dev/content/product.webp"
+    });
+  });
+
   it("builds environment-scoped Spaces keys", () => {
     const key = firstPartyImageStorageKey({
       entityId: "abc 123",

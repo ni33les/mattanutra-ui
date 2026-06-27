@@ -544,7 +544,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /cachedSimulationData \?\? initialSimulationData/);
     assert.match(view, /productResultRows/);
     assert.match(view, /visibleProductResultRows/);
-    assert.match(view, /Eligible product results/);
+    assert.match(view, /Best performing products/);
+    assert.match(view, /No products have been selected by the simulation yet/);
+    assert.match(view, /Run the simulation to see product usefulness/);
+    assert.match(view, /row\.chosenCount > 0/);
     assert.match(view, /savedSimulationReplayTarget/);
     assert.match(view, /replayCachedDemandProfiles/);
     assert.match(view, /window\.addEventListener\("focus"/);

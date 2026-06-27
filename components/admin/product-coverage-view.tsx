@@ -536,6 +536,24 @@ function productResultRows(
   data: AdminPlanCoverageSimulationData,
   candidates: AdminPlanCoverageSimulationData["input"]["candidates"]
 ) {
+  if (data.sampleSize > 0) {
+    return data.mostUsefulProducts
+      .filter((row) =>
+        row.chosenCount > 0 ||
+        row.averageStackContributionPercent > 0 ||
+        row.averageProductCoveragePercent > 0
+      )
+      .sort((first, second) =>
+        second.chosenCount - first.chosenCount ||
+        second.averageStackContributionPercent -
+          first.averageStackContributionPercent ||
+        (first.expectedPriceAmount ?? Number.MAX_SAFE_INTEGER) -
+          (second.expectedPriceAmount ?? Number.MAX_SAFE_INTEGER) ||
+        first.title.localeCompare(second.title)
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  }
+
   const rowsById = new Map(data.mostUsefulProducts.map((row) => [row.id, row]));
   const rows = [
     ...data.mostUsefulProducts,
@@ -2263,8 +2281,8 @@ export function AdminPlanCoverageSimulatorView({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
         <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-bold text-slate-950">Eligible product results</h2>
-            <Badge>{numberText(visibleProductResultRows.length)} eligible</Badge>
+            <h2 className="text-lg font-bold text-slate-950">Best performing products</h2>
+            <Badge>{numberText(visibleProductResultRows.length)} used</Badge>
           </div>
           <div className="mt-2">
             {visibleProductResultRows.length > 0 ? (
@@ -2273,7 +2291,9 @@ export function AdminPlanCoverageSimulatorView({
               ))
             ) : (
               <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
-                No eligible products are available for this simulation.
+                {simulationData.sampleSize > 0
+                  ? "No products have been selected by the simulation yet."
+                  : "Run the simulation to see product usefulness."}
               </p>
             )}
           </div>

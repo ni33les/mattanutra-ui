@@ -118,6 +118,7 @@ describe("product admin card layout", () => {
     assert.match(dropzone, /viewLabels\.imageUseUrl/);
     assert.match(dropzone, /URL\.createObjectURL\(file\)/);
     assert.match(dropzone, /onPreviewImageUrlChange\?\.\(previewUrl\)/);
+    assert.match(dropzone, /onPreviewImageUrlChange\?\.\(null\);[\s\S]*onImageUrlChange\(result\.url\)/);
     assert.match(view, /row\.imageUrl\.startsWith\("blob:"\)/);
     assert.doesNotMatch(dropzone, /imageFileDropUnsupported/);
     assert.match(dropzone, /draggable=\{true\}/);
@@ -129,13 +130,19 @@ describe("product admin card layout", () => {
     assert.match(detailView, /onPreviewImageUrlChange=\{setLocalImagePreviewUrl\}/);
     assert.match(detailView, /row=\{previewDraft\}/);
     assert.match(detailView, /storedImageUrl=\{draft\.imageUrl\}/);
+    assert.match(detailView, /setDraft\(\(currentDraft\) =>/);
+    assert.match(detailView, /\.\.\.currentDraft\.imageCandidates/);
     assert.match(detailView, /imageCandidates: \[/);
     assert.match(resolveRoute, /mirrorImageToFirstParty/);
+    assert.match(resolveRoute, /updateAdminProduct/);
+    assert.match(resolveRoute, /product_image_url_resolved/);
     assert.match(resolveRoute, /This image host blocks direct imports/);
     assert.match(resolveRoute, /namespace: "products"/);
     assert.match(resolveRoute, /source: "admin_product_image_dropzone"/);
     assert.match(uploadRoute, /uploadContentImage/);
     assert.match(uploadRoute, /uploadLocalContentImage/);
+    assert.match(uploadRoute, /updateAdminProduct/);
+    assert.match(uploadRoute, /product_image_uploaded/);
     assert.match(uploadRoute, /nonProductionUploadFallbackAllowed/);
     assert.match(uploadRoute, /InvalidAccessKeyId/);
     assert.match(uploadRoute, /maxUploadBytes = 6 \* 1024 \* 1024/);
@@ -214,6 +221,28 @@ describe("product admin card layout", () => {
     assert.match(writes, /productForm,/);
     assert.match(writes, /input\.productForm !== undefined \? \{ productForm: input\.productForm \} : \{\}/);
     assert.doesNotMatch(writes, /product_form =/);
+  });
+
+  it("shows matching readiness on the product detail page", async () => {
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
+    const readiness = await readFile("lib/product-matching-readiness.ts", "utf8");
+
+    assert.match(detailView, /productMatchingReadiness/);
+    assert.match(detailView, /ProductMatchingReadinessPanel/);
+    assert.match(detailView, /labels\.matchingReadiness/);
+    assert.match(detailView, /labels\.matchingCanMatch/);
+    assert.match(detailView, /labels\.matchingCannotMatchYet/);
+    assert.match(detailView, /labels\.matchingNeedsWork/);
+    assert.match(helpers, /matchingReadiness: "Matching readiness"/);
+    assert.match(helpers, /matchingCanMatch: "Can match"/);
+    assert.match(helpers, /matchingCannotMatchYet: "Cannot match yet"/);
+    assert.match(helpers, /matchingReady: "Ready"/);
+    assert.match(readiness, /brandStatus === "approved"/);
+    assert.match(readiness, /input\.status === "approved"/);
+    assert.match(readiness, /validation\?\.status === "pass"/);
+    assert.match(readiness, /input\.labelStatus === "parsed"/);
+    assert.match(readiness, /hasCompatibleCountryAvailability/);
   });
 
   it("only allows hard deleting ignored products from the admin detail page", async () => {

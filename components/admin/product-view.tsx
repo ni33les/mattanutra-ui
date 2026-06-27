@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Plus, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import type {
   AdminProductDetailData,
   AdminProductDetailRow,
@@ -23,6 +23,7 @@ import {
   defaultRegulatoryAgencyForCountry,
   regulatoryAgencyByCode
 } from "@/lib/product-regulatory-agencies";
+import { productMatchingReadiness } from "@/lib/product-matching-readiness";
 import { type Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
@@ -51,6 +52,7 @@ import {
   type ProductMetricFilter,
 } from "@/components/admin/product-view-helpers";
 import {
+  AddProductFromUrlModal,
   LocalizedFallbackBadge,
   ProductCard,
   ProductCountryManager,
@@ -145,6 +147,14 @@ function normalizeProductMergeOptions(
 ) {
   return options.map(normalizeProductMergeOption);
 }
+
+type ProductDraftUpdate =
+  | AdminProductDetailRow
+  | AdminProductRow
+  | null
+  | ((
+      current: AdminProductDetailRow,
+    ) => AdminProductDetailRow | AdminProductRow | null);
 
 function regulatoryApprovalsForSave(
   row: Pick<AdminProductDetailRow, "regulatoryApprovals">
@@ -381,78 +391,15 @@ export function AdminProductListView({
       </div>
 
       {addProductOpen ? (
-        <div
-          aria-labelledby="add-product-from-url-title"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"
-          role="dialog"
-        >
-          <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl ring-1 ring-gray-200">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Sparkles aria-hidden="true" className="size-4 text-[#1FA77A]" />
-                  <h2
-                    className="text-base font-semibold text-gray-950"
-                    id="add-product-from-url-title"
-                  >
-                    {viewLabels.addProductFromUrl}
-                  </h2>
-                </div>
-              </div>
-              <button
-                aria-label={viewLabels.close}
-                className="inline-flex size-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
-                onClick={() => {
-                  if (!addProductSaving) {
-                    setAddProductOpen(false);
-                  }
-                }}
-                type="button"
-              >
-                <X aria-hidden="true" className="size-4" />
-              </button>
-            </div>
-
-            <form className="mt-5 space-y-4" onSubmit={handleAddProductSubmit}>
-              <label className="block space-y-2 text-sm font-medium text-gray-700">
-                <span>{viewLabels.productUrl}</span>
-                <input
-                  className="w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
-                  onChange={(event) => setAddProductUrl(event.target.value)}
-                  placeholder="https://"
-                  required
-                  type="url"
-                  value={addProductUrl}
-                />
-              </label>
-
-              {addProductError ? (
-                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
-                  {addProductError}
-                </p>
-              ) : null}
-
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button
-                  className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={addProductSaving}
-                  onClick={() => setAddProductOpen(false)}
-                  type="button"
-                >
-                  {viewLabels.close}
-                </button>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={addProductSaving}
-                  type="submit"
-                >
-                  {addProductSaving ? viewLabels.creatingProduct : viewLabels.createDraft}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <AddProductFromUrlModal
+          error={addProductError}
+          onClose={() => setAddProductOpen(false)}
+          onProductUrlChange={setAddProductUrl}
+          onSubmit={handleAddProductSubmit}
+          productUrl={addProductUrl}
+          saving={addProductSaving}
+          viewLabels={viewLabels}
+        />
       ) : null}
 
       <BusinessStatsGrid
@@ -576,8 +523,21 @@ export function AdminProductDetailView({
   const viewLabels = productViewLabels[locale];
   const backHref = `/${locale}/admin/products${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`;
 
-  function setDraft(row: AdminProductDetailRow | AdminProductRow | null) {
-    setDraftState(row ? normalizeProductDetailRow(row) : null);
+  function setDraft(update: ProductDraftUpdate) {
+    if (typeof update === "function") {
+      setDraftState((current) => {
+        if (!current) {
+          return null;
+        }
+
+        const next = update(current);
+
+        return next ? normalizeProductDetailRow(next) : null;
+      });
+      return;
+    }
+
+    setDraftState(update ? normalizeProductDetailRow(update) : null);
   }
 
   async function saveProduct(
@@ -932,6 +892,81 @@ export function AdminProductDetailView({
   );
 }
 
+function ProductMatchingReadinessPanel({
+  labels,
+  row,
+}: Readonly<{
+  labels: Readonly<Record<string, string>>;
+  row: AdminProductDetailRow;
+}>) {
+  const readiness = productMatchingReadiness(row);
+  const checkLabels: Record<string, string> = {
+    brand_status: labels.matchingBrand,
+    country_availability: labels.matchingMarkets,
+    facts: labels.matchingFacts,
+    image: labels.matchingImage,
+    product_status: labels.matchingProduct,
+    validation: labels.matchingValidation,
+  };
+
+  return (
+    <div
+      className={classNames(
+        "mt-5 rounded-lg border p-4",
+        readiness.ready
+          ? "border-emerald-200 bg-emerald-50/70"
+          : "border-amber-200 bg-amber-50/70",
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-950">
+            {labels.matchingReadiness}
+          </h3>
+          <p className="mt-1 text-sm text-gray-700">
+            {readiness.primaryReason}
+          </p>
+        </div>
+        <span
+          className={classNames(
+            "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
+            readiness.ready
+              ? "bg-white text-emerald-700 ring-emerald-200"
+              : "bg-white text-amber-800 ring-amber-200",
+          )}
+        >
+          {readiness.ready
+            ? labels.matchingCanMatch
+            : labels.matchingCannotMatchYet}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {readiness.checks.map((check) => (
+          <div
+            className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-2 text-xs ring-1 ring-gray-100"
+            key={check.id}
+            title={check.reason}
+          >
+            <span className="font-semibold text-gray-700">
+              {checkLabels[check.id] ?? check.label}
+            </span>
+            <span
+              className={classNames(
+                "rounded-full px-2 py-0.5 font-semibold",
+                check.passed
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-800",
+              )}
+            >
+              {check.passed ? labels.matchingReady : labels.matchingNeedsWork}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ProductDetailPanel({
   accessToken,
   backHref,
@@ -974,7 +1009,7 @@ function ProductDetailPanel({
   ) => Promise<boolean>;
   mergeOptions: AdminProductMergeOption[];
   saving: boolean;
-  setDraft: (row: AdminProductDetailRow) => void;
+  setDraft: (update: ProductDraftUpdate) => void;
 }>) {
   const [mergeProductId, setMergeProductId] = useState(
     draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? "",
@@ -1272,6 +1307,8 @@ function ProductDetailPanel({
           </div>
         </div>
 
+        <ProductMatchingReadinessPanel labels={viewLabels} row={draft} />
+
         <div className="mt-5 space-y-4">
           <div className="max-w-xl">
             <ProductCountryManager
@@ -1357,16 +1394,16 @@ function ProductDetailPanel({
         <ProductImageDropzone
           accessToken={accessToken}
           onImageUrlChange={(imageUrl) =>
-            setDraft({
-              ...draft,
+            setDraft((currentDraft) => ({
+              ...currentDraft,
               imageCandidates: [
                 ...new Set([
                   ...(imageUrl ? [imageUrl] : []),
-                  ...draft.imageCandidates,
+                  ...currentDraft.imageCandidates,
                 ]),
               ],
               imageUrl,
-            })
+            }))
           }
           onPreviewImageUrlChange={setLocalImagePreviewUrl}
           productId={draft.id}

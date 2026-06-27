@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
+import { updateAdminProduct } from "@/lib/admin-products";
 import { isUuid } from "@/lib/assessment-store";
 import {
   uploadContentImage,
@@ -160,6 +161,12 @@ export async function POST(
       );
       upload = await uploadLocalContentImage(uploadInput);
     }
+    await updateAdminProduct({
+      actor: "admin_dashboard",
+      changeNote: "product_image_uploaded",
+      id,
+      imageUrl: upload.url,
+    });
 
     return NextResponse.json(
       {
