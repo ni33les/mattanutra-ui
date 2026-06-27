@@ -37,6 +37,7 @@ type SourceableProductRow = Readonly<{
   source_url: string | null;
   title: string;
   translated_titles: string[] | null;
+  upc_identifiers: string[] | null;
 }>;
 
 const thaiFdaOryorApiBaseUrl = "https://api.oryor.com";
@@ -217,6 +218,7 @@ export function thaiFdaOryorSearchTermsForProduct(row: SourceableProductRow) {
   const terms: string[] = [];
 
   addIdentifierSearchTerms(terms, row.ean13_identifiers, 2);
+  addIdentifierSearchTerms(terms, row.upc_identifiers, 2);
   addIdentifierSearchTerms(terms, row.manufacturer_sku_identifiers, 2);
   addSearchTerm(terms, row.title, { brandName: row.brand_name });
   for (const title of row.translated_titles ?? []) {
@@ -688,6 +690,7 @@ export async function sourceProductFdaApprovalNumbers(input: Readonly<{
     source_url: string | null;
     title: string;
     translated_titles: string[] | null;
+    upc_identifiers: string[] | null;
   }>>`
     select
       products.brand_name,
@@ -699,6 +702,13 @@ export async function sourceProductFdaApprovalNumbers(input: Readonly<{
         array[]::text[]
       ) as ean13_identifiers,
       products.id::text,
+      coalesce(
+        array_agg(distinct product_identifiers.identifier_value order by product_identifiers.identifier_value) filter (
+          where product_identifiers.identifier_type = 'upc'
+            and product_identifiers.status = 'active'
+        ),
+        array[]::text[]
+      ) as upc_identifiers,
       coalesce(
         array_agg(distinct product_identifiers.identifier_value order by product_identifiers.identifier_value) filter (
           where product_identifiers.identifier_type = 'manufacturer_sku'
@@ -720,7 +730,7 @@ export async function sourceProductFdaApprovalNumbers(input: Readonly<{
     from public.products
     left join public.product_identifiers
       on product_identifiers.product_id = products.id
-      and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
+      and product_identifiers.identifier_type in ('ean13', 'upc', 'manufacturer_sku')
       and product_identifiers.status = 'active'
     left join public.product_translations
       on product_translations.product_id = products.id

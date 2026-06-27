@@ -68,7 +68,7 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
-    description: "Approved product identifiers such as EAN-13 and manufacturer SKU rows.",
+    description: "Approved product identifiers such as EAN-13, UPC, and manufacturer SKU rows.",
     name: "product_identifiers",
     requiredForReload: true
   },

@@ -2058,12 +2058,13 @@ CREATE TABLE public.product_identifiers (
     CONSTRAINT product_identifiers_confidence_check CHECK ((confidence = ANY (ARRAY['trusted'::text, 'high'::text, 'medium'::text, 'low'::text]))),
     CONSTRAINT product_identifiers_ean13_check CHECK (((identifier_type <> 'ean13'::text) OR (normalized_value ~ '^[0-9]{13}$'::text))),
     CONSTRAINT product_identifiers_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'deleted'::text]))),
-    CONSTRAINT product_identifiers_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
+    CONSTRAINT product_identifiers_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'upc'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
+    CONSTRAINT product_identifiers_upc_check CHECK (((identifier_type <> 'upc'::text) OR (normalized_value ~ '^[0-9]{12}$'::text))),
     CONSTRAINT product_identifiers_value_check CHECK (((length(TRIM(BOTH FROM identifier_value)) > 0) AND (length(TRIM(BOTH FROM normalized_value)) > 0)))
 );
 
 
-COMMENT ON TABLE public.product_identifiers IS 'Approved product identifiers such as EAN-13 barcodes, manufacturer SKUs, retailer codes, and supplier codes.';
+COMMENT ON TABLE public.product_identifiers IS 'Approved product identifiers such as EAN-13/UPC barcodes, manufacturer SKUs, retailer codes, and supplier codes.';
 
 
 --
@@ -2087,7 +2088,8 @@ CREATE TABLE public.product_identifier_candidates (
     CONSTRAINT product_identifier_candidates_confidence_check CHECK ((confidence = ANY (ARRAY['trusted'::text, 'high'::text, 'medium'::text, 'low'::text]))),
     CONSTRAINT product_identifier_candidates_ean13_check CHECK (((identifier_type <> 'ean13'::text) OR (normalized_value ~ '^[0-9]{13}$'::text))),
     CONSTRAINT product_identifier_candidates_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'conflict'::text]))),
-    CONSTRAINT product_identifier_candidates_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
+    CONSTRAINT product_identifier_candidates_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'upc'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
+    CONSTRAINT product_identifier_candidates_upc_check CHECK (((identifier_type <> 'upc'::text) OR (normalized_value ~ '^[0-9]{12}$'::text))),
     CONSTRAINT product_identifier_candidates_value_check CHECK (((length(TRIM(BOTH FROM identifier_value)) > 0) AND (length(TRIM(BOTH FROM normalized_value)) > 0)))
 );
 

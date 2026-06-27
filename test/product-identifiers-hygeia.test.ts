@@ -5,7 +5,8 @@ import {
   ean13ChecksumValid,
   extractTrustedIdentifierEvidence,
   normalizeIdentifierValue,
-  productIdentifiersFromBody
+  productIdentifiersFromBody,
+  upcChecksumValid
 } from "@/lib/product-identifiers";
 import {
   extractTrustedFdaApprovalEvidence,
@@ -16,15 +17,23 @@ import {
 import { parseHygeiaCsv } from "@/lib/hygeia-product-files";
 
 describe("product identifiers and Hygeia files", () => {
-  it("validates and normalizes EAN-13 identifiers", () => {
+  it("validates and normalizes EAN-13 and UPC identifiers", () => {
     assert.equal(normalizeIdentifierValue("ean13", "4006 3813 3393 1"), "4006381333931");
     assert.equal(ean13ChecksumValid("4006381333931"), true);
     assert.equal(normalizeIdentifierValue("ean13", "4006381333932"), null);
+    assert.equal(normalizeIdentifierValue("upc", "036000 291452"), "036000291452");
+    assert.equal(upcChecksumValid("036000291452"), true);
+    assert.equal(normalizeIdentifierValue("upc", "036000291453"), null);
     assert.deepEqual(productIdentifiersFromBody([
       {
         source: "admin",
         type: "ean13",
         value: "4006381333931"
+      },
+      {
+        source: "admin",
+        type: "upc",
+        value: "036000291452"
       },
       {
         source: "admin",
@@ -43,6 +52,13 @@ describe("product identifiers and Hygeia files", () => {
         source: "admin",
         type: "ean13",
         value: "4006381333931"
+      },
+      {
+        confidence: "medium",
+        evidenceUrl: null,
+        source: "admin",
+        type: "upc",
+        value: "036000291452"
       }
     ]);
   });
@@ -52,7 +68,7 @@ describe("product identifiers and Hygeia files", () => {
       evidenceUrl: "https://manufacturer.example/product",
       html: `
         <script type="application/ld+json">
-          {"@type":"Product","name":"Example","gtin13":"4006381333931","sku":"MN-ABC"}
+          {"@type":"Product","name":"Example","gtin13":"4006381333931","gtin12":"036000291452","sku":"MN-ABC"}
         </script>
       `
     }) as Array<{
@@ -66,6 +82,12 @@ describe("product identifiers and Hygeia files", () => {
     assert.ok(evidence.some((item) =>
       item.type === "ean13" &&
       item.value === "4006381333931" &&
+      item.autoApprove === true &&
+      item.source === "manufacturer_structured_data"
+    ));
+    assert.ok(evidence.some((item) =>
+      item.type === "upc" &&
+      item.value === "036000291452" &&
       item.autoApprove === true &&
       item.source === "manufacturer_structured_data"
     ));
@@ -109,7 +131,8 @@ describe("product identifiers and Hygeia files", () => {
         source_snapshot: {},
         source_url: null,
         title: "Blackmores Bio C 1000 150 Tablets",
-        translated_titles: ["BLACKMORES BIO C 1000"]
+        translated_titles: ["BLACKMORES BIO C 1000"],
+        upc_identifiers: []
       }),
       [
         "Blackmores Bio C 1000",
@@ -118,7 +141,7 @@ describe("product identifiers and Hygeia files", () => {
     );
   });
 
-  it("includes active EAN and manufacturer SKU terms before product-name FDA searches", () => {
+  it("includes active EAN, UPC and manufacturer SKU terms before product-name FDA searches", () => {
     assert.deepEqual(
       thaiFdaOryorSearchTermsForProduct({
         brand_name: "Blackmores",
@@ -129,10 +152,12 @@ describe("product identifiers and Hygeia files", () => {
         source_snapshot: {},
         source_url: null,
         title: "Blackmores Bio C 1000 150 Tablets",
-        translated_titles: ["BLACKMORES BIO C 1000"]
+        translated_titles: ["BLACKMORES BIO C 1000"],
+        upc_identifiers: ["036000291452"]
       }),
       [
         "9300807325698",
+        "036000291452",
         "BIO-C-1000",
         "Blackmores Bio C 1000"
       ]
@@ -149,7 +174,8 @@ describe("product identifiers and Hygeia files", () => {
       source_snapshot: {},
       source_url: null,
       title: "VISTRA GLUTA COMPLEX 600",
-      translated_titles: []
+      translated_titles: [],
+      upc_identifiers: []
     };
 
     assert.deepEqual(
@@ -221,10 +247,10 @@ describe("product identifiers and Hygeia files", () => {
     assert.match(apply, /where identifier_type = 'internal_sku'/);
   });
 
-  it("keeps bulk identifier sourcing focused on missing active EAN/SKU values", async () => {
+  it("keeps bulk identifier sourcing focused on missing active EAN/UPC/SKU values", async () => {
     const service = await readFile("lib/product-identifiers.ts", "utf8");
 
-    assert.match(service, /sourceableProductIdentifierTypes = \["ean13", "manufacturer_sku"\]/);
+    assert.match(service, /sourceableProductIdentifierTypes = \["ean13", "upc", "manufacturer_sku"\]/);
     assert.match(service, /active_identifier_types/);
     assert.match(service, /missingIdentifierTypes/);
     assert.match(service, /snapshotEvidence/);

@@ -45,6 +45,7 @@ describe("product catalogue CSV", () => {
     assert.ok(PRODUCT_CATALOGUE_CSV_HEADERS.includes("Regulatory Approvals"));
     assert.ok(PRODUCT_CATALOGUE_CSV_HEADERS.includes("Manufacturer SKU"));
     assert.ok(PRODUCT_CATALOGUE_CSV_HEADERS.includes("Barcode"));
+    assert.ok(PRODUCT_CATALOGUE_CSV_HEADERS.includes("UPC"));
     assert.ok(PRODUCT_CATALOGUE_CSV_HEADERS.includes("Quantity in Stock"));
     assert.ok(PRODUCT_CATALOGUE_CSV_HEADERS.includes("Backorder Demand"));
     assert.ok(PRODUCT_CATALOGUE_CSV_HEADERS.includes("Backorder Policy"));
@@ -53,8 +54,8 @@ describe("product catalogue CSV", () => {
   it("parses exported column aliases used by operators", () => {
     const rows = parseProductCatalogueCsv(
       [
-        "Internal SKU,Manufacturer,Name,FDA Approval,Manufacturer SKU,Barcode,Quantity in Stock",
-        "00000000-0000-4000-8000-000000000001,Brand A,Product A,TH-123,MSKU-1,1234567890128,4",
+        "Internal SKU,Manufacturer,Name,FDA Approval,Manufacturer SKU,Barcode,UPC,Quantity in Stock",
+        "00000000-0000-4000-8000-000000000001,Brand A,Product A,TH-123,MSKU-1,1234567890128,036000291452,4",
       ].join("\n"),
     );
 
@@ -66,6 +67,7 @@ describe("product catalogue CSV", () => {
     assert.equal(rows[0]?.columns.manufacturer, "Brand A");
     assert.equal(rows[0]?.columns.fda_approval, "TH-123");
     assert.equal(rows[0]?.columns.manufacturer_sku, "MSKU-1");
+    assert.equal(rows[0]?.columns.upc, "036000291452");
     assert.equal(rows[0]?.columns.quantity_in_stock, "4");
   });
 

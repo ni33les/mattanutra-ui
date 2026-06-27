@@ -71,6 +71,7 @@ type ProductMatch = Readonly<{
   normalizedBrandName: string | null;
   normalizedTitle: string | null;
   productId: string;
+  upc: string | null;
 }>;
 
 type ProductImportSourceImageRow = Readonly<{
@@ -149,6 +150,7 @@ export const PRODUCT_CATALOGUE_CSV_HEADERS = [
   "Regulatory Approvals",
   "Manufacturer SKU",
   "Barcode",
+  "UPC",
   "Quantity in Stock",
   "Backorder Demand",
   "Backorder Policy",
@@ -474,7 +476,7 @@ async function productMatches() {
     left join public.product_identifiers
       on product_identifiers.product_id = products.id
       and product_identifiers.status = 'active'
-      and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
+      and product_identifiers.identifier_type in ('ean13', 'upc', 'manufacturer_sku')
     where products.status <> 'ignored'
   `;
   const byProductId = new Map<string, ProductMatch>();
@@ -488,6 +490,7 @@ async function productMatches() {
       normalizedBrandName: row.normalized_brand_name,
       normalizedTitle: row.normalized_title,
       productId: row.product_id,
+      upc: null,
     };
     const next = {
       ...existing,
@@ -496,6 +499,9 @@ async function productMatches() {
         : {}),
       ...(row.identifier_type === "manufacturer_sku"
         ? { manufacturerSku: row.normalized_value }
+        : {}),
+      ...(row.identifier_type === "upc"
+        ? { upc: row.normalized_value }
         : {}),
     };
 
@@ -542,6 +548,7 @@ function registerProductMatch(
     manufacturerSku: string | null;
     productId: string;
     title: string | null;
+    upc: string | null;
   }>,
 ) {
   const existing = matches.byProductId.get(input.productId);
@@ -555,6 +562,7 @@ function registerProductMatch(
       ? normalizeProductKey(input.title)
       : (existing?.normalizedTitle ?? null),
     productId: input.productId,
+    upc: input.upc ?? existing?.upc ?? null,
   };
 
   matches.byProductId.set(input.productId, next);
@@ -565,6 +573,10 @@ function registerProductMatch(
 
   if (next.manufacturerSku) {
     matches.byIdentifier.set(`manufacturer_sku:${next.manufacturerSku}`, next);
+  }
+
+  if (next.upc) {
+    matches.byIdentifier.set(`upc:${next.upc}`, next);
   }
 
   if (next.normalizedBrandName && next.normalizedTitle) {
@@ -611,6 +623,17 @@ function matchRowProduct(
       "manufacturer code",
     ]),
   );
+  const upc = normalizeIdentifierValue(
+    "upc",
+    column(row, [
+      "upc",
+      "upc barcode",
+      "upc-a",
+      "upca",
+      "gtin12",
+      "gtin-12",
+    ]),
+  );
   const title = cleanText(
     column(row, ["name", "product name", "canonical product title"]),
     500,
@@ -622,11 +645,11 @@ function matchRowProduct(
   const fingerprint = productRowFingerprint({ brandName, title });
 
   if (productId && matches.byProductId.has(productId)) {
-    return { ean13, manufacturerSku, productId, skuInvalid: false };
+    return { ean13, manufacturerSku, productId, skuInvalid: false, upc };
   }
 
   if (hasSku) {
-    return { ean13, manufacturerSku, productId: null, skuInvalid: true };
+    return { ean13, manufacturerSku, productId: null, skuInvalid: true, upc };
   }
 
   if (ean13 && matches.byIdentifier.has(`ean13:${ean13}`)) {
@@ -635,6 +658,17 @@ function matchRowProduct(
       manufacturerSku,
       productId: matches.byIdentifier.get(`ean13:${ean13}`)?.productId ?? null,
       skuInvalid: false,
+      upc,
+    };
+  }
+
+  if (upc && matches.byIdentifier.has(`upc:${upc}`)) {
+    return {
+      ean13,
+      manufacturerSku,
+      productId: matches.byIdentifier.get(`upc:${upc}`)?.productId ?? null,
+      skuInvalid: false,
+      upc,
     };
   }
 
@@ -649,6 +683,7 @@ function matchRowProduct(
         matches.byIdentifier.get(`manufacturer_sku:${manufacturerSku}`)
           ?.productId ?? null,
       skuInvalid: false,
+      upc,
     };
   }
 
@@ -658,17 +693,22 @@ function matchRowProduct(
       manufacturerSku,
       productId: matches.byFingerprint.get(fingerprint)?.productId ?? null,
       skuInvalid: false,
+      upc,
     };
   }
 
-  return { ean13, manufacturerSku, productId: null, skuInvalid: false };
+  return { ean13, manufacturerSku, productId: null, skuInvalid: false, upc };
 }
 
 function mergedIdentifiers(
   row: AdminProductRow | null,
-  input: Readonly<{ ean13: string | null; manufacturerSku: string | null }>,
+  input: Readonly<{
+    ean13: string | null;
+    manufacturerSku: string | null;
+    upc: string | null;
+  }>,
 ): ProductIdentifierInput[] | undefined {
-  const hasChanges = Boolean(input.ean13 || input.manufacturerSku);
+  const hasChanges = Boolean(input.ean13 || input.manufacturerSku || input.upc);
 
   if (!hasChanges) {
     return undefined;
@@ -703,6 +743,16 @@ function mergedIdentifiers(
       source: "product_catalogue_csv",
       type: "manufacturer_sku",
       value: input.manufacturerSku,
+    });
+  }
+
+  if (input.upc) {
+    byType.set("upc", {
+      confidence: "trusted",
+      evidenceUrl: null,
+      source: "product_catalogue_csv",
+      type: "upc",
+      value: input.upc,
     });
   }
 
@@ -1183,6 +1233,7 @@ export async function buildProductCatalogueCsv(
       title: string;
       title_en: string | null;
       title_th: string | null;
+      upc: string | null;
       wholesale_price_amount: string | number | null;
     }>
   >`
@@ -1212,6 +1263,9 @@ export async function buildProductCatalogueCsv(
       max(product_identifiers.identifier_value) filter (
         where product_identifiers.identifier_type = 'manufacturer_sku'
       ) as manufacturer_sku,
+      max(product_identifiers.identifier_value) filter (
+        where product_identifiers.identifier_type = 'upc'
+      ) as upc,
       max(product_regulatory_approvals.approval_number) filter (
         where product_regulatory_approvals.agency_code = 'TH_FDA'
           and product_regulatory_approvals.status in ('sourced', 'verified')
@@ -1281,7 +1335,7 @@ export async function buildProductCatalogueCsv(
     left join public.product_identifiers
       on product_identifiers.product_id = products.id
       and product_identifiers.status = 'active'
-      and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
+      and product_identifiers.identifier_type in ('ean13', 'upc', 'manufacturer_sku')
     left join public.product_translations product_translation_en
       on product_translation_en.product_id = products.id
       and product_translation_en.locale = 'en'
@@ -1353,6 +1407,7 @@ export async function buildProductCatalogueCsv(
         row.regulatory_approvals,
         row.manufacturer_sku,
         row.ean13,
+        row.upc,
         row.stock_quantity,
         row.backorder_demand,
         row.backorder_policy,
@@ -1445,6 +1500,7 @@ export async function applyProductCatalogueCsvImport(
         mergedIdentifiers(existing, {
           ean13: matched.ean13,
           manufacturerSku: matched.manufacturerSku,
+          upc: matched.upc,
         });
       const approvals = (existing: AdminProductRow | null) =>
         mergedApprovals(existing, approvalInputFromRow(row, countryCode));
@@ -1478,6 +1534,7 @@ export async function applyProductCatalogueCsvImport(
           identifiers: mergedIdentifiers(null, {
             ean13: matched.ean13,
             manufacturerSku: matched.manufacturerSku,
+            upc: matched.upc,
           }),
           platform: "manual",
           productAudience: productAudienceFromColumn(column(row, ["audience"])),
@@ -1505,6 +1562,7 @@ export async function applyProductCatalogueCsvImport(
           manufacturerSku: matched.manufacturerSku,
           productId,
           title,
+          upc: matched.upc,
         });
         result.createdProducts += 1;
       } else {
@@ -1552,6 +1610,7 @@ export async function applyProductCatalogueCsvImport(
           manufacturerSku: matched.manufacturerSku,
           productId,
           title: title ?? existing.title,
+          upc: matched.upc,
         });
         result.updatedProducts += 1;
       }

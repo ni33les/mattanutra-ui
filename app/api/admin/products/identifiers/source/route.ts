@@ -128,7 +128,7 @@ export async function POST(request: Request) {
         source: "admin_product_identifier_source_task"
       },
       description:
-        "Source missing EAN and manufacturer SKU identifiers from trusted product evidence.",
+        "Source missing EAN, UPC, and manufacturer SKU identifiers from trusted product evidence.",
       idempotencyKey: `source-product-identifiers:${productId ?? "all"}`,
       idempotencyScope: "active",
       idempotencyScopeKey: "product-identifier-sourcing",

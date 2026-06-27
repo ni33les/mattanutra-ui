@@ -7,6 +7,7 @@ type ProductIdentifierDb = Db | postgres.TransactionSql;
 
 export const PRODUCT_IDENTIFIER_TYPES = [
   "ean13",
+  "upc",
   "manufacturer_sku",
   "retailer_local_code",
   "supplier_code"
@@ -59,7 +60,7 @@ type IdentifierEvidence = ProductIdentifierInput & Readonly<{
   metadata?: Record<string, unknown>;
 }>;
 
-const sourceableProductIdentifierTypes = ["ean13", "manufacturer_sku"] as const;
+const sourceableProductIdentifierTypes = ["ean13", "upc", "manufacturer_sku"] as const;
 
 function cleanText(value: unknown, max = 2000) {
   if (typeof value !== "string") {
@@ -101,6 +102,18 @@ export function normalizeEan13(value: unknown) {
   return /^\d{13}$/.test(compact) ? compact : null;
 }
 
+export function normalizeUpc(value: unknown) {
+  const text = cleanText(value, 80);
+
+  if (!text) {
+    return null;
+  }
+
+  const compact = text.replace(/[\s-]/g, "");
+
+  return /^\d{12}$/.test(compact) ? compact : null;
+}
+
 export function ean13ChecksumValid(value: unknown) {
   const normalized = normalizeEan13(value);
 
@@ -118,6 +131,23 @@ export function ean13ChecksumValid(value: unknown) {
   return check === (10 - (sum % 10)) % 10;
 }
 
+export function upcChecksumValid(value: unknown) {
+  const normalized = normalizeUpc(value);
+
+  if (!normalized) {
+    return false;
+  }
+
+  const digits = normalized.split("").map(Number);
+  const check = digits.pop();
+  const sum = digits.reduce(
+    (total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1),
+    0
+  );
+
+  return check === (10 - (sum % 10)) % 10;
+}
+
 export function normalizeIdentifierValue(
   type: ProductIdentifierType,
   value: unknown
@@ -128,9 +158,26 @@ export function normalizeIdentifierValue(
     return normalized && ean13ChecksumValid(normalized) ? normalized : null;
   }
 
+  if (type === "upc") {
+    const normalized = normalizeUpc(value);
+
+    return normalized && upcChecksumValid(normalized) ? normalized : null;
+  }
+
   const text = cleanText(value, 180);
 
   return text ? text.replace(/\s+/g, " ").toUpperCase() : null;
+}
+
+function identifierValueForStorage(
+  type: ProductIdentifierType,
+  value: string
+) {
+  const normalizedValue = normalizeIdentifierValue(type, value);
+
+  return type === "ean13" || type === "upc"
+    ? normalizedValue
+    : value.trim();
 }
 
 function identifierConfidence(value: unknown): ProductIdentifierConfidence {
@@ -282,7 +329,7 @@ export async function replaceApprovedProductIdentifiers(
           normalizedValue,
           source: cleanText(identifier.source, 200) ?? "admin",
           type: identifier.type,
-          value: identifier.type === "ean13" ? normalizedValue : identifier.value.trim()
+          value: identifierValueForStorage(identifier.type, identifier.value) ?? identifier.value.trim()
         }]
       : [];
   });
@@ -429,7 +476,7 @@ export async function recordProductIdentifierCandidate(
     values (
       ${input.productId}::uuid,
       ${input.type},
-      ${input.type === "ean13" ? normalizedValue : input.value.trim()},
+      ${identifierValueForStorage(input.type, input.value) ?? input.value.trim()},
       ${normalizedValue},
       ${source},
       ${confidence},
@@ -462,7 +509,7 @@ export async function recordProductIdentifierCandidate(
         evidenceUrl: cleanText(input.evidenceUrl, 2000),
         source,
         type: input.type,
-        value: input.type === "ean13" ? normalizedValue : input.value.trim()
+        value: identifierValueForStorage(input.type, input.value) ?? input.value.trim()
       }],
       productId: input.productId
     });
@@ -501,8 +548,20 @@ function pushIdentifierEvidence(
 
   output.push({
     ...evidence,
-    value: evidence.type === "ean13" ? normalizedValue : evidence.value
+    value: identifierValueForStorage(evidence.type, evidence.value) ?? evidence.value
   });
+}
+
+function barcodeIdentifierTypeForValue(value: unknown) {
+  if (normalizeIdentifierValue("upc", value)) {
+    return "upc" as const;
+  }
+
+  if (normalizeIdentifierValue("ean13", value)) {
+    return "ean13" as const;
+  }
+
+  return null;
 }
 
 function extractIdentifierEvidenceFromRecord(
@@ -533,7 +592,7 @@ function extractIdentifierEvidenceFromRecord(
 
     if (text) {
       if (
-        ["gtin", "gtin13", "ean", "ean13", "barcode", "barcodeean13"].includes(normalizedKey)
+        ["gtin13", "ean", "ean13", "barcodeean13"].includes(normalizedKey)
       ) {
         pushIdentifierEvidence(output, {
           autoApprove: source.includes("structured") || source.includes("snapshot"),
@@ -543,6 +602,28 @@ function extractIdentifierEvidenceFromRecord(
           type: "ean13",
           value: text
         });
+      } else if (["gtin12", "upc", "upca", "barcodeupc"].includes(normalizedKey)) {
+        pushIdentifierEvidence(output, {
+          autoApprove: source.includes("structured") || source.includes("snapshot"),
+          confidence: source.includes("structured") ? "trusted" : "high",
+          evidenceUrl,
+          source,
+          type: "upc",
+          value: text
+        });
+      } else if (["gtin", "barcode"].includes(normalizedKey)) {
+        const type = barcodeIdentifierTypeForValue(text);
+
+        if (type) {
+          pushIdentifierEvidence(output, {
+            autoApprove: source.includes("structured") || source.includes("snapshot"),
+            confidence: source.includes("structured") ? "trusted" : "high",
+            evidenceUrl,
+            source,
+            type,
+            value: text
+          });
+        }
       } else if (["sku", "productsku"].includes(normalizedKey)) {
         pushIdentifierEvidence(output, {
           autoApprove: source.includes("structured") || source.includes("snapshot"),
@@ -635,6 +716,19 @@ export function extractTrustedIdentifierEvidence(input: Readonly<{
         evidenceUrl,
         source: "manufacturer_visible_text",
         type: "ean13",
+        value: match[1] ?? ""
+      });
+    }
+
+    for (const match of html.matchAll(
+      /\b(?:UPC(?:-?A)?|GTIN(?:-?12)?)\b[^0-9]{0,30}([0-9][0-9\s-]{10,22}[0-9])/gi
+    )) {
+      pushIdentifierEvidence(output, {
+        autoApprove: false,
+        confidence: "medium",
+        evidenceUrl,
+        source: "manufacturer_visible_text",
+        type: "upc",
         value: match[1] ?? ""
       });
     }

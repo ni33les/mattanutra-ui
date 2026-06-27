@@ -940,7 +940,7 @@ function normalizedDraftIdentifierValue(
 ) {
   const trimmed = value.trim();
 
-  if (type === "ean13") {
+  if (type === "ean13" || type === "upc") {
     return trimmed.replace(/[\s-]/g, "");
   }
 
@@ -982,7 +982,7 @@ export function ProductIdentifiersEditor({
               type,
               updatedAt: null,
               value:
-                type === "ean13"
+                type === "ean13" || type === "upc"
                   ? normalizedDraftIdentifierValue(type, trimmed)
                   : trimmed,
             },
@@ -1013,7 +1013,7 @@ export function ProductIdentifiersEditor({
           </span>
         ) : null}
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-4">
         <label className="text-xs font-semibold text-gray-700">
           {viewLabels.ean13}
           <input
@@ -1023,6 +1023,17 @@ export function ProductIdentifiersEditor({
             onChange={(event) => updateIdentifier("ean13", event.target.value)}
             type="text"
             value={identifierValue(draft, "ean13")}
+          />
+        </label>
+        <label className="text-xs font-semibold text-gray-700">
+          {viewLabels.upc}
+          <input
+            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            inputMode="numeric"
+            maxLength={16}
+            onChange={(event) => updateIdentifier("upc", event.target.value)}
+            type="text"
+            value={identifierValue(draft, "upc")}
           />
         </label>
         <label className="text-xs font-semibold text-gray-700">
