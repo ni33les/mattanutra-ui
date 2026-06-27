@@ -547,6 +547,9 @@ describe("product coverage workflow", () => {
     assert.doesNotMatch(view, /AI-generated plan demand/);
     assert.match(view, /Best next moves/);
     assert.match(view, /Clear list/);
+    assert.match(view, /nextMoveReasonText/);
+    assert.match(view, /Adding this covers/);
+    assert.doesNotMatch(view, /row\.blockedReason/);
     assert.match(view, /simulator-clear-target/);
     assert.match(view, /ChevronDownIcon/);
     assert.match(view, /buildSimulationNextMoveRows/);

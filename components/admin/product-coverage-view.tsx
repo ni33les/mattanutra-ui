@@ -914,6 +914,46 @@ function ProductUsefulnessBar({
   );
 }
 
+function compactDisplayList(values: readonly string[]) {
+  const visibleValues = values.slice(0, 3);
+
+  if (values.length < 1) {
+    return "unmet supplement demand";
+  }
+
+  if (values.length === 1) {
+    return visibleValues[0];
+  }
+
+  if (values.length === 2) {
+    return `${visibleValues[0]} and ${visibleValues[1]}`;
+  }
+
+  if (values.length === 3) {
+    return `${visibleValues[0]}, ${visibleValues[1]}, and ${visibleValues[2]}`;
+  }
+
+  return `${visibleValues[0]}, ${visibleValues[1]}, ${visibleValues[2]}, and ${numberText(values.length - 3)} more`;
+}
+
+function nextMoveReasonText(row: AdminSimulationNextMoveRow) {
+  const profileLabel = row.unmetDemandCount === 1 ? "profile" : "profiles";
+  const gapText =
+    row.gapSupplementCount > 0
+      ? ` and closes ${numberText(row.gapSupplementCount)} current catalogue ${
+          row.gapSupplementCount === 1 ? "gap" : "gaps"
+        }`
+      : "";
+  const overallText =
+    row.matchableSupplementCount > row.unmetSupplementNames.length
+      ? `; it covers ${numberText(row.matchableSupplementCount)} matchable supplements overall`
+      : "";
+
+  return `Adding this covers ${compactDisplayList(row.unmetSupplementNames)} across ${numberText(
+    row.unmetDemandCount
+  )} simulated ${profileLabel} (${percentText(row.unmetDemandPercent)})${gapText}${overallText}.`;
+}
+
 function NextMoveProductRow({
   accessToken,
   locale,
@@ -937,9 +977,8 @@ function NextMoveProductRow({
           <ArrowTopRightOnSquareIcon className="size-4 shrink-0" aria-hidden={true} />
         </a>
         <p className="mt-1 text-xs text-slate-500">{row.brandName ?? "No brand"}</p>
-        <p className="mt-1 text-xs text-slate-500">{row.blockedReason}</p>
-        <p className="mt-1 truncate text-xs text-slate-500">
-          {row.unmetSupplementNames.join(" · ")}
+        <p className="mt-1 text-xs font-medium text-slate-700">
+          {nextMoveReasonText(row)}
         </p>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
           <div
