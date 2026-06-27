@@ -190,33 +190,36 @@ export function AddProductFromUrlModal({
 
 export function ProductImagePreview({
   alt = "",
+  onImageLoad,
+  previewImageUrl,
   row,
   size = "md",
 }: Readonly<{
   alt?: string;
+  onImageLoad?: (imageUrl: string) => void;
+  previewImageUrl?: string | null;
   row: Pick<AdminProductRow, "brandName" | "imageUrl" | "platform" | "title">;
   size?: "md" | "lg";
 }>) {
   const fallback = <ProductImageFallback row={row} size={size} />;
+  const preview = previewImageUrl ? (
+    <ProductImageBlobPreview
+      alt={alt}
+      imageUrl={previewImageUrl}
+      size={size}
+    />
+  ) : null;
 
   if (!row.imageUrl) {
-    return fallback;
+    return preview ?? fallback;
   }
 
   if (row.imageUrl.startsWith("blob:")) {
     return (
-      <div
-        aria-label={alt || undefined}
-        className={classNames(
-          "shrink-0 bg-cover bg-center ring-1 ring-gray-200",
-          size === "lg"
-            ? "size-24 rounded-xl"
-            : "size-20 rounded-lg",
-        )}
-        role={alt ? "img" : undefined}
-        style={{
-          backgroundImage: `url("${row.imageUrl.replace(/["\\]/g, "\\$&")}")`,
-        }}
+      <ProductImageBlobPreview
+        alt={alt}
+        imageUrl={row.imageUrl}
+        size={size}
       />
     );
   }
@@ -230,10 +233,37 @@ export function ProductImagePreview({
           ? "size-24 rounded-xl"
           : "size-20 rounded-lg",
       )}
-      fallback={fallback}
+      fallback={preview ?? fallback}
       height={size === "lg" ? 96 : 80}
+      onLoad={() => onImageLoad?.(row.imageUrl!)}
       src={row.imageUrl}
       width={size === "lg" ? 96 : 80}
+    />
+  );
+}
+
+function ProductImageBlobPreview({
+  alt,
+  imageUrl,
+  size,
+}: Readonly<{
+  alt: string;
+  imageUrl: string;
+  size: "md" | "lg";
+}>) {
+  return (
+    <div
+      aria-label={alt || undefined}
+      className={classNames(
+        "shrink-0 bg-cover bg-center ring-1 ring-gray-200",
+        size === "lg"
+          ? "size-24 rounded-xl"
+          : "size-20 rounded-lg",
+      )}
+      role={alt ? "img" : undefined}
+      style={{
+        backgroundImage: `url("${imageUrl.replace(/["\\]/g, "\\$&")}")`,
+      }}
     />
   );
 }
@@ -265,7 +295,9 @@ function droppedImageUrl(dataTransfer: DataTransfer) {
 export function ProductImageDropzone({
   accessToken,
   onImageUrlChange,
+  onPreviewImageLoad,
   onPreviewImageUrlChange,
+  previewImageUrl,
   productId,
   row,
   storedImageUrl,
@@ -273,7 +305,12 @@ export function ProductImageDropzone({
 }: Readonly<{
   accessToken: string;
   onImageUrlChange: (imageUrl: string | null) => void;
-  onPreviewImageUrlChange?: (imageUrl: string | null) => void;
+  onPreviewImageLoad?: (imageUrl: string) => void;
+  onPreviewImageUrlChange?: (
+    imageUrl: string | null,
+    targetImageUrl?: string | null,
+  ) => void;
+  previewImageUrl?: string | null;
   productId: string;
   row: Pick<
     AdminProductRow,
@@ -381,7 +418,7 @@ export function ProductImageDropzone({
         throw new Error(result.message);
       }
 
-      onPreviewImageUrlChange?.(null);
+      onPreviewImageUrlChange?.(previewUrl, result.url);
       onImageUrlChange(result.url);
     } catch (error) {
       onPreviewImageUrlChange?.(null);
@@ -450,7 +487,13 @@ export function ProductImageDropzone({
           void applyImageUrl(imageUrl);
         }}
       >
-        <ProductImagePreview alt="" row={row} size="lg" />
+        <ProductImagePreview
+          alt=""
+          onImageLoad={onPreviewImageLoad}
+          previewImageUrl={previewImageUrl}
+          row={row}
+          size="lg"
+        />
         <div className="min-w-0">
           <div className="flex flex-col gap-2 sm:flex-row">
             <input

@@ -66,7 +66,9 @@ describe("product admin card layout", () => {
     assert.match(detailView, /ProductImagePreview/);
     assert.match(detailView, /localImagePreviewUrl/);
     assert.match(detailView, /URL\.revokeObjectURL\(localImagePreviewUrl\)/);
-    assert.match(detailView, /<ProductImagePreview alt=\{localized\.title\.value\} row=\{previewDraft\} size="lg" \/>/);
+    assert.match(detailView, /onImageLoad=\{handleSavedImageLoad\}/);
+    assert.match(detailView, /previewImageUrl=\{localImagePreviewUrl\}/);
+    assert.match(detailView, /row=\{draft\}/);
     assert.doesNotMatch(productCard, /row\.platform\.toUpperCase\(\)/);
     assert.doesNotMatch(view, /productStatusLabel\(row\.productKind, locale\)/);
     assert.match(productCard, /viewLabels\.translations/);
@@ -118,7 +120,9 @@ describe("product admin card layout", () => {
     assert.match(dropzone, /viewLabels\.imageUseUrl/);
     assert.match(dropzone, /URL\.createObjectURL\(file\)/);
     assert.match(dropzone, /onPreviewImageUrlChange\?\.\(previewUrl\)/);
-    assert.match(dropzone, /onPreviewImageUrlChange\?\.\(null\);[\s\S]*onImageUrlChange\(result\.url\)/);
+    assert.match(dropzone, /onPreviewImageUrlChange\?\.\(previewUrl, result\.url\);[\s\S]*onImageUrlChange\(result\.url\)/);
+    assert.match(view, /fallback=\{preview \?\? fallback\}/);
+    assert.match(view, /onLoad=\{\(\) => onImageLoad\?\.\(row\.imageUrl!\)\}/);
     assert.match(view, /row\.imageUrl\.startsWith\("blob:"\)/);
     assert.doesNotMatch(dropzone, /imageFileDropUnsupported/);
     assert.match(dropzone, /draggable=\{true\}/);
@@ -127,8 +131,10 @@ describe("product admin card layout", () => {
     assert.match(detailView, /<ProductImageDropzone/);
     assert.match(detailView, /accessToken=\{accessToken\}/);
     assert.match(detailView, /productId=\{draft\.id\}/);
-    assert.match(detailView, /onPreviewImageUrlChange=\{setLocalImagePreviewUrl\}/);
-    assert.match(detailView, /row=\{previewDraft\}/);
+    assert.match(detailView, /onPreviewImageUrlChange=\{handleLocalImagePreviewChange\}/);
+    assert.match(detailView, /onPreviewImageLoad=\{handleSavedImageLoad\}/);
+    assert.match(detailView, /previewImageUrl=\{localImagePreviewUrl\}/);
+    assert.match(detailView, /row=\{draft\}/);
     assert.match(detailView, /storedImageUrl=\{draft\.imageUrl\}/);
     assert.match(detailView, /setDraft\(\(currentDraft\) =>/);
     assert.match(detailView, /\.\.\.currentDraft\.imageCandidates/);

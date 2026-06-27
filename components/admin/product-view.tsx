@@ -1015,7 +1015,10 @@ function ProductDetailPanel({
     draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? "",
   );
   const [reviewerNote, setReviewerNote] = useState("");
-  const [localImagePreviewUrl, setLocalImagePreviewUrl] = useState<string | null>(null);
+  const [localImagePreview, setLocalImagePreview] = useState<{
+    imageUrl: string;
+    targetImageUrl: string | null;
+  } | null>(null);
   const viewLabels = productViewLabels[locale];
   const hasOpenImportReview = Boolean(draft.importReviewTaskId);
   const approvalBlockedMessage =
@@ -1040,12 +1043,7 @@ function ProductDetailPanel({
       : [manufacturerCountryCodes[0] ?? defaultProductCountryCode];
   const localized = adminLocalizedProductText(draft, locale);
   const fallbackLabel = adminLocalizedFallbackLabel(localized.title, locale);
-  const previewDraft = localImagePreviewUrl
-    ? {
-        ...draft,
-        imageUrl: localImagePreviewUrl,
-      }
-    : draft;
+  const localImagePreviewUrl = localImagePreview?.imageUrl ?? null;
 
   useEffect(
     () => () => {
@@ -1055,6 +1053,30 @@ function ProductDetailPanel({
     },
     [localImagePreviewUrl],
   );
+
+  function handleLocalImagePreviewChange(
+    imageUrl: string | null,
+    targetImageUrl: string | null = null,
+  ) {
+    setLocalImagePreview((current) => {
+      if (!imageUrl) {
+        return null;
+      }
+
+      return {
+        imageUrl,
+        targetImageUrl:
+          targetImageUrl ??
+          (current?.imageUrl === imageUrl ? current.targetImageUrl : null),
+      };
+    });
+  }
+
+  function handleSavedImageLoad(imageUrl: string) {
+    setLocalImagePreview((current) =>
+      current?.targetImageUrl === imageUrl ? null : current
+    );
+  }
 
   function addManufacturerCountry(countryCode: string) {
     setDraft({
@@ -1271,7 +1293,13 @@ function ProductDetailPanel({
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
-            <ProductImagePreview alt={localized.title.value} row={previewDraft} size="lg" />
+            <ProductImagePreview
+              alt={localized.title.value}
+              onImageLoad={handleSavedImageLoad}
+              previewImageUrl={localImagePreviewUrl}
+              row={draft}
+              size="lg"
+            />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex flex-col gap-1">
@@ -1405,9 +1433,11 @@ function ProductDetailPanel({
               imageUrl,
             }))
           }
-          onPreviewImageUrlChange={setLocalImagePreviewUrl}
+          onPreviewImageLoad={handleSavedImageLoad}
+          onPreviewImageUrlChange={handleLocalImagePreviewChange}
+          previewImageUrl={localImagePreviewUrl}
           productId={draft.id}
-          row={previewDraft}
+          row={draft}
           storedImageUrl={draft.imageUrl}
           viewLabels={viewLabels}
         />
