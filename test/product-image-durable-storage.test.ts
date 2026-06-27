@@ -10,6 +10,7 @@ describe("durable product image storage tooling", () => {
       probeUatAppScript,
       uatSmoke,
       probeScript,
+      runtimeProbeRoute,
       uploadRoute,
       uploadSmokeScript,
       repairScript
@@ -19,6 +20,7 @@ describe("durable product image storage tooling", () => {
       readFile("scripts/probe-uat-app-image-storage.mjs", "utf8"),
       readFile("scripts/uat-smoke.mjs", "utf8"),
       readFile("scripts/probe-spaces-image-storage.ts", "utf8"),
+      readFile("app/api/admin/products/image-storage/diagnostics/route.ts", "utf8"),
       readFile("app/api/admin/products/[id]/image/upload/route.ts", "utf8"),
       readFile("scripts/uat-product-image-upload-smoke.ts", "utf8"),
       readFile("scripts/repair-nondurable-product-images.ts", "utf8")
@@ -40,6 +42,10 @@ describe("durable product image storage tooling", () => {
     assert.match(probeScript, /readinessForError/);
     assert.match(probeScript, /auth-failed/);
     assert.match(probeScript, /cdn-not-readable/);
+    assert.match(runtimeProbeRoute, /storeFirstPartyImageBytes/);
+    assert.match(runtimeProbeRoute, /DeleteObjectCommand/);
+    assert.match(runtimeProbeRoute, /adminDashboardOrClawRequestAllowed/);
+    assert.match(runtimeProbeRoute, /x-request-id/);
     assert.match(uploadRoute, /randomUUID/);
     assert.match(uploadRoute, /x-request-id/);
     assert.match(uploadRoute, /Admin product image upload started/);
