@@ -510,6 +510,12 @@ describe("product coverage workflow", () => {
     assert.match(simulationModel, /demandProfiles/);
     assert.match(view, /SIMULATOR_STORAGE_KEY/);
     assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
+    assert.match(view, /version: 2\s*\n\s*}\s+satisfies SavedDemandProfilesState/);
+    assert.match(view, /function loadSavedDemandProfiles\(\)/);
+    assert.doesNotMatch(view, /parsed\.demandKey !== demandKey/);
+    assert.match(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
+    assert.match(view, /function savedDemandProfiles/);
+    assert.match(view, /clearSavedDemandProfiles\(\)/);
     assert.match(view, /\/api\/admin\/product-coverage\/simulation-input/);
     assert.match(view, /cache: "no-store"/);
     assert.match(view, /inputStatus !== "ready"/);

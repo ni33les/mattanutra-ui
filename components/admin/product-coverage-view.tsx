@@ -73,9 +73,10 @@ type SavedSimulationState = Readonly<{
 }>;
 
 type SavedDemandProfilesState = Readonly<{
-  demandKey: string;
+  demandKey?: string;
+  savedAt?: string;
   profiles: readonly AdminPlanCoverageDemandProfile[];
-  version: 1;
+  version: 1 | 2;
 }>;
 
 type SimulatorInputStatus = "error" | "loading" | "ready";
@@ -285,20 +286,19 @@ function simulationDataWithArchetypes(
 }
 
 function saveDemandProfiles(
-  demandKey: string,
   profiles: readonly AdminPlanCoverageDemandProfile[]
 ) {
   try {
     window.localStorage.setItem(
       SIMULATOR_DEMAND_STORAGE_KEY,
       JSON.stringify({
-        demandKey,
+        savedAt: new Date().toISOString(),
         profiles,
-        version: 1
+        version: 2
       } satisfies SavedDemandProfilesState)
     );
   } catch {
-    // Storage is a convenience; profiles can be regenerated.
+    // Storage availability depends on the browser, but explicit clear remains the app path.
   }
 }
 
@@ -310,7 +310,7 @@ function clearSavedDemandProfiles() {
   }
 }
 
-function loadSavedDemandProfiles(demandKey: string) {
+function loadSavedDemandProfiles() {
   try {
     const raw = window.localStorage.getItem(SIMULATOR_DEMAND_STORAGE_KEY);
 
@@ -321,17 +321,35 @@ function loadSavedDemandProfiles(demandKey: string) {
     const parsed = JSON.parse(raw) as Partial<SavedDemandProfilesState>;
 
     if (
-      parsed.version !== 1 ||
-      parsed.demandKey !== demandKey ||
+      (parsed.version !== 1 && parsed.version !== 2) ||
       !Array.isArray(parsed.profiles)
     ) {
       return [];
     }
 
-    return normalizeDemandProfiles(parsed.profiles);
+    return savedDemandProfiles(normalizeDemandProfiles(parsed.profiles));
   } catch {
     return [];
   }
+}
+
+function savedDemandProfiles(
+  profiles: readonly AdminPlanCoverageDemandProfile[]
+) {
+  const bySampleIndex = new Map<number, AdminPlanCoverageDemandProfile>();
+
+  for (const profile of profiles) {
+    if (
+      profile.sampleIndex >= 0 &&
+      profile.sampleIndex < ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES
+    ) {
+      bySampleIndex.set(profile.sampleIndex, profile);
+    }
+  }
+
+  return [...bySampleIndex.values()].sort(
+    (first, second) => first.sampleIndex - second.sampleIndex
+  );
 }
 
 function savedStateFromRunner(
@@ -1600,7 +1618,7 @@ export function AdminPlanCoverageSimulatorView({
     useState<SimulatorClearTarget>("results");
   const [demandProfiles, setDemandProfiles] = useState<
     AdminPlanCoverageDemandProfile[]
-  >([]);
+  >(loadSavedDemandProfiles);
   const [demandGenerating, setDemandGenerating] = useState(false);
   const [demandError, setDemandError] = useState<string | null>(null);
   const [inputRefreshNonce, setInputRefreshNonce] = useState(0);
@@ -1844,7 +1862,7 @@ export function AdminPlanCoverageSimulatorView({
 
       setDemandGenerating(false);
       setDemandError(null);
-      setDemandProfiles(loadSavedDemandProfiles(demandKey));
+      setDemandProfiles(loadSavedDemandProfiles());
 
       if (previousDemandKey !== null && previousDemandKey !== demandKey) {
         clearSavedSimulationState();
@@ -2013,7 +2031,7 @@ export function AdminPlanCoverageSimulatorView({
           runner = runnerWithDemandProfiles(runner, profiles);
           runnerRef.current = runner;
           setDemandProfiles(profiles);
-          saveDemandProfiles(demandKey, profiles);
+          saveDemandProfiles(profiles);
         }
 
         setDemandGenerating(false);
