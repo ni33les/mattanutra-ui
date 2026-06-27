@@ -22,6 +22,7 @@ import type { ProductCandidate } from "../lib/product-recommendations.ts";
 
 const supplementId = "11111111-1111-4111-8111-111111111111";
 const magnesiumSupplementId = "33333333-3333-4333-8333-333333333333";
+const zincSupplementId = "55555555-5555-4555-8555-555555555555";
 
 function product(overrides: Partial<ProductCandidate> = {}): ProductCandidate {
   return {
@@ -360,6 +361,18 @@ describe("product coverage workflow", () => {
       targetText: "200 mg/day",
       weight: 8
     };
+    const zincNeed = {
+      category: "Minerals",
+      displayName: "Zinc",
+      id: "supplement:zinc",
+      itemType: "supplement" as const,
+      normalizedName: "zinc",
+      sourceId: zincSupplementId,
+      targetComparableAmount: 15000,
+      targetDose: null,
+      targetText: "15 mg/day",
+      weight: 8
+    };
     const blockedProduct = product({
       facts: [
         ...product().facts,
@@ -405,9 +418,10 @@ describe("product coverage workflow", () => {
         demandProfile({
           needs: [
             ...demandProfile().needs,
-            magnesiumNeed
+            magnesiumNeed,
+            zincNeed
           ],
-          supplementNames: ["CoQ10", "Magnesium"]
+          supplementNames: ["CoQ10", "Magnesium", "Zinc"]
         })
       ],
       sampleSize: 8,
@@ -416,12 +430,18 @@ describe("product coverage workflow", () => {
     });
     const nextMoves = buildSimulationNextMoveRows({
       reviewPriorityProducts: reviewRows,
+      simulationInput: simulationData.input,
       simulationData
     });
+    const sourceMove = nextMoves.find((row) => row.kind === "source_supplement");
 
     assert.equal(nextMoves[0]?.id, blockedProduct.id);
+    assert.equal(nextMoves[0]?.kind, "review_product");
     assert.equal(nextMoves[0]?.unmetSupplementNames[0], "Magnesium");
     assert.equal(nextMoves[0]?.unmetDemandCount, 8);
+    assert.equal(sourceMove?.sourceSupplementName, "Zinc");
+    assert.equal(sourceMove?.targetDoseText, "15 mg/day");
+    assert.equal(sourceMove?.unmetDemandCount, 8);
   });
 
   it("converts Customer Intelligence users into simulator profiles", () => {
@@ -549,6 +569,9 @@ describe("product coverage workflow", () => {
     assert.match(view, /Clear list/);
     assert.match(view, /nextMoveReasonText/);
     assert.match(view, /Adding this covers/);
+    assert.match(view, /source_supplement/);
+    assert.match(view, /Optimum dose/);
+    assert.match(view, /simulationInput: activeInputData\.input/);
     assert.doesNotMatch(view, /row\.blockedReason/);
     assert.match(view, /simulator-clear-target/);
     assert.match(view, /ChevronDownIcon/);

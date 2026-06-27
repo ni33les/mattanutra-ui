@@ -937,6 +937,14 @@ function compactDisplayList(values: readonly string[]) {
 }
 
 function nextMoveReasonText(row: AdminSimulationNextMoveRow) {
+  if (row.kind === "source_supplement") {
+    return `Source a product for ${row.sourceSupplementName}; demand appears across ${numberText(
+      row.unmetDemandCount
+    )} simulated ${
+      row.unmetDemandCount === 1 ? "profile" : "profiles"
+    } (${percentText(row.unmetDemandPercent)}) and no catalogue product currently covers it.`;
+  }
+
   const profileLabel = row.unmetDemandCount === 1 ? "profile" : "profiles";
   const gapText =
     row.gapSupplementCount > 0
@@ -964,25 +972,41 @@ function NextMoveProductRow({
   row: AdminSimulationNextMoveRow;
 }>) {
   const width = Math.max(8, Math.min(100, row.unmetDemandPercent));
+  const targetDoseText =
+    row.kind === "source_supplement" ? row.targetDoseText ?? "Not set" : null;
 
   return (
     <div className="grid gap-3 border-t border-slate-200 py-4 lg:grid-cols-[44px_minmax(0,1fr)_120px_120px_120px] lg:items-center">
       <p className="text-sm font-bold text-slate-400">#{row.rank}</p>
       <div className="min-w-0">
-        <a
-          className="inline-flex max-w-full items-center gap-1 truncate text-sm font-semibold text-slate-950 hover:text-[#168060]"
-          href={productDetailHref(row.id, locale, accessToken)}
-        >
-          <span className="truncate">{row.title}</span>
-          <ArrowTopRightOnSquareIcon className="size-4 shrink-0" aria-hidden={true} />
-        </a>
-        <p className="mt-1 text-xs text-slate-500">{row.brandName ?? "No brand"}</p>
+        {row.kind === "review_product" ? (
+          <a
+            className="inline-flex max-w-full items-center gap-1 truncate text-sm font-semibold text-slate-950 hover:text-[#168060]"
+            href={productDetailHref(row.id, locale, accessToken)}
+          >
+            <span className="truncate">{row.title}</span>
+            <ArrowTopRightOnSquareIcon className="size-4 shrink-0" aria-hidden={true} />
+          </a>
+        ) : (
+          <p className="truncate text-sm font-semibold text-slate-950">{row.title}</p>
+        )}
+        <p className="mt-1 text-xs text-slate-500">
+          {row.kind === "source_supplement" ? "New product needed" : row.brandName ?? "No brand"}
+        </p>
         <p className="mt-1 text-xs font-medium text-slate-700">
           {nextMoveReasonText(row)}
         </p>
+        {targetDoseText ? (
+          <p className="mt-1 text-xs text-slate-500">
+            Optimum dose: {targetDoseText}
+          </p>
+        ) : null}
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full rounded-full bg-[#F59E0B]"
+            className={classNames(
+              "h-full rounded-full",
+              row.kind === "source_supplement" ? "bg-[#2563EB]" : "bg-[#F59E0B]"
+            )}
             style={{ width: `${width}%` }}
           />
         </div>
@@ -998,9 +1022,13 @@ function NextMoveProductRow({
         </p>
       </div>
       <div className="text-sm">
-        <p className="text-xs text-slate-500">Price</p>
+        <p className="text-xs text-slate-500">
+          {row.kind === "source_supplement" ? "Optimum dose" : "Price"}
+        </p>
         <p className="font-bold text-slate-950">
-          {amountText(row.expectedPriceAmount)}
+          {row.kind === "source_supplement"
+            ? row.targetDoseText ?? "Not set"
+            : amountText(row.expectedPriceAmount)}
         </p>
       </div>
     </div>
@@ -1707,10 +1735,11 @@ export function AdminPlanCoverageSimulatorView({
   const nextMoveRows = useMemo(
     () =>
       buildSimulationNextMoveRows({
+        simulationInput: activeInputData.input,
         reviewPriorityProducts: inputData.reviewPriorityProducts,
         simulationData
       }),
-    [inputData.reviewPriorityProducts, simulationData]
+    [activeInputData.input, inputData.reviewPriorityProducts, simulationData]
   );
   const nextMovesKey = useMemo(
     () =>
@@ -1719,7 +1748,9 @@ export function AdminPlanCoverageSimulatorView({
           inputKey,
           rows: nextMoveRows.map((row) => ({
             id: row.id,
+            kind: row.kind,
             score: row.nextMoveScore,
+            targetDoseText: row.targetDoseText,
             unmetDemandCount: row.unmetDemandCount
           })),
           sampleSize: simulationData.sampleSize,
@@ -2279,7 +2310,7 @@ export function AdminPlanCoverageSimulatorView({
               Best next moves
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Blocked products ranked by the unmet supplement demand in this simulation.
+              Blocked products and missing supplement sourcing moves ranked by unmet demand.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -2325,8 +2356,8 @@ export function AdminPlanCoverageSimulatorView({
             </p>
           ) : (
             <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
-              No blocked products currently cover the unmet supplements in this
-              simulation output.
+              No blocked products or missing supplement sourcing moves currently cover the
+              unmet demand in this simulation output.
             </p>
           )}
         </div>

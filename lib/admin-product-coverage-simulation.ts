@@ -83,12 +83,45 @@ export type AdminSimulationReviewProductRow = Readonly<{
   title: string;
 }>;
 
-export type AdminSimulationNextMoveRow = AdminSimulationReviewProductRow & Readonly<{
+type AdminSimulationNextMoveBase = Readonly<{
   nextMoveScore: number;
+  rank: number;
   unmetDemandCount: number;
   unmetDemandPercent: number;
   unmetSupplementNames: readonly string[];
 }>;
+
+export type AdminSimulationProductNextMoveRow =
+  AdminSimulationReviewProductRow &
+    AdminSimulationNextMoveBase &
+    Readonly<{
+      kind: "review_product";
+      targetDoseText: null;
+    }>;
+
+export type AdminSimulationSourcingNextMoveRow =
+  AdminSimulationNextMoveBase &
+    Readonly<{
+      brandName: null;
+      brandStatus: null;
+      blockedReason: string;
+      coveredSupplementNames: readonly string[];
+      currency: string;
+      expectedPriceAmount: null;
+      gapSupplementCount: number;
+      id: string;
+      kind: "source_supplement";
+      matchableSupplementCount: number;
+      productStatus: "pending_review";
+      reviewScore: number;
+      sourceSupplementName: string;
+      targetDoseText: string | null;
+      title: string;
+    }>;
+
+export type AdminSimulationNextMoveRow =
+  | AdminSimulationProductNextMoveRow
+  | AdminSimulationSourcingNextMoveRow;
 
 export type AdminPlanCoverageSimulationData = Readonly<{
   countryCode: string;
@@ -905,8 +938,80 @@ function normalizedSupplementName(value: string) {
     .replace(/\s+/g, " ");
 }
 
+function doseTextBySupplement(input: AdminPlanCoverageSimulationInput) {
+  const doseCountsBySupplement = new Map<string, Map<string, number>>();
+
+  for (const profile of input.demandProfiles) {
+    for (const need of profile.needs) {
+      if (need.itemType !== "supplement" || !need.targetText) {
+        continue;
+      }
+
+      const keys = [
+        normalizedSupplementName(need.displayName),
+        normalizedSupplementName(need.normalizedName),
+        normalizedSupplementName(need.sourceId)
+      ].filter((key) => key.length > 0);
+
+      for (const key of new Set(keys)) {
+        const counts = doseCountsBySupplement.get(key) ?? new Map<string, number>();
+
+        counts.set(need.targetText, (counts.get(need.targetText) ?? 0) + 1);
+        doseCountsBySupplement.set(key, counts);
+      }
+    }
+  }
+
+  return new Map(
+    [...doseCountsBySupplement.entries()].map(([key, counts]) => [
+      key,
+      [...counts.entries()]
+        .sort((first, second) =>
+          second[1] - first[1] || first[0].localeCompare(second[0])
+        )[0]?.[0] ?? null
+    ])
+  );
+}
+
+function supplementCoverageKeys(input: Readonly<{
+  reviewPriorityProducts: readonly AdminSimulationReviewProductRow[];
+  simulationInput: AdminPlanCoverageSimulationInput | null;
+}>) {
+  const keys = new Set<string>();
+  const supplementById = new Map(
+    (input.simulationInput?.supplements ?? []).map((supplement) => [
+      supplement.id,
+      supplement
+    ])
+  );
+
+  for (const product of input.simulationInput?.candidates ?? []) {
+    for (const fact of product.facts) {
+      if (!fact.supplementId || factComparableAmount(fact) === null) {
+        continue;
+      }
+
+      const supplement = supplementById.get(fact.supplementId);
+
+      keys.add(normalizedSupplementName(supplement?.name ?? fact.name));
+      keys.add(normalizedSupplementName(supplement?.normalizedName ?? fact.normalizedName));
+    }
+  }
+
+  for (const product of input.reviewPriorityProducts) {
+    for (const name of product.coveredSupplementNames) {
+      keys.add(normalizedSupplementName(name));
+    }
+  }
+
+  keys.delete("");
+
+  return keys;
+}
+
 export function buildSimulationNextMoveRows(input: Readonly<{
   reviewPriorityProducts: readonly AdminSimulationReviewProductRow[];
+  simulationInput?: AdminPlanCoverageSimulationInput | null;
   simulationData: AdminPlanCoverageSimulationData;
 }>): AdminSimulationNextMoveRow[] {
   if (input.simulationData.sampleSize < 1) {
@@ -924,7 +1029,7 @@ export function buildSimulationNextMoveRows(input: Readonly<{
     return [];
   }
 
-  return input.reviewPriorityProducts
+  const productRows = input.reviewPriorityProducts
     .map((product): AdminSimulationNextMoveRow | null => {
       const unmetSupplements = product.coveredSupplementNames
         .map((name) => unmetByName.get(normalizedSupplementName(name)))
@@ -949,7 +1054,9 @@ export function buildSimulationNextMoveRows(input: Readonly<{
 
       return {
         ...product,
+        kind: "review_product",
         nextMoveScore,
+        targetDoseText: null,
         unmetDemandCount,
         unmetDemandPercent: safePercent(
           (unmetDemandCount / Math.max(1, input.simulationData.sampleSize)) * 100
@@ -959,7 +1066,44 @@ export function buildSimulationNextMoveRows(input: Readonly<{
           .sort((first, second) => first.localeCompare(second))
       };
     })
-    .filter((row): row is AdminSimulationNextMoveRow => row !== null)
+    .filter((row): row is AdminSimulationProductNextMoveRow => row !== null);
+  const coveredSupplementKeys = supplementCoverageKeys({
+    reviewPriorityProducts: input.reviewPriorityProducts,
+    simulationInput: input.simulationInput ?? input.simulationData.input
+  });
+  const targetDoseBySupplement = doseTextBySupplement(
+    input.simulationInput ?? input.simulationData.input
+  );
+  const sourceRows = [...unmetByName.entries()]
+    .filter(([key]) => !coveredSupplementKeys.has(key))
+    .map(([key, supplement]): AdminSimulationSourcingNextMoveRow => {
+      const nextMoveScore = supplement.count * 10 + 5;
+
+      return {
+        brandName: null,
+        brandStatus: null,
+        blockedReason: "No product in the catalogue covers this supplement.",
+        coveredSupplementNames: [supplement.name],
+        currency: input.simulationData.summary.currency,
+        expectedPriceAmount: null,
+        gapSupplementCount: 1,
+        id: `source-supplement:${key.replace(/[^a-z0-9]+/g, "-")}`,
+        kind: "source_supplement",
+        matchableSupplementCount: 1,
+        nextMoveScore,
+        productStatus: "pending_review",
+        rank: 0,
+        reviewScore: nextMoveScore,
+        sourceSupplementName: supplement.name,
+        targetDoseText: targetDoseBySupplement.get(key) ?? null,
+        title: `Source ${supplement.name}`,
+        unmetDemandCount: supplement.count,
+        unmetDemandPercent: supplement.percent,
+        unmetSupplementNames: [supplement.name]
+      };
+    });
+
+  return [...productRows, ...sourceRows]
     .sort((first, second) =>
       second.nextMoveScore - first.nextMoveScore ||
       second.unmetDemandCount - first.unmetDemandCount ||
