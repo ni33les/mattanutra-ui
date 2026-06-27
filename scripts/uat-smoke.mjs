@@ -186,9 +186,11 @@ async function checkDigitalOceanDeployment() {
       envKeys.has("DO_SPACES_PUBLIC_BASE_URL");
     const hasExplicitSpacesCredentials =
       (envKeys.has("DO_SPACES_ACCESS_KEY_ID") ||
-        envKeys.has("DO_SPACES_ACCESS_KEY")) &&
+        envKeys.has("DO_SPACES_ACCESS_KEY") ||
+        envKeys.has("DO_SPACES_KEY_ID")) &&
       (envKeys.has("DO_SPACES_SECRET_ACCESS_KEY") ||
-        envKeys.has("DO_SPACES_SECRET_KEY"));
+        envKeys.has("DO_SPACES_SECRET_KEY") ||
+        envKeys.has("DO_SPACES_KEY"));
     const hasLegacySpacesCredentials = envKeys.has("DO_SPACES_KEY");
     const imageStorageReady =
       hasSpacesEndpoint &&
@@ -209,7 +211,7 @@ async function checkDigitalOceanDeployment() {
               : "DO_SPACES_CDN_ENDPOINT or DO_SPACES_CDN_URL",
             hasExplicitSpacesCredentials || hasLegacySpacesCredentials
               ? null
-              : "DO_SPACES_ACCESS_KEY_ID + DO_SPACES_SECRET_ACCESS_KEY or DO_SPACES_KEY",
+              : "DO_SPACES_KEY_ID + DO_SPACES_KEY, DO_SPACES_ACCESS_KEY_ID + DO_SPACES_SECRET_ACCESS_KEY, or legacy DO_SPACES_KEY",
           ].filter(Boolean).join(", ")}`,
     );
     if (serviceEnvKeys.has(retiredDatabaseUrlKey)) {

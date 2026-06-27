@@ -60,6 +60,7 @@ const productImageVerificationRetryDelaysMs = [0, 300, 900, 1800] as const;
 const storageCredentialEnvKeys = [
   "DO_SPACES_ACCESS_KEY",
   "DO_SPACES_ACCESS_KEY_ID",
+  "DO_SPACES_KEY_ID",
   "DO_SPACES_SECRET_ACCESS_KEY",
   "DO_SPACES_SECRET_KEY",
   "DO_SPACES_KEY"
@@ -121,10 +122,12 @@ function storageEnvPresent(name: string) {
 function storageCredentialMode() {
   const hasExplicitAccess =
     storageEnvPresent("DO_SPACES_ACCESS_KEY_ID") ||
-    storageEnvPresent("DO_SPACES_ACCESS_KEY");
+    storageEnvPresent("DO_SPACES_ACCESS_KEY") ||
+    storageEnvPresent("DO_SPACES_KEY_ID");
   const hasExplicitSecret =
     storageEnvPresent("DO_SPACES_SECRET_ACCESS_KEY") ||
-    storageEnvPresent("DO_SPACES_SECRET_KEY");
+    storageEnvPresent("DO_SPACES_SECRET_KEY") ||
+    (hasExplicitAccess && storageEnvPresent("DO_SPACES_KEY"));
 
   if (hasExplicitAccess || hasExplicitSecret) {
     return hasExplicitAccess && hasExplicitSecret

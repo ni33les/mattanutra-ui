@@ -122,30 +122,55 @@ function digitalOceanCredentialPair(value: string) {
   return { accessKeyId, secretAccessKey };
 }
 
+function digitalOceanSecretFromKey(value: string) {
+  const separator = value.includes(":") ? ":" : value.includes("|") ? "|" : "";
+
+  if (!separator) {
+    return value;
+  }
+
+  const secretAccessKey = value.slice(value.indexOf(separator) + 1).trim();
+
+  if (!secretAccessKey) {
+    throw new Error(
+      "DO_SPACES_KEY must include a secret value when DO_SPACES_KEY_ID is set."
+    );
+  }
+
+  return secretAccessKey;
+}
+
 function digitalOceanCredentialsFromEnv() {
   const explicitAccessKeyId = envValue(
     "DO_SPACES_ACCESS_KEY_ID",
-    "DO_SPACES_ACCESS_KEY"
+    "DO_SPACES_ACCESS_KEY",
+    "DO_SPACES_KEY_ID"
   );
   const explicitSecretAccessKey = envValue(
     "DO_SPACES_SECRET_ACCESS_KEY",
     "DO_SPACES_SECRET_KEY"
   );
+  const digitalOceanSecretKey = envValue("DO_SPACES_KEY");
+  const secretAccessKey = explicitSecretAccessKey || (
+    explicitAccessKeyId && digitalOceanSecretKey
+      ? digitalOceanSecretFromKey(digitalOceanSecretKey)
+      : ""
+  );
 
-  if (explicitAccessKeyId || explicitSecretAccessKey) {
-    if (!explicitAccessKeyId || !explicitSecretAccessKey) {
+  if (explicitAccessKeyId || secretAccessKey) {
+    if (!explicitAccessKeyId || !secretAccessKey) {
       throw new Error(
-        "Set both DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY for DigitalOcean Spaces storage."
+        "Set both DO_SPACES_KEY_ID and DO_SPACES_KEY, or DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY, for DigitalOcean Spaces storage."
       );
     }
 
     return {
       accessKeyId: explicitAccessKeyId,
-      secretAccessKey: explicitSecretAccessKey
+      secretAccessKey
     };
   }
 
-  const legacyCredential = envValue("DO_SPACES_KEY");
+  const legacyCredential = digitalOceanSecretKey;
 
   return legacyCredential
     ? digitalOceanCredentialPair(legacyCredential)

@@ -31,6 +31,7 @@ describe("durable product image storage tooling", () => {
     assert.match(deployUat, /UAT_IMAGE_STORAGE_PROBE_REQUIRED/);
     assert.match(deployUat, /uat:images:storage:probe:app/);
     assert.match(probeUatAppScript, /DIGITALOCEAN_ACCESS_TOKEN/);
+    assert.match(probeUatAppScript, /DO_SPACES_KEY_ID/);
     assert.match(probeUatAppScript, /DO_SPACES_SECRET_ACCESS_KEY/);
     assert.match(probeUatAppScript, /probe-spaces-image-storage/);
     assert.match(uatSmoke, /DigitalOcean image storage env/);

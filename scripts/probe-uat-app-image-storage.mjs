@@ -41,17 +41,36 @@ const cdnEndpoint =
   envValue("DO_SPACES_CDN_URL") ||
   envValue("DO_SPACES_PUBLIC_BASE_URL");
 const explicitAccess =
-  envValue("DO_SPACES_ACCESS_KEY_ID") || envValue("DO_SPACES_ACCESS_KEY");
+  envValue("DO_SPACES_ACCESS_KEY_ID") ||
+  envValue("DO_SPACES_ACCESS_KEY") ||
+  envValue("DO_SPACES_KEY_ID");
 const explicitSecret =
-  envValue("DO_SPACES_SECRET_ACCESS_KEY") || envValue("DO_SPACES_SECRET_KEY");
+  envValue("DO_SPACES_SECRET_ACCESS_KEY") ||
+  envValue("DO_SPACES_SECRET_KEY");
 const legacyKey = envValue("DO_SPACES_KEY");
+const secretFromKey = (() => {
+  if (!explicitAccess || !legacyKey) {
+    return "";
+  }
+
+  const separator = legacyKey.includes(":")
+    ? ":"
+    : legacyKey.includes("|")
+      ? "|"
+      : "";
+
+  return separator
+    ? legacyKey.slice(legacyKey.indexOf(separator) + 1).trim()
+    : legacyKey;
+})();
+const secretAccessKey = explicitSecret || secretFromKey;
 
 console.log(JSON.stringify({
   appId: app.id,
   appName,
   credentialMode:
     explicitAccess || explicitSecret
-      ? explicitAccess && explicitSecret
+      ? explicitAccess && secretAccessKey
         ? "explicit"
         : "partial_explicit"
       : legacyKey
@@ -74,8 +93,8 @@ const probe = spawnSync(process.execPath, [
     DO_SPACES_ACCESS_KEY_ID: explicitAccess,
     DO_SPACES_CDN_ENDPOINT: cdnEndpoint,
     DO_SPACES_ENDPOINT: endpoint,
-    DO_SPACES_KEY: legacyKey,
-    DO_SPACES_SECRET_ACCESS_KEY: explicitSecret,
+    DO_SPACES_KEY: explicitAccess ? "" : legacyKey,
+    DO_SPACES_SECRET_ACCESS_KEY: secretAccessKey,
     MATTANUTRA_ENV: "uat"
   }
 });

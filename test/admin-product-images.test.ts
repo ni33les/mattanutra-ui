@@ -178,6 +178,7 @@ describe("admin product images", () => {
       "DO_SPACES_CDN_ENDPOINT",
       "DO_SPACES_ENDPOINT",
       "DO_SPACES_KEY",
+      "DO_SPACES_KEY_ID",
       "DO_SPACES_SECRET_ACCESS_KEY",
       "DO_SPACES_SECRET_KEY",
       "MATTANUTRA_ENV",
@@ -191,6 +192,7 @@ describe("admin product images", () => {
     env.DO_SPACES_CDN_ENDPOINT = "https://cdn.example.com";
     env.DO_SPACES_ENDPOINT = "https://mattanutra.sgp1.digitaloceanspaces.com";
     env.DO_SPACES_KEY = "only-one-half";
+    delete env.DO_SPACES_KEY_ID;
     delete env.DO_SPACES_SECRET_ACCESS_KEY;
     delete env.DO_SPACES_SECRET_KEY;
     env.MATTANUTRA_ENV = "uat";
@@ -240,6 +242,7 @@ describe("admin product images", () => {
       "DO_SPACES_CDN_ENDPOINT",
       "DO_SPACES_ENDPOINT",
       "DO_SPACES_KEY",
+      "DO_SPACES_KEY_ID",
       "DO_SPACES_SECRET_ACCESS_KEY",
       "DO_SPACES_SECRET_KEY",
       "MATTANUTRA_ENV",
@@ -252,6 +255,7 @@ describe("admin product images", () => {
     env.DO_SPACES_CDN_ENDPOINT = "https://cdn.example.com";
     env.DO_SPACES_ENDPOINT = "https://mattanutra.sgp1.digitaloceanspaces.com";
     delete env.DO_SPACES_KEY;
+    delete env.DO_SPACES_KEY_ID;
     delete env.DO_SPACES_SECRET_ACCESS_KEY;
     delete env.DO_SPACES_SECRET_KEY;
     env.MATTANUTRA_ENV = "uat";
@@ -265,6 +269,56 @@ describe("admin product images", () => {
       assert.equal(diagnostics.credentialMode, "partial_explicit");
       assert.match(text, /DO_SPACES_ACCESS_KEY_ID/);
       assert.doesNotMatch(text, /access-value/);
+    } finally {
+      for (const [key, value] of previousEnv) {
+        if (value === undefined) {
+          delete env[key];
+        } else {
+          env[key] = value;
+        }
+      }
+    }
+  });
+
+  it("reports DigitalOcean key id plus key credentials as explicit without exposing values", () => {
+    const env = process.env as Record<string, string | undefined>;
+    const previousEnv = new Map<string, string | undefined>();
+
+    for (const key of [
+      "DO_SPACES_ACCESS_KEY",
+      "DO_SPACES_ACCESS_KEY_ID",
+      "DO_SPACES_CDN_ENDPOINT",
+      "DO_SPACES_ENDPOINT",
+      "DO_SPACES_KEY",
+      "DO_SPACES_KEY_ID",
+      "DO_SPACES_SECRET_ACCESS_KEY",
+      "DO_SPACES_SECRET_KEY",
+      "MATTANUTRA_ENV",
+      "NODE_ENV",
+    ]) {
+      previousEnv.set(key, env[key]);
+    }
+
+    delete env.DO_SPACES_ACCESS_KEY;
+    delete env.DO_SPACES_ACCESS_KEY_ID;
+    env.DO_SPACES_CDN_ENDPOINT = "https://cdn.example.com";
+    env.DO_SPACES_ENDPOINT = "https://mattanutra.sgp1.digitaloceanspaces.com";
+    env.DO_SPACES_KEY = "secret-value";
+    env.DO_SPACES_KEY_ID = "access-value";
+    delete env.DO_SPACES_SECRET_ACCESS_KEY;
+    delete env.DO_SPACES_SECRET_KEY;
+    env.MATTANUTRA_ENV = "uat";
+    env.NODE_ENV = "production";
+
+    try {
+      const diagnostics = adminProductImageStorageDiagnostics();
+      const text = JSON.stringify(diagnostics);
+
+      assert.equal(diagnostics.readiness, "configured");
+      assert.equal(diagnostics.credentialMode, "explicit");
+      assert.match(text, /DO_SPACES_KEY_ID/);
+      assert.doesNotMatch(text, /access-value/);
+      assert.doesNotMatch(text, /secret-value/);
     } finally {
       for (const [key, value] of previousEnv) {
         if (value === undefined) {

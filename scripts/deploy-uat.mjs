@@ -80,11 +80,13 @@ async function runImageStorageProbeIfConfigured() {
   const hasExplicitCredentials = Boolean(
     (
       process.env.DO_SPACES_ACCESS_KEY_ID?.trim() ||
-      process.env.DO_SPACES_ACCESS_KEY?.trim()
+      process.env.DO_SPACES_ACCESS_KEY?.trim() ||
+      process.env.DO_SPACES_KEY_ID?.trim()
     ) &&
       (
         process.env.DO_SPACES_SECRET_ACCESS_KEY?.trim() ||
-        process.env.DO_SPACES_SECRET_KEY?.trim()
+        process.env.DO_SPACES_SECRET_KEY?.trim() ||
+        process.env.DO_SPACES_KEY?.trim()
       )
   );
   const hasLegacyCredentials = Boolean(process.env.DO_SPACES_KEY?.trim());
