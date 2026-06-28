@@ -278,6 +278,33 @@ describe("product coverage workflow", () => {
     assert.equal(first.mostUsefulProducts[0]?.id, product().id);
   });
 
+  it("reports simulator convergence after the balanced sample window", () => {
+    const input = {
+      candidates: [product()],
+      countryCode: "TH",
+      seed: "fixed",
+      supplements: [
+        {
+          category: "Antioxidants",
+          id: supplementId,
+          name: "CoQ10",
+          normalizedName: "coq10",
+          targetComparableAmount: 100000
+        }
+      ]
+    };
+    const early = runAdminPlanCoverageSimulation({ ...input, sampleSize: 32 });
+    const stable = runAdminPlanCoverageSimulation({ ...input, sampleSize: 64 });
+    const complete = runAdminPlanCoverageSimulation({ ...input, sampleSize: 256 });
+
+    assert.equal(early.convergence.status, "insufficient_samples");
+    assert.equal(stable.convergence.status, "stable");
+    assert.equal(stable.convergence.stable, true);
+    assert.equal(stable.convergence.windowSize, 32);
+    assert.equal(stable.convergence.topProductOverlapPercent, 100);
+    assert.equal(complete.convergence.status, "complete");
+  });
+
   it("uses generated demand profiles as simulator needs", () => {
     const result = runAdminPlanCoverageSimulation({
       candidates: [product()],
@@ -859,6 +886,24 @@ describe("product coverage workflow", () => {
     assert.match(view, /nextMoveReasonText/);
     assert.match(view, /Reviewing this product could cover/);
     assert.match(view, /source_supplement/);
+    assert.match(view, /productCountryOptions/);
+    assert.match(view, /changeSimulatorCountry/);
+    assert.match(view, /updateSimulatorCountryUrl/);
+    assert.match(view, /popstate/);
+    assert.match(view, /Product performance/);
+    assert.match(view, /Average stack coverage contribution/);
+    assert.match(view, /Chosen rate/);
+    assert.match(view, /productScatterRows/);
+    assert.match(view, /chosenRatePercent/);
+    assert.match(view, /priceBand/);
+    assert.match(view, /convergenceProgressText/);
+    assert.match(view, /Useful runs/);
+    assert.match(view, /version: 4/);
+    assert.match(simulationModel, /AdminPlanCoverageSimulationConvergence/);
+    assert.match(simulationModel, /ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE = 32/);
+    assert.match(simulationModel, /ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES = 64/);
+    assert.match(simulationModel, /topProductOverlapPercent/);
+    assert.match(simulationModel, /recordConvergenceCheckpointIfNeeded/);
     assert.match(view, /Unmet plan demand/);
     assert.match(view, /Catalogue gaps/);
     assert.match(view, /Eligible products exist, but were not selected/);

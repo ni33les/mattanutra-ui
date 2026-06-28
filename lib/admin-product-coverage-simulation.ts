@@ -150,7 +150,49 @@ export type AdminPlanCoverageSimulationUnmetDemandRow =
       percent: number;
     }>;
 
+export type AdminPlanCoverageConvergenceStatus =
+  | "changing"
+  | "complete"
+  | "insufficient_samples"
+  | "stable";
+
+export type AdminPlanCoverageSimulationSummary = Readonly<{
+  averageCoveragePercent: number;
+  currency: string;
+  expectedCostAmount: number | null;
+  medianCoveragePercent: number;
+  p10CoveragePercent: number;
+  percentAbove50: number;
+  percentAbove75: number;
+  percentAbove90: number;
+}>;
+
+export type AdminPlanCoverageConvergenceDeltas = Readonly<{
+  averageCoveragePercent: number | null;
+  expectedCostPercent: number | null;
+  medianCoveragePercent: number | null;
+  p10CoveragePercent: number | null;
+  percentAbove75: number | null;
+}>;
+
+export type AdminPlanCoverageSimulationCheckpoint = Readonly<{
+  sampleSize: number;
+  summary: AdminPlanCoverageSimulationSummary;
+  topProductIds: readonly string[];
+}>;
+
+export type AdminPlanCoverageSimulationConvergence = Readonly<{
+  deltas: AdminPlanCoverageConvergenceDeltas;
+  lastMeaningfulChangeSample: number | null;
+  samplesSinceMeaningfulChange: number;
+  stable: boolean;
+  status: AdminPlanCoverageConvergenceStatus;
+  topProductOverlapPercent: number | null;
+  windowSize: number;
+}>;
+
 export type AdminPlanCoverageSimulationData = Readonly<{
+  convergence: AdminPlanCoverageSimulationConvergence;
   countryCode: string;
   databaseAvailable: boolean;
   generatedAt: string;
@@ -160,16 +202,7 @@ export type AdminPlanCoverageSimulationData = Readonly<{
   realCustomerProfiles: readonly SyntheticPlanArchetype[];
   sampleSize: number;
   seed: string;
-  summary: {
-    averageCoveragePercent: number;
-    medianCoveragePercent: number;
-    p10CoveragePercent: number;
-    percentAbove50: number;
-    percentAbove75: number;
-    percentAbove90: number;
-    expectedCostAmount: number | null;
-    currency: string;
-  };
+  summary: AdminPlanCoverageSimulationSummary;
   archetypes: readonly SyntheticPlanArchetype[];
   compactCatalog: readonly AdminSimulationProductUsefulnessRow[];
   mostUsefulProducts: readonly AdminSimulationProductUsefulnessRow[];
@@ -188,6 +221,7 @@ export type AdminPlanCoverageSimulationProductStats = {
 };
 
 export type AdminPlanCoverageSimulationRunner = {
+  convergenceCheckpoints: AdminPlanCoverageSimulationCheckpoint[];
   costValues: number[];
   coverageValues: number[];
   generatedAt: string;
@@ -200,6 +234,9 @@ export type AdminPlanCoverageSimulationRunner = {
 };
 
 export const ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES = 256;
+export const ADMIN_PLAN_COVERAGE_CONVERGENCE_CHECKPOINT_INTERVAL = 8;
+export const ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES = 64;
+export const ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE = 32;
 export const DEFAULT_SIMULATION_SAMPLE_SIZE = 64;
 export const DEFAULT_SIMULATION_SEED = "mattanutra-product-coverage-v1";
 
@@ -791,6 +828,21 @@ export function emptyAdminPlanCoverageSimulationData(input: Readonly<{
   return {
     archetypes: simulationInput.archetypes,
     compactCatalog: [],
+    convergence: {
+      deltas: {
+        averageCoveragePercent: null,
+        expectedCostPercent: null,
+        medianCoveragePercent: null,
+        p10CoveragePercent: null,
+        percentAbove75: null
+      },
+      lastMeaningfulChangeSample: null,
+      samplesSinceMeaningfulChange: 0,
+      stable: false,
+      status: "insufficient_samples",
+      topProductOverlapPercent: null,
+      windowSize: ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE
+    },
     countryCode: simulationInput.countryCode,
     databaseAvailable: Boolean(input.databaseAvailable),
     generatedAt: new Date().toISOString(),
@@ -915,6 +967,257 @@ function productUsefulnessRows(
     }));
 }
 
+function simulationSummary(input: Readonly<{
+  candidates: readonly ProductCandidate[];
+  costValues: readonly number[];
+  coverageValues: readonly number[];
+  sampleSize: number;
+}>): AdminPlanCoverageSimulationSummary {
+  return {
+    averageCoveragePercent: safePercent(average(input.coverageValues)),
+    currency:
+      input.candidates.find((candidate) => candidate.currency)?.currency ?? "THB",
+    expectedCostAmount:
+      input.costValues.some((value) => value > 0)
+        ? Math.round(average(input.costValues))
+        : null,
+    medianCoveragePercent: safePercent(median(input.coverageValues)),
+    p10CoveragePercent: safePercent(percentile(input.coverageValues, 10)),
+    percentAbove50: safePercent(
+      (input.coverageValues.filter((value) => value >= 50).length /
+        Math.max(1, input.sampleSize)) * 100
+    ),
+    percentAbove75: safePercent(
+      (input.coverageValues.filter((value) => value >= 75).length /
+        Math.max(1, input.sampleSize)) * 100
+    ),
+    percentAbove90: safePercent(
+      (input.coverageValues.filter((value) => value >= 90).length /
+        Math.max(1, input.sampleSize)) * 100
+    )
+  };
+}
+
+function topProductIds(
+  productStats: ReadonlyMap<string, AdminPlanCoverageSimulationProductStats>,
+  sampleSize: number
+) {
+  return productUsefulnessRows(productStats, sampleSize)
+    .filter((row) => row.chosenCount > 0)
+    .slice(0, 10)
+    .map((row) => row.id);
+}
+
+function convergenceCheckpoint(
+  runner: AdminPlanCoverageSimulationRunner
+): AdminPlanCoverageSimulationCheckpoint {
+  return {
+    sampleSize: runner.sampleSize,
+    summary: simulationSummary({
+      candidates: runner.input.candidates,
+      costValues: runner.costValues,
+      coverageValues: runner.coverageValues,
+      sampleSize: runner.sampleSize
+    }),
+    topProductIds: topProductIds(runner.productStats, runner.sampleSize)
+  };
+}
+
+function recordConvergenceCheckpointIfNeeded(
+  runner: AdminPlanCoverageSimulationRunner
+) {
+  if (
+    runner.sampleSize < 1 ||
+    (runner.sampleSize % ADMIN_PLAN_COVERAGE_CONVERGENCE_CHECKPOINT_INTERVAL !== 0 &&
+      runner.sampleSize < ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES)
+  ) {
+    return;
+  }
+
+  if (
+    runner.convergenceCheckpoints.at(-1)?.sampleSize === runner.sampleSize
+  ) {
+    return;
+  }
+
+  runner.convergenceCheckpoints.push(convergenceCheckpoint(runner));
+}
+
+function summaryDeltas(
+  current: AdminPlanCoverageSimulationSummary,
+  previous: AdminPlanCoverageSimulationSummary
+): AdminPlanCoverageConvergenceDeltas {
+  const expectedCostPercent = (() => {
+    if (current.expectedCostAmount === null && previous.expectedCostAmount === null) {
+      return null;
+    }
+
+    if (current.expectedCostAmount === null || previous.expectedCostAmount === null) {
+      return 100;
+    }
+
+    if (previous.expectedCostAmount === 0) {
+      return current.expectedCostAmount === 0 ? 0 : 100;
+    }
+
+    return safePercent(
+      (Math.abs(current.expectedCostAmount - previous.expectedCostAmount) /
+        previous.expectedCostAmount) * 100
+    );
+  })();
+
+  return {
+    averageCoveragePercent: Math.abs(
+      current.averageCoveragePercent - previous.averageCoveragePercent
+    ),
+    expectedCostPercent,
+    medianCoveragePercent: Math.abs(
+      current.medianCoveragePercent - previous.medianCoveragePercent
+    ),
+    p10CoveragePercent: Math.abs(
+      current.p10CoveragePercent - previous.p10CoveragePercent
+    ),
+    percentAbove75: Math.abs(current.percentAbove75 - previous.percentAbove75)
+  };
+}
+
+function topProductOverlapPercent(
+  current: readonly string[],
+  previous: readonly string[]
+) {
+  if (current.length < 1 && previous.length < 1) {
+    return 100;
+  }
+
+  if (current.length < 1 || previous.length < 1) {
+    return 0;
+  }
+
+  const previousIds = new Set(previous);
+  const overlap = current.filter((id) => previousIds.has(id)).length;
+
+  return safePercent((overlap / Math.max(current.length, previous.length)) * 100);
+}
+
+function checkpointBeforeOrAt(
+  checkpoints: readonly AdminPlanCoverageSimulationCheckpoint[],
+  sampleSize: number
+) {
+  return [...checkpoints]
+    .reverse()
+    .find((checkpoint) => checkpoint.sampleSize <= sampleSize) ?? null;
+}
+
+function convergenceWindowChanged(input: Readonly<{
+  current: AdminPlanCoverageSimulationCheckpoint;
+  previous: AdminPlanCoverageSimulationCheckpoint;
+}>) {
+  const deltas = summaryDeltas(input.current.summary, input.previous.summary);
+  const overlap = topProductOverlapPercent(
+    input.current.topProductIds,
+    input.previous.topProductIds
+  );
+  const changed =
+    (deltas.averageCoveragePercent ?? 0) > 1 ||
+    (deltas.medianCoveragePercent ?? 0) > 1 ||
+    (deltas.p10CoveragePercent ?? 0) > 1 ||
+    (deltas.percentAbove75 ?? 0) > 1 ||
+    (deltas.expectedCostPercent ?? 0) > 3 ||
+    overlap < 80;
+
+  return { changed, deltas, overlap };
+}
+
+function simulationConvergence(
+  runner: AdminPlanCoverageSimulationRunner,
+  current: AdminPlanCoverageSimulationCheckpoint
+): AdminPlanCoverageSimulationConvergence {
+  const emptyDeltas: AdminPlanCoverageConvergenceDeltas = {
+    averageCoveragePercent: null,
+    expectedCostPercent: null,
+    medianCoveragePercent: null,
+    p10CoveragePercent: null,
+    percentAbove75: null
+  };
+
+  if (runner.sampleSize < ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES) {
+    return {
+      deltas: emptyDeltas,
+      lastMeaningfulChangeSample: null,
+      samplesSinceMeaningfulChange: runner.sampleSize,
+      stable: false,
+      status: "insufficient_samples",
+      topProductOverlapPercent: null,
+      windowSize: ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE
+    };
+  }
+
+  const checkpoints = [
+    ...runner.convergenceCheckpoints.filter((checkpoint) =>
+      checkpoint.sampleSize !== current.sampleSize
+    ),
+    current
+  ].sort((first, second) => first.sampleSize - second.sampleSize);
+  const previous = checkpointBeforeOrAt(
+    checkpoints,
+    runner.sampleSize - ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE
+  );
+
+  if (!previous) {
+    return {
+      deltas: emptyDeltas,
+      lastMeaningfulChangeSample: null,
+      samplesSinceMeaningfulChange: runner.sampleSize,
+      stable: false,
+      status: "insufficient_samples",
+      topProductOverlapPercent: null,
+      windowSize: ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE
+    };
+  }
+
+  const latestWindow = convergenceWindowChanged({ current, previous });
+  let lastMeaningfulChangeSample: number | null = latestWindow.changed
+    ? current.sampleSize
+    : null;
+
+  for (const checkpoint of checkpoints) {
+    if (checkpoint.sampleSize < ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES) {
+      continue;
+    }
+
+    const baseline = checkpointBeforeOrAt(
+      checkpoints,
+      checkpoint.sampleSize - ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE
+    );
+
+    if (!baseline) {
+      continue;
+    }
+
+    if (convergenceWindowChanged({ current: checkpoint, previous: baseline }).changed) {
+      lastMeaningfulChangeSample = checkpoint.sampleSize;
+    }
+  }
+
+  const stable = !latestWindow.changed;
+
+  return {
+    deltas: latestWindow.deltas,
+    lastMeaningfulChangeSample,
+    samplesSinceMeaningfulChange:
+      runner.sampleSize - (lastMeaningfulChangeSample ?? previous.sampleSize),
+    stable,
+    status:
+      runner.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES
+        ? "complete"
+        : stable
+          ? "stable"
+          : "changing",
+    topProductOverlapPercent: latestWindow.overlap,
+    windowSize: ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE
+  };
+}
+
 export function createAdminPlanCoverageSimulationRunner(input: Readonly<{
   archetypes?: readonly SyntheticPlanArchetype[] | null;
   candidates: readonly ProductCandidate[];
@@ -928,6 +1231,7 @@ export function createAdminPlanCoverageSimulationRunner(input: Readonly<{
   const simulationInput = normalizeSimulationInput(input);
 
   return {
+    convergenceCheckpoints: [],
     costValues: [],
     coverageValues: [],
     generatedAt: new Date().toISOString(),
@@ -947,6 +1251,8 @@ export function adminPlanCoverageSimulationDataFromRunner(
     runner.productStats,
     runner.sampleSize
   );
+  const currentCheckpoint = convergenceCheckpoint(runner);
+  const summary = currentCheckpoint.summary;
   const compactCatalog = mostUsefulProducts
     .filter((row) =>
       row.averageStackContributionPercent > 0 &&
@@ -958,6 +1264,7 @@ export function adminPlanCoverageSimulationDataFromRunner(
   return {
     archetypes: runner.input.archetypes,
     compactCatalog,
+    convergence: simulationConvergence(runner, currentCheckpoint),
     countryCode: runner.input.countryCode,
     databaseAvailable: true,
     generatedAt: runner.generatedAt,
@@ -975,30 +1282,7 @@ export function adminPlanCoverageSimulationDataFromRunner(
     reviewPriorityProducts: runner.reviewPriorityProducts,
     sampleSize: runner.sampleSize,
     seed: runner.input.seed,
-    summary: {
-      averageCoveragePercent: safePercent(average(runner.coverageValues)),
-      currency:
-        runner.input.candidates.find((candidate) => candidate.currency)
-          ?.currency ?? "THB",
-      expectedCostAmount:
-        runner.costValues.some((value) => value > 0)
-          ? Math.round(average(runner.costValues))
-          : null,
-      medianCoveragePercent: safePercent(median(runner.coverageValues)),
-      p10CoveragePercent: safePercent(percentile(runner.coverageValues, 10)),
-      percentAbove50: safePercent(
-        (runner.coverageValues.filter((value) => value >= 50).length /
-          Math.max(1, runner.sampleSize)) * 100
-      ),
-      percentAbove75: safePercent(
-        (runner.coverageValues.filter((value) => value >= 75).length /
-          Math.max(1, runner.sampleSize)) * 100
-      ),
-      percentAbove90: safePercent(
-        (runner.coverageValues.filter((value) => value >= 90).length /
-          Math.max(1, runner.sampleSize)) * 100
-      )
-    },
+    summary,
     unmetSupplements: [...runner.unmetCounts.values()]
       .map((bucket) => ({
         ...bucket,
@@ -1456,6 +1740,8 @@ export function runNextAdminPlanCoverageSimulationSample(
 
     runner.productStats.set(item.product.id, current);
   }
+
+  recordConvergenceCheckpointIfNeeded(runner);
 
   return adminPlanCoverageSimulationDataFromRunner(runner);
 }

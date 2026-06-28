@@ -10,6 +10,7 @@ import {
 import type {
   AdminPlanCoverageDemandProfile,
   AdminPlanCoverageSimulationData,
+  AdminPlanCoverageSimulationCheckpoint,
   AdminProductCoverageData,
   AdminPlanCoverageSimulationProductStats,
   AdminPlanCoverageSimulationRunner,
@@ -31,6 +32,13 @@ import {
 import { AdminModal } from "@/components/admin/ui";
 import { SafeImage } from "@/components/safe-image";
 import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode,
+  productCountryLabel,
+  productCountryOptions
+} from "@/lib/product-countries";
+import {
+  ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES,
   ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
   SIMULATION_ARCHETYPES,
   adminPlanCoverageSimulationDataFromRunner,
@@ -63,6 +71,7 @@ type ArchetypeDraft = Readonly<{
 }>;
 
 type SavedSimulationState = Readonly<{
+  convergenceCheckpoints?: readonly AdminPlanCoverageSimulationCheckpoint[];
   costValues: number[];
   coverageValues: number[];
   generatedAt: string;
@@ -71,7 +80,7 @@ type SavedSimulationState = Readonly<{
   randomState: number;
   sampleSize: number;
   unmetCounts: Array<[string, AdminPlanCoverageSimulationUnmetDemandBucket]>;
-  version: 3;
+  version: 3 | 4;
 }>;
 
 type SavedDemandProfilesState = Readonly<{
@@ -112,6 +121,18 @@ function amountText(amount: number | null) {
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 0
   }).format(amount);
+}
+
+function normalizedSimulatorCountryCode(value: string | null | undefined) {
+  return normalizeProductCountryCode(value) ?? defaultProductCountryCode;
+}
+
+function updateSimulatorCountryUrl(countryCode: string) {
+  const url = new URL(window.location.href);
+
+  url.searchParams.set("country", countryCode);
+  url.searchParams.set("view", "plan-coverage-simulator");
+  window.history.pushState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
 }
 
 function hashText(value: string) {
@@ -397,6 +418,7 @@ function savedStateFromRunner(
   runner: AdminPlanCoverageSimulationRunner
 ): SavedSimulationState {
   return {
+    convergenceCheckpoints: runner.convergenceCheckpoints,
     costValues: runner.costValues,
     coverageValues: runner.coverageValues,
     generatedAt: runner.generatedAt,
@@ -405,7 +427,7 @@ function savedStateFromRunner(
     randomState: runner.randomState,
     sampleSize: runner.sampleSize,
     unmetCounts: [...runner.unmetCounts.entries()],
-    version: 3
+    version: 4
   };
 }
 
@@ -442,7 +464,7 @@ function loadSavedSimulationState(inputKey: string) {
     const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
 
     if (
-      parsed.version !== 3 ||
+      (parsed.version !== 3 && parsed.version !== 4) ||
       parsed.inputKey !== inputKey ||
       !Array.isArray(parsed.coverageValues) ||
       !Array.isArray(parsed.costValues) ||
@@ -471,6 +493,10 @@ function runnerFromSavedState(
 
   runner.costValues = [...saved.costValues];
   runner.coverageValues = [...saved.coverageValues];
+  runner.convergenceCheckpoints =
+    saved.version === 4 && Array.isArray(saved.convergenceCheckpoints)
+      ? [...saved.convergenceCheckpoints]
+      : [];
   runner.generatedAt = saved.generatedAt;
   runner.productStats = new Map(saved.productStats);
   runner.randomState = saved.randomState;
@@ -540,6 +566,80 @@ function productResultRows(
       first.title.localeCompare(second.title)
     )
     .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+type ProductPerformancePriceBand = "high" | "low" | "mid" | "unknown";
+
+type ProductPerformanceScatterRow = AdminSimulationProductUsefulnessRow &
+  Readonly<{
+    chosenRatePercent: number;
+    priceBand: ProductPerformancePriceBand;
+  }>;
+
+function priceBandClassName(band: ProductPerformancePriceBand) {
+  switch (band) {
+    case "low":
+      return "#1FA77A";
+    case "mid":
+      return "#3A7BD5";
+    case "high":
+      return "#B45309";
+    default:
+      return "#94A3B8";
+  }
+}
+
+function priceBandLabel(band: ProductPerformancePriceBand) {
+  switch (band) {
+    case "low":
+      return "Value price";
+    case "mid":
+      return "Mid price";
+    case "high":
+      return "Premium price";
+    default:
+      return "No price";
+  }
+}
+
+function productScatterRows(
+  data: AdminPlanCoverageSimulationData,
+  rows: readonly AdminSimulationProductUsefulnessRow[]
+): ProductPerformanceScatterRow[] {
+  if (data.sampleSize < 1) {
+    return [];
+  }
+
+  const chosenRows = rows.filter((row) => row.chosenCount > 0);
+  const prices = chosenRows
+    .map((row) => row.expectedPriceAmount)
+    .filter((price): price is number => price !== null)
+    .sort((first, second) => first - second);
+  const lowThreshold = prices[Math.floor(Math.max(0, prices.length - 1) * 0.33)] ?? null;
+  const highThreshold = prices[Math.floor(Math.max(0, prices.length - 1) * 0.66)] ?? null;
+
+  return chosenRows.map((row) => {
+    const priceBand: ProductPerformancePriceBand =
+      row.expectedPriceAmount === null || lowThreshold === null || highThreshold === null
+        ? "unknown"
+        : row.expectedPriceAmount <= lowThreshold
+          ? "low"
+          : row.expectedPriceAmount >= highThreshold
+            ? "high"
+            : "mid";
+
+    return {
+      ...row,
+      chosenRatePercent: safeUiPercent(
+        (row.chosenCount / Math.max(1, data.sampleSize)) * 100
+      ),
+      priceBand
+    };
+  });
+}
+
+function safeUiPercent(value: number) {
+  return Number.isFinite(value) ? Math.round(value) : 0;
 }
 
 function waitForNextSample() {
@@ -902,6 +1002,217 @@ function ProductUsefulnessBar({
   );
 }
 
+function ProductPerformanceScatter({
+  currency,
+  rows,
+  sampleSize
+}: Readonly<{
+  currency: string;
+  rows: readonly ProductPerformanceScatterRow[];
+  sampleSize: number;
+}>) {
+  const [selectedId, setSelectedId] = useState<string | null>(rows[0]?.id ?? null);
+  const selectedRow = rows.find((row) => row.id === selectedId) ?? rows[0] ?? null;
+  const width = 760;
+  const height = 360;
+  const paddingLeft = 52;
+  const paddingRight = 24;
+  const paddingTop = 24;
+  const paddingBottom = 54;
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+  const maxContribution = Math.max(
+    10,
+    ...rows.map((row) => row.averageStackContributionPercent)
+  );
+  const maxChosenRate = Math.max(10, ...rows.map((row) => row.chosenRatePercent));
+  const xFor = (value: number) =>
+    paddingLeft + (Math.max(0, value) / maxContribution) * chartWidth;
+  const yFor = (value: number) =>
+    paddingTop + chartHeight - (Math.max(0, value) / maxChosenRate) * chartHeight;
+  const pointRadius = (row: ProductPerformanceScatterRow) =>
+    Math.max(5, Math.min(11, 4 + Math.sqrt(row.chosenCount)));
+
+  return (
+    <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">Product performance</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Coverage contribution versus chosen rate across {numberText(sampleSize)} samples.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+          {(["low", "mid", "high", "unknown"] as const).map((band) => (
+            <span className="inline-flex items-center gap-1" key={band}>
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: priceBandClassName(band) }}
+              />
+              {priceBandLabel(band)}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {sampleSize < 1 ? (
+        <p className="mt-4 border-t border-slate-200 py-4 text-sm text-slate-500">
+          Run the simulation to see product performance.
+        </p>
+      ) : rows.length < 1 ? (
+        <p className="mt-4 border-t border-slate-200 py-4 text-sm text-slate-500">
+          No products were selected by this simulation run.
+        </p>
+      ) : (
+        <>
+          <svg
+            aria-label="Product performance scatter"
+            className="mt-4 h-80 w-full overflow-visible"
+            role="img"
+            viewBox={`0 0 ${width} ${height}`}
+          >
+            {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+              const x = paddingLeft + tick * chartWidth;
+              const y = paddingTop + chartHeight - tick * chartHeight;
+
+              return (
+                <g key={tick}>
+                  <line
+                    className="stroke-slate-200"
+                    strokeWidth="1"
+                    x1={paddingLeft}
+                    x2={width - paddingRight}
+                    y1={y}
+                    y2={y}
+                  />
+                  <line
+                    className="stroke-slate-100"
+                    strokeWidth="1"
+                    x1={x}
+                    x2={x}
+                    y1={paddingTop}
+                    y2={paddingTop + chartHeight}
+                  />
+                  <text
+                    className="fill-slate-400 text-[11px]"
+                    textAnchor="end"
+                    x={paddingLeft - 8}
+                    y={y + 4}
+                  >
+                    {percentText(Math.round(maxChosenRate * tick))}
+                  </text>
+                  <text
+                    className="fill-slate-400 text-[11px]"
+                    textAnchor="middle"
+                    x={x}
+                    y={height - 18}
+                  >
+                    {percentText(Math.round(maxContribution * tick))}
+                  </text>
+                </g>
+              );
+            })}
+            <line
+              className="stroke-slate-300"
+              strokeWidth="1.5"
+              x1={paddingLeft}
+              x2={width - paddingRight}
+              y1={paddingTop + chartHeight}
+              y2={paddingTop + chartHeight}
+            />
+            <line
+              className="stroke-slate-300"
+              strokeWidth="1.5"
+              x1={paddingLeft}
+              x2={paddingLeft}
+              y1={paddingTop}
+              y2={paddingTop + chartHeight}
+            />
+            <text
+              className="fill-slate-500 text-[12px] font-semibold"
+              textAnchor="middle"
+              x={paddingLeft + chartWidth / 2}
+              y={height - 2}
+            >
+              Average stack coverage contribution
+            </text>
+            <text
+              className="fill-slate-500 text-[12px] font-semibold"
+              textAnchor="middle"
+              transform={`rotate(-90 ${16} ${paddingTop + chartHeight / 2})`}
+              x={16}
+              y={paddingTop + chartHeight / 2}
+            >
+              Chosen rate
+            </text>
+            {rows.map((row) => {
+              const selected = selectedRow?.id === row.id;
+
+              return (
+                <circle
+                  aria-label={`${row.title}, chosen ${numberText(row.chosenCount)} times, ${percentText(row.chosenRatePercent)} chosen rate, ${percentText(row.averageStackContributionPercent)} contribution`}
+                  className="cursor-pointer outline-none transition-opacity focus:opacity-100"
+                  cx={xFor(row.averageStackContributionPercent)}
+                  cy={yFor(row.chosenRatePercent)}
+                  fill={priceBandClassName(row.priceBand)}
+                  key={row.id}
+                  onClick={() => setSelectedId(row.id)}
+                  onFocus={() => setSelectedId(row.id)}
+                  onMouseEnter={() => setSelectedId(row.id)}
+                  opacity={selected ? 1 : 0.72}
+                  r={pointRadius(row)}
+                  role="button"
+                  stroke={selected ? "#0F172A" : "white"}
+                  strokeWidth={selected ? 3 : 2}
+                  tabIndex={0}
+                >
+                  <title>
+                    {row.title} · {numberText(row.chosenCount)} chosen ·{" "}
+                    {percentText(row.chosenRatePercent)} chosen rate
+                  </title>
+                </circle>
+              );
+            })}
+          </svg>
+
+          {selectedRow ? (
+            <div className="mt-3 grid gap-2 rounded-md bg-slate-50 p-3 text-sm ring-1 ring-slate-200 md:grid-cols-[minmax(0,1fr)_repeat(4,auto)] md:items-center">
+              <div className="min-w-0">
+                <p className="truncate font-bold text-slate-950">{selectedRow.title}</p>
+                <p className="text-xs text-slate-500">
+                  {selectedRow.brandName ?? "No brand"} · {priceBandLabel(selectedRow.priceBand)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Chosen</p>
+                <p className="font-bold text-slate-950">{numberText(selectedRow.chosenCount)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Chosen rate</p>
+                <p className="font-bold text-slate-950">
+                  {percentText(selectedRow.chosenRatePercent)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Contribution</p>
+                <p className="font-bold text-slate-950">
+                  {percentText(selectedRow.averageStackContributionPercent)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Price ({currency})</p>
+                <p className="font-bold text-slate-950">
+                  {amountText(selectedRow.expectedPriceAmount)}
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
 function compactDisplayList(values: readonly string[]) {
   const visibleValues = values.slice(0, 3);
 
@@ -1088,14 +1399,6 @@ function simulationMetrics(data: AdminPlanCoverageSimulationData): BusinessMetri
       value: percentText(data.summary.averageCoveragePercent)
     },
     {
-      color: "#0F766E",
-      format: "percent",
-      id: "medianCoverage",
-      label: "Median coverage",
-      series: [],
-      value: percentText(data.summary.medianCoveragePercent)
-    },
-    {
       color: "#F59E0B",
       format: "percent",
       id: "p10Coverage",
@@ -1107,7 +1410,7 @@ function simulationMetrics(data: AdminPlanCoverageSimulationData): BusinessMetri
       color: "#3A7BD5",
       format: "percent",
       id: "above75",
-      label: "Above 75%",
+      label: "Plans >=75%",
       series: [],
       value: percentText(data.summary.percentAbove75)
     },
@@ -1120,13 +1423,36 @@ function simulationMetrics(data: AdminPlanCoverageSimulationData): BusinessMetri
       value: amountText(data.summary.expectedCostAmount)
     },
     {
-      color: "#8B5CF6",
+      color: data.convergence.stable ? "#1FA77A" : "#8B5CF6",
+      id: "usefulRuns",
+      label: "Useful runs",
+      series: [],
+      value: convergenceMetricValue(data)
+    },
+    {
+      color: "#6B7280",
       id: "samples",
       label: "Samples",
       series: [],
       value: numberText(data.sampleSize)
     }
   ];
+}
+
+function convergenceMetricValue(data: AdminPlanCoverageSimulationData) {
+  if (data.convergence.status === "complete") {
+    return data.convergence.stable ? "Stable" : "Complete";
+  }
+
+  if (data.convergence.status === "stable") {
+    return `${numberText(data.convergence.samplesSinceMeaningfulChange)} steady`;
+  }
+
+  if (data.convergence.status === "changing") {
+    return "Changing";
+  }
+
+  return `Need ${numberText(Math.max(0, ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES - data.sampleSize))}`;
 }
 
 function sexFilterLabel(value: "both" | "female" | "male" | null) {
@@ -1183,6 +1509,33 @@ function simulationStatusText(
   return "Ready";
 }
 
+function convergenceProgressText(data: AdminPlanCoverageSimulationData) {
+  if (data.convergence.status === "insufficient_samples") {
+    return `Need ${numberText(Math.max(0, ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES - data.sampleSize))} more samples to assess stability.`;
+  }
+
+  const delta = data.convergence.deltas.averageCoveragePercent;
+  const windowText = `Last ${numberText(data.convergence.windowSize)} runs`;
+  const coverageText =
+    delta === null
+      ? "coverage movement is not available yet"
+      : `changed average coverage by ${percentText(delta)}`;
+  const overlapText =
+    data.convergence.topProductOverlapPercent === null
+      ? ""
+      : ` · top products ${percentText(data.convergence.topProductOverlapPercent)} stable`;
+
+  if (data.convergence.stable) {
+    return `${windowText} ${coverageText}${overlapText}. Results look stable enough to stop.`;
+  }
+
+  if (data.convergence.status === "complete") {
+    return `${windowText} ${coverageText}${overlapText}. Full run complete.`;
+  }
+
+  return `${windowText} ${coverageText}${overlapText}. Results are still moving.`;
+}
+
 function SimulationProgressPanel({
   demandError,
   demandProfiles,
@@ -1227,6 +1580,11 @@ function SimulationProgressPanel({
       </div>
       {demandError ? (
         <p className="mt-2 text-sm font-semibold text-rose-700">{demandError}</p>
+      ) : null}
+      {!demandError && simulationData.sampleSize > 0 ? (
+        <p className="mt-2 text-sm text-slate-500">
+          {convergenceProgressText(simulationData)}
+        </p>
       ) : null}
     </section>
   );
@@ -1715,6 +2073,9 @@ export function AdminPlanCoverageSimulatorView({
   locale: Locale;
   range: AdminDashboardRange;
 }>) {
+  const [selectedCountryCode, setSelectedCountryCode] = useState(() =>
+    normalizedSimulatorCountryCode(data.countryCode)
+  );
   const [inputData, setInputData] = useState(data);
   const [inputStatus, setInputStatus] =
     useState<SimulatorInputStatus>("loading");
@@ -1809,6 +2170,10 @@ export function AdminPlanCoverageSimulatorView({
     () => productResultRows(simulationData, activeInputData.input.candidates),
     [activeInputData.input.candidates, simulationData]
   );
+  const scatterRows = useMemo(
+    () => productScatterRows(simulationData, visibleProductResultRows),
+    [simulationData, visibleProductResultRows]
+  );
   const catalogueGapRows = useMemo(
     () =>
       simulationData.unmetSupplements.filter((row) =>
@@ -1820,6 +2185,22 @@ export function AdminPlanCoverageSimulatorView({
   useEffect(() => {
     runningRef.current = running || demandGenerating;
   }, [demandGenerating, running]);
+
+  useEffect(() => {
+    const syncCountryFromUrl = () => {
+      setSelectedCountryCode(
+        normalizedSimulatorCountryCode(
+          new URL(window.location.href).searchParams.get("country")
+        )
+      );
+    };
+
+    window.addEventListener("popstate", syncCountryFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncCountryFromUrl);
+    };
+  }, []);
 
   useEffect(() => {
     inputStatusRef.current = inputStatus;
@@ -1867,13 +2248,22 @@ export function AdminPlanCoverageSimulatorView({
       }, SIMULATOR_INPUT_TIMEOUT_MS);
       setInputStatus("loading");
       setInputError(null);
-      setInputData(data);
-      setSimulationData(initialSimulationData(data));
+      const loadingData =
+        normalizedSimulatorCountryCode(data.countryCode) === selectedCountryCode
+          ? data
+          : emptyAdminPlanCoverageSimulationData({
+              countryCode: selectedCountryCode,
+              databaseAvailable: data.databaseAvailable,
+              seed: data.seed
+            });
+
+      setInputData(loadingData);
+      setSimulationData(initialSimulationData(loadingData));
       setHydrated(false);
       setRunning(false);
       runnerRef.current = null;
 
-      fetch(simulatorInputHref(data.countryCode, accessToken, range), {
+      fetch(simulatorInputHref(selectedCountryCode, accessToken, range), {
         cache: "no-store",
         credentials: "same-origin",
         headers: {
@@ -1909,7 +2299,7 @@ export function AdminPlanCoverageSimulatorView({
             window.clearTimeout(requestTimeoutId);
           }
           setInputData(emptyAdminPlanCoverageSimulationData({
-            countryCode: data.countryCode,
+            countryCode: selectedCountryCode,
             databaseAvailable: false,
             seed: data.seed
           }));
@@ -1931,7 +2321,7 @@ export function AdminPlanCoverageSimulatorView({
       controller?.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [accessToken, data, inputRefreshNonce, range]);
+  }, [accessToken, data, inputRefreshNonce, range, selectedCountryCode]);
 
   useEffect(() => {
     if (inputStatus !== "ready") {
@@ -2244,6 +2634,22 @@ export function AdminPlanCoverageSimulatorView({
     setInputRefreshNonce((value) => value + 1);
   }
 
+  function changeSimulatorCountry(countryCode: string) {
+    const normalizedCountryCode = normalizedSimulatorCountryCode(countryCode);
+
+    if (normalizedCountryCode === selectedCountryCode) {
+      return;
+    }
+
+    stopSimulation();
+    updateSimulatorCountryUrl(normalizedCountryCode);
+    setSelectedCountryCode(normalizedCountryCode);
+    setInputStatus("loading");
+    setInputError(null);
+    setHydrated(false);
+    setInputRefreshNonce((value) => value + 1);
+  }
+
   return (
     <div className="space-y-6">
       <BusinessStatsGrid metrics={simulationMetrics(simulationData)} />
@@ -2269,16 +2675,32 @@ export function AdminPlanCoverageSimulatorView({
             </span>
           ) : null}
         </div>
-        <SimulatorActionBar
-          canRun={canRun}
-          clearTarget={clearTarget}
-          onClear={clearSelectedSimulatorState}
-          onClearTargetChange={setClearTarget}
-          onConfigure={() => setProfileEditorOpen(true)}
-          onRun={startSimulation}
-          onStop={stopSimulation}
-          running={running}
-        />
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            Country
+            <select
+              className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-950 shadow-sm focus:border-[#1FA77A] focus:outline-none focus:ring-2 focus:ring-[#1FA77A]/20"
+              onChange={(event) => changeSimulatorCountry(event.target.value)}
+              value={selectedCountryCode}
+            >
+              {productCountryOptions.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {productCountryLabel(country.code)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <SimulatorActionBar
+            canRun={canRun}
+            clearTarget={clearTarget}
+            onClear={clearSelectedSimulatorState}
+            onClearTargetChange={setClearTarget}
+            onConfigure={() => setProfileEditorOpen(true)}
+            onRun={startSimulation}
+            onStop={stopSimulation}
+            running={running}
+          />
+        </div>
       </div>
 
       <SimulationProgressPanel
@@ -2303,6 +2725,12 @@ export function AdminPlanCoverageSimulatorView({
           syntheticArchetypes={syntheticArchetypes}
         />
       ) : null}
+
+      <ProductPerformanceScatter
+        currency={simulationData.summary.currency}
+        rows={scatterRows}
+        sampleSize={simulationData.sampleSize}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
         <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">

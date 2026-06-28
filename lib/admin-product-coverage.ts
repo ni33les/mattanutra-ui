@@ -49,6 +49,8 @@ export {
 } from "@/lib/admin-product-coverage-simulation";
 export type {
   AdminPlanCoverageDemandProfile,
+  AdminPlanCoverageSimulationCheckpoint,
+  AdminPlanCoverageSimulationConvergence,
   AdminPlanCoverageSimulationData,
   AdminPlanCoverageSimulationInput,
   AdminPlanCoverageSimulationProductStats,

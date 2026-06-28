@@ -86,6 +86,10 @@ import {
   firstAllowedAdminView,
   isAdminDashboardView
 } from "@/lib/admin-rbac";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode
+} from "@/lib/product-countries";
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +129,7 @@ function panyaSectionParam(value: string | string[] | undefined) {
 }
 
 function countryCodeParam(value: string | string[] | undefined) {
-  return firstParam(value) ?? "TH";
+  return normalizeProductCountryCode(firstParam(value)) ?? defaultProductCountryCode;
 }
 
 function dashboardUrl(
