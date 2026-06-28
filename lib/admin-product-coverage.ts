@@ -388,7 +388,7 @@ async function loadSupplementGovernanceHash(
         concat_ws(
           ':',
           supplements.id::text,
-          ${countryCode},
+          ${countryCode}::text,
           supplements.list_status,
           supplements.is_active::text,
           supplements.updated_at::text,

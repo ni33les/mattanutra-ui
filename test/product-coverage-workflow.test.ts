@@ -783,6 +783,7 @@ describe("product coverage workflow", () => {
     assert.match(readModel, /buildReviewPriorityProductRows/);
     assert.match(readModel, /supplementGovernanceHash/);
     assert.match(readModel, /source_payload -> 'countryAvailability'/);
+    assert.match(readModel, /\$\{countryCode\}::text/);
     assert.match(simulationModel, /buildSimulationNextMoveRows/);
     assert.match(simulationModel, /sanitizeDemandProfilesForSimulationSupplements/);
     assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
