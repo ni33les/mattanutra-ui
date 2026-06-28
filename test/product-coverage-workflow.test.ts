@@ -27,6 +27,7 @@ import type {
 import type { ProductCandidate } from "../lib/product-recommendations.ts";
 
 const supplementId = "11111111-1111-4111-8111-111111111111";
+const apigeninSupplementId = "aaaaaaaa-1111-4111-8111-111111111111";
 const ashwagandhaSupplementId = "99999999-9999-4999-8999-999999999999";
 const rhodiolaSupplementId = "77777777-7777-4777-8777-777777777777";
 const magnesiumSupplementId = "33333333-3333-4333-8333-333333333333";
@@ -316,6 +317,64 @@ describe("product coverage workflow", () => {
     });
 
     assert.equal(result.mostUsefulProducts[0]?.id, product().id);
+    assert.equal(result.unmetSupplements.length, 0);
+  });
+
+  it("repairs cached demand numeric targets from readable dose text", () => {
+    const apigeninProduct = product({
+      facts: [
+        {
+          amount: 50,
+          comparableAmount: 50000,
+          confidence: "high",
+          itemType: "supplement",
+          name: "Apigenin",
+          normalizedName: "apigenin",
+          supplementId: apigeninSupplementId,
+          unit: "mg"
+        }
+      ],
+      id: "aaaaaaaa-2222-4222-8222-222222222222",
+      title: "Example Apigenin"
+    });
+    const result = runAdminPlanCoverageSimulation({
+      candidates: [apigeninProduct],
+      countryCode: "TH",
+      demandProfiles: [
+        demandProfile({
+          needs: [
+            {
+              category: "Advanced Longevity",
+              displayName: "Apigenin",
+              id: "supplement:apigenin",
+              itemType: "supplement",
+              normalizedName: "apigenin",
+              sourceId: apigeninSupplementId,
+              targetComparableAmount: 500000,
+              targetDose: null,
+              targetText: "50 mg/day",
+              weight: 8
+            }
+          ],
+          supplementNames: ["Apigenin"]
+        })
+      ],
+      sampleSize: 8,
+      seed: "fixed",
+      supplements: [
+        {
+          category: "Advanced Longevity",
+          id: apigeninSupplementId,
+          name: "Apigenin",
+          normalizedName: "apigenin",
+          targetComparableAmount: 50000
+        }
+      ]
+    });
+
+    assert.equal(result.summary.averageCoveragePercent, 100);
+    assert.equal(result.mostUsefulProducts[0]?.id, apigeninProduct.id);
+    assert.equal(result.input.demandProfiles[0]?.needs[0]?.targetComparableAmount, 50000);
     assert.equal(result.unmetSupplements.length, 0);
   });
 

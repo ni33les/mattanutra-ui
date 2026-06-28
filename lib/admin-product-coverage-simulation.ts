@@ -3,6 +3,10 @@ import {
   safePercent
 } from "@/lib/product-recommendation-metrics";
 import {
+  comparableDoseAmount,
+  parseDose
+} from "@/lib/dose-conversion";
+import {
   defaultProductCountryCode,
   normalizeProductCountryCode
 } from "@/lib/product-countries";
@@ -505,12 +509,26 @@ function recordFromUnknown(value: unknown) {
     : {};
 }
 
+function targetDoseFromText(input: Readonly<{
+  normalizedName: string;
+  targetText: string | null;
+}>) {
+  const targetText = input.targetText?.trim();
+
+  return targetText ? parseDose(targetText, input.normalizedName) : null;
+}
+
 function normalizeDemandNeed(value: unknown): ProductRecommendationNeed | null {
   const record = recordFromUnknown(value);
   const displayName = textOrEmpty(record.displayName);
   const normalizedName = textOrEmpty(record.normalizedName);
   const sourceId = textOrEmpty(record.sourceId) || textOrEmpty(record.id);
   const id = textOrEmpty(record.id) || `demand:${normalizedName}`;
+  const targetText = textOrEmpty(record.targetText) || null;
+  const parsedTargetDose = targetDoseFromText({ normalizedName, targetText });
+  const parsedTargetComparableAmount = parsedTargetDose
+    ? comparableDoseAmount(parsedTargetDose, normalizedName)
+    : null;
 
   if (!displayName || !normalizedName || !sourceId) {
     return null;
@@ -530,12 +548,14 @@ function normalizeDemandNeed(value: unknown): ProductRecommendationNeed | null {
     itemType: "supplement",
     normalizedName,
     sourceId,
-    targetComparableAmount: positiveNumberOrNull(record.targetComparableAmount),
-    targetDose:
-      record.targetDose && typeof record.targetDose === "object"
+    targetComparableAmount:
+      parsedTargetComparableAmount ??
+      positiveNumberOrNull(record.targetComparableAmount),
+    targetDose: parsedTargetDose ??
+      (record.targetDose && typeof record.targetDose === "object"
         ? record.targetDose as ProductRecommendationNeed["targetDose"]
-        : null,
-    targetText: textOrEmpty(record.targetText) || null,
+        : null),
+    targetText,
     weight: Math.max(1, Math.min(12, Math.round(Number(record.weight) || 1)))
   };
 }
