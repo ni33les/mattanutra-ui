@@ -83,11 +83,18 @@ type SavedSimulationState = Readonly<{
   version: 3 | 4;
 }>;
 
-type SavedDemandProfilesState = Readonly<{
-  demandKey?: string;
+type SavedDemandProfilesEntry = Readonly<{
+  demandKey: string;
   savedAt?: string;
   profiles: readonly AdminPlanCoverageDemandProfile[];
-  version: 1 | 2;
+}>;
+
+type SavedDemandProfilesState = Readonly<{
+  demandKey?: string;
+  entries?: readonly SavedDemandProfilesEntry[];
+  profiles?: readonly AdminPlanCoverageDemandProfile[];
+  savedAt?: string;
+  version: 1 | 2 | 3;
 }>;
 
 type SimulatorInputStatus = "error" | "loading" | "ready";
@@ -342,13 +349,23 @@ function saveDemandProfiles(
   profiles: readonly AdminPlanCoverageDemandProfile[]
 ) {
   try {
+    const savedAt = new Date().toISOString();
+    const currentProfiles = savedDemandProfiles(profiles);
+    const entries = savedDemandProfileEntriesFromStorage();
+    const nextEntries = [
+      {
+        demandKey,
+        profiles: currentProfiles,
+        savedAt
+      },
+      ...entries.filter((entry) => entry.demandKey !== demandKey)
+    ];
+
     window.localStorage.setItem(
       SIMULATOR_DEMAND_STORAGE_KEY,
       JSON.stringify({
-        demandKey,
-        savedAt: new Date().toISOString(),
-        profiles,
-        version: 2
+        entries: nextEntries,
+        version: 3
       } satisfies SavedDemandProfilesState)
     );
   } catch {
@@ -364,7 +381,7 @@ function clearSavedDemandProfiles() {
   }
 }
 
-function loadSavedDemandProfiles(expectedDemandKey?: string) {
+function savedDemandProfileEntriesFromStorage(): SavedDemandProfilesEntry[] {
   try {
     const raw = window.localStorage.getItem(SIMULATOR_DEMAND_STORAGE_KEY);
 
@@ -374,24 +391,62 @@ function loadSavedDemandProfiles(expectedDemandKey?: string) {
 
     const parsed = JSON.parse(raw) as Partial<SavedDemandProfilesState>;
 
-    if (
-      (parsed.version !== 1 && parsed.version !== 2) ||
-      !Array.isArray(parsed.profiles)
-    ) {
+    if (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3) {
       return [];
     }
 
-    if (
-      expectedDemandKey &&
-      (parsed.version !== 2 || parsed.demandKey !== expectedDemandKey)
-    ) {
-      return [];
+    const entries =
+      parsed.version === 3 && Array.isArray(parsed.entries)
+        ? parsed.entries
+        : [];
+    const normalizedEntries = entries
+      .map((entry) => ({
+        demandKey: typeof entry.demandKey === "string" ? entry.demandKey : "",
+        profiles: savedDemandProfiles(normalizeDemandProfiles(entry.profiles)),
+        savedAt: typeof entry.savedAt === "string" ? entry.savedAt : undefined
+      }))
+      .filter((entry) => entry.demandKey && entry.profiles.length > 0);
+
+    if (normalizedEntries.length > 0) {
+      return normalizedEntries;
     }
 
-    return savedDemandProfiles(normalizeDemandProfiles(parsed.profiles));
+    if (Array.isArray(parsed.profiles)) {
+      const profiles = savedDemandProfiles(normalizeDemandProfiles(parsed.profiles));
+
+      if (profiles.length > 0) {
+        return [{
+          demandKey:
+            parsed.version === 2 && typeof parsed.demandKey === "string"
+              ? parsed.demandKey
+              : "legacy",
+          profiles,
+          savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : undefined
+        }];
+      }
+    }
   } catch {
     return [];
   }
+
+  return [];
+}
+
+function loadSavedDemandProfiles(expectedDemandKey?: string) {
+  const entries = savedDemandProfileEntriesFromStorage();
+  const exact = expectedDemandKey
+    ? entries.find((entry) => entry.demandKey === expectedDemandKey)
+    : null;
+
+  if (exact) {
+    return exact.profiles;
+  }
+
+  return [...entries]
+    .sort((first, second) =>
+      second.profiles.length - first.profiles.length ||
+      (second.savedAt ?? "").localeCompare(first.savedAt ?? "")
+    )[0]?.profiles ?? [];
 }
 
 function savedDemandProfiles(
@@ -2336,15 +2391,18 @@ export function AdminPlanCoverageSimulatorView({
 
       const previousDemandKey = previousDemandKeyRef.current;
       previousDemandKeyRef.current = demandKey;
+      const savedProfiles = sanitizeDemandProfilesForSimulationSupplements(
+        loadSavedDemandProfiles(demandKey),
+        inputData.input.supplements
+      );
 
       setDemandGenerating(false);
       setDemandError(null);
-      setDemandProfiles(
-        sanitizeDemandProfilesForSimulationSupplements(
-          loadSavedDemandProfiles(demandKey),
-          inputData.input.supplements
-        )
-      );
+      setDemandProfiles(savedProfiles);
+
+      if (savedProfiles.length > 0) {
+        saveDemandProfiles(demandKey, savedProfiles);
+      }
 
       if (previousDemandKey !== null && previousDemandKey !== demandKey) {
         clearSavedSimulationState();

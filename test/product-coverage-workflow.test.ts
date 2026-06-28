@@ -837,9 +837,13 @@ describe("product coverage workflow", () => {
     assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
     assert.match(view, /supplementGovernanceHash: data\.input\.supplementGovernanceHash/);
     assert.match(view, /sanitizeDemandProfilesForSimulationSupplements/);
-    assert.match(view, /version: 2\s*\n\s*}\s+satisfies SavedDemandProfilesState/);
+    assert.match(view, /type SavedDemandProfilesEntry/);
+    assert.match(view, /savedDemandProfileEntriesFromStorage/);
+    assert.match(view, /version: 3\s*\n\s*}\s+satisfies SavedDemandProfilesState/);
     assert.match(view, /function loadSavedDemandProfiles\(expectedDemandKey\?: string\)/);
-    assert.match(view, /parsed\.demandKey !== expectedDemandKey/);
+    assert.match(view, /entry\.demandKey === expectedDemandKey/);
+    assert.match(view, /saveDemandProfiles\(demandKey, savedProfiles\)/);
+    assert.doesNotMatch(view, /parsed\.demandKey !== expectedDemandKey/);
     assert.doesNotMatch(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
     assert.match(view, /function savedDemandProfiles/);
     assert.match(view, /clearSavedDemandProfiles\(\)/);
