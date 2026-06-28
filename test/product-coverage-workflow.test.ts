@@ -21,6 +21,7 @@ import type {
 import type { ProductCandidate } from "../lib/product-recommendations.ts";
 
 const supplementId = "11111111-1111-4111-8111-111111111111";
+const rhodiolaSupplementId = "77777777-7777-4777-8777-777777777777";
 const magnesiumSupplementId = "33333333-3333-4333-8333-333333333333";
 const zincSupplementId = "55555555-5555-4555-8555-555555555555";
 
@@ -299,6 +300,7 @@ describe("product coverage workflow", () => {
     assert.equal(result.mostUsefulProducts.length, 0);
     assert.equal(result.unmetSupplements[0]?.name, "CoQ10");
     assert.equal(result.unmetSupplements[0]?.count, 8);
+    assert.equal(result.unmetSupplements[0]?.state, "catalogue_gap");
   });
 
   it("ranks blocked products by review opportunity without adding them to simulation", () => {
@@ -424,6 +426,7 @@ describe("product coverage workflow", () => {
           supplementNames: ["CoQ10", "Magnesium", "Zinc"]
         })
       ],
+      reviewPriorityProducts: reviewRows,
       sampleSize: 8,
       seed: "fixed",
       supplements: []
@@ -437,11 +440,113 @@ describe("product coverage workflow", () => {
 
     assert.equal(nextMoves[0]?.id, blockedProduct.id);
     assert.equal(nextMoves[0]?.kind, "review_product");
+    assert.equal(nextMoves[0]?.actionType, "review_blocked_product");
     assert.equal(nextMoves[0]?.unmetSupplementNames[0], "Magnesium");
     assert.equal(nextMoves[0]?.unmetDemandCount, 8);
+    assert.equal(
+      simulationData.unmetSupplements.find((row) => row.name === "Magnesium")?.state,
+      "blocked_only"
+    );
     assert.equal(sourceMove?.sourceSupplementName, "Zinc");
+    assert.equal(sourceMove?.actionType, "source_missing_supplement");
     assert.equal(sourceMove?.targetDoseText, "15 mg/day");
     assert.equal(sourceMove?.unmetDemandCount, 8);
+  });
+
+  it("does not create sourcing moves for covered but unselected demand", () => {
+    const simulationData = {
+      ...emptyAdminPlanCoverageSimulationData({
+        candidates: [
+          product({
+            facts: [
+              {
+                amount: 200,
+                comparableAmount: 200000,
+                confidence: "high",
+                itemType: "supplement",
+                name: "Rhodiola",
+                normalizedName: "rhodiola",
+                supplementId: rhodiolaSupplementId,
+                unit: "mg"
+              }
+            ],
+            id: "66666666-6666-4666-8666-666666666666",
+            title: "Example Rhodiola"
+          })
+        ],
+        countryCode: "TH",
+        databaseAvailable: true,
+        sampleSize: 8,
+        supplements: [
+          {
+            category: "Adaptogens",
+            id: rhodiolaSupplementId,
+            name: "Rhodiola",
+            normalizedName: "rhodiola",
+            targetComparableAmount: 200000
+          }
+        ]
+      }),
+      unmetSupplements: [
+        {
+          blockedProductCount: 0,
+          count: 8,
+          eligibleProductCount: 1,
+          name: "Rhodiola",
+          percent: 100,
+          state: "available_unselected" as const,
+          supplementId: rhodiolaSupplementId,
+          supplementKey: rhodiolaSupplementId,
+          targetDoseText: "200 mg/day"
+        }
+      ]
+    };
+    const nextMoves = buildSimulationNextMoveRows({
+      reviewPriorityProducts: [],
+      simulationInput: simulationData.input,
+      simulationData
+    });
+
+    assert.equal(
+      nextMoves.some((row) =>
+        row.kind === "source_supplement" &&
+        row.sourceSupplementName === "Rhodiola"
+      ),
+      false
+    );
+  });
+
+  it("creates source moves only for true catalogue gaps", () => {
+    const simulationData = {
+      ...emptyAdminPlanCoverageSimulationData({
+        countryCode: "TH",
+        databaseAvailable: true,
+        sampleSize: 8,
+        supplements: []
+      }),
+      unmetSupplements: [
+        {
+          blockedProductCount: 0,
+          count: 8,
+          eligibleProductCount: 0,
+          name: "Zinc",
+          percent: 100,
+          state: "catalogue_gap" as const,
+          supplementId: zincSupplementId,
+          supplementKey: zincSupplementId,
+          targetDoseText: "15 mg/day"
+        }
+      ]
+    };
+    const nextMoves = buildSimulationNextMoveRows({
+      reviewPriorityProducts: [],
+      simulationInput: simulationData.input,
+      simulationData
+    });
+
+    assert.equal(nextMoves[0]?.kind, "source_supplement");
+    assert.equal(nextMoves[0]?.actionType, "source_missing_supplement");
+    assert.equal(nextMoves[0]?.sourceSupplementName, "Zinc");
   });
 
   it("converts Customer Intelligence users into simulator profiles", () => {
@@ -531,25 +636,25 @@ describe("product coverage workflow", () => {
     assert.match(view, /SIMULATOR_STORAGE_KEY/);
     assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
     assert.match(view, /version: 2\s*\n\s*}\s+satisfies SavedDemandProfilesState/);
-    assert.match(view, /function loadSavedDemandProfiles\(\)/);
-    assert.doesNotMatch(view, /parsed\.demandKey !== demandKey/);
-    assert.match(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
+    assert.match(view, /function loadSavedDemandProfiles\(expectedDemandKey\?: string\)/);
+    assert.match(view, /parsed\.demandKey !== expectedDemandKey/);
+    assert.doesNotMatch(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
     assert.match(view, /function savedDemandProfiles/);
     assert.match(view, /clearSavedDemandProfiles\(\)/);
     assert.match(view, /\/api\/admin\/product-coverage\/simulation-input/);
     assert.match(view, /cache: "no-store"/);
     assert.match(view, /inputStatus !== "ready"/);
-    assert.match(view, /displayData: simulationDisplaySnapshotFromRunner/);
-    assert.match(view, /loadSavedSimulationDisplayData/);
-    assert.match(view, /cachedSimulationData \?\? initialSimulationData/);
+    assert.match(view, /version: 3/);
+    assert.doesNotMatch(view, /loadSavedSimulationDisplayData/);
+    assert.doesNotMatch(view, /cachedSimulationData \?\? initialSimulationData/);
     assert.match(view, /productResultRows/);
     assert.match(view, /visibleProductResultRows/);
     assert.match(view, /Best performing products/);
     assert.match(view, /No products have been selected by the simulation yet/);
     assert.match(view, /Run the simulation to see product usefulness/);
     assert.match(view, /row\.chosenCount > 0/);
-    assert.match(view, /savedSimulationReplayTarget/);
-    assert.match(view, /replayCachedDemandProfiles/);
+    assert.doesNotMatch(view, /savedSimulationReplayTarget/);
+    assert.doesNotMatch(view, /replayCachedDemandProfiles/);
     assert.match(view, /window\.addEventListener\("focus"/);
     assert.match(view, /window\.addEventListener\("pageshow"/);
     assert.match(view, /visibilitychange/);
@@ -571,8 +676,12 @@ describe("product coverage workflow", () => {
     assert.match(view, /Best next moves/);
     assert.match(view, /Clear list/);
     assert.match(view, /nextMoveReasonText/);
-    assert.match(view, /Adding this covers/);
+    assert.match(view, /Reviewing this product could cover/);
     assert.match(view, /source_supplement/);
+    assert.match(view, /Unmet plan demand/);
+    assert.match(view, /Catalogue gaps/);
+    assert.match(view, /Eligible products exist, but were not selected/);
+    assert.doesNotMatch(view, /Most unmet supplements/);
     assert.match(view, /Optimum dose/);
     assert.match(view, /simulationInput: activeInputData\.input/);
     assert.doesNotMatch(view, /row\.blockedReason/);

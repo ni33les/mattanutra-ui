@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowTopRightOnSquareIcon,
   ChevronDownIcon,
@@ -13,6 +13,7 @@ import type {
   AdminProductCoverageData,
   AdminPlanCoverageSimulationProductStats,
   AdminPlanCoverageSimulationRunner,
+  AdminPlanCoverageSimulationUnmetDemandBucket,
   AdminSimulationNextMoveRow,
   AdminSimulationProductUsefulnessRow,
   AdminSupplementCoverageProductRow,
@@ -42,7 +43,7 @@ import {
 } from "@/lib/admin-product-coverage-simulation";
 
 const SIMULATOR_STORAGE_KEY =
-  "mattanutra:admin-plan-coverage-simulator:v2";
+  "mattanutra:admin-plan-coverage-simulator:v3";
 const SIMULATOR_ARCHETYPES_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-archetypes:v1";
 const SIMULATOR_DEMAND_STORAGE_KEY =
@@ -62,14 +63,13 @@ type ArchetypeDraft = Readonly<{
 type SavedSimulationState = Readonly<{
   costValues: number[];
   coverageValues: number[];
-  displayData?: AdminPlanCoverageSimulationData;
   generatedAt: string;
   inputKey: string;
   productStats: Array<[string, AdminPlanCoverageSimulationProductStats]>;
   randomState: number;
   sampleSize: number;
-  unmetCounts: Array<[string, number]>;
-  version: 2;
+  unmetCounts: Array<[string, AdminPlanCoverageSimulationUnmetDemandBucket]>;
+  version: 3;
 }>;
 
 type SavedDemandProfilesState = Readonly<{
@@ -154,9 +154,26 @@ function simulationInputKey(data: AdminPlanCoverageSimulationData) {
         unitPriceAmount: candidate.unitPriceAmount ?? null
       })),
       countryCode: data.input.countryCode,
+      demandProfiles: data.input.demandProfiles.map((profile) => ({
+        archetypeId: profile.archetypeId,
+        clientSex: profile.clientSex,
+        id: profile.id,
+        needs: profile.needs.map((need) => ({
+          displayName: need.displayName,
+          id: need.id,
+          normalizedName: need.normalizedName,
+          sourceId: need.sourceId,
+          targetComparableAmount: need.targetComparableAmount ?? null,
+          targetText: need.targetText ?? null,
+          weight: need.weight
+        })),
+        sampleIndex: profile.sampleIndex
+      })),
       seed: data.input.seed,
       supplements: data.input.supplements.map((supplement) => ({
         id: supplement.id,
+        name: supplement.name,
+        normalizedName: supplement.normalizedName,
         targetComparableAmount: supplement.targetComparableAmount
       }))
     })
@@ -179,7 +196,12 @@ function demandProfilesKey(
         preferredSupplementNames: archetype.preferredSupplementNames
       })),
       countryCode: data.countryCode,
-      seed: data.seed
+      seed: data.seed,
+      supplements: data.input.supplements.map((supplement) => ({
+        id: supplement.id,
+        name: supplement.name,
+        targetComparableAmount: supplement.targetComparableAmount
+      }))
     })
   );
 }
@@ -286,12 +308,14 @@ function simulationDataWithArchetypes(
 }
 
 function saveDemandProfiles(
+  demandKey: string,
   profiles: readonly AdminPlanCoverageDemandProfile[]
 ) {
   try {
     window.localStorage.setItem(
       SIMULATOR_DEMAND_STORAGE_KEY,
       JSON.stringify({
+        demandKey,
         savedAt: new Date().toISOString(),
         profiles,
         version: 2
@@ -310,7 +334,7 @@ function clearSavedDemandProfiles() {
   }
 }
 
-function loadSavedDemandProfiles() {
+function loadSavedDemandProfiles(expectedDemandKey?: string) {
   try {
     const raw = window.localStorage.getItem(SIMULATOR_DEMAND_STORAGE_KEY);
 
@@ -323,6 +347,13 @@ function loadSavedDemandProfiles() {
     if (
       (parsed.version !== 1 && parsed.version !== 2) ||
       !Array.isArray(parsed.profiles)
+    ) {
+      return [];
+    }
+
+    if (
+      expectedDemandKey &&
+      (parsed.version !== 2 || parsed.demandKey !== expectedDemandKey)
     ) {
       return [];
     }
@@ -359,14 +390,13 @@ function savedStateFromRunner(
   return {
     costValues: runner.costValues,
     coverageValues: runner.coverageValues,
-    displayData: simulationDisplaySnapshotFromRunner(runner),
     generatedAt: runner.generatedAt,
     inputKey,
     productStats: [...runner.productStats.entries()],
     randomState: runner.randomState,
     sampleSize: runner.sampleSize,
     unmetCounts: [...runner.unmetCounts.entries()],
-    version: 2
+    version: 3
   };
 }
 
@@ -403,7 +433,7 @@ function loadSavedSimulationState(inputKey: string) {
     const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
 
     if (
-      parsed.version !== 2 ||
+      parsed.version !== 3 ||
       parsed.inputKey !== inputKey ||
       !Array.isArray(parsed.coverageValues) ||
       !Array.isArray(parsed.costValues) ||
@@ -421,88 +451,14 @@ function loadSavedSimulationState(inputKey: string) {
   }
 }
 
-function savedSimulationReplayTarget(inputKey: string) {
-  try {
-    const raw = window.localStorage.getItem(SIMULATOR_STORAGE_KEY);
-
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
-
-    if (
-      parsed.version !== 2 ||
-      parsed.inputKey === inputKey ||
-      typeof parsed.sampleSize !== "number" ||
-      parsed.sampleSize < 1
-    ) {
-      return null;
-    }
-
-    return Math.min(
-      ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
-      Math.max(0, Math.floor(parsed.sampleSize))
-    );
-  } catch {
-    return null;
-  }
-}
-
-function simulationDisplaySnapshotFromRunner(
-  runner: AdminPlanCoverageSimulationRunner
-) {
-  const data = adminPlanCoverageSimulationDataFromRunner(runner);
-
-  return {
-    ...data,
-    archetypes: [],
-    input: {
-      ...data.input,
-      archetypes: [],
-      candidates: [],
-      demandProfiles: [],
-      supplements: []
-    },
-    realCustomerArchetypes: [],
-    realCustomerProfiles: [],
-    reviewPriorityProducts: []
-  };
-}
-
-function loadSavedSimulationDisplayData(countryCode: string) {
-  try {
-    const raw = window.localStorage.getItem(SIMULATOR_STORAGE_KEY);
-
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
-    const displayData = parsed.displayData;
-
-    if (
-      parsed.version !== 2 ||
-      !displayData ||
-      displayData.countryCode !== countryCode ||
-      typeof displayData.sampleSize !== "number" ||
-      !Array.isArray(displayData.mostUsefulProducts) ||
-      !Array.isArray(displayData.unmetSupplements)
-    ) {
-      return null;
-    }
-
-    return displayData;
-  } catch {
-    return null;
-  }
-}
-
 function runnerFromSavedState(
   data: AdminPlanCoverageSimulationData,
   saved: SavedSimulationState
 ) {
-  const runner = createAdminPlanCoverageSimulationRunner(data.input);
+  const runner = createAdminPlanCoverageSimulationRunner({
+    ...data.input,
+    reviewPriorityProducts: data.reviewPriorityProducts
+  });
 
   runner.costValues = [...saved.costValues];
   runner.coverageValues = [...saved.coverageValues];
@@ -524,12 +480,6 @@ function initialSimulationData(data: AdminPlanCoverageSimulationData) {
     realCustomerProfiles: data.realCustomerProfiles,
     reviewPriorityProducts: data.reviewPriorityProducts
   });
-}
-
-function initialSimulationDataWithCachedDisplay(
-  data: AdminPlanCoverageSimulationData
-) {
-  return loadSavedSimulationDisplayData(data.countryCode) ?? initialSimulationData(data);
 }
 
 function productResultRows(
@@ -956,17 +906,17 @@ function compactDisplayList(values: readonly string[]) {
 
 function nextMoveReasonText(row: AdminSimulationNextMoveRow) {
   if (row.kind === "source_supplement") {
-    return `Source a product for ${row.sourceSupplementName}; demand appears across ${numberText(
+    return `Source a product for ${row.sourceSupplementName}; this true catalogue gap appears across ${numberText(
       row.unmetDemandCount
     )} simulated ${
       row.unmetDemandCount === 1 ? "profile" : "profiles"
-    } (${percentText(row.unmetDemandPercent)}) and no catalogue product currently covers it.`;
+    } (${percentText(row.unmetDemandPercent)}).`;
   }
 
   const profileLabel = row.unmetDemandCount === 1 ? "profile" : "profiles";
   const gapText =
     row.gapSupplementCount > 0
-      ? ` and closes ${numberText(row.gapSupplementCount)} current catalogue ${
+      ? ` and helps close ${numberText(row.gapSupplementCount)} catalogue ${
           row.gapSupplementCount === 1 ? "gap" : "gaps"
         }`
       : "";
@@ -975,9 +925,63 @@ function nextMoveReasonText(row: AdminSimulationNextMoveRow) {
       ? `; it covers ${numberText(row.matchableSupplementCount)} matchable supplements overall`
       : "";
 
-  return `Adding this covers ${compactDisplayList(row.unmetSupplementNames)} across ${numberText(
+  return `Reviewing this product could cover ${compactDisplayList(row.unmetSupplementNames)} across ${numberText(
     row.unmetDemandCount
   )} simulated ${profileLabel} (${percentText(row.unmetDemandPercent)})${gapText}${overallText}.`;
+}
+
+function unmetDemandStateLabel(
+  state: AdminPlanCoverageSimulationData["unmetSupplements"][number]["state"]
+) {
+  if (state === "catalogue_gap") {
+    return "Catalogue gap";
+  }
+
+  if (state === "blocked_only") {
+    return "Blocked only";
+  }
+
+  if (state === "underdosed") {
+    return "Underdosed";
+  }
+
+  return "Available";
+}
+
+function unmetDemandStateClassName(
+  state: AdminPlanCoverageSimulationData["unmetSupplements"][number]["state"]
+) {
+  if (state === "catalogue_gap") {
+    return "bg-rose-50 text-rose-700 ring-rose-200";
+  }
+
+  if (state === "blocked_only") {
+    return "bg-amber-50 text-amber-700 ring-amber-200";
+  }
+
+  if (state === "underdosed") {
+    return "bg-blue-50 text-blue-700 ring-blue-200";
+  }
+
+  return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+}
+
+function unmetDemandReasonText(
+  row: AdminPlanCoverageSimulationData["unmetSupplements"][number]
+) {
+  if (row.state === "catalogue_gap") {
+    return "No eligible product currently covers this supplement.";
+  }
+
+  if (row.state === "blocked_only") {
+    return "Only blocked or pending products currently cover this need.";
+  }
+
+  if (row.state === "underdosed") {
+    return "Eligible products exist, but current dose coverage is below the target.";
+  }
+
+  return "Eligible products exist, but were not selected in these simulated stacks.";
 }
 
 function NextMoveProductRow({
@@ -1703,7 +1707,7 @@ export function AdminPlanCoverageSimulatorView({
     useState<SimulatorClearTarget>("results");
   const [demandProfiles, setDemandProfiles] = useState<
     AdminPlanCoverageDemandProfile[]
-  >(loadSavedDemandProfiles);
+  >([]);
   const [demandGenerating, setDemandGenerating] = useState(false);
   const [demandError, setDemandError] = useState<string | null>(null);
   const [inputRefreshNonce, setInputRefreshNonce] = useState(0);
@@ -1729,7 +1733,7 @@ export function AdminPlanCoverageSimulatorView({
     [activeInputData]
   );
   const [simulationData, setSimulationData] = useState(() =>
-    initialSimulationDataWithCachedDisplay(data)
+    initialSimulationData(data)
   );
   const [hydrated, setHydrated] = useState(false);
   const [running, setRunning] = useState(false);
@@ -1784,65 +1788,13 @@ export function AdminPlanCoverageSimulatorView({
     () => productResultRows(simulationData, activeInputData.input.candidates),
     [activeInputData.input.candidates, simulationData]
   );
-
-  const replayCachedDemandProfiles = useCallback(async (
-    runToken: number,
-    targetSampleSize: number
-  ) => {
-    const profiles = [...demandProfiles].sort(
-      (first, second) => first.sampleIndex - second.sampleIndex
-    );
-
-    if (profiles.length < 1 || !activeInputData.databaseAvailable) {
-      return;
-    }
-
-    let runner = createAdminPlanCoverageSimulationRunner({
-      ...activeInputData.input,
-      demandProfiles: profiles
-    });
-    const target = Math.min(
-      ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
-      profiles.length,
-      Math.max(1, Math.floor(targetSampleSize))
-    );
-
-    runnerRef.current = runner;
-    setDemandError(null);
-    setDemandGenerating(false);
-    setRunning(true);
-    setHydrated(true);
-
-    try {
-      while (runToken === runTokenRef.current && runner.sampleSize < target) {
-        const nextData = runNextAdminPlanCoverageSimulationSample(runner);
-
-        if (runToken !== runTokenRef.current) {
-          break;
-        }
-
-        runner = runnerWithDemandProfiles(runner, profiles);
-        runnerRef.current = runner;
-        setSimulationData(nextData);
-        saveSimulationState(inputKey, runner);
-
-        if (
-          runner.sampleSize >= target ||
-          runner.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES
-        ) {
-          break;
-        }
-
-        if (runner.sampleSize % 8 === 0) {
-          await waitForNextSample();
-        }
-      }
-    } finally {
-      if (runToken === runTokenRef.current) {
-        setRunning(false);
-      }
-    }
-  }, [activeInputData, demandProfiles, inputKey]);
+  const catalogueGapRows = useMemo(
+    () =>
+      simulationData.unmetSupplements.filter((row) =>
+        row.state === "catalogue_gap"
+      ),
+    [simulationData.unmetSupplements]
+  );
 
   useEffect(() => {
     runningRef.current = running || demandGenerating;
@@ -1883,9 +1835,8 @@ export function AdminPlanCoverageSimulatorView({
       setInputStatus("loading");
       setInputError(null);
       setInputData(data);
-      const cachedSimulationData = loadSavedSimulationDisplayData(data.countryCode);
-      setSimulationData(cachedSimulationData ?? initialSimulationData(data));
-      setHydrated(Boolean(cachedSimulationData));
+      setSimulationData(initialSimulationData(data));
+      setHydrated(false);
       setRunning(false);
       runnerRef.current = null;
 
@@ -1950,7 +1901,7 @@ export function AdminPlanCoverageSimulatorView({
 
       setDemandGenerating(false);
       setDemandError(null);
-      setDemandProfiles(loadSavedDemandProfiles());
+      setDemandProfiles(loadSavedDemandProfiles(demandKey));
 
       if (previousDemandKey !== null && previousDemandKey !== demandKey) {
         clearSavedSimulationState();
@@ -1996,20 +1947,11 @@ export function AdminPlanCoverageSimulatorView({
         runnerRef.current = savedRunner;
         setSimulationData(adminPlanCoverageSimulationDataFromRunner(savedRunner));
       } else {
-        const replayTarget = savedSimulationReplayTarget(inputKey);
-
-        runnerRef.current = createAdminPlanCoverageSimulationRunner(activeInputData.input);
+        runnerRef.current = createAdminPlanCoverageSimulationRunner({
+          ...activeInputData.input,
+          reviewPriorityProducts: activeInputData.reviewPriorityProducts
+        });
         setSimulationData(initialSimulationData(activeInputData));
-
-        if (
-          replayTarget !== null &&
-          activeInputData.input.demandProfiles.length > 0
-        ) {
-          runTokenRef.current += 1;
-          setNextMovesClearedKey(null);
-          void replayCachedDemandProfiles(runTokenRef.current, replayTarget);
-          return;
-        }
       }
 
       setRunning(false);
@@ -2025,7 +1967,6 @@ export function AdminPlanCoverageSimulatorView({
     demandGenerating,
     inputKey,
     inputStatus,
-    replayCachedDemandProfiles,
     running
   ]);
 
@@ -2091,7 +2032,10 @@ export function AdminPlanCoverageSimulatorView({
   async function runSimulationLoop(runToken: number) {
     let runner =
       runnerRef.current ??
-      createAdminPlanCoverageSimulationRunner(activeInputData.input);
+      createAdminPlanCoverageSimulationRunner({
+        ...activeInputData.input,
+        reviewPriorityProducts: activeInputData.reviewPriorityProducts
+      });
     let profiles = [...demandProfiles].sort(
       (first, second) => first.sampleIndex - second.sampleIndex
     );
@@ -2119,7 +2063,7 @@ export function AdminPlanCoverageSimulatorView({
           runner = runnerWithDemandProfiles(runner, profiles);
           runnerRef.current = runner;
           setDemandProfiles(profiles);
-          saveDemandProfiles(profiles);
+          saveDemandProfiles(demandKey, profiles);
         }
 
         setDemandGenerating(false);
@@ -2183,7 +2127,10 @@ export function AdminPlanCoverageSimulatorView({
     setNextMovesClearedKey(null);
 
     const runner = activeInputData.databaseAvailable
-      ? createAdminPlanCoverageSimulationRunner(activeInputData.input)
+      ? createAdminPlanCoverageSimulationRunner({
+          ...activeInputData.input,
+          reviewPriorityProducts: activeInputData.reviewPriorityProducts
+        })
       : null;
 
     runnerRef.current = runner;
@@ -2201,7 +2148,8 @@ export function AdminPlanCoverageSimulatorView({
     runnerRef.current = activeInputData.databaseAvailable
       ? createAdminPlanCoverageSimulationRunner({
           ...activeInputData.input,
-          demandProfiles: []
+          demandProfiles: [],
+          reviewPriorityProducts: activeInputData.reviewPriorityProducts
         })
       : null;
     setSimulationData(initialSimulationData({
@@ -2221,6 +2169,11 @@ export function AdminPlanCoverageSimulatorView({
     }
 
     clearDemandProfiles();
+
+    if (clearTarget === "all") {
+      setSyntheticArchetypes(SIMULATION_ARCHETYPES);
+      saveSyntheticArchetypes(SIMULATION_ARCHETYPES);
+    }
   }
 
   function clearNextMoves() {
@@ -2300,23 +2253,68 @@ export function AdminPlanCoverageSimulatorView({
         </section>
 
         <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <h2 className="text-lg font-bold text-slate-950">Most unmet supplements</h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-950">Unmet plan demand</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Supplements requested by simulated profiles that the selected stacks did
+                not satisfy.
+              </p>
+            </div>
+            <Badge>{numberText(catalogueGapRows.length)} catalogue gaps</Badge>
+          </div>
           <div className="mt-2">
             {simulationData.unmetSupplements.length > 0 ? (
               simulationData.unmetSupplements.map((row) => (
                 <div
-                  className="flex items-center justify-between gap-3 border-t border-slate-200 py-3 text-sm"
-                  key={row.name}
+                  className="border-t border-slate-200 py-3 text-sm"
+                  key={row.supplementKey}
                 >
-                  <span className="font-semibold text-slate-950">{row.name}</span>
-                  <span className="text-slate-500">
-                    {numberText(row.count)} · {percentText(row.percent)}
-                  </span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-slate-950">{row.name}</span>
+                        <Badge className={unmetDemandStateClassName(row.state)}>
+                          {unmetDemandStateLabel(row.state)}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {unmetDemandReasonText(row)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {numberText(row.eligibleProductCount)} eligible ·{" "}
+                        {numberText(row.blockedProductCount)} blocked
+                        {row.targetDoseText ? ` · target ${row.targetDoseText}` : ""}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-slate-500">
+                      {numberText(row.count)} · {percentText(row.percent)}
+                    </span>
+                  </div>
                 </div>
               ))
             ) : (
               <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
                 Every simulated supplement need had at least partial coverage.
+              </p>
+            )}
+          </div>
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <h3 className="text-sm font-bold text-slate-950">Catalogue gaps</h3>
+            {catalogueGapRows.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {catalogueGapRows.slice(0, 8).map((row) => (
+                  <Badge
+                    className="bg-rose-50 text-rose-700 ring-rose-200"
+                    key={row.supplementKey}
+                  >
+                    {row.name}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">
+                No true catalogue gaps in this simulation output.
               </p>
             )}
           </div>
@@ -2330,7 +2328,7 @@ export function AdminPlanCoverageSimulatorView({
               Best next moves
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Blocked products and missing supplement sourcing moves ranked by unmet demand.
+              Review blocked products or source true catalogue gaps ranked by unmet plan demand.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -2367,8 +2365,8 @@ export function AdminPlanCoverageSimulatorView({
             </p>
           ) : simulationData.sampleSize < 1 ? (
             <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
-              Run the simulation to calculate which blocked products would close the
-              largest current coverage gaps.
+              Run the simulation to calculate which blocked products and catalogue gaps
+              matter most.
             </p>
           ) : simulationData.unmetSupplements.length < 1 ? (
             <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
@@ -2376,8 +2374,8 @@ export function AdminPlanCoverageSimulatorView({
             </p>
           ) : (
             <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
-              No blocked products or missing supplement sourcing moves currently cover the
-              unmet demand in this simulation output.
+              No blocked products or true catalogue gaps currently explain the unmet plan
+              demand in this simulation output.
             </p>
           )}
         </div>
