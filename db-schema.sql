@@ -119,6 +119,7 @@ drop table if exists
   public.supplement_admin_audit,
   public.supplement_alias_events,
   public.supplement_aliases,
+  public.supplement_country_availability,
   public.supplement_recommendation_selections,
   public.supplement_safety_limits,
   public.supplement_translations,
@@ -2773,6 +2774,23 @@ CREATE TABLE public.supplement_aliases (
 
 
 --
+-- Name: supplement_country_availability; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.supplement_country_availability (
+    supplement_id uuid NOT NULL,
+    country_code text NOT NULL,
+    status text NOT NULL,
+    reason text,
+    source text DEFAULT 'admin_dashboard'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT supplement_country_availability_country_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
+    CONSTRAINT supplement_country_availability_status_check CHECK ((status = ANY (ARRAY['allowed'::text, 'blocked'::text])))
+);
+
+
+--
 -- Name: supplement_safety_limits; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4026,6 +4044,14 @@ ALTER TABLE ONLY public.supplement_aliases
 
 ALTER TABLE ONLY public.supplement_aliases
     ADD CONSTRAINT supplement_aliases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: supplement_country_availability supplement_country_availability_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.supplement_country_availability
+    ADD CONSTRAINT supplement_country_availability_pkey PRIMARY KEY (supplement_id, country_code);
 
 
 --
@@ -5455,6 +5481,13 @@ CREATE INDEX supplement_aliases_supplement_idx ON public.supplement_aliases USIN
 
 
 --
+-- Name: supplement_country_availability_country_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX supplement_country_availability_country_idx ON public.supplement_country_availability USING btree (country_code, status, updated_at DESC);
+
+
+--
 -- Name: supplement_recommendation_selections_current_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6784,6 +6817,14 @@ ALTER TABLE ONLY public.supplement_admin_audit
 
 ALTER TABLE ONLY public.supplement_aliases
     ADD CONSTRAINT supplement_aliases_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE CASCADE;
+
+
+--
+-- Name: supplement_country_availability supplement_country_availability_supplement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.supplement_country_availability
+    ADD CONSTRAINT supplement_country_availability_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE CASCADE;
 
 
 --

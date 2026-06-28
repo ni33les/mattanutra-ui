@@ -53,6 +53,7 @@ export type AdminPlanCoverageSimulationInput = Readonly<{
   countryCode: string;
   demandProfiles: readonly AdminPlanCoverageDemandProfile[];
   seed: string;
+  supplementGovernanceHash: string;
   supplements: readonly AdminPlanCoverageSimulationSupplement[];
 }>;
 
@@ -355,6 +356,15 @@ function textOrEmpty(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizedSupplementKey(value: unknown) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 function normalizeArchetypeList(value: unknown) {
   if (Array.isArray(value)) {
     return value
@@ -532,6 +542,48 @@ export function normalizeDemandProfiles(value: unknown) {
   });
 }
 
+export function sanitizeDemandProfilesForSimulationSupplements(
+  profiles: readonly AdminPlanCoverageDemandProfile[],
+  supplements: readonly AdminPlanCoverageSimulationSupplement[]
+) {
+  const allowedKeys = new Set(
+    supplements.flatMap((supplement) => [
+      supplement.id,
+      supplement.normalizedName,
+      normalizedSupplementKey(supplement.name)
+    ])
+  );
+
+  if (allowedKeys.size < 1) {
+    return [];
+  }
+
+  return profiles.flatMap((profile): AdminPlanCoverageDemandProfile[] => {
+    const needs = profile.needs.filter((need) => {
+      const keys = [
+        need.sourceId,
+        need.id.replace(/^supplement:/, ""),
+        need.normalizedName,
+        normalizedSupplementKey(need.displayName)
+      ];
+
+      return keys.some((key) =>
+        allowedKeys.has(key) || allowedKeys.has(normalizedSupplementKey(key))
+      );
+    });
+
+    if (needs.length < 1) {
+      return [];
+    }
+
+    return [{
+      ...profile,
+      needs,
+      supplementNames: needs.map((need) => need.displayName)
+    }];
+  });
+}
+
 function positiveNumberOrNull(value: unknown) {
   const parsed = Number(value);
 
@@ -698,6 +750,7 @@ function normalizeSimulationInput(input: Readonly<{
   countryCode?: string | null;
   demandProfiles?: readonly AdminPlanCoverageDemandProfile[] | null;
   seed?: string | null;
+  supplementGovernanceHash?: string | null;
   supplements?: readonly AdminPlanCoverageSimulationSupplement[] | null;
 }>): AdminPlanCoverageSimulationInput {
   const seed = input.seed?.trim() || DEFAULT_SIMULATION_SEED;
@@ -709,6 +762,8 @@ function normalizeSimulationInput(input: Readonly<{
     countryCode,
     demandProfiles: normalizeDemandProfiles(input.demandProfiles),
     seed,
+    supplementGovernanceHash:
+      input.supplementGovernanceHash?.trim() || "supplement-governance:unknown",
     supplements: input.supplements ?? []
   };
 }
@@ -725,6 +780,7 @@ export function emptyAdminPlanCoverageSimulationData(input: Readonly<{
   reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
   sampleSize?: number | null;
   seed?: string | null;
+  supplementGovernanceHash?: string | null;
   supplements?: readonly AdminPlanCoverageSimulationSupplement[] | null;
 }> = {}): AdminPlanCoverageSimulationData {
   const simulationInput = normalizeSimulationInput(input);
@@ -866,6 +922,7 @@ export function createAdminPlanCoverageSimulationRunner(input: Readonly<{
   demandProfiles?: readonly AdminPlanCoverageDemandProfile[] | null;
   reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
   seed?: string | null;
+  supplementGovernanceHash?: string | null;
   supplements: readonly AdminPlanCoverageSimulationSupplement[];
 }>): AdminPlanCoverageSimulationRunner {
   const simulationInput = normalizeSimulationInput(input);
@@ -1411,6 +1468,7 @@ export function runAdminPlanCoverageSimulation(input: Readonly<{
   reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
   sampleSize?: number | null;
   seed?: string | null;
+  supplementGovernanceHash?: string | null;
   supplements: readonly AdminPlanCoverageSimulationSupplement[];
 }>): AdminPlanCoverageSimulationData {
   const runner = createAdminPlanCoverageSimulationRunner(input);

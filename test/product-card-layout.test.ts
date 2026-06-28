@@ -298,4 +298,22 @@ describe("product admin card layout", () => {
     assert.match(writes, /and status = 'pending_review'/);
     assert.match(writes, /brandAutoApproved/);
   });
+
+  it("keeps product fact dose edits as decimal drafts while typing", async () => {
+    const view = await readFile("components/admin/product-view-ui.tsx", "utf8");
+    const factsEditor = view.slice(
+      view.indexOf("export function ProductFactsEditor"),
+      view.indexOf("function productFactIssueMessages"),
+    );
+
+    assert.match(factsEditor, /amountDrafts/);
+    assert.match(factsEditor, /function parsedCompleteDecimal/);
+    assert.match(factsEditor, /inputMode="decimal"/);
+    assert.match(factsEditor, /step="any"/);
+    assert.match(factsEditor, /type="text"/);
+    assert.match(factsEditor, /setAmountDrafts/);
+    assert.match(factsEditor, /if \(parsed !== undefined\)/);
+    assert.match(factsEditor, /\\d\*\\\.\\d\+/);
+    assert.doesNotMatch(factsEditor, /Number\(event\.target\.value\)/);
+  });
 });

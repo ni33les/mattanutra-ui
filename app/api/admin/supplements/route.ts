@@ -4,10 +4,15 @@ import {
   createAdminSupplement,
   isSupplementConfidence,
   isSupplementListStatus,
+  type AdminSupplementCountryAvailabilityInput,
   type AdminSupplementTranslationInput,
   type SupplementConfidence,
   type SupplementListStatus
 } from "@/lib/admin-supplements";
+import {
+  isSupplementCountryAvailabilityStatus,
+  normalizeSupplementAvailabilityCountryCode
+} from "@/lib/supplement-country-availability";
 import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
 
 export const runtime = "nodejs";
@@ -84,6 +89,39 @@ function parseTranslations(value: unknown): AdminSupplementTranslationInput[] {
   return translations;
 }
 
+function parseCountryAvailability(
+  value: unknown
+): AdminSupplementCountryAvailabilityInput[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item): AdminSupplementCountryAvailabilityInput[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const status = record.status;
+
+    if (!isSupplementCountryAvailabilityStatus(status)) {
+      return [];
+    }
+
+    return [{
+      countryCode: normalizeSupplementAvailabilityCountryCode(
+        typeof record.countryCode === "string"
+          ? record.countryCode
+          : typeof record.country_code === "string"
+            ? record.country_code
+            : null
+      ),
+      reason: textOrNull(record.reason, 1000),
+      status
+    }];
+  });
+}
+
 function errorDetails(error: unknown) {
   if (!(error instanceof Error)) {
     return error;
@@ -143,6 +181,7 @@ export async function POST(request: Request) {
       actor: "admin_dashboard",
       category: textOrNull(body.category, 120),
       confidence: parseConfidence(body.confidence),
+      countryAvailability: parseCountryAvailability(body.countryAvailability),
       listStatus: parseListStatus(body.listStatus),
       maxAmount: amountValue(body.maxAmount),
       maxUnit: textOrNull(body.maxUnit, 80),

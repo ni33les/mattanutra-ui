@@ -39,7 +39,8 @@ import {
   emptyAdminPlanCoverageSimulationData,
   normalizeDemandProfiles,
   normalizeSyntheticPlanArchetypes,
-  runNextAdminPlanCoverageSimulationSample
+  runNextAdminPlanCoverageSimulationSample,
+  sanitizeDemandProfilesForSimulationSupplements
 } from "@/lib/admin-product-coverage-simulation";
 
 const SIMULATOR_STORAGE_KEY =
@@ -171,6 +172,7 @@ function simulationInputKey(data: AdminPlanCoverageSimulationData) {
         sampleIndex: profile.sampleIndex
       })),
       seed: data.input.seed,
+      supplementGovernanceHash: data.input.supplementGovernanceHash,
       supplements: data.input.supplements.map((supplement) => ({
         id: supplement.id,
         name: supplement.name,
@@ -198,6 +200,7 @@ function demandProfilesKey(
       })),
       countryCode: data.countryCode,
       seed: data.seed,
+      supplementGovernanceHash: data.input.supplementGovernanceHash,
       supplements: data.input.supplements.map((supplement) => ({
         id: supplement.id,
         name: supplement.name,
@@ -296,11 +299,16 @@ function simulationDataWithArchetypes(
   archetypes: readonly SyntheticPlanArchetype[],
   demandProfiles: readonly AdminPlanCoverageDemandProfile[]
 ) {
+  const sanitizedDemandProfiles = sanitizeDemandProfilesForSimulationSupplements(
+    demandProfiles,
+    data.input.supplements
+  );
+
   return emptyAdminPlanCoverageSimulationData({
     ...data.input,
     archetypes,
     databaseAvailable: data.databaseAvailable,
-    demandProfiles,
+    demandProfiles: sanitizedDemandProfiles,
     realCustomerArchetypes: data.realCustomerArchetypes,
     realCustomerProfileCount: data.realCustomerProfileCount,
     realCustomerProfiles: data.realCustomerProfiles,
@@ -1941,7 +1949,12 @@ export function AdminPlanCoverageSimulatorView({
 
       setDemandGenerating(false);
       setDemandError(null);
-      setDemandProfiles(loadSavedDemandProfiles(demandKey));
+      setDemandProfiles(
+        sanitizeDemandProfilesForSimulationSupplements(
+          loadSavedDemandProfiles(demandKey),
+          inputData.input.supplements
+        )
+      );
 
       if (previousDemandKey !== null && previousDemandKey !== demandKey) {
         clearSavedSimulationState();
@@ -1953,7 +1966,7 @@ export function AdminPlanCoverageSimulatorView({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [demandKey, inputStatus]);
+  }, [demandKey, inputData.input.supplements, inputStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2099,7 +2112,10 @@ export function AdminPlanCoverageSimulatorView({
             break;
           }
 
-          profiles = nextDemandProfiles(profiles, profile);
+          profiles = sanitizeDemandProfilesForSimulationSupplements(
+            nextDemandProfiles(profiles, profile),
+            inputData.input.supplements
+          );
           runner = runnerWithDemandProfiles(runner, profiles);
           runnerRef.current = runner;
           setDemandProfiles(profiles);

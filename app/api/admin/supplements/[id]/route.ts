@@ -3,6 +3,7 @@ import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
   isSupplementConfidence,
   isSupplementListStatus,
+  type AdminSupplementCountryAvailabilityInput,
   type SupplementConfidence,
   type AdminSupplementTranslationInput,
   type SupplementListStatus,
@@ -11,6 +12,10 @@ import {
 } from "@/lib/admin-supplements";
 import { isUuid } from "@/lib/assessment-store";
 import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
+import {
+  isSupplementCountryAvailabilityStatus,
+  normalizeSupplementAvailabilityCountryCode
+} from "@/lib/supplement-country-availability";
 
 export const runtime = "nodejs";
 
@@ -90,6 +95,43 @@ function parseTranslations(value: unknown): AdminSupplementTranslationInput[] {
   }
 
   return translations;
+}
+
+function parseCountryAvailability(
+  value: unknown
+): AdminSupplementCountryAvailabilityInput[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item): AdminSupplementCountryAvailabilityInput[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const status = record.status;
+
+    if (!isSupplementCountryAvailabilityStatus(status)) {
+      return [];
+    }
+
+    return [{
+      countryCode: normalizeSupplementAvailabilityCountryCode(
+        typeof record.countryCode === "string"
+          ? record.countryCode
+          : typeof record.country_code === "string"
+            ? record.country_code
+            : null
+      ),
+      reason: textOrNull(record.reason),
+      status
+    }];
+  });
 }
 
 function errorDetails(error: unknown) {
@@ -220,6 +262,7 @@ export async function PATCH(
         ? undefined
         : textOrNull(body.category),
       confidence,
+      countryAvailability: parseCountryAvailability(body.countryAvailability),
       id,
       listStatus,
       maxAmount: amountValue(body.maxAmount),

@@ -1565,6 +1565,27 @@ export function ProductFactsEditor({
   viewLabels: Readonly<Record<string, string>>;
 }>) {
   type ProductFact = AdminProductDetailRow["facts"][number];
+  const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
+
+  function amountInputValue(fact: ProductFact) {
+    return amountDrafts[fact.id] ?? (fact.amount ?? "");
+  }
+
+  function parsedCompleteDecimal(value: string) {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    if (!/^(?:\d+|\d*\.\d+)$/.test(trimmed)) {
+      return undefined;
+    }
+
+    const parsed = Number(trimmed);
+
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  }
 
   function updateFact(index: number, patch: Partial<ProductFact>) {
     setDraft({
@@ -1659,20 +1680,37 @@ export function ProductFactsEditor({
                 <input
                   className={inputClass}
                   inputMode="decimal"
+                  step="any"
+                  type="text"
                   onChange={(event) => {
-                    const parsed = Number(event.target.value);
+                    const value = event.target.value;
+                    const parsed = parsedCompleteDecimal(value);
 
-                    updateFact(index, {
-                      amount:
-                        event.target.value.trim() &&
-                        Number.isFinite(parsed) &&
-                        parsed >= 0
-                          ? parsed
-                          : null,
-                    });
+                    setAmountDrafts((current) => ({
+                      ...current,
+                      [fact.id]: value,
+                    }));
+
+                    if (parsed !== undefined) {
+                      updateFact(index, { amount: parsed });
+                    }
+                  }}
+                  onBlur={(event) => {
+                    const parsed = parsedCompleteDecimal(event.target.value);
+
+                    if (parsed !== undefined) {
+                      updateFact(index, { amount: parsed });
+                      setAmountDrafts((current) => {
+                        const next = { ...current };
+
+                        delete next[fact.id];
+
+                        return next;
+                      });
+                    }
                   }}
                   placeholder={viewLabels.amount}
-                  value={fact.amount ?? ""}
+                  value={amountInputValue(fact)}
                 />
                 <select
                   className={inputClass}

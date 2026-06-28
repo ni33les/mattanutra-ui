@@ -11,6 +11,10 @@ import {
   normalizeProductCountryCode
 } from "@/lib/product-countries";
 import {
+  getSupplementEffectiveAvailability,
+  productHasCountryBlockedSupplement
+} from "@/lib/supplement-country-availability";
+import {
   customerPriceFromRpp,
   getCustomerPriceMarginPercent
 } from "@/lib/customer-pricing";
@@ -236,6 +240,11 @@ export async function getProductRecommendationCandidates(input: Readonly<{
     ? normalizeProductCountryCode(input.countryCode)
     : null;
   const customerPriceMarginPercent = await getCustomerPriceMarginPercent();
+  const db = countryCode ? getSql() : null;
+  const supplementAvailability =
+    countryCode && db
+      ? await getSupplementEffectiveAvailability(db, countryCode)
+      : null;
   let candidates = rows.map((sourceRow) =>
     candidateFromProductRow({
       countryCode,
@@ -252,7 +261,11 @@ export async function getProductRecommendationCandidates(input: Readonly<{
       return (
         productCountries.includes(countryCode) &&
         (manufacturerCountries.length < 1 ||
-          manufacturerCountries.includes(countryCode))
+          manufacturerCountries.includes(countryCode)) &&
+        (
+          !supplementAvailability ||
+          !productHasCountryBlockedSupplement(candidate, supplementAvailability)
+        )
       );
     });
   }
@@ -292,6 +305,10 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
 
   const productRowsById = new Map(
     rows.map((sourceRow) => [rowFromDb(sourceRow).id, sourceRow])
+  );
+  const supplementAvailability = await getSupplementEffectiveAvailability(
+    sql,
+    countryCode
   );
   const productIds = [...productRowsById.keys()];
   const retailRows = await sql<RetailProductCandidateRow[]>`
@@ -405,7 +422,8 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       (
         manufacturerCountries.length > 0 &&
         !manufacturerCountries.includes(countryCode)
-      )
+      ) ||
+      productHasCountryBlockedSupplement(candidate, supplementAvailability)
     ) {
       continue;
     }

@@ -44,7 +44,8 @@ export {
   normalizeSyntheticPlanArchetypes,
   normalizeSimulationSampleSize,
   runAdminPlanCoverageSimulation,
-  runNextAdminPlanCoverageSimulationSample
+  runNextAdminPlanCoverageSimulationSample,
+  sanitizeDemandProfilesForSimulationSupplements
 } from "@/lib/admin-product-coverage-simulation";
 export type {
   AdminPlanCoverageDemandProfile,
@@ -341,7 +342,10 @@ async function schemaAvailable(sql: NonNullable<ReturnType<typeof getSql>>) {
   return Boolean(row?.product_facts && row.products && row.supplements);
 }
 
-async function loadActiveSupplements(sql: NonNullable<ReturnType<typeof getSql>>) {
+async function loadActiveSupplements(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  countryCode: string
+) {
   return sql<SupplementRow[]>`
     select
       supplements.id::text,
@@ -349,10 +353,56 @@ async function loadActiveSupplements(sql: NonNullable<ReturnType<typeof getSql>>
       supplements.normalized_name,
       supplements.category
     from public.supplements
-    where supplements.is_active = true
-      and supplements.list_status = 'active'
+    left join lateral (
+      select rule.status
+      from jsonb_to_recordset(
+        case
+          when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
+            then supplements.source_payload -> 'countryAvailability'
+          else '[]'::jsonb
+        end
+      ) as rule("countryCode" text, country_code text, status text)
+      where coalesce(rule."countryCode", rule.country_code) = ${countryCode}
+        and rule.status in ('allowed', 'blocked')
+      limit 1
+    ) country_availability on true
+    where (
+      country_availability.status = 'allowed'
+      or (
+        country_availability.status is null
+        and supplements.is_active = true
+        and supplements.list_status = 'active'
+      )
+    )
     order by supplements.category asc, supplements.name asc
   `;
+}
+
+async function loadSupplementGovernanceHash(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  countryCode: string
+) {
+  const rows = await sql<Array<{ governance_hash: string | null }>>`
+    select md5(coalesce(
+      string_agg(
+        concat_ws(
+          ':',
+          supplements.id::text,
+          ${countryCode},
+          supplements.list_status,
+          supplements.is_active::text,
+          supplements.updated_at::text,
+          coalesce(supplements.source_payload -> 'countryAvailability', '[]'::jsonb)::text
+        ),
+        '|'
+        order by supplements.id::text
+      ),
+      ''
+    )) as governance_hash
+    from public.supplements
+  `;
+
+  return rows[0]?.governance_hash ?? "supplement-governance:empty";
 }
 
 function supplementInputs(
@@ -679,7 +729,7 @@ export async function getAdminProductCoverageData(input: Readonly<{
 
     const [supplementRows, candidates, retailAvailableProductIds] =
       await Promise.all([
-        loadActiveSupplements(sql),
+        loadActiveSupplements(sql, countryCode),
         getProductRecommendationCandidates({
           countryCode,
           includeIneligible: true
@@ -734,8 +784,14 @@ export async function getAdminPlanCoverageSimulationData(input: Readonly<{
       return emptyAdminPlanCoverageSimulationData({ ...input, countryCode });
     }
 
-    const [supplementRows, allCandidates, customerInsights] = await Promise.all([
-      loadActiveSupplements(sql),
+    const [
+      supplementRows,
+      supplementGovernanceHash,
+      allCandidates,
+      customerInsights
+    ] = await Promise.all([
+      loadActiveSupplements(sql, countryCode),
+      loadSupplementGovernanceHash(sql, countryCode),
       getProductRecommendationCandidates({
         countryCode,
         includeIneligible: true
@@ -765,6 +821,7 @@ export async function getAdminPlanCoverageSimulationData(input: Readonly<{
       realCustomerProfiles,
       reviewPriorityProducts,
       seed: input.seed,
+      supplementGovernanceHash,
       supplements
     });
   } catch (error) {

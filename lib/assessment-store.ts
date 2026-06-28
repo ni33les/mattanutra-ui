@@ -146,6 +146,7 @@ function asProductRecommendationRefreshReason(
     value === "product_catalogue_changed" ||
     value === "retail_catalogue_changed" ||
     value === "stock_or_allocation_changed" ||
+    value === "supplement_governance_changed" ||
     value === "formulation_changed"
     ? value
     : undefined;
@@ -1697,6 +1698,41 @@ export async function getStoredFormulationResult(
         and product_translation_default.locale = ${defaultLocale}
       where product_recommendation_run.id is not null
         and product_recommendation_items.run_id = product_recommendation_run.id
+        and not exists (
+          select 1
+          from public.product_facts blocked_product_facts
+          join public.supplements blocked_supplements
+            on blocked_supplements.id = blocked_product_facts.supplement_id
+          left join lateral (
+            select rule.status
+            from jsonb_to_recordset(
+              case
+                when jsonb_typeof(blocked_supplements.source_payload -> 'countryAvailability') = 'array'
+                  then blocked_supplements.source_payload -> 'countryAvailability'
+                else '[]'::jsonb
+              end
+            ) as rule("countryCode" text, country_code text, status text)
+            where coalesce(rule."countryCode", rule.country_code) = case
+                when upper(btrim(coalesce(assessments.answers ->> 'country', 'TH'))) in ('GB', 'UK', 'GREAT BRITAIN', 'UNITED KINGDOM') then 'GB'
+                when upper(btrim(coalesce(assessments.answers ->> 'country', 'TH'))) ~ '^[A-Z]{2}$' then upper(btrim(coalesce(assessments.answers ->> 'country', 'TH')))
+                else 'TH'
+              end
+              and rule.status in ('allowed', 'blocked')
+            limit 1
+          ) blocked_country on true
+          where blocked_product_facts.product_id = products.id
+            and blocked_product_facts.item_type = 'supplement'
+            and (
+              blocked_country.status = 'blocked'
+              or (
+                blocked_country.status is null
+                and (
+                  blocked_supplements.is_active = false
+                  or blocked_supplements.list_status = 'blocked'
+                )
+              )
+            )
+        )
     ) product_recommendation_items_payload on true
     left join lateral (
       with latest_runs as (
@@ -1849,6 +1885,41 @@ export async function getStoredFormulationResult(
           on product_translation_default.product_id = products.id
           and product_translation_default.locale = ${defaultLocale}
         where product_recommendation_items.run_id = latest_runs.id
+          and not exists (
+            select 1
+            from public.product_facts blocked_product_facts
+            join public.supplements blocked_supplements
+              on blocked_supplements.id = blocked_product_facts.supplement_id
+            left join lateral (
+              select rule.status
+              from jsonb_to_recordset(
+                case
+                  when jsonb_typeof(blocked_supplements.source_payload -> 'countryAvailability') = 'array'
+                    then blocked_supplements.source_payload -> 'countryAvailability'
+                  else '[]'::jsonb
+                end
+              ) as rule("countryCode" text, country_code text, status text)
+              where coalesce(rule."countryCode", rule.country_code) = case
+                  when upper(btrim(coalesce(assessments.answers ->> 'country', 'TH'))) in ('GB', 'UK', 'GREAT BRITAIN', 'UNITED KINGDOM') then 'GB'
+                  when upper(btrim(coalesce(assessments.answers ->> 'country', 'TH'))) ~ '^[A-Z]{2}$' then upper(btrim(coalesce(assessments.answers ->> 'country', 'TH')))
+                  else 'TH'
+                end
+                and rule.status in ('allowed', 'blocked')
+              limit 1
+            ) blocked_country on true
+            where blocked_product_facts.product_id = products.id
+              and blocked_product_facts.item_type = 'supplement'
+              and (
+                blocked_country.status = 'blocked'
+                or (
+                  blocked_country.status is null
+                  and (
+                    blocked_supplements.is_active = false
+                    or blocked_supplements.list_status = 'blocked'
+                  )
+                )
+              )
+          )
       ) option_items on true
     ) product_recommendation_options_payload on true
     left join lateral (
@@ -1939,8 +2010,11 @@ export async function getStoredFormulationResult(
   const productRecommendationItems = asArray<RecommendedProduct>(
     row.product_recommendation_items_payload
   );
+  const hasStructuredProductRecommendationRun =
+    typeof row.product_recommendation_run_status === "string" &&
+    row.product_recommendation_run_status.length > 0;
   const recommendations =
-    productRecommendationItems.length > 0
+    hasStructuredProductRecommendationRun
       ? productRecommendationItems
       : legacyRecommendations;
   const productRecommendationCoverage = reconcileProductRecommendationCoverage({

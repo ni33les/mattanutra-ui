@@ -26,6 +26,10 @@ import { supplementDoseUnits } from "@/lib/supplement-dose-units";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n-messages";
 import {
+  productCountryLabel,
+  productCountryOptions
+} from "@/lib/product-countries";
+import {
   supplementDoseSuggestionTimeoutMs,
   type AdminContent
 } from "@/components/admin/dashboard-content";
@@ -84,6 +88,7 @@ function supplementExportRow(row: AdminSupplementRow) {
     aliases: row.aliases.map((alias) => alias.name),
     category: row.category,
     confidence: row.confidence,
+    countryAvailability: row.countryAvailability,
     id: row.id,
     ingredientType: row.ingredientType ?? "",
     listStatus: row.listStatus,
@@ -115,6 +120,7 @@ function supplementRowsToCsv(rows: readonly AdminSupplementRow[]) {
     "sourceStatus",
     "listStatus",
     "confidence",
+    "countryAvailability",
     "maxAmount",
     "maxUnit",
     "safetyFlags",
@@ -236,6 +242,7 @@ export function AdminSupplementsView({
       aliases: [],
       category: category || categories[0] || "Manual",
       confidence: "low",
+      countryAvailability: [],
       id: newSupplementDraftId,
       ingredientType: null,
       listStatus: "active",
@@ -280,6 +287,7 @@ export function AdminSupplementsView({
           accessToken,
           category: row.category,
           confidence: row.confidence,
+          countryAvailability: row.countryAvailability,
           listStatus: row.listStatus,
           maxAmount: row.maxAmount,
           maxUnit: row.maxUnit,
@@ -339,6 +347,7 @@ export function AdminSupplementsView({
           accessToken,
           category: row.category,
           confidence: row.confidence,
+          countryAvailability: row.countryAvailability,
           listStatus: row.listStatus,
           maxAmount: row.maxAmount,
           maxUnit: row.maxUnit,
@@ -873,6 +882,51 @@ export function SupplementDetailsModal({
     safetyHidden: t(locale, "admin.supplementSelectionSummary.safetyHidden"),
     title: t(locale, "admin.supplementSelectionSummary.title")
   };
+  const countryAvailability = draft.countryAvailability ?? [];
+  const usedCountryCodes = new Set(
+    countryAvailability.map((item) => item.countryCode)
+  );
+  const availableCountryOptions = productCountryOptions.filter(
+    (country) => !usedCountryCodes.has(country.code)
+  );
+
+  function updateCountryAvailability(
+    countryCode: string,
+    patch: Partial<AdminSupplementRow["countryAvailability"][number]>
+  ) {
+    onChange({
+      countryAvailability: countryAvailability.map((item) =>
+        item.countryCode === countryCode ? { ...item, ...patch } : item
+      )
+    });
+  }
+
+  function removeCountryAvailability(countryCode: string) {
+    onChange({
+      countryAvailability: countryAvailability.filter(
+        (item) => item.countryCode !== countryCode
+      )
+    });
+  }
+
+  function addCountryAvailability(countryCode: string) {
+    if (!countryCode || usedCountryCodes.has(countryCode)) {
+      return;
+    }
+
+    onChange({
+      countryAvailability: [
+        ...countryAvailability,
+        {
+          countryCode,
+          reason: "",
+          source: "admin_dashboard",
+          status: "blocked",
+          updatedAt: null
+        }
+      ]
+    });
+  }
 
   async function addAssociation() {
     if (!onAddAssociation || !trimmedNewAlias || addingAssociation) {
@@ -1296,6 +1350,92 @@ export function SupplementDetailsModal({
                     ))}
                   </select>
                 </label>
+              </div>
+
+              <div className="grid gap-2 text-sm font-medium text-gray-700">
+                Country rules
+                <div className="rounded-xl bg-white p-3 ring-1 ring-gray-200">
+                  <div className="flex flex-wrap gap-2">
+                    {countryAvailability.length > 0 ? (
+                      countryAvailability.map((item) => (
+                        <span
+                          className={classNames(
+                            "rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
+                            item.status === "blocked"
+                              ? "bg-red-50 text-red-700 ring-red-200"
+                              : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                          )}
+                          key={item.countryCode}
+                        >
+                          {item.status === "blocked" ? "Blocked" : "Allowed"} in{" "}
+                          {item.countryCode}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs font-normal text-gray-500">
+                        Uses the global status in every country.
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {countryAvailability.map((item) => (
+                      <div
+                        className="grid gap-2 rounded-lg bg-gray-50 p-2 sm:grid-cols-[8rem_8rem_minmax(0,1fr)_auto]"
+                        key={item.countryCode}
+                      >
+                        <div className="flex items-center text-xs font-semibold text-gray-700">
+                          {productCountryLabel(item.countryCode)}
+                        </div>
+                        <select
+                          className={inputClass}
+                          onChange={(event) =>
+                            updateCountryAvailability(item.countryCode, {
+                              status: event.target.value as "allowed" | "blocked"
+                            })
+                          }
+                          value={item.status}
+                        >
+                          <option value="blocked">Blocked</option>
+                          <option value="allowed">Allowed</option>
+                        </select>
+                        <input
+                          className={inputClass}
+                          onChange={(event) =>
+                            updateCountryAvailability(item.countryCode, {
+                              reason: event.target.value
+                            })
+                          }
+                          placeholder="Reason"
+                          value={item.reason ?? ""}
+                        />
+                        <button
+                          className="rounded-md bg-white px-2.5 py-2 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50"
+                          onClick={() =>
+                            removeCountryAvailability(item.countryCode)
+                          }
+                          type="button"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <select
+                    className={classNames(inputClass, "mt-3")}
+                    onChange={(event) => {
+                      addCountryAvailability(event.target.value);
+                      event.target.value = "";
+                    }}
+                    value=""
+                  >
+                    <option value="">Add country rule</option>
+                    {availableCountryOptions.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="grid gap-2 text-sm font-medium text-gray-700">

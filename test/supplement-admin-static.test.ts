@@ -47,4 +47,46 @@ describe("supplement admin popup", () => {
     assert.match(labels, /deleteSupplementConfirm/);
     assert.match(labels, /primaryUseCase/);
   });
+
+  it("supports country-specific supplement allow and block overrides", async () => {
+    const view = await readFile("components/admin/supplement-view.tsx", "utf8");
+    const service = await readFile("lib/admin-supplements.ts", "utf8");
+    const createRoute = await readFile("app/api/admin/supplements/route.ts", "utf8");
+    const updateRoute = await readFile("app/api/admin/supplements/[id]/route.ts", "utf8");
+    const schema = await readFile("db-schema.sql", "utf8");
+    const packageJson = await readFile("package.json", "utf8");
+    const rebuildPrd = await readFile("scripts/rebuild-prd-db.mjs", "utf8");
+    const rebuildUat = await readFile("scripts/rebuild-uat-db.mjs", "utf8");
+    const repairScript = await readFile(
+      "scripts/repair-ashwagandha-country-availability.ts",
+      "utf8"
+    );
+    const schemaScript = await readFile(
+      "scripts/apply-supplement-country-availability-schema.ts",
+      "utf8"
+    );
+
+    assert.match(schema, /CREATE TABLE public\.supplement_country_availability/);
+    assert.match(schema, /PRIMARY KEY \(supplement_id, country_code\)/);
+    assert.match(service, /countryAvailability/);
+    assert.match(service, /replaceSupplementCountryAvailability/);
+    assert.match(service, /normalizeSupplementAvailabilityCountryCode/);
+    assert.match(service, /source_payload/);
+    assert.match(createRoute, /parseCountryAvailability/);
+    assert.match(updateRoute, /parseCountryAvailability/);
+    assert.match(view, /Country rules/);
+    assert.match(view, /item\.status === "blocked" \? "Blocked" : "Allowed"/);
+    assert.match(view, /\{item\.countryCode\}/);
+    assert.match(view, /value="allowed"/);
+    assert.match(view, /productCountryOptions/);
+    assert.match(view, /countryAvailability: row\.countryAvailability/);
+    assert.match(repairScript, /Ashwaganda/);
+    assert.match(repairScript, /countryCode: "TH"[\s\S]*status: "blocked"/);
+    assert.match(repairScript, /countryCode: "GB"[\s\S]*status: "allowed"/);
+    assert.match(repairScript, /source_payload/);
+    assert.match(schemaScript, /create table if not exists public\.supplement_country_availability/);
+    assert.match(packageJson, /supplements:country-availability:schema:apply/);
+    assert.match(rebuildPrd, /supplements:country-availability:schema:apply/);
+    assert.match(rebuildUat, /supplements:country-availability:schema:apply/);
+  });
 });

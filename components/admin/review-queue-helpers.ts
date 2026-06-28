@@ -353,6 +353,7 @@ export function reviewRowToSupplementDraft(
       row.reviewKind === "unknown_food"
         ? "low"
         : "moderate",
+    countryAvailability: [],
     id: row.id,
     ingredientType: `${reviewKindLabel(labels, row)} · ${value.label}`,
     listStatus: "active",

@@ -253,6 +253,7 @@ export type ProductRecommendationRefreshReason =
   | "product_catalogue_changed"
   | "retail_catalogue_changed"
   | "stock_or_allocation_changed"
+  | "supplement_governance_changed"
   | "formulation_changed";
 export type ProductStackPreference = "balanced" | "compact";
 

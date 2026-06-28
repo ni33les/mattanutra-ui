@@ -254,6 +254,7 @@ for (const scriptName of [
   "product-identifiers:schema:apply",
   "product-regulatory:schema:apply",
   "product-offers:schema:remove",
+  "supplements:country-availability:schema:apply",
   "recommendation-insights:schema:apply",
   "thai-tax:schema:apply",
   "foods:schema:apply",

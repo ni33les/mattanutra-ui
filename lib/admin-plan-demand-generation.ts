@@ -19,6 +19,11 @@ import {
 } from "@/lib/admin-product-coverage-simulation";
 import type { ProductClientSex } from "@/lib/product-recommendations";
 import type { Locale } from "@/lib/i18n";
+import {
+  filterProductNeedsBySupplementAvailability,
+  getSupplementEffectiveAvailability,
+  normalizeSupplementAvailabilityCountryCode
+} from "@/lib/supplement-country-availability";
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_REASONING_EFFORT = "low";
@@ -577,7 +582,8 @@ async function generateAssessmentAnswersWithAi(input: Readonly<{
 }
 
 async function loadCanonicalSupplementOptions(
-  sql: NonNullable<ReturnType<typeof getSql>>
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  countryCode: string
 ): Promise<CanonicalSupplementOption[]> {
   const rows = await sql<Array<{
     aliases: string[];
@@ -596,7 +602,12 @@ async function loadCanonicalSupplementOptions(
       supplements.name,
       supplements.normalized_name,
       supplements.category,
-      supplements.list_status,
+      case
+        when country_availability.status = 'allowed' then 'active'
+        when country_availability.status = 'blocked' then 'blocked'
+        when supplements.is_active = false then 'blocked'
+        else supplements.list_status
+      end as list_status,
       safety.max_amount,
       safety.max_unit,
       safety.safety_flags,
@@ -610,6 +621,19 @@ async function loadCanonicalSupplementOptions(
         '{}'::text[]
       ) as aliases
     from public.supplements
+    left join lateral (
+      select rule.status
+      from jsonb_to_recordset(
+        case
+          when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
+            then supplements.source_payload -> 'countryAvailability'
+          else '[]'::jsonb
+        end
+      ) as rule("countryCode" text, country_code text, status text)
+      where coalesce(rule."countryCode", rule.country_code) = ${countryCode}
+        and rule.status in ('allowed', 'blocked')
+      limit 1
+    ) country_availability on true
     left join public.supplement_aliases
       on supplement_aliases.supplement_id = supplements.id
     left join lateral (
@@ -619,14 +643,22 @@ async function loadCanonicalSupplementOptions(
       order by version desc, updated_at desc
       limit 1
     ) safety on true
-    where supplements.is_active = true
-      and supplements.list_status = 'active'
+    where (
+      country_availability.status = 'allowed'
+      or (
+        country_availability.status is null
+        and supplements.is_active = true
+        and supplements.list_status = 'active'
+      )
+    )
     group by
       supplements.id,
       supplements.name,
       supplements.normalized_name,
       supplements.category,
       supplements.list_status,
+      supplements.is_active,
+      country_availability.status,
       safety.max_amount,
       safety.max_unit,
       safety.safety_flags,
@@ -673,9 +705,9 @@ export async function generateAdminPlanCoverageDemandProfile(input: Readonly<{
       : SIMULATION_ARCHETYPES
   );
   const archetype = archetypes[sampleIndex % archetypes.length]!;
-  const countryCode = input.countryCode?.trim() || "TH";
+  const countryCode = normalizeSupplementAvailabilityCountryCode(input.countryCode);
   const [canonicalSupplements, answers] = await Promise.all([
-    loadCanonicalSupplementOptions(sql),
+    loadCanonicalSupplementOptions(sql, countryCode),
     generateAssessmentAnswersWithAi({
       archetype,
       countryCode,
@@ -692,10 +724,14 @@ export async function generateAdminPlanCoverageDemandProfile(input: Readonly<{
     planId: randomUUID(),
     taskId: null
   });
-  const needs = buildProductNeeds({
-    foodGuidance: null,
-    formulation: analysis.formulation
-  });
+  const availability = await getSupplementEffectiveAvailability(sql, countryCode);
+  const needs = filterProductNeedsBySupplementAvailability(
+    buildProductNeeds({
+      foodGuidance: null,
+      formulation: analysis.formulation
+    }),
+    availability
+  );
 
   if (needs.length < 1) {
     throw new Error("Generated formulation did not return usable supplement needs");

@@ -16,6 +16,12 @@ import {
   type AdminSupplementSelectionStats
 } from "@/lib/admin-recommendation-insights";
 import { normalizeLocaleCode, type LocaleCode } from "@/lib/i18n";
+import {
+  isSupplementCountryAvailabilityStatus,
+  normalizeSupplementAvailabilityCountryCode,
+  type SupplementCountryAvailability,
+  type SupplementCountryAvailabilityStatus
+} from "@/lib/supplement-country-availability";
 export type { SupplementSafetyFlag } from "@/lib/supplement-safety-flags";
 
 export type SupplementListStatus =
@@ -27,6 +33,15 @@ export type SupplementConfidence = "high" | "low" | "moderate";
 export type AdminSupplementAlias = Readonly<{
   id: string;
   name: string;
+}>;
+
+export type AdminSupplementCountryAvailability =
+  SupplementCountryAvailability;
+
+export type AdminSupplementCountryAvailabilityInput = Readonly<{
+  countryCode: string;
+  reason?: string | null;
+  status: SupplementCountryAvailabilityStatus;
 }>;
 
 export type AdminSupplementTranslation = Readonly<{
@@ -44,6 +59,7 @@ export type AdminSupplementRow = Readonly<{
   aliases: AdminSupplementAlias[];
   category: string;
   confidence: SupplementConfidence;
+  countryAvailability: AdminSupplementCountryAvailability[];
   id: string;
   ingredientType: string | null;
   listStatus: SupplementListStatus;
@@ -75,6 +91,7 @@ type SupplementDbRow = Readonly<{
   aliases: unknown;
   category: string;
   confidence: SupplementConfidence;
+  country_availability: unknown;
   id: string;
   ingredient_type: string | null;
   is_active: boolean;
@@ -105,6 +122,7 @@ export type UpdateAdminSupplementInput = Readonly<{
   actor?: string | null;
   category?: string | null;
   confidence: SupplementConfidence;
+  countryAvailability?: ReadonlyArray<AdminSupplementCountryAvailabilityInput> | null;
   id: string;
   listStatus: SupplementListStatus;
   maxAmount: number | null;
@@ -120,6 +138,7 @@ export type CreateAdminSupplementInput = Readonly<{
   actor?: string | null;
   category?: string | null;
   confidence?: SupplementConfidence | null;
+  countryAvailability?: ReadonlyArray<AdminSupplementCountryAvailabilityInput> | null;
   listStatus?: SupplementListStatus | null;
   maxAmount?: number | null;
   maxUnit?: string | null;
@@ -202,6 +221,87 @@ function aliasesFromDb(value: unknown): AdminSupplementAlias[] {
       return id && name ? { id, name } : null;
     })
     .filter((item): item is AdminSupplementAlias => Boolean(item));
+}
+
+function countryAvailabilityFromDb(
+  value: unknown
+): AdminSupplementCountryAvailability[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item): AdminSupplementCountryAvailability[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const countryCode = normalizeSupplementAvailabilityCountryCode(
+      typeof record.countryCode === "string"
+        ? record.countryCode
+        : typeof record.country_code === "string"
+          ? record.country_code
+          : null
+    );
+    const status = record.status;
+
+    if (!isSupplementCountryAvailabilityStatus(status)) {
+      return [];
+    }
+
+    return [{
+      countryCode,
+      reason:
+        typeof record.reason === "string" && record.reason.trim()
+          ? record.reason.trim()
+          : null,
+      source:
+        typeof record.source === "string" && record.source.trim()
+          ? record.source.trim()
+          : null,
+      status,
+      updatedAt:
+        typeof record.updatedAt === "string"
+          ? record.updatedAt
+          : typeof record.updated_at === "string"
+            ? record.updated_at
+            : null
+    }];
+  }).sort((first, second) => first.countryCode.localeCompare(second.countryCode));
+}
+
+function normalizeCountryAvailabilityInputs(
+  value: ReadonlyArray<AdminSupplementCountryAvailabilityInput> | null | undefined
+) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    return [] as AdminSupplementCountryAvailabilityInput[];
+  }
+
+  const byCountry = new Map<string, AdminSupplementCountryAvailabilityInput>();
+
+  for (const item of value) {
+    const countryCode = normalizeSupplementAvailabilityCountryCode(
+      item.countryCode
+    );
+
+    if (!isSupplementCountryAvailabilityStatus(item.status)) {
+      continue;
+    }
+
+    byCountry.set(countryCode, {
+      countryCode,
+      reason: item.reason?.trim().slice(0, 1000) || null,
+      status: item.status
+    });
+  }
+
+  return [...byCountry.values()].sort((first, second) =>
+    first.countryCode.localeCompare(second.countryCode)
+  );
 }
 
 function textOrNull(value: unknown, maxLength = 2000) {
@@ -355,6 +455,52 @@ async function upsertSupplementTranslations(
   }
 }
 
+async function replaceSupplementCountryAvailability(
+  sql: postgres.Sql | postgres.TransactionSql,
+  supplementId: string,
+  countryAvailability:
+    | ReadonlyArray<AdminSupplementCountryAvailabilityInput>
+    | null
+    | undefined,
+  actor: string | null | undefined
+) {
+  const rows = normalizeCountryAvailabilityInputs(countryAvailability);
+
+  if (rows === undefined) {
+    return;
+  }
+
+  if (rows.length < 1) {
+    await sql`
+      update public.supplements
+      set
+        source_payload = coalesce(source_payload, '{}'::jsonb) - 'countryAvailability',
+        updated_at = now()
+      where id = ${supplementId}::uuid
+    `;
+    return;
+  }
+
+  await sql`
+    update public.supplements
+    set
+      source_payload = jsonb_set(
+        coalesce(source_payload, '{}'::jsonb),
+        '{countryAvailability}',
+        ${sql.json(rows.map((row) => ({
+          countryCode: row.countryCode,
+          reason: row.reason ?? null,
+          source: actor ?? "admin_dashboard",
+          status: row.status,
+          updatedAt: new Date().toISOString()
+        })))}::jsonb,
+        true
+      ),
+      updated_at = now()
+    where id = ${supplementId}::uuid
+  `;
+}
+
 function rowFromDb(
   row: SupplementDbRow,
   selectionStats?: AdminSupplementSelectionStats
@@ -363,6 +509,7 @@ function rowFromDb(
     aliases: aliasesFromDb(row.aliases),
     category: row.category,
     confidence: row.confidence,
+    countryAvailability: countryAvailabilityFromDb(row.country_availability),
     id: row.id,
     ingredientType: row.ingredient_type,
     listStatus: row.is_active ? row.list_status : "blocked",
@@ -440,6 +587,11 @@ export async function getAdminSupplementsData(
         limits.safety_flags,
         limits.safety_notes,
         coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
+        case
+          when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
+            then supplements.source_payload -> 'countryAvailability'
+          else '[]'::jsonb
+        end as country_availability,
         coalesce(translation_rows.translations, '{}'::jsonb) as translations
       from public.supplements supplements
       left join lateral (
@@ -530,6 +682,11 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       limits.safety_flags,
       limits.safety_notes,
       coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
+      case
+        when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
+          then supplements.source_payload -> 'countryAvailability'
+        else '[]'::jsonb
+      end as country_availability,
       coalesce(translation_rows.translations, '{}'::jsonb) as translations
     from public.supplements supplements
     left join lateral (
@@ -593,6 +750,9 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
   const nextPrimaryUseCase = input.primaryUseCase === undefined
     ? before.primary_use_case
     : textOrNull(input.primaryUseCase, 500);
+  const nextCountryAvailability =
+    normalizeCountryAvailabilityInputs(input.countryAvailability) ??
+    countryAvailabilityFromDb(before.country_availability);
 
   if (!nextName || !nextNormalizedName) {
     throw new Error("Supplement name is required");
@@ -625,6 +785,7 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       ...rowFromDb(before),
       category: nextCategory,
       confidence: input.confidence,
+      countryAvailability: nextCountryAvailability,
       listStatus: input.listStatus,
       maxAmount: input.maxAmount,
       maxUnit: input.maxUnit,
@@ -724,6 +885,12 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     input.translations,
     input.actor
   );
+  await replaceSupplementCountryAvailability(
+    sql,
+    input.id,
+    input.countryAvailability,
+    input.actor
+  );
 
   await sql`
     insert into public.supplement_admin_audit (
@@ -743,6 +910,7 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       ${sql.json({
         ...input,
         category: nextCategory,
+        countryAvailability: nextCountryAvailability,
         name: nextName,
         primaryUseCase: nextPrimaryUseCase
       })}
@@ -820,9 +988,12 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
 
   const supplementId = randomUUID();
   const aliasId = randomUUID();
+  const countryAvailability =
+    normalizeCountryAvailabilityInputs(input.countryAvailability) ?? [];
   const afterPayload = {
     category,
     confidence,
+    countryAvailability,
     listStatus,
     maxAmount: input.maxAmount ?? null,
     maxUnit,
@@ -931,6 +1102,12 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
     sql,
     supplementId,
     input.translations,
+    input.actor
+  );
+  await replaceSupplementCountryAvailability(
+    sql,
+    supplementId,
+    countryAvailability,
     input.actor
   );
 

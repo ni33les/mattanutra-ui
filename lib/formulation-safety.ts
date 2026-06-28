@@ -11,6 +11,10 @@ import {
 } from "@/lib/dose-conversion";
 import type { FormulationBlueprint, FormulationIngredient, LocalizedText } from "@/lib/formulation-types";
 import { resolveLocalizedText, type Locale } from "@/lib/i18n";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode
+} from "@/lib/product-countries";
 import { productFactAliasKeys, productKeysMatch } from "@/lib/product-recommendations";
 import { createTask, type TaskServiceDb } from "@/lib/task-service";
 
@@ -30,6 +34,7 @@ type SafetyInput = Readonly<{
   locale: Locale;
   plan: AssessmentPlan;
   planId: string;
+  countryCode?: string | null;
   requestId?: string | null;
   taskId: string;
 }>;
@@ -39,7 +44,7 @@ type SupplementRow = Readonly<{
   confidence: string | null;
   id: string;
   is_active: boolean;
-  list_status: "active" | "blocked";
+  list_status: string;
   max_amount: number | string | null;
   max_unit: string | null;
   name: string;
@@ -264,13 +269,28 @@ function reviewTaskBusinessValue(kind: ReviewKind) {
   return 350;
 }
 
-async function loadSupplementLookup(sql: TaskServiceDb) {
+function countryCodeFromSafetyInput(input: SafetyInput) {
+  if (input.countryCode) {
+    return normalizeProductCountryCode(input.countryCode) ?? defaultProductCountryCode;
+  }
+
+  const answers = isRecord(input.answers) ? input.answers : {};
+
+  return normalizeProductCountryCode(answers.country) ?? defaultProductCountryCode;
+}
+
+async function loadSupplementLookup(sql: TaskServiceDb, countryCode: string) {
   const rows = await sql<SupplementRow[]>`
     select
       supplements.id::text,
       supplements.name,
       supplements.normalized_name,
       case
+        when country_availability.status in ('allowed', 'blocked')
+          then case country_availability.status
+            when 'allowed' then 'active'
+            else 'blocked'
+          end
         when supplements.is_active = false then 'blocked'
         else supplements.list_status
       end as list_status,
@@ -286,6 +306,19 @@ async function loadSupplementLookup(sql: TaskServiceDb) {
       ) as aliases
     from public.supplements supplements
     left join lateral (
+      select rule.status
+      from jsonb_to_recordset(
+        case
+          when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
+            then supplements.source_payload -> 'countryAvailability'
+          else '[]'::jsonb
+        end
+      ) as rule("countryCode" text, country_code text, status text)
+      where coalesce(rule."countryCode", rule.country_code) = ${countryCode}
+        and rule.status in ('allowed', 'blocked')
+      limit 1
+    ) country_availability on true
+    left join lateral (
       select *
       from public.supplement_safety_limits limits
       where limits.supplement_id = supplements.id
@@ -300,6 +333,7 @@ async function loadSupplementLookup(sql: TaskServiceDb) {
       supplements.normalized_name,
       supplements.list_status,
       supplements.is_active,
+      country_availability.status,
       limits.max_amount,
       limits.max_unit,
       limits.confidence,
@@ -833,7 +867,8 @@ export async function applyFormulationSafety(
   sql: TaskServiceDb,
   input: SafetyInput
 ) {
-  const lookup = await loadSupplementLookup(sql);
+  const countryCode = countryCodeFromSafetyInput(input);
+  const lookup = await loadSupplementLookup(sql, countryCode);
   const supplementBreakdown: FormulationIngredient[] = [];
   const summary = {
     adjustedCount: 0,

@@ -29,6 +29,7 @@ import {
   defaultProductCountryCode,
   normalizeProductCountryCode
 } from "@/lib/product-countries";
+import { filterProductNeedsBySupplementAvailabilityForCountry } from "@/lib/supplement-country-availability";
 import { loadActivePlanFeedback } from "@/lib/plan-feedback";
 import { loadActivePlanGuidanceAdjustments } from "@/lib/plan-guidance-adjustments";
 import {
@@ -1783,11 +1784,23 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   if (!task.planId || !context.formulation) {
     throw new Error("Product recommendation task requires a finalized plan");
   }
-  const needs = await enrichProductNeedsWithAliases(buildProductNeeds({
-    foodGuidance: null,
-    formulation: context.formulation
-  }));
   const countryCode = productCountryCodeFromAnswers(context.answers);
+  const sql = getSql();
+  const needs = await enrichProductNeedsWithAliases(
+    sql
+      ? await filterProductNeedsBySupplementAvailabilityForCountry(
+          sql,
+          buildProductNeeds({
+            foodGuidance: null,
+            formulation: context.formulation
+          }),
+          countryCode
+        )
+      : buildProductNeeds({
+          foodGuidance: null,
+          formulation: context.formulation
+        })
+  );
   const candidateLoadStartedAt = Date.now();
   const retailerCandidateSets =
     await getRetailerAwareProductRecommendationCandidateSets({

@@ -28,6 +28,7 @@ export type ProductRecommendationFreshnessSnapshot = Readonly<{
   stackPreference: ProductStackPreference;
   status: string | null;
   stockOrAllocationUpdatedAt: string | null;
+  supplementGovernanceUpdatedAt: string | null;
 }>;
 
 function payloadRecord(value: unknown) {
@@ -59,6 +60,7 @@ export function productRecommendationRefreshReason(input: Readonly<{
   productCatalogueUpdatedAt?: string | Date | null;
   retailCatalogueUpdatedAt?: string | Date | null;
   stockOrAllocationUpdatedAt?: string | Date | null;
+  supplementGovernanceUpdatedAt?: string | Date | null;
 }>): ProductRecommendationRefreshReason | null {
   const generatedMs = dateMs(input.generatedAt);
 
@@ -72,6 +74,10 @@ export function productRecommendationRefreshReason(input: Readonly<{
 
   if (isAfterRun(input.productCatalogueUpdatedAt, generatedMs)) {
     return "product_catalogue_changed";
+  }
+
+  if (isAfterRun(input.supplementGovernanceUpdatedAt, generatedMs)) {
+    return "supplement_governance_changed";
   }
 
   if (isAfterRun(input.retailCatalogueUpdatedAt, generatedMs)) {
@@ -132,6 +138,7 @@ export async function loadProductRecommendationFreshnessSnapshot(
     safety_review_state: unknown;
     status: string | null;
     stock_or_allocation_updated_at: string | null;
+    supplement_governance_updated_at: string | null;
   }>>`
     select
       latest_run.id::text as run_id,
@@ -145,7 +152,8 @@ export async function loadProductRecommendationFreshnessSnapshot(
       coalesce(retail_state.retail_catalogue_revision, '{"sellableCount":0,"stockCount":0}'::jsonb) as retail_catalogue_revision,
       retail_state.retail_catalogue_updated_at::text,
       retail_state.stock_or_allocation_updated_at::text,
-      coalesce(safety_state.safety_review_state, '[]'::jsonb) as safety_review_state
+      coalesce(safety_state.safety_review_state, '[]'::jsonb) as safety_review_state,
+      supplement_governance_state.updated_at::text as supplement_governance_updated_at
     from (select 1) seed
     left join lateral (
       select
@@ -243,6 +251,10 @@ export async function loadProductRecommendationFreshnessSnapshot(
         and status in ('accepted', 'closed', 'rejected')
     ) safety_state on true
     left join lateral (
+      select max(supplements.updated_at) as updated_at
+      from public.supplements
+    ) supplement_governance_state on true
+    left join lateral (
       select id, status, generated_at
       from public.product_recommendation_runs
       where plan_id = ${input.planId}::uuid
@@ -274,7 +286,8 @@ export async function loadProductRecommendationFreshnessSnapshot(
     safetyReviewState: row.safety_review_state,
     stackPreference: input.stackPreference,
     status: row.status,
-    stockOrAllocationUpdatedAt: row.stock_or_allocation_updated_at
+    stockOrAllocationUpdatedAt: row.stock_or_allocation_updated_at,
+    supplementGovernanceUpdatedAt: row.supplement_governance_updated_at
   } satisfies Omit<ProductRecommendationFreshnessSnapshot, "reason">;
 
   return {
@@ -285,7 +298,8 @@ export async function loadProductRecommendationFreshnessSnapshot(
       now: input.now,
       productCatalogueUpdatedAt: snapshot.productCatalogueUpdatedAt,
       retailCatalogueUpdatedAt: snapshot.retailCatalogueUpdatedAt,
-      stockOrAllocationUpdatedAt: snapshot.stockOrAllocationUpdatedAt
+      stockOrAllocationUpdatedAt: snapshot.stockOrAllocationUpdatedAt,
+      supplementGovernanceUpdatedAt: snapshot.supplementGovernanceUpdatedAt
     })
   };
 }

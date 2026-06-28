@@ -93,6 +93,14 @@ describe("product recommendation freshness", () => {
       }),
       "stock_or_allocation_changed",
     );
+    assert.equal(
+      productRecommendationRefreshReason({
+        generatedAt: staleRun,
+        now,
+        supplementGovernanceUpdatedAt: "2026-06-17T06:00:00.000Z",
+      }),
+      "supplement_governance_changed",
+    );
   });
 
   it("dedupes reveal refreshes through the existing active product task path", () => {

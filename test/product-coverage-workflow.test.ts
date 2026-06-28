@@ -10,9 +10,15 @@ import {
   normalizeSimulationSampleSize,
   productCoversSupplementForMatching,
   runAdminPlanCoverageSimulation,
+  sanitizeDemandProfilesForSimulationSupplements,
   simulationCustomerArchetypesFromInsights,
   simulationCustomerProfilesFromInsights
 } from "../lib/admin-product-coverage.ts";
+import {
+  filterProductNeedsBySupplementAvailability,
+  productHasCountryBlockedSupplement,
+  supplementAvailabilityLookupFromRows
+} from "../lib/supplement-country-availability.ts";
 import type { AdminPlanCoverageDemandProfile } from "../lib/admin-product-coverage.ts";
 import type {
   AdminCustomerInsightsData,
@@ -21,6 +27,7 @@ import type {
 import type { ProductCandidate } from "../lib/product-recommendations.ts";
 
 const supplementId = "11111111-1111-4111-8111-111111111111";
+const ashwagandhaSupplementId = "99999999-9999-4999-8999-999999999999";
 const rhodiolaSupplementId = "77777777-7777-4777-8777-777777777777";
 const magnesiumSupplementId = "33333333-3333-4333-8333-333333333333";
 const zincSupplementId = "55555555-5555-4555-8555-555555555555";
@@ -283,6 +290,149 @@ describe("product coverage workflow", () => {
 
     assert.equal(result.mostUsefulProducts[0]?.id, product().id);
     assert.equal(result.unmetSupplements.length, 0);
+  });
+
+  it("sanitizes generated demand profiles against current country supplement governance", () => {
+    const coq10Need = demandProfile().needs[0]!;
+    const ashwagandhaNeed = {
+      ...coq10Need,
+      displayName: "Ashwagandha",
+      id: "supplement:ashwagandha",
+      normalizedName: "ashwagandha",
+      sourceId: ashwagandhaSupplementId
+    };
+    const profiles = sanitizeDemandProfilesForSimulationSupplements(
+      [
+        demandProfile({
+          id: "mixed-profile",
+          needs: [coq10Need, ashwagandhaNeed],
+          supplementNames: ["CoQ10", "Ashwagandha"]
+        }),
+        demandProfile({
+          id: "blocked-only-profile",
+          needs: [ashwagandhaNeed],
+          supplementNames: ["Ashwagandha"]
+        })
+      ],
+      [
+        {
+          category: "Antioxidants",
+          id: supplementId,
+          name: "CoQ10",
+          normalizedName: "coq10",
+          targetComparableAmount: 100000
+        }
+      ]
+    );
+
+    assert.equal(profiles.length, 1);
+    assert.equal(profiles[0]?.id, "mixed-profile");
+    assert.deepEqual(
+      profiles[0]?.needs.map((need) => need.displayName),
+      ["CoQ10"]
+    );
+    assert.deepEqual(profiles[0]?.supplementNames, ["CoQ10"]);
+  });
+
+  it("filters blocked country supplements from product needs while keeping allowed country overrides", () => {
+    const coq10Need = demandProfile().needs[0]!;
+    const ashwagandhaNeed = {
+      ...coq10Need,
+      displayName: "Ashwaganda root",
+      id: "supplement:ashwagandha",
+      normalizedName: "ashwaganda",
+      sourceId: ashwagandhaSupplementId
+    };
+    const foodNeed = {
+      ...coq10Need,
+      displayName: "Leafy greens",
+      id: "food:leafy-greens",
+      itemType: "food" as const,
+      normalizedName: "leafy_greens",
+      sourceId: "food-leafy-greens"
+    };
+    const thLookup = supplementAvailabilityLookupFromRows([
+      {
+        aliases: [],
+        country_code: null,
+        explicit_status: null,
+        global_active: true,
+        global_list_status: "active",
+        name: "CoQ10",
+        normalized_name: "coq10",
+        reason: null,
+        source: null,
+        status: "allowed",
+        supplement_id: supplementId,
+        updated_at: "2026-06-01T00:00:00.000Z"
+      },
+      {
+        aliases: ["ashwaganda"],
+        country_code: "TH",
+        explicit_status: "blocked",
+        global_active: true,
+        global_list_status: "active",
+        name: "Ashwagandha",
+        normalized_name: "ashwagandha",
+        reason: "Blocked in Thailand",
+        source: "test",
+        status: "blocked",
+        supplement_id: ashwagandhaSupplementId,
+        updated_at: "2026-06-01T00:00:00.000Z"
+      }
+    ], "TH");
+    const gbLookup = supplementAvailabilityLookupFromRows([
+      {
+        aliases: ["ashwaganda"],
+        country_code: "GB",
+        explicit_status: "allowed",
+        global_active: false,
+        global_list_status: "blocked",
+        name: "Ashwagandha",
+        normalized_name: "ashwagandha",
+        reason: "Allowed in the UK",
+        source: "test",
+        status: "allowed",
+        supplement_id: ashwagandhaSupplementId,
+        updated_at: "2026-06-01T00:00:00.000Z"
+      }
+    ], "UK");
+
+    assert.deepEqual(
+      filterProductNeedsBySupplementAvailability(
+        [coq10Need, ashwagandhaNeed, foodNeed],
+        thLookup
+      ).map((need) => need.displayName),
+      ["CoQ10", "Leafy greens"]
+    );
+    assert.deepEqual(
+      filterProductNeedsBySupplementAvailability([ashwagandhaNeed], gbLookup)
+        .map((need) => need.displayName),
+      ["Ashwaganda root"]
+    );
+    assert.equal(
+      productHasCountryBlockedSupplement(
+        product({
+          facts: [
+            {
+              amount: 300,
+              comparableAmount: 300000,
+              confidence: "high",
+              itemType: "supplement",
+              name: "Ashwaganda root",
+              normalizedName: "ashwaganda",
+              supplementId: ashwagandhaSupplementId,
+              unit: "mg"
+            }
+          ],
+          id: "88888888-8888-4888-8888-888888888888",
+          title: "Approved Ashwagandha"
+        }),
+        thLookup
+      ),
+      true
+    );
+    assert.equal(gbLookup.countryCode, "GB");
   });
 
   it("runs simulations with no approved product candidates", () => {
@@ -600,6 +750,14 @@ describe("product coverage workflow", () => {
       "lib/admin-plan-demand-generation.ts",
       "utf8"
     );
+    const assessmentStore = readFileSync("lib/assessment-store.ts", "utf8");
+    const candidateSearch = readFileSync("lib/admin-product-search.ts", "utf8");
+    const freshness = readFileSync(
+      "lib/product-recommendation-freshness.ts",
+      "utf8"
+    );
+    const schema = readFileSync("db-schema.sql", "utf8");
+    const taskWorkItems = readFileSync("lib/task-work-items.ts", "utf8");
     const resetScript = readFileSync(
       "scripts/products-master-pending-review.ts",
       "utf8"
@@ -623,7 +781,10 @@ describe("product coverage workflow", () => {
     assert.match(page, /product-insights/);
     assert.match(readModel, /targetComparableAmountBySupplement/);
     assert.match(readModel, /buildReviewPriorityProductRows/);
+    assert.match(readModel, /supplementGovernanceHash/);
+    assert.match(readModel, /source_payload -> 'countryAvailability'/);
     assert.match(simulationModel, /buildSimulationNextMoveRows/);
+    assert.match(simulationModel, /sanitizeDemandProfilesForSimulationSupplements/);
     assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
     assert.match(simulationInputRoute, /adminViewAllowed/);
     assert.match(simulationInputRoute, /"Cache-Control": "no-store"/);
@@ -631,10 +792,23 @@ describe("product coverage workflow", () => {
     assert.match(demandProfileRoute, /adminViewAllowed/);
     assert.match(demandGeneration, /analyzeFormulationWithGrok/);
     assert.match(demandGeneration, /buildProductNeeds/);
+    assert.match(demandGeneration, /filterProductNeedsBySupplementAvailability/);
+    assert.match(demandGeneration, /source_payload -> 'countryAvailability'/);
+    assert.match(taskWorkItems, /filterProductNeedsBySupplementAvailabilityForCountry/);
+    assert.match(candidateSearch, /productHasCountryBlockedSupplement/);
+    assert.match(candidateSearch, /getSupplementEffectiveAvailability/);
+    assert.match(assessmentStore, /blocked_country/);
+    assert.match(assessmentStore, /source_payload -> 'countryAvailability'/);
+    assert.match(freshness, /supplement_governance_changed/);
+    assert.match(freshness, /supplementGovernanceUpdatedAt/);
+    assert.match(schema, /CREATE TABLE public\.supplement_country_availability/);
+    assert.match(schema, /status = ANY \(ARRAY\['allowed'::text, 'blocked'::text\]\)/);
     assert.match(simulationModel, /recommendProductStackFullBeam/);
     assert.match(simulationModel, /demandProfiles/);
     assert.match(view, /SIMULATOR_STORAGE_KEY/);
     assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
+    assert.match(view, /supplementGovernanceHash: data\.input\.supplementGovernanceHash/);
+    assert.match(view, /sanitizeDemandProfilesForSimulationSupplements/);
     assert.match(view, /version: 2\s*\n\s*}\s+satisfies SavedDemandProfilesState/);
     assert.match(view, /function loadSavedDemandProfiles\(expectedDemandKey\?: string\)/);
     assert.match(view, /parsed\.demandKey !== expectedDemandKey/);
