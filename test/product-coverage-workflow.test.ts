@@ -10,6 +10,7 @@ import {
   normalizeSimulationSampleSize,
   productCoversSupplementForMatching,
   runAdminCatalogueOptimization,
+  runAdminCatalogueOptimizationCooperatively,
   runAdminPlanCoverageSimulation,
   sanitizeDemandProfilesForSimulationSupplements,
   simulationCustomerArchetypesFromInsights,
@@ -419,7 +420,7 @@ describe("product coverage workflow", () => {
     assert.equal(result.unmetSupplements.length, 0);
   });
 
-  it("optimizes to the smallest catalogue that preserves baseline coverage", () => {
+  it("optimizes to the smallest catalogue that preserves baseline coverage", async () => {
     const coq10Need = supplementNeed({
       displayName: "CoQ10",
       id: supplementId,
@@ -518,6 +519,21 @@ describe("product coverage workflow", () => {
       ),
       true
     );
+
+    const progressStages: string[] = [];
+    const cooperativeOptimization = await runAdminCatalogueOptimizationCooperatively({
+      onProgress: (progress) => {
+        progressStages.push(progress.stage);
+      },
+      simulationData
+    });
+
+    assert.equal(cooperativeOptimization.status, "ready");
+    assert.equal(cooperativeOptimization.optimized.productCount, 1);
+    assert.equal(cooperativeOptimization.carryProducts[0]?.id, broadMulti.id);
+    assert.equal(progressStages.includes("scoring"), true);
+    assert.equal(progressStages.includes("validating"), true);
+    assert.equal(progressStages.includes("done"), true);
   });
 
   it("keeps critical single products and uses price as an optimizer tie-breaker", () => {

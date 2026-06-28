@@ -295,6 +295,20 @@ export type AdminCatalogueOptimizationData = Readonly<{
   status: "not_ready" | "ready";
 }>;
 
+export type AdminCatalogueOptimizationProgressStage =
+  | "actions"
+  | "done"
+  | "pruning"
+  | "scoring"
+  | "validating";
+
+export type AdminCatalogueOptimizationProgress = Readonly<{
+  current: number;
+  label: string;
+  stage: AdminCatalogueOptimizationProgressStage;
+  total: number;
+}>;
+
 export type AdminPlanCoverageSimulationData = Readonly<{
   convergence: AdminPlanCoverageSimulationConvergence;
   countryCode: string;
@@ -2127,6 +2141,63 @@ function sortedNeedNames(counts: ReadonlyMap<string, number>) {
     .map(([name]) => name);
 }
 
+type CatalogueOptimizationAsyncRuntime = Readonly<{
+  onProgress?: (progress: AdminCatalogueOptimizationProgress) => void;
+  signal?: AbortSignal;
+}>;
+
+function catalogueOptimizationAbortError() {
+  const error = new Error("Catalogue optimization cancelled");
+
+  error.name = "AbortError";
+
+  return error;
+}
+
+function throwIfCatalogueOptimizationAborted(signal: AbortSignal | undefined) {
+  if (signal?.aborted) {
+    throw catalogueOptimizationAbortError();
+  }
+}
+
+function reportCatalogueOptimizationProgress(
+  runtime: CatalogueOptimizationAsyncRuntime,
+  progress: AdminCatalogueOptimizationProgress
+) {
+  runtime.onProgress?.({
+    ...progress,
+    current: Math.max(0, Math.min(progress.current, progress.total)),
+    total: Math.max(1, progress.total)
+  });
+}
+
+function waitForCatalogueOptimizationTurn(
+  runtime: CatalogueOptimizationAsyncRuntime
+) {
+  throwIfCatalogueOptimizationAborted(runtime.signal);
+
+  return new Promise<void>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      runtime.signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, 0);
+    const onAbort = () => {
+      clearTimeout(timeoutId);
+      reject(catalogueOptimizationAbortError());
+    };
+
+    runtime.signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+async function yieldCatalogueOptimizationProgress(
+  runtime: CatalogueOptimizationAsyncRuntime,
+  progress: AdminCatalogueOptimizationProgress
+) {
+  reportCatalogueOptimizationProgress(runtime, progress);
+  await waitForCatalogueOptimizationTurn(runtime);
+}
+
 function catalogueProductProfiles(
   data: AdminPlanCoverageSimulationData
 ): CatalogueProductProfile[] {
@@ -2189,6 +2260,86 @@ function catalogueProductProfiles(
       title: candidate.title
     };
   });
+}
+
+async function catalogueProductProfilesAsync(
+  data: AdminPlanCoverageSimulationData,
+  runtime: CatalogueOptimizationAsyncRuntime
+): Promise<CatalogueProductProfile[]> {
+  const byProduct = new Map<string, {
+    protectedNeedCounts: Map<string, number>;
+    selectedCount: number;
+    stackContributionTotal: number;
+  }>();
+
+  for (const trace of data.sampleTraces) {
+    for (const product of trace.selectedProducts) {
+      const current = byProduct.get(product.id) ?? {
+        protectedNeedCounts: new Map<string, number>(),
+        selectedCount: 0,
+        stackContributionTotal: 0
+      };
+
+      current.selectedCount += 1;
+      current.stackContributionTotal += product.stackContributionPercent;
+      addNeedCounts(current.protectedNeedCounts, product.coveredNeedNames);
+      byProduct.set(product.id, current);
+    }
+  }
+
+  const profiles: CatalogueProductProfile[] = [];
+  const total = data.input.candidates.length;
+
+  for (let index = 0; index < data.input.candidates.length; index += 1) {
+    const candidate = data.input.candidates[index]!;
+    const selected = byProduct.get(candidate.id) ?? {
+      protectedNeedCounts: new Map<string, number>(),
+      selectedCount: 0,
+      stackContributionTotal: 0
+    };
+    let potentialCoverageTotal = 0;
+    let potentialPlanCount = 0;
+    const protectedNeedCounts = new Map(selected.protectedNeedCounts);
+
+    for (const trace of data.sampleTraces) {
+      const coverage = productNeedCoverageSummary({
+        clientSex: trace.clientSex,
+        needs: trace.needs,
+        product: candidate
+      });
+
+      if (coverage.coveragePercent <= 0) {
+        continue;
+      }
+
+      potentialCoverageTotal += coverage.coveragePercent;
+      potentialPlanCount += 1;
+      addNeedCounts(protectedNeedCounts, coverage.coveredNeedNames);
+    }
+
+    profiles.push({
+      brandName: candidate.brandName ?? null,
+      candidate,
+      expectedPriceAmount: productPrice(candidate),
+      potentialCoverageTotal,
+      potentialPlanCount,
+      protectedNeedCounts,
+      selectedCount: selected.selectedCount,
+      stackContributionTotal: selected.stackContributionTotal,
+      title: candidate.title
+    });
+
+    if (index % 2 === 1 || index === data.input.candidates.length - 1) {
+      await yieldCatalogueOptimizationProgress(runtime, {
+        current: index + 1,
+        label: "Scoring catalogue products",
+        stage: "scoring",
+        total
+      });
+    }
+  }
+
+  return profiles;
 }
 
 function catalogueProductScore(profile: CatalogueProductProfile) {
@@ -2310,6 +2461,112 @@ function evaluateCatalogueSubset(input: Readonly<{
   };
 }
 
+async function evaluateCatalogueSubsetAsync(input: Readonly<{
+  data: AdminPlanCoverageSimulationData;
+  productIds: readonly string[];
+  progress?: Readonly<{
+    current: number;
+    label: string;
+    total: number;
+    stage: AdminCatalogueOptimizationProgressStage;
+  }>;
+  runtime: CatalogueOptimizationAsyncRuntime;
+}>): Promise<CatalogueEvaluation> {
+  const productIdSet = new Set(input.productIds);
+  const candidates = input.data.input.candidates.filter((candidate) =>
+    productIdSet.has(candidate.id)
+  );
+  const costValues: number[] = [];
+  const coverageValues: number[] = [];
+  const selectedProductIds = new Set<string>();
+  const selectedProducts = new Map<string, {
+    brandName: string | null;
+    chosenCount: number;
+    costTotal: number;
+    costCount: number;
+    coverageTotal: number;
+    protectedNeedCounts: Map<string, number>;
+    stackContributionTotal: number;
+    title: string;
+  }>();
+  const yieldEvery = 4;
+
+  for (let index = 0; index < input.data.sampleTraces.length; index += 1) {
+    const trace = input.data.sampleTraces[index]!;
+    const result = recommendProductStackFullBeam({
+      candidates,
+      clientSex: trace.clientSex,
+      countryCode: input.data.countryCode,
+      maxProducts: 6,
+      needs: [...trace.needs],
+      stackPreference: "balanced"
+    });
+    const selectedCost = result.recommendations.reduce(
+      (total, item) => total + (productPrice(item.product) ?? 0),
+      0
+    );
+
+    coverageValues.push(safePercent(result.supplementProductCoveragePercent));
+    costValues.push(selectedCost);
+
+    for (const item of result.recommendations) {
+      selectedProductIds.add(item.product.id);
+      const current = selectedProducts.get(item.product.id) ?? {
+        brandName: item.product.brandName ?? null,
+        chosenCount: 0,
+        costTotal: 0,
+        costCount: 0,
+        coverageTotal: 0,
+        protectedNeedCounts: new Map<string, number>(),
+        stackContributionTotal: 0,
+        title: item.product.title
+      };
+      const price = productPrice(item.product);
+
+      current.chosenCount += 1;
+      current.coverageTotal += item.productCoveragePercent;
+      current.stackContributionTotal += item.stackContributionPercent;
+      addNeedCounts(
+        current.protectedNeedCounts,
+        item.coveredNeeds.map((need) => need.displayName)
+      );
+
+      if (price !== null) {
+        current.costTotal += price;
+        current.costCount += 1;
+      }
+
+      selectedProducts.set(item.product.id, current);
+    }
+
+    if (
+      input.progress &&
+      (index % yieldEvery === yieldEvery - 1 ||
+        index === input.data.sampleTraces.length - 1)
+    ) {
+      await yieldCatalogueOptimizationProgress(input.runtime, {
+        current: input.progress.current,
+        label: input.progress.label,
+        stage: input.progress.stage,
+        total: input.progress.total
+      });
+    }
+  }
+
+  return {
+    costValues,
+    coverageValues,
+    productIds: input.productIds,
+    selectedProductIds: [...selectedProductIds],
+    selectedProducts,
+    summary: catalogueSummary({
+      costValues,
+      coverageValues,
+      productCount: input.productIds.length
+    })
+  };
+}
+
 function bestFrontierFallback(
   points: readonly AdminCatalogueOptimizationFrontierPoint[]
 ) {
@@ -2376,6 +2633,103 @@ function prunedCatalogueEvaluation(input: Readonly<{
       const nextEvaluation = evaluateCatalogueSubset({
         data: input.data,
         productIds: nextIds
+      });
+
+      if (
+        withinCatalogueCoverageFloor({
+          baseline: input.baseline,
+          coverageLossTolerancePercent: input.coverageLossTolerancePercent,
+          next: nextEvaluation.summary
+        })
+      ) {
+        evaluation = nextEvaluation;
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return evaluation;
+}
+
+async function prunedCatalogueEvaluationAsync(input: Readonly<{
+  baseline: AdminCatalogueOptimizationSummary;
+  coverageLossTolerancePercent: number;
+  data: AdminPlanCoverageSimulationData;
+  productIds: readonly string[];
+  profilesById: ReadonlyMap<string, CatalogueProductProfile>;
+  runtime: CatalogueOptimizationAsyncRuntime;
+}>): Promise<CatalogueEvaluation> {
+  let evaluation = await evaluateCatalogueSubsetAsync({
+    data: input.data,
+    productIds: input.productIds,
+    progress: {
+      current: 1,
+      label: "Pruning redundant products",
+      stage: "pruning",
+      total: Math.max(1, input.productIds.length)
+    },
+    runtime: input.runtime
+  });
+
+  if (
+    evaluation.selectedProductIds.length > 0 &&
+    evaluation.selectedProductIds.length < evaluation.productIds.length
+  ) {
+    const selectedEvaluation = await evaluateCatalogueSubsetAsync({
+      data: input.data,
+      productIds: evaluation.selectedProductIds,
+      progress: {
+        current: 1,
+        label: "Pruning unused products",
+        stage: "pruning",
+        total: Math.max(1, input.productIds.length)
+      },
+      runtime: input.runtime
+    });
+
+    if (
+      withinCatalogueCoverageFloor({
+        baseline: input.baseline,
+        coverageLossTolerancePercent: input.coverageLossTolerancePercent,
+        next: selectedEvaluation.summary
+      })
+    ) {
+      evaluation = selectedEvaluation;
+    }
+  }
+
+  let changed = true;
+  let checkedCount = 0;
+  const maxChecks = Math.max(1, input.productIds.length * input.productIds.length);
+
+  while (changed && evaluation.productIds.length > 1) {
+    changed = false;
+    const removalOrder = [...evaluation.productIds].sort((firstId, secondId) => {
+      const first = input.profilesById.get(firstId);
+      const second = input.profilesById.get(secondId);
+
+      return (
+        (first?.selectedCount ?? 0) - (second?.selectedCount ?? 0) ||
+        (first?.potentialPlanCount ?? 0) - (second?.potentialPlanCount ?? 0) ||
+        (second?.expectedPriceAmount ?? 0) - (first?.expectedPriceAmount ?? 0) ||
+        (first?.title ?? firstId).localeCompare(second?.title ?? secondId)
+      );
+    });
+
+    for (const productId of removalOrder) {
+      checkedCount += 1;
+      const nextIds = evaluation.productIds.filter((id) => id !== productId);
+      const nextEvaluation = await evaluateCatalogueSubsetAsync({
+        data: input.data,
+        productIds: nextIds,
+        progress: {
+          current: checkedCount,
+          label: "Pruning redundant products",
+          stage: "pruning",
+          total: maxChecks
+        },
+        runtime: input.runtime
       });
 
       if (
@@ -2763,6 +3117,272 @@ export function runAdminCatalogueOptimization(input: Readonly<{
     sampleSize: data.sampleSize,
     status: "ready"
   };
+}
+
+export async function runAdminCatalogueOptimizationCooperatively(input: Readonly<{
+  simulationData: AdminPlanCoverageSimulationData;
+  reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
+  coverageLossTolerancePercent?: number | null;
+  objective?: AdminCatalogueOptimizationObjective | null;
+  mutationMode?: AdminCatalogueOptimizationMutationMode | null;
+  onProgress?: (progress: AdminCatalogueOptimizationProgress) => void;
+  signal?: AbortSignal;
+}>): Promise<AdminCatalogueOptimizationData> {
+  const runtime: CatalogueOptimizationAsyncRuntime = {
+    onProgress: input.onProgress,
+    signal: input.signal
+  };
+  const data = input.simulationData;
+  const coverageLossTolerancePercent = positiveNumberOrNull(
+    input.coverageLossTolerancePercent
+  ) ?? DEFAULT_CATALOGUE_OPTIMIZATION_COVERAGE_LOSS_TOLERANCE_PERCENT;
+  const objective = input.objective ?? CATALOGUE_OPTIMIZATION_OBJECTIVE;
+  const mutationMode = input.mutationMode ?? CATALOGUE_OPTIMIZATION_MUTATION_MODE;
+  const baseline = baselineCatalogueSummary(data);
+  const generatedAt = new Date().toISOString();
+
+  throwIfCatalogueOptimizationAborted(runtime.signal);
+
+  if (data.sampleTraces.length < 1 || data.sampleSize < 1) {
+    return {
+      actionRows: [],
+      baseline,
+      carryProducts: [],
+      coverageLossTolerancePercent,
+      frontier: [],
+      generatedAt,
+      mutationMode,
+      objective,
+      optimized: emptyCatalogueOptimizationSummary(0),
+      productReductionCount: 0,
+      productReductionPercent: 0,
+      sampleSize: data.sampleSize,
+      status: "not_ready"
+    };
+  }
+
+  await yieldCatalogueOptimizationProgress(runtime, {
+    current: 0,
+    label: "Scoring catalogue products",
+    stage: "scoring",
+    total: Math.max(1, data.input.candidates.length)
+  });
+
+  const profiles = await catalogueProductProfilesAsync(data, runtime);
+  const profilesById = new Map(
+    profiles.map((profile) => [profile.candidate.id, profile])
+  );
+  const rankedProducts = rankedCatalogueProducts(profiles);
+
+  if (rankedProducts.length < 1) {
+    await yieldCatalogueOptimizationProgress(runtime, {
+      current: 1,
+      label: "Building catalogue actions",
+      stage: "actions",
+      total: 1
+    });
+
+    const reviewRows = reviewActionRows({
+      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      sampleSize: data.sampleSize,
+      unmetSupplements: data.unmetSupplements
+    });
+    const sourceRows = sourceActionRows({
+      sampleSize: data.sampleSize,
+      unmetSupplements: data.unmetSupplements
+    });
+    const result = {
+      actionRows: rankedCatalogueActionRows([...reviewRows, ...sourceRows]),
+      baseline,
+      carryProducts: [],
+      coverageLossTolerancePercent,
+      frontier: [],
+      generatedAt,
+      mutationMode,
+      objective,
+      optimized: emptyCatalogueOptimizationSummary(0),
+      productReductionCount: data.input.candidates.length,
+      productReductionPercent: safePercent(
+        (data.input.candidates.length / Math.max(1, data.input.candidates.length)) * 100
+      ),
+      sampleSize: data.sampleSize,
+      status: "ready" as const
+    };
+
+    reportCatalogueOptimizationProgress(runtime, {
+      current: 1,
+      label: "Minimum catalogue ready",
+      stage: "done",
+      total: 1
+    });
+
+    return result;
+  }
+
+  const provisionalPoints: AdminCatalogueOptimizationFrontierPoint[] = [];
+  let firstPassingEvaluation: CatalogueEvaluation | null = null;
+
+  for (let count = 1; count <= rankedProducts.length; count += 1) {
+    const productIds = rankedProducts
+      .slice(0, count)
+      .map((profile) => profile.candidate.id);
+    const evaluation = await evaluateCatalogueSubsetAsync({
+      data,
+      productIds,
+      progress: {
+        current: count,
+        label: "Validating catalogue frontier",
+        stage: "validating",
+        total: rankedProducts.length
+      },
+      runtime
+    });
+    const point = frontierPoint({
+      baseline,
+      coverageLossTolerancePercent,
+      evaluation,
+      recommended: false
+    });
+
+    provisionalPoints.push(point);
+
+    if (!firstPassingEvaluation && point.withinCoverageFloor) {
+      firstPassingEvaluation = evaluation;
+      break;
+    }
+  }
+
+  const fullUsefulProductIds = rankedProducts.map((profile) => profile.candidate.id);
+  const hasFullUsefulPoint = provisionalPoints.some((point) =>
+    point.productIds.length === fullUsefulProductIds.length &&
+    point.productIds.every((id, index) => id === fullUsefulProductIds[index])
+  );
+
+  if (!hasFullUsefulPoint) {
+    provisionalPoints.push(frontierPoint({
+      baseline,
+      coverageLossTolerancePercent,
+      evaluation: await evaluateCatalogueSubsetAsync({
+        data,
+        productIds: fullUsefulProductIds,
+        progress: {
+          current: rankedProducts.length,
+          label: "Validating full useful catalogue",
+          stage: "validating",
+          total: rankedProducts.length
+        },
+        runtime
+      }),
+      recommended: false
+    }));
+  }
+
+  if (!firstPassingEvaluation) {
+    const fallback = bestFrontierFallback(provisionalPoints);
+
+    firstPassingEvaluation = fallback
+      ? await evaluateCatalogueSubsetAsync({
+          data,
+          productIds: fallback.productIds,
+          progress: {
+            current: rankedProducts.length,
+            label: "Validating best frontier fallback",
+            stage: "validating",
+            total: rankedProducts.length
+          },
+          runtime
+        })
+      : await evaluateCatalogueSubsetAsync({
+          data,
+          productIds: rankedProducts.map((profile) => profile.candidate.id),
+          progress: {
+            current: rankedProducts.length,
+            label: "Validating full ranked catalogue",
+            stage: "validating",
+            total: rankedProducts.length
+          },
+          runtime
+        });
+  }
+
+  const recommendedEvaluation = await prunedCatalogueEvaluationAsync({
+    baseline,
+    coverageLossTolerancePercent,
+    data,
+    productIds: firstPassingEvaluation.productIds,
+    profilesById,
+    runtime
+  });
+  const recommendedPoint = frontierPoint({
+    baseline,
+    coverageLossTolerancePercent,
+    evaluation: recommendedEvaluation,
+    recommended: true
+  });
+  const frontier = [
+    ...provisionalPoints.filter((point) =>
+      point.productCount !== recommendedPoint.productCount ||
+      point.productIds.join("|") !== recommendedPoint.productIds.join("|")
+    ),
+    recommendedPoint
+  ].sort((first, second) => first.productCount - second.productCount);
+  const carryProducts = productRowsFromEvaluation(recommendedEvaluation);
+  const optimizedProductIds = new Set(recommendedEvaluation.productIds);
+
+  await yieldCatalogueOptimizationProgress(runtime, {
+    current: 1,
+    label: "Building catalogue actions",
+    stage: "actions",
+    total: 1
+  });
+
+  const actionRows = rankedCatalogueActionRows([
+    ...carryActionRows({ carryProducts, sampleSize: data.sampleSize }),
+    ...reviewActionRows({
+      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      sampleSize: data.sampleSize,
+      unmetSupplements: data.unmetSupplements
+    }),
+    ...sourceActionRows({
+      sampleSize: data.sampleSize,
+      unmetSupplements: data.unmetSupplements
+    }),
+    ...retireActionRows({
+      optimizedProductIds,
+      profiles,
+      sampleSize: data.sampleSize
+    })
+  ]);
+  const productReductionCount = Math.max(
+    0,
+    data.input.candidates.length - recommendedEvaluation.productIds.length
+  );
+  const result = {
+    actionRows,
+    baseline,
+    carryProducts,
+    coverageLossTolerancePercent,
+    frontier,
+    generatedAt,
+    mutationMode,
+    objective,
+    optimized: recommendedEvaluation.summary,
+    productReductionCount,
+    productReductionPercent: safePercent(
+      (productReductionCount / Math.max(1, data.input.candidates.length)) * 100
+    ),
+    sampleSize: data.sampleSize,
+    status: "ready" as const
+  };
+
+  reportCatalogueOptimizationProgress(runtime, {
+    current: 1,
+    label: "Minimum catalogue ready",
+    stage: "done",
+    total: 1
+  });
+
+  return result;
 }
 
 export function targetComparableAmountBySupplement(

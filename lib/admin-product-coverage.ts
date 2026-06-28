@@ -45,6 +45,7 @@ export {
   normalizeSimulationSampleSize,
   runAdminPlanCoverageSimulation,
   runAdminCatalogueOptimization,
+  runAdminCatalogueOptimizationCooperatively,
   runNextAdminPlanCoverageSimulationSample,
   sanitizeDemandProfilesForSimulationSupplements
 } from "@/lib/admin-product-coverage-simulation";
@@ -53,6 +54,7 @@ export type {
   AdminCatalogueOptimizationData,
   AdminCatalogueOptimizationFrontierPoint,
   AdminCatalogueOptimizationProductRow,
+  AdminCatalogueOptimizationProgress,
   AdminCatalogueOptimizationSummary,
   AdminPlanCoverageDemandProfile,
   AdminPlanCoverageSimulationCheckpoint,
