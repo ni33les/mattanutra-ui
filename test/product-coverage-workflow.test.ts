@@ -644,6 +644,12 @@ describe("product coverage workflow", () => {
     assert.match(view, /\/api\/admin\/product-coverage\/simulation-input/);
     assert.match(view, /cache: "no-store"/);
     assert.match(view, /inputStatus !== "ready"/);
+    assert.match(view, /SIMULATOR_INPUT_TIMEOUT_MS/);
+    assert.match(view, /new AbortController\(\)/);
+    assert.match(view, /signal: controller\.signal/);
+    assert.match(view, /inputStatusRef\.current === "loading"/);
+    assert.match(view, /retrySimulatorInput/);
+    assert.match(view, />\s*Retry\s*</);
     assert.match(view, /version: 3/);
     assert.doesNotMatch(view, /loadSavedSimulationDisplayData/);
     assert.doesNotMatch(view, /cachedSimulationData \?\? initialSimulationData/);

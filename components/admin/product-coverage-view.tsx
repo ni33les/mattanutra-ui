@@ -48,6 +48,7 @@ const SIMULATOR_ARCHETYPES_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-archetypes:v1";
 const SIMULATOR_DEMAND_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-demand-profiles:v1";
+const SIMULATOR_INPUT_TIMEOUT_MS = 30_000;
 
 type ArchetypeDraft = Readonly<{
   clientSex: "" | "female" | "male";
@@ -537,6 +538,17 @@ function waitForNextSample() {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, 24);
   });
+}
+
+function simulatorInputErrorMessage(error: unknown) {
+  if (
+    error instanceof DOMException &&
+    (error.name === "AbortError" || error.name === "TimeoutError")
+  ) {
+    return "Simulator input request timed out. Try again.";
+  }
+
+  return error instanceof Error ? error.message : "Unknown input error";
 }
 
 function runnerWithDemandProfiles(
@@ -1741,6 +1753,7 @@ export function AdminPlanCoverageSimulatorView({
     null
   );
   const runnerRef = useRef<AdminPlanCoverageSimulationRunner | null>(null);
+  const inputStatusRef = useRef<SimulatorInputStatus>("loading");
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
   const runningRef = useRef(false);
@@ -1801,8 +1814,12 @@ export function AdminPlanCoverageSimulatorView({
   }, [demandGenerating, running]);
 
   useEffect(() => {
+    inputStatusRef.current = inputStatus;
+  }, [inputStatus]);
+
+  useEffect(() => {
     const refreshInput = () => {
-      if (runningRef.current) {
+      if (runningRef.current || inputStatusRef.current === "loading") {
         return;
       }
 
@@ -1827,11 +1844,19 @@ export function AdminPlanCoverageSimulatorView({
 
   useEffect(() => {
     let cancelled = false;
+    let controller: AbortController | null = null;
+    let requestTimedOut = false;
+    let requestTimeoutId: number | null = null;
     const timeoutId = window.setTimeout(() => {
       if (cancelled) {
         return;
       }
 
+      controller = new AbortController();
+      requestTimeoutId = window.setTimeout(() => {
+        requestTimedOut = true;
+        controller?.abort();
+      }, SIMULATOR_INPUT_TIMEOUT_MS);
       setInputStatus("loading");
       setInputError(null);
       setInputData(data);
@@ -1846,7 +1871,8 @@ export function AdminPlanCoverageSimulatorView({
         headers: {
           "Cache-Control": "no-store",
           ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
-        }
+        },
+        signal: controller.signal
       })
         .then(async (response) => {
           if (!response.ok) {
@@ -1860,6 +1886,9 @@ export function AdminPlanCoverageSimulatorView({
             return;
           }
 
+          if (requestTimeoutId !== null) {
+            window.clearTimeout(requestTimeoutId);
+          }
           setInputData(payload);
           setInputStatus("ready");
         })
@@ -1868,12 +1897,19 @@ export function AdminPlanCoverageSimulatorView({
             return;
           }
 
+          if (requestTimeoutId !== null) {
+            window.clearTimeout(requestTimeoutId);
+          }
           setInputData(emptyAdminPlanCoverageSimulationData({
             countryCode: data.countryCode,
             databaseAvailable: false,
             seed: data.seed
           }));
-          setInputError(error instanceof Error ? error.message : "Unknown input error");
+          setInputError(
+            requestTimedOut
+              ? "Simulator input request timed out. Try again."
+              : simulatorInputErrorMessage(error)
+          );
           setInputStatus("error");
           setHydrated(true);
         });
@@ -1881,6 +1917,10 @@ export function AdminPlanCoverageSimulatorView({
 
     return () => {
       cancelled = true;
+      if (requestTimeoutId !== null) {
+        window.clearTimeout(requestTimeoutId);
+      }
+      controller?.abort();
       window.clearTimeout(timeoutId);
     };
   }, [accessToken, data, inputRefreshNonce, range]);
@@ -2180,6 +2220,14 @@ export function AdminPlanCoverageSimulatorView({
     setNextMovesClearedKey(nextMovesKey);
   }
 
+  function retrySimulatorInput() {
+    if (inputStatus === "loading") {
+      return;
+    }
+
+    setInputRefreshNonce((value) => value + 1);
+  }
+
   return (
     <div className="space-y-6">
       <BusinessStatsGrid metrics={simulationMetrics(simulationData)} />
@@ -2193,7 +2241,16 @@ export function AdminPlanCoverageSimulatorView({
             {numberText(activeInputData.input.candidates.length)} eligible products
           </p>
           {inputError ? (
-            <p className="mt-1 text-sm font-semibold text-rose-700">{inputError}</p>
+            <span className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-rose-700">{inputError}</span>
+              <button
+                className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                onClick={retrySimulatorInput}
+                type="button"
+              >
+                Retry
+              </button>
+            </span>
           ) : null}
         </div>
         <SimulatorActionBar
