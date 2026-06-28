@@ -105,6 +105,7 @@ type SavedDemandProfilesState = Readonly<{
 
 type SimulatorInputStatus = "error" | "loading" | "ready";
 type SimulatorClearTarget = "all" | "profiles" | "results";
+type CatalogueOptimizationStatus = "blocked" | "idle" | "processing" | "ready";
 
 function numberText(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
@@ -1533,12 +1534,14 @@ function MinimumCataloguePanel({
   accessToken,
   locale,
   optimization,
+  optimizationStatus,
   running,
   sampleSize
 }: Readonly<{
   accessToken: string;
   locale: Locale;
   optimization: AdminCatalogueOptimizationData | null;
+  optimizationStatus: CatalogueOptimizationStatus;
   running: boolean;
   sampleSize: number;
 }>) {
@@ -1550,6 +1553,27 @@ function MinimumCataloguePanel({
           Pause or complete the simulation to calculate the smallest catalogue that
           preserves near-full coverage.
         </p>
+      </section>
+    );
+  }
+
+  if (optimizationStatus === "processing") {
+    return (
+      <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Calculating the smallest carry set against the completed simulation.
+            </p>
+          </div>
+          <Badge className="bg-blue-50 text-blue-700 ring-blue-200">
+            Optimizing
+          </Badge>
+        </div>
+        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full w-full animate-pulse rounded-full bg-[#3A7BD5]" />
+        </div>
       </section>
     );
   }
@@ -1911,6 +1935,7 @@ function simulationStatusText(
   inputStatus: SimulatorInputStatus,
   generatingProfile: boolean,
   running: boolean,
+  optimizationStatus: CatalogueOptimizationStatus,
   hydrated: boolean
 ) {
   if (inputStatus === "loading") {
@@ -1935,6 +1960,10 @@ function simulationStatusText(
 
   if (running) {
     return "Running simulation";
+  }
+
+  if (optimizationStatus === "processing" && data.sampleSize > 0) {
+    return "Optimizing catalogue";
   }
 
   if (data.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) {
@@ -1975,25 +2004,47 @@ function convergenceProgressText(data: AdminPlanCoverageSimulationData) {
   return `${windowText} ${coverageText}${overlapText}. Results are still moving.`;
 }
 
-function SimulationProgressPanel({
-  demandError,
+function simulationProgressSampleCount({
   demandProfiles,
+  generating,
+  running,
+  simulationData
+}: Readonly<{
+  demandProfiles: readonly AdminPlanCoverageDemandProfile[];
+  generating: boolean;
+  running: boolean;
+  simulationData: AdminPlanCoverageSimulationData;
+}>) {
+  if (generating && running) {
+    return demandProfiles.length;
+  }
+
+  return simulationData.sampleSize;
+}
+
+function SimulationProgressPanel({
+  catalogueOptimizationStatus,
+  demandError,
   generating,
   hydrated,
   inputStatus,
+  progressCount,
   progressPercent,
   running,
   simulationData
 }: Readonly<{
+  catalogueOptimizationStatus: CatalogueOptimizationStatus;
   demandError: string | null;
-  demandProfiles: readonly AdminPlanCoverageDemandProfile[];
   generating: boolean;
   hydrated: boolean;
   inputStatus: SimulatorInputStatus;
+  progressCount: number;
   progressPercent: number;
   running: boolean;
   simulationData: AdminPlanCoverageSimulationData;
 }>) {
+  const optimizingCatalogue = catalogueOptimizationStatus === "processing";
+
   return (
     <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2003,17 +2054,21 @@ function SimulationProgressPanel({
             inputStatus,
             generating,
             running,
+            catalogueOptimizationStatus,
             hydrated
           )}
         </p>
         <p className="text-sm text-slate-500">
-          {numberText(Math.max(simulationData.sampleSize, demandProfiles.length))} /{" "}
+          {numberText(progressCount)} /{" "}
           {numberText(ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES)}
         </p>
       </div>
       <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100">
         <div
-          className="h-full rounded-full bg-[#1FA77A] transition-[width]"
+          className={classNames(
+            "h-full rounded-full transition-[width]",
+            optimizingCatalogue ? "animate-pulse bg-[#3A7BD5]" : "bg-[#1FA77A]"
+          )}
           style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
         />
       </div>
@@ -2557,6 +2612,10 @@ export function AdminPlanCoverageSimulatorView({
   );
   const [hydrated, setHydrated] = useState(false);
   const [running, setRunning] = useState(false);
+  const [catalogueOptimization, setCatalogueOptimization] =
+    useState<AdminCatalogueOptimizationData | null>(null);
+  const [catalogueOptimizationStatus, setCatalogueOptimizationStatus] =
+    useState<CatalogueOptimizationStatus>("idle");
   const [nextMovesClearedKey, setNextMovesClearedKey] = useState<string | null>(
     null
   );
@@ -2565,9 +2624,14 @@ export function AdminPlanCoverageSimulatorView({
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
   const runningRef = useRef(false);
+  const progressCount = simulationProgressSampleCount({
+    demandProfiles,
+    generating: demandGenerating,
+    running,
+    simulationData
+  });
   const progressPercent =
-    (Math.max(simulationData.sampleSize, demandProfiles.length) /
-      ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) * 100;
+    (progressCount / ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) * 100;
   const canRun =
     hydrated &&
     inputStatus === "ready" &&
@@ -2613,16 +2677,6 @@ export function AdminPlanCoverageSimulatorView({
     () => productScatterRows(simulationData, visibleProductResultRows),
     [simulationData, visibleProductResultRows]
   );
-  const catalogueOptimization = useMemo(
-    () =>
-      running || demandGenerating
-        ? null
-        : runAdminCatalogueOptimization({
-            reviewPriorityProducts: inputData.reviewPriorityProducts,
-            simulationData
-          }),
-    [demandGenerating, inputData.reviewPriorityProducts, running, simulationData]
-  );
   const catalogueGapRows = useMemo(
     () =>
       simulationData.unmetSupplements.filter((row) =>
@@ -2634,6 +2688,60 @@ export function AdminPlanCoverageSimulatorView({
   useEffect(() => {
     runningRef.current = running || demandGenerating;
   }, [demandGenerating, running]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let optimizationTimeoutId: number | null = null;
+
+    const statusTimeoutId = window.setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
+
+      if (running || demandGenerating) {
+        setCatalogueOptimization(null);
+        setCatalogueOptimizationStatus("blocked");
+        return;
+      }
+
+      if (simulationData.sampleSize < 1 || simulationData.sampleTraces.length < 1) {
+        setCatalogueOptimization(null);
+        setCatalogueOptimizationStatus("idle");
+        return;
+      }
+
+      setCatalogueOptimization(null);
+      setCatalogueOptimizationStatus("processing");
+
+      optimizationTimeoutId = window.setTimeout(() => {
+        const optimization = runAdminCatalogueOptimization({
+          reviewPriorityProducts: inputData.reviewPriorityProducts,
+          simulationData
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setCatalogueOptimization(optimization);
+        setCatalogueOptimizationStatus("ready");
+      }, 75);
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(statusTimeoutId);
+
+      if (optimizationTimeoutId !== null) {
+        window.clearTimeout(optimizationTimeoutId);
+      }
+    };
+  }, [
+    demandGenerating,
+    inputData.reviewPriorityProducts,
+    running,
+    simulationData
+  ]);
 
   useEffect(() => {
     const syncCountryFromUrl = () => {
@@ -3156,11 +3264,12 @@ export function AdminPlanCoverageSimulatorView({
       </div>
 
       <SimulationProgressPanel
+        catalogueOptimizationStatus={catalogueOptimizationStatus}
         demandError={demandError}
-        demandProfiles={demandProfiles}
         generating={demandGenerating}
         hydrated={hydrated}
         inputStatus={inputStatus}
+        progressCount={progressCount}
         progressPercent={progressPercent}
         running={running}
         simulationData={simulationData}
@@ -3181,14 +3290,6 @@ export function AdminPlanCoverageSimulatorView({
       <ProductPerformanceScatter
         currency={simulationData.summary.currency}
         rows={scatterRows}
-        sampleSize={simulationData.sampleSize}
-      />
-
-      <MinimumCataloguePanel
-        accessToken={accessToken}
-        locale={locale}
-        optimization={catalogueOptimization}
-        running={running || demandGenerating}
         sampleSize={simulationData.sampleSize}
       />
 
@@ -3341,6 +3442,15 @@ export function AdminPlanCoverageSimulatorView({
           )}
         </div>
       </section>
+
+      <MinimumCataloguePanel
+        accessToken={accessToken}
+        locale={locale}
+        optimization={catalogueOptimization}
+        optimizationStatus={catalogueOptimizationStatus}
+        running={running || demandGenerating}
+        sampleSize={simulationData.sampleSize}
+      />
 
     </div>
   );
