@@ -2652,6 +2652,209 @@ function prunedCatalogueEvaluation(input: Readonly<{
   return evaluation;
 }
 
+function traceCatalogueProductProfiles(
+  data: AdminPlanCoverageSimulationData
+): CatalogueProductProfile[] {
+  const byProduct = new Map<string, {
+    protectedNeedCounts: Map<string, number>;
+    selectedCount: number;
+    stackContributionTotal: number;
+  }>();
+
+  for (const trace of data.sampleTraces) {
+    for (const product of trace.selectedProducts) {
+      const current = byProduct.get(product.id) ?? {
+        protectedNeedCounts: new Map<string, number>(),
+        selectedCount: 0,
+        stackContributionTotal: 0
+      };
+
+      current.selectedCount += 1;
+      current.stackContributionTotal += product.stackContributionPercent;
+      addNeedCounts(current.protectedNeedCounts, product.coveredNeedNames);
+      byProduct.set(product.id, current);
+    }
+  }
+
+  return data.input.candidates.map((candidate) => {
+    const selected = byProduct.get(candidate.id) ?? {
+      protectedNeedCounts: new Map<string, number>(),
+      selectedCount: 0,
+      stackContributionTotal: 0
+    };
+
+    return {
+      brandName: candidate.brandName ?? null,
+      candidate,
+      expectedPriceAmount: productPrice(candidate),
+      potentialCoverageTotal: selected.stackContributionTotal,
+      potentialPlanCount: selected.selectedCount,
+      protectedNeedCounts: new Map(selected.protectedNeedCounts),
+      selectedCount: selected.selectedCount,
+      stackContributionTotal: selected.stackContributionTotal,
+      title: candidate.title
+    };
+  });
+}
+
+function evaluateTraceCatalogueSubset(input: Readonly<{
+  data: AdminPlanCoverageSimulationData;
+  productIds: readonly string[];
+}>): CatalogueEvaluation {
+  const productIdSet = new Set(input.productIds);
+  const costValues: number[] = [];
+  const coverageValues: number[] = [];
+  const selectedProductIds = new Set<string>();
+  const selectedProducts = new Map<string, {
+    brandName: string | null;
+    chosenCount: number;
+    costTotal: number;
+    costCount: number;
+    coverageTotal: number;
+    protectedNeedCounts: Map<string, number>;
+    stackContributionTotal: number;
+    title: string;
+  }>();
+
+  for (const trace of input.data.sampleTraces) {
+    let retainedCoverage = 0;
+    let selectedCost = 0;
+
+    for (const product of trace.selectedProducts) {
+      if (!productIdSet.has(product.id)) {
+        continue;
+      }
+
+      selectedProductIds.add(product.id);
+      retainedCoverage += Math.max(0, product.stackContributionPercent);
+      selectedCost += product.costAmount ?? 0;
+
+      const current = selectedProducts.get(product.id) ?? {
+        brandName: product.brandName,
+        chosenCount: 0,
+        costTotal: 0,
+        costCount: 0,
+        coverageTotal: 0,
+        protectedNeedCounts: new Map<string, number>(),
+        stackContributionTotal: 0,
+        title: product.title
+      };
+
+      current.chosenCount += 1;
+      current.coverageTotal += product.productCoveragePercent;
+      current.stackContributionTotal += product.stackContributionPercent;
+      addNeedCounts(current.protectedNeedCounts, product.coveredNeedNames);
+
+      if (product.costAmount !== null) {
+        current.costTotal += product.costAmount;
+        current.costCount += 1;
+      }
+
+      selectedProducts.set(product.id, current);
+    }
+
+    coverageValues.push(
+      safePercent(Math.min(trace.baselineCoveragePercent, retainedCoverage))
+    );
+    costValues.push(selectedCost);
+  }
+
+  return {
+    costValues,
+    coverageValues,
+    productIds: input.productIds,
+    selectedProductIds: [...selectedProductIds],
+    selectedProducts,
+    summary: catalogueSummary({
+      costValues,
+      coverageValues,
+      productCount: input.productIds.length
+    })
+  };
+}
+
+function prunedTraceCatalogueEvaluation(input: Readonly<{
+  baseline: AdminCatalogueOptimizationSummary;
+  coverageLossTolerancePercent: number;
+  data: AdminPlanCoverageSimulationData;
+  productIds: readonly string[];
+  profilesById: ReadonlyMap<string, CatalogueProductProfile>;
+}>): CatalogueEvaluation {
+  let evaluation = evaluateTraceCatalogueSubset({
+    data: input.data,
+    productIds: input.productIds
+  });
+
+  if (
+    evaluation.selectedProductIds.length > 0 &&
+    evaluation.selectedProductIds.length < evaluation.productIds.length
+  ) {
+    const selectedEvaluation = evaluateTraceCatalogueSubset({
+      data: input.data,
+      productIds: evaluation.selectedProductIds
+    });
+
+    if (
+      withinCatalogueCoverageFloor({
+        baseline: input.baseline,
+        coverageLossTolerancePercent: input.coverageLossTolerancePercent,
+        next: selectedEvaluation.summary
+      })
+    ) {
+      evaluation = selectedEvaluation;
+    }
+  }
+
+  let changed = true;
+  let checkedCount = 0;
+  const maxChecks = Math.min(
+    400,
+    Math.max(1, evaluation.productIds.length * evaluation.productIds.length)
+  );
+
+  while (changed && evaluation.productIds.length > 1 && checkedCount < maxChecks) {
+    changed = false;
+    const removalOrder = [...evaluation.productIds].sort((firstId, secondId) => {
+      const first = input.profilesById.get(firstId);
+      const second = input.profilesById.get(secondId);
+
+      return (
+        (first?.selectedCount ?? 0) - (second?.selectedCount ?? 0) ||
+        (first?.potentialPlanCount ?? 0) - (second?.potentialPlanCount ?? 0) ||
+        (second?.expectedPriceAmount ?? 0) - (first?.expectedPriceAmount ?? 0) ||
+        (first?.title ?? firstId).localeCompare(second?.title ?? secondId)
+      );
+    });
+
+    for (const productId of removalOrder) {
+      if (checkedCount >= maxChecks) {
+        break;
+      }
+
+      checkedCount += 1;
+      const nextIds = evaluation.productIds.filter((id) => id !== productId);
+      const nextEvaluation = evaluateTraceCatalogueSubset({
+        data: input.data,
+        productIds: nextIds
+      });
+
+      if (
+        withinCatalogueCoverageFloor({
+          baseline: input.baseline,
+          coverageLossTolerancePercent: input.coverageLossTolerancePercent,
+          next: nextEvaluation.summary
+        })
+      ) {
+        evaluation = nextEvaluation;
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return evaluation;
+}
+
 async function prunedCatalogueEvaluationAsync(input: Readonly<{
   baseline: AdminCatalogueOptimizationSummary;
   coverageLossTolerancePercent: number;
@@ -2932,6 +3135,188 @@ function rankedCatalogueActionRows(
       first.title.localeCompare(second.title)
     )
     .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+export function runAdminCatalogueOptimizationFast(input: Readonly<{
+  simulationData: AdminPlanCoverageSimulationData;
+  reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
+  coverageLossTolerancePercent?: number | null;
+  objective?: AdminCatalogueOptimizationObjective | null;
+  mutationMode?: AdminCatalogueOptimizationMutationMode | null;
+}>): AdminCatalogueOptimizationData {
+  const data = input.simulationData;
+  const coverageLossTolerancePercent = positiveNumberOrNull(
+    input.coverageLossTolerancePercent
+  ) ?? DEFAULT_CATALOGUE_OPTIMIZATION_COVERAGE_LOSS_TOLERANCE_PERCENT;
+  const objective = input.objective ?? CATALOGUE_OPTIMIZATION_OBJECTIVE;
+  const mutationMode = input.mutationMode ?? CATALOGUE_OPTIMIZATION_MUTATION_MODE;
+  const baseline = baselineCatalogueSummary(data);
+  const generatedAt = new Date().toISOString();
+
+  if (data.sampleTraces.length < 1 || data.sampleSize < 1) {
+    return {
+      actionRows: [],
+      baseline,
+      carryProducts: [],
+      coverageLossTolerancePercent,
+      frontier: [],
+      generatedAt,
+      mutationMode,
+      objective,
+      optimized: emptyCatalogueOptimizationSummary(0),
+      productReductionCount: 0,
+      productReductionPercent: 0,
+      sampleSize: data.sampleSize,
+      status: "not_ready"
+    };
+  }
+
+  const profiles = traceCatalogueProductProfiles(data);
+  const profilesById = new Map(
+    profiles.map((profile) => [profile.candidate.id, profile])
+  );
+  const rankedProducts = rankedCatalogueProducts(profiles);
+
+  if (rankedProducts.length < 1) {
+    const reviewRows = reviewActionRows({
+      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      sampleSize: data.sampleSize,
+      unmetSupplements: data.unmetSupplements
+    });
+    const sourceRows = sourceActionRows({
+      sampleSize: data.sampleSize,
+      unmetSupplements: data.unmetSupplements
+    });
+
+    return {
+      actionRows: rankedCatalogueActionRows([...reviewRows, ...sourceRows]),
+      baseline,
+      carryProducts: [],
+      coverageLossTolerancePercent,
+      frontier: [],
+      generatedAt,
+      mutationMode,
+      objective,
+      optimized: emptyCatalogueOptimizationSummary(0),
+      productReductionCount: data.input.candidates.length,
+      productReductionPercent: safePercent(
+        (data.input.candidates.length / Math.max(1, data.input.candidates.length)) * 100
+      ),
+      sampleSize: data.sampleSize,
+      status: "ready"
+    };
+  }
+
+  const provisionalPoints: AdminCatalogueOptimizationFrontierPoint[] = [];
+  let firstPassingEvaluation: CatalogueEvaluation | null = null;
+
+  for (let count = 1; count <= rankedProducts.length; count += 1) {
+    const productIds = rankedProducts
+      .slice(0, count)
+      .map((profile) => profile.candidate.id);
+    const evaluation = evaluateTraceCatalogueSubset({ data, productIds });
+    const point = frontierPoint({
+      baseline,
+      coverageLossTolerancePercent,
+      evaluation,
+      recommended: false
+    });
+
+    provisionalPoints.push(point);
+
+    if (!firstPassingEvaluation && point.withinCoverageFloor) {
+      firstPassingEvaluation = evaluation;
+      break;
+    }
+  }
+
+  const fullUsefulProductIds = rankedProducts.map((profile) => profile.candidate.id);
+  const hasFullUsefulPoint = provisionalPoints.some((point) =>
+    point.productIds.length === fullUsefulProductIds.length &&
+    point.productIds.every((id, index) => id === fullUsefulProductIds[index])
+  );
+
+  if (!hasFullUsefulPoint) {
+    provisionalPoints.push(frontierPoint({
+      baseline,
+      coverageLossTolerancePercent,
+      evaluation: evaluateTraceCatalogueSubset({
+        data,
+        productIds: fullUsefulProductIds
+      }),
+      recommended: false
+    }));
+  }
+
+  if (!firstPassingEvaluation) {
+    const fallback = bestFrontierFallback(provisionalPoints);
+
+    firstPassingEvaluation = fallback
+      ? evaluateTraceCatalogueSubset({ data, productIds: fallback.productIds })
+      : evaluateTraceCatalogueSubset({ data, productIds: fullUsefulProductIds });
+  }
+
+  const recommendedEvaluation = prunedTraceCatalogueEvaluation({
+    baseline,
+    coverageLossTolerancePercent,
+    data,
+    productIds: firstPassingEvaluation.productIds,
+    profilesById
+  });
+  const recommendedPoint = frontierPoint({
+    baseline,
+    coverageLossTolerancePercent,
+    evaluation: recommendedEvaluation,
+    recommended: true
+  });
+  const frontier = [
+    ...provisionalPoints.filter((point) =>
+      point.productCount !== recommendedPoint.productCount ||
+      point.productIds.join("|") !== recommendedPoint.productIds.join("|")
+    ),
+    recommendedPoint
+  ].sort((first, second) => first.productCount - second.productCount);
+  const carryProducts = productRowsFromEvaluation(recommendedEvaluation);
+  const optimizedProductIds = new Set(recommendedEvaluation.productIds);
+  const actionRows = rankedCatalogueActionRows([
+    ...carryActionRows({ carryProducts, sampleSize: data.sampleSize }),
+    ...reviewActionRows({
+      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      sampleSize: data.sampleSize,
+      unmetSupplements: data.unmetSupplements
+    }),
+    ...sourceActionRows({
+      sampleSize: data.sampleSize,
+      unmetSupplements: data.unmetSupplements
+    }),
+    ...retireActionRows({
+      optimizedProductIds,
+      profiles,
+      sampleSize: data.sampleSize
+    })
+  ]);
+  const productReductionCount = Math.max(
+    0,
+    data.input.candidates.length - recommendedEvaluation.productIds.length
+  );
+
+  return {
+    actionRows,
+    baseline,
+    carryProducts,
+    coverageLossTolerancePercent,
+    frontier,
+    generatedAt,
+    mutationMode,
+    objective,
+    optimized: recommendedEvaluation.summary,
+    productReductionCount,
+    productReductionPercent: safePercent(
+      (productReductionCount / Math.max(1, data.input.candidates.length)) * 100
+    ),
+    sampleSize: data.sampleSize,
+    status: "ready"
+  };
 }
 
 export function runAdminCatalogueOptimization(input: Readonly<{

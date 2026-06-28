@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createHash } from "node:crypto";
 import {
   adminCsrfCookieName,
   adminSessionCookieName,
@@ -6,7 +7,8 @@ import {
   resolveAdminSession
 } from "@/lib/admin-access";
 import {
-  runAdminCatalogueOptimization,
+  runAdminCatalogueOptimizationFast,
+  type AdminCatalogueOptimizationData,
   type AdminPlanCoverageSimulationData
 } from "@/lib/admin-product-coverage";
 import { adminViewAllowed } from "@/lib/admin-rbac";
@@ -17,9 +19,68 @@ export const runtime = "nodejs";
 const noStoreHeaders = {
   "Cache-Control": "no-store"
 };
+const cacheTtlMs = 60 * 60 * 1000;
+const maxCacheEntries = 50;
+const optimizationCache = new Map<string, {
+  optimization: AdminCatalogueOptimizationData;
+  storedAt: number;
+}>();
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function optimizationCacheKey(body: Record<string, unknown>) {
+  const explicitKey = text(body.cacheKey);
+
+  if (explicitKey) {
+    return explicitKey.slice(0, 500);
+  }
+
+  return createHash("sha256")
+    .update(JSON.stringify({
+      reviewPriorityProducts: body.reviewPriorityProducts ?? null,
+      simulationData: body.simulationData ?? null
+    }))
+    .digest("hex");
+}
+
+function getCachedOptimization(cacheKey: string) {
+  const cached = optimizationCache.get(cacheKey);
+
+  if (!cached) {
+    return null;
+  }
+
+  if (Date.now() - cached.storedAt > cacheTtlMs) {
+    optimizationCache.delete(cacheKey);
+    return null;
+  }
+
+  optimizationCache.delete(cacheKey);
+  optimizationCache.set(cacheKey, cached);
+
+  return cached.optimization;
+}
+
+function setCachedOptimization(
+  cacheKey: string,
+  optimization: AdminCatalogueOptimizationData
+) {
+  optimizationCache.set(cacheKey, {
+    optimization,
+    storedAt: Date.now()
+  });
+
+  while (optimizationCache.size > maxCacheEntries) {
+    const oldestKey = optimizationCache.keys().next().value;
+
+    if (!oldestKey) {
+      break;
+    }
+
+    optimizationCache.delete(oldestKey);
+  }
 }
 
 function accessTokenFromRequest(request: NextRequest, body: Record<string, unknown>) {
@@ -81,14 +142,32 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const cacheKey = optimizationCacheKey(body);
+    const cachedOptimization = getCachedOptimization(cacheKey);
+
+    if (cachedOptimization) {
+      return NextResponse.json(
+        {
+          cached: true,
+          optimization: cachedOptimization
+        },
+        { headers: noStoreHeaders }
+      );
+    }
+
+    const optimization = runAdminCatalogueOptimizationFast({
+      reviewPriorityProducts: Array.isArray(body.reviewPriorityProducts)
+        ? body.reviewPriorityProducts
+        : null,
+      simulationData
+    });
+
+    setCachedOptimization(cacheKey, optimization);
+
     return NextResponse.json(
       {
-        optimization: runAdminCatalogueOptimization({
-          reviewPriorityProducts: Array.isArray(body.reviewPriorityProducts)
-            ? body.reviewPriorityProducts
-            : null,
-          simulationData
-        })
+        cached: false,
+        optimization
       },
       { headers: noStoreHeaders }
     );

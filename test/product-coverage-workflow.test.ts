@@ -11,6 +11,7 @@ import {
   productCoversSupplementForMatching,
   runAdminCatalogueOptimization,
   runAdminCatalogueOptimizationCooperatively,
+  runAdminCatalogueOptimizationFast,
   runAdminPlanCoverageSimulation,
   sanitizeDemandProfilesForSimulationSupplements,
   simulationCustomerArchetypesFromInsights,
@@ -519,6 +520,13 @@ describe("product coverage workflow", () => {
       ),
       true
     );
+
+    const fastOptimization = runAdminCatalogueOptimizationFast({ simulationData });
+
+    assert.equal(fastOptimization.status, "ready");
+    assert.equal(fastOptimization.optimized.productCount, 1);
+    assert.equal(fastOptimization.carryProducts[0]?.id, broadMulti.id);
+    assert.equal(fastOptimization.productReductionCount, 3);
 
     const progressStages: string[] = [];
     const cooperativeOptimization = await runAdminCatalogueOptimizationCooperatively({
@@ -1263,6 +1271,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /catalogueOptimizationHref/);
     assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization/);
     assert.match(view, /Calculating on server/);
+    assert.match(view, /SIMULATOR_OPTIMIZATION_STORAGE_KEY/);
+    assert.match(view, /saveCatalogueOptimization/);
+    assert.match(view, /loadSavedCatalogueOptimization/);
+    assert.match(view, /cacheKey: requestKey/);
     assert.doesNotMatch(view, /runAdminCatalogueOptimizationCooperatively/);
     assert.match(view, /CatalogueFrontierChart/);
     assert.match(view, /Catalogue actions/);
@@ -1278,6 +1290,7 @@ describe("product coverage workflow", () => {
     assert.match(simulationModel, /AdminPlanCoverageSimulationConvergence/);
     assert.match(simulationModel, /AdminCatalogueOptimizationData/);
     assert.match(simulationModel, /runAdminCatalogueOptimization/);
+    assert.match(simulationModel, /runAdminCatalogueOptimizationFast/);
     assert.match(simulationModel, /productNeedCoverageSummary/);
     assert.match(simulationModel, /ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE = 32/);
     assert.match(simulationModel, /ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES = 64/);

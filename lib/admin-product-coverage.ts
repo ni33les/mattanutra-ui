@@ -46,6 +46,7 @@ export {
   runAdminPlanCoverageSimulation,
   runAdminCatalogueOptimization,
   runAdminCatalogueOptimizationCooperatively,
+  runAdminCatalogueOptimizationFast,
   runNextAdminPlanCoverageSimulationSample,
   sanitizeDemandProfilesForSimulationSupplements
 } from "@/lib/admin-product-coverage-simulation";

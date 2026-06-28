@@ -62,6 +62,8 @@ const SIMULATOR_ARCHETYPES_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-archetypes:v1";
 const SIMULATOR_DEMAND_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-demand-profiles:v1";
+const SIMULATOR_OPTIMIZATION_STORAGE_KEY =
+  "mattanutra:admin-plan-coverage-catalogue-optimization:v1";
 const SIMULATOR_INPUT_TIMEOUT_MS = 30_000;
 
 type ArchetypeDraft = Readonly<{
@@ -101,6 +103,17 @@ type SavedDemandProfilesState = Readonly<{
   profiles?: readonly AdminPlanCoverageDemandProfile[];
   savedAt?: string;
   version: 1 | 2 | 3;
+}>;
+
+type SavedCatalogueOptimizationEntry = Readonly<{
+  cacheKey: string;
+  optimization: AdminCatalogueOptimizationData;
+  savedAt: string;
+}>;
+
+type SavedCatalogueOptimizationState = Readonly<{
+  entries: readonly SavedCatalogueOptimizationEntry[];
+  version: 1;
 }>;
 
 type SimulatorInputStatus = "error" | "loading" | "ready";
@@ -515,6 +528,91 @@ function saveSimulationState(
 function clearSavedSimulationState() {
   try {
     window.localStorage.removeItem(SIMULATOR_STORAGE_KEY);
+  } catch {
+    // Ignore private browsing or storage policy failures.
+  }
+}
+
+function savedCatalogueOptimizationEntriesFromStorage() {
+  try {
+    const raw = window.localStorage.getItem(SIMULATOR_OPTIMIZATION_STORAGE_KEY);
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as Partial<SavedCatalogueOptimizationState>;
+
+    if (parsed.version !== 1 || !Array.isArray(parsed.entries)) {
+      return [];
+    }
+
+    return parsed.entries
+      .map((entry) => ({
+        cacheKey: typeof entry.cacheKey === "string" ? entry.cacheKey : "",
+        optimization: entry.optimization,
+        savedAt: typeof entry.savedAt === "string" ? entry.savedAt : ""
+      }))
+      .filter((entry) =>
+        entry.cacheKey &&
+        entry.optimization &&
+        entry.optimization.status === "ready"
+      )
+      .slice(0, 12);
+  } catch {
+    return [];
+  }
+}
+
+function loadSavedCatalogueOptimization(cacheKey: string) {
+  return savedCatalogueOptimizationEntriesFromStorage()
+    .find((entry) => entry.cacheKey === cacheKey)?.optimization ?? null;
+}
+
+function saveCatalogueOptimization(
+  cacheKey: string,
+  optimization: AdminCatalogueOptimizationData
+) {
+  try {
+    const entries = savedCatalogueOptimizationEntriesFromStorage();
+    const nextEntries = [
+      {
+        cacheKey,
+        optimization,
+        savedAt: new Date().toISOString()
+      },
+      ...entries.filter((entry) => entry.cacheKey !== cacheKey)
+    ].slice(0, 12);
+
+    window.localStorage.setItem(
+      SIMULATOR_OPTIMIZATION_STORAGE_KEY,
+      JSON.stringify({
+        entries: nextEntries,
+        version: 1
+      } satisfies SavedCatalogueOptimizationState)
+    );
+  } catch {
+    // Optimizer caching is a speed-up; calculation still works without storage.
+  }
+}
+
+function clearSavedCatalogueOptimization(cacheKey?: string) {
+  try {
+    if (!cacheKey) {
+      window.localStorage.removeItem(SIMULATOR_OPTIMIZATION_STORAGE_KEY);
+      return;
+    }
+
+    const nextEntries = savedCatalogueOptimizationEntriesFromStorage()
+      .filter((entry) => entry.cacheKey !== cacheKey);
+
+    window.localStorage.setItem(
+      SIMULATOR_OPTIMIZATION_STORAGE_KEY,
+      JSON.stringify({
+        entries: nextEntries,
+        version: 1
+      } satisfies SavedCatalogueOptimizationState)
+    );
   } catch {
     // Ignore private browsing or storage policy failures.
   }
@@ -2804,6 +2902,50 @@ export function AdminPlanCoverageSimulatorView({
   }, [demandGenerating, running]);
 
   useEffect(() => {
+    let cancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (
+        cancelled ||
+        running ||
+        demandGenerating ||
+        catalogueOptimizationStatus === "processing" ||
+        simulationData.sampleSize < 1 ||
+        simulationData.sampleTraces.length < 1 ||
+        catalogueOptimizationKey === catalogueOptimizationRunKey
+      ) {
+        return;
+      }
+
+      const savedOptimization = loadSavedCatalogueOptimization(
+        catalogueOptimizationRunKey
+      );
+
+      if (!savedOptimization) {
+        return;
+      }
+
+      setCatalogueOptimization(savedOptimization);
+      setCatalogueOptimizationError(null);
+      setCatalogueOptimizationKey(catalogueOptimizationRunKey);
+      setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStatus("ready");
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    catalogueOptimizationKey,
+    catalogueOptimizationRunKey,
+    catalogueOptimizationStatus,
+    demandGenerating,
+    running,
+    simulationData.sampleSize,
+    simulationData.sampleTraces.length
+  ]);
+
+  useEffect(() => {
     const syncCountryFromUrl = () => {
       setSelectedCountryCode(
         normalizedSimulatorCountryCode(
@@ -3177,9 +3319,14 @@ export function AdminPlanCoverageSimulatorView({
     }
   }
 
-  function clearCatalogueOptimization() {
+  function clearCatalogueOptimization(options?: Readonly<{ clearSaved?: boolean }>) {
     catalogueOptimizationControllerRef.current?.abort();
     catalogueOptimizationControllerRef.current = null;
+
+    if (options?.clearSaved) {
+      clearSavedCatalogueOptimization();
+    }
+
     setCatalogueOptimization(null);
     setCatalogueOptimizationError(null);
     setCatalogueOptimizationKey(null);
@@ -3199,6 +3346,17 @@ export function AdminPlanCoverageSimulatorView({
     }
 
     const requestKey = catalogueOptimizationRunKey;
+    const savedOptimization = loadSavedCatalogueOptimization(requestKey);
+
+    if (savedOptimization) {
+      setCatalogueOptimization(savedOptimization);
+      setCatalogueOptimizationError(null);
+      setCatalogueOptimizationKey(requestKey);
+      setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStatus("ready");
+      return;
+    }
+
     const controller = new AbortController();
 
     catalogueOptimizationControllerRef.current?.abort();
@@ -3218,6 +3376,7 @@ export function AdminPlanCoverageSimulatorView({
       const response = await fetch(catalogueOptimizationHref(accessToken), {
         body: JSON.stringify({
           accessToken,
+          cacheKey: requestKey,
           reviewPriorityProducts: inputData.reviewPriorityProducts,
           simulationData
         }),
@@ -3248,6 +3407,7 @@ export function AdminPlanCoverageSimulatorView({
         return;
       }
 
+      saveCatalogueOptimization(requestKey, payload.optimization);
       setCatalogueOptimization(payload.optimization);
       setCatalogueOptimizationError(null);
       setCatalogueOptimizationProgress(null);
@@ -3299,7 +3459,7 @@ export function AdminPlanCoverageSimulatorView({
     runTokenRef.current += 1;
     setRunning(false);
     setDemandGenerating(false);
-    clearCatalogueOptimization();
+    clearCatalogueOptimization({ clearSaved: true });
     clearSavedSimulationState();
     setNextMovesClearedKey(null);
 
@@ -3317,7 +3477,7 @@ export function AdminPlanCoverageSimulatorView({
 
   function clearDemandProfiles() {
     stopSimulation();
-    clearCatalogueOptimization();
+    clearCatalogueOptimization({ clearSaved: true });
     clearSavedDemandProfiles();
     clearSavedSimulationState();
     setDemandError(null);
