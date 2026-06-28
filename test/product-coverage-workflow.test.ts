@@ -1260,7 +1260,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /popstate/);
     assert.match(view, /Product performance/);
     assert.match(view, /Minimum catalogue/);
-    assert.match(view, /runAdminCatalogueOptimization/);
+    assert.match(view, /catalogueOptimizationHref/);
+    assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization/);
+    assert.match(view, /Calculating on server/);
+    assert.doesNotMatch(view, /runAdminCatalogueOptimizationCooperatively/);
     assert.match(view, /CatalogueFrontierChart/);
     assert.match(view, /Catalogue actions/);
     assert.match(view, /Consider retiring/);

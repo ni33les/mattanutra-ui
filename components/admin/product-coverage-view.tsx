@@ -52,7 +52,6 @@ import {
   emptyAdminPlanCoverageSimulationData,
   normalizeDemandProfiles,
   normalizeSyntheticPlanArchetypes,
-  runAdminCatalogueOptimizationCooperatively,
   runNextAdminPlanCoverageSimulationSample,
   sanitizeDemandProfilesForSimulationSupplements
 } from "@/lib/admin-product-coverage-simulation";
@@ -780,6 +779,18 @@ function demandProfileHref(accessToken: string) {
   const suffix = params.toString();
 
   return `/api/admin/product-coverage/demand-profile${suffix ? `?${suffix}` : ""}`;
+}
+
+function catalogueOptimizationHref(accessToken: string) {
+  const params = new URLSearchParams();
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
+
+  const suffix = params.toString();
+
+  return `/api/admin/product-coverage/catalogue-optimization${suffix ? `?${suffix}` : ""}`;
 }
 
 function stateLabel(state: SupplementCoverageState) {
@@ -1537,7 +1548,10 @@ function CatalogueOptimizationActionRow({
 
 function MinimumCataloguePanel({
   accessToken,
+  canCalculate,
+  error,
   locale,
+  onCalculate,
   optimization,
   optimizationProgress,
   optimizationStatus,
@@ -1545,7 +1559,10 @@ function MinimumCataloguePanel({
   sampleSize
 }: Readonly<{
   accessToken: string;
+  canCalculate: boolean;
+  error: string | null;
   locale: Locale;
+  onCalculate: () => void;
   optimization: AdminCatalogueOptimizationData | null;
   optimizationProgress: AdminCatalogueOptimizationProgress | null;
   optimizationStatus: CatalogueOptimizationStatus;
@@ -1571,7 +1588,7 @@ function MinimumCataloguePanel({
           <div>
             <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Calculating the smallest carry set against the completed simulation.
+              Calculating the smallest carry set on the server so the page stays responsive.
             </p>
           </div>
           <Badge className="bg-blue-50 text-blue-700 ring-blue-200">
@@ -1607,10 +1624,31 @@ function MinimumCataloguePanel({
   if (!optimization || optimization.status === "not_ready") {
     return (
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Run the simulation to calculate carry, review, source, and retire actions.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Run the simulation, then calculate the carry, review, source, and retire
+              actions on the server.
+            </p>
+          </div>
+          <button
+            className={classNames(
+              "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
+              canCalculate
+                ? "bg-[#20343A] text-white ring-[#20343A] hover:bg-[#16252A]"
+                : "bg-slate-100 text-slate-400 ring-slate-200"
+            )}
+            disabled={!canCalculate}
+            onClick={onCalculate}
+            type="button"
+          >
+            Calculate
+          </button>
+        </div>
+        {error ? (
+          <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>
+        ) : null}
       </section>
     );
   }
@@ -2665,6 +2703,10 @@ export function AdminPlanCoverageSimulatorView({
   const [running, setRunning] = useState(false);
   const [catalogueOptimization, setCatalogueOptimization] =
     useState<AdminCatalogueOptimizationData | null>(null);
+  const [catalogueOptimizationError, setCatalogueOptimizationError] =
+    useState<string | null>(null);
+  const [catalogueOptimizationKey, setCatalogueOptimizationKey] =
+    useState<string | null>(null);
   const [catalogueOptimizationProgress, setCatalogueOptimizationProgress] =
     useState<AdminCatalogueOptimizationProgress | null>(null);
   const [catalogueOptimizationStatus, setCatalogueOptimizationStatus] =
@@ -2674,12 +2716,27 @@ export function AdminPlanCoverageSimulatorView({
   );
   const runnerRef = useRef<AdminPlanCoverageSimulationRunner | null>(null);
   const inputStatusRef = useRef<SimulatorInputStatus>("loading");
+  const catalogueOptimizationControllerRef = useRef<AbortController | null>(null);
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
   const runningRef = useRef(false);
+  const catalogueOptimizationRunKey = `${inputKey}:${simulationData.sampleSize}:${simulationData.sampleTraces.length}`;
+  const currentCatalogueOptimization =
+    catalogueOptimizationKey === catalogueOptimizationRunKey
+      ? catalogueOptimization
+      : null;
+  const currentCatalogueOptimizationStatus =
+    catalogueOptimizationStatus === "processing" ||
+    catalogueOptimizationKey === catalogueOptimizationRunKey
+      ? catalogueOptimizationStatus
+      : "idle";
+  const currentCatalogueOptimizationProgress =
+    currentCatalogueOptimizationStatus === "processing"
+      ? catalogueOptimizationProgress
+      : null;
   const progressDisplay = simulationProgressDisplay({
-    catalogueOptimizationProgress,
-    catalogueOptimizationStatus,
+    catalogueOptimizationProgress: currentCatalogueOptimizationProgress,
+    catalogueOptimizationStatus: currentCatalogueOptimizationStatus,
     demandProfiles,
     generating: demandGenerating,
     running,
@@ -2745,81 +2802,6 @@ export function AdminPlanCoverageSimulatorView({
   useEffect(() => {
     runningRef.current = running || demandGenerating;
   }, [demandGenerating, running]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-
-    const statusTimeoutId = window.setTimeout(() => {
-      if (cancelled) {
-        return;
-      }
-
-      if (running || demandGenerating) {
-        setCatalogueOptimization(null);
-        setCatalogueOptimizationProgress(null);
-        setCatalogueOptimizationStatus("blocked");
-        return;
-      }
-
-      if (simulationData.sampleSize < 1 || simulationData.sampleTraces.length < 1) {
-        setCatalogueOptimization(null);
-        setCatalogueOptimizationProgress(null);
-        setCatalogueOptimizationStatus("idle");
-        return;
-      }
-
-      setCatalogueOptimization(null);
-      setCatalogueOptimizationProgress({
-        current: 0,
-        label: "Preparing catalogue optimizer",
-        stage: "scoring",
-        total: 1
-      });
-      setCatalogueOptimizationStatus("processing");
-
-      void runAdminCatalogueOptimizationCooperatively({
-        onProgress: (progress) => {
-          if (!cancelled) {
-            setCatalogueOptimizationProgress(progress);
-          }
-        },
-        reviewPriorityProducts: inputData.reviewPriorityProducts,
-        signal: controller.signal,
-        simulationData
-      })
-        .then((optimization) => {
-          if (cancelled) {
-            return;
-          }
-
-          setCatalogueOptimization(optimization);
-          setCatalogueOptimizationProgress(null);
-          setCatalogueOptimizationStatus("ready");
-        })
-        .catch((error) => {
-          if (cancelled || controller.signal.aborted) {
-            return;
-          }
-
-          console.error("Catalogue optimization failed", error);
-          setCatalogueOptimization(null);
-          setCatalogueOptimizationProgress(null);
-          setCatalogueOptimizationStatus("idle");
-        });
-    }, 0);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearTimeout(statusTimeoutId);
-    };
-  }, [
-    demandGenerating,
-    inputData.reviewPriorityProducts,
-    running,
-    simulationData
-  ]);
 
   useEffect(() => {
     const syncCountryFromUrl = () => {
@@ -3185,11 +3167,120 @@ export function AdminPlanCoverageSimulatorView({
     }
   }
 
+  function stopCatalogueOptimization() {
+    catalogueOptimizationControllerRef.current?.abort();
+    catalogueOptimizationControllerRef.current = null;
+    setCatalogueOptimizationProgress(null);
+
+    if (catalogueOptimizationStatus === "processing") {
+      setCatalogueOptimizationStatus("idle");
+    }
+  }
+
+  function clearCatalogueOptimization() {
+    catalogueOptimizationControllerRef.current?.abort();
+    catalogueOptimizationControllerRef.current = null;
+    setCatalogueOptimization(null);
+    setCatalogueOptimizationError(null);
+    setCatalogueOptimizationKey(null);
+    setCatalogueOptimizationProgress(null);
+    setCatalogueOptimizationStatus("idle");
+  }
+
+  async function calculateCatalogueOptimization() {
+    if (
+      catalogueOptimizationStatus === "processing" ||
+      running ||
+      demandGenerating ||
+      simulationData.sampleSize < 1 ||
+      simulationData.sampleTraces.length < 1
+    ) {
+      return;
+    }
+
+    const requestKey = catalogueOptimizationRunKey;
+    const controller = new AbortController();
+
+    catalogueOptimizationControllerRef.current?.abort();
+    catalogueOptimizationControllerRef.current = controller;
+    setCatalogueOptimization(null);
+    setCatalogueOptimizationError(null);
+    setCatalogueOptimizationKey(requestKey);
+    setCatalogueOptimizationProgress({
+      current: 0,
+      label: "Calculating on server",
+      stage: "validating",
+      total: 1
+    });
+    setCatalogueOptimizationStatus("processing");
+
+    try {
+      const response = await fetch(catalogueOptimizationHref(accessToken), {
+        body: JSON.stringify({
+          accessToken,
+          reviewPriorityProducts: inputData.reviewPriorityProducts,
+          simulationData
+        }),
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
+        },
+        method: "POST",
+        signal: controller.signal
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        optimization?: AdminCatalogueOptimizationData;
+      };
+
+      if (!response.ok || !payload.optimization) {
+        throw new Error(
+          payload.error ?? `Minimum catalogue request failed (${response.status})`
+        );
+      }
+
+      if (
+        controller.signal.aborted ||
+        catalogueOptimizationControllerRef.current !== controller
+      ) {
+        return;
+      }
+
+      setCatalogueOptimization(payload.optimization);
+      setCatalogueOptimizationError(null);
+      setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStatus("ready");
+    } catch (error) {
+      if (
+        controller.signal.aborted ||
+        catalogueOptimizationControllerRef.current !== controller
+      ) {
+        return;
+      }
+
+      setCatalogueOptimization(null);
+      setCatalogueOptimizationError(
+        error instanceof Error
+          ? error.message
+          : "Unable to calculate minimum catalogue"
+      );
+      setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStatus("idle");
+    } finally {
+      if (catalogueOptimizationControllerRef.current === controller) {
+        catalogueOptimizationControllerRef.current = null;
+      }
+    }
+  }
+
   function startSimulation() {
     if (!canRun || running) {
       return;
     }
 
+    clearCatalogueOptimization();
     runTokenRef.current += 1;
     setDemandError(null);
     setNextMovesClearedKey(null);
@@ -3201,12 +3292,14 @@ export function AdminPlanCoverageSimulatorView({
     runTokenRef.current += 1;
     setRunning(false);
     setDemandGenerating(false);
+    stopCatalogueOptimization();
   }
 
   function clearSimulation() {
     runTokenRef.current += 1;
     setRunning(false);
     setDemandGenerating(false);
+    clearCatalogueOptimization();
     clearSavedSimulationState();
     setNextMovesClearedKey(null);
 
@@ -3224,6 +3317,7 @@ export function AdminPlanCoverageSimulatorView({
 
   function clearDemandProfiles() {
     stopSimulation();
+    clearCatalogueOptimization();
     clearSavedDemandProfiles();
     clearSavedSimulationState();
     setDemandError(null);
@@ -3342,8 +3436,8 @@ export function AdminPlanCoverageSimulatorView({
       </div>
 
       <SimulationProgressPanel
-        catalogueOptimizationProgress={catalogueOptimizationProgress}
-        catalogueOptimizationStatus={catalogueOptimizationStatus}
+        catalogueOptimizationProgress={currentCatalogueOptimizationProgress}
+        catalogueOptimizationStatus={currentCatalogueOptimizationStatus}
         demandError={demandError}
         generating={demandGenerating}
         hydrated={hydrated}
@@ -3525,10 +3619,19 @@ export function AdminPlanCoverageSimulatorView({
 
       <MinimumCataloguePanel
         accessToken={accessToken}
+        canCalculate={
+          !running &&
+          !demandGenerating &&
+          currentCatalogueOptimizationStatus !== "processing" &&
+          simulationData.sampleSize > 0 &&
+          simulationData.sampleTraces.length > 0
+        }
+        error={catalogueOptimizationError}
         locale={locale}
-        optimization={catalogueOptimization}
-        optimizationProgress={catalogueOptimizationProgress}
-        optimizationStatus={catalogueOptimizationStatus}
+        onCalculate={calculateCatalogueOptimization}
+        optimization={currentCatalogueOptimization}
+        optimizationProgress={currentCatalogueOptimizationProgress}
+        optimizationStatus={currentCatalogueOptimizationStatus}
         running={running || demandGenerating}
         sampleSize={simulationData.sampleSize}
       />
