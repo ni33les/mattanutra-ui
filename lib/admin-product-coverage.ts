@@ -44,10 +44,16 @@ export {
   normalizeSyntheticPlanArchetypes,
   normalizeSimulationSampleSize,
   runAdminPlanCoverageSimulation,
+  runAdminCatalogueOptimization,
   runNextAdminPlanCoverageSimulationSample,
   sanitizeDemandProfilesForSimulationSupplements
 } from "@/lib/admin-product-coverage-simulation";
 export type {
+  AdminCatalogueOptimizationActionRow,
+  AdminCatalogueOptimizationData,
+  AdminCatalogueOptimizationFrontierPoint,
+  AdminCatalogueOptimizationProductRow,
+  AdminCatalogueOptimizationSummary,
   AdminPlanCoverageDemandProfile,
   AdminPlanCoverageSimulationCheckpoint,
   AdminPlanCoverageSimulationConvergence,
@@ -55,6 +61,7 @@ export type {
   AdminPlanCoverageSimulationInput,
   AdminPlanCoverageSimulationProductStats,
   AdminPlanCoverageSimulationRunner,
+  AdminPlanCoverageSimulationSampleTrace,
   AdminPlanCoverageSimulationSupplement,
   AdminPlanCoverageSimulationUnmetDemandBucket,
   AdminPlanCoverageSimulationUnmetDemandRow,

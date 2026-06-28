@@ -9,6 +9,7 @@ import {
   emptyAdminProductCoverageData,
   normalizeSimulationSampleSize,
   productCoversSupplementForMatching,
+  runAdminCatalogueOptimization,
   runAdminPlanCoverageSimulation,
   sanitizeDemandProfilesForSimulationSupplements,
   simulationCustomerArchetypesFromInsights,
@@ -194,6 +195,46 @@ function demandProfile(
   };
 }
 
+function supplementNeed(input: Readonly<{
+  category?: string;
+  displayName: string;
+  id: string;
+  targetComparableAmount: number;
+  targetText: string;
+  weight?: number;
+}>) {
+  return {
+    category: input.category ?? "Supplement",
+    displayName: input.displayName,
+    id: `supplement:${input.displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    itemType: "supplement" as const,
+    normalizedName: input.displayName.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+    sourceId: input.id,
+    targetComparableAmount: input.targetComparableAmount,
+    targetDose: null,
+    targetText: input.targetText,
+    weight: input.weight ?? 8
+  };
+}
+
+function fact(input: Readonly<{
+  amount: number;
+  name: string;
+  supplementId: string;
+  unit?: string;
+}>) {
+  return {
+    amount: input.amount,
+    comparableAmount: input.amount * 1000,
+    confidence: "high" as const,
+    itemType: "supplement" as const,
+    name: input.name,
+    normalizedName: input.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+    supplementId: input.supplementId,
+    unit: input.unit ?? "mg"
+  };
+}
+
 describe("product coverage workflow", () => {
   it("classifies supplement coverage from eligible, pending, dirty and missing states", () => {
     assert.equal(
@@ -376,6 +417,252 @@ describe("product coverage workflow", () => {
     assert.equal(result.mostUsefulProducts[0]?.id, apigeninProduct.id);
     assert.equal(result.input.demandProfiles[0]?.needs[0]?.targetComparableAmount, 50000);
     assert.equal(result.unmetSupplements.length, 0);
+  });
+
+  it("optimizes to the smallest catalogue that preserves baseline coverage", () => {
+    const coq10Need = supplementNeed({
+      displayName: "CoQ10",
+      id: supplementId,
+      targetComparableAmount: 100000,
+      targetText: "100 mg/day"
+    });
+    const magnesiumNeed = supplementNeed({
+      displayName: "Magnesium",
+      id: magnesiumSupplementId,
+      targetComparableAmount: 200000,
+      targetText: "200 mg/day"
+    });
+    const zincNeed = supplementNeed({
+      displayName: "Zinc",
+      id: zincSupplementId,
+      targetComparableAmount: 15000,
+      targetText: "15 mg/day"
+    });
+    const broadMulti = product({
+      facts: [
+        fact({ amount: 100, name: "CoQ10", supplementId }),
+        fact({ amount: 200, name: "Magnesium", supplementId: magnesiumSupplementId }),
+        fact({ amount: 15, name: "Zinc", supplementId: zincSupplementId })
+      ],
+      id: "bbbbbbbb-2222-4222-8222-222222222222",
+      priceAmount: 220,
+      productKind: "multi",
+      title: "Broad Daily Multi"
+    });
+    const coq10Single = product({
+      facts: [fact({ amount: 100, name: "CoQ10", supplementId })],
+      id: "bbbbbbbb-3333-4333-8333-333333333333",
+      priceAmount: 120,
+      title: "CoQ10 Single"
+    });
+    const magnesiumSingle = product({
+      facts: [fact({ amount: 200, name: "Magnesium", supplementId: magnesiumSupplementId })],
+      id: "bbbbbbbb-4444-4444-8444-444444444444",
+      priceAmount: 120,
+      title: "Magnesium Single"
+    });
+    const zincSingle = product({
+      facts: [fact({ amount: 15, name: "Zinc", supplementId: zincSupplementId })],
+      id: "bbbbbbbb-5555-4555-8555-555555555555",
+      priceAmount: 120,
+      title: "Zinc Single"
+    });
+    const simulationData = runAdminPlanCoverageSimulation({
+      candidates: [broadMulti, coq10Single, magnesiumSingle, zincSingle],
+      countryCode: "TH",
+      demandProfiles: [
+        demandProfile({
+          needs: [coq10Need, magnesiumNeed, zincNeed],
+          supplementNames: ["CoQ10", "Magnesium", "Zinc"]
+        })
+      ],
+      sampleSize: 8,
+      seed: "fixed",
+      supplements: [
+        {
+          category: "Antioxidants",
+          id: supplementId,
+          name: "CoQ10",
+          normalizedName: "coq10",
+          targetComparableAmount: 100000
+        },
+        {
+          category: "Minerals",
+          id: magnesiumSupplementId,
+          name: "Magnesium",
+          normalizedName: "magnesium",
+          targetComparableAmount: 200000
+        },
+        {
+          category: "Minerals",
+          id: zincSupplementId,
+          name: "Zinc",
+          normalizedName: "zinc",
+          targetComparableAmount: 15000
+        }
+      ]
+    });
+    const optimization = runAdminCatalogueOptimization({ simulationData });
+
+    assert.equal(optimization.status, "ready");
+    assert.equal(optimization.optimized.productCount, 1);
+    assert.equal(optimization.carryProducts[0]?.id, broadMulti.id);
+    assert.equal(optimization.productReductionCount, 3);
+    assert.equal(
+      optimization.frontier.find((point) => point.recommended)?.productCount,
+      1
+    );
+    assert.equal(
+      optimization.actionRows.some((row) =>
+        row.actionType === "consider_retiring" && row.productId === coq10Single.id
+      ),
+      true
+    );
+  });
+
+  it("keeps critical single products and uses price as an optimizer tie-breaker", () => {
+    const coq10Need = supplementNeed({
+      displayName: "CoQ10",
+      id: supplementId,
+      targetComparableAmount: 100000,
+      targetText: "100 mg/day"
+    });
+    const zincNeed = supplementNeed({
+      displayName: "Zinc",
+      id: zincSupplementId,
+      targetComparableAmount: 15000,
+      targetText: "15 mg/day"
+    });
+    const expensiveCoq10 = product({
+      facts: [fact({ amount: 100, name: "CoQ10", supplementId })],
+      id: "cccccccc-1111-4111-8111-111111111111",
+      priceAmount: 500,
+      title: "Expensive CoQ10"
+    });
+    const valueCoq10 = product({
+      facts: [fact({ amount: 100, name: "CoQ10", supplementId })],
+      id: "cccccccc-2222-4222-8222-222222222222",
+      priceAmount: 200,
+      title: "Value CoQ10"
+    });
+    const zincCritical = product({
+      facts: [fact({ amount: 15, name: "Zinc", supplementId: zincSupplementId })],
+      id: "cccccccc-3333-4333-8333-333333333333",
+      priceAmount: 150,
+      title: "Critical Zinc"
+    });
+    const simulationData = runAdminPlanCoverageSimulation({
+      candidates: [expensiveCoq10, valueCoq10, zincCritical],
+      countryCode: "TH",
+      demandProfiles: [
+        demandProfile({
+          needs: [coq10Need, zincNeed],
+          supplementNames: ["CoQ10", "Zinc"]
+        })
+      ],
+      sampleSize: 8,
+      seed: "fixed",
+      supplements: [
+        {
+          category: "Antioxidants",
+          id: supplementId,
+          name: "CoQ10",
+          normalizedName: "coq10",
+          targetComparableAmount: 100000
+        },
+        {
+          category: "Minerals",
+          id: zincSupplementId,
+          name: "Zinc",
+          normalizedName: "zinc",
+          targetComparableAmount: 15000
+        }
+      ]
+    });
+    const optimization = runAdminCatalogueOptimization({ simulationData });
+    const carryIds = new Set(optimization.carryProducts.map((row) => row.id));
+
+    assert.equal(carryIds.has(valueCoq10.id), true);
+    assert.equal(carryIds.has(zincCritical.id), true);
+    assert.equal(carryIds.has(expensiveCoq10.id), false);
+    assert.equal(optimization.optimized.productCount, 2);
+  });
+
+  it("keeps optimizer actions advisory for review and source moves", () => {
+    const magnesiumNeed = supplementNeed({
+      displayName: "Magnesium",
+      id: magnesiumSupplementId,
+      targetComparableAmount: 200000,
+      targetText: "200 mg/day"
+    });
+    const zincNeed = supplementNeed({
+      displayName: "Zinc",
+      id: zincSupplementId,
+      targetComparableAmount: 15000,
+      targetText: "15 mg/day"
+    });
+    const simulationData = runAdminPlanCoverageSimulation({
+      candidates: [],
+      countryCode: "TH",
+      demandProfiles: [
+        demandProfile({
+          needs: [magnesiumNeed, zincNeed],
+          supplementNames: ["Magnesium", "Zinc"]
+        })
+      ],
+      sampleSize: 8,
+      seed: "fixed",
+      supplements: [
+        {
+          category: "Minerals",
+          id: magnesiumSupplementId,
+          name: "Magnesium",
+          normalizedName: "magnesium",
+          targetComparableAmount: 200000
+        },
+        {
+          category: "Minerals",
+          id: zincSupplementId,
+          name: "Zinc",
+          normalizedName: "zinc",
+          targetComparableAmount: 15000
+        }
+      ]
+    });
+    const optimization = runAdminCatalogueOptimization({
+      reviewPriorityProducts: [
+        {
+          blockedReason: "Product is not approved yet",
+          brandName: "Example",
+          brandStatus: "approved",
+          coveredSupplementNames: ["Magnesium"],
+          currency: "THB",
+          expectedPriceAmount: 150,
+          gapSupplementCount: 1,
+          id: "dddddddd-1111-4111-8111-111111111111",
+          matchableSupplementCount: 1,
+          productStatus: "pending_review",
+          rank: 1,
+          reviewScore: 10,
+          title: "Pending Magnesium"
+        }
+      ],
+      simulationData
+    });
+
+    assert.equal(
+      optimization.actionRows.some((row) =>
+        row.actionType === "review_first" && row.productId === "dddddddd-1111-4111-8111-111111111111"
+      ),
+      true
+    );
+    assert.equal(
+      optimization.actionRows.some((row) =>
+        row.actionType === "source_missing" && row.supplementId === zincSupplementId
+      ),
+      true
+    );
+    assert.equal(optimization.carryProducts.length, 0);
   });
 
   it("sanitizes generated demand profiles against current country supplement governance", () => {
@@ -893,6 +1180,7 @@ describe("product coverage workflow", () => {
     assert.match(simulationModel, /recommendProductStackFullBeam/);
     assert.match(simulationModel, /demandProfiles/);
     assert.match(view, /SIMULATOR_STORAGE_KEY/);
+    assert.match(view, /admin-plan-coverage-simulator:v4/);
     assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
     assert.match(view, /supplementGovernanceHash: data\.input\.supplementGovernanceHash/);
     assert.match(view, /sanitizeDemandProfilesForSimulationSupplements/);
@@ -915,7 +1203,8 @@ describe("product coverage workflow", () => {
     assert.match(view, /inputStatusRef\.current === "loading"/);
     assert.match(view, /retrySimulatorInput/);
     assert.match(view, />\s*Retry\s*</);
-    assert.match(view, /version: 3/);
+    assert.match(view, /version: 5/);
+    assert.match(view, /sampleTraces/);
     assert.doesNotMatch(view, /loadSavedSimulationDisplayData/);
     assert.doesNotMatch(view, /cachedSimulationData \?\? initialSimulationData/);
     assert.match(view, /productResultRows/);
@@ -954,6 +1243,11 @@ describe("product coverage workflow", () => {
     assert.match(view, /updateSimulatorCountryUrl/);
     assert.match(view, /popstate/);
     assert.match(view, /Product performance/);
+    assert.match(view, /Minimum catalogue/);
+    assert.match(view, /runAdminCatalogueOptimization/);
+    assert.match(view, /CatalogueFrontierChart/);
+    assert.match(view, /Catalogue actions/);
+    assert.match(view, /Consider retiring/);
     assert.match(view, /Average stack coverage contribution/);
     assert.match(view, /Chosen rate/);
     assert.match(view, /productScatterRows/);
@@ -961,8 +1255,11 @@ describe("product coverage workflow", () => {
     assert.match(view, /priceBand/);
     assert.match(view, /convergenceProgressText/);
     assert.match(view, /Useful runs/);
-    assert.match(view, /version: 4/);
+    assert.match(view, /version: 5/);
     assert.match(simulationModel, /AdminPlanCoverageSimulationConvergence/);
+    assert.match(simulationModel, /AdminCatalogueOptimizationData/);
+    assert.match(simulationModel, /runAdminCatalogueOptimization/);
+    assert.match(simulationModel, /productNeedCoverageSummary/);
     assert.match(simulationModel, /ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE = 32/);
     assert.match(simulationModel, /ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES = 64/);
     assert.match(simulationModel, /topProductOverlapPercent/);

@@ -227,6 +227,12 @@ type V2BeamState = Readonly<{
   totalPlanCoveragePercent: number;
 }>;
 
+export type ProductNeedCoverageSummary = Readonly<{
+  coveragePercent: number;
+  coveredNeedIds: readonly string[];
+  coveredNeedNames: readonly string[];
+}>;
+
 function normalizedNeedWeightTotal(needs: readonly ProductRecommendationNeed[]) {
   return needs.reduce((total, need) => total + Math.max(0, need.weight), 0);
 }
@@ -595,6 +601,29 @@ function productCoverageV2(
     metricsByNeed,
     product,
     servingMultiplier
+  };
+}
+
+export function productNeedCoverageSummary(input: Readonly<{
+  clientSex?: ProductClientSex | null;
+  needs: readonly ProductRecommendationNeed[];
+  product: ProductCandidate;
+  servingMultiplier?: number | null;
+}>): ProductNeedCoverageSummary {
+  const entry = productCoverageV2(
+    input.product,
+    [...input.needs],
+    input.clientSex,
+    input.servingMultiplier ?? 1
+  );
+
+  return {
+    coveragePercent: visibleCoveragePercent(
+      entry.coverage.percent,
+      entry.coverage.coveredNeeds.length > 0
+    ),
+    coveredNeedIds: entry.coverage.coveredNeeds.map((need) => need.id),
+    coveredNeedNames: entry.coverage.coveredNeeds.map((need) => need.displayName)
   };
 }
 

@@ -8,9 +8,13 @@ import {
   TrashIcon
 } from "@heroicons/react/24/outline";
 import type {
+  AdminCatalogueOptimizationActionRow,
+  AdminCatalogueOptimizationData,
+  AdminCatalogueOptimizationFrontierPoint,
   AdminPlanCoverageDemandProfile,
   AdminPlanCoverageSimulationData,
   AdminPlanCoverageSimulationCheckpoint,
+  AdminPlanCoverageSimulationSampleTrace,
   AdminProductCoverageData,
   AdminPlanCoverageSimulationProductStats,
   AdminPlanCoverageSimulationRunner,
@@ -47,12 +51,13 @@ import {
   emptyAdminPlanCoverageSimulationData,
   normalizeDemandProfiles,
   normalizeSyntheticPlanArchetypes,
+  runAdminCatalogueOptimization,
   runNextAdminPlanCoverageSimulationSample,
   sanitizeDemandProfilesForSimulationSupplements
 } from "@/lib/admin-product-coverage-simulation";
 
 const SIMULATOR_STORAGE_KEY =
-  "mattanutra:admin-plan-coverage-simulator:v3";
+  "mattanutra:admin-plan-coverage-simulator:v4";
 const SIMULATOR_ARCHETYPES_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-archetypes:v1";
 const SIMULATOR_DEMAND_STORAGE_KEY =
@@ -79,8 +84,9 @@ type SavedSimulationState = Readonly<{
   productStats: Array<[string, AdminPlanCoverageSimulationProductStats]>;
   randomState: number;
   sampleSize: number;
+  sampleTraces?: readonly AdminPlanCoverageSimulationSampleTrace[];
   unmetCounts: Array<[string, AdminPlanCoverageSimulationUnmetDemandBucket]>;
-  version: 3 | 4;
+  version: 5;
 }>;
 
 type SavedDemandProfilesEntry = Readonly<{
@@ -481,8 +487,9 @@ function savedStateFromRunner(
     productStats: [...runner.productStats.entries()],
     randomState: runner.randomState,
     sampleSize: runner.sampleSize,
+    sampleTraces: runner.sampleTraces,
     unmetCounts: [...runner.unmetCounts.entries()],
-    version: 4
+    version: 5
   };
 }
 
@@ -519,11 +526,12 @@ function loadSavedSimulationState(inputKey: string) {
     const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
 
     if (
-      (parsed.version !== 3 && parsed.version !== 4) ||
+      parsed.version !== 5 ||
       parsed.inputKey !== inputKey ||
       !Array.isArray(parsed.coverageValues) ||
       !Array.isArray(parsed.costValues) ||
       !Array.isArray(parsed.productStats) ||
+      !Array.isArray(parsed.sampleTraces) ||
       !Array.isArray(parsed.unmetCounts) ||
       typeof parsed.randomState !== "number" ||
       typeof parsed.sampleSize !== "number"
@@ -549,13 +557,14 @@ function runnerFromSavedState(
   runner.costValues = [...saved.costValues];
   runner.coverageValues = [...saved.coverageValues];
   runner.convergenceCheckpoints =
-    saved.version === 4 && Array.isArray(saved.convergenceCheckpoints)
+    Array.isArray(saved.convergenceCheckpoints)
       ? [...saved.convergenceCheckpoints]
       : [];
   runner.generatedAt = saved.generatedAt;
   runner.productStats = new Map(saved.productStats);
   runner.randomState = saved.randomState;
   runner.sampleSize = Math.max(0, Math.floor(saved.sampleSize));
+  runner.sampleTraces = [...(saved.sampleTraces ?? [])];
   runner.unmetCounts = new Map(saved.unmetCounts);
 
   return runner;
@@ -1264,6 +1273,381 @@ function ProductPerformanceScatter({
           ) : null}
         </>
       )}
+    </section>
+  );
+}
+
+function optimizationActionLabel(actionType: AdminCatalogueOptimizationActionRow["actionType"]) {
+  if (actionType === "carry") {
+    return "Carry";
+  }
+
+  if (actionType === "review_first") {
+    return "Review first";
+  }
+
+  if (actionType === "source_missing") {
+    return "Source missing";
+  }
+
+  return "Consider retiring";
+}
+
+function optimizationActionClassName(
+  actionType: AdminCatalogueOptimizationActionRow["actionType"]
+) {
+  if (actionType === "carry") {
+    return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  }
+
+  if (actionType === "review_first") {
+    return "bg-amber-50 text-amber-700 ring-amber-200";
+  }
+
+  if (actionType === "source_missing") {
+    return "bg-blue-50 text-blue-700 ring-blue-200";
+  }
+
+  return "bg-slate-100 text-slate-700 ring-slate-200";
+}
+
+function CatalogueOptimizationMetric({
+  label,
+  value
+}: Readonly<{
+  label: string;
+  value: string;
+}>) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-lg font-bold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function CatalogueFrontierChart({
+  frontier
+}: Readonly<{
+  frontier: readonly AdminCatalogueOptimizationFrontierPoint[];
+}>) {
+  const width = 760;
+  const height = 260;
+  const paddingLeft = 52;
+  const paddingRight = 24;
+  const paddingTop = 24;
+  const paddingBottom = 46;
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+  const maxProducts = Math.max(1, ...frontier.map((point) => point.productCount));
+  const maxRetained = Math.max(
+    100,
+    ...frontier.map((point) => point.retainedAverageCoveragePercent)
+  );
+  const xFor = (value: number) =>
+    paddingLeft + (Math.max(0, value) / maxProducts) * chartWidth;
+  const yFor = (value: number) =>
+    paddingTop + chartHeight - (Math.max(0, value) / maxRetained) * chartHeight;
+  const linePoints = frontier
+    .map((point) => `${xFor(point.productCount)},${yFor(point.retainedAverageCoveragePercent)}`)
+    .join(" ");
+
+  if (frontier.length < 1) {
+    return (
+      <p className="mt-4 border-t border-slate-200 py-4 text-sm text-slate-500">
+        Run the simulation to calculate the minimum catalogue frontier.
+      </p>
+    );
+  }
+
+  return (
+    <svg
+      aria-label="Minimum catalogue frontier"
+      className="mt-4 h-64 w-full overflow-visible"
+      role="img"
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+        const x = paddingLeft + tick * chartWidth;
+        const y = paddingTop + chartHeight - tick * chartHeight;
+
+        return (
+          <g key={tick}>
+            <line
+              className="stroke-slate-200"
+              strokeWidth="1"
+              x1={paddingLeft}
+              x2={width - paddingRight}
+              y1={y}
+              y2={y}
+            />
+            <line
+              className="stroke-slate-100"
+              strokeWidth="1"
+              x1={x}
+              x2={x}
+              y1={paddingTop}
+              y2={paddingTop + chartHeight}
+            />
+            <text
+              className="fill-slate-400 text-[11px]"
+              textAnchor="end"
+              x={paddingLeft - 8}
+              y={y + 4}
+            >
+              {percentText(Math.round(maxRetained * tick))}
+            </text>
+            <text
+              className="fill-slate-400 text-[11px]"
+              textAnchor="middle"
+              x={x}
+              y={height - 16}
+            >
+              {numberText(Math.round(maxProducts * tick))}
+            </text>
+          </g>
+        );
+      })}
+      <line
+        className="stroke-slate-300"
+        strokeWidth="1.5"
+        x1={paddingLeft}
+        x2={width - paddingRight}
+        y1={paddingTop + chartHeight}
+        y2={paddingTop + chartHeight}
+      />
+      <line
+        className="stroke-slate-300"
+        strokeWidth="1.5"
+        x1={paddingLeft}
+        x2={paddingLeft}
+        y1={paddingTop}
+        y2={paddingTop + chartHeight}
+      />
+      <polyline
+        fill="none"
+        points={linePoints}
+        stroke="#3A7BD5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="3"
+      />
+      {frontier.map((point) => (
+        <circle
+          cx={xFor(point.productCount)}
+          cy={yFor(point.retainedAverageCoveragePercent)}
+          fill={point.recommended ? "#1FA77A" : point.withinCoverageFloor ? "#3A7BD5" : "#CBD5E1"}
+          key={`${point.productCount}:${point.productIds.join("-")}`}
+          r={point.recommended ? 7 : 5}
+          stroke="white"
+          strokeWidth="2"
+        >
+          <title>
+            {numberText(point.productCount)} products ·{" "}
+            {percentText(point.retainedAverageCoveragePercent)} average coverage retained
+          </title>
+        </circle>
+      ))}
+      <text
+        className="fill-slate-500 text-[12px] font-semibold"
+        textAnchor="middle"
+        x={paddingLeft + chartWidth / 2}
+        y={height - 1}
+      >
+        Products carried
+      </text>
+      <text
+        className="fill-slate-500 text-[12px] font-semibold"
+        textAnchor="middle"
+        transform={`rotate(-90 ${16} ${paddingTop + chartHeight / 2})`}
+        x={16}
+        y={paddingTop + chartHeight / 2}
+      >
+        Average coverage retained
+      </text>
+    </svg>
+  );
+}
+
+function CatalogueOptimizationActionRow({
+  accessToken,
+  locale,
+  row
+}: Readonly<{
+  accessToken: string;
+  locale: Locale;
+  row: AdminCatalogueOptimizationActionRow;
+}>) {
+  const href = row.productId
+    ? productDetailHref(row.productId, locale, accessToken)
+    : null;
+
+  return (
+    <div className="grid gap-3 border-t border-slate-200 py-4 lg:grid-cols-[44px_minmax(0,1fr)_120px_120px_120px] lg:items-center">
+      <p className="text-sm font-bold text-slate-400">#{row.rank}</p>
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {href ? (
+            <a
+              className="inline-flex min-w-0 items-center gap-1 truncate text-sm font-semibold text-slate-950 hover:text-[#168060]"
+              href={href}
+            >
+              <span className="truncate">{row.title}</span>
+              <ArrowTopRightOnSquareIcon className="size-4 shrink-0" aria-hidden={true} />
+            </a>
+          ) : (
+            <span className="truncate text-sm font-semibold text-slate-950">
+              {row.title}
+            </span>
+          )}
+          <Badge className={optimizationActionClassName(row.actionType)}>
+            {optimizationActionLabel(row.actionType)}
+          </Badge>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          {row.brandName ?? row.statusLabel}
+        </p>
+        <p className="mt-1 text-xs font-medium text-slate-700">{row.reason}</p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Profiles</p>
+        <p className="font-bold text-slate-950">{numberText(row.affectedPlanCount)}</p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Impact</p>
+        <p className="font-bold text-slate-950">
+          {percentText(row.coverageImpactPercent)}
+        </p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Price</p>
+        <p className="font-bold text-slate-950">{amountText(row.expectedPriceAmount)}</p>
+      </div>
+    </div>
+  );
+}
+
+function MinimumCataloguePanel({
+  accessToken,
+  locale,
+  optimization,
+  running,
+  sampleSize
+}: Readonly<{
+  accessToken: string;
+  locale: Locale;
+  optimization: AdminCatalogueOptimizationData | null;
+  running: boolean;
+  sampleSize: number;
+}>) {
+  if (running) {
+    return (
+      <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Pause or complete the simulation to calculate the smallest catalogue that
+          preserves near-full coverage.
+        </p>
+      </section>
+    );
+  }
+
+  if (!optimization || optimization.status === "not_ready") {
+    return (
+      <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Run the simulation to calculate carry, review, source, and retire actions.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Smallest matchable catalogue that stays within {percentText(
+              optimization.coverageLossTolerancePercent
+            )} of the full catalogue across {numberText(sampleSize)} simulated profiles.
+          </p>
+        </div>
+        <Badge className="bg-emerald-50 text-emerald-700 ring-emerald-200">
+          {numberText(optimization.optimized.productCount)} carry products
+        </Badge>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <CatalogueOptimizationMetric
+          label="Full catalogue"
+          value={`${numberText(optimization.baseline.productCount)} products`}
+        />
+        <CatalogueOptimizationMetric
+          label="Optimized catalogue"
+          value={`${numberText(optimization.optimized.productCount)} products`}
+        />
+        <CatalogueOptimizationMetric
+          label="Product reduction"
+          value={`${numberText(optimization.productReductionCount)} (${percentText(
+            optimization.productReductionPercent
+          )})`}
+        />
+        <CatalogueOptimizationMetric
+          label="Expected cost"
+          value={`${amountText(optimization.baseline.expectedCostAmount)} → ${amountText(
+            optimization.optimized.expectedCostAmount
+          )}`}
+        />
+        <CatalogueOptimizationMetric
+          label="Average coverage"
+          value={`${percentText(optimization.baseline.averageCoveragePercent)} → ${percentText(
+            optimization.optimized.averageCoveragePercent
+          )}`}
+        />
+        <CatalogueOptimizationMetric
+          label="P10 coverage"
+          value={`${percentText(optimization.baseline.p10CoveragePercent)} → ${percentText(
+            optimization.optimized.p10CoveragePercent
+          )}`}
+        />
+        <CatalogueOptimizationMetric
+          label="Plans >=75%"
+          value={`${percentText(optimization.baseline.percentAbove75)} → ${percentText(
+            optimization.optimized.percentAbove75
+          )}`}
+        />
+        <CatalogueOptimizationMetric
+          label="Actions"
+          value={numberText(optimization.actionRows.length)}
+        />
+      </div>
+
+      <CatalogueFrontierChart frontier={optimization.frontier} />
+
+      <div className="mt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-950">Catalogue actions</h3>
+          <Badge>{numberText(optimization.actionRows.length)} actions</Badge>
+        </div>
+        {optimization.actionRows.length > 0 ? (
+          optimization.actionRows.map((row) => (
+            <CatalogueOptimizationActionRow
+              accessToken={accessToken}
+              key={row.id}
+              locale={locale}
+              row={row}
+            />
+          ))
+        ) : (
+          <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
+            No catalogue actions are available for this simulation output.
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -2229,6 +2613,16 @@ export function AdminPlanCoverageSimulatorView({
     () => productScatterRows(simulationData, visibleProductResultRows),
     [simulationData, visibleProductResultRows]
   );
+  const catalogueOptimization = useMemo(
+    () =>
+      running || demandGenerating
+        ? null
+        : runAdminCatalogueOptimization({
+            reviewPriorityProducts: inputData.reviewPriorityProducts,
+            simulationData
+          }),
+    [demandGenerating, inputData.reviewPriorityProducts, running, simulationData]
+  );
   const catalogueGapRows = useMemo(
     () =>
       simulationData.unmetSupplements.filter((row) =>
@@ -2787,6 +3181,14 @@ export function AdminPlanCoverageSimulatorView({
       <ProductPerformanceScatter
         currency={simulationData.summary.currency}
         rows={scatterRows}
+        sampleSize={simulationData.sampleSize}
+      />
+
+      <MinimumCataloguePanel
+        accessToken={accessToken}
+        locale={locale}
+        optimization={catalogueOptimization}
+        running={running || demandGenerating}
         sampleSize={simulationData.sampleSize}
       />
 
