@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowTopRightOnSquareIcon,
   ChevronDownIcon,
@@ -10,8 +10,6 @@ import {
 import type {
   AdminCatalogueOptimizationData,
   AdminCatalogueOptimizationProgress,
-  AdminCataloguePotentialOptimizationData,
-  AdminCataloguePotentialTraceChunkResponse,
   AdminPlanCoverageDemandProfile,
   AdminPlanCoverageSimulationData,
   AdminPlanCoverageSimulationCheckpoint,
@@ -55,6 +53,7 @@ import {
   runNextAdminPlanCoverageSimulationSample,
   sanitizeDemandProfilesForSimulationSupplements
 } from "@/lib/admin-product-coverage-simulation";
+import type { AdminCatalogueOptimizationJobView } from "@/lib/admin-catalogue-optimization-jobs";
 
 const SIMULATOR_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-simulator:v4";
@@ -112,25 +111,16 @@ type SavedCatalogueOptimizationEntry = Readonly<{
   savedAt: string;
 }>;
 
-type SavedCataloguePotentialTraceChunk = Readonly<{
-  sampleTraces: readonly AdminPlanCoverageSimulationSampleTrace[];
-  startIndex: number;
-}>;
-
-type SavedCataloguePotentialTraceEntry = Readonly<{
-  baseCacheKey: string;
-  candidateCount: number;
-  candidateHash: string;
-  chunkSize: number;
-  chunks: readonly SavedCataloguePotentialTraceChunk[];
-  savedAt: string;
-  totalSamples: number;
-}>;
-
 type SavedCatalogueOptimizationState = Readonly<{
   entries: readonly SavedCatalogueOptimizationEntry[];
-  potentialEntries?: readonly SavedCataloguePotentialTraceEntry[];
   version: 1 | 2;
+}>;
+
+type CatalogueOptimizationCachedProgress = Readonly<{
+  candidateCount: number;
+  current: number;
+  savedAt: string;
+  total: number;
 }>;
 
 type SimulatorInputStatus = "error" | "loading" | "ready";
@@ -147,6 +137,18 @@ function numberText(value: number) {
 
 function percentText(value: number) {
   return `${numberText(value)}%`;
+}
+
+function durationText(totalSeconds: number) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+
+  if (minutes < 1) {
+    return `${remainder}s`;
+  }
+
+  return `${minutes}m ${remainder.toString().padStart(2, "0")}s`;
 }
 
 function compactListText(values: readonly string[]) {
@@ -575,7 +577,6 @@ function catalogueOptimizationStateFromStorage(): SavedCatalogueOptimizationStat
     if (!raw) {
       return {
         entries: [],
-        potentialEntries: [],
         version: 2
       };
     }
@@ -588,7 +589,6 @@ function catalogueOptimizationStateFromStorage(): SavedCatalogueOptimizationStat
     ) {
       return {
         entries: [],
-        potentialEntries: [],
         version: 2
       };
     }
@@ -607,47 +607,13 @@ function catalogueOptimizationStateFromStorage(): SavedCatalogueOptimizationStat
         entry.optimization.status === "ready"
       )
       .slice(0, 12);
-    const potentialEntries = Array.isArray(parsed.potentialEntries)
-      ? parsed.potentialEntries
-          .map((entry: Partial<SavedCataloguePotentialTraceEntry>) => ({
-            baseCacheKey:
-              typeof entry.baseCacheKey === "string" ? entry.baseCacheKey : "",
-            candidateCount: Math.max(0, Math.floor(entry.candidateCount ?? 0)),
-            candidateHash:
-              typeof entry.candidateHash === "string" ? entry.candidateHash : "",
-            chunkSize: Math.max(1, Math.floor(entry.chunkSize ?? 4)),
-            chunks: Array.isArray(entry.chunks)
-              ? entry.chunks
-                  .map((chunk: Partial<SavedCataloguePotentialTraceChunk>) => ({
-                    sampleTraces: Array.isArray(chunk.sampleTraces)
-                      ? chunk.sampleTraces
-                      : [],
-                    startIndex: Math.max(0, Math.floor(chunk.startIndex ?? 0))
-                  }))
-                  .filter((chunk: SavedCataloguePotentialTraceChunk) =>
-                    chunk.sampleTraces.length > 0
-                  )
-              : [],
-            savedAt: typeof entry.savedAt === "string" ? entry.savedAt : "",
-            totalSamples: Math.max(0, Math.floor(entry.totalSamples ?? 0))
-          }))
-          .filter((entry) =>
-            entry.baseCacheKey &&
-            entry.candidateHash &&
-            entry.totalSamples > 0
-          )
-          .slice(0, 12)
-      : [];
-
     return {
       entries,
-      potentialEntries,
       version: 2
     };
   } catch {
     return {
       entries: [],
-      potentialEntries: [],
       version: 2
     };
   }
@@ -663,7 +629,8 @@ function loadSavedCatalogueOptimization(cacheKey: string) {
   return savedCatalogueOptimizationEntriesFromStorage()
     .find((entry) =>
       expectsPotentialHash
-        ? entry.baseCacheKey === cacheKey
+        ? entry.cacheKey === cacheKey ||
+          entry.baseCacheKey === cacheKey
         : entry.cacheKey === cacheKey ||
           entry.baseCacheKey === cacheKey
     )?.optimization ?? null;
@@ -694,69 +661,11 @@ function saveCatalogueOptimization(
       SIMULATOR_OPTIMIZATION_STORAGE_KEY,
       JSON.stringify({
         entries: nextEntries,
-        potentialEntries: state.potentialEntries ?? [],
         version: 2
       } satisfies SavedCatalogueOptimizationState)
     );
   } catch {
     // Optimizer caching is a speed-up; calculation still works without storage.
-  }
-}
-
-function loadSavedPotentialTraceEntry(baseCacheKey: string) {
-  return catalogueOptimizationStateFromStorage().potentialEntries
-    ?.find((entry) => entry.baseCacheKey === baseCacheKey) ?? null;
-}
-
-function savePotentialTraceChunk(
-  baseCacheKey: string,
-  chunk: AdminCataloguePotentialTraceChunkResponse
-) {
-  try {
-    const state = catalogueOptimizationStateFromStorage();
-    const existing = state.potentialEntries?.find((entry) =>
-      entry.baseCacheKey === baseCacheKey &&
-      entry.candidateHash === chunk.candidateHash
-    );
-    const chunksByStart = new Map<number, SavedCataloguePotentialTraceChunk>();
-
-    for (const savedChunk of existing?.chunks ?? []) {
-      chunksByStart.set(savedChunk.startIndex, savedChunk);
-    }
-
-    chunksByStart.set(chunk.chunkStartIndex, {
-      sampleTraces: chunk.sampleTraces,
-      startIndex: chunk.chunkStartIndex
-    });
-
-    const potentialEntry = {
-      baseCacheKey,
-      candidateCount: chunk.candidateCount,
-      candidateHash: chunk.candidateHash,
-      chunkSize: chunk.chunkSize,
-      chunks: [...chunksByStart.values()].sort((first, second) =>
-        first.startIndex - second.startIndex
-      ),
-      savedAt: new Date().toISOString(),
-      totalSamples: chunk.totalSamples
-    } satisfies SavedCataloguePotentialTraceEntry;
-    const nextPotentialEntries = [
-      potentialEntry,
-      ...(state.potentialEntries ?? []).filter((entry) =>
-        entry.baseCacheKey !== baseCacheKey
-      )
-    ].slice(0, 12);
-
-    window.localStorage.setItem(
-      SIMULATOR_OPTIMIZATION_STORAGE_KEY,
-      JSON.stringify({
-        entries: state.entries,
-        potentialEntries: nextPotentialEntries,
-        version: 2
-      } satisfies SavedCatalogueOptimizationState)
-    );
-  } catch {
-    // Partial trace persistence is resumable sugar, not required to calculate.
   }
 }
 
@@ -773,50 +682,17 @@ function clearSavedCatalogueOptimization(cacheKey?: string) {
         entry.cacheKey !== cacheKey &&
         entry.baseCacheKey !== cacheKey
       );
-    const nextPotentialEntries = (state.potentialEntries ?? [])
-      .filter((entry) => entry.baseCacheKey !== cacheKey);
 
     window.localStorage.setItem(
       SIMULATOR_OPTIMIZATION_STORAGE_KEY,
       JSON.stringify({
         entries: nextEntries,
-        potentialEntries: nextPotentialEntries,
         version: 2
       } satisfies SavedCatalogueOptimizationState)
     );
   } catch {
     // Ignore private browsing or storage policy failures.
   }
-}
-
-function firstMissingPotentialTraceStart(
-  entry: SavedCataloguePotentialTraceEntry | null,
-  totalSamples: number,
-  chunkSize: number
-) {
-  const chunksByStart = new Map(
-    (entry?.chunks ?? []).map((chunk) => [chunk.startIndex, chunk])
-  );
-
-  for (let startIndex = 0; startIndex < totalSamples; startIndex += chunkSize) {
-    const chunk = chunksByStart.get(startIndex);
-    const expectedLength = Math.min(chunkSize, totalSamples - startIndex);
-
-    if (!chunk || chunk.sampleTraces.length < expectedLength) {
-      return startIndex;
-    }
-  }
-
-  return totalSamples;
-}
-
-function mergedPotentialSampleTraces(
-  entry: SavedCataloguePotentialTraceEntry | null
-) {
-  return (entry?.chunks ?? [])
-    .slice()
-    .sort((first, second) => first.startIndex - second.startIndex)
-    .flatMap((chunk) => chunk.sampleTraces);
 }
 
 function loadSavedSimulationState(inputKey: string) {
@@ -1092,7 +968,7 @@ function catalogueOptimizationHref(accessToken: string) {
   return `/api/admin/product-coverage/catalogue-optimization${suffix ? `?${suffix}` : ""}`;
 }
 
-function cataloguePotentialTraceHref(accessToken: string) {
+function catalogueOptimizationJobHref(accessToken: string) {
   const params = new URLSearchParams();
 
   if (accessToken) {
@@ -1101,19 +977,68 @@ function cataloguePotentialTraceHref(accessToken: string) {
 
   const suffix = params.toString();
 
-  return `/api/admin/product-coverage/catalogue-optimization/potential-traces${suffix ? `?${suffix}` : ""}`;
+  return `/api/admin/product-coverage/catalogue-optimization/jobs${suffix ? `?${suffix}` : ""}`;
 }
 
-function cataloguePotentialFinalizeHref(accessToken: string) {
-  const params = new URLSearchParams();
-
-  if (accessToken) {
-    params.set("access_token", accessToken);
+function catalogueOptimizationJobCachedProgress(
+  job: AdminCatalogueOptimizationJobView | null,
+  fallbackTotal: number
+): CatalogueOptimizationCachedProgress | null {
+  if (!job || (job.status !== "queued" && job.status !== "running")) {
+    return null;
   }
 
-  const suffix = params.toString();
+  return {
+    candidateCount: job.candidateCount,
+    current: Math.max(0, job.completedSamples),
+    savedAt: job.updatedAt,
+    total: Math.max(1, job.totalSamples || fallbackTotal)
+  };
+}
 
-  return `/api/admin/product-coverage/catalogue-optimization/potential-finalize${suffix ? `?${suffix}` : ""}`;
+function catalogueOptimizationProgressFromJob(
+  job: AdminCatalogueOptimizationJobView,
+  fallbackTotal: number
+): AdminCatalogueOptimizationProgress {
+  const total = Math.max(1, job.totalSamples || fallbackTotal);
+  const current = Math.min(total, Math.max(0, job.completedSamples));
+
+  if (
+    job.stage === "loading_catalogue" ||
+    job.stage === "queued" ||
+    job.stage === "starting"
+  ) {
+    return {
+      current,
+      label: job.message || "Preparing potential catalogue",
+      stage: "validating",
+      total
+    };
+  }
+
+  if (job.stage === "finalizing") {
+    return {
+      current: total,
+      label: job.message || "Finalizing optimum basket",
+      stage: "pruning",
+      total
+    };
+  }
+
+  return {
+    current,
+    label: job.message || "Evaluating potential basket",
+    stage: "scoring",
+    total
+  };
+}
+
+function catalogueOptimizationJobStartedAt(
+  job: AdminCatalogueOptimizationJobView
+) {
+  const parsed = Date.parse(job.startedAt ?? job.createdAt);
+
+  return Number.isFinite(parsed) ? parsed : Date.now();
 }
 
 function stateLabel(state: SupplementCoverageState) {
@@ -1739,6 +1664,8 @@ function CatalogueOptimizationReviewToggle({
 function MinimumCataloguePanel({
   accessToken,
   canCalculate,
+  cachedProgress,
+  elapsedSeconds,
   error,
   includeReviewPriorityProducts,
   locale,
@@ -1753,6 +1680,8 @@ function MinimumCataloguePanel({
 }: Readonly<{
   accessToken: string;
   canCalculate: boolean;
+  cachedProgress: CatalogueOptimizationCachedProgress | null;
+  elapsedSeconds: number | null;
   error: string | null;
   includeReviewPriorityProducts: boolean;
   locale: Locale;
@@ -1765,6 +1694,10 @@ function MinimumCataloguePanel({
   running: boolean;
   sampleSize: number;
 }>) {
+  const cachedProgressText = cachedProgress
+    ? `${numberText(cachedProgress.current)} / ${numberText(cachedProgress.total)} profiles completed by shared job`
+    : null;
+
   if (running) {
     return (
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -1787,7 +1720,8 @@ function MinimumCataloguePanel({
               Optimum product basket
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Calculating the product basket on the server so the page stays responsive.
+              Calculating the product basket as a shared background job. You can
+              leave this page and return later.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1807,6 +1741,27 @@ function MinimumCataloguePanel({
               Stop
             </button>
           </div>
+        </div>
+        <div className="mt-4 rounded-md bg-blue-50 p-3 text-sm text-blue-800 ring-1 ring-blue-100">
+          <p className="font-semibold">
+            {optimizationProgress?.current
+              ? "Still working"
+              : "Preparing the shared job"}
+            {elapsedSeconds !== null ? ` · ${durationText(elapsedSeconds)} elapsed` : ""}
+          </p>
+          <p className="mt-1 text-blue-700">
+            The first update is usually the slowest because the server loads the
+            potential product catalogue before it can save the first chunk. Progress is
+            saved to the shared job after each chunk.
+          </p>
+          {cachedProgressText ? (
+            <p className="mt-1 font-semibold text-blue-900">
+              {cachedProgressText}
+              {cachedProgress?.candidateCount
+                ? ` · ${numberText(cachedProgress.candidateCount)} products considered`
+                : ""}
+            </p>
+          ) : null}
         </div>
         <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
           <div
@@ -1880,6 +1835,12 @@ function MinimumCataloguePanel({
         </div>
         {error ? (
           <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>
+        ) : null}
+        {cachedProgressText ? (
+          <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100">
+            Shared job progress found: {cachedProgressText}. Calculate will show the
+            latest shared result or continue the job.
+          </p>
         ) : null}
       </section>
     );
@@ -2947,6 +2908,14 @@ export function AdminPlanCoverageSimulatorView({
     useState<AdminCatalogueOptimizationProgress | null>(null);
   const [catalogueOptimizationStatus, setCatalogueOptimizationStatus] =
     useState<CatalogueOptimizationStatus>("idle");
+  const [catalogueOptimizationStartedAt, setCatalogueOptimizationStartedAt] =
+    useState<number | null>(null);
+  const [catalogueOptimizationHeartbeat, setCatalogueOptimizationHeartbeat] =
+    useState(() => Date.now());
+  const [catalogueOptimizationCachedProgress, setCatalogueOptimizationCachedProgress] =
+    useState<CatalogueOptimizationCachedProgress | null>(null);
+  const [catalogueOptimizationJob, setCatalogueOptimizationJob] =
+    useState<AdminCatalogueOptimizationJobView | null>(null);
   const [
     includeReviewPriorityProductsInCatalogueOptimization,
     setIncludeReviewPriorityProductsInCatalogueOptimization
@@ -2980,6 +2949,10 @@ export function AdminPlanCoverageSimulatorView({
   const catalogueOptimizationRunKey = `${inputKey}:${simulationData.sampleSize}:${simulationData.sampleTraces.length}:review:${
     includeReviewPriorityProductsInCatalogueOptimization ? "1" : "0"
   }:${includeReviewPriorityProductsInCatalogueOptimization ? catalogueReviewProductsKey : "none"}`;
+  const catalogueOptimizationJobUrl = useMemo(
+    () => catalogueOptimizationJobHref(accessToken),
+    [accessToken]
+  );
   const currentCatalogueOptimization =
     catalogueOptimizationKey === catalogueOptimizationRunKey
       ? catalogueOptimization
@@ -2992,6 +2965,20 @@ export function AdminPlanCoverageSimulatorView({
   const currentCatalogueOptimizationProgress =
     currentCatalogueOptimizationStatus === "processing"
       ? catalogueOptimizationProgress
+      : null;
+  const currentCatalogueOptimizationCachedProgress =
+    includeReviewPriorityProductsInCatalogueOptimization
+      ? catalogueOptimizationJobCachedProgress(
+          catalogueOptimizationJob,
+          simulationData.sampleTraces.length
+        ) ?? catalogueOptimizationCachedProgress
+      : catalogueOptimizationCachedProgress;
+  const currentCatalogueOptimizationElapsedSeconds =
+    currentCatalogueOptimizationStatus === "processing" &&
+    catalogueOptimizationStartedAt !== null
+      ? Math.floor(
+          (catalogueOptimizationHeartbeat - catalogueOptimizationStartedAt) / 1000
+        )
       : null;
   const progressDisplay = simulationProgressDisplay({
     catalogueOptimizationProgress: currentCatalogueOptimizationProgress,
@@ -3058,15 +3045,135 @@ export function AdminPlanCoverageSimulatorView({
     [simulationData.unmetSupplements]
   );
 
+  const applyCatalogueOptimizationJob = useCallback((
+    job: AdminCatalogueOptimizationJobView | null,
+    requestKey: string
+  ) => {
+    setCatalogueOptimizationJob(job);
+
+    if (!job) {
+      setCatalogueOptimizationCachedProgress(null);
+      return;
+    }
+
+    setCatalogueOptimizationKey(requestKey);
+    setCatalogueOptimizationCachedProgress(
+      catalogueOptimizationJobCachedProgress(
+        job,
+        simulationData.sampleTraces.length
+      )
+    );
+
+    if (job.status === "completed" && job.optimization) {
+      saveCatalogueOptimization(requestKey, job.optimization);
+      setCatalogueOptimization(job.optimization);
+      setCatalogueOptimizationError(null);
+      setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStartedAt(null);
+      setCatalogueOptimizationStatus("ready");
+      return;
+    }
+
+    if (job.status === "failed") {
+      setCatalogueOptimization(null);
+      setCatalogueOptimizationError(
+        job.errorMessage || "Optimum basket request failed"
+      );
+      setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStartedAt(null);
+      setCatalogueOptimizationStatus("idle");
+      return;
+    }
+
+    if (job.status === "cancelled") {
+      setCatalogueOptimization(null);
+      setCatalogueOptimizationError(null);
+      setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStartedAt(null);
+      setCatalogueOptimizationStatus("idle");
+      return;
+    }
+
+    setCatalogueOptimization(null);
+    setCatalogueOptimizationError(null);
+    setCatalogueOptimizationProgress(
+      catalogueOptimizationProgressFromJob(
+        job,
+        simulationData.sampleTraces.length
+      )
+    );
+    setCatalogueOptimizationStartedAt(catalogueOptimizationJobStartedAt(job));
+    setCatalogueOptimizationHeartbeat(Date.now());
+    setCatalogueOptimizationStatus("processing");
+  }, [simulationData.sampleTraces.length]);
+
+  const requestCatalogueOptimizationJob = useCallback(async (
+    action: "cancel" | "start" | "status",
+    requestKey: string
+  ) => {
+    const response = await fetch(catalogueOptimizationJobUrl, {
+      body: JSON.stringify({
+        accessToken,
+        action,
+        cacheKey: requestKey,
+        includePendingReviewProducts:
+          includeReviewPriorityProductsInCatalogueOptimization,
+        ...(action === "start" ? { simulationData } : {})
+      }),
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
+      },
+      method: "POST"
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      job?: AdminCatalogueOptimizationJobView | null;
+    };
+
+    if (!response.ok) {
+      throw new Error(
+        payload.error ?? `Optimum basket request failed (${response.status})`
+      );
+    }
+
+    return payload.job ?? null;
+  }, [
+    accessToken,
+    catalogueOptimizationJobUrl,
+    includeReviewPriorityProductsInCatalogueOptimization,
+    simulationData
+  ]);
+
   useEffect(() => {
     runningRef.current = running || demandGenerating;
   }, [demandGenerating, running]);
+
+  useEffect(() => {
+    if (
+      currentCatalogueOptimizationStatus !== "processing" ||
+      catalogueOptimizationStartedAt === null
+    ) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setCatalogueOptimizationHeartbeat(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [catalogueOptimizationStartedAt, currentCatalogueOptimizationStatus]);
 
   useEffect(() => {
     let cancelled = false;
     const timeoutId = window.setTimeout(() => {
       if (
         cancelled ||
+        includeReviewPriorityProductsInCatalogueOptimization ||
         running ||
         demandGenerating ||
         catalogueOptimizationStatus === "processing" ||
@@ -3089,6 +3196,7 @@ export function AdminPlanCoverageSimulatorView({
       setCatalogueOptimizationError(null);
       setCatalogueOptimizationKey(catalogueOptimizationRunKey);
       setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStartedAt(null);
       setCatalogueOptimizationStatus("ready");
     }, 0);
 
@@ -3101,9 +3209,94 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationRunKey,
     catalogueOptimizationStatus,
     demandGenerating,
+    includeReviewPriorityProductsInCatalogueOptimization,
     running,
     simulationData.sampleSize,
     simulationData.sampleTraces.length
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (
+        cancelled ||
+        !includeReviewPriorityProductsInCatalogueOptimization ||
+        running ||
+        demandGenerating ||
+        simulationData.sampleSize < 1 ||
+        simulationData.sampleTraces.length < 1
+      ) {
+        return;
+      }
+
+      void requestCatalogueOptimizationJob("status", catalogueOptimizationRunKey)
+        .then((job) => {
+          if (!cancelled && job) {
+            applyCatalogueOptimizationJob(job, catalogueOptimizationRunKey);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setCatalogueOptimizationCachedProgress(null);
+          }
+        });
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    applyCatalogueOptimizationJob,
+    catalogueOptimizationRunKey,
+    demandGenerating,
+    includeReviewPriorityProductsInCatalogueOptimization,
+    requestCatalogueOptimizationJob,
+    running,
+    simulationData.sampleSize,
+    simulationData.sampleTraces.length
+  ]);
+
+  useEffect(() => {
+    if (
+      !includeReviewPriorityProductsInCatalogueOptimization ||
+      currentCatalogueOptimizationStatus !== "processing" ||
+      catalogueOptimizationKey !== catalogueOptimizationRunKey
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const pollJob = () => {
+      void requestCatalogueOptimizationJob("status", catalogueOptimizationRunKey)
+        .then((job) => {
+          if (!cancelled) {
+            applyCatalogueOptimizationJob(job, catalogueOptimizationRunKey);
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setCatalogueOptimizationError(
+              error instanceof Error
+                ? error.message
+                : "Unable to check optimum basket job"
+            );
+          }
+        });
+    };
+    const intervalId = window.setInterval(pollJob, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    applyCatalogueOptimizationJob,
+    catalogueOptimizationKey,
+    catalogueOptimizationRunKey,
+    currentCatalogueOptimizationStatus,
+    includeReviewPriorityProductsInCatalogueOptimization,
+    requestCatalogueOptimizationJob
   ]);
 
   useEffect(() => {
@@ -3473,7 +3666,23 @@ export function AdminPlanCoverageSimulatorView({
   function stopCatalogueOptimization() {
     catalogueOptimizationControllerRef.current?.abort();
     catalogueOptimizationControllerRef.current = null;
+    const requestKey = catalogueOptimizationKey;
+
+    if (
+      includeReviewPriorityProductsInCatalogueOptimization &&
+      catalogueOptimizationStatus === "processing" &&
+      requestKey
+    ) {
+      void requestCatalogueOptimizationJob("cancel", requestKey)
+        .then((job) => applyCatalogueOptimizationJob(job, requestKey))
+        .catch(() => {
+          // The local UI can stop even if the shared cancellation request fails.
+        });
+    }
+
     setCatalogueOptimizationProgress(null);
+    setCatalogueOptimizationStartedAt(null);
+    setCatalogueOptimizationCachedProgress(null);
 
     if (catalogueOptimizationStatus === "processing") {
       setCatalogueOptimizationStatus("idle");
@@ -3492,162 +3701,10 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationError(null);
     setCatalogueOptimizationKey(null);
     setCatalogueOptimizationProgress(null);
+    setCatalogueOptimizationStartedAt(null);
+    setCatalogueOptimizationCachedProgress(null);
+    setCatalogueOptimizationJob(null);
     setCatalogueOptimizationStatus("idle");
-  }
-
-  async function calculatePotentialCatalogueOptimization({
-    controller,
-    requestKey
-  }: Readonly<{
-    controller: AbortController;
-    requestKey: string;
-  }>): Promise<{
-    candidateHash: string;
-    potential: AdminCataloguePotentialOptimizationData;
-  }> {
-    const chunkSize = 4;
-    const totalSamples = simulationData.sampleTraces.length;
-    let restartedAfterServerChange = false;
-    let entry = loadSavedPotentialTraceEntry(requestKey);
-
-    if (
-      entry &&
-      (entry.totalSamples !== totalSamples || entry.chunkSize !== chunkSize)
-    ) {
-      clearSavedCatalogueOptimization(requestKey);
-      entry = null;
-    }
-
-    while (true) {
-      let startIndex = firstMissingPotentialTraceStart(
-        entry,
-        totalSamples,
-        chunkSize
-      );
-
-      while (startIndex < totalSamples) {
-        setCatalogueOptimizationProgress({
-          current: startIndex,
-          label: "Evaluating potential basket",
-          stage: "scoring",
-          total: totalSamples
-        });
-
-        const response = await fetch(cataloguePotentialTraceHref(accessToken), {
-          body: JSON.stringify({
-            accessToken,
-            cacheKey: requestKey,
-            chunkSize,
-            countryCode: simulationData.countryCode,
-            simulationData,
-            startIndex
-          }),
-          cache: "no-store",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/json",
-            ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
-          },
-          method: "POST",
-          signal: controller.signal
-        });
-        const payload = (await response.json().catch(() => ({}))) as
-          Partial<AdminCataloguePotentialTraceChunkResponse> & {
-            error?: string;
-          };
-
-        if (!response.ok || !payload.candidateHash) {
-          throw new Error(
-            payload.error ?? `Optimum basket request failed (${response.status})`
-          );
-        }
-
-        if (
-          entry?.candidateHash &&
-          payload.candidateHash !== entry.candidateHash
-        ) {
-          clearSavedCatalogueOptimization(requestKey);
-          entry = null;
-          startIndex = 0;
-          continue;
-        }
-
-        savePotentialTraceChunk(
-          requestKey,
-          payload as AdminCataloguePotentialTraceChunkResponse
-        );
-        entry = loadSavedPotentialTraceEntry(requestKey);
-        startIndex = firstMissingPotentialTraceStart(
-          entry,
-          totalSamples,
-          chunkSize
-        );
-      }
-
-      const sampleTraces = mergedPotentialSampleTraces(entry).slice(0, totalSamples);
-
-      if (!entry?.candidateHash || sampleTraces.length < totalSamples) {
-        clearSavedCatalogueOptimization(requestKey);
-        entry = null;
-
-        if (restartedAfterServerChange) {
-          throw new Error("Optimum basket request failed");
-        }
-
-        restartedAfterServerChange = true;
-        continue;
-      }
-
-      setCatalogueOptimizationProgress({
-        current: totalSamples,
-        label: "Finalizing optimum basket",
-        stage: "pruning",
-        total: totalSamples
-      });
-
-      const response = await fetch(cataloguePotentialFinalizeHref(accessToken), {
-        body: JSON.stringify({
-          accessToken,
-          cacheKey: `${requestKey}:potential:${entry.candidateHash}`,
-          candidateCount: entry.candidateCount,
-          candidateHash: entry.candidateHash,
-          countryCode: simulationData.countryCode,
-          sampleTraces,
-          simulationData
-        }),
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
-        },
-        method: "POST",
-        signal: controller.signal
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        candidateHash?: string;
-        error?: string;
-        potential?: AdminCataloguePotentialOptimizationData;
-      };
-
-      if (response.status === 409 && !restartedAfterServerChange) {
-        clearSavedCatalogueOptimization(requestKey);
-        entry = null;
-        restartedAfterServerChange = true;
-        continue;
-      }
-
-      if (!response.ok || !payload.potential) {
-        throw new Error(
-          payload.error ?? `Optimum basket request failed (${response.status})`
-        );
-      }
-
-      return {
-        candidateHash: payload.candidateHash ?? entry.candidateHash,
-        potential: payload.potential
-      };
-    }
   }
 
   async function calculateCatalogueOptimization() {
@@ -3662,6 +3719,45 @@ export function AdminPlanCoverageSimulatorView({
     }
 
     const requestKey = catalogueOptimizationRunKey;
+
+    if (includeReviewPriorityProductsInCatalogueOptimization) {
+      setCatalogueOptimization(null);
+      setCatalogueOptimizationError(null);
+      setCatalogueOptimizationKey(requestKey);
+      setCatalogueOptimizationProgress({
+        current: 0,
+        label: "Starting shared optimum basket job",
+        stage: "validating",
+        total: Math.max(1, simulationData.sampleTraces.length)
+      });
+      setCatalogueOptimizationCachedProgress({
+        candidateCount: 0,
+        current: 0,
+        savedAt: new Date().toISOString(),
+        total: Math.max(1, simulationData.sampleTraces.length)
+      });
+      setCatalogueOptimizationStartedAt(Date.now());
+      setCatalogueOptimizationHeartbeat(Date.now());
+      setCatalogueOptimizationStatus("processing");
+
+      try {
+        const job = await requestCatalogueOptimizationJob("start", requestKey);
+        applyCatalogueOptimizationJob(job, requestKey);
+      } catch (error) {
+        setCatalogueOptimization(null);
+        setCatalogueOptimizationError(
+          error instanceof Error
+            ? error.message
+            : "Unable to calculate optimum basket"
+        );
+        setCatalogueOptimizationProgress(null);
+        setCatalogueOptimizationStartedAt(null);
+        setCatalogueOptimizationStatus("idle");
+      }
+
+      return;
+    }
+
     const savedOptimization = loadSavedCatalogueOptimization(requestKey);
 
     if (savedOptimization) {
@@ -3669,6 +3765,7 @@ export function AdminPlanCoverageSimulatorView({
       setCatalogueOptimizationError(null);
       setCatalogueOptimizationKey(requestKey);
       setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStartedAt(null);
       setCatalogueOptimizationStatus("ready");
       return;
     }
@@ -3686,6 +3783,8 @@ export function AdminPlanCoverageSimulatorView({
       stage: "validating",
       total: 1
     });
+    setCatalogueOptimizationStartedAt(Date.now());
+    setCatalogueOptimizationHeartbeat(Date.now());
     setCatalogueOptimizationStatus("processing");
 
     try {
@@ -3723,41 +3822,13 @@ export function AdminPlanCoverageSimulatorView({
         return;
       }
 
-      let optimization = payload.optimization;
-      let optimizationCacheKey = requestKey;
-      let optimizationBaseCacheKey: string | undefined;
+      const optimization = payload.optimization;
 
-      if (includeReviewPriorityProductsInCatalogueOptimization) {
-        const potentialResult = await calculatePotentialCatalogueOptimization({
-          controller,
-          requestKey
-        });
-
-        if (
-          controller.signal.aborted ||
-          catalogueOptimizationControllerRef.current !== controller
-        ) {
-          return;
-        }
-
-        optimization = {
-          ...optimization,
-          potential: potentialResult.potential
-        };
-        optimizationCacheKey = `${requestKey}:potential:${potentialResult.candidateHash}`;
-        optimizationBaseCacheKey = requestKey;
-      }
-
-      saveCatalogueOptimization(
-        optimizationCacheKey,
-        optimization,
-        optimizationBaseCacheKey
-          ? { baseCacheKey: optimizationBaseCacheKey }
-          : undefined
-      );
+      saveCatalogueOptimization(requestKey, optimization);
       setCatalogueOptimization(optimization);
       setCatalogueOptimizationError(null);
       setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStartedAt(null);
       setCatalogueOptimizationStatus("ready");
     } catch (error) {
       if (
@@ -3774,6 +3845,7 @@ export function AdminPlanCoverageSimulatorView({
           : "Unable to calculate optimum basket"
       );
       setCatalogueOptimizationProgress(null);
+      setCatalogueOptimizationStartedAt(null);
       setCatalogueOptimizationStatus("idle");
     } finally {
       if (catalogueOptimizationControllerRef.current === controller) {
@@ -4131,8 +4203,10 @@ export function AdminPlanCoverageSimulatorView({
           !demandGenerating &&
           currentCatalogueOptimizationStatus !== "processing" &&
           simulationData.sampleSize > 0 &&
-          simulationData.sampleTraces.length > 0
+            simulationData.sampleTraces.length > 0
         }
+        cachedProgress={currentCatalogueOptimizationCachedProgress}
+        elapsedSeconds={currentCatalogueOptimizationElapsedSeconds}
         error={catalogueOptimizationError}
         includeReviewPriorityProducts={
           includeReviewPriorityProductsInCatalogueOptimization

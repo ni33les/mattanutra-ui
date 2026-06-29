@@ -1265,6 +1265,14 @@ describe("product coverage workflow", () => {
       "app/api/admin/product-coverage/catalogue-optimization/potential-finalize/route.ts",
       "utf8"
     );
+    const catalogueOptimizationJobRoute = readFileSync(
+      "app/api/admin/product-coverage/catalogue-optimization/jobs/route.ts",
+      "utf8"
+    );
+    const catalogueOptimizationJobs = readFileSync(
+      "lib/admin-catalogue-optimization-jobs.ts",
+      "utf8"
+    );
     const demandProfileRoute = readFileSync(
       "app/api/admin/product-coverage/demand-profile/route.ts",
       "utf8"
@@ -1395,28 +1403,48 @@ describe("product coverage workflow", () => {
     assert.match(view, /Product performance/);
     assert.match(view, /Optimum product basket/);
     assert.match(view, /catalogueOptimizationHref/);
+    assert.match(view, /catalogueOptimizationJobHref/);
     assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization/);
-    assert.match(view, /cataloguePotentialTraceHref/);
-    assert.match(view, /cataloguePotentialFinalizeHref/);
+    assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization\/jobs/);
     assert.match(view, /Calculating approved basket/);
+    assert.match(view, /Preparing potential catalogue/);
     assert.match(view, /Evaluating potential basket/);
+    assert.match(view, /shared background job/);
+    assert.match(view, /profiles completed by shared job/);
+    assert.match(view, /Shared job progress found/);
+    assert.match(view, /durationText/);
     assert.match(view, /Optimum basket request failed/);
     assert.doesNotMatch(view, /Minimum catalogue request failed/);
     assert.match(view, /SIMULATOR_OPTIMIZATION_STORAGE_KEY/);
     assert.match(view, /saveCatalogueOptimization/);
     assert.match(view, /loadSavedCatalogueOptimization/);
-    assert.match(view, /loadSavedPotentialTraceEntry/);
-    assert.match(view, /savePotentialTraceChunk/);
-    assert.match(view, /firstMissingPotentialTraceStart/);
+    assert.match(view, /requestCatalogueOptimizationJob/);
+    assert.match(view, /applyCatalogueOptimizationJob/);
+    assert.match(view, /catalogueOptimizationJobCachedProgress/);
     assert.match(view, /cacheKey: requestKey/);
     assert.match(view, /Include pending-review products/);
     assert.match(view, /Shows the best possible basket if pending products were approved/);
     assert.match(view, /includeReviewPriorityProductsInCatalogueOptimization/);
     assert.match(view, /catalogueReviewProductsKey/);
     assert.match(view, /includeReviewPriorityProducts: false/);
+    assert.match(view, /includePendingReviewProducts/);
     assert.match(catalogueOptimizationRoute, /includeReviewPriorityProducts/);
     assert.doesNotMatch(catalogueOptimizationRoute, /runAdminCataloguePotentialOptimizationFast/);
     assert.doesNotMatch(catalogueOptimizationRoute, /getProductRecommendationCandidates/);
+    assert.match(catalogueOptimizationJobRoute, /startAdminCatalogueOptimizationJob/);
+    assert.match(catalogueOptimizationJobRoute, /getAdminCatalogueOptimizationJob/);
+    assert.match(catalogueOptimizationJobRoute, /cancelAdminCatalogueOptimizationJob/);
+    assert.match(catalogueOptimizationJobs, /public\.tasks/);
+    assert.match(catalogueOptimizationJobs, /admin_catalogue_optimization_job/);
+    assert.match(catalogueOptimizationJobs, /idempotency_scope_key/);
+    assert.match(catalogueOptimizationJobs, /result_payload/);
+    assert.match(catalogueOptimizationJobs, /kickAdminCatalogueOptimizationJob/);
+    assert.match(catalogueOptimizationJobs, /lease_until/);
+    assert.match(catalogueOptimizationJobs, /buildAdminCataloguePotentialTraceChunk/);
+    assert.match(catalogueOptimizationJobs, /runAdminCataloguePotentialOptimizationFromTraces/);
+    assert.doesNotMatch(catalogueOptimizationJobs, /create table/i);
+    assert.doesNotMatch(packageJson, /catalogue-optimization-jobs:schema:apply/);
+    assert.doesNotMatch(schema, /CREATE TABLE public\.admin_catalogue_optimization_jobs/);
     assert.match(cataloguePotentialTraceRoute, /buildAdminCataloguePotentialTraceChunk/);
     assert.match(cataloguePotentialTraceRoute, /normalizedPotentialTraceChunkSize/);
     assert.match(cataloguePotentialTraceRoute, /potentialCandidateHash/);
