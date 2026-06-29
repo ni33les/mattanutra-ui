@@ -2179,6 +2179,31 @@ function convergenceMetricValue(data: AdminPlanCoverageSimulationData) {
   return `Need ${numberText(Math.max(0, ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES - data.sampleSize))}`;
 }
 
+function convergenceDeltaSummaryText(
+  deltas: AdminPlanCoverageSimulationData["convergence"]["deltas"]
+) {
+  const metrics = [
+    ["average", deltas.averageCoveragePercent],
+    ["median", deltas.medianCoveragePercent],
+    ["P10", deltas.p10CoveragePercent],
+    [">=75%", deltas.percentAbove75],
+    ["cost", deltas.expectedCostPercent]
+  ] as const;
+  const availableMetrics: string[] = [];
+
+  for (const [label, value] of metrics) {
+    if (value !== null) {
+      availableMetrics.push(`${label} ${percentText(value)}`);
+    }
+  }
+
+  if (availableMetrics.length === 0) {
+    return "movement is not available yet";
+  }
+
+  return availableMetrics.join(" · ");
+}
+
 function sexFilterLabel(value: "both" | "female" | "male" | null) {
   if (value === "female") {
     return "Female";
@@ -2243,26 +2268,24 @@ function convergenceProgressText(data: AdminPlanCoverageSimulationData) {
     return `Need ${numberText(Math.max(0, ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES - data.sampleSize))} more samples to assess stability.`;
   }
 
-  const delta = data.convergence.deltas.averageCoveragePercent;
   const windowText = `Last ${numberText(data.convergence.windowSize)} runs`;
-  const coverageText =
-    delta === null
-      ? "coverage movement is not available yet"
-      : `changed average coverage by ${percentText(delta)}`;
+  const deltaText = convergenceDeltaSummaryText(data.convergence.deltas);
   const overlapText =
     data.convergence.topProductOverlapPercent === null
       ? ""
       : ` · top products ${percentText(data.convergence.topProductOverlapPercent)} stable`;
 
-  if (data.convergence.stable) {
-    return `${windowText} ${coverageText}${overlapText}. Results look stable enough to stop.`;
-  }
-
   if (data.convergence.status === "complete") {
-    return `${windowText} ${coverageText}${overlapText}. Full run complete.`;
+    return data.convergence.stable
+      ? `${windowText}: ${deltaText}${overlapText}. Full run complete and stable.`
+      : `${windowText}: ${deltaText}${overlapText}. Full run complete, but the last window was still moving.`;
   }
 
-  return `${windowText} ${coverageText}${overlapText}. Results are still moving.`;
+  if (data.convergence.status === "stable" && data.convergence.stable) {
+    return `${windowText}: ${deltaText}${overlapText}. Results look stable enough to stop.`;
+  }
+
+  return `${windowText}: ${deltaText}${overlapText}. Results are still moving.`;
 }
 
 function simulationProgressDisplay({
@@ -3641,7 +3664,7 @@ export function AdminPlanCoverageSimulatorView({
         }
 
         setSimulationData(nextData);
-        saveSimulationState(inputKey, runner);
+        saveSimulationState(simulationInputKey(nextData), runner);
 
         if (runner.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) {
           break;

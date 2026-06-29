@@ -1348,6 +1348,8 @@ describe("product coverage workflow", () => {
     assert.match(view, /function loadSavedDemandProfiles\(expectedDemandKey\?: string\)/);
     assert.match(view, /entry\.demandKey === expectedDemandKey/);
     assert.match(view, /saveDemandProfiles\(demandKey, savedProfiles\)/);
+    assert.match(view, /saveSimulationState\(simulationInputKey\(nextData\), runner\)/);
+    assert.doesNotMatch(view, /saveSimulationState\(inputKey, runner\)/);
     assert.doesNotMatch(view, /parsed\.demandKey !== expectedDemandKey/);
     assert.doesNotMatch(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
     assert.match(view, /function savedDemandProfiles/);
@@ -1461,6 +1463,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /chosenRatePercent/);
     assert.match(view, /priceBand/);
     assert.match(view, /convergenceProgressText/);
+    assert.match(view, /convergenceDeltaSummaryText/);
+    assert.match(view, /\["average", deltas\.averageCoveragePercent\]/);
+    assert.match(view, /\["cost", deltas\.expectedCostPercent\]/);
+    assert.doesNotMatch(view, /changed average coverage by/);
     assert.match(view, /Useful runs/);
     assert.match(view, /version: 5/);
     assert.match(simulationModel, /AdminPlanCoverageSimulationConvergence/);
