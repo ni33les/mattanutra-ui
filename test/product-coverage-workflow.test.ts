@@ -12,6 +12,7 @@ import {
   runAdminCatalogueOptimization,
   runAdminCatalogueOptimizationCooperatively,
   runAdminCatalogueOptimizationFast,
+  runAdminCataloguePotentialOptimizationFast,
   runAdminPlanCoverageSimulation,
   sanitizeDemandProfilesForSimulationSupplements,
   simulationCustomerArchetypesFromInsights,
@@ -22,7 +23,10 @@ import {
   productHasCountryBlockedSupplement,
   supplementAvailabilityLookupFromRows
 } from "../lib/supplement-country-availability.ts";
-import type { AdminPlanCoverageDemandProfile } from "../lib/admin-product-coverage.ts";
+import type {
+  AdminPlanCoverageDemandProfile,
+  AdminSimulationReviewProductRow
+} from "../lib/admin-product-coverage.ts";
 import type {
   AdminCustomerInsightsData,
   CustomerInsightProfile
@@ -612,6 +616,79 @@ describe("product coverage workflow", () => {
     assert.equal(optimization.optimized.productCount, 2);
   });
 
+  it("builds a potential optimum basket from pending review products", () => {
+    const coq10Need = supplementNeed({
+      displayName: "CoQ10",
+      id: supplementId,
+      targetComparableAmount: 100000,
+      targetText: "100 mg/day"
+    });
+    const zincNeed = supplementNeed({
+      displayName: "Zinc",
+      id: zincSupplementId,
+      targetComparableAmount: 15000,
+      targetText: "15 mg/day"
+    });
+    const approvedCoq10 = product({
+      facts: [fact({ amount: 100, name: "CoQ10", supplementId })],
+      id: "eeeeeeee-1111-4111-8111-111111111111",
+      title: "Approved CoQ10"
+    });
+    const approvedZinc = product({
+      facts: [fact({ amount: 15, name: "Zinc", supplementId: zincSupplementId })],
+      id: "eeeeeeee-2222-4222-8222-222222222222",
+      title: "Approved Zinc"
+    });
+    const pendingMulti = product({
+      facts: [
+        fact({ amount: 100, name: "CoQ10", supplementId }),
+        fact({ amount: 15, name: "Zinc", supplementId: zincSupplementId })
+      ],
+      id: "eeeeeeee-3333-4333-8333-333333333333",
+      status: "pending_review",
+      title: "Pending CoQ10 Zinc"
+    });
+    const simulationData = runAdminPlanCoverageSimulation({
+      candidates: [approvedCoq10, approvedZinc],
+      countryCode: "TH",
+      demandProfiles: [
+        demandProfile({
+          needs: [coq10Need, zincNeed],
+          supplementNames: ["CoQ10", "Zinc"]
+        })
+      ],
+      sampleSize: 8,
+      seed: "fixed",
+      supplements: [
+        {
+          category: "Antioxidants",
+          id: supplementId,
+          name: "CoQ10",
+          normalizedName: "coq10",
+          targetComparableAmount: 100000
+        },
+        {
+          category: "Minerals",
+          id: zincSupplementId,
+          name: "Zinc",
+          normalizedName: "zinc",
+          targetComparableAmount: 15000
+        }
+      ]
+    });
+    const potential = runAdminCataloguePotentialOptimizationFast({
+      coverageLossTolerancePercent: 0,
+      potentialCandidates: [approvedCoq10, approvedZinc, pendingMulti],
+      simulationData
+    });
+
+    assert.equal(potential.status, "ready");
+    assert.equal(potential.optimized.productCount, 1);
+    assert.equal(potential.carryProducts[0]?.id, pendingMulti.id);
+    assert.equal(potential.carryProducts[0]?.readiness, "needs_review");
+    assert.equal(potential.carryProducts[0]?.readinessLabel, "Pending review");
+  });
+
   it("keeps optimizer actions advisory for review and source moves", () => {
     const magnesiumNeed = supplementNeed({
       displayName: "Magnesium",
@@ -653,24 +730,30 @@ describe("product coverage workflow", () => {
         }
       ]
     });
+    const reviewPriorityProducts: AdminSimulationReviewProductRow[] = [
+      {
+        blockedReason: "Product is not approved yet",
+        brandName: "Example",
+        brandStatus: "approved",
+        coveredSupplementNames: ["Magnesium"],
+        currency: "THB",
+        expectedPriceAmount: 150,
+        gapSupplementCount: 1,
+        id: "dddddddd-1111-4111-8111-111111111111",
+        matchableSupplementCount: 1,
+        productStatus: "pending_review" as const,
+        rank: 1,
+        reviewScore: 10,
+        title: "Pending Magnesium"
+      }
+    ];
     const optimization = runAdminCatalogueOptimization({
-      reviewPriorityProducts: [
-        {
-          blockedReason: "Product is not approved yet",
-          brandName: "Example",
-          brandStatus: "approved",
-          coveredSupplementNames: ["Magnesium"],
-          currency: "THB",
-          expectedPriceAmount: 150,
-          gapSupplementCount: 1,
-          id: "dddddddd-1111-4111-8111-111111111111",
-          matchableSupplementCount: 1,
-          productStatus: "pending_review",
-          rank: 1,
-          reviewScore: 10,
-          title: "Pending Magnesium"
-        }
-      ],
+      reviewPriorityProducts,
+      simulationData
+    });
+    const approvedOnlyOptimization = runAdminCatalogueOptimization({
+      includeReviewPriorityProducts: false,
+      reviewPriorityProducts,
       simulationData
     });
 
@@ -685,6 +768,12 @@ describe("product coverage workflow", () => {
         row.actionType === "source_missing" && row.supplementId === zincSupplementId
       ),
       true
+    );
+    assert.equal(
+      approvedOnlyOptimization.actionRows.some((row) =>
+        row.actionType === "review_first"
+      ),
+      false
     );
     assert.equal(optimization.carryProducts.length, 0);
   });
@@ -1139,6 +1228,10 @@ describe("product coverage workflow", () => {
       "app/api/admin/product-coverage/simulation-input/route.ts",
       "utf8"
     );
+    const catalogueOptimizationRoute = readFileSync(
+      "app/api/admin/product-coverage/catalogue-optimization/route.ts",
+      "utf8"
+    );
     const demandProfileRoute = readFileSync(
       "app/api/admin/product-coverage/demand-profile/route.ts",
       "utf8"
@@ -1267,7 +1360,7 @@ describe("product coverage workflow", () => {
     assert.match(view, /updateSimulatorCountryUrl/);
     assert.match(view, /popstate/);
     assert.match(view, /Product performance/);
-    assert.match(view, /Minimum catalogue/);
+    assert.match(view, /Optimum product basket/);
     assert.match(view, /catalogueOptimizationHref/);
     assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization/);
     assert.match(view, /Calculating on server/);
@@ -1275,10 +1368,18 @@ describe("product coverage workflow", () => {
     assert.match(view, /saveCatalogueOptimization/);
     assert.match(view, /loadSavedCatalogueOptimization/);
     assert.match(view, /cacheKey: requestKey/);
+    assert.match(view, /Review pending products/);
+    assert.match(view, /includeReviewPriorityProductsInCatalogueOptimization/);
+    assert.match(view, /catalogueReviewProductsKey/);
+    assert.match(view, /includeReviewPriorityProducts:\s*\n\s*includeReviewPriorityProductsInCatalogueOptimization/);
+    assert.match(catalogueOptimizationRoute, /includeReviewPriorityProducts/);
+    assert.match(catalogueOptimizationRoute, /body\.includeReviewPriorityProducts !== false/);
+    assert.match(catalogueOptimizationRoute, /runAdminCataloguePotentialOptimizationFast/);
+    assert.match(catalogueOptimizationRoute, /coverageLossTolerancePercent: 0/);
     assert.doesNotMatch(view, /runAdminCatalogueOptimizationCooperatively/);
-    assert.match(view, /CatalogueFrontierChart/);
-    assert.match(view, /Catalogue actions/);
-    assert.match(view, /Consider retiring/);
+    assert.match(view, /Basket products/);
+    assert.match(view, /No basket products were identified/);
+    assert.doesNotMatch(view, /Catalogue actions/);
     assert.match(view, /Average stack coverage contribution/);
     assert.match(view, /Chosen rate/);
     assert.match(view, /productScatterRows/);
@@ -1289,8 +1390,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /version: 5/);
     assert.match(simulationModel, /AdminPlanCoverageSimulationConvergence/);
     assert.match(simulationModel, /AdminCatalogueOptimizationData/);
+    assert.match(simulationModel, /AdminCataloguePotentialOptimizationData/);
     assert.match(simulationModel, /runAdminCatalogueOptimization/);
     assert.match(simulationModel, /runAdminCatalogueOptimizationFast/);
+    assert.match(simulationModel, /runAdminCataloguePotentialOptimizationFast/);
     assert.match(simulationModel, /productNeedCoverageSummary/);
     assert.match(simulationModel, /ADMIN_PLAN_COVERAGE_CONVERGENCE_WINDOW_SIZE = 32/);
     assert.match(simulationModel, /ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES = 64/);

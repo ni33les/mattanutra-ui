@@ -8,9 +8,7 @@ import {
   TrashIcon
 } from "@heroicons/react/24/outline";
 import type {
-  AdminCatalogueOptimizationActionRow,
   AdminCatalogueOptimizationData,
-  AdminCatalogueOptimizationFrontierPoint,
   AdminCatalogueOptimizationProgress,
   AdminPlanCoverageDemandProfile,
   AdminPlanCoverageSimulationData,
@@ -130,6 +128,24 @@ function numberText(value: number) {
 
 function percentText(value: number) {
   return `${numberText(value)}%`;
+}
+
+function compactListText(values: readonly string[]) {
+  const items = values.filter(Boolean).slice(0, 3);
+
+  if (items.length < 1) {
+    return "simulated demand";
+  }
+
+  if (items.length === 1) {
+    return items[0]!;
+  }
+
+  if (items.length === 2) {
+    return `${items[0]} and ${items[1]}`;
+  }
+
+  return `${items[0]}, ${items[1]}, and ${items[2]}`;
 }
 
 function moneyText(amount: number | null, currency: string) {
@@ -1392,40 +1408,6 @@ function ProductPerformanceScatter({
   );
 }
 
-function optimizationActionLabel(actionType: AdminCatalogueOptimizationActionRow["actionType"]) {
-  if (actionType === "carry") {
-    return "Carry";
-  }
-
-  if (actionType === "review_first") {
-    return "Review first";
-  }
-
-  if (actionType === "source_missing") {
-    return "Source missing";
-  }
-
-  return "Consider retiring";
-}
-
-function optimizationActionClassName(
-  actionType: AdminCatalogueOptimizationActionRow["actionType"]
-) {
-  if (actionType === "carry") {
-    return "bg-emerald-50 text-emerald-700 ring-emerald-200";
-  }
-
-  if (actionType === "review_first") {
-    return "bg-amber-50 text-amber-700 ring-amber-200";
-  }
-
-  if (actionType === "source_missing") {
-    return "bg-blue-50 text-blue-700 ring-blue-200";
-  }
-
-  return "bg-slate-100 text-slate-700 ring-slate-200";
-}
-
 function CatalogueOptimizationMetric({
   label,
   value
@@ -1443,197 +1425,49 @@ function CatalogueOptimizationMetric({
   );
 }
 
-function CatalogueFrontierChart({
-  frontier
-}: Readonly<{
-  frontier: readonly AdminCatalogueOptimizationFrontierPoint[];
-}>) {
-  const width = 760;
-  const height = 260;
-  const paddingLeft = 52;
-  const paddingRight = 24;
-  const paddingTop = 24;
-  const paddingBottom = 46;
-  const chartWidth = width - paddingLeft - paddingRight;
-  const chartHeight = height - paddingTop - paddingBottom;
-  const maxProducts = Math.max(1, ...frontier.map((point) => point.productCount));
-  const maxRetained = Math.max(
-    100,
-    ...frontier.map((point) => point.retainedAverageCoveragePercent)
-  );
-  const xFor = (value: number) =>
-    paddingLeft + (Math.max(0, value) / maxProducts) * chartWidth;
-  const yFor = (value: number) =>
-    paddingTop + chartHeight - (Math.max(0, value) / maxRetained) * chartHeight;
-  const linePoints = frontier
-    .map((point) => `${xFor(point.productCount)},${yFor(point.retainedAverageCoveragePercent)}`)
-    .join(" ");
-
-  if (frontier.length < 1) {
-    return (
-      <p className="mt-4 border-t border-slate-200 py-4 text-sm text-slate-500">
-        Run the simulation to calculate the minimum catalogue frontier.
-      </p>
-    );
-  }
-
-  return (
-    <svg
-      aria-label="Minimum catalogue frontier"
-      className="mt-4 h-64 w-full overflow-visible"
-      role="img"
-      viewBox={`0 0 ${width} ${height}`}
-    >
-      {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-        const x = paddingLeft + tick * chartWidth;
-        const y = paddingTop + chartHeight - tick * chartHeight;
-
-        return (
-          <g key={tick}>
-            <line
-              className="stroke-slate-200"
-              strokeWidth="1"
-              x1={paddingLeft}
-              x2={width - paddingRight}
-              y1={y}
-              y2={y}
-            />
-            <line
-              className="stroke-slate-100"
-              strokeWidth="1"
-              x1={x}
-              x2={x}
-              y1={paddingTop}
-              y2={paddingTop + chartHeight}
-            />
-            <text
-              className="fill-slate-400 text-[11px]"
-              textAnchor="end"
-              x={paddingLeft - 8}
-              y={y + 4}
-            >
-              {percentText(Math.round(maxRetained * tick))}
-            </text>
-            <text
-              className="fill-slate-400 text-[11px]"
-              textAnchor="middle"
-              x={x}
-              y={height - 16}
-            >
-              {numberText(Math.round(maxProducts * tick))}
-            </text>
-          </g>
-        );
-      })}
-      <line
-        className="stroke-slate-300"
-        strokeWidth="1.5"
-        x1={paddingLeft}
-        x2={width - paddingRight}
-        y1={paddingTop + chartHeight}
-        y2={paddingTop + chartHeight}
-      />
-      <line
-        className="stroke-slate-300"
-        strokeWidth="1.5"
-        x1={paddingLeft}
-        x2={paddingLeft}
-        y1={paddingTop}
-        y2={paddingTop + chartHeight}
-      />
-      <polyline
-        fill="none"
-        points={linePoints}
-        stroke="#3A7BD5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="3"
-      />
-      {frontier.map((point) => (
-        <circle
-          cx={xFor(point.productCount)}
-          cy={yFor(point.retainedAverageCoveragePercent)}
-          fill={point.recommended ? "#1FA77A" : point.withinCoverageFloor ? "#3A7BD5" : "#CBD5E1"}
-          key={`${point.productCount}:${point.productIds.join("-")}`}
-          r={point.recommended ? 7 : 5}
-          stroke="white"
-          strokeWidth="2"
-        >
-          <title>
-            {numberText(point.productCount)} products ·{" "}
-            {percentText(point.retainedAverageCoveragePercent)} average coverage retained
-          </title>
-        </circle>
-      ))}
-      <text
-        className="fill-slate-500 text-[12px] font-semibold"
-        textAnchor="middle"
-        x={paddingLeft + chartWidth / 2}
-        y={height - 1}
-      >
-        Products carried
-      </text>
-      <text
-        className="fill-slate-500 text-[12px] font-semibold"
-        textAnchor="middle"
-        transform={`rotate(-90 ${16} ${paddingTop + chartHeight / 2})`}
-        x={16}
-        y={paddingTop + chartHeight / 2}
-      >
-        Average coverage retained
-      </text>
-    </svg>
-  );
+function readinessBadgeClassName(readiness?: "current" | "needs_review") {
+  return readiness === "needs_review"
+    ? "bg-amber-50 text-amber-700 ring-amber-200"
+    : "bg-emerald-50 text-emerald-700 ring-emerald-200";
 }
 
-function CatalogueOptimizationActionRow({
+function CatalogueCarryProductRow({
   accessToken,
   locale,
   row
 }: Readonly<{
   accessToken: string;
   locale: Locale;
-  row: AdminCatalogueOptimizationActionRow;
+  row: AdminCatalogueOptimizationData["carryProducts"][number];
 }>) {
-  const href = row.productId
-    ? productDetailHref(row.productId, locale, accessToken)
-    : null;
-
   return (
-    <div className="grid gap-3 border-t border-slate-200 py-4 lg:grid-cols-[44px_minmax(0,1fr)_120px_120px_120px] lg:items-center">
+    <div className="grid gap-3 border-t border-slate-200 py-3 lg:grid-cols-[44px_minmax(0,1fr)_100px_120px_120px] lg:items-center">
       <p className="text-sm font-bold text-slate-400">#{row.rank}</p>
       <div className="min-w-0">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          {href ? (
-            <a
-              className="inline-flex min-w-0 items-center gap-1 truncate text-sm font-semibold text-slate-950 hover:text-[#168060]"
-              href={href}
-            >
-              <span className="truncate">{row.title}</span>
-              <ArrowTopRightOnSquareIcon className="size-4 shrink-0" aria-hidden={true} />
-            </a>
-          ) : (
-            <span className="truncate text-sm font-semibold text-slate-950">
-              {row.title}
-            </span>
-          )}
-          <Badge className={optimizationActionClassName(row.actionType)}>
-            {optimizationActionLabel(row.actionType)}
+          <a
+            className="inline-flex min-w-0 items-center gap-1 truncate text-sm font-semibold text-slate-950 hover:text-[#168060]"
+            href={productDetailHref(row.id, locale, accessToken)}
+          >
+            <span className="truncate">{row.title}</span>
+            <ArrowTopRightOnSquareIcon className="size-4 shrink-0" aria-hidden={true} />
+          </a>
+          <Badge className={readinessBadgeClassName(row.readiness)}>
+            {row.readinessLabel ?? "Current"}
           </Badge>
         </div>
         <p className="mt-1 text-xs text-slate-500">
-          {row.brandName ?? row.statusLabel}
+          {row.brandName ?? "No brand"} · {compactListText(row.protectedSupplementNames)}
         </p>
-        <p className="mt-1 text-xs font-medium text-slate-700">{row.reason}</p>
       </div>
       <div className="text-sm">
         <p className="text-xs text-slate-500">Profiles</p>
-        <p className="font-bold text-slate-950">{numberText(row.affectedPlanCount)}</p>
+        <p className="font-bold text-slate-950">{numberText(row.protectedPlanCount)}</p>
       </div>
       <div className="text-sm">
-        <p className="text-xs text-slate-500">Impact</p>
+        <p className="text-xs text-slate-500">Contribution</p>
         <p className="font-bold text-slate-950">
-          {percentText(row.coverageImpactPercent)}
+          {percentText(row.averageStackContributionPercent)}
         </p>
       </div>
       <div className="text-sm">
@@ -1644,12 +1478,63 @@ function CatalogueOptimizationActionRow({
   );
 }
 
+function CatalogueOptimizationReviewToggle({
+  checked,
+  disabled = false,
+  onChange
+}: Readonly<{
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}>) {
+  return (
+    <label
+      className={classNames(
+        "inline-flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
+        disabled
+          ? "cursor-not-allowed bg-slate-50 text-slate-400 ring-slate-200"
+          : "cursor-pointer bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+      )}
+    >
+      <span className="text-left">
+        <span className="block">Review pending products</span>
+        <span className="block text-xs font-medium text-slate-500">
+          Show pending/blocked products as review actions
+        </span>
+      </span>
+      <input
+        checked={checked}
+        className="sr-only"
+        disabled={disabled}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        type="checkbox"
+      />
+      <span
+        aria-hidden={true}
+        className={classNames(
+          "relative inline-flex h-6 w-11 shrink-0 rounded-full transition",
+          checked ? "bg-[#168060]" : "bg-slate-300"
+        )}
+      >
+        <span
+          className={classNames(
+            "absolute top-1 size-4 rounded-full bg-white shadow transition",
+            checked ? "left-6" : "left-1"
+          )}
+        />
+      </span>
+    </label>
+  );
+}
+
 function MinimumCataloguePanel({
   accessToken,
   canCalculate,
   error,
+  includeReviewPriorityProducts,
   locale,
   onCalculate,
+  onIncludeReviewPriorityProductsChange,
   optimization,
   optimizationProgress,
   optimizationStatus,
@@ -1659,8 +1544,10 @@ function MinimumCataloguePanel({
   accessToken: string;
   canCalculate: boolean;
   error: string | null;
+  includeReviewPriorityProducts: boolean;
   locale: Locale;
   onCalculate: () => void;
+  onIncludeReviewPriorityProductsChange: (checked: boolean) => void;
   optimization: AdminCatalogueOptimizationData | null;
   optimizationProgress: AdminCatalogueOptimizationProgress | null;
   optimizationStatus: CatalogueOptimizationStatus;
@@ -1670,10 +1557,11 @@ function MinimumCataloguePanel({
   if (running) {
     return (
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+        <h2 className="text-lg font-bold text-slate-950">
+          Optimum product basket
+        </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Pause or complete the simulation to calculate the smallest catalogue that
-          preserves near-full coverage.
+          Pause or complete the simulation to calculate the product basket.
         </p>
       </section>
     );
@@ -1684,14 +1572,21 @@ function MinimumCataloguePanel({
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+            <h2 className="text-lg font-bold text-slate-950">
+              Optimum product basket
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Calculating the smallest carry set on the server so the page stays responsive.
+              Calculating the product basket on the server so the page stays responsive.
             </p>
           </div>
           <Badge className="bg-blue-50 text-blue-700 ring-blue-200">
             Optimizing
           </Badge>
+          <CatalogueOptimizationReviewToggle
+            checked={includeReviewPriorityProducts}
+            disabled={true}
+            onChange={onIncludeReviewPriorityProductsChange}
+          />
         </div>
         <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
           <div
@@ -1724,25 +1619,32 @@ function MinimumCataloguePanel({
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+            <h2 className="text-lg font-bold text-slate-950">
+              Optimum product basket
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Run the simulation, then calculate the carry, review, source, and retire
-              actions on the server.
+              Run the simulation, then calculate the products to carry.
             </p>
           </div>
-          <button
-            className={classNames(
-              "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
-              canCalculate
-                ? "bg-[#20343A] text-white ring-[#20343A] hover:bg-[#16252A]"
-                : "bg-slate-100 text-slate-400 ring-slate-200"
-            )}
-            disabled={!canCalculate}
-            onClick={onCalculate}
-            type="button"
-          >
-            Calculate
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <CatalogueOptimizationReviewToggle
+              checked={includeReviewPriorityProducts}
+              onChange={onIncludeReviewPriorityProductsChange}
+            />
+            <button
+              className={classNames(
+                "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
+                canCalculate
+                  ? "bg-[#20343A] text-white ring-[#20343A] hover:bg-[#16252A]"
+                  : "bg-slate-100 text-slate-400 ring-slate-200"
+              )}
+              disabled={!canCalculate}
+              onClick={onCalculate}
+              type="button"
+            >
+              Calculate
+            </button>
+          </div>
         </div>
         {error ? (
           <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>
@@ -1751,77 +1653,81 @@ function MinimumCataloguePanel({
     );
   }
 
+  const potentialBasket =
+    includeReviewPriorityProducts && optimization.potential?.status === "ready"
+      ? optimization.potential
+      : null;
+  const basketProducts = potentialBasket?.carryProducts ?? optimization.carryProducts;
+  const basketBaseline = potentialBasket?.baseline ?? optimization.baseline;
+  const basketSummary = potentialBasket?.optimized ?? optimization.optimized;
+  const basketProductCount = potentialBasket?.candidateCount ??
+    optimization.baseline.productCount;
+  const basketNeedsReviewCount = basketProducts.filter((product) =>
+    product.readiness === "needs_review"
+  ).length;
+
   return (
     <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-950">Minimum catalogue</h2>
+          <h2 className="text-lg font-bold text-slate-950">
+            Optimum product basket
+          </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Smallest matchable catalogue that stays within {percentText(
-              optimization.coverageLossTolerancePercent
-            )} of the full catalogue across {numberText(sampleSize)} simulated profiles.
+            Products to carry for the highest simulated coverage across{" "}
+            {numberText(sampleSize)} profiles.
           </p>
         </div>
-        <Badge className="bg-emerald-50 text-emerald-700 ring-emerald-200">
-          {numberText(optimization.optimized.productCount)} carry products
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <CatalogueOptimizationReviewToggle
+            checked={includeReviewPriorityProducts}
+            onChange={onIncludeReviewPriorityProductsChange}
+          />
+          <Badge className="bg-emerald-50 text-emerald-700 ring-emerald-200">
+            {numberText(basketSummary.productCount)} products
+          </Badge>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <CatalogueOptimizationMetric
-          label="Full catalogue"
-          value={`${numberText(optimization.baseline.productCount)} products`}
+          label="Products considered"
+          value={`${numberText(basketProductCount)} products`}
         />
         <CatalogueOptimizationMetric
-          label="Optimized catalogue"
-          value={`${numberText(optimization.optimized.productCount)} products`}
+          label="Basket products"
+          value={`${numberText(basketSummary.productCount)} products`}
         />
         <CatalogueOptimizationMetric
-          label="Product reduction"
-          value={`${numberText(optimization.productReductionCount)} (${percentText(
-            optimization.productReductionPercent
-          )})`}
+          label="Need review"
+          value={numberText(basketNeedsReviewCount)}
         />
         <CatalogueOptimizationMetric
           label="Expected cost"
-          value={`${amountText(optimization.baseline.expectedCostAmount)} → ${amountText(
-            optimization.optimized.expectedCostAmount
-          )}`}
+          value={amountText(basketSummary.expectedCostAmount)}
         />
         <CatalogueOptimizationMetric
           label="Average coverage"
-          value={`${percentText(optimization.baseline.averageCoveragePercent)} → ${percentText(
-            optimization.optimized.averageCoveragePercent
-          )}`}
+          value={percentText(basketSummary.averageCoveragePercent)}
         />
         <CatalogueOptimizationMetric
           label="P10 coverage"
-          value={`${percentText(optimization.baseline.p10CoveragePercent)} → ${percentText(
-            optimization.optimized.p10CoveragePercent
-          )}`}
+          value={percentText(basketSummary.p10CoveragePercent)}
         />
         <CatalogueOptimizationMetric
           label="Plans >=75%"
-          value={`${percentText(optimization.baseline.percentAbove75)} → ${percentText(
-            optimization.optimized.percentAbove75
-          )}`}
+          value={percentText(basketSummary.percentAbove75)}
         />
         <CatalogueOptimizationMetric
-          label="Actions"
-          value={numberText(optimization.actionRows.length)}
+          label="Max coverage"
+          value={percentText(basketBaseline.averageCoveragePercent)}
         />
       </div>
 
-      <CatalogueFrontierChart frontier={optimization.frontier} />
-
       <div className="mt-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-bold text-slate-950">Catalogue actions</h3>
-          <Badge>{numberText(optimization.actionRows.length)} actions</Badge>
-        </div>
-        {optimization.actionRows.length > 0 ? (
-          optimization.actionRows.map((row) => (
-            <CatalogueOptimizationActionRow
+        {basketProducts.length > 0 ? (
+          basketProducts.map((row) => (
+            <CatalogueCarryProductRow
               accessToken={accessToken}
               key={row.id}
               locale={locale}
@@ -1830,7 +1736,7 @@ function MinimumCataloguePanel({
           ))
         ) : (
           <p className="border-t border-slate-200 py-4 text-sm text-slate-500">
-            No catalogue actions are available for this simulation output.
+            No basket products were identified for this simulation output.
           </p>
         )}
       </div>
@@ -2809,6 +2715,10 @@ export function AdminPlanCoverageSimulatorView({
     useState<AdminCatalogueOptimizationProgress | null>(null);
   const [catalogueOptimizationStatus, setCatalogueOptimizationStatus] =
     useState<CatalogueOptimizationStatus>("idle");
+  const [
+    includeReviewPriorityProductsInCatalogueOptimization,
+    setIncludeReviewPriorityProductsInCatalogueOptimization
+  ] = useState(true);
   const [nextMovesClearedKey, setNextMovesClearedKey] = useState<string | null>(
     null
   );
@@ -2818,7 +2728,26 @@ export function AdminPlanCoverageSimulatorView({
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
   const runningRef = useRef(false);
-  const catalogueOptimizationRunKey = `${inputKey}:${simulationData.sampleSize}:${simulationData.sampleTraces.length}`;
+  const catalogueReviewProductsKey = useMemo(
+    () =>
+      hashText(
+        JSON.stringify(
+          inputData.reviewPriorityProducts.map((product) => ({
+            blockedReason: product.blockedReason,
+            brandStatus: product.brandStatus ?? null,
+            coveredSupplementNames: product.coveredSupplementNames,
+            expectedPriceAmount: product.expectedPriceAmount,
+            id: product.id,
+            productStatus: product.productStatus,
+            reviewScore: product.reviewScore
+          }))
+        )
+      ),
+    [inputData.reviewPriorityProducts]
+  );
+  const catalogueOptimizationRunKey = `${inputKey}:${simulationData.sampleSize}:${simulationData.sampleTraces.length}:review:${
+    includeReviewPriorityProductsInCatalogueOptimization ? "1" : "0"
+  }:${includeReviewPriorityProductsInCatalogueOptimization ? catalogueReviewProductsKey : "none"}`;
   const currentCatalogueOptimization =
     catalogueOptimizationKey === catalogueOptimizationRunKey
       ? catalogueOptimization
@@ -3377,6 +3306,8 @@ export function AdminPlanCoverageSimulatorView({
         body: JSON.stringify({
           accessToken,
           cacheKey: requestKey,
+          includeReviewPriorityProducts:
+            includeReviewPriorityProductsInCatalogueOptimization,
           reviewPriorityProducts: inputData.reviewPriorityProducts,
           simulationData
         }),
@@ -3787,8 +3718,14 @@ export function AdminPlanCoverageSimulatorView({
           simulationData.sampleTraces.length > 0
         }
         error={catalogueOptimizationError}
+        includeReviewPriorityProducts={
+          includeReviewPriorityProductsInCatalogueOptimization
+        }
         locale={locale}
         onCalculate={calculateCatalogueOptimization}
+        onIncludeReviewPriorityProductsChange={
+          setIncludeReviewPriorityProductsInCatalogueOptimization
+        }
         optimization={currentCatalogueOptimization}
         optimizationProgress={currentCatalogueOptimizationProgress}
         optimizationStatus={currentCatalogueOptimizationStatus}

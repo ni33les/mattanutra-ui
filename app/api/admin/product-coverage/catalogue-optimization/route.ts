@@ -7,7 +7,11 @@ import {
   resolveAdminSession
 } from "@/lib/admin-access";
 import {
+  getProductRecommendationCandidates
+} from "@/lib/admin-product-search";
+import {
   runAdminCatalogueOptimizationFast,
+  runAdminCataloguePotentialOptimizationFast,
   type AdminCatalogueOptimizationData,
   type AdminPlanCoverageSimulationData
 } from "@/lib/admin-product-coverage";
@@ -39,6 +43,7 @@ function optimizationCacheKey(body: Record<string, unknown>) {
 
   return createHash("sha256")
     .update(JSON.stringify({
+      includeReviewPriorityProducts: body.includeReviewPriorityProducts !== false,
       reviewPriorityProducts: body.reviewPriorityProducts ?? null,
       simulationData: body.simulationData ?? null
     }))
@@ -155,19 +160,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const includeReviewPriorityProducts =
+      body.includeReviewPriorityProducts !== false;
     const optimization = runAdminCatalogueOptimizationFast({
+      includeReviewPriorityProducts,
       reviewPriorityProducts: Array.isArray(body.reviewPriorityProducts)
         ? body.reviewPriorityProducts
         : null,
       simulationData
     });
+    const potential = includeReviewPriorityProducts
+      ? runAdminCataloguePotentialOptimizationFast({
+          coverageLossTolerancePercent: 0,
+          potentialCandidates: await getProductRecommendationCandidates({
+            countryCode: simulationData.countryCode,
+            includeIneligible: true
+          }),
+          simulationData
+        })
+      : null;
+    const optimizationWithPotential = {
+      ...optimization,
+      potential
+    } satisfies AdminCatalogueOptimizationData;
 
-    setCachedOptimization(cacheKey, optimization);
+    setCachedOptimization(cacheKey, optimizationWithPotential);
 
     return NextResponse.json(
       {
         cached: false,
-        optimization
+        optimization: optimizationWithPotential
       },
       { headers: noStoreHeaders }
     );

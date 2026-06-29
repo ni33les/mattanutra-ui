@@ -197,10 +197,12 @@ export type AdminPlanCoverageSimulationConvergence = Readonly<{
 }>;
 
 export type AdminPlanCoverageSimulationTraceProduct = Readonly<{
+  brandStatus?: ProductCandidate["brandStatus"] | null;
   brandName: string | null;
   coveredNeedNames: readonly string[];
   costAmount: number | null;
   id: string;
+  productStatus?: ProductCandidate["status"] | null;
   productCoveragePercent: number;
   stackContributionPercent: number;
   title: string;
@@ -247,13 +249,17 @@ export type AdminCatalogueOptimizationFrontierPoint =
 
 export type AdminCatalogueOptimizationProductRow = Readonly<{
   averageStackContributionPercent: number;
+  brandStatus?: ProductCandidate["brandStatus"] | null;
   brandName: string | null;
   chosenCount: number;
   expectedPriceAmount: number | null;
   id: string;
+  productStatus?: ProductCandidate["status"] | null;
   protectedPlanCount: number;
   protectedSupplementNames: readonly string[];
   rank: number;
+  readiness?: "current" | "needs_review";
+  readinessLabel?: string;
   title: string;
 }>;
 
@@ -288,6 +294,21 @@ export type AdminCatalogueOptimizationData = Readonly<{
   generatedAt: string;
   mutationMode: AdminCatalogueOptimizationMutationMode;
   objective: AdminCatalogueOptimizationObjective;
+  optimized: AdminCatalogueOptimizationSummary;
+  potential: AdminCataloguePotentialOptimizationData | null;
+  productReductionCount: number;
+  productReductionPercent: number;
+  sampleSize: number;
+  status: "not_ready" | "ready";
+}>;
+
+export type AdminCataloguePotentialOptimizationData = Readonly<{
+  baseline: AdminCatalogueOptimizationSummary;
+  carryProducts: readonly AdminCatalogueOptimizationProductRow[];
+  candidateCount: number;
+  frontier: readonly AdminCatalogueOptimizationFrontierPoint[];
+  generatedAt: string;
+  needsReviewCount: number;
   optimized: AdminCatalogueOptimizationSummary;
   productReductionCount: number;
   productReductionPercent: number;
@@ -1822,10 +1843,12 @@ function traceFromRecommendation(input: Readonly<{
     sampleIndex: input.sampleIndex,
     selectedProductIds: input.result.recommendations.map((item) => item.product.id),
     selectedProducts: input.result.recommendations.map((item) => ({
+      brandStatus: item.product.brandStatus ?? null,
       brandName: item.product.brandName ?? null,
       coveredNeedNames: item.coveredNeeds.map((need) => need.displayName),
       costAmount: productPrice(item.product),
       id: item.product.id,
+      productStatus: item.product.status,
       productCoveragePercent: item.productCoveragePercent,
       stackContributionPercent: item.stackContributionPercent,
       title: item.product.title
@@ -1964,18 +1987,22 @@ type CatalogueEvaluation = Readonly<{
   coverageValues: readonly number[];
   productIds: readonly string[];
   selectedProductIds: readonly string[];
-  selectedProducts: ReadonlyMap<string, {
-    brandName: string | null;
-    chosenCount: number;
-    costTotal: number;
-    costCount: number;
-    coverageTotal: number;
-    protectedNeedCounts: Map<string, number>;
-    stackContributionTotal: number;
-    title: string;
-  }>;
+  selectedProducts: ReadonlyMap<string, CatalogueSelectedProductStats>;
   summary: AdminCatalogueOptimizationSummary;
 }>;
+
+type CatalogueSelectedProductStats = {
+  brandName: string | null;
+  brandStatus?: ProductCandidate["brandStatus"] | null;
+  chosenCount: number;
+  costTotal: number;
+  costCount: number;
+  coverageTotal: number;
+  productStatus?: ProductCandidate["status"] | null;
+  protectedNeedCounts: Map<string, number>;
+  stackContributionTotal: number;
+  title: string;
+};
 
 type CatalogueProductProfile = Readonly<{
   brandName: string | null;
@@ -2124,6 +2151,16 @@ function compactNames(values: readonly string[]) {
   }
 
   return `${names[0]}, ${names[1]}, and ${names[2]}`;
+}
+
+function optimizationReviewProducts(input: Readonly<{
+  includeReviewPriorityProducts?: boolean | null;
+  reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
+  simulationData: AdminPlanCoverageSimulationData;
+}>) {
+  return input.includeReviewPriorityProducts === false
+    ? []
+    : input.reviewPriorityProducts ?? input.simulationData.reviewPriorityProducts;
 }
 
 function addNeedCounts(
@@ -2388,16 +2425,7 @@ function evaluateCatalogueSubset(input: Readonly<{
   const costValues: number[] = [];
   const coverageValues: number[] = [];
   const selectedProductIds = new Set<string>();
-  const selectedProducts = new Map<string, {
-    brandName: string | null;
-    chosenCount: number;
-    costTotal: number;
-    costCount: number;
-    coverageTotal: number;
-    protectedNeedCounts: Map<string, number>;
-    stackContributionTotal: number;
-    title: string;
-  }>();
+  const selectedProducts = new Map<string, CatalogueSelectedProductStats>();
 
   for (const trace of input.data.sampleTraces) {
     const result = recommendProductStackFullBeam({
@@ -2420,10 +2448,12 @@ function evaluateCatalogueSubset(input: Readonly<{
       selectedProductIds.add(item.product.id);
       const current = selectedProducts.get(item.product.id) ?? {
         brandName: item.product.brandName ?? null,
+        brandStatus: item.product.brandStatus ?? null,
         chosenCount: 0,
         costTotal: 0,
         costCount: 0,
         coverageTotal: 0,
+        productStatus: item.product.status,
         protectedNeedCounts: new Map<string, number>(),
         stackContributionTotal: 0,
         title: item.product.title
@@ -2479,16 +2509,7 @@ async function evaluateCatalogueSubsetAsync(input: Readonly<{
   const costValues: number[] = [];
   const coverageValues: number[] = [];
   const selectedProductIds = new Set<string>();
-  const selectedProducts = new Map<string, {
-    brandName: string | null;
-    chosenCount: number;
-    costTotal: number;
-    costCount: number;
-    coverageTotal: number;
-    protectedNeedCounts: Map<string, number>;
-    stackContributionTotal: number;
-    title: string;
-  }>();
+  const selectedProducts = new Map<string, CatalogueSelectedProductStats>();
   const yieldEvery = 4;
 
   for (let index = 0; index < input.data.sampleTraces.length; index += 1) {
@@ -2513,10 +2534,12 @@ async function evaluateCatalogueSubsetAsync(input: Readonly<{
       selectedProductIds.add(item.product.id);
       const current = selectedProducts.get(item.product.id) ?? {
         brandName: item.product.brandName ?? null,
+        brandStatus: item.product.brandStatus ?? null,
         chosenCount: 0,
         costTotal: 0,
         costCount: 0,
         coverageTotal: 0,
+        productStatus: item.product.status,
         protectedNeedCounts: new Map<string, number>(),
         stackContributionTotal: 0,
         title: item.product.title
@@ -2705,16 +2728,7 @@ function evaluateTraceCatalogueSubset(input: Readonly<{
   const costValues: number[] = [];
   const coverageValues: number[] = [];
   const selectedProductIds = new Set<string>();
-  const selectedProducts = new Map<string, {
-    brandName: string | null;
-    chosenCount: number;
-    costTotal: number;
-    costCount: number;
-    coverageTotal: number;
-    protectedNeedCounts: Map<string, number>;
-    stackContributionTotal: number;
-    title: string;
-  }>();
+  const selectedProducts = new Map<string, CatalogueSelectedProductStats>();
 
   for (const trace of input.data.sampleTraces) {
     let retainedCoverage = 0;
@@ -2731,10 +2745,12 @@ function evaluateTraceCatalogueSubset(input: Readonly<{
 
       const current = selectedProducts.get(product.id) ?? {
         brandName: product.brandName,
+        brandStatus: product.brandStatus ?? null,
         chosenCount: 0,
         costTotal: 0,
         costCount: 0,
         coverageTotal: 0,
+        productStatus: product.productStatus ?? null,
         protectedNeedCounts: new Map<string, number>(),
         stackContributionTotal: 0,
         title: product.title
@@ -2855,6 +2871,175 @@ function prunedTraceCatalogueEvaluation(input: Readonly<{
   return evaluation;
 }
 
+function potentialCatalogueCandidate(product: ProductCandidate): ProductCandidate | null {
+  if (
+    product.status === "ignored" ||
+    product.brandStatus === "ignored" ||
+    product.facts.length < 1
+  ) {
+    return null;
+  }
+
+  return {
+    ...product,
+    automatedSafetyPassed: true,
+    brandStatus: "approved",
+    labelStatus: "parsed",
+    status: "approved",
+    validation: null
+  };
+}
+
+function potentialCatalogueTrace(input: Readonly<{
+  countryCode: string;
+  originalProductsById: ReadonlyMap<string, ProductCandidate>;
+  potentialCandidates: readonly ProductCandidate[];
+  trace: AdminPlanCoverageSimulationSampleTrace;
+}>): AdminPlanCoverageSimulationSampleTrace {
+  const result = recommendProductStackFullBeam({
+    candidates: [...input.potentialCandidates],
+    clientSex: input.trace.clientSex,
+    countryCode: input.countryCode,
+    maxProducts: 6,
+    needs: [...input.trace.needs],
+    stackPreference: "balanced"
+  });
+  const selectedProducts = result.recommendations.map((item) => {
+    const originalProduct = input.originalProductsById.get(item.product.id) ??
+      item.product;
+
+    return {
+      brandName: originalProduct.brandName ?? null,
+      brandStatus: originalProduct.brandStatus ?? null,
+      coveredNeedNames: item.coveredNeeds.map((need) => need.displayName),
+      costAmount: productPrice(originalProduct),
+      id: originalProduct.id,
+      productCoveragePercent: item.productCoveragePercent,
+      productStatus: originalProduct.status,
+      stackContributionPercent: item.stackContributionPercent,
+      title: originalProduct.title
+    };
+  });
+  const baselineCostAmount = selectedProducts.some((product) =>
+    product.costAmount !== null
+  )
+    ? selectedProducts.reduce(
+        (total, product) => total + (product.costAmount ?? 0),
+        0
+      )
+    : null;
+
+  return {
+    ...input.trace,
+    baselineCostAmount,
+    baselineCoveragePercent: safePercent(result.supplementProductCoveragePercent),
+    selectedProductIds: selectedProducts.map((product) => product.id),
+    selectedProducts,
+    unmetNeedIds: result.diagnostics.unmatchedNeeds.map((need) => need.id),
+    unmetNeedNames: result.diagnostics.unmatchedNeeds.map((need) => need.displayName)
+  };
+}
+
+function potentialCatalogueSimulationData(input: Readonly<{
+  potentialCandidates: readonly ProductCandidate[];
+  simulationData: AdminPlanCoverageSimulationData;
+}>): AdminPlanCoverageSimulationData {
+  const originalProductsById = new Map(
+    input.potentialCandidates.map((product) => [product.id, product])
+  );
+  const potentialCandidates = input.potentialCandidates
+    .map(potentialCatalogueCandidate)
+    .filter((product): product is ProductCandidate => Boolean(product));
+  const sampleTraces = input.simulationData.sampleTraces.map((trace) =>
+    potentialCatalogueTrace({
+      countryCode: input.simulationData.countryCode,
+      originalProductsById,
+      potentialCandidates,
+      trace
+    })
+  );
+  const coverageValues = sampleTraces.map((trace) =>
+    trace.baselineCoveragePercent
+  );
+  const costValues = sampleTraces.map((trace) =>
+    trace.baselineCostAmount ?? 0
+  );
+
+  return {
+    ...input.simulationData,
+    input: {
+      ...input.simulationData.input,
+      candidates: potentialCandidates
+    },
+    sampleSize: sampleTraces.length,
+    sampleTraces,
+    summary: simulationSummary({
+      candidates: potentialCandidates,
+      costValues,
+      coverageValues,
+      sampleSize: sampleTraces.length
+    })
+  };
+}
+
+export function runAdminCataloguePotentialOptimizationFast(input: Readonly<{
+  potentialCandidates: readonly ProductCandidate[];
+  simulationData: AdminPlanCoverageSimulationData;
+  coverageLossTolerancePercent?: number | null;
+}>): AdminCataloguePotentialOptimizationData {
+  const candidateCount = input.potentialCandidates.filter((product) =>
+    product.status !== "ignored" &&
+    product.brandStatus !== "ignored" &&
+    product.facts.length > 0
+  ).length;
+
+  if (
+    input.simulationData.sampleTraces.length < 1 ||
+    candidateCount < 1
+  ) {
+    return {
+      baseline: emptyCatalogueOptimizationSummary(candidateCount),
+      carryProducts: [],
+      candidateCount,
+      frontier: [],
+      generatedAt: new Date().toISOString(),
+      needsReviewCount: 0,
+      optimized: emptyCatalogueOptimizationSummary(0),
+      productReductionCount: candidateCount,
+      productReductionPercent: candidateCount > 0 ? 100 : 0,
+      sampleSize: input.simulationData.sampleSize,
+      status: "not_ready"
+    };
+  }
+
+  const potentialSimulationData = potentialCatalogueSimulationData({
+    potentialCandidates: input.potentialCandidates,
+    simulationData: input.simulationData
+  });
+  const optimization = runAdminCatalogueOptimizationFast({
+    coverageLossTolerancePercent: input.coverageLossTolerancePercent,
+    includeReviewPriorityProducts: false,
+    simulationData: potentialSimulationData
+  });
+  const needsReviewCount = optimization.carryProducts.filter((product) =>
+    product.readiness === "needs_review"
+  ).length;
+
+  return {
+    baseline: optimization.baseline,
+    carryProducts: optimization.carryProducts,
+    candidateCount,
+    frontier: optimization.frontier,
+    generatedAt: optimization.generatedAt,
+    needsReviewCount,
+    optimized: optimization.optimized,
+    productReductionCount: optimization.productReductionCount,
+    productReductionPercent: optimization.productReductionPercent,
+    sampleSize: optimization.sampleSize,
+    status: optimization.status
+  };
+}
+
 async function prunedCatalogueEvaluationAsync(input: Readonly<{
   baseline: AdminCatalogueOptimizationSummary;
   coverageLossTolerancePercent: number;
@@ -2961,13 +3146,29 @@ function productRowsFromEvaluation(
         stats.stackContributionTotal / Math.max(1, stats.chosenCount)
       ),
       brandName: stats.brandName,
+      brandStatus: stats.brandStatus ?? null,
       chosenCount: stats.chosenCount,
       expectedPriceAmount:
         stats.costCount > 0 ? Math.round(stats.costTotal / stats.costCount) : null,
       id,
+      productStatus: stats.productStatus ?? null,
       protectedPlanCount: stats.chosenCount,
       protectedSupplementNames: sortedNeedNames(stats.protectedNeedCounts).slice(0, 6),
       rank: 0,
+      readiness:
+        stats.productStatus === "approved" &&
+        (stats.brandStatus === null || stats.brandStatus === "approved")
+          ? "current" as const
+          : "needs_review" as const,
+      readinessLabel:
+        stats.productStatus === "approved" &&
+        (stats.brandStatus === null || stats.brandStatus === "approved")
+          ? "Current"
+          : stats.productStatus === "pending_review"
+            ? "Pending review"
+            : stats.brandStatus === "pending_review"
+              ? "Brand pending"
+              : "Needs review",
       title: stats.title
     }))
     .sort((first, second) =>
@@ -2978,6 +3179,46 @@ function productRowsFromEvaluation(
       first.title.localeCompare(second.title)
     )
     .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+function reviewDemandImpact(input: Readonly<{
+  product: AdminSimulationReviewProductRow;
+  sampleTraces: readonly AdminPlanCoverageSimulationSampleTrace[];
+}>) {
+  const productKeys = new Set(
+    input.product.coveredSupplementNames
+      .map((name) => normalizedSupplementName(name))
+      .filter((name) => name.length > 0)
+  );
+  const supplementCounts = new Map<string, number>();
+  let affectedPlanCount = 0;
+
+  for (const trace of input.sampleTraces) {
+    const traceMatches = new Set<string>();
+
+    for (const need of trace.needs) {
+      if (!needDemandKeys(need).some((key) => productKeys.has(key))) {
+        continue;
+      }
+
+      traceMatches.add(need.displayName || need.normalizedName);
+    }
+
+    if (traceMatches.size < 1) {
+      continue;
+    }
+
+    affectedPlanCount += 1;
+
+    for (const name of traceMatches) {
+      supplementCounts.set(name, (supplementCounts.get(name) ?? 0) + 1);
+    }
+  }
+
+  return {
+    affectedPlanCount,
+    supplementNames: sortedNeedNames(supplementCounts)
+  };
 }
 
 function carryActionRows(input: Readonly<{
@@ -3010,6 +3251,7 @@ function carryActionRows(input: Readonly<{
 function reviewActionRows(input: Readonly<{
   reviewPriorityProducts: readonly AdminSimulationReviewProductRow[];
   sampleSize: number;
+  sampleTraces?: readonly AdminPlanCoverageSimulationSampleTrace[];
   unmetSupplements: readonly AdminPlanCoverageSimulationUnmetDemandRow[];
 }>): AdminCatalogueOptimizationActionRow[] {
   const unmetByName = new Map<string, AdminPlanCoverageSimulationUnmetDemandRow>();
@@ -3022,31 +3264,49 @@ function reviewActionRows(input: Readonly<{
     const matched = product.coveredSupplementNames
       .map((name) => unmetByName.get(normalizedSupplementName(name)))
       .filter((row): row is AdminPlanCoverageSimulationUnmetDemandRow => Boolean(row));
+    const demandImpact = reviewDemandImpact({
+      product,
+      sampleTraces: input.sampleTraces ?? []
+    });
 
-    if (matched.length < 1) {
+    if (matched.length < 1 && demandImpact.affectedPlanCount < 1) {
       return [];
     }
 
-    const affectedPlanCount = matched.reduce((total, row) => total + row.count, 0);
-    const affectedSupplementNames = matched.map((row) => row.name);
+    const affectedPlanCount =
+      matched.length > 0
+        ? matched.reduce((total, row) => total + row.count, 0)
+        : demandImpact.affectedPlanCount;
+    const affectedSupplementNames =
+      matched.length > 0
+        ? matched.map((row) => row.name)
+        : demandImpact.supplementNames;
+    const affectedPlanPercent = safePercent(
+      (affectedPlanCount / Math.max(1, input.sampleSize)) * 100
+    );
 
     return [{
       actionType: "review_first" as const,
       affectedPlanCount,
-      affectedPlanPercent: safePercent(
-        (affectedPlanCount / Math.max(1, input.sampleSize)) * 100
-      ),
+      affectedPlanPercent,
       brandName: product.brandName,
-      coverageImpactPercent: product.reviewScore,
+      coverageImpactPercent: affectedPlanPercent,
       expectedPriceAmount: product.expectedPriceAmount,
       id: `review:${product.id}`,
       productId: product.id,
       rank: 0,
-      reason: `Review this blocked product first; it could help ${compactNames(
-        affectedSupplementNames
-      )} demand across ${affectedPlanCount} simulated ${
-        affectedPlanCount === 1 ? "profile" : "profiles"
-      }.`,
+      reason:
+        matched.length > 0
+          ? `Review this product first; it could help unresolved ${compactNames(
+              affectedSupplementNames
+            )} demand across ${affectedPlanCount} simulated ${
+              affectedPlanCount === 1 ? "profile" : "profiles"
+            }.`
+          : `Review this product; it matches ${compactNames(
+              affectedSupplementNames
+            )} demand in ${affectedPlanCount} simulated ${
+              affectedPlanCount === 1 ? "profile" : "profiles"
+            }.`,
       statusLabel: "Review first",
       supplementId: null,
       title: product.title
@@ -3140,6 +3400,7 @@ function rankedCatalogueActionRows(
 export function runAdminCatalogueOptimizationFast(input: Readonly<{
   simulationData: AdminPlanCoverageSimulationData;
   reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
+  includeReviewPriorityProducts?: boolean | null;
   coverageLossTolerancePercent?: number | null;
   objective?: AdminCatalogueOptimizationObjective | null;
   mutationMode?: AdminCatalogueOptimizationMutationMode | null;
@@ -3152,6 +3413,11 @@ export function runAdminCatalogueOptimizationFast(input: Readonly<{
   const mutationMode = input.mutationMode ?? CATALOGUE_OPTIMIZATION_MUTATION_MODE;
   const baseline = baselineCatalogueSummary(data);
   const generatedAt = new Date().toISOString();
+  const reviewProducts = optimizationReviewProducts({
+    includeReviewPriorityProducts: input.includeReviewPriorityProducts,
+    reviewPriorityProducts: input.reviewPriorityProducts,
+    simulationData: data
+  });
 
   if (data.sampleTraces.length < 1 || data.sampleSize < 1) {
     return {
@@ -3164,6 +3430,7 @@ export function runAdminCatalogueOptimizationFast(input: Readonly<{
       mutationMode,
       objective,
       optimized: emptyCatalogueOptimizationSummary(0),
+      potential: null,
       productReductionCount: 0,
       productReductionPercent: 0,
       sampleSize: data.sampleSize,
@@ -3179,8 +3446,9 @@ export function runAdminCatalogueOptimizationFast(input: Readonly<{
 
   if (rankedProducts.length < 1) {
     const reviewRows = reviewActionRows({
-      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      reviewPriorityProducts: reviewProducts,
       sampleSize: data.sampleSize,
+      sampleTraces: data.sampleTraces,
       unmetSupplements: data.unmetSupplements
     });
     const sourceRows = sourceActionRows({
@@ -3198,6 +3466,7 @@ export function runAdminCatalogueOptimizationFast(input: Readonly<{
       mutationMode,
       objective,
       optimized: emptyCatalogueOptimizationSummary(0),
+      potential: null,
       productReductionCount: data.input.candidates.length,
       productReductionPercent: safePercent(
         (data.input.candidates.length / Math.max(1, data.input.candidates.length)) * 100
@@ -3281,8 +3550,9 @@ export function runAdminCatalogueOptimizationFast(input: Readonly<{
   const actionRows = rankedCatalogueActionRows([
     ...carryActionRows({ carryProducts, sampleSize: data.sampleSize }),
     ...reviewActionRows({
-      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      reviewPriorityProducts: reviewProducts,
       sampleSize: data.sampleSize,
+      sampleTraces: data.sampleTraces,
       unmetSupplements: data.unmetSupplements
     }),
     ...sourceActionRows({
@@ -3310,6 +3580,7 @@ export function runAdminCatalogueOptimizationFast(input: Readonly<{
     mutationMode,
     objective,
     optimized: recommendedEvaluation.summary,
+    potential: null,
     productReductionCount,
     productReductionPercent: safePercent(
       (productReductionCount / Math.max(1, data.input.candidates.length)) * 100
@@ -3322,6 +3593,7 @@ export function runAdminCatalogueOptimizationFast(input: Readonly<{
 export function runAdminCatalogueOptimization(input: Readonly<{
   simulationData: AdminPlanCoverageSimulationData;
   reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
+  includeReviewPriorityProducts?: boolean | null;
   coverageLossTolerancePercent?: number | null;
   objective?: AdminCatalogueOptimizationObjective | null;
   mutationMode?: AdminCatalogueOptimizationMutationMode | null;
@@ -3334,6 +3606,11 @@ export function runAdminCatalogueOptimization(input: Readonly<{
   const mutationMode = input.mutationMode ?? CATALOGUE_OPTIMIZATION_MUTATION_MODE;
   const baseline = baselineCatalogueSummary(data);
   const generatedAt = new Date().toISOString();
+  const reviewProducts = optimizationReviewProducts({
+    includeReviewPriorityProducts: input.includeReviewPriorityProducts,
+    reviewPriorityProducts: input.reviewPriorityProducts,
+    simulationData: data
+  });
 
   if (data.sampleTraces.length < 1 || data.sampleSize < 1) {
     return {
@@ -3346,6 +3623,7 @@ export function runAdminCatalogueOptimization(input: Readonly<{
       mutationMode,
       objective,
       optimized: emptyCatalogueOptimizationSummary(0),
+      potential: null,
       productReductionCount: 0,
       productReductionPercent: 0,
       sampleSize: data.sampleSize,
@@ -3361,8 +3639,9 @@ export function runAdminCatalogueOptimization(input: Readonly<{
 
   if (rankedProducts.length < 1) {
     const reviewRows = reviewActionRows({
-      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      reviewPriorityProducts: reviewProducts,
       sampleSize: data.sampleSize,
+      sampleTraces: data.sampleTraces,
       unmetSupplements: data.unmetSupplements
     });
     const sourceRows = sourceActionRows({
@@ -3380,6 +3659,7 @@ export function runAdminCatalogueOptimization(input: Readonly<{
       mutationMode,
       objective,
       optimized: emptyCatalogueOptimizationSummary(0),
+      potential: null,
       productReductionCount: data.input.candidates.length,
       productReductionPercent: safePercent(
         (data.input.candidates.length / Math.max(1, data.input.candidates.length)) * 100
@@ -3466,8 +3746,9 @@ export function runAdminCatalogueOptimization(input: Readonly<{
   const actionRows = rankedCatalogueActionRows([
     ...carryActionRows({ carryProducts, sampleSize: data.sampleSize }),
     ...reviewActionRows({
-      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      reviewPriorityProducts: reviewProducts,
       sampleSize: data.sampleSize,
+      sampleTraces: data.sampleTraces,
       unmetSupplements: data.unmetSupplements
     }),
     ...sourceActionRows({
@@ -3495,6 +3776,7 @@ export function runAdminCatalogueOptimization(input: Readonly<{
     mutationMode,
     objective,
     optimized: recommendedEvaluation.summary,
+    potential: null,
     productReductionCount,
     productReductionPercent: safePercent(
       (productReductionCount / Math.max(1, data.input.candidates.length)) * 100
@@ -3507,6 +3789,7 @@ export function runAdminCatalogueOptimization(input: Readonly<{
 export async function runAdminCatalogueOptimizationCooperatively(input: Readonly<{
   simulationData: AdminPlanCoverageSimulationData;
   reviewPriorityProducts?: readonly AdminSimulationReviewProductRow[] | null;
+  includeReviewPriorityProducts?: boolean | null;
   coverageLossTolerancePercent?: number | null;
   objective?: AdminCatalogueOptimizationObjective | null;
   mutationMode?: AdminCatalogueOptimizationMutationMode | null;
@@ -3525,6 +3808,11 @@ export async function runAdminCatalogueOptimizationCooperatively(input: Readonly
   const mutationMode = input.mutationMode ?? CATALOGUE_OPTIMIZATION_MUTATION_MODE;
   const baseline = baselineCatalogueSummary(data);
   const generatedAt = new Date().toISOString();
+  const reviewProducts = optimizationReviewProducts({
+    includeReviewPriorityProducts: input.includeReviewPriorityProducts,
+    reviewPriorityProducts: input.reviewPriorityProducts,
+    simulationData: data
+  });
 
   throwIfCatalogueOptimizationAborted(runtime.signal);
 
@@ -3539,6 +3827,7 @@ export async function runAdminCatalogueOptimizationCooperatively(input: Readonly
       mutationMode,
       objective,
       optimized: emptyCatalogueOptimizationSummary(0),
+      potential: null,
       productReductionCount: 0,
       productReductionPercent: 0,
       sampleSize: data.sampleSize,
@@ -3568,8 +3857,9 @@ export async function runAdminCatalogueOptimizationCooperatively(input: Readonly
     });
 
     const reviewRows = reviewActionRows({
-      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      reviewPriorityProducts: reviewProducts,
       sampleSize: data.sampleSize,
+      sampleTraces: data.sampleTraces,
       unmetSupplements: data.unmetSupplements
     });
     const sourceRows = sourceActionRows({
@@ -3586,6 +3876,7 @@ export async function runAdminCatalogueOptimizationCooperatively(input: Readonly
       mutationMode,
       objective,
       optimized: emptyCatalogueOptimizationSummary(0),
+      potential: null,
       productReductionCount: data.input.candidates.length,
       productReductionPercent: safePercent(
         (data.input.candidates.length / Math.max(1, data.input.candidates.length)) * 100
@@ -3724,8 +4015,9 @@ export async function runAdminCatalogueOptimizationCooperatively(input: Readonly
   const actionRows = rankedCatalogueActionRows([
     ...carryActionRows({ carryProducts, sampleSize: data.sampleSize }),
     ...reviewActionRows({
-      reviewPriorityProducts: input.reviewPriorityProducts ?? data.reviewPriorityProducts,
+      reviewPriorityProducts: reviewProducts,
       sampleSize: data.sampleSize,
+      sampleTraces: data.sampleTraces,
       unmetSupplements: data.unmetSupplements
     }),
     ...sourceActionRows({
@@ -3752,6 +4044,7 @@ export async function runAdminCatalogueOptimizationCooperatively(input: Readonly
     mutationMode,
     objective,
     optimized: recommendedEvaluation.summary,
+    potential: null,
     productReductionCount,
     productReductionPercent: safePercent(
       (productReductionCount / Math.max(1, data.input.candidates.length)) * 100
