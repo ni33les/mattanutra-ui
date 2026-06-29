@@ -1,38 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createHash } from "node:crypto";
 import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  legacyAdminContext,
-  resolveAdminSession
-} from "@/lib/admin-access";
-import {
-  getProductRecommendationCandidates
-} from "@/lib/admin-product-search";
-import {
   runAdminCatalogueOptimizationFast,
-  runAdminCataloguePotentialOptimizationFast,
   type AdminCatalogueOptimizationData,
   type AdminPlanCoverageSimulationData
 } from "@/lib/admin-product-coverage";
-import { adminViewAllowed } from "@/lib/admin-rbac";
+import {
+  noStoreHeaders,
+  rejectUnauthorizedPlanCoverageRequest,
+  text
+} from "@/app/api/admin/product-coverage/catalogue-optimization/shared";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const noStoreHeaders = {
-  "Cache-Control": "no-store"
-};
 const cacheTtlMs = 60 * 60 * 1000;
 const maxCacheEntries = 50;
 const optimizationCache = new Map<string, {
   optimization: AdminCatalogueOptimizationData;
   storedAt: number;
 }>();
-
-function text(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function optimizationCacheKey(body: Record<string, unknown>) {
   const explicitKey = text(body.cacheKey);
@@ -88,51 +75,12 @@ function setCachedOptimization(
   }
 }
 
-function accessTokenFromRequest(request: NextRequest, body: Record<string, unknown>) {
-  const url = new URL(request.url);
-
-  return (
-    text(request.headers.get("x-admin-dashboard-token")) ||
-    text(body.accessToken) ||
-    text(url.searchParams.get("access_token")) ||
-    null
-  );
-}
-
-async function adminContext(
-  request: NextRequest,
-  body: Record<string, unknown>
-) {
-  const session = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
-
-  return session ?? legacyAdminContext(accessTokenFromRequest(request, body));
-}
-
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const context = await adminContext(request, body);
+  const rejection = await rejectUnauthorizedPlanCoverageRequest(request, body);
 
-  if (!context) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { headers: noStoreHeaders, status: 401 }
-    );
-  }
-
-  if (
-    !adminViewAllowed(
-      context,
-      "plan-coverage-simulator",
-      context.effectiveOrganisation.type
-    )
-  ) {
-    return NextResponse.json(
-      { error: "Forbidden" },
-      { headers: noStoreHeaders, status: 403 }
-    );
+  if (rejection) {
+    return rejection;
   }
 
   const simulationData = body.simulationData as
@@ -160,28 +108,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const includeReviewPriorityProducts =
-      body.includeReviewPriorityProducts !== false;
     const optimization = runAdminCatalogueOptimizationFast({
-      includeReviewPriorityProducts,
-      reviewPriorityProducts: Array.isArray(body.reviewPriorityProducts)
-        ? body.reviewPriorityProducts
-        : null,
+      includeReviewPriorityProducts: false,
       simulationData
     });
-    const potential = includeReviewPriorityProducts
-      ? runAdminCataloguePotentialOptimizationFast({
-          coverageLossTolerancePercent: 0,
-          potentialCandidates: await getProductRecommendationCandidates({
-            countryCode: simulationData.countryCode,
-            includeIneligible: true
-          }),
-          simulationData
-        })
-      : null;
     const optimizationWithPotential = {
       ...optimization,
-      potential
+      potential: null
     } satisfies AdminCatalogueOptimizationData;
 
     setCachedOptimization(cacheKey, optimizationWithPotential);
@@ -201,7 +134,7 @@ export async function POST(request: NextRequest) {
         error:
           error instanceof Error
             ? error.message
-            : "Unable to calculate minimum catalogue"
+            : "Unable to calculate optimum basket"
       },
       { headers: noStoreHeaders, status: 500 }
     );

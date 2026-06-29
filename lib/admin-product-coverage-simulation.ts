@@ -316,6 +316,34 @@ export type AdminCataloguePotentialOptimizationData = Readonly<{
   status: "not_ready" | "ready";
 }>;
 
+export type AdminCataloguePotentialTraceChunkRequest = Readonly<{
+  accessToken?: string | null;
+  cacheKey?: string | null;
+  chunkSize?: number | null;
+  countryCode?: string | null;
+  simulationData: AdminPlanCoverageSimulationData;
+  startIndex?: number | null;
+}>;
+
+export type AdminCataloguePotentialTraceChunkResponse = Readonly<{
+  candidateCount: number;
+  candidateHash: string;
+  chunkSize: number;
+  chunkStartIndex: number;
+  sampleTraces: readonly AdminPlanCoverageSimulationSampleTrace[];
+  totalSamples: number;
+}>;
+
+export type AdminCataloguePotentialFinalizeRequest = Readonly<{
+  accessToken?: string | null;
+  cacheKey?: string | null;
+  candidateCount: number;
+  candidateHash: string;
+  countryCode?: string | null;
+  sampleTraces: readonly AdminPlanCoverageSimulationSampleTrace[];
+  simulationData: AdminPlanCoverageSimulationData;
+}>;
+
 export type AdminCatalogueOptimizationProgressStage =
   | "actions"
   | "done"
@@ -2890,6 +2918,14 @@ function potentialCatalogueCandidate(product: ProductCandidate): ProductCandidat
   };
 }
 
+export function adminCataloguePotentialCandidates(
+  products: readonly ProductCandidate[]
+) {
+  return products
+    .map(potentialCatalogueCandidate)
+    .filter((product): product is ProductCandidate => Boolean(product));
+}
+
 function potentialCatalogueTrace(input: Readonly<{
   countryCode: string;
   originalProductsById: ReadonlyMap<string, ProductCandidate>;
@@ -2940,24 +2976,56 @@ function potentialCatalogueTrace(input: Readonly<{
   };
 }
 
-function potentialCatalogueSimulationData(input: Readonly<{
+export function buildAdminCataloguePotentialTraceChunk(input: Readonly<{
   potentialCandidates: readonly ProductCandidate[];
   simulationData: AdminPlanCoverageSimulationData;
-}>): AdminPlanCoverageSimulationData {
+  startIndex?: number | null;
+  chunkSize?: number | null;
+}>): Omit<AdminCataloguePotentialTraceChunkResponse, "candidateHash"> {
   const originalProductsById = new Map(
     input.potentialCandidates.map((product) => [product.id, product])
   );
-  const potentialCandidates = input.potentialCandidates
-    .map(potentialCatalogueCandidate)
-    .filter((product): product is ProductCandidate => Boolean(product));
-  const sampleTraces = input.simulationData.sampleTraces.map((trace) =>
-    potentialCatalogueTrace({
-      countryCode: input.simulationData.countryCode,
-      originalProductsById,
-      potentialCandidates,
-      trace
-    })
+  const potentialCandidates = adminCataloguePotentialCandidates(
+    input.potentialCandidates
   );
+  const totalSamples = input.simulationData.sampleTraces.length;
+  const chunkStartIndex = Math.max(
+    0,
+    Math.min(
+      totalSamples,
+      Math.floor(input.startIndex ?? 0)
+    )
+  );
+  const chunkSize = Math.max(1, Math.floor(input.chunkSize ?? 4));
+  const sampleTraces = input.simulationData.sampleTraces
+    .slice(chunkStartIndex, chunkStartIndex + chunkSize)
+    .map((trace) =>
+      potentialCatalogueTrace({
+        countryCode: input.simulationData.countryCode,
+        originalProductsById,
+        potentialCandidates,
+        trace
+      })
+    );
+
+  return {
+    candidateCount: potentialCandidates.length,
+    chunkSize,
+    chunkStartIndex,
+    sampleTraces,
+    totalSamples
+  };
+}
+
+function potentialCatalogueSimulationDataFromTraces(input: Readonly<{
+  potentialCandidates: readonly ProductCandidate[];
+  sampleTraces: readonly AdminPlanCoverageSimulationSampleTrace[];
+  simulationData: AdminPlanCoverageSimulationData;
+}>): AdminPlanCoverageSimulationData {
+  const potentialCandidates = adminCataloguePotentialCandidates(
+    input.potentialCandidates
+  );
+  const sampleTraces = input.sampleTraces;
   const coverageValues = sampleTraces.map((trace) =>
     trace.baselineCoveragePercent
   );
@@ -2982,21 +3050,17 @@ function potentialCatalogueSimulationData(input: Readonly<{
   };
 }
 
-export function runAdminCataloguePotentialOptimizationFast(input: Readonly<{
+export function runAdminCataloguePotentialOptimizationFromTraces(input: Readonly<{
   potentialCandidates: readonly ProductCandidate[];
+  sampleTraces: readonly AdminPlanCoverageSimulationSampleTrace[];
   simulationData: AdminPlanCoverageSimulationData;
   coverageLossTolerancePercent?: number | null;
 }>): AdminCataloguePotentialOptimizationData {
-  const candidateCount = input.potentialCandidates.filter((product) =>
-    product.status !== "ignored" &&
-    product.brandStatus !== "ignored" &&
-    product.facts.length > 0
+  const candidateCount = adminCataloguePotentialCandidates(
+    input.potentialCandidates
   ).length;
 
-  if (
-    input.simulationData.sampleTraces.length < 1 ||
-    candidateCount < 1
-  ) {
+  if (input.sampleTraces.length < 1 || candidateCount < 1) {
     return {
       baseline: emptyCatalogueOptimizationSummary(candidateCount),
       carryProducts: [],
@@ -3007,13 +3071,14 @@ export function runAdminCataloguePotentialOptimizationFast(input: Readonly<{
       optimized: emptyCatalogueOptimizationSummary(0),
       productReductionCount: candidateCount,
       productReductionPercent: candidateCount > 0 ? 100 : 0,
-      sampleSize: input.simulationData.sampleSize,
+      sampleSize: input.sampleTraces.length,
       status: "not_ready"
     };
   }
 
-  const potentialSimulationData = potentialCatalogueSimulationData({
+  const potentialSimulationData = potentialCatalogueSimulationDataFromTraces({
     potentialCandidates: input.potentialCandidates,
+    sampleTraces: input.sampleTraces,
     simulationData: input.simulationData
   });
   const optimization = runAdminCatalogueOptimizationFast({
@@ -3038,6 +3103,26 @@ export function runAdminCataloguePotentialOptimizationFast(input: Readonly<{
     sampleSize: optimization.sampleSize,
     status: optimization.status
   };
+}
+
+export function runAdminCataloguePotentialOptimizationFast(input: Readonly<{
+  potentialCandidates: readonly ProductCandidate[];
+  simulationData: AdminPlanCoverageSimulationData;
+  coverageLossTolerancePercent?: number | null;
+}>): AdminCataloguePotentialOptimizationData {
+  const chunk = buildAdminCataloguePotentialTraceChunk({
+    chunkSize: input.simulationData.sampleTraces.length,
+    potentialCandidates: input.potentialCandidates,
+    simulationData: input.simulationData,
+    startIndex: 0
+  });
+
+  return runAdminCataloguePotentialOptimizationFromTraces({
+    coverageLossTolerancePercent: input.coverageLossTolerancePercent,
+    potentialCandidates: input.potentialCandidates,
+    sampleTraces: chunk.sampleTraces,
+    simulationData: input.simulationData
+  });
 }
 
 async function prunedCatalogueEvaluationAsync(input: Readonly<{

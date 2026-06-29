@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  buildAdminCataloguePotentialTraceChunk,
   buildSimulationNextMoveRows,
   buildReviewPriorityProductRows,
   classifySupplementCoverage,
@@ -12,6 +13,7 @@ import {
   runAdminCatalogueOptimization,
   runAdminCatalogueOptimizationCooperatively,
   runAdminCatalogueOptimizationFast,
+  runAdminCataloguePotentialOptimizationFromTraces,
   runAdminCataloguePotentialOptimizationFast,
   runAdminPlanCoverageSimulation,
   sanitizeDemandProfilesForSimulationSupplements,
@@ -687,6 +689,29 @@ describe("product coverage workflow", () => {
     assert.equal(potential.carryProducts[0]?.id, pendingMulti.id);
     assert.equal(potential.carryProducts[0]?.readiness, "needs_review");
     assert.equal(potential.carryProducts[0]?.readinessLabel, "Pending review");
+
+    const chunk = buildAdminCataloguePotentialTraceChunk({
+      chunkSize: 4,
+      potentialCandidates: [approvedCoq10, approvedZinc, pendingMulti],
+      simulationData,
+      startIndex: 0
+    });
+    const resumedPotential = runAdminCataloguePotentialOptimizationFromTraces({
+      coverageLossTolerancePercent: 0,
+      potentialCandidates: [approvedCoq10, approvedZinc, pendingMulti],
+      sampleTraces: chunk.sampleTraces,
+      simulationData
+    });
+
+    assert.equal(chunk.chunkStartIndex, 0);
+    assert.equal(chunk.chunkSize, 4);
+    assert.equal(chunk.totalSamples, simulationData.sampleTraces.length);
+    assert.equal(
+      chunk.sampleTraces.length,
+      Math.min(4, simulationData.sampleTraces.length)
+    );
+    assert.equal(resumedPotential.status, "ready");
+    assert.equal(resumedPotential.carryProducts[0]?.readiness, "needs_review");
   });
 
   it("keeps optimizer actions advisory for review and source moves", () => {
@@ -1232,6 +1257,14 @@ describe("product coverage workflow", () => {
       "app/api/admin/product-coverage/catalogue-optimization/route.ts",
       "utf8"
     );
+    const cataloguePotentialTraceRoute = readFileSync(
+      "app/api/admin/product-coverage/catalogue-optimization/potential-traces/route.ts",
+      "utf8"
+    );
+    const cataloguePotentialFinalizeRoute = readFileSync(
+      "app/api/admin/product-coverage/catalogue-optimization/potential-finalize/route.ts",
+      "utf8"
+    );
     const demandProfileRoute = readFileSync(
       "app/api/admin/product-coverage/demand-profile/route.ts",
       "utf8"
@@ -1363,19 +1396,33 @@ describe("product coverage workflow", () => {
     assert.match(view, /Optimum product basket/);
     assert.match(view, /catalogueOptimizationHref/);
     assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization/);
-    assert.match(view, /Calculating on server/);
+    assert.match(view, /cataloguePotentialTraceHref/);
+    assert.match(view, /cataloguePotentialFinalizeHref/);
+    assert.match(view, /Calculating approved basket/);
+    assert.match(view, /Evaluating potential basket/);
+    assert.match(view, /Optimum basket request failed/);
+    assert.doesNotMatch(view, /Minimum catalogue request failed/);
     assert.match(view, /SIMULATOR_OPTIMIZATION_STORAGE_KEY/);
     assert.match(view, /saveCatalogueOptimization/);
     assert.match(view, /loadSavedCatalogueOptimization/);
+    assert.match(view, /loadSavedPotentialTraceEntry/);
+    assert.match(view, /savePotentialTraceChunk/);
+    assert.match(view, /firstMissingPotentialTraceStart/);
     assert.match(view, /cacheKey: requestKey/);
-    assert.match(view, /Review pending products/);
+    assert.match(view, /Include pending-review products/);
+    assert.match(view, /Shows the best possible basket if pending products were approved/);
     assert.match(view, /includeReviewPriorityProductsInCatalogueOptimization/);
     assert.match(view, /catalogueReviewProductsKey/);
-    assert.match(view, /includeReviewPriorityProducts:\s*\n\s*includeReviewPriorityProductsInCatalogueOptimization/);
+    assert.match(view, /includeReviewPriorityProducts: false/);
     assert.match(catalogueOptimizationRoute, /includeReviewPriorityProducts/);
-    assert.match(catalogueOptimizationRoute, /body\.includeReviewPriorityProducts !== false/);
-    assert.match(catalogueOptimizationRoute, /runAdminCataloguePotentialOptimizationFast/);
-    assert.match(catalogueOptimizationRoute, /coverageLossTolerancePercent: 0/);
+    assert.doesNotMatch(catalogueOptimizationRoute, /runAdminCataloguePotentialOptimizationFast/);
+    assert.doesNotMatch(catalogueOptimizationRoute, /getProductRecommendationCandidates/);
+    assert.match(cataloguePotentialTraceRoute, /buildAdminCataloguePotentialTraceChunk/);
+    assert.match(cataloguePotentialTraceRoute, /normalizedPotentialTraceChunkSize/);
+    assert.match(cataloguePotentialTraceRoute, /potentialCandidateHash/);
+    assert.match(cataloguePotentialFinalizeRoute, /runAdminCataloguePotentialOptimizationFromTraces/);
+    assert.match(cataloguePotentialFinalizeRoute, /coverageLossTolerancePercent: 0/);
+    assert.match(cataloguePotentialFinalizeRoute, /status: 409/);
     assert.doesNotMatch(view, /runAdminCatalogueOptimizationCooperatively/);
     assert.match(view, /Basket products/);
     assert.match(view, /No basket products were identified/);
@@ -1391,6 +1438,9 @@ describe("product coverage workflow", () => {
     assert.match(simulationModel, /AdminPlanCoverageSimulationConvergence/);
     assert.match(simulationModel, /AdminCatalogueOptimizationData/);
     assert.match(simulationModel, /AdminCataloguePotentialOptimizationData/);
+    assert.match(simulationModel, /AdminCataloguePotentialTraceChunkResponse/);
+    assert.match(simulationModel, /buildAdminCataloguePotentialTraceChunk/);
+    assert.match(simulationModel, /runAdminCataloguePotentialOptimizationFromTraces/);
     assert.match(simulationModel, /runAdminCatalogueOptimization/);
     assert.match(simulationModel, /runAdminCatalogueOptimizationFast/);
     assert.match(simulationModel, /runAdminCataloguePotentialOptimizationFast/);
