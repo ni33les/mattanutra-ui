@@ -308,6 +308,7 @@ export async function getAdminCatalogueOptimizationJob(cacheKey: string) {
 
 export async function startAdminCatalogueOptimizationJob(input: Readonly<{
   cacheKey: string;
+  forceRestart?: boolean;
   includePendingReviewProducts: boolean;
   simulationData: AdminPlanCoverageSimulationData;
 }>) {
@@ -319,8 +320,15 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
 
   const existing = await jobByKey(sql, input.cacheKey);
   const existingStatus = existing ? jobStatus(existing.status) : null;
+  const restartCompleted =
+    input.forceRestart === true && existingStatus === "completed";
 
-  if (existing && existingStatus !== "failed" && existingStatus !== "cancelled") {
+  if (
+    existing &&
+    existingStatus !== "failed" &&
+    existingStatus !== "cancelled" &&
+    !restartCompleted
+  ) {
     return jobView(existing);
   }
 
@@ -345,8 +353,10 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           status = 'queued',
           error_message = null,
           lease_until = null,
+          reserved_by_agent_id = null,
           started_at = null,
           completed_at = null,
+          attempts = 0,
           updated_at = now()
         where id = ${existing.id}::uuid
         returning

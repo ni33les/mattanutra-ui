@@ -151,6 +151,19 @@ function durationText(totalSeconds: number) {
   return `${minutes}m ${remainder.toString().padStart(2, "0")}s`;
 }
 
+function dateTimeText(value: string, locale: Locale) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time";
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
 function compactListText(values: readonly string[]) {
   const items = values.filter(Boolean).slice(0, 3);
 
@@ -553,6 +566,21 @@ function saveSimulationState(
   runner: AdminPlanCoverageSimulationRunner
 ) {
   try {
+    const raw = window.localStorage.getItem(SIMULATOR_STORAGE_KEY);
+
+    if (raw) {
+      const existing = JSON.parse(raw) as Partial<SavedSimulationState>;
+
+      if (
+        existing.version === 5 &&
+        existing.inputKey === inputKey &&
+        typeof existing.sampleSize === "number" &&
+        existing.sampleSize > runner.sampleSize
+      ) {
+        return;
+      }
+    }
+
     window.localStorage.setItem(
       SIMULATOR_STORAGE_KEY,
       JSON.stringify(savedStateFromRunner(inputKey, runner))
@@ -1600,6 +1628,63 @@ function CatalogueCarryProductRow({
   );
 }
 
+function CatalogueOptimizationRemoveRow({
+  accessToken,
+  locale,
+  row
+}: Readonly<{
+  accessToken: string;
+  locale: Locale;
+  row: AdminCatalogueOptimizationData["actionRows"][number];
+}>) {
+  return (
+    <div className="grid gap-3 py-3 lg:grid-cols-[44px_minmax(0,1fr)_120px_120px_120px] lg:items-center">
+      <p className="text-sm font-bold text-slate-400">#{row.rank}</p>
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {row.productId ? (
+            <a
+              className="inline-flex min-w-0 items-center gap-1 truncate text-sm font-semibold text-slate-950 hover:text-[#168060]"
+              href={productDetailHref(row.productId, locale, accessToken)}
+            >
+              <span className="truncate">{row.title}</span>
+              <ArrowTopRightOnSquareIcon className="size-4 shrink-0" aria-hidden={true} />
+            </a>
+          ) : (
+            <p className="truncate text-sm font-semibold text-slate-950">
+              {row.title}
+            </p>
+          )}
+          <Badge className="bg-rose-50 text-rose-700 ring-rose-200">
+            Remove
+          </Badge>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          {row.brandName ?? "No brand"} · {row.reason}
+        </p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Baseline use</p>
+        <p className="font-bold text-slate-950">
+          {numberText(row.affectedPlanCount)}
+        </p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Contribution</p>
+        <p className="font-bold text-slate-950">
+          {percentText(row.coverageImpactPercent)}
+        </p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Price</p>
+        <p className="font-bold text-slate-950">
+          {amountText(row.expectedPriceAmount)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function CatalogueOptimizationReviewToggle({
   checked,
   disabled = false,
@@ -1659,6 +1744,8 @@ function MinimumCataloguePanel({
   locale,
   onCalculate,
   onIncludeReviewPriorityProductsChange,
+  onRecalculate,
+  onReset,
   onStop,
   optimization,
   optimizationProgress,
@@ -1675,6 +1762,8 @@ function MinimumCataloguePanel({
   locale: Locale;
   onCalculate: () => void;
   onIncludeReviewPriorityProductsChange: (checked: boolean) => void;
+  onRecalculate: () => void;
+  onReset: () => void;
   onStop: () => void;
   optimization: AdminCatalogueOptimizationData | null;
   optimizationProgress: AdminCatalogueOptimizationProgress | null;
@@ -1843,9 +1932,15 @@ function MinimumCataloguePanel({
   const basketSummary = potentialBasket?.optimized ?? optimization.optimized;
   const basketProductCount = potentialBasket?.candidateCount ??
     optimization.baseline.productCount;
+  const basketGeneratedAt = potentialBasket?.generatedAt ?? optimization.generatedAt;
+  const basketSampleSize = potentialBasket?.sampleSize ?? optimization.sampleSize;
   const basketNeedsReviewCount = basketProducts.filter((product) =>
     product.readiness === "needs_review"
   ).length;
+  const removeRecommendationRows = optimization.actionRows
+    .filter((row) => row.actionType === "consider_retiring")
+    .slice(0, 8);
+  const sampleCountMismatch = basketSampleSize !== sampleSize;
 
   return (
     <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -1855,15 +1950,42 @@ function MinimumCataloguePanel({
             Optimum product basket
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Products to carry for the highest simulated coverage across{" "}
-            {numberText(sampleSize)} profiles.
+            Products to carry for the highest simulated coverage. Generated{" "}
+            {dateTimeText(basketGeneratedAt, locale)} from{" "}
+            {numberText(basketSampleSize)} profiles.
           </p>
+          {sampleCountMismatch ? (
+            <p className="mt-1 text-xs font-semibold text-amber-700">
+              Current simulator sample count is {numberText(sampleSize)}; recalculate
+              to align this basket with the visible simulation.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CatalogueOptimizationReviewToggle
             checked={includeReviewPriorityProducts}
             onChange={onIncludeReviewPriorityProductsChange}
           />
+          <button
+            className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
+            onClick={onReset}
+            type="button"
+          >
+            Reset
+          </button>
+          <button
+            className={classNames(
+              "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
+              canCalculate
+                ? "bg-[#20343A] text-white ring-[#20343A] hover:bg-[#16252A]"
+                : "bg-slate-100 text-slate-400 ring-slate-200"
+            )}
+            disabled={!canCalculate}
+            onClick={onRecalculate}
+            type="button"
+          >
+            Recalculate
+          </button>
           <Badge className="bg-emerald-50 text-emerald-700 ring-emerald-200">
             {numberText(basketSummary.productCount)} products
           </Badge>
@@ -1921,6 +2043,35 @@ function MinimumCataloguePanel({
           </p>
         )}
       </div>
+
+      {removeRecommendationRows.length > 0 ? (
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">
+                Remove recommendations
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Products outside the minimum carry set that can be considered for
+                retirement.
+              </p>
+            </div>
+            <Badge className="bg-rose-50 text-rose-700 ring-rose-200">
+              {numberText(removeRecommendationRows.length)} candidates
+            </Badge>
+          </div>
+          <div className="mt-2 divide-y divide-slate-200">
+            {removeRecommendationRows.map((row) => (
+              <CatalogueOptimizationRemoveRow
+                accessToken={accessToken}
+                key={row.id}
+                locale={locale}
+                row={row}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -2927,6 +3078,8 @@ export function AdminPlanCoverageSimulatorView({
     useState<CatalogueOptimizationCachedProgress | null>(null);
   const [catalogueOptimizationJob, setCatalogueOptimizationJob] =
     useState<AdminCatalogueOptimizationJobView | null>(null);
+  const [catalogueOptimizationResetKey, setCatalogueOptimizationResetKey] =
+    useState<string | null>(null);
   const [
     includeReviewPriorityProductsInCatalogueOptimization,
     setIncludeReviewPriorityProductsInCatalogueOptimization
@@ -2939,6 +3092,7 @@ export function AdminPlanCoverageSimulatorView({
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
   const runningRef = useRef(false);
+  const catalogueOptimizationResetKeyRef = useRef<string | null>(null);
   const catalogueReviewProductsKey = useMemo(
     () =>
       hashText(
@@ -2977,12 +3131,10 @@ export function AdminPlanCoverageSimulatorView({
       ? catalogueOptimizationProgress
       : null;
   const currentCatalogueOptimizationCachedProgress =
-    includeReviewPriorityProductsInCatalogueOptimization
-      ? catalogueOptimizationJobCachedProgress(
-          catalogueOptimizationJob,
-          simulationData.sampleTraces.length
-        ) ?? catalogueOptimizationCachedProgress
-      : catalogueOptimizationCachedProgress;
+    catalogueOptimizationJobCachedProgress(
+      catalogueOptimizationJob,
+      simulationData.sampleTraces.length
+    ) ?? catalogueOptimizationCachedProgress;
   const currentCatalogueOptimizationElapsedSeconds =
     currentCatalogueOptimizationStatus === "processing" &&
     catalogueOptimizationStartedAt !== null
@@ -3059,6 +3211,10 @@ export function AdminPlanCoverageSimulatorView({
     job: AdminCatalogueOptimizationJobView | null,
     requestKey: string
   ) => {
+    if (catalogueOptimizationResetKeyRef.current === requestKey) {
+      return;
+    }
+
     setCatalogueOptimizationJob(job);
 
     if (!job) {
@@ -3119,13 +3275,17 @@ export function AdminPlanCoverageSimulatorView({
 
   const requestCatalogueOptimizationJob = useCallback(async (
     action: "cancel" | "start" | "status",
-    requestKey: string
+    requestKey: string,
+    options?: Readonly<{ forceRestart?: boolean }>
   ) => {
     const response = await fetch(catalogueOptimizationJobUrl, {
       body: JSON.stringify({
         accessToken,
         action,
         cacheKey: requestKey,
+        ...(action === "start" && options?.forceRestart
+          ? { forceRestart: true }
+          : {}),
         includePendingReviewProducts:
           includeReviewPriorityProductsInCatalogueOptimization,
         ...(action === "start" ? { simulationData } : {})
@@ -3189,6 +3349,7 @@ export function AdminPlanCoverageSimulatorView({
         catalogueOptimizationStatus === "processing" ||
         simulationData.sampleSize < 1 ||
         simulationData.sampleTraces.length < 1 ||
+        catalogueOptimizationResetKey === catalogueOptimizationRunKey ||
         catalogueOptimizationKey === catalogueOptimizationRunKey
       ) {
         return;
@@ -3216,6 +3377,7 @@ export function AdminPlanCoverageSimulatorView({
     };
   }, [
     catalogueOptimizationKey,
+    catalogueOptimizationResetKey,
     catalogueOptimizationRunKey,
     catalogueOptimizationStatus,
     demandGenerating,
@@ -3233,7 +3395,8 @@ export function AdminPlanCoverageSimulatorView({
         running ||
         demandGenerating ||
         simulationData.sampleSize < 1 ||
-        simulationData.sampleTraces.length < 1
+        simulationData.sampleTraces.length < 1 ||
+        catalogueOptimizationResetKey === catalogueOptimizationRunKey
       ) {
         return;
       }
@@ -3257,6 +3420,7 @@ export function AdminPlanCoverageSimulatorView({
     };
   }, [
     applyCatalogueOptimizationJob,
+    catalogueOptimizationResetKey,
     catalogueOptimizationRunKey,
     demandGenerating,
     requestCatalogueOptimizationJob,
@@ -3692,9 +3856,12 @@ export function AdminPlanCoverageSimulatorView({
     }
   }
 
-  function clearCatalogueOptimization(options?: Readonly<{ clearSaved?: boolean }>) {
+  function clearCatalogueOptimization(options?: Readonly<{
+    cacheKey?: string;
+    clearSaved?: boolean;
+  }>) {
     if (options?.clearSaved) {
-      clearSavedCatalogueOptimization();
+      clearSavedCatalogueOptimization(options.cacheKey);
     }
 
     setCatalogueOptimization(null);
@@ -3704,10 +3871,14 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationStartedAt(null);
     setCatalogueOptimizationCachedProgress(null);
     setCatalogueOptimizationJob(null);
+    catalogueOptimizationResetKeyRef.current = null;
+    setCatalogueOptimizationResetKey(null);
     setCatalogueOptimizationStatus("idle");
   }
 
-  async function calculateCatalogueOptimization() {
+  async function calculateCatalogueOptimization(options?: Readonly<{
+    forceRestart?: boolean;
+  }>) {
     if (
       catalogueOptimizationStatus === "processing" ||
       running ||
@@ -3719,6 +3890,13 @@ export function AdminPlanCoverageSimulatorView({
     }
 
     const requestKey = catalogueOptimizationRunKey;
+
+    catalogueOptimizationResetKeyRef.current = null;
+    setCatalogueOptimizationResetKey(null);
+
+    if (options?.forceRestart) {
+      clearSavedCatalogueOptimization(requestKey);
+    }
 
     setCatalogueOptimization(null);
     setCatalogueOptimizationError(null);
@@ -3740,7 +3918,11 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationStatus("processing");
 
     try {
-      const job = await requestCatalogueOptimizationJob("start", requestKey);
+      const job = await requestCatalogueOptimizationJob(
+        "start",
+        requestKey,
+        { forceRestart: options?.forceRestart }
+      );
       applyCatalogueOptimizationJob(job, requestKey);
     } catch (error) {
       setCatalogueOptimization(null);
@@ -3753,6 +3935,19 @@ export function AdminPlanCoverageSimulatorView({
       setCatalogueOptimizationStartedAt(null);
       setCatalogueOptimizationStatus("idle");
     }
+  }
+
+  function resetCatalogueOptimization() {
+    clearCatalogueOptimization({
+      cacheKey: catalogueOptimizationRunKey,
+      clearSaved: true
+    });
+    catalogueOptimizationResetKeyRef.current = catalogueOptimizationRunKey;
+    setCatalogueOptimizationResetKey(catalogueOptimizationRunKey);
+  }
+
+  function recalculateCatalogueOptimization() {
+    void calculateCatalogueOptimization({ forceRestart: true });
   }
 
   function startSimulation() {
@@ -4117,6 +4312,8 @@ export function AdminPlanCoverageSimulatorView({
         onIncludeReviewPriorityProductsChange={
           setIncludeReviewPriorityProductsInCatalogueOptimization
         }
+        onRecalculate={recalculateCatalogueOptimization}
+        onReset={resetCatalogueOptimization}
         onStop={stopCatalogueOptimization}
         optimization={currentCatalogueOptimization}
         optimizationProgress={currentCatalogueOptimizationProgress}

@@ -1414,6 +1414,13 @@ describe("product coverage workflow", () => {
     assert.match(view, /shared background job/);
     assert.match(view, /profiles completed by shared job/);
     assert.match(view, /Shared job progress found/);
+    assert.match(view, /Reset/);
+    assert.match(view, /Recalculate/);
+    assert.match(view, /forceRestart: true/);
+    assert.match(view, /dateTimeText/);
+    assert.match(view, /Generated/);
+    assert.match(view, /sample count is/);
+    assert.match(view, /catalogueOptimizationResetKey/);
     assert.match(view, /durationText/);
     assert.match(view, /Optimum basket request failed/);
     assert.doesNotMatch(view, /Minimum catalogue request failed/);
@@ -1424,6 +1431,7 @@ describe("product coverage workflow", () => {
     assert.match(view, /applyCatalogueOptimizationJob/);
     assert.match(view, /catalogueOptimizationJobCachedProgress/);
     assert.match(view, /cacheKey: requestKey/);
+    assert.match(view, /existing\.sampleSize > runner\.sampleSize/);
     assert.match(view, /Include pending-review products/);
     assert.match(view, /Shows the best possible basket if pending products were approved/);
     assert.match(view, /includeReviewPriorityProductsInCatalogueOptimization/);
@@ -1435,6 +1443,7 @@ describe("product coverage workflow", () => {
     assert.doesNotMatch(catalogueOptimizationRoute, /runAdminCataloguePotentialOptimizationFast/);
     assert.doesNotMatch(catalogueOptimizationRoute, /getProductRecommendationCandidates/);
     assert.match(catalogueOptimizationJobRoute, /startAdminCatalogueOptimizationJob/);
+    assert.match(catalogueOptimizationJobRoute, /forceRestart/);
     assert.match(catalogueOptimizationJobRoute, /getAdminCatalogueOptimizationJob/);
     assert.match(catalogueOptimizationJobRoute, /cancelAdminCatalogueOptimizationJob/);
     assert.match(catalogueOptimizationJobs, /public\.tasks/);
@@ -1446,6 +1455,9 @@ describe("product coverage workflow", () => {
       /on conflict \(idempotency_scope_key, idempotency_key\)[\s\S]*do nothing/
     );
     assert.match(catalogueOptimizationJobs, /result_payload/);
+    assert.match(catalogueOptimizationJobs, /restartCompleted/);
+    assert.match(catalogueOptimizationJobs, /existingStatus === "completed"/);
+    assert.match(catalogueOptimizationJobs, /attempts = 0/);
     assert.match(catalogueOptimizationJobs, /notifyTaskQueueChanged/);
     assert.match(catalogueOptimizationJobs, /analytics_catalogue_optimization|requiredCapabilitiesForWorkTaskType/);
     assert.doesNotMatch(catalogueOptimizationJobs, /kickAdminCatalogueOptimizationJob/);
@@ -1476,7 +1488,8 @@ describe("product coverage workflow", () => {
       view,
       /!includeReviewPriorityProductsInCatalogueOptimization \|\|\s*\n\s*running/
     );
-    assert.doesNotMatch(view, /Catalogue actions/);
+    assert.match(view, /Remove recommendations/);
+    assert.match(view, /actionType === "consider_retiring"/);
     assert.match(view, /Average stack coverage contribution/);
     assert.match(view, /Chosen rate/);
     assert.match(view, /productScatterRows/);

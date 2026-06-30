@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
     return jobResponse(
       await startAdminCatalogueOptimizationJob({
         cacheKey,
+        forceRestart: body.forceRestart === true,
         includePendingReviewProducts:
           body.includePendingReviewProducts !== false,
         simulationData
@@ -85,4 +86,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
