@@ -1297,18 +1297,22 @@ describe("product coverage workflow", () => {
     const packageJson = readFileSync("package.json", "utf8");
 
     assert.match(dashboardContent, /"product-coverage"/);
+    assert.match(dashboardContent, /"product-optimisation"/);
     assert.match(dashboardContent, /"plan-coverage-simulator"/);
     assert.match(dashboardContent, /Supplement Coverage/);
+    assert.match(dashboardContent, /Product Optimisation/);
     assert.doesNotMatch(dashboardContent, /Product Coverage/);
     assert.doesNotMatch(dashboardContent, /"product-insights"/);
     assert.doesNotMatch(dashboardContent, /"supplement-insights"/);
     assert.doesNotMatch(dashboardContent, /"coverage-improvement-insights"/);
     assert.match(dashboard, /AdminProductCoverageView/);
     assert.match(dashboard, /AdminPlanCoverageSimulatorView/);
+    assert.match(dashboard, /AdminProductOptimisationView/);
     assert.match(dashboard, /Shows every active supplement/);
     assert.match(dashboard, /Run synthetic customer plans/);
+    assert.match(dashboard, /Run the product basket optimiser/);
     assert.match(page, /getAdminProductCoverageData/);
-    assert.doesNotMatch(page, /getAdminPlanCoverageSimulationData/);
+    assert.match(page, /getAdminPlanCoverageSimulationData/);
     assert.match(page, /retiredInsightsReplacementView/);
     assert.match(page, /product-insights/);
     assert.match(readModel, /targetComparableAmountBySupplement/);
@@ -1342,6 +1346,7 @@ describe("product coverage workflow", () => {
     assert.match(view, /admin-plan-coverage-simulator:v4/);
     assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
     assert.match(view, /supplementGovernanceHash: data\.input\.supplementGovernanceHash/);
+    assert.doesNotMatch(view, /demandProfiles: data\.input\.demandProfiles\.map/);
     assert.match(view, /sanitizeDemandProfilesForSimulationSupplements/);
     assert.match(view, /type SavedDemandProfilesEntry/);
     assert.match(view, /savedDemandProfileEntriesFromStorage/);
@@ -1351,6 +1356,8 @@ describe("product coverage workflow", () => {
     assert.match(view, /saveDemandProfiles\(demandKey, savedProfiles\)/);
     assert.match(view, /saveSimulationState\(simulationInputKey\(nextData\), runner\)/);
     assert.doesNotMatch(view, /saveSimulationState\(inputKey, runner\)/);
+    assert.match(view, /existingEntry\.profiles\.length > currentProfiles\.length/);
+    assert.match(view, /setHydrated\(\(current\) => current && sameSelectedCountry\)/);
     assert.doesNotMatch(view, /parsed\.demandKey !== expectedDemandKey/);
     assert.doesNotMatch(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
     assert.match(view, /function savedDemandProfiles/);
@@ -1405,6 +1412,9 @@ describe("product coverage workflow", () => {
     assert.match(view, /popstate/);
     assert.match(view, /Product performance/);
     assert.match(view, /Optimum product basket/);
+    assert.match(view, /AdminProductOptimisationView/);
+    assert.match(view, /mode="optimisation"/);
+    assert.match(view, /productOptimisationMode \? \(/);
     assert.doesNotMatch(view, /catalogueOptimizationHref/);
     assert.match(view, /catalogueOptimizationJobHref/);
     assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization\/jobs/);
@@ -1413,6 +1423,8 @@ describe("product coverage workflow", () => {
     assert.match(view, /Evaluating potential basket/);
     assert.match(view, /shared background job/);
     assert.match(view, /profiles completed by shared job/);
+    assert.match(view, /Waiting for Analytics worker/);
+    assert.match(view, /Restart queued job/);
     assert.match(view, /Shared job progress found/);
     assert.match(view, /Reset/);
     assert.match(view, /Recalculate/);
@@ -1455,8 +1467,9 @@ describe("product coverage workflow", () => {
       /on conflict \(idempotency_scope_key, idempotency_key\)[\s\S]*do nothing/
     );
     assert.match(catalogueOptimizationJobs, /result_payload/);
-    assert.match(catalogueOptimizationJobs, /restartCompleted/);
+    assert.match(catalogueOptimizationJobs, /restartRequested/);
     assert.match(catalogueOptimizationJobs, /existingStatus === "completed"/);
+    assert.match(catalogueOptimizationJobs, /existingStatus === "queued"/);
     assert.match(catalogueOptimizationJobs, /attempts = 0/);
     assert.match(catalogueOptimizationJobs, /notifyTaskQueueChanged/);
     assert.match(catalogueOptimizationJobs, /analytics_catalogue_optimization|requiredCapabilitiesForWorkTaskType/);

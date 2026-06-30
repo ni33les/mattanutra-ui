@@ -126,6 +126,7 @@ type CatalogueOptimizationCachedProgress = Readonly<{
 type SimulatorInputStatus = "error" | "loading" | "ready";
 type SimulatorClearTarget = "all" | "profiles" | "results";
 type CatalogueOptimizationStatus = "blocked" | "idle" | "processing" | "ready";
+type PlanCoverageSimulatorMode = "optimisation" | "simulator";
 type SimulatorProgressDisplay = Readonly<{
   current: number;
   total: number;
@@ -258,21 +259,6 @@ function simulationInputKey(data: AdminPlanCoverageSimulationData) {
         unitPriceAmount: candidate.unitPriceAmount ?? null
       })),
       countryCode: data.input.countryCode,
-      demandProfiles: data.input.demandProfiles.map((profile) => ({
-        archetypeId: profile.archetypeId,
-        clientSex: profile.clientSex,
-        id: profile.id,
-        needs: profile.needs.map((need) => ({
-          displayName: need.displayName,
-          id: need.id,
-          normalizedName: need.normalizedName,
-          sourceId: need.sourceId,
-          targetComparableAmount: need.targetComparableAmount ?? null,
-          targetText: need.targetText ?? null,
-          weight: need.weight
-        })),
-        sampleIndex: profile.sampleIndex
-      })),
       seed: data.input.seed,
       supplementGovernanceHash: data.input.supplementGovernanceHash,
       supplements: data.input.supplements.map((supplement) => ({
@@ -426,11 +412,20 @@ function saveDemandProfiles(
     const savedAt = new Date().toISOString();
     const currentProfiles = savedDemandProfiles(profiles);
     const entries = savedDemandProfileEntriesFromStorage();
+    const existingEntry = entries.find((entry) => entry.demandKey === demandKey);
+    const profilesToSave =
+      existingEntry && existingEntry.profiles.length > currentProfiles.length
+        ? existingEntry.profiles
+        : currentProfiles;
+    const savedAtToSave =
+      existingEntry && existingEntry.profiles.length > currentProfiles.length
+        ? existingEntry.savedAt
+        : savedAt;
     const nextEntries = [
       {
         demandKey,
-        profiles: currentProfiles,
-        savedAt
+        profiles: profilesToSave,
+        savedAt: savedAtToSave
       },
       ...entries.filter((entry) => entry.demandKey !== demandKey)
     ];
@@ -1742,6 +1737,7 @@ function MinimumCataloguePanel({
   error,
   includeReviewPriorityProducts,
   locale,
+  onRestartQueued,
   onCalculate,
   onIncludeReviewPriorityProductsChange,
   onRecalculate,
@@ -1749,6 +1745,8 @@ function MinimumCataloguePanel({
   onStop,
   optimization,
   optimizationProgress,
+  queued,
+  canRestartQueued,
   optimizationStatus,
   running,
   sampleSize
@@ -1763,10 +1761,13 @@ function MinimumCataloguePanel({
   onCalculate: () => void;
   onIncludeReviewPriorityProductsChange: (checked: boolean) => void;
   onRecalculate: () => void;
+  onRestartQueued: () => void;
   onReset: () => void;
   onStop: () => void;
   optimization: AdminCatalogueOptimizationData | null;
   optimizationProgress: AdminCatalogueOptimizationProgress | null;
+  queued: boolean;
+  canRestartQueued: boolean;
   optimizationStatus: CatalogueOptimizationStatus;
   running: boolean;
   sampleSize: number;
@@ -1797,13 +1798,14 @@ function MinimumCataloguePanel({
               Optimum product basket
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Calculating the product basket as a shared background job. You can
-              leave this page and return later.
+              {queued
+                ? "Waiting for the Analytics worker to start this shared background job."
+                : "Calculating the product basket as a shared background job. You can leave this page and return later."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="bg-blue-50 text-blue-700 ring-blue-200">
-              Optimizing
+              {queued ? "Queued" : "Optimizing"}
             </Badge>
             <CatalogueOptimizationReviewToggle
               checked={includeReviewPriorityProducts}
@@ -1817,13 +1819,30 @@ function MinimumCataloguePanel({
             >
               Stop
             </button>
+            {queued ? (
+              <button
+                className={classNames(
+                  "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
+                  canRestartQueued
+                    ? "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                    : "bg-slate-100 text-slate-400 ring-slate-200"
+                )}
+                disabled={!canRestartQueued}
+                onClick={onRestartQueued}
+                type="button"
+              >
+                Restart queued job
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="mt-4 rounded-md bg-blue-50 p-3 text-sm text-blue-800 ring-1 ring-blue-100">
           <p className="font-semibold">
-            {optimizationProgress?.current
-              ? "Still working"
-              : "Preparing the shared job"}
+            {queued
+              ? "Waiting for Analytics worker"
+              : optimizationProgress?.current
+                ? "Still working"
+                : "Preparing the shared job"}
             {elapsedSeconds !== null ? ` · ${durationText(elapsedSeconds)} elapsed` : ""}
           </p>
           <p className="mt-1 text-blue-700">
@@ -3008,13 +3027,16 @@ export function AdminPlanCoverageSimulatorView({
   accessToken,
   data,
   locale,
+  mode = "simulator",
   range
 }: Readonly<{
   accessToken: string;
   data: AdminPlanCoverageSimulationData;
   locale: Locale;
+  mode?: PlanCoverageSimulatorMode;
   range: AdminDashboardRange;
 }>) {
+  const productOptimisationMode = mode === "optimisation";
   const [selectedCountryCode, setSelectedCountryCode] = useState(() =>
     normalizedSimulatorCountryCode(data.countryCode)
   );
@@ -3142,9 +3164,20 @@ export function AdminPlanCoverageSimulatorView({
           (catalogueOptimizationHeartbeat - catalogueOptimizationStartedAt) / 1000
         )
       : null;
+  const currentCatalogueOptimizationQueued =
+    currentCatalogueOptimizationStatus === "processing" &&
+    catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey &&
+    catalogueOptimizationJob.status === "queued";
+  const canRestartQueuedCatalogueOptimization =
+    currentCatalogueOptimizationQueued &&
+    (currentCatalogueOptimizationElapsedSeconds ?? 0) >= 30;
   const progressDisplay = simulationProgressDisplay({
-    catalogueOptimizationProgress: currentCatalogueOptimizationProgress,
-    catalogueOptimizationStatus: currentCatalogueOptimizationStatus,
+    catalogueOptimizationProgress: productOptimisationMode
+      ? currentCatalogueOptimizationProgress
+      : null,
+    catalogueOptimizationStatus: productOptimisationMode
+      ? currentCatalogueOptimizationStatus
+      : "idle",
     demandProfiles,
     generating: demandGenerating,
     running,
@@ -3343,6 +3376,7 @@ export function AdminPlanCoverageSimulatorView({
     const timeoutId = window.setTimeout(() => {
       if (
         cancelled ||
+        !productOptimisationMode ||
         includeReviewPriorityProductsInCatalogueOptimization ||
         running ||
         demandGenerating ||
@@ -3382,6 +3416,7 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationStatus,
     demandGenerating,
     includeReviewPriorityProductsInCatalogueOptimization,
+    productOptimisationMode,
     running,
     simulationData.sampleSize,
     simulationData.sampleTraces.length
@@ -3392,6 +3427,7 @@ export function AdminPlanCoverageSimulatorView({
     const timeoutId = window.setTimeout(() => {
       if (
         cancelled ||
+        !productOptimisationMode ||
         running ||
         demandGenerating ||
         simulationData.sampleSize < 1 ||
@@ -3423,6 +3459,7 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationResetKey,
     catalogueOptimizationRunKey,
     demandGenerating,
+    productOptimisationMode,
     requestCatalogueOptimizationJob,
     running,
     simulationData.sampleSize,
@@ -3432,6 +3469,7 @@ export function AdminPlanCoverageSimulatorView({
   useEffect(() => {
     if (
       currentCatalogueOptimizationStatus !== "processing" ||
+      !productOptimisationMode ||
       catalogueOptimizationKey !== catalogueOptimizationRunKey
     ) {
       return;
@@ -3466,6 +3504,7 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationKey,
     catalogueOptimizationRunKey,
     currentCatalogueOptimizationStatus,
+    productOptimisationMode,
     requestCatalogueOptimizationJob
   ]);
 
@@ -3531,8 +3570,10 @@ export function AdminPlanCoverageSimulatorView({
       }, SIMULATOR_INPUT_TIMEOUT_MS);
       setInputStatus("loading");
       setInputError(null);
+      const sameSelectedCountry =
+        normalizedSimulatorCountryCode(data.countryCode) === selectedCountryCode;
       const loadingData =
-        normalizedSimulatorCountryCode(data.countryCode) === selectedCountryCode
+        sameSelectedCountry
           ? data
           : emptyAdminPlanCoverageSimulationData({
               countryCode: selectedCountryCode,
@@ -3541,10 +3582,12 @@ export function AdminPlanCoverageSimulatorView({
             });
 
       setInputData(loadingData);
-      setSimulationData(initialSimulationData(loadingData));
-      setHydrated(false);
+      if (!hydrated || !sameSelectedCountry) {
+        setSimulationData(initialSimulationData(loadingData));
+        runnerRef.current = null;
+      }
+      setHydrated((current) => current && sameSelectedCountry);
       setRunning(false);
-      runnerRef.current = null;
 
       fetch(simulatorInputHref(selectedCountryCode, accessToken, range), {
         cache: "no-store",
@@ -3604,7 +3647,7 @@ export function AdminPlanCoverageSimulatorView({
       controller?.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [accessToken, data, inputRefreshNonce, range, selectedCountryCode]);
+  }, [accessToken, data, hydrated, inputRefreshNonce, range, selectedCountryCode]);
 
   useEffect(() => {
     if (inputStatus !== "ready") {
@@ -3656,7 +3699,9 @@ export function AdminPlanCoverageSimulatorView({
       }
 
       if (inputStatus === "loading") {
-        runnerRef.current = null;
+        if (!hydrated) {
+          runnerRef.current = null;
+        }
         setRunning(false);
         return;
       }
@@ -3694,6 +3739,7 @@ export function AdminPlanCoverageSimulatorView({
   }, [
     activeInputData,
     demandGenerating,
+    hydrated,
     inputKey,
     inputStatus,
     running
@@ -3878,9 +3924,10 @@ export function AdminPlanCoverageSimulatorView({
 
   async function calculateCatalogueOptimization(options?: Readonly<{
     forceRestart?: boolean;
+    ignoreProcessing?: boolean;
   }>) {
     if (
-      catalogueOptimizationStatus === "processing" ||
+      (!options?.ignoreProcessing && catalogueOptimizationStatus === "processing") ||
       running ||
       demandGenerating ||
       simulationData.sampleSize < 1 ||
@@ -3948,6 +3995,13 @@ export function AdminPlanCoverageSimulatorView({
 
   function recalculateCatalogueOptimization() {
     void calculateCatalogueOptimization({ forceRestart: true });
+  }
+
+  function restartQueuedCatalogueOptimization() {
+    void calculateCatalogueOptimization({
+      forceRestart: true,
+      ignoreProcessing: true
+    });
   }
 
   function startSimulation() {
@@ -4063,7 +4117,11 @@ export function AdminPlanCoverageSimulatorView({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-950">Plan coverage projection</h2>
+          <h2 className="text-lg font-bold text-slate-950">
+            {productOptimisationMode
+              ? "Product optimisation run"
+              : "Plan coverage projection"}
+          </h2>
           <p className="text-sm text-slate-500">
             {simulationData.countryCode} catalogue · seed {simulationData.seed} ·{" "}
             currency {simulationData.summary.currency} ·{" "}
@@ -4111,8 +4169,12 @@ export function AdminPlanCoverageSimulatorView({
       </div>
 
       <SimulationProgressPanel
-        catalogueOptimizationProgress={currentCatalogueOptimizationProgress}
-        catalogueOptimizationStatus={currentCatalogueOptimizationStatus}
+        catalogueOptimizationProgress={
+          productOptimisationMode ? currentCatalogueOptimizationProgress : null
+        }
+        catalogueOptimizationStatus={
+          productOptimisationMode ? currentCatalogueOptimizationStatus : "idle"
+        }
         demandError={demandError}
         generating={demandGenerating}
         hydrated={hydrated}
@@ -4136,12 +4198,15 @@ export function AdminPlanCoverageSimulatorView({
         />
       ) : null}
 
-      <ProductPerformanceScatter
-        currency={simulationData.summary.currency}
-        rows={scatterRows}
-        sampleSize={simulationData.sampleSize}
-      />
+      {!productOptimisationMode ? (
+        <ProductPerformanceScatter
+          currency={simulationData.summary.currency}
+          rows={scatterRows}
+          sampleSize={simulationData.sampleSize}
+        />
+      ) : null}
 
+      {!productOptimisationMode ? (
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
         <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="flex items-center justify-between gap-3">
@@ -4231,7 +4296,9 @@ export function AdminPlanCoverageSimulatorView({
           </div>
         </section>
       </div>
+      ) : null}
 
+      {!productOptimisationMode ? (
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -4291,7 +4358,9 @@ export function AdminPlanCoverageSimulatorView({
           )}
         </div>
       </section>
+      ) : null}
 
+      {productOptimisationMode ? (
       <MinimumCataloguePanel
         accessToken={accessToken}
         canCalculate={
@@ -4313,15 +4382,28 @@ export function AdminPlanCoverageSimulatorView({
           setIncludeReviewPriorityProductsInCatalogueOptimization
         }
         onRecalculate={recalculateCatalogueOptimization}
+        onRestartQueued={restartQueuedCatalogueOptimization}
         onReset={resetCatalogueOptimization}
         onStop={stopCatalogueOptimization}
         optimization={currentCatalogueOptimization}
         optimizationProgress={currentCatalogueOptimizationProgress}
+        queued={currentCatalogueOptimizationQueued}
+        canRestartQueued={canRestartQueuedCatalogueOptimization}
         optimizationStatus={currentCatalogueOptimizationStatus}
         running={running || demandGenerating}
         sampleSize={simulationData.sampleSize}
       />
+      ) : null}
 
     </div>
   );
+}
+
+export function AdminProductOptimisationView(props: Readonly<{
+  accessToken: string;
+  data: AdminPlanCoverageSimulationData;
+  locale: Locale;
+  range: AdminDashboardRange;
+}>) {
+  return <AdminPlanCoverageSimulatorView {...props} mode="optimisation" />;
 }

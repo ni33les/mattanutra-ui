@@ -66,6 +66,11 @@ export async function rejectUnauthorizedPlanCoverageRequest(
       context,
       "plan-coverage-simulator",
       context.effectiveOrganisation.type
+    ) &&
+    !adminViewAllowed(
+      context,
+      "product-optimisation",
+      context.effectiveOrganisation.type
     )
   ) {
     return NextResponse.json(
@@ -137,4 +142,3 @@ export function potentialCandidateHash(candidates: readonly ProductCandidate[]) 
     .update(JSON.stringify(hashableCandidates))
     .digest("hex");
 }
-

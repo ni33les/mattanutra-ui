@@ -320,14 +320,20 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
 
   const existing = await jobByKey(sql, input.cacheKey);
   const existingStatus = existing ? jobStatus(existing.status) : null;
-  const restartCompleted =
-    input.forceRestart === true && existingStatus === "completed";
+  const restartRequested =
+    input.forceRestart === true &&
+    (
+      existingStatus === "completed" ||
+      existingStatus === "failed" ||
+      existingStatus === "cancelled" ||
+      existingStatus === "queued"
+    );
 
   if (
     existing &&
     existingStatus !== "failed" &&
     existingStatus !== "cancelled" &&
-    !restartCompleted
+    !restartRequested
   ) {
     return jobView(existing);
   }

@@ -52,6 +52,11 @@ export async function POST(request: NextRequest) {
       context,
       "plan-coverage-simulator",
       context.effectiveOrganisation.type
+    ) &&
+    !adminViewAllowed(
+      context,
+      "product-optimisation",
+      context.effectiveOrganisation.type
     )
   ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

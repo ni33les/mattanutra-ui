@@ -688,6 +688,10 @@
       "view": "product-coverage"
     },
     {
+      "name": "产品优化",
+      "view": "product-optimisation"
+    },
+    {
       "name": "方案模拟器",
       "view": "plan-coverage-simulator"
     }
@@ -734,6 +738,7 @@
     "people": "人员",
     "panya": "Panya",
     "plan-coverage-simulator": "方案覆盖模拟器",
+    "product-optimisation": "产品优化",
     "product-coverage": "补充剂覆盖",
     "products": "产品",
     "retail-customer-orders": "客户订单",

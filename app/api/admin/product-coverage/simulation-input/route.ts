@@ -54,6 +54,11 @@ export async function GET(request: NextRequest) {
       context,
       "plan-coverage-simulator",
       context.effectiveOrganisation.type
+    ) &&
+    !adminViewAllowed(
+      context,
+      "product-optimisation",
+      context.effectiveOrganisation.type
     )
   ) {
     return NextResponse.json(

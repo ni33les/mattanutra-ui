@@ -50,6 +50,7 @@ export type AdminDashboardView =
   | "people"
   | "panya"
   | "plan-coverage-simulator"
+  | "product-optimisation"
   | "product-coverage"
   | "products"
   | "reviews"
@@ -1471,6 +1472,7 @@ const baseContent = {
     insights: [
       { icon: UserGroupIcon, name: "Customer Intelligence", view: "customer-insights" },
       { icon: BeakerIcon, name: "Supplement Coverage", view: "product-coverage" },
+      { icon: SparklesIcon, name: "Product Optimisation", view: "product-optimisation" },
       { icon: FunnelIcon, name: "Plan Simulator", view: "plan-coverage-simulator" }
     ],
     insightsTitle: "Insights",
@@ -1503,6 +1505,7 @@ const baseContent = {
       people: "People",
       panya: "Panya",
       "plan-coverage-simulator": "Plan Coverage Simulator",
+      "product-optimisation": "Product Optimisation",
       "product-coverage": "Supplement Coverage",
       products: "Products",
       "retail-customer-orders": "Customer Orders",
@@ -2345,6 +2348,7 @@ const baseContent = {
     insights: [
       { icon: UserGroupIcon, name: "ข้อมูลลูกค้า", view: "customer-insights" },
       { icon: BeakerIcon, name: "ความครอบคลุมอาหารเสริม", view: "product-coverage" },
+      { icon: SparklesIcon, name: "ปรับตะกร้าสินค้า", view: "product-optimisation" },
       { icon: FunnelIcon, name: "จำลองความครอบคลุม", view: "plan-coverage-simulator" }
     ],
     insightsTitle: "อินไซต์",
@@ -2377,6 +2381,7 @@ const baseContent = {
       people: "ผู้ใช้",
       panya: "Panya",
       "plan-coverage-simulator": "จำลองความครอบคลุมแผน",
+      "product-optimisation": "ปรับตะกร้าสินค้า",
       "product-coverage": "ความครอบคลุมอาหารเสริม",
       products: "สินค้า",
       "retail-customer-orders": "คำสั่งซื้อลูกค้า",

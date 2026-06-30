@@ -239,6 +239,7 @@ const adminViews = [
   "content",
   "customer-insights",
   "product-coverage",
+  "product-optimisation",
   "plan-coverage-simulator",
   "visibility",
   "people",
@@ -348,6 +349,7 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
     view === "campaigns" ||
     view === "customer-insights" ||
     view === "plan-coverage-simulator" ||
+    view === "product-optimisation" ||
     view === "product-coverage" ||
     view === "leads"
   ) {
