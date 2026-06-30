@@ -77,6 +77,7 @@ type JobResultPayload = Readonly<{
 
 export const ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE =
   "admin_catalogue_optimization_job";
+const ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS = 3;
 const jobIdempotencyScopeKey = "admin_catalogue_optimization_job";
 
 function toIsoString(value: Date | string | null | undefined) {
@@ -445,7 +446,7 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           ${jobIdempotencyScopeKey},
           now(),
           0,
-          1,
+          ${ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS},
           now(),
           now()
         where not exists (
