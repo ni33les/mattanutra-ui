@@ -5,9 +5,9 @@ import {
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
-import { applyTaskFailureResult } from "@/lib/task-result-applier";
 import { buildTaskWorkItem } from "@/lib/task-work-items";
 import { enqueueMissingProductRecommendationsForReadyPlans } from "@/lib/task-worker";
+import { applyTaskFailureResult } from "@/lib/task-result-applier";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
   failTask,
@@ -24,6 +24,7 @@ export const runtime = "nodejs";
 
 const DEFAULT_RESERVE_POLL_INTERVAL_MS = 5_000;
 const INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000;
+const RESERVE_EXPIRED_SWEEP_BATCH_LIMIT = 3;
 const INTERACTIVE_TASK_TYPES = new Set([
   "analyze_healthscore",
   "generate_food_gap_guidance",
@@ -63,6 +64,7 @@ function reservePollIntervalMs(taskTypes: readonly string[]) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const access = await requireWorkerAccess(request);
   const unauthorized = access.unauthorized;
 
@@ -87,25 +89,29 @@ export async function POST(request: Request) {
   }
 
   try {
+    const heartbeatStartedAt = Date.now();
     await heartbeatWorkerSession({
       accessScope: access.scope,
       agentId,
       status: "polling",
       workerSessionId
     });
+    const heartbeatDurationMs = Date.now() - heartbeatStartedAt;
 
-    await releaseExpiredReservations({
-      applyFailure: (context) =>
-        applyTaskFailureResult({
-          afterCommit: context.afterCommit,
-          errorMessage: context.errorMessage,
-          resultPayload: context.resultPayload,
-          retryWillBeScheduled: context.retryWillBeScheduled,
-          sql: context.sql,
-          task: context.task,
-          taskId: context.task.id
-        })
+    const sweepStartedAt = Date.now();
+    const releasedExpiredReservations = await releaseExpiredReservations({
+      batchLimit: RESERVE_EXPIRED_SWEEP_BATCH_LIMIT
     });
+    const sweepDurationMs = Date.now() - sweepStartedAt;
+
+    if (sweepDurationMs > 1_000 || releasedExpiredReservations > 0) {
+      console.info("[tasks:reserve] expired reservation sweep", {
+        durationMs: sweepDurationMs,
+        releasedExpiredReservations,
+        taskTypes,
+        workerSessionId
+      });
+    }
 
     if (taskTypes.includes("generate_product_recommendations")) {
       await enqueueMissingProductRecommendationsForReadyPlans();
@@ -131,13 +137,32 @@ export async function POST(request: Request) {
       if (!reserved) {
         if (Date.now() >= deadline) {
           if (workerSessionId) {
+            const idleHeartbeatStartedAt = Date.now();
             await heartbeatWorkerSession({
               accessScope: access.scope,
               agentId,
               status: "idle",
               workerSessionId
             });
+            const idleHeartbeatDurationMs = Date.now() - idleHeartbeatStartedAt;
+
+            if (idleHeartbeatDurationMs > 1_000) {
+              console.info("[tasks:reserve] idle heartbeat", {
+                durationMs: idleHeartbeatDurationMs,
+                taskTypes,
+                workerSessionId
+              });
+            }
           }
+
+          console.info("[tasks:reserve]", {
+            heartbeatDurationMs,
+            reserved: false,
+            sweepDurationMs,
+            taskTypes,
+            totalDurationMs: Date.now() - startedAt,
+            workerSessionId
+          });
 
           return openClawJson({ task: null });
         }
@@ -205,6 +230,16 @@ export async function POST(request: Request) {
         severity: "low"
       });
 
+      console.info("[tasks:reserve]", {
+        heartbeatDurationMs,
+        reserved: true,
+        sweepDurationMs,
+        taskId: reserved.task.id,
+        taskType: reserved.task.taskType,
+        totalDurationMs: Date.now() - startedAt,
+        workerSessionId
+      });
+
       return openClawJson({
         agent: reserved.agent,
         comments: bundle.comments,
@@ -215,6 +250,13 @@ export async function POST(request: Request) {
       });
     }
   } catch (error) {
+    console.warn("[tasks:reserve] failed", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      taskTypes,
+      totalDurationMs: Date.now() - startedAt,
+      workerSessionId
+    });
+
     return taskApiError(error, "Unable to reserve task");
   }
 }

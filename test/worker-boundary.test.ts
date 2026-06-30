@@ -415,6 +415,16 @@ describe("external worker boundaries", () => {
       "a malformed reserved task should be failed and skipped without turning reserve into a worker-visible 500",
     );
     assert.match(
+      source,
+      /RESERVE_EXPIRED_SWEEP_BATCH_LIMIT = 3[\s\S]*releaseExpiredReservations\(\{[\s\S]*batchLimit: RESERVE_EXPIRED_SWEEP_BATCH_LIMIT/,
+      "worker reserve polling must not block behind a full expired-reservation sweep",
+    );
+    assert.match(
+      source,
+      /\[tasks:reserve\][\s\S]*totalDurationMs/,
+      "worker reserve polling must emit timing logs for production diagnosis",
+    );
+    assert.match(
       serviceSource,
       /notifyTaskQueueChanged\(\)/,
       "task creation should notify waiting workers without constant DB polling",

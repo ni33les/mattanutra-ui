@@ -570,6 +570,8 @@ function saveSimulationState(
         existing.version === 5 &&
         existing.inputKey === inputKey &&
         typeof existing.sampleSize === "number" &&
+        Array.isArray(existing.sampleTraces) &&
+        existing.sampleTraces.length >= existing.sampleSize &&
         existing.sampleSize > runner.sampleSize
       ) {
         return;
@@ -657,6 +659,20 @@ function loadSavedCatalogueOptimization(cacheKey: string) {
         : entry.cacheKey === cacheKey ||
           entry.baseCacheKey === cacheKey
     )?.optimization ?? null;
+}
+
+function catalogueOptimizationMatchesSampleSize(
+  optimization: AdminCatalogueOptimizationData,
+  sampleSize: number
+) {
+  if (optimization.sampleSize !== sampleSize) {
+    return false;
+  }
+
+  return !(
+    optimization.potential?.status === "ready" &&
+    optimization.potential.sampleSize !== sampleSize
+  );
 }
 
 function saveCatalogueOptimization(
@@ -766,8 +782,25 @@ function runnerFromSavedState(
   runner.generatedAt = saved.generatedAt;
   runner.productStats = new Map(saved.productStats);
   runner.randomState = saved.randomState;
-  runner.sampleSize = Math.max(0, Math.floor(saved.sampleSize));
   runner.sampleTraces = [...(saved.sampleTraces ?? [])];
+  runner.sampleSize = Math.max(
+    0,
+    Math.min(
+      Math.floor(saved.sampleSize),
+      runner.sampleTraces.length,
+      saved.coverageValues.length,
+      saved.costValues.length
+    )
+  );
+  if (runner.sampleTraces.length > runner.sampleSize) {
+    runner.sampleTraces = runner.sampleTraces.slice(0, runner.sampleSize);
+  }
+  if (runner.coverageValues.length > runner.sampleSize) {
+    runner.coverageValues = runner.coverageValues.slice(0, runner.sampleSize);
+  }
+  if (runner.costValues.length > runner.sampleSize) {
+    runner.costValues = runner.costValues.slice(0, runner.sampleSize);
+  }
   runner.unmetCounts = new Map(saved.unmetCounts);
 
   return runner;
@@ -1939,6 +1972,15 @@ function MinimumCataloguePanel({
               checked={includeReviewPriorityProducts}
               onChange={onIncludeReviewPriorityProductsChange}
             />
+            {error || cachedProgress || job ? (
+              <button
+                className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
+                onClick={onReset}
+                type="button"
+              >
+                Reset
+              </button>
+            ) : null}
             <button
               className={classNames(
                 "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
@@ -1950,7 +1992,7 @@ function MinimumCataloguePanel({
               onClick={error ? onRecalculate : onCalculate}
               type="button"
             >
-              {error ? "Restart failed job" : "Calculate"}
+              {error ? "Run again" : "Calculate"}
             </button>
           </div>
         </div>
@@ -3212,7 +3254,7 @@ export function AdminPlanCoverageSimulatorView({
     );
   const canRestartQueuedCatalogueOptimization =
     (currentCatalogueOptimizationQueued || currentCatalogueOptimizationBlocked) &&
-    (currentCatalogueOptimizationElapsedSeconds ?? 0) >= 30;
+    (currentCatalogueOptimizationElapsedSeconds ?? 0) >= 10;
   const progressDisplay = simulationProgressDisplay({
     catalogueOptimizationProgress: productOptimisationMode
       ? currentCatalogueOptimizationProgress
@@ -3306,6 +3348,22 @@ export function AdminPlanCoverageSimulatorView({
     );
 
     if (job.status === "completed" && job.optimization) {
+      if (
+        !catalogueOptimizationMatchesSampleSize(
+          job.optimization,
+          simulationData.sampleSize
+        )
+      ) {
+        setCatalogueOptimization(null);
+        setCatalogueOptimizationError(
+          "The saved optimum basket does not match the visible simulation. Run it again to replace the stale result."
+        );
+        setCatalogueOptimizationProgress(null);
+        setCatalogueOptimizationStartedAt(null);
+        setCatalogueOptimizationStatus("idle");
+        return;
+      }
+
       saveCatalogueOptimization(requestKey, job.optimization);
       setCatalogueOptimization(job.optimization);
       setCatalogueOptimizationError(null);
@@ -3346,7 +3404,7 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationStartedAt(catalogueOptimizationJobStartedAt(job));
     setCatalogueOptimizationHeartbeat(Date.now());
     setCatalogueOptimizationStatus("processing");
-  }, [simulationData.sampleTraces.length]);
+  }, [simulationData.sampleSize, simulationData.sampleTraces.length]);
 
   const requestCatalogueOptimizationJob = useCallback(async (
     action: "cancel" | "start" | "status",
@@ -3436,6 +3494,16 @@ export function AdminPlanCoverageSimulatorView({
       );
 
       if (!savedOptimization) {
+        return;
+      }
+
+      if (
+        !catalogueOptimizationMatchesSampleSize(
+          savedOptimization,
+          simulationData.sampleSize
+        )
+      ) {
+        clearSavedCatalogueOptimization(catalogueOptimizationRunKey);
         return;
       }
 

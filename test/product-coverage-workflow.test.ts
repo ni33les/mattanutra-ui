@@ -1512,7 +1512,9 @@ describe("product coverage workflow", () => {
     assert.match(view, /reservationId/);
     assert.match(view, /workerSessionId/);
     assert.match(view, /Restart blocked job/);
-    assert.match(view, /Restart failed job/);
+    assert.match(view, /Run again/);
+    assert.match(view, /catalogueOptimizationMatchesSampleSize/);
+    assert.match(view, /does not match the visible simulation/);
     assert.match(view, /onClick=\{error \? onRecalculate : onCalculate\}/);
     assert.match(view, /actionType === "consider_retiring"/);
     assert.match(view, /Average stack coverage contribution/);
