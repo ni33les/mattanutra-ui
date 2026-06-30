@@ -19,7 +19,7 @@ import { analyzePanyaCustomerChatWithGrok } from "@/lib/panya-chat-agent";
 import {
   adminCataloguePotentialCandidates,
   buildAdminCataloguePotentialTraceChunk,
-  runAdminCatalogueOptimizationCooperatively,
+  runAdminCatalogueOptimizationFast,
   runAdminCataloguePotentialOptimizationFromTraces,
   type AdminPlanCoverageSimulationSampleTrace
 } from "@/lib/admin-product-coverage";
@@ -48,6 +48,12 @@ function analysisErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
     : "Unknown HealthScore analysis error";
+}
+
+function throwIfTaskExecutionAborted(runtime: TaskExecutionRuntime) {
+  if (runtime.signal?.aborted) {
+    throw new Error("Task execution aborted");
+  }
 }
 
 function hasHealthScoreAdvice(value: unknown) {
@@ -120,44 +126,6 @@ async function reportExecutionProgress(
   if (runtime.reportProgress) {
     await runtime.reportProgress(resultPayload);
   }
-}
-
-function catalogueOptimizationProgressQueue(runtime: TaskExecutionRuntime) {
-  const controller = new AbortController();
-  let chain = Promise.resolve();
-  let failure: unknown = null;
-  const abortFromRuntime = () => {
-    controller.abort();
-  };
-
-  if (runtime.signal?.aborted) {
-    abortFromRuntime();
-  } else {
-    runtime.signal?.addEventListener("abort", abortFromRuntime, { once: true });
-  }
-
-  const report = (resultPayload: Record<string, unknown>) => {
-    chain = chain
-      .then(() => reportExecutionProgress(runtime, resultPayload))
-      .catch((error) => {
-        failure = error;
-        controller.abort();
-      });
-  };
-  const flush = async () => {
-    await chain;
-    runtime.signal?.removeEventListener("abort", abortFromRuntime);
-
-    if (failure) {
-      throw failure;
-    }
-
-    if (runtime.signal?.aborted) {
-      throw new Error("Task execution aborted");
-    }
-  };
-
-  return { controller, flush, report };
 }
 
 type RetailerRecommendationOption = Readonly<{
@@ -390,21 +358,19 @@ export async function executeTaskWorkItem(
       stage: "starting",
       totalSamples
     });
-    const progress = catalogueOptimizationProgressQueue(runtime);
-    const approvedOptimization = await runAdminCatalogueOptimizationCooperatively({
+    throwIfTaskExecutionAborted(runtime);
+    const approvedOptimization = runAdminCatalogueOptimizationFast({
       includeReviewPriorityProducts: false,
-      onProgress: (update) => {
-        progress.report({
-          completedSamples: 0,
-          message: update.label,
-          stage: "starting",
-          totalSamples
-        });
-      },
-      signal: progress.controller.signal,
       simulationData
     });
-    await progress.flush();
+    throwIfTaskExecutionAborted(runtime);
+
+    await reportExecutionProgress(runtime, {
+      completedSamples: 0,
+      message: "Approved basket calculated",
+      stage: "loading_catalogue",
+      totalSamples
+    });
 
     if (!workItem.includePendingReviewProducts) {
       const optimization = {
@@ -458,6 +424,7 @@ export async function executeTaskWorkItem(
       startIndex < totalSamples;
       startIndex += catalogueOptimizationJobChunkSize
     ) {
+      throwIfTaskExecutionAborted(runtime);
       const chunk = buildAdminCataloguePotentialTraceChunk({
         chunkSize: catalogueOptimizationJobChunkSize,
         potentialCandidates,
@@ -481,6 +448,7 @@ export async function executeTaskWorkItem(
       });
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
+    throwIfTaskExecutionAborted(runtime);
 
     await reportExecutionProgress(runtime, {
       candidateCount,
