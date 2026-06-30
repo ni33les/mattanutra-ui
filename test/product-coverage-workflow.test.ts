@@ -1470,6 +1470,8 @@ describe("product coverage workflow", () => {
     assert.match(catalogueOptimizationJobs, /restartRequested/);
     assert.match(catalogueOptimizationJobs, /existingStatus === "completed"/);
     assert.match(catalogueOptimizationJobs, /existingStatus === "queued"/);
+    assert.match(catalogueOptimizationJobs, /staleActiveJob/);
+    assert.match(catalogueOptimizationJobs, /isExpiredDate\(existing\?\.lease_until\)/);
     assert.match(catalogueOptimizationJobs, /attempts = 0/);
     assert.match(catalogueOptimizationJobs, /notifyTaskQueueChanged/);
     assert.match(catalogueOptimizationJobs, /analytics_catalogue_optimization|requiredCapabilitiesForWorkTaskType/);
@@ -1502,6 +1504,8 @@ describe("product coverage workflow", () => {
       /!includeReviewPriorityProductsInCatalogueOptimization \|\|\s*\n\s*running/
     );
     assert.match(view, /Remove recommendations/);
+    assert.match(view, /currentCatalogueOptimizationBlocked/);
+    assert.match(view, /Restart blocked job/);
     assert.match(view, /actionType === "consider_retiring"/);
     assert.match(view, /Average stack coverage contribution/);
     assert.match(view, /Chosen rate/);

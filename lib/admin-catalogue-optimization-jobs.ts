@@ -86,6 +86,16 @@ function toIsoString(value: Date | string | null | undefined) {
   return value instanceof Date ? value.toISOString() : value;
 }
 
+function isExpiredDate(value: Date | string | null | undefined) {
+  if (!value) {
+    return true;
+  }
+
+  const time = value instanceof Date ? value.getTime() : Date.parse(value);
+
+  return Number.isFinite(time) ? time <= Date.now() : true;
+}
+
 function jsonValue(value: unknown): postgres.JSONValue {
   return JSON.parse(JSON.stringify(value ?? null)) as postgres.JSONValue;
 }
@@ -320,13 +330,16 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
 
   const existing = await jobByKey(sql, input.cacheKey);
   const existingStatus = existing ? jobStatus(existing.status) : null;
+  const staleActiveJob =
+    existingStatus === "running" && isExpiredDate(existing?.lease_until);
   const restartRequested =
     input.forceRestart === true &&
     (
       existingStatus === "completed" ||
       existingStatus === "failed" ||
       existingStatus === "cancelled" ||
-      existingStatus === "queued"
+      existingStatus === "queued" ||
+      staleActiveJob
     );
 
   if (

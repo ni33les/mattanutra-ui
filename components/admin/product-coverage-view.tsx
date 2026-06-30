@@ -1745,6 +1745,7 @@ function MinimumCataloguePanel({
   onStop,
   optimization,
   optimizationProgress,
+  blocked,
   queued,
   canRestartQueued,
   optimizationStatus,
@@ -1766,6 +1767,7 @@ function MinimumCataloguePanel({
   onStop: () => void;
   optimization: AdminCatalogueOptimizationData | null;
   optimizationProgress: AdminCatalogueOptimizationProgress | null;
+  blocked: boolean;
   queued: boolean;
   canRestartQueued: boolean;
   optimizationStatus: CatalogueOptimizationStatus;
@@ -1798,14 +1800,16 @@ function MinimumCataloguePanel({
               Optimum product basket
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              {queued
+              {blocked
+                ? "The Analytics worker stopped updating this shared background job."
+                : queued
                 ? "Waiting for the Analytics worker to start this shared background job."
                 : "Calculating the product basket as a shared background job. You can leave this page and return later."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="bg-blue-50 text-blue-700 ring-blue-200">
-              {queued ? "Queued" : "Optimizing"}
+              {blocked ? "Blocked" : queued ? "Queued" : "Optimizing"}
             </Badge>
             <CatalogueOptimizationReviewToggle
               checked={includeReviewPriorityProducts}
@@ -1819,7 +1823,7 @@ function MinimumCataloguePanel({
             >
               Stop
             </button>
-            {queued ? (
+            {queued || blocked ? (
               <button
                 className={classNames(
                   "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
@@ -1831,7 +1835,7 @@ function MinimumCataloguePanel({
                 onClick={onRestartQueued}
                 type="button"
               >
-                Restart queued job
+                {blocked ? "Restart blocked job" : "Restart queued job"}
               </button>
             ) : null}
           </div>
@@ -1840,9 +1844,11 @@ function MinimumCataloguePanel({
           <p className="font-semibold">
             {queued
               ? "Waiting for Analytics worker"
-              : optimizationProgress?.current
-                ? "Still working"
-                : "Preparing the shared job"}
+              : blocked
+                ? "Analytics worker update stalled"
+                : optimizationProgress?.current
+                  ? "Still working"
+                  : "Preparing the shared job"}
             {elapsedSeconds !== null ? ` · ${durationText(elapsedSeconds)} elapsed` : ""}
           </p>
           <p className="mt-1 text-blue-700">
@@ -3168,8 +3174,15 @@ export function AdminPlanCoverageSimulatorView({
     currentCatalogueOptimizationStatus === "processing" &&
     catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey &&
     catalogueOptimizationJob.status === "queued";
+  const currentCatalogueOptimizationBlocked =
+    currentCatalogueOptimizationStatus === "processing" &&
+    catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey &&
+    catalogueOptimizationJob.status === "running" &&
+    Number.isFinite(Date.parse(catalogueOptimizationJob.updatedAt)) &&
+    catalogueOptimizationHeartbeat - Date.parse(catalogueOptimizationJob.updatedAt) >=
+      120_000;
   const canRestartQueuedCatalogueOptimization =
-    currentCatalogueOptimizationQueued &&
+    (currentCatalogueOptimizationQueued || currentCatalogueOptimizationBlocked) &&
     (currentCatalogueOptimizationElapsedSeconds ?? 0) >= 30;
   const progressDisplay = simulationProgressDisplay({
     catalogueOptimizationProgress: productOptimisationMode
@@ -4387,6 +4400,7 @@ export function AdminPlanCoverageSimulatorView({
         onStop={stopCatalogueOptimization}
         optimization={currentCatalogueOptimization}
         optimizationProgress={currentCatalogueOptimizationProgress}
+        blocked={currentCatalogueOptimizationBlocked}
         queued={currentCatalogueOptimizationQueued}
         canRestartQueued={canRestartQueuedCatalogueOptimization}
         optimizationStatus={currentCatalogueOptimizationStatus}

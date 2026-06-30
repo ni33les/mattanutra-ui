@@ -39,6 +39,7 @@ import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
 
 export type TaskExecutionRuntime = Readonly<{
   reportProgress?: (resultPayload: Record<string, unknown>) => Promise<unknown> | unknown;
+  signal?: AbortSignal;
 }>;
 
 const catalogueOptimizationJobChunkSize = 4;
@@ -125,6 +126,16 @@ function catalogueOptimizationProgressQueue(runtime: TaskExecutionRuntime) {
   const controller = new AbortController();
   let chain = Promise.resolve();
   let failure: unknown = null;
+  const abortFromRuntime = () => {
+    controller.abort();
+  };
+
+  if (runtime.signal?.aborted) {
+    abortFromRuntime();
+  } else {
+    runtime.signal?.addEventListener("abort", abortFromRuntime, { once: true });
+  }
+
   const report = (resultPayload: Record<string, unknown>) => {
     chain = chain
       .then(() => reportExecutionProgress(runtime, resultPayload))
@@ -135,9 +146,14 @@ function catalogueOptimizationProgressQueue(runtime: TaskExecutionRuntime) {
   };
   const flush = async () => {
     await chain;
+    runtime.signal?.removeEventListener("abort", abortFromRuntime);
 
     if (failure) {
       throw failure;
+    }
+
+    if (runtime.signal?.aborted) {
+      throw new Error("Task execution aborted");
     }
   };
 

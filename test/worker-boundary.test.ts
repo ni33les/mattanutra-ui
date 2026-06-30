@@ -448,6 +448,11 @@ describe("external worker boundaries", () => {
       "admin catalogue optimisation must run on Analytics, not Product Matcher",
     );
     assert.match(runnerSource, /client\.progress/);
+    assert.match(
+      runnerSource,
+      /could not renew task[\s\S]*abortTask\(error\)/,
+      "workers must abort CPU-heavy task execution when lease renewal fails",
+    );
     assert.doesNotMatch(catalogueOptimizationJobsSource, /setTimeout/);
     assert.doesNotMatch(
       catalogueOptimizationJobsSource,

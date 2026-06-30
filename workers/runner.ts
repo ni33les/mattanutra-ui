@@ -57,6 +57,7 @@ type WorkItemExecutionContext = Readonly<{
   agentId: string;
   leaseSeconds: number;
   reservationId: string;
+  signal?: AbortSignal;
   taskId: string;
   workerSessionId: string;
 }>;
@@ -293,6 +294,7 @@ async function executeWorkItem(
         taskId: context.taskId,
         workerSessionId: context.workerSessionId,
       }),
+    signal: context.signal,
   });
 }
 
@@ -444,6 +446,15 @@ async function runAgentLoop(
       const workItem = reserved.workItem;
       heartbeatStatus = "working";
       heartbeatTaskId = taskId;
+      const taskAbortController = new AbortController();
+      let taskAbortReason: Error | null = null;
+      const abortTask = (error: unknown) => {
+        if (!taskAbortController.signal.aborted) {
+          taskAbortReason =
+            error instanceof Error ? error : new Error(errorMessage(error));
+          taskAbortController.abort();
+        }
+      };
       const renew = setInterval(
         () => {
           void retryApiCall(
@@ -461,6 +472,7 @@ async function runAgentLoop(
             console.error(
               `[agent] ${agent.name} could not renew task ${taskId}: ${errorMessage(error)}`,
             );
+            abortTask(error);
           });
         },
         Math.max(30_000, Math.floor(leaseSeconds * 400)),
@@ -474,11 +486,15 @@ async function runAgentLoop(
           agentId: agent.id,
           leaseSeconds,
           reservationId,
+          signal: taskAbortController.signal,
           taskId,
           workerSessionId,
         });
 
         clearInterval(renew);
+        if (taskAbortReason) {
+          throw taskAbortReason;
+        }
         await retryApiCall(`${agent.name} task completion`, () =>
           client.complete({
             agentId: agent.id,
@@ -493,11 +509,12 @@ async function runAgentLoop(
       } catch (error) {
         clearInterval(renew);
         let staleSession = isStaleWorkerSessionError(error);
+        const taskError = taskAbortReason ?? error;
 
         await retryApiCall(`${agent.name} task failure`, () =>
           client.fail({
             agentId: agent.id,
-            errorMessage: errorMessage(error),
+            errorMessage: errorMessage(taskError),
             reservationId,
             resultPayload: {
               taskType,
