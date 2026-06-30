@@ -1505,6 +1505,7 @@ describe("product coverage workflow", () => {
     );
     assert.match(view, /Remove recommendations/);
     assert.match(view, /currentCatalogueOptimizationBlocked/);
+    assert.match(view, /catalogueOptimizationJob\.leaseUntil/);
     assert.match(view, /Restart blocked job/);
     assert.match(view, /actionType === "consider_retiring"/);
     assert.match(view, /Average stack coverage contribution/);

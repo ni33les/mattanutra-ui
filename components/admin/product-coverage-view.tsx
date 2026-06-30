@@ -3178,9 +3178,14 @@ export function AdminPlanCoverageSimulatorView({
     currentCatalogueOptimizationStatus === "processing" &&
     catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey &&
     catalogueOptimizationJob.status === "running" &&
-    Number.isFinite(Date.parse(catalogueOptimizationJob.updatedAt)) &&
-    catalogueOptimizationHeartbeat - Date.parse(catalogueOptimizationJob.updatedAt) >=
-      120_000;
+    (
+      !catalogueOptimizationJob.leaseUntil ||
+      (
+        Number.isFinite(Date.parse(catalogueOptimizationJob.leaseUntil)) &&
+        Date.parse(catalogueOptimizationJob.leaseUntil) <=
+          catalogueOptimizationHeartbeat
+      )
+    );
   const canRestartQueuedCatalogueOptimization =
     (currentCatalogueOptimizationQueued || currentCatalogueOptimizationBlocked) &&
     (currentCatalogueOptimizationElapsedSeconds ?? 0) >= 30;

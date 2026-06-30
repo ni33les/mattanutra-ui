@@ -29,6 +29,7 @@ export type AdminCatalogueOptimizationJobView = Readonly<{
   errorMessage: string | null;
   id: string;
   includePendingReviewProducts: boolean;
+  leaseUntil: string | null;
   message: string;
   optimization: AdminCatalogueOptimizationData | null;
   startedAt: string | null;
@@ -236,6 +237,7 @@ function jobView(row: JobTaskRow): AdminCatalogueOptimizationJobView {
     errorMessage: row.error_message ?? result.errorMessage ?? null,
     id: row.id,
     includePendingReviewProducts: context.includePendingReviewProducts,
+    leaseUntil: toIsoString(row.lease_until),
     message: result.message ?? "",
     optimization: asOptimization(result.optimization),
     startedAt: toIsoString(row.started_at),
