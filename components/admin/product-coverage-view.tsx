@@ -3230,7 +3230,6 @@ export function AdminPlanCoverageSimulatorView({
     const timeoutId = window.setTimeout(() => {
       if (
         cancelled ||
-        !includeReviewPriorityProductsInCatalogueOptimization ||
         running ||
         demandGenerating ||
         simulationData.sampleSize < 1 ||
@@ -3260,7 +3259,6 @@ export function AdminPlanCoverageSimulatorView({
     applyCatalogueOptimizationJob,
     catalogueOptimizationRunKey,
     demandGenerating,
-    includeReviewPriorityProductsInCatalogueOptimization,
     requestCatalogueOptimizationJob,
     running,
     simulationData.sampleSize,
@@ -3269,7 +3267,6 @@ export function AdminPlanCoverageSimulatorView({
 
   useEffect(() => {
     if (
-      !includeReviewPriorityProductsInCatalogueOptimization ||
       currentCatalogueOptimizationStatus !== "processing" ||
       catalogueOptimizationKey !== catalogueOptimizationRunKey
     ) {
@@ -3305,7 +3302,6 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationKey,
     catalogueOptimizationRunKey,
     currentCatalogueOptimizationStatus,
-    includeReviewPriorityProductsInCatalogueOptimization,
     requestCatalogueOptimizationJob
   ]);
 

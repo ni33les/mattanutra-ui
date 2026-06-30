@@ -1440,6 +1440,11 @@ describe("product coverage workflow", () => {
     assert.match(catalogueOptimizationJobs, /public\.tasks/);
     assert.match(catalogueOptimizationJobs, /admin_catalogue_optimization_job/);
     assert.match(catalogueOptimizationJobs, /idempotency_scope_key/);
+    assert.match(catalogueOptimizationJobs, /where not exists \(/);
+    assert.match(
+      catalogueOptimizationJobs,
+      /on conflict \(idempotency_scope_key, idempotency_key\)[\s\S]*do nothing/
+    );
     assert.match(catalogueOptimizationJobs, /result_payload/);
     assert.match(catalogueOptimizationJobs, /notifyTaskQueueChanged/);
     assert.match(catalogueOptimizationJobs, /analytics_catalogue_optimization|requiredCapabilitiesForWorkTaskType/);
@@ -1463,6 +1468,14 @@ describe("product coverage workflow", () => {
     assert.doesNotMatch(view, /runAdminCatalogueOptimizationCooperatively/);
     assert.match(view, /Basket products/);
     assert.match(view, /No basket products were identified/);
+    assert.doesNotMatch(
+      view,
+      /!includeReviewPriorityProductsInCatalogueOptimization \|\|\s*\n\s*currentCatalogueOptimizationStatus !== "processing"/
+    );
+    assert.doesNotMatch(
+      view,
+      /!includeReviewPriorityProductsInCatalogueOptimization \|\|\s*\n\s*running/
+    );
     assert.doesNotMatch(view, /Catalogue actions/);
     assert.match(view, /Average stack coverage contribution/);
     assert.match(view, /Chosen rate/);

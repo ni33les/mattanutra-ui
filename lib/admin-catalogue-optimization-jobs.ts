@@ -391,7 +391,7 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           created_at,
           updated_at
         )
-        values (
+        select
           ${randomUUID()}::uuid,
           ${organisationId}::uuid,
           ${randomUUID()}::uuid,
@@ -417,7 +417,22 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           1,
           now(),
           now()
+        where not exists (
+          select 1
+          from public.tasks
+          where task_type = ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE}
+            and idempotency_scope_key = ${jobIdempotencyScopeKey}
+            and idempotency_key = ${input.cacheKey}
         )
+        on conflict (idempotency_scope_key, idempotency_key)
+          where idempotency_key is not null
+            and status <> all (array[
+              'completed'::text,
+              'failed'::text,
+              'cancelled'::text,
+              'skipped'::text
+            ])
+        do nothing
         returning
           id::text,
           idempotency_key,
@@ -432,13 +447,15 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           created_at,
           updated_at
       `;
-  const row = rows[0];
+  const row = rows[0] ?? await jobByKey(sql, input.cacheKey);
 
   if (!row) {
-    throw new Error("Unable to create shared optimum basket job");
+    throw new Error("Unable to create or reuse shared optimum basket job");
   }
 
-  notifyTaskQueueChanged();
+  if (rows[0]) {
+    notifyTaskQueueChanged();
+  }
 
   return jobView(row);
 }
