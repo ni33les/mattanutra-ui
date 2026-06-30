@@ -1928,10 +1928,10 @@ function MinimumCataloguePanel({
                   : "bg-slate-100 text-slate-400 ring-slate-200"
               )}
               disabled={!canCalculate}
-              onClick={onCalculate}
+              onClick={error ? onRecalculate : onCalculate}
               type="button"
             >
-              Calculate
+              {error ? "Restart failed job" : "Calculate"}
             </button>
           </div>
         </div>
