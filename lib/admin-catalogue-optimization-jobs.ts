@@ -379,6 +379,7 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           started_at = null,
           completed_at = null,
           attempts = 0,
+          max_attempts = ${ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS},
           updated_at = now()
         where id = ${existing.id}::uuid
         returning

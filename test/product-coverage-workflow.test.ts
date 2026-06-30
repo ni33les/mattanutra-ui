@@ -1474,6 +1474,7 @@ describe("product coverage workflow", () => {
     assert.match(catalogueOptimizationJobs, /isExpiredDate\(existing\?\.lease_until\)/);
     assert.match(catalogueOptimizationJobs, /ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS = 3/);
     assert.match(catalogueOptimizationJobs, /attempts = 0/);
+    assert.match(catalogueOptimizationJobs, /max_attempts = \$\{ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS\}/);
     assert.match(catalogueOptimizationJobs, /notifyTaskQueueChanged/);
     assert.match(catalogueOptimizationJobs, /analytics_catalogue_optimization|requiredCapabilitiesForWorkTaskType/);
     assert.doesNotMatch(catalogueOptimizationJobs, /kickAdminCatalogueOptimizationJob/);
