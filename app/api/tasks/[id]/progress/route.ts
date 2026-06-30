@@ -20,7 +20,9 @@ export async function POST(
   request: Request,
   { params }: ProgressTaskRouteProps
 ) {
+  const startedAt = Date.now();
   const access = await requireWorkerAccess(request);
+  const authDurationMs = Date.now() - startedAt;
   const unauthorized = access.unauthorized;
 
   if (unauthorized) {
@@ -47,18 +49,40 @@ export async function POST(
   }
 
   try {
-    return openClawJson(
-      await reportTaskProgress({
-        accessScope: access.scope,
-        agentId: access.principal?.agentId ?? textValue(body.agentId),
-        leaseSeconds: body.leaseSeconds,
-        reservationId,
-        resultPayload: objectValue(body.resultPayload),
-        taskId: id,
-        workerSessionId
-      })
-    );
+    const resultPayload = objectValue(body.resultPayload);
+    const dbStartedAt = Date.now();
+    const result = await reportTaskProgress({
+      accessScope: access.scope,
+      agentId: access.principal?.agentId ?? textValue(body.agentId),
+      leaseSeconds: body.leaseSeconds,
+      reservationId,
+      resultPayload,
+      taskId: id,
+      workerSessionId
+    });
+    const dbDurationMs = Date.now() - dbStartedAt;
+
+    console.info("[tasks:progress]", {
+      authDurationMs,
+      dbDurationMs,
+      reservationId,
+      stage: typeof resultPayload.stage === "string" ? resultPayload.stage : null,
+      taskId: id,
+      totalDurationMs: Date.now() - startedAt,
+      workerSessionId
+    });
+
+    return openClawJson(result);
   } catch (error) {
+    console.warn("[tasks:progress] failed", {
+      authDurationMs,
+      error: error instanceof Error ? error.message : "Unknown error",
+      reservationId,
+      taskId: id,
+      totalDurationMs: Date.now() - startedAt,
+      workerSessionId
+    });
+
     return taskApiError(error, "Unable to report task progress");
   }
 }

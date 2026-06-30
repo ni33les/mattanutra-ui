@@ -2278,8 +2278,6 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
     throw new Error("Task lease renewal requires a valid taskId and reservationId, agentId, or workerSessionId");
   }
 
-  await ensureWorkerSessionSchema(sql);
-
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
   const rows = await sql<TaskReservationResultRow[]>`
     with active_reservation as (
@@ -2317,33 +2315,19 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
       where task_reservations.id = updated_task.reservation_id::uuid
       returning task_reservations.id
     ),
-    task_event as (
-      insert into public.task_events (
-        id,
-        task_id,
-        agent_id,
-        event_type,
-        event_status,
-        severity,
-        event_payload,
-        occurred_at,
-        created_at
-      )
-      select
-        gen_random_uuid(),
-        updated_task.id,
-        updated_task.reservation_agent_id::uuid,
-        'task_lease_renewed',
-        'accepted',
-        'low',
-        jsonb_build_object(
-          'leaseSeconds', ${leaseSeconds}::integer,
-          'reservationId', updated_task.reservation_id
-        ),
-        now(),
-        now()
+    updated_session as (
+      update public.worker_sessions set
+        status = 'working',
+        current_task_id = ${taskId}::uuid,
+        last_seen_at = now(),
+        updated_at = now()
       from updated_task
-      returning id
+      where worker_sessions.id = updated_task.reservation_worker_session_id::uuid
+        and (
+          updated_task.reservation_membership_id::uuid is null
+          or worker_sessions.membership_id = updated_task.reservation_membership_id::uuid
+        )
+      returning worker_sessions.id
     )
     select *
     from updated_task
@@ -2354,56 +2338,9 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
     throw new Error(`Task ${taskId} is not currently renewable`);
   }
 
-  if (workerSessionId) {
-    await sql`
-      update public.worker_sessions
-      set
-        status = 'working',
-        current_task_id = ${taskId}::uuid,
-        last_seen_at = now(),
-        updated_at = now()
-      where id = ${workerSessionId}::uuid
-        and (${row.reservation_membership_id ?? null}::uuid is null or membership_id = ${row.reservation_membership_id ?? null}::uuid)
-    `;
-  }
-
-  if (row.reservation_agent_id) {
-    await sql`
-      update public.agents
-      set
-        last_seen_at = now(),
-        updated_at = now()
-      where id = ${row.reservation_agent_id}::uuid
-    `;
-  }
-
   return {
     reservationId: row.reservation_id ?? "",
     task: mapTask(row)
-  };
-}
-
-function progressEventPayload(
-  payload: Record<string, unknown>,
-  reservationId: string | null
-) {
-  const safeKeys = [
-    "candidateCount",
-    "candidateHash",
-    "completedSamples",
-    "message",
-    "stage",
-    "totalSamples"
-  ];
-  const eventPayload = Object.fromEntries(
-    safeKeys
-      .filter((key) => payload[key] !== undefined)
-      .map((key) => [key, payload[key]])
-  );
-
-  return {
-    ...eventPayload,
-    reservationId
   };
 }
 
@@ -2418,8 +2355,6 @@ export async function reportTaskProgress(input: ProgressTaskInput) {
   if (!taskId || (!reservationId && !agentId && !workerSessionId)) {
     throw new Error("Task progress requires a valid taskId and reservationId, agentId, or workerSessionId");
   }
-
-  await ensureWorkerSessionSchema(sql);
 
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
   const resultPayload = payloadRecord(input.resultPayload ?? {});
@@ -2461,30 +2396,19 @@ export async function reportTaskProgress(input: ProgressTaskInput) {
       where task_reservations.id = updated_task.reservation_id::uuid
       returning task_reservations.id
     ),
-    task_event as (
-      insert into public.task_events (
-        id,
-        task_id,
-        agent_id,
-        event_type,
-        event_status,
-        severity,
-        event_payload,
-        occurred_at,
-        created_at
-      )
-      select
-        gen_random_uuid(),
-        updated_task.id,
-        updated_task.reservation_agent_id::uuid,
-        'task_progress_reported',
-        'accepted',
-        'low',
-        ${sql.json(toJsonValue(progressEventPayload(resultPayload, reservationId)))}::jsonb,
-        now(),
-        now()
+    updated_session as (
+      update public.worker_sessions set
+        status = 'working',
+        current_task_id = ${taskId}::uuid,
+        last_seen_at = now(),
+        updated_at = now()
       from updated_task
-      returning id
+      where worker_sessions.id = updated_task.reservation_worker_session_id::uuid
+        and (
+          updated_task.reservation_membership_id::uuid is null
+          or worker_sessions.membership_id = updated_task.reservation_membership_id::uuid
+        )
+      returning worker_sessions.id
     )
     select *
     from updated_task
@@ -2493,29 +2417,6 @@ export async function reportTaskProgress(input: ProgressTaskInput) {
 
   if (!row) {
     throw new Error(`Task ${taskId} is not currently progress-reportable`);
-  }
-
-  if (workerSessionId) {
-    await sql`
-      update public.worker_sessions
-      set
-        status = 'working',
-        current_task_id = ${taskId}::uuid,
-        last_seen_at = now(),
-        updated_at = now()
-      where id = ${workerSessionId}::uuid
-        and (${row.reservation_membership_id ?? null}::uuid is null or membership_id = ${row.reservation_membership_id ?? null}::uuid)
-    `;
-  }
-
-  if (row.reservation_agent_id) {
-    await sql`
-      update public.agents
-      set
-        last_seen_at = now(),
-        updated_at = now()
-      where id = ${row.reservation_agent_id}::uuid
-    `;
   }
 
   notifyTaskQueueChanged();

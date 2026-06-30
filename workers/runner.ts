@@ -459,6 +459,7 @@ async function runAgentLoop(
       };
       const renew = setInterval(
         () => {
+          const renewStartedAt = Date.now();
           void retryApiCall(
             `${agent.name} task lease renewal`,
             async () => {
@@ -470,6 +471,9 @@ async function runAgentLoop(
                 workerSessionId,
               });
               lastLeaseAcknowledgedAt = Date.now();
+              console.info(
+                `[agent] ${agent.name} renewed task ${taskId} lease in ${lastLeaseAcknowledgedAt - renewStartedAt}ms`,
+              );
             },
             2,
           ).catch((error) => {
@@ -478,12 +482,13 @@ async function runAgentLoop(
               0,
               leaseSeconds * 1_000 - TASK_LEASE_ABORT_SAFETY_MS,
             );
+            const willAbort = leaseAgeMs >= leaseAbortAfterMs;
 
             console.error(
-              `[agent] ${agent.name} could not renew task ${taskId}: ${errorMessage(error)}`,
+              `[agent] ${agent.name} could not renew task ${taskId}: ${errorMessage(error)} durationMs=${Date.now() - renewStartedAt} leaseAgeMs=${leaseAgeMs} abortAfterMs=${leaseAbortAfterMs} willAbort=${willAbort}`,
             );
 
-            if (leaseAgeMs >= leaseAbortAfterMs) {
+            if (willAbort) {
               abortTask(error);
             }
           });

@@ -1508,6 +1508,9 @@ describe("product coverage workflow", () => {
     assert.match(view, /Remove recommendations/);
     assert.match(view, /currentCatalogueOptimizationBlocked/);
     assert.match(view, /catalogueOptimizationJob\.leaseUntil/);
+    assert.match(view, /lastWorkerHeartbeatAt/);
+    assert.match(view, /reservationId/);
+    assert.match(view, /workerSessionId/);
     assert.match(view, /Restart blocked job/);
     assert.match(view, /Restart failed job/);
     assert.match(view, /onClick=\{error \? onRecalculate : onCalculate\}/);

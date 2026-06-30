@@ -399,7 +399,16 @@ describe("external worker boundaries", () => {
     assert.match(failRouteSource, /eventName: "task_failed"/);
     assert.match(progressRouteSource, /requireWorkerAccess/);
     assert.match(progressRouteSource, /reportTaskProgress/);
-    assert.match(serviceSource, /task_progress_reported/);
+    assert.match(serviceSource, /export async function renewTaskLease/);
+    assert.match(serviceSource, /export async function reportTaskProgress/);
+    assert.doesNotMatch(
+      serviceSource.slice(
+        serviceSource.indexOf("export async function renewTaskLease"),
+        serviceSource.indexOf("async function claimTaskFailureApplication"),
+      ),
+      /task_(?:lease_renewed|progress_reported)|ensureWorkerSessionSchema\(sql\)/,
+      "renew/progress are heartbeat hot paths and must not do schema checks or per-call task event inserts",
+    );
     assert.match(
       source,
       /buildTaskWorkItem[\s\S]*failTask[\s\S]*continue;/,

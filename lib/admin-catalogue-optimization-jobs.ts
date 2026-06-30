@@ -29,14 +29,18 @@ export type AdminCatalogueOptimizationJobView = Readonly<{
   errorMessage: string | null;
   id: string;
   includePendingReviewProducts: boolean;
+  lastWorkerHeartbeatAt: string | null;
   leaseUntil: string | null;
   message: string;
   optimization: AdminCatalogueOptimizationData | null;
+  reservationId: string | null;
+  reservationLeaseUntil: string | null;
   startedAt: string | null;
   stage: string;
   status: AdminCatalogueOptimizationJobStatus;
   totalSamples: number;
   updatedAt: string;
+  workerSessionId: string | null;
 }>;
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
@@ -50,6 +54,10 @@ type JobTaskRow = Readonly<{
   idempotency_key: string | null;
   lease_until: Date | string | null;
   payload: unknown;
+  reservation_heartbeat_at: Date | string | null;
+  reservation_id: string | null;
+  reservation_lease_until: Date | string | null;
+  reservation_worker_session_id: string | null;
   result_payload: unknown;
   started_at: Date | string | null;
   status: string;
@@ -238,14 +246,18 @@ function jobView(row: JobTaskRow): AdminCatalogueOptimizationJobView {
     errorMessage: row.error_message ?? result.errorMessage ?? null,
     id: row.id,
     includePendingReviewProducts: context.includePendingReviewProducts,
+    lastWorkerHeartbeatAt: toIsoString(row.reservation_heartbeat_at),
     leaseUntil: toIsoString(row.lease_until),
     message: result.message ?? "",
     optimization: asOptimization(result.optimization),
+    reservationId: row.reservation_id,
+    reservationLeaseUntil: toIsoString(row.reservation_lease_until),
     startedAt: toIsoString(row.started_at),
     stage: result.stage ?? status,
     status,
     totalSamples,
-    updatedAt: toIsoString(row.updated_at) ?? new Date().toISOString()
+    updatedAt: toIsoString(row.updated_at) ?? new Date().toISOString(),
+    workerSessionId: row.reservation_worker_session_id
   };
 }
 
@@ -269,23 +281,39 @@ async function platformOrganisationId(sql: Db) {
 async function jobByKey(sql: Db, cacheKey: string) {
   const rows = await sql<JobTaskRow[]>`
     select
-      id::text,
-      idempotency_key,
-      context,
-      payload,
-      result_payload,
-      status,
-      error_message,
-      lease_until,
-      started_at,
-      completed_at,
-      created_at,
-      updated_at
+      tasks.id::text,
+      tasks.idempotency_key,
+      tasks.context,
+      tasks.payload,
+      tasks.result_payload,
+      tasks.status,
+      tasks.error_message,
+      tasks.lease_until,
+      active_reservation.heartbeat_at as reservation_heartbeat_at,
+      active_reservation.id::text as reservation_id,
+      active_reservation.lease_until as reservation_lease_until,
+      active_reservation.worker_session_id::text as reservation_worker_session_id,
+      tasks.started_at,
+      tasks.completed_at,
+      tasks.created_at,
+      tasks.updated_at
     from public.tasks
-    where task_type = ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE}
-      and idempotency_scope_key = ${jobIdempotencyScopeKey}
-      and idempotency_key = ${cacheKey}
-    order by created_at desc
+    left join lateral (
+      select
+        task_reservations.heartbeat_at,
+        task_reservations.id,
+        task_reservations.lease_until,
+        task_reservations.worker_session_id
+      from public.task_reservations
+      where task_reservations.task_id = tasks.id
+        and task_reservations.status = 'active'
+      order by task_reservations.reserved_at desc
+      limit 1
+    ) active_reservation on true
+    where tasks.task_type = ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE}
+      and tasks.idempotency_scope_key = ${jobIdempotencyScopeKey}
+      and tasks.idempotency_key = ${cacheKey}
+    order by tasks.created_at desc
     limit 1
   `;
 
@@ -391,6 +419,10 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           status,
           error_message,
           lease_until,
+          null::timestamptz as reservation_heartbeat_at,
+          null::text as reservation_id,
+          null::timestamptz as reservation_lease_until,
+          null::text as reservation_worker_session_id,
           started_at,
           completed_at,
           created_at,
@@ -475,6 +507,10 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           status,
           error_message,
           lease_until,
+          null::timestamptz as reservation_heartbeat_at,
+          null::text as reservation_id,
+          null::timestamptz as reservation_lease_until,
+          null::text as reservation_worker_session_id,
           started_at,
           completed_at,
           created_at,
@@ -525,6 +561,10 @@ export async function cancelAdminCatalogueOptimizationJob(cacheKey: string) {
       status,
       error_message,
       lease_until,
+      null::timestamptz as reservation_heartbeat_at,
+      null::text as reservation_id,
+      null::timestamptz as reservation_lease_until,
+      null::text as reservation_worker_session_id,
       started_at,
       completed_at,
       created_at,

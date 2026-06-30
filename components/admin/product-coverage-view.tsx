@@ -1745,6 +1745,7 @@ function MinimumCataloguePanel({
   onStop,
   optimization,
   optimizationProgress,
+  job,
   blocked,
   queued,
   canRestartQueued,
@@ -1767,6 +1768,7 @@ function MinimumCataloguePanel({
   onStop: () => void;
   optimization: AdminCatalogueOptimizationData | null;
   optimizationProgress: AdminCatalogueOptimizationProgress | null;
+  job: AdminCatalogueOptimizationJobView | null;
   blocked: boolean;
   queued: boolean;
   canRestartQueued: boolean;
@@ -1777,6 +1779,18 @@ function MinimumCataloguePanel({
   const cachedProgressText = cachedProgress
     ? `${numberText(cachedProgress.current)} / ${numberText(cachedProgress.total)} profiles completed by shared job`
     : null;
+  const jobDiagnostics = job
+    ? [
+        job.reservationId ? `reservation ${job.reservationId.slice(0, 8)}` : null,
+        job.workerSessionId ? `worker ${job.workerSessionId.slice(0, 8)}` : null,
+        job.leaseUntil
+          ? `lease ${dateTimeText(job.leaseUntil, locale)}`
+          : null,
+        job.lastWorkerHeartbeatAt
+          ? `heartbeat ${dateTimeText(job.lastWorkerHeartbeatAt, locale)}`
+          : null
+      ].filter(Boolean).join(" · ")
+    : "";
 
   if (running) {
     return (
@@ -1864,6 +1878,11 @@ function MinimumCataloguePanel({
                 : ""}
             </p>
           ) : null}
+          {jobDiagnostics ? (
+            <p className="mt-1 text-xs font-semibold text-blue-900">
+              {jobDiagnostics}
+            </p>
+          ) : null}
         </div>
         <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
           <div
@@ -1937,6 +1956,11 @@ function MinimumCataloguePanel({
         </div>
         {error ? (
           <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>
+        ) : null}
+        {jobDiagnostics ? (
+          <p className="mt-2 text-xs font-semibold text-slate-500">
+            {jobDiagnostics}
+          </p>
         ) : null}
         {cachedProgressText ? (
           <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100">
@@ -4405,6 +4429,7 @@ export function AdminPlanCoverageSimulatorView({
         onStop={stopCatalogueOptimization}
         optimization={currentCatalogueOptimization}
         optimizationProgress={currentCatalogueOptimizationProgress}
+        job={catalogueOptimizationJob}
         blocked={currentCatalogueOptimizationBlocked}
         queued={currentCatalogueOptimizationQueued}
         canRestartQueued={canRestartQueuedCatalogueOptimization}
