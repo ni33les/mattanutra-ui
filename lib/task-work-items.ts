@@ -26,6 +26,13 @@ import {
   type ProductRecommendationRetailerCandidateSet
 } from "@/lib/admin-products";
 import {
+  type AdminPlanCoverageSimulationData,
+  type AdminPlanCoverageSimulationSampleTrace
+} from "@/lib/admin-product-coverage";
+import {
+  ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE
+} from "@/lib/admin-catalogue-optimization-jobs";
+import {
   defaultProductCountryCode,
   normalizeProductCountryCode
 } from "@/lib/product-countries";
@@ -358,6 +365,18 @@ export type ProductIdentifierSourcingWorkItem = Readonly<{
   taskType: "source_product_identifiers";
 }>;
 
+export type AdminCatalogueOptimizationWorkItem = Readonly<{
+  cacheKey: string;
+  countryCode: string;
+  existingCandidateHash: string | null;
+  existingPotentialTraces: AdminPlanCoverageSimulationSampleTrace[];
+  includePendingReviewProducts: boolean;
+  potentialCandidates: ProductCandidate[];
+  simulationData: AdminPlanCoverageSimulationData;
+  taskId: string;
+  taskType: "admin_catalogue_optimization_job";
+}>;
+
 export type RetailStockForecastWorkItem = Readonly<{
   organisationId: string;
   productId: string | null;
@@ -380,6 +399,7 @@ export type RetailOperationsReviewWorkItem = Readonly<{
 }>;
 
 export type TaskWorkItem =
+  | AdminCatalogueOptimizationWorkItem
   | CarrierShipmentWorkItem
   | CommunicationFollowupWorkItem
   | ContentStatusChangeWorkItem
@@ -1836,6 +1856,61 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   } satisfies ProductRecommendationsWorkItem;
 }
 
+function simulationDataPayload(value: unknown): AdminPlanCoverageSimulationData | null {
+  return value && typeof value === "object"
+    ? value as AdminPlanCoverageSimulationData
+    : null;
+}
+
+function sampleTracesPayload(value: unknown) {
+  return Array.isArray(value)
+    ? value as AdminPlanCoverageSimulationSampleTrace[]
+    : [];
+}
+
+async function buildAdminCatalogueOptimizationWorkItem(task: TaskRecord) {
+  const simulationData = simulationDataPayload(task.payload);
+
+  if (!simulationData) {
+    throw new Error("Catalogue optimization task requires simulation data");
+  }
+
+  const context = payloadRecord(task.context);
+  const result = payloadRecord(task.resultPayload);
+  const countryCode =
+    textFromRecord(context, "countryCode") ||
+    simulationData.countryCode ||
+    defaultProductCountryCode;
+  const includePendingReviewProducts =
+    context.includePendingReviewProducts === undefined
+      ? true
+      : context.includePendingReviewProducts === true;
+  const potentialCandidates = includePendingReviewProducts
+    ? await getProductRecommendationCandidates({
+        countryCode,
+        includeIneligible: true
+      })
+    : [];
+
+  return {
+    cacheKey:
+      textFromRecord(context, "cacheKey") ||
+      task.idempotencyKey ||
+      task.id,
+    countryCode,
+    existingCandidateHash: textFromRecord(result, "candidateHash"),
+    existingPotentialTraces: sampleTracesPayload(result.potentialTraces),
+    includePendingReviewProducts,
+    potentialCandidates,
+    simulationData: {
+      ...simulationData,
+      countryCode
+    },
+    taskId: task.id,
+    taskType: ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE
+  } satisfies AdminCatalogueOptimizationWorkItem;
+}
+
 async function enrichProductNeedsWithAliases(
   needs: readonly ProductRecommendationNeed[]
 ): Promise<ProductRecommendationNeed[]> {
@@ -1901,6 +1976,10 @@ async function buildNutritionPlanRefinementWorkItem(task: TaskRecord) {
 }
 
 export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem> {
+  if (task.taskType === ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE) {
+    return buildAdminCatalogueOptimizationWorkItem(task);
+  }
+
   if (
     task.taskType === "carrier_event_process" ||
     task.taskType === "carrier_label_generate" ||

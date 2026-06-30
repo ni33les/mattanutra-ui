@@ -2,6 +2,7 @@ import type { AgentType } from "./task-service.ts";
 import { normalizeCapabilities } from "./task-service-utils.ts";
 
 export const AGENT_CAPABILITIES = {
+  analyticsCatalogueOptimization: "analytics_catalogue_optimization",
   chatSend: "chat_send",
   clientSafetyFollowup: "client_safety_followup",
   communicationDispatch: "communication_dispatch",
@@ -48,6 +49,7 @@ export const AGENT_CAPABILITIES = {
 } as const;
 
 export type SystemAgentKey =
+  | "analytics"
   | "chatDispatcher"
   | "carrierCoordinator"
   | "communicationsCoordinator"
@@ -74,6 +76,19 @@ export type SystemAgentDefinition = Readonly<{
 }>;
 
 export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinition>> = {
+  analytics: {
+    capabilities: [
+      AGENT_CAPABILITIES.analyticsCatalogueOptimization
+    ],
+    id: "4a2a1ec9-36f4-4c0b-ac9e-5f58236f4ccb",
+    metadata: {
+      analyticsFamily: "admin",
+      seeded: true
+    },
+    model: null,
+    name: "Analytics",
+    type: "deterministic"
+  },
   chatDispatcher: {
     capabilities: [
       AGENT_CAPABILITIES.chatSend,
@@ -304,6 +319,7 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
 export const SYSTEM_AGENT_LIST = Object.values(SYSTEM_AGENTS);
 
 export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
+  admin_catalogue_optimization_job: "analytics",
   analyze_healthscore: "healthScoreEngine",
   carrier_event_process: "carrierCoordinator",
   carrier_label_generate: "carrierCoordinator",
@@ -345,6 +361,9 @@ export function systemAgentForWorkTaskType(taskType: string) {
 
 export function requiredCapabilitiesForWorkTaskType(taskType: string) {
   const capabilitiesByTaskType: Record<string, readonly string[]> = {
+    admin_catalogue_optimization_job: [
+      AGENT_CAPABILITIES.analyticsCatalogueOptimization
+    ],
     analyze_healthscore: [AGENT_CAPABILITIES.healthScoreAnalysis],
     carrier_event_process: [AGENT_CAPABILITIES.carrierEventProcess],
     carrier_label_generate: [AGENT_CAPABILITIES.carrierLabelGenerate],

@@ -206,6 +206,20 @@ insert into public.agents (
 )
 values
   (
+    '4a2a1ec9-36f4-4c0b-ac9e-5f58236f4ccb'::uuid,
+    'Analytics',
+    'deterministic',
+    'active',
+    array[
+      'analytics_catalogue_optimization'
+    ]::text[],
+    null,
+    '{"seeded": true, "analyticsFamily": "admin"}'::jsonb,
+    null,
+    now(),
+    now()
+  ),
+  (
     '668ee3d3-00ec-48a0-86cc-8091af904eda'::uuid,
     'HealthScore Engine',
     'ai',
@@ -274,6 +288,7 @@ values
     'active',
     array[
       'dose_normalization',
+      'product_recommendation_full_beam',
       'product_recommendation',
       'supplement_safety_scan'
     ]::text[],

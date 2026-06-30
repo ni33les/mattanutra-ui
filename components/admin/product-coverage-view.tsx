@@ -956,18 +956,6 @@ function demandProfileHref(accessToken: string) {
   return `/api/admin/product-coverage/demand-profile${suffix ? `?${suffix}` : ""}`;
 }
 
-function catalogueOptimizationHref(accessToken: string) {
-  const params = new URLSearchParams();
-
-  if (accessToken) {
-    params.set("access_token", accessToken);
-  }
-
-  const suffix = params.toString();
-
-  return `/api/admin/product-coverage/catalogue-optimization${suffix ? `?${suffix}` : ""}`;
-}
-
 function catalogueOptimizationJobHref(accessToken: string) {
   const params = new URLSearchParams();
 
@@ -2948,7 +2936,6 @@ export function AdminPlanCoverageSimulatorView({
   );
   const runnerRef = useRef<AdminPlanCoverageSimulationRunner | null>(null);
   const inputStatusRef = useRef<SimulatorInputStatus>("loading");
-  const catalogueOptimizationControllerRef = useRef<AbortController | null>(null);
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
   const runningRef = useRef(false);
@@ -3687,12 +3674,9 @@ export function AdminPlanCoverageSimulatorView({
   }
 
   function stopCatalogueOptimization() {
-    catalogueOptimizationControllerRef.current?.abort();
-    catalogueOptimizationControllerRef.current = null;
     const requestKey = catalogueOptimizationKey;
 
     if (
-      includeReviewPriorityProductsInCatalogueOptimization &&
       catalogueOptimizationStatus === "processing" &&
       requestKey
     ) {
@@ -3713,9 +3697,6 @@ export function AdminPlanCoverageSimulatorView({
   }
 
   function clearCatalogueOptimization(options?: Readonly<{ clearSaved?: boolean }>) {
-    catalogueOptimizationControllerRef.current?.abort();
-    catalogueOptimizationControllerRef.current = null;
-
     if (options?.clearSaved) {
       clearSavedCatalogueOptimization();
     }
@@ -3743,124 +3724,29 @@ export function AdminPlanCoverageSimulatorView({
 
     const requestKey = catalogueOptimizationRunKey;
 
-    if (includeReviewPriorityProductsInCatalogueOptimization) {
-      setCatalogueOptimization(null);
-      setCatalogueOptimizationError(null);
-      setCatalogueOptimizationKey(requestKey);
-      setCatalogueOptimizationProgress({
-        current: 0,
-        label: "Starting shared optimum basket job",
-        stage: "validating",
-        total: Math.max(1, simulationData.sampleTraces.length)
-      });
-      setCatalogueOptimizationCachedProgress({
-        candidateCount: 0,
-        current: 0,
-        savedAt: new Date().toISOString(),
-        total: Math.max(1, simulationData.sampleTraces.length)
-      });
-      setCatalogueOptimizationStartedAt(Date.now());
-      setCatalogueOptimizationHeartbeat(Date.now());
-      setCatalogueOptimizationStatus("processing");
-
-      try {
-        const job = await requestCatalogueOptimizationJob("start", requestKey);
-        applyCatalogueOptimizationJob(job, requestKey);
-      } catch (error) {
-        setCatalogueOptimization(null);
-        setCatalogueOptimizationError(
-          error instanceof Error
-            ? error.message
-            : "Unable to calculate optimum basket"
-        );
-        setCatalogueOptimizationProgress(null);
-        setCatalogueOptimizationStartedAt(null);
-        setCatalogueOptimizationStatus("idle");
-      }
-
-      return;
-    }
-
-    const savedOptimization = loadSavedCatalogueOptimization(requestKey);
-
-    if (savedOptimization) {
-      setCatalogueOptimization(savedOptimization);
-      setCatalogueOptimizationError(null);
-      setCatalogueOptimizationKey(requestKey);
-      setCatalogueOptimizationProgress(null);
-      setCatalogueOptimizationStartedAt(null);
-      setCatalogueOptimizationStatus("ready");
-      return;
-    }
-
-    const controller = new AbortController();
-
-    catalogueOptimizationControllerRef.current?.abort();
-    catalogueOptimizationControllerRef.current = controller;
     setCatalogueOptimization(null);
     setCatalogueOptimizationError(null);
     setCatalogueOptimizationKey(requestKey);
     setCatalogueOptimizationProgress({
       current: 0,
-      label: "Calculating approved basket",
+      label: "Starting shared optimum basket job",
       stage: "validating",
-      total: 1
+      total: Math.max(1, simulationData.sampleTraces.length)
+    });
+    setCatalogueOptimizationCachedProgress({
+      candidateCount: 0,
+      current: 0,
+      savedAt: new Date().toISOString(),
+      total: Math.max(1, simulationData.sampleTraces.length)
     });
     setCatalogueOptimizationStartedAt(Date.now());
     setCatalogueOptimizationHeartbeat(Date.now());
     setCatalogueOptimizationStatus("processing");
 
     try {
-      const response = await fetch(catalogueOptimizationHref(accessToken), {
-        body: JSON.stringify({
-          accessToken,
-          cacheKey: requestKey,
-          includeReviewPriorityProducts: false,
-          simulationData
-        }),
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
-        },
-        method: "POST",
-        signal: controller.signal
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        optimization?: AdminCatalogueOptimizationData;
-      };
-
-      if (!response.ok || !payload.optimization) {
-        throw new Error(
-          payload.error ?? `Optimum basket request failed (${response.status})`
-        );
-      }
-
-      if (
-        controller.signal.aborted ||
-        catalogueOptimizationControllerRef.current !== controller
-      ) {
-        return;
-      }
-
-      const optimization = payload.optimization;
-
-      saveCatalogueOptimization(requestKey, optimization);
-      setCatalogueOptimization(optimization);
-      setCatalogueOptimizationError(null);
-      setCatalogueOptimizationProgress(null);
-      setCatalogueOptimizationStartedAt(null);
-      setCatalogueOptimizationStatus("ready");
+      const job = await requestCatalogueOptimizationJob("start", requestKey);
+      applyCatalogueOptimizationJob(job, requestKey);
     } catch (error) {
-      if (
-        controller.signal.aborted ||
-        catalogueOptimizationControllerRef.current !== controller
-      ) {
-        return;
-      }
-
       setCatalogueOptimization(null);
       setCatalogueOptimizationError(
         error instanceof Error
@@ -3870,10 +3756,6 @@ export function AdminPlanCoverageSimulatorView({
       setCatalogueOptimizationProgress(null);
       setCatalogueOptimizationStartedAt(null);
       setCatalogueOptimizationStatus("idle");
-    } finally {
-      if (catalogueOptimizationControllerRef.current === controller) {
-        catalogueOptimizationControllerRef.current = null;
-      }
     }
   }
 

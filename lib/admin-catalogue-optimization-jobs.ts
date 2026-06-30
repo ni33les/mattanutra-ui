@@ -1,17 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
 import type postgres from "postgres";
-import { getProductRecommendationCandidates } from "@/lib/admin-product-search";
 import {
   adminCataloguePotentialCandidates,
-  buildAdminCataloguePotentialTraceChunk,
-  runAdminCatalogueOptimizationFast,
-  runAdminCataloguePotentialOptimizationFromTraces,
   type AdminCatalogueOptimizationData,
   type AdminPlanCoverageSimulationData,
   type AdminPlanCoverageSimulationSampleTrace
 } from "@/lib/admin-product-coverage";
 import { getSql } from "@/lib/db";
 import type { ProductCandidate } from "@/lib/product-recommendations";
+import { requiredCapabilitiesForWorkTaskType } from "@/lib/system-agents";
+import { notifyTaskQueueChanged } from "@/lib/task-wakeup";
 
 export type AdminCatalogueOptimizationJobStatus =
   | "cancelled"
@@ -76,12 +74,8 @@ type JobResultPayload = Readonly<{
   totalSamples?: number;
 }>;
 
-const activeJobsGlobal = globalThis as typeof globalThis & {
-  mattanutraCatalogueOptimizationJobs?: Set<string>;
-};
-const jobLeaseSeconds = 15 * 60;
-const jobChunkSize = 4;
-const jobTaskType = "admin_catalogue_optimization_job";
+export const ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE =
+  "admin_catalogue_optimization_job";
 const jobIdempotencyScopeKey = "admin_catalogue_optimization_job";
 
 function toIsoString(value: Date | string | null | undefined) {
@@ -120,12 +114,6 @@ function asSimulationData(value: unknown): AdminPlanCoverageSimulationData | nul
     : null;
 }
 
-function asSampleTraces(value: unknown) {
-  return Array.isArray(value)
-    ? value as AdminPlanCoverageSimulationSampleTrace[]
-    : [];
-}
-
 function asOptimization(value: unknown) {
   return value && typeof value === "object"
     ? value as AdminCatalogueOptimizationData
@@ -140,17 +128,9 @@ function jobStatus(value: string): AdminCatalogueOptimizationJobStatus {
   return value === "running" || value === "reserved" ? "running" : "queued";
 }
 
-function activeJobs() {
-  activeJobsGlobal.mattanutraCatalogueOptimizationJobs ??= new Set<string>();
-
-  return activeJobsGlobal.mattanutraCatalogueOptimizationJobs;
-}
-
-async function pauseBetweenChunks() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function potentialCandidateHash(candidates: readonly ProductCandidate[]) {
+export function adminCataloguePotentialCandidateHash(
+  candidates: readonly ProductCandidate[]
+) {
   const rawById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
   const hashableCandidates = adminCataloguePotentialCandidates(candidates)
     .map((candidate) => {
@@ -289,7 +269,7 @@ async function jobByKey(sql: Db, cacheKey: string) {
       created_at,
       updated_at
     from public.tasks
-    where task_type = ${jobTaskType}
+    where task_type = ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE}
       and idempotency_scope_key = ${jobIdempotencyScopeKey}
       and idempotency_key = ${cacheKey}
     order by created_at desc
@@ -323,10 +303,6 @@ export async function getAdminCatalogueOptimizationJob(cacheKey: string) {
 
   const row = await jobByKey(sql, cacheKey);
 
-  if (row && (jobStatus(row.status) === "queued" || jobStatus(row.status) === "running")) {
-    kickAdminCatalogueOptimizationJob(row.id);
-  }
-
   return row ? jobView(row) : null;
 }
 
@@ -345,7 +321,6 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
   const existingStatus = existing ? jobStatus(existing.status) : null;
 
   if (existing && existingStatus !== "failed" && existingStatus !== "cancelled") {
-    kickAdminCatalogueOptimizationJob(existing.id);
     return jobView(existing);
   }
 
@@ -421,13 +396,13 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           ${organisationId}::uuid,
           ${randomUUID()}::uuid,
           'Optimum product basket',
-          ${jobTaskType},
+          ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE},
           'Optimum product basket',
           'Shared background calculation for the admin plan coverage simulator.',
           'system',
           'queued',
           200,
-          '{}'::text[],
+          ${requiredCapabilitiesForWorkTaskType(ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE)}::text[],
           'none',
           ${sql.json(jsonValue(context))}::jsonb,
           ${sql.json(jsonValue(input.simulationData))}::jsonb,
@@ -463,7 +438,7 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
     throw new Error("Unable to create shared optimum basket job");
   }
 
-  kickAdminCatalogueOptimizationJob(row.id);
+  notifyTaskQueueChanged();
 
   return jobView(row);
 }
@@ -487,10 +462,10 @@ export async function cancelAdminCatalogueOptimizationJob(cacheKey: string) {
       lease_until = null,
       completed_at = coalesce(completed_at, now()),
       updated_at = now()
-    where task_type = ${jobTaskType}
+    where task_type = ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE}
       and idempotency_scope_key = ${jobIdempotencyScopeKey}
       and idempotency_key = ${cacheKey}
-      and status in ('queued', 'running')
+      and status in ('queued', 'reserved', 'running')
     returning
       id::text,
       idempotency_key,
@@ -505,328 +480,10 @@ export async function cancelAdminCatalogueOptimizationJob(cacheKey: string) {
       created_at,
       updated_at
   `;
+
+  if (rows[0]) {
+    notifyTaskQueueChanged();
+  }
 
   return rows[0] ? jobView(rows[0]) : await getAdminCatalogueOptimizationJob(cacheKey);
-}
-
-export function kickAdminCatalogueOptimizationJob(jobId: string) {
-  const jobs = activeJobs();
-
-  if (jobs.has(jobId)) {
-    return;
-  }
-
-  jobs.add(jobId);
-  setTimeout(() => {
-    void runAdminCatalogueOptimizationJob(jobId).finally(() => {
-      jobs.delete(jobId);
-    });
-  }, 0);
-}
-
-async function claimJob(sql: Db, jobId: string) {
-  const rows = await sql<JobTaskRow[]>`
-    update public.tasks
-    set
-      status = 'running',
-      result_payload = coalesce(result_payload, '{}'::jsonb) ||
-        ${sql.json(jsonValue({
-          message: "Starting shared optimum basket job",
-          stage: "starting"
-        } satisfies JobResultPayload))}::jsonb,
-      started_at = coalesce(started_at, now()),
-      lease_until = now() + (${jobLeaseSeconds}::int * interval '1 second'),
-      updated_at = now()
-    where id = ${jobId}::uuid
-      and task_type = ${jobTaskType}
-      and status in ('queued', 'running')
-      and (lease_until is null or lease_until < now())
-    returning
-      id::text,
-      idempotency_key,
-      context,
-      payload,
-      result_payload,
-      status,
-      error_message,
-      lease_until,
-      started_at,
-      completed_at,
-      created_at,
-      updated_at
-  `;
-
-  return rows[0] ?? null;
-}
-
-async function updateJobProgress(sql: Db, input: Readonly<{
-  candidateCount?: number;
-  candidateHash?: string | null;
-  completedSamples?: number;
-  currentStage: string;
-  jobId: string;
-  message: string;
-  potentialTraces?: readonly AdminPlanCoverageSimulationSampleTrace[];
-  totalSamples?: number;
-}>) {
-  const payload = {
-    ...(input.candidateCount === undefined ? {} : { candidateCount: input.candidateCount }),
-    ...(input.candidateHash === undefined ? {} : { candidateHash: input.candidateHash }),
-    ...(input.completedSamples === undefined ? {} : { completedSamples: input.completedSamples }),
-    ...(input.potentialTraces === undefined ? {} : { potentialTraces: input.potentialTraces }),
-    ...(input.totalSamples === undefined ? {} : { totalSamples: input.totalSamples }),
-    message: input.message,
-    stage: input.currentStage
-  } satisfies JobResultPayload;
-
-  const rows = await sql<JobTaskRow[]>`
-    update public.tasks
-    set
-      result_payload = coalesce(result_payload, '{}'::jsonb) ||
-        ${sql.json(jsonValue(payload))}::jsonb,
-      lease_until = now() + (${jobLeaseSeconds}::int * interval '1 second'),
-      updated_at = now()
-    where id = ${input.jobId}::uuid
-      and task_type = ${jobTaskType}
-      and status = 'running'
-    returning
-      id::text,
-      idempotency_key,
-      context,
-      payload,
-      result_payload,
-      status,
-      error_message,
-      lease_until,
-      started_at,
-      completed_at,
-      created_at,
-      updated_at
-  `;
-
-  return rows[0] ?? null;
-}
-
-async function completeJob(sql: Db, input: Readonly<{
-  approvedOptimization: AdminCatalogueOptimizationData;
-  jobId: string;
-  optimization: AdminCatalogueOptimizationData;
-}>) {
-  const payload = {
-    approvedOptimization: input.approvedOptimization,
-    completedSamples: input.optimization.sampleSize,
-    message: "Optimum basket ready",
-    optimization: input.optimization,
-    stage: "completed",
-    totalSamples: input.optimization.sampleSize
-  } satisfies JobResultPayload;
-
-  const rows = await sql<JobTaskRow[]>`
-    update public.tasks
-    set
-      status = 'completed',
-      result_payload = coalesce(result_payload, '{}'::jsonb) ||
-        ${sql.json(jsonValue(payload))}::jsonb,
-      lease_until = null,
-      completed_at = now(),
-      updated_at = now()
-    where id = ${input.jobId}::uuid
-      and task_type = ${jobTaskType}
-      and status = 'running'
-    returning
-      id::text,
-      idempotency_key,
-      context,
-      payload,
-      result_payload,
-      status,
-      error_message,
-      lease_until,
-      started_at,
-      completed_at,
-      created_at,
-      updated_at
-  `;
-
-  return rows[0] ?? null;
-}
-
-async function failJob(sql: Db, input: Readonly<{
-  error: unknown;
-  jobId: string;
-}>) {
-  const message =
-    input.error instanceof Error
-      ? input.error.message
-      : "Shared optimum basket job failed";
-
-  await sql`
-    update public.tasks
-    set
-      status = 'failed',
-      result_payload = coalesce(result_payload, '{}'::jsonb) ||
-        ${sql.json(jsonValue({
-          errorMessage: message,
-          message: "Optimum basket failed",
-          stage: "failed"
-        } satisfies JobResultPayload))}::jsonb,
-      error_message = ${message},
-      lease_until = null,
-      completed_at = now(),
-      updated_at = now()
-    where id = ${input.jobId}::uuid
-      and task_type = ${jobTaskType}
-  `;
-}
-
-async function jobStillRunning(sql: Db, jobId: string) {
-  const rows = await sql<Array<{ status: string }>>`
-    select status
-    from public.tasks
-    where id = ${jobId}::uuid
-      and task_type = ${jobTaskType}
-    limit 1
-  `;
-
-  return rows[0]?.status === "running";
-}
-
-async function runAdminCatalogueOptimizationJob(jobId: string) {
-  const sql = getSql();
-
-  if (!sql) {
-    return;
-  }
-
-  let row = await claimJob(sql, jobId);
-
-  if (!row) {
-    return;
-  }
-
-  try {
-    const simulationData = asSimulationData(row.payload);
-
-    if (!simulationData) {
-      throw new Error("Shared optimum basket job is missing simulation data");
-    }
-
-    row = await updateJobProgress(sql, {
-      currentStage: "starting",
-      jobId,
-      message: "Calculating approved basket",
-      totalSamples: simulationData.sampleTraces.length
-    }) ?? row;
-
-    const approvedOptimization = runAdminCatalogueOptimizationFast({
-      includeReviewPriorityProducts: false,
-      simulationData
-    });
-
-    if (!jobContext(row).includePendingReviewProducts) {
-      await completeJob(sql, {
-        approvedOptimization,
-        jobId,
-        optimization: {
-          ...approvedOptimization,
-          potential: null
-        }
-      });
-      return;
-    }
-
-    row = await updateJobProgress(sql, {
-      currentStage: "loading_catalogue",
-      jobId,
-      message: "Loading potential product catalogue",
-      totalSamples: simulationData.sampleTraces.length
-    }) ?? row;
-
-    const potentialCandidates = await getProductRecommendationCandidates({
-      countryCode: simulationData.countryCode,
-      includeIneligible: true
-    });
-    const potentialCandidateCount =
-      adminCataloguePotentialCandidates(potentialCandidates).length;
-    const candidateHash = potentialCandidateHash(potentialCandidates);
-    let potentialTraces = asSampleTraces(jobResult(row).potentialTraces);
-
-    if (jobResult(row).candidateHash && jobResult(row).candidateHash !== candidateHash) {
-      potentialTraces = [];
-    }
-
-    await updateJobProgress(sql, {
-      candidateCount: potentialCandidateCount,
-      candidateHash,
-      completedSamples: potentialTraces.length,
-      currentStage: "evaluating",
-      jobId,
-      message: "Evaluating potential basket",
-      potentialTraces,
-      totalSamples: simulationData.sampleTraces.length
-    });
-
-    for (
-      let startIndex = potentialTraces.length;
-      startIndex < simulationData.sampleTraces.length;
-      startIndex += jobChunkSize
-    ) {
-      if (!await jobStillRunning(sql, jobId)) {
-        return;
-      }
-
-      const chunk = buildAdminCataloguePotentialTraceChunk({
-        chunkSize: jobChunkSize,
-        potentialCandidates,
-        simulationData,
-        startIndex
-      });
-
-      potentialTraces = [
-        ...potentialTraces,
-        ...chunk.sampleTraces
-      ];
-
-      await updateJobProgress(sql, {
-        candidateCount: chunk.candidateCount,
-        candidateHash,
-        completedSamples: potentialTraces.length,
-        currentStage: "evaluating",
-        jobId,
-        message: "Evaluating potential basket",
-        potentialTraces,
-        totalSamples: chunk.totalSamples
-      });
-      await pauseBetweenChunks();
-    }
-
-    await updateJobProgress(sql, {
-      completedSamples: potentialTraces.length,
-      currentStage: "finalizing",
-      jobId,
-      message: "Finalizing optimum basket",
-      potentialTraces,
-      totalSamples: simulationData.sampleTraces.length
-    });
-
-    const potential = runAdminCataloguePotentialOptimizationFromTraces({
-      coverageLossTolerancePercent: 0,
-      potentialCandidates,
-      sampleTraces: potentialTraces,
-      simulationData
-    });
-    const optimization = {
-      ...approvedOptimization,
-      potential
-    } satisfies AdminCatalogueOptimizationData;
-
-    await completeJob(sql, {
-      approvedOptimization,
-      jobId,
-      optimization
-    });
-  } catch (error) {
-    console.error("Shared optimum basket job failed", error);
-    await failJob(sql, { error, jobId });
-  }
 }

@@ -177,7 +177,7 @@ export async function POST(request: Request) {
       priorityReason: "Admin requested missing FDA sourcing.",
       priorityScore: 420,
       requiredCapabilities:
-        requiredCapabilitiesForWorkTaskType("generate_product_recommendations"),
+        requiredCapabilitiesForWorkTaskType("source_product_fda_approvals"),
       retryPolicy: {
         maxRetries: 0
       },

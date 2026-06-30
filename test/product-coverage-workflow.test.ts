@@ -1273,6 +1273,7 @@ describe("product coverage workflow", () => {
       "lib/admin-catalogue-optimization-jobs.ts",
       "utf8"
     );
+    const taskExecution = readFileSync("lib/task-execution.ts", "utf8");
     const demandProfileRoute = readFileSync(
       "app/api/admin/product-coverage/demand-profile/route.ts",
       "utf8"
@@ -1404,11 +1405,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /popstate/);
     assert.match(view, /Product performance/);
     assert.match(view, /Optimum product basket/);
-    assert.match(view, /catalogueOptimizationHref/);
+    assert.doesNotMatch(view, /catalogueOptimizationHref/);
     assert.match(view, /catalogueOptimizationJobHref/);
-    assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization/);
     assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization\/jobs/);
-    assert.match(view, /Calculating approved basket/);
+    assert.match(view, /Starting shared optimum basket job/);
     assert.match(view, /Preparing potential catalogue/);
     assert.match(view, /Evaluating potential basket/);
     assert.match(view, /shared background job/);
@@ -1428,9 +1428,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /Shows the best possible basket if pending products were approved/);
     assert.match(view, /includeReviewPriorityProductsInCatalogueOptimization/);
     assert.match(view, /catalogueReviewProductsKey/);
-    assert.match(view, /includeReviewPriorityProducts: false/);
     assert.match(view, /includePendingReviewProducts/);
-    assert.match(catalogueOptimizationRoute, /includeReviewPriorityProducts/);
+    assert.match(catalogueOptimizationRoute, /startAdminCatalogueOptimizationJob/);
+    assert.match(catalogueOptimizationRoute, /status: 202/);
+    assert.doesNotMatch(catalogueOptimizationRoute, /runAdminCatalogueOptimizationFast/);
     assert.doesNotMatch(catalogueOptimizationRoute, /runAdminCataloguePotentialOptimizationFast/);
     assert.doesNotMatch(catalogueOptimizationRoute, /getProductRecommendationCandidates/);
     assert.match(catalogueOptimizationJobRoute, /startAdminCatalogueOptimizationJob/);
@@ -1440,19 +1441,25 @@ describe("product coverage workflow", () => {
     assert.match(catalogueOptimizationJobs, /admin_catalogue_optimization_job/);
     assert.match(catalogueOptimizationJobs, /idempotency_scope_key/);
     assert.match(catalogueOptimizationJobs, /result_payload/);
-    assert.match(catalogueOptimizationJobs, /kickAdminCatalogueOptimizationJob/);
-    assert.match(catalogueOptimizationJobs, /lease_until/);
-    assert.match(catalogueOptimizationJobs, /buildAdminCataloguePotentialTraceChunk/);
-    assert.match(catalogueOptimizationJobs, /runAdminCataloguePotentialOptimizationFromTraces/);
+    assert.match(catalogueOptimizationJobs, /notifyTaskQueueChanged/);
+    assert.match(catalogueOptimizationJobs, /analytics_catalogue_optimization|requiredCapabilitiesForWorkTaskType/);
+    assert.doesNotMatch(catalogueOptimizationJobs, /kickAdminCatalogueOptimizationJob/);
+    assert.doesNotMatch(catalogueOptimizationJobs, /setTimeout/);
+    assert.doesNotMatch(catalogueOptimizationJobs, /runAdminCatalogueOptimizationJob/);
     assert.doesNotMatch(catalogueOptimizationJobs, /create table/i);
     assert.doesNotMatch(packageJson, /catalogue-optimization-jobs:schema:apply/);
+    assert.match(packageJson, /worker:analytics/);
     assert.doesNotMatch(schema, /CREATE TABLE public\.admin_catalogue_optimization_jobs/);
-    assert.match(cataloguePotentialTraceRoute, /buildAdminCataloguePotentialTraceChunk/);
-    assert.match(cataloguePotentialTraceRoute, /normalizedPotentialTraceChunkSize/);
-    assert.match(cataloguePotentialTraceRoute, /potentialCandidateHash/);
-    assert.match(cataloguePotentialFinalizeRoute, /runAdminCataloguePotentialOptimizationFromTraces/);
-    assert.match(cataloguePotentialFinalizeRoute, /coverageLossTolerancePercent: 0/);
-    assert.match(cataloguePotentialFinalizeRoute, /status: 409/);
+    assert.match(cataloguePotentialTraceRoute, /Analytics worker job/);
+    assert.match(cataloguePotentialTraceRoute, /status: 410/);
+    assert.doesNotMatch(cataloguePotentialTraceRoute, /buildAdminCataloguePotentialTraceChunk/);
+    assert.doesNotMatch(cataloguePotentialTraceRoute, /getProductRecommendationCandidates/);
+    assert.match(cataloguePotentialFinalizeRoute, /Analytics worker job/);
+    assert.match(cataloguePotentialFinalizeRoute, /status: 410/);
+    assert.doesNotMatch(cataloguePotentialFinalizeRoute, /runAdminCataloguePotentialOptimizationFromTraces/);
+    assert.match(taskExecution, /admin_catalogue_optimization_job/);
+    assert.match(taskExecution, /buildAdminCataloguePotentialTraceChunk/);
+    assert.match(taskExecution, /runAdminCataloguePotentialOptimizationFromTraces/);
     assert.doesNotMatch(view, /runAdminCatalogueOptimizationCooperatively/);
     assert.match(view, /Basket products/);
     assert.match(view, /No basket products were identified/);

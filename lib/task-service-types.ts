@@ -428,6 +428,16 @@ export type FailTaskInput = Readonly<{
   workerSessionId?: string | null;
 }>;
 
+export type ProgressTaskInput = Readonly<{
+  accessScope?: TaskAgentAccessScope | null;
+  agentId?: string | null;
+  leaseSeconds?: unknown;
+  reservationId?: string | null;
+  resultPayload?: Record<string, unknown>;
+  taskId: string;
+  workerSessionId?: string | null;
+}>;
+
 export type TaskCompletionContext = Readonly<{
   afterCommit?: (effect: TaskAfterCommitEffect) => void;
   agentId?: string | null;

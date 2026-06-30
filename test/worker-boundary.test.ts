@@ -345,6 +345,10 @@ describe("external worker boundaries", () => {
       "app/api/tasks/[id]/fail/route.ts",
       "utf8",
     );
+    const progressRouteSource = await readFile(
+      "app/api/tasks/[id]/progress/route.ts",
+      "utf8",
+    );
     const visibilityEventsSource = await readFile(
       "app/api/admin/visibility/events/route.ts",
       "utf8",
@@ -361,6 +365,14 @@ describe("external worker boundaries", () => {
     );
     const serviceSource = await readFile("lib/task-service.ts", "utf8");
     const runnerSource = await readFile("workers/runner.ts", "utf8");
+    const profilesSource = await readFile(
+      "lib/worker-agent-credentials.ts",
+      "utf8",
+    );
+    const catalogueOptimizationJobsSource = await readFile(
+      "lib/admin-catalogue-optimization-jobs.ts",
+      "utf8",
+    );
 
     assert.match(
       source,
@@ -385,6 +397,9 @@ describe("external worker boundaries", () => {
     assert.match(source, /eventName: "task_reserved"/);
     assert.match(completeRouteSource, /eventName: "task_completed"/);
     assert.match(failRouteSource, /eventName: "task_failed"/);
+    assert.match(progressRouteSource, /requireWorkerAccess/);
+    assert.match(progressRouteSource, /reportTaskProgress/);
+    assert.match(serviceSource, /task_progress_reported/);
     assert.match(
       source,
       /buildTaskWorkItem[\s\S]*failTask[\s\S]*continue;/,
@@ -426,6 +441,17 @@ describe("external worker boundaries", () => {
       source,
       /INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000/,
       "interactive fallback polling should keep user-visible tasks responsive",
+    );
+    assert.match(
+      profilesSource,
+      /"analytics", "analytics"[\s\S]*"admin_catalogue_optimization_job"/,
+      "admin catalogue optimisation must run on Analytics, not Product Matcher",
+    );
+    assert.match(runnerSource, /client\.progress/);
+    assert.doesNotMatch(catalogueOptimizationJobsSource, /setTimeout/);
+    assert.doesNotMatch(
+      catalogueOptimizationJobsSource,
+      /kickAdminCatalogueOptimizationJob/,
     );
     assert.equal(
       /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_supplement_guidance/.test(

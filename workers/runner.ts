@@ -19,6 +19,8 @@ nextEnv.loadEnvConfig(process.cwd());
 type WorkerMode =
   | "advisor"
   | "all"
+  | "analytics"
+  | "carrier"
   | "chat"
   | "communications"
   | "content"
@@ -51,6 +53,13 @@ type ActiveSession = Readonly<{
 }>;
 
 type WorkerHeartbeatStatus = "idle" | "working";
+type WorkItemExecutionContext = Readonly<{
+  agentId: string;
+  leaseSeconds: number;
+  reservationId: string;
+  taskId: string;
+  workerSessionId: string;
+}>;
 
 const activeSessions = new Map<string, ActiveSession>();
 let fatalAuthProfileFailure = false;
@@ -130,6 +139,8 @@ function workerMode(value: string | undefined): WorkerMode {
   }
 
   return value === "chat" ||
+    value === "analytics" ||
+    value === "carrier" ||
     value === "communications" ||
     value === "content" ||
     value === "email" ||
@@ -257,6 +268,7 @@ function workerProfileModesForRun(mode: WorkerMode) {
 async function executeWorkItem(
   client: WorkerApiClient,
   workItem: Record<string, unknown>,
+  context: WorkItemExecutionContext,
 ) {
   if (workItem.taskType === "client_safety_followup") {
     const communication = await client.sendCommunication({
@@ -271,7 +283,17 @@ async function executeWorkItem(
     return { communication };
   }
 
-  return executeTaskWorkItem(workItem as never);
+  return executeTaskWorkItem(workItem as never, {
+    reportProgress: (resultPayload) =>
+      client.progress({
+        agentId: context.agentId,
+        leaseSeconds: context.leaseSeconds,
+        reservationId: context.reservationId,
+        resultPayload,
+        taskId: context.taskId,
+        workerSessionId: context.workerSessionId,
+      }),
+  });
 }
 
 async function runAgentLoop(
@@ -448,7 +470,13 @@ async function runAgentLoop(
       ).unref?.();
 
       try {
-        const resultPayload = await executeWorkItem(client, workItem);
+        const resultPayload = await executeWorkItem(client, workItem, {
+          agentId: agent.id,
+          leaseSeconds,
+          reservationId,
+          taskId,
+          workerSessionId,
+        });
 
         clearInterval(renew);
         await retryApiCall(`${agent.name} task completion`, () =>
