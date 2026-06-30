@@ -1077,12 +1077,22 @@ function catalogueOptimizationProgressFromJob(
   };
 }
 
+function timestampMillis(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function catalogueOptimizationJobStartedAt(
   job: AdminCatalogueOptimizationJobView
 ) {
-  const parsed = Date.parse(job.startedAt ?? job.createdAt);
+  const parsed = timestampMillis(job.startedAt ?? job.createdAt);
 
-  return Number.isFinite(parsed) ? parsed : Date.now();
+  return parsed ?? Date.now();
 }
 
 function stateLabel(state: SupplementCoverageState) {
@@ -3236,20 +3246,49 @@ export function AdminPlanCoverageSimulatorView({
           (catalogueOptimizationHeartbeat - catalogueOptimizationStartedAt) / 1000
         )
       : null;
+  const currentCatalogueOptimizationJobMatches =
+    catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey;
+  const currentCatalogueOptimizationLeaseUntil =
+    timestampMillis(
+      catalogueOptimizationJob?.reservationLeaseUntil ??
+        catalogueOptimizationJob?.leaseUntil
+    );
+  const currentCatalogueOptimizationLastHeartbeat =
+    timestampMillis(catalogueOptimizationJob?.lastWorkerHeartbeatAt);
+  const currentCatalogueOptimizationHasReservation =
+    Boolean(catalogueOptimizationJob?.reservationId);
+  const currentCatalogueOptimizationLeaseExpired =
+    currentCatalogueOptimizationHasReservation &&
+    (
+      currentCatalogueOptimizationLeaseUntil === null ||
+      currentCatalogueOptimizationLeaseUntil <= catalogueOptimizationHeartbeat
+    );
+  const currentCatalogueOptimizationHeartbeatStale =
+    currentCatalogueOptimizationHasReservation &&
+    (
+      currentCatalogueOptimizationLastHeartbeat === null ||
+      catalogueOptimizationHeartbeat - currentCatalogueOptimizationLastHeartbeat >
+        120_000
+    );
   const currentCatalogueOptimizationQueued =
     currentCatalogueOptimizationStatus === "processing" &&
-    catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey &&
-    catalogueOptimizationJob.status === "queued";
+    currentCatalogueOptimizationJobMatches &&
+    catalogueOptimizationJob?.status === "queued" &&
+    !currentCatalogueOptimizationHasReservation;
   const currentCatalogueOptimizationBlocked =
     currentCatalogueOptimizationStatus === "processing" &&
-    catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey &&
-    catalogueOptimizationJob.status === "running" &&
+    currentCatalogueOptimizationJobMatches &&
     (
-      !catalogueOptimizationJob.leaseUntil ||
       (
-        Number.isFinite(Date.parse(catalogueOptimizationJob.leaseUntil)) &&
-        Date.parse(catalogueOptimizationJob.leaseUntil) <=
-          catalogueOptimizationHeartbeat
+        catalogueOptimizationJob?.status === "queued" &&
+        currentCatalogueOptimizationHasReservation
+      ) ||
+      (
+        catalogueOptimizationJob?.status === "running" &&
+        (
+          currentCatalogueOptimizationLeaseExpired ||
+          currentCatalogueOptimizationHeartbeatStale
+        )
       )
     );
   const canRestartQueuedCatalogueOptimization =

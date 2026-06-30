@@ -1507,7 +1507,10 @@ describe("product coverage workflow", () => {
     );
     assert.match(view, /Remove recommendations/);
     assert.match(view, /currentCatalogueOptimizationBlocked/);
-    assert.match(view, /catalogueOptimizationJob\.leaseUntil/);
+    assert.match(view, /currentCatalogueOptimizationLeaseUntil/);
+    assert.match(view, /reservationLeaseUntil/);
+    assert.match(view, /currentCatalogueOptimizationHasReservation/);
+    assert.match(view, /currentCatalogueOptimizationHeartbeatStale/);
     assert.match(view, /lastWorkerHeartbeatAt/);
     assert.match(view, /reservationId/);
     assert.match(view, /workerSessionId/);

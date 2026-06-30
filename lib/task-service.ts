@@ -140,6 +140,7 @@ type TaskReservationResultRow = TaskRow & {
 };
 type ExpiredReservationClaimRow = ExpiredReservationRow & {
   exhausted: boolean;
+  release_reason: string;
   retry_will_be_scheduled: boolean;
 };
 
@@ -1192,27 +1193,41 @@ async function claimExpiredReservationsBatch(
   batchLimit: number
 ) {
   const rows = await sql<ExpiredReservationClaimRow[]>`
-    with expired as (
-      select
-        task_reservations.id as reservation_id,
-        task_reservations.agent_id as reservation_agent_id,
-        task_reservations.membership_id as reservation_membership_id,
-        task_reservations.worker_session_id as reservation_worker_session_id,
-        tasks.id as task_id,
-        (tasks.attempts >= tasks.max_attempts) as exhausted,
-        (
-          tasks.idempotency_key is not null
-          and tasks.retry_attempt < tasks.max_retries
-        ) as retry_will_be_scheduled
-      from public.task_reservations
-      join public.tasks on tasks.id = task_reservations.task_id
-      where task_reservations.status = 'active'
-        and task_reservations.lease_until < now()
-        and tasks.status in ('reserved', 'running')
-      order by task_reservations.lease_until asc
-      limit ${batchLimit}
-      for update skip locked
-    ),
+	    with expired as (
+	      select
+	        task_reservations.id as reservation_id,
+	        task_reservations.agent_id as reservation_agent_id,
+	        task_reservations.membership_id as reservation_membership_id,
+	        task_reservations.worker_session_id as reservation_worker_session_id,
+	        tasks.id as task_id,
+	        case
+	          when tasks.status not in ('reserved', 'running') then 'invalid_active_reservation'
+	          when tasks.lease_until is null then 'missing_task_lease'
+	          when tasks.lease_until < now() then 'task_lease_expired'
+	          else 'reservation_lease_expired'
+	        end as release_reason,
+	        (
+	          tasks.status in ('reserved', 'running')
+	          and tasks.attempts >= tasks.max_attempts
+	        ) as exhausted,
+	        (
+	          tasks.idempotency_key is not null
+	          and tasks.retry_attempt < tasks.max_retries
+	        ) as retry_will_be_scheduled
+	      from public.task_reservations
+	      join public.tasks on tasks.id = task_reservations.task_id
+	      where task_reservations.status = 'active'
+	        and tasks.status not in ('completed', 'cancelled', 'skipped')
+	        and (
+	          task_reservations.lease_until < now()
+	          or tasks.status not in ('reserved', 'running')
+	          or tasks.lease_until is null
+	          or tasks.lease_until < now()
+	        )
+	      order by task_reservations.lease_until asc
+	      limit ${batchLimit}
+	      for update skip locked
+	    ),
     released as (
       update public.task_reservations set
         status = 'expired',
@@ -1223,17 +1238,22 @@ async function claimExpiredReservationsBatch(
         expired.reservation_id,
         expired.reservation_agent_id,
         expired.reservation_membership_id,
-        expired.reservation_worker_session_id,
-        expired.task_id,
-        expired.exhausted,
-        expired.retry_will_be_scheduled
-    ),
-    updated_tasks as (
-      update public.tasks set
-        status = case when released.exhausted then 'failed' else 'queued' end,
-        reserved_by_agent_id = null,
-        lease_until = null,
-        error_message = case
+	        expired.reservation_worker_session_id,
+	        expired.task_id,
+	        expired.exhausted,
+	        expired.release_reason,
+	        expired.retry_will_be_scheduled
+	    ),
+	    updated_tasks as (
+	      update public.tasks set
+	        status = case
+	          when released.exhausted then 'failed'
+	          when public.tasks.status in ('reserved', 'running') then 'queued'
+	          else public.tasks.status
+	        end,
+	        reserved_by_agent_id = null,
+	        lease_until = null,
+	        error_message = case
           when released.exhausted then 'Task lease expired after maximum attempts.'
           else null
         end,
@@ -1250,10 +1270,11 @@ async function claimExpiredReservationsBatch(
         released.reservation_id::text as reservation_id,
         released.reservation_agent_id::text as reservation_agent_id,
         released.reservation_membership_id::text as reservation_membership_id,
-        released.reservation_worker_session_id::text as reservation_worker_session_id,
-        released.exhausted,
-        released.retry_will_be_scheduled
-    ),
+	        released.reservation_worker_session_id::text as reservation_worker_session_id,
+	        released.exhausted,
+	        released.release_reason,
+	        released.retry_will_be_scheduled
+	    ),
     task_events as (
       insert into public.task_events (
         id,
@@ -1276,11 +1297,12 @@ async function claimExpiredReservationsBatch(
         end,
         case when updated_tasks.exhausted then 'failed' else 'observed' end,
         case when updated_tasks.exhausted then 'high' else 'medium' end,
-        jsonb_build_object(
-          'exhausted', updated_tasks.exhausted,
-          'reservationId', updated_tasks.reservation_id,
-          'retryWillBeScheduled', updated_tasks.retry_will_be_scheduled
-        ),
+	        jsonb_build_object(
+	          'exhausted', updated_tasks.exhausted,
+	          'releaseReason', updated_tasks.release_reason,
+	          'reservationId', updated_tasks.reservation_id,
+	          'retryWillBeScheduled', updated_tasks.retry_will_be_scheduled
+	        ),
         now(),
         now()
       from updated_tasks
