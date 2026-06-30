@@ -43,6 +43,7 @@ const MAX_POLLING_BACKOFF_MS = 30_000;
 const MAX_WORKER_PROFILE_CONCURRENCY = 8;
 const WORKER_AUTH_CONFIGURATION_EXIT_CODE = 78;
 const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
+const TASK_LEASE_ABORT_SAFETY_MS = 120_000;
 const WORKER_RUN_ID = randomUUID();
 const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES;
 
@@ -448,6 +449,7 @@ async function runAgentLoop(
       heartbeatTaskId = taskId;
       const taskAbortController = new AbortController();
       let taskAbortReason: Error | null = null;
+      let lastLeaseAcknowledgedAt = Date.now();
       const abortTask = (error: unknown) => {
         if (!taskAbortController.signal.aborted) {
           taskAbortReason =
@@ -459,23 +461,34 @@ async function runAgentLoop(
         () => {
           void retryApiCall(
             `${agent.name} task lease renewal`,
-            () =>
-              client.renew({
+            async () => {
+              await client.renew({
                 agentId: agent.id,
                 leaseSeconds,
                 reservationId,
                 taskId,
                 workerSessionId,
-              }),
+              });
+              lastLeaseAcknowledgedAt = Date.now();
+            },
             2,
           ).catch((error) => {
+            const leaseAgeMs = Date.now() - lastLeaseAcknowledgedAt;
+            const leaseAbortAfterMs = Math.max(
+              0,
+              leaseSeconds * 1_000 - TASK_LEASE_ABORT_SAFETY_MS,
+            );
+
             console.error(
               `[agent] ${agent.name} could not renew task ${taskId}: ${errorMessage(error)}`,
             );
-            abortTask(error);
+
+            if (leaseAgeMs >= leaseAbortAfterMs) {
+              abortTask(error);
+            }
           });
         },
-        Math.max(30_000, Math.floor(leaseSeconds * 400)),
+        Math.max(30_000, Math.floor(leaseSeconds * 200)),
       );
       (
         renew as ReturnType<typeof setInterval> & { unref?: () => void }

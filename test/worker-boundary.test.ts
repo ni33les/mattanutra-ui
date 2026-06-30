@@ -450,8 +450,8 @@ describe("external worker boundaries", () => {
     assert.match(runnerSource, /client\.progress/);
     assert.match(
       runnerSource,
-      /could not renew task[\s\S]*abortTask\(error\)/,
-      "workers must abort CPU-heavy task execution when lease renewal fails",
+      /TASK_LEASE_ABORT_SAFETY_MS[\s\S]*leaseAgeMs >= leaseAbortAfterMs[\s\S]*abortTask\(error\)/,
+      "workers must tolerate transient renewal failures but abort before the lease becomes unsafe",
     );
     assert.doesNotMatch(catalogueOptimizationJobsSource, /setTimeout/);
     assert.doesNotMatch(
