@@ -274,7 +274,17 @@ describe("product admin card layout", () => {
     assert.match(detailView, /currentBusinessState === "ignored"/);
     assert.match(detailView, /window\.confirm\(viewLabels\.deleteIgnoredConfirm\)/);
     assert.match(detailView, /viewLabels\.deleteAction/);
+    assert.match(detailView, /statusMessage/);
+    assert.match(detailView, /viewLabels\.backToProducts/);
+    assert.match(detailView, /viewLabels\.saveChanges/);
+    assert.match(detailView, /await onSave\(ignoredDraft\);/);
+    assert.match(detailView, /await onSave\(approvedDraft\);/);
+    assert.doesNotMatch(detailView, /if \(await onSave\(ignoredDraft\)\) \{\s*onClose\(\);/);
+    assert.doesNotMatch(detailView, /if \(await onSave\(approvedDraft\)\) \{\s*onClose\(\);/);
     assert.match(helpers, /deleteIgnoredConfirm/);
+    assert.match(helpers, /saveChanges/);
+    assert.match(helpers, /productSaved/);
+    assert.match(helpers, /statusActions/);
     assert.match(writes, /export async function deleteIgnoredAdminProduct/);
     assert.match(writes, /target\.status = 'ignored'/);
     assert.match(writes, /delete from public\.products/);

@@ -209,11 +209,17 @@ function normalizedSimulatorCountryCode(value: string | null | undefined) {
   return normalizeProductCountryCode(value) ?? defaultProductCountryCode;
 }
 
-function updateSimulatorCountryUrl(countryCode: string) {
+function updateSimulatorCountryUrl(
+  countryCode: string,
+  mode: PlanCoverageSimulatorMode
+) {
   const url = new URL(window.location.href);
 
   url.searchParams.set("country", countryCode);
-  url.searchParams.set("view", "plan-coverage-simulator");
+  url.searchParams.set(
+    "view",
+    mode === "optimisation" ? "product-optimisation" : "plan-coverage-simulator"
+  );
   window.history.pushState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
 }
 
@@ -815,6 +821,20 @@ function initialSimulationData(data: AdminPlanCoverageSimulationData) {
     realCustomerProfiles: data.realCustomerProfiles,
     reviewPriorityProducts: data.reviewPriorityProducts
   });
+}
+
+function simulatorInputReady(data: AdminPlanCoverageSimulationData) {
+  return (
+    data.databaseAvailable &&
+    (
+      data.input.candidates.length > 0 ||
+      data.input.supplements.length > 0 ||
+      data.input.supplementGovernanceHash !== "supplement-governance:unknown" ||
+      data.realCustomerArchetypes.length > 0 ||
+      data.realCustomerProfiles.length > 0 ||
+      data.reviewPriorityProducts.length > 0
+    )
+  );
 }
 
 function productResultRows(
@@ -2191,22 +2211,6 @@ function MinimumCataloguePanel({
             </p>
           ) : null}
         </div>
-        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full animate-pulse rounded-full bg-[#3A7BD5]"
-            style={{
-              width: `${Math.max(
-                8,
-                Math.min(
-                  100,
-                  ((optimizationProgress?.current ?? 0) /
-                    Math.max(1, optimizationProgress?.total ?? 1)) *
-                    100
-                )
-              )}%`
-            }}
-          />
-        </div>
         {optimizationProgress ? (
           <p className="mt-2 text-sm text-slate-500">
             {optimizationProgress.label}
@@ -2736,7 +2740,7 @@ function simulationStatusText(
   hydrated: boolean
 ) {
   if (inputStatus === "loading") {
-    return "Loading";
+    return "Loading catalogue input";
   }
 
   if (inputStatus === "error") {
@@ -2800,30 +2804,19 @@ function convergenceProgressText(data: AdminPlanCoverageSimulationData) {
 }
 
 function simulationProgressDisplay({
-  catalogueOptimizationProgress,
-  catalogueOptimizationStatus,
   demandProfiles,
   generating,
   running,
   simulationData
 }: Readonly<{
-  catalogueOptimizationProgress: AdminCatalogueOptimizationProgress | null;
-  catalogueOptimizationStatus: CatalogueOptimizationStatus;
   demandProfiles: readonly AdminPlanCoverageDemandProfile[];
   generating: boolean;
   running: boolean;
   simulationData: AdminPlanCoverageSimulationData;
 }>): SimulatorProgressDisplay {
-  if (catalogueOptimizationStatus === "processing") {
-    return {
-      current: catalogueOptimizationProgress?.current ?? 0,
-      total: catalogueOptimizationProgress?.total ?? 1
-    };
-  }
-
   if (generating && running) {
     return {
-      current: demandProfiles.length,
+      current: Math.max(simulationData.sampleSize, demandProfiles.length),
       total: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES
     };
   }
@@ -2860,6 +2853,16 @@ function SimulationProgressPanel({
   simulationData: AdminPlanCoverageSimulationData;
 }>) {
   const optimizingCatalogue = catalogueOptimizationStatus === "processing";
+  const loadingInput = inputStatus === "loading" && !hydrated;
+  const barPercent = loadingInput
+    ? 34
+    : Math.max(0, Math.min(100, progressPercent));
+  const optimizationProgressText =
+    optimizingCatalogue && catalogueOptimizationProgress
+      ? `${catalogueOptimizationProgress.label} · ${numberText(
+          catalogueOptimizationProgress.current
+        )} / ${numberText(catalogueOptimizationProgress.total)} profiles`
+      : null;
 
   return (
     <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -2882,17 +2885,20 @@ function SimulationProgressPanel({
         <div
           className={classNames(
             "h-full rounded-full transition-[width]",
-            optimizingCatalogue ? "animate-pulse bg-[#3A7BD5]" : "bg-[#1FA77A]"
+            optimizingCatalogue || loadingInput ? "bg-[#3A7BD5]" : "bg-[#1FA77A]",
+            loadingInput && "admin-progress-indeterminate"
           )}
-          style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
+          style={{
+            width: `${barPercent}%`
+          }}
         />
       </div>
       {demandError ? (
         <p className="mt-2 text-sm font-semibold text-rose-700">{demandError}</p>
       ) : null}
-      {!demandError && optimizingCatalogue && catalogueOptimizationProgress ? (
+      {!demandError && optimizationProgressText ? (
         <p className="mt-2 text-sm text-slate-500">
-          {catalogueOptimizationProgress.label}
+          {optimizationProgressText}
         </p>
       ) : null}
       {!demandError && simulationData.sampleSize > 0 ? (
@@ -2900,6 +2906,221 @@ function SimulationProgressPanel({
           {convergenceProgressText(simulationData)}
         </p>
       ) : null}
+    </section>
+  );
+}
+
+function answerLabelText(key: string) {
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+function answerValueText(value: unknown): string {
+  if (Array.isArray(value)) {
+    const text = value.map(answerValueText).filter(Boolean).join(", ");
+
+    return text || "None";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? numberText(value) : "Unknown";
+  }
+
+  if (typeof value === "string") {
+    return value.trim() || "Blank";
+  }
+
+  if (value && typeof value === "object") {
+    const text = Object.entries(value as Record<string, unknown>)
+      .map(([key, nestedValue]) => `${answerLabelText(key)}: ${answerValueText(nestedValue)}`)
+      .filter(Boolean)
+      .join("; ");
+
+    return text || "Blank";
+  }
+
+  return "Blank";
+}
+
+function clippedAnswerText(value: unknown, maxLength = 150) {
+  const text = answerValueText(value);
+
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
+}
+
+const PROFILE_ANSWER_SUMMARY_KEYS = [
+  "age",
+  "sex",
+  "country",
+  "goals",
+  "symptoms",
+  "sleep",
+  "stress",
+  "medications",
+  "conditions",
+  "diet"
+] as const;
+
+function questionnaireAnswerRows(answers: Record<string, unknown>) {
+  const usedKeys = new Set<string>();
+  const preferredRows = PROFILE_ANSWER_SUMMARY_KEYS.flatMap((key) => {
+    if (!(key in answers)) {
+      return [];
+    }
+
+    usedKeys.add(key);
+    return [[key, answers[key]] as const];
+  });
+  const remainingRows = Object.entries(answers)
+    .filter(([key]) => !usedKeys.has(key))
+    .sort(([first], [second]) => first.localeCompare(second));
+
+  return [...preferredRows, ...remainingRows];
+}
+
+function demandProfileSummaryText(profile: AdminPlanCoverageDemandProfile) {
+  const answerRows = questionnaireAnswerRows(profile.answers);
+  const summary = answerRows
+    .filter(([key]) => PROFILE_ANSWER_SUMMARY_KEYS.includes(
+      key as (typeof PROFILE_ANSWER_SUMMARY_KEYS)[number]
+    ))
+    .slice(0, 4)
+    .map(([key, value]) => `${answerLabelText(key)}: ${clippedAnswerText(value, 54)}`);
+
+  return summary.length > 0 ? summary.join(" · ") : "No questionnaire answers";
+}
+
+function GeneratedDemandProfilesPanel({
+  profiles
+}: Readonly<{
+  profiles: readonly AdminPlanCoverageDemandProfile[];
+}>) {
+  const sortedProfiles = [...profiles].sort(
+    (first, second) => first.sampleIndex - second.sampleIndex
+  );
+
+  return (
+    <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">
+            AI profile questionnaires
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Generated profiles mapped to their AI-filled assessment answers and
+            supplement needs.
+          </p>
+        </div>
+        <Badge>{numberText(sortedProfiles.length)} generated</Badge>
+      </div>
+
+      {sortedProfiles.length > 0 ? (
+        <div className="mt-3 max-h-[520px] overflow-auto rounded-md border border-slate-200">
+          {sortedProfiles.map((profile) => {
+            const answerRows = questionnaireAnswerRows(profile.answers);
+            const needRows = profile.needs.slice(0, 8);
+
+            return (
+              <details
+                className="group border-t border-slate-200 first:border-t-0"
+                key={`${profile.sampleIndex}:${profile.id}`}
+              >
+                <summary className="grid cursor-pointer gap-3 px-3 py-3 text-left hover:bg-slate-50 md:grid-cols-[72px_minmax(0,1fr)_minmax(0,1.4fr)_minmax(160px,0.7fr)] md:items-center">
+                  <span className="text-sm font-bold text-slate-500">
+                    #{numberText(profile.sampleIndex + 1)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {profile.archetypeName}
+                    </span>
+                    <span className="block text-xs text-slate-500">
+                      {profile.clientSex ? sexFilterLabel(profile.clientSex) : "Any sex"}
+                    </span>
+                  </span>
+                  <span className="text-xs font-medium text-slate-600">
+                    {demandProfileSummaryText(profile)}
+                  </span>
+                  <span className="flex flex-wrap gap-1">
+                    {profile.supplementNames.slice(0, 3).map((name) => (
+                      <Badge
+                        className="bg-emerald-50 text-emerald-700 ring-emerald-100"
+                        key={name}
+                      >
+                        {name}
+                      </Badge>
+                    ))}
+                    {profile.supplementNames.length > 3 ? (
+                      <Badge>
+                        +{numberText(profile.supplementNames.length - 3)}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </summary>
+                <div className="grid gap-4 border-t border-slate-100 bg-slate-50 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.75fr)]">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase text-slate-500">
+                      Questionnaire answers
+                    </h3>
+                    <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {answerRows.map(([key, value]) => (
+                        <div
+                          className="rounded-md bg-white p-2 ring-1 ring-slate-200"
+                          key={key}
+                        >
+                          <dt className="text-[11px] font-semibold uppercase text-slate-400">
+                            {answerLabelText(key)}
+                          </dt>
+                          <dd className="mt-1 break-words text-xs font-medium text-slate-700">
+                            {clippedAnswerText(value, 240)}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase text-slate-500">
+                      Supplement needs
+                    </h3>
+                    <div className="mt-2 divide-y divide-slate-200 rounded-md bg-white ring-1 ring-slate-200">
+                      {needRows.map((need) => (
+                        <div
+                          className="px-3 py-2 text-xs"
+                          key={`${need.id}:${need.displayName}`}
+                        >
+                          <p className="font-semibold text-slate-950">
+                            {need.displayName}
+                          </p>
+                          <p className="mt-1 text-slate-500">
+                            {need.category} · {need.targetText ?? "No target dose"} ·
+                            weight {numberText(need.weight)}
+                          </p>
+                        </div>
+                      ))}
+                      {profile.needs.length > needRows.length ? (
+                        <p className="px-3 py-2 text-xs font-semibold text-slate-500">
+                          +{numberText(profile.needs.length - needRows.length)} more needs
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-500 ring-1 ring-slate-200">
+          No AI questionnaires generated yet.
+        </p>
+      )}
     </section>
   );
 }
@@ -3390,12 +3611,13 @@ export function AdminPlanCoverageSimulatorView({
   range: AdminDashboardRange;
 }>) {
   const productOptimisationMode = mode === "optimisation";
+  const initialInputReady = simulatorInputReady(data);
   const [selectedCountryCode, setSelectedCountryCode] = useState(() =>
     normalizedSimulatorCountryCode(data.countryCode)
   );
   const [inputData, setInputData] = useState(data);
   const [inputStatus, setInputStatus] =
-    useState<SimulatorInputStatus>("loading");
+    useState<SimulatorInputStatus>(initialInputReady ? "ready" : "loading");
   const [inputError, setInputError] = useState<string | null>(null);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [syntheticArchetypes, setSyntheticArchetypes] = useState(
@@ -3433,7 +3655,7 @@ export function AdminPlanCoverageSimulatorView({
   const [simulationData, setSimulationData] = useState(() =>
     initialSimulationData(data)
   );
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated] = useState(initialInputReady);
   const [running, setRunning] = useState(false);
   const [catalogueOptimization, setCatalogueOptimization] =
     useState<AdminCatalogueOptimizationData | null>(null);
@@ -3566,12 +3788,6 @@ export function AdminPlanCoverageSimulatorView({
     (currentCatalogueOptimizationQueued || currentCatalogueOptimizationBlocked) &&
     (currentCatalogueOptimizationElapsedSeconds ?? 0) >= 10;
   const progressDisplay = simulationProgressDisplay({
-    catalogueOptimizationProgress: productOptimisationMode
-      ? currentCatalogueOptimizationProgress
-      : null,
-    catalogueOptimizationStatus: productOptimisationMode
-      ? currentCatalogueOptimizationStatus
-      : "idle",
     demandProfiles,
     generating: demandGenerating,
     running,
@@ -3581,10 +3797,6 @@ export function AdminPlanCoverageSimulatorView({
   const progressTotal = progressDisplay.total;
   const progressPercent =
     (progressCount / Math.max(1, progressTotal)) * 100;
-  const showSimulationProgressPanel = !(
-    productOptimisationMode &&
-    currentCatalogueOptimizationStatus === "processing"
-  );
   const canRun =
     hydrated &&
     inputStatus === "ready" &&
@@ -4043,7 +4255,9 @@ export function AdminPlanCoverageSimulatorView({
           if (requestTimeoutId !== null) {
             window.clearTimeout(requestTimeoutId);
           }
-          setInputData(payload);
+          if (shouldReplaceVisibleData) {
+            setInputData(payload);
+          }
           setInputStatus("ready");
         })
         .catch((error) => {
@@ -4537,7 +4751,7 @@ export function AdminPlanCoverageSimulatorView({
     }
 
     stopSimulation();
-    updateSimulatorCountryUrl(normalizedCountryCode);
+    updateSimulatorCountryUrl(normalizedCountryCode, mode);
     setSelectedCountryCode(normalizedCountryCode);
     setInputStatus("loading");
     setInputError(null);
@@ -4602,25 +4816,23 @@ export function AdminPlanCoverageSimulatorView({
         </div>
       </div>
 
-      {showSimulationProgressPanel ? (
-        <SimulationProgressPanel
-          catalogueOptimizationProgress={
-            productOptimisationMode ? currentCatalogueOptimizationProgress : null
-          }
-          catalogueOptimizationStatus={
-            productOptimisationMode ? currentCatalogueOptimizationStatus : "idle"
-          }
-          demandError={demandError}
-          generating={demandGenerating}
-          hydrated={hydrated}
-          inputStatus={inputStatus}
-          progressCount={progressCount}
-          progressPercent={progressPercent}
-          progressTotal={progressTotal}
-          running={running}
-          simulationData={simulationData}
-        />
-      ) : null}
+      <SimulationProgressPanel
+        catalogueOptimizationProgress={
+          productOptimisationMode ? currentCatalogueOptimizationProgress : null
+        }
+        catalogueOptimizationStatus={
+          productOptimisationMode ? currentCatalogueOptimizationStatus : "idle"
+        }
+        demandError={demandError}
+        generating={demandGenerating}
+        hydrated={hydrated}
+        inputStatus={inputStatus}
+        progressCount={progressCount}
+        progressPercent={progressPercent}
+        progressTotal={progressTotal}
+        running={running}
+        simulationData={simulationData}
+      />
 
       {profileEditorOpen ? (
         <SimulationProfileEditorModal
@@ -4794,6 +5006,10 @@ export function AdminPlanCoverageSimulatorView({
           )}
         </div>
       </section>
+      ) : null}
+
+      {productOptimisationMode ? (
+        <GeneratedDemandProfilesPanel profiles={demandProfiles} />
       ) : null}
 
       {productOptimisationMode ? (

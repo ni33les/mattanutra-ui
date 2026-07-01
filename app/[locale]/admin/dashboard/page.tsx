@@ -24,6 +24,7 @@ import {
 import {
   emptyAdminPlanCoverageSimulationData,
   emptyAdminProductCoverageData,
+  getAdminPlanCoverageSimulationData,
   getAdminProductCoverageData
 } from "@/lib/admin-product-coverage";
 import {
@@ -267,7 +268,7 @@ export default async function LocalizedAdminDashboardPage({
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
-  const planCoverageSimulationData = emptyAdminPlanCoverageSimulationData({
+  let planCoverageSimulationData = emptyAdminPlanCoverageSimulationData({
     countryCode: coverageCountryCode,
     databaseAvailable:
       view === "plan-coverage-simulator" || view === "product-optimisation"
@@ -345,6 +346,11 @@ export default async function LocalizedAdminDashboardPage({
   } else if (view === "product-coverage") {
     productCoverageData = await getAdminProductCoverageData({
       countryCode: coverageCountryCode
+    });
+  } else if (view === "plan-coverage-simulator" || view === "product-optimisation") {
+    planCoverageSimulationData = await getAdminPlanCoverageSimulationData({
+      countryCode: coverageCountryCode,
+      range
     });
   } else if (view === "customer-insights") {
     customerInsightsData = await getAdminCustomerInsightsData(range);

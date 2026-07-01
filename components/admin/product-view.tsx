@@ -521,6 +521,7 @@ export function AdminProductDetailView({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const viewLabels = productViewLabels[locale];
   const backHref = `/${locale}/admin/products${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`;
 
@@ -548,6 +549,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const englishTitle = row.translations?.en?.title?.trim() || row.title;
@@ -598,6 +600,7 @@ export function AdminProductDetailView({
       );
 
       setDraft(savedRow);
+      setStatusMessage(viewLabels.productSaved);
       return true;
     } catch (error) {
       setErrorId(row.id);
@@ -614,6 +617,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const response = await fetch(`/api/admin/products/${row.id}`, {
@@ -649,6 +653,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const response = await fetch(
@@ -684,6 +689,7 @@ export function AdminProductDetailView({
       }
 
       setDraft(correctedRow);
+      setStatusMessage(viewLabels.factsCorrected);
 
       return correctedRow;
     } catch (error) {
@@ -706,6 +712,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const response = await fetch(
@@ -746,6 +753,7 @@ export function AdminProductDetailView({
       }
 
       setDraft(savedRow);
+      setStatusMessage(viewLabels.safetyLimitUpdated);
 
       return true;
     } catch (error) {
@@ -774,6 +782,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const response = await fetch(
@@ -842,6 +851,11 @@ export function AdminProductDetailView({
       );
 
       setDraft(savedRow.id === row.id ? savedRow : null);
+      setStatusMessage(
+        savedRow.id === row.id
+          ? viewLabels.importReviewUpdated
+          : null
+      );
 
       return true;
     } catch (error) {
@@ -889,6 +903,7 @@ export function AdminProductDetailView({
       mergeOptions={mergeOptions}
       saving={savingId === draft.id}
       setDraft={setDraft}
+      statusMessage={statusMessage}
     />
   );
 }
@@ -984,6 +999,7 @@ function ProductDetailPanel({
   mergeOptions,
   saving,
   setDraft,
+  statusMessage,
 }: Readonly<{
   accessToken: string;
   backHref: string;
@@ -1011,6 +1027,7 @@ function ProductDetailPanel({
   mergeOptions: AdminProductMergeOption[];
   saving: boolean;
   setDraft: (update: ProductDraftUpdate) => void;
+  statusMessage: string | null;
 }>) {
   const router = useRouter();
   const [mergeProductId, setMergeProductId] = useState(
@@ -1670,59 +1687,51 @@ function ProductDetailPanel({
         </p>
       ) : null}
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            aria-label={viewLabels.correctFactsWithAi}
-            className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#2563EB] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#2563EB] hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={saving}
-            onClick={() => void onCorrectFacts(draft)}
-            title={viewLabels.correctFactsWithAi}
-            type="button"
-          >
-            {viewLabels.correctFactsWithAi}
-          </button>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          {currentBusinessState === "ignored" ? (
-            <button
-              className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saving}
-              onClick={async () => {
-                if (!window.confirm(viewLabels.deleteIgnoredConfirm)) {
-                  return;
-                }
+      {statusMessage ? (
+        <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100">
+          {statusMessage}
+        </p>
+      ) : null}
 
-                if (await onDelete(draft)) {
-                  onClose();
-                }
-              }}
-              type="button"
-            >
-              {viewLabels.deleteAction}
-            </button>
-          ) : null}
-          <span className="isolate inline-flex rounded-md shadow-xs">
+      <div className="sticky bottom-0 z-20 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 py-4 shadow-[0_-12px_24px_rgba(15,23,42,0.06)] backdrop-blur">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label={viewLabels.correctFactsWithAi}
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#2563EB] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#2563EB] hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={saving}
-              onClick={onClose}
+              onClick={() => void onCorrectFacts(draft)}
+              title={viewLabels.correctFactsWithAi}
               type="button"
             >
-              {viewLabels.close}
+              {viewLabels.correctFactsWithAi}
             </button>
+            {currentBusinessState === "ignored" ? (
+              <button
+                className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onClick={async () => {
+                  if (!window.confirm(viewLabels.deleteIgnoredConfirm)) {
+                    return;
+                  }
+
+                  if (await onDelete(draft)) {
+                    onClose();
+                  }
+                }}
+                type="button"
+              >
+                {viewLabels.deleteAction}
+              </button>
+            ) : null}
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-gray-500">
+                {viewLabels.statusActions}
+              </span>
             <button
-              className="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saving}
-              onClick={() => void onSave(draft)}
-              type="button"
-            >
-              {saving ? viewLabels.saving : viewLabels.save}
-            </button>
-          </span>
-          <span className="isolate inline-flex rounded-md shadow-xs">
-            <button
-              className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={saving || currentBusinessState === "ignored"}
               onClick={async () => {
                 const ignoredDraft: AdminProductDetailRow = {
@@ -1731,30 +1740,24 @@ function ProductDetailPanel({
                 };
 
                 if (hasOpenImportReview) {
-                  if (
-                    await onImportDecision(
-                      ignoredDraft,
-                      "ignore_import",
-                      null,
-                      reviewerNote.trim() || null,
-                    )
-                  ) {
-                    onClose();
-                  }
+                  await onImportDecision(
+                    ignoredDraft,
+                    "ignore_import",
+                    null,
+                    reviewerNote.trim() || null,
+                  );
 
                   return;
                 }
 
-                if (await onSave(ignoredDraft)) {
-                  onClose();
-                }
+                await onSave(ignoredDraft);
               }}
               type="button"
             >
               {viewLabels.ignoredAction}
             </button>
             <button
-              className="relative -ml-px inline-flex items-center rounded-r-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={approveDisabled}
               onClick={async () => {
                 const approvedDraft: AdminProductDetailRow = {
@@ -1765,30 +1768,43 @@ function ProductDetailPanel({
                 };
 
                 if (hasOpenImportReview) {
-                  if (
-                    await onImportDecision(
-                      approvedDraft,
-                      "approve_product",
-                      null,
-                      reviewerNote.trim() || null,
-                    )
-                  ) {
-                    onClose();
-                  }
+                  await onImportDecision(
+                    approvedDraft,
+                    "approve_product",
+                    null,
+                    reviewerNote.trim() || null,
+                  );
 
                   return;
                 }
 
-                if (await onSave(approvedDraft)) {
-                  onClose();
-                }
+                await onSave(approvedDraft);
               }}
               title={approvalBlockedMessage ?? undefined}
               type="button"
             >
               {viewLabels.approve}
             </button>
-          </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onClick={onClose}
+                type="button"
+              >
+                {viewLabels.backToProducts}
+              </button>
+              <button
+                className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onClick={() => void onSave(draft)}
+                type="button"
+              >
+                {saving ? viewLabels.saving : viewLabels.saveChanges}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       </div>
