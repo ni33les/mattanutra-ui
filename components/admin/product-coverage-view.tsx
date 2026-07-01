@@ -117,6 +117,7 @@ type SavedCatalogueOptimizationState = Readonly<{
 }>;
 
 type CatalogueOptimizationCachedProgress = Readonly<{
+  cacheKey: string;
   candidateCount: number;
   current: number;
   savedAt: string;
@@ -427,13 +428,19 @@ function saveDemandProfiles(
       existingEntry && existingEntry.profiles.length > currentProfiles.length
         ? existingEntry.savedAt
         : savedAt;
+    const retainedEntries = entries
+      .filter((entry) => entry.demandKey !== demandKey)
+      .sort((first, second) =>
+        (second.savedAt ?? "").localeCompare(first.savedAt ?? "")
+      )
+      .slice(0, 2);
     const nextEntries = [
       {
         demandKey,
         profiles: profilesToSave,
         savedAt: savedAtToSave
       },
-      ...entries.filter((entry) => entry.demandKey !== demandKey)
+      ...retainedEntries
     ];
 
     window.localStorage.setItem(
@@ -445,6 +452,37 @@ function saveDemandProfiles(
     );
   } catch {
     // Storage availability depends on the browser, but explicit clear remains the app path.
+  }
+}
+
+function pruneSavedDemandProfileEntries(demandKey?: string) {
+  try {
+    const entries = savedDemandProfileEntriesFromStorage();
+    const exact = demandKey
+      ? entries.find((entry) => entry.demandKey === demandKey)
+      : null;
+    const retainedEntries = entries
+      .filter((entry) => entry.demandKey !== exact?.demandKey)
+      .sort((first, second) =>
+        (second.savedAt ?? "").localeCompare(first.savedAt ?? "")
+      )
+      .slice(0, exact ? 2 : 1);
+    const nextEntries = exact ? [exact, ...retainedEntries] : retainedEntries;
+
+    if (nextEntries.length < 1) {
+      window.localStorage.removeItem(SIMULATOR_DEMAND_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      SIMULATOR_DEMAND_STORAGE_KEY,
+      JSON.stringify({
+        entries: nextEntries,
+        version: 3
+      } satisfies SavedDemandProfilesState)
+    );
+  } catch {
+    // Pruning is a best-effort recovery path for storage quota pressure.
   }
 }
 
@@ -562,10 +600,22 @@ function savedStateFromRunner(
   };
 }
 
+function writeSavedSimulationState(state: SavedSimulationState) {
+  try {
+    window.localStorage.setItem(SIMULATOR_STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function saveSimulationState(
   inputKey: string,
-  runner: AdminPlanCoverageSimulationRunner
+  runner: AdminPlanCoverageSimulationRunner,
+  options?: Readonly<{ demandKey?: string }>
 ) {
+  const nextState = savedStateFromRunner(inputKey, runner);
+
   try {
     const raw = window.localStorage.getItem(SIMULATOR_STORAGE_KEY);
 
@@ -580,17 +630,21 @@ function saveSimulationState(
         existing.sampleTraces.length >= existing.sampleSize &&
         existing.sampleSize > runner.sampleSize
       ) {
-        return;
+        return true;
       }
     }
-
-    window.localStorage.setItem(
-      SIMULATOR_STORAGE_KEY,
-      JSON.stringify(savedStateFromRunner(inputKey, runner))
-    );
   } catch {
-    // Storage is a convenience; the simulator still works without it.
+    // Ignore unreadable existing storage and try to write the new state.
   }
+
+  if (writeSavedSimulationState(nextState)) {
+    return true;
+  }
+
+  pruneSavedDemandProfileEntries(options?.demandKey);
+  pruneSavedCatalogueOptimizationEntries();
+
+  return writeSavedSimulationState(nextState);
 }
 
 function clearSavedSimulationState() {
@@ -711,6 +765,30 @@ function saveCatalogueOptimization(
     );
   } catch {
     // Optimizer caching is a speed-up; calculation still works without storage.
+  }
+}
+
+function pruneSavedCatalogueOptimizationEntries(maxEntries = 1) {
+  try {
+    const state = catalogueOptimizationStateFromStorage();
+    const nextEntries = [...state.entries]
+      .sort((first, second) => second.savedAt.localeCompare(first.savedAt))
+      .slice(0, Math.max(0, maxEntries));
+
+    if (nextEntries.length < 1) {
+      window.localStorage.removeItem(SIMULATOR_OPTIMIZATION_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      SIMULATOR_OPTIMIZATION_STORAGE_KEY,
+      JSON.stringify({
+        entries: nextEntries,
+        version: 2
+      } satisfies SavedCatalogueOptimizationState)
+    );
+  } catch {
+    // Pruning is a best-effort recovery path for storage quota pressure.
   }
 }
 
@@ -1053,6 +1131,7 @@ function catalogueOptimizationJobCachedProgress(
   }
 
   return {
+    cacheKey: job.cacheKey,
     candidateCount: job.candidateCount,
     current: Math.max(0, job.completedSamples),
     savedAt: job.updatedAt,
@@ -2806,14 +2885,23 @@ function convergenceProgressText(data: AdminPlanCoverageSimulationData) {
 function simulationProgressDisplay({
   demandProfiles,
   generating,
+  optimizingCatalogue,
   running,
   simulationData
 }: Readonly<{
   demandProfiles: readonly AdminPlanCoverageDemandProfile[];
   generating: boolean;
+  optimizingCatalogue: boolean;
   running: boolean;
   simulationData: AdminPlanCoverageSimulationData;
 }>): SimulatorProgressDisplay {
+  if (optimizingCatalogue) {
+    return {
+      current: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
+      total: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES
+    };
+  }
+
   if (generating && running) {
     return {
       current: Math.max(simulationData.sampleSize, demandProfiles.length),
@@ -3685,6 +3773,8 @@ export function AdminPlanCoverageSimulatorView({
     null
   );
   const runnerRef = useRef<AdminPlanCoverageSimulationRunner | null>(null);
+  const runnerInputKeyRef = useRef<string | null>(null);
+  const simulationDataRef = useRef(simulationData);
   const inputStatusRef = useRef<SimulatorInputStatus>("loading");
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
@@ -3718,8 +3808,11 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationKey === catalogueOptimizationRunKey
       ? catalogueOptimization
       : null;
+  const matchedCatalogueOptimizationJob =
+    catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey
+      ? catalogueOptimizationJob
+      : null;
   const currentCatalogueOptimizationStatus =
-    catalogueOptimizationStatus === "processing" ||
     catalogueOptimizationKey === catalogueOptimizationRunKey
       ? catalogueOptimizationStatus
       : "idle";
@@ -3729,9 +3822,13 @@ export function AdminPlanCoverageSimulatorView({
       : null;
   const currentCatalogueOptimizationCachedProgress =
     catalogueOptimizationJobCachedProgress(
-      catalogueOptimizationJob,
+      matchedCatalogueOptimizationJob,
       simulationData.sampleTraces.length
-    ) ?? catalogueOptimizationCachedProgress;
+    ) ?? (
+      catalogueOptimizationCachedProgress?.cacheKey === catalogueOptimizationRunKey
+        ? catalogueOptimizationCachedProgress
+        : null
+    );
   const currentCatalogueOptimizationElapsedSeconds =
     currentCatalogueOptimizationStatus === "processing" &&
     catalogueOptimizationStartedAt !== null
@@ -3740,16 +3837,16 @@ export function AdminPlanCoverageSimulatorView({
         )
       : null;
   const currentCatalogueOptimizationJobMatches =
-    catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey;
+    matchedCatalogueOptimizationJob !== null;
   const currentCatalogueOptimizationLeaseUntil =
     timestampMillis(
-      catalogueOptimizationJob?.reservationLeaseUntil ??
-        catalogueOptimizationJob?.leaseUntil
+      matchedCatalogueOptimizationJob?.reservationLeaseUntil ??
+        matchedCatalogueOptimizationJob?.leaseUntil
     );
   const currentCatalogueOptimizationLastHeartbeat =
-    timestampMillis(catalogueOptimizationJob?.lastWorkerHeartbeatAt);
+    timestampMillis(matchedCatalogueOptimizationJob?.lastWorkerHeartbeatAt);
   const currentCatalogueOptimizationHasReservation =
-    Boolean(catalogueOptimizationJob?.reservationId);
+    Boolean(matchedCatalogueOptimizationJob?.reservationId);
   const currentCatalogueOptimizationLeaseExpired =
     currentCatalogueOptimizationHasReservation &&
     (
@@ -3766,18 +3863,18 @@ export function AdminPlanCoverageSimulatorView({
   const currentCatalogueOptimizationQueued =
     currentCatalogueOptimizationStatus === "processing" &&
     currentCatalogueOptimizationJobMatches &&
-    catalogueOptimizationJob?.status === "queued" &&
+    matchedCatalogueOptimizationJob?.status === "queued" &&
     !currentCatalogueOptimizationHasReservation;
   const currentCatalogueOptimizationBlocked =
     currentCatalogueOptimizationStatus === "processing" &&
     currentCatalogueOptimizationJobMatches &&
     (
       (
-        catalogueOptimizationJob?.status === "queued" &&
+        matchedCatalogueOptimizationJob?.status === "queued" &&
         currentCatalogueOptimizationHasReservation
       ) ||
       (
-        catalogueOptimizationJob?.status === "running" &&
+        matchedCatalogueOptimizationJob?.status === "running" &&
         (
           currentCatalogueOptimizationLeaseExpired ||
           currentCatalogueOptimizationHeartbeatStale
@@ -3787,9 +3884,15 @@ export function AdminPlanCoverageSimulatorView({
   const canRestartQueuedCatalogueOptimization =
     (currentCatalogueOptimizationQueued || currentCatalogueOptimizationBlocked) &&
     (currentCatalogueOptimizationElapsedSeconds ?? 0) >= 10;
+  const productOptimisationSimulationComplete =
+    simulationData.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES &&
+    simulationData.sampleTraces.length >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES;
   const progressDisplay = simulationProgressDisplay({
     demandProfiles,
     generating: demandGenerating,
+    optimizingCatalogue:
+      productOptimisationMode &&
+      currentCatalogueOptimizationStatus === "processing",
     running,
     simulationData
   });
@@ -3850,6 +3953,49 @@ export function AdminPlanCoverageSimulatorView({
     [simulationData.unmetSupplements]
   );
 
+  const preserveLatestSimulationState = useCallback((
+    nextData: AdminPlanCoverageSimulationData,
+    nextRunner: AdminPlanCoverageSimulationRunner
+  ) => {
+    simulationDataRef.current = nextData;
+    runnerRef.current = nextRunner;
+    runnerInputKeyRef.current = inputKey;
+    setSimulationData(nextData);
+  }, [inputKey]);
+
+  const restoreSavedSimulationIfNewer = useCallback((
+    minimumSampleSize = 0
+  ) => {
+    const currentRunner = runnerRef.current;
+    const currentSampleSize = Math.max(
+      simulationDataRef.current.sampleSize,
+      currentRunner && runnerInputKeyRef.current === inputKey
+        ? currentRunner.sampleSize
+        : 0
+    );
+    const savedState = loadSavedSimulationState(inputKey);
+
+    if (!savedState) {
+      return currentSampleSize;
+    }
+
+    const savedRunner = runnerFromSavedState(activeInputData, savedState);
+
+    if (
+      savedRunner.sampleSize <= currentSampleSize ||
+      savedRunner.sampleSize < minimumSampleSize
+    ) {
+      return currentSampleSize;
+    }
+
+    preserveLatestSimulationState(
+      adminPlanCoverageSimulationDataFromRunner(savedRunner),
+      savedRunner
+    );
+
+    return savedRunner.sampleSize;
+  }, [activeInputData, inputKey, preserveLatestSimulationState]);
+
   const applyCatalogueOptimizationJob = useCallback((
     job: AdminCatalogueOptimizationJobView | null,
     requestKey: string
@@ -3868,16 +4014,20 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationKey(requestKey);
     setCatalogueOptimizationCachedProgress(
       catalogueOptimizationJobCachedProgress(
-        job,
+        job.cacheKey === requestKey ? job : null,
         simulationData.sampleTraces.length
       )
     );
 
     if (job.status === "completed" && job.optimization) {
+      const visibleSampleSize = restoreSavedSimulationIfNewer(
+        job.optimization.sampleSize
+      );
+
       if (
         !catalogueOptimizationMatchesSampleSize(
           job.optimization,
-          simulationData.sampleSize
+          visibleSampleSize
         )
       ) {
         setCatalogueOptimization(null);
@@ -3930,7 +4080,10 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationStartedAt(catalogueOptimizationJobStartedAt(job));
     setCatalogueOptimizationHeartbeat(Date.now());
     setCatalogueOptimizationStatus("processing");
-  }, [simulationData.sampleSize, simulationData.sampleTraces.length]);
+  }, [
+    restoreSavedSimulationIfNewer,
+    simulationData.sampleTraces.length
+  ]);
 
   const requestCatalogueOptimizationJob = useCallback(async (
     action: "cancel" | "start" | "status",
@@ -3981,6 +4134,10 @@ export function AdminPlanCoverageSimulatorView({
   }, [demandGenerating, running]);
 
   useEffect(() => {
+    simulationDataRef.current = simulationData;
+  }, [simulationData]);
+
+  useEffect(() => {
     if (
       currentCatalogueOptimizationStatus !== "processing" ||
       catalogueOptimizationStartedAt === null
@@ -4007,8 +4164,7 @@ export function AdminPlanCoverageSimulatorView({
         running ||
         demandGenerating ||
         catalogueOptimizationStatus === "processing" ||
-        simulationData.sampleSize < 1 ||
-        simulationData.sampleTraces.length < 1 ||
+        !productOptimisationSimulationComplete ||
         catalogueOptimizationResetKey === catalogueOptimizationRunKey ||
         catalogueOptimizationKey === catalogueOptimizationRunKey
       ) {
@@ -4053,6 +4209,7 @@ export function AdminPlanCoverageSimulatorView({
     demandGenerating,
     includeReviewPriorityProductsInCatalogueOptimization,
     productOptimisationMode,
+    productOptimisationSimulationComplete,
     running,
     simulationData.sampleSize,
     simulationData.sampleTraces.length
@@ -4066,8 +4223,7 @@ export function AdminPlanCoverageSimulatorView({
         !productOptimisationMode ||
         running ||
         demandGenerating ||
-        simulationData.sampleSize < 1 ||
-        simulationData.sampleTraces.length < 1 ||
+        !productOptimisationSimulationComplete ||
         catalogueOptimizationResetKey === catalogueOptimizationRunKey
       ) {
         return;
@@ -4096,6 +4252,7 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationRunKey,
     demandGenerating,
     productOptimisationMode,
+    productOptimisationSimulationComplete,
     requestCatalogueOptimizationJob,
     running,
     simulationData.sampleSize,
@@ -4223,8 +4380,12 @@ export function AdminPlanCoverageSimulatorView({
 
       if (shouldReplaceVisibleData) {
         setInputData(loadingData);
-        setSimulationData(initialSimulationData(loadingData));
+        const loadingSimulationData = initialSimulationData(loadingData);
+
+        simulationDataRef.current = loadingSimulationData;
+        setSimulationData(loadingSimulationData);
         runnerRef.current = null;
+        runnerInputKeyRef.current = null;
       }
       setHydrated((current) =>
         shouldReplaceVisibleData ? current && sameSelectedCountry : current
@@ -4326,6 +4487,7 @@ export function AdminPlanCoverageSimulatorView({
       if (previousDemandKey !== null && previousDemandKey !== demandKey) {
         clearSavedSimulationState();
         runnerRef.current = null;
+        runnerInputKeyRef.current = null;
       }
     }, 0);
 
@@ -4363,17 +4525,48 @@ export function AdminPlanCoverageSimulatorView({
       }
 
       const savedState = loadSavedSimulationState(inputKey);
+      const currentRunner = runnerRef.current;
+      const currentSampleSize =
+        runnerInputKeyRef.current === inputKey && currentRunner
+          ? Math.max(simulationDataRef.current.sampleSize, currentRunner.sampleSize)
+          : simulationDataRef.current.sampleSize;
 
       if (savedState) {
         const savedRunner = runnerFromSavedState(activeInputData, savedState);
-        runnerRef.current = savedRunner;
-        setSimulationData(adminPlanCoverageSimulationDataFromRunner(savedRunner));
+
+        if (
+          runnerInputKeyRef.current === inputKey &&
+          currentRunner &&
+          currentSampleSize > savedRunner.sampleSize
+        ) {
+          preserveLatestSimulationState(
+            adminPlanCoverageSimulationDataFromRunner(currentRunner),
+            currentRunner
+          );
+        } else {
+          preserveLatestSimulationState(
+            adminPlanCoverageSimulationDataFromRunner(savedRunner),
+            savedRunner
+          );
+        }
       } else {
-        runnerRef.current = createAdminPlanCoverageSimulationRunner({
+        const runner = createAdminPlanCoverageSimulationRunner({
           ...activeInputData.input,
           reviewPriorityProducts: activeInputData.reviewPriorityProducts
         });
-        setSimulationData(initialSimulationData(activeInputData));
+
+        if (
+          runnerInputKeyRef.current === inputKey &&
+          currentRunner &&
+          currentSampleSize > 0
+        ) {
+          preserveLatestSimulationState(
+            adminPlanCoverageSimulationDataFromRunner(currentRunner),
+            currentRunner
+          );
+        } else {
+          preserveLatestSimulationState(initialSimulationData(activeInputData), runner);
+        }
       }
 
       setRunning(false);
@@ -4390,6 +4583,7 @@ export function AdminPlanCoverageSimulatorView({
     hydrated,
     inputKey,
     inputStatus,
+    preserveLatestSimulationState,
     running
   ]);
 
@@ -4465,6 +4659,7 @@ export function AdminPlanCoverageSimulatorView({
 
     runner = runnerWithDemandProfiles(runner, profiles);
     runnerRef.current = runner;
+    runnerInputKeyRef.current = inputKey;
 
     try {
       while (
@@ -4488,6 +4683,7 @@ export function AdminPlanCoverageSimulatorView({
           );
           runner = runnerWithDemandProfiles(runner, profiles);
           runnerRef.current = runner;
+          runnerInputKeyRef.current = inputKey;
           setDemandProfiles(profiles);
           saveDemandProfiles(demandKey, profiles);
         }
@@ -4504,8 +4700,8 @@ export function AdminPlanCoverageSimulatorView({
           break;
         }
 
-        setSimulationData(nextData);
-        saveSimulationState(inputKey, runner);
+        preserveLatestSimulationState(nextData, runner);
+        saveSimulationState(inputKey, runner, { demandKey });
 
         if (runner.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) {
           break;
@@ -4578,8 +4774,7 @@ export function AdminPlanCoverageSimulatorView({
       (!options?.ignoreProcessing && catalogueOptimizationStatus === "processing") ||
       running ||
       demandGenerating ||
-      simulationData.sampleSize < 1 ||
-      simulationData.sampleTraces.length < 1
+      !productOptimisationSimulationComplete
     ) {
       return;
     }
@@ -4603,6 +4798,7 @@ export function AdminPlanCoverageSimulatorView({
       total: Math.max(1, simulationData.sampleTraces.length)
     });
     setCatalogueOptimizationCachedProgress({
+      cacheKey: requestKey,
       candidateCount: 0,
       current: 0,
       savedAt: new Date().toISOString(),
@@ -4688,7 +4884,11 @@ export function AdminPlanCoverageSimulatorView({
       : null;
 
     runnerRef.current = runner;
-    setSimulationData(initialSimulationData(activeInputData));
+    runnerInputKeyRef.current = runner ? inputKey : null;
+    const nextData = initialSimulationData(activeInputData);
+
+    simulationDataRef.current = nextData;
+    setSimulationData(nextData);
     setHydrated(true);
   }
 
@@ -4707,13 +4907,17 @@ export function AdminPlanCoverageSimulatorView({
           reviewPriorityProducts: activeInputData.reviewPriorityProducts
         })
       : null;
-    setSimulationData(initialSimulationData({
+    runnerInputKeyRef.current = runnerRef.current ? inputKey : null;
+    const nextData = initialSimulationData({
       ...activeInputData,
       input: {
         ...activeInputData.input,
         demandProfiles: []
       }
-    }));
+    });
+
+    simulationDataRef.current = nextData;
+    setSimulationData(nextData);
     setHydrated(true);
   }
 
@@ -5019,8 +5223,7 @@ export function AdminPlanCoverageSimulatorView({
           !running &&
           !demandGenerating &&
           currentCatalogueOptimizationStatus !== "processing" &&
-          simulationData.sampleSize > 0 &&
-            simulationData.sampleTraces.length > 0
+          productOptimisationSimulationComplete
         }
         cachedProgress={currentCatalogueOptimizationCachedProgress}
         elapsedSeconds={currentCatalogueOptimizationElapsedSeconds}

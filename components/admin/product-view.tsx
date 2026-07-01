@@ -157,6 +157,8 @@ type ProductDraftUpdate =
       current: AdminProductDetailRow,
     ) => AdminProductDetailRow | AdminProductRow | null);
 
+type ProductStateAction = "approved" | "deleted" | "ignored";
+
 function regulatoryApprovalsForSave(
   row: Pick<AdminProductDetailRow, "regulatoryApprovals">
 ) {
@@ -1049,6 +1051,10 @@ function ProductDetailPanel({
     saving ||
     currentBusinessState === "approved" ||
     Boolean(approvalBlockedMessage);
+  const stateActionValue =
+    currentBusinessState === "approved" || currentBusinessState === "ignored"
+      ? currentBusinessState
+      : "";
   const manufacturerCountryCodes = normalizedProductCountryCodes(
     draft.manufacturerCountryCodes,
   );
@@ -1095,6 +1101,91 @@ function ProductDetailPanel({
     setLocalImagePreview((current) =>
       current?.targetImageUrl === imageUrl ? null : current
     );
+  }
+
+  async function applyIgnoredState(row: AdminProductDetailRow) {
+    const ignoredDraft: AdminProductDetailRow = {
+      ...row,
+      status: "ignored",
+    };
+
+    if (hasOpenImportReview) {
+      return onImportDecision(
+        ignoredDraft,
+        "ignore_import",
+        null,
+        reviewerNote.trim() || null,
+      );
+    }
+
+    return onSave(ignoredDraft);
+  }
+
+  async function applyApprovedState(row: AdminProductDetailRow) {
+    const approvedDraft: AdminProductDetailRow = {
+      ...row,
+      labelStatus: row.facts.length > 0 ? "parsed" : row.labelStatus,
+      status: "approved",
+    };
+
+    if (hasOpenImportReview) {
+      return onImportDecision(
+        approvedDraft,
+        "approve_product",
+        null,
+        reviewerNote.trim() || null,
+      );
+    }
+
+    return onSave(approvedDraft);
+  }
+
+  async function handleProductStateAction(action: ProductStateAction | "") {
+    if (!action || saving) {
+      return;
+    }
+
+    if (action === "approved") {
+      if (approveDisabled) {
+        return;
+      }
+
+      await applyApprovedState(draft);
+      return;
+    }
+
+    if (action === "ignored") {
+      if (currentBusinessState === "ignored") {
+        return;
+      }
+
+      await applyIgnoredState(draft);
+      return;
+    }
+
+    if (!window.confirm(viewLabels.deleteIgnoredConfirm)) {
+      return;
+    }
+
+    const deleteTarget: AdminProductDetailRow =
+      currentBusinessState === "ignored"
+        ? draft
+        : {
+            ...draft,
+            status: "ignored",
+          };
+
+    if (currentBusinessState !== "ignored") {
+      const productIgnored = await applyIgnoredState(deleteTarget);
+
+      if (!productIgnored) {
+        return;
+      }
+    }
+
+    if (await onDelete(deleteTarget)) {
+      onClose();
+    }
   }
 
   function handlePersistedImageChange(
@@ -1706,95 +1797,49 @@ function ProductDetailPanel({
             >
               {viewLabels.correctFactsWithAi}
             </button>
-            {currentBusinessState === "ignored" ? (
-              <button
-                className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={saving}
-                onClick={async () => {
-                  if (!window.confirm(viewLabels.deleteIgnoredConfirm)) {
-                    return;
-                  }
-
-                  if (await onDelete(draft)) {
-                    onClose();
-                  }
-                }}
-                type="button"
-              >
-                {viewLabels.deleteAction}
-              </button>
-            ) : null}
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-gray-500">
-                {viewLabels.statusActions}
-              </span>
-            <button
-              className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saving || currentBusinessState === "ignored"}
-              onClick={async () => {
-                const ignoredDraft: AdminProductDetailRow = {
-                  ...draft,
-                  status: "ignored",
-                };
-
-                if (hasOpenImportReview) {
-                  await onImportDecision(
-                    ignoredDraft,
-                    "ignore_import",
-                    null,
-                    reviewerNote.trim() || null,
-                  );
-
-                  return;
-                }
-
-                await onSave(ignoredDraft);
-              }}
-              type="button"
-            >
-              {viewLabels.ignoredAction}
-            </button>
-            <button
-              className="inline-flex min-h-9 items-center justify-center rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={approveDisabled}
-              onClick={async () => {
-                const approvedDraft: AdminProductDetailRow = {
-                  ...draft,
-                  labelStatus:
-                    draft.facts.length > 0 ? "parsed" : draft.labelStatus,
-                  status: "approved",
-                };
-
-                if (hasOpenImportReview) {
-                  await onImportDecision(
-                    approvedDraft,
-                    "approve_product",
-                    null,
-                    reviewerNote.trim() || null,
-                  );
-
-                  return;
-                }
-
-                await onSave(approvedDraft);
-              }}
-              title={approvalBlockedMessage ?? undefined}
-              type="button"
-            >
-              {viewLabels.approve}
-            </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            <label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500">
+              {viewLabels.stateAction}
+              <select
+                aria-label={viewLabels.stateAction}
+                className="min-h-9 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-200 outline-none hover:bg-gray-50 focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={saving}
-                onClick={onClose}
-                type="button"
+                onChange={(event) => {
+                  void handleProductStateAction(
+                    event.target.value as ProductStateAction | "",
+                  );
+                }}
+                title={approvalBlockedMessage ?? undefined}
+                value={stateActionValue}
               >
+                <option disabled={true} value="">
+                  {viewLabels.stateSelectPlaceholder}
+                </option>
+                <option disabled={approveDisabled} value="approved">
+                  {viewLabels.stateApproved}
+                </option>
+                <option
+                  disabled={currentBusinessState === "ignored"}
+                  value="ignored"
+                >
+                  {viewLabels.stateIgnored}
+                </option>
+                <option value="deleted">{viewLabels.stateDeleted}</option>
+              </select>
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 hover:text-[#0F5C45]"
+                href={backHref}
+              >
+                <ArrowLeft
+                  aria-hidden={true}
+                  className="size-4"
+                  strokeWidth={2.25}
+                />
                 {viewLabels.backToProducts}
-              </button>
+              </a>
               <button
                 className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={saving}

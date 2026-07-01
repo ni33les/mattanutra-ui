@@ -260,31 +260,49 @@ describe("product admin card layout", () => {
     assert.match(readiness, /hasCompatibleCountryAvailability/);
   });
 
-  it("only allows hard deleting ignored products from the admin detail page", async () => {
+  it("exposes product state transitions through one dropdown", async () => {
     const detailView = await readFile("components/admin/product-view.tsx", "utf8");
     const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
     const route = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
     const barrel = await readFile("lib/admin-products.ts", "utf8");
     const writes = await readFile("lib/admin-product-writes.ts", "utf8");
+    const backHrefUsages = detailView.match(/href=\{backHref\}/g) ?? [];
 
     assert.match(route, /export async function DELETE/);
     assert.match(route, /deleteIgnoredAdminProduct/);
     assert.match(barrel, /deleteIgnoredAdminProduct/);
     assert.match(detailView, /method: "DELETE"/);
+    assert.match(detailView, /type ProductStateAction = "approved" \| "deleted" \| "ignored"/);
+    assert.match(detailView, /handleProductStateAction/);
+    assert.match(detailView, /aria-label=\{viewLabels\.stateAction\}/);
+    assert.match(detailView, /value=\{stateActionValue\}/);
+    assert.match(detailView, /value="approved"[\s\S]*viewLabels\.stateApproved/);
+    assert.match(detailView, /value="ignored"[\s\S]*viewLabels\.stateIgnored/);
+    assert.match(detailView, /value="deleted">\{viewLabels\.stateDeleted\}/);
     assert.match(detailView, /currentBusinessState === "ignored"/);
     assert.match(detailView, /window\.confirm\(viewLabels\.deleteIgnoredConfirm\)/);
-    assert.match(detailView, /viewLabels\.deleteAction/);
+    assert.match(detailView, /const deleteTarget: AdminProductDetailRow =[\s\S]*status: "ignored"/);
+    assert.match(detailView, /const productIgnored = await applyIgnoredState\(deleteTarget\)/);
+    assert.match(detailView, /if \(await onDelete\(deleteTarget\)\) \{\s*onClose\(\);/);
     assert.match(detailView, /statusMessage/);
     assert.match(detailView, /viewLabels\.backToProducts/);
     assert.match(detailView, /viewLabels\.saveChanges/);
-    assert.match(detailView, /await onSave\(ignoredDraft\);/);
-    assert.match(detailView, /await onSave\(approvedDraft\);/);
+    assert.match(detailView, /return onSave\(ignoredDraft\);/);
+    assert.match(detailView, /return onSave\(approvedDraft\);/);
+    assert.ok(backHrefUsages.length >= 2);
+    assert.doesNotMatch(
+      detailView,
+      /onClick=\{onClose\}[\s\S]{0,200}\{viewLabels\.backToProducts\}/,
+    );
     assert.doesNotMatch(detailView, /if \(await onSave\(ignoredDraft\)\) \{\s*onClose\(\);/);
     assert.doesNotMatch(detailView, /if \(await onSave\(approvedDraft\)\) \{\s*onClose\(\);/);
     assert.match(helpers, /deleteIgnoredConfirm/);
     assert.match(helpers, /saveChanges/);
     assert.match(helpers, /productSaved/);
-    assert.match(helpers, /statusActions/);
+    assert.match(helpers, /stateAction/);
+    assert.match(helpers, /stateApproved/);
+    assert.match(helpers, /stateIgnored/);
+    assert.match(helpers, /stateDeleted/);
     assert.match(writes, /export async function deleteIgnoredAdminProduct/);
     assert.match(writes, /target\.status = 'ignored'/);
     assert.match(writes, /delete from public\.products/);
