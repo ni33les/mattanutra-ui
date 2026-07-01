@@ -45,6 +45,24 @@ function uatDbUrl() {
   return process.env.UAT_DB_URL?.trim() || deriveUatDbUrl(process.env.DB_URL?.trim());
 }
 
+function uatSchemaDbUrl() {
+  const explicitSchema =
+    process.env.UAT_DB_SCHEMA_URL?.trim() || process.env.UAT_DB_OWNER_URL?.trim();
+
+  if (explicitSchema) {
+    return explicitSchema;
+  }
+
+  const sharedSchema =
+    process.env.DB_SCHEMA_URL?.trim() || process.env.DB_OWNER_URL?.trim();
+
+  if (sharedSchema) {
+    return deriveUatDbUrl(sharedSchema);
+  }
+
+  return uatDbUrl();
+}
+
 function assertUatDbUrl(connection) {
   if (!connection) {
     throw new Error("Set UAT_DB_URL, or DB_URL that can be derived to the UAT database.");
@@ -58,7 +76,7 @@ function assertUatDbUrl(connection) {
   }
 }
 
-function uatDatabaseEnv() {
+function uatRuntimeDatabaseEnv() {
   const connection = uatDbUrl();
   assertUatDbUrl(connection);
 
@@ -68,6 +86,21 @@ function uatDatabaseEnv() {
     DB_URL: connection,
     MATTANUTRA_ENV: "uat",
     UAT_DB_URL: connection
+  };
+}
+
+function uatSchemaDatabaseEnv() {
+  const connection = uatSchemaDbUrl();
+  assertUatDbUrl(connection);
+
+  return {
+    ...process.env,
+    DB_ALLOW_DIRECT_CONNECTION: "true",
+    DB_APPLICATION_NAME:
+      process.env.DB_APPLICATION_NAME ?? "mattanutra-uat-deploy-schema",
+    DB_URL: connection,
+    MATTANUTRA_ENV: "uat",
+    UAT_DB_URL: uatDbUrl() ?? connection
   };
 }
 
@@ -188,13 +221,14 @@ async function main() {
   }
 
   const commit = await runCapture("git", ["rev-parse", "HEAD"]);
-  const schemaEnv = uatDatabaseEnv();
+  const runtimeEnv = uatRuntimeDatabaseEnv();
+  const schemaEnv = uatSchemaDatabaseEnv();
 
   console.log(`[deploy:uat] Branch: ${branch}`);
   console.log(`[deploy:uat] Commit: ${commit}`);
   await applyRuntimeSchema(schemaEnv);
   await run("git", ["push", "origin", `HEAD:uat`]);
-  await runSmokeUntilActive(schemaEnv);
+  await runSmokeUntilActive(runtimeEnv);
   await runImageStorageProbeIfConfigured();
   console.log("[deploy:uat] UAT deployment accepted.");
 }

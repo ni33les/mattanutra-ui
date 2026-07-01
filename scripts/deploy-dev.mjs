@@ -1,4 +1,4 @@
-import { npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
+import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
 
 const serviceName = "mattanutra-ui-dev.service";
 const smokeUrls = [
@@ -39,6 +39,23 @@ async function smokeCheck(url, attempts = 20) {
   throw lastError ?? new Error(`Smoke check failed: ${url}`);
 }
 
+function schemaEnv() {
+  const schemaConnection =
+    process.env.DB_SCHEMA_URL?.trim() || process.env.DB_OWNER_URL?.trim();
+
+  if (!schemaConnection) {
+    return process.env;
+  }
+
+  return {
+    ...process.env,
+    DB_ALLOW_DIRECT_CONNECTION: "true",
+    DB_APPLICATION_NAME:
+      process.env.DB_APPLICATION_NAME ?? "mattanutra-dev-deploy-schema",
+    DB_URL: schemaConnection
+  };
+}
+
 async function main() {
   const branch = await runCapture("git", ["branch", "--show-current"]);
 
@@ -51,7 +68,9 @@ async function main() {
   console.log(`[deploy:dev] Branch: ${branch}`);
   await npmRun("verify:dev");
   console.log("[deploy:dev] Applying runtime schema...");
-  await npmRun("supplements:country-availability:schema:apply");
+  await run(npmCommand, ["run", "supplements:country-availability:schema:apply"], {
+    env: schemaEnv()
+  });
   console.log(`[deploy:dev] Restarting ${serviceName}...`);
   await run("systemctl", ["restart", serviceName]);
   await run("systemctl", ["is-active", "--quiet", serviceName]);

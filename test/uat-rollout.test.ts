@@ -182,6 +182,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(workerCredentialProfiles, /carrierCoordinator/);
     assert.match(uatDeployScript, /supplements:country-availability:schema:apply/);
     assert.match(uatDeployScript, /deriveUatDbUrl/);
+    assert.match(uatDeployScript, /UAT_DB_SCHEMA_URL/);
     assert.match(uatDeployScript, /git", \["push", "origin", `HEAD:uat`\]/);
     assert.match(uatDeployScript, /npmCommand, \["run", "uat:smoke"\]/);
     assert.match(uatSmokeScript, /"supplement_country_availability"/);

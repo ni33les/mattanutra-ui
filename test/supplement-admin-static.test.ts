@@ -94,10 +94,19 @@ describe("supplement admin popup", () => {
     assert.match(repairScript, /countryCode: "TH"[\s\S]*status: "blocked"/);
     assert.match(repairScript, /countryCode: "GB"[\s\S]*status: "allowed"/);
     assert.match(repairScript, /source_payload/);
-    assert.match(schemaScript, /create table if not exists public\.supplement_country_availability/);
+    assert.match(schemaScript, /DB_SCHEMA_URL/);
+    assert.match(schemaScript, /DB_OWNER_URL/);
+    assert.match(schemaScript, /cannot create in schema public/);
+    assert.match(schemaScript, /create table public\.supplement_country_availability/);
+    assert.match(
+      schemaScript,
+      /grant select, insert, update, delete on table[\s\S]*public\.supplement_country_availability/
+    );
     assert.match(packageJson, /supplements:country-availability:schema:apply/);
     assert.match(deployDev, /supplements:country-availability:schema:apply/);
+    assert.match(deployDev, /DB_SCHEMA_URL/);
     assert.match(deployUat, /supplements:country-availability:schema:apply/);
+    assert.match(deployUat, /UAT_DB_SCHEMA_URL/);
     assert.match(deployUat, /UAT_DB_URL/);
     assert.match(uatSmoke, /"supplement_country_availability"/);
     assert.match(rebuildPrd, /supplements:country-availability:schema:apply/);
