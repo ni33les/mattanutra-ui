@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 describe("supplement admin popup", () => {
-  it("hard deletes supplements while accounting for orphaned product facts", async () => {
+  it("soft deletes supplements while accounting for orphaned product facts", async () => {
     const route = await readFile("app/api/admin/supplements/[id]/route.ts", "utf8");
     const service = await readFile("lib/admin-supplements.ts", "utf8");
     const schema = await readFile("db-schema.sql", "utf8");
@@ -13,10 +13,17 @@ describe("supplement admin popup", () => {
     assert.match(service, /export async function deleteAdminSupplement/);
     assert.match(service, /productIdsUsingSupplement/);
     assert.match(service, /refreshAndPersistProductValidations/);
-    assert.match(service, /delete from public\.supplements/);
+    assert.match(service, /update public\.product_facts[\s\S]*set supplement_id = null/);
+    assert.match(service, /delete from public\.supplement_aliases/);
+    assert.match(service, /update public\.supplements/);
+    assert.match(service, /source_payload[\s\S]*'deleted', true/);
+    assert.match(service, /normalized_name = concat/);
     assert.match(service, /action:\s*"deleted"/);
     assert.match(schema, /product_facts_product_id_fkey[\s\S]*ON DELETE CASCADE/);
     assert.match(schema, /product_facts_supplement_id_fkey[\s\S]*ON DELETE SET NULL/);
+    assert.match(schema, /supplement_safety_limits_supplement_id_fkey[\s\S]*ON DELETE RESTRICT/);
+    assert.doesNotMatch(service, /delete from public\.supplements/);
+    assert.doesNotMatch(service, /delete from public\.supplement_safety_limits/);
     assert.doesNotMatch(service, /delete from public\.supplement_versions/);
   });
 

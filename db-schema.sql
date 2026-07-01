@@ -6856,7 +6856,7 @@ ALTER TABLE ONLY public.supplement_recommendation_selections
 --
 
 ALTER TABLE ONLY public.supplement_safety_limits
-    ADD CONSTRAINT supplement_safety_limits_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE CASCADE;
+    ADD CONSTRAINT supplement_safety_limits_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE RESTRICT;
 
 
 --
