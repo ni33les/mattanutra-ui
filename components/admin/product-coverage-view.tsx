@@ -63,6 +63,11 @@ const SIMULATOR_DEMAND_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-demand-profiles:v1";
 const SIMULATOR_OPTIMIZATION_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-catalogue-optimization:v1";
+const SIMULATOR_DURABLE_DB_NAME =
+  "mattanutra-admin-product-coverage";
+const SIMULATOR_DURABLE_STORE_NAME = "entries";
+const SIMULATOR_DURABLE_SIMULATION_PREFIX = "simulation:";
+const SIMULATOR_DURABLE_OPTIMIZATION_PREFIX = "optimization:";
 const SIMULATOR_INPUT_TIMEOUT_MS = 30_000;
 
 type ArchetypeDraft = Readonly<{
@@ -114,6 +119,12 @@ type SavedCatalogueOptimizationEntry = Readonly<{
 type SavedCatalogueOptimizationState = Readonly<{
   entries: readonly SavedCatalogueOptimizationEntry[];
   version: 1 | 2;
+}>;
+
+type SimulatorDurableEntry = Readonly<{
+  key: string;
+  savedAt: string;
+  value: unknown;
 }>;
 
 type CatalogueOptimizationCachedProgress = Readonly<{
@@ -233,6 +244,167 @@ function hashText(value: string) {
   }
 
   return (hash >>> 0).toString(36);
+}
+
+function simulatorDurableStorageAvailable() {
+  return typeof window !== "undefined" && "indexedDB" in window;
+}
+
+function openSimulatorDurableDb() {
+  return new Promise<IDBDatabase | null>((resolve) => {
+    if (!simulatorDurableStorageAvailable()) {
+      resolve(null);
+      return;
+    }
+
+    const request = window.indexedDB.open(SIMULATOR_DURABLE_DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(SIMULATOR_DURABLE_STORE_NAME)) {
+        db.createObjectStore(SIMULATOR_DURABLE_STORE_NAME, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+    request.onblocked = () => resolve(null);
+  });
+}
+
+async function writeSimulatorDurableEntry(key: string, value: unknown) {
+  const db = await openSimulatorDurableDb();
+
+  if (!db) {
+    return false;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    const transaction = db.transaction(SIMULATOR_DURABLE_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(SIMULATOR_DURABLE_STORE_NAME);
+
+    store.put({
+      key,
+      savedAt: new Date().toISOString(),
+      value
+    } satisfies SimulatorDurableEntry);
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve(true);
+    };
+    transaction.onerror = () => {
+      db.close();
+      resolve(false);
+    };
+    transaction.onabort = () => {
+      db.close();
+      resolve(false);
+    };
+  });
+}
+
+async function readSimulatorDurableEntry<T>(key: string) {
+  const db = await openSimulatorDurableDb();
+
+  if (!db) {
+    return null;
+  }
+
+  return new Promise<T | null>((resolve) => {
+    const transaction = db.transaction(SIMULATOR_DURABLE_STORE_NAME, "readonly");
+    const store = transaction.objectStore(SIMULATOR_DURABLE_STORE_NAME);
+    const request = store.get(key);
+
+    request.onsuccess = () => {
+      const entry = request.result as SimulatorDurableEntry | undefined;
+
+      db.close();
+      resolve(entry ? entry.value as T : null);
+    };
+    request.onerror = () => {
+      db.close();
+      resolve(null);
+    };
+    transaction.onerror = () => {
+      db.close();
+      resolve(null);
+    };
+  });
+}
+
+async function deleteSimulatorDurableEntry(key: string) {
+  const db = await openSimulatorDurableDb();
+
+  if (!db) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const transaction = db.transaction(SIMULATOR_DURABLE_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(SIMULATOR_DURABLE_STORE_NAME);
+
+    store.delete(key);
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onabort = () => {
+      db.close();
+      resolve();
+    };
+  });
+}
+
+async function deleteSimulatorDurableEntriesByPrefix(prefix: string) {
+  const db = await openSimulatorDurableDb();
+
+  if (!db) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const transaction = db.transaction(SIMULATOR_DURABLE_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(SIMULATOR_DURABLE_STORE_NAME);
+    const request = store.openCursor();
+
+    request.onsuccess = () => {
+      const cursor = request.result;
+
+      if (!cursor) {
+        return;
+      }
+
+      if (String(cursor.key).startsWith(prefix)) {
+        cursor.delete();
+      }
+      cursor.continue();
+    };
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onabort = () => {
+      db.close();
+      resolve();
+    };
+  });
+}
+
+function durableSimulationKey(inputKey: string) {
+  return `${SIMULATOR_DURABLE_SIMULATION_PREFIX}${inputKey}`;
+}
+
+function durableOptimizationKey(cacheKey: string) {
+  return `${SIMULATOR_DURABLE_OPTIMIZATION_PREFIX}${cacheKey}`;
 }
 
 function simulationInputKey(data: AdminPlanCoverageSimulationData) {
@@ -455,7 +627,7 @@ function saveDemandProfiles(
   }
 }
 
-function pruneSavedDemandProfileEntries(demandKey?: string) {
+function pruneSavedDemandProfileEntries(demandKey?: string, maxOtherEntries = 0) {
   try {
     const entries = savedDemandProfileEntriesFromStorage();
     const exact = demandKey
@@ -466,7 +638,7 @@ function pruneSavedDemandProfileEntries(demandKey?: string) {
       .sort((first, second) =>
         (second.savedAt ?? "").localeCompare(first.savedAt ?? "")
       )
-      .slice(0, exact ? 2 : 1);
+      .slice(0, Math.max(0, maxOtherEntries));
     const nextEntries = exact ? [exact, ...retainedEntries] : retainedEntries;
 
     if (nextEntries.length < 1) {
@@ -600,6 +772,37 @@ function savedStateFromRunner(
   };
 }
 
+function normalizedSavedSimulationState(
+  value: unknown,
+  inputKey: string
+): SavedSimulationState | null {
+  const parsed = value as Partial<SavedSimulationState> | null;
+
+  if (
+    !parsed ||
+    parsed.version !== 5 ||
+    parsed.inputKey !== inputKey ||
+    !Array.isArray(parsed.coverageValues) ||
+    !Array.isArray(parsed.costValues) ||
+    !Array.isArray(parsed.productStats) ||
+    !Array.isArray(parsed.sampleTraces) ||
+    !Array.isArray(parsed.unmetCounts) ||
+    typeof parsed.randomState !== "number" ||
+    typeof parsed.sampleSize !== "number"
+  ) {
+    return null;
+  }
+
+  return parsed as SavedSimulationState;
+}
+
+function saveSimulationStateToDurable(state: SavedSimulationState) {
+  void writeSimulatorDurableEntry(
+    durableSimulationKey(state.inputKey),
+    state
+  );
+}
+
 function writeSavedSimulationState(state: SavedSimulationState) {
   try {
     window.localStorage.setItem(SIMULATOR_STORAGE_KEY, JSON.stringify(state));
@@ -616,18 +819,17 @@ function saveSimulationState(
 ) {
   const nextState = savedStateFromRunner(inputKey, runner);
 
+  saveSimulationStateToDurable(nextState);
+
   try {
     const raw = window.localStorage.getItem(SIMULATOR_STORAGE_KEY);
 
     if (raw) {
-      const existing = JSON.parse(raw) as Partial<SavedSimulationState>;
+      const existing = normalizedSavedSimulationState(JSON.parse(raw), inputKey);
 
       if (
-        existing.version === 5 &&
-        existing.inputKey === inputKey &&
-        typeof existing.sampleSize === "number" &&
-        Array.isArray(existing.sampleTraces) &&
-        existing.sampleTraces.length >= existing.sampleSize &&
+        existing &&
+        (existing.sampleTraces?.length ?? 0) >= existing.sampleSize &&
         existing.sampleSize > runner.sampleSize
       ) {
         return true;
@@ -642,7 +844,13 @@ function saveSimulationState(
   }
 
   pruneSavedDemandProfileEntries(options?.demandKey);
-  pruneSavedCatalogueOptimizationEntries();
+  pruneSavedCatalogueOptimizationEntries(0);
+
+  if (writeSavedSimulationState(nextState)) {
+    return true;
+  }
+
+  clearSavedDemandProfiles();
 
   return writeSavedSimulationState(nextState);
 }
@@ -653,6 +861,7 @@ function clearSavedSimulationState() {
   } catch {
     // Ignore private browsing or storage policy failures.
   }
+  void deleteSimulatorDurableEntriesByPrefix(SIMULATOR_DURABLE_SIMULATION_PREFIX);
 }
 
 function catalogueOptimizationStateFromStorage(): SavedCatalogueOptimizationState {
@@ -721,6 +930,22 @@ function loadSavedCatalogueOptimization(cacheKey: string) {
     )?.optimization ?? null;
 }
 
+function normalizedSavedCatalogueOptimization(value: unknown) {
+  return value &&
+    typeof value === "object" &&
+    (value as AdminCatalogueOptimizationData).status === "ready"
+    ? value as AdminCatalogueOptimizationData
+    : null;
+}
+
+async function loadSavedCatalogueOptimizationFromDurable(cacheKey: string) {
+  const saved = await readSimulatorDurableEntry<AdminCatalogueOptimizationData>(
+    durableOptimizationKey(cacheKey)
+  );
+
+  return normalizedSavedCatalogueOptimization(saved);
+}
+
 function catalogueOptimizationMatchesSampleSize(
   optimization: AdminCatalogueOptimizationData,
   sampleSize: number
@@ -740,9 +965,19 @@ function saveCatalogueOptimization(
   optimization: AdminCatalogueOptimizationData,
   options?: Readonly<{ baseCacheKey?: string | null }>
 ) {
+  void writeSimulatorDurableEntry(durableOptimizationKey(cacheKey), optimization);
+
   try {
     const state = catalogueOptimizationStateFromStorage();
     const baseCacheKey = options?.baseCacheKey?.trim() || undefined;
+
+    if (baseCacheKey) {
+      void writeSimulatorDurableEntry(
+        durableOptimizationKey(baseCacheKey),
+        optimization
+      );
+    }
+
     const nextEntries = [
       {
         ...(baseCacheKey ? { baseCacheKey } : {}),
@@ -796,6 +1031,9 @@ function clearSavedCatalogueOptimization(cacheKey?: string) {
   try {
     if (!cacheKey) {
       window.localStorage.removeItem(SIMULATOR_OPTIMIZATION_STORAGE_KEY);
+      void deleteSimulatorDurableEntriesByPrefix(
+        SIMULATOR_DURABLE_OPTIMIZATION_PREFIX
+      );
       return;
     }
 
@@ -813,6 +1051,7 @@ function clearSavedCatalogueOptimization(cacheKey?: string) {
         version: 2
       } satisfies SavedCatalogueOptimizationState)
     );
+    void deleteSimulatorDurableEntry(durableOptimizationKey(cacheKey));
   } catch {
     // Ignore private browsing or storage policy failures.
   }
@@ -826,26 +1065,18 @@ function loadSavedSimulationState(inputKey: string) {
       return null;
     }
 
-    const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
-
-    if (
-      parsed.version !== 5 ||
-      parsed.inputKey !== inputKey ||
-      !Array.isArray(parsed.coverageValues) ||
-      !Array.isArray(parsed.costValues) ||
-      !Array.isArray(parsed.productStats) ||
-      !Array.isArray(parsed.sampleTraces) ||
-      !Array.isArray(parsed.unmetCounts) ||
-      typeof parsed.randomState !== "number" ||
-      typeof parsed.sampleSize !== "number"
-    ) {
-      return null;
-    }
-
-    return parsed as SavedSimulationState;
+    return normalizedSavedSimulationState(JSON.parse(raw), inputKey);
   } catch {
     return null;
   }
+}
+
+async function loadSavedSimulationStateFromDurable(inputKey: string) {
+  const saved = await readSimulatorDurableEntry<SavedSimulationState>(
+    durableSimulationKey(inputKey)
+  );
+
+  return normalizedSavedSimulationState(saved, inputKey);
 }
 
 function runnerFromSavedState(
@@ -3997,6 +4228,13 @@ export function AdminPlanCoverageSimulatorView({
         return;
       }
 
+      if (
+        runnerRef.current &&
+        runnerInputKeyRef.current === inputKey &&
+        runnerRef.current.sampleSize >= visibleSampleSize
+      ) {
+        saveSimulationState(inputKey, runnerRef.current, { demandKey });
+      }
       saveCatalogueOptimization(requestKey, job.optimization);
       setCatalogueOptimization(job.optimization);
       setCatalogueOptimizationError(null);
@@ -4038,6 +4276,8 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationHeartbeat(Date.now());
     setCatalogueOptimizationStatus("processing");
   }, [
+    demandKey,
+    inputKey,
     restoreSavedSimulationIfNewer,
     simulationData.sampleTraces.length
   ]);
@@ -4128,30 +4368,44 @@ export function AdminPlanCoverageSimulatorView({
         return;
       }
 
+      const applySavedOptimization = (
+        savedOptimization: AdminCatalogueOptimizationData
+      ) => {
+        if (
+          !catalogueOptimizationMatchesSampleSize(
+            savedOptimization,
+            simulationData.sampleSize
+          )
+        ) {
+          clearSavedCatalogueOptimization(catalogueOptimizationRunKey);
+          return;
+        }
+
+        setCatalogueOptimization(savedOptimization);
+        setCatalogueOptimizationError(null);
+        setCatalogueOptimizationKey(catalogueOptimizationRunKey);
+        setCatalogueOptimizationProgress(null);
+        setCatalogueOptimizationStartedAt(null);
+        setCatalogueOptimizationStatus("ready");
+      };
       const savedOptimization = loadSavedCatalogueOptimization(
         catalogueOptimizationRunKey
       );
 
-      if (!savedOptimization) {
+      if (savedOptimization) {
+        applySavedOptimization(savedOptimization);
         return;
       }
 
-      if (
-        !catalogueOptimizationMatchesSampleSize(
-          savedOptimization,
-          simulationData.sampleSize
-        )
-      ) {
-        clearSavedCatalogueOptimization(catalogueOptimizationRunKey);
-        return;
-      }
-
-      setCatalogueOptimization(savedOptimization);
-      setCatalogueOptimizationError(null);
-      setCatalogueOptimizationKey(catalogueOptimizationRunKey);
-      setCatalogueOptimizationProgress(null);
-      setCatalogueOptimizationStartedAt(null);
-      setCatalogueOptimizationStatus("ready");
+      void loadSavedCatalogueOptimizationFromDurable(catalogueOptimizationRunKey)
+        .then((durableOptimization) => {
+          if (!cancelled && durableOptimization) {
+            applySavedOptimization(durableOptimization);
+          }
+        })
+        .catch(() => {
+          // Durable restore is a fallback; the shared job status poll still runs.
+        });
     }, 0);
 
     return () => {
@@ -4487,6 +4741,41 @@ export function AdminPlanCoverageSimulatorView({
         runnerInputKeyRef.current === inputKey && currentRunner
           ? Math.max(simulationDataRef.current.sampleSize, currentRunner.sampleSize)
           : simulationDataRef.current.sampleSize;
+      const restoreDurableSimulationState = () => {
+        void loadSavedSimulationStateFromDurable(inputKey)
+          .then((durableState) => {
+            if (cancelled || !durableState || runningRef.current) {
+              return;
+            }
+
+            const durableRunner = runnerFromSavedState(
+              activeInputData,
+              durableState
+            );
+            const latestRunner = runnerRef.current;
+            const latestSampleSize =
+              runnerInputKeyRef.current === inputKey && latestRunner
+                ? Math.max(
+                    simulationDataRef.current.sampleSize,
+                    latestRunner.sampleSize
+                  )
+                : simulationDataRef.current.sampleSize;
+
+            if (durableRunner.sampleSize <= latestSampleSize) {
+              return;
+            }
+
+            preserveLatestSimulationState(
+              adminPlanCoverageSimulationDataFromRunner(durableRunner),
+              durableRunner
+            );
+            writeSavedSimulationState(durableState);
+            setHydrated(true);
+          })
+          .catch(() => {
+            // Durable restore is a fallback; local state remains usable without it.
+          });
+      };
 
       if (savedState) {
         const savedRunner = runnerFromSavedState(activeInputData, savedState);
@@ -4528,6 +4817,7 @@ export function AdminPlanCoverageSimulatorView({
 
       setRunning(false);
       setHydrated(true);
+      restoreDurableSimulationState();
     }, 0);
 
     return () => {
