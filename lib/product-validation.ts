@@ -463,7 +463,9 @@ export function validateProduct(input: ValidationInput): ValidationResult {
     reasons.add("unsafe_dose");
   }
 
-  if (productSourceIdentityConflicts(input)) {
+  const matchableFactCount = facts.filter(matchableFact).length;
+
+  if (productSourceIdentityConflicts(input) && matchableFactCount < 1) {
     reasons.add("source_conflict");
   }
 
@@ -478,8 +480,6 @@ export function validateProduct(input: ValidationInput): ValidationResult {
   ) {
     reasons.add("source_conflict");
   }
-
-  const matchableFactCount = facts.filter(matchableFact).length;
 
   if (matchableFactCount < 1) {
     reasons.add("no_dosed_facts");

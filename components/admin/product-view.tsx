@@ -157,7 +157,7 @@ type ProductDraftUpdate =
       current: AdminProductDetailRow,
     ) => AdminProductDetailRow | AdminProductRow | null);
 
-type ProductStateAction = "approved" | "deleted" | "ignored";
+type ProductStateAction = "approved" | "deleted" | "ignored" | "pending_review";
 
 function regulatoryApprovalsForSave(
   row: Pick<AdminProductDetailRow, "regulatoryApprovals">
@@ -1051,10 +1051,7 @@ function ProductDetailPanel({
     saving ||
     currentBusinessState === "approved" ||
     Boolean(approvalBlockedMessage);
-  const stateActionValue =
-    currentBusinessState === "approved" || currentBusinessState === "ignored"
-      ? currentBusinessState
-      : "";
+  const stateActionValue = currentBusinessState;
   const manufacturerCountryCodes = normalizedProductCountryCodes(
     draft.manufacturerCountryCodes,
   );
@@ -1140,6 +1137,15 @@ function ProductDetailPanel({
     return onSave(approvedDraft);
   }
 
+  async function applyPendingReviewState(row: AdminProductDetailRow) {
+    const pendingReviewDraft: AdminProductDetailRow = {
+      ...row,
+      status: "pending_review",
+    };
+
+    return onSave(pendingReviewDraft);
+  }
+
   async function handleProductStateAction(action: ProductStateAction | "") {
     if (!action || saving) {
       return;
@@ -1151,6 +1157,15 @@ function ProductDetailPanel({
       }
 
       await applyApprovedState(draft);
+      return;
+    }
+
+    if (action === "pending_review") {
+      if (currentBusinessState === "pending_review") {
+        return;
+      }
+
+      await applyPendingReviewState(draft);
       return;
     }
 
@@ -1784,6 +1799,20 @@ function ProductDetailPanel({
         </p>
       ) : null}
 
+      <div className="mt-6">
+        <a
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#126B4F] underline-offset-4 hover:text-[#0F5C45] hover:underline"
+          href={backHref}
+        >
+          <ArrowLeft
+            aria-hidden={true}
+            className="size-4"
+            strokeWidth={2.25}
+          />
+          {viewLabels.backToProducts}
+        </a>
+      </div>
+
       <div className="sticky bottom-0 z-20 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 py-4 shadow-[0_-12px_24px_rgba(15,23,42,0.06)] backdrop-blur">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">
@@ -1799,8 +1828,7 @@ function ProductDetailPanel({
             </button>
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
-            <label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500">
-              {viewLabels.stateAction}
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 aria-label={viewLabels.stateAction}
                 className="min-h-9 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-200 outline-none hover:bg-gray-50 focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
@@ -1813,8 +1841,11 @@ function ProductDetailPanel({
                 title={approvalBlockedMessage ?? undefined}
                 value={stateActionValue}
               >
-                <option disabled={true} value="">
-                  {viewLabels.stateSelectPlaceholder}
+                <option
+                  disabled={currentBusinessState === "pending_review"}
+                  value="pending_review"
+                >
+                  {viewLabels.statePendingReview}
                 </option>
                 <option disabled={approveDisabled} value="approved">
                   {viewLabels.stateApproved}
@@ -1827,19 +1858,8 @@ function ProductDetailPanel({
                 </option>
                 <option value="deleted">{viewLabels.stateDeleted}</option>
               </select>
-            </label>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
-              <a
-                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 hover:text-[#0F5C45]"
-                href={backHref}
-              >
-                <ArrowLeft
-                  aria-hidden={true}
-                  className="size-4"
-                  strokeWidth={2.25}
-                />
-                {viewLabels.backToProducts}
-              </a>
               <button
                 className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={saving}

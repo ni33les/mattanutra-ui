@@ -272,13 +272,15 @@ describe("product admin card layout", () => {
     assert.match(route, /deleteIgnoredAdminProduct/);
     assert.match(barrel, /deleteIgnoredAdminProduct/);
     assert.match(detailView, /method: "DELETE"/);
-    assert.match(detailView, /type ProductStateAction = "approved" \| "deleted" \| "ignored"/);
+    assert.match(detailView, /type ProductStateAction = "approved" \| "deleted" \| "ignored" \| "pending_review"/);
     assert.match(detailView, /handleProductStateAction/);
     assert.match(detailView, /aria-label=\{viewLabels\.stateAction\}/);
     assert.match(detailView, /value=\{stateActionValue\}/);
+    assert.match(detailView, /value="pending_review"[\s\S]*viewLabels\.statePendingReview/);
     assert.match(detailView, /value="approved"[\s\S]*viewLabels\.stateApproved/);
     assert.match(detailView, /value="ignored"[\s\S]*viewLabels\.stateIgnored/);
     assert.match(detailView, /value="deleted">\{viewLabels\.stateDeleted\}/);
+    assert.match(detailView, /return onSave\(pendingReviewDraft\);/);
     assert.match(detailView, /currentBusinessState === "ignored"/);
     assert.match(detailView, /window\.confirm\(viewLabels\.deleteIgnoredConfirm\)/);
     assert.match(detailView, /const deleteTarget: AdminProductDetailRow =[\s\S]*status: "ignored"/);
@@ -287,6 +289,7 @@ describe("product admin card layout", () => {
     assert.match(detailView, /statusMessage/);
     assert.match(detailView, /viewLabels\.backToProducts/);
     assert.match(detailView, /viewLabels\.saveChanges/);
+    assert.match(detailView, /hover:underline/);
     assert.match(detailView, /return onSave\(ignoredDraft\);/);
     assert.match(detailView, /return onSave\(approvedDraft\);/);
     assert.ok(backHrefUsages.length >= 2);
@@ -303,6 +306,11 @@ describe("product admin card layout", () => {
     assert.match(helpers, /stateApproved/);
     assert.match(helpers, /stateIgnored/);
     assert.match(helpers, /stateDeleted/);
+    assert.match(helpers, /statePendingReview/);
+    assert.doesNotMatch(
+      detailView,
+      /<label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500">[\s\S]{0,120}\{viewLabels\.stateAction\}/,
+    );
     assert.match(writes, /export async function deleteIgnoredAdminProduct/);
     assert.match(writes, /target\.status = 'ignored'/);
     assert.match(writes, /delete from public\.products/);
