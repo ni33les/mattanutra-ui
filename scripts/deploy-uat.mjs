@@ -12,12 +12,78 @@ function allowDirtyTree() {
   return process.env.UAT_DEPLOY_ALLOW_DIRTY === "1" || process.argv.includes("--allow-dirty");
 }
 
-function runCaptureWithStatus(command, args = []) {
+function deriveUatDbUrl(value) {
+  if (!value) {
+    return null;
+  }
+
+  const url = new URL(value);
+  const database = url.pathname.replace(/^\/+/, "");
+
+  if (/uat/i.test(database)) {
+    return url.toString();
+  }
+
+  if (/^mn-dev$/i.test(database)) {
+    url.pathname = "/mn-uat";
+  } else if (/mattanutra-dev/i.test(database)) {
+    url.pathname = `/${database.replace(/mattanutra-dev/ig, "mattanutra-uat")}`;
+  } else {
+    url.pathname = "/mn-uat";
+  }
+
+  if (!url.port || url.port === "25060") {
+    url.port = "25061";
+  }
+
+  url.searchParams.set("sslmode", "require");
+
+  return url.toString();
+}
+
+function uatDbUrl() {
+  return process.env.UAT_DB_URL?.trim() || deriveUatDbUrl(process.env.DB_URL?.trim());
+}
+
+function assertUatDbUrl(connection) {
+  if (!connection) {
+    throw new Error("Set UAT_DB_URL, or DB_URL that can be derived to the UAT database.");
+  }
+
+  const url = new URL(connection);
+  const database = url.pathname.replace(/^\/+/, "");
+
+  if (!/uat|mattanutra-uat/i.test(database) || /prd|prod/i.test(database)) {
+    throw new Error(`Refusing to apply UAT schema to unexpected database "${database}".`);
+  }
+}
+
+function uatDatabaseEnv() {
+  const connection = uatDbUrl();
+  assertUatDbUrl(connection);
+
+  return {
+    ...process.env,
+    DB_APPLICATION_NAME: process.env.DB_APPLICATION_NAME ?? "mattanutra-uat-deploy",
+    DB_URL: connection,
+    MATTANUTRA_ENV: "uat",
+    UAT_DB_URL: connection
+  };
+}
+
+async function applyRuntimeSchema(env) {
+  console.log("[deploy:uat] Applying runtime schema...");
+  await run(npmCommand, ["run", "supplements:country-availability:schema:apply"], {
+    env
+  });
+}
+
+function runCaptureWithStatus(command, args = [], env = process.env) {
   return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
     const child = spawn(command, args, {
-      env: process.env,
+      env,
       shell: process.platform === "win32",
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -45,12 +111,12 @@ function runCaptureWithStatus(command, args = []) {
   });
 }
 
-async function runSmokeUntilActive() {
+async function runSmokeUntilActive(env = process.env) {
   let lastOutput = "";
 
   for (let attempt = 1; attempt <= smokeAttempts; attempt += 1) {
     console.log(`[deploy:uat] Running UAT smoke attempt ${attempt}/${smokeAttempts}...`);
-    const result = await runCaptureWithStatus(npmCommand, ["run", "uat:smoke"]);
+    const result = await runCaptureWithStatus(npmCommand, ["run", "uat:smoke"], env);
     const output = `${result.stdout}\n${result.stderr}`.trim();
     lastOutput = output;
 
@@ -122,11 +188,13 @@ async function main() {
   }
 
   const commit = await runCapture("git", ["rev-parse", "HEAD"]);
+  const schemaEnv = uatDatabaseEnv();
 
   console.log(`[deploy:uat] Branch: ${branch}`);
   console.log(`[deploy:uat] Commit: ${commit}`);
+  await applyRuntimeSchema(schemaEnv);
   await run("git", ["push", "origin", `HEAD:uat`]);
-  await runSmokeUntilActive();
+  await runSmokeUntilActive(schemaEnv);
   await runImageStorageProbeIfConfigured();
   console.log("[deploy:uat] UAT deployment accepted.");
 }

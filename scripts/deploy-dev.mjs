@@ -50,6 +50,8 @@ async function main() {
 
   console.log(`[deploy:dev] Branch: ${branch}`);
   await npmRun("verify:dev");
+  console.log("[deploy:dev] Applying runtime schema...");
+  await npmRun("supplements:country-availability:schema:apply");
   console.log(`[deploy:dev] Restarting ${serviceName}...`);
   await run("systemctl", ["restart", serviceName]);
   await run("systemctl", ["is-active", "--quiet", serviceName]);
