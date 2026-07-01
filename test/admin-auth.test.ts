@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import {
   adminClawRequestAllowed,
@@ -11,6 +12,23 @@ const previousAdminClawToken = process.env.ADMIN_CLAW_TOKEN;
 const previousAdminDashboardToken = process.env.ADMIN_DASHBOARD_TOKEN;
 const previousLegacyTokenAuth = process.env.MATTANUTRA_LEGACY_TOKEN_AUTH;
 const previousWorkerToken = process.env.WORKER_API_TOKEN;
+
+async function routeFilesUnder(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const path = join(dir, entry.name);
+
+      return entry.isDirectory()
+        ? routeFilesUnder(path)
+        : entry.name === "route.ts"
+          ? [path]
+          : [];
+    })
+  );
+
+  return files.flat().sort();
+}
 
 describe("admin claw token auth", () => {
   before(() => {
@@ -86,14 +104,7 @@ describe("admin claw token auth", () => {
     );
   });
 
-  it("allows dashboard or machine auth for admin mutation APIs", () => {
-    assert.equal(
-      adminDashboardOrClawRequestAllowed(
-        new Request("https://example.test/api/admin/supplements/1"),
-        "test-dashboard-token"
-      ),
-      true
-    );
+  it("allows machine auth and rejects dashboard tokens for admin mutation APIs", () => {
     assert.equal(
       adminDashboardOrClawRequestAllowed(
         new Request("https://example.test/api/admin/supplements/1", {
@@ -101,6 +112,21 @@ describe("admin claw token auth", () => {
         })
       ),
       true
+    );
+    assert.equal(
+      adminDashboardOrClawRequestAllowed(
+        new Request("https://example.test/api/admin/supplements/1"),
+        "test-dashboard-token"
+      ),
+      false
+    );
+    assert.equal(
+      adminDashboardOrClawRequestAllowed(
+        new Request("https://example.test/api/admin/supplements/1", {
+          headers: { "x-admin-dashboard-token": "test-dashboard-token" }
+        })
+      ),
+      false
     );
   });
 
@@ -239,22 +265,22 @@ describe("API auth boundaries", () => {
     }
   });
 
-  it("lets the dashboard token read admin query data without making it public", async () => {
+  it("keeps admin query data on scoped remote-agent access", async () => {
     const source = await readFile("app/api/admin/query/[view]/route.ts", "utf8");
 
     assert.match(
       source,
-      /adminDashboardOrClawRequestAllowed/,
-      "admin query data must accept the dashboard token used by the admin UI"
+      /requireRemoteAgentAccess/,
+      "admin query data must use scoped remote-agent auth"
+    );
+    assert.doesNotMatch(
+      source,
+      /access_token|x-admin-dashboard-token|adminDashboardOrClawRequestAllowed/,
+      "admin query data must not accept dashboard URL tokens"
     );
     assert.match(
       source,
-      /searchParams\.get\("access_token"\)/,
-      "admin query data must read the access_token preserved in dashboard links"
-    );
-    assert.match(
-      source,
-      /openClawUnauthorized/,
+      /permissionForAdminRequest/,
       "admin query data must still reject unauthenticated requests"
     );
   });
@@ -282,6 +308,48 @@ describe("API auth boundaries", () => {
         source,
         /adminDashboardOrClawRequestAllowed/,
         `${file} must not accept dashboard tokens for provider sends`
+      );
+    }
+  });
+
+  it("covers every admin API route with an approved auth boundary", async () => {
+    const adminRoutes = await routeFilesUnder("app/api/admin");
+    const allowedPublicAuthRoutes = new Set([
+      "app/api/admin/auth/passkey/login/options/route.ts",
+      "app/api/admin/auth/passkey/login/verify/route.ts",
+      "app/api/admin/auth/passkey/register/options/route.ts",
+      "app/api/admin/auth/passkey/register/verify/route.ts",
+      "app/api/admin/auth/session/route.ts"
+    ]);
+    const approvedMarkers = [
+      "adminDashboardOrClawRequestAllowed",
+      "postProductValidation",
+      "rejectUnauthorizedPlanCoverageRequest",
+      "requireAdminRouteAccess",
+      "requireRemoteAgentAccess",
+      "resolveAdminRouteAccess",
+      "resolveAdminSession",
+      "requestOriginAllowed"
+    ];
+
+    assert.ok(adminRoutes.length > 50, "admin route inventory should be broad");
+
+    for (const file of adminRoutes) {
+      const source = await readFile(file, "utf8");
+
+      if (allowedPublicAuthRoutes.has(file)) {
+        continue;
+      }
+
+      assert.equal(
+        approvedMarkers.some((marker) => source.includes(marker)),
+        true,
+        `${file} must use an approved admin auth boundary`
+      );
+      assert.equal(
+        source.includes("legacyAdminContext"),
+        false,
+        `${file} must not authorize API requests with dashboard bootstrap tokens`
       );
     }
   });

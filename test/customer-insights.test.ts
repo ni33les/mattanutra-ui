@@ -9,7 +9,7 @@ import {
 } from "../lib/admin-customer-insights.ts";
 import { adminViewPermission } from "../lib/admin-rbac.ts";
 
-const timestamp = "2026-06-16T08:00:00.000Z";
+const timestamp = new Date(Date.now() - 2 * 86_400_000).toISOString();
 
 function customer(overrides: Record<string, unknown> = {}) {
   return {

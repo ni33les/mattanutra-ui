@@ -48,11 +48,10 @@ export function adminDashboardOrClawRequestAllowed(
   request: Request,
   dashboardToken?: unknown
 ) {
+  void dashboardToken;
+
   return (
     adminClawRequestAllowed(request) ||
-    adminDashboardTokenAllowed(
-      dashboardToken ?? request.headers.get("x-admin-dashboard-token")
-    ) ||
     signedAdminSessionAllowedForRequest(request)
   );
 }

@@ -4,7 +4,8 @@ import { describe, it } from "node:test";
 import {
   requiredCapabilitiesForWorkTaskType,
   SYSTEM_AGENT_LIST,
-  systemAgentForWorkTaskType
+  systemAgentForWorkTaskType,
+  WORK_TASK_REGISTRY
 } from "../lib/system-agents.ts";
 import { hasRequiredCapabilities } from "../lib/task-service-utils.ts";
 import {
@@ -76,6 +77,26 @@ describe("system agents", () => {
         hasRequiredCapabilities(required, agent.capabilities),
         true,
         `${agent.name} should satisfy ${taskType}`
+      );
+    }
+  });
+
+  it("uses one registry for work-task agent and capability routing", () => {
+    for (const [taskType, entry] of Object.entries(WORK_TASK_REGISTRY)) {
+      const agent = systemAgentForWorkTaskType(taskType);
+
+      assert.equal(
+        agent.id,
+        SYSTEM_AGENT_LIST.find((candidate) => candidate.name === agent.name)?.id
+      );
+      assert.deepEqual(
+        requiredCapabilitiesForWorkTaskType(taskType),
+        [...entry.requiredCapabilities].sort()
+      );
+      assert.equal(
+        hasRequiredCapabilities(entry.requiredCapabilities, agent.capabilities),
+        true,
+        `${taskType} must route to an agent with its required capabilities`
       );
     }
   });

@@ -1613,6 +1613,270 @@ function CatalogueOptimizationMetric({
   );
 }
 
+function CatalogueOptimizationFrontierGraph({
+  baseline,
+  frontier,
+  optimized
+}: Readonly<{
+  baseline: AdminCatalogueOptimizationData["baseline"];
+  frontier: AdminCatalogueOptimizationData["frontier"];
+  optimized: AdminCatalogueOptimizationData["optimized"];
+}>) {
+  const points = [...frontier]
+    .filter((point) =>
+      Number.isFinite(point.productCount) &&
+      Number.isFinite(point.averageCoveragePercent)
+    )
+    .sort((first, second) => first.productCount - second.productCount);
+  const sweetSpot =
+    points.find((point) => point.recommended) ??
+    points.find((point) => point.productCount === optimized.productCount) ??
+    null;
+
+  if (points.length < 1 || !sweetSpot) {
+    return null;
+  }
+
+  const width = 720;
+  const height = 280;
+  const padding = {
+    bottom: 42,
+    left: 54,
+    right: 22,
+    top: 22
+  };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const maxProducts = Math.max(
+    baseline.productCount,
+    ...points.map((point) => point.productCount),
+    1
+  );
+  const minCoverage = Math.max(
+    0,
+    Math.min(
+      ...points.map((point) => point.averageCoveragePercent),
+      sweetSpot.averageCoveragePercent,
+      baseline.averageCoveragePercent
+    ) - 5
+  );
+  const maxCoverage = Math.min(
+    100,
+    Math.max(
+      ...points.map((point) => point.averageCoveragePercent),
+      sweetSpot.averageCoveragePercent,
+      baseline.averageCoveragePercent
+    ) + 2
+  );
+  const coverageSpan = Math.max(1, maxCoverage - minCoverage);
+  const x = (productCount: number) =>
+    padding.left + (productCount / maxProducts) * plotWidth;
+  const y = (coveragePercent: number) =>
+    padding.top +
+    ((maxCoverage - coveragePercent) / coverageSpan) * plotHeight;
+  const path = points
+    .map((point, index) =>
+      `${index === 0 ? "M" : "L"} ${x(point.productCount).toFixed(1)} ${y(
+        point.averageCoveragePercent
+      ).toFixed(1)}`
+    )
+    .join(" ");
+  const perfectY = y(baseline.averageCoveragePercent);
+  const sweetX = x(sweetSpot.productCount);
+  const sweetY = y(sweetSpot.averageCoveragePercent);
+  const coverageLoss = Math.max(
+    0,
+    baseline.averageCoveragePercent - sweetSpot.averageCoveragePercent
+  );
+
+  return (
+    <div className="mt-4 rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-950">
+            Optimisation frontier
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            The curve shows average coverage as the basket grows toward the
+            full-catalogue baseline.
+          </p>
+        </div>
+        <Badge className="bg-emerald-50 text-emerald-700 ring-emerald-200">
+          Sweet spot · {numberText(sweetSpot.productCount)} products
+        </Badge>
+      </div>
+
+      <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_230px] lg:items-center">
+        <svg
+          aria-label="Optimisation frontier graph"
+          className="h-auto w-full overflow-visible"
+          role="img"
+          viewBox={`0 0 ${width} ${height}`}
+        >
+          <line
+            stroke="#CBD5E1"
+            strokeWidth="1"
+            x1={padding.left}
+            x2={padding.left}
+            y1={padding.top}
+            y2={height - padding.bottom}
+          />
+          <line
+            stroke="#CBD5E1"
+            strokeWidth="1"
+            x1={padding.left}
+            x2={width - padding.right}
+            y1={height - padding.bottom}
+            y2={height - padding.bottom}
+          />
+          <line
+            stroke="#94A3B8"
+            strokeDasharray="5 5"
+            strokeWidth="1.5"
+            x1={padding.left}
+            x2={width - padding.right}
+            y1={perfectY}
+            y2={perfectY}
+          />
+          <text
+            fill="#64748B"
+            fontSize="12"
+            x={padding.left}
+            y={Math.max(12, perfectY - 8)}
+          >
+            Perfect coverage baseline
+          </text>
+          <path
+            d={path}
+            fill="none"
+            stroke="#3A7BD5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="3"
+          />
+          {points.map((point) => (
+            <circle
+              cx={x(point.productCount)}
+              cy={y(point.averageCoveragePercent)}
+              fill={point.withinCoverageFloor ? "#3A7BD5" : "#CBD5E1"}
+              key={`${point.productCount}-${point.averageCoveragePercent}`}
+              r={point.recommended ? 0 : 4}
+            />
+          ))}
+          <line
+            stroke="#168060"
+            strokeDasharray="4 4"
+            strokeWidth="1.5"
+            x1={sweetX}
+            x2={sweetX}
+            y1={sweetY}
+            y2={height - padding.bottom}
+          />
+          <circle
+            cx={sweetX}
+            cy={sweetY}
+            fill="#168060"
+            r="7"
+            stroke="#FFFFFF"
+            strokeWidth="3"
+          />
+          <text
+            fill="#0F513F"
+            fontSize="13"
+            fontWeight="700"
+            x={Math.min(width - 180, sweetX + 12)}
+            y={Math.max(18, sweetY - 10)}
+          >
+            Sweet spot
+          </text>
+          <text fill="#64748B" fontSize="12" x={padding.left} y={height - 10}>
+            Products carried
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            transform={`translate(14 ${height / 2}) rotate(-90)`}
+          >
+            Average coverage
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            textAnchor="middle"
+            x={padding.left}
+            y={height - padding.bottom + 18}
+          >
+            0
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            textAnchor="middle"
+            x={width - padding.right}
+            y={height - padding.bottom + 18}
+          >
+            {numberText(maxProducts)}
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            textAnchor="end"
+            x={padding.left - 8}
+            y={y(minCoverage) + 4}
+          >
+            {percentText(Math.round(minCoverage))}
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            textAnchor="end"
+            x={padding.left - 8}
+            y={y(maxCoverage) + 4}
+          >
+            {percentText(Math.round(maxCoverage))}
+          </text>
+        </svg>
+
+        <div className="space-y-3 text-sm">
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Sweet spot
+            </p>
+            <p className="mt-1 text-lg font-bold text-slate-950">
+              {numberText(sweetSpot.productCount)} products
+            </p>
+            <p className="text-slate-500">
+              {percentText(sweetSpot.averageCoveragePercent)} average coverage
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Coverage retained
+            </p>
+            <p className="mt-1 font-bold text-slate-950">
+              {percentText(sweetSpot.retainedAverageCoveragePercent)}
+            </p>
+            <p className="text-slate-500">
+              {percentText(coverageLoss)} below the full-catalogue baseline.
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Reliability
+            </p>
+            <p className="mt-1 font-bold text-slate-950">
+              {percentText(sweetSpot.p10CoveragePercent)} P10 coverage
+            </p>
+            <p className="text-slate-500">
+              {percentText(sweetSpot.percentAbove75)} of plans reach at least 75%.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function readinessBadgeClassName(readiness?: "current" | "needs_review") {
   return readiness === "needs_review"
     ? "bg-amber-50 text-amber-700 ring-amber-200"
@@ -2030,6 +2294,7 @@ function MinimumCataloguePanel({
       : null;
   const basketProducts = potentialBasket?.carryProducts ?? optimization.carryProducts;
   const basketBaseline = potentialBasket?.baseline ?? optimization.baseline;
+  const basketFrontier = potentialBasket?.frontier ?? optimization.frontier;
   const basketSummary = potentialBasket?.optimized ?? optimization.optimized;
   const basketProductCount = potentialBasket?.candidateCount ??
     optimization.baseline.productCount;
@@ -2127,6 +2392,12 @@ function MinimumCataloguePanel({
           value={percentText(basketBaseline.averageCoveragePercent)}
         />
       </div>
+
+      <CatalogueOptimizationFrontierGraph
+        baseline={basketBaseline}
+        frontier={basketFrontier}
+        optimized={basketSummary}
+      />
 
       <div className="mt-4">
         {basketProducts.length > 0 ? (
@@ -3310,6 +3581,10 @@ export function AdminPlanCoverageSimulatorView({
   const progressTotal = progressDisplay.total;
   const progressPercent =
     (progressCount / Math.max(1, progressTotal)) * 100;
+  const showSimulationProgressPanel = !(
+    productOptimisationMode &&
+    currentCatalogueOptimizationStatus === "processing"
+  );
   const canRun =
     hydrated &&
     inputStatus === "ready" &&
@@ -3717,10 +3992,9 @@ export function AdminPlanCoverageSimulatorView({
         requestTimedOut = true;
         controller?.abort();
       }, SIMULATOR_INPUT_TIMEOUT_MS);
-      setInputStatus("loading");
-      setInputError(null);
       const sameSelectedCountry =
         normalizedSimulatorCountryCode(data.countryCode) === selectedCountryCode;
+      const shouldReplaceVisibleData = !hydrated || !sameSelectedCountry;
       const loadingData =
         sameSelectedCountry
           ? data
@@ -3730,12 +4004,19 @@ export function AdminPlanCoverageSimulatorView({
               seed: data.seed
             });
 
-      setInputData(loadingData);
-      if (!hydrated || !sameSelectedCountry) {
+      if (shouldReplaceVisibleData) {
+        setInputStatus("loading");
+      }
+      setInputError(null);
+
+      if (shouldReplaceVisibleData) {
+        setInputData(loadingData);
         setSimulationData(initialSimulationData(loadingData));
         runnerRef.current = null;
       }
-      setHydrated((current) => current && sameSelectedCountry);
+      setHydrated((current) =>
+        shouldReplaceVisibleData ? current && sameSelectedCountry : current
+      );
       setRunning(false);
 
       fetch(simulatorInputHref(selectedCountryCode, accessToken, range), {
@@ -3773,17 +4054,21 @@ export function AdminPlanCoverageSimulatorView({
           if (requestTimeoutId !== null) {
             window.clearTimeout(requestTimeoutId);
           }
-          setInputData(emptyAdminPlanCoverageSimulationData({
-            countryCode: selectedCountryCode,
-            databaseAvailable: false,
-            seed: data.seed
-          }));
+          if (shouldReplaceVisibleData) {
+            setInputData(emptyAdminPlanCoverageSimulationData({
+              countryCode: selectedCountryCode,
+              databaseAvailable: false,
+              seed: data.seed
+            }));
+            setInputStatus("error");
+          } else {
+            setInputStatus("ready");
+          }
           setInputError(
             requestTimedOut
               ? "Simulator input request timed out. Try again."
               : simulatorInputErrorMessage(error)
           );
-          setInputStatus("error");
           setHydrated(true);
         });
     }, 0);
@@ -4006,7 +4291,7 @@ export function AdminPlanCoverageSimulatorView({
         }
 
         setSimulationData(nextData);
-        saveSimulationState(simulationInputKey(nextData), runner);
+        saveSimulationState(inputKey, runner);
 
         if (runner.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) {
           break;
@@ -4317,23 +4602,25 @@ export function AdminPlanCoverageSimulatorView({
         </div>
       </div>
 
-      <SimulationProgressPanel
-        catalogueOptimizationProgress={
-          productOptimisationMode ? currentCatalogueOptimizationProgress : null
-        }
-        catalogueOptimizationStatus={
-          productOptimisationMode ? currentCatalogueOptimizationStatus : "idle"
-        }
-        demandError={demandError}
-        generating={demandGenerating}
-        hydrated={hydrated}
-        inputStatus={inputStatus}
-        progressCount={progressCount}
-        progressPercent={progressPercent}
-        progressTotal={progressTotal}
-        running={running}
-        simulationData={simulationData}
-      />
+      {showSimulationProgressPanel ? (
+        <SimulationProgressPanel
+          catalogueOptimizationProgress={
+            productOptimisationMode ? currentCatalogueOptimizationProgress : null
+          }
+          catalogueOptimizationStatus={
+            productOptimisationMode ? currentCatalogueOptimizationStatus : "idle"
+          }
+          demandError={demandError}
+          generating={demandGenerating}
+          hydrated={hydrated}
+          inputStatus={inputStatus}
+          progressCount={progressCount}
+          progressPercent={progressPercent}
+          progressTotal={progressTotal}
+          running={running}
+          simulationData={simulationData}
+        />
+      ) : null}
 
       {profileEditorOpen ? (
         <SimulationProfileEditorModal

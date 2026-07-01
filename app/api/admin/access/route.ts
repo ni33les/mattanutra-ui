@@ -14,7 +14,6 @@ import {
   generateAgentCredential,
   getAdminAccessData,
   inviteAgent,
-  legacyAdminContext,
   revokeAgentCredential,
   rotateAgentCredential,
   resolveAdminSession,
@@ -39,25 +38,11 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function accessTokenFromRequest(request: NextRequest, body?: Record<string, unknown>) {
-  return (
-    text(body?.accessToken) ||
-    text(request.headers.get("x-admin-dashboard-token")) ||
-    text(new URL(request.url).searchParams.get("access_token")) ||
-    null
-  );
-}
-
-async function adminContext(
-  request: NextRequest,
-  body?: Record<string, unknown>
-) {
-  const session = await resolveAdminSession({
+async function adminContext(request: NextRequest) {
+  return resolveAdminSession({
     csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
     sessionCookie: request.cookies.get(adminSessionCookieName)?.value
   });
-
-  return session ?? legacyAdminContext(accessTokenFromRequest(request, body));
 }
 
 function localeValue(value: unknown): Locale {
@@ -152,7 +137,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const context = await adminContext(request, body);
+  const context = await adminContext(request);
 
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

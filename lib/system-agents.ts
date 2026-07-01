@@ -318,102 +318,166 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
 
 export const SYSTEM_AGENT_LIST = Object.values(SYSTEM_AGENTS);
 
-export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
-  admin_catalogue_optimization_job: "analytics",
-  analyze_healthscore: "healthScoreEngine",
-  carrier_event_process: "carrierCoordinator",
-  carrier_label_generate: "carrierCoordinator",
-  carrier_pickup_book: "carrierCoordinator",
-  carrier_shipment_create: "carrierCoordinator",
-  carrier_tracking_sync: "carrierCoordinator",
-  client_safety_followup: "communicationsCoordinator",
-  customer_chat_reply: "panya",
-  dispatch_chat_communication_message: "chatDispatcher",
-  dispatch_email_communication_message: "emailDispatcher",
-  generate_example_supplement_guidance: "formulationWorker",
-  generate_food_gap_guidance: "foodGuidanceWorker",
-  generate_food_guidance: "foodGuidanceWorker",
-  generate_supplement_guidance: "formulationWorker",
-  generate_nutrition_report: "nutritionPlanAdvisor",
-  generate_product_recommendations: "productMatcher",
-  source_product_fda_approvals: "productMatcher",
-  source_product_identifiers: "productMatcher",
-  retail_stock_forecast_refresh: "retailStockPlanner",
-  retail_customer_order_allocate: "retailStockPlanner",
-  retail_shopping_list_review: "retailStockPlanner",
-  nutrition_plan_chat_reply: "nutritionPlanAdvisor",
-  refine_nutrition_plan: "nutritionPlanAdvisor",
-  content_status_change: "contentPublisher",
-  route_admin_communication: "communicationsCoordinator",
-  send_example_email: "emailDispatcher",
-  send_reassessment_email: "emailDispatcher",
-  send_retail_order_workflow_email: "emailDispatcher",
-  sync_digitalocean_billing: "scheduler"
-} as const;
+export type WorkTaskRegistryEntry = Readonly<{
+  agentKey: SystemAgentKey;
+  requiredCapabilities: readonly string[];
+}>;
+
+export const WORK_TASK_REGISTRY = {
+  admin_catalogue_optimization_job: {
+    agentKey: "analytics",
+    requiredCapabilities: [AGENT_CAPABILITIES.analyticsCatalogueOptimization]
+  },
+  analyze_healthscore: {
+    agentKey: "healthScoreEngine",
+    requiredCapabilities: [AGENT_CAPABILITIES.healthScoreAnalysis]
+  },
+  carrier_event_process: {
+    agentKey: "carrierCoordinator",
+    requiredCapabilities: [AGENT_CAPABILITIES.carrierEventProcess]
+  },
+  carrier_label_generate: {
+    agentKey: "carrierCoordinator",
+    requiredCapabilities: [AGENT_CAPABILITIES.carrierLabelGenerate]
+  },
+  carrier_pickup_book: {
+    agentKey: "carrierCoordinator",
+    requiredCapabilities: [AGENT_CAPABILITIES.carrierPickupBook]
+  },
+  carrier_shipment_create: {
+    agentKey: "carrierCoordinator",
+    requiredCapabilities: [AGENT_CAPABILITIES.carrierShipmentCreate]
+  },
+  carrier_tracking_sync: {
+    agentKey: "carrierCoordinator",
+    requiredCapabilities: [AGENT_CAPABILITIES.carrierTrackingSync]
+  },
+  client_safety_followup: {
+    agentKey: "communicationsCoordinator",
+    requiredCapabilities: [AGENT_CAPABILITIES.clientSafetyFollowup]
+  },
+  content_status_change: {
+    agentKey: "contentPublisher",
+    requiredCapabilities: [AGENT_CAPABILITIES.contentPublish]
+  },
+  customer_chat_reply: {
+    agentKey: "panya",
+    requiredCapabilities: [AGENT_CAPABILITIES.customerChatReply]
+  },
+  dispatch_chat_communication_message: {
+    agentKey: "chatDispatcher",
+    requiredCapabilities: [
+      AGENT_CAPABILITIES.communicationDispatch,
+      AGENT_CAPABILITIES.lineSend
+    ]
+  },
+  dispatch_email_communication_message: {
+    agentKey: "emailDispatcher",
+    requiredCapabilities: [AGENT_CAPABILITIES.emailSend]
+  },
+  generate_example_supplement_guidance: {
+    agentKey: "formulationWorker",
+    requiredCapabilities: [AGENT_CAPABILITIES.freeExampleFormulation]
+  },
+  generate_food_gap_guidance: {
+    agentKey: "foodGuidanceWorker",
+    requiredCapabilities: [AGENT_CAPABILITIES.foodGuidanceGeneration]
+  },
+  generate_food_guidance: {
+    agentKey: "foodGuidanceWorker",
+    requiredCapabilities: [AGENT_CAPABILITIES.foodGuidanceGeneration]
+  },
+  generate_nutrition_report: {
+    agentKey: "nutritionPlanAdvisor",
+    requiredCapabilities: [AGENT_CAPABILITIES.nutritionReportGeneration]
+  },
+  generate_product_recommendations: {
+    agentKey: "productMatcher",
+    requiredCapabilities: [
+      AGENT_CAPABILITIES.productRecommendationFullBeam,
+      AGENT_CAPABILITIES.productRecommendation
+    ]
+  },
+  generate_supplement_guidance: {
+    agentKey: "formulationWorker",
+    requiredCapabilities: [AGENT_CAPABILITIES.formulationGeneration]
+  },
+  nutrition_plan_chat_reply: {
+    agentKey: "nutritionPlanAdvisor",
+    requiredCapabilities: [AGENT_CAPABILITIES.nutritionPlanChat]
+  },
+  refine_nutrition_plan: {
+    agentKey: "nutritionPlanAdvisor",
+    requiredCapabilities: [AGENT_CAPABILITIES.nutritionPlanRefinement]
+  },
+  retail_customer_order_allocate: {
+    agentKey: "retailStockPlanner",
+    requiredCapabilities: [AGENT_CAPABILITIES.retailStockPolicyReview]
+  },
+  retail_shopping_list_review: {
+    agentKey: "retailStockPlanner",
+    requiredCapabilities: [AGENT_CAPABILITIES.retailStockPolicyReview]
+  },
+  retail_stock_forecast_refresh: {
+    agentKey: "retailStockPlanner",
+    requiredCapabilities: [AGENT_CAPABILITIES.retailStockForecast]
+  },
+  route_admin_communication: {
+    agentKey: "communicationsCoordinator",
+    requiredCapabilities: [AGENT_CAPABILITIES.communicationRoute]
+  },
+  send_example_email: {
+    agentKey: "emailDispatcher",
+    requiredCapabilities: [AGENT_CAPABILITIES.freeEmailSend]
+  },
+  send_reassessment_email: {
+    agentKey: "emailDispatcher",
+    requiredCapabilities: [AGENT_CAPABILITIES.reassessmentEmailSend]
+  },
+  send_retail_order_workflow_email: {
+    agentKey: "emailDispatcher",
+    requiredCapabilities: [AGENT_CAPABILITIES.emailSend]
+  },
+  source_product_fda_approvals: {
+    agentKey: "productMatcher",
+    requiredCapabilities: [AGENT_CAPABILITIES.productRecommendation]
+  },
+  source_product_identifiers: {
+    agentKey: "productMatcher",
+    requiredCapabilities: [AGENT_CAPABILITIES.productRecommendation]
+  },
+  sync_digitalocean_billing: {
+    agentKey: "scheduler",
+    requiredCapabilities: [AGENT_CAPABILITIES.hostingCostSync]
+  }
+} as const satisfies Readonly<Record<string, WorkTaskRegistryEntry>>;
+
+export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> =
+  Object.fromEntries(
+    Object.entries(WORK_TASK_REGISTRY).map(([taskType, entry]) => [
+      taskType,
+      entry.agentKey
+    ])
+  );
 
 export function systemAgentForKey(key: SystemAgentKey) {
   return SYSTEM_AGENTS[key];
 }
 
 export function systemAgentForWorkTaskType(taskType: string) {
-  return SYSTEM_AGENTS[WORK_TASK_AGENT_KEYS[taskType] ?? "scheduler"];
+  const entry = (WORK_TASK_REGISTRY as Readonly<Record<string, WorkTaskRegistryEntry>>)[
+    taskType
+  ];
+
+  return SYSTEM_AGENTS[entry?.agentKey ?? "scheduler"];
 }
 
 export function requiredCapabilitiesForWorkTaskType(taskType: string) {
-  const capabilitiesByTaskType: Record<string, readonly string[]> = {
-    admin_catalogue_optimization_job: [
-      AGENT_CAPABILITIES.analyticsCatalogueOptimization
-    ],
-    analyze_healthscore: [AGENT_CAPABILITIES.healthScoreAnalysis],
-    carrier_event_process: [AGENT_CAPABILITIES.carrierEventProcess],
-    carrier_label_generate: [AGENT_CAPABILITIES.carrierLabelGenerate],
-    carrier_pickup_book: [AGENT_CAPABILITIES.carrierPickupBook],
-    carrier_shipment_create: [AGENT_CAPABILITIES.carrierShipmentCreate],
-    carrier_tracking_sync: [AGENT_CAPABILITIES.carrierTrackingSync],
-    client_safety_followup: [AGENT_CAPABILITIES.clientSafetyFollowup],
-    customer_chat_reply: [AGENT_CAPABILITIES.customerChatReply],
-    dispatch_chat_communication_message: [
-      AGENT_CAPABILITIES.communicationDispatch,
-      AGENT_CAPABILITIES.lineSend
-    ],
-    dispatch_email_communication_message: [AGENT_CAPABILITIES.emailSend],
-    generate_example_supplement_guidance: [
-      AGENT_CAPABILITIES.freeExampleFormulation
-    ],
-    generate_food_gap_guidance: [AGENT_CAPABILITIES.foodGuidanceGeneration],
-    generate_food_guidance: [AGENT_CAPABILITIES.foodGuidanceGeneration],
-    generate_supplement_guidance: [AGENT_CAPABILITIES.formulationGeneration],
-    generate_nutrition_report: [
-      AGENT_CAPABILITIES.nutritionReportGeneration
-    ],
-    generate_product_recommendations: [
-      AGENT_CAPABILITIES.productRecommendationFullBeam,
-      AGENT_CAPABILITIES.productRecommendation
-    ],
-    source_product_fda_approvals: [
-      AGENT_CAPABILITIES.productRecommendation
-    ],
-    source_product_identifiers: [
-      AGENT_CAPABILITIES.productRecommendation
-    ],
-    retail_stock_forecast_refresh: [AGENT_CAPABILITIES.retailStockForecast],
-    retail_customer_order_allocate: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    retail_shopping_list_review: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    nutrition_plan_chat_reply: [AGENT_CAPABILITIES.nutritionPlanChat],
-    refine_nutrition_plan: [AGENT_CAPABILITIES.nutritionPlanRefinement],
-    content_status_change: [AGENT_CAPABILITIES.contentPublish],
-    route_admin_communication: [AGENT_CAPABILITIES.communicationRoute],
-    send_example_email: [AGENT_CAPABILITIES.freeEmailSend],
-    send_reassessment_email: [AGENT_CAPABILITIES.reassessmentEmailSend],
-    send_retail_order_workflow_email: [AGENT_CAPABILITIES.emailSend],
-    sync_digitalocean_billing: [AGENT_CAPABILITIES.hostingCostSync]
-  };
+  const entry = (WORK_TASK_REGISTRY as Readonly<Record<string, WorkTaskRegistryEntry>>)[
+    taskType
+  ];
 
   return normalizeCapabilities(
-    capabilitiesByTaskType[taskType] ?? []
+    entry?.requiredCapabilities ?? []
   );
 }

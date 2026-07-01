@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   adminCsrfCookieName,
   adminSessionCookieName,
-  legacyAdminContext,
   resolveAdminSession
 } from "@/lib/admin-access";
 import { normalizeAdminDashboardRange } from "@/lib/admin-dashboard-data";
@@ -16,27 +15,11 @@ const noStoreHeaders = {
   "Cache-Control": "no-store"
 };
 
-function text(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function accessTokenFromRequest(request: NextRequest) {
-  const url = new URL(request.url);
-
-  return (
-    text(request.headers.get("x-admin-dashboard-token")) ||
-    text(url.searchParams.get("access_token")) ||
-    null
-  );
-}
-
 async function adminContext(request: NextRequest) {
-  const session = await resolveAdminSession({
+  return resolveAdminSession({
     csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
     sessionCookie: request.cookies.get(adminSessionCookieName)?.value
   });
-
-  return session ?? legacyAdminContext(accessTokenFromRequest(request));
 }
 
 export async function GET(request: NextRequest) {

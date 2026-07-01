@@ -13,7 +13,7 @@ import type {
   FormulationStatus
 } from "@/lib/formulation-types";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
@@ -338,13 +338,17 @@ async function callGrok({
   model: string;
   reasoningEffort?: string;
 }>) {
-  return callGrokChatCompletion({
+  return callGovernedGrokChatCompletion({
     apiKey,
+    cost: {
+      metadata: { accountingPath: "task_result_applier" },
+      recordUsage: false
+    },
     maxTokens: MAX_RESPONSE_TOKENS,
     messages,
     model,
     purpose: "formulation request",
-    reasoningEffort,
+    reasoningEffort: reasoningEffort ?? "low",
     temperature: 0.2,
     timeoutMs: REQUEST_TIMEOUT_MS
   });

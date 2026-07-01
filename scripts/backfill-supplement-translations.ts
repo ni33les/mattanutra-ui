@@ -1,6 +1,6 @@
 import { getSql } from "@/lib/db";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
@@ -107,8 +107,16 @@ async function translateBatch(
   rows: readonly SupplementRow[],
   locale: string
 ) {
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: getRequiredXaiApiKey(),
+    cost: {
+      metadata: {
+        locale,
+        rowCount: rows.length,
+        source: "backfill_supplement_translations"
+      },
+      recordUsage: true
+    },
     maxTokens: 6000,
     messages: [
       {

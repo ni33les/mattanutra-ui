@@ -61,7 +61,7 @@ describe("continuous improvement insights", () => {
     assert.doesNotMatch(dashboard, /AdminFoodImprovementInsightsView/);
     assert.doesNotMatch(page, /getAdminSupplementAvailabilityMatrixData/);
     assert.match(page, /getAdminProductCoverageData/);
-    assert.match(page, /getAdminPlanCoverageSimulationData/);
+    assert.doesNotMatch(page, /getAdminPlanCoverageSimulationData/);
     assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
     assert.doesNotMatch(page, /getAdminProductRecommendationInsightsData/);
     assert.doesNotMatch(page, /getAdminSupplementImprovementInsightsData/);

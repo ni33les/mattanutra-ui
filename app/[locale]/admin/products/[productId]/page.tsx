@@ -8,7 +8,6 @@ import {
   adminCsrfCookieName,
   adminSessionCookieName,
   clientAdminSessionContext,
-  legacyAdminContext,
   resolveAdminSession
 } from "@/lib/admin-access";
 import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
@@ -83,8 +82,7 @@ export default async function ProductDetailPage({
     csrfToken: cookieStore.get(adminCsrfCookieName)?.value,
     sessionCookie: cookieStore.get(adminSessionCookieName)?.value
   });
-  const adminContext =
-    sessionContext ?? (await legacyAdminContext(accessToken).catch(() => null));
+  const adminContext = sessionContext;
 
   if (!adminContext) {
     const loginParams = new URLSearchParams({
@@ -114,7 +112,7 @@ export default async function ProductDetailPage({
 
   return (
     <ProductAdminShell
-      accessToken={accessToken ?? ""}
+      accessToken=""
       adminContext={clientAdminSessionContext(adminContext)}
       filters={filters}
       locale={locale}
@@ -122,7 +120,7 @@ export default async function ProductDetailPage({
       range={range}
     >
       <AdminProductDetailView
-        accessToken={accessToken ?? ""}
+        accessToken=""
         data={productDetailData}
         locale={locale}
         productId={productId}

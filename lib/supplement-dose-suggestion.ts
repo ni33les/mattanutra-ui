@@ -13,7 +13,7 @@ import {
 } from "@/lib/supplement-safety-flags";
 import { recordXaiUsageCost } from "@/lib/finance-ledger";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
@@ -168,8 +168,16 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
   const grok = config();
   const locale = input.locale ?? "en";
 
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: grok.apiKey,
+    cost: {
+      metadata: {
+        accountingPath: "manual_record_xai_usage_cost",
+        locale,
+        supplementName: input.supplementName
+      },
+      recordUsage: false
+    },
     maxTokens: 400,
     messages: [
       {

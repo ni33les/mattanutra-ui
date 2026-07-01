@@ -106,7 +106,8 @@ describe("HealthScore AI copy validator", () => {
       "utf8"
     );
 
-    assert.match(source, /callGrokChatCompletion/);
+    assert.match(source, /callGovernedGrokChatCompletion/);
+    assert.doesNotMatch(source, /callGrokChatCompletion\(\{/);
     assert.match(source, /getRequiredXaiApiKey/);
     assert.match(source, /process\.env\.GROK_MODEL/);
     assert.match(source, /v8-single-display-locale/);

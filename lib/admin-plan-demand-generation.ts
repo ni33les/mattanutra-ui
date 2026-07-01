@@ -4,7 +4,7 @@ import { getSql } from "@/lib/db";
 import { analyzeFormulationWithGrok } from "@/lib/formulation-analysis";
 import { buildProductNeeds } from "@/lib/product-recommendation-needs";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
@@ -528,8 +528,18 @@ async function generateAssessmentAnswersWithAi(input: Readonly<{
 }>) {
   const config = grokConfig();
   const fallback = defaultAnswers(input);
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: config.apiKey,
+    cost: {
+      metadata: {
+        archetypeId: input.archetype.id,
+        countryCode: input.countryCode,
+        sampleIndex: input.sampleIndex,
+        seed: input.seed,
+        source: "admin_plan_demand_generation"
+      },
+      recordUsage: true
+    },
     maxTokens: 2400,
     messages: [
       {

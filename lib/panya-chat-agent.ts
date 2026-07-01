@@ -1,5 +1,5 @@
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
@@ -115,8 +115,18 @@ export async function analyzePanyaCustomerChatWithGrok(
   const panyaEntitlement = entitlementForTools(input.entitlement);
   const toolPolicy = panyaToolContext({ entitlement: panyaEntitlement });
   const dailyMessageLimit = governedConfig.config.quotas[panyaEntitlement];
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: config.apiKey,
+    cost: {
+      metadata: {
+        accountingPath: "task_result_applier",
+        entitlement: input.entitlement,
+        locale: input.customer.locale,
+        planId: input.planId
+      },
+      recordUsage: false,
+      taskId: input.taskId
+    },
     maxTokens: MAX_RESPONSE_TOKENS,
     messages: [
       {

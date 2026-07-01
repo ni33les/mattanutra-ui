@@ -1,6 +1,6 @@
 import { recordXaiUsageCost } from "@/lib/finance-ledger";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
@@ -81,8 +81,16 @@ function text(value: unknown, fallback: string) {
 async function callGrok(input: FoodReviewSuggestionInput) {
   const grok = config();
 
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: grok.apiKey,
+    cost: {
+      metadata: {
+        accountingPath: "manual_record_xai_usage_cost",
+        foodName: input.foodName,
+        locale: input.locale
+      },
+      recordUsage: false
+    },
     maxTokens: 350,
     messages: [
       {

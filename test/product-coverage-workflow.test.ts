@@ -1312,7 +1312,7 @@ describe("product coverage workflow", () => {
     assert.match(dashboard, /Run synthetic customer plans/);
     assert.match(dashboard, /Run the product basket optimiser/);
     assert.match(page, /getAdminProductCoverageData/);
-    assert.match(page, /getAdminPlanCoverageSimulationData/);
+    assert.doesNotMatch(page, /getAdminPlanCoverageSimulationData/);
     assert.match(page, /retiredInsightsReplacementView/);
     assert.match(page, /product-insights/);
     assert.match(readModel, /targetComparableAmountBySupplement/);
@@ -1354,10 +1354,11 @@ describe("product coverage workflow", () => {
     assert.match(view, /function loadSavedDemandProfiles\(expectedDemandKey\?: string\)/);
     assert.match(view, /entry\.demandKey === expectedDemandKey/);
     assert.match(view, /saveDemandProfiles\(demandKey, savedProfiles\)/);
-    assert.match(view, /saveSimulationState\(simulationInputKey\(nextData\), runner\)/);
-    assert.doesNotMatch(view, /saveSimulationState\(inputKey, runner\)/);
+    assert.match(view, /saveSimulationState\(inputKey, runner\)/);
+    assert.doesNotMatch(view, /saveSimulationState\(simulationInputKey\(nextData\), runner\)/);
     assert.match(view, /existingEntry\.profiles\.length > currentProfiles\.length/);
-    assert.match(view, /setHydrated\(\(current\) => current && sameSelectedCountry\)/);
+    assert.match(view, /const shouldReplaceVisibleData = !hydrated \|\| !sameSelectedCountry/);
+    assert.match(view, /shouldReplaceVisibleData \? current && sameSelectedCountry : current/);
     assert.doesNotMatch(view, /parsed\.demandKey !== expectedDemandKey/);
     assert.doesNotMatch(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
     assert.match(view, /function savedDemandProfiles/);
@@ -1390,6 +1391,7 @@ describe("product coverage workflow", () => {
     assert.match(view, /\/api\/admin\/product-coverage\/demand-profile/);
     assert.doesNotMatch(view, /Simulation assumptions/);
     assert.match(view, /SimulationProgressPanel/);
+    assert.match(view, /showSimulationProgressPanel/);
     assert.match(view, /Generating questionnaire/);
     assert.match(view, /Running simulation/);
     assert.match(view, /SimulatorActionBar/);
@@ -1496,6 +1498,10 @@ describe("product coverage workflow", () => {
     assert.match(taskExecution, /runAdminCataloguePotentialOptimizationFromTraces/);
     assert.doesNotMatch(view, /runAdminCatalogueOptimizationCooperatively/);
     assert.match(view, /Basket products/);
+    assert.match(view, /CatalogueOptimizationFrontierGraph/);
+    assert.match(view, /Optimisation frontier/);
+    assert.match(view, /Sweet spot/);
+    assert.match(view, /Perfect coverage baseline/);
     assert.match(view, /No basket products were identified/);
     assert.doesNotMatch(
       view,

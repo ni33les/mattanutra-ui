@@ -5,7 +5,7 @@ import {
   type AdminProductRow
 } from "@/lib/admin-products";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey,
@@ -212,8 +212,17 @@ async function callGrok(input: Readonly<{
   const grok = config();
   const targetLocale = normalizeLocaleCode(input.targetLocale) ?? "th";
 
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: grok.apiKey,
+    cost: {
+      metadata: {
+        accountingPath: "manual_record_xai_usage_cost",
+        locale: targetLocale,
+        productId: input.product.id,
+        productTitle: input.product.title
+      },
+      recordUsage: false
+    },
     maxTokens: 1400,
     messages: [
       {

@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   adminCsrfCookieName,
   adminSessionCookieName,
-  legacyAdminContext,
   resolveAdminSession
 } from "@/lib/admin-access";
 import { generateAdminPlanCoverageDemandProfile } from "@/lib/admin-plan-demand-generation";
@@ -16,32 +15,16 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function accessTokenFromRequest(request: NextRequest, body: Record<string, unknown>) {
-  const url = new URL(request.url);
-
-  return (
-    text(request.headers.get("x-admin-dashboard-token")) ||
-    text(body.accessToken) ||
-    text(url.searchParams.get("access_token")) ||
-    null
-  );
-}
-
-async function adminContext(
-  request: NextRequest,
-  body: Record<string, unknown>
-) {
-  const session = await resolveAdminSession({
+async function adminContext(request: NextRequest) {
+  return resolveAdminSession({
     csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
     sessionCookie: request.cookies.get(adminSessionCookieName)?.value
   });
-
-  return session ?? legacyAdminContext(accessTokenFromRequest(request, body));
 }
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const context = await adminContext(request, body);
+  const context = await adminContext(request);
 
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

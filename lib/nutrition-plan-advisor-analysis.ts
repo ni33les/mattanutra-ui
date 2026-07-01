@@ -16,7 +16,7 @@ import {
 import type { HealthScoreResult } from "@/lib/health-score";
 import { HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS } from "@/lib/health-score";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
@@ -128,8 +128,12 @@ async function callGrok({
   reasoningEffort: string;
   temperature: number;
 }>) {
-  return callGrokChatCompletion({
+  return callGovernedGrokChatCompletion({
     apiKey,
+    cost: {
+      metadata: { accountingPath: "task_result_applier" },
+      recordUsage: false
+    },
     maxTokens,
     messages,
     model,
