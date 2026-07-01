@@ -17,6 +17,8 @@ describe("supplement admin popup", () => {
     assert.match(service, /delete from public\.supplement_aliases/);
     assert.match(service, /update public\.supplements/);
     assert.match(service, /source_payload[\s\S]*'deleted', true/);
+    assert.match(service, /'deletedAt', \$\{deletedAt\}::text/);
+    assert.match(service, /'deletedBy', \$\{deletedBy\}::text/);
     assert.match(service, /normalized_name = concat/);
     assert.match(service, /action:\s*"deleted"/);
     assert.match(schema, /product_facts_product_id_fkey[\s\S]*ON DELETE CASCADE/);

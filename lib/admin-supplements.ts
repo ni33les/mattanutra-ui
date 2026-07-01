@@ -1232,8 +1232,8 @@ export async function deleteAdminSupplement(
         coalesce(source_payload, '{}'::jsonb) - 'countryAvailability'
       ) || jsonb_build_object(
         'deleted', true,
-        'deletedAt', ${deletedAt},
-        'deletedBy', ${deletedBy},
+        'deletedAt', ${deletedAt}::text,
+        'deletedBy', ${deletedBy}::text,
         'deletedIsActive', is_active,
         'deletedListStatus', list_status,
         'deletedNormalizedName', normalized_name,
