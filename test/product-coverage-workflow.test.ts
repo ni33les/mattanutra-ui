@@ -1447,11 +1447,18 @@ describe("product coverage workflow", () => {
     assert.doesNotMatch(view, /simulationData\.sampleSize > 0 &&\s*\n\s*simulationData\.sampleTraces\.length > 0/);
     assert.match(view, /optimizingCatalogue/);
     assert.match(view, /current: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,\s*\n\s*total: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES/);
-    assert.match(view, /shared background job/);
-    assert.match(view, /profiles completed by shared job/);
-    assert.match(view, /Waiting for Analytics worker/);
+    assert.match(view, /Heartbeat active/);
+    assert.match(view, /Waiting for heartbeat/);
+    assert.match(view, /Optimum product basket progress/);
+    assert.match(view, /role="progressbar"/);
     assert.match(view, /Restart queued job/);
-    assert.match(view, /Shared job progress found/);
+    assert.match(view, /Saved progress:/);
+    assert.doesNotMatch(view, /shared background job/);
+    assert.doesNotMatch(view, /profiles completed by shared job/);
+    assert.doesNotMatch(view, /Waiting for Analytics worker/);
+    assert.doesNotMatch(view, /Shared job progress found/);
+    assert.doesNotMatch(view, /products considered/);
+    assert.doesNotMatch(view, /The first update is usually the slowest/);
     assert.match(view, /Reset/);
     assert.match(view, /Recalculate/);
     assert.match(view, /forceRestart: true/);
@@ -1475,7 +1482,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /cacheKey: requestKey/);
     assert.match(view, /existing\.sampleSize > runner\.sampleSize/);
     assert.match(view, /Include pending-review products/);
-    assert.match(view, /Shows the best possible basket if pending products were approved/);
+    assert.doesNotMatch(
+      view,
+      /Shows the best possible basket if pending products were approved/
+    );
     assert.match(view, /includeReviewPriorityProductsInCatalogueOptimization/);
     assert.match(view, /catalogueReviewProductsKey/);
     assert.match(view, /includePendingReviewProducts/);
@@ -1547,7 +1557,7 @@ describe("product coverage workflow", () => {
     assert.match(view, /currentCatalogueOptimizationHeartbeatStale/);
     assert.match(view, /lastWorkerHeartbeatAt/);
     assert.match(view, /reservationId/);
-    assert.match(view, /workerSessionId/);
+    assert.doesNotMatch(view, /workerSessionId/);
     assert.match(view, /Restart blocked job/);
     assert.match(view, /Run again/);
     assert.match(view, /catalogueOptimizationMatchesSampleSize/);

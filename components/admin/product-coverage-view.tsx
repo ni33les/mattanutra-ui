@@ -2106,9 +2106,6 @@ function CatalogueOptimizationReviewToggle({
     >
       <span className="text-left">
         <span className="block">Include pending-review products</span>
-        <span className="block text-xs font-medium text-slate-500">
-          Shows the best possible basket if pending products were approved
-        </span>
       </span>
       <input
         checked={checked}
@@ -2182,21 +2179,28 @@ function MinimumCataloguePanel({
   running: boolean;
   sampleSize: number;
 }>) {
-  const cachedProgressText = cachedProgress
-    ? `${numberText(cachedProgress.current)} / ${numberText(cachedProgress.total)} profiles completed by shared job`
+  const savedProgressText = cachedProgress
+    ? `${numberText(cachedProgress.current)} / ${numberText(cachedProgress.total)}`
     : null;
-  const jobDiagnostics = job
-    ? [
-        job.reservationId ? `reservation ${job.reservationId.slice(0, 8)}` : null,
-        job.workerSessionId ? `worker ${job.workerSessionId.slice(0, 8)}` : null,
-        job.leaseUntil
-          ? `lease ${dateTimeText(job.leaseUntil, locale)}`
-          : null,
-        job.lastWorkerHeartbeatAt
-          ? `heartbeat ${dateTimeText(job.lastWorkerHeartbeatAt, locale)}`
-          : null
-      ].filter(Boolean).join(" · ")
-    : "";
+  const progressCurrent = Math.max(
+    0,
+    optimizationProgress?.current ?? cachedProgress?.current ?? 0
+  );
+  const progressTotal = Math.max(
+    1,
+    optimizationProgress?.total ?? cachedProgress?.total ?? sampleSize
+  );
+  const progressPercent = Math.max(
+    0,
+    Math.min(100, (Math.min(progressCurrent, progressTotal) / progressTotal) * 100)
+  );
+  const heartbeatText = blocked
+    ? "Heartbeat stalled"
+    : queued
+      ? "Waiting for heartbeat"
+      : job?.lastWorkerHeartbeatAt
+        ? "Heartbeat active"
+        : "Starting";
 
   if (running) {
     return (
@@ -2219,13 +2223,6 @@ function MinimumCataloguePanel({
             <h2 className="text-lg font-bold text-slate-950">
               Optimum product basket
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {blocked
-                ? "The Analytics worker stopped updating this shared background job."
-                : queued
-                ? "Waiting for the Analytics worker to start this shared background job."
-                : "Calculating the product basket as a shared background job. You can leave this page and return later."}
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="bg-blue-50 text-blue-700 ring-blue-200">
@@ -2260,54 +2257,34 @@ function MinimumCataloguePanel({
             ) : null}
           </div>
         </div>
-        <div className="mt-4 rounded-md bg-blue-50 p-3 text-sm text-blue-800 ring-1 ring-blue-100">
-          <p className="font-semibold">
-            {queued
-              ? "Waiting for Analytics worker"
-              : blocked
-                ? "Analytics worker update stalled"
-                : optimizationProgress?.current
-                  ? "Still working"
-                  : "Preparing the shared job"}
-            {elapsedSeconds !== null ? ` · ${durationText(elapsedSeconds)} elapsed` : ""}
-          </p>
-          <p className="mt-1 text-blue-700">
-            The first update is usually the slowest because the server loads the
-            potential product catalogue before it can save the first chunk. Progress is
-            saved to the shared job after each chunk.
-          </p>
-          {cachedProgressText ? (
-            <p className="mt-1 font-semibold text-blue-900">
-              {cachedProgressText}
-              {cachedProgress?.candidateCount
-                ? ` · ${numberText(cachedProgress.candidateCount)} products considered`
-                : ""}
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-700">
+              {heartbeatText}
+              {elapsedSeconds !== null ? ` · ${durationText(elapsedSeconds)}` : ""}
             </p>
-          ) : null}
-          {jobDiagnostics ? (
-            <p className="mt-1 text-xs font-semibold text-blue-900">
-              {jobDiagnostics}
+            <p className="text-sm font-semibold text-slate-500">
+              {numberText(Math.min(progressCurrent, progressTotal))} /{" "}
+              {numberText(progressTotal)}
             </p>
-          ) : null}
+          </div>
+          <div
+            aria-label="Optimum product basket progress"
+            aria-valuemax={progressTotal}
+            aria-valuemin={0}
+            aria-valuenow={Math.min(progressCurrent, progressTotal)}
+            className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100"
+            role="progressbar"
+          >
+            <div
+              className={classNames(
+                "h-full rounded-full transition-[width]",
+                blocked ? "bg-amber-500" : "bg-[#1FA77A]"
+              )}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
-        {optimizationProgress ? (
-          <p className="mt-2 text-sm text-slate-500">
-            {optimizationProgress.label}
-            {optimizationProgress.stage === "scoring" ? (
-              <>
-                {" · "}
-                {numberText(optimizationProgress.current)} /{" "}
-                {numberText(optimizationProgress.total)} profiles
-              </>
-            ) : (
-              <>
-                {" · "}
-                {numberText(optimizationProgress.current)} /{" "}
-                {numberText(optimizationProgress.total)}
-              </>
-            )}
-          </p>
-        ) : null}
       </section>
     );
   }
@@ -2356,15 +2333,9 @@ function MinimumCataloguePanel({
         {error ? (
           <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>
         ) : null}
-        {jobDiagnostics ? (
-          <p className="mt-2 text-xs font-semibold text-slate-500">
-            {jobDiagnostics}
-          </p>
-        ) : null}
-        {cachedProgressText ? (
+        {savedProgressText ? (
           <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100">
-            Shared job progress found: {cachedProgressText}. Calculate will show the
-            latest shared result or continue the job.
+            Saved progress: {savedProgressText}. Calculate will continue from there.
           </p>
         ) : null}
       </section>
@@ -2916,7 +2887,6 @@ function simulationProgressDisplay({
 }
 
 function SimulationProgressPanel({
-  catalogueOptimizationProgress,
   catalogueOptimizationStatus,
   demandError,
   generating,
@@ -2928,7 +2898,6 @@ function SimulationProgressPanel({
   running,
   simulationData
 }: Readonly<{
-  catalogueOptimizationProgress: AdminCatalogueOptimizationProgress | null;
   catalogueOptimizationStatus: CatalogueOptimizationStatus;
   demandError: string | null;
   generating: boolean;
@@ -2945,13 +2914,6 @@ function SimulationProgressPanel({
   const barPercent = loadingInput
     ? 34
     : Math.max(0, Math.min(100, progressPercent));
-  const optimizationProgressText =
-    optimizingCatalogue && catalogueOptimizationProgress
-      ? `${catalogueOptimizationProgress.label} · ${numberText(
-          catalogueOptimizationProgress.current
-        )} / ${numberText(catalogueOptimizationProgress.total)} profiles`
-      : null;
-
   return (
     <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2983,11 +2945,6 @@ function SimulationProgressPanel({
       </div>
       {demandError ? (
         <p className="mt-2 text-sm font-semibold text-rose-700">{demandError}</p>
-      ) : null}
-      {!demandError && optimizationProgressText ? (
-        <p className="mt-2 text-sm text-slate-500">
-          {optimizationProgressText}
-        </p>
       ) : null}
       {!demandError && simulationData.sampleSize > 0 ? (
         <p className="mt-2 text-sm text-slate-500">
@@ -5021,9 +4978,6 @@ export function AdminPlanCoverageSimulatorView({
       </div>
 
       <SimulationProgressPanel
-        catalogueOptimizationProgress={
-          productOptimisationMode ? currentCatalogueOptimizationProgress : null
-        }
         catalogueOptimizationStatus={
           productOptimisationMode ? currentCatalogueOptimizationStatus : "idle"
         }
