@@ -377,6 +377,9 @@ export function AdminSupplementsView({
       }
 
       syncRow(payload.row);
+      setSearch(name);
+      setCategory("");
+      setStatus("");
       return true;
     } catch (createError) {
       setErrorId(row.id);

@@ -43,6 +43,9 @@ describe("supplement admin popup", () => {
     assert.match(createModal, /export function CreateSupplementModal/);
     assert.match(view, /newSupplementDraftId/);
     assert.match(view, /createSupplementFromDraft/);
+    assert.match(view, /setSearch\(name\)/);
+    assert.match(view, /setCategory\(""\)/);
+    assert.match(view, /setStatus\(""\)/);
     assert.match(view, /method: "POST"/);
     assert.match(view, /method: "PATCH"/);
     assert.match(view, /method: "DELETE"/);
