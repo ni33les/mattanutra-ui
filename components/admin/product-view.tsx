@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Plus } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import type {
   AdminProductDetailData,
   AdminProductDetailRow,
@@ -620,69 +620,6 @@ export function AdminProductDetailView({
     }
   }
 
-  async function saveProductState(
-    row: AdminProductDetailRow,
-    state: ProductBusinessState,
-  ) {
-    setSavingId(row.id);
-    setErrorId(null);
-    setErrorMessage(null);
-    setStatusMessage(null);
-
-    try {
-      const nextLabelStatus =
-        state === "approved" && row.facts.length > 0 ? "parsed" : row.labelStatus;
-      const body = {
-        accessToken,
-        status: state,
-        ...(state === "approved" && row.facts.length > 0
-          ? { labelStatus: nextLabelStatus }
-          : {}),
-      };
-      const response = await fetch(`/api/admin/products/${row.id}`, {
-        body: JSON.stringify(body),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "PATCH",
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          await adminResponseErrorMessage(response, "Unable to save product"),
-        );
-      }
-
-      const payload = (await response.json()) as {
-        row?: AdminProductRow;
-      };
-      const savedRow = normalizeProductDetailRow(
-        payload.row
-          ? {
-              ...payload.row,
-              imageCandidates: row.imageCandidates
-            }
-          : {
-              ...row,
-              labelStatus: nextLabelStatus,
-              status: state,
-            },
-      );
-
-      setDraft(savedRow);
-      setStatusMessage(viewLabels.stateSaved);
-      return true;
-    } catch (error) {
-      setErrorId(row.id);
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to save product",
-      );
-      return false;
-    } finally {
-      setSavingId(null);
-    }
-  }
-
   async function deleteProduct(row: AdminProductDetailRow) {
     setSavingId(row.id);
     setErrorId(null);
@@ -970,7 +907,6 @@ export function AdminProductDetailView({
       }}
       onDelete={deleteProduct}
       onSave={saveProduct}
-      onSaveState={saveProductState}
       mergeOptions={mergeOptions}
       saving={savingId === draft.id}
       setDraft={setDraft}
@@ -1179,7 +1115,6 @@ function ProductDetailPanel({
   onClose,
   onDelete,
   onSave,
-  onSaveState,
   mergeOptions,
   saving,
   setDraft,
@@ -1207,10 +1142,6 @@ function ProductDetailPanel({
   onSave: (
     row: AdminProductDetailRow,
     options?: Readonly<{ changeNote?: string | null }>
-  ) => Promise<boolean>;
-  onSaveState: (
-    row: AdminProductDetailRow,
-    state: ProductBusinessState,
   ) => Promise<boolean>;
   mergeOptions: AdminProductMergeOption[];
   saving: boolean;
@@ -1250,10 +1181,6 @@ function ProductDetailPanel({
       ? stateSelection.selectedState
       : currentBusinessState;
   const approvedStateBlocked = Boolean(approvalBlockedMessage);
-  const stateSaveDisabled =
-    saving ||
-    selectedState === currentBusinessState ||
-    (selectedState === "approved" && approvedStateBlocked);
   const manufacturerCountryCodes = normalizedProductCountryCodes(
     draft.manufacturerCountryCodes,
   );
@@ -1302,75 +1229,56 @@ function ProductDetailPanel({
     );
   }
 
-  async function applyIgnoredState(row: AdminProductDetailRow) {
-    const ignoredDraft: AdminProductDetailRow = {
-      ...row,
-      status: "ignored",
-    };
-
-    if (hasOpenImportReview) {
-      return onImportDecision(
-        ignoredDraft,
-        "ignore_import",
-        null,
-        reviewerNote.trim() || null,
-      );
-    }
-
-    return onSaveState(ignoredDraft, "ignored");
-  }
-
-  async function applyApprovedState(row: AdminProductDetailRow) {
-    const approvedDraft: AdminProductDetailRow = {
-      ...row,
-      labelStatus: row.facts.length > 0 ? "parsed" : row.labelStatus,
-      status: "approved",
-    };
-
-    if (hasOpenImportReview) {
-      return onImportDecision(
-        approvedDraft,
-        "approve_product",
-        null,
-        reviewerNote.trim() || null,
-      );
-    }
-
-    return onSaveState(approvedDraft, "approved");
-  }
-
-  async function applyPendingReviewState(row: AdminProductDetailRow) {
-    const pendingReviewDraft: AdminProductDetailRow = {
-      ...row,
-      status: "pending_review",
-    };
-
-    return onSaveState(pendingReviewDraft, "pending_review");
-  }
-
-  async function handleProductStateSave() {
-    if (saving || selectedState === currentBusinessState) {
-      return;
+  function draftWithSelectedState(row: AdminProductDetailRow) {
+    if (selectedState === currentBusinessState) {
+      return row;
     }
 
     if (selectedState === "approved") {
-      if (approvedStateBlocked) {
-        return;
-      }
+      return {
+        ...row,
+        labelStatus: row.facts.length > 0 ? "parsed" : row.labelStatus,
+        status: "approved",
+      } satisfies AdminProductDetailRow;
+    }
 
-      await applyApprovedState(draft);
+    return {
+      ...row,
+      status: selectedState,
+    } satisfies AdminProductDetailRow;
+  }
+
+  async function handleSaveChanges() {
+    if (saving) {
       return;
     }
 
-    if (selectedState === "pending_review") {
-      await applyPendingReviewState(draft);
+    if (selectedState === "approved" && approvedStateBlocked) {
       return;
     }
 
-    if (selectedState === "ignored") {
-      await applyIgnoredState(draft);
+    const nextDraft = draftWithSelectedState(draft);
+    const reviewerNoteText = reviewerNote.trim() || null;
+
+    if (
+      hasOpenImportReview &&
+      selectedState !== currentBusinessState &&
+      selectedState === "approved"
+    ) {
+      await onImportDecision(nextDraft, "approve_product", null, reviewerNoteText);
       return;
     }
+
+    if (
+      hasOpenImportReview &&
+      selectedState !== currentBusinessState &&
+      selectedState === "ignored"
+    ) {
+      await onImportDecision(nextDraft, "ignore_import", null, reviewerNoteText);
+      return;
+    }
+
+    await onSave(nextDraft);
   }
 
   async function handleIgnoredProductDelete() {
@@ -1998,42 +1906,30 @@ function ProductDetailPanel({
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="isolate inline-flex rounded-md shadow-xs">
-                <select
-                  aria-label={viewLabels.stateAction}
-                  className="relative min-h-9 rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-200 outline-none hover:bg-gray-50 focus:z-10 focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={saving}
-                  onChange={(event) =>
-                    selectProductState(event.target.value as ProductStateAction)
-                  }
-                  title={
-                    selectedState === "approved"
-                      ? approvalBlockedMessage ?? undefined
-                      : undefined
-                  }
-                  value={selectedState}
-                >
-                  <option value="pending_review">
-                    {viewLabels.statePendingReview}
-                  </option>
-                  <option disabled={approvedStateBlocked} value="approved">
-                    {viewLabels.stateApproved}
-                  </option>
-                  <option value="ignored">
-                    {viewLabels.stateIgnored}
-                  </option>
-                </select>
-                <button
-                  aria-label={viewLabels.saveState}
-                  className="relative -ml-px inline-flex min-h-9 w-10 items-center justify-center rounded-r-md bg-white text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={stateSaveDisabled}
-                  onClick={() => void handleProductStateSave()}
-                  title={viewLabels.saveState}
-                  type="button"
-                >
-                  <Check aria-hidden={true} className="size-4" strokeWidth={2.5} />
-                </button>
-              </span>
+              <select
+                aria-label={viewLabels.stateAction}
+                className="min-h-9 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-200 outline-none hover:bg-gray-50 focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onChange={(event) =>
+                  selectProductState(event.target.value as ProductStateAction)
+                }
+                title={
+                  selectedState === "approved"
+                    ? approvalBlockedMessage ?? undefined
+                    : undefined
+                }
+                value={selectedState}
+              >
+                <option value="pending_review">
+                  {viewLabels.statePendingReview}
+                </option>
+                <option disabled={approvedStateBlocked} value="approved">
+                  {viewLabels.stateApproved}
+                </option>
+                <option value="ignored">
+                  {viewLabels.stateIgnored}
+                </option>
+              </select>
               {currentBusinessState === "ignored" ? (
                 <button
                   className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -2049,7 +1945,7 @@ function ProductDetailPanel({
               <button
                 className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={saving}
-                onClick={() => void onSave(draft)}
+                onClick={() => void handleSaveChanges()}
                 type="button"
               >
                 {saving ? viewLabels.saving : viewLabels.saveChanges}

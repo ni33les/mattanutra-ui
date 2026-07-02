@@ -260,7 +260,7 @@ describe("product admin card layout", () => {
     assert.match(readiness, /hasCompatibleCountryAvailability/);
   });
 
-  it("exposes product state transitions through an explicit dropdown combo save", async () => {
+  it("saves product edits and selected state through one save action", async () => {
     const detailView = await readFile("components/admin/product-view.tsx", "utf8");
     const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
     const route = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
@@ -273,21 +273,24 @@ describe("product admin card layout", () => {
     assert.match(barrel, /deleteIgnoredAdminProduct/);
     assert.match(detailView, /method: "DELETE"/);
     assert.match(detailView, /type ProductStateAction = "approved" \| "ignored" \| "pending_review"/);
-    assert.match(detailView, /function saveProductState/);
-    assert.match(detailView, /onSaveState=\{saveProductState\}/);
+    assert.doesNotMatch(detailView, /function saveProductState/);
+    assert.doesNotMatch(detailView, /onSaveState/);
     assert.match(detailView, /const \[stateSelection, setStateSelection\]/);
     assert.match(detailView, /function selectProductState/);
-    assert.match(detailView, /async function handleProductStateSave/);
+    assert.match(detailView, /function draftWithSelectedState/);
+    assert.match(detailView, /async function handleSaveChanges/);
     assert.doesNotMatch(detailView, /handleProductStateAction/);
-    assert.match(detailView, /import \{ ArrowLeft, Check, Plus \} from "lucide-react";/);
-    assert.match(detailView, /<span className="isolate inline-flex rounded-md shadow-xs">/);
-    assert.match(detailView, /rounded-l-md[\s\S]*rounded-r-md/);
+    assert.match(detailView, /import \{ ArrowLeft, Plus \} from "lucide-react";/);
+    assert.doesNotMatch(detailView, /<span className="isolate inline-flex rounded-md shadow-xs">/);
+    assert.doesNotMatch(detailView, /rounded-l-md[\s\S]*rounded-r-md/);
     assert.match(detailView, /aria-label=\{viewLabels\.stateAction\}/);
-    assert.match(detailView, /aria-label=\{viewLabels\.saveState\}/);
+    assert.doesNotMatch(detailView, /aria-label=\{viewLabels\.saveState\}/);
     assert.match(detailView, /selectProductState\(event\.target\.value as ProductStateAction\)/);
     assert.match(detailView, /value=\{selectedState\}/);
-    assert.match(detailView, /disabled=\{stateSaveDisabled\}/);
-    assert.match(detailView, /viewLabels\.saveState/);
+    assert.doesNotMatch(detailView, /stateSaveDisabled/);
+    assert.doesNotMatch(detailView, /viewLabels\.saveState/);
+    assert.match(detailView, /onClick=\{\(\) => void handleSaveChanges\(\)\}/);
+    assert.match(detailView, /await onSave\(nextDraft\)/);
     assert.doesNotMatch(
       detailView,
       />\s*\{saving \? viewLabels\.saving : viewLabels\.saveState\}\s*<\/button>/,
@@ -296,7 +299,7 @@ describe("product admin card layout", () => {
     assert.match(detailView, /value="approved"[\s\S]*viewLabels\.stateApproved/);
     assert.match(detailView, /value="ignored"[\s\S]*viewLabels\.stateIgnored/);
     assert.doesNotMatch(detailView, /value="deleted"/);
-    assert.match(detailView, /return onSaveState\(pendingReviewDraft, "pending_review"\);/);
+    assert.match(detailView, /status: selectedState/);
     assert.match(detailView, /currentBusinessState === "ignored"/);
     assert.match(detailView, /async function handleIgnoredProductDelete/);
     assert.match(detailView, /currentBusinessState === "ignored" \? \(/);
@@ -311,10 +314,9 @@ describe("product admin card layout", () => {
     assert.match(detailView, /viewLabels\.backToProducts/);
     assert.match(detailView, /viewLabels\.saveChanges/);
     assert.match(detailView, /hover:underline/);
-    assert.match(detailView, /return onSaveState\(ignoredDraft, "ignored"\);/);
-    assert.match(detailView, /return onSaveState\(approvedDraft, "approved"\);/);
-    assert.match(detailView, /status: state/);
-    assert.match(detailView, /labelStatus: nextLabelStatus/);
+    assert.match(detailView, /labelStatus: row\.facts\.length > 0 \? "parsed" : row\.labelStatus/);
+    assert.match(detailView, /await onImportDecision\(nextDraft, "approve_product", null, reviewerNoteText\)/);
+    assert.match(detailView, /await onImportDecision\(nextDraft, "ignore_import", null, reviewerNoteText\)/);
     assert.ok(backHrefUsages.length >= 2);
     assert.ok(
       detailView.lastIndexOf("viewLabels.saveChanges") <
@@ -330,9 +332,7 @@ describe("product admin card layout", () => {
     assert.doesNotMatch(helpers, /deleteIgnoredConfirm/);
     assert.match(helpers, /deleteAction/);
     assert.match(helpers, /saveChanges/);
-    assert.match(helpers, /saveState/);
     assert.match(helpers, /productSaved/);
-    assert.match(helpers, /stateSaved/);
     assert.match(helpers, /stateAction/);
     assert.match(helpers, /stateApproved/);
     assert.match(helpers, /stateIgnored/);
