@@ -260,7 +260,7 @@ describe("product admin card layout", () => {
     assert.match(readiness, /hasCompatibleCountryAvailability/);
   });
 
-  it("exposes product state transitions through one dropdown", async () => {
+  it("exposes product state transitions through an explicit dropdown save", async () => {
     const detailView = await readFile("components/admin/product-view.tsx", "utf8");
     const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
     const route = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
@@ -272,40 +272,62 @@ describe("product admin card layout", () => {
     assert.match(route, /deleteIgnoredAdminProduct/);
     assert.match(barrel, /deleteIgnoredAdminProduct/);
     assert.match(detailView, /method: "DELETE"/);
-    assert.match(detailView, /type ProductStateAction = "approved" \| "deleted" \| "ignored" \| "pending_review"/);
-    assert.match(detailView, /handleProductStateAction/);
+    assert.match(detailView, /type ProductStateAction = "approved" \| "ignored" \| "pending_review"/);
+    assert.match(detailView, /function saveProductState/);
+    assert.match(detailView, /onSaveState=\{saveProductState\}/);
+    assert.match(detailView, /const \[stateSelection, setStateSelection\]/);
+    assert.match(detailView, /function selectProductState/);
+    assert.match(detailView, /async function handleProductStateSave/);
+    assert.doesNotMatch(detailView, /handleProductStateAction/);
     assert.match(detailView, /aria-label=\{viewLabels\.stateAction\}/);
-    assert.match(detailView, /value=\{stateActionValue\}/);
+    assert.match(detailView, /selectProductState\(event\.target\.value as ProductStateAction\)/);
+    assert.match(detailView, /value=\{selectedState\}/);
+    assert.match(detailView, /disabled=\{stateSaveDisabled\}/);
+    assert.match(detailView, /viewLabels\.saveState/);
     assert.match(detailView, /value="pending_review"[\s\S]*viewLabels\.statePendingReview/);
     assert.match(detailView, /value="approved"[\s\S]*viewLabels\.stateApproved/);
     assert.match(detailView, /value="ignored"[\s\S]*viewLabels\.stateIgnored/);
-    assert.match(detailView, /value="deleted">\{viewLabels\.stateDeleted\}/);
-    assert.match(detailView, /return onSave\(pendingReviewDraft\);/);
+    assert.doesNotMatch(detailView, /value="deleted"/);
+    assert.match(detailView, /return onSaveState\(pendingReviewDraft, "pending_review"\);/);
     assert.match(detailView, /currentBusinessState === "ignored"/);
-    assert.match(detailView, /window\.confirm\(viewLabels\.deleteIgnoredConfirm\)/);
-    assert.match(detailView, /const deleteTarget: AdminProductDetailRow =[\s\S]*status: "ignored"/);
-    assert.match(detailView, /const productIgnored = await applyIgnoredState\(deleteTarget\)/);
-    assert.match(detailView, /if \(await onDelete\(deleteTarget\)\) \{\s*onClose\(\);/);
+    assert.match(detailView, /async function handleIgnoredProductDelete/);
+    assert.match(detailView, /currentBusinessState === "ignored" \? \(/);
+    assert.match(detailView, /onClick=\{\(\) => void handleIgnoredProductDelete\(\)\}/);
+    assert.match(detailView, /\{viewLabels\.deleteAction\}/);
+    assert.match(detailView, /if \(await onDelete\(draft\)\) \{\s*onClose\(\);/);
+    assert.doesNotMatch(detailView, /window\.confirm/);
+    assert.doesNotMatch(detailView, /deleteIgnoredConfirm/);
+    assert.doesNotMatch(detailView, /const deleteTarget: AdminProductDetailRow/);
+    assert.doesNotMatch(detailView, /const productIgnored = await applyIgnoredState/);
     assert.match(detailView, /statusMessage/);
     assert.match(detailView, /viewLabels\.backToProducts/);
     assert.match(detailView, /viewLabels\.saveChanges/);
     assert.match(detailView, /hover:underline/);
-    assert.match(detailView, /return onSave\(ignoredDraft\);/);
-    assert.match(detailView, /return onSave\(approvedDraft\);/);
+    assert.match(detailView, /return onSaveState\(ignoredDraft, "ignored"\);/);
+    assert.match(detailView, /return onSaveState\(approvedDraft, "approved"\);/);
+    assert.match(detailView, /status: state/);
+    assert.match(detailView, /labelStatus: nextLabelStatus/);
     assert.ok(backHrefUsages.length >= 2);
+    assert.ok(
+      detailView.lastIndexOf("viewLabels.saveChanges") <
+        detailView.lastIndexOf("viewLabels.backToProducts"),
+    );
     assert.doesNotMatch(
       detailView,
       /onClick=\{onClose\}[\s\S]{0,200}\{viewLabels\.backToProducts\}/,
     );
+    assert.doesNotMatch(detailView, /sticky bottom-0/);
     assert.doesNotMatch(detailView, /if \(await onSave\(ignoredDraft\)\) \{\s*onClose\(\);/);
     assert.doesNotMatch(detailView, /if \(await onSave\(approvedDraft\)\) \{\s*onClose\(\);/);
-    assert.match(helpers, /deleteIgnoredConfirm/);
+    assert.doesNotMatch(helpers, /deleteIgnoredConfirm/);
+    assert.match(helpers, /deleteAction/);
     assert.match(helpers, /saveChanges/);
+    assert.match(helpers, /saveState/);
     assert.match(helpers, /productSaved/);
+    assert.match(helpers, /stateSaved/);
     assert.match(helpers, /stateAction/);
     assert.match(helpers, /stateApproved/);
     assert.match(helpers, /stateIgnored/);
-    assert.match(helpers, /stateDeleted/);
     assert.match(helpers, /statePendingReview/);
     assert.doesNotMatch(
       detailView,
@@ -319,6 +341,44 @@ describe("product admin card layout", () => {
     assert.match(writes, /retail_customer_order_lines/);
     assert.match(writes, /retail_order_allocations/);
     assert.doesNotMatch(writes, /delete from public\.product_versions/);
+  });
+
+  it("uses a top-right close control for the product country approval dialog", async () => {
+    const view = await readFile("components/admin/product-view-ui.tsx", "utf8");
+    const countryManager = view.slice(
+      view.indexOf("export function ProductCountryManager"),
+      view.indexOf("type ProductIdentifierType"),
+    );
+
+    assert.match(countryManager, /<X aria-hidden=\{true\}/);
+    assert.match(countryManager, /aria-label=\{pricingLabels\?\.cancel \?\? "Close"\}/);
+    assert.match(countryManager, /setApprovalDialog\(null\);\s*return;/);
+    assert.match(countryManager, /onClick=\{\(\) => void saveApprovalDialog\(\)\}/);
+    assert.doesNotMatch(
+      countryManager,
+      /\{pricingLabels\?\.cancel \?\? "Cancel"\}/,
+    );
+  });
+
+  it("renders a matcher profile preview directly under product facts", async () => {
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const matcher = await readFile("lib/product-matching-profile.ts", "utf8");
+
+    assert.match(detailView, /ProductMatchingProfilePanel/);
+    assert.match(detailView, /buildProductMatchingProfile\(row\)/);
+    assert.match(detailView, /labels\.matchingProfile/);
+    assert.match(detailView, /labels\.matcherItem/);
+    assert.match(detailView, /labels\.matcherDose/);
+    assert.match(detailView, /labels\.matcherSource/);
+    assert.match(detailView, /labels\.matcherStatus/);
+    assert.ok(
+      detailView.indexOf("<ProductFactsEditor") <
+        detailView.indexOf("<ProductMatchingProfilePanel"),
+    );
+    assert.match(matcher, /export function buildProductMatchingProfile/);
+    assert.match(matcher, /displayName: "Omega-3"/);
+    assert.match(matcher, /productFactAliasKeys/);
+    assert.match(matcher, /factComparableAmount/);
   });
 
   it("keeps approved products matchable by approving pending brands", async () => {
@@ -350,6 +410,8 @@ describe("product admin card layout", () => {
     assert.match(factsEditor, /setAmountDrafts/);
     assert.match(factsEditor, /if \(parsed !== undefined\)/);
     assert.match(factsEditor, /\\d\*\\\.\\d\+/);
+    assert.match(factsEditor, /confidence: "high"/);
+    assert.doesNotMatch(factsEditor, /confidence: "moderate"/);
     assert.doesNotMatch(factsEditor, /Number\(event\.target\.value\)/);
   });
 });

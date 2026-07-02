@@ -7,7 +7,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { ImageOff, Sparkles, Upload } from "lucide-react";
+import { ImageOff, Sparkles, Upload, X } from "lucide-react";
 import type {
   AdminProductDetailRow,
   AdminProductRow
@@ -1091,14 +1091,25 @@ export function ProductCountryManager({
           role="dialog"
         >
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl ring-1 ring-gray-200">
-            <div>
-              <h3 className="text-base font-semibold text-gray-900">
-                {pricingLabels?.associateApproval ??
-                  "Associate approval number"}
-              </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {productCountryLabel(approvalDialog.countryCode)}
-              </p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">
+                  {pricingLabels?.associateApproval ??
+                    "Associate approval number"}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {productCountryLabel(approvalDialog.countryCode)}
+                </p>
+              </div>
+              <button
+                aria-label={pricingLabels?.cancel ?? "Close"}
+                className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={approvalDialog.saving}
+                onClick={() => setApprovalDialog(null)}
+                type="button"
+              >
+                <X aria-hidden={true} className="size-4" strokeWidth={2.25} />
+              </button>
             </div>
             <div className="mt-4 grid gap-3">
               <label className="text-sm font-semibold text-gray-700">
@@ -1153,15 +1164,7 @@ export function ProductCountryManager({
                 />
               </label>
             </div>
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={approvalDialog.saving}
-                onClick={() => setApprovalDialog(null)}
-                type="button"
-              >
-                {pricingLabels?.cancel ?? "Cancel"}
-              </button>
+            <div className="mt-5 flex justify-end">
               <button
                 className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={approvalDialog.saving}
@@ -1611,7 +1614,7 @@ export function ProductFactsEditor({
         {
           amount: null,
           comparableAmount: null,
-          confidence: "moderate",
+          confidence: "high",
           id: crypto.randomUUID(),
           itemType: "supplement",
           maxAmount: null,

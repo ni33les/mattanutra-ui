@@ -25,6 +25,10 @@ import {
   regulatoryAgencyByCode
 } from "@/lib/product-regulatory-agencies";
 import { productMatchingReadiness } from "@/lib/product-matching-readiness";
+import {
+  buildProductMatchingProfile,
+  type ProductMatchingProfileRow,
+} from "@/lib/product-matching-profile";
 import { type Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
@@ -50,6 +54,7 @@ import {
   productStatusLabel,
   productViewLabels,
   removeProductCountryCode,
+  type ProductBusinessState,
   type ProductMetricFilter,
 } from "@/components/admin/product-view-helpers";
 import {
@@ -157,7 +162,7 @@ type ProductDraftUpdate =
       current: AdminProductDetailRow,
     ) => AdminProductDetailRow | AdminProductRow | null);
 
-type ProductStateAction = "approved" | "deleted" | "ignored" | "pending_review";
+type ProductStateAction = "approved" | "ignored" | "pending_review";
 
 function regulatoryApprovalsForSave(
   row: Pick<AdminProductDetailRow, "regulatoryApprovals">
@@ -615,6 +620,69 @@ export function AdminProductDetailView({
     }
   }
 
+  async function saveProductState(
+    row: AdminProductDetailRow,
+    state: ProductBusinessState,
+  ) {
+    setSavingId(row.id);
+    setErrorId(null);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      const nextLabelStatus =
+        state === "approved" && row.facts.length > 0 ? "parsed" : row.labelStatus;
+      const body = {
+        accessToken,
+        status: state,
+        ...(state === "approved" && row.facts.length > 0
+          ? { labelStatus: nextLabelStatus }
+          : {}),
+      };
+      const response = await fetch(`/api/admin/products/${row.id}`, {
+        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "PATCH",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await adminResponseErrorMessage(response, "Unable to save product"),
+        );
+      }
+
+      const payload = (await response.json()) as {
+        row?: AdminProductRow;
+      };
+      const savedRow = normalizeProductDetailRow(
+        payload.row
+          ? {
+              ...payload.row,
+              imageCandidates: row.imageCandidates
+            }
+          : {
+              ...row,
+              labelStatus: nextLabelStatus,
+              status: state,
+            },
+      );
+
+      setDraft(savedRow);
+      setStatusMessage(viewLabels.stateSaved);
+      return true;
+    } catch (error) {
+      setErrorId(row.id);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to save product",
+      );
+      return false;
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   async function deleteProduct(row: AdminProductDetailRow) {
     setSavingId(row.id);
     setErrorId(null);
@@ -902,6 +970,7 @@ export function AdminProductDetailView({
       }}
       onDelete={deleteProduct}
       onSave={saveProduct}
+      onSaveState={saveProductState}
       mergeOptions={mergeOptions}
       saving={savingId === draft.id}
       setDraft={setDraft}
@@ -985,6 +1054,118 @@ function ProductMatchingReadinessPanel({
   );
 }
 
+function matcherProfileStatusClass(status: ProductMatchingProfileRow["status"]) {
+  if (status === "aggregate") {
+    return "border-blue-100 bg-blue-50 text-blue-700";
+  }
+
+  if (status === "matchable") {
+    return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  }
+
+  return "border-amber-100 bg-amber-50 text-amber-800";
+}
+
+function matcherComparableLabel(value: number | null) {
+  return value === null
+    ? "-"
+    : new Intl.NumberFormat("en-US", {
+        maximumFractionDigits: 4,
+      }).format(value);
+}
+
+function ProductMatchingProfilePanel({
+  labels,
+  row,
+}: Readonly<{
+  labels: Readonly<Record<string, string>>;
+  row: AdminProductDetailRow;
+}>) {
+  const rows = buildProductMatchingProfile(row);
+
+  return (
+    <div className="mt-5 border-t border-gray-100 pt-5">
+      <h3 className="text-sm font-semibold text-gray-900">
+        {labels.matchingProfile}
+      </h3>
+      {rows.length > 0 ? (
+        <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 bg-white">
+          <table className="min-w-full divide-y divide-gray-100 text-left text-xs">
+            <thead className="bg-gray-50 text-gray-500">
+              <tr>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.matcherItem}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.matcherDose}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.confidence}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.matcherSource}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.matcherStatus}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((item) => (
+                <tr key={item.id}>
+                  <td className="px-3 py-2 align-top">
+                    <div className="font-semibold text-gray-900">
+                      {item.displayName}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-gray-500">
+                      {labels.matcherKey}: {item.normalizedKey || "-"}
+                    </div>
+                    {item.supplementId ? (
+                      <div className="mt-0.5 text-[11px] text-gray-500">
+                        {item.supplementId}
+                        {item.supplementStatus
+                          ? ` · ${productStatusLabel(item.supplementStatus, "en")}`
+                          : ""}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2 align-top text-gray-700">
+                    <div>{item.amountLabel}</div>
+                    <div className="mt-0.5 text-[11px] text-gray-500">
+                      {labels.matcherComparable}:{" "}
+                      {matcherComparableLabel(item.comparableAmount)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 align-top text-gray-700">
+                    {item.confidence === "mixed"
+                      ? "Mixed"
+                      : productStatusLabel(item.confidence, "en")}
+                  </td>
+                  <td className="px-3 py-2 align-top text-gray-700">
+                    {item.sourceLabel}
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <span
+                      className={classNames(
+                        "inline-flex rounded-full border px-2 py-0.5 font-semibold",
+                        matcherProfileStatusClass(item.status),
+                      )}
+                    >
+                      {item.statusLabel}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-gray-500">{labels.noParsedFacts}</p>
+      )}
+    </div>
+  );
+}
+
 function ProductDetailPanel({
   accessToken,
   backHref,
@@ -998,6 +1179,7 @@ function ProductDetailPanel({
   onClose,
   onDelete,
   onSave,
+  onSaveState,
   mergeOptions,
   saving,
   setDraft,
@@ -1026,6 +1208,10 @@ function ProductDetailPanel({
     row: AdminProductDetailRow,
     options?: Readonly<{ changeNote?: string | null }>
   ) => Promise<boolean>;
+  onSaveState: (
+    row: AdminProductDetailRow,
+    state: ProductBusinessState,
+  ) => Promise<boolean>;
   mergeOptions: AdminProductMergeOption[];
   saving: boolean;
   setDraft: (update: ProductDraftUpdate) => void;
@@ -1047,11 +1233,27 @@ function ProductDetailPanel({
       ? `Approval is blocked until validation passes: ${draft.validation.summary}`
       : null;
   const currentBusinessState = productBusinessState(draft);
-  const approveDisabled =
+  const [stateSelection, setStateSelection] = useState<
+    Readonly<{
+      productId: string;
+      savedState: ProductBusinessState;
+      selectedState: ProductStateAction;
+    }>
+  >({
+    productId: draft.id,
+    savedState: currentBusinessState,
+    selectedState: currentBusinessState,
+  });
+  const selectedState =
+    stateSelection.productId === draft.id &&
+    stateSelection.savedState === currentBusinessState
+      ? stateSelection.selectedState
+      : currentBusinessState;
+  const approvedStateBlocked = Boolean(approvalBlockedMessage);
+  const stateSaveDisabled =
     saving ||
-    currentBusinessState === "approved" ||
-    Boolean(approvalBlockedMessage);
-  const stateActionValue = currentBusinessState;
+    selectedState === currentBusinessState ||
+    (selectedState === "approved" && approvedStateBlocked);
   const manufacturerCountryCodes = normalizedProductCountryCodes(
     draft.manufacturerCountryCodes,
   );
@@ -1115,7 +1317,7 @@ function ProductDetailPanel({
       );
     }
 
-    return onSave(ignoredDraft);
+    return onSaveState(ignoredDraft, "ignored");
   }
 
   async function applyApprovedState(row: AdminProductDetailRow) {
@@ -1134,7 +1336,7 @@ function ProductDetailPanel({
       );
     }
 
-    return onSave(approvedDraft);
+    return onSaveState(approvedDraft, "approved");
   }
 
   async function applyPendingReviewState(row: AdminProductDetailRow) {
@@ -1143,16 +1345,16 @@ function ProductDetailPanel({
       status: "pending_review",
     };
 
-    return onSave(pendingReviewDraft);
+    return onSaveState(pendingReviewDraft, "pending_review");
   }
 
-  async function handleProductStateAction(action: ProductStateAction | "") {
-    if (!action || saving) {
+  async function handleProductStateSave() {
+    if (saving || selectedState === currentBusinessState) {
       return;
     }
 
-    if (action === "approved") {
-      if (approveDisabled) {
+    if (selectedState === "approved") {
+      if (approvedStateBlocked) {
         return;
       }
 
@@ -1160,47 +1362,33 @@ function ProductDetailPanel({
       return;
     }
 
-    if (action === "pending_review") {
-      if (currentBusinessState === "pending_review") {
-        return;
-      }
-
+    if (selectedState === "pending_review") {
       await applyPendingReviewState(draft);
       return;
     }
 
-    if (action === "ignored") {
-      if (currentBusinessState === "ignored") {
-        return;
-      }
-
+    if (selectedState === "ignored") {
       await applyIgnoredState(draft);
       return;
     }
+  }
 
-    if (!window.confirm(viewLabels.deleteIgnoredConfirm)) {
+  async function handleIgnoredProductDelete() {
+    if (saving || currentBusinessState !== "ignored") {
       return;
     }
 
-    const deleteTarget: AdminProductDetailRow =
-      currentBusinessState === "ignored"
-        ? draft
-        : {
-            ...draft,
-            status: "ignored",
-          };
-
-    if (currentBusinessState !== "ignored") {
-      const productIgnored = await applyIgnoredState(deleteTarget);
-
-      if (!productIgnored) {
-        return;
-      }
-    }
-
-    if (await onDelete(deleteTarget)) {
+    if (await onDelete(draft)) {
       onClose();
     }
+  }
+
+  function selectProductState(selectedState: ProductStateAction) {
+    setStateSelection({
+      productId: draft.id,
+      savedState: currentBusinessState,
+      selectedState,
+    });
   }
 
   function handlePersistedImageChange(
@@ -1439,13 +1627,6 @@ function ProductDetailPanel({
 
   return (
     <section className="mt-8 space-y-6">
-      <a
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#126B4F] hover:text-[#0F5C45]"
-        href={backHref}
-      >
-        <ArrowLeft aria-hidden={true} className="size-4" strokeWidth={2.25} />
-        {viewLabels.backToProducts}
-      </a>
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
@@ -1663,6 +1844,8 @@ function ProductDetailPanel({
         viewLabels={viewLabels}
       />
 
+      <ProductMatchingProfilePanel labels={viewLabels} row={draft} />
+
       <div className="mt-5">
         <h3 className="text-sm font-semibold text-gray-900">
           {viewLabels.shopAvailability}
@@ -1799,26 +1982,12 @@ function ProductDetailPanel({
         </p>
       ) : null}
 
-      <div className="mt-6">
-        <a
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#126B4F] underline-offset-4 hover:text-[#0F5C45] hover:underline"
-          href={backHref}
-        >
-          <ArrowLeft
-            aria-hidden={true}
-            className="size-4"
-            strokeWidth={2.25}
-          />
-          {viewLabels.backToProducts}
-        </a>
-      </div>
-
-      <div className="sticky bottom-0 z-20 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 py-4 shadow-[0_-12px_24px_rgba(15,23,42,0.06)] backdrop-blur">
+      <div className="mt-6 border-t border-gray-200 pt-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <button
               aria-label={viewLabels.correctFactsWithAi}
-              className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#2563EB] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#2563EB] hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={saving}
               onClick={() => void onCorrectFacts(draft)}
               title={viewLabels.correctFactsWithAi}
@@ -1833,31 +2002,44 @@ function ProductDetailPanel({
                 aria-label={viewLabels.stateAction}
                 className="min-h-9 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-200 outline-none hover:bg-gray-50 focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={saving}
-                onChange={(event) => {
-                  void handleProductStateAction(
-                    event.target.value as ProductStateAction | "",
-                  );
-                }}
-                title={approvalBlockedMessage ?? undefined}
-                value={stateActionValue}
+                onChange={(event) =>
+                  selectProductState(event.target.value as ProductStateAction)
+                }
+                title={
+                  selectedState === "approved"
+                    ? approvalBlockedMessage ?? undefined
+                    : undefined
+                }
+                value={selectedState}
               >
-                <option
-                  disabled={currentBusinessState === "pending_review"}
-                  value="pending_review"
-                >
+                <option value="pending_review">
                   {viewLabels.statePendingReview}
                 </option>
-                <option disabled={approveDisabled} value="approved">
+                <option disabled={approvedStateBlocked} value="approved">
                   {viewLabels.stateApproved}
                 </option>
-                <option
-                  disabled={currentBusinessState === "ignored"}
-                  value="ignored"
-                >
+                <option value="ignored">
                   {viewLabels.stateIgnored}
                 </option>
-                <option value="deleted">{viewLabels.stateDeleted}</option>
               </select>
+              <button
+                className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={stateSaveDisabled}
+                onClick={() => void handleProductStateSave()}
+                type="button"
+              >
+                {saving ? viewLabels.saving : viewLabels.saveState}
+              </button>
+              {currentBusinessState === "ignored" ? (
+                <button
+                  className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => void handleIgnoredProductDelete()}
+                  type="button"
+                >
+                  {viewLabels.deleteAction}
+                </button>
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -1871,6 +2053,19 @@ function ProductDetailPanel({
             </div>
           </div>
         </div>
+      </div>
+      <div className="mt-4">
+        <a
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#126B4F] underline-offset-4 hover:text-[#0F5C45] hover:underline"
+          href={backHref}
+        >
+          <ArrowLeft
+            aria-hidden={true}
+            className="size-4"
+            strokeWidth={2.25}
+          />
+          {viewLabels.backToProducts}
+        </a>
       </div>
       </div>
     </section>
