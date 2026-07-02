@@ -255,6 +255,7 @@ for (const scriptName of [
   "retail-financials:schema:apply",
   "retail-stock:schema:apply",
   "product-identifiers:schema:apply",
+  "products:soft-delete:schema:apply",
   "product-regulatory:schema:apply",
   "product-offers:schema:remove",
   "supplements:country-availability:schema:apply",

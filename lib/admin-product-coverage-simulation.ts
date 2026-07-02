@@ -2970,7 +2970,9 @@ function prunedTraceCatalogueEvaluation(input: Readonly<{
 function potentialCatalogueCandidate(product: ProductCandidate): ProductCandidate | null {
   if (
     product.status === "ignored" ||
+    product.status === "deleted" ||
     product.brandStatus === "ignored" ||
+    product.brandStatus === "deleted" ||
     product.facts.length < 1
   ) {
     return null;

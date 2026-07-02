@@ -39,6 +39,13 @@ describe("product matching profile", () => {
     const rows = buildProductMatchingProfile(
       productRow([
         productFact({
+          aliasKeys: [
+            "omega_3",
+            "epa",
+            "dha",
+            "eicosapentaenoic_acid",
+            "docosahexaenoic_acid",
+          ],
           amount: 80,
           id: "epa",
           name: "EPA",
@@ -46,6 +53,13 @@ describe("product matching profile", () => {
           unit: "mg",
         }),
         productFact({
+          aliasKeys: [
+            "omega_3",
+            "epa",
+            "dha",
+            "eicosapentaenoic_acid",
+            "docosahexaenoic_acid",
+          ],
           amount: 100,
           id: "dha",
           name: "DHA",

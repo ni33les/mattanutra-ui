@@ -360,7 +360,8 @@ export async function loadProductRows(
         on product_recommendation_runs.id = product_recommendation_items.run_id
       where product_recommendation_items.product_id = products.id
     ) history on true
-    where (${productId ?? null}::uuid is null or products.id = ${productId ?? null}::uuid)
+    where products.status <> 'deleted'
+      and (${productId ?? null}::uuid is null or products.id = ${productId ?? null}::uuid)
       and (${brandId}::uuid is null or products.brand_id = ${brandId}::uuid)
     order by products.updated_at desc, products.title asc
   `;
@@ -780,6 +781,7 @@ export async function getAdminProductListData(
           from public.product_recommendation_items
           where product_recommendation_items.product_id = products.id
         ) history on true
+        where products.status <> 'deleted'
       ),
       filtered_products as (
         select *
@@ -844,6 +846,7 @@ export async function getAdminProductListData(
         coalesce(nullif(products.brand_name, ''), 'Unknown manufacturer') as label,
         count(*) as total
       from public.products
+      where products.status <> 'deleted'
       group by key, label
       order by total desc, label asc
       limit 200
@@ -918,6 +921,7 @@ export async function getAdminProductListData(
             from public.product_regulatory_approvals
             where product_regulatory_approvals.product_id = products.id
           ) product_regulatory_rows on true
+          where products.status <> 'deleted'
         ),
         filtered_products as (
           select *
@@ -1131,12 +1135,15 @@ async function loadAdminProductMergeOptions(input: Readonly<{
       from public.product_translations
       where product_translations.product_id = products.id
     ) product_translation_rows on true
-    where (
-      ${useDuplicateIds}::boolean
-      and products.id = any(${duplicateProductIds}::uuid[])
-    ) or (
-      not ${useDuplicateIds}::boolean
-      and products.id <> ${input.productId}::uuid
+    where products.status <> 'deleted'
+      and (
+        (
+          ${useDuplicateIds}::boolean
+          and products.id = any(${duplicateProductIds}::uuid[])
+        ) or (
+          not ${useDuplicateIds}::boolean
+          and products.id <> ${input.productId}::uuid
+        )
     )
     order by
       case
@@ -1156,6 +1163,8 @@ export async function getAdminProductDetailData(
   productId: string,
   _range: AdminDashboardRange = "all"
 ): Promise<AdminProductDetailData | null> {
+  void _range;
+
   if (!isUuidValue(productId)) {
     return null;
   }
@@ -1189,6 +1198,8 @@ export async function getAdminProductDetailData(
 export async function getAdminProductsData(
   _range: AdminDashboardRange = "all"
 ): Promise<AdminProductsData> {
+  void _range;
+
   try {
     const rows = await loadProductRows();
 

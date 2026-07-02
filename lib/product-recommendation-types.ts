@@ -3,6 +3,7 @@ import type { ValidationResult } from "@/lib/product-validation";
 
 export type ProductStatus =
   | "approved"
+  | "deleted"
   | "ignored"
   | "pending_review";
 

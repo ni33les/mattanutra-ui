@@ -220,7 +220,7 @@ export async function PATCH(
   if (
     (body.title !== undefined && !effectiveTitle) ||
     (body.productUrl !== undefined && !productUrl) ||
-    (body.status !== undefined && !isProductStatus(status)) ||
+    (body.status !== undefined && (!isProductStatus(status) || status === "deleted")) ||
     (body.labelStatus !== undefined && !isProductLabelStatus(labelStatus)) ||
     (body.productKind !== undefined && !productKind) ||
     (body.productForm !== undefined && !productForm) ||
@@ -258,7 +258,7 @@ export async function PATCH(
       labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
       availableCountryCodes: countryCodesFromBody(body.availableCountryCodes),
       manufacturerCountryCodes: countryCodesFromBody(body.manufacturerCountryCodes),
-      status: isProductStatus(status) ? status : undefined,
+      status: isProductStatus(status) && status !== "deleted" ? status : undefined,
       productAudience,
       productForm,
       productKind,

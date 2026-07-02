@@ -1702,147 +1702,116 @@ export async function deleteIgnoredAdminProduct(input: Readonly<{
     throw new Error("Product not found");
   }
 
+  const actor = input.actor ?? "admin_dashboard";
+  const deletedAt = new Date().toISOString();
   const rows = await sql<Array<{
-    blocked_references: string[] | null;
-    deleted_id: string | null;
-    product_exists: boolean;
-    product_status: string | null;
-    product_title: string | null;
+    product_id: string;
+    title: string | null;
   }>>`
     with target as (
       select
         products.id,
         products.brand_id,
-        products.status,
-        products.title,
+        products.status as previous_status,
+        products.normalized_url,
         to_jsonb(products.*) as before_payload
       from public.products
       where products.id = ${input.productId}::uuid
-      limit 1
+        and products.status = 'ignored'
     ),
-    blockers as (
-      select array_remove(array[
-        case
-          when exists (
-            select 1
-            from public.product_recommendation_items
-            where product_recommendation_items.product_id = ${input.productId}::uuid
-            limit 1
-          ) then 'recommendation history'
-        end,
-        case
-          when exists (
-            select 1
-            from public.product_recommendation_decisions
-            where product_recommendation_decisions.product_id = ${input.productId}::uuid
-            limit 1
-          ) then 'recommendation decisions'
-        end,
-        case
-          when exists (
-            select 1
-            from public.retail_customer_order_lines
-            where retail_customer_order_lines.product_id = ${input.productId}::uuid
-            limit 1
-          ) then 'customer order lines'
-        end,
-        case
-          when exists (
-            select 1
-            from public.retail_order_allocations
-            where retail_order_allocations.product_id = ${input.productId}::uuid
-            limit 1
-          ) then 'retail order allocations'
-        end
-      ], null) as names
+    deleted_product as (
+      update public.products
+      set
+        status = 'deleted',
+        availability_status = 'unavailable',
+        normalized_url = target.normalized_url || '#deleted#' || replace(target.id::text, '-', ''),
+        source_snapshot = products.source_snapshot || jsonb_build_object(
+          'deleted', true,
+          'deletedAt', ${deletedAt},
+          'deletedBy', ${actor},
+          'deleteReason', 'ignored_product_soft_delete',
+          'originalNormalizedUrl', target.normalized_url,
+          'previousStatus', target.previous_status,
+          'productId', target.id::text
+        ),
+        current_version = coalesce(products.current_version, 0) + 1,
+        updated_at = now()
+      from target
+      where products.id = target.id
+        and products.status = 'ignored'
+      returning products.*, target.brand_id as target_brand_id, target.before_payload
     ),
-    eligible as (
-      select target.*
-      from target, blockers
-      where target.status = 'ignored'
-        and cardinality(blockers.names) = 0
-    ),
-    deleted_shopping_lines as (
+    deleted_shopping_list_lines as (
       delete from public.retail_shopping_list_lines
-      where retail_shopping_list_lines.product_id in (select eligible.id from eligible)
+      where product_id in (select id from deleted_product)
       returning 1
-    ),
-    shopping_step as (
-      select eligible.*
-      from eligible
-      left join (select count(*) as deleted_count from deleted_shopping_lines) deleted on true
     ),
     deleted_reorder_advice as (
       delete from public.retail_stock_reorder_advice
-      where retail_stock_reorder_advice.product_id in (select shopping_step.id from shopping_step)
+      where product_id in (select id from deleted_product)
       returning 1
     ),
-    reorder_step as (
-      select shopping_step.*
-      from shopping_step
-      left join (select count(*) as deleted_count from deleted_reorder_advice) deleted on true
-    ),
-    deleted_movements as (
-      delete from public.retail_stock_movements
-      where retail_stock_movements.product_id in (select reorder_step.id from reorder_step)
+    deleted_sellable_products as (
+      update public.retail_sellable_products
+      set
+        status = 'deleted',
+        metadata = metadata || jsonb_build_object(
+          'deletedAt', ${deletedAt},
+          'deletedBy', ${actor},
+          'deleteReason', 'product_soft_delete',
+          'deletedProductId', product_id::text
+        ),
+        updated_at = now()
+      where product_id in (select id from deleted_product)
+        and status <> 'deleted'
       returning 1
     ),
-    movements_step as (
-      select reorder_step.*
-      from reorder_step
-      left join (select count(*) as deleted_count from deleted_movements) deleted on true
-    ),
-    deleted_lots as (
-      delete from public.retail_stock_lots
-      where retail_stock_lots.product_id in (select movements_step.id from movements_step)
+    deleted_product_stock as (
+      update public.retail_product_stock
+      set
+        status = 'deleted',
+        metadata = metadata || jsonb_build_object(
+          'deletedAt', ${deletedAt},
+          'deletedBy', ${actor},
+          'deleteReason', 'product_soft_delete',
+          'deletedProductId', product_id::text
+        ),
+        updated_at = now()
+      where product_id in (select id from deleted_product)
+        and status <> 'deleted'
       returning 1
     ),
-    lots_step as (
-      select movements_step.*
-      from movements_step
-      left join (select count(*) as deleted_count from deleted_lots) deleted on true
-    ),
-    deleted_snapshots as (
-      delete from public.retail_product_stock_snapshots
-      where retail_product_stock_snapshots.product_id in (select lots_step.id from lots_step)
+    deleted_stock_lots as (
+      update public.retail_stock_lots
+      set
+        status = 'deleted',
+        metadata = metadata || jsonb_build_object(
+          'deletedAt', ${deletedAt},
+          'deletedBy', ${actor},
+          'deleteReason', 'product_soft_delete',
+          'deletedProductId', product_id::text
+        ),
+        updated_at = now()
+      where product_id in (select id from deleted_product)
+        and status = 'active'
       returning 1
     ),
-    snapshots_step as (
-      select lots_step.*
-      from lots_step
-      left join (select count(*) as deleted_count from deleted_snapshots) deleted on true
-    ),
-    deleted_stock as (
-      delete from public.retail_product_stock
-      where retail_product_stock.product_id in (select snapshots_step.id from snapshots_step)
+    deleted_product_identifiers as (
+      update public.product_identifiers
+      set
+        status = 'deleted',
+        metadata = metadata || jsonb_build_object(
+          'deletedAt', ${deletedAt},
+          'deletedBy', ${actor},
+          'deleteReason', 'product_soft_delete',
+          'deletedProductId', product_id::text
+        ),
+        updated_at = now()
+      where product_id in (select id from deleted_product)
+        and status <> 'deleted'
       returning 1
     ),
-    stock_step as (
-      select snapshots_step.*
-      from snapshots_step
-      left join (select count(*) as deleted_count from deleted_stock) deleted on true
-    ),
-    deleted_sellables as (
-      delete from public.retail_sellable_products
-      where retail_sellable_products.product_id in (select stock_step.id from stock_step)
-      returning 1
-    ),
-    sellables_step as (
-      select stock_step.*
-      from stock_step
-      left join (select count(*) as deleted_count from deleted_sellables) deleted on true
-    ),
-    deleted_countries as (
-      delete from public.product_countries
-      where product_countries.product_id in (select sellables_step.id from sellables_step)
-      returning 1
-    ),
-    countries_step as (
-      select sellables_step.*
-      from sellables_step
-      left join (select count(*) as deleted_count from deleted_countries) deleted on true
-    ),
-    deleted_audit as (
+    inserted_audit as (
       insert into public.product_admin_audit (
         product_id,
         brand_id,
@@ -1852,63 +1821,171 @@ export async function deleteIgnoredAdminProduct(input: Readonly<{
         after_payload
       )
       select
-        null,
-        countries_step.brand_id,
-        ${input.actor ?? "admin_dashboard"},
-        'ignored_product_deleted',
-        countries_step.before_payload,
+        deleted_product.id,
+        deleted_product.target_brand_id,
+        ${actor},
+        'ignored_product_soft_deleted',
+        deleted_product.before_payload,
+        to_jsonb(deleted_product.*) - 'target_brand_id' - 'before_payload'
+      from deleted_product
+      returning product_id
+    ),
+    inserted_version as (
+      insert into public.product_versions (
+        product_id,
+        version,
+        actor,
+        change_note,
+        reason,
+        source,
+        title,
+        brand_name,
+        normalized_brand_name,
+        image_url,
+        product_url,
+        normalized_url,
+        description,
+        fda_approval_number,
+        product_kind,
+        product_audience,
+        status,
+        label_status,
+        availability_status,
+        price_amount,
+        currency,
+        validation_status,
+        validation_reasons,
+        validation_summary,
+        validation_checked_at,
+        facts_snapshot,
+        source_snapshot,
+        snapshot,
+        metadata,
+        created_at
+      )
+      select
+        deleted_product.id,
+        deleted_product.current_version,
+        ${actor},
+        'product_soft_deleted',
+        'product_soft_deleted',
+        'admin_products',
+        deleted_product.title,
+        deleted_product.brand_name,
+        deleted_product.normalized_brand_name,
+        deleted_product.image_url,
+        deleted_product.product_url,
+        deleted_product.normalized_url,
+        deleted_product.description,
+        deleted_product.fda_approval_number,
+        deleted_product.product_kind,
+        deleted_product.product_audience,
+        deleted_product.status,
+        deleted_product.label_status,
+        deleted_product.availability_status,
+        deleted_product.price_amount,
+        deleted_product.currency,
+        deleted_product.validation_status,
+        deleted_product.validation_reasons,
+        deleted_product.validation_summary,
+        deleted_product.validation_checked_at,
+        coalesce(fact_rows.facts, '[]'::jsonb),
+        deleted_product.source_snapshot,
         jsonb_build_object(
-          'deletedAt', now(),
-          'productId', countries_step.id::text,
-          'status', countries_step.status,
-          'title', countries_step.title
-        )
-      from countries_step
-      returning 1
-    ),
-    audit_step as (
-      select countries_step.*
-      from countries_step
-      left join (select count(*) as deleted_count from deleted_audit) deleted on true
-    ),
-    deleted_product as (
-      delete from public.products
-      where products.id in (select audit_step.id from audit_step)
-      returning products.id::text, products.title
+          'product', to_jsonb(deleted_product.*) - 'target_brand_id' - 'before_payload',
+          'facts', coalesce(fact_rows.facts, '[]'::jsonb),
+          'translations', coalesce(translation_rows.translations, '{}'::jsonb)
+        ),
+        '{}'::jsonb,
+        now()
+      from deleted_product
+      left join lateral (
+        select coalesce(
+          jsonb_object_agg(
+            product_translations.locale,
+            jsonb_build_object(
+              'locale', product_translations.locale,
+              'title', product_translations.title,
+              'description', product_translations.description,
+              'status', product_translations.status,
+              'updatedAt', product_translations.updated_at
+            )
+            order by product_translations.locale
+          ),
+          '{}'::jsonb
+        ) as translations
+        from public.product_translations
+        where product_translations.product_id = deleted_product.id
+      ) translation_rows on true
+      left join lateral (
+        select coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'id', product_facts.id,
+              'itemType', product_facts.item_type,
+              'supplementId', product_facts.supplement_id,
+              'foodId', product_facts.food_id,
+              'nutrientId', product_facts.nutrient_id,
+              'name', product_facts.name,
+              'normalizedName', product_facts.normalized_name,
+              'amount', product_facts.amount,
+              'unit', product_facts.unit,
+              'servingLabel', product_facts.serving_label,
+              'confidence', product_facts.confidence,
+              'source', product_facts.source,
+              'sourceUrl', product_facts.source_url,
+              'sourceText', product_facts.source_text
+            )
+            order by product_facts.created_at asc
+          ),
+          '[]'::jsonb
+        ) as facts
+        from public.product_facts
+        where product_facts.product_id = deleted_product.id
+      ) fact_rows on true
+      returning version
     )
     select
-      exists(select 1 from target) as product_exists,
-      (select target.status from target) as product_status,
-      (select target.title from target) as product_title,
-      (select blockers.names from blockers) as blocked_references,
-      (select deleted_product.id from deleted_product) as deleted_id
+      deleted_product.id::text as product_id,
+      deleted_product.title
+    from deleted_product
+    left join inserted_audit on inserted_audit.product_id = deleted_product.id
+    left join inserted_version on true
   `;
-  const row = rows[0];
+  let result = rows[0];
 
-  if (!row?.product_exists) {
-    throw new Error("Product not found");
-  }
+  if (!result) {
+    const existingRows = await sql<Array<{
+      product_id: string;
+      status: string;
+      title: string | null;
+    }>>`
+      select id::text as product_id, status, title
+      from public.products
+      where id = ${input.productId}::uuid
+    `;
+    const existing = existingRows[0];
 
-  if (row.product_status !== "ignored") {
-    throw new Error("Only ignored products can be deleted");
-  }
+    if (!existing) {
+      throw new Error("Product not found");
+    }
 
-  if (row.blocked_references?.length) {
-    throw new Error(
-      `Product cannot be deleted because it has ${row.blocked_references.join(", ")}.`
-    );
-  }
+    if (existing.status !== "deleted") {
+      throw new Error("Only ignored products can be deleted");
+    }
 
-  if (!row.deleted_id) {
-    throw new Error("Product was not deleted");
+    result = {
+      product_id: existing.product_id,
+      title: existing.title
+    };
   }
 
   clearProductRecommendationCandidateCache();
 
   return {
     deleted: true,
-    productId: row.deleted_id,
-    title: row.product_title
+    productId: result.product_id,
+    title: result.title
   };
 }
 export {};

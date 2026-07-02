@@ -90,14 +90,13 @@ function matchingProfileFactStatus(
 }
 
 function omegaSourceForFact(fact: ProductFact): "DHA" | "EPA" | null {
-  const directKeys = [
+  const primaryKeys = [
     normalizeProductFactKey(fact.name),
     normalizeProductFactKey(fact.normalizedName),
-    ...(fact.aliasKeys ?? []).map((alias) => normalizeProductFactKey(alias)),
   ].filter(Boolean);
 
   if (
-    directKeys.some(
+    primaryKeys.some(
       (key) => key === "dha" || key.includes("docosahexaenoic_acid"),
     )
   ) {
@@ -105,10 +104,28 @@ function omegaSourceForFact(fact: ProductFact): "DHA" | "EPA" | null {
   }
 
   if (
-    directKeys.some(
+    primaryKeys.some(
       (key) => key === "epa" || key.includes("eicosapentaenoic_acid"),
     )
   ) {
+    return "EPA";
+  }
+
+  const aliasKeys = (fact.aliasKeys ?? [])
+    .map((alias) => normalizeProductFactKey(alias))
+    .filter(Boolean);
+  const aliasesDha = aliasKeys.some(
+    (key) => key === "dha" || key.includes("docosahexaenoic_acid"),
+  );
+  const aliasesEpa = aliasKeys.some(
+    (key) => key === "epa" || key.includes("eicosapentaenoic_acid"),
+  );
+
+  if (aliasesDha && !aliasesEpa) {
+    return "DHA";
+  }
+
+  if (aliasesEpa && !aliasesDha) {
     return "EPA";
   }
 

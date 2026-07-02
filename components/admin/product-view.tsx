@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Check, Plus } from "lucide-react";
 import type {
   AdminProductDetailData,
   AdminProductDetailRow,
@@ -1998,38 +1998,42 @@ function ProductDetailPanel({
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                aria-label={viewLabels.stateAction}
-                className="min-h-9 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-200 outline-none hover:bg-gray-50 focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={saving}
-                onChange={(event) =>
-                  selectProductState(event.target.value as ProductStateAction)
-                }
-                title={
-                  selectedState === "approved"
-                    ? approvalBlockedMessage ?? undefined
-                    : undefined
-                }
-                value={selectedState}
-              >
-                <option value="pending_review">
-                  {viewLabels.statePendingReview}
-                </option>
-                <option disabled={approvedStateBlocked} value="approved">
-                  {viewLabels.stateApproved}
-                </option>
-                <option value="ignored">
-                  {viewLabels.stateIgnored}
-                </option>
-              </select>
-              <button
-                className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={stateSaveDisabled}
-                onClick={() => void handleProductStateSave()}
-                type="button"
-              >
-                {saving ? viewLabels.saving : viewLabels.saveState}
-              </button>
+              <span className="isolate inline-flex rounded-md shadow-xs">
+                <select
+                  aria-label={viewLabels.stateAction}
+                  className="relative min-h-9 rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-200 outline-none hover:bg-gray-50 focus:z-10 focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saving}
+                  onChange={(event) =>
+                    selectProductState(event.target.value as ProductStateAction)
+                  }
+                  title={
+                    selectedState === "approved"
+                      ? approvalBlockedMessage ?? undefined
+                      : undefined
+                  }
+                  value={selectedState}
+                >
+                  <option value="pending_review">
+                    {viewLabels.statePendingReview}
+                  </option>
+                  <option disabled={approvedStateBlocked} value="approved">
+                    {viewLabels.stateApproved}
+                  </option>
+                  <option value="ignored">
+                    {viewLabels.stateIgnored}
+                  </option>
+                </select>
+                <button
+                  aria-label={viewLabels.saveState}
+                  className="relative -ml-px inline-flex min-h-9 w-10 items-center justify-center rounded-r-md bg-white text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={stateSaveDisabled}
+                  onClick={() => void handleProductStateSave()}
+                  title={viewLabels.saveState}
+                  type="button"
+                >
+                  <Check aria-hidden={true} className="size-4" strokeWidth={2.5} />
+                </button>
+              </span>
               {currentBusinessState === "ignored" ? (
                 <button
                   className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"

@@ -4627,9 +4627,7 @@ export function AdminPlanCoverageSimulatorView({
           if (requestTimeoutId !== null) {
             window.clearTimeout(requestTimeoutId);
           }
-          if (shouldReplaceVisibleData) {
-            setInputData(payload);
-          }
+          setInputData(payload);
           setInputStatus("ready");
         })
         .catch((error) => {

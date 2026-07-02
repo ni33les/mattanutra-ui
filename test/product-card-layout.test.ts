@@ -260,7 +260,7 @@ describe("product admin card layout", () => {
     assert.match(readiness, /hasCompatibleCountryAvailability/);
   });
 
-  it("exposes product state transitions through an explicit dropdown save", async () => {
+  it("exposes product state transitions through an explicit dropdown combo save", async () => {
     const detailView = await readFile("components/admin/product-view.tsx", "utf8");
     const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
     const route = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
@@ -279,11 +279,19 @@ describe("product admin card layout", () => {
     assert.match(detailView, /function selectProductState/);
     assert.match(detailView, /async function handleProductStateSave/);
     assert.doesNotMatch(detailView, /handleProductStateAction/);
+    assert.match(detailView, /import \{ ArrowLeft, Check, Plus \} from "lucide-react";/);
+    assert.match(detailView, /<span className="isolate inline-flex rounded-md shadow-xs">/);
+    assert.match(detailView, /rounded-l-md[\s\S]*rounded-r-md/);
     assert.match(detailView, /aria-label=\{viewLabels\.stateAction\}/);
+    assert.match(detailView, /aria-label=\{viewLabels\.saveState\}/);
     assert.match(detailView, /selectProductState\(event\.target\.value as ProductStateAction\)/);
     assert.match(detailView, /value=\{selectedState\}/);
     assert.match(detailView, /disabled=\{stateSaveDisabled\}/);
     assert.match(detailView, /viewLabels\.saveState/);
+    assert.doesNotMatch(
+      detailView,
+      />\s*\{saving \? viewLabels\.saving : viewLabels\.saveState\}\s*<\/button>/,
+    );
     assert.match(detailView, /value="pending_review"[\s\S]*viewLabels\.statePendingReview/);
     assert.match(detailView, /value="approved"[\s\S]*viewLabels\.stateApproved/);
     assert.match(detailView, /value="ignored"[\s\S]*viewLabels\.stateIgnored/);
@@ -334,13 +342,50 @@ describe("product admin card layout", () => {
       /<label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500">[\s\S]{0,120}\{viewLabels\.stateAction\}/,
     );
     assert.match(writes, /export async function deleteIgnoredAdminProduct/);
-    assert.match(writes, /target\.status = 'ignored'/);
-    assert.match(writes, /delete from public\.products/);
-    assert.match(writes, /product_recommendation_items/);
-    assert.match(writes, /product_recommendation_decisions/);
-    assert.match(writes, /retail_customer_order_lines/);
-    assert.match(writes, /retail_order_allocations/);
+    assert.match(writes, /products\.status = 'ignored'/);
+    assert.match(writes, /existing\.status !== "deleted"/);
+    assert.match(writes, /status = 'deleted'/);
+    assert.match(writes, /availability_status = 'unavailable'/);
+    assert.match(writes, /#deleted#/);
+    assert.match(writes, /originalNormalizedUrl/);
+    assert.match(writes, /ignored_product_soft_deleted/);
+    assert.match(writes, /product_soft_deleted/);
+    assert.doesNotMatch(writes, /delete from public\.products/);
+    assert.doesNotMatch(writes, /delete from public\.product_recommendation_items/);
+    assert.doesNotMatch(writes, /delete from public\.product_recommendation_decisions/);
+    assert.doesNotMatch(writes, /delete from public\.retail_customer_order_lines/);
+    assert.doesNotMatch(writes, /delete from public\.retail_order_allocations/);
+    assert.doesNotMatch(writes, /delete from public\.retail_stock_movements/);
     assert.doesNotMatch(writes, /delete from public\.product_versions/);
+  });
+
+  it("soft-deletes products with recommendation history and hides them from active product surfaces", async () => {
+    const productStatusTypes = await readFile("lib/product-recommendation-types.ts", "utf8");
+    const adminProductTypes = await readFile("lib/admin-product-types.ts", "utf8");
+    const schema = await readFile("db-schema.sql", "utf8");
+    const schemaScript = await readFile("scripts/apply-product-soft-delete-schema.ts", "utf8");
+    const deployDev = await readFile("scripts/deploy-dev.mjs", "utf8");
+    const deployUat = await readFile("scripts/deploy-uat.mjs", "utf8");
+    const rebuildUat = await readFile("scripts/rebuild-uat-db.mjs", "utf8");
+    const rebuildPrd = await readFile("scripts/rebuild-prd-db.mjs", "utf8");
+    const readModel = await readFile("lib/admin-product-read-model.ts", "utf8");
+    const catalogueCsv = await readFile("lib/product-catalogue-csv.ts", "utf8");
+    const createRoute = await readFile("app/api/admin/products/route.ts", "utf8");
+    const detailRoute = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
+
+    assert.match(productStatusTypes, /\| "deleted"/);
+    assert.match(adminProductTypes, /"deleted"/);
+    assert.match(schema, /products_status_check[\s\S]*'deleted'::text/);
+    assert.match(schemaScript, /products_status_check/);
+    assert.match(schemaScript, /status in \('approved', 'deleted', 'ignored', 'pending_review'\)/);
+    assert.match(deployDev, /products:soft-delete:schema:apply/);
+    assert.match(deployUat, /products:soft-delete:schema:apply/);
+    assert.match(rebuildUat, /products:soft-delete:schema:apply/);
+    assert.match(rebuildPrd, /products:soft-delete:schema:apply/);
+    assert.match(readModel, /where products\.status <> 'deleted'/);
+    assert.match(catalogueCsv, /products\.status not in \('ignored', 'deleted'\)/);
+    assert.match(createRoute, /status === "deleted"/);
+    assert.match(detailRoute, /status === "deleted"/);
   });
 
   it("uses a top-right close control for the product country approval dialog", async () => {

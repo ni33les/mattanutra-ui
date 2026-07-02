@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  adminCataloguePotentialCandidates,
   buildAdminCataloguePotentialTraceChunk,
   buildSimulationNextMoveRows,
   buildReviewPriorityProductRows,
@@ -1011,6 +1012,39 @@ describe("product coverage workflow", () => {
     assert.equal(rows[0]?.matchableSupplementCount, 2);
   });
 
+  it("keeps deleted products out of potential catalogue candidates", () => {
+    const pendingProduct = product({
+      id: "55555555-4444-4444-8444-444444444444",
+      status: "pending_review",
+      title: "Pending CoQ10"
+    });
+    const deletedProduct = product({
+      id: "66666666-4444-4444-8444-444444444444",
+      status: "deleted",
+      title: "Deleted CoQ10"
+    });
+    const deletedBrandProduct = product({
+      brandStatus: "deleted",
+      id: "77777777-4444-4444-8444-444444444444",
+      title: "Deleted Brand CoQ10"
+    });
+    const candidates = adminCataloguePotentialCandidates([
+      product(),
+      pendingProduct,
+      deletedProduct,
+      deletedBrandProduct
+    ]);
+
+    assert.deepEqual(
+      candidates.map((candidate) => candidate.id),
+      [product().id, pendingProduct.id]
+    );
+    assert.equal(
+      candidates.find((candidate) => candidate.id === pendingProduct.id)?.status,
+      "approved"
+    );
+  });
+
   it("ranks next moves from simulation unmet demand", () => {
     const magnesiumNeed = {
       category: "Minerals",
@@ -1372,6 +1406,11 @@ describe("product coverage workflow", () => {
     assert.match(view, /\.slice\(0, 2\)/);
     assert.match(view, /const shouldReplaceVisibleData = !hydrated \|\| !sameSelectedCountry/);
     assert.match(view, /shouldReplaceVisibleData \? current && sameSelectedCountry : current/);
+    assert.match(view, /setInputData\(payload\)/);
+    assert.doesNotMatch(
+      view,
+      /if \(shouldReplaceVisibleData\) \{\s*setInputData\(payload\);/
+    );
     assert.doesNotMatch(view, /parsed\.demandKey !== expectedDemandKey/);
     assert.doesNotMatch(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
     assert.match(view, /function savedDemandProfiles/);
@@ -1519,6 +1558,10 @@ describe("product coverage workflow", () => {
     );
     assert.match(catalogueOptimizationJobs, /result_payload/);
     assert.match(catalogueOptimizationJobs, /restartRequested/);
+    assert.match(catalogueOptimizationJobs, /refreshSimulationCatalogueSnapshot/);
+    assert.match(catalogueOptimizationJobs, /getProductRecommendationCandidates/);
+    assert.match(catalogueOptimizationJobs, /sampleTraces: simulationData\.sampleTraces\.map/);
+    assert.match(catalogueOptimizationJobs, /reviewPriorityProducts = simulationData\.reviewPriorityProducts\s*\n\s*\.flatMap/);
     assert.match(catalogueOptimizationJobs, /existingStatus === "completed"/);
     assert.match(catalogueOptimizationJobs, /existingStatus === "queued"/);
     assert.match(catalogueOptimizationJobs, /staleActiveJob/);
@@ -1528,6 +1571,8 @@ describe("product coverage workflow", () => {
     assert.match(catalogueOptimizationJobs, /max_attempts = \$\{ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS\}/);
     assert.match(catalogueOptimizationJobs, /notifyTaskQueueChanged/);
     assert.match(catalogueOptimizationJobs, /analytics_catalogue_optimization|requiredCapabilitiesForWorkTaskType/);
+    assert.match(simulationModel, /product\.status === "deleted"/);
+    assert.match(simulationModel, /product\.brandStatus === "deleted"/);
     assert.doesNotMatch(catalogueOptimizationJobs, /kickAdminCatalogueOptimizationJob/);
     assert.doesNotMatch(catalogueOptimizationJobs, /setTimeout/);
     assert.doesNotMatch(catalogueOptimizationJobs, /runAdminCatalogueOptimizationJob/);

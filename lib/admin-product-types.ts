@@ -39,6 +39,7 @@ export type {
 // Status / label / platform guards and sets (pure, no side effects)
 const productStatuses = new Set<ProductStatus>([
   "approved",
+  "deleted",
   "ignored",
   "pending_review"
 ]);

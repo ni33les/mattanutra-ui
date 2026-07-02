@@ -4,8 +4,11 @@ import {
   adminCataloguePotentialCandidates,
   type AdminCatalogueOptimizationData,
   type AdminPlanCoverageSimulationData,
-  type AdminPlanCoverageSimulationSampleTrace
+  type AdminPlanCoverageSimulationSampleTrace,
+  type AdminSimulationReviewProductRow
 } from "@/lib/admin-product-coverage";
+import { productPrice } from "@/lib/admin-product-coverage-simulation";
+import { getProductRecommendationCandidates } from "@/lib/admin-product-search";
 import { getSql } from "@/lib/db";
 import type { ProductCandidate } from "@/lib/product-recommendations";
 import { requiredCapabilitiesForWorkTaskType } from "@/lib/system-agents";
@@ -335,6 +338,161 @@ function initialJobResult(input: Readonly<{
   } satisfies JobResultPayload;
 }
 
+function inactiveProductStatus(
+  status: ProductCandidate["status"] | null | undefined
+): ProductCandidate["status"] {
+  return status === "deleted" ? "deleted" : "ignored";
+}
+
+function inactiveBrandStatus(
+  status: ProductCandidate["brandStatus"] | null | undefined
+): ProductCandidate["brandStatus"] {
+  return status === "deleted" ? "deleted" : "ignored";
+}
+
+function refreshCandidateSnapshot(
+  candidate: ProductCandidate,
+  currentCandidatesById: ReadonlyMap<string, ProductCandidate>
+): ProductCandidate {
+  const current = currentCandidatesById.get(candidate.id);
+
+  if (!current) {
+    return {
+      ...candidate,
+      automatedSafetyPassed: false,
+      availabilityStatus: "unavailable",
+      brandStatus: inactiveBrandStatus(candidate.brandStatus),
+      retailAvailabilityStatus: "unavailable",
+      status: inactiveProductStatus(candidate.status),
+      validation: null
+    };
+  }
+
+  return {
+    ...candidate,
+    automatedSafetyPassed: current.automatedSafetyPassed,
+    availabilityStatus: current.availabilityStatus,
+    availableCountryCodes: current.availableCountryCodes,
+    brandName: current.brandName ?? null,
+    brandStatus: current.brandStatus ?? null,
+    currency: current.currency,
+    imageUrl: current.imageUrl ?? null,
+    labelStatus: current.labelStatus,
+    priceAmount: current.priceAmount ?? null,
+    priceSource: current.priceSource ?? null,
+    productAudience: current.productAudience ?? null,
+    productDataExpiresAt: current.productDataExpiresAt ?? null,
+    productKind: current.productKind ?? null,
+    productUrl: current.productUrl,
+    region: current.region,
+    retailAvailabilityStatus: current.retailAvailabilityStatus ?? null,
+    retailEtaDate: current.retailEtaDate ?? null,
+    retailSellableProductId: current.retailSellableProductId ?? null,
+    selectedRetailerName: current.selectedRetailerName ?? null,
+    selectedRetailerOrganisationId:
+      current.selectedRetailerOrganisationId ?? null,
+    status: current.status,
+    title: current.title,
+    unitPriceAmount: current.unitPriceAmount ?? null,
+    validation: current.validation ?? null
+  };
+}
+
+function refreshTraceProductSnapshot(
+  product: AdminPlanCoverageSimulationSampleTrace["selectedProducts"][number],
+  currentCandidatesById: ReadonlyMap<string, ProductCandidate>
+): AdminPlanCoverageSimulationSampleTrace["selectedProducts"][number] {
+  const current = currentCandidatesById.get(product.id);
+
+  if (!current) {
+    return {
+      ...product,
+      brandStatus: inactiveBrandStatus(product.brandStatus),
+      productStatus: inactiveProductStatus(product.productStatus)
+    };
+  }
+
+  return {
+    ...product,
+    brandName: current.brandName ?? null,
+    brandStatus: current.brandStatus ?? null,
+    costAmount: productPrice(current),
+    productStatus: current.status,
+    title: current.title
+  };
+}
+
+function currentCandidateIsApproved(candidate: ProductCandidate) {
+  return (
+    candidate.status === "approved" &&
+    candidate.brandStatus === "approved" &&
+    candidate.validation?.status === "pass" &&
+    candidate.automatedSafetyPassed
+  );
+}
+
+function refreshReviewPriorityProduct(
+  product: AdminSimulationReviewProductRow,
+  currentCandidatesById: ReadonlyMap<string, ProductCandidate>
+): readonly AdminSimulationReviewProductRow[] {
+  const current = currentCandidatesById.get(product.id);
+
+  if (
+    !current ||
+    current.status === "ignored" ||
+    current.status === "deleted" ||
+    current.brandStatus === "ignored" ||
+    current.brandStatus === "deleted" ||
+    currentCandidateIsApproved(current)
+  ) {
+    return [];
+  }
+
+  return [{
+    ...product,
+    brandName: current.brandName ?? null,
+    brandStatus: current.brandStatus ?? null,
+    currency: current.currency,
+    expectedPriceAmount: productPrice(current) ?? product.expectedPriceAmount,
+    productStatus: current.status,
+    title: current.title
+  }];
+}
+
+async function refreshSimulationCatalogueSnapshot(
+  simulationData: AdminPlanCoverageSimulationData
+): Promise<AdminPlanCoverageSimulationData> {
+  const currentCandidates = await getProductRecommendationCandidates({
+    countryCode: simulationData.countryCode,
+    includeIneligible: true
+  });
+  const currentCandidatesById = new Map(
+    currentCandidates.map((candidate) => [candidate.id, candidate])
+  );
+  const reviewPriorityProducts = simulationData.reviewPriorityProducts
+    .flatMap((product) =>
+      refreshReviewPriorityProduct(product, currentCandidatesById)
+    )
+    .map((product, index) => ({ ...product, rank: index + 1 }));
+
+  return {
+    ...simulationData,
+    input: {
+      ...simulationData.input,
+      candidates: simulationData.input.candidates.map((candidate) =>
+        refreshCandidateSnapshot(candidate, currentCandidatesById)
+      )
+    },
+    reviewPriorityProducts,
+    sampleTraces: simulationData.sampleTraces.map((trace) => ({
+      ...trace,
+      selectedProducts: trace.selectedProducts.map((product) =>
+        refreshTraceProductSnapshot(product, currentCandidatesById)
+      )
+    }))
+  };
+}
+
 export async function getAdminCatalogueOptimizationJob(cacheKey: string) {
   const sql = getSql();
 
@@ -382,14 +540,17 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
     return jobView(existing);
   }
 
+  const simulationData = await refreshSimulationCatalogueSnapshot(
+    input.simulationData
+  );
   const context = {
     cacheKey: input.cacheKey,
-    countryCode: input.simulationData.countryCode,
+    countryCode: simulationData.countryCode,
     includePendingReviewProducts: input.includePendingReviewProducts
   } satisfies JobContext;
   const resultPayload = initialJobResult({
     message: "Waiting to start",
-    simulationData: input.simulationData
+    simulationData
   });
   const organisationId = await platformOrganisationId(sql);
 
@@ -398,7 +559,7 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
         update public.tasks
         set
           context = ${sql.json(jsonValue(context))}::jsonb,
-          payload = ${sql.json(jsonValue(input.simulationData))}::jsonb,
+          payload = ${sql.json(jsonValue(simulationData))}::jsonb,
           result_payload = ${sql.json(jsonValue(resultPayload))}::jsonb,
           status = 'queued',
           error_message = null,
@@ -470,7 +631,7 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           ${requiredCapabilitiesForWorkTaskType(ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE)}::text[],
           'none',
           ${sql.json(jsonValue(context))}::jsonb,
-          ${sql.json(jsonValue(input.simulationData))}::jsonb,
+          ${sql.json(jsonValue(simulationData))}::jsonb,
           ${sql.json(jsonValue(resultPayload))}::jsonb,
           200,
           'Admin-requested simulator optimisation',

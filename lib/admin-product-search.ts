@@ -348,6 +348,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       and organisations.status = 'active'
       and organisations.country_code = ${countryCode}
       and sellable.product_id = any(${productIds}::uuid[])
+      and products.status <> 'deleted'
     order by lower(organisations.name), sellable.updated_at desc
   `;
   const customerPriceMarginPercent = await getCustomerPriceMarginPercent({ sql });

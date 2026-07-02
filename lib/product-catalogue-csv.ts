@@ -477,7 +477,7 @@ async function productMatches() {
       on product_identifiers.product_id = products.id
       and product_identifiers.status = 'active'
       and product_identifiers.identifier_type in ('ean13', 'upc', 'manufacturer_sku')
-    where products.status <> 'ignored'
+    where products.status not in ('ignored', 'deleted')
   `;
   const byProductId = new Map<string, ProductMatch>();
   const byFingerprint = new Map<string, ProductMatch>();
@@ -1166,7 +1166,7 @@ export async function buildRetailProductCatalogueJson(
         and product_identifiers.status = 'active'
         and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
     ) identifiers on true
-    where products.status <> 'ignored'
+    where products.status not in ('ignored', 'deleted')
     order by lower(coalesce(products.brand_name, '')), lower(products.title)
   `;
 
@@ -1346,7 +1346,7 @@ export async function buildProductCatalogueCsv(
       and product_translation_th.status <> 'missing'
     left join public.product_regulatory_approvals
       on product_regulatory_approvals.product_id = products.id
-    where products.status <> 'ignored'
+    where products.status not in ('ignored', 'deleted')
       and (
         ${input.scope} <> 'retail'
         or exists (
