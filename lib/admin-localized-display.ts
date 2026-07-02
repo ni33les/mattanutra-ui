@@ -116,6 +116,7 @@ export function adminLocalizedSupplementText(
         translation?.[key] ?? null
       ])
     );
+  const nameValues = fieldValues("name");
   const aliases = translations[locale]?.aliases?.length
     ? translations[locale]?.aliases ?? []
     : translations.en?.aliases?.length
@@ -125,7 +126,11 @@ export function adminLocalizedSupplementText(
   return {
     aliases,
     category: localizedText(locale, fieldValues("categoryLabel"), row.category),
-    name: localizedText(locale, fieldValues("name"), row.name),
+    name: localizedText(
+      locale,
+      locale === "en" ? { ...nameValues, en: row.name } : nameValues,
+      row.name
+    ),
     primaryUseCase: localizedText(
       locale,
       fieldValues("primaryUseCase"),

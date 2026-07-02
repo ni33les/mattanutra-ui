@@ -21,6 +21,8 @@ describe("supplement admin popup", () => {
     assert.match(service, /'deletedBy', \$\{deletedBy\}::text/);
     assert.match(service, /normalized_name = concat/);
     assert.match(service, /action:\s*"deleted"/);
+    assert.match(service, /syncEnglishSupplementTranslationName/);
+    assert.match(service, /supplement_canonical_name_update/);
     assert.match(schema, /product_facts_product_id_fkey[\s\S]*ON DELETE CASCADE/);
     assert.match(schema, /product_facts_supplement_id_fkey[\s\S]*ON DELETE SET NULL/);
     assert.match(schema, /supplement_safety_limits_supplement_id_fkey[\s\S]*ON DELETE RESTRICT/);

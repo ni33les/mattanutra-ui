@@ -455,6 +455,28 @@ async function upsertSupplementTranslations(
   }
 }
 
+async function syncEnglishSupplementTranslationName(
+  sql: postgres.Sql | postgres.TransactionSql,
+  supplementId: string,
+  name: string,
+  actor: string | null | undefined
+) {
+  await sql`
+    update public.supplement_translations
+    set
+      name = ${name},
+      source = 'admin',
+      metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json({
+        actor: actor ?? "admin_dashboard",
+        updatedVia: "supplement_canonical_name_update"
+      })}::jsonb,
+      updated_at = now()
+    where supplement_id = ${supplementId}::uuid
+      and locale = 'en'
+      and coalesce(name, '') <> ${name}
+  `;
+}
+
 async function replaceSupplementCountryAvailability(
   sql: postgres.Sql | postgres.TransactionSql,
   supplementId: string,
@@ -886,6 +908,14 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     input.translations,
     input.actor
   );
+  if (nextName !== before.name) {
+    await syncEnglishSupplementTranslationName(
+      sql,
+      input.id,
+      nextName,
+      input.actor
+    );
+  }
   await replaceSupplementCountryAvailability(
     sql,
     input.id,
