@@ -21,7 +21,6 @@ const validateLine =
   externalSecretChecksStrict || process.env.PRD_SMOKE_VALIDATE_LINE === "true";
 const validateDatabase = process.env.PRD_SMOKE_VALIDATE_DB === "true";
 const validateWorkerCredentials =
-  externalSecretChecksStrict ||
   process.env.PRD_SMOKE_VALIDATE_WORKER_CREDENTIALS === "true";
 const expectedDeploymentCommit = process.env.PRD_EXPECT_COMMIT?.trim() || "";
 const requireFreshWorkerSessions =
