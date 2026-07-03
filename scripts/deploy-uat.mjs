@@ -102,12 +102,6 @@ function uatSchemaDatabaseEnv() {
 
 async function applyRuntimeSchema(env) {
   console.log("[deploy:uat] Applying runtime schema...");
-  await run(npmCommand, ["run", "supplements:country-availability:schema:apply"], {
-    env
-  });
-  await run(npmCommand, ["run", "products:soft-delete:schema:apply"], {
-    env
-  });
   await run(npmCommand, ["run", "payments:schema:apply"], {
     env
   });
