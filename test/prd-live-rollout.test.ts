@@ -135,9 +135,11 @@ describe("live-safe PRD rollout tooling", () => {
     assert.match(deployPrd, /MATTANUTRA_CONFIRM_PRD_LIVE_ROLLOUT/);
     assert.match(deployPrd, /PRD_EXPECT_COMMIT: commit/);
     assert.match(deployPrd, /PRD_SMOKE_REQUIRE_FRESH_WORKERS/);
+    assert.match(deployPrd, /products:v9:schema:apply/);
     assert.match(deployPrd, /DB_SCHEMA_URL: connection/);
     assert.match(deployPrd, /PRD_DB_SCHEMA_URL: connection/);
     assert.match(deployUat, /DB_SCHEMA_URL: connection/);
+    assert.match(deployUat, /products:v9:schema:apply/);
     assert.match(syncPrd, /assertPrdPreserveConfirmation/);
     assert.match(syncLibrary, /input\.mode === "append_only"/);
     assert.match(syncLibrary, /"do nothing"/);

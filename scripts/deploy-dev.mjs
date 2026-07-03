@@ -76,6 +76,9 @@ async function main() {
   await run(npmCommand, ["run", "products:soft-delete:schema:apply"], {
     env: schemaEnv()
   });
+  await run(npmCommand, ["run", "products:v9:schema:apply"], {
+    env: schemaEnv()
+  });
   await run(npmCommand, ["run", "product-coverage:demand-cache:schema:apply"], {
     env: schemaEnv()
   });

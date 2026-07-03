@@ -20,6 +20,7 @@ const forwardSchemaScripts = [
   "retail-stock:schema:apply",
   "product-identifiers:schema:apply",
   "products:soft-delete:schema:apply",
+  "products:v9:schema:apply",
   "product-regulatory:schema:apply",
   "product-coverage:demand-cache:schema:apply",
   "supplements:country-availability:schema:apply",

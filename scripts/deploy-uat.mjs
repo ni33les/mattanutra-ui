@@ -110,6 +110,9 @@ async function applyRuntimeSchema(env) {
   await run(npmCommand, ["run", "products:soft-delete:schema:apply"], {
     env
   });
+  await run(npmCommand, ["run", "products:v9:schema:apply"], {
+    env
+  });
   await run(npmCommand, ["run", "product-coverage:demand-cache:schema:apply"], {
     env
   });
