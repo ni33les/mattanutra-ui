@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { allLocales } from "@/lib/i18n";
 
 type StripePaymentDb = NonNullable<ReturnType<typeof getSql>>;
 
@@ -81,6 +82,25 @@ export async function assertPaymentSchema(sql: StripePaymentDb) {
     if (missing.length > 0) {
       throw new Error(
         `Payment schema is incomplete. Apply db-schema.sql before using Stripe payments. Missing: ${missing.join(", ")}`
+      );
+    }
+
+    const constraints = await sql<Array<{ definition: string | null }>>`
+      select pg_get_constraintdef(pg_constraint.oid) as definition
+      from pg_constraint
+      join pg_class on pg_class.oid = pg_constraint.conrelid
+      join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+      where pg_namespace.nspname = 'public'
+        and pg_class.relname = 'payments'
+        and pg_constraint.conname = 'payments_locale_check'
+      limit 1
+    `;
+    const localeConstraint = constraints[0]?.definition ?? "";
+    const missingLocales = allLocales.filter((locale) => !localeConstraint.includes(locale));
+
+    if (missingLocales.length > 0) {
+      throw new Error(
+        `Payment schema locale constraint is stale. Apply scripts/apply-payment-schema.ts before using Stripe payments. Missing locales: ${missingLocales.join(", ")}`
       );
     }
   })().catch((error) => {
