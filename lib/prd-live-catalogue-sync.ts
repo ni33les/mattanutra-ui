@@ -370,6 +370,7 @@ async function sourceMissingTargetRows(
 
 async function upsertRows(input: Readonly<{
   conflictColumns: readonly string[];
+  mode: PrdCatalogueSyncMode;
   rows: readonly SnapshotRow[];
   sql: Db;
   tableName: string;
@@ -388,7 +389,10 @@ async function upsertRows(input: Readonly<{
 
   const conflictSql = conflictTargetSql(input.conflictColumns);
   const updateSql = updateSetSql(columns, input.conflictColumns);
-  const actionSql = updateSql ? `do update set ${updateSql}` : "do nothing";
+  const actionSql =
+    input.mode === "append_only" || !updateSql
+      ? "do nothing"
+      : `do update set ${updateSql}`;
   let count = 0;
 
   for (const chunk of chunkRows(input.rows, 150)) {
@@ -651,6 +655,7 @@ async function applyTables(
     const upsertedRows = apply
       ? await upsertRows({
           conflictColumns: policy.conflictColumns,
+          mode: policy.mode,
           rows,
           sql,
           tableName

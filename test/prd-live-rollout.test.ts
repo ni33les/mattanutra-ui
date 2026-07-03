@@ -102,6 +102,7 @@ describe("live-safe PRD rollout tooling", () => {
       deployPrd,
       deployUat,
       syncPrd,
+      syncLibrary,
       seedWorkerCredential,
       safety,
       protectedData,
@@ -113,6 +114,7 @@ describe("live-safe PRD rollout tooling", () => {
       readFile("scripts/deploy-prd.mjs", "utf8"),
       readFile("scripts/deploy-uat.mjs", "utf8"),
       readFile("scripts/catalogue-sync-prd.ts", "utf8"),
+      readFile("lib/prd-live-catalogue-sync.ts", "utf8"),
       readFile("scripts/seed-worker-credential.ts", "utf8"),
       readFile("lib/prd-rollout-safety.ts", "utf8"),
       readFile("scripts/prd-protected-data.ts", "utf8"),
@@ -133,6 +135,8 @@ describe("live-safe PRD rollout tooling", () => {
     assert.match(deployPrd, /PRD_DB_SCHEMA_URL: connection/);
     assert.match(deployUat, /DB_SCHEMA_URL: connection/);
     assert.match(syncPrd, /assertPrdPreserveConfirmation/);
+    assert.match(syncLibrary, /input\.mode === "append_only"/);
+    assert.match(syncLibrary, /"do nothing"/);
     assert.match(seedWorkerCredential, /assertPrdRuntimeEnvironment/);
     assert.match(seedWorkerCredential, /assertPrdDatabaseTarget/);
     assert.match(seedWorkerCredential, /MATTANUTRA_CONFIRM_PRD_WORKER_CREDENTIAL/);
