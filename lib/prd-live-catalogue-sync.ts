@@ -216,7 +216,10 @@ export const PRD_LIVE_CATALOGUE_TABLE_POLICIES: Record<string, TablePolicy> = {
     parentColumn: "supplement_id",
     parentTable: "supplements"
   },
-  supplement_safety_limits: { conflictColumns: ["id"], mode: "append_only" },
+  supplement_safety_limits: {
+    conflictColumns: ["supplement_id", "version"],
+    mode: "append_only"
+  },
   supplement_translations: {
     conflictColumns: ["supplement_id", "locale"],
     mode: "replace_scoped_child",
