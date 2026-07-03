@@ -255,6 +255,7 @@ for (const scriptName of [
   "products:soft-delete:schema:apply",
   "product-regulatory:schema:apply",
   "product-offers:schema:remove",
+  "product-coverage:demand-cache:schema:apply",
   "supplements:country-availability:schema:apply",
   "recommendation-insights:schema:apply",
   "thai-tax:schema:apply",

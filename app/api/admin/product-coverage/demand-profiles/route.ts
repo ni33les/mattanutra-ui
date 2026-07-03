@@ -4,7 +4,7 @@ import {
   adminSessionCookieName,
   resolveAdminSession
 } from "@/lib/admin-access";
-import { getOrGenerateCachedAdminPlanCoverageDemandProfile } from "@/lib/admin-plan-demand-generation";
+import { readCachedAdminPlanCoverageDemandProfiles } from "@/lib/admin-plan-demand-generation";
 import { adminViewAllowed } from "@/lib/admin-rbac";
 import { isLocale } from "@/lib/i18n";
 
@@ -46,33 +46,30 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await getOrGenerateCachedAdminPlanCoverageDemandProfile({
+    const result = await readCachedAdminPlanCoverageDemandProfiles({
       archetypes: Array.isArray(body.archetypes) ? body.archetypes : null,
       countryCode: text(body.countryCode) || null,
       locale: isLocale(body.locale) ? body.locale : "en",
-      sampleIndex: Number(body.sampleIndex),
+      sampleIndexes: Array.isArray(body.sampleIndexes) ? body.sampleIndexes : null,
       seed: text(body.seed) || null,
       supplementGovernanceHash: text(body.supplementGovernanceHash) || null,
       supplements: Array.isArray(body.supplements) ? body.supplements : null
     });
 
-    return NextResponse.json(
-      result,
-      {
-        headers: {
-          "Cache-Control": "no-store"
-        }
+    return NextResponse.json(result, {
+      headers: {
+        "Cache-Control": "no-store"
       }
-    );
+    });
   } catch (error) {
-    console.error("Unable to generate product coverage demand profile", error);
+    console.error("Unable to read product coverage demand profile cache", error);
 
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? error.message
-            : "Unable to generate demand profile"
+            : "Unable to read demand profile cache"
       },
       {
         headers: {

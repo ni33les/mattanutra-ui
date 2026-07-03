@@ -143,9 +143,49 @@ type SimulatorProgressDisplay = Readonly<{
   current: number;
   total: number;
 }>;
+type DemandProfileCacheStatus = "answers_hit" | "hit" | "miss";
+type DemandProfileCacheSummary = Readonly<{
+  cachedCount: number;
+  generatedThisRun: number;
+  restoring: boolean;
+}>;
+type DemandProfileCacheBatchResponse = Readonly<{
+  cache?: Readonly<{
+    answerHitSampleIndexes?: readonly number[];
+    demandKey?: string;
+    questionnaireKey?: string;
+    requestedSamples?: number;
+    totalCached?: number;
+  }>;
+  missingSampleIndexes?: readonly number[];
+  profiles?: readonly AdminPlanCoverageDemandProfile[];
+}>;
+type DemandProfileResponse = Readonly<{
+  cache?: Readonly<{
+    demandKey?: string;
+    questionnaireKey?: string;
+    status?: DemandProfileCacheStatus;
+  }>;
+  profile?: AdminPlanCoverageDemandProfile;
+}>;
 
 function numberText(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+function emptyDemandProfileCacheSummary(): DemandProfileCacheSummary {
+  return {
+    cachedCount: 0,
+    generatedThisRun: 0,
+    restoring: false
+  };
+}
+
+function allDemandProfileSampleIndexes() {
+  return Array.from(
+    { length: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES },
+    (_, index) => index
+  );
 }
 
 function percentText(value: number) {
@@ -1339,6 +1379,18 @@ function demandProfileHref(accessToken: string) {
   const suffix = params.toString();
 
   return `/api/admin/product-coverage/demand-profile${suffix ? `?${suffix}` : ""}`;
+}
+
+function demandProfilesHref(accessToken: string) {
+  const params = new URLSearchParams();
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
+
+  const suffix = params.toString();
+
+  return `/api/admin/product-coverage/demand-profiles${suffix ? `?${suffix}` : ""}`;
 }
 
 function catalogueOptimizationJobHref(accessToken: string) {
@@ -3119,6 +3171,7 @@ function simulationProgressDisplay({
 
 function SimulationProgressPanel({
   catalogueOptimizationStatus,
+  demandCacheSummary,
   demandError,
   generating,
   hydrated,
@@ -3130,6 +3183,7 @@ function SimulationProgressPanel({
   simulationData
 }: Readonly<{
   catalogueOptimizationStatus: CatalogueOptimizationStatus;
+  demandCacheSummary: DemandProfileCacheSummary;
   demandError: string | null;
   generating: boolean;
   hydrated: boolean;
@@ -3145,6 +3199,18 @@ function SimulationProgressPanel({
   const barPercent = loadingInput
     ? 34
     : Math.max(0, Math.min(100, progressPercent));
+  const cachedProfileCount = Math.max(
+    0,
+    Math.min(
+      ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
+      demandCacheSummary.cachedCount
+    )
+  );
+  const profileCacheText =
+    cachedProfileCount > 0 || demandCacheSummary.generatedThisRun > 0
+      ? `Profiles: ${numberText(cachedProfileCount)} cached · ${numberText(demandCacheSummary.generatedThisRun)} generated this run`
+      : null;
+
   return (
     <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3176,6 +3242,9 @@ function SimulationProgressPanel({
       </div>
       {demandError ? (
         <p className="mt-2 text-sm font-semibold text-rose-700">{demandError}</p>
+      ) : null}
+      {!demandError && profileCacheText ? (
+        <p className="mt-2 text-sm text-slate-500">{profileCacheText}</p>
       ) : null}
       {!demandError && simulationData.sampleSize > 0 ? (
         <p className="mt-2 text-sm text-slate-500">
@@ -3905,6 +3974,9 @@ export function AdminPlanCoverageSimulatorView({
     AdminPlanCoverageDemandProfile[]
   >([]);
   const [demandGenerating, setDemandGenerating] = useState(false);
+  const [demandCacheSummary, setDemandCacheSummary] = useState(
+    emptyDemandProfileCacheSummary
+  );
   const [demandError, setDemandError] = useState<string | null>(null);
   const [inputRefreshNonce, setInputRefreshNonce] = useState(0);
   const activeArchetypes = useMemo(
@@ -4667,6 +4739,65 @@ export function AdminPlanCoverageSimulatorView({
     };
   }, [accessToken, data, hydrated, inputRefreshNonce, range, selectedCountryCode]);
 
+  const fetchCachedDemandProfilesForSamples = useCallback(
+    async (sampleIndexes?: readonly number[]) => {
+      const response = await fetch(demandProfilesHref(accessToken), {
+        body: JSON.stringify({
+          accessToken,
+          archetypes: activeArchetypes,
+          countryCode: activeInputData.countryCode,
+          locale,
+          sampleIndexes: sampleIndexes ?? allDemandProfileSampleIndexes(),
+          seed: activeInputData.seed,
+          supplementGovernanceHash:
+            activeInputData.input.supplementGovernanceHash,
+          supplements: activeInputData.input.supplements
+        }),
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+
+        throw new Error(
+          payload.error ?? `Demand profile cache request failed (${response.status})`
+        );
+      }
+
+      const payload = (await response.json()) as DemandProfileCacheBatchResponse;
+      const profiles = sanitizeDemandProfilesForSimulationSupplements(
+        normalizeDemandProfiles(payload.profiles),
+        activeInputData.input.supplements
+      );
+
+      return {
+        answerHitSampleIndexes: [
+          ...(payload.cache?.answerHitSampleIndexes ?? [])
+        ],
+        missingSampleIndexes: [...(payload.missingSampleIndexes ?? [])],
+        profiles,
+        totalCached: payload.cache?.totalCached ?? profiles.length
+      };
+    },
+    [
+      accessToken,
+      activeArchetypes,
+      activeInputData.countryCode,
+      activeInputData.input.supplementGovernanceHash,
+      activeInputData.input.supplements,
+      activeInputData.seed,
+      locale
+    ]
+  );
+
   useEffect(() => {
     if (inputStatus !== "ready") {
       return;
@@ -4688,6 +4819,11 @@ export function AdminPlanCoverageSimulatorView({
       setDemandGenerating(false);
       setDemandError(null);
       setDemandProfiles(savedProfiles);
+      setDemandCacheSummary({
+        cachedCount: savedProfiles.length,
+        generatedThisRun: 0,
+        restoring: true
+      });
 
       if (savedProfiles.length > 0) {
         saveDemandProfiles(demandKey, savedProfiles);
@@ -4698,13 +4834,68 @@ export function AdminPlanCoverageSimulatorView({
         runnerRef.current = null;
         runnerInputKeyRef.current = null;
       }
+
+      void fetchCachedDemandProfilesForSamples()
+        .then((cacheResult) => {
+          if (cancelled) {
+            return;
+          }
+
+          const mergedProfiles = sanitizeDemandProfilesForSimulationSupplements(
+            [
+              ...savedProfiles,
+              ...cacheResult.profiles.filter(
+                (profile) =>
+                  !savedProfiles.some(
+                    (savedProfile) =>
+                      savedProfile.sampleIndex === profile.sampleIndex
+                  )
+              )
+            ],
+            inputData.input.supplements
+          );
+
+          setDemandProfiles(mergedProfiles);
+          setDemandCacheSummary({
+            cachedCount: Math.max(
+              mergedProfiles.length,
+              cacheResult.totalCached
+            ),
+            generatedThisRun: 0,
+            restoring: false
+          });
+
+          if (mergedProfiles.length > 0) {
+            saveDemandProfiles(demandKey, mergedProfiles);
+          }
+        })
+        .catch((error) => {
+          if (cancelled) {
+            return;
+          }
+
+          setDemandCacheSummary((current) => ({
+            ...current,
+            restoring: false
+          }));
+          setDemandError(
+            error instanceof Error
+              ? error.message
+              : "Unable to restore cached demand profiles"
+          );
+        });
     }, 0);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [demandKey, inputData.input.supplements, inputStatus]);
+  }, [
+    demandKey,
+    fetchCachedDemandProfilesForSamples,
+    inputData.input.supplements,
+    inputStatus
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -4846,7 +5037,34 @@ export function AdminPlanCoverageSimulatorView({
     sampleIndex: number,
     runToken: number
   ) {
-    setDemandGenerating(true);
+    const cacheResult = await fetchCachedDemandProfilesForSamples([sampleIndex]);
+    const cachedProfile = cacheResult.profiles.find(
+      (profile) => profile.sampleIndex === sampleIndex
+    );
+
+    if (runToken !== runTokenRef.current) {
+      return undefined;
+    }
+
+    if (cachedProfile) {
+      setDemandCacheSummary((current) => ({
+        ...current,
+        cachedCount: Math.max(
+          current.cachedCount,
+          cacheResult.totalCached,
+          demandProfiles.length,
+          sampleIndex + 1
+        ),
+        restoring: false
+      }));
+
+      return cachedProfile;
+    }
+
+    const questionnaireAnswersCached =
+      cacheResult.answerHitSampleIndexes.includes(sampleIndex);
+
+    setDemandGenerating(!questionnaireAnswersCached);
 
     const response = await fetch(demandProfileHref(accessToken), {
       body: JSON.stringify({
@@ -4855,7 +5073,10 @@ export function AdminPlanCoverageSimulatorView({
         countryCode: activeInputData.countryCode,
         locale,
         sampleIndex,
-        seed: activeInputData.seed
+        seed: activeInputData.seed,
+        supplementGovernanceHash:
+          activeInputData.input.supplementGovernanceHash,
+        supplements: activeInputData.input.supplements
       }),
       cache: "no-store",
       credentials: "same-origin",
@@ -4880,13 +5101,20 @@ export function AdminPlanCoverageSimulatorView({
       );
     }
 
-    const payload = (await response.json()) as {
-      profile?: AdminPlanCoverageDemandProfile;
-    };
+    const payload = (await response.json()) as DemandProfileResponse;
 
     if (!payload.profile) {
       throw new Error("Demand profile response did not include a profile");
     }
+
+    setDemandCacheSummary((current) => ({
+      cachedCount: Math.max(current.cachedCount, sampleIndex + 1),
+      generatedThisRun:
+        payload.cache?.status === "miss"
+          ? current.generatedThisRun + 1
+          : current.generatedThisRun,
+      restoring: false
+    }));
 
     return payload.profile;
   }
@@ -4952,7 +5180,9 @@ export function AdminPlanCoverageSimulatorView({
           break;
         }
 
-        await waitForNextSample();
+        if (profiles.length < ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) {
+          await waitForNextSample();
+        }
       }
     } catch (error) {
       if (runToken === runTokenRef.current) {
@@ -5110,6 +5340,10 @@ export function AdminPlanCoverageSimulatorView({
     runTokenRef.current += 1;
     setRunning(false);
     setDemandGenerating(false);
+    setDemandCacheSummary((current) => ({
+      ...current,
+      restoring: false
+    }));
     stopCatalogueOptimization();
   }
 
@@ -5117,6 +5351,11 @@ export function AdminPlanCoverageSimulatorView({
     runTokenRef.current += 1;
     setRunning(false);
     setDemandGenerating(false);
+    setDemandCacheSummary((current) => ({
+      ...current,
+      cachedCount: Math.max(current.cachedCount, demandProfiles.length),
+      restoring: false
+    }));
     clearCatalogueOptimization({ clearSaved: true });
     clearSavedSimulationState();
     setNextMovesClearedKey(null);
@@ -5144,6 +5383,7 @@ export function AdminPlanCoverageSimulatorView({
     clearSavedSimulationState();
     setDemandError(null);
     setDemandProfiles([]);
+    setDemandCacheSummary(emptyDemandProfileCacheSummary());
     setNextMovesClearedKey(null);
     runnerRef.current = activeInputData.databaseAvailable
       ? createAdminPlanCoverageSimulationRunner({
@@ -5269,6 +5509,13 @@ export function AdminPlanCoverageSimulatorView({
         catalogueOptimizationStatus={
           productOptimisationMode ? currentCatalogueOptimizationStatus : "idle"
         }
+        demandCacheSummary={{
+          ...demandCacheSummary,
+          cachedCount: Math.max(
+            demandCacheSummary.cachedCount,
+            demandProfiles.length
+          )
+        }}
         demandError={demandError}
         generating={demandGenerating}
         hydrated={hydrated}

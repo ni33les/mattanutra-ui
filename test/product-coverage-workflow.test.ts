@@ -26,6 +26,7 @@ import {
   productHasCountryBlockedSupplement,
   supplementAvailabilityLookupFromRows
 } from "../lib/supplement-country-availability.ts";
+import { adminPlanDemandProfileCacheKeys } from "../lib/admin-plan-demand-generation.ts";
 import type {
   AdminPlanCoverageDemandProfile,
   AdminSimulationReviewProductRow
@@ -846,6 +847,70 @@ describe("product coverage workflow", () => {
     assert.deepEqual(profiles[0]?.supplementNames, ["CoQ10"]);
   });
 
+  it("keys demand profile cache by questionnaire inputs and supplement governance only", () => {
+    const baseInput = {
+      archetypes: [
+        {
+          age: null,
+          clientSex: "female" as const,
+          customerCount: null,
+          description: "Busy office worker",
+          goals: ["energy"],
+          id: "busy-office-worker",
+          medications: [],
+          name: "Busy office worker",
+          needCount: 4,
+          preferredSupplementNames: ["CoQ10"],
+          source: "synthetic" as const
+        }
+      ],
+      countryCode: "TH",
+      locale: "en" as const,
+      seed: "fixed",
+      supplementGovernanceHash: "supplement-governance:v1",
+      supplements: [
+        {
+          category: "Antioxidants",
+          id: supplementId,
+          name: "CoQ10",
+          normalizedName: "coq10",
+          targetComparableAmount: 100000
+        }
+      ]
+    };
+    const candidateChangedInput = {
+      ...baseInput,
+      candidates: [product({ title: "Changed product catalogue" })]
+    };
+    const baseKeys = adminPlanDemandProfileCacheKeys(baseInput);
+    const candidateChangedKeys =
+      adminPlanDemandProfileCacheKeys(candidateChangedInput);
+    const governanceChangedKeys = adminPlanDemandProfileCacheKeys({
+      ...baseInput,
+      supplementGovernanceHash: "supplement-governance:v2"
+    });
+    const archetypeChangedKeys = adminPlanDemandProfileCacheKeys({
+      ...baseInput,
+      archetypes: [
+        {
+          ...baseInput.archetypes[0]!,
+          goals: ["sleep"],
+          id: "sleep-focused-worker"
+        }
+      ]
+    });
+    const countryChangedKeys = adminPlanDemandProfileCacheKeys({
+      ...baseInput,
+      countryCode: "GB"
+    });
+
+    assert.deepEqual(candidateChangedKeys, baseKeys);
+    assert.equal(governanceChangedKeys.questionnaireKey, baseKeys.questionnaireKey);
+    assert.notEqual(governanceChangedKeys.demandKey, baseKeys.demandKey);
+    assert.notEqual(archetypeChangedKeys.questionnaireKey, baseKeys.questionnaireKey);
+    assert.notEqual(countryChangedKeys.questionnaireKey, baseKeys.questionnaireKey);
+  });
+
   it("filters blocked country supplements from product needs while keeping allowed country overrides", () => {
     const coq10Need = demandProfile().needs[0]!;
     const ashwagandhaNeed = {
@@ -1312,8 +1377,16 @@ describe("product coverage workflow", () => {
       "app/api/admin/product-coverage/demand-profile/route.ts",
       "utf8"
     );
+    const demandProfilesRoute = readFileSync(
+      "app/api/admin/product-coverage/demand-profiles/route.ts",
+      "utf8"
+    );
     const demandGeneration = readFileSync(
       "lib/admin-plan-demand-generation.ts",
+      "utf8"
+    );
+    const demandCacheSchemaScript = readFileSync(
+      "scripts/apply-product-coverage-demand-cache-schema.ts",
       "utf8"
     );
     const assessmentStore = readFileSync("lib/assessment-store.ts", "utf8");
@@ -1360,12 +1433,28 @@ describe("product coverage workflow", () => {
     assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
     assert.match(simulationInputRoute, /adminViewAllowed/);
     assert.match(simulationInputRoute, /"Cache-Control": "no-store"/);
-    assert.match(demandProfileRoute, /generateAdminPlanCoverageDemandProfile/);
+    assert.match(demandProfileRoute, /getOrGenerateCachedAdminPlanCoverageDemandProfile/);
+    assert.match(demandProfileRoute, /supplementGovernanceHash/);
+    assert.match(demandProfileRoute, /supplements/);
+    assert.match(demandProfilesRoute, /readCachedAdminPlanCoverageDemandProfiles/);
+    assert.match(demandProfilesRoute, /sampleIndexes/);
+    assert.match(demandProfilesRoute, /"Cache-Control": "no-store"/);
+    assert.doesNotMatch(demandProfilesRoute, /generateAdminPlanCoverageDemandProfile/);
     assert.match(demandProfileRoute, /adminViewAllowed/);
     assert.match(demandGeneration, /analyzeFormulationWithGrok/);
+    assert.match(demandGeneration, /adminPlanDemandProfileCacheKeys/);
+    assert.match(demandGeneration, /questionnaireKey/);
+    assert.match(demandGeneration, /demandKey/);
+    assert.match(demandGeneration, /answers_hit/);
+    assert.match(demandGeneration, /claimDemandProfileCacheGeneration/);
+    assert.doesNotMatch(demandGeneration, /pg_advisory(?:_xact)?_lock/);
     assert.match(demandGeneration, /buildProductNeeds/);
     assert.match(demandGeneration, /filterProductNeedsBySupplementAvailability/);
     assert.match(demandGeneration, /source_payload -> 'countryAvailability'/);
+    assert.match(demandCacheSchemaScript, /admin_product_coverage_demand_profile_cache/);
+    assert.match(demandCacheSchemaScript, /unique \(demand_key, sample_index\)/);
+    assert.match(demandCacheSchemaScript, /questionnaire_key,\s*sample_index/);
+    assert.match(packageJson, /product-coverage:demand-cache:schema:apply/);
     assert.match(taskWorkItems, /filterProductNeedsBySupplementAvailabilityForCountry/);
     assert.match(candidateSearch, /productHasCountryBlockedSupplement/);
     assert.match(candidateSearch, /getSupplementEffectiveAvailability/);
@@ -1447,6 +1536,11 @@ describe("product coverage workflow", () => {
     assert.match(view, /visibilitychange/);
     assert.match(view, /eligible products/);
     assert.match(view, /\/api\/admin\/product-coverage\/demand-profile/);
+    assert.match(view, /\/api\/admin\/product-coverage\/demand-profiles/);
+    assert.match(view, /fetchCachedDemandProfilesForSamples/);
+    assert.match(view, /answerHitSampleIndexes/);
+    assert.match(view, /generated this run/);
+    assert.match(view, /supplementGovernanceHash:\s*\n\s*activeInputData\.input\.supplementGovernanceHash/);
     assert.doesNotMatch(view, /Simulation assumptions/);
     assert.match(view, /SimulationProgressPanel/);
     assert.doesNotMatch(view, /showSimulationProgressPanel/);
