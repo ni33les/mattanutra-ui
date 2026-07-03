@@ -229,7 +229,7 @@ async function main() {
   console.log("[deploy:prd] Running pre-deploy PRD smoke...");
   await runSmokeOnce(runtimeEnv);
   await applyForwardSchema(schemaEnv);
-  await run("git", ["push", "origin", `HEAD:${prdBranch}`]);
+  await run("git", ["push", "--force-with-lease", "origin", `HEAD:${prdBranch}`]);
   await runSmokeUntilActive(postDeploySmokeEnv);
   await runStrictSmokeIfRequested(postDeploySmokeEnv);
   console.log("[deploy:prd] PRD deployment accepted.");
