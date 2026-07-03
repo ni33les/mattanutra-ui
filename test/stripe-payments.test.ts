@@ -16,6 +16,14 @@ const paymentService = readFileSync(
   new URL("../lib/stripe-payments.ts", import.meta.url),
   "utf8"
 );
+const paymentSchemaScript = readFileSync(
+  new URL("../scripts/apply-payment-schema.ts", import.meta.url),
+  "utf8"
+);
+const paymentSchemaGuard = readFileSync(
+  new URL("../lib/stripe-payment-schema.ts", import.meta.url),
+  "utf8"
+);
 
 async function withStripeEnv<T>(
   env: Readonly<{
@@ -202,6 +210,19 @@ describe("Stripe payment schema and lifecycle", () => {
     assert.match(schema, /'test'::text,\s*'live'::text,\s*'mock'::text/i);
     assert.match(schema, /stripe_event_id\s+text\s+not\s+null/i);
     assert.match(schema, /stripe_webhook_events_stripe_event_id_key\s+unique/i);
+  });
+
+  it("derives payment locale checks from the locale registry", () => {
+    assert.match(paymentSchemaScript, /import \{ allLocales \} from "@\/lib\/i18n"/);
+    assert.match(paymentSchemaScript, /paymentLocaleSqlList = allLocales\.map\(sqlLiteral\)/);
+    assert.match(
+      paymentSchemaScript,
+      /payments_locale_check check \(locale in \(\$\{paymentLocaleSqlList\}\)\)/
+    );
+    assert.doesNotMatch(paymentSchemaScript, /locale in \('en', 'th'\)/);
+    assert.match(paymentSchemaGuard, /allLocales/);
+    assert.match(paymentSchemaGuard, /payments_locale_check/);
+    assert.match(paymentSchemaGuard, /missingLocales/);
   });
 
   it("extends platform finance categories for payment accounting", () => {

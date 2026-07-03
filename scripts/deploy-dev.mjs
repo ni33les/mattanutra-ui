@@ -74,6 +74,9 @@ async function main() {
   await run(npmCommand, ["run", "products:soft-delete:schema:apply"], {
     env: schemaEnv()
   });
+  await run(npmCommand, ["run", "payments:schema:apply"], {
+    env: schemaEnv()
+  });
   console.log(`[deploy:dev] Restarting ${serviceName}...`);
   await run("systemctl", ["restart", serviceName]);
   await run("systemctl", ["is-active", "--quiet", serviceName]);

@@ -112,6 +112,9 @@ async function applyRuntimeSchema(env) {
   await run(npmCommand, ["run", "products:soft-delete:schema:apply"], {
     env
   });
+  await run(npmCommand, ["run", "payments:schema:apply"], {
+    env
+  });
 }
 
 function runCaptureWithStatus(command, args = [], env = process.env) {

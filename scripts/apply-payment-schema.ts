@@ -1,4 +1,11 @@
 import { getSql } from "@/lib/db";
+import { allLocales } from "@/lib/i18n";
+
+function sqlLiteral(value: string) {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+const paymentLocaleSqlList = allLocales.map(sqlLiteral).join(", ");
 
 const schemaSql = `
 create or replace function public.prevent_domain_version_mutation()
@@ -59,7 +66,7 @@ alter table public.payments
 update public.payments
 set
   selected_plan = coalesce(selected_plan, 'precision'::public.assessment_plan),
-  locale = case when locale in ('en', 'th') then locale else 'en' end,
+  locale = case when locale in (${paymentLocaleSqlList}) then locale else 'en' end,
   source_surface = case when source_surface in ('landing', 'healthscore') then source_surface else 'healthscore' end,
   status = case
     when status in (
@@ -133,7 +140,7 @@ alter table public.payments
       'bound'
     )
   ),
-  add constraint payments_locale_check check (locale in ('en', 'th')),
+  add constraint payments_locale_check check (locale in (${paymentLocaleSqlList})),
   add constraint payments_source_surface_check check (source_surface in ('landing', 'healthscore')),
   add constraint payments_amount_check check (amount > 0),
   add constraint payments_amount_unit_check check (amount_unit = 'micros'),
