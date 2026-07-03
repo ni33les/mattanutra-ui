@@ -1182,8 +1182,8 @@ describe("retail stock and FX infrastructure", () => {
     assert.match(stockMutations, /"status_changed"/);
     assert.match(agents, /retailStockForecast: "retail_stock_forecast"/);
     assert.match(agents, /retailStockPlanner/);
-    assert.match(agents, /retail_stock_forecast_refresh: "retailStockPlanner"/);
-    assert.match(agents, /send_retail_order_workflow_email: "emailDispatcher"/);
+    assert.match(agents, /retail_stock_forecast_refresh:[\s\S]*agentKey: "retailStockPlanner"/);
+    assert.match(agents, /send_retail_order_workflow_email:[\s\S]*agentKey: "emailDispatcher"/);
     assert.match(worker, /runtimeWorkerProfileForMode\(mode\)/);
     assert.match(workerProfiles, /"send_retail_order_workflow_email"/);
     assert.match(workerProfiles, /"stock", "retailStockPlanner"/);

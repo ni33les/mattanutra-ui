@@ -73,6 +73,34 @@ test("admin localized display reports fallback when requested locale is missing"
   assert.deepEqual(zh.aliases, ["English alias"]);
 });
 
+test("admin localized supplement display uses canonical English after rename", () => {
+  const supplement = {
+    aliases: [],
+    category: "canonical_category",
+    name: "Probiotics",
+    primaryUseCase: "Canonical use",
+    safetyNotes: "Canonical notes",
+    translations: {
+      en: {
+        aliases: [],
+        categoryLabel: "English category",
+        locale: "en",
+        name: "Multi-strain probiotics",
+        primaryUseCase: "English use",
+        safetyNotes: "English notes",
+        status: "complete",
+        updatedAt: null
+      }
+    }
+  };
+
+  const en = adminLocalizedSupplementText(supplement as never, "en");
+
+  assert.equal(en.name.value, "Probiotics");
+  assert.equal(en.name.canonicalValue, "Probiotics");
+  assert.equal(en.name.fallbackUsed, false);
+});
+
 test("admin localized food display uses translated food names and image alt text", () => {
   const food = {
     category: "canonical_category",

@@ -66,6 +66,10 @@ function productStatusReason(status: ProductStatus) {
     return "Product is ignored.";
   }
 
+  if (status === "deleted") {
+    return "Product is deleted.";
+  }
+
   return "Product is still pending review.";
 }
 

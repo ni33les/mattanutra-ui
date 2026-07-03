@@ -30,6 +30,10 @@ const uatDeployScript = readFileSync(
   new URL("../scripts/deploy-uat.mjs", import.meta.url),
   "utf8",
 );
+const uatSmokeScript = readFileSync(
+  new URL("../scripts/uat-smoke.mjs", import.meta.url),
+  "utf8",
+);
 const workerCredentialProfiles = readFileSync(
   new URL("../lib/worker-agent-credentials.ts", import.meta.url),
   "utf8",
@@ -159,8 +163,10 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(uatRebuildScript, /retail-checkout:schema:apply/);
     assert.match(uatRebuildScript, /retail-stock:schema:apply/);
     assert.match(uatRebuildScript, /product-identifiers:schema:apply/);
+    assert.match(uatRebuildScript, /products:soft-delete:schema:apply/);
     assert.match(uatRebuildScript, /product-regulatory:schema:apply/);
     assert.match(uatRebuildScript, /product-offers:schema:remove/);
+    assert.match(uatRebuildScript, /supplements:country-availability:schema:apply/);
     assert.match(uatRebuildScript, /foods:schema:apply/);
     assert.match(uatRebuildScript, /locales:schema:apply/);
     assert.match(uatRebuildScript, /versions:core:check/);
@@ -175,8 +181,13 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(workerCredentialProfiles, /WORKER_CARRIER_AGENT_API_KEY/);
     assert.match(workerCredentialProfiles, /productMatcher/);
     assert.match(workerCredentialProfiles, /carrierCoordinator/);
+    assert.match(uatDeployScript, /supplements:country-availability:schema:apply/);
+    assert.match(uatDeployScript, /products:soft-delete:schema:apply/);
+    assert.match(uatDeployScript, /deriveUatDbUrl/);
+    assert.match(uatDeployScript, /UAT_DB_SCHEMA_URL/);
     assert.match(uatDeployScript, /git", \["push", "origin", `HEAD:uat`\]/);
     assert.match(uatDeployScript, /npmCommand, \["run", "uat:smoke"\]/);
+    assert.match(uatSmokeScript, /"supplement_country_availability"/);
   });
 
   it("preserves UAT-only access, communication channel, and credential config", () => {

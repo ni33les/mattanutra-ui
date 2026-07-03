@@ -2631,6 +2631,74 @@ function bestFrontierFallback(
   )[0] ?? null;
 }
 
+function firstPassingTraceCatalogueEvaluation(input: Readonly<{
+  baseline: AdminCatalogueOptimizationSummary;
+  coverageLossTolerancePercent: number;
+  data: AdminPlanCoverageSimulationData;
+  rankedProducts: readonly CatalogueProductProfile[];
+}>) {
+  const provisionalPoints: AdminCatalogueOptimizationFrontierPoint[] = [];
+  const evaluationByCount = new Map<number, CatalogueEvaluation>();
+  const evaluateCount = (count: number) => {
+    const boundedCount = Math.max(
+      1,
+      Math.min(input.rankedProducts.length, Math.floor(count))
+    );
+    const existing = evaluationByCount.get(boundedCount);
+
+    if (existing) {
+      return existing;
+    }
+
+    const productIds = input.rankedProducts
+      .slice(0, boundedCount)
+      .map((profile) => profile.candidate.id);
+    const evaluation = evaluateTraceCatalogueSubset({
+      data: input.data,
+      productIds
+    });
+    const point = frontierPoint({
+      baseline: input.baseline,
+      coverageLossTolerancePercent: input.coverageLossTolerancePercent,
+      evaluation,
+      recommended: false
+    });
+
+    evaluationByCount.set(boundedCount, evaluation);
+    provisionalPoints.push(point);
+
+    return evaluation;
+  };
+  let low = 1;
+  let high = input.rankedProducts.length;
+  let firstPassingEvaluation: CatalogueEvaluation | null = null;
+
+  while (low <= high) {
+    const midpoint = Math.floor((low + high) / 2);
+    const evaluation = evaluateCount(midpoint);
+    const passes = withinCatalogueCoverageFloor({
+      baseline: input.baseline,
+      coverageLossTolerancePercent: input.coverageLossTolerancePercent,
+      next: evaluation.summary
+    });
+
+    if (passes) {
+      firstPassingEvaluation = evaluation;
+      high = midpoint - 1;
+    } else {
+      low = midpoint + 1;
+    }
+  }
+
+  const fullUsefulEvaluation = evaluateCount(input.rankedProducts.length);
+
+  return {
+    firstPassingEvaluation,
+    fullUsefulEvaluation,
+    provisionalPoints
+  };
+}
+
 function prunedCatalogueEvaluation(input: Readonly<{
   baseline: AdminCatalogueOptimizationSummary;
   coverageLossTolerancePercent: number;
@@ -2902,7 +2970,9 @@ function prunedTraceCatalogueEvaluation(input: Readonly<{
 function potentialCatalogueCandidate(product: ProductCandidate): ProductCandidate | null {
   if (
     product.status === "ignored" ||
+    product.status === "deleted" ||
     product.brandStatus === "ignored" ||
+    product.brandStatus === "deleted" ||
     product.facts.length < 1
   ) {
     return null;
@@ -3561,53 +3631,24 @@ export function runAdminCatalogueOptimizationFast(input: Readonly<{
     };
   }
 
-  const provisionalPoints: AdminCatalogueOptimizationFrontierPoint[] = [];
-  let firstPassingEvaluation: CatalogueEvaluation | null = null;
-
-  for (let count = 1; count <= rankedProducts.length; count += 1) {
-    const productIds = rankedProducts
-      .slice(0, count)
-      .map((profile) => profile.candidate.id);
-    const evaluation = evaluateTraceCatalogueSubset({ data, productIds });
-    const point = frontierPoint({
-      baseline,
-      coverageLossTolerancePercent,
-      evaluation,
-      recommended: false
-    });
-
-    provisionalPoints.push(point);
-
-    if (!firstPassingEvaluation && point.withinCoverageFloor) {
-      firstPassingEvaluation = evaluation;
-      break;
-    }
-  }
-
-  const fullUsefulProductIds = rankedProducts.map((profile) => profile.candidate.id);
-  const hasFullUsefulPoint = provisionalPoints.some((point) =>
-    point.productIds.length === fullUsefulProductIds.length &&
-    point.productIds.every((id, index) => id === fullUsefulProductIds[index])
-  );
-
-  if (!hasFullUsefulPoint) {
-    provisionalPoints.push(frontierPoint({
-      baseline,
-      coverageLossTolerancePercent,
-      evaluation: evaluateTraceCatalogueSubset({
-        data,
-        productIds: fullUsefulProductIds
-      }),
-      recommended: false
-    }));
-  }
+  const {
+    firstPassingEvaluation: firstPassingTraceEvaluation,
+    fullUsefulEvaluation,
+    provisionalPoints
+  } = firstPassingTraceCatalogueEvaluation({
+    baseline,
+    coverageLossTolerancePercent,
+    data,
+    rankedProducts
+  });
+  let firstPassingEvaluation = firstPassingTraceEvaluation;
 
   if (!firstPassingEvaluation) {
     const fallback = bestFrontierFallback(provisionalPoints);
 
     firstPassingEvaluation = fallback
       ? evaluateTraceCatalogueSubset({ data, productIds: fallback.productIds })
-      : evaluateTraceCatalogueSubset({ data, productIds: fullUsefulProductIds });
+      : fullUsefulEvaluation;
   }
 
   const recommendedEvaluation = prunedTraceCatalogueEvaluation({

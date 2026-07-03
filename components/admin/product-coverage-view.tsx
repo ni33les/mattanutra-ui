@@ -63,6 +63,11 @@ const SIMULATOR_DEMAND_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-demand-profiles:v1";
 const SIMULATOR_OPTIMIZATION_STORAGE_KEY =
   "mattanutra:admin-plan-coverage-catalogue-optimization:v1";
+const SIMULATOR_DURABLE_DB_NAME =
+  "mattanutra-admin-product-coverage";
+const SIMULATOR_DURABLE_STORE_NAME = "entries";
+const SIMULATOR_DURABLE_SIMULATION_PREFIX = "simulation:";
+const SIMULATOR_DURABLE_OPTIMIZATION_PREFIX = "optimization:";
 const SIMULATOR_INPUT_TIMEOUT_MS = 30_000;
 
 type ArchetypeDraft = Readonly<{
@@ -116,7 +121,14 @@ type SavedCatalogueOptimizationState = Readonly<{
   version: 1 | 2;
 }>;
 
+type SimulatorDurableEntry = Readonly<{
+  key: string;
+  savedAt: string;
+  value: unknown;
+}>;
+
 type CatalogueOptimizationCachedProgress = Readonly<{
+  cacheKey: string;
   candidateCount: number;
   current: number;
   savedAt: string;
@@ -126,13 +138,54 @@ type CatalogueOptimizationCachedProgress = Readonly<{
 type SimulatorInputStatus = "error" | "loading" | "ready";
 type SimulatorClearTarget = "all" | "profiles" | "results";
 type CatalogueOptimizationStatus = "blocked" | "idle" | "processing" | "ready";
+type PlanCoverageSimulatorMode = "optimisation" | "simulator";
 type SimulatorProgressDisplay = Readonly<{
   current: number;
   total: number;
 }>;
+type DemandProfileCacheStatus = "answers_hit" | "hit" | "miss";
+type DemandProfileCacheSummary = Readonly<{
+  cachedCount: number;
+  generatedThisRun: number;
+  restoring: boolean;
+}>;
+type DemandProfileCacheBatchResponse = Readonly<{
+  cache?: Readonly<{
+    answerHitSampleIndexes?: readonly number[];
+    demandKey?: string;
+    questionnaireKey?: string;
+    requestedSamples?: number;
+    totalCached?: number;
+  }>;
+  missingSampleIndexes?: readonly number[];
+  profiles?: readonly AdminPlanCoverageDemandProfile[];
+}>;
+type DemandProfileResponse = Readonly<{
+  cache?: Readonly<{
+    demandKey?: string;
+    questionnaireKey?: string;
+    status?: DemandProfileCacheStatus;
+  }>;
+  profile?: AdminPlanCoverageDemandProfile;
+}>;
 
 function numberText(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+function emptyDemandProfileCacheSummary(): DemandProfileCacheSummary {
+  return {
+    cachedCount: 0,
+    generatedThisRun: 0,
+    restoring: false
+  };
+}
+
+function allDemandProfileSampleIndexes() {
+  return Array.from(
+    { length: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES },
+    (_, index) => index
+  );
 }
 
 function percentText(value: number) {
@@ -149,6 +202,19 @@ function durationText(totalSeconds: number) {
   }
 
   return `${minutes}m ${remainder.toString().padStart(2, "0")}s`;
+}
+
+function dateTimeText(value: string, locale: Locale) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time";
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
 }
 
 function compactListText(values: readonly string[]) {
@@ -195,11 +261,17 @@ function normalizedSimulatorCountryCode(value: string | null | undefined) {
   return normalizeProductCountryCode(value) ?? defaultProductCountryCode;
 }
 
-function updateSimulatorCountryUrl(countryCode: string) {
+function updateSimulatorCountryUrl(
+  countryCode: string,
+  mode: PlanCoverageSimulatorMode
+) {
   const url = new URL(window.location.href);
 
   url.searchParams.set("country", countryCode);
-  url.searchParams.set("view", "plan-coverage-simulator");
+  url.searchParams.set(
+    "view",
+    mode === "optimisation" ? "product-optimisation" : "plan-coverage-simulator"
+  );
   window.history.pushState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
 }
 
@@ -212,6 +284,167 @@ function hashText(value: string) {
   }
 
   return (hash >>> 0).toString(36);
+}
+
+function simulatorDurableStorageAvailable() {
+  return typeof window !== "undefined" && "indexedDB" in window;
+}
+
+function openSimulatorDurableDb() {
+  return new Promise<IDBDatabase | null>((resolve) => {
+    if (!simulatorDurableStorageAvailable()) {
+      resolve(null);
+      return;
+    }
+
+    const request = window.indexedDB.open(SIMULATOR_DURABLE_DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(SIMULATOR_DURABLE_STORE_NAME)) {
+        db.createObjectStore(SIMULATOR_DURABLE_STORE_NAME, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+    request.onblocked = () => resolve(null);
+  });
+}
+
+async function writeSimulatorDurableEntry(key: string, value: unknown) {
+  const db = await openSimulatorDurableDb();
+
+  if (!db) {
+    return false;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    const transaction = db.transaction(SIMULATOR_DURABLE_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(SIMULATOR_DURABLE_STORE_NAME);
+
+    store.put({
+      key,
+      savedAt: new Date().toISOString(),
+      value
+    } satisfies SimulatorDurableEntry);
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve(true);
+    };
+    transaction.onerror = () => {
+      db.close();
+      resolve(false);
+    };
+    transaction.onabort = () => {
+      db.close();
+      resolve(false);
+    };
+  });
+}
+
+async function readSimulatorDurableEntry<T>(key: string) {
+  const db = await openSimulatorDurableDb();
+
+  if (!db) {
+    return null;
+  }
+
+  return new Promise<T | null>((resolve) => {
+    const transaction = db.transaction(SIMULATOR_DURABLE_STORE_NAME, "readonly");
+    const store = transaction.objectStore(SIMULATOR_DURABLE_STORE_NAME);
+    const request = store.get(key);
+
+    request.onsuccess = () => {
+      const entry = request.result as SimulatorDurableEntry | undefined;
+
+      db.close();
+      resolve(entry ? entry.value as T : null);
+    };
+    request.onerror = () => {
+      db.close();
+      resolve(null);
+    };
+    transaction.onerror = () => {
+      db.close();
+      resolve(null);
+    };
+  });
+}
+
+async function deleteSimulatorDurableEntry(key: string) {
+  const db = await openSimulatorDurableDb();
+
+  if (!db) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const transaction = db.transaction(SIMULATOR_DURABLE_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(SIMULATOR_DURABLE_STORE_NAME);
+
+    store.delete(key);
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onabort = () => {
+      db.close();
+      resolve();
+    };
+  });
+}
+
+async function deleteSimulatorDurableEntriesByPrefix(prefix: string) {
+  const db = await openSimulatorDurableDb();
+
+  if (!db) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const transaction = db.transaction(SIMULATOR_DURABLE_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(SIMULATOR_DURABLE_STORE_NAME);
+    const request = store.openCursor();
+
+    request.onsuccess = () => {
+      const cursor = request.result;
+
+      if (!cursor) {
+        return;
+      }
+
+      if (String(cursor.key).startsWith(prefix)) {
+        cursor.delete();
+      }
+      cursor.continue();
+    };
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onabort = () => {
+      db.close();
+      resolve();
+    };
+  });
+}
+
+function durableSimulationKey(inputKey: string) {
+  return `${SIMULATOR_DURABLE_SIMULATION_PREFIX}${inputKey}`;
+}
+
+function durableOptimizationKey(cacheKey: string) {
+  return `${SIMULATOR_DURABLE_OPTIMIZATION_PREFIX}${cacheKey}`;
 }
 
 function simulationInputKey(data: AdminPlanCoverageSimulationData) {
@@ -245,21 +478,6 @@ function simulationInputKey(data: AdminPlanCoverageSimulationData) {
         unitPriceAmount: candidate.unitPriceAmount ?? null
       })),
       countryCode: data.input.countryCode,
-      demandProfiles: data.input.demandProfiles.map((profile) => ({
-        archetypeId: profile.archetypeId,
-        clientSex: profile.clientSex,
-        id: profile.id,
-        needs: profile.needs.map((need) => ({
-          displayName: need.displayName,
-          id: need.id,
-          normalizedName: need.normalizedName,
-          sourceId: need.sourceId,
-          targetComparableAmount: need.targetComparableAmount ?? null,
-          targetText: need.targetText ?? null,
-          weight: need.weight
-        })),
-        sampleIndex: profile.sampleIndex
-      })),
       seed: data.input.seed,
       supplementGovernanceHash: data.input.supplementGovernanceHash,
       supplements: data.input.supplements.map((supplement) => ({
@@ -413,13 +631,28 @@ function saveDemandProfiles(
     const savedAt = new Date().toISOString();
     const currentProfiles = savedDemandProfiles(profiles);
     const entries = savedDemandProfileEntriesFromStorage();
+    const existingEntry = entries.find((entry) => entry.demandKey === demandKey);
+    const profilesToSave =
+      existingEntry && existingEntry.profiles.length > currentProfiles.length
+        ? existingEntry.profiles
+        : currentProfiles;
+    const savedAtToSave =
+      existingEntry && existingEntry.profiles.length > currentProfiles.length
+        ? existingEntry.savedAt
+        : savedAt;
+    const retainedEntries = entries
+      .filter((entry) => entry.demandKey !== demandKey)
+      .sort((first, second) =>
+        (second.savedAt ?? "").localeCompare(first.savedAt ?? "")
+      )
+      .slice(0, 2);
     const nextEntries = [
       {
         demandKey,
-        profiles: currentProfiles,
-        savedAt
+        profiles: profilesToSave,
+        savedAt: savedAtToSave
       },
-      ...entries.filter((entry) => entry.demandKey !== demandKey)
+      ...retainedEntries
     ];
 
     window.localStorage.setItem(
@@ -431,6 +664,37 @@ function saveDemandProfiles(
     );
   } catch {
     // Storage availability depends on the browser, but explicit clear remains the app path.
+  }
+}
+
+function pruneSavedDemandProfileEntries(demandKey?: string, maxOtherEntries = 0) {
+  try {
+    const entries = savedDemandProfileEntriesFromStorage();
+    const exact = demandKey
+      ? entries.find((entry) => entry.demandKey === demandKey)
+      : null;
+    const retainedEntries = entries
+      .filter((entry) => entry.demandKey !== exact?.demandKey)
+      .sort((first, second) =>
+        (second.savedAt ?? "").localeCompare(first.savedAt ?? "")
+      )
+      .slice(0, Math.max(0, maxOtherEntries));
+    const nextEntries = exact ? [exact, ...retainedEntries] : retainedEntries;
+
+    if (nextEntries.length < 1) {
+      window.localStorage.removeItem(SIMULATOR_DEMAND_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      SIMULATOR_DEMAND_STORAGE_KEY,
+      JSON.stringify({
+        entries: nextEntries,
+        version: 3
+      } satisfies SavedDemandProfilesState)
+    );
+  } catch {
+    // Pruning is a best-effort recovery path for storage quota pressure.
   }
 }
 
@@ -548,18 +812,87 @@ function savedStateFromRunner(
   };
 }
 
+function normalizedSavedSimulationState(
+  value: unknown,
+  inputKey: string
+): SavedSimulationState | null {
+  const parsed = value as Partial<SavedSimulationState> | null;
+
+  if (
+    !parsed ||
+    parsed.version !== 5 ||
+    parsed.inputKey !== inputKey ||
+    !Array.isArray(parsed.coverageValues) ||
+    !Array.isArray(parsed.costValues) ||
+    !Array.isArray(parsed.productStats) ||
+    !Array.isArray(parsed.sampleTraces) ||
+    !Array.isArray(parsed.unmetCounts) ||
+    typeof parsed.randomState !== "number" ||
+    typeof parsed.sampleSize !== "number"
+  ) {
+    return null;
+  }
+
+  return parsed as SavedSimulationState;
+}
+
+function saveSimulationStateToDurable(state: SavedSimulationState) {
+  void writeSimulatorDurableEntry(
+    durableSimulationKey(state.inputKey),
+    state
+  );
+}
+
+function writeSavedSimulationState(state: SavedSimulationState) {
+  try {
+    window.localStorage.setItem(SIMULATOR_STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function saveSimulationState(
   inputKey: string,
-  runner: AdminPlanCoverageSimulationRunner
+  runner: AdminPlanCoverageSimulationRunner,
+  options?: Readonly<{ demandKey?: string }>
 ) {
+  const nextState = savedStateFromRunner(inputKey, runner);
+
+  saveSimulationStateToDurable(nextState);
+
   try {
-    window.localStorage.setItem(
-      SIMULATOR_STORAGE_KEY,
-      JSON.stringify(savedStateFromRunner(inputKey, runner))
-    );
+    const raw = window.localStorage.getItem(SIMULATOR_STORAGE_KEY);
+
+    if (raw) {
+      const existing = normalizedSavedSimulationState(JSON.parse(raw), inputKey);
+
+      if (
+        existing &&
+        (existing.sampleTraces?.length ?? 0) >= existing.sampleSize &&
+        existing.sampleSize > runner.sampleSize
+      ) {
+        return true;
+      }
+    }
   } catch {
-    // Storage is a convenience; the simulator still works without it.
+    // Ignore unreadable existing storage and try to write the new state.
   }
+
+  if (writeSavedSimulationState(nextState)) {
+    return true;
+  }
+
+  pruneSavedDemandProfileEntries(options?.demandKey);
+  pruneSavedCatalogueOptimizationEntries(0);
+
+  if (writeSavedSimulationState(nextState)) {
+    return true;
+  }
+
+  clearSavedDemandProfiles();
+
+  return writeSavedSimulationState(nextState);
 }
 
 function clearSavedSimulationState() {
@@ -568,6 +901,7 @@ function clearSavedSimulationState() {
   } catch {
     // Ignore private browsing or storage policy failures.
   }
+  void deleteSimulatorDurableEntriesByPrefix(SIMULATOR_DURABLE_SIMULATION_PREFIX);
 }
 
 function catalogueOptimizationStateFromStorage(): SavedCatalogueOptimizationState {
@@ -636,14 +970,54 @@ function loadSavedCatalogueOptimization(cacheKey: string) {
     )?.optimization ?? null;
 }
 
+function normalizedSavedCatalogueOptimization(value: unknown) {
+  return value &&
+    typeof value === "object" &&
+    (value as AdminCatalogueOptimizationData).status === "ready"
+    ? value as AdminCatalogueOptimizationData
+    : null;
+}
+
+async function loadSavedCatalogueOptimizationFromDurable(cacheKey: string) {
+  const saved = await readSimulatorDurableEntry<AdminCatalogueOptimizationData>(
+    durableOptimizationKey(cacheKey)
+  );
+
+  return normalizedSavedCatalogueOptimization(saved);
+}
+
+function catalogueOptimizationMatchesSampleSize(
+  optimization: AdminCatalogueOptimizationData,
+  sampleSize: number
+) {
+  if (optimization.sampleSize !== sampleSize) {
+    return false;
+  }
+
+  return !(
+    optimization.potential?.status === "ready" &&
+    optimization.potential.sampleSize !== sampleSize
+  );
+}
+
 function saveCatalogueOptimization(
   cacheKey: string,
   optimization: AdminCatalogueOptimizationData,
   options?: Readonly<{ baseCacheKey?: string | null }>
 ) {
+  void writeSimulatorDurableEntry(durableOptimizationKey(cacheKey), optimization);
+
   try {
     const state = catalogueOptimizationStateFromStorage();
     const baseCacheKey = options?.baseCacheKey?.trim() || undefined;
+
+    if (baseCacheKey) {
+      void writeSimulatorDurableEntry(
+        durableOptimizationKey(baseCacheKey),
+        optimization
+      );
+    }
+
     const nextEntries = [
       {
         ...(baseCacheKey ? { baseCacheKey } : {}),
@@ -669,10 +1043,37 @@ function saveCatalogueOptimization(
   }
 }
 
+function pruneSavedCatalogueOptimizationEntries(maxEntries = 1) {
+  try {
+    const state = catalogueOptimizationStateFromStorage();
+    const nextEntries = [...state.entries]
+      .sort((first, second) => second.savedAt.localeCompare(first.savedAt))
+      .slice(0, Math.max(0, maxEntries));
+
+    if (nextEntries.length < 1) {
+      window.localStorage.removeItem(SIMULATOR_OPTIMIZATION_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      SIMULATOR_OPTIMIZATION_STORAGE_KEY,
+      JSON.stringify({
+        entries: nextEntries,
+        version: 2
+      } satisfies SavedCatalogueOptimizationState)
+    );
+  } catch {
+    // Pruning is a best-effort recovery path for storage quota pressure.
+  }
+}
+
 function clearSavedCatalogueOptimization(cacheKey?: string) {
   try {
     if (!cacheKey) {
       window.localStorage.removeItem(SIMULATOR_OPTIMIZATION_STORAGE_KEY);
+      void deleteSimulatorDurableEntriesByPrefix(
+        SIMULATOR_DURABLE_OPTIMIZATION_PREFIX
+      );
       return;
     }
 
@@ -690,6 +1091,7 @@ function clearSavedCatalogueOptimization(cacheKey?: string) {
         version: 2
       } satisfies SavedCatalogueOptimizationState)
     );
+    void deleteSimulatorDurableEntry(durableOptimizationKey(cacheKey));
   } catch {
     // Ignore private browsing or storage policy failures.
   }
@@ -703,26 +1105,18 @@ function loadSavedSimulationState(inputKey: string) {
       return null;
     }
 
-    const parsed = JSON.parse(raw) as Partial<SavedSimulationState>;
-
-    if (
-      parsed.version !== 5 ||
-      parsed.inputKey !== inputKey ||
-      !Array.isArray(parsed.coverageValues) ||
-      !Array.isArray(parsed.costValues) ||
-      !Array.isArray(parsed.productStats) ||
-      !Array.isArray(parsed.sampleTraces) ||
-      !Array.isArray(parsed.unmetCounts) ||
-      typeof parsed.randomState !== "number" ||
-      typeof parsed.sampleSize !== "number"
-    ) {
-      return null;
-    }
-
-    return parsed as SavedSimulationState;
+    return normalizedSavedSimulationState(JSON.parse(raw), inputKey);
   } catch {
     return null;
   }
+}
+
+async function loadSavedSimulationStateFromDurable(inputKey: string) {
+  const saved = await readSimulatorDurableEntry<SavedSimulationState>(
+    durableSimulationKey(inputKey)
+  );
+
+  return normalizedSavedSimulationState(saved, inputKey);
 }
 
 function runnerFromSavedState(
@@ -743,8 +1137,25 @@ function runnerFromSavedState(
   runner.generatedAt = saved.generatedAt;
   runner.productStats = new Map(saved.productStats);
   runner.randomState = saved.randomState;
-  runner.sampleSize = Math.max(0, Math.floor(saved.sampleSize));
   runner.sampleTraces = [...(saved.sampleTraces ?? [])];
+  runner.sampleSize = Math.max(
+    0,
+    Math.min(
+      Math.floor(saved.sampleSize),
+      runner.sampleTraces.length,
+      saved.coverageValues.length,
+      saved.costValues.length
+    )
+  );
+  if (runner.sampleTraces.length > runner.sampleSize) {
+    runner.sampleTraces = runner.sampleTraces.slice(0, runner.sampleSize);
+  }
+  if (runner.coverageValues.length > runner.sampleSize) {
+    runner.coverageValues = runner.coverageValues.slice(0, runner.sampleSize);
+  }
+  if (runner.costValues.length > runner.sampleSize) {
+    runner.costValues = runner.costValues.slice(0, runner.sampleSize);
+  }
   runner.unmetCounts = new Map(saved.unmetCounts);
 
   return runner;
@@ -759,6 +1170,20 @@ function initialSimulationData(data: AdminPlanCoverageSimulationData) {
     realCustomerProfiles: data.realCustomerProfiles,
     reviewPriorityProducts: data.reviewPriorityProducts
   });
+}
+
+function simulatorInputReady(data: AdminPlanCoverageSimulationData) {
+  return (
+    data.databaseAvailable &&
+    (
+      data.input.candidates.length > 0 ||
+      data.input.supplements.length > 0 ||
+      data.input.supplementGovernanceHash !== "supplement-governance:unknown" ||
+      data.realCustomerArchetypes.length > 0 ||
+      data.realCustomerProfiles.length > 0 ||
+      data.reviewPriorityProducts.length > 0
+    )
+  );
 }
 
 function productResultRows(
@@ -956,7 +1381,7 @@ function demandProfileHref(accessToken: string) {
   return `/api/admin/product-coverage/demand-profile${suffix ? `?${suffix}` : ""}`;
 }
 
-function catalogueOptimizationHref(accessToken: string) {
+function demandProfilesHref(accessToken: string) {
   const params = new URLSearchParams();
 
   if (accessToken) {
@@ -965,7 +1390,7 @@ function catalogueOptimizationHref(accessToken: string) {
 
   const suffix = params.toString();
 
-  return `/api/admin/product-coverage/catalogue-optimization${suffix ? `?${suffix}` : ""}`;
+  return `/api/admin/product-coverage/demand-profiles${suffix ? `?${suffix}` : ""}`;
 }
 
 function catalogueOptimizationJobHref(accessToken: string) {
@@ -989,6 +1414,7 @@ function catalogueOptimizationJobCachedProgress(
   }
 
   return {
+    cacheKey: job.cacheKey,
     candidateCount: job.candidateCount,
     current: Math.max(0, job.completedSamples),
     savedAt: job.updatedAt,
@@ -1033,12 +1459,22 @@ function catalogueOptimizationProgressFromJob(
   };
 }
 
+function timestampMillis(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function catalogueOptimizationJobStartedAt(
   job: AdminCatalogueOptimizationJobView
 ) {
-  const parsed = Date.parse(job.startedAt ?? job.createdAt);
+  const parsed = timestampMillis(job.startedAt ?? job.createdAt);
 
-  return Number.isFinite(parsed) ? parsed : Date.now();
+  return parsed ?? Date.now();
 }
 
 function stateLabel(state: SupplementCoverageState) {
@@ -1559,6 +1995,270 @@ function CatalogueOptimizationMetric({
   );
 }
 
+function CatalogueOptimizationFrontierGraph({
+  baseline,
+  frontier,
+  optimized
+}: Readonly<{
+  baseline: AdminCatalogueOptimizationData["baseline"];
+  frontier: AdminCatalogueOptimizationData["frontier"];
+  optimized: AdminCatalogueOptimizationData["optimized"];
+}>) {
+  const points = [...frontier]
+    .filter((point) =>
+      Number.isFinite(point.productCount) &&
+      Number.isFinite(point.averageCoveragePercent)
+    )
+    .sort((first, second) => first.productCount - second.productCount);
+  const sweetSpot =
+    points.find((point) => point.recommended) ??
+    points.find((point) => point.productCount === optimized.productCount) ??
+    null;
+
+  if (points.length < 1 || !sweetSpot) {
+    return null;
+  }
+
+  const width = 720;
+  const height = 280;
+  const padding = {
+    bottom: 42,
+    left: 54,
+    right: 22,
+    top: 22
+  };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const maxProducts = Math.max(
+    baseline.productCount,
+    ...points.map((point) => point.productCount),
+    1
+  );
+  const minCoverage = Math.max(
+    0,
+    Math.min(
+      ...points.map((point) => point.averageCoveragePercent),
+      sweetSpot.averageCoveragePercent,
+      baseline.averageCoveragePercent
+    ) - 5
+  );
+  const maxCoverage = Math.min(
+    100,
+    Math.max(
+      ...points.map((point) => point.averageCoveragePercent),
+      sweetSpot.averageCoveragePercent,
+      baseline.averageCoveragePercent
+    ) + 2
+  );
+  const coverageSpan = Math.max(1, maxCoverage - minCoverage);
+  const x = (productCount: number) =>
+    padding.left + (productCount / maxProducts) * plotWidth;
+  const y = (coveragePercent: number) =>
+    padding.top +
+    ((maxCoverage - coveragePercent) / coverageSpan) * plotHeight;
+  const path = points
+    .map((point, index) =>
+      `${index === 0 ? "M" : "L"} ${x(point.productCount).toFixed(1)} ${y(
+        point.averageCoveragePercent
+      ).toFixed(1)}`
+    )
+    .join(" ");
+  const perfectY = y(baseline.averageCoveragePercent);
+  const sweetX = x(sweetSpot.productCount);
+  const sweetY = y(sweetSpot.averageCoveragePercent);
+  const coverageLoss = Math.max(
+    0,
+    baseline.averageCoveragePercent - sweetSpot.averageCoveragePercent
+  );
+
+  return (
+    <div className="mt-4 rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-950">
+            Optimisation frontier
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            The curve shows average coverage as the basket grows toward the
+            full-catalogue baseline.
+          </p>
+        </div>
+        <Badge className="bg-emerald-50 text-emerald-700 ring-emerald-200">
+          Sweet spot · {numberText(sweetSpot.productCount)} products
+        </Badge>
+      </div>
+
+      <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_230px] lg:items-center">
+        <svg
+          aria-label="Optimisation frontier graph"
+          className="h-auto w-full overflow-visible"
+          role="img"
+          viewBox={`0 0 ${width} ${height}`}
+        >
+          <line
+            stroke="#CBD5E1"
+            strokeWidth="1"
+            x1={padding.left}
+            x2={padding.left}
+            y1={padding.top}
+            y2={height - padding.bottom}
+          />
+          <line
+            stroke="#CBD5E1"
+            strokeWidth="1"
+            x1={padding.left}
+            x2={width - padding.right}
+            y1={height - padding.bottom}
+            y2={height - padding.bottom}
+          />
+          <line
+            stroke="#94A3B8"
+            strokeDasharray="5 5"
+            strokeWidth="1.5"
+            x1={padding.left}
+            x2={width - padding.right}
+            y1={perfectY}
+            y2={perfectY}
+          />
+          <text
+            fill="#64748B"
+            fontSize="12"
+            x={padding.left}
+            y={Math.max(12, perfectY - 8)}
+          >
+            Perfect coverage baseline
+          </text>
+          <path
+            d={path}
+            fill="none"
+            stroke="#3A7BD5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="3"
+          />
+          {points.map((point) => (
+            <circle
+              cx={x(point.productCount)}
+              cy={y(point.averageCoveragePercent)}
+              fill={point.withinCoverageFloor ? "#3A7BD5" : "#CBD5E1"}
+              key={`${point.productCount}-${point.averageCoveragePercent}`}
+              r={point.recommended ? 0 : 4}
+            />
+          ))}
+          <line
+            stroke="#168060"
+            strokeDasharray="4 4"
+            strokeWidth="1.5"
+            x1={sweetX}
+            x2={sweetX}
+            y1={sweetY}
+            y2={height - padding.bottom}
+          />
+          <circle
+            cx={sweetX}
+            cy={sweetY}
+            fill="#168060"
+            r="7"
+            stroke="#FFFFFF"
+            strokeWidth="3"
+          />
+          <text
+            fill="#0F513F"
+            fontSize="13"
+            fontWeight="700"
+            x={Math.min(width - 180, sweetX + 12)}
+            y={Math.max(18, sweetY - 10)}
+          >
+            Sweet spot
+          </text>
+          <text fill="#64748B" fontSize="12" x={padding.left} y={height - 10}>
+            Products carried
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            transform={`translate(14 ${height / 2}) rotate(-90)`}
+          >
+            Average coverage
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            textAnchor="middle"
+            x={padding.left}
+            y={height - padding.bottom + 18}
+          >
+            0
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            textAnchor="middle"
+            x={width - padding.right}
+            y={height - padding.bottom + 18}
+          >
+            {numberText(maxProducts)}
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            textAnchor="end"
+            x={padding.left - 8}
+            y={y(minCoverage) + 4}
+          >
+            {percentText(Math.round(minCoverage))}
+          </text>
+          <text
+            fill="#64748B"
+            fontSize="12"
+            textAnchor="end"
+            x={padding.left - 8}
+            y={y(maxCoverage) + 4}
+          >
+            {percentText(Math.round(maxCoverage))}
+          </text>
+        </svg>
+
+        <div className="space-y-3 text-sm">
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Sweet spot
+            </p>
+            <p className="mt-1 text-lg font-bold text-slate-950">
+              {numberText(sweetSpot.productCount)} products
+            </p>
+            <p className="text-slate-500">
+              {percentText(sweetSpot.averageCoveragePercent)} average coverage
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Coverage retained
+            </p>
+            <p className="mt-1 font-bold text-slate-950">
+              {percentText(sweetSpot.retainedAverageCoveragePercent)}
+            </p>
+            <p className="text-slate-500">
+              {percentText(coverageLoss)} below the full-catalogue baseline.
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Reliability
+            </p>
+            <p className="mt-1 font-bold text-slate-950">
+              {percentText(sweetSpot.p10CoveragePercent)} P10 coverage
+            </p>
+            <p className="text-slate-500">
+              {percentText(sweetSpot.percentAbove75)} of plans reach at least 75%.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function readinessBadgeClassName(readiness?: "current" | "needs_review") {
   return readiness === "needs_review"
     ? "bg-amber-50 text-amber-700 ring-amber-200"
@@ -1612,6 +2312,63 @@ function CatalogueCarryProductRow({
   );
 }
 
+function CatalogueOptimizationRemoveRow({
+  accessToken,
+  locale,
+  row
+}: Readonly<{
+  accessToken: string;
+  locale: Locale;
+  row: AdminCatalogueOptimizationData["actionRows"][number];
+}>) {
+  return (
+    <div className="grid gap-3 py-3 lg:grid-cols-[44px_minmax(0,1fr)_120px_120px_120px] lg:items-center">
+      <p className="text-sm font-bold text-slate-400">#{row.rank}</p>
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {row.productId ? (
+            <a
+              className="inline-flex min-w-0 items-center gap-1 truncate text-sm font-semibold text-slate-950 hover:text-[#168060]"
+              href={productDetailHref(row.productId, locale, accessToken)}
+            >
+              <span className="truncate">{row.title}</span>
+              <ArrowTopRightOnSquareIcon className="size-4 shrink-0" aria-hidden={true} />
+            </a>
+          ) : (
+            <p className="truncate text-sm font-semibold text-slate-950">
+              {row.title}
+            </p>
+          )}
+          <Badge className="bg-rose-50 text-rose-700 ring-rose-200">
+            Remove
+          </Badge>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          {row.brandName ?? "No brand"} · {row.reason}
+        </p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Baseline use</p>
+        <p className="font-bold text-slate-950">
+          {numberText(row.affectedPlanCount)}
+        </p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Contribution</p>
+        <p className="font-bold text-slate-950">
+          {percentText(row.coverageImpactPercent)}
+        </p>
+      </div>
+      <div className="text-sm">
+        <p className="text-xs text-slate-500">Price</p>
+        <p className="font-bold text-slate-950">
+          {amountText(row.expectedPriceAmount)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function CatalogueOptimizationReviewToggle({
   checked,
   disabled = false,
@@ -1632,9 +2389,6 @@ function CatalogueOptimizationReviewToggle({
     >
       <span className="text-left">
         <span className="block">Include pending-review products</span>
-        <span className="block text-xs font-medium text-slate-500">
-          Shows the best possible basket if pending products were approved
-        </span>
       </span>
       <input
         checked={checked}
@@ -1669,11 +2423,18 @@ function MinimumCataloguePanel({
   error,
   includeReviewPriorityProducts,
   locale,
+  onRestartQueued,
   onCalculate,
   onIncludeReviewPriorityProductsChange,
+  onRecalculate,
+  onReset,
   onStop,
   optimization,
   optimizationProgress,
+  job,
+  blocked,
+  queued,
+  canRestartQueued,
   optimizationStatus,
   running,
   sampleSize
@@ -1687,16 +2448,42 @@ function MinimumCataloguePanel({
   locale: Locale;
   onCalculate: () => void;
   onIncludeReviewPriorityProductsChange: (checked: boolean) => void;
+  onRecalculate: () => void;
+  onRestartQueued: () => void;
+  onReset: () => void;
   onStop: () => void;
   optimization: AdminCatalogueOptimizationData | null;
   optimizationProgress: AdminCatalogueOptimizationProgress | null;
+  job: AdminCatalogueOptimizationJobView | null;
+  blocked: boolean;
+  queued: boolean;
+  canRestartQueued: boolean;
   optimizationStatus: CatalogueOptimizationStatus;
   running: boolean;
   sampleSize: number;
 }>) {
-  const cachedProgressText = cachedProgress
-    ? `${numberText(cachedProgress.current)} / ${numberText(cachedProgress.total)} profiles completed by shared job`
+  const savedProgressText = cachedProgress
+    ? `${numberText(cachedProgress.current)} / ${numberText(cachedProgress.total)}`
     : null;
+  const progressCurrent = Math.max(
+    0,
+    optimizationProgress?.current ?? cachedProgress?.current ?? 0
+  );
+  const progressTotal = Math.max(
+    1,
+    optimizationProgress?.total ?? cachedProgress?.total ?? sampleSize
+  );
+  const progressPercent = Math.max(
+    0,
+    Math.min(100, (Math.min(progressCurrent, progressTotal) / progressTotal) * 100)
+  );
+  const heartbeatText = blocked
+    ? "Heartbeat stalled"
+    : queued
+      ? "Waiting for heartbeat"
+      : job?.lastWorkerHeartbeatAt
+        ? "Heartbeat active"
+        : "Starting";
 
   if (running) {
     return (
@@ -1719,14 +2506,10 @@ function MinimumCataloguePanel({
             <h2 className="text-lg font-bold text-slate-950">
               Optimum product basket
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Calculating the product basket as a shared background job. You can
-              leave this page and return later.
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="bg-blue-50 text-blue-700 ring-blue-200">
-              Optimizing
+              {blocked ? "Blocked" : queued ? "Queued" : "Optimizing"}
             </Badge>
             <CatalogueOptimizationReviewToggle
               checked={includeReviewPriorityProducts}
@@ -1740,63 +2523,51 @@ function MinimumCataloguePanel({
             >
               Stop
             </button>
+            {queued || blocked ? (
+              <button
+                className={classNames(
+                  "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
+                  canRestartQueued
+                    ? "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                    : "bg-slate-100 text-slate-400 ring-slate-200"
+                )}
+                disabled={!canRestartQueued}
+                onClick={onRestartQueued}
+                type="button"
+              >
+                {blocked ? "Restart blocked job" : "Restart queued job"}
+              </button>
+            ) : null}
           </div>
         </div>
-        <div className="mt-4 rounded-md bg-blue-50 p-3 text-sm text-blue-800 ring-1 ring-blue-100">
-          <p className="font-semibold">
-            {optimizationProgress?.current
-              ? "Still working"
-              : "Preparing the shared job"}
-            {elapsedSeconds !== null ? ` · ${durationText(elapsedSeconds)} elapsed` : ""}
-          </p>
-          <p className="mt-1 text-blue-700">
-            The first update is usually the slowest because the server loads the
-            potential product catalogue before it can save the first chunk. Progress is
-            saved to the shared job after each chunk.
-          </p>
-          {cachedProgressText ? (
-            <p className="mt-1 font-semibold text-blue-900">
-              {cachedProgressText}
-              {cachedProgress?.candidateCount
-                ? ` · ${numberText(cachedProgress.candidateCount)} products considered`
-                : ""}
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-700">
+              {heartbeatText}
+              {elapsedSeconds !== null ? ` · ${durationText(elapsedSeconds)}` : ""}
             </p>
-          ) : null}
-        </div>
-        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+            <p className="text-sm font-semibold text-slate-500">
+              {numberText(Math.min(progressCurrent, progressTotal))} /{" "}
+              {numberText(progressTotal)}
+            </p>
+          </div>
           <div
-            className="h-full animate-pulse rounded-full bg-[#3A7BD5]"
-            style={{
-              width: `${Math.max(
-                8,
-                Math.min(
-                  100,
-                  ((optimizationProgress?.current ?? 0) /
-                    Math.max(1, optimizationProgress?.total ?? 1)) *
-                    100
-                )
-              )}%`
-            }}
-          />
+            aria-label="Optimum product basket progress"
+            aria-valuemax={progressTotal}
+            aria-valuemin={0}
+            aria-valuenow={Math.min(progressCurrent, progressTotal)}
+            className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100"
+            role="progressbar"
+          >
+            <div
+              className={classNames(
+                "h-full rounded-full transition-[width]",
+                blocked ? "bg-amber-500" : "bg-[#1FA77A]"
+              )}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
-        {optimizationProgress ? (
-          <p className="mt-2 text-sm text-slate-500">
-            {optimizationProgress.label}
-            {optimizationProgress.stage === "scoring" ? (
-              <>
-                {" · "}
-                {numberText(optimizationProgress.current)} /{" "}
-                {numberText(optimizationProgress.total)} profiles
-              </>
-            ) : (
-              <>
-                {" · "}
-                {numberText(optimizationProgress.current)} /{" "}
-                {numberText(optimizationProgress.total)}
-              </>
-            )}
-          </p>
-        ) : null}
       </section>
     );
   }
@@ -1818,6 +2589,15 @@ function MinimumCataloguePanel({
               checked={includeReviewPriorityProducts}
               onChange={onIncludeReviewPriorityProductsChange}
             />
+            {error || cachedProgress || job ? (
+              <button
+                className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
+                onClick={onReset}
+                type="button"
+              >
+                Reset
+              </button>
+            ) : null}
             <button
               className={classNames(
                 "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
@@ -1826,20 +2606,19 @@ function MinimumCataloguePanel({
                   : "bg-slate-100 text-slate-400 ring-slate-200"
               )}
               disabled={!canCalculate}
-              onClick={onCalculate}
+              onClick={error ? onRecalculate : onCalculate}
               type="button"
             >
-              Calculate
+              {error ? "Run again" : "Calculate"}
             </button>
           </div>
         </div>
         {error ? (
           <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>
         ) : null}
-        {cachedProgressText ? (
+        {savedProgressText ? (
           <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100">
-            Shared job progress found: {cachedProgressText}. Calculate will show the
-            latest shared result or continue the job.
+            Saved progress: {savedProgressText}. Calculate will continue from there.
           </p>
         ) : null}
       </section>
@@ -1852,12 +2631,19 @@ function MinimumCataloguePanel({
       : null;
   const basketProducts = potentialBasket?.carryProducts ?? optimization.carryProducts;
   const basketBaseline = potentialBasket?.baseline ?? optimization.baseline;
+  const basketFrontier = potentialBasket?.frontier ?? optimization.frontier;
   const basketSummary = potentialBasket?.optimized ?? optimization.optimized;
   const basketProductCount = potentialBasket?.candidateCount ??
     optimization.baseline.productCount;
+  const basketGeneratedAt = potentialBasket?.generatedAt ?? optimization.generatedAt;
+  const basketSampleSize = potentialBasket?.sampleSize ?? optimization.sampleSize;
   const basketNeedsReviewCount = basketProducts.filter((product) =>
     product.readiness === "needs_review"
   ).length;
+  const removeRecommendationRows = optimization.actionRows
+    .filter((row) => row.actionType === "consider_retiring")
+    .slice(0, 8);
+  const sampleCountMismatch = basketSampleSize !== sampleSize;
 
   return (
     <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -1867,15 +2653,42 @@ function MinimumCataloguePanel({
             Optimum product basket
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Products to carry for the highest simulated coverage across{" "}
-            {numberText(sampleSize)} profiles.
+            Products to carry for the highest simulated coverage. Generated{" "}
+            {dateTimeText(basketGeneratedAt, locale)} from{" "}
+            {numberText(basketSampleSize)} profiles.
           </p>
+          {sampleCountMismatch ? (
+            <p className="mt-1 text-xs font-semibold text-amber-700">
+              Current simulator sample count is {numberText(sampleSize)}; recalculate
+              to align this basket with the visible simulation.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CatalogueOptimizationReviewToggle
             checked={includeReviewPriorityProducts}
             onChange={onIncludeReviewPriorityProductsChange}
           />
+          <button
+            className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
+            onClick={onReset}
+            type="button"
+          >
+            Reset
+          </button>
+          <button
+            className={classNames(
+              "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset",
+              canCalculate
+                ? "bg-[#20343A] text-white ring-[#20343A] hover:bg-[#16252A]"
+                : "bg-slate-100 text-slate-400 ring-slate-200"
+            )}
+            disabled={!canCalculate}
+            onClick={onRecalculate}
+            type="button"
+          >
+            Recalculate
+          </button>
           <Badge className="bg-emerald-50 text-emerald-700 ring-emerald-200">
             {numberText(basketSummary.productCount)} products
           </Badge>
@@ -1917,6 +2730,12 @@ function MinimumCataloguePanel({
         />
       </div>
 
+      <CatalogueOptimizationFrontierGraph
+        baseline={basketBaseline}
+        frontier={basketFrontier}
+        optimized={basketSummary}
+      />
+
       <div className="mt-4">
         {basketProducts.length > 0 ? (
           basketProducts.map((row) => (
@@ -1933,6 +2752,35 @@ function MinimumCataloguePanel({
           </p>
         )}
       </div>
+
+      {removeRecommendationRows.length > 0 ? (
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">
+                Remove recommendations
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Products outside the minimum carry set that can be considered for
+                retirement.
+              </p>
+            </div>
+            <Badge className="bg-rose-50 text-rose-700 ring-rose-200">
+              {numberText(removeRecommendationRows.length)} candidates
+            </Badge>
+          </div>
+          <div className="mt-2 divide-y divide-slate-200">
+            {removeRecommendationRows.map((row) => (
+              <CatalogueOptimizationRemoveRow
+                accessToken={accessToken}
+                key={row.id}
+                locale={locale}
+                row={row}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -2225,7 +3073,7 @@ function simulationStatusText(
   hydrated: boolean
 ) {
   if (inputStatus === "loading") {
-    return "Loading";
+    return "Loading catalogue input";
   }
 
   if (inputStatus === "error") {
@@ -2289,30 +3137,28 @@ function convergenceProgressText(data: AdminPlanCoverageSimulationData) {
 }
 
 function simulationProgressDisplay({
-  catalogueOptimizationProgress,
-  catalogueOptimizationStatus,
   demandProfiles,
   generating,
+  optimizingCatalogue,
   running,
   simulationData
 }: Readonly<{
-  catalogueOptimizationProgress: AdminCatalogueOptimizationProgress | null;
-  catalogueOptimizationStatus: CatalogueOptimizationStatus;
   demandProfiles: readonly AdminPlanCoverageDemandProfile[];
   generating: boolean;
+  optimizingCatalogue: boolean;
   running: boolean;
   simulationData: AdminPlanCoverageSimulationData;
 }>): SimulatorProgressDisplay {
-  if (catalogueOptimizationStatus === "processing") {
+  if (optimizingCatalogue) {
     return {
-      current: catalogueOptimizationProgress?.current ?? 0,
-      total: catalogueOptimizationProgress?.total ?? 1
+      current: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
+      total: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES
     };
   }
 
   if (generating && running) {
     return {
-      current: demandProfiles.length,
+      current: Math.max(simulationData.sampleSize, demandProfiles.length),
       total: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES
     };
   }
@@ -2324,8 +3170,8 @@ function simulationProgressDisplay({
 }
 
 function SimulationProgressPanel({
-  catalogueOptimizationProgress,
   catalogueOptimizationStatus,
+  demandCacheSummary,
   demandError,
   generating,
   hydrated,
@@ -2336,8 +3182,8 @@ function SimulationProgressPanel({
   running,
   simulationData
 }: Readonly<{
-  catalogueOptimizationProgress: AdminCatalogueOptimizationProgress | null;
   catalogueOptimizationStatus: CatalogueOptimizationStatus;
+  demandCacheSummary: DemandProfileCacheSummary;
   demandError: string | null;
   generating: boolean;
   hydrated: boolean;
@@ -2349,6 +3195,21 @@ function SimulationProgressPanel({
   simulationData: AdminPlanCoverageSimulationData;
 }>) {
   const optimizingCatalogue = catalogueOptimizationStatus === "processing";
+  const loadingInput = inputStatus === "loading" && !hydrated;
+  const barPercent = loadingInput
+    ? 34
+    : Math.max(0, Math.min(100, progressPercent));
+  const cachedProfileCount = Math.max(
+    0,
+    Math.min(
+      ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
+      demandCacheSummary.cachedCount
+    )
+  );
+  const profileCacheText =
+    cachedProfileCount > 0 || demandCacheSummary.generatedThisRun > 0
+      ? `Profiles: ${numberText(cachedProfileCount)} cached · ${numberText(demandCacheSummary.generatedThisRun)} generated this run`
+      : null;
 
   return (
     <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -2371,24 +3232,240 @@ function SimulationProgressPanel({
         <div
           className={classNames(
             "h-full rounded-full transition-[width]",
-            optimizingCatalogue ? "animate-pulse bg-[#3A7BD5]" : "bg-[#1FA77A]"
+            optimizingCatalogue || loadingInput ? "bg-[#3A7BD5]" : "bg-[#1FA77A]",
+            loadingInput && "admin-progress-indeterminate"
           )}
-          style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
+          style={{
+            width: `${barPercent}%`
+          }}
         />
       </div>
       {demandError ? (
         <p className="mt-2 text-sm font-semibold text-rose-700">{demandError}</p>
       ) : null}
-      {!demandError && optimizingCatalogue && catalogueOptimizationProgress ? (
-        <p className="mt-2 text-sm text-slate-500">
-          {catalogueOptimizationProgress.label}
-        </p>
+      {!demandError && profileCacheText ? (
+        <p className="mt-2 text-sm text-slate-500">{profileCacheText}</p>
       ) : null}
       {!demandError && simulationData.sampleSize > 0 ? (
         <p className="mt-2 text-sm text-slate-500">
           {convergenceProgressText(simulationData)}
         </p>
       ) : null}
+    </section>
+  );
+}
+
+function answerLabelText(key: string) {
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+function answerValueText(value: unknown): string {
+  if (Array.isArray(value)) {
+    const text = value.map(answerValueText).filter(Boolean).join(", ");
+
+    return text || "None";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? numberText(value) : "Unknown";
+  }
+
+  if (typeof value === "string") {
+    return value.trim() || "Blank";
+  }
+
+  if (value && typeof value === "object") {
+    const text = Object.entries(value as Record<string, unknown>)
+      .map(([key, nestedValue]) => `${answerLabelText(key)}: ${answerValueText(nestedValue)}`)
+      .filter(Boolean)
+      .join("; ");
+
+    return text || "Blank";
+  }
+
+  return "Blank";
+}
+
+function clippedAnswerText(value: unknown, maxLength = 150) {
+  const text = answerValueText(value);
+
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
+}
+
+const PROFILE_ANSWER_SUMMARY_KEYS = [
+  "age",
+  "sex",
+  "country",
+  "goals",
+  "symptoms",
+  "sleep",
+  "stress",
+  "medications",
+  "conditions",
+  "diet"
+] as const;
+
+function questionnaireAnswerRows(answers: Record<string, unknown>) {
+  const usedKeys = new Set<string>();
+  const preferredRows = PROFILE_ANSWER_SUMMARY_KEYS.flatMap((key) => {
+    if (!(key in answers)) {
+      return [];
+    }
+
+    usedKeys.add(key);
+    return [[key, answers[key]] as const];
+  });
+  const remainingRows = Object.entries(answers)
+    .filter(([key]) => !usedKeys.has(key))
+    .sort(([first], [second]) => first.localeCompare(second));
+
+  return [...preferredRows, ...remainingRows];
+}
+
+function demandProfileSummaryText(profile: AdminPlanCoverageDemandProfile) {
+  const answerRows = questionnaireAnswerRows(profile.answers);
+  const summary = answerRows
+    .filter(([key]) => PROFILE_ANSWER_SUMMARY_KEYS.includes(
+      key as (typeof PROFILE_ANSWER_SUMMARY_KEYS)[number]
+    ))
+    .slice(0, 4)
+    .map(([key, value]) => `${answerLabelText(key)}: ${clippedAnswerText(value, 54)}`);
+
+  return summary.length > 0 ? summary.join(" · ") : "No questionnaire answers";
+}
+
+function GeneratedDemandProfilesPanel({
+  profiles
+}: Readonly<{
+  profiles: readonly AdminPlanCoverageDemandProfile[];
+}>) {
+  const sortedProfiles = [...profiles].sort(
+    (first, second) => first.sampleIndex - second.sampleIndex
+  );
+
+  return (
+    <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">
+            AI profile questionnaires
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Generated profiles mapped to their AI-filled assessment answers and
+            supplement needs.
+          </p>
+        </div>
+        <Badge>{numberText(sortedProfiles.length)} generated</Badge>
+      </div>
+
+      {sortedProfiles.length > 0 ? (
+        <div className="mt-3 max-h-[520px] overflow-auto rounded-md border border-slate-200">
+          {sortedProfiles.map((profile) => {
+            const answerRows = questionnaireAnswerRows(profile.answers);
+            const needRows = profile.needs.slice(0, 8);
+
+            return (
+              <details
+                className="group border-t border-slate-200 first:border-t-0"
+                key={`${profile.sampleIndex}:${profile.id}`}
+              >
+                <summary className="grid cursor-pointer gap-3 px-3 py-3 text-left hover:bg-slate-50 md:grid-cols-[72px_minmax(0,1fr)_minmax(0,1.4fr)_minmax(160px,0.7fr)] md:items-center">
+                  <span className="text-sm font-bold text-slate-500">
+                    #{numberText(profile.sampleIndex + 1)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {profile.archetypeName}
+                    </span>
+                    <span className="block text-xs text-slate-500">
+                      {profile.clientSex ? sexFilterLabel(profile.clientSex) : "Any sex"}
+                    </span>
+                  </span>
+                  <span className="text-xs font-medium text-slate-600">
+                    {demandProfileSummaryText(profile)}
+                  </span>
+                  <span className="flex flex-wrap gap-1">
+                    {profile.supplementNames.slice(0, 3).map((name) => (
+                      <Badge
+                        className="bg-emerald-50 text-emerald-700 ring-emerald-100"
+                        key={name}
+                      >
+                        {name}
+                      </Badge>
+                    ))}
+                    {profile.supplementNames.length > 3 ? (
+                      <Badge>
+                        +{numberText(profile.supplementNames.length - 3)}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </summary>
+                <div className="grid gap-4 border-t border-slate-100 bg-slate-50 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.75fr)]">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase text-slate-500">
+                      Questionnaire answers
+                    </h3>
+                    <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {answerRows.map(([key, value]) => (
+                        <div
+                          className="rounded-md bg-white p-2 ring-1 ring-slate-200"
+                          key={key}
+                        >
+                          <dt className="text-[11px] font-semibold uppercase text-slate-400">
+                            {answerLabelText(key)}
+                          </dt>
+                          <dd className="mt-1 break-words text-xs font-medium text-slate-700">
+                            {clippedAnswerText(value, 240)}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase text-slate-500">
+                      Supplement needs
+                    </h3>
+                    <div className="mt-2 divide-y divide-slate-200 rounded-md bg-white ring-1 ring-slate-200">
+                      {needRows.map((need) => (
+                        <div
+                          className="px-3 py-2 text-xs"
+                          key={`${need.id}:${need.displayName}`}
+                        >
+                          <p className="font-semibold text-slate-950">
+                            {need.displayName}
+                          </p>
+                          <p className="mt-1 text-slate-500">
+                            {need.category} · {need.targetText ?? "No target dose"} ·
+                            weight {numberText(need.weight)}
+                          </p>
+                        </div>
+                      ))}
+                      {profile.needs.length > needRows.length ? (
+                        <p className="px-3 py-2 text-xs font-semibold text-slate-500">
+                          +{numberText(profile.needs.length - needRows.length)} more needs
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-500 ring-1 ring-slate-200">
+          No AI questionnaires generated yet.
+        </p>
+      )}
     </section>
   );
 }
@@ -2869,19 +3946,23 @@ export function AdminPlanCoverageSimulatorView({
   accessToken,
   data,
   locale,
+  mode = "simulator",
   range
 }: Readonly<{
   accessToken: string;
   data: AdminPlanCoverageSimulationData;
   locale: Locale;
+  mode?: PlanCoverageSimulatorMode;
   range: AdminDashboardRange;
 }>) {
+  const productOptimisationMode = mode === "optimisation";
+  const initialInputReady = simulatorInputReady(data);
   const [selectedCountryCode, setSelectedCountryCode] = useState(() =>
     normalizedSimulatorCountryCode(data.countryCode)
   );
   const [inputData, setInputData] = useState(data);
   const [inputStatus, setInputStatus] =
-    useState<SimulatorInputStatus>("loading");
+    useState<SimulatorInputStatus>(initialInputReady ? "ready" : "loading");
   const [inputError, setInputError] = useState<string | null>(null);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [syntheticArchetypes, setSyntheticArchetypes] = useState(
@@ -2893,6 +3974,9 @@ export function AdminPlanCoverageSimulatorView({
     AdminPlanCoverageDemandProfile[]
   >([]);
   const [demandGenerating, setDemandGenerating] = useState(false);
+  const [demandCacheSummary, setDemandCacheSummary] = useState(
+    emptyDemandProfileCacheSummary
+  );
   const [demandError, setDemandError] = useState<string | null>(null);
   const [inputRefreshNonce, setInputRefreshNonce] = useState(0);
   const activeArchetypes = useMemo(
@@ -2919,7 +4003,7 @@ export function AdminPlanCoverageSimulatorView({
   const [simulationData, setSimulationData] = useState(() =>
     initialSimulationData(data)
   );
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated] = useState(initialInputReady);
   const [running, setRunning] = useState(false);
   const [catalogueOptimization, setCatalogueOptimization] =
     useState<AdminCatalogueOptimizationData | null>(null);
@@ -2939,6 +4023,8 @@ export function AdminPlanCoverageSimulatorView({
     useState<CatalogueOptimizationCachedProgress | null>(null);
   const [catalogueOptimizationJob, setCatalogueOptimizationJob] =
     useState<AdminCatalogueOptimizationJobView | null>(null);
+  const [catalogueOptimizationResetKey, setCatalogueOptimizationResetKey] =
+    useState<string | null>(null);
   const [
     includeReviewPriorityProductsInCatalogueOptimization,
     setIncludeReviewPriorityProductsInCatalogueOptimization
@@ -2947,11 +4033,13 @@ export function AdminPlanCoverageSimulatorView({
     null
   );
   const runnerRef = useRef<AdminPlanCoverageSimulationRunner | null>(null);
+  const runnerInputKeyRef = useRef<string | null>(null);
+  const simulationDataRef = useRef(simulationData);
   const inputStatusRef = useRef<SimulatorInputStatus>("loading");
-  const catalogueOptimizationControllerRef = useRef<AbortController | null>(null);
   const runTokenRef = useRef(0);
   const previousDemandKeyRef = useRef<string | null>(null);
   const runningRef = useRef(false);
+  const catalogueOptimizationResetKeyRef = useRef<string | null>(null);
   const catalogueReviewProductsKey = useMemo(
     () =>
       hashText(
@@ -2980,8 +4068,11 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationKey === catalogueOptimizationRunKey
       ? catalogueOptimization
       : null;
+  const matchedCatalogueOptimizationJob =
+    catalogueOptimizationJob?.cacheKey === catalogueOptimizationRunKey
+      ? catalogueOptimizationJob
+      : null;
   const currentCatalogueOptimizationStatus =
-    catalogueOptimizationStatus === "processing" ||
     catalogueOptimizationKey === catalogueOptimizationRunKey
       ? catalogueOptimizationStatus
       : "idle";
@@ -2990,12 +4081,14 @@ export function AdminPlanCoverageSimulatorView({
       ? catalogueOptimizationProgress
       : null;
   const currentCatalogueOptimizationCachedProgress =
-    includeReviewPriorityProductsInCatalogueOptimization
-      ? catalogueOptimizationJobCachedProgress(
-          catalogueOptimizationJob,
-          simulationData.sampleTraces.length
-        ) ?? catalogueOptimizationCachedProgress
-      : catalogueOptimizationCachedProgress;
+    catalogueOptimizationJobCachedProgress(
+      matchedCatalogueOptimizationJob,
+      simulationData.sampleTraces.length
+    ) ?? (
+      catalogueOptimizationCachedProgress?.cacheKey === catalogueOptimizationRunKey
+        ? catalogueOptimizationCachedProgress
+        : null
+    );
   const currentCatalogueOptimizationElapsedSeconds =
     currentCatalogueOptimizationStatus === "processing" &&
     catalogueOptimizationStartedAt !== null
@@ -3003,11 +4096,63 @@ export function AdminPlanCoverageSimulatorView({
           (catalogueOptimizationHeartbeat - catalogueOptimizationStartedAt) / 1000
         )
       : null;
+  const currentCatalogueOptimizationJobMatches =
+    matchedCatalogueOptimizationJob !== null;
+  const currentCatalogueOptimizationLeaseUntil =
+    timestampMillis(
+      matchedCatalogueOptimizationJob?.reservationLeaseUntil ??
+        matchedCatalogueOptimizationJob?.leaseUntil
+    );
+  const currentCatalogueOptimizationLastHeartbeat =
+    timestampMillis(matchedCatalogueOptimizationJob?.lastWorkerHeartbeatAt);
+  const currentCatalogueOptimizationHasReservation =
+    Boolean(matchedCatalogueOptimizationJob?.reservationId);
+  const currentCatalogueOptimizationLeaseExpired =
+    currentCatalogueOptimizationHasReservation &&
+    (
+      currentCatalogueOptimizationLeaseUntil === null ||
+      currentCatalogueOptimizationLeaseUntil <= catalogueOptimizationHeartbeat
+    );
+  const currentCatalogueOptimizationHeartbeatStale =
+    currentCatalogueOptimizationHasReservation &&
+    (
+      currentCatalogueOptimizationLastHeartbeat === null ||
+      catalogueOptimizationHeartbeat - currentCatalogueOptimizationLastHeartbeat >
+        120_000
+    );
+  const currentCatalogueOptimizationQueued =
+    currentCatalogueOptimizationStatus === "processing" &&
+    currentCatalogueOptimizationJobMatches &&
+    matchedCatalogueOptimizationJob?.status === "queued" &&
+    !currentCatalogueOptimizationHasReservation;
+  const currentCatalogueOptimizationBlocked =
+    currentCatalogueOptimizationStatus === "processing" &&
+    currentCatalogueOptimizationJobMatches &&
+    (
+      (
+        matchedCatalogueOptimizationJob?.status === "queued" &&
+        currentCatalogueOptimizationHasReservation
+      ) ||
+      (
+        matchedCatalogueOptimizationJob?.status === "running" &&
+        (
+          currentCatalogueOptimizationLeaseExpired ||
+          currentCatalogueOptimizationHeartbeatStale
+        )
+      )
+    );
+  const canRestartQueuedCatalogueOptimization =
+    (currentCatalogueOptimizationQueued || currentCatalogueOptimizationBlocked) &&
+    (currentCatalogueOptimizationElapsedSeconds ?? 0) >= 10;
+  const productOptimisationSimulationComplete =
+    simulationData.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES &&
+    simulationData.sampleTraces.length >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES;
   const progressDisplay = simulationProgressDisplay({
-    catalogueOptimizationProgress: currentCatalogueOptimizationProgress,
-    catalogueOptimizationStatus: currentCatalogueOptimizationStatus,
     demandProfiles,
     generating: demandGenerating,
+    optimizingCatalogue:
+      productOptimisationMode &&
+      currentCatalogueOptimizationStatus === "processing",
     running,
     simulationData
   });
@@ -3068,10 +4213,57 @@ export function AdminPlanCoverageSimulatorView({
     [simulationData.unmetSupplements]
   );
 
+  const preserveLatestSimulationState = useCallback((
+    nextData: AdminPlanCoverageSimulationData,
+    nextRunner: AdminPlanCoverageSimulationRunner
+  ) => {
+    simulationDataRef.current = nextData;
+    runnerRef.current = nextRunner;
+    runnerInputKeyRef.current = inputKey;
+    setSimulationData(nextData);
+  }, [inputKey]);
+
+  const restoreSavedSimulationIfNewer = useCallback((
+    minimumSampleSize = 0
+  ) => {
+    const currentRunner = runnerRef.current;
+    const currentSampleSize = Math.max(
+      simulationDataRef.current.sampleSize,
+      currentRunner && runnerInputKeyRef.current === inputKey
+        ? currentRunner.sampleSize
+        : 0
+    );
+    const savedState = loadSavedSimulationState(inputKey);
+
+    if (!savedState) {
+      return currentSampleSize;
+    }
+
+    const savedRunner = runnerFromSavedState(activeInputData, savedState);
+
+    if (
+      savedRunner.sampleSize <= currentSampleSize ||
+      savedRunner.sampleSize < minimumSampleSize
+    ) {
+      return currentSampleSize;
+    }
+
+    preserveLatestSimulationState(
+      adminPlanCoverageSimulationDataFromRunner(savedRunner),
+      savedRunner
+    );
+
+    return savedRunner.sampleSize;
+  }, [activeInputData, inputKey, preserveLatestSimulationState]);
+
   const applyCatalogueOptimizationJob = useCallback((
     job: AdminCatalogueOptimizationJobView | null,
     requestKey: string
   ) => {
+    if (catalogueOptimizationResetKeyRef.current === requestKey) {
+      return;
+    }
+
     setCatalogueOptimizationJob(job);
 
     if (!job) {
@@ -3082,12 +4274,39 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationKey(requestKey);
     setCatalogueOptimizationCachedProgress(
       catalogueOptimizationJobCachedProgress(
-        job,
+        job.cacheKey === requestKey ? job : null,
         simulationData.sampleTraces.length
       )
     );
 
     if (job.status === "completed" && job.optimization) {
+      const visibleSampleSize = restoreSavedSimulationIfNewer(
+        job.optimization.sampleSize
+      );
+
+      if (
+        !catalogueOptimizationMatchesSampleSize(
+          job.optimization,
+          visibleSampleSize
+        )
+      ) {
+        setCatalogueOptimization(null);
+        setCatalogueOptimizationError(
+          "The saved optimum basket does not match the visible simulation. Run it again to replace the stale result."
+        );
+        setCatalogueOptimizationProgress(null);
+        setCatalogueOptimizationStartedAt(null);
+        setCatalogueOptimizationStatus("idle");
+        return;
+      }
+
+      if (
+        runnerRef.current &&
+        runnerInputKeyRef.current === inputKey &&
+        runnerRef.current.sampleSize >= visibleSampleSize
+      ) {
+        saveSimulationState(inputKey, runnerRef.current, { demandKey });
+      }
       saveCatalogueOptimization(requestKey, job.optimization);
       setCatalogueOptimization(job.optimization);
       setCatalogueOptimizationError(null);
@@ -3128,17 +4347,26 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationStartedAt(catalogueOptimizationJobStartedAt(job));
     setCatalogueOptimizationHeartbeat(Date.now());
     setCatalogueOptimizationStatus("processing");
-  }, [simulationData.sampleTraces.length]);
+  }, [
+    demandKey,
+    inputKey,
+    restoreSavedSimulationIfNewer,
+    simulationData.sampleTraces.length
+  ]);
 
   const requestCatalogueOptimizationJob = useCallback(async (
     action: "cancel" | "start" | "status",
-    requestKey: string
+    requestKey: string,
+    options?: Readonly<{ forceRestart?: boolean }>
   ) => {
     const response = await fetch(catalogueOptimizationJobUrl, {
       body: JSON.stringify({
         accessToken,
         action,
         cacheKey: requestKey,
+        ...(action === "start" && options?.forceRestart
+          ? { forceRestart: true }
+          : {}),
         includePendingReviewProducts:
           includeReviewPriorityProductsInCatalogueOptimization,
         ...(action === "start" ? { simulationData } : {})
@@ -3175,6 +4403,10 @@ export function AdminPlanCoverageSimulatorView({
   }, [demandGenerating, running]);
 
   useEffect(() => {
+    simulationDataRef.current = simulationData;
+  }, [simulationData]);
+
+  useEffect(() => {
     if (
       currentCatalogueOptimizationStatus !== "processing" ||
       catalogueOptimizationStartedAt === null
@@ -3196,31 +4428,56 @@ export function AdminPlanCoverageSimulatorView({
     const timeoutId = window.setTimeout(() => {
       if (
         cancelled ||
+        !productOptimisationMode ||
         includeReviewPriorityProductsInCatalogueOptimization ||
         running ||
         demandGenerating ||
         catalogueOptimizationStatus === "processing" ||
-        simulationData.sampleSize < 1 ||
-        simulationData.sampleTraces.length < 1 ||
+        !productOptimisationSimulationComplete ||
+        catalogueOptimizationResetKey === catalogueOptimizationRunKey ||
         catalogueOptimizationKey === catalogueOptimizationRunKey
       ) {
         return;
       }
 
+      const applySavedOptimization = (
+        savedOptimization: AdminCatalogueOptimizationData
+      ) => {
+        if (
+          !catalogueOptimizationMatchesSampleSize(
+            savedOptimization,
+            simulationData.sampleSize
+          )
+        ) {
+          clearSavedCatalogueOptimization(catalogueOptimizationRunKey);
+          return;
+        }
+
+        setCatalogueOptimization(savedOptimization);
+        setCatalogueOptimizationError(null);
+        setCatalogueOptimizationKey(catalogueOptimizationRunKey);
+        setCatalogueOptimizationProgress(null);
+        setCatalogueOptimizationStartedAt(null);
+        setCatalogueOptimizationStatus("ready");
+      };
       const savedOptimization = loadSavedCatalogueOptimization(
         catalogueOptimizationRunKey
       );
 
-      if (!savedOptimization) {
+      if (savedOptimization) {
+        applySavedOptimization(savedOptimization);
         return;
       }
 
-      setCatalogueOptimization(savedOptimization);
-      setCatalogueOptimizationError(null);
-      setCatalogueOptimizationKey(catalogueOptimizationRunKey);
-      setCatalogueOptimizationProgress(null);
-      setCatalogueOptimizationStartedAt(null);
-      setCatalogueOptimizationStatus("ready");
+      void loadSavedCatalogueOptimizationFromDurable(catalogueOptimizationRunKey)
+        .then((durableOptimization) => {
+          if (!cancelled && durableOptimization) {
+            applySavedOptimization(durableOptimization);
+          }
+        })
+        .catch(() => {
+          // Durable restore is a fallback; the shared job status poll still runs.
+        });
     }, 0);
 
     return () => {
@@ -3229,10 +4486,13 @@ export function AdminPlanCoverageSimulatorView({
     };
   }, [
     catalogueOptimizationKey,
+    catalogueOptimizationResetKey,
     catalogueOptimizationRunKey,
     catalogueOptimizationStatus,
     demandGenerating,
     includeReviewPriorityProductsInCatalogueOptimization,
+    productOptimisationMode,
+    productOptimisationSimulationComplete,
     running,
     simulationData.sampleSize,
     simulationData.sampleTraces.length
@@ -3243,11 +4503,11 @@ export function AdminPlanCoverageSimulatorView({
     const timeoutId = window.setTimeout(() => {
       if (
         cancelled ||
-        !includeReviewPriorityProductsInCatalogueOptimization ||
+        !productOptimisationMode ||
         running ||
         demandGenerating ||
-        simulationData.sampleSize < 1 ||
-        simulationData.sampleTraces.length < 1
+        !productOptimisationSimulationComplete ||
+        catalogueOptimizationResetKey === catalogueOptimizationRunKey
       ) {
         return;
       }
@@ -3271,9 +4531,11 @@ export function AdminPlanCoverageSimulatorView({
     };
   }, [
     applyCatalogueOptimizationJob,
+    catalogueOptimizationResetKey,
     catalogueOptimizationRunKey,
     demandGenerating,
-    includeReviewPriorityProductsInCatalogueOptimization,
+    productOptimisationMode,
+    productOptimisationSimulationComplete,
     requestCatalogueOptimizationJob,
     running,
     simulationData.sampleSize,
@@ -3282,8 +4544,8 @@ export function AdminPlanCoverageSimulatorView({
 
   useEffect(() => {
     if (
-      !includeReviewPriorityProductsInCatalogueOptimization ||
       currentCatalogueOptimizationStatus !== "processing" ||
+      !productOptimisationMode ||
       catalogueOptimizationKey !== catalogueOptimizationRunKey
     ) {
       return;
@@ -3318,7 +4580,7 @@ export function AdminPlanCoverageSimulatorView({
     catalogueOptimizationKey,
     catalogueOptimizationRunKey,
     currentCatalogueOptimizationStatus,
-    includeReviewPriorityProductsInCatalogueOptimization,
+    productOptimisationMode,
     requestCatalogueOptimizationJob
   ]);
 
@@ -3382,10 +4644,11 @@ export function AdminPlanCoverageSimulatorView({
         requestTimedOut = true;
         controller?.abort();
       }, SIMULATOR_INPUT_TIMEOUT_MS);
-      setInputStatus("loading");
-      setInputError(null);
+      const sameSelectedCountry =
+        normalizedSimulatorCountryCode(data.countryCode) === selectedCountryCode;
+      const shouldReplaceVisibleData = !hydrated || !sameSelectedCountry;
       const loadingData =
-        normalizedSimulatorCountryCode(data.countryCode) === selectedCountryCode
+        sameSelectedCountry
           ? data
           : emptyAdminPlanCoverageSimulationData({
               countryCode: selectedCountryCode,
@@ -3393,11 +4656,24 @@ export function AdminPlanCoverageSimulatorView({
               seed: data.seed
             });
 
-      setInputData(loadingData);
-      setSimulationData(initialSimulationData(loadingData));
-      setHydrated(false);
+      if (shouldReplaceVisibleData) {
+        setInputStatus("loading");
+      }
+      setInputError(null);
+
+      if (shouldReplaceVisibleData) {
+        setInputData(loadingData);
+        const loadingSimulationData = initialSimulationData(loadingData);
+
+        simulationDataRef.current = loadingSimulationData;
+        setSimulationData(loadingSimulationData);
+        runnerRef.current = null;
+        runnerInputKeyRef.current = null;
+      }
+      setHydrated((current) =>
+        shouldReplaceVisibleData ? current && sameSelectedCountry : current
+      );
       setRunning(false);
-      runnerRef.current = null;
 
       fetch(simulatorInputHref(selectedCountryCode, accessToken, range), {
         cache: "no-store",
@@ -3434,17 +4710,21 @@ export function AdminPlanCoverageSimulatorView({
           if (requestTimeoutId !== null) {
             window.clearTimeout(requestTimeoutId);
           }
-          setInputData(emptyAdminPlanCoverageSimulationData({
-            countryCode: selectedCountryCode,
-            databaseAvailable: false,
-            seed: data.seed
-          }));
+          if (shouldReplaceVisibleData) {
+            setInputData(emptyAdminPlanCoverageSimulationData({
+              countryCode: selectedCountryCode,
+              databaseAvailable: false,
+              seed: data.seed
+            }));
+            setInputStatus("error");
+          } else {
+            setInputStatus("ready");
+          }
           setInputError(
             requestTimedOut
               ? "Simulator input request timed out. Try again."
               : simulatorInputErrorMessage(error)
           );
-          setInputStatus("error");
           setHydrated(true);
         });
     }, 0);
@@ -3457,7 +4737,66 @@ export function AdminPlanCoverageSimulatorView({
       controller?.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [accessToken, data, inputRefreshNonce, range, selectedCountryCode]);
+  }, [accessToken, data, hydrated, inputRefreshNonce, range, selectedCountryCode]);
+
+  const fetchCachedDemandProfilesForSamples = useCallback(
+    async (sampleIndexes?: readonly number[]) => {
+      const response = await fetch(demandProfilesHref(accessToken), {
+        body: JSON.stringify({
+          accessToken,
+          archetypes: activeArchetypes,
+          countryCode: activeInputData.countryCode,
+          locale,
+          sampleIndexes: sampleIndexes ?? allDemandProfileSampleIndexes(),
+          seed: activeInputData.seed,
+          supplementGovernanceHash:
+            activeInputData.input.supplementGovernanceHash,
+          supplements: activeInputData.input.supplements
+        }),
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+
+        throw new Error(
+          payload.error ?? `Demand profile cache request failed (${response.status})`
+        );
+      }
+
+      const payload = (await response.json()) as DemandProfileCacheBatchResponse;
+      const profiles = sanitizeDemandProfilesForSimulationSupplements(
+        normalizeDemandProfiles(payload.profiles),
+        activeInputData.input.supplements
+      );
+
+      return {
+        answerHitSampleIndexes: [
+          ...(payload.cache?.answerHitSampleIndexes ?? [])
+        ],
+        missingSampleIndexes: [...(payload.missingSampleIndexes ?? [])],
+        profiles,
+        totalCached: payload.cache?.totalCached ?? profiles.length
+      };
+    },
+    [
+      accessToken,
+      activeArchetypes,
+      activeInputData.countryCode,
+      activeInputData.input.supplementGovernanceHash,
+      activeInputData.input.supplements,
+      activeInputData.seed,
+      locale
+    ]
+  );
 
   useEffect(() => {
     if (inputStatus !== "ready") {
@@ -3480,6 +4819,11 @@ export function AdminPlanCoverageSimulatorView({
       setDemandGenerating(false);
       setDemandError(null);
       setDemandProfiles(savedProfiles);
+      setDemandCacheSummary({
+        cachedCount: savedProfiles.length,
+        generatedThisRun: 0,
+        restoring: true
+      });
 
       if (savedProfiles.length > 0) {
         saveDemandProfiles(demandKey, savedProfiles);
@@ -3488,14 +4832,70 @@ export function AdminPlanCoverageSimulatorView({
       if (previousDemandKey !== null && previousDemandKey !== demandKey) {
         clearSavedSimulationState();
         runnerRef.current = null;
+        runnerInputKeyRef.current = null;
       }
+
+      void fetchCachedDemandProfilesForSamples()
+        .then((cacheResult) => {
+          if (cancelled) {
+            return;
+          }
+
+          const mergedProfiles = sanitizeDemandProfilesForSimulationSupplements(
+            [
+              ...savedProfiles,
+              ...cacheResult.profiles.filter(
+                (profile) =>
+                  !savedProfiles.some(
+                    (savedProfile) =>
+                      savedProfile.sampleIndex === profile.sampleIndex
+                  )
+              )
+            ],
+            inputData.input.supplements
+          );
+
+          setDemandProfiles(mergedProfiles);
+          setDemandCacheSummary({
+            cachedCount: Math.max(
+              mergedProfiles.length,
+              cacheResult.totalCached
+            ),
+            generatedThisRun: 0,
+            restoring: false
+          });
+
+          if (mergedProfiles.length > 0) {
+            saveDemandProfiles(demandKey, mergedProfiles);
+          }
+        })
+        .catch((error) => {
+          if (cancelled) {
+            return;
+          }
+
+          setDemandCacheSummary((current) => ({
+            ...current,
+            restoring: false
+          }));
+          setDemandError(
+            error instanceof Error
+              ? error.message
+              : "Unable to restore cached demand profiles"
+          );
+        });
     }, 0);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [demandKey, inputData.input.supplements, inputStatus]);
+  }, [
+    demandKey,
+    fetchCachedDemandProfilesForSamples,
+    inputData.input.supplements,
+    inputStatus
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3509,7 +4909,9 @@ export function AdminPlanCoverageSimulatorView({
       }
 
       if (inputStatus === "loading") {
-        runnerRef.current = null;
+        if (!hydrated) {
+          runnerRef.current = null;
+        }
         setRunning(false);
         return;
       }
@@ -3523,21 +4925,88 @@ export function AdminPlanCoverageSimulatorView({
       }
 
       const savedState = loadSavedSimulationState(inputKey);
+      const currentRunner = runnerRef.current;
+      const currentSampleSize =
+        runnerInputKeyRef.current === inputKey && currentRunner
+          ? Math.max(simulationDataRef.current.sampleSize, currentRunner.sampleSize)
+          : simulationDataRef.current.sampleSize;
+      const restoreDurableSimulationState = () => {
+        void loadSavedSimulationStateFromDurable(inputKey)
+          .then((durableState) => {
+            if (cancelled || !durableState || runningRef.current) {
+              return;
+            }
+
+            const durableRunner = runnerFromSavedState(
+              activeInputData,
+              durableState
+            );
+            const latestRunner = runnerRef.current;
+            const latestSampleSize =
+              runnerInputKeyRef.current === inputKey && latestRunner
+                ? Math.max(
+                    simulationDataRef.current.sampleSize,
+                    latestRunner.sampleSize
+                  )
+                : simulationDataRef.current.sampleSize;
+
+            if (durableRunner.sampleSize <= latestSampleSize) {
+              return;
+            }
+
+            preserveLatestSimulationState(
+              adminPlanCoverageSimulationDataFromRunner(durableRunner),
+              durableRunner
+            );
+            writeSavedSimulationState(durableState);
+            setHydrated(true);
+          })
+          .catch(() => {
+            // Durable restore is a fallback; local state remains usable without it.
+          });
+      };
 
       if (savedState) {
         const savedRunner = runnerFromSavedState(activeInputData, savedState);
-        runnerRef.current = savedRunner;
-        setSimulationData(adminPlanCoverageSimulationDataFromRunner(savedRunner));
+
+        if (
+          runnerInputKeyRef.current === inputKey &&
+          currentRunner &&
+          currentSampleSize > savedRunner.sampleSize
+        ) {
+          preserveLatestSimulationState(
+            adminPlanCoverageSimulationDataFromRunner(currentRunner),
+            currentRunner
+          );
+        } else {
+          preserveLatestSimulationState(
+            adminPlanCoverageSimulationDataFromRunner(savedRunner),
+            savedRunner
+          );
+        }
       } else {
-        runnerRef.current = createAdminPlanCoverageSimulationRunner({
+        const runner = createAdminPlanCoverageSimulationRunner({
           ...activeInputData.input,
           reviewPriorityProducts: activeInputData.reviewPriorityProducts
         });
-        setSimulationData(initialSimulationData(activeInputData));
+
+        if (
+          runnerInputKeyRef.current === inputKey &&
+          currentRunner &&
+          currentSampleSize > 0
+        ) {
+          preserveLatestSimulationState(
+            adminPlanCoverageSimulationDataFromRunner(currentRunner),
+            currentRunner
+          );
+        } else {
+          preserveLatestSimulationState(initialSimulationData(activeInputData), runner);
+        }
       }
 
       setRunning(false);
       setHydrated(true);
+      restoreDurableSimulationState();
     }, 0);
 
     return () => {
@@ -3547,8 +5016,10 @@ export function AdminPlanCoverageSimulatorView({
   }, [
     activeInputData,
     demandGenerating,
+    hydrated,
     inputKey,
     inputStatus,
+    preserveLatestSimulationState,
     running
   ]);
 
@@ -3566,7 +5037,34 @@ export function AdminPlanCoverageSimulatorView({
     sampleIndex: number,
     runToken: number
   ) {
-    setDemandGenerating(true);
+    const cacheResult = await fetchCachedDemandProfilesForSamples([sampleIndex]);
+    const cachedProfile = cacheResult.profiles.find(
+      (profile) => profile.sampleIndex === sampleIndex
+    );
+
+    if (runToken !== runTokenRef.current) {
+      return undefined;
+    }
+
+    if (cachedProfile) {
+      setDemandCacheSummary((current) => ({
+        ...current,
+        cachedCount: Math.max(
+          current.cachedCount,
+          cacheResult.totalCached,
+          demandProfiles.length,
+          sampleIndex + 1
+        ),
+        restoring: false
+      }));
+
+      return cachedProfile;
+    }
+
+    const questionnaireAnswersCached =
+      cacheResult.answerHitSampleIndexes.includes(sampleIndex);
+
+    setDemandGenerating(!questionnaireAnswersCached);
 
     const response = await fetch(demandProfileHref(accessToken), {
       body: JSON.stringify({
@@ -3575,7 +5073,10 @@ export function AdminPlanCoverageSimulatorView({
         countryCode: activeInputData.countryCode,
         locale,
         sampleIndex,
-        seed: activeInputData.seed
+        seed: activeInputData.seed,
+        supplementGovernanceHash:
+          activeInputData.input.supplementGovernanceHash,
+        supplements: activeInputData.input.supplements
       }),
       cache: "no-store",
       credentials: "same-origin",
@@ -3600,13 +5101,20 @@ export function AdminPlanCoverageSimulatorView({
       );
     }
 
-    const payload = (await response.json()) as {
-      profile?: AdminPlanCoverageDemandProfile;
-    };
+    const payload = (await response.json()) as DemandProfileResponse;
 
     if (!payload.profile) {
       throw new Error("Demand profile response did not include a profile");
     }
+
+    setDemandCacheSummary((current) => ({
+      cachedCount: Math.max(current.cachedCount, sampleIndex + 1),
+      generatedThisRun:
+        payload.cache?.status === "miss"
+          ? current.generatedThisRun + 1
+          : current.generatedThisRun,
+      restoring: false
+    }));
 
     return payload.profile;
   }
@@ -3624,6 +5132,7 @@ export function AdminPlanCoverageSimulatorView({
 
     runner = runnerWithDemandProfiles(runner, profiles);
     runnerRef.current = runner;
+    runnerInputKeyRef.current = inputKey;
 
     try {
       while (
@@ -3647,6 +5156,7 @@ export function AdminPlanCoverageSimulatorView({
           );
           runner = runnerWithDemandProfiles(runner, profiles);
           runnerRef.current = runner;
+          runnerInputKeyRef.current = inputKey;
           setDemandProfiles(profiles);
           saveDemandProfiles(demandKey, profiles);
         }
@@ -3663,14 +5173,16 @@ export function AdminPlanCoverageSimulatorView({
           break;
         }
 
-        setSimulationData(nextData);
-        saveSimulationState(simulationInputKey(nextData), runner);
+        preserveLatestSimulationState(nextData, runner);
+        saveSimulationState(inputKey, runner, { demandKey });
 
         if (runner.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) {
           break;
         }
 
-        await waitForNextSample();
+        if (profiles.length < ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES) {
+          await waitForNextSample();
+        }
       }
     } catch (error) {
       if (runToken === runTokenRef.current) {
@@ -3687,12 +5199,9 @@ export function AdminPlanCoverageSimulatorView({
   }
 
   function stopCatalogueOptimization() {
-    catalogueOptimizationControllerRef.current?.abort();
-    catalogueOptimizationControllerRef.current = null;
     const requestKey = catalogueOptimizationKey;
 
     if (
-      includeReviewPriorityProductsInCatalogueOptimization &&
       catalogueOptimizationStatus === "processing" &&
       requestKey
     ) {
@@ -3712,12 +5221,12 @@ export function AdminPlanCoverageSimulatorView({
     }
   }
 
-  function clearCatalogueOptimization(options?: Readonly<{ clearSaved?: boolean }>) {
-    catalogueOptimizationControllerRef.current?.abort();
-    catalogueOptimizationControllerRef.current = null;
-
+  function clearCatalogueOptimization(options?: Readonly<{
+    cacheKey?: string;
+    clearSaved?: boolean;
+  }>) {
     if (options?.clearSaved) {
-      clearSavedCatalogueOptimization();
+      clearSavedCatalogueOptimization(options.cacheKey);
     }
 
     setCatalogueOptimization(null);
@@ -3727,140 +5236,61 @@ export function AdminPlanCoverageSimulatorView({
     setCatalogueOptimizationStartedAt(null);
     setCatalogueOptimizationCachedProgress(null);
     setCatalogueOptimizationJob(null);
+    catalogueOptimizationResetKeyRef.current = null;
+    setCatalogueOptimizationResetKey(null);
     setCatalogueOptimizationStatus("idle");
   }
 
-  async function calculateCatalogueOptimization() {
+  async function calculateCatalogueOptimization(options?: Readonly<{
+    forceRestart?: boolean;
+    ignoreProcessing?: boolean;
+  }>) {
     if (
-      catalogueOptimizationStatus === "processing" ||
+      (!options?.ignoreProcessing && catalogueOptimizationStatus === "processing") ||
       running ||
       demandGenerating ||
-      simulationData.sampleSize < 1 ||
-      simulationData.sampleTraces.length < 1
+      !productOptimisationSimulationComplete
     ) {
       return;
     }
 
     const requestKey = catalogueOptimizationRunKey;
 
-    if (includeReviewPriorityProductsInCatalogueOptimization) {
-      setCatalogueOptimization(null);
-      setCatalogueOptimizationError(null);
-      setCatalogueOptimizationKey(requestKey);
-      setCatalogueOptimizationProgress({
-        current: 0,
-        label: "Starting shared optimum basket job",
-        stage: "validating",
-        total: Math.max(1, simulationData.sampleTraces.length)
-      });
-      setCatalogueOptimizationCachedProgress({
-        candidateCount: 0,
-        current: 0,
-        savedAt: new Date().toISOString(),
-        total: Math.max(1, simulationData.sampleTraces.length)
-      });
-      setCatalogueOptimizationStartedAt(Date.now());
-      setCatalogueOptimizationHeartbeat(Date.now());
-      setCatalogueOptimizationStatus("processing");
+    catalogueOptimizationResetKeyRef.current = null;
+    setCatalogueOptimizationResetKey(null);
 
-      try {
-        const job = await requestCatalogueOptimizationJob("start", requestKey);
-        applyCatalogueOptimizationJob(job, requestKey);
-      } catch (error) {
-        setCatalogueOptimization(null);
-        setCatalogueOptimizationError(
-          error instanceof Error
-            ? error.message
-            : "Unable to calculate optimum basket"
-        );
-        setCatalogueOptimizationProgress(null);
-        setCatalogueOptimizationStartedAt(null);
-        setCatalogueOptimizationStatus("idle");
-      }
-
-      return;
+    if (options?.forceRestart) {
+      clearSavedCatalogueOptimization(requestKey);
     }
 
-    const savedOptimization = loadSavedCatalogueOptimization(requestKey);
-
-    if (savedOptimization) {
-      setCatalogueOptimization(savedOptimization);
-      setCatalogueOptimizationError(null);
-      setCatalogueOptimizationKey(requestKey);
-      setCatalogueOptimizationProgress(null);
-      setCatalogueOptimizationStartedAt(null);
-      setCatalogueOptimizationStatus("ready");
-      return;
-    }
-
-    const controller = new AbortController();
-
-    catalogueOptimizationControllerRef.current?.abort();
-    catalogueOptimizationControllerRef.current = controller;
     setCatalogueOptimization(null);
     setCatalogueOptimizationError(null);
     setCatalogueOptimizationKey(requestKey);
     setCatalogueOptimizationProgress({
       current: 0,
-      label: "Calculating approved basket",
+      label: "Starting shared optimum basket job",
       stage: "validating",
-      total: 1
+      total: Math.max(1, simulationData.sampleTraces.length)
+    });
+    setCatalogueOptimizationCachedProgress({
+      cacheKey: requestKey,
+      candidateCount: 0,
+      current: 0,
+      savedAt: new Date().toISOString(),
+      total: Math.max(1, simulationData.sampleTraces.length)
     });
     setCatalogueOptimizationStartedAt(Date.now());
     setCatalogueOptimizationHeartbeat(Date.now());
     setCatalogueOptimizationStatus("processing");
 
     try {
-      const response = await fetch(catalogueOptimizationHref(accessToken), {
-        body: JSON.stringify({
-          accessToken,
-          cacheKey: requestKey,
-          includeReviewPriorityProducts: false,
-          simulationData
-        }),
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { "x-admin-dashboard-token": accessToken } : {})
-        },
-        method: "POST",
-        signal: controller.signal
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        optimization?: AdminCatalogueOptimizationData;
-      };
-
-      if (!response.ok || !payload.optimization) {
-        throw new Error(
-          payload.error ?? `Optimum basket request failed (${response.status})`
-        );
-      }
-
-      if (
-        controller.signal.aborted ||
-        catalogueOptimizationControllerRef.current !== controller
-      ) {
-        return;
-      }
-
-      const optimization = payload.optimization;
-
-      saveCatalogueOptimization(requestKey, optimization);
-      setCatalogueOptimization(optimization);
-      setCatalogueOptimizationError(null);
-      setCatalogueOptimizationProgress(null);
-      setCatalogueOptimizationStartedAt(null);
-      setCatalogueOptimizationStatus("ready");
+      const job = await requestCatalogueOptimizationJob(
+        "start",
+        requestKey,
+        { forceRestart: options?.forceRestart }
+      );
+      applyCatalogueOptimizationJob(job, requestKey);
     } catch (error) {
-      if (
-        controller.signal.aborted ||
-        catalogueOptimizationControllerRef.current !== controller
-      ) {
-        return;
-      }
-
       setCatalogueOptimization(null);
       setCatalogueOptimizationError(
         error instanceof Error
@@ -3870,11 +5300,27 @@ export function AdminPlanCoverageSimulatorView({
       setCatalogueOptimizationProgress(null);
       setCatalogueOptimizationStartedAt(null);
       setCatalogueOptimizationStatus("idle");
-    } finally {
-      if (catalogueOptimizationControllerRef.current === controller) {
-        catalogueOptimizationControllerRef.current = null;
-      }
     }
+  }
+
+  function resetCatalogueOptimization() {
+    clearCatalogueOptimization({
+      cacheKey: catalogueOptimizationRunKey,
+      clearSaved: true
+    });
+    catalogueOptimizationResetKeyRef.current = catalogueOptimizationRunKey;
+    setCatalogueOptimizationResetKey(catalogueOptimizationRunKey);
+  }
+
+  function recalculateCatalogueOptimization() {
+    void calculateCatalogueOptimization({ forceRestart: true });
+  }
+
+  function restartQueuedCatalogueOptimization() {
+    void calculateCatalogueOptimization({
+      forceRestart: true,
+      ignoreProcessing: true
+    });
   }
 
   function startSimulation() {
@@ -3894,6 +5340,10 @@ export function AdminPlanCoverageSimulatorView({
     runTokenRef.current += 1;
     setRunning(false);
     setDemandGenerating(false);
+    setDemandCacheSummary((current) => ({
+      ...current,
+      restoring: false
+    }));
     stopCatalogueOptimization();
   }
 
@@ -3901,6 +5351,11 @@ export function AdminPlanCoverageSimulatorView({
     runTokenRef.current += 1;
     setRunning(false);
     setDemandGenerating(false);
+    setDemandCacheSummary((current) => ({
+      ...current,
+      cachedCount: Math.max(current.cachedCount, demandProfiles.length),
+      restoring: false
+    }));
     clearCatalogueOptimization({ clearSaved: true });
     clearSavedSimulationState();
     setNextMovesClearedKey(null);
@@ -3913,7 +5368,11 @@ export function AdminPlanCoverageSimulatorView({
       : null;
 
     runnerRef.current = runner;
-    setSimulationData(initialSimulationData(activeInputData));
+    runnerInputKeyRef.current = runner ? inputKey : null;
+    const nextData = initialSimulationData(activeInputData);
+
+    simulationDataRef.current = nextData;
+    setSimulationData(nextData);
     setHydrated(true);
   }
 
@@ -3924,6 +5383,7 @@ export function AdminPlanCoverageSimulatorView({
     clearSavedSimulationState();
     setDemandError(null);
     setDemandProfiles([]);
+    setDemandCacheSummary(emptyDemandProfileCacheSummary());
     setNextMovesClearedKey(null);
     runnerRef.current = activeInputData.databaseAvailable
       ? createAdminPlanCoverageSimulationRunner({
@@ -3932,13 +5392,17 @@ export function AdminPlanCoverageSimulatorView({
           reviewPriorityProducts: activeInputData.reviewPriorityProducts
         })
       : null;
-    setSimulationData(initialSimulationData({
+    runnerInputKeyRef.current = runnerRef.current ? inputKey : null;
+    const nextData = initialSimulationData({
       ...activeInputData,
       input: {
         ...activeInputData.input,
         demandProfiles: []
       }
-    }));
+    });
+
+    simulationDataRef.current = nextData;
+    setSimulationData(nextData);
     setHydrated(true);
   }
 
@@ -3976,7 +5440,7 @@ export function AdminPlanCoverageSimulatorView({
     }
 
     stopSimulation();
-    updateSimulatorCountryUrl(normalizedCountryCode);
+    updateSimulatorCountryUrl(normalizedCountryCode, mode);
     setSelectedCountryCode(normalizedCountryCode);
     setInputStatus("loading");
     setInputError(null);
@@ -3990,7 +5454,11 @@ export function AdminPlanCoverageSimulatorView({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-950">Plan coverage projection</h2>
+          <h2 className="text-lg font-bold text-slate-950">
+            {productOptimisationMode
+              ? "Product optimisation run"
+              : "Plan coverage projection"}
+          </h2>
           <p className="text-sm text-slate-500">
             {simulationData.countryCode} catalogue · seed {simulationData.seed} ·{" "}
             currency {simulationData.summary.currency} ·{" "}
@@ -4038,8 +5506,16 @@ export function AdminPlanCoverageSimulatorView({
       </div>
 
       <SimulationProgressPanel
-        catalogueOptimizationProgress={currentCatalogueOptimizationProgress}
-        catalogueOptimizationStatus={currentCatalogueOptimizationStatus}
+        catalogueOptimizationStatus={
+          productOptimisationMode ? currentCatalogueOptimizationStatus : "idle"
+        }
+        demandCacheSummary={{
+          ...demandCacheSummary,
+          cachedCount: Math.max(
+            demandCacheSummary.cachedCount,
+            demandProfiles.length
+          )
+        }}
         demandError={demandError}
         generating={demandGenerating}
         hydrated={hydrated}
@@ -4063,12 +5539,15 @@ export function AdminPlanCoverageSimulatorView({
         />
       ) : null}
 
-      <ProductPerformanceScatter
-        currency={simulationData.summary.currency}
-        rows={scatterRows}
-        sampleSize={simulationData.sampleSize}
-      />
+      {!productOptimisationMode ? (
+        <ProductPerformanceScatter
+          currency={simulationData.summary.currency}
+          rows={scatterRows}
+          sampleSize={simulationData.sampleSize}
+        />
+      ) : null}
 
+      {!productOptimisationMode ? (
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
         <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="flex items-center justify-between gap-3">
@@ -4158,7 +5637,9 @@ export function AdminPlanCoverageSimulatorView({
           </div>
         </section>
       </div>
+      ) : null}
 
+      {!productOptimisationMode ? (
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -4218,15 +5699,20 @@ export function AdminPlanCoverageSimulatorView({
           )}
         </div>
       </section>
+      ) : null}
 
+      {productOptimisationMode ? (
+        <GeneratedDemandProfilesPanel profiles={demandProfiles} />
+      ) : null}
+
+      {productOptimisationMode ? (
       <MinimumCataloguePanel
         accessToken={accessToken}
         canCalculate={
           !running &&
           !demandGenerating &&
           currentCatalogueOptimizationStatus !== "processing" &&
-          simulationData.sampleSize > 0 &&
-            simulationData.sampleTraces.length > 0
+          productOptimisationSimulationComplete
         }
         cachedProgress={currentCatalogueOptimizationCachedProgress}
         elapsedSeconds={currentCatalogueOptimizationElapsedSeconds}
@@ -4239,14 +5725,31 @@ export function AdminPlanCoverageSimulatorView({
         onIncludeReviewPriorityProductsChange={
           setIncludeReviewPriorityProductsInCatalogueOptimization
         }
+        onRecalculate={recalculateCatalogueOptimization}
+        onRestartQueued={restartQueuedCatalogueOptimization}
+        onReset={resetCatalogueOptimization}
         onStop={stopCatalogueOptimization}
         optimization={currentCatalogueOptimization}
         optimizationProgress={currentCatalogueOptimizationProgress}
+        job={catalogueOptimizationJob}
+        blocked={currentCatalogueOptimizationBlocked}
+        queued={currentCatalogueOptimizationQueued}
+        canRestartQueued={canRestartQueuedCatalogueOptimization}
         optimizationStatus={currentCatalogueOptimizationStatus}
         running={running || demandGenerating}
         sampleSize={simulationData.sampleSize}
       />
+      ) : null}
 
     </div>
   );
+}
+
+export function AdminProductOptimisationView(props: Readonly<{
+  accessToken: string;
+  data: AdminPlanCoverageSimulationData;
+  locale: Locale;
+  range: AdminDashboardRange;
+}>) {
+  return <AdminPlanCoverageSimulatorView {...props} mode="optimisation" />;
 }

@@ -345,6 +345,10 @@ describe("external worker boundaries", () => {
       "app/api/tasks/[id]/fail/route.ts",
       "utf8",
     );
+    const progressRouteSource = await readFile(
+      "app/api/tasks/[id]/progress/route.ts",
+      "utf8",
+    );
     const visibilityEventsSource = await readFile(
       "app/api/admin/visibility/events/route.ts",
       "utf8",
@@ -361,6 +365,14 @@ describe("external worker boundaries", () => {
     );
     const serviceSource = await readFile("lib/task-service.ts", "utf8");
     const runnerSource = await readFile("workers/runner.ts", "utf8");
+    const profilesSource = await readFile(
+      "lib/worker-agent-credentials.ts",
+      "utf8",
+    );
+    const catalogueOptimizationJobsSource = await readFile(
+      "lib/admin-catalogue-optimization-jobs.ts",
+      "utf8",
+    );
 
     assert.match(
       source,
@@ -385,10 +397,32 @@ describe("external worker boundaries", () => {
     assert.match(source, /eventName: "task_reserved"/);
     assert.match(completeRouteSource, /eventName: "task_completed"/);
     assert.match(failRouteSource, /eventName: "task_failed"/);
+    assert.match(progressRouteSource, /requireWorkerAccess/);
+    assert.match(progressRouteSource, /reportTaskProgress/);
+    assert.match(serviceSource, /export async function renewTaskLease/);
+    assert.match(serviceSource, /export async function reportTaskProgress/);
+    assert.doesNotMatch(
+      serviceSource.slice(
+        serviceSource.indexOf("export async function renewTaskLease"),
+        serviceSource.indexOf("async function claimTaskFailureApplication"),
+      ),
+      /task_(?:lease_renewed|progress_reported)|ensureWorkerSessionSchema\(sql\)/,
+      "renew/progress are heartbeat hot paths and must not do schema checks or per-call task event inserts",
+    );
     assert.match(
       source,
       /buildTaskWorkItem[\s\S]*failTask[\s\S]*continue;/,
       "a malformed reserved task should be failed and skipped without turning reserve into a worker-visible 500",
+    );
+    assert.match(
+      source,
+      /RESERVE_EXPIRED_SWEEP_BATCH_LIMIT = 3[\s\S]*releaseExpiredReservations\(\{[\s\S]*batchLimit: RESERVE_EXPIRED_SWEEP_BATCH_LIMIT/,
+      "worker reserve polling must not block behind a full expired-reservation sweep",
+    );
+    assert.match(
+      source,
+      /\[tasks:reserve\][\s\S]*totalDurationMs/,
+      "worker reserve polling must emit timing logs for production diagnosis",
     );
     assert.match(
       serviceSource,
@@ -426,6 +460,22 @@ describe("external worker boundaries", () => {
       source,
       /INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000/,
       "interactive fallback polling should keep user-visible tasks responsive",
+    );
+    assert.match(
+      profilesSource,
+      /"analytics", "analytics"[\s\S]*"admin_catalogue_optimization_job"/,
+      "admin catalogue optimisation must run on Analytics, not Product Matcher",
+    );
+    assert.match(runnerSource, /client\.progress/);
+    assert.match(
+      runnerSource,
+      /TASK_LEASE_ABORT_SAFETY_MS[\s\S]*leaseAgeMs >= leaseAbortAfterMs[\s\S]*abortTask\(error\)/,
+      "workers must tolerate transient renewal failures but abort before the lease becomes unsafe",
+    );
+    assert.doesNotMatch(catalogueOptimizationJobsSource, /setTimeout/);
+    assert.doesNotMatch(
+      catalogueOptimizationJobsSource,
+      /kickAdminCatalogueOptimizationJob/,
     );
     assert.equal(
       /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_supplement_guidance/.test(

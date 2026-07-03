@@ -15,7 +15,7 @@ import {
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
@@ -720,8 +720,17 @@ async function generatePanyaWelcome(input: Readonly<{
     process.env.PANYA_MODEL,
     process.env.GROK_MODEL
   );
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: getRequiredXaiApiKey(),
+    cost: {
+      metadata: {
+        entitlement: input.context.plan.entitlement,
+        locale: input.context.customer.locale,
+        outputLocaleMode: "single_display_locale",
+        planId: input.context.planId
+      },
+      recordUsage: true
+    },
     maxTokens: 420,
     messages: [
       {

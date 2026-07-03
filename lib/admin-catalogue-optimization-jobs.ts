@@ -1,17 +1,18 @@
 import { createHash, randomUUID } from "node:crypto";
 import type postgres from "postgres";
-import { getProductRecommendationCandidates } from "@/lib/admin-product-search";
 import {
   adminCataloguePotentialCandidates,
-  buildAdminCataloguePotentialTraceChunk,
-  runAdminCatalogueOptimizationFast,
-  runAdminCataloguePotentialOptimizationFromTraces,
   type AdminCatalogueOptimizationData,
   type AdminPlanCoverageSimulationData,
-  type AdminPlanCoverageSimulationSampleTrace
+  type AdminPlanCoverageSimulationSampleTrace,
+  type AdminSimulationReviewProductRow
 } from "@/lib/admin-product-coverage";
+import { productPrice } from "@/lib/admin-product-coverage-simulation";
+import { getProductRecommendationCandidates } from "@/lib/admin-product-search";
 import { getSql } from "@/lib/db";
 import type { ProductCandidate } from "@/lib/product-recommendations";
+import { requiredCapabilitiesForWorkTaskType } from "@/lib/system-agents";
+import { notifyTaskQueueChanged } from "@/lib/task-wakeup";
 
 export type AdminCatalogueOptimizationJobStatus =
   | "cancelled"
@@ -31,13 +32,18 @@ export type AdminCatalogueOptimizationJobView = Readonly<{
   errorMessage: string | null;
   id: string;
   includePendingReviewProducts: boolean;
+  lastWorkerHeartbeatAt: string | null;
+  leaseUntil: string | null;
   message: string;
   optimization: AdminCatalogueOptimizationData | null;
+  reservationId: string | null;
+  reservationLeaseUntil: string | null;
   startedAt: string | null;
   stage: string;
   status: AdminCatalogueOptimizationJobStatus;
   totalSamples: number;
   updatedAt: string;
+  workerSessionId: string | null;
 }>;
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
@@ -51,6 +57,10 @@ type JobTaskRow = Readonly<{
   idempotency_key: string | null;
   lease_until: Date | string | null;
   payload: unknown;
+  reservation_heartbeat_at: Date | string | null;
+  reservation_id: string | null;
+  reservation_lease_until: Date | string | null;
+  reservation_worker_session_id: string | null;
   result_payload: unknown;
   started_at: Date | string | null;
   status: string;
@@ -76,12 +86,9 @@ type JobResultPayload = Readonly<{
   totalSamples?: number;
 }>;
 
-const activeJobsGlobal = globalThis as typeof globalThis & {
-  mattanutraCatalogueOptimizationJobs?: Set<string>;
-};
-const jobLeaseSeconds = 15 * 60;
-const jobChunkSize = 4;
-const jobTaskType = "admin_catalogue_optimization_job";
+export const ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE =
+  "admin_catalogue_optimization_job";
+const ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS = 3;
 const jobIdempotencyScopeKey = "admin_catalogue_optimization_job";
 
 function toIsoString(value: Date | string | null | undefined) {
@@ -90,6 +97,16 @@ function toIsoString(value: Date | string | null | undefined) {
   }
 
   return value instanceof Date ? value.toISOString() : value;
+}
+
+function isExpiredDate(value: Date | string | null | undefined) {
+  if (!value) {
+    return true;
+  }
+
+  const time = value instanceof Date ? value.getTime() : Date.parse(value);
+
+  return Number.isFinite(time) ? time <= Date.now() : true;
 }
 
 function jsonValue(value: unknown): postgres.JSONValue {
@@ -120,12 +137,6 @@ function asSimulationData(value: unknown): AdminPlanCoverageSimulationData | nul
     : null;
 }
 
-function asSampleTraces(value: unknown) {
-  return Array.isArray(value)
-    ? value as AdminPlanCoverageSimulationSampleTrace[]
-    : [];
-}
-
 function asOptimization(value: unknown) {
   return value && typeof value === "object"
     ? value as AdminCatalogueOptimizationData
@@ -140,17 +151,9 @@ function jobStatus(value: string): AdminCatalogueOptimizationJobStatus {
   return value === "running" || value === "reserved" ? "running" : "queued";
 }
 
-function activeJobs() {
-  activeJobsGlobal.mattanutraCatalogueOptimizationJobs ??= new Set<string>();
-
-  return activeJobsGlobal.mattanutraCatalogueOptimizationJobs;
-}
-
-async function pauseBetweenChunks() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function potentialCandidateHash(candidates: readonly ProductCandidate[]) {
+export function adminCataloguePotentialCandidateHash(
+  candidates: readonly ProductCandidate[]
+) {
   const rawById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
   const hashableCandidates = adminCataloguePotentialCandidates(candidates)
     .map((candidate) => {
@@ -246,13 +249,18 @@ function jobView(row: JobTaskRow): AdminCatalogueOptimizationJobView {
     errorMessage: row.error_message ?? result.errorMessage ?? null,
     id: row.id,
     includePendingReviewProducts: context.includePendingReviewProducts,
+    lastWorkerHeartbeatAt: toIsoString(row.reservation_heartbeat_at),
+    leaseUntil: toIsoString(row.lease_until),
     message: result.message ?? "",
     optimization: asOptimization(result.optimization),
+    reservationId: row.reservation_id,
+    reservationLeaseUntil: toIsoString(row.reservation_lease_until),
     startedAt: toIsoString(row.started_at),
     stage: result.stage ?? status,
     status,
     totalSamples,
-    updatedAt: toIsoString(row.updated_at) ?? new Date().toISOString()
+    updatedAt: toIsoString(row.updated_at) ?? new Date().toISOString(),
+    workerSessionId: row.reservation_worker_session_id
   };
 }
 
@@ -276,23 +284,39 @@ async function platformOrganisationId(sql: Db) {
 async function jobByKey(sql: Db, cacheKey: string) {
   const rows = await sql<JobTaskRow[]>`
     select
-      id::text,
-      idempotency_key,
-      context,
-      payload,
-      result_payload,
-      status,
-      error_message,
-      lease_until,
-      started_at,
-      completed_at,
-      created_at,
-      updated_at
+      tasks.id::text,
+      tasks.idempotency_key,
+      tasks.context,
+      tasks.payload,
+      tasks.result_payload,
+      tasks.status,
+      tasks.error_message,
+      tasks.lease_until,
+      active_reservation.heartbeat_at as reservation_heartbeat_at,
+      active_reservation.id::text as reservation_id,
+      active_reservation.lease_until as reservation_lease_until,
+      active_reservation.worker_session_id::text as reservation_worker_session_id,
+      tasks.started_at,
+      tasks.completed_at,
+      tasks.created_at,
+      tasks.updated_at
     from public.tasks
-    where task_type = ${jobTaskType}
-      and idempotency_scope_key = ${jobIdempotencyScopeKey}
-      and idempotency_key = ${cacheKey}
-    order by created_at desc
+    left join lateral (
+      select
+        task_reservations.heartbeat_at,
+        task_reservations.id,
+        task_reservations.lease_until,
+        task_reservations.worker_session_id
+      from public.task_reservations
+      where task_reservations.task_id = tasks.id
+        and task_reservations.status = 'active'
+      order by task_reservations.reserved_at desc
+      limit 1
+    ) active_reservation on true
+    where tasks.task_type = ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE}
+      and tasks.idempotency_scope_key = ${jobIdempotencyScopeKey}
+      and tasks.idempotency_key = ${cacheKey}
+    order by tasks.created_at desc
     limit 1
   `;
 
@@ -314,6 +338,161 @@ function initialJobResult(input: Readonly<{
   } satisfies JobResultPayload;
 }
 
+function inactiveProductStatus(
+  status: ProductCandidate["status"] | null | undefined
+): ProductCandidate["status"] {
+  return status === "deleted" ? "deleted" : "ignored";
+}
+
+function inactiveBrandStatus(
+  status: ProductCandidate["brandStatus"] | null | undefined
+): ProductCandidate["brandStatus"] {
+  return status === "deleted" ? "deleted" : "ignored";
+}
+
+function refreshCandidateSnapshot(
+  candidate: ProductCandidate,
+  currentCandidatesById: ReadonlyMap<string, ProductCandidate>
+): ProductCandidate {
+  const current = currentCandidatesById.get(candidate.id);
+
+  if (!current) {
+    return {
+      ...candidate,
+      automatedSafetyPassed: false,
+      availabilityStatus: "unavailable",
+      brandStatus: inactiveBrandStatus(candidate.brandStatus),
+      retailAvailabilityStatus: "unavailable",
+      status: inactiveProductStatus(candidate.status),
+      validation: null
+    };
+  }
+
+  return {
+    ...candidate,
+    automatedSafetyPassed: current.automatedSafetyPassed,
+    availabilityStatus: current.availabilityStatus,
+    availableCountryCodes: current.availableCountryCodes,
+    brandName: current.brandName ?? null,
+    brandStatus: current.brandStatus ?? null,
+    currency: current.currency,
+    imageUrl: current.imageUrl ?? null,
+    labelStatus: current.labelStatus,
+    priceAmount: current.priceAmount ?? null,
+    priceSource: current.priceSource ?? null,
+    productAudience: current.productAudience ?? null,
+    productDataExpiresAt: current.productDataExpiresAt ?? null,
+    productKind: current.productKind ?? null,
+    productUrl: current.productUrl,
+    region: current.region,
+    retailAvailabilityStatus: current.retailAvailabilityStatus ?? null,
+    retailEtaDate: current.retailEtaDate ?? null,
+    retailSellableProductId: current.retailSellableProductId ?? null,
+    selectedRetailerName: current.selectedRetailerName ?? null,
+    selectedRetailerOrganisationId:
+      current.selectedRetailerOrganisationId ?? null,
+    status: current.status,
+    title: current.title,
+    unitPriceAmount: current.unitPriceAmount ?? null,
+    validation: current.validation ?? null
+  };
+}
+
+function refreshTraceProductSnapshot(
+  product: AdminPlanCoverageSimulationSampleTrace["selectedProducts"][number],
+  currentCandidatesById: ReadonlyMap<string, ProductCandidate>
+): AdminPlanCoverageSimulationSampleTrace["selectedProducts"][number] {
+  const current = currentCandidatesById.get(product.id);
+
+  if (!current) {
+    return {
+      ...product,
+      brandStatus: inactiveBrandStatus(product.brandStatus),
+      productStatus: inactiveProductStatus(product.productStatus)
+    };
+  }
+
+  return {
+    ...product,
+    brandName: current.brandName ?? null,
+    brandStatus: current.brandStatus ?? null,
+    costAmount: productPrice(current),
+    productStatus: current.status,
+    title: current.title
+  };
+}
+
+function currentCandidateIsApproved(candidate: ProductCandidate) {
+  return (
+    candidate.status === "approved" &&
+    candidate.brandStatus === "approved" &&
+    candidate.validation?.status === "pass" &&
+    candidate.automatedSafetyPassed
+  );
+}
+
+function refreshReviewPriorityProduct(
+  product: AdminSimulationReviewProductRow,
+  currentCandidatesById: ReadonlyMap<string, ProductCandidate>
+): readonly AdminSimulationReviewProductRow[] {
+  const current = currentCandidatesById.get(product.id);
+
+  if (
+    !current ||
+    current.status === "ignored" ||
+    current.status === "deleted" ||
+    current.brandStatus === "ignored" ||
+    current.brandStatus === "deleted" ||
+    currentCandidateIsApproved(current)
+  ) {
+    return [];
+  }
+
+  return [{
+    ...product,
+    brandName: current.brandName ?? null,
+    brandStatus: current.brandStatus ?? null,
+    currency: current.currency,
+    expectedPriceAmount: productPrice(current) ?? product.expectedPriceAmount,
+    productStatus: current.status,
+    title: current.title
+  }];
+}
+
+async function refreshSimulationCatalogueSnapshot(
+  simulationData: AdminPlanCoverageSimulationData
+): Promise<AdminPlanCoverageSimulationData> {
+  const currentCandidates = await getProductRecommendationCandidates({
+    countryCode: simulationData.countryCode,
+    includeIneligible: true
+  });
+  const currentCandidatesById = new Map(
+    currentCandidates.map((candidate) => [candidate.id, candidate])
+  );
+  const reviewPriorityProducts = simulationData.reviewPriorityProducts
+    .flatMap((product) =>
+      refreshReviewPriorityProduct(product, currentCandidatesById)
+    )
+    .map((product, index) => ({ ...product, rank: index + 1 }));
+
+  return {
+    ...simulationData,
+    input: {
+      ...simulationData.input,
+      candidates: simulationData.input.candidates.map((candidate) =>
+        refreshCandidateSnapshot(candidate, currentCandidatesById)
+      )
+    },
+    reviewPriorityProducts,
+    sampleTraces: simulationData.sampleTraces.map((trace) => ({
+      ...trace,
+      selectedProducts: trace.selectedProducts.map((product) =>
+        refreshTraceProductSnapshot(product, currentCandidatesById)
+      )
+    }))
+  };
+}
+
 export async function getAdminCatalogueOptimizationJob(cacheKey: string) {
   const sql = getSql();
 
@@ -323,15 +502,12 @@ export async function getAdminCatalogueOptimizationJob(cacheKey: string) {
 
   const row = await jobByKey(sql, cacheKey);
 
-  if (row && (jobStatus(row.status) === "queued" || jobStatus(row.status) === "running")) {
-    kickAdminCatalogueOptimizationJob(row.id);
-  }
-
   return row ? jobView(row) : null;
 }
 
 export async function startAdminCatalogueOptimizationJob(input: Readonly<{
   cacheKey: string;
+  forceRestart?: boolean;
   includePendingReviewProducts: boolean;
   simulationData: AdminPlanCoverageSimulationData;
 }>) {
@@ -343,20 +519,38 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
 
   const existing = await jobByKey(sql, input.cacheKey);
   const existingStatus = existing ? jobStatus(existing.status) : null;
+  const staleActiveJob =
+    existingStatus === "running" && isExpiredDate(existing?.lease_until);
+  const restartRequested =
+    input.forceRestart === true &&
+    (
+      existingStatus === "completed" ||
+      existingStatus === "failed" ||
+      existingStatus === "cancelled" ||
+      existingStatus === "queued" ||
+      staleActiveJob
+    );
 
-  if (existing && existingStatus !== "failed" && existingStatus !== "cancelled") {
-    kickAdminCatalogueOptimizationJob(existing.id);
+  if (
+    existing &&
+    existingStatus !== "failed" &&
+    existingStatus !== "cancelled" &&
+    !restartRequested
+  ) {
     return jobView(existing);
   }
 
+  const simulationData = await refreshSimulationCatalogueSnapshot(
+    input.simulationData
+  );
   const context = {
     cacheKey: input.cacheKey,
-    countryCode: input.simulationData.countryCode,
+    countryCode: simulationData.countryCode,
     includePendingReviewProducts: input.includePendingReviewProducts
   } satisfies JobContext;
   const resultPayload = initialJobResult({
     message: "Waiting to start",
-    simulationData: input.simulationData
+    simulationData
   });
   const organisationId = await platformOrganisationId(sql);
 
@@ -365,13 +559,16 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
         update public.tasks
         set
           context = ${sql.json(jsonValue(context))}::jsonb,
-          payload = ${sql.json(jsonValue(input.simulationData))}::jsonb,
+          payload = ${sql.json(jsonValue(simulationData))}::jsonb,
           result_payload = ${sql.json(jsonValue(resultPayload))}::jsonb,
           status = 'queued',
           error_message = null,
           lease_until = null,
+          reserved_by_agent_id = null,
           started_at = null,
           completed_at = null,
+          attempts = 0,
+          max_attempts = ${ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS},
           updated_at = now()
         where id = ${existing.id}::uuid
         returning
@@ -383,6 +580,10 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           status,
           error_message,
           lease_until,
+          null::timestamptz as reservation_heartbeat_at,
+          null::text as reservation_id,
+          null::timestamptz as reservation_lease_until,
+          null::text as reservation_worker_session_id,
           started_at,
           completed_at,
           created_at,
@@ -416,21 +617,21 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           created_at,
           updated_at
         )
-        values (
+        select
           ${randomUUID()}::uuid,
           ${organisationId}::uuid,
           ${randomUUID()}::uuid,
           'Optimum product basket',
-          ${jobTaskType},
+          ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE},
           'Optimum product basket',
           'Shared background calculation for the admin plan coverage simulator.',
           'system',
           'queued',
           200,
-          '{}'::text[],
+          ${requiredCapabilitiesForWorkTaskType(ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE)}::text[],
           'none',
           ${sql.json(jsonValue(context))}::jsonb,
-          ${sql.json(jsonValue(input.simulationData))}::jsonb,
+          ${sql.json(jsonValue(simulationData))}::jsonb,
           ${sql.json(jsonValue(resultPayload))}::jsonb,
           200,
           'Admin-requested simulator optimisation',
@@ -439,10 +640,25 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           ${jobIdempotencyScopeKey},
           now(),
           0,
-          1,
+          ${ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS},
           now(),
           now()
+        where not exists (
+          select 1
+          from public.tasks
+          where task_type = ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE}
+            and idempotency_scope_key = ${jobIdempotencyScopeKey}
+            and idempotency_key = ${input.cacheKey}
         )
+        on conflict (idempotency_scope_key, idempotency_key)
+          where idempotency_key is not null
+            and status <> all (array[
+              'completed'::text,
+              'failed'::text,
+              'cancelled'::text,
+              'skipped'::text
+            ])
+        do nothing
         returning
           id::text,
           idempotency_key,
@@ -452,18 +668,24 @@ export async function startAdminCatalogueOptimizationJob(input: Readonly<{
           status,
           error_message,
           lease_until,
+          null::timestamptz as reservation_heartbeat_at,
+          null::text as reservation_id,
+          null::timestamptz as reservation_lease_until,
+          null::text as reservation_worker_session_id,
           started_at,
           completed_at,
           created_at,
           updated_at
       `;
-  const row = rows[0];
+  const row = rows[0] ?? await jobByKey(sql, input.cacheKey);
 
   if (!row) {
-    throw new Error("Unable to create shared optimum basket job");
+    throw new Error("Unable to create or reuse shared optimum basket job");
   }
 
-  kickAdminCatalogueOptimizationJob(row.id);
+  if (rows[0]) {
+    notifyTaskQueueChanged();
+  }
 
   return jobView(row);
 }
@@ -487,10 +709,10 @@ export async function cancelAdminCatalogueOptimizationJob(cacheKey: string) {
       lease_until = null,
       completed_at = coalesce(completed_at, now()),
       updated_at = now()
-    where task_type = ${jobTaskType}
+    where task_type = ${ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE}
       and idempotency_scope_key = ${jobIdempotencyScopeKey}
       and idempotency_key = ${cacheKey}
-      and status in ('queued', 'running')
+      and status in ('queued', 'reserved', 'running')
     returning
       id::text,
       idempotency_key,
@@ -500,333 +722,19 @@ export async function cancelAdminCatalogueOptimizationJob(cacheKey: string) {
       status,
       error_message,
       lease_until,
+      null::timestamptz as reservation_heartbeat_at,
+      null::text as reservation_id,
+      null::timestamptz as reservation_lease_until,
+      null::text as reservation_worker_session_id,
       started_at,
       completed_at,
       created_at,
       updated_at
   `;
+
+  if (rows[0]) {
+    notifyTaskQueueChanged();
+  }
 
   return rows[0] ? jobView(rows[0]) : await getAdminCatalogueOptimizationJob(cacheKey);
-}
-
-export function kickAdminCatalogueOptimizationJob(jobId: string) {
-  const jobs = activeJobs();
-
-  if (jobs.has(jobId)) {
-    return;
-  }
-
-  jobs.add(jobId);
-  setTimeout(() => {
-    void runAdminCatalogueOptimizationJob(jobId).finally(() => {
-      jobs.delete(jobId);
-    });
-  }, 0);
-}
-
-async function claimJob(sql: Db, jobId: string) {
-  const rows = await sql<JobTaskRow[]>`
-    update public.tasks
-    set
-      status = 'running',
-      result_payload = coalesce(result_payload, '{}'::jsonb) ||
-        ${sql.json(jsonValue({
-          message: "Starting shared optimum basket job",
-          stage: "starting"
-        } satisfies JobResultPayload))}::jsonb,
-      started_at = coalesce(started_at, now()),
-      lease_until = now() + (${jobLeaseSeconds}::int * interval '1 second'),
-      updated_at = now()
-    where id = ${jobId}::uuid
-      and task_type = ${jobTaskType}
-      and status in ('queued', 'running')
-      and (lease_until is null or lease_until < now())
-    returning
-      id::text,
-      idempotency_key,
-      context,
-      payload,
-      result_payload,
-      status,
-      error_message,
-      lease_until,
-      started_at,
-      completed_at,
-      created_at,
-      updated_at
-  `;
-
-  return rows[0] ?? null;
-}
-
-async function updateJobProgress(sql: Db, input: Readonly<{
-  candidateCount?: number;
-  candidateHash?: string | null;
-  completedSamples?: number;
-  currentStage: string;
-  jobId: string;
-  message: string;
-  potentialTraces?: readonly AdminPlanCoverageSimulationSampleTrace[];
-  totalSamples?: number;
-}>) {
-  const payload = {
-    ...(input.candidateCount === undefined ? {} : { candidateCount: input.candidateCount }),
-    ...(input.candidateHash === undefined ? {} : { candidateHash: input.candidateHash }),
-    ...(input.completedSamples === undefined ? {} : { completedSamples: input.completedSamples }),
-    ...(input.potentialTraces === undefined ? {} : { potentialTraces: input.potentialTraces }),
-    ...(input.totalSamples === undefined ? {} : { totalSamples: input.totalSamples }),
-    message: input.message,
-    stage: input.currentStage
-  } satisfies JobResultPayload;
-
-  const rows = await sql<JobTaskRow[]>`
-    update public.tasks
-    set
-      result_payload = coalesce(result_payload, '{}'::jsonb) ||
-        ${sql.json(jsonValue(payload))}::jsonb,
-      lease_until = now() + (${jobLeaseSeconds}::int * interval '1 second'),
-      updated_at = now()
-    where id = ${input.jobId}::uuid
-      and task_type = ${jobTaskType}
-      and status = 'running'
-    returning
-      id::text,
-      idempotency_key,
-      context,
-      payload,
-      result_payload,
-      status,
-      error_message,
-      lease_until,
-      started_at,
-      completed_at,
-      created_at,
-      updated_at
-  `;
-
-  return rows[0] ?? null;
-}
-
-async function completeJob(sql: Db, input: Readonly<{
-  approvedOptimization: AdminCatalogueOptimizationData;
-  jobId: string;
-  optimization: AdminCatalogueOptimizationData;
-}>) {
-  const payload = {
-    approvedOptimization: input.approvedOptimization,
-    completedSamples: input.optimization.sampleSize,
-    message: "Optimum basket ready",
-    optimization: input.optimization,
-    stage: "completed",
-    totalSamples: input.optimization.sampleSize
-  } satisfies JobResultPayload;
-
-  const rows = await sql<JobTaskRow[]>`
-    update public.tasks
-    set
-      status = 'completed',
-      result_payload = coalesce(result_payload, '{}'::jsonb) ||
-        ${sql.json(jsonValue(payload))}::jsonb,
-      lease_until = null,
-      completed_at = now(),
-      updated_at = now()
-    where id = ${input.jobId}::uuid
-      and task_type = ${jobTaskType}
-      and status = 'running'
-    returning
-      id::text,
-      idempotency_key,
-      context,
-      payload,
-      result_payload,
-      status,
-      error_message,
-      lease_until,
-      started_at,
-      completed_at,
-      created_at,
-      updated_at
-  `;
-
-  return rows[0] ?? null;
-}
-
-async function failJob(sql: Db, input: Readonly<{
-  error: unknown;
-  jobId: string;
-}>) {
-  const message =
-    input.error instanceof Error
-      ? input.error.message
-      : "Shared optimum basket job failed";
-
-  await sql`
-    update public.tasks
-    set
-      status = 'failed',
-      result_payload = coalesce(result_payload, '{}'::jsonb) ||
-        ${sql.json(jsonValue({
-          errorMessage: message,
-          message: "Optimum basket failed",
-          stage: "failed"
-        } satisfies JobResultPayload))}::jsonb,
-      error_message = ${message},
-      lease_until = null,
-      completed_at = now(),
-      updated_at = now()
-    where id = ${input.jobId}::uuid
-      and task_type = ${jobTaskType}
-  `;
-}
-
-async function jobStillRunning(sql: Db, jobId: string) {
-  const rows = await sql<Array<{ status: string }>>`
-    select status
-    from public.tasks
-    where id = ${jobId}::uuid
-      and task_type = ${jobTaskType}
-    limit 1
-  `;
-
-  return rows[0]?.status === "running";
-}
-
-async function runAdminCatalogueOptimizationJob(jobId: string) {
-  const sql = getSql();
-
-  if (!sql) {
-    return;
-  }
-
-  let row = await claimJob(sql, jobId);
-
-  if (!row) {
-    return;
-  }
-
-  try {
-    const simulationData = asSimulationData(row.payload);
-
-    if (!simulationData) {
-      throw new Error("Shared optimum basket job is missing simulation data");
-    }
-
-    row = await updateJobProgress(sql, {
-      currentStage: "starting",
-      jobId,
-      message: "Calculating approved basket",
-      totalSamples: simulationData.sampleTraces.length
-    }) ?? row;
-
-    const approvedOptimization = runAdminCatalogueOptimizationFast({
-      includeReviewPriorityProducts: false,
-      simulationData
-    });
-
-    if (!jobContext(row).includePendingReviewProducts) {
-      await completeJob(sql, {
-        approvedOptimization,
-        jobId,
-        optimization: {
-          ...approvedOptimization,
-          potential: null
-        }
-      });
-      return;
-    }
-
-    row = await updateJobProgress(sql, {
-      currentStage: "loading_catalogue",
-      jobId,
-      message: "Loading potential product catalogue",
-      totalSamples: simulationData.sampleTraces.length
-    }) ?? row;
-
-    const potentialCandidates = await getProductRecommendationCandidates({
-      countryCode: simulationData.countryCode,
-      includeIneligible: true
-    });
-    const potentialCandidateCount =
-      adminCataloguePotentialCandidates(potentialCandidates).length;
-    const candidateHash = potentialCandidateHash(potentialCandidates);
-    let potentialTraces = asSampleTraces(jobResult(row).potentialTraces);
-
-    if (jobResult(row).candidateHash && jobResult(row).candidateHash !== candidateHash) {
-      potentialTraces = [];
-    }
-
-    await updateJobProgress(sql, {
-      candidateCount: potentialCandidateCount,
-      candidateHash,
-      completedSamples: potentialTraces.length,
-      currentStage: "evaluating",
-      jobId,
-      message: "Evaluating potential basket",
-      potentialTraces,
-      totalSamples: simulationData.sampleTraces.length
-    });
-
-    for (
-      let startIndex = potentialTraces.length;
-      startIndex < simulationData.sampleTraces.length;
-      startIndex += jobChunkSize
-    ) {
-      if (!await jobStillRunning(sql, jobId)) {
-        return;
-      }
-
-      const chunk = buildAdminCataloguePotentialTraceChunk({
-        chunkSize: jobChunkSize,
-        potentialCandidates,
-        simulationData,
-        startIndex
-      });
-
-      potentialTraces = [
-        ...potentialTraces,
-        ...chunk.sampleTraces
-      ];
-
-      await updateJobProgress(sql, {
-        candidateCount: chunk.candidateCount,
-        candidateHash,
-        completedSamples: potentialTraces.length,
-        currentStage: "evaluating",
-        jobId,
-        message: "Evaluating potential basket",
-        potentialTraces,
-        totalSamples: chunk.totalSamples
-      });
-      await pauseBetweenChunks();
-    }
-
-    await updateJobProgress(sql, {
-      completedSamples: potentialTraces.length,
-      currentStage: "finalizing",
-      jobId,
-      message: "Finalizing optimum basket",
-      potentialTraces,
-      totalSamples: simulationData.sampleTraces.length
-    });
-
-    const potential = runAdminCataloguePotentialOptimizationFromTraces({
-      coverageLossTolerancePercent: 0,
-      potentialCandidates,
-      sampleTraces: potentialTraces,
-      simulationData
-    });
-    const optimization = {
-      ...approvedOptimization,
-      potential
-    } satisfies AdminCatalogueOptimizationData;
-
-    await completeJob(sql, {
-      approvedOptimization,
-      jobId,
-      optimization
-    });
-  } catch (error) {
-    console.error("Shared optimum basket job failed", error);
-    await failJob(sql, { error, jobId });
-  }
 }

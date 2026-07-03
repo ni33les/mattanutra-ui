@@ -2034,7 +2034,7 @@ CREATE TABLE public.products (
     CONSTRAINT products_platform_check CHECK ((platform = ANY (ARRAY['lazada'::text, 'manual'::text, 'shopee'::text, 'wholesale_pharmacy_import'::text]))),
     CONSTRAINT products_product_audience_check CHECK ((product_audience = ANY (ARRAY['both'::text, 'female'::text, 'male'::text]))),
     CONSTRAINT products_product_kind_check CHECK ((product_kind = ANY (ARRAY['food'::text, 'multi'::text, 'other'::text, 'supplement'::text]))),
-    CONSTRAINT products_status_check CHECK ((status = ANY (ARRAY['approved'::text, 'ignored'::text, 'pending_review'::text]))),
+    CONSTRAINT products_status_check CHECK ((status = ANY (ARRAY['approved'::text, 'deleted'::text, 'ignored'::text, 'pending_review'::text]))),
     CONSTRAINT products_validation_status_check CHECK ((validation_status = ANY (ARRAY['failed'::text, 'needs_review'::text, 'pass'::text])))
 );
 
@@ -6856,7 +6856,7 @@ ALTER TABLE ONLY public.supplement_recommendation_selections
 --
 
 ALTER TABLE ONLY public.supplement_safety_limits
-    ADD CONSTRAINT supplement_safety_limits_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE CASCADE;
+    ADD CONSTRAINT supplement_safety_limits_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE RESTRICT;
 
 
 --

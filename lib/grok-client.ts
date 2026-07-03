@@ -25,6 +25,24 @@ export type GrokChatCompletionInput = Readonly<{
   timeoutMs?: number;
 }>;
 
+export type GovernedGrokCostMetadata = Readonly<{
+  metadata: Record<string, unknown>;
+  recordUsage: boolean;
+  taskId?: string | null;
+}>;
+
+export type GovernedGrokChatCompletionInput = Omit<
+  GrokChatCompletionInput,
+  "maxTokens" | "purpose" | "reasoningEffort" | "timeoutMs"
+> &
+  Readonly<{
+    cost: GovernedGrokCostMetadata;
+    maxTokens: number;
+    purpose: string;
+    reasoningEffort: string;
+    timeoutMs: number;
+  }>;
+
 export const DEFAULT_GROK_MODEL = "grok-4.3";
 
 const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
@@ -101,4 +119,27 @@ export async function callGrokChatCompletion({
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function callGovernedGrokChatCompletion({
+  cost,
+  ...input
+}: GovernedGrokChatCompletionInput) {
+  const completion = await callGrokChatCompletion(input);
+
+  if (cost.recordUsage && completion.usage) {
+    const { recordXaiUsageCost } = await import("@/lib/finance-ledger");
+
+    await recordXaiUsageCost({
+      metadata: cost.metadata,
+      model: completion.model ?? input.model,
+      purpose: input.purpose,
+      reasoningEffort: input.reasoningEffort,
+      responseId: completion.id,
+      taskId: cost.taskId ?? null,
+      usage: completion.usage
+    });
+  }
+
+  return completion;
 }

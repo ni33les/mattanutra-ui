@@ -167,7 +167,7 @@ async function approvedIdentifierMatches(sql: NonNullable<ReturnType<typeof getS
       on product_identifiers.product_id = products.id
       and product_identifiers.status = 'active'
       and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
-    where products.status <> 'ignored'
+    where products.status not in ('ignored', 'deleted')
   `;
   const byProductId = new Map<string, typeof rows[number]>();
   const byIdentifier = new Map<string, typeof rows[number]>();

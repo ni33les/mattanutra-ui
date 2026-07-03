@@ -4,7 +4,7 @@ import {
 } from "@/lib/admin-dashboard-data";
 import { getSql } from "@/lib/db";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
@@ -887,8 +887,15 @@ async function enrichCustomerInsightSegments(
       process.env.CUSTOMER_INSIGHTS_MODEL,
       process.env.GROK_MODEL
     );
-    const completion = await callGrokChatCompletion({
+    const completion = await callGovernedGrokChatCompletion({
       apiKey,
+      cost: {
+        metadata: {
+          segmentCount: segments.length,
+          source: "admin_customer_insights"
+        },
+        recordUsage: true
+      },
       maxTokens: 1000,
       messages: [
         {

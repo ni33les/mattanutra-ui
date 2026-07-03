@@ -140,6 +140,11 @@ describe("database transaction boundaries", () => {
       /limit\s+\$\{batchLimit\}[\s\S]*for\s+update\s+skip\s+locked/i,
       "expired reservation release must claim a bounded batch while holding row locks"
     );
+    assert.match(
+      claimBody,
+      /invalid_active_reservation/,
+      "expired reservation release must also clear orphaned active reservations that block queued tasks"
+    );
   });
 
   it("keeps common task lifecycle transitions out of explicit app transactions", async () => {

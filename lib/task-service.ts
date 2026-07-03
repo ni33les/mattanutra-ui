@@ -54,6 +54,7 @@ import type {
   ExpiredReservationRow,
   FailTaskInput,
   ReleaseExpiredReservationsInput,
+  ProgressTaskInput,
   RenewTaskLeaseInput,
   ReserveNextTaskInput,
   ReservedTask,
@@ -87,6 +88,7 @@ export type {
   CreatedTaskSequence,
   FailTaskInput,
   HeartbeatWorkerSessionInput,
+  ProgressTaskInput,
   RegisterWorkerSessionInput,
   ReleaseExpiredReservationsInput,
   RenewTaskLeaseInput,
@@ -138,6 +140,7 @@ type TaskReservationResultRow = TaskRow & {
 };
 type ExpiredReservationClaimRow = ExpiredReservationRow & {
   exhausted: boolean;
+  release_reason: string;
   retry_will_be_scheduled: boolean;
 };
 
@@ -1190,27 +1193,41 @@ async function claimExpiredReservationsBatch(
   batchLimit: number
 ) {
   const rows = await sql<ExpiredReservationClaimRow[]>`
-    with expired as (
-      select
-        task_reservations.id as reservation_id,
-        task_reservations.agent_id as reservation_agent_id,
-        task_reservations.membership_id as reservation_membership_id,
-        task_reservations.worker_session_id as reservation_worker_session_id,
-        tasks.id as task_id,
-        (tasks.attempts >= tasks.max_attempts) as exhausted,
-        (
-          tasks.idempotency_key is not null
-          and tasks.retry_attempt < tasks.max_retries
-        ) as retry_will_be_scheduled
-      from public.task_reservations
-      join public.tasks on tasks.id = task_reservations.task_id
-      where task_reservations.status = 'active'
-        and task_reservations.lease_until < now()
-        and tasks.status in ('reserved', 'running')
-      order by task_reservations.lease_until asc
-      limit ${batchLimit}
-      for update skip locked
-    ),
+	    with expired as (
+	      select
+	        task_reservations.id as reservation_id,
+	        task_reservations.agent_id as reservation_agent_id,
+	        task_reservations.membership_id as reservation_membership_id,
+	        task_reservations.worker_session_id as reservation_worker_session_id,
+	        tasks.id as task_id,
+	        case
+	          when tasks.status not in ('reserved', 'running') then 'invalid_active_reservation'
+	          when tasks.lease_until is null then 'missing_task_lease'
+	          when tasks.lease_until < now() then 'task_lease_expired'
+	          else 'reservation_lease_expired'
+	        end as release_reason,
+	        (
+	          tasks.status in ('reserved', 'running')
+	          and tasks.attempts >= tasks.max_attempts
+	        ) as exhausted,
+	        (
+	          tasks.idempotency_key is not null
+	          and tasks.retry_attempt < tasks.max_retries
+	        ) as retry_will_be_scheduled
+	      from public.task_reservations
+	      join public.tasks on tasks.id = task_reservations.task_id
+	      where task_reservations.status = 'active'
+	        and tasks.status not in ('completed', 'cancelled', 'skipped')
+	        and (
+	          task_reservations.lease_until < now()
+	          or tasks.status not in ('reserved', 'running')
+	          or tasks.lease_until is null
+	          or tasks.lease_until < now()
+	        )
+	      order by task_reservations.lease_until asc
+	      limit ${batchLimit}
+	      for update skip locked
+	    ),
     released as (
       update public.task_reservations set
         status = 'expired',
@@ -1221,17 +1238,22 @@ async function claimExpiredReservationsBatch(
         expired.reservation_id,
         expired.reservation_agent_id,
         expired.reservation_membership_id,
-        expired.reservation_worker_session_id,
-        expired.task_id,
-        expired.exhausted,
-        expired.retry_will_be_scheduled
-    ),
-    updated_tasks as (
-      update public.tasks set
-        status = case when released.exhausted then 'failed' else 'queued' end,
-        reserved_by_agent_id = null,
-        lease_until = null,
-        error_message = case
+	        expired.reservation_worker_session_id,
+	        expired.task_id,
+	        expired.exhausted,
+	        expired.release_reason,
+	        expired.retry_will_be_scheduled
+	    ),
+	    updated_tasks as (
+	      update public.tasks set
+	        status = case
+	          when released.exhausted then 'failed'
+	          when public.tasks.status in ('reserved', 'running') then 'queued'
+	          else public.tasks.status
+	        end,
+	        reserved_by_agent_id = null,
+	        lease_until = null,
+	        error_message = case
           when released.exhausted then 'Task lease expired after maximum attempts.'
           else null
         end,
@@ -1248,10 +1270,11 @@ async function claimExpiredReservationsBatch(
         released.reservation_id::text as reservation_id,
         released.reservation_agent_id::text as reservation_agent_id,
         released.reservation_membership_id::text as reservation_membership_id,
-        released.reservation_worker_session_id::text as reservation_worker_session_id,
-        released.exhausted,
-        released.retry_will_be_scheduled
-    ),
+	        released.reservation_worker_session_id::text as reservation_worker_session_id,
+	        released.exhausted,
+	        released.release_reason,
+	        released.retry_will_be_scheduled
+	    ),
     task_events as (
       insert into public.task_events (
         id,
@@ -1274,11 +1297,12 @@ async function claimExpiredReservationsBatch(
         end,
         case when updated_tasks.exhausted then 'failed' else 'observed' end,
         case when updated_tasks.exhausted then 'high' else 'medium' end,
-        jsonb_build_object(
-          'exhausted', updated_tasks.exhausted,
-          'reservationId', updated_tasks.reservation_id,
-          'retryWillBeScheduled', updated_tasks.retry_will_be_scheduled
-        ),
+	        jsonb_build_object(
+	          'exhausted', updated_tasks.exhausted,
+	          'releaseReason', updated_tasks.release_reason,
+	          'reservationId', updated_tasks.reservation_id,
+	          'retryWillBeScheduled', updated_tasks.retry_will_be_scheduled
+	        ),
         now(),
         now()
       from updated_tasks
@@ -2276,8 +2300,6 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
     throw new Error("Task lease renewal requires a valid taskId and reservationId, agentId, or workerSessionId");
   }
 
-  await ensureWorkerSessionSchema(sql);
-
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
   const rows = await sql<TaskReservationResultRow[]>`
     with active_reservation as (
@@ -2315,33 +2337,19 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
       where task_reservations.id = updated_task.reservation_id::uuid
       returning task_reservations.id
     ),
-    task_event as (
-      insert into public.task_events (
-        id,
-        task_id,
-        agent_id,
-        event_type,
-        event_status,
-        severity,
-        event_payload,
-        occurred_at,
-        created_at
-      )
-      select
-        gen_random_uuid(),
-        updated_task.id,
-        updated_task.reservation_agent_id::uuid,
-        'task_lease_renewed',
-        'accepted',
-        'low',
-        jsonb_build_object(
-          'leaseSeconds', ${leaseSeconds}::integer,
-          'reservationId', updated_task.reservation_id
-        ),
-        now(),
-        now()
+    updated_session as (
+      update public.worker_sessions set
+        status = 'working',
+        current_task_id = ${taskId}::uuid,
+        last_seen_at = now(),
+        updated_at = now()
       from updated_task
-      returning id
+      where worker_sessions.id = updated_task.reservation_worker_session_id::uuid
+        and (
+          updated_task.reservation_membership_id::uuid is null
+          or worker_sessions.membership_id = updated_task.reservation_membership_id::uuid
+        )
+      returning worker_sessions.id
     )
     select *
     from updated_task
@@ -2352,28 +2360,88 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
     throw new Error(`Task ${taskId} is not currently renewable`);
   }
 
-  if (workerSessionId) {
-    await sql`
-      update public.worker_sessions
-      set
+  return {
+    reservationId: row.reservation_id ?? "",
+    task: mapTask(row)
+  };
+}
+
+export async function reportTaskProgress(input: ProgressTaskInput) {
+  const sql = getRequiredSql();
+  const taskId = uuidOrNull(input.taskId);
+  const reservationId = uuidOrNull(input.reservationId);
+  const agentId = scopeAgentId(input);
+  const membershipId = scopeMembershipId(input);
+  const workerSessionId = uuidOrNull(input.workerSessionId);
+
+  if (!taskId || (!reservationId && !agentId && !workerSessionId)) {
+    throw new Error("Task progress requires a valid taskId and reservationId, agentId, or workerSessionId");
+  }
+
+  const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
+  const resultPayload = payloadRecord(input.resultPayload ?? {});
+  const rows = await sql<TaskReservationResultRow[]>`
+    with active_reservation as (
+      select id, agent_id, membership_id, worker_session_id
+      from public.task_reservations
+      where task_id = ${taskId}::uuid
+        and status = 'active'
+        and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
+        and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+      order by reserved_at desc
+      limit 1
+    ),
+    updated_task as (
+      update public.tasks set
+        result_payload = coalesce(result_payload, '{}'::jsonb) ||
+          ${sql.json(toJsonValue(resultPayload))}::jsonb,
+        lease_until = now() + make_interval(secs => ${leaseSeconds}),
+        updated_at = now()
+      from active_reservation
+      where public.tasks.id = ${taskId}::uuid
+        and public.tasks.reserved_by_agent_id = active_reservation.agent_id
+        and public.tasks.status in ('reserved', 'running')
+      returning
+        public.tasks.*,
+        active_reservation.id::text as reservation_id,
+        active_reservation.agent_id::text as reservation_agent_id,
+        active_reservation.membership_id::text as reservation_membership_id,
+        active_reservation.worker_session_id::text as reservation_worker_session_id
+    ),
+    updated_reservation as (
+      update public.task_reservations set
+        lease_until = updated_task.lease_until,
+        heartbeat_at = now()
+      from updated_task
+      where task_reservations.id = updated_task.reservation_id::uuid
+      returning task_reservations.id
+    ),
+    updated_session as (
+      update public.worker_sessions set
         status = 'working',
         current_task_id = ${taskId}::uuid,
         last_seen_at = now(),
         updated_at = now()
-      where id = ${workerSessionId}::uuid
-        and (${row.reservation_membership_id ?? null}::uuid is null or membership_id = ${row.reservation_membership_id ?? null}::uuid)
-    `;
+      from updated_task
+      where worker_sessions.id = updated_task.reservation_worker_session_id::uuid
+        and (
+          updated_task.reservation_membership_id::uuid is null
+          or worker_sessions.membership_id = updated_task.reservation_membership_id::uuid
+        )
+      returning worker_sessions.id
+    )
+    select *
+    from updated_task
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error(`Task ${taskId} is not currently progress-reportable`);
   }
 
-  if (row.reservation_agent_id) {
-    await sql`
-      update public.agents
-      set
-        last_seen_at = now(),
-        updated_at = now()
-      where id = ${row.reservation_agent_id}::uuid
-    `;
-  }
+  notifyTaskQueueChanged();
 
   return {
     reservationId: row.reservation_id ?? "",

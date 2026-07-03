@@ -6,6 +6,7 @@ import type { SystemAgentKey } from "@/lib/system-agents";
 
 export type WorkerProfileMode =
   | "advisor"
+  | "analytics"
   | "carrier"
   | "chat"
   | "communications"
@@ -41,6 +42,9 @@ export const RUNTIME_WORKER_PROFILES: readonly RuntimeWorkerCredentialProfile[] 
   profile("advisor", "nutritionPlanAdvisor", "WORKER_ADVISOR_AGENT_API_KEY", "platform_agent", [
     "nutrition_plan_chat_reply",
     "refine_nutrition_plan"
+  ]),
+  profile("analytics", "analytics", "WORKER_ANALYTICS_AGENT_API_KEY", "platform_agent", [
+    "admin_catalogue_optimization_job"
   ]),
   profile("carrier", "carrierCoordinator", "WORKER_CARRIER_AGENT_API_KEY", "retail_agent", RETAIL_CARRIER_AGENT_EXECUTABLE_TASK_TYPES),
   profile("chat", "chatDispatcher", "WORKER_CHAT_AGENT_API_KEY", "platform_agent", [

@@ -19,6 +19,8 @@ nextEnv.loadEnvConfig(process.cwd());
 type WorkerMode =
   | "advisor"
   | "all"
+  | "analytics"
+  | "carrier"
   | "chat"
   | "communications"
   | "content"
@@ -41,6 +43,7 @@ const MAX_POLLING_BACKOFF_MS = 30_000;
 const MAX_WORKER_PROFILE_CONCURRENCY = 8;
 const WORKER_AUTH_CONFIGURATION_EXIT_CODE = 78;
 const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
+const TASK_LEASE_ABORT_SAFETY_MS = 120_000;
 const WORKER_RUN_ID = randomUUID();
 const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES;
 
@@ -51,6 +54,14 @@ type ActiveSession = Readonly<{
 }>;
 
 type WorkerHeartbeatStatus = "idle" | "working";
+type WorkItemExecutionContext = Readonly<{
+  agentId: string;
+  leaseSeconds: number;
+  reservationId: string;
+  signal?: AbortSignal;
+  taskId: string;
+  workerSessionId: string;
+}>;
 
 const activeSessions = new Map<string, ActiveSession>();
 let fatalAuthProfileFailure = false;
@@ -130,6 +141,8 @@ function workerMode(value: string | undefined): WorkerMode {
   }
 
   return value === "chat" ||
+    value === "analytics" ||
+    value === "carrier" ||
     value === "communications" ||
     value === "content" ||
     value === "email" ||
@@ -257,6 +270,7 @@ function workerProfileModesForRun(mode: WorkerMode) {
 async function executeWorkItem(
   client: WorkerApiClient,
   workItem: Record<string, unknown>,
+  context: WorkItemExecutionContext,
 ) {
   if (workItem.taskType === "client_safety_followup") {
     const communication = await client.sendCommunication({
@@ -271,7 +285,18 @@ async function executeWorkItem(
     return { communication };
   }
 
-  return executeTaskWorkItem(workItem as never);
+  return executeTaskWorkItem(workItem as never, {
+    reportProgress: (resultPayload) =>
+      client.progress({
+        agentId: context.agentId,
+        leaseSeconds: context.leaseSeconds,
+        reservationId: context.reservationId,
+        resultPayload,
+        taskId: context.taskId,
+        workerSessionId: context.workerSessionId,
+      }),
+    signal: context.signal,
+  });
 }
 
 async function runAgentLoop(
@@ -422,35 +447,72 @@ async function runAgentLoop(
       const workItem = reserved.workItem;
       heartbeatStatus = "working";
       heartbeatTaskId = taskId;
+      const taskAbortController = new AbortController();
+      let taskAbortReason: Error | null = null;
+      let lastLeaseAcknowledgedAt = Date.now();
+      const abortTask = (error: unknown) => {
+        if (!taskAbortController.signal.aborted) {
+          taskAbortReason =
+            error instanceof Error ? error : new Error(errorMessage(error));
+          taskAbortController.abort();
+        }
+      };
       const renew = setInterval(
         () => {
+          const renewStartedAt = Date.now();
           void retryApiCall(
             `${agent.name} task lease renewal`,
-            () =>
-              client.renew({
+            async () => {
+              await client.renew({
                 agentId: agent.id,
                 leaseSeconds,
                 reservationId,
                 taskId,
                 workerSessionId,
-              }),
+              });
+              lastLeaseAcknowledgedAt = Date.now();
+              console.info(
+                `[agent] ${agent.name} renewed task ${taskId} lease in ${lastLeaseAcknowledgedAt - renewStartedAt}ms`,
+              );
+            },
             2,
           ).catch((error) => {
-            console.error(
-              `[agent] ${agent.name} could not renew task ${taskId}: ${errorMessage(error)}`,
+            const leaseAgeMs = Date.now() - lastLeaseAcknowledgedAt;
+            const leaseAbortAfterMs = Math.max(
+              0,
+              leaseSeconds * 1_000 - TASK_LEASE_ABORT_SAFETY_MS,
             );
+            const willAbort = leaseAgeMs >= leaseAbortAfterMs;
+
+            console.error(
+              `[agent] ${agent.name} could not renew task ${taskId}: ${errorMessage(error)} durationMs=${Date.now() - renewStartedAt} leaseAgeMs=${leaseAgeMs} abortAfterMs=${leaseAbortAfterMs} willAbort=${willAbort}`,
+            );
+
+            if (willAbort) {
+              abortTask(error);
+            }
           });
         },
-        Math.max(30_000, Math.floor(leaseSeconds * 400)),
+        Math.max(30_000, Math.floor(leaseSeconds * 200)),
       );
       (
         renew as ReturnType<typeof setInterval> & { unref?: () => void }
       ).unref?.();
 
       try {
-        const resultPayload = await executeWorkItem(client, workItem);
+        const resultPayload = await executeWorkItem(client, workItem, {
+          agentId: agent.id,
+          leaseSeconds,
+          reservationId,
+          signal: taskAbortController.signal,
+          taskId,
+          workerSessionId,
+        });
 
         clearInterval(renew);
+        if (taskAbortReason) {
+          throw taskAbortReason;
+        }
         await retryApiCall(`${agent.name} task completion`, () =>
           client.complete({
             agentId: agent.id,
@@ -465,11 +527,12 @@ async function runAgentLoop(
       } catch (error) {
         clearInterval(renew);
         let staleSession = isStaleWorkerSessionError(error);
+        const taskError = taskAbortReason ?? error;
 
         await retryApiCall(`${agent.name} task failure`, () =>
           client.fail({
             agentId: agent.id,
-            errorMessage: errorMessage(error),
+            errorMessage: errorMessage(taskError),
             reservationId,
             resultPayload: {
               taskType,

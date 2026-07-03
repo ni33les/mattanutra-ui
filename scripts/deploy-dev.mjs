@@ -68,6 +68,15 @@ async function main() {
   console.log(`[deploy:dev] Branch: ${branch}`);
   await npmRun("verify:dev");
   console.log("[deploy:dev] Applying runtime schema...");
+  await run(npmCommand, ["run", "supplements:country-availability:schema:apply"], {
+    env: schemaEnv()
+  });
+  await run(npmCommand, ["run", "products:soft-delete:schema:apply"], {
+    env: schemaEnv()
+  });
+  await run(npmCommand, ["run", "product-coverage:demand-cache:schema:apply"], {
+    env: schemaEnv()
+  });
   await run(npmCommand, ["run", "payments:schema:apply"], {
     env: schemaEnv()
   });

@@ -172,7 +172,7 @@ export async function POST(request: Request) {
     !title ||
     !productUrl ||
     !isProductPlatform(platform) ||
-    (body.status !== undefined && !isProductStatus(status)) ||
+    (body.status !== undefined && (!isProductStatus(status) || status === "deleted")) ||
     (body.labelStatus !== undefined && !isProductLabelStatus(labelStatus)) ||
     (body.productKind !== undefined && !productKind) ||
     (body.productForm !== undefined && !productForm) ||
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
       identifiers: productIdentifiersFromBody(body.identifiers),
 	      labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
 	      manufacturerCountryCodes: countryCodesFromBody(body.manufacturerCountryCodes),
-	      status: isProductStatus(status) ? status : undefined,
+	      status: isProductStatus(status) && status !== "deleted" ? status : undefined,
       platform,
       productAudience,
       productForm,

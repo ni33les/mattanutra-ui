@@ -455,6 +455,28 @@ async function upsertSupplementTranslations(
   }
 }
 
+async function syncEnglishSupplementTranslationName(
+  sql: postgres.Sql | postgres.TransactionSql,
+  supplementId: string,
+  name: string,
+  actor: string | null | undefined
+) {
+  await sql`
+    update public.supplement_translations
+    set
+      name = ${name},
+      source = 'admin',
+      metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json({
+        actor: actor ?? "admin_dashboard",
+        updatedVia: "supplement_canonical_name_update"
+      })}::jsonb,
+      updated_at = now()
+    where supplement_id = ${supplementId}::uuid
+      and locale = 'en'
+      and coalesce(name, '') <> ${name}
+  `;
+}
+
 async function replaceSupplementCountryAvailability(
   sql: postgres.Sql | postgres.TransactionSql,
   supplementId: string,
@@ -636,6 +658,7 @@ export async function getAdminSupplementsData(
         from public.supplement_translations supplement_translations
         where supplement_translations.supplement_id = supplements.id
       ) translation_rows on true
+      where coalesce(supplements.source_payload ->> 'deleted', 'false') <> 'true'
       order by supplements.category asc, supplements.name asc
       limit 1000
     `;
@@ -885,6 +908,14 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     input.translations,
     input.actor
   );
+  if (nextName !== before.name) {
+    await syncEnglishSupplementTranslationName(
+      sql,
+      input.id,
+      nextName,
+      input.actor
+    );
+  }
   await replaceSupplementCountryAvailability(
     sql,
     input.id,
@@ -1159,6 +1190,8 @@ export async function deleteAdminSupplement(
   const { productIdsUsingSupplement, refreshAndPersistProductValidations } =
     await import("@/lib/admin-product-writes");
   const orphanedProductIds = await productIdsUsingSupplement(sql, input.id);
+  const deletedAt = new Date().toISOString();
+  const deletedBy = input.actor ?? "admin_dashboard";
 
   await appendSupplementVersion(sql, {
     action: "deleted",
@@ -1185,21 +1218,60 @@ export async function deleteAdminSupplement(
     )
     values (
       ${randomUUID()}::uuid,
-      null,
+      ${input.id}::uuid,
       ${"deleted"},
-      ${input.actor ?? "admin_dashboard"},
+      ${deletedBy},
       ${sql.json(before)},
       ${sql.json({
         deleted: true,
+        deletedAt,
+        deletedBy,
         orphanedProductIds,
         supplementId: input.id
       })}
     )
   `;
 
+  await sql`
+    update public.product_facts
+    set supplement_id = null
+    where supplement_id = ${input.id}::uuid
+  `;
+
+  await sql`
+    delete from public.supplement_aliases
+    where supplement_id = ${input.id}::uuid
+  `;
+
+  await sql`
+    delete from public.supplement_country_availability
+    where supplement_id = ${input.id}::uuid
+  `;
+
   const deletedRows = await sql<{ id: string }[]>`
-    delete from public.supplements
+    update public.supplements
+    set
+      is_active = false,
+      list_status = 'blocked',
+      normalized_name = concat(
+        normalized_name,
+        '__deleted__',
+        replace(id::text, '-', '')
+      ),
+      source_payload = (
+        coalesce(source_payload, '{}'::jsonb) - 'countryAvailability'
+      ) || jsonb_build_object(
+        'deleted', true,
+        'deletedAt', ${deletedAt}::text,
+        'deletedBy', ${deletedBy}::text,
+        'deletedIsActive', is_active,
+        'deletedListStatus', list_status,
+        'deletedNormalizedName', normalized_name,
+        'orphanedProductIds', ${sql.json(orphanedProductIds)}::jsonb
+      ),
+      updated_at = now()
     where id = ${input.id}::uuid
+      and coalesce(source_payload ->> 'deleted', 'false') <> 'true'
     returning id::text
   `;
 

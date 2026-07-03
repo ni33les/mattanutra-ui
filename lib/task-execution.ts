@@ -17,6 +17,16 @@ import {
 } from "@/lib/nutrition-plan-advisor-analysis";
 import { analyzePanyaCustomerChatWithGrok } from "@/lib/panya-chat-agent";
 import {
+  adminCataloguePotentialCandidates,
+  buildAdminCataloguePotentialTraceChunk,
+  runAdminCatalogueOptimizationFast,
+  runAdminCataloguePotentialOptimizationFromTraces,
+  type AdminPlanCoverageSimulationSampleTrace
+} from "@/lib/admin-product-coverage";
+import {
+  adminCataloguePotentialCandidateHash
+} from "@/lib/admin-catalogue-optimization-jobs";
+import {
   PRODUCT_STACK_VARIANT_CONFIGS,
   recommendProductStackFullBeam,
   type ProductRecommendationResult
@@ -27,10 +37,23 @@ import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { TaskWorkItem } from "@/lib/task-work-items";
 import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
 
+export type TaskExecutionRuntime = Readonly<{
+  reportProgress?: (resultPayload: Record<string, unknown>) => Promise<unknown> | unknown;
+  signal?: AbortSignal;
+}>;
+
+const catalogueOptimizationJobChunkSize = 4;
+
 function analysisErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
     : "Unknown HealthScore analysis error";
+}
+
+function throwIfTaskExecutionAborted(runtime: TaskExecutionRuntime) {
+  if (runtime.signal?.aborted) {
+    throw new Error("Task execution aborted");
+  }
 }
 
 function hasHealthScoreAdvice(value: unknown) {
@@ -94,6 +117,15 @@ async function sourceProductIdentifiersForTask(input: Parameters<
   const { sourceProductIdentifiers } = await import("@/lib/product-identifiers");
 
   return sourceProductIdentifiers(input);
+}
+
+async function reportExecutionProgress(
+  runtime: TaskExecutionRuntime,
+  resultPayload: Record<string, unknown>
+) {
+  if (runtime.reportProgress) {
+    await runtime.reportProgress(resultPayload);
+  }
 }
 
 type RetailerRecommendationOption = Readonly<{
@@ -312,7 +344,145 @@ function requireSentEmail(
   );
 }
 
-export async function executeTaskWorkItem(workItem: TaskWorkItem) {
+export async function executeTaskWorkItem(
+  workItem: TaskWorkItem,
+  runtime: TaskExecutionRuntime = {}
+) {
+  if (workItem.taskType === "admin_catalogue_optimization_job") {
+    const simulationData = workItem.simulationData;
+    const totalSamples = simulationData.sampleTraces.length;
+
+    await reportExecutionProgress(runtime, {
+      completedSamples: 0,
+      message: "Calculating approved basket",
+      stage: "starting",
+      totalSamples
+    });
+    throwIfTaskExecutionAborted(runtime);
+    const approvedOptimization = runAdminCatalogueOptimizationFast({
+      includeReviewPriorityProducts: false,
+      simulationData
+    });
+    throwIfTaskExecutionAborted(runtime);
+
+    await reportExecutionProgress(runtime, {
+      completedSamples: 0,
+      message: "Approved basket calculated",
+      stage: "loading_catalogue",
+      totalSamples
+    });
+
+    if (!workItem.includePendingReviewProducts) {
+      const optimization = {
+        ...approvedOptimization,
+        potential: null
+      };
+
+      return {
+        approvedOptimization,
+        candidateCount: 0,
+        candidateHash: null,
+        completedSamples: optimization.sampleSize,
+        message: "Optimum basket ready",
+        optimization,
+        stage: "completed",
+        totalSamples: optimization.sampleSize
+      };
+    }
+
+    await reportExecutionProgress(runtime, {
+      completedSamples: 0,
+      message: "Loading potential product catalogue",
+      stage: "loading_catalogue",
+      totalSamples
+    });
+
+    const potentialCandidates = workItem.potentialCandidates;
+    const candidateCount = adminCataloguePotentialCandidates(
+      potentialCandidates
+    ).length;
+    const candidateHash = adminCataloguePotentialCandidateHash(
+      potentialCandidates
+    );
+    let potentialTraces: AdminPlanCoverageSimulationSampleTrace[] =
+      workItem.existingCandidateHash === candidateHash
+        ? [...workItem.existingPotentialTraces]
+        : [];
+
+    await reportExecutionProgress(runtime, {
+      candidateCount,
+      candidateHash,
+      completedSamples: potentialTraces.length,
+      message: "Evaluating potential basket",
+      potentialTraces,
+      stage: "evaluating",
+      totalSamples
+    });
+
+    for (
+      let startIndex = potentialTraces.length;
+      startIndex < totalSamples;
+      startIndex += catalogueOptimizationJobChunkSize
+    ) {
+      throwIfTaskExecutionAborted(runtime);
+      const chunk = buildAdminCataloguePotentialTraceChunk({
+        chunkSize: catalogueOptimizationJobChunkSize,
+        potentialCandidates,
+        simulationData,
+        startIndex
+      });
+
+      potentialTraces = [
+        ...potentialTraces,
+        ...chunk.sampleTraces
+      ];
+
+      await reportExecutionProgress(runtime, {
+        candidateCount: chunk.candidateCount,
+        candidateHash,
+        completedSamples: potentialTraces.length,
+        message: "Evaluating potential basket",
+        potentialTraces,
+        stage: "evaluating",
+        totalSamples: chunk.totalSamples
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    throwIfTaskExecutionAborted(runtime);
+
+    await reportExecutionProgress(runtime, {
+      candidateCount,
+      candidateHash,
+      completedSamples: potentialTraces.length,
+      message: "Finalizing optimum basket",
+      potentialTraces,
+      stage: "finalizing",
+      totalSamples
+    });
+
+    const potential = runAdminCataloguePotentialOptimizationFromTraces({
+      coverageLossTolerancePercent: 0,
+      potentialCandidates,
+      sampleTraces: potentialTraces,
+      simulationData
+    });
+    const optimization = {
+      ...approvedOptimization,
+      potential
+    };
+
+    return {
+      approvedOptimization,
+      candidateCount,
+      candidateHash,
+      completedSamples: optimization.sampleSize,
+      message: "Optimum basket ready",
+      optimization,
+      stage: "completed",
+      totalSamples: optimization.sampleSize
+    };
+  }
+
   if (workItem.taskType === "analyze_healthscore") {
     if (hasHealthScoreAdvice(workItem.healthScore)) {
       return {

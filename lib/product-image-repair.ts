@@ -827,7 +827,7 @@ async function loadProductImageRepairProducts() {
       join public.organisations organisations on organisations.id = retail_sellable_products.organisation_id
       where retail_sellable_products.product_id = products.id
     ) retail on true
-    where products.status <> 'ignored'
+    where products.status not in ('ignored', 'deleted')
     order by
       coalesce(retail.active_delight_sellable, false) desc,
       products.status = 'approved' desc,

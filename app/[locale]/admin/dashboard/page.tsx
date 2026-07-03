@@ -8,7 +8,6 @@ import {
   clientAdminSessionContext,
   getAdminAccessData,
   getAdminSettingsData,
-  legacyAdminContext,
   resolveAdminSession,
   type AdminAccessData,
   type AdminSettingsData
@@ -25,6 +24,7 @@ import {
 import {
   emptyAdminPlanCoverageSimulationData,
   emptyAdminProductCoverageData,
+  getAdminPlanCoverageSimulationData,
   getAdminProductCoverageData
 } from "@/lib/admin-product-coverage";
 import {
@@ -224,8 +224,7 @@ export default async function LocalizedAdminDashboardPage({
     csrfToken: cookieStore.get(adminCsrfCookieName)?.value,
     sessionCookie: cookieStore.get(adminSessionCookieName)?.value
   });
-  const adminContext =
-    sessionContext ?? (await legacyAdminContext(accessToken).catch(() => null));
+  const adminContext = sessionContext;
 
   if (!adminContext) {
     const loginParams = new URLSearchParams({
@@ -269,9 +268,10 @@ export default async function LocalizedAdminDashboardPage({
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
-  const planCoverageSimulationData = emptyAdminPlanCoverageSimulationData({
+  let planCoverageSimulationData = emptyAdminPlanCoverageSimulationData({
     countryCode: coverageCountryCode,
-    databaseAvailable: view === "plan-coverage-simulator"
+    databaseAvailable:
+      view === "plan-coverage-simulator" || view === "product-optimisation"
   });
   let panyaData = emptyAdminPanyaData();
   let productCoverageData = emptyAdminProductCoverageData(coverageCountryCode);
@@ -347,6 +347,11 @@ export default async function LocalizedAdminDashboardPage({
     productCoverageData = await getAdminProductCoverageData({
       countryCode: coverageCountryCode
     });
+  } else if (view === "plan-coverage-simulator" || view === "product-optimisation") {
+    planCoverageSimulationData = await getAdminPlanCoverageSimulationData({
+      countryCode: coverageCountryCode,
+      range
+    });
   } else if (view === "customer-insights") {
     customerInsightsData = await getAdminCustomerInsightsData(range);
   } else if (view === "reviews") {
@@ -362,7 +367,7 @@ export default async function LocalizedAdminDashboardPage({
 
   return (
     <AdminDashboard
-      accessToken={accessToken ?? ""}
+      accessToken=""
       accessData={accessData}
       adminContext={clientAdminSessionContext(adminContext)}
       alertsData={alertsData}

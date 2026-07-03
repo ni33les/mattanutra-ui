@@ -260,29 +260,170 @@ describe("product admin card layout", () => {
     assert.match(readiness, /hasCompatibleCountryAvailability/);
   });
 
-  it("only allows hard deleting ignored products from the admin detail page", async () => {
+  it("saves product edits and selected state through one save action", async () => {
     const detailView = await readFile("components/admin/product-view.tsx", "utf8");
     const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
     const route = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
     const barrel = await readFile("lib/admin-products.ts", "utf8");
     const writes = await readFile("lib/admin-product-writes.ts", "utf8");
+    const backHrefUsages = detailView.match(/href=\{backHref\}/g) ?? [];
 
     assert.match(route, /export async function DELETE/);
     assert.match(route, /deleteIgnoredAdminProduct/);
     assert.match(barrel, /deleteIgnoredAdminProduct/);
     assert.match(detailView, /method: "DELETE"/);
+    assert.match(detailView, /type ProductStateAction = "approved" \| "ignored" \| "pending_review"/);
+    assert.doesNotMatch(detailView, /function saveProductState/);
+    assert.doesNotMatch(detailView, /onSaveState/);
+    assert.match(detailView, /const \[stateSelection, setStateSelection\]/);
+    assert.match(detailView, /function selectProductState/);
+    assert.match(detailView, /function draftWithSelectedState/);
+    assert.match(detailView, /async function handleSaveChanges/);
+    assert.doesNotMatch(detailView, /handleProductStateAction/);
+    assert.match(detailView, /import \{ ArrowLeft, Plus \} from "lucide-react";/);
+    assert.doesNotMatch(detailView, /<span className="isolate inline-flex rounded-md shadow-xs">/);
+    assert.doesNotMatch(detailView, /rounded-l-md[\s\S]*rounded-r-md/);
+    assert.match(detailView, /aria-label=\{viewLabels\.stateAction\}/);
+    assert.doesNotMatch(detailView, /aria-label=\{viewLabels\.saveState\}/);
+    assert.match(detailView, /selectProductState\(event\.target\.value as ProductStateAction\)/);
+    assert.match(detailView, /value=\{selectedState\}/);
+    assert.doesNotMatch(detailView, /stateSaveDisabled/);
+    assert.doesNotMatch(detailView, /viewLabels\.saveState/);
+    assert.match(detailView, /onClick=\{\(\) => void handleSaveChanges\(\)\}/);
+    assert.match(detailView, /await onSave\(nextDraft\)/);
+    assert.doesNotMatch(
+      detailView,
+      />\s*\{saving \? viewLabels\.saving : viewLabels\.saveState\}\s*<\/button>/,
+    );
+    assert.match(detailView, /value="pending_review"[\s\S]*viewLabels\.statePendingReview/);
+    assert.match(detailView, /value="approved"[\s\S]*viewLabels\.stateApproved/);
+    assert.match(detailView, /value="ignored"[\s\S]*viewLabels\.stateIgnored/);
+    assert.doesNotMatch(detailView, /value="deleted"/);
+    assert.match(detailView, /status: selectedState/);
     assert.match(detailView, /currentBusinessState === "ignored"/);
-    assert.match(detailView, /window\.confirm\(viewLabels\.deleteIgnoredConfirm\)/);
-    assert.match(detailView, /viewLabels\.deleteAction/);
-    assert.match(helpers, /deleteIgnoredConfirm/);
+    assert.match(detailView, /async function handleIgnoredProductDelete/);
+    assert.match(detailView, /currentBusinessState === "ignored" \? \(/);
+    assert.match(detailView, /onClick=\{\(\) => void handleIgnoredProductDelete\(\)\}/);
+    assert.match(detailView, /\{viewLabels\.deleteAction\}/);
+    assert.match(detailView, /if \(await onDelete\(draft\)\) \{\s*onClose\(\);/);
+    assert.doesNotMatch(detailView, /window\.confirm/);
+    assert.doesNotMatch(detailView, /deleteIgnoredConfirm/);
+    assert.doesNotMatch(detailView, /const deleteTarget: AdminProductDetailRow/);
+    assert.doesNotMatch(detailView, /const productIgnored = await applyIgnoredState/);
+    assert.match(detailView, /statusMessage/);
+    assert.match(detailView, /viewLabels\.backToProducts/);
+    assert.match(detailView, /viewLabels\.saveChanges/);
+    assert.match(detailView, /hover:underline/);
+    assert.match(detailView, /labelStatus: row\.facts\.length > 0 \? "parsed" : row\.labelStatus/);
+    assert.match(detailView, /await onImportDecision\(nextDraft, "approve_product", null, reviewerNoteText\)/);
+    assert.match(detailView, /await onImportDecision\(nextDraft, "ignore_import", null, reviewerNoteText\)/);
+    assert.ok(backHrefUsages.length >= 2);
+    assert.ok(
+      detailView.lastIndexOf("viewLabels.saveChanges") <
+        detailView.lastIndexOf("viewLabels.backToProducts"),
+    );
+    assert.doesNotMatch(
+      detailView,
+      /onClick=\{onClose\}[\s\S]{0,200}\{viewLabels\.backToProducts\}/,
+    );
+    assert.doesNotMatch(detailView, /sticky bottom-0/);
+    assert.doesNotMatch(detailView, /if \(await onSave\(ignoredDraft\)\) \{\s*onClose\(\);/);
+    assert.doesNotMatch(detailView, /if \(await onSave\(approvedDraft\)\) \{\s*onClose\(\);/);
+    assert.doesNotMatch(helpers, /deleteIgnoredConfirm/);
+    assert.match(helpers, /deleteAction/);
+    assert.match(helpers, /saveChanges/);
+    assert.match(helpers, /productSaved/);
+    assert.match(helpers, /stateAction/);
+    assert.match(helpers, /stateApproved/);
+    assert.match(helpers, /stateIgnored/);
+    assert.match(helpers, /statePendingReview/);
+    assert.doesNotMatch(
+      detailView,
+      /<label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500">[\s\S]{0,120}\{viewLabels\.stateAction\}/,
+    );
     assert.match(writes, /export async function deleteIgnoredAdminProduct/);
-    assert.match(writes, /target\.status = 'ignored'/);
-    assert.match(writes, /delete from public\.products/);
-    assert.match(writes, /product_recommendation_items/);
-    assert.match(writes, /product_recommendation_decisions/);
-    assert.match(writes, /retail_customer_order_lines/);
-    assert.match(writes, /retail_order_allocations/);
+    assert.match(writes, /products\.status = 'ignored'/);
+    assert.match(writes, /existing\.status !== "deleted"/);
+    assert.match(writes, /status = 'deleted'/);
+    assert.match(writes, /availability_status = 'unavailable'/);
+    assert.match(writes, /#deleted#/);
+    assert.match(writes, /originalNormalizedUrl/);
+    assert.match(writes, /ignored_product_soft_deleted/);
+    assert.match(writes, /product_soft_deleted/);
+    assert.doesNotMatch(writes, /delete from public\.products/);
+    assert.doesNotMatch(writes, /delete from public\.product_recommendation_items/);
+    assert.doesNotMatch(writes, /delete from public\.product_recommendation_decisions/);
+    assert.doesNotMatch(writes, /delete from public\.retail_customer_order_lines/);
+    assert.doesNotMatch(writes, /delete from public\.retail_order_allocations/);
+    assert.doesNotMatch(writes, /delete from public\.retail_stock_movements/);
     assert.doesNotMatch(writes, /delete from public\.product_versions/);
+  });
+
+  it("soft-deletes products with recommendation history and hides them from active product surfaces", async () => {
+    const productStatusTypes = await readFile("lib/product-recommendation-types.ts", "utf8");
+    const adminProductTypes = await readFile("lib/admin-product-types.ts", "utf8");
+    const schema = await readFile("db-schema.sql", "utf8");
+    const schemaScript = await readFile("scripts/apply-product-soft-delete-schema.ts", "utf8");
+    const deployDev = await readFile("scripts/deploy-dev.mjs", "utf8");
+    const deployUat = await readFile("scripts/deploy-uat.mjs", "utf8");
+    const rebuildUat = await readFile("scripts/rebuild-uat-db.mjs", "utf8");
+    const rebuildPrd = await readFile("scripts/rebuild-prd-db.mjs", "utf8");
+    const readModel = await readFile("lib/admin-product-read-model.ts", "utf8");
+    const catalogueCsv = await readFile("lib/product-catalogue-csv.ts", "utf8");
+    const createRoute = await readFile("app/api/admin/products/route.ts", "utf8");
+    const detailRoute = await readFile("app/api/admin/products/[id]/route.ts", "utf8");
+
+    assert.match(productStatusTypes, /\| "deleted"/);
+    assert.match(adminProductTypes, /"deleted"/);
+    assert.match(schema, /products_status_check[\s\S]*'deleted'::text/);
+    assert.match(schemaScript, /products_status_check/);
+    assert.match(schemaScript, /status in \('approved', 'deleted', 'ignored', 'pending_review'\)/);
+    assert.match(deployDev, /products:soft-delete:schema:apply/);
+    assert.match(deployUat, /products:soft-delete:schema:apply/);
+    assert.match(rebuildUat, /products:soft-delete:schema:apply/);
+    assert.match(rebuildPrd, /products:soft-delete:schema:apply/);
+    assert.match(readModel, /where products\.status <> 'deleted'/);
+    assert.match(catalogueCsv, /products\.status not in \('ignored', 'deleted'\)/);
+    assert.match(createRoute, /status === "deleted"/);
+    assert.match(detailRoute, /status === "deleted"/);
+  });
+
+  it("uses a top-right close control for the product country approval dialog", async () => {
+    const view = await readFile("components/admin/product-view-ui.tsx", "utf8");
+    const countryManager = view.slice(
+      view.indexOf("export function ProductCountryManager"),
+      view.indexOf("type ProductIdentifierType"),
+    );
+
+    assert.match(countryManager, /<X aria-hidden=\{true\}/);
+    assert.match(countryManager, /aria-label=\{pricingLabels\?\.cancel \?\? "Close"\}/);
+    assert.match(countryManager, /setApprovalDialog\(null\);\s*return;/);
+    assert.match(countryManager, /onClick=\{\(\) => void saveApprovalDialog\(\)\}/);
+    assert.doesNotMatch(
+      countryManager,
+      /\{pricingLabels\?\.cancel \?\? "Cancel"\}/,
+    );
+  });
+
+  it("renders a matcher profile preview directly under product facts", async () => {
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const matcher = await readFile("lib/product-matching-profile.ts", "utf8");
+
+    assert.match(detailView, /ProductMatchingProfilePanel/);
+    assert.match(detailView, /buildProductMatchingProfile\(row\)/);
+    assert.match(detailView, /labels\.matchingProfile/);
+    assert.match(detailView, /labels\.matcherItem/);
+    assert.match(detailView, /labels\.matcherDose/);
+    assert.match(detailView, /labels\.matcherSource/);
+    assert.match(detailView, /labels\.matcherStatus/);
+    assert.ok(
+      detailView.indexOf("<ProductFactsEditor") <
+        detailView.indexOf("<ProductMatchingProfilePanel"),
+    );
+    assert.match(matcher, /export function buildProductMatchingProfile/);
+    assert.match(matcher, /displayName: "Omega-3"/);
+    assert.match(matcher, /productFactAliasKeys/);
+    assert.match(matcher, /factComparableAmount/);
   });
 
   it("keeps approved products matchable by approving pending brands", async () => {
@@ -314,6 +455,8 @@ describe("product admin card layout", () => {
     assert.match(factsEditor, /setAmountDrafts/);
     assert.match(factsEditor, /if \(parsed !== undefined\)/);
     assert.match(factsEditor, /\\d\*\\\.\\d\+/);
+    assert.match(factsEditor, /confidence: "high"/);
+    assert.doesNotMatch(factsEditor, /confidence: "moderate"/);
     assert.doesNotMatch(factsEditor, /Number\(event\.target\.value\)/);
   });
 });

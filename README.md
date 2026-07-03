@@ -50,12 +50,12 @@ Configure the DigitalOcean scheduler to call the app every 15 minutes:
 
 ```txt
 POST /api/cron
-Authorization: Bearer <ADMIN_CLAW_TOKEN>
+Authorization: Bearer <REMOTE_AGENT_API_KEY>
 ```
 
-The cron endpoint scans due cron actions and queues task-backed work only. It does not execute worker tasks. Scheduled content publishing runs through the normal `content_status_change` task queue once its `scheduled_for` time is due.
+The cron endpoint accepts a DB-managed agent credential with task scheduling permission. During rollout, legacy admin-claw auth is still accepted only when `MATTANUTRA_LEGACY_TOKEN_AUTH=allow`; dashboard URL tokens are never valid here. The endpoint scans due cron actions and queues task-backed work only. It does not execute worker tasks. Scheduled content publishing runs through the normal `content_status_change` task queue once its `scheduled_for` time is due.
 
-A worker process must be running with DB-managed agent API keys. `npm run worker:all` requires profile-specific keys such as `WORKER_HEALTHSCORE_AGENT_API_KEY`, `WORKER_FORMULATION_AGENT_API_KEY`, and `WORKER_PRODUCTS_AGENT_API_KEY`; each key resolves to the matching agent membership and organisation scope. Workers register with `/api/workers/register`, heartbeat with `/api/workers/heartbeat`, long-poll `/api/tasks/reserve`, and complete/fail tasks through the task API. In DigitalOcean App Platform, `npm run start:platform` is the no-extra-component deployment mode: the web service owns a colocated worker process, but task execution still goes through the protected worker API rather than web-app internals.
+A worker process must be running with DB-managed agent API keys. `npm run worker:all` requires profile-specific keys such as `WORKER_HEALTHSCORE_AGENT_API_KEY`, `WORKER_FORMULATION_AGENT_API_KEY`, `WORKER_PRODUCTS_AGENT_API_KEY`, and `WORKER_ANALYTICS_AGENT_API_KEY`; each key resolves to the matching agent membership and organisation scope. Run `npm run worker:analytics` on a separate CPU box for admin catalogue optimisation work. Workers register with `/api/workers/register`, heartbeat with `/api/workers/heartbeat`, long-poll `/api/tasks/reserve`, and complete/fail/progress tasks through the task API. In DigitalOcean App Platform, `npm run start:platform` is the no-extra-component deployment mode: the web service owns a colocated worker process, but task execution still goes through the protected worker API rather than web-app internals.
 
 UI-blocking work such as HealthScore analysis and paid formulation uses the interactive reserve path, so online workers check for newly queued work quickly while long-polling. Free example formulation is lower-value background work because it does not block the assessment UX. `WORKER_CONCURRENCY` starts multiple independent sessions per agent profile, and profile-specific overrides such as `WORKER_HEALTHSCORE_CONCURRENCY=2` and `WORKER_FORMULATION_CONCURRENCY=2` let you keep extra capacity for those user-facing tasks without speeding up background jobs. Default worker leases are short and renewed while work is active, so crashed workers release reserved tasks quickly.
 
@@ -67,16 +67,16 @@ Financial rows default to `nominal`, which is used for fine-grained cost accrual
 
 ## Admin Machine APIs
 
-OpenClaw and admin machine APIs use DB-managed agent keys where possible; legacy `ADMIN_CLAW_TOKEN` is only available when `MATTANUTRA_LEGACY_TOKEN_AUTH=allow`. Worker execution APIs use DB-managed agent keys, not `WORKER_API_TOKEN`.
+OpenClaw, admin query, communications, cron, and worker execution APIs use DB-managed agent keys. Legacy `ADMIN_CLAW_TOKEN` and `WORKER_API_TOKEN` are audited break-glass paths only when `MATTANUTRA_LEGACY_TOKEN_AUTH=allow`.
 
-Send either header:
+Preferred headers:
 
 ```txt
-Authorization: Bearer <ADMIN_CLAW_TOKEN>
-x-admin-claw-token: <ADMIN_CLAW_TOKEN>
+Authorization: Bearer <AGENT_API_KEY>
+x-agent-api-key: <AGENT_API_KEY>
 ```
 
-Dashboard URL tokens are only for browser dashboard access and are not accepted by machine APIs.
+OpenClaw and future remote agents must authenticate as scoped `platform_agent` or `retail_agent` principals with the required organisation, role, permission, and capability set. Dashboard URL tokens are only for browser bootstrap/login compatibility and are not accepted by machine APIs.
 
 `BPM_HASH_SALT` is not an auth token. It is the stable salt used when hashing
 email/IP values before they are written to BPM analytics. Keep it stable across

@@ -4,7 +4,8 @@ import { describe, it } from "node:test";
 import {
   requiredCapabilitiesForWorkTaskType,
   SYSTEM_AGENT_LIST,
-  systemAgentForWorkTaskType
+  systemAgentForWorkTaskType,
+  WORK_TASK_REGISTRY
 } from "../lib/system-agents.ts";
 import { hasRequiredCapabilities } from "../lib/task-service-utils.ts";
 import {
@@ -21,6 +22,7 @@ describe("system agents", () => {
     assert.deepEqual(
       names.sort(),
       [
+        "Analytics",
         "Carrier Coordinator",
         "Chat Dispatcher",
         "Communications Coordinator",
@@ -42,6 +44,7 @@ describe("system agents", () => {
 
   it("routes each current work task to an agent with the required capability", () => {
     for (const taskType of [
+      "admin_catalogue_optimization_job",
       "analyze_healthscore",
       "client_safety_followup",
       "content_status_change",
@@ -74,6 +77,26 @@ describe("system agents", () => {
         hasRequiredCapabilities(required, agent.capabilities),
         true,
         `${agent.name} should satisfy ${taskType}`
+      );
+    }
+  });
+
+  it("uses one registry for work-task agent and capability routing", () => {
+    for (const [taskType, entry] of Object.entries(WORK_TASK_REGISTRY)) {
+      const agent = systemAgentForWorkTaskType(taskType);
+
+      assert.equal(
+        agent.id,
+        SYSTEM_AGENT_LIST.find((candidate) => candidate.name === agent.name)?.id
+      );
+      assert.deepEqual(
+        requiredCapabilitiesForWorkTaskType(taskType),
+        [...entry.requiredCapabilities].sort()
+      );
+      assert.equal(
+        hasRequiredCapabilities(entry.requiredCapabilities, agent.capabilities),
+        true,
+        `${taskType} must route to an agent with its required capabilities`
       );
     }
   });
@@ -112,6 +135,7 @@ describe("system agents", () => {
     const profiles = readFileSync("lib/worker-agent-credentials.ts", "utf8");
 
     assert.match(runner, /const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES/);
+    assert.match(profiles, /"analytics", "analytics"[\s\S]*"admin_catalogue_optimization_job"/);
     assert.match(profiles, /RUNTIME_WORKER_PROFILES[\s\S]*"stock"/);
     assert.match(runner, /WORKER_STOCK_AGENT_API_KEYS/);
     assert.match(runner, /function workerAgentKeys/);
@@ -129,6 +153,7 @@ describe("system agents", () => {
 
     assert.deepEqual(envKeys.sort(), [
       "WORKER_ADVISOR_AGENT_API_KEY",
+      "WORKER_ANALYTICS_AGENT_API_KEY",
       "WORKER_CARRIER_AGENT_API_KEY",
       "WORKER_CHAT_AGENT_API_KEY",
       "WORKER_COMMUNICATIONS_AGENT_API_KEY",

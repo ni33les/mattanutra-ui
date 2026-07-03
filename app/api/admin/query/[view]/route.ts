@@ -3,15 +3,10 @@ import {
   getAdminExternalQueryData,
   normalizeAdminExternalQueryView
 } from "@/lib/admin-query-data";
-import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession
-} from "@/lib/admin-access";
+import { permissionForAdminRequest } from "@/lib/admin-rbac";
 import {
   openClawJson,
-  openClawUnauthorized,
+  requireRemoteAgentAccess,
   taskApiError
 } from "@/lib/openclaw-api";
 
@@ -26,17 +21,6 @@ type AdminQueryRouteProps = Readonly<{
 
 export async function GET(request: NextRequest, { params }: AdminQueryRouteProps) {
   const url = new URL(request.url);
-  const unauthorized = adminDashboardOrClawRequestAllowed(
-    request,
-    url.searchParams.get("access_token")
-  )
-    ? null
-    : openClawUnauthorized();
-
-  if (unauthorized) {
-    return unauthorized;
-  }
-
   const { view: rawView } = await params;
   const view = normalizeAdminExternalQueryView(rawView);
 
@@ -44,16 +28,20 @@ export async function GET(request: NextRequest, { params }: AdminQueryRouteProps
     return openClawJson({ message: "Unknown admin query view" }, { status: 404 });
   }
 
-  try {
-    const context = await resolveAdminSession({
-      csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-      sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-    });
+  const permission =
+    permissionForAdminRequest(request.method, `/api/admin/query/${view}`) ??
+    "performance.read";
+  const { unauthorized } = await requireRemoteAgentAccess(request, permission);
 
+  if (unauthorized) {
+    return unauthorized;
+  }
+
+  try {
     return openClawJson(await getAdminExternalQueryData(
       view,
       url.searchParams,
-      context
+      null
     ));
   } catch (error) {
     return taskApiError(error, "Unable to load admin query");

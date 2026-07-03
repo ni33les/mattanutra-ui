@@ -274,27 +274,44 @@ describe("codebase cleanup guardrails", () => {
     }
   });
 
-  it("keeps direct Grok calls on bounded response budgets", () => {
-    const directCallPattern = /callGrokChatCompletion\(\{/g;
+  it("keeps Grok calls on the governed transport with cost metadata", () => {
+    const rawCallPattern = /callGrokChatCompletion\(\{/;
+    const governedCallPattern = /callGovernedGrokChatCompletion\(\{/g;
 
-    for (const file of trackedSourceFiles(new URL("../lib/", import.meta.url))) {
+    for (const file of trackedSourceFiles(repoRoot)) {
       const path = file.pathname;
+      const source = readFileSync(file, "utf8");
 
       if (path.endsWith("/lib/grok-client.ts")) {
         continue;
       }
 
-      const source = readFileSync(file, "utf8");
-      const matches = [...source.matchAll(directCallPattern)];
+      assert.equal(
+        rawCallPattern.test(source),
+        false,
+        `${path} must not call the raw Grok transport directly`
+      );
+
+      const matches = [...source.matchAll(governedCallPattern)];
 
       for (const match of matches) {
         const callStart = match.index ?? 0;
-        const callSnippet = source.slice(callStart, callStart + 700);
+        const callSnippet = source.slice(callStart, callStart + 10000);
 
         assert.match(
           callSnippet,
           /maxTokens(?:\s*:|\s*,)/,
-          `${path} has an unbounded direct Grok call`
+          `${path} has a governed Grok call without an explicit response budget`
+        );
+        assert.match(
+          callSnippet,
+          /timeoutMs(?:\s*:|\s*,)/,
+          `${path} has a governed Grok call without an explicit timeout`
+        );
+        assert.match(
+          callSnippet,
+          /cost\s*:\s*\{/,
+          `${path} has a governed Grok call without cost metadata`
         );
       }
     }

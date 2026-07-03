@@ -38,10 +38,12 @@ export type OpenClawAccess = Readonly<{
   unauthorized: ReturnType<typeof openClawUnauthorized> | null;
 }>;
 
-export async function requireOpenClawAccess(
+export type RemoteAgentAccess = OpenClawAccess;
+
+export async function requireRemoteAgentAccess(
   request: Request,
   permission: AdminPermission = "tasks.write"
-): Promise<OpenClawAccess> {
+): Promise<RemoteAgentAccess> {
   const principal = await resolveAccessPrincipal(request, {
     allowAgent: true,
     allowLegacy: "admin_claw",
@@ -72,6 +74,13 @@ export async function requireOpenClawAccess(
     scope: null,
     unauthorized: openClawUnauthorized()
   };
+}
+
+export async function requireOpenClawAccess(
+  request: Request,
+  permission: AdminPermission = "tasks.write"
+): Promise<OpenClawAccess> {
+  return requireRemoteAgentAccess(request, permission);
 }
 
 export function openClawJson(

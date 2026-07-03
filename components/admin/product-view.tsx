@@ -25,6 +25,10 @@ import {
   regulatoryAgencyByCode
 } from "@/lib/product-regulatory-agencies";
 import { productMatchingReadiness } from "@/lib/product-matching-readiness";
+import {
+  buildProductMatchingProfile,
+  type ProductMatchingProfileRow,
+} from "@/lib/product-matching-profile";
 import { type Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
@@ -50,6 +54,7 @@ import {
   productStatusLabel,
   productViewLabels,
   removeProductCountryCode,
+  type ProductBusinessState,
   type ProductMetricFilter,
 } from "@/components/admin/product-view-helpers";
 import {
@@ -156,6 +161,8 @@ type ProductDraftUpdate =
   | ((
       current: AdminProductDetailRow,
     ) => AdminProductDetailRow | AdminProductRow | null);
+
+type ProductStateAction = "approved" | "ignored" | "pending_review";
 
 function regulatoryApprovalsForSave(
   row: Pick<AdminProductDetailRow, "regulatoryApprovals">
@@ -521,6 +528,7 @@ export function AdminProductDetailView({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const viewLabels = productViewLabels[locale];
   const backHref = `/${locale}/admin/products${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`;
 
@@ -548,6 +556,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const englishTitle = row.translations?.en?.title?.trim() || row.title;
@@ -598,6 +607,7 @@ export function AdminProductDetailView({
       );
 
       setDraft(savedRow);
+      setStatusMessage(viewLabels.productSaved);
       return true;
     } catch (error) {
       setErrorId(row.id);
@@ -614,6 +624,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const response = await fetch(`/api/admin/products/${row.id}`, {
@@ -649,6 +660,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const response = await fetch(
@@ -684,6 +696,7 @@ export function AdminProductDetailView({
       }
 
       setDraft(correctedRow);
+      setStatusMessage(viewLabels.factsCorrected);
 
       return correctedRow;
     } catch (error) {
@@ -706,6 +719,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const response = await fetch(
@@ -746,6 +760,7 @@ export function AdminProductDetailView({
       }
 
       setDraft(savedRow);
+      setStatusMessage(viewLabels.safetyLimitUpdated);
 
       return true;
     } catch (error) {
@@ -774,6 +789,7 @@ export function AdminProductDetailView({
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
       const response = await fetch(
@@ -842,6 +858,11 @@ export function AdminProductDetailView({
       );
 
       setDraft(savedRow.id === row.id ? savedRow : null);
+      setStatusMessage(
+        savedRow.id === row.id
+          ? viewLabels.importReviewUpdated
+          : null
+      );
 
       return true;
     } catch (error) {
@@ -889,6 +910,7 @@ export function AdminProductDetailView({
       mergeOptions={mergeOptions}
       saving={savingId === draft.id}
       setDraft={setDraft}
+      statusMessage={statusMessage}
     />
   );
 }
@@ -968,6 +990,118 @@ function ProductMatchingReadinessPanel({
   );
 }
 
+function matcherProfileStatusClass(status: ProductMatchingProfileRow["status"]) {
+  if (status === "aggregate") {
+    return "border-blue-100 bg-blue-50 text-blue-700";
+  }
+
+  if (status === "matchable") {
+    return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  }
+
+  return "border-amber-100 bg-amber-50 text-amber-800";
+}
+
+function matcherComparableLabel(value: number | null) {
+  return value === null
+    ? "-"
+    : new Intl.NumberFormat("en-US", {
+        maximumFractionDigits: 4,
+      }).format(value);
+}
+
+function ProductMatchingProfilePanel({
+  labels,
+  row,
+}: Readonly<{
+  labels: Readonly<Record<string, string>>;
+  row: AdminProductDetailRow;
+}>) {
+  const rows = buildProductMatchingProfile(row);
+
+  return (
+    <div className="mt-5 border-t border-gray-100 pt-5">
+      <h3 className="text-sm font-semibold text-gray-900">
+        {labels.matchingProfile}
+      </h3>
+      {rows.length > 0 ? (
+        <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 bg-white">
+          <table className="min-w-full divide-y divide-gray-100 text-left text-xs">
+            <thead className="bg-gray-50 text-gray-500">
+              <tr>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.matcherItem}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.matcherDose}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.confidence}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.matcherSource}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {labels.matcherStatus}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((item) => (
+                <tr key={item.id}>
+                  <td className="px-3 py-2 align-top">
+                    <div className="font-semibold text-gray-900">
+                      {item.displayName}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-gray-500">
+                      {labels.matcherKey}: {item.normalizedKey || "-"}
+                    </div>
+                    {item.supplementId ? (
+                      <div className="mt-0.5 text-[11px] text-gray-500">
+                        {item.supplementId}
+                        {item.supplementStatus
+                          ? ` · ${productStatusLabel(item.supplementStatus, "en")}`
+                          : ""}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2 align-top text-gray-700">
+                    <div>{item.amountLabel}</div>
+                    <div className="mt-0.5 text-[11px] text-gray-500">
+                      {labels.matcherComparable}:{" "}
+                      {matcherComparableLabel(item.comparableAmount)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 align-top text-gray-700">
+                    {item.confidence === "mixed"
+                      ? "Mixed"
+                      : productStatusLabel(item.confidence, "en")}
+                  </td>
+                  <td className="px-3 py-2 align-top text-gray-700">
+                    {item.sourceLabel}
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <span
+                      className={classNames(
+                        "inline-flex rounded-full border px-2 py-0.5 font-semibold",
+                        matcherProfileStatusClass(item.status),
+                      )}
+                    >
+                      {item.statusLabel}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-gray-500">{labels.noParsedFacts}</p>
+      )}
+    </div>
+  );
+}
+
 function ProductDetailPanel({
   accessToken,
   backHref,
@@ -984,6 +1118,7 @@ function ProductDetailPanel({
   mergeOptions,
   saving,
   setDraft,
+  statusMessage,
 }: Readonly<{
   accessToken: string;
   backHref: string;
@@ -1011,6 +1146,7 @@ function ProductDetailPanel({
   mergeOptions: AdminProductMergeOption[];
   saving: boolean;
   setDraft: (update: ProductDraftUpdate) => void;
+  statusMessage: string | null;
 }>) {
   const router = useRouter();
   const [mergeProductId, setMergeProductId] = useState(
@@ -1028,10 +1164,23 @@ function ProductDetailPanel({
       ? `Approval is blocked until validation passes: ${draft.validation.summary}`
       : null;
   const currentBusinessState = productBusinessState(draft);
-  const approveDisabled =
-    saving ||
-    currentBusinessState === "approved" ||
-    Boolean(approvalBlockedMessage);
+  const [stateSelection, setStateSelection] = useState<
+    Readonly<{
+      productId: string;
+      savedState: ProductBusinessState;
+      selectedState: ProductStateAction;
+    }>
+  >({
+    productId: draft.id,
+    savedState: currentBusinessState,
+    selectedState: currentBusinessState,
+  });
+  const selectedState =
+    stateSelection.productId === draft.id &&
+    stateSelection.savedState === currentBusinessState
+      ? stateSelection.selectedState
+      : currentBusinessState;
+  const approvedStateBlocked = Boolean(approvalBlockedMessage);
   const manufacturerCountryCodes = normalizedProductCountryCodes(
     draft.manufacturerCountryCodes,
   );
@@ -1078,6 +1227,76 @@ function ProductDetailPanel({
     setLocalImagePreview((current) =>
       current?.targetImageUrl === imageUrl ? null : current
     );
+  }
+
+  function draftWithSelectedState(row: AdminProductDetailRow) {
+    if (selectedState === currentBusinessState) {
+      return row;
+    }
+
+    if (selectedState === "approved") {
+      return {
+        ...row,
+        labelStatus: row.facts.length > 0 ? "parsed" : row.labelStatus,
+        status: "approved",
+      } satisfies AdminProductDetailRow;
+    }
+
+    return {
+      ...row,
+      status: selectedState,
+    } satisfies AdminProductDetailRow;
+  }
+
+  async function handleSaveChanges() {
+    if (saving) {
+      return;
+    }
+
+    if (selectedState === "approved" && approvedStateBlocked) {
+      return;
+    }
+
+    const nextDraft = draftWithSelectedState(draft);
+    const reviewerNoteText = reviewerNote.trim() || null;
+
+    if (
+      hasOpenImportReview &&
+      selectedState !== currentBusinessState &&
+      selectedState === "approved"
+    ) {
+      await onImportDecision(nextDraft, "approve_product", null, reviewerNoteText);
+      return;
+    }
+
+    if (
+      hasOpenImportReview &&
+      selectedState !== currentBusinessState &&
+      selectedState === "ignored"
+    ) {
+      await onImportDecision(nextDraft, "ignore_import", null, reviewerNoteText);
+      return;
+    }
+
+    await onSave(nextDraft);
+  }
+
+  async function handleIgnoredProductDelete() {
+    if (saving || currentBusinessState !== "ignored") {
+      return;
+    }
+
+    if (await onDelete(draft)) {
+      onClose();
+    }
+  }
+
+  function selectProductState(selectedState: ProductStateAction) {
+    setStateSelection({
+      productId: draft.id,
+      savedState: currentBusinessState,
+      selectedState,
+    });
   }
 
   function handlePersistedImageChange(
@@ -1316,13 +1535,6 @@ function ProductDetailPanel({
 
   return (
     <section className="mt-8 space-y-6">
-      <a
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#126B4F] hover:text-[#0F5C45]"
-        href={backHref}
-      >
-        <ArrowLeft aria-hidden={true} className="size-4" strokeWidth={2.25} />
-        {viewLabels.backToProducts}
-      </a>
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
@@ -1540,6 +1752,8 @@ function ProductDetailPanel({
         viewLabels={viewLabels}
       />
 
+      <ProductMatchingProfilePanel labels={viewLabels} row={draft} />
+
       <div className="mt-5">
         <h3 className="text-sm font-semibold text-gray-900">
           {viewLabels.shopAvailability}
@@ -1670,126 +1884,88 @@ function ProductDetailPanel({
         </p>
       ) : null}
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            aria-label={viewLabels.correctFactsWithAi}
-            className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#2563EB] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#2563EB] hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={saving}
-            onClick={() => void onCorrectFacts(draft)}
-            title={viewLabels.correctFactsWithAi}
-            type="button"
-          >
-            {viewLabels.correctFactsWithAi}
-          </button>
+      {statusMessage ? (
+        <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100">
+          {statusMessage}
+        </p>
+      ) : null}
+
+      <div className="mt-6 border-t border-gray-200 pt-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              aria-label={viewLabels.correctFactsWithAi}
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={saving}
+              onClick={() => void onCorrectFacts(draft)}
+              title={viewLabels.correctFactsWithAi}
+              type="button"
+            >
+              {viewLabels.correctFactsWithAi}
+            </button>
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                aria-label={viewLabels.stateAction}
+                className="min-h-9 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-200 outline-none hover:bg-gray-50 focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onChange={(event) =>
+                  selectProductState(event.target.value as ProductStateAction)
+                }
+                title={
+                  selectedState === "approved"
+                    ? approvalBlockedMessage ?? undefined
+                    : undefined
+                }
+                value={selectedState}
+              >
+                <option value="pending_review">
+                  {viewLabels.statePendingReview}
+                </option>
+                <option disabled={approvedStateBlocked} value="approved">
+                  {viewLabels.stateApproved}
+                </option>
+                <option value="ignored">
+                  {viewLabels.stateIgnored}
+                </option>
+              </select>
+              {currentBusinessState === "ignored" ? (
+                <button
+                  className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => void handleIgnoredProductDelete()}
+                  type="button"
+                >
+                  {viewLabels.deleteAction}
+                </button>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onClick={() => void handleSaveChanges()}
+                type="button"
+              >
+                {saving ? viewLabels.saving : viewLabels.saveChanges}
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          {currentBusinessState === "ignored" ? (
-            <button
-              className="inline-flex min-h-9 items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saving}
-              onClick={async () => {
-                if (!window.confirm(viewLabels.deleteIgnoredConfirm)) {
-                  return;
-                }
-
-                if (await onDelete(draft)) {
-                  onClose();
-                }
-              }}
-              type="button"
-            >
-              {viewLabels.deleteAction}
-            </button>
-          ) : null}
-          <span className="isolate inline-flex rounded-md shadow-xs">
-            <button
-              className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saving}
-              onClick={onClose}
-              type="button"
-            >
-              {viewLabels.close}
-            </button>
-            <button
-              className="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saving}
-              onClick={() => void onSave(draft)}
-              type="button"
-            >
-              {saving ? viewLabels.saving : viewLabels.save}
-            </button>
-          </span>
-          <span className="isolate inline-flex rounded-md shadow-xs">
-            <button
-              className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saving || currentBusinessState === "ignored"}
-              onClick={async () => {
-                const ignoredDraft: AdminProductDetailRow = {
-                  ...draft,
-                  status: "ignored",
-                };
-
-                if (hasOpenImportReview) {
-                  if (
-                    await onImportDecision(
-                      ignoredDraft,
-                      "ignore_import",
-                      null,
-                      reviewerNote.trim() || null,
-                    )
-                  ) {
-                    onClose();
-                  }
-
-                  return;
-                }
-
-                if (await onSave(ignoredDraft)) {
-                  onClose();
-                }
-              }}
-              type="button"
-            >
-              {viewLabels.ignoredAction}
-            </button>
-            <button
-              className="relative -ml-px inline-flex items-center rounded-r-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={approveDisabled}
-              onClick={async () => {
-                const approvedDraft: AdminProductDetailRow = {
-                  ...draft,
-                  labelStatus:
-                    draft.facts.length > 0 ? "parsed" : draft.labelStatus,
-                  status: "approved",
-                };
-
-                if (hasOpenImportReview) {
-                  if (
-                    await onImportDecision(
-                      approvedDraft,
-                      "approve_product",
-                      null,
-                      reviewerNote.trim() || null,
-                    )
-                  ) {
-                    onClose();
-                  }
-
-                  return;
-                }
-
-                if (await onSave(approvedDraft)) {
-                  onClose();
-                }
-              }}
-              title={approvalBlockedMessage ?? undefined}
-              type="button"
-            >
-              {viewLabels.approve}
-            </button>
-          </span>
-        </div>
+      </div>
+      <div className="mt-4">
+        <a
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#126B4F] underline-offset-4 hover:text-[#0F5C45] hover:underline"
+          href={backHref}
+        >
+          <ArrowLeft
+            aria-hidden={true}
+            className="size-4"
+            strokeWidth={2.25}
+          />
+          {viewLabels.backToProducts}
+        </a>
       </div>
       </div>
     </section>

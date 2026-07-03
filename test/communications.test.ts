@@ -255,11 +255,11 @@ describe("communications channel selection", () => {
     assert.match(workItems, /buildCommunicationDispatchWorkItem/);
     assert.match(execution, /executeAdminCommunicationRouteTask/);
     assert.match(execution, /executeCommunicationDispatchTask/);
-    assert.match(agents, /route_admin_communication: "communicationsCoordinator"/);
-    assert.match(agents, /customer_chat_reply: "panya"/);
+    assert.match(agents, /route_admin_communication:[\s\S]*agentKey: "communicationsCoordinator"/);
+    assert.match(agents, /customer_chat_reply:[\s\S]*agentKey: "panya"/);
     assert.match(agents, /name: "Panya"/);
-    assert.match(agents, /dispatch_email_communication_message: "emailDispatcher"/);
-    assert.match(agents, /dispatch_chat_communication_message: "chatDispatcher"/);
+    assert.match(agents, /dispatch_email_communication_message:[\s\S]*agentKey: "emailDispatcher"/);
+    assert.match(agents, /dispatch_chat_communication_message:[\s\S]*agentKey: "chatDispatcher"/);
     assert.match(runner, /runtimeWorkerProfileForMode\(mode\)/);
     assert.match(workerProfiles, /"chat", "chatDispatcher"[\s\S]*"dispatch_chat_communication_message"/);
     assert.match(workerProfiles, /"panya", "panya"[\s\S]*"customer_chat_reply"/);
@@ -321,8 +321,10 @@ describe("communications channel selection", () => {
     assert.match(adminSettings, /if \(!context\)/);
     assert.match(adminSettings, /return \{\s*\.\.\.emptyCommunicationsData\(\)/);
     assert.match(adminQueryData, /getAdminCommunicationsData\(params\.range, context\)/);
-    assert.match(adminQueryRoute, /resolveAdminSession/);
-    assert.match(adminQueryRoute, /getAdminExternalQueryData\([\s\S]*context/);
+    assert.match(adminQueryRoute, /requireRemoteAgentAccess/);
+    assert.doesNotMatch(adminQueryRoute, /resolveAdminSession/);
+    assert.match(adminQueryRoute, /getAdminExternalQueryData\([\s\S]*null/);
+    assert.doesNotMatch(adminQueryRoute, /x-admin-dashboard-token/);
     assert.match(organisationApi, /canAccessEffectiveOrganisation/);
     assert.match(organisationApi, /requestedOrganisationId === context\.effectiveOrganisation\.id/);
     assert.match(organisationApi, /adminCommunicationEventScope\(nextEventKey\)/);

@@ -16,7 +16,9 @@ type RenewTaskRouteProps = Readonly<{
 }>;
 
 export async function POST(request: Request, { params }: RenewTaskRouteProps) {
+  const startedAt = Date.now();
   const access = await requireWorkerAccess(request);
+  const authDurationMs = Date.now() - startedAt;
   const unauthorized = access.unauthorized;
 
   if (unauthorized) {
@@ -43,17 +45,37 @@ export async function POST(request: Request, { params }: RenewTaskRouteProps) {
   }
 
   try {
-    return openClawJson(
-      await renewTaskLease({
-        accessScope: access.scope,
-        agentId: access.principal?.agentId ?? textValue(body.agentId),
-        leaseSeconds: body.leaseSeconds,
-        reservationId,
-        taskId: id,
-        workerSessionId
-      })
-    );
+    const dbStartedAt = Date.now();
+    const result = await renewTaskLease({
+      accessScope: access.scope,
+      agentId: access.principal?.agentId ?? textValue(body.agentId),
+      leaseSeconds: body.leaseSeconds,
+      reservationId,
+      taskId: id,
+      workerSessionId
+    });
+    const dbDurationMs = Date.now() - dbStartedAt;
+
+    console.info("[tasks:renew]", {
+      authDurationMs,
+      dbDurationMs,
+      reservationId,
+      taskId: id,
+      totalDurationMs: Date.now() - startedAt,
+      workerSessionId
+    });
+
+    return openClawJson(result);
   } catch (error) {
+    console.warn("[tasks:renew] failed", {
+      authDurationMs,
+      error: error instanceof Error ? error.message : "Unknown error",
+      reservationId,
+      taskId: id,
+      totalDurationMs: Date.now() - startedAt,
+      workerSessionId
+    });
+
     return taskApiError(error, "Unable to renew task lease");
   }
 }

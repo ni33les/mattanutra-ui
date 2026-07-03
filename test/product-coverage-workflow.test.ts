@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  adminCataloguePotentialCandidates,
   buildAdminCataloguePotentialTraceChunk,
   buildSimulationNextMoveRows,
   buildReviewPriorityProductRows,
@@ -25,6 +26,7 @@ import {
   productHasCountryBlockedSupplement,
   supplementAvailabilityLookupFromRows
 } from "../lib/supplement-country-availability.ts";
+import { adminPlanDemandProfileCacheKeys } from "../lib/admin-plan-demand-generation.ts";
 import type {
   AdminPlanCoverageDemandProfile,
   AdminSimulationReviewProductRow
@@ -845,6 +847,70 @@ describe("product coverage workflow", () => {
     assert.deepEqual(profiles[0]?.supplementNames, ["CoQ10"]);
   });
 
+  it("keys demand profile cache by questionnaire inputs and supplement governance only", () => {
+    const baseInput = {
+      archetypes: [
+        {
+          age: null,
+          clientSex: "female" as const,
+          customerCount: null,
+          description: "Busy office worker",
+          goals: ["energy"],
+          id: "busy-office-worker",
+          medications: [],
+          name: "Busy office worker",
+          needCount: 4,
+          preferredSupplementNames: ["CoQ10"],
+          source: "synthetic" as const
+        }
+      ],
+      countryCode: "TH",
+      locale: "en" as const,
+      seed: "fixed",
+      supplementGovernanceHash: "supplement-governance:v1",
+      supplements: [
+        {
+          category: "Antioxidants",
+          id: supplementId,
+          name: "CoQ10",
+          normalizedName: "coq10",
+          targetComparableAmount: 100000
+        }
+      ]
+    };
+    const candidateChangedInput = {
+      ...baseInput,
+      candidates: [product({ title: "Changed product catalogue" })]
+    };
+    const baseKeys = adminPlanDemandProfileCacheKeys(baseInput);
+    const candidateChangedKeys =
+      adminPlanDemandProfileCacheKeys(candidateChangedInput);
+    const governanceChangedKeys = adminPlanDemandProfileCacheKeys({
+      ...baseInput,
+      supplementGovernanceHash: "supplement-governance:v2"
+    });
+    const archetypeChangedKeys = adminPlanDemandProfileCacheKeys({
+      ...baseInput,
+      archetypes: [
+        {
+          ...baseInput.archetypes[0]!,
+          goals: ["sleep"],
+          id: "sleep-focused-worker"
+        }
+      ]
+    });
+    const countryChangedKeys = adminPlanDemandProfileCacheKeys({
+      ...baseInput,
+      countryCode: "GB"
+    });
+
+    assert.deepEqual(candidateChangedKeys, baseKeys);
+    assert.equal(governanceChangedKeys.questionnaireKey, baseKeys.questionnaireKey);
+    assert.notEqual(governanceChangedKeys.demandKey, baseKeys.demandKey);
+    assert.notEqual(archetypeChangedKeys.questionnaireKey, baseKeys.questionnaireKey);
+    assert.notEqual(countryChangedKeys.questionnaireKey, baseKeys.questionnaireKey);
+  });
+
   it("filters blocked country supplements from product needs while keeping allowed country overrides", () => {
     const coq10Need = demandProfile().needs[0]!;
     const ashwagandhaNeed = {
@@ -1009,6 +1075,39 @@ describe("product coverage workflow", () => {
     assert.equal(rows[0]?.blockedReason, "Product is not approved yet");
     assert.equal(rows[0]?.gapSupplementCount, 1);
     assert.equal(rows[0]?.matchableSupplementCount, 2);
+  });
+
+  it("keeps deleted products out of potential catalogue candidates", () => {
+    const pendingProduct = product({
+      id: "55555555-4444-4444-8444-444444444444",
+      status: "pending_review",
+      title: "Pending CoQ10"
+    });
+    const deletedProduct = product({
+      id: "66666666-4444-4444-8444-444444444444",
+      status: "deleted",
+      title: "Deleted CoQ10"
+    });
+    const deletedBrandProduct = product({
+      brandStatus: "deleted",
+      id: "77777777-4444-4444-8444-444444444444",
+      title: "Deleted Brand CoQ10"
+    });
+    const candidates = adminCataloguePotentialCandidates([
+      product(),
+      pendingProduct,
+      deletedProduct,
+      deletedBrandProduct
+    ]);
+
+    assert.deepEqual(
+      candidates.map((candidate) => candidate.id),
+      [product().id, pendingProduct.id]
+    );
+    assert.equal(
+      candidates.find((candidate) => candidate.id === pendingProduct.id)?.status,
+      "approved"
+    );
   });
 
   it("ranks next moves from simulation unmet demand", () => {
@@ -1273,12 +1372,21 @@ describe("product coverage workflow", () => {
       "lib/admin-catalogue-optimization-jobs.ts",
       "utf8"
     );
+    const taskExecution = readFileSync("lib/task-execution.ts", "utf8");
     const demandProfileRoute = readFileSync(
       "app/api/admin/product-coverage/demand-profile/route.ts",
       "utf8"
     );
+    const demandProfilesRoute = readFileSync(
+      "app/api/admin/product-coverage/demand-profiles/route.ts",
+      "utf8"
+    );
     const demandGeneration = readFileSync(
       "lib/admin-plan-demand-generation.ts",
+      "utf8"
+    );
+    const demandCacheSchemaScript = readFileSync(
+      "scripts/apply-product-coverage-demand-cache-schema.ts",
       "utf8"
     );
     const assessmentStore = readFileSync("lib/assessment-store.ts", "utf8");
@@ -1296,18 +1404,23 @@ describe("product coverage workflow", () => {
     const packageJson = readFileSync("package.json", "utf8");
 
     assert.match(dashboardContent, /"product-coverage"/);
+    assert.match(dashboardContent, /"product-optimisation"/);
     assert.match(dashboardContent, /"plan-coverage-simulator"/);
     assert.match(dashboardContent, /Supplement Coverage/);
+    assert.match(dashboardContent, /Product Optimisation/);
     assert.doesNotMatch(dashboardContent, /Product Coverage/);
     assert.doesNotMatch(dashboardContent, /"product-insights"/);
     assert.doesNotMatch(dashboardContent, /"supplement-insights"/);
     assert.doesNotMatch(dashboardContent, /"coverage-improvement-insights"/);
     assert.match(dashboard, /AdminProductCoverageView/);
     assert.match(dashboard, /AdminPlanCoverageSimulatorView/);
+    assert.match(dashboard, /AdminProductOptimisationView/);
     assert.match(dashboard, /Shows every active supplement/);
     assert.match(dashboard, /Run synthetic customer plans/);
+    assert.match(dashboard, /Run the product basket optimiser/);
     assert.match(page, /getAdminProductCoverageData/);
-    assert.doesNotMatch(page, /getAdminPlanCoverageSimulationData/);
+    assert.match(page, /getAdminPlanCoverageSimulationData/);
+    assert.match(page, /view === "plan-coverage-simulator" \|\| view === "product-optimisation"/);
     assert.match(page, /retiredInsightsReplacementView/);
     assert.match(page, /product-insights/);
     assert.match(readModel, /targetComparableAmountBySupplement/);
@@ -1320,12 +1433,28 @@ describe("product coverage workflow", () => {
     assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
     assert.match(simulationInputRoute, /adminViewAllowed/);
     assert.match(simulationInputRoute, /"Cache-Control": "no-store"/);
-    assert.match(demandProfileRoute, /generateAdminPlanCoverageDemandProfile/);
+    assert.match(demandProfileRoute, /getOrGenerateCachedAdminPlanCoverageDemandProfile/);
+    assert.match(demandProfileRoute, /supplementGovernanceHash/);
+    assert.match(demandProfileRoute, /supplements/);
+    assert.match(demandProfilesRoute, /readCachedAdminPlanCoverageDemandProfiles/);
+    assert.match(demandProfilesRoute, /sampleIndexes/);
+    assert.match(demandProfilesRoute, /"Cache-Control": "no-store"/);
+    assert.doesNotMatch(demandProfilesRoute, /generateAdminPlanCoverageDemandProfile/);
     assert.match(demandProfileRoute, /adminViewAllowed/);
     assert.match(demandGeneration, /analyzeFormulationWithGrok/);
+    assert.match(demandGeneration, /adminPlanDemandProfileCacheKeys/);
+    assert.match(demandGeneration, /questionnaireKey/);
+    assert.match(demandGeneration, /demandKey/);
+    assert.match(demandGeneration, /answers_hit/);
+    assert.match(demandGeneration, /claimDemandProfileCacheGeneration/);
+    assert.doesNotMatch(demandGeneration, /pg_advisory(?:_xact)?_lock/);
     assert.match(demandGeneration, /buildProductNeeds/);
     assert.match(demandGeneration, /filterProductNeedsBySupplementAvailability/);
     assert.match(demandGeneration, /source_payload -> 'countryAvailability'/);
+    assert.match(demandCacheSchemaScript, /admin_product_coverage_demand_profile_cache/);
+    assert.match(demandCacheSchemaScript, /unique \(demand_key, sample_index\)/);
+    assert.match(demandCacheSchemaScript, /questionnaire_key,\s*sample_index/);
+    assert.match(packageJson, /product-coverage:demand-cache:schema:apply/);
     assert.match(taskWorkItems, /filterProductNeedsBySupplementAvailabilityForCountry/);
     assert.match(candidateSearch, /productHasCountryBlockedSupplement/);
     assert.match(candidateSearch, /getSupplementEffectiveAvailability/);
@@ -1340,7 +1469,15 @@ describe("product coverage workflow", () => {
     assert.match(view, /SIMULATOR_STORAGE_KEY/);
     assert.match(view, /admin-plan-coverage-simulator:v4/);
     assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
+    assert.match(view, /SIMULATOR_DURABLE_DB_NAME/);
+    assert.match(view, /window\.indexedDB\.open/);
+    assert.match(view, /durableSimulationKey/);
+    assert.match(view, /durableOptimizationKey/);
+    assert.match(view, /saveSimulationStateToDurable/);
+    assert.match(view, /loadSavedSimulationStateFromDurable/);
+    assert.match(view, /loadSavedCatalogueOptimizationFromDurable/);
     assert.match(view, /supplementGovernanceHash: data\.input\.supplementGovernanceHash/);
+    assert.doesNotMatch(view, /demandProfiles: data\.input\.demandProfiles\.map/);
     assert.match(view, /sanitizeDemandProfilesForSimulationSupplements/);
     assert.match(view, /type SavedDemandProfilesEntry/);
     assert.match(view, /savedDemandProfileEntriesFromStorage/);
@@ -1348,8 +1485,21 @@ describe("product coverage workflow", () => {
     assert.match(view, /function loadSavedDemandProfiles\(expectedDemandKey\?: string\)/);
     assert.match(view, /entry\.demandKey === expectedDemandKey/);
     assert.match(view, /saveDemandProfiles\(demandKey, savedProfiles\)/);
-    assert.match(view, /saveSimulationState\(simulationInputKey\(nextData\), runner\)/);
-    assert.doesNotMatch(view, /saveSimulationState\(inputKey, runner\)/);
+    assert.match(view, /saveSimulationState\(inputKey, runner, \{ demandKey \}\)/);
+    assert.doesNotMatch(view, /saveSimulationState\(simulationInputKey\(nextData\), runner\)/);
+    assert.match(view, /existingEntry\.profiles\.length > currentProfiles\.length/);
+    assert.match(view, /pruneSavedDemandProfileEntries\(options\?\.demandKey\)/);
+    assert.match(view, /pruneSavedCatalogueOptimizationEntries\(0\)/);
+    assert.match(view, /clearSavedDemandProfiles\(\)/);
+    assert.match(view, /return writeSavedSimulationState\(nextState\)/);
+    assert.match(view, /\.slice\(0, 2\)/);
+    assert.match(view, /const shouldReplaceVisibleData = !hydrated \|\| !sameSelectedCountry/);
+    assert.match(view, /shouldReplaceVisibleData \? current && sameSelectedCountry : current/);
+    assert.match(view, /setInputData\(payload\)/);
+    assert.doesNotMatch(
+      view,
+      /if \(shouldReplaceVisibleData\) \{\s*setInputData\(payload\);/
+    );
     assert.doesNotMatch(view, /parsed\.demandKey !== expectedDemandKey/);
     assert.doesNotMatch(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
     assert.match(view, /function savedDemandProfiles/);
@@ -1365,6 +1515,12 @@ describe("product coverage workflow", () => {
     assert.match(view, />\s*Retry\s*</);
     assert.match(view, /version: 5/);
     assert.match(view, /sampleTraces/);
+    assert.match(view, /runnerInputKeyRef/);
+    assert.match(view, /simulationDataRef/);
+    assert.match(view, /currentSampleSize > savedRunner\.sampleSize/);
+    assert.match(view, /durableRunner\.sampleSize <= latestSampleSize/);
+    assert.match(view, /preserveLatestSimulationState\(\s*adminPlanCoverageSimulationDataFromRunner\(currentRunner\)/);
+    assert.match(view, /preserveLatestSimulationState\(\s*adminPlanCoverageSimulationDataFromRunner\(durableRunner\)/);
     assert.doesNotMatch(view, /loadSavedSimulationDisplayData/);
     assert.doesNotMatch(view, /cachedSimulationData \?\? initialSimulationData/);
     assert.match(view, /productResultRows/);
@@ -1380,12 +1536,21 @@ describe("product coverage workflow", () => {
     assert.match(view, /visibilitychange/);
     assert.match(view, /eligible products/);
     assert.match(view, /\/api\/admin\/product-coverage\/demand-profile/);
+    assert.match(view, /\/api\/admin\/product-coverage\/demand-profiles/);
+    assert.match(view, /fetchCachedDemandProfilesForSamples/);
+    assert.match(view, /answerHitSampleIndexes/);
+    assert.match(view, /generated this run/);
+    assert.match(view, /supplementGovernanceHash:\s*\n\s*activeInputData\.input\.supplementGovernanceHash/);
     assert.doesNotMatch(view, /Simulation assumptions/);
     assert.match(view, /SimulationProgressPanel/);
+    assert.doesNotMatch(view, /showSimulationProgressPanel/);
+    assert.match(view, /Loading catalogue input/);
+    assert.match(view, /admin-progress-indeterminate/);
     assert.match(view, /Generating questionnaire/);
     assert.match(view, /Running simulation/);
     assert.match(view, /SimulatorActionBar/);
-    assert.doesNotMatch(view, /input\.candidates\.length > 0/);
+    assert.match(view, /simulatorInputReady/);
+    assert.doesNotMatch(view, /activeInputData\.input\.candidates\.length > 0/);
     assert.match(view, /value="results"/);
     assert.match(view, /value="profiles"/);
     assert.match(view, /value="all"/);
@@ -1401,19 +1566,49 @@ describe("product coverage workflow", () => {
     assert.match(view, /productCountryOptions/);
     assert.match(view, /changeSimulatorCountry/);
     assert.match(view, /updateSimulatorCountryUrl/);
+    assert.match(view, /mode === "optimisation" \? "product-optimisation" : "plan-coverage-simulator"/);
     assert.match(view, /popstate/);
     assert.match(view, /Product performance/);
     assert.match(view, /Optimum product basket/);
-    assert.match(view, /catalogueOptimizationHref/);
+    assert.match(view, /GeneratedDemandProfilesPanel/);
+    assert.match(view, /AI profile questionnaires/);
+    assert.match(view, /Questionnaire answers/);
+    assert.match(view, /Supplement needs/);
+    assert.match(view, /AdminProductOptimisationView/);
+    assert.match(view, /mode="optimisation"/);
+    assert.match(view, /productOptimisationMode \? \(/);
+    assert.doesNotMatch(view, /catalogueOptimizationHref/);
     assert.match(view, /catalogueOptimizationJobHref/);
-    assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization/);
     assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization\/jobs/);
-    assert.match(view, /Calculating approved basket/);
+    assert.match(view, /Starting shared optimum basket job/);
     assert.match(view, /Preparing potential catalogue/);
     assert.match(view, /Evaluating potential basket/);
-    assert.match(view, /shared background job/);
-    assert.match(view, /profiles completed by shared job/);
-    assert.match(view, /Shared job progress found/);
+    assert.match(view, /productOptimisationSimulationComplete/);
+    assert.match(view, /simulationData\.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES/);
+    assert.match(view, /simulationData\.sampleTraces\.length >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES/);
+    assert.match(view, /!productOptimisationSimulationComplete/);
+    assert.doesNotMatch(view, /simulationData\.sampleSize > 0 &&\s*\n\s*simulationData\.sampleTraces\.length > 0/);
+    assert.match(view, /optimizingCatalogue/);
+    assert.match(view, /current: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,\s*\n\s*total: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES/);
+    assert.match(view, /Heartbeat active/);
+    assert.match(view, /Waiting for heartbeat/);
+    assert.match(view, /Optimum product basket progress/);
+    assert.match(view, /role="progressbar"/);
+    assert.match(view, /Restart queued job/);
+    assert.match(view, /Saved progress:/);
+    assert.doesNotMatch(view, /shared background job/);
+    assert.doesNotMatch(view, /profiles completed by shared job/);
+    assert.doesNotMatch(view, /Waiting for Analytics worker/);
+    assert.doesNotMatch(view, /Shared job progress found/);
+    assert.doesNotMatch(view, /products considered/);
+    assert.doesNotMatch(view, /The first update is usually the slowest/);
+    assert.match(view, /Reset/);
+    assert.match(view, /Recalculate/);
+    assert.match(view, /forceRestart: true/);
+    assert.match(view, /dateTimeText/);
+    assert.match(view, /Generated/);
+    assert.match(view, /sample count is/);
+    assert.match(view, /catalogueOptimizationResetKey/);
     assert.match(view, /durationText/);
     assert.match(view, /Optimum basket request failed/);
     assert.doesNotMatch(view, /Minimum catalogue request failed/);
@@ -1422,41 +1617,103 @@ describe("product coverage workflow", () => {
     assert.match(view, /loadSavedCatalogueOptimization/);
     assert.match(view, /requestCatalogueOptimizationJob/);
     assert.match(view, /applyCatalogueOptimizationJob/);
+    assert.match(view, /saveSimulationState\(inputKey, runnerRef\.current, \{ demandKey \}\)/);
     assert.match(view, /catalogueOptimizationJobCachedProgress/);
+    assert.match(view, /cacheKey: job\.cacheKey/);
+    assert.match(view, /catalogueOptimizationCachedProgress\?\.cacheKey === catalogueOptimizationRunKey/);
+    assert.match(view, /job\.cacheKey === requestKey \? job : null/);
+    assert.match(view, /restoreSavedSimulationIfNewer\(\s*job\.optimization\.sampleSize/);
     assert.match(view, /cacheKey: requestKey/);
+    assert.match(view, /existing\.sampleSize > runner\.sampleSize/);
     assert.match(view, /Include pending-review products/);
-    assert.match(view, /Shows the best possible basket if pending products were approved/);
+    assert.doesNotMatch(
+      view,
+      /Shows the best possible basket if pending products were approved/
+    );
     assert.match(view, /includeReviewPriorityProductsInCatalogueOptimization/);
     assert.match(view, /catalogueReviewProductsKey/);
-    assert.match(view, /includeReviewPriorityProducts: false/);
     assert.match(view, /includePendingReviewProducts/);
-    assert.match(catalogueOptimizationRoute, /includeReviewPriorityProducts/);
+    assert.match(catalogueOptimizationRoute, /startAdminCatalogueOptimizationJob/);
+    assert.match(catalogueOptimizationRoute, /status: 202/);
+    assert.doesNotMatch(catalogueOptimizationRoute, /runAdminCatalogueOptimizationFast/);
     assert.doesNotMatch(catalogueOptimizationRoute, /runAdminCataloguePotentialOptimizationFast/);
     assert.doesNotMatch(catalogueOptimizationRoute, /getProductRecommendationCandidates/);
     assert.match(catalogueOptimizationJobRoute, /startAdminCatalogueOptimizationJob/);
+    assert.match(catalogueOptimizationJobRoute, /forceRestart/);
     assert.match(catalogueOptimizationJobRoute, /getAdminCatalogueOptimizationJob/);
     assert.match(catalogueOptimizationJobRoute, /cancelAdminCatalogueOptimizationJob/);
     assert.match(catalogueOptimizationJobs, /public\.tasks/);
     assert.match(catalogueOptimizationJobs, /admin_catalogue_optimization_job/);
     assert.match(catalogueOptimizationJobs, /idempotency_scope_key/);
+    assert.match(catalogueOptimizationJobs, /where not exists \(/);
+    assert.match(
+      catalogueOptimizationJobs,
+      /on conflict \(idempotency_scope_key, idempotency_key\)[\s\S]*do nothing/
+    );
     assert.match(catalogueOptimizationJobs, /result_payload/);
-    assert.match(catalogueOptimizationJobs, /kickAdminCatalogueOptimizationJob/);
-    assert.match(catalogueOptimizationJobs, /lease_until/);
-    assert.match(catalogueOptimizationJobs, /buildAdminCataloguePotentialTraceChunk/);
-    assert.match(catalogueOptimizationJobs, /runAdminCataloguePotentialOptimizationFromTraces/);
+    assert.match(catalogueOptimizationJobs, /restartRequested/);
+    assert.match(catalogueOptimizationJobs, /refreshSimulationCatalogueSnapshot/);
+    assert.match(catalogueOptimizationJobs, /getProductRecommendationCandidates/);
+    assert.match(catalogueOptimizationJobs, /sampleTraces: simulationData\.sampleTraces\.map/);
+    assert.match(catalogueOptimizationJobs, /reviewPriorityProducts = simulationData\.reviewPriorityProducts\s*\n\s*\.flatMap/);
+    assert.match(catalogueOptimizationJobs, /existingStatus === "completed"/);
+    assert.match(catalogueOptimizationJobs, /existingStatus === "queued"/);
+    assert.match(catalogueOptimizationJobs, /staleActiveJob/);
+    assert.match(catalogueOptimizationJobs, /isExpiredDate\(existing\?\.lease_until\)/);
+    assert.match(catalogueOptimizationJobs, /ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS = 3/);
+    assert.match(catalogueOptimizationJobs, /attempts = 0/);
+    assert.match(catalogueOptimizationJobs, /max_attempts = \$\{ADMIN_CATALOGUE_OPTIMIZATION_MAX_ATTEMPTS\}/);
+    assert.match(catalogueOptimizationJobs, /notifyTaskQueueChanged/);
+    assert.match(catalogueOptimizationJobs, /analytics_catalogue_optimization|requiredCapabilitiesForWorkTaskType/);
+    assert.match(simulationModel, /product\.status === "deleted"/);
+    assert.match(simulationModel, /product\.brandStatus === "deleted"/);
+    assert.doesNotMatch(catalogueOptimizationJobs, /kickAdminCatalogueOptimizationJob/);
+    assert.doesNotMatch(catalogueOptimizationJobs, /setTimeout/);
+    assert.doesNotMatch(catalogueOptimizationJobs, /runAdminCatalogueOptimizationJob/);
     assert.doesNotMatch(catalogueOptimizationJobs, /create table/i);
     assert.doesNotMatch(packageJson, /catalogue-optimization-jobs:schema:apply/);
+    assert.match(packageJson, /worker:analytics/);
     assert.doesNotMatch(schema, /CREATE TABLE public\.admin_catalogue_optimization_jobs/);
-    assert.match(cataloguePotentialTraceRoute, /buildAdminCataloguePotentialTraceChunk/);
-    assert.match(cataloguePotentialTraceRoute, /normalizedPotentialTraceChunkSize/);
-    assert.match(cataloguePotentialTraceRoute, /potentialCandidateHash/);
-    assert.match(cataloguePotentialFinalizeRoute, /runAdminCataloguePotentialOptimizationFromTraces/);
-    assert.match(cataloguePotentialFinalizeRoute, /coverageLossTolerancePercent: 0/);
-    assert.match(cataloguePotentialFinalizeRoute, /status: 409/);
+    assert.match(cataloguePotentialTraceRoute, /Analytics worker job/);
+    assert.match(cataloguePotentialTraceRoute, /status: 410/);
+    assert.doesNotMatch(cataloguePotentialTraceRoute, /buildAdminCataloguePotentialTraceChunk/);
+    assert.doesNotMatch(cataloguePotentialTraceRoute, /getProductRecommendationCandidates/);
+    assert.match(cataloguePotentialFinalizeRoute, /Analytics worker job/);
+    assert.match(cataloguePotentialFinalizeRoute, /status: 410/);
+    assert.doesNotMatch(cataloguePotentialFinalizeRoute, /runAdminCataloguePotentialOptimizationFromTraces/);
+    assert.match(taskExecution, /admin_catalogue_optimization_job/);
+    assert.match(taskExecution, /buildAdminCataloguePotentialTraceChunk/);
+    assert.match(taskExecution, /runAdminCataloguePotentialOptimizationFromTraces/);
     assert.doesNotMatch(view, /runAdminCatalogueOptimizationCooperatively/);
     assert.match(view, /Basket products/);
+    assert.match(view, /CatalogueOptimizationFrontierGraph/);
+    assert.match(view, /Optimisation frontier/);
+    assert.match(view, /Sweet spot/);
+    assert.match(view, /Perfect coverage baseline/);
     assert.match(view, /No basket products were identified/);
-    assert.doesNotMatch(view, /Catalogue actions/);
+    assert.doesNotMatch(
+      view,
+      /!includeReviewPriorityProductsInCatalogueOptimization \|\|\s*\n\s*currentCatalogueOptimizationStatus !== "processing"/
+    );
+    assert.doesNotMatch(
+      view,
+      /!includeReviewPriorityProductsInCatalogueOptimization \|\|\s*\n\s*running/
+    );
+    assert.match(view, /Remove recommendations/);
+    assert.match(view, /currentCatalogueOptimizationBlocked/);
+    assert.match(view, /currentCatalogueOptimizationLeaseUntil/);
+    assert.match(view, /reservationLeaseUntil/);
+    assert.match(view, /currentCatalogueOptimizationHasReservation/);
+    assert.match(view, /currentCatalogueOptimizationHeartbeatStale/);
+    assert.match(view, /lastWorkerHeartbeatAt/);
+    assert.match(view, /reservationId/);
+    assert.doesNotMatch(view, /workerSessionId/);
+    assert.match(view, /Restart blocked job/);
+    assert.match(view, /Run again/);
+    assert.match(view, /catalogueOptimizationMatchesSampleSize/);
+    assert.match(view, /does not match the visible simulation/);
+    assert.match(view, /onClick=\{error \? onRecalculate : onCalculate\}/);
+    assert.match(view, /actionType === "consider_retiring"/);
     assert.match(view, /Average stack coverage contribution/);
     assert.match(view, /Chosen rate/);
     assert.match(view, /productScatterRows/);

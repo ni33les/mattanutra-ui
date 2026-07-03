@@ -63,9 +63,14 @@ describe("product coverage improvement insights", () => {
     assert.doesNotMatch(dashboard, /AdminCoverageImprovementInsightsView/);
     assert.doesNotMatch(page, /getAdminCoverageImprovementInsightsData\(range, locale\)/);
     assert.match(dashboardContent, /"product-coverage"/);
+    assert.match(dashboardContent, /"product-optimisation"/);
     assert.match(dashboardContent, /"plan-coverage-simulator"/);
     assert.equal(
       adminViewPermission("product-coverage"),
+      "marketing.read"
+    );
+    assert.equal(
+      adminViewPermission("product-optimisation"),
       "marketing.read"
     );
     assert.equal(

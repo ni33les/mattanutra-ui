@@ -198,6 +198,17 @@ export class WorkerApiClient {
     return this.post(`/api/tasks/${input.taskId}/renew`, input);
   }
 
+  progress(input: Readonly<{
+    agentId: string;
+    leaseSeconds: number;
+    reservationId: string;
+    resultPayload: JsonRecord;
+    taskId: string;
+    workerSessionId: string;
+  }>) {
+    return this.post(`/api/tasks/${input.taskId}/progress`, input);
+  }
+
   complete(input: Readonly<{
     agentId: string;
     reservationId: string;

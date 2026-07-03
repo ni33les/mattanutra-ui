@@ -1182,7 +1182,7 @@ export async function loadDelightExistingProducts() {
     left join public.product_regulatory_approvals
       on product_regulatory_approvals.product_id = products.id
       and product_regulatory_approvals.status in ('sourced', 'verified')
-    where products.status <> 'ignored'
+    where products.status not in ('ignored', 'deleted')
     group by products.id
   `;
 

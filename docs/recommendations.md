@@ -258,7 +258,7 @@ Use the "Reloadable Catalogue Snapshot" (`npm run catalogue:snapshot`) as the gu
 - Add `lint-staged` + husky pre-commit hooks (typecheck + lint + test on staged files).
 - Add a GitHub Actions CI workflow (or DO equivalent) that runs `npm run typecheck && npm run lint && npm test`.
 - Replace many `console.log/error` in production paths with a lightweight logger (or just structured JSON).
-- Review the many bearer-token auth surfaces (ADMIN_CLAW_TOKEN, WORKER_API_TOKEN, dashboard tokens) for consistency and rate-limiting.
+- Keep shared-token auth as audited break-glass only and continue converging machine callers onto DB-managed scoped agent credentials with route-level rate limits.
 - Consider extracting the task engine into its own small package if it stabilizes (currently very healthy).
 
 ---

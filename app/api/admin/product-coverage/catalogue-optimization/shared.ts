@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   adminCsrfCookieName,
   adminSessionCookieName,
-  legacyAdminContext,
   resolveAdminSession
 } from "@/lib/admin-access";
 import { adminViewAllowed } from "@/lib/admin-rbac";
@@ -22,30 +21,16 @@ export function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export function accessTokenFromRequest(
-  request: NextRequest,
-  body: Record<string, unknown>
-) {
-  const url = new URL(request.url);
-
-  return (
-    text(request.headers.get("x-admin-dashboard-token")) ||
-    text(body.accessToken) ||
-    text(url.searchParams.get("access_token")) ||
-    null
-  );
-}
-
 export async function adminContext(
   request: NextRequest,
-  body: Record<string, unknown>
+  _body: Record<string, unknown>
 ) {
-  const session = await resolveAdminSession({
+  void _body;
+
+  return resolveAdminSession({
     csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
     sessionCookie: request.cookies.get(adminSessionCookieName)?.value
   });
-
-  return session ?? legacyAdminContext(accessTokenFromRequest(request, body));
 }
 
 export async function rejectUnauthorizedPlanCoverageRequest(
@@ -65,6 +50,11 @@ export async function rejectUnauthorizedPlanCoverageRequest(
     !adminViewAllowed(
       context,
       "plan-coverage-simulator",
+      context.effectiveOrganisation.type
+    ) &&
+    !adminViewAllowed(
+      context,
+      "product-optimisation",
       context.effectiveOrganisation.type
     )
   ) {
@@ -137,4 +127,3 @@ export function potentialCandidateHash(candidates: readonly ProductCandidate[]) 
     .update(JSON.stringify(hashableCandidates))
     .digest("hex");
 }
-

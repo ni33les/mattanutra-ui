@@ -28,6 +28,7 @@ const requiredTables = [
   "retail_sellable_products",
   "retail_shopping_list_lines",
   "retail_shopping_lists",
+  "supplement_country_availability",
   "tasks",
   "worker_sessions",
 ];

@@ -560,7 +560,7 @@ test("admin DB object titles are rendered through localized translation helpers"
   assert.match(dashboard, /foodsData=\{foodsData\}/);
 
   assert.match(dashboardPage, /getAdminProductCoverageData/);
-  assert.doesNotMatch(dashboardPage, /getAdminPlanCoverageSimulationData/);
+  assert.match(dashboardPage, /getAdminPlanCoverageSimulationData/);
   assert.match(simulationInputRoute, /getAdminPlanCoverageSimulationData/);
   assert.doesNotMatch(dashboardPage, /getAdminSupplementImprovementInsightsData/);
   assert.doesNotMatch(dashboardPage, /getAdminProductImprovementInsightsData\(range,\s*locale\)/);

@@ -1,16 +1,18 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
+import { toJsonValue } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { analyzeFormulationWithGrok } from "@/lib/formulation-analysis";
 import { buildProductNeeds } from "@/lib/product-recommendation-needs";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
 import {
   DEFAULT_SIMULATION_SEED,
+  ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
   SIMULATION_ARCHETYPES,
   normalizeDemandProfiles,
   normalizeSyntheticPlanArchetypes,
@@ -27,6 +29,80 @@ import {
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_REASONING_EFFORT = "low";
+export const ADMIN_PRODUCT_COVERAGE_QUESTIONNAIRE_SCHEMA_VERSION = "v1";
+export const ADMIN_PRODUCT_COVERAGE_QUESTIONNAIRE_PROMPT_VERSION = "v1";
+export const ADMIN_PRODUCT_COVERAGE_FORMULATION_CACHE_VERSION = "v1";
+const DEMAND_CACHE_GENERATION_STALE_MINUTES = 10;
+const DEMAND_CACHE_READY_WAIT_MS = 20_000;
+const DEMAND_CACHE_READY_POLL_MS = 350;
+
+export type AdminPlanDemandProfileCacheStatus = "answers_hit" | "hit" | "miss";
+
+export type AdminPlanDemandProfileCacheMetadata = Readonly<{
+  demandKey: string;
+  questionnaireKey: string;
+  status: AdminPlanDemandProfileCacheStatus;
+}>;
+
+export type CachedAdminPlanCoverageDemandProfileResult = Readonly<{
+  cache: AdminPlanDemandProfileCacheMetadata;
+  profile: AdminPlanCoverageDemandProfile;
+}>;
+
+export type AdminPlanDemandProfileBatchCacheMetadata = Readonly<{
+  answerHitSampleIndexes: readonly number[];
+  demandKey: string;
+  questionnaireKey: string;
+  requestedSamples: number;
+  totalCached: number;
+}>;
+
+export type CachedAdminPlanCoverageDemandProfilesBatchResult = Readonly<{
+  cache: AdminPlanDemandProfileBatchCacheMetadata;
+  missingSampleIndexes: readonly number[];
+  profiles: readonly AdminPlanCoverageDemandProfile[];
+}>;
+
+type AdminPlanDemandProfileCacheInput = Readonly<{
+  archetypes?: readonly SyntheticPlanArchetype[] | null;
+  countryCode?: string | null;
+  locale?: Locale | null;
+  sampleIndex?: number | null;
+  sampleIndexes?: readonly unknown[] | null;
+  seed?: string | null;
+  supplementGovernanceHash?: string | null;
+  supplements?: readonly unknown[] | null;
+}>;
+
+type DemandCacheContext = Readonly<{
+  archetypes: readonly SyntheticPlanArchetype[];
+  countryCode: string;
+  demandKey: string;
+  keyMetadata: Record<string, unknown>;
+  locale: Locale;
+  questionnaireKey: string;
+  seed: string;
+  supplementGovernanceHash: string;
+  supplements: readonly NormalizedDemandCacheSupplement[];
+}>;
+
+type NormalizedDemandCacheSupplement = Readonly<{
+  category: string | null;
+  id: string;
+  name: string;
+  normalizedName: string;
+  targetComparableAmount: number | null;
+}>;
+
+type DemandCacheProfileRow = Readonly<{
+  profile: unknown;
+  sample_index: number;
+}>;
+
+type DemandCacheAnswersRow = Readonly<{
+  answers: unknown;
+  sample_index: number;
+}>;
 
 const optionValues = {
   activity: ["sitting", "light", "moderate", "active", "athlete"],
@@ -142,14 +218,60 @@ const foodFrequencyDefaults = {
   redmeat: "1-2"
 };
 
-function grokConfig() {
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stableValue);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([first], [second]) => first.localeCompare(second))
+        .map(([key, entry]) => [key, stableValue(entry)])
+    );
+  }
+
+  return value;
+}
+
+function stableJson(value: unknown) {
+  return JSON.stringify(stableValue(value));
+}
+
+function stableHash(value: unknown) {
+  return createHash("sha256").update(stableJson(value)).digest("hex");
+}
+
+function demandGrokModelMetadata() {
   return {
-    apiKey: getRequiredXaiApiKey(),
     model: configuredGrokModel(process.env.GROK_MODEL),
     reasoningEffort:
       configuredGrokValue(process.env.PRODUCT_COVERAGE_DEMAND_REASONING_EFFORT) ||
       configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
       DEFAULT_REASONING_EFFORT
+  };
+}
+
+function formulationCacheMetadata() {
+  return {
+    model: configuredGrokModel(process.env.GROK_MODEL),
+    promptVersion:
+      configuredGrokValue(process.env.FORMULATION_PROMPT_VERSION) || "v1",
+    reasoningEffort:
+      configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
+      DEFAULT_REASONING_EFFORT,
+    version: ADMIN_PRODUCT_COVERAGE_FORMULATION_CACHE_VERSION
+  };
+}
+
+function grokConfig() {
+  const metadata = demandGrokModelMetadata();
+
+  return {
+    apiKey: getRequiredXaiApiKey(),
+    model: metadata.model,
+    reasoningEffort: metadata.reasoningEffort
   };
 }
 
@@ -161,6 +283,146 @@ function recordFromUnknown(value: unknown) {
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function numberOrNull(value: unknown) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeDemandSampleIndex(value: unknown) {
+  const parsed = Math.round(Number(value) || 0);
+
+  return Math.max(
+    0,
+    Math.min(ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES - 1, parsed)
+  );
+}
+
+function normalizeDemandSampleIndexes(value: readonly unknown[] | null | undefined) {
+  const rawIndexes = Array.isArray(value)
+    ? value
+    : Array.from(
+        { length: ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES },
+        (_, index) => index
+      );
+  const indexes = new Set<number>();
+
+  for (const item of rawIndexes) {
+    indexes.add(normalizeDemandSampleIndex(item));
+  }
+
+  return [...indexes].sort((first, second) => first - second);
+}
+
+function normalizeDemandCacheSupplements(
+  value: readonly unknown[] | null | undefined
+) {
+  const supplements = Array.isArray(value) ? value : [];
+
+  return supplements
+    .map((supplement): NormalizedDemandCacheSupplement | null => {
+      const record = recordFromUnknown(supplement);
+      const id = text(record.id);
+      const name = text(record.name);
+
+      if (!id && !name) {
+        return null;
+      }
+
+      return {
+        category: text(record.category) || null,
+        id,
+        name,
+        normalizedName: text(record.normalizedName),
+        targetComparableAmount: numberOrNull(record.targetComparableAmount)
+      };
+    })
+    .filter((supplement): supplement is NormalizedDemandCacheSupplement =>
+      supplement !== null
+    )
+    .sort((first, second) =>
+      first.id.localeCompare(second.id) ||
+      first.normalizedName.localeCompare(second.normalizedName) ||
+      first.name.localeCompare(second.name)
+    );
+}
+
+function normalizedArchetypeForCache(archetype: SyntheticPlanArchetype) {
+  return {
+    clientSex: archetype.clientSex,
+    description: archetype.description,
+    goals: archetype.goals,
+    id: archetype.id,
+    medications: archetype.medications,
+    name: archetype.name,
+    needCount: archetype.needCount,
+    preferredSupplementNames: archetype.preferredSupplementNames,
+    source: archetype.source
+  };
+}
+
+function normalizeDemandCacheContext(
+  input: AdminPlanDemandProfileCacheInput
+): DemandCacheContext {
+  const seed = input.seed?.trim() || DEFAULT_SIMULATION_SEED;
+  const countryCode = normalizeSupplementAvailabilityCountryCode(input.countryCode);
+  const archetypes = normalizeSyntheticPlanArchetypes(
+    input.archetypes && input.archetypes.length > 0
+      ? input.archetypes
+      : SIMULATION_ARCHETYPES
+  );
+  const supplements = normalizeDemandCacheSupplements(input.supplements);
+  const supplementGovernanceHash =
+    input.supplementGovernanceHash?.trim() || "supplement-governance:unknown";
+  const questionnaireIdentity = {
+    archetypes: archetypes.map(normalizedArchetypeForCache),
+    countryCode,
+    grok: demandGrokModelMetadata(),
+    optionSchemaVersion: ADMIN_PRODUCT_COVERAGE_QUESTIONNAIRE_SCHEMA_VERSION,
+    optionValues,
+    promptVersion: ADMIN_PRODUCT_COVERAGE_QUESTIONNAIRE_PROMPT_VERSION,
+    seed
+  };
+  const questionnaireKey = `admin-product-coverage-questionnaire:${stableHash(
+    questionnaireIdentity
+  )}`;
+  const demandIdentity = {
+    canonicalSupplementAvailabilityBasis: supplements,
+    countryCode,
+    formulation: formulationCacheMetadata(),
+    locale: input.locale ?? "en",
+    questionnaireKey,
+    supplementGovernanceHash
+  };
+  const demandKey = `admin-product-coverage-demand:${stableHash(demandIdentity)}`;
+
+  return {
+    archetypes,
+    countryCode,
+    demandKey,
+    keyMetadata: {
+      demandIdentity,
+      questionnaireIdentity
+    },
+    locale: input.locale ?? "en",
+    questionnaireKey,
+    seed,
+    supplementGovernanceHash,
+    supplements
+  };
+}
+
+export function adminPlanDemandProfileCacheKeys(
+  input: AdminPlanDemandProfileCacheInput
+) {
+  const context = normalizeDemandCacheContext(input);
+
+  return {
+    demandKey: context.demandKey,
+    questionnaireKey: context.questionnaireKey
+  };
 }
 
 function hashSeed(value: string) {
@@ -528,8 +790,18 @@ async function generateAssessmentAnswersWithAi(input: Readonly<{
 }>) {
   const config = grokConfig();
   const fallback = defaultAnswers(input);
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: config.apiKey,
+    cost: {
+      metadata: {
+        archetypeId: input.archetype.id,
+        countryCode: input.countryCode,
+        sampleIndex: input.sampleIndex,
+        seed: input.seed,
+        source: "admin_plan_demand_generation"
+      },
+      recordUsage: true
+    },
     maxTokens: 2400,
     messages: [
       {
@@ -684,47 +956,35 @@ async function loadCanonicalSupplementOptions(
   }));
 }
 
-export async function generateAdminPlanCoverageDemandProfile(input: Readonly<{
-  archetypes?: readonly SyntheticPlanArchetype[] | null;
-  countryCode?: string | null;
-  locale?: Locale | null;
-  sampleIndex?: number | null;
-  seed?: string | null;
-}>): Promise<AdminPlanCoverageDemandProfile> {
-  const sql = getSql();
+function archetypeForSample(
+  archetypes: readonly SyntheticPlanArchetype[],
+  sampleIndex: number
+) {
+  return archetypes[sampleIndex % archetypes.length]!;
+}
 
-  if (!sql) {
-    throw new Error("Database is not configured");
-  }
-
-  const sampleIndex = Math.max(0, Math.round(Number(input.sampleIndex) || 0));
-  const seed = input.seed?.trim() || DEFAULT_SIMULATION_SEED;
-  const archetypes = normalizeSyntheticPlanArchetypes(
-    input.archetypes && input.archetypes.length > 0
-      ? input.archetypes
-      : SIMULATION_ARCHETYPES
-  );
-  const archetype = archetypes[sampleIndex % archetypes.length]!;
-  const countryCode = normalizeSupplementAvailabilityCountryCode(input.countryCode);
-  const [canonicalSupplements, answers] = await Promise.all([
-    loadCanonicalSupplementOptions(sql, countryCode),
-    generateAssessmentAnswersWithAi({
-      archetype,
-      countryCode,
-      sampleIndex,
-      seed
-    })
-  ]);
+async function buildAdminPlanCoverageDemandProfileFromAnswers(input: Readonly<{
+  answers: Record<string, unknown>;
+  archetype: SyntheticPlanArchetype;
+  canonicalSupplements: readonly CanonicalSupplementOption[];
+  countryCode: string;
+  locale: Locale;
+  sampleIndex: number;
+  sql: NonNullable<ReturnType<typeof getSql>>;
+}>) {
   const analysis = await analyzeFormulationWithGrok({
-    answers,
+    answers: input.answers,
     audit: async () => undefined,
-    canonicalSupplements,
-    locale: input.locale ?? "en",
+    canonicalSupplements: [...input.canonicalSupplements],
+    locale: input.locale,
     plan: "precision",
     planId: randomUUID(),
     taskId: null
   });
-  const availability = await getSupplementEffectiveAvailability(sql, countryCode);
+  const availability = await getSupplementEffectiveAvailability(
+    input.sql,
+    input.countryCode
+  );
   const needs = filterProductNeedsBySupplementAvailability(
     buildProductNeeds({
       foodGuidance: null,
@@ -738,14 +998,17 @@ export async function generateAdminPlanCoverageDemandProfile(input: Readonly<{
   }
 
   const profile = normalizeDemandProfiles([{
-    answers,
-    archetypeId: archetype.id,
-    archetypeName: archetype.name,
-    clientSex: answers.sex === "female" || answers.sex === "male" ? answers.sex : null,
+    answers: input.answers,
+    archetypeId: input.archetype.id,
+    archetypeName: input.archetype.name,
+    clientSex:
+      input.answers.sex === "female" || input.answers.sex === "male"
+        ? input.answers.sex
+        : null,
     generatedAt: new Date().toISOString(),
-    id: `ai-demand-${sampleIndex + 1}-${archetype.id}`,
+    id: `ai-demand-${input.sampleIndex + 1}-${input.archetype.id}`,
     needs,
-    sampleIndex,
+    sampleIndex: input.sampleIndex,
     supplementNames: needs.map((need) => need.displayName)
   }])[0];
 
@@ -754,4 +1017,428 @@ export async function generateAdminPlanCoverageDemandProfile(input: Readonly<{
   }
 
   return profile;
+}
+
+export async function generateAdminPlanCoverageDemandProfile(
+  input: AdminPlanDemandProfileCacheInput
+): Promise<AdminPlanCoverageDemandProfile> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const context = normalizeDemandCacheContext(input);
+  const sampleIndex = normalizeDemandSampleIndex(input.sampleIndex);
+  const archetype = archetypeForSample(context.archetypes, sampleIndex);
+  const [canonicalSupplements, answers] = await Promise.all([
+    loadCanonicalSupplementOptions(sql, context.countryCode),
+    generateAssessmentAnswersWithAi({
+      archetype,
+      countryCode: context.countryCode,
+      sampleIndex,
+      seed: context.seed
+    })
+  ]);
+
+  return buildAdminPlanCoverageDemandProfileFromAnswers({
+    answers,
+    canonicalSupplements,
+    archetype,
+    countryCode: context.countryCode,
+    locale: context.locale,
+    sampleIndex,
+    sql
+  });
+}
+
+function normalizeCachedProfile(row: DemandCacheProfileRow | undefined) {
+  if (!row) {
+    return null;
+  }
+
+  return normalizeDemandProfiles([row.profile])[0] ?? null;
+}
+
+async function readReadyCachedDemandProfile(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  demandKey: string,
+  sampleIndex: number
+) {
+  const rows = await sql<DemandCacheProfileRow[]>`
+    select sample_index, profile
+    from public.admin_product_coverage_demand_profile_cache
+    where demand_key = ${demandKey}
+      and sample_index = ${sampleIndex}
+      and status = 'ready'
+      and profile is not null
+    limit 1
+  `;
+
+  return normalizeCachedProfile(rows[0]);
+}
+
+async function readReadyCachedDemandProfiles(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  demandKey: string,
+  sampleIndexes: readonly number[]
+) {
+  if (sampleIndexes.length < 1) {
+    return [];
+  }
+
+  const rows = await sql<DemandCacheProfileRow[]>`
+    select sample_index, profile
+    from public.admin_product_coverage_demand_profile_cache
+    where demand_key = ${demandKey}
+      and sample_index = any(${sampleIndexes}::int[])
+      and status = 'ready'
+      and profile is not null
+    order by sample_index
+  `;
+
+  return normalizeDemandProfiles(rows.map((row) => row.profile));
+}
+
+async function readCachedQuestionnaireAnswers(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  questionnaireKey: string,
+  sampleIndexes: readonly number[]
+) {
+  if (sampleIndexes.length < 1) {
+    return [];
+  }
+
+  return sql<DemandCacheAnswersRow[]>`
+    select distinct on (sample_index)
+      sample_index,
+      answers
+    from public.admin_product_coverage_demand_profile_cache
+    where questionnaire_key = ${questionnaireKey}
+      and sample_index = any(${sampleIndexes}::int[])
+      and status = 'ready'
+      and answers is not null
+    order by sample_index, updated_at desc
+  `;
+}
+
+async function claimDemandProfileCacheGeneration(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  context: DemandCacheContext,
+  sampleIndex: number
+) {
+  const archetype = archetypeForSample(context.archetypes, sampleIndex);
+  const rows = await sql<Array<{ id: string }>>`
+    insert into public.admin_product_coverage_demand_profile_cache (
+      questionnaire_key,
+      demand_key,
+      sample_index,
+      country_code,
+      seed,
+      archetype_id,
+      archetype_name,
+      status,
+      cache_metadata
+    )
+    values (
+      ${context.questionnaireKey},
+      ${context.demandKey},
+      ${sampleIndex},
+      ${context.countryCode},
+      ${context.seed},
+      ${archetype.id},
+      ${archetype.name},
+      'generating',
+      ${sql.json(toJsonValue({
+        ...context.keyMetadata,
+        claimedAt: new Date().toISOString(),
+        sampleIndex
+      }))}::jsonb
+    )
+    on conflict (demand_key, sample_index) do update
+      set
+        status = excluded.status,
+        cache_metadata = excluded.cache_metadata,
+        error_message = null,
+        updated_at = now()
+      where admin_product_coverage_demand_profile_cache.status = 'failed'
+        or (
+          admin_product_coverage_demand_profile_cache.status = 'generating'
+          and admin_product_coverage_demand_profile_cache.updated_at <
+            now() - (${DEMAND_CACHE_GENERATION_STALE_MINUTES}::int * interval '1 minute')
+        )
+    returning id::text
+  `;
+
+  return rows.length > 0;
+}
+
+async function markDemandProfileCacheFailed(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  context: DemandCacheContext,
+  sampleIndex: number,
+  error: unknown
+) {
+  await sql`
+    update public.admin_product_coverage_demand_profile_cache
+    set
+      status = 'failed',
+      error_message = ${error instanceof Error ? error.message : "Unknown error"},
+      updated_at = now()
+    where demand_key = ${context.demandKey}
+      and sample_index = ${sampleIndex}
+      and status = 'generating'
+  `;
+}
+
+async function persistReadyDemandProfileCache(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  context: DemandCacheContext,
+  sampleIndex: number,
+  answers: Record<string, unknown>,
+  profile: AdminPlanCoverageDemandProfile,
+  cacheStatus: AdminPlanDemandProfileCacheStatus
+) {
+  const archetype = archetypeForSample(context.archetypes, sampleIndex);
+
+  await sql`
+    insert into public.admin_product_coverage_demand_profile_cache (
+      questionnaire_key,
+      demand_key,
+      sample_index,
+      country_code,
+      seed,
+      archetype_id,
+      archetype_name,
+      answers,
+      needs,
+      profile,
+      status,
+      error_message,
+      cache_metadata
+    )
+    values (
+      ${context.questionnaireKey},
+      ${context.demandKey},
+      ${sampleIndex},
+      ${context.countryCode},
+      ${context.seed},
+      ${archetype.id},
+      ${archetype.name},
+      ${sql.json(toJsonValue(answers))}::jsonb,
+      ${sql.json(toJsonValue(profile.needs))}::jsonb,
+      ${sql.json(toJsonValue(profile))}::jsonb,
+      'ready',
+      null,
+      ${sql.json(toJsonValue({
+        ...context.keyMetadata,
+        cacheStatus,
+        sampleIndex,
+        storedAt: new Date().toISOString()
+      }))}::jsonb
+    )
+    on conflict (demand_key, sample_index) do update
+      set
+        questionnaire_key = excluded.questionnaire_key,
+        country_code = excluded.country_code,
+        seed = excluded.seed,
+        archetype_id = excluded.archetype_id,
+        archetype_name = excluded.archetype_name,
+        answers = excluded.answers,
+        needs = excluded.needs,
+        profile = excluded.profile,
+        status = excluded.status,
+        error_message = null,
+        cache_metadata = excluded.cache_metadata,
+        updated_at = now()
+  `;
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function waitForReadyCachedDemandProfile(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  demandKey: string,
+  sampleIndex: number
+) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < DEMAND_CACHE_READY_WAIT_MS) {
+    await sleep(DEMAND_CACHE_READY_POLL_MS);
+
+    const profile = await readReadyCachedDemandProfile(
+      sql,
+      demandKey,
+      sampleIndex
+    );
+
+    if (profile) {
+      return profile;
+    }
+  }
+
+  return null;
+}
+
+export async function readCachedAdminPlanCoverageDemandProfiles(
+  input: AdminPlanDemandProfileCacheInput
+): Promise<CachedAdminPlanCoverageDemandProfilesBatchResult> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const context = normalizeDemandCacheContext(input);
+  const sampleIndexes = normalizeDemandSampleIndexes(input.sampleIndexes);
+  const profiles = await readReadyCachedDemandProfiles(
+    sql,
+    context.demandKey,
+    sampleIndexes
+  );
+  const cachedSampleIndexes = new Set(profiles.map((profile) => profile.sampleIndex));
+  const missingSampleIndexes = sampleIndexes.filter(
+    (sampleIndex) => !cachedSampleIndexes.has(sampleIndex)
+  );
+  const answerRows = await readCachedQuestionnaireAnswers(
+    sql,
+    context.questionnaireKey,
+    missingSampleIndexes
+  );
+
+  return {
+    cache: {
+      answerHitSampleIndexes: answerRows.map((row) => row.sample_index),
+      demandKey: context.demandKey,
+      questionnaireKey: context.questionnaireKey,
+      requestedSamples: sampleIndexes.length,
+      totalCached: profiles.length
+    },
+    missingSampleIndexes,
+    profiles
+  };
+}
+
+export async function getOrGenerateCachedAdminPlanCoverageDemandProfile(
+  input: AdminPlanDemandProfileCacheInput
+): Promise<CachedAdminPlanCoverageDemandProfileResult> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const context = normalizeDemandCacheContext(input);
+  const sampleIndex = normalizeDemandSampleIndex(input.sampleIndex);
+  const cachedProfile = await readReadyCachedDemandProfile(
+    sql,
+    context.demandKey,
+    sampleIndex
+  );
+
+  if (cachedProfile) {
+    return {
+      cache: {
+        demandKey: context.demandKey,
+        questionnaireKey: context.questionnaireKey,
+        status: "hit"
+      },
+      profile: cachedProfile
+    };
+  }
+
+  const claimed = await claimDemandProfileCacheGeneration(
+    sql,
+    context,
+    sampleIndex
+  );
+
+  if (!claimed) {
+    const waitedProfile = await waitForReadyCachedDemandProfile(
+      sql,
+      context.demandKey,
+      sampleIndex
+    );
+
+    if (waitedProfile) {
+      return {
+        cache: {
+          demandKey: context.demandKey,
+          questionnaireKey: context.questionnaireKey,
+          status: "hit"
+        },
+        profile: waitedProfile
+      };
+    }
+
+    throw new Error(
+      "Demand profile is already being generated. Try again in a moment."
+    );
+  }
+
+  try {
+    const [answersHit] = await readCachedQuestionnaireAnswers(
+      sql,
+      context.questionnaireKey,
+      [sampleIndex]
+    );
+    const archetype = archetypeForSample(context.archetypes, sampleIndex);
+    const canonicalSupplements = await loadCanonicalSupplementOptions(
+      sql,
+      context.countryCode
+    );
+    const cacheStatus: AdminPlanDemandProfileCacheStatus = answersHit
+      ? "answers_hit"
+      : "miss";
+    const answers = answersHit
+      ? sanitizeAnswers(
+          answersHit.answers,
+          defaultAnswers({
+            archetype,
+            countryCode: context.countryCode,
+            sampleIndex,
+            seed: context.seed
+          })
+        )
+      : await generateAssessmentAnswersWithAi({
+          archetype,
+          countryCode: context.countryCode,
+          sampleIndex,
+          seed: context.seed
+        });
+    const profile = await buildAdminPlanCoverageDemandProfileFromAnswers({
+      answers,
+      archetype,
+      canonicalSupplements,
+      countryCode: context.countryCode,
+      locale: context.locale,
+      sampleIndex,
+      sql
+    });
+
+    await persistReadyDemandProfileCache(
+      sql,
+      context,
+      sampleIndex,
+      answers,
+      profile,
+      cacheStatus
+    );
+
+    return {
+      cache: {
+        demandKey: context.demandKey,
+        questionnaireKey: context.questionnaireKey,
+        status: cacheStatus
+      },
+      profile
+    };
+  } catch (error) {
+    await markDemandProfileCacheFailed(sql, context, sampleIndex, error);
+    throw error;
+  }
 }

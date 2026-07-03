@@ -2581,6 +2581,15 @@ export async function applyTaskFailureResult({
     return resultPayload;
   }
 
+  if (task.taskType === "admin_catalogue_optimization_job") {
+    return {
+      ...objectValue(resultPayload),
+      errorMessage,
+      message: "Optimum basket failed",
+      stage: "failed"
+    };
+  }
+
   let shouldUpdateAssessmentFailure = true;
 
   if (

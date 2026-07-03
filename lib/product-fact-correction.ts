@@ -13,7 +13,7 @@ import {
   type ProductConfidence
 } from "@/lib/product-recommendations";
 import {
-  callGrokChatCompletion,
+  callGovernedGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
   getRequiredXaiApiKey,
@@ -467,8 +467,16 @@ async function callGrok(input: Readonly<{
       "Never invent ingredients or doses that are not supported by the supplied product page data."
     ];
 
-  const completion = await callGrokChatCompletion({
+  const completion = await callGovernedGrokChatCompletion({
     apiKey: grok.apiKey,
+    cost: {
+      metadata: {
+        accountingPath: "manual_record_xai_usage_cost",
+        productId: input.product.id,
+        productTitle: input.product.title
+      },
+      recordUsage: false
+    },
     maxTokens: 2200,
     messages: [
       {
@@ -655,8 +663,16 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
     : textUserMessage;
 
   async function request(messages: Array<{ content: unknown; role: "system" | "user" }>) {
-    return callGrokChatCompletion({
+    return callGovernedGrokChatCompletion({
       apiKey: grok.apiKey,
+      cost: {
+        metadata: {
+          accountingPath: "manual_record_xai_usage_cost",
+          productId: input.product.id,
+          productTitle: input.product.title
+        },
+        recordUsage: false
+      },
       maxTokens: 2600,
       messages,
       model: grok.model,

@@ -86,6 +86,7 @@ import { AdminLeadsView } from "@/components/admin/marketing-leads";
 import { AdminCustomerInsightsView } from "@/components/admin/customer-insights-view";
 import {
   AdminPlanCoverageSimulatorView,
+  AdminProductOptimisationView,
   AdminProductCoverageView
 } from "@/components/admin/product-coverage-view";
 import { AdminCommunicationsView } from "@/components/admin/communications-view";
@@ -138,6 +139,11 @@ const pageDescriptions: Partial<Record<AdminDashboardView, Record<Locale, string
     en: "Run synthetic customer plans against the current eligible catalogue. Results appear one sample at a time, improve as the run grows, and never write recommendation runs, tasks, BPM events, or customer records.",
     th: "จำลองแผนลูกค้ากับแคตตาล็อกที่พร้อมจับคู่ในปัจจุบัน ผลลัพธ์จะเพิ่มทีละตัวอย่างและไม่เขียน recommendation runs, tasks, BPM events หรือข้อมูลลูกค้า",
     "zh-CN": "用当前可匹配目录运行合成客户方案模拟。结果会逐个样本更新，并且不会写入推荐运行、任务、BPM 事件或客户记录。"
+  },
+  "product-optimisation": {
+    en: "Run the product basket optimiser as a shared Analytics worker job, then review the carry and remove recommendations.",
+    th: "รันตัวปรับตะกร้าสินค้าผ่านงาน Analytics worker แล้วตรวจสอบคำแนะนำสินค้าที่ควรคงไว้และนำออก",
+    "zh-CN": "通过 Analytics worker 运行产品篮优化，并查看保留和移除建议。"
   },
   "product-coverage": {
     en: "Shows every active supplement and whether the master product catalogue has clean, approved, retail-available products that can match it. Open a supplement to see which products need cleanup.",
@@ -350,7 +356,7 @@ function adminViewDatabaseAvailable({
     return productDetailData?.databaseAvailable ?? productsData.databaseAvailable;
   }
 
-  if (view === "plan-coverage-simulator") {
+  if (view === "plan-coverage-simulator" || view === "product-optimisation") {
     return planCoverageSimulationData.databaseAvailable;
   }
 
@@ -794,6 +800,13 @@ export function AdminDashboard({
             />
           ) : view === "plan-coverage-simulator" ? (
             <AdminPlanCoverageSimulatorView
+              accessToken={accessToken}
+              data={planCoverageSimulationData}
+              locale={locale}
+              range={data.range}
+            />
+          ) : view === "product-optimisation" ? (
+            <AdminProductOptimisationView
               accessToken={accessToken}
               data={planCoverageSimulationData}
               locale={locale}

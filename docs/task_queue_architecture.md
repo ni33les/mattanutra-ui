@@ -124,19 +124,27 @@ Task groups with one task are uncolored. Multi-task groups receive a stable subt
 
 ## API Rules
 
-Admin machine APIs use `ADMIN_CLAW_TOKEN`.
+Human admin APIs use signed passkey sessions plus CSRF/origin checks and route-specific RBAC permissions.
 
-Dashboard URLs use `ADMIN_DASHBOARD_TOKEN` and must not be accepted for worker APIs.
-
-Workers use:
+Machine APIs use DB-managed agent credentials:
 
 ```http
-Authorization: Bearer <WORKER_API_TOKEN>
+Authorization: Bearer <AGENT_API_KEY>
 ```
+
+or:
+
+```http
+x-agent-api-key: <AGENT_API_KEY>
+```
+
+OpenClaw, admin query, communications, cron, and worker execution callers must resolve to scoped `platform_agent` or `retail_agent` principals with the required organisation, role, permission, and capability set. Legacy `ADMIN_CLAW_TOKEN` and `WORKER_API_TOKEN` are audited break-glass paths only when `MATTANUTRA_LEGACY_TOKEN_AUTH=allow`.
+
+Dashboard URLs can use `ADMIN_DASHBOARD_TOKEN` only for browser bootstrap/login compatibility. Dashboard tokens must not be accepted for worker APIs, OpenClaw APIs, admin query APIs, communications APIs, or cron.
 
 External workers need:
 
-- `WORKER_API_TOKEN`
+- profile-specific DB-managed keys such as `WORKER_HEALTHSCORE_AGENT_API_KEY`, `WORKER_FORMULATION_AGENT_API_KEY`, and `WORKER_PRODUCTS_AGENT_API_KEY`
 - `WORKER_API_BASE_URL` or `MATTANUTRA_API_BASE_URL`
 - provider secrets for their own capability only
 - optional `WORKER_CONCURRENCY`, profile-specific overrides such as `WORKER_HEALTHSCORE_CONCURRENCY` and `WORKER_FORMULATION_CONCURRENCY`, `WORKER_LEASE_SECONDS`, and `WORKER_POLL_WAIT_SECONDS`
