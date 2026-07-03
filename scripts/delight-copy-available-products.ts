@@ -1,8 +1,7 @@
 import {
-  assertProductListRolloutDatabaseTarget,
-  type ProductListRolloutEnvironment
-} from "@/lib/product-list-rollout";
-import { runDelightAvailableProductsRollout } from "@/lib/delight-available-products-rollout";
+  type DelightAvailableProductsRolloutEnvironment,
+  runDelightAvailableProductsRollout
+} from "@/lib/delight-available-products-rollout";
 
 function argValue(name: string) {
   const prefix = `--${name}=`;
@@ -19,7 +18,7 @@ function hasArg(name: string) {
   return process.argv.includes(`--${name}`);
 }
 
-function environmentFromArgs(): ProductListRolloutEnvironment {
+function environmentFromArgs(): DelightAvailableProductsRolloutEnvironment {
   const raw = argValue("env") ?? process.env.MATTANUTRA_ENV ?? "dev";
   const normalized = raw.trim().toLowerCase();
 
@@ -29,6 +28,10 @@ function environmentFromArgs(): ProductListRolloutEnvironment {
 
   if (normalized === "uat" || normalized === "staging" || normalized === "stage") {
     return "uat";
+  }
+
+  if (normalized === "prd" || normalized === "prod" || normalized === "production") {
+    return "prd";
   }
 
   throw new Error(`Unsupported Delight available product rollout environment: ${raw}`);
@@ -59,7 +62,7 @@ function deriveUatDbUrl(value: string | undefined) {
   return url.toString();
 }
 
-function dbUrlForEnvironment(environment: ProductListRolloutEnvironment) {
+function dbUrlForEnvironment(environment: DelightAvailableProductsRolloutEnvironment) {
   const explicitEnvName = argValue("db-url-env");
 
   if (explicitEnvName) {
@@ -70,14 +73,16 @@ function dbUrlForEnvironment(environment: ProductListRolloutEnvironment) {
     return process.env.UAT_DB_URL ?? deriveUatDbUrl(process.env.DB_URL);
   }
 
+  if (environment === "prd") {
+    return process.env.PRD_DB_URL ?? process.env.DB_URL ?? null;
+  }
+
   return process.env.DB_URL ?? null;
 }
 
 async function main() {
   const environment = environmentFromArgs();
   const dbUrl = dbUrlForEnvironment(environment);
-
-  assertProductListRolloutDatabaseTarget(dbUrl ?? undefined, environment);
 
   const summary = await runDelightAvailableProductsRollout({
     apply: hasArg("apply"),

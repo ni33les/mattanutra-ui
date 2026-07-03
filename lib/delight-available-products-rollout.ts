@@ -11,6 +11,16 @@ import {
   assertProductListRolloutDatabaseTarget,
   type ProductListRolloutEnvironment
 } from "@/lib/product-list-rollout";
+import {
+  assertPrdApplyConfirmation,
+  assertPrdDatabaseTarget,
+  assertPrdPreserveConfirmation,
+  assertPrdRuntimeEnvironment
+} from "@/lib/prd-rollout-safety";
+
+export type DelightAvailableProductsRolloutEnvironment =
+  | ProductListRolloutEnvironment
+  | "prd";
 
 export type DelightAvailableProductBlocker =
   | "country_blocked_supplement"
@@ -52,7 +62,7 @@ export type DelightAvailableProductsRolloutSummary = Readonly<{
   blockerCounts: Record<DelightAvailableProductBlocker, number>;
   copied: number;
   dryRun: boolean;
-  environment: ProductListRolloutEnvironment;
+  environment: DelightAvailableProductsRolloutEnvironment;
   generatedAt: string;
   reportDirectory: string;
   repairedBrandCountries: number;
@@ -66,7 +76,7 @@ export type DelightAvailableProductsRolloutSummary = Readonly<{
 export type RunDelightAvailableProductsRolloutInput = Readonly<{
   apply?: boolean;
   dbUrl?: string | null;
-  environment: ProductListRolloutEnvironment;
+  environment: DelightAvailableProductsRolloutEnvironment;
   outputDir?: string | null;
 }>;
 
@@ -213,10 +223,33 @@ function addBlockerCounts(
   }
 }
 
-function defaultOutputDir(environment: ProductListRolloutEnvironment) {
+function defaultOutputDir(environment: DelightAvailableProductsRolloutEnvironment) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 
   return path.join("reports", "delight-available-products", `${environment}-${stamp}`);
+}
+
+export function assertDelightAvailableProductsRolloutTarget(input: Readonly<{
+  apply: boolean;
+  dbUrl?: string | null;
+  environment: DelightAvailableProductsRolloutEnvironment;
+}>) {
+  if (input.environment !== "prd") {
+    assertProductListRolloutDatabaseTarget(input.dbUrl ?? undefined, input.environment);
+    return;
+  }
+
+  assertPrdRuntimeEnvironment();
+  assertPrdDatabaseTarget(input.dbUrl, "PRD_DB_URL/DB_URL");
+
+  if (input.apply) {
+    assertPrdPreserveConfirmation();
+    assertPrdApplyConfirmation({
+      envName: "MATTANUTRA_CONFIRM_PRD_DELIGHT_COPY",
+      expected: "copy-delight",
+      label: "PRD Delight available product copy"
+    });
+  }
 }
 
 async function writeReportFile(filePath: string, contents: string) {
@@ -643,7 +676,11 @@ export async function runDelightAvailableProductsRollout(
   }
 
   process.env.MATTANUTRA_ENV = input.environment;
-  assertProductListRolloutDatabaseTarget(process.env.DB_URL, input.environment);
+  assertDelightAvailableProductsRolloutTarget({
+    apply: Boolean(input.apply),
+    dbUrl: process.env.DB_URL,
+    environment: input.environment
+  });
 
   const sql = getSql();
 

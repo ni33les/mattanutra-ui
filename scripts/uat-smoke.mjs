@@ -1,6 +1,10 @@
 import { createHmac } from "node:crypto";
 import { spawn } from "node:child_process";
 import postgres from "postgres";
+import {
+  platformWorkerModeRunsProfile,
+  requiredRuntimeWorkerProfiles,
+} from "./runtime-worker-profiles.mjs";
 
 const targetBaseUrl = (
   process.env.UAT_SITE_URL || "https://uat.mattanutra.com"
@@ -33,6 +37,7 @@ const requiredTables = [
   "worker_sessions",
 ];
 const criticalTaskTypes = [
+  "admin_catalogue_optimization_job",
   "customer_chat_reply",
   "carrier_event_process",
   "dispatch_chat_communication_message",
@@ -43,21 +48,7 @@ const criticalTaskTypes = [
   "route_admin_communication",
   "send_retail_order_workflow_email",
 ];
-const requiredWorkerProfiles = [
-  { envKey: "WORKER_ADVISOR_AGENT_API_KEY", mode: "advisor" },
-  { envKey: "WORKER_CARRIER_AGENT_API_KEY", mode: "carrier" },
-  { envKey: "WORKER_CHAT_AGENT_API_KEY", mode: "chat" },
-  { envKey: "WORKER_COMMUNICATIONS_AGENT_API_KEY", mode: "communications" },
-  { envKey: "WORKER_CONTENT_AGENT_API_KEY", mode: "content" },
-  { envKey: "WORKER_EMAIL_AGENT_API_KEY", mode: "email" },
-  { envKey: "WORKER_FOOD_AGENT_API_KEY", mode: "food" },
-  { envKey: "WORKER_FORMULATION_AGENT_API_KEY", mode: "formulation" },
-  { envKey: "WORKER_HEALTHSCORE_AGENT_API_KEY", mode: "healthscore" },
-  { envKey: "WORKER_HOSTING_AGENT_API_KEY", mode: "hosting" },
-  { envKey: "WORKER_PANYA_AGENT_API_KEY", mode: "panya" },
-  { envKey: "WORKER_PRODUCTS_AGENT_API_KEY", mode: "products" },
-  { envKey: "WORKER_STOCK_AGENT_API_KEY", mode: "stock" },
-];
+const requiredWorkerProfiles = requiredRuntimeWorkerProfiles("uat");
 const requiredUatAppEnvKeys = requiredWorkerProfiles.map(
   (profile) => profile.envKey,
 );
@@ -98,7 +89,7 @@ async function checkRoute(path) {
     const response = await fetch(url, {
       redirect: "manual",
     });
-    const ok = response.status >= 200 && response.status < 500;
+    const ok = response.status >= 200 && response.status < 400;
 
     record(`route ${path}`, ok, `status=${response.status}`);
   } catch (error) {
@@ -153,13 +144,27 @@ async function checkDigitalOceanDeployment() {
       },
     );
     const appData = await appResponse.json();
+    const componentName =
+      process.env.UAT_DIGITALOCEAN_COMPONENT_NAME?.trim() ||
+      process.env.UAT_DIGITALOCEAN_SERVICE_NAME?.trim() ||
+      "mattanutra-ui";
     const envKeys = configuredEnvKeysFromAppSpec(appData.app?.spec);
     const serviceEnvKeys = configuredServiceEnvKeysFromAppSpec(
       appData.app?.spec,
-      process.env.UAT_DIGITALOCEAN_COMPONENT_NAME?.trim() ||
-        process.env.UAT_DIGITALOCEAN_SERVICE_NAME?.trim() ||
-        "mattanutra-ui",
+      componentName,
     );
+    const environmentMode = configuredEnvValueFromAppSpec(
+      appData.app?.spec,
+      "MATTANUTRA_ENV",
+      componentName,
+    );
+    const platformWorkerMode =
+      configuredEnvValueFromAppSpec(
+        appData.app?.spec,
+        "PLATFORM_WORKER_MODE",
+        componentName,
+      ) ||
+      "all";
     const missingEnvKeys = requiredUatAppEnvKeys.filter(
       (key) => !envKeys.has(key),
     );
@@ -179,6 +184,18 @@ async function checkDigitalOceanDeployment() {
           ? "DB_URL configured on app and service"
           : "DB_URL configured at app level"
         : "DB_URL missing from app spec",
+    );
+    record(
+      "DigitalOcean runtime environment",
+      environmentMode === "uat",
+      environmentMode
+        ? `MATTANUTRA_ENV=${environmentMode}`
+        : "MATTANUTRA_ENV missing from app spec",
+    );
+    record(
+      "DigitalOcean optimisation worker mode",
+      platformWorkerModeRunsProfile(platformWorkerMode, "analytics"),
+      `PLATFORM_WORKER_MODE=${platformWorkerMode}`,
     );
     const hasSpacesEndpoint = envKeys.has("DO_SPACES_ENDPOINT");
     const hasSpacesCdn =
@@ -414,6 +431,32 @@ function configuredServiceEnvKeysFromAppSpec(spec, serviceName) {
 
   return new Set(
     (service?.envs ?? []).map((envVar) => envVar?.key).filter(Boolean),
+  );
+}
+
+function configuredEnvValueFromAppSpec(spec, key, componentName = "") {
+  const collect = (envs) => {
+    for (const envVar of envs ?? []) {
+      if (envVar?.key === key && String(envVar.value ?? "").trim()) {
+        return String(envVar.value).trim();
+      }
+    }
+
+    return "";
+  };
+  const component = [
+    ...(spec?.services ?? []),
+    ...(spec?.workers ?? []),
+    ...(spec?.jobs ?? []),
+  ].find((candidate) => candidate?.name === componentName);
+
+  return (
+    collect(component?.envs) ||
+    collect(spec?.envs) ||
+    (spec?.services ?? []).map((service) => collect(service.envs)).find(Boolean) ||
+    (spec?.workers ?? []).map((worker) => collect(worker.envs)).find(Boolean) ||
+    (spec?.jobs ?? []).map((job) => collect(job.envs)).find(Boolean) ||
+    ""
   );
 }
 
@@ -730,6 +773,7 @@ async function main() {
 
   await checkRoute("/en");
   await checkRoute("/en/admin/login");
+  await checkRoute("/en/admin/dashboard?view=product-optimisation");
   await checkRoute("/en/nutrition/quiz");
   await checkDigitalOceanDeployment();
   await checkLineWebhook();

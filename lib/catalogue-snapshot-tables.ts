@@ -48,6 +48,11 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
+    description: "Country-specific supplement allow/block overrides used by product matching.",
+    name: "supplement_country_availability",
+    requiredForReload: true
+  },
+  {
     description: "Manufacturer/brand projection rows.",
     name: "product_brands",
     requiredForReload: true
@@ -163,6 +168,7 @@ export const CATALOGUE_RELOAD_ORDER = [
   "supplement_safety_limits",
   "supplement_translations",
   "supplement_versions",
+  "supplement_country_availability",
   "product_brands",
   "product_brand_countries",
   "products",
@@ -209,6 +215,7 @@ export const CATALOGUE_TRUNCATE_ORDER = [
   "product_brand_countries",
   "product_brands",
   "supplement_versions",
+  "supplement_country_availability",
   "supplement_translations",
   "supplement_safety_limits",
   "supplement_aliases",

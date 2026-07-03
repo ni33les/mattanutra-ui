@@ -94,6 +94,8 @@ function uatSchemaDatabaseEnv() {
     DB_ALLOW_DIRECT_CONNECTION: "true",
     DB_APPLICATION_NAME:
       process.env.DB_APPLICATION_NAME ?? "mattanutra-uat-deploy-schema",
+    DB_OWNER_URL: connection,
+    DB_SCHEMA_URL: connection,
     DB_URL: connection,
     MATTANUTRA_ENV: "uat",
     UAT_DB_URL: uatDbUrl() ?? connection

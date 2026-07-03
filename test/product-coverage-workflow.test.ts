@@ -1401,6 +1401,12 @@ describe("product coverage workflow", () => {
       "scripts/products-master-pending-review.ts",
       "utf8"
     );
+    const runtimeWorkerProfiles = readFileSync(
+      "scripts/runtime-worker-profiles.mjs",
+      "utf8"
+    );
+    const prdSmoke = readFileSync("scripts/prd-smoke.mjs", "utf8");
+    const uatSmoke = readFileSync("scripts/uat-smoke.mjs", "utf8");
     const packageJson = readFileSync("package.json", "utf8");
 
     assert.match(dashboardContent, /"product-coverage"/);
@@ -1673,6 +1679,14 @@ describe("product coverage workflow", () => {
     assert.doesNotMatch(catalogueOptimizationJobs, /create table/i);
     assert.doesNotMatch(packageJson, /catalogue-optimization-jobs:schema:apply/);
     assert.match(packageJson, /worker:analytics/);
+    assert.match(runtimeWorkerProfiles, /WORKER_ANALYTICS_AGENT_API_KEY/);
+    assert.match(runtimeWorkerProfiles, /mode: "analytics"/);
+    assert.match(prdSmoke, /requiredRuntimeWorkerProfiles\("prd"\)/);
+    assert.match(uatSmoke, /requiredRuntimeWorkerProfiles\("uat"\)/);
+    assert.match(prdSmoke, /\/en\/admin\/dashboard\?view=product-optimisation/);
+    assert.match(uatSmoke, /\/en\/admin\/dashboard\?view=product-optimisation/);
+    assert.match(prdSmoke, /DigitalOcean optimisation worker mode/);
+    assert.match(uatSmoke, /DigitalOcean optimisation worker mode/);
     assert.doesNotMatch(schema, /CREATE TABLE public\.admin_catalogue_optimization_jobs/);
     assert.match(cataloguePotentialTraceRoute, /Analytics worker job/);
     assert.match(cataloguePotentialTraceRoute, /status: 410/);

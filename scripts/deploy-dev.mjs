@@ -52,6 +52,8 @@ function schemaEnv() {
     DB_ALLOW_DIRECT_CONNECTION: "true",
     DB_APPLICATION_NAME:
       process.env.DB_APPLICATION_NAME ?? "mattanutra-dev-deploy-schema",
+    DB_OWNER_URL: schemaConnection,
+    DB_SCHEMA_URL: schemaConnection,
     DB_URL: schemaConnection
   };
 }

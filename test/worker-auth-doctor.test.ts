@@ -12,10 +12,18 @@ describe("worker auth doctor", () => {
       new URL("../scripts/workers-doctor.ts", import.meta.url),
       "utf8",
     );
+    const seedCredentialSource = readFileSync(
+      new URL("../scripts/seed-worker-credential.ts", import.meta.url),
+      "utf8",
+    );
 
     assert.match(
       packageJson.scripts?.["workers:doctor"] ?? "",
       /workers-doctor\.ts/,
+    );
+    assert.match(
+      packageJson.scripts?.["workers:seed-credential"] ?? "",
+      /seed-worker-credential\.ts/,
     );
     assert.match(
       packageJson.scripts?.["uat:workers:repair"] ?? "",
@@ -32,6 +40,15 @@ describe("worker auth doctor", () => {
     assert.match(doctorSource, /missing-db-url/);
     assert.match(doctorSource, /workerAgentKeyCount/);
     assert.match(doctorSource, /dbUrlVariantKeys/);
+    assert.match(seedCredentialSource, /runtimeWorkerProfileForMode/);
+    assert.match(seedCredentialSource, /MATTANUTRA_CONFIRM_PRD_WORKER_CREDENTIAL/);
+    assert.match(seedCredentialSource, /seed-worker/);
+    assert.match(seedCredentialSource, /metadata->>'envKey'/);
+    assert.match(seedCredentialSource, /public\.agent_credentials/);
+    assert.match(seedCredentialSource, /public\.organisation_memberships/);
+    assert.doesNotMatch(seedCredentialSource, /retail_sellable_products/);
+    assert.doesNotMatch(seedCredentialSource, /retail_product_stock/);
+    assert.doesNotMatch(seedCredentialSource, /panya_config_versions/);
   });
 
   it("keeps worker credential repair out of request-time auth", () => {
@@ -62,6 +79,8 @@ describe("worker auth doctor", () => {
     assert.match(smokeSource, /local worker credential hash validation skipped/);
     assert.match(smokeSource, /DigitalOcean DB env/);
     assert.match(smokeSource, /DigitalOcean retired DB env/);
+    assert.match(smokeSource, /DigitalOcean runtime environment/);
+    assert.match(smokeSource, /DigitalOcean optimisation worker mode/);
     assert.match(
       smokeSource,
       /retiredDatabaseUrlKey = \["DATABASE", "URL"\]\.join\("_"\)/,
@@ -72,6 +91,44 @@ describe("worker auth doctor", () => {
     );
     assert.match(smokeSource, /last_seen_at >= now\(\) - interval '2 minutes'/);
     assert.match(smokeSource, /Worker API access is not authorized/);
+  });
+
+  it("keeps PRD and UAT product optimisation smoke tied to the analytics worker", () => {
+    const profileSource = readFileSync(
+      new URL("../scripts/runtime-worker-profiles.mjs", import.meta.url),
+      "utf8",
+    );
+    const prdSmokeSource = readFileSync(
+      new URL("../scripts/prd-smoke.mjs", import.meta.url),
+      "utf8",
+    );
+    const uatSmokeSource = readFileSync(
+      new URL("../scripts/uat-smoke.mjs", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(profileSource, /WORKER_ANALYTICS_AGENT_API_KEY/);
+    assert.match(profileSource, /mode: "analytics"/);
+    assert.match(prdSmokeSource, /requiredRuntimeWorkerProfiles\("prd"\)/);
+    assert.match(uatSmokeSource, /requiredRuntimeWorkerProfiles\("uat"\)/);
+    assert.match(
+      prdSmokeSource,
+      /platformWorkerModeRunsProfile\(platformWorkerMode, "analytics"\)/,
+    );
+    assert.match(
+      uatSmokeSource,
+      /platformWorkerModeRunsProfile\(platformWorkerMode, "analytics"\)/,
+    );
+    assert.match(
+      prdSmokeSource,
+      /\/en\/admin\/dashboard\?view=product-optimisation/,
+    );
+    assert.match(
+      uatSmokeSource,
+      /\/en\/admin\/dashboard\?view=product-optimisation/,
+    );
+    assert.match(prdSmokeSource, /admin_catalogue_optimization_job/);
+    assert.match(uatSmokeSource, /admin_catalogue_optimization_job/);
   });
 
   it("keeps PRD smoke live-safe while preserving strict external secret checks", () => {
@@ -95,12 +152,19 @@ describe("worker auth doctor", () => {
     assert.match(smokeSource, /PRD_SMOKE_VALIDATE_LINE/);
     assert.match(smokeSource, /PRD_SMOKE_VALIDATE_DB/);
     assert.match(smokeSource, /PRD_SMOKE_VALIDATE_WORKER_CREDENTIALS/);
+    assert.match(smokeSource, /PRD_SMOKE_REQUIRE_FRESH_WORKERS/);
     assert.match(smokeSource, /PRD_EXPECT_CLEAN_RUNTIME/);
+    assert.match(smokeSource, /PRD_EXPECT_COMMIT/);
     assert.match(smokeSource, /mattanutra-ui-prd/);
     assert.match(smokeSource, /function prdDigitalOceanComponentName/);
+    assert.match(smokeSource, /DigitalOcean deployed commit/);
     assert.match(
       packageJson.scripts?.["prd:smoke:strict"] ?? "",
       /PRD_SMOKE_VALIDATE_LINE=true/,
+    );
+    assert.match(
+      packageJson.scripts?.["prd:smoke:strict"] ?? "",
+      /PRD_SMOKE_REQUIRE_FRESH_WORKERS=true/,
     );
     assert.match(
       packageJson.scripts?.["prd:smoke:strict"] ?? "",
@@ -124,6 +188,8 @@ describe("worker auth doctor", () => {
     );
     assert.match(smokeSource, /DigitalOcean DB env/);
     assert.match(smokeSource, /DigitalOcean retired DB env/);
+    assert.match(smokeSource, /DigitalOcean runtime environment/);
+    assert.match(smokeSource, /DigitalOcean optimisation worker mode/);
     assert.match(
       smokeSource,
       /retiredDatabaseUrlKey = \["DATABASE", "URL"\]\.join\("_"\)/,
@@ -133,6 +199,7 @@ describe("worker auth doctor", () => {
       /runtime logs show DB_URL is not visible to start:platform/,
     );
     assert.match(smokeSource, /last_seen_at >= now\(\) - interval '2 minutes'/);
+    assert.match(smokeSource, /fresh worker session check deferred until post-deploy/);
     assert.match(smokeSource, /if \(expectCleanRuntime\)/);
     assert.match(smokeSource, /clean operational runtime/);
     assert.match(smokeSource, /Worker API access is not authorized/);

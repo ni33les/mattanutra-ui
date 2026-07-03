@@ -3,6 +3,10 @@
 import { createHmac } from "node:crypto";
 import { spawn } from "node:child_process";
 import postgres from "postgres";
+import {
+  platformWorkerModeRunsProfile,
+  requiredRuntimeWorkerProfiles
+} from "./runtime-worker-profiles.mjs";
 
 const targetBaseUrl = (
   process.env.PRD_SITE_URL || "https://mattanutra.com"
@@ -19,6 +23,10 @@ const validateDatabase = process.env.PRD_SMOKE_VALIDATE_DB === "true";
 const validateWorkerCredentials =
   externalSecretChecksStrict ||
   process.env.PRD_SMOKE_VALIDATE_WORKER_CREDENTIALS === "true";
+const expectedDeploymentCommit = process.env.PRD_EXPECT_COMMIT?.trim() || "";
+const requireFreshWorkerSessions =
+  process.env.PRD_SMOKE_REQUIRE_FRESH_WORKERS === "true" ||
+  Boolean(expectedDeploymentCommit);
 const requiredTables = [
   "communication_channels",
   "communication_messages",
@@ -40,6 +48,7 @@ const requiredTables = [
   "worker_sessions"
 ];
 const criticalTaskTypes = [
+  "admin_catalogue_optimization_job",
   "customer_chat_reply",
   "carrier_event_process",
   "dispatch_chat_communication_message",
@@ -50,21 +59,7 @@ const criticalTaskTypes = [
   "route_admin_communication",
   "send_retail_order_workflow_email"
 ];
-const requiredWorkerProfiles = [
-  { envKey: "WORKER_ADVISOR_AGENT_API_KEY", mode: "advisor" },
-  { envKey: "WORKER_CARRIER_AGENT_API_KEY", mode: "carrier" },
-  { envKey: "WORKER_CHAT_AGENT_API_KEY", mode: "chat" },
-  { envKey: "WORKER_COMMUNICATIONS_AGENT_API_KEY", mode: "communications" },
-  { envKey: "WORKER_CONTENT_AGENT_API_KEY", mode: "content" },
-  { envKey: "WORKER_EMAIL_AGENT_API_KEY", mode: "email" },
-  { envKey: "WORKER_FOOD_AGENT_API_KEY", mode: "food" },
-  { envKey: "WORKER_FORMULATION_AGENT_API_KEY", mode: "formulation" },
-  { envKey: "WORKER_HEALTHSCORE_AGENT_API_KEY", mode: "healthscore" },
-  { envKey: "WORKER_HOSTING_AGENT_API_KEY", mode: "hosting" },
-  { envKey: "WORKER_PANYA_AGENT_API_KEY", mode: "panya" },
-  { envKey: "WORKER_PRODUCTS_AGENT_API_KEY", mode: "products" },
-  { envKey: "WORKER_STOCK_AGENT_API_KEY", mode: "stock" }
-];
+const requiredWorkerProfiles = requiredRuntimeWorkerProfiles("prd");
 const requiredPrdAppEnvKeys = requiredWorkerProfiles.map((profile) => profile.envKey);
 const retiredDatabaseUrlKey = ["DATABASE", "URL"].join("_");
 const checks = [];
@@ -116,7 +111,7 @@ async function checkRoute(path) {
 
   try {
     const response = await fetch(url, { redirect: "manual" });
-    const ok = response.status >= 200 && response.status < 500;
+    const ok = response.status >= 200 && response.status < 400;
 
     record(`route ${path}`, ok, `status=${response.status}`);
   } catch (error) {
@@ -158,6 +153,45 @@ function configuredServiceEnvKeysFromAppSpec(spec, serviceName) {
   );
 
   return new Set((service?.envs ?? []).map((envVar) => envVar?.key).filter(Boolean));
+}
+
+function configuredEnvValueFromAppSpec(spec, key, componentName = "") {
+  const collect = (envs) => {
+    for (const envVar of envs ?? []) {
+      if (envVar?.key === key && String(envVar.value ?? "").trim()) {
+        return String(envVar.value).trim();
+      }
+    }
+
+    return "";
+  };
+  const component = [
+    ...(spec?.services ?? []),
+    ...(spec?.workers ?? []),
+    ...(spec?.jobs ?? [])
+  ].find((candidate) => candidate?.name === componentName);
+
+  return (
+    collect(component?.envs) ||
+    collect(spec?.envs) ||
+    (spec?.services ?? []).map((service) => collect(service.envs)).find(Boolean) ||
+    (spec?.workers ?? []).map((worker) => collect(worker.envs)).find(Boolean) ||
+    (spec?.jobs ?? []).map((job) => collect(job.envs)).find(Boolean) ||
+    ""
+  );
+}
+
+function deploymentMatchesExpectedCommit(deployment, expectedCommit) {
+  const normalized = String(expectedCommit ?? "").trim().toLowerCase();
+
+  if (!normalized) {
+    return true;
+  }
+
+  const short = normalized.slice(0, 7);
+  const haystack = JSON.stringify(deployment ?? {}).toLowerCase();
+
+  return haystack.includes(normalized) || (short.length >= 7 && haystack.includes(short));
 }
 
 function prdDigitalOceanComponentName(spec) {
@@ -228,6 +262,18 @@ async function checkDigitalOceanDeployment() {
       digitalOceanAppSpec,
       componentName
     );
+    const environmentMode = configuredEnvValueFromAppSpec(
+      digitalOceanAppSpec,
+      "MATTANUTRA_ENV",
+      componentName
+    );
+    const platformWorkerMode =
+      configuredEnvValueFromAppSpec(
+        digitalOceanAppSpec,
+        "PLATFORM_WORKER_MODE",
+        componentName
+      ) ||
+      "all";
     const missingEnvKeys = requiredPrdAppEnvKeys.filter((key) => !envKeys.has(key));
 
     record(
@@ -245,6 +291,18 @@ async function checkDigitalOceanDeployment() {
           ? "DB_URL configured on app and service"
           : "DB_URL configured at app level"
         : "DB_URL missing from app spec"
+    );
+    record(
+      "DigitalOcean runtime environment",
+      environmentMode === "prd",
+      environmentMode
+        ? `MATTANUTRA_ENV=${environmentMode}`
+        : "MATTANUTRA_ENV missing from app spec"
+    );
+    record(
+      "DigitalOcean optimisation worker mode",
+      platformWorkerModeRunsProfile(platformWorkerMode, "analytics"),
+      `PLATFORM_WORKER_MODE=${platformWorkerMode}`
     );
     if (serviceEnvKeys.has(retiredDatabaseUrlKey)) {
       record(
@@ -271,6 +329,20 @@ async function checkDigitalOceanDeployment() {
         ? `phase=${active.phase} cause=${active.cause ?? "unknown"}`
         : "no deployment"
     );
+    if (expectedDeploymentCommit) {
+      const commitMatches = deploymentMatchesExpectedCommit(
+        active,
+        expectedDeploymentCommit
+      );
+
+      record(
+        "DigitalOcean deployed commit",
+        commitMatches,
+        commitMatches
+          ? `expected=${expectedDeploymentCommit.slice(0, 12)}`
+          : `expected=${expectedDeploymentCommit.slice(0, 12)} active=${active?.cause ?? "unknown"}`
+      );
+    }
   } catch (error) {
     record(
       "DigitalOcean deployment",
@@ -581,7 +653,10 @@ async function checkDatabase() {
       staleWorkerProfiles.length === 0,
       staleWorkerProfiles.length === 0
         ? `${requiredWorkerProfiles.length} required profiles fresh`
-        : `stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`
+        : requireFreshWorkerSessions
+          ? `stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`
+          : `fresh worker session check deferred until post-deploy; stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`,
+      requireFreshWorkerSessions ? "error" : "skip"
     );
 
     if (!validateWorkerCredentials) {
@@ -698,6 +773,7 @@ async function main() {
 
   await checkRoute("/en");
   await checkRoute("/en/admin/login");
+  await checkRoute("/en/admin/dashboard?view=product-optimisation");
   await checkRoute("/en/nutrition/quiz");
   await checkDigitalOceanDeployment();
   await checkLineWebhook();
