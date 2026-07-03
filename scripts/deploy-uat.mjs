@@ -32,10 +32,6 @@ function deriveUatDbUrl(value) {
     url.pathname = "/mn-uat";
   }
 
-  if (!url.port || url.port === "25060") {
-    url.port = "25061";
-  }
-
   url.searchParams.set("sslmode", "require");
 
   return url.toString();
