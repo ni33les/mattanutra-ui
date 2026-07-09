@@ -110,8 +110,10 @@ describe("supplement admin popup", () => {
       /grant select, insert, update, delete on table[\s\S]*public\.supplement_country_availability/
     );
     assert.match(packageJson, /supplements:country-availability:schema:apply/);
+    assert.match(packageJson, /dev-runtime-schema:verify/);
     assert.match(deployDev, /supplements:country-availability:schema:apply/);
     assert.match(deployDev, /DB_SCHEMA_URL/);
+    assert.match(deployDev, /dev-runtime-schema:verify/);
     assert.match(deployUat, /supplements:country-availability:schema:apply/);
     assert.match(deployUat, /UAT_DB_SCHEMA_URL/);
     assert.match(deployUat, /UAT_DB_URL/);

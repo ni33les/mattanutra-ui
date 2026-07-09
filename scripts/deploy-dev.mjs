@@ -1,6 +1,13 @@
 import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
 
 const serviceName = "mattanutra-ui-dev.service";
+const schemaScripts = [
+  "supplements:country-availability:schema:apply",
+  "products:soft-delete:schema:apply",
+  "products:v9:schema:apply",
+  "product-coverage:demand-cache:schema:apply",
+  "payments:schema:apply"
+];
 const smokeUrls = [
   "http://127.0.0.1:3000/en/admin/login",
   "https://dev.mattanutra.com/en/admin/login"
@@ -58,6 +65,27 @@ function schemaEnv() {
   };
 }
 
+async function applyOrVerifyRuntimeSchema() {
+  const schemaConnection =
+    process.env.DB_SCHEMA_URL?.trim() || process.env.DB_OWNER_URL?.trim();
+
+  if (!schemaConnection) {
+    console.log(
+      "[deploy:dev] DB_SCHEMA_URL/DB_OWNER_URL not set; verifying existing runtime schema..."
+    );
+    await npmRun("dev-runtime-schema:verify");
+    return;
+  }
+
+  console.log("[deploy:dev] Applying runtime schema...");
+
+  for (const script of schemaScripts) {
+    await run(npmCommand, ["run", script], {
+      env: schemaEnv()
+    });
+  }
+}
+
 async function main() {
   const branch = await runCapture("git", ["branch", "--show-current"]);
 
@@ -69,22 +97,7 @@ async function main() {
 
   console.log(`[deploy:dev] Branch: ${branch}`);
   await npmRun("verify:dev");
-  console.log("[deploy:dev] Applying runtime schema...");
-  await run(npmCommand, ["run", "supplements:country-availability:schema:apply"], {
-    env: schemaEnv()
-  });
-  await run(npmCommand, ["run", "products:soft-delete:schema:apply"], {
-    env: schemaEnv()
-  });
-  await run(npmCommand, ["run", "products:v9:schema:apply"], {
-    env: schemaEnv()
-  });
-  await run(npmCommand, ["run", "product-coverage:demand-cache:schema:apply"], {
-    env: schemaEnv()
-  });
-  await run(npmCommand, ["run", "payments:schema:apply"], {
-    env: schemaEnv()
-  });
+  await applyOrVerifyRuntimeSchema();
   console.log(`[deploy:dev] Restarting ${serviceName}...`);
   await run("systemctl", ["restart", serviceName]);
   await run("systemctl", ["is-active", "--quiet", serviceName]);

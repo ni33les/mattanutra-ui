@@ -122,6 +122,7 @@ export function isBroadChange(file) {
     file === "scripts/dev-cycle-utils.mjs" ||
     file === "scripts/build-dev-fast.mjs" ||
     file === "scripts/verify-dev.mjs" ||
+    file === "scripts/verify-dev-runtime-schema.ts" ||
     file === "scripts/deploy-dev.mjs"
   );
 }
