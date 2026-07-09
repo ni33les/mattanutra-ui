@@ -22,9 +22,9 @@ const orderTrackingCopy = {
     customer: "Customer",
     eta: "Estimated arrival",
     footer:
-      "MattaNutra x Delight Pharmacy - Your personalized nutrition, delivered with care.",
+      "MattaNutra x your retail partner - Your personalized nutrition, delivered with care.",
     invalidBody:
-      "This tracking link is missing or no longer valid. Please use the link from your confirmation message, or contact Delight Pharmacy for help.",
+      "This tracking link is missing or no longer valid. Please use the link from your confirmation message, or contact your retail partner for help.",
     invalidTitle: "We could not open this tracking link",
     lastUpdated: "Last updated",
     order: "Order",
@@ -36,7 +36,7 @@ const orderTrackingCopy = {
     shipped: "Out for delivery",
     shipment: "Shipment",
     shipmentPending:
-      "Your order is on the way. Delight Pharmacy will update this page if courier tracking becomes available.",
+      "Your order is on the way. Your retail partner will update this page if courier tracking becomes available.",
     status: "Status",
     subtotal: "Paid total",
     subtitle:
@@ -56,9 +56,9 @@ const orderTrackingCopy = {
     customer: "ลูกค้า",
     eta: "เวลาถึงโดยประมาณ",
     footer:
-      "MattaNutra x Delight Pharmacy - โภชนาการเฉพาะบุคคล ส่งถึงคุณอย่างใส่ใจ",
+      "MattaNutra x พาร์ทเนอร์ร้านค้าของคุณ - โภชนาการเฉพาะบุคคล ส่งถึงคุณอย่างใส่ใจ",
     invalidBody:
-      "ลิงก์ติดตามนี้ไม่ครบถ้วนหรือไม่สามารถใช้งานได้แล้ว โปรดใช้ลิงก์จากข้อความยืนยัน หรือติดต่อ Delight Pharmacy เพื่อขอความช่วยเหลือ",
+      "ลิงก์ติดตามนี้ไม่ครบถ้วนหรือไม่สามารถใช้งานได้แล้ว โปรดใช้ลิงก์จากข้อความยืนยัน หรือติดต่อพาร์ทเนอร์ร้านค้าของคุณเพื่อขอความช่วยเหลือ",
     invalidTitle: "ไม่สามารถเปิดลิงก์ติดตามนี้ได้",
     lastUpdated: "อัปเดตล่าสุด",
     order: "คำสั่งซื้อ",
@@ -70,7 +70,7 @@ const orderTrackingCopy = {
     shipped: "กำลังจัดส่ง",
     shipment: "การจัดส่ง",
     shipmentPending:
-      "คำสั่งซื้อของคุณกำลังจัดส่ง Delight Pharmacy จะอัปเดตหน้านี้หากมีลิงก์ติดตามพัสดุ",
+      "คำสั่งซื้อของคุณกำลังจัดส่ง พาร์ทเนอร์ร้านค้าของคุณจะอัปเดตหน้านี้หากมีลิงก์ติดตามพัสดุ",
     status: "สถานะ",
     subtotal: "ยอดชำระ",
     subtitle:
@@ -89,9 +89,9 @@ const orderTrackingCopy = {
     carrier: "承运商",
     customer: "客户",
     eta: "预计送达",
-    footer: "MattaNutra x Delight Pharmacy - 你的个性化营养方案，安心送达。",
+    footer: "MattaNutra x 你的零售伙伴 - 你的个性化营养方案，安心送达。",
     invalidBody:
-      "这个追踪链接缺失或已失效。请使用确认消息中的链接，或联系 Delight Pharmacy 获取帮助。",
+      "这个追踪链接缺失或已失效。请使用确认消息中的链接，或联系你的零售伙伴获取帮助。",
     invalidTitle: "无法打开此追踪链接",
     lastUpdated: "最后更新",
     order: "订单",
@@ -102,7 +102,7 @@ const orderTrackingCopy = {
     shipped: "你的订单正在配送中",
     shipment: "配送",
     shipmentPending:
-      "你的订单正在配送中。如果有快递追踪信息，Delight Pharmacy 会更新此页面。",
+      "你的订单正在配送中。如果有快递追踪信息，你的零售伙伴会更新此页面。",
     status: "状态",
     subtotal: "支付总额",
     subtitle: "你的订单已确认。请收藏此页面，查看药房更新和配送进度。",
@@ -252,9 +252,10 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
 
   const eta = latestEta(order.lines);
   const displayStatus = displayOrderStatus(order);
+  const retailerName = order.retailerName ?? copy.retailer.toLowerCase();
   const timeline = [
     { active: true, label: copy.paid, meta: formatAmount(locale, order.totalAmount, order.currency) },
-    { active: true, label: copy.preparing, meta: order.retailerName ?? "Delight Pharmacy" },
+    { active: true, label: copy.preparing, meta: retailerName },
     { active: true, label: copy.status, meta: statusLabel(locale, displayStatus) },
     { active: Boolean(eta), label: copy.eta, meta: eta ?? "-" }
   ];
@@ -359,7 +360,7 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                 <div>
                   <dt className={labelClass(locale)}>{copy.retailer}</dt>
                   <dd className="mt-1 font-semibold text-[var(--mn-ink)]">
-                    {order.retailerName ?? "Delight Pharmacy"}
+                    {retailerName}
                   </dd>
                 </div>
                 <div>

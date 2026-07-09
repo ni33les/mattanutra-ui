@@ -1742,8 +1742,7 @@ export async function getAdminSupplementImprovementInsightsData(
 
 export async function loadMasterSupplementAvailabilityInsights(
   sql: InsightsDb,
-  start: Date | null,
-  _locale: Locale = "en"
+  start: Date | null
 ): Promise<MasterSupplementAvailabilityInsight[]> {
   const rows = await sql<Array<{
     active_retailer_count: number | string;
@@ -1989,7 +1988,7 @@ export async function getAdminProductImprovementInsightsData(
     const [rawOpportunities, planComparisons, supplementAvailability] = await Promise.all([
       loadMasterListOpportunities(sql, range, locale, start),
       loadPlanCoverageComparisons(sql, start),
-      loadMasterSupplementAvailabilityInsights(sql, start, locale)
+      loadMasterSupplementAvailabilityInsights(sql, start)
     ]);
     const doseContextByName = new Map(
       supplementAvailability.map((insight) => [
@@ -2336,33 +2335,6 @@ function externalCandidateQuery(
   gap: Pick<MasterSupplementAvailabilityInsight, "supplementName" | "topDoseLabels">
 ) {
   return supplementAvailabilitySearchPhrase(gap);
-}
-
-function unavailableExternalCandidate(
-  gap: MasterSupplementAvailabilityInsight,
-  diagnostics: MarketplaceSearchDiagnostic[],
-  status: ExternalProductCandidate["searchStatus"] = "unavailable"
-): ExternalProductCandidate {
-  return {
-    affectedPlanCount: gap.affectedPlanCount,
-    brandName: null,
-    blockerSolved: gap.availabilityState,
-    confidence: "unavailable",
-    diagnostics,
-    evidenceRequired: ["Marketplace adapter result", "FDA registration", "Ingredient facts"],
-    externalProductId: null,
-    imageUrl: null,
-    matchedDoseLabel: primaryDoseLabel(gap.topDoseLabels),
-    matchedGapId: gap.supplementId,
-    matchedGapName: gap.supplementName,
-    platform: null,
-    priceAmount: null,
-    productUrl: null,
-    query: externalCandidateQuery(gap),
-    rationale: gap.rationale,
-    searchStatus: status,
-    title: null
-  };
 }
 
 function externalCandidateRowsFromSnapshots(

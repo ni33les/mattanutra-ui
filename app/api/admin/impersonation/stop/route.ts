@@ -7,23 +7,16 @@ import {
   signAdminSessionContext,
   stopAdminImpersonation
 } from "@/lib/admin-access";
-import { requestOriginAllowed } from "@/lib/admin-session-cookie";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  if (!requestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const { context, unauthorized } = await requireAdminRouteAccess(request, null);
 
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
-
-  if (!context) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   await stopAdminImpersonation(context);

@@ -1,10 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession
-} from "@/lib/admin-access";
-import { hasAdminPermission } from "@/lib/admin-rbac";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { renderRetailPlanInsertPdfForOrder } from "@/lib/retail-plan-insert";
 
@@ -24,12 +19,16 @@ function localeFromRequest(request: NextRequest): Locale | null {
 }
 
 export async function GET(request: NextRequest, { params }: RouteProps) {
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "stock.read"
+  );
 
-  if (!context || !hasAdminPermission(context, "stock.read")) {
+  if (unauthorized) {
+    return unauthorized;
+  }
+
+  if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

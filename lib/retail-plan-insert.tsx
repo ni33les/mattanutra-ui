@@ -3,7 +3,7 @@ import path from "node:path";
 import React from "react";
 import {
   Document,
-  Image,
+  Image as PdfImage,
   Page,
   StyleSheet,
   Text,
@@ -34,6 +34,9 @@ import { siteBaseUrl } from "@/lib/site-url";
 import { isUuid, getStoredFormulationResult } from "@/lib/assessment-store";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
+const PdfImageWithAlt = PdfImage as React.ComponentType<
+  React.ComponentProps<typeof PdfImage> & { alt: string }
+>;
 
 const panyaInsertExpiryMinutes = 90 * 24 * 60;
 const maxProductCards = 4;
@@ -85,6 +88,7 @@ export type RetailPlanInsertData = Readonly<{
   orderId: string;
   orderNumber: string;
   organisationName: string | null;
+  partnerLocationLabel: string | null;
   panyaCode: string;
   panyaExpiresAt: string;
   panyaLineUrl: string;
@@ -102,6 +106,7 @@ type OrderRow = Readonly<{
   metadata: unknown;
   order_number: string;
   organisation_id: string;
+  organisation_country_code: string | null;
   organisation_name: string | null;
   placed_at: Date | string | null;
   plan_id: string | null;
@@ -143,6 +148,12 @@ function safeFilename(value: string) {
 
 export function retailPlanInsertFilename(orderNumber: string) {
   return `plan-insert-${safeFilename(orderNumber)}.pdf`;
+}
+
+function partnerLocationLabel(countryCode: string | null) {
+  const cleaned = text(countryCode).toUpperCase();
+
+  return cleaned || null;
 }
 
 function firstNameFromName(name: string | null) {
@@ -214,6 +225,7 @@ async function loadOrderRow(input: Readonly<{
     select
       retail_customer_orders.id::text,
       retail_customer_orders.organisation_id::text,
+      organisations.country_code as organisation_country_code,
       organisations.name as organisation_name,
       retail_customer_orders.order_number,
       retail_customer_orders.customer_name,
@@ -672,6 +684,7 @@ export async function loadRetailPlanInsertData(input: Readonly<{
     orderId: order.id,
     orderNumber: order.order_number,
     organisationName: order.organisation_name,
+    partnerLocationLabel: partnerLocationLabel(order.organisation_country_code),
     panyaCode: token.code,
     panyaExpiresAt: token.expiresAt,
     panyaLineUrl,
@@ -991,10 +1004,19 @@ function initials(value: string) {
 }
 
 function FrontCover({ data }: { data: RetailPlanInsertData }) {
+  const partnerName = data.organisationName || "your retail partner";
+  const partnerLocation = data.partnerLocationLabel
+    ? `, ${data.partnerLocationLabel}`
+    : "";
+
   return (
     <View style={[styles.panel, styles.panelDivider, styles.center]}>
       {data.brandMarkDataUri ? (
-        <Image src={data.brandMarkDataUri} style={styles.brandMark} />
+        <PdfImageWithAlt
+          alt="MattaNutra brand mark"
+          src={data.brandMarkDataUri}
+          style={styles.brandMark}
+        />
       ) : null}
       <InsertText style={styles.wordmark}>MattaNutra</InsertText>
       <InsertText style={styles.tagline}>Knowing the Right Amount</InsertText>
@@ -1009,8 +1031,7 @@ function FrontCover({ data }: { data: RetailPlanInsertData }) {
       </InsertText>
       <View style={styles.spacer} />
       <InsertText style={styles.pharmacist}>
-        Hand-checked and packed by Khun Dream, Licensed Pharmacist - Delight
-        Pharmacy, Chiang Mai
+        Hand-checked and packed by {partnerName}{partnerLocation}
       </InsertText>
     </View>
   );
@@ -1024,7 +1045,11 @@ function BackCover({ data }: { data: RetailPlanInsertData }) {
       <View style={styles.qrWrap}>
         <View style={styles.qrCard}>
           <View style={styles.qrTile}>
-            <Image src={data.panyaQrDataUri} style={styles.qrImage} />
+            <PdfImageWithAlt
+              alt="Panya LINE QR code"
+              src={data.panyaQrDataUri}
+              style={styles.qrImage}
+            />
           </View>
           <InsertText style={styles.qrTitle}>Ask Panya on LINE</InsertText>
           <InsertText style={styles.qrSub}>
@@ -1033,7 +1058,11 @@ function BackCover({ data }: { data: RetailPlanInsertData }) {
         </View>
         <View style={styles.qrCard}>
           <View style={styles.qrTile}>
-            <Image src={data.revealQrDataUri} style={styles.qrImage} />
+            <PdfImageWithAlt
+              alt="Plan QR code"
+              src={data.revealQrDataUri}
+              style={styles.qrImage}
+            />
           </View>
           <InsertText style={styles.qrTitle}>Open your plan</InsertText>
           <InsertText style={styles.qrSub}>
@@ -1051,7 +1080,7 @@ function BackCover({ data }: { data: RetailPlanInsertData }) {
         medical condition, or your situation changes.
       </InsertText>
       <InsertText style={styles.trust}>
-        Thai FDA registered - Every batch verified - Chiang Mai
+        Registered products - Every batch verified
       </InsertText>
     </View>
   );
@@ -1071,7 +1100,11 @@ function FoodPanel({ data }: { data: RetailPlanInsertData }) {
       {data.foodRows.length > 0 ? data.foodRows.map((food) => (
         <View key={food.foodId} style={styles.foodCard}>
           {food.imageDataUri ? (
-            <Image src={food.imageDataUri} style={styles.foodImage} />
+            <PdfImageWithAlt
+              alt={food.name}
+              src={food.imageDataUri}
+              style={styles.foodImage}
+            />
           ) : (
             <View style={[styles.foodImage, styles.center]}>
               <InsertText style={styles.thumbFallback}>{initials(food.name)}</InsertText>
@@ -1115,7 +1148,11 @@ function ProductPanel({ data }: { data: RetailPlanInsertData }) {
           <View key={product.productId} style={styles.doseRow}>
             <View style={styles.thumb}>
               {product.imageDataUri ? (
-                <Image src={product.imageDataUri} style={styles.thumbImage} />
+                <PdfImageWithAlt
+                  alt={product.title}
+                  src={product.imageDataUri}
+                  style={styles.thumbImage}
+                />
               ) : (
                 <InsertText style={styles.thumbFallback}>
                   {initials(product.title)}

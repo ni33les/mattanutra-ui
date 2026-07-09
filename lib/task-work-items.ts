@@ -1975,209 +1975,178 @@ async function buildNutritionPlanRefinementWorkItem(task: TaskRecord) {
   } satisfies NutritionPlanRefinementWorkItem;
 }
 
+function buildProductFdaApprovalSourcingWorkItem(task: TaskRecord) {
+  return {
+    includeManufacturerEvidence: payloadBoolean(
+      task.payload,
+      "includeManufacturerEvidence",
+      false
+    ),
+    limit: payloadNumber(task.payload, "limit", 120, 1, 500),
+    maxRunMs: payloadNumber(task.payload, "maxRunMs", 180_000, 10_000, 600_000),
+    productId: textFromRecord(payloadRecord(task.payload), "productId"),
+    taskId: task.id,
+    taskType: "source_product_fda_approvals"
+  } satisfies ProductFdaApprovalSourcingWorkItem;
+}
+
+function buildProductIdentifierSourcingWorkItem(task: TaskRecord) {
+  return {
+    limit: payloadNumber(task.payload, "limit", 2000, 1, 2000),
+    productId: textFromRecord(payloadRecord(task.payload), "productId"),
+    taskId: task.id,
+    taskType: "source_product_identifiers"
+  } satisfies ProductIdentifierSourcingWorkItem;
+}
+
+function buildRetailStockForecastWorkItem(task: TaskRecord) {
+  return {
+    organisationId: task.organisationId,
+    productId: textFromRecord(payloadRecord(task.payload), "productId"),
+    source: textFromRecord(payloadRecord(task.payload), "source"),
+    stockId: textFromRecord(payloadRecord(task.payload), "stockId"),
+    taskId: task.id,
+    taskType: "retail_stock_forecast_refresh"
+  } satisfies RetailStockForecastWorkItem;
+}
+
+function buildRetailOperationsReviewWorkItem(task: TaskRecord) {
+  if (!isRetailAgentExecutableTaskType(task.taskType)) {
+    throw new Error(
+      `Retail task ${task.taskType} is human-only or not agent-executable`
+    );
+  }
+
+  const taskType = task.taskType as Exclude<
+    RetailAgentExecutableTaskType,
+    "retail_stock_forecast_refresh"
+  >;
+
+  return {
+    organisationId: task.organisationId,
+    payload: payloadRecord(task.payload),
+    sourceEntityId: task.sourceEntityId,
+    sourceEntityType: task.sourceEntityType,
+    taskId: task.id,
+    taskType
+  } satisfies RetailOperationsReviewWorkItem;
+}
+
+function buildCommunicationFollowupWorkItem(task: TaskRecord) {
+  const payload = payloadRecord(task.payload);
+  const legacySafetyReviewId = payloadText(payload, "safetyReviewId");
+  const reviewedItems = safetyFollowupItems(payload.reviewedItems);
+  const safetyReviewIds = [
+    ...reviewedItems
+      .map((item) => item.safetyReviewId)
+      .filter((id): id is string => Boolean(id)),
+    ...(isUuid(legacySafetyReviewId) ? [legacySafetyReviewId] : [])
+  ];
+  const supplementName =
+    payloadText(payload, "supplementName") || "your supplement";
+  const decision = payloadText(payload, "decision") || "reviewed";
+
+  return {
+    body: safetyFollowupMessage({
+      clientDose: payloadText(payload, "clientDose") || null,
+      decision,
+      reviewedItems,
+      supplementName
+    }),
+    metadata: {
+      decision,
+      reviewedItems,
+      safetyReviewIds,
+      source: "client_safety_followup_task",
+      supplementName
+    },
+    payload,
+    planId: task.planId,
+    safetyReviewIds,
+    subject: "Your MattaNutra safety review is complete",
+    taskId: task.id,
+    taskType: "client_safety_followup"
+  } satisfies CommunicationFollowupWorkItem;
+}
+
+function buildContentStatusChangeWorkItem(task: TaskRecord) {
+  const payload = payloadRecord(task.payload);
+  const contentType = payloadText(payload, "contentType");
+  const targetStatus = payloadText(payload, "targetStatus");
+  const contentId = payloadText(payload, "contentId");
+
+  if (
+    (contentType !== "blog_post" && contentType !== "testimonial") ||
+    (targetStatus !== "archived" &&
+      targetStatus !== "draft" &&
+      targetStatus !== "published" &&
+      targetStatus !== "review") ||
+    !isUuid(contentId)
+  ) {
+    throw new Error("Content status change work item is incomplete");
+  }
+
+  return {
+    contentId,
+    contentType,
+    payload,
+    targetStatus,
+    taskType: "content_status_change"
+  } satisfies ContentStatusChangeWorkItem;
+}
+
+function buildDigitalOceanBillingSyncWorkItem(task: TaskRecord) {
+  return {
+    projectNames: payloadTextArray(task.payload, "projectNames"),
+    taskId: task.id,
+    taskType: "sync_digitalocean_billing"
+  } satisfies DigitalOceanBillingSyncWorkItem;
+}
+
+type TaskWorkItemBuilder = (task: TaskRecord) => Promise<TaskWorkItem> | TaskWorkItem;
+
+const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
+  [ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE]: buildAdminCatalogueOptimizationWorkItem,
+  analyze_healthscore: buildHealthScoreWorkItem,
+  carrier_event_process: buildCarrierShipmentWorkItem,
+  carrier_label_generate: buildCarrierShipmentWorkItem,
+  carrier_pickup_book: buildCarrierShipmentWorkItem,
+  carrier_shipment_create: buildCarrierShipmentWorkItem,
+  carrier_tracking_sync: buildCarrierShipmentWorkItem,
+  client_safety_followup: buildCommunicationFollowupWorkItem,
+  content_status_change: buildContentStatusChangeWorkItem,
+  customer_chat_reply: buildCustomerChatReplyWorkItem,
+  dispatch_chat_communication_message: buildCommunicationDispatchWorkItem,
+  dispatch_email_communication_message: buildCommunicationDispatchWorkItem,
+  generate_example_supplement_guidance: buildFormulationWorkItem,
+  generate_food_gap_guidance: buildFoodGapSupportWorkItem,
+  generate_food_guidance: buildFoodGuidanceWorkItem,
+  generate_nutrition_report: buildNutritionReportWorkItem,
+  generate_product_recommendations: buildProductRecommendationsWorkItem,
+  generate_supplement_guidance: buildFormulationWorkItem,
+  nutrition_plan_chat_reply: buildNutritionPlanChatWorkItem,
+  refine_nutrition_plan: buildNutritionPlanRefinementWorkItem,
+  retail_customer_order_allocate: buildRetailOperationsReviewWorkItem,
+  retail_shopping_list_review: buildRetailOperationsReviewWorkItem,
+  retail_stock_forecast_refresh: buildRetailStockForecastWorkItem,
+  route_admin_communication: buildAdminCommunicationRouteWorkItem,
+  send_example_email: buildExampleEmailWorkItem,
+  send_reassessment_email: buildReassessmentEmailWorkItem,
+  send_retail_order_workflow_email: buildRetailOrderWorkflowEmailWorkItem,
+  source_product_fda_approvals: buildProductFdaApprovalSourcingWorkItem,
+  source_product_identifiers: buildProductIdentifierSourcingWorkItem,
+  sync_digitalocean_billing: buildDigitalOceanBillingSyncWorkItem
+};
+
 export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem> {
-  if (task.taskType === ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE) {
-    return buildAdminCatalogueOptimizationWorkItem(task);
-  }
+  const handler = taskWorkItemHandlers[task.taskType];
 
-  if (
-    task.taskType === "carrier_event_process" ||
-    task.taskType === "carrier_label_generate" ||
-    task.taskType === "carrier_pickup_book" ||
-    task.taskType === "carrier_shipment_create" ||
-    task.taskType === "carrier_tracking_sync"
-  ) {
-    return buildCarrierShipmentWorkItem(task);
-  }
-
-  if (task.taskType === "analyze_healthscore") {
-    return buildHealthScoreWorkItem(task);
-  }
-
-  if (
-    task.taskType === "generate_supplement_guidance" ||
-    task.taskType === "generate_example_supplement_guidance"
-  ) {
-    return buildFormulationWorkItem(task);
-  }
-
-  if (task.taskType === "generate_food_guidance") {
-    return buildFoodGuidanceWorkItem(task);
-  }
-
-  if (task.taskType === "generate_food_gap_guidance") {
-    return buildFoodGapSupportWorkItem(task);
-  }
-
-  if (task.taskType === "send_example_email") {
-    return buildExampleEmailWorkItem(task);
-  }
-
-  if (task.taskType === "send_reassessment_email") {
-    return buildReassessmentEmailWorkItem(task);
-  }
-
-  if (task.taskType === "send_retail_order_workflow_email") {
-    return buildRetailOrderWorkflowEmailWorkItem(task);
-  }
-
-  if (task.taskType === "route_admin_communication") {
-    return buildAdminCommunicationRouteWorkItem(task);
-  }
-
-  if (task.taskType === "customer_chat_reply") {
-    return buildCustomerChatReplyWorkItem(task);
-  }
-
-  if (
-    task.taskType === "dispatch_chat_communication_message" ||
-    task.taskType === "dispatch_email_communication_message"
-  ) {
-    return buildCommunicationDispatchWorkItem(task);
-  }
-
-  if (task.taskType === "nutrition_plan_chat_reply") {
-    return buildNutritionPlanChatWorkItem(task);
-  }
-
-  if (task.taskType === "refine_nutrition_plan") {
-    return buildNutritionPlanRefinementWorkItem(task);
-  }
-
-  if (task.taskType === "generate_nutrition_report") {
-    return buildNutritionReportWorkItem(task);
-  }
-
-  if (task.taskType === "generate_product_recommendations") {
-    return buildProductRecommendationsWorkItem(task);
-  }
-
-  if (task.taskType === "source_product_fda_approvals") {
-    return {
-      includeManufacturerEvidence: payloadBoolean(
-        task.payload,
-        "includeManufacturerEvidence",
-        false
-      ),
-      limit: payloadNumber(task.payload, "limit", 120, 1, 500),
-      maxRunMs: payloadNumber(task.payload, "maxRunMs", 180_000, 10_000, 600_000),
-      productId: textFromRecord(payloadRecord(task.payload), "productId"),
-      taskId: task.id,
-      taskType: "source_product_fda_approvals"
-    } satisfies ProductFdaApprovalSourcingWorkItem;
-  }
-
-  if (task.taskType === "source_product_identifiers") {
-    return {
-      limit: payloadNumber(task.payload, "limit", 2000, 1, 2000),
-      productId: textFromRecord(payloadRecord(task.payload), "productId"),
-      taskId: task.id,
-      taskType: "source_product_identifiers"
-    } satisfies ProductIdentifierSourcingWorkItem;
-  }
-
-  if (task.taskType === "retail_stock_forecast_refresh") {
-    return {
-      organisationId: task.organisationId,
-      productId: textFromRecord(payloadRecord(task.payload), "productId"),
-      source: textFromRecord(payloadRecord(task.payload), "source"),
-      stockId: textFromRecord(payloadRecord(task.payload), "stockId"),
-      taskId: task.id,
-      taskType: "retail_stock_forecast_refresh"
-    } satisfies RetailStockForecastWorkItem;
+  if (handler) {
+    return handler(task);
   }
 
   if (task.taskType.startsWith("retail_")) {
-    if (!isRetailAgentExecutableTaskType(task.taskType)) {
-      throw new Error(
-        `Retail task ${task.taskType} is human-only or not agent-executable`
-      );
-    }
-
-    const taskType = task.taskType as Exclude<
-      RetailAgentExecutableTaskType,
-      "retail_stock_forecast_refresh"
-    >;
-
-    return {
-      organisationId: task.organisationId,
-      payload: payloadRecord(task.payload),
-      sourceEntityId: task.sourceEntityId,
-      sourceEntityType: task.sourceEntityType,
-      taskId: task.id,
-      taskType
-    } satisfies RetailOperationsReviewWorkItem;
-  }
-
-  if (task.taskType === "client_safety_followup") {
-    const payload = payloadRecord(task.payload);
-    const legacySafetyReviewId = payloadText(payload, "safetyReviewId");
-    const reviewedItems = safetyFollowupItems(payload.reviewedItems);
-    const safetyReviewIds = [
-      ...reviewedItems
-        .map((item) => item.safetyReviewId)
-        .filter((id): id is string => Boolean(id)),
-      ...(isUuid(legacySafetyReviewId) ? [legacySafetyReviewId] : [])
-    ];
-    const supplementName =
-      payloadText(payload, "supplementName") || "your supplement";
-    const decision = payloadText(payload, "decision") || "reviewed";
-
-    return {
-      body: safetyFollowupMessage({
-        clientDose: payloadText(payload, "clientDose") || null,
-        decision,
-        reviewedItems,
-        supplementName
-      }),
-      metadata: {
-        decision,
-        reviewedItems,
-        safetyReviewIds,
-        source: "client_safety_followup_task",
-        supplementName
-      },
-      payload,
-      planId: task.planId,
-      safetyReviewIds,
-      subject: "Your MattaNutra safety review is complete",
-      taskId: task.id,
-      taskType: "client_safety_followup"
-    } satisfies CommunicationFollowupWorkItem;
-  }
-
-  if (task.taskType === "content_status_change") {
-    const payload = payloadRecord(task.payload);
-    const contentType = payloadText(payload, "contentType");
-    const targetStatus = payloadText(payload, "targetStatus");
-    const contentId = payloadText(payload, "contentId");
-
-    if (
-      (contentType !== "blog_post" && contentType !== "testimonial") ||
-      (targetStatus !== "archived" &&
-        targetStatus !== "draft" &&
-        targetStatus !== "published" &&
-        targetStatus !== "review") ||
-      !isUuid(contentId)
-    ) {
-      throw new Error("Content status change work item is incomplete");
-    }
-
-    return {
-      contentId,
-      contentType,
-      payload,
-      targetStatus,
-      taskType: "content_status_change"
-    } satisfies ContentStatusChangeWorkItem;
-  }
-
-  if (task.taskType === "sync_digitalocean_billing") {
-    return {
-      projectNames: payloadTextArray(task.payload, "projectNames"),
-      taskId: task.id,
-      taskType: "sync_digitalocean_billing"
-    } satisfies DigitalOceanBillingSyncWorkItem;
+    return buildRetailOperationsReviewWorkItem(task);
   }
 
   return {

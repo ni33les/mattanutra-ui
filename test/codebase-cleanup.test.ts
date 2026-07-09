@@ -184,6 +184,14 @@ const retailOrderWorkflowRules = readFileSync(
   new URL("../lib/retail-order-workflow-rules.ts", import.meta.url),
   "utf8"
 );
+const retailOrderWorkflow = readFileSync(
+  new URL("../lib/retail-order-workflow.ts", import.meta.url),
+  "utf8"
+);
+const retailPlanInsert = readFileSync(
+  new URL("../lib/retail-plan-insert.tsx", import.meta.url),
+  "utf8"
+);
 const communicationsService = readFileSync(
   new URL("../lib/communications.ts", import.meta.url),
   "utf8"
@@ -1027,6 +1035,24 @@ describe("codebase cleanup guardrails", () => {
     assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-reveal-ready \[data-reveal\]/);
     assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-titlebar\b/);
     assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-site-footer\b/);
+  });
+
+  it("keeps partner-specific names out of generic runtime UI", () => {
+    for (const root of ["../app/", "../components/"] as const) {
+      for (const file of trackedSourceFiles(new URL(root, import.meta.url))) {
+        const source = readFileSync(file, "utf8");
+
+        assert.doesNotMatch(source, /Delight|delight-pharmacy|delight/i, file.pathname);
+      }
+    }
+
+    for (const [name, source] of [
+      ["retail order workflow", retailOrderWorkflow],
+      ["retail plan insert", retailPlanInsert]
+    ] as const) {
+      assert.doesNotMatch(source, /Delight|delight-pharmacy|delight/i, name);
+      assert.match(source, /retail partner/i, name);
+    }
   });
 
   it("keeps local admin dev origins hydrated", () => {

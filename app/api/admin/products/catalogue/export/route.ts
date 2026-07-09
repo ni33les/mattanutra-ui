@@ -1,12 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession,
-} from "@/lib/admin-access";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import { canAccessRetailOrganisation } from "@/lib/admin-retail-stock-access";
-import { hasAdminPermission } from "@/lib/admin-rbac";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import { isUuidValue } from "@/lib/admin-product-helpers";
 import {
   buildPlatformProductCatalogueJson,
@@ -45,22 +40,24 @@ async function resolveRetailExport(request: NextRequest, organisationId: string 
     };
   }
 
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "stock.read"
+  );
 
-  if (!context || !hasAdminPermission(context, "stock.read")) {
+  if (unauthorized || !context) {
     return {
-      error: NextResponse.json(
-        { message: "Unauthorized" },
-        {
-          headers: {
-            "Cache-Control": "no-store"
-          },
-          status: 401
-        }
-      )
+      error:
+        unauthorized ??
+        NextResponse.json(
+          { message: "Unauthorized" },
+          {
+            headers: {
+              "Cache-Control": "no-store"
+            },
+            status: 401
+          }
+        )
     };
   }
 

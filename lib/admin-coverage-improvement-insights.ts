@@ -1106,8 +1106,7 @@ function buildFilters(
 }
 
 export async function getAdminCoverageImprovementInsightsData(
-  range: AdminDashboardRange,
-  _locale: Locale = "en"
+  range: AdminDashboardRange
 ): Promise<AdminCoverageImprovementInsightsData> {
   const sql = getSql();
 
@@ -1144,7 +1143,7 @@ export async function getAdminCoverageImprovementInsightsData(
           availability.retailSellableProducts &&
           availability.supplementSelections &&
           availability.supplements
-          ? loadMasterSupplementAvailabilityInsights(sql, adminDashboardRangeStart(range), _locale)
+          ? loadMasterSupplementAvailabilityInsights(sql, adminDashboardRangeStart(range))
           : Promise.resolve([])
       ]);
     const orders = await loadOrderInsights(

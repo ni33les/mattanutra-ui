@@ -196,4 +196,68 @@ describe("system agents", () => {
       );
     }
   });
+
+  it("keeps executable worker profiles aligned to the work-task registry", () => {
+    const workTaskRegistry = WORK_TASK_REGISTRY as Readonly<
+      Record<string, { requiredCapabilities: readonly string[] }>
+    >;
+
+    for (const profile of RUNTIME_WORKER_PROFILES) {
+      const expectedAgent = SYSTEM_AGENT_LIST.find(
+        (agent) => agent.id === systemAgentForWorkTaskType(profile.taskTypes[0] ?? "").id
+      );
+
+      assert.ok(expectedAgent, `${profile.mode} must resolve to a system agent`);
+      assert.equal(
+        expectedAgent?.id,
+        systemAgentForWorkTaskType(profile.taskTypes[0] ?? "").id,
+        `${profile.mode} must route through the central registry`
+      );
+
+      for (const taskType of profile.taskTypes) {
+        const registryEntry = workTaskRegistry[taskType];
+        const agent = systemAgentForWorkTaskType(taskType);
+        const roleExpectedByAgent =
+          agent.name === "Retail Stock Planner" || agent.name === "Carrier Coordinator"
+            ? "retail_agent"
+            : "platform_agent";
+
+        assert.ok(registryEntry, `${taskType} must exist in WORK_TASK_REGISTRY`);
+        assert.equal(
+          agent.id,
+          systemAgentForWorkTaskType(taskType).id,
+          `${taskType} must resolve consistently`
+        );
+        assert.equal(
+          profile.role,
+          roleExpectedByAgent,
+          `${profile.mode} role must match ${agent.name}`
+        );
+        assert.equal(
+          hasRequiredCapabilities(registryEntry.requiredCapabilities, agent.capabilities),
+          true,
+          `${agent.name} must satisfy ${taskType}`
+        );
+      }
+    }
+  });
+
+  it("keeps task work-item and result dispatch on handler registries", () => {
+    const workItems = readFileSync("lib/task-work-items.ts", "utf8");
+    const resultApplier = readFileSync("lib/task-result-applier.ts", "utf8");
+    const buildTaskWorkItemBody = workItems.slice(
+      workItems.indexOf("export async function buildTaskWorkItem")
+    );
+    const applyTaskCompletionResultBody = resultApplier.slice(
+      resultApplier.indexOf("export async function applyTaskCompletionResult"),
+      resultApplier.indexOf("export async function applyTaskFailureResult")
+    );
+
+    assert.match(workItems, /const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = \{/);
+    assert.match(resultApplier, /const taskCompletionResultHandlers: Readonly<Record<string, TaskCompletionResultApplier>> = \{/);
+    assert.match(buildTaskWorkItemBody, /taskWorkItemHandlers\[task\.taskType\]/);
+    assert.match(applyTaskCompletionResultBody, /taskCompletionResultHandlers\[task\.taskType\]/);
+    assert.doesNotMatch(buildTaskWorkItemBody, /task\.taskType ===/);
+    assert.doesNotMatch(applyTaskCompletionResultBody, /task\.taskType ===/);
+  });
 });

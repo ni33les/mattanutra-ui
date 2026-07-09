@@ -1,11 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession
-} from "@/lib/admin-access";
-import { requestOriginAllowed } from "@/lib/admin-session-cookie";
-import { hasAdminPermission } from "@/lib/admin-rbac";
+import type { AdminSessionContext } from "@/lib/admin-access-types";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import {
   queueAdminOrganisationCommunication,
   type AdminCommunicationChannelType
@@ -23,24 +18,20 @@ function channelType(value: unknown): AdminCommunicationChannelType | null {
 }
 
 function canAccessEffectiveOrganisation(
-  context: NonNullable<Awaited<ReturnType<typeof resolveAdminSession>>>,
+  context: AdminSessionContext,
   requestedOrganisationId: string
 ) {
   return requestedOrganisationId === context.effectiveOrganisation.id;
 }
 
 export async function POST(request: NextRequest) {
-  if (!requestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "communications.write"
+  );
 
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
-
-  if (!context || !hasAdminPermission(context, "communications.write")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;

@@ -7,8 +7,7 @@ import {
   resolveAdminSession,
   signAdminSessionContext
 } from "@/lib/admin-access";
-import { requestOriginAllowed } from "@/lib/admin-session-cookie";
-import { hasAdminPermission } from "@/lib/admin-rbac";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,17 +17,13 @@ function text(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!requestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "impersonation.write"
+  );
 
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
-
-  if (!context || !hasAdminPermission(context, "impersonation.write")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

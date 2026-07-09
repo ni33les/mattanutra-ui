@@ -353,4 +353,59 @@ describe("API auth boundaries", () => {
       );
     }
   });
+
+  it("keeps aligned admin routes on the central route guard", async () => {
+    for (const file of [
+      "app/api/admin/communications/line-connect/route.ts",
+      "app/api/admin/communications/organisation/route.ts",
+      "app/api/admin/communications/test/route.ts",
+      "app/api/admin/impersonation/start/route.ts",
+      "app/api/admin/impersonation/stop/route.ts",
+      "app/api/admin/panya/export/route.ts",
+      "app/api/admin/panya/route.ts",
+      "app/api/admin/product-coverage/demand-profile/route.ts",
+      "app/api/admin/product-coverage/demand-profiles/route.ts",
+      "app/api/admin/product-coverage/simulation-input/route.ts",
+      "app/api/admin/products/catalogue/export/route.ts",
+      "app/api/admin/retail-financials/route.ts",
+      "app/api/admin/retail-stock/customer-orders/[orderId]/plan-insert/route.ts",
+      "app/api/admin/settings/route.ts"
+    ]) {
+      const source = await readFile(file, "utf8");
+
+      assert.match(
+        source,
+        /requireAdminRouteAccess/,
+        `${file} must use the central admin route guard`
+      );
+      assert.doesNotMatch(
+        source,
+        /hasAdminPermission\(/,
+        `${file} must not duplicate permission checks`
+      );
+      assert.doesNotMatch(
+        source,
+        /requestOriginAllowed\(/,
+        `${file} must not duplicate origin checks`
+      );
+    }
+
+    for (const file of [
+      "app/api/admin/access/route.ts",
+      "app/api/admin/retail-stock/route.ts"
+    ]) {
+      const source = await readFile(file, "utf8");
+
+      assert.match(
+        source,
+        /requireAdminRouteAccess/,
+        `${file} must use the central admin route guard`
+      );
+      assert.doesNotMatch(
+        source,
+        /requestOriginAllowed\(/,
+        `${file} must not duplicate origin checks`
+      );
+    }
+  });
 });

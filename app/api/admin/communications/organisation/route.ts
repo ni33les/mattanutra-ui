@@ -1,12 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession
-} from "@/lib/admin-access";
+import type { AdminSessionContext } from "@/lib/admin-access-types";
 import { getAdminOrganisationCommunicationSettings } from "@/lib/admin-communications";
-import { requestOriginAllowed } from "@/lib/admin-session-cookie";
-import { hasAdminPermission } from "@/lib/admin-rbac";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import {
   adminCommunicationEventKeys,
   adminCommunicationEventScope,
@@ -44,23 +39,23 @@ function eventKey(value: unknown): AdminCommunicationEventKey | null {
 }
 
 function canAccessEffectiveOrganisation(
-  context: NonNullable<Awaited<ReturnType<typeof resolveAdminSession>>>,
+  context: AdminSessionContext,
   requestedOrganisationId: string
 ) {
   return requestedOrganisationId === context.effectiveOrganisation.id;
 }
 
 async function requireCommunicationSession(request: NextRequest, write: boolean) {
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
   const permission = write ? "communications.write" : "communications.read";
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    permission
+  );
 
-  if (!context || !hasAdminPermission(context, permission)) {
+  if (unauthorized || !context) {
     return {
       context: null,
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      response: unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     };
   }
 
@@ -90,10 +85,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!requestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const { context, response } = await requireCommunicationSession(request, true);
 
   if (!context) {

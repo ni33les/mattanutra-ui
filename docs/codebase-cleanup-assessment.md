@@ -1,6 +1,67 @@
 # MattaNutra DB-Up Codebase Cleanup Assessment
 
-Last assessed: 2026-06-15 on local `dev`.
+Last assessed: 2026-07-09 on local `dev`.
+
+## 2026-07-09 Refresh
+
+`npm run audit:codebase` now shows that the first retail/product cleanup
+package has landed: `lib/admin-retail-stock.ts` is a facade-sized module, the
+admin safety surface is split by domain, product admin uses list/detail pages,
+and product offers are removed from runtime code.
+
+Current local audit summary:
+
+| Domain | Tables | Rows | Cleanup posture |
+| --- | ---: | ---: | --- |
+| Assessment | 4 | 7 | Keep append-only versions plus projection |
+| Task runtime | 8 | 1,086 | Keep generic engine isolated from domain effects |
+| Product catalogue | 17 | 7,106 | Continue catalogue/read-model simplification |
+| Supplement catalogue | 8 | 1,051 | Continue state and safety-limit simplification |
+| Food dormant | 9 | 365 | Preserve dormant infrastructure |
+| Communications | 4 | 4 | Split after core architecture cleanup |
+| Content | 2 | 51 | Preserve; public/content pass is separate |
+| Finance | 3 | 15 | Preserve; simplify only at service boundaries |
+| Operations/other | 53 | 3,629 | Keep runtime data out of catalogue snapshots |
+
+Largest current cleanup targets:
+
+| File | Lines | Issue |
+| --- | ---: | --- |
+| `components/admin/product-coverage-view.tsx` | 5,756 | Product coverage UI and view-state density |
+| `lib/admin-access.ts` | 4,768 | RBAC/session/passkey/invitation/agent credential concerns in one module |
+| `components/admin/retail-stock-view.tsx` | 4,635 | Still large despite extracted controls and read models |
+| `lib/admin-product-coverage-simulation.ts` | 4,222 | Product coverage simulation and formatting breadth |
+| `lib/communications.ts` | 3,919 | Channel, routing, persistence, and task enqueueing mixed |
+| `lib/product-recommendations.ts` | 2,952 | Matcher path and diagnostics remain dense |
+| `lib/task-service.ts` | 2,842 | Generic task lifecycle should stay isolated and guarded |
+| `lib/task-result-applier.ts` | 2,754 | Domain result effects are being moved behind handlers |
+| `lib/task-worker.ts` | 2,699 | Domain enqueueing remains broad |
+| `lib/stripe-payments.ts` | 2,692 | Payment lifecycle, pregeneration, and provider handling mixed |
+
+Current direct SQL write hotspots:
+
+| File | Direct writes | Next action |
+| --- | ---: | --- |
+| `lib/admin-access.ts` | 51 | Split by access concern while preserving facade exports |
+| `lib/task-service.ts` | 41 | Keep writes generic and statement-atomic |
+| `lib/admin-product-writes.ts` | 33 | Keep product writes behind the product service boundary |
+| `lib/communications.ts` | 30 | Split routing, persistence, and task enqueueing |
+| `lib/retail-carrier-shipments.ts` | 27 | Split carrier command persistence from shipment read helpers |
+| `lib/admin-supplements.ts` | 25 | Continue supplement state/safety service separation |
+| `lib/task-result-applier.ts` | 22 | Route completion effects through task-type handlers |
+
+Current guardrails that must remain green:
+
+- `test/codebase-cleanup.test.ts` preserves the completed retail stock,
+  product admin, product offer removal, overlay, CSS, Grok transport, and
+  catalogue snapshot boundaries.
+- `test/admin-access-rbac.test.ts`, `test/system-agents.test.ts`,
+  `test/worker-boundary.test.ts`, `test/task-only-schema.test.ts`, and
+  `test/transaction-boundary.test.ts` preserve RBAC, task, worker, and
+  transaction boundaries.
+- Canonical partner vocabulary is `retail partner/org` backed by tenant
+  `organisations`; `retail_agent` is the machine role for tenant-scoped worker
+  credentials.
 
 ## Executive Summary
 
@@ -17,9 +78,10 @@ Food, content, communications, finance, campaigns, and BPM exist and should not 
 
 The immediate cleanup risk is not missing code; it is having too many overlapping state systems: mutable projections plus append-only version tables, `status` plus validation cache, `list_status` plus `is_active`, import evidence plus `source_snapshot`, product stack variants plus legacy matcher paths, and old marketplace naming inside catalogue-first code.
 
-## Current Cleanup Baseline
+## Historical Cleanup Baseline
 
-The current `audit:codebase` baseline on 2026-06-15 shows the first cleanup package should stay focused on admin/catalogue and retail internals:
+The `audit:codebase` baseline on 2026-06-15 showed the first cleanup package
+should stay focused on admin/catalogue and retail internals:
 
 - Total tracked source lines across the audited app/components/lib/scripts/workers/test set: about 200k.
 - Largest module: `lib/admin-retail-stock.ts` at about 7.7k lines, 94 named/exported functions, and 44 direct SQL write sites.

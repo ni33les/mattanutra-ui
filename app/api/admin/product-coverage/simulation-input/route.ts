@@ -1,11 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession
-} from "@/lib/admin-access";
 import { normalizeAdminDashboardRange } from "@/lib/admin-dashboard-data";
 import { getAdminPlanCoverageSimulationData } from "@/lib/admin-product-coverage";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import { adminViewAllowed } from "@/lib/admin-rbac";
 
 export const dynamic = "force-dynamic";
@@ -16,17 +12,14 @@ const noStoreHeaders = {
 };
 
 async function adminContext(request: NextRequest) {
-  return resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
+  return requireAdminRouteAccess(request, null);
 }
 
 export async function GET(request: NextRequest) {
-  const context = await adminContext(request);
+  const { context, unauthorized } = await adminContext(request);
 
-  if (!context) {
-    return NextResponse.json(
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json(
       { error: "Unauthorized" },
       { headers: noStoreHeaders, status: 401 }
     );

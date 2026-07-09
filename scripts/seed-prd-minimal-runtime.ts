@@ -79,10 +79,6 @@ function envText(name: string) {
   return process.env[name]?.trim() || "";
 }
 
-function hasArg(name: string) {
-  return process.argv.includes(`--${name}`);
-}
-
 function fail(message: string): never {
   throw new Error(`[prd-minimal-runtime] ${message}`);
 }

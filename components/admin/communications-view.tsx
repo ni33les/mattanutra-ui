@@ -678,7 +678,7 @@ export function AdminCommunicationsView({
                   className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50"
                   disabled={!settings.canManage || settingsBusy}
                   onChange={(event) => setEmailContactName(event.target.value)}
-                  placeholder="Delight Pharmacy orders desk"
+                  placeholder="Retail partner orders desk"
                   type="text"
                   value={emailContactName}
                 />

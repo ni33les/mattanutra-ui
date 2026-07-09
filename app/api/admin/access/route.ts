@@ -24,10 +24,10 @@ import {
   updateOwnPerson,
   updateAgent,
   updatePerson,
-  assumeAdminIdentity,
-  type AdminSessionContext
+  assumeAdminIdentity
 } from "@/lib/admin-access";
-import { requestOriginAllowed } from "@/lib/admin-session-cookie";
+import type { AdminSessionContext } from "@/lib/admin-access-types";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import { hasAdminPermission, isAdminRole, isAgentRole } from "@/lib/admin-rbac";
 import { isLocale, type Locale } from "@/lib/i18n";
 
@@ -39,10 +39,7 @@ function text(value: unknown) {
 }
 
 async function adminContext(request: NextRequest) {
-  return resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
+  return requireAdminRouteAccess(request, null);
 }
 
 function localeValue(value: unknown): Locale {
@@ -111,24 +108,21 @@ async function accessResponse(
 }
 
 export async function GET(request: NextRequest) {
-  const context = await adminContext(request);
+  const { context, unauthorized } = await adminContext(request);
 
   if (
+    unauthorized ||
     !context ||
     (!hasAdminPermission(context, "access.read") &&
       !hasAdminPermission(context, "access.agents.read"))
   ) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   return NextResponse.json(await accessPayload(context));
 }
 
 export async function POST(request: NextRequest) {
-  if (!requestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   let body: Record<string, unknown>;
 
   try {
@@ -137,10 +131,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const context = await adminContext(request);
+  const { context, unauthorized } = await adminContext(request);
 
-  if (!context) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {

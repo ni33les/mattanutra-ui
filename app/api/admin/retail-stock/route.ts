@@ -1,11 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession,
-} from "@/lib/admin-access";
-import { requestOriginAllowed } from "@/lib/admin-session-cookie";
-import {
   advanceRetailCustomerOrder,
   allocateRetailCustomerOrder,
   createRetailCustomerOrder,
@@ -25,6 +19,8 @@ import {
   upsertRetailStockItem,
   voidRetailStockMovement
 } from "@/lib/admin-retail-stock";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
+import type { AdminSessionContext } from "@/lib/admin-access-types";
 import { hasAdminPermission } from "@/lib/admin-rbac";
 import {
   bookRetailOrderPickup,
@@ -121,7 +117,7 @@ function actionFailureMessage(action: string) {
 }
 
 type RetailStockRouteHandler = (
-  context: NonNullable<Awaited<ReturnType<typeof resolveAdminSession>>>,
+  context: AdminSessionContext,
   body: Record<string, unknown>
 ) => Promise<{
   resourceId: string | null;
@@ -399,13 +395,13 @@ const retailStockRouteHandlers: Partial<Record<RetailCommandId, RetailStockRoute
 };
 
 export async function GET(request: NextRequest) {
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "stock.read"
+  );
 
-  if (!context || !hasAdminPermission(context, "stock.read")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const locale = localeValue(new URL(request.url).searchParams.get("locale"));
@@ -428,10 +424,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!requestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   let body: Record<string, unknown>;
 
   try {
@@ -440,18 +432,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
+  const { context, unauthorized } = await requireAdminRouteAccess(request, null);
+
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   if (
-    !context ||
-    (
-      !hasAdminPermission(context, "stock.write") &&
-      !hasAdminPermission(context, "shipments.write") &&
-      !hasAdminPermission(context, "shipments.configure")
-    )
+    !hasAdminPermission(context, "stock.write") &&
+    !hasAdminPermission(context, "shipments.write") &&
+    !hasAdminPermission(context, "shipments.configure")
   ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

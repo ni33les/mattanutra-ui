@@ -378,7 +378,7 @@ describe("admin RBAC", () => {
     assert.match(accessView, /defaultValue=\{organisation\.currency\}/);
     assert.match(accessView, /defaultValue=\{organisation\.countryCode\}/);
     assert.match(accessView, /labels\.settings\.currency/);
-	    assert.match(settingsRoute, /hasAdminPermission\(context, "settings\.read"\)/);
+	    assert.match(settingsRoute, /requireAdminRouteAccess\(\s*request,\s*"settings\.read"/);
 	    assert.match(settingsRoute, /action === "update_organisation"/);
 	    assert.match(settingsRoute, /currency: text\(body\.currency\)/);
 	    assert.match(settingsRoute, /Object\.hasOwn\(body, "customerPriceMarginPercent"\)/);

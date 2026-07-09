@@ -12,7 +12,8 @@ describe("retail plan insert static wiring", () => {
       "app/api/admin/retail-stock/customer-orders/[orderId]/plan-insert/route.ts"
     );
 
-    assert.match(route, /hasAdminPermission\(context, "stock\.read"\)/);
+    assert.match(route, /requireAdminRouteAccess\(\s*request,\s*"stock\.read"/);
+    assert.doesNotMatch(route, /hasAdminPermission\(/);
     assert.match(route, /renderRetailPlanInsertPdfForOrder/);
     assert.match(route, /"Content-Type": "application\/pdf"/);
     assert.match(route, /"Cache-Control": "no-store"/);

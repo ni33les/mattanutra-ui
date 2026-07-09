@@ -1082,7 +1082,7 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(hygeiaExportRoute, /Retail Stock only/);
 	    const retailStockRoute = readFileSync("app/api/admin/retail-stock/route.ts", "utf8");
 	    assert.match(retailStockRoute, /export async function GET/);
-	    assert.match(retailStockRoute, /hasAdminPermission\(context, "stock\.read"\)/);
+	    assert.match(retailStockRoute, /requireAdminRouteAccess\(\s*request,\s*"stock\.read"/);
 	    assert.match(customerOrders, /retailOrderWorkflowTaskDetails/);
 	    assert.match(customerOrders, /@\/lib\/retail-order-workflow-rules/);
 	    assert.match(workflowRules, /status === "shipped"[\s\S]*return "deliver"/);

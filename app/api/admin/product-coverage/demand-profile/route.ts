@@ -1,10 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession
-} from "@/lib/admin-access";
 import { getOrGenerateCachedAdminPlanCoverageDemandProfile } from "@/lib/admin-plan-demand-generation";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import { adminViewAllowed } from "@/lib/admin-rbac";
 import { isLocale } from "@/lib/i18n";
 
@@ -16,18 +12,15 @@ function text(value: unknown) {
 }
 
 async function adminContext(request: NextRequest) {
-  return resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
+  return requireAdminRouteAccess(request, null);
 }
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const context = await adminContext(request);
+  const { context, unauthorized } = await adminContext(request);
 
-  if (!context) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   if (

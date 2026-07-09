@@ -1,39 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  recordAdminAudit,
-  resolveAdminSession
-} from "@/lib/admin-access";
+import { recordAdminAudit } from "@/lib/admin-access";
 import { getAdminPanyaData, panyaConversationsCsv } from "@/lib/admin-panya";
 import { normalizeAdminDashboardRange } from "@/lib/admin-dashboard-data";
-import { hasAdminPermission } from "@/lib/admin-rbac";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-async function panyaContext(request: NextRequest) {
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
+export async function GET(request: NextRequest) {
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "panya.read"
+  );
 
-  if (
-    !context ||
-    context.effectiveOrganisation.type !== "platform" ||
-    !hasAdminPermission(context, "panya.read")
-  ) {
-    return null;
+  if (unauthorized) {
+    return unauthorized;
   }
 
-  return context;
-}
-
-export async function GET(request: NextRequest) {
-  const context = await panyaContext(request);
-
-  if (!context) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!context || context.effectiveOrganisation.type !== "platform") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const url = new URL(request.url);

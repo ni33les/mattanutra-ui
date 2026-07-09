@@ -10,8 +10,7 @@ import {
   updateEffectiveOrganisationSettings,
   updateOwnPerson
 } from "@/lib/admin-access";
-import { requestOriginAllowed } from "@/lib/admin-session-cookie";
-import { hasAdminPermission } from "@/lib/admin-rbac";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import { isLocale, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -51,25 +50,20 @@ async function refreshSessionCookie(
 }
 
 export async function POST(request: NextRequest) {
-  if (!requestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "settings.read"
+  );
+
+  if (unauthorized || !context) {
+    return unauthorized ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: Record<string, unknown>;
-
   try {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
-
-  if (!context || !hasAdminPermission(context, "settings.read")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {

@@ -1,11 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCsrfCookieName,
-  adminSessionCookieName,
-  resolveAdminSession
-} from "@/lib/admin-access";
 import { normalizeAdminDashboardRange } from "@/lib/admin-dashboard-data";
-import { requestOriginAllowed } from "@/lib/admin-session-cookie";
+import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import {
   confirmRetailSettlementReceived,
   getAdminRetailFinancialsData,
@@ -13,7 +8,6 @@ import {
   markRetailSettlementReview,
   retailFinancialsCsv
 } from "@/lib/admin-retail-financials";
-import { hasAdminPermission } from "@/lib/admin-rbac";
 import { isLocale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -33,19 +27,15 @@ function numberOrNull(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function financeContext(request: NextRequest) {
-  const context = await resolveAdminSession({
-    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
-    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
-  });
-
-  return context && hasAdminPermission(context, "finance.read")
-    ? context
-    : null;
-}
-
 export async function GET(request: NextRequest) {
-  const context = await financeContext(request);
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "finance.read"
+  );
+
+  if (unauthorized) {
+    return unauthorized;
+  }
 
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -72,11 +62,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!requestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const { context, unauthorized } = await requireAdminRouteAccess(
+    request,
+    "finance.read"
+  );
 
-  const context = await financeContext(request);
+  if (unauthorized) {
+    return unauthorized;
+  }
 
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

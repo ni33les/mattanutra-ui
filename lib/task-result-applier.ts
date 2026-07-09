@@ -2463,6 +2463,58 @@ async function applyProductRecommendationsResult(
   };
 }
 
+type TaskCompletionResultApplier = (
+  task: TaskRecord,
+  resultPayload: unknown,
+  sql: TaskServiceDb | undefined,
+  afterCommit: AfterCommitScheduler | undefined
+) => Promise<unknown>;
+
+const taskCompletionResultHandlers: Readonly<Record<string, TaskCompletionResultApplier>> = {
+  analyze_healthscore: async (task, resultPayload, sql, afterCommit) => {
+    await applyHealthScoreResult(task, resultPayload, sql, afterCommit);
+    return resultPayload;
+  },
+  client_safety_followup: applyCommunicationFollowupResult,
+  content_status_change: async (task, _resultPayload, sql, afterCommit) =>
+    applyContentStatusChangeResult(task, sql, afterCommit),
+  customer_chat_reply: applyCustomerChatReplyResult,
+  generate_example_supplement_guidance: async (
+    task,
+    resultPayload,
+    sql,
+    afterCommit
+  ) => {
+    await applyExampleFormulationResult(task, resultPayload, sql, afterCommit);
+    return resultPayload;
+  },
+  generate_food_gap_guidance: async (task, resultPayload, sql, afterCommit) => {
+    await applyFoodGapSupportResult(task, resultPayload, sql, afterCommit);
+    return resultPayload;
+  },
+  generate_food_guidance: async (task, resultPayload, sql, afterCommit) => {
+    await applyFoodGuidanceResult(task, resultPayload, sql, afterCommit);
+    return resultPayload;
+  },
+  generate_nutrition_report: applyNutritionReportResult,
+  generate_product_recommendations: applyProductRecommendationsResult,
+  generate_supplement_guidance: async (task, resultPayload, sql, afterCommit) => {
+    await applyPaidFormulationResult(task, resultPayload, sql, afterCommit);
+    return resultPayload;
+  },
+  nutrition_plan_chat_reply: applyNutritionPlanChatResult,
+  refine_nutrition_plan: applyNutritionPlanRefinementResult,
+  send_example_email: async (task, resultPayload, sql, afterCommit) => {
+    await applyExampleEmailResult(task, resultPayload, sql, afterCommit);
+    return resultPayload;
+  },
+  send_reassessment_email: async (task, resultPayload, sql, afterCommit) => {
+    await applyReassessmentEmailResult(task, resultPayload, sql, afterCommit);
+    return resultPayload;
+  },
+  sync_digitalocean_billing: applyDigitalOceanBillingSyncResult
+};
+
 export async function applyTaskCompletionResult({
   afterCommit,
   resultPayload,
@@ -2477,72 +2529,10 @@ export async function applyTaskCompletionResult({
   taskId: string;
 }>) {
   const task = providedTask ?? (await getTaskBundle({ taskId })).task;
+  const handler = taskCompletionResultHandlers[task.taskType];
 
-  if (task.taskType === "analyze_healthscore") {
-    await applyHealthScoreResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
-  if (task.taskType === "generate_supplement_guidance") {
-    await applyPaidFormulationResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
-  if (task.taskType === "generate_food_guidance") {
-    await applyFoodGuidanceResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
-  if (task.taskType === "generate_food_gap_guidance") {
-    await applyFoodGapSupportResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
-  if (task.taskType === "generate_example_supplement_guidance") {
-    await applyExampleFormulationResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
-  if (task.taskType === "send_example_email") {
-    await applyExampleEmailResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
-  if (task.taskType === "send_reassessment_email") {
-    await applyReassessmentEmailResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
-  if (task.taskType === "client_safety_followup") {
-    return applyCommunicationFollowupResult(task, resultPayload, sql, afterCommit);
-  }
-
-  if (task.taskType === "content_status_change") {
-    return applyContentStatusChangeResult(task, sql, afterCommit);
-  }
-
-  if (task.taskType === "sync_digitalocean_billing") {
-    return applyDigitalOceanBillingSyncResult(task, resultPayload, sql, afterCommit);
-  }
-
-  if (task.taskType === "nutrition_plan_chat_reply") {
-    return applyNutritionPlanChatResult(task, resultPayload, sql, afterCommit);
-  }
-
-  if (task.taskType === "customer_chat_reply") {
-    return applyCustomerChatReplyResult(task, resultPayload, sql, afterCommit);
-  }
-
-  if (task.taskType === "refine_nutrition_plan") {
-    return applyNutritionPlanRefinementResult(task, resultPayload, sql, afterCommit);
-  }
-
-  if (task.taskType === "generate_nutrition_report") {
-    return applyNutritionReportResult(task, resultPayload, sql, afterCommit);
-  }
-
-  if (task.taskType === "generate_product_recommendations") {
-    return applyProductRecommendationsResult(task, resultPayload, sql, afterCommit);
+  if (handler) {
+    return handler(task, resultPayload, sql, afterCommit);
   }
 
   return resultPayload;

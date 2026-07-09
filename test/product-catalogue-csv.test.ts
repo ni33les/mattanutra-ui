@@ -343,8 +343,9 @@ describe("product catalogue CSV", () => {
     assert.match(retailView, /importRetailProductCatalogueFile/);
     assert.match(exportRoute, /buildPlatformProductCatalogueJson/);
     assert.match(exportRoute, /buildRetailProductCatalogueJson/);
-    assert.match(exportRoute, /resolveAdminSession/);
-    assert.match(exportRoute, /hasAdminPermission\(context, "stock\.read"\)/);
+    assert.match(exportRoute, /requireAdminRouteAccess\(\s*request,\s*"stock\.read"/);
+    assert.doesNotMatch(exportRoute, /resolveAdminSession/);
+    assert.doesNotMatch(exportRoute, /hasAdminPermission\(/);
     assert.match(exportRoute, /canAccessRetailOrganisation/);
     assert.match(exportRoute, /platform-product-catalogue\.json/);
     assert.match(exportRoute, /retail-product-catalogue-\$\{organisationId\}\.json/);
