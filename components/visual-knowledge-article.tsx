@@ -1,30 +1,12 @@
 import { LibraryVisualPage } from "@/components/library-visual-page";
+import { getNamespace } from "@/lib/i18n-messages";
 import { absoluteUrl } from "@/lib/seo";
 import type { LibraryArticle } from "@/lib/library";
 
-function shareLabel(locale: LibraryArticle["locale"]) {
-  if (locale === "th") {
-    return "แชร์";
-  }
-
-  if (locale === "zh-CN") {
-    return "分享";
-  }
-
-  return "Share";
-}
-
-function copiedLabel(locale: LibraryArticle["locale"]) {
-  if (locale === "th") {
-    return "คัดลอกแล้ว";
-  }
-
-  if (locale === "zh-CN") {
-    return "已复制";
-  }
-
-  return "Copied";
-}
+type LibraryArticleActionsCopy = Readonly<{
+  copiedLabel: string;
+  shareLabel: string;
+}>;
 
 export function VisualKnowledgeArticle({
   article
@@ -38,14 +20,19 @@ export function VisualKnowledgeArticle({
     return null;
   }
 
+  const actions = getNamespace<LibraryArticleActionsCopy>(
+    article.locale,
+    "customer.libraryArticleActions"
+  );
+
   return (
     <LibraryVisualPage
       articleUrl={absoluteUrl(article.href)}
-      copiedLabel={copiedLabel(article.locale)}
+      copiedLabel={actions.copiedLabel}
       locale={article.locale}
       nodes={nodes}
       quiz={quiz}
-      shareLabel={shareLabel(article.locale)}
+      shareLabel={actions.shareLabel}
       slug={article.slug}
     />
   );

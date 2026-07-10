@@ -9,9 +9,11 @@ import type {
   LibraryCategory,
   LibraryCategorySlug
 } from "@/lib/library";
+import type { Locale } from "@/lib/i18n";
 
 type LibraryIndexClientProps = Readonly<{
   allCategoryLabel: string;
+  articleImageAltPrefix: string;
   articles: readonly LibraryArticleSummary[];
   categories: readonly LibraryCategory[];
   categoryLabel: string;
@@ -19,6 +21,7 @@ type LibraryIndexClientProps = Readonly<{
   emptyLabel: string;
   initialVisibleCount?: number;
   loadMoreLabel: string;
+  locale: Locale;
   noContentNote: string;
   resultLabel: string;
   resultsLabel: string;
@@ -70,6 +73,7 @@ function searchableText(article: LibraryArticleSummary) {
 
 export function LibraryIndexClient({
   allCategoryLabel,
+  articleImageAltPrefix,
   articles,
   categories,
   categoryLabel,
@@ -77,6 +81,7 @@ export function LibraryIndexClient({
   emptyLabel,
   initialVisibleCount,
   loadMoreLabel,
+  locale,
   noContentNote,
   resultLabel,
   resultsLabel,
@@ -87,6 +92,7 @@ export function LibraryIndexClient({
   const [activeCategory, setActiveCategory] = useState<ActiveCategory>("all");
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(initialCount);
+  const numberFormatter = useMemo(() => new Intl.NumberFormat(locale), [locale]);
 
   useEffect(() => {
     const hash = window.location.hash.replace(/^#/, "");
@@ -201,7 +207,8 @@ export function LibraryIndexClient({
 
         {showCount ? (
           <p className="mt-8 mb-6 text-[13px] text-ash">
-            {filtered.length} {filtered.length === 1 ? resultLabel : resultsLabel}
+            {numberFormatter.format(filtered.length)}{" "}
+            {filtered.length === 1 ? resultLabel : resultsLabel}
           </p>
         ) : null}
 
@@ -218,7 +225,7 @@ export function LibraryIndexClient({
                   )} px-5 pt-4`}
                 >
                   <Image
-                    alt={`Nong Matta illustration - ${article.category.label}`}
+                    alt={`${articleImageAltPrefix} - ${article.category.label}`}
                     className="h-[120px] w-auto object-contain sm:h-[136px]"
                     height={674}
                     loading="lazy"

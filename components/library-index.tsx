@@ -67,7 +67,7 @@ export function LibraryIndex({
               </p>
             </div>
             <Image
-              alt="Nong Matta, the MattaNutra Library guide"
+              alt={copy.guideImageAlt}
               className="hidden h-40 w-auto md:block"
               height={466}
               priority={true}
@@ -80,12 +80,14 @@ export function LibraryIndex({
 
         <LibraryIndexClient
           allCategoryLabel={copy.allCategory}
+          articleImageAltPrefix={copy.articleImageAltPrefix}
           articles={articles}
           categories={categories}
           categoryLabel={copy.categoryLabel}
           clearSearchLabel={copy.clearSearch}
           emptyLabel={copy.empty}
           loadMoreLabel={copy.loadMore}
+          locale={locale}
           noContentNote={copy.noContentNote}
           resultLabel={copy.result}
           resultsLabel={copy.results}
@@ -114,7 +116,7 @@ export function LibraryIndex({
               </Link>
             </div>
             <Image
-              alt="Nong Matta celebrating"
+              alt={copy.ctaImageAlt}
               className="hidden h-48 w-auto md:block"
               height={431}
               src="/assets/library/nong/nong-celebrate.webp"

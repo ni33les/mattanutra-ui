@@ -82,16 +82,21 @@ export type LibraryArticle = LibraryArticleSummary &
 
 type LibraryCopy = Readonly<{
   allCategory: string;
+  articleImageAltPrefix: string;
+  articleListName: string;
   breadcrumbHome: string;
   browse: string;
   categoryLabel: string;
   clearSearch: string;
   ctaBody: string;
   ctaButton: string;
+  ctaImageAlt: string;
   ctaTitle: string;
   empty: string;
   eyebrow: string;
+  featuredListName: string;
   guide: string;
+  guideImageAlt: string;
   guideName: string;
   intro: string;
   loadMore: string;
@@ -176,6 +181,8 @@ const staticSlugs = new Set(staticLibraryArticles.map((article) => article.slug)
 const localizedLibraryCopy = {
   en: {
     allCategory: "All",
+    articleImageAltPrefix: "Nong Matta illustration",
+    articleListName: "The MattaNutra Library articles",
     breadcrumbHome: "Home",
     browse: "Browse the Library",
     categoryLabel: "Category",
@@ -183,11 +190,14 @@ const localizedLibraryCopy = {
     ctaBody:
       "A few minutes gives MattaNutra the context it needs to turn broad answers into your Right Amount.",
     ctaButton: "Start designing your Right Amount",
+    ctaImageAlt: "Nong Matta celebrating",
     ctaTitle: "Ready to make the guidance personal?",
     empty:
       "No articles match yet - try a different word or category. More are on the way.",
     eyebrow: "The MattaNutra Library",
+    featuredListName: "The MattaNutra Library - Featured articles",
     guide: "Your guide",
+    guideImageAlt: "Nong Matta, the MattaNutra Library guide",
     guideName: "Nong Matta",
     intro:
       "Evidence-aware answers to common supplement questions - clear enough to use, careful enough to trust.",
@@ -202,6 +212,8 @@ const localizedLibraryCopy = {
   },
   th: {
     allCategory: "ทั้งหมด",
+    articleImageAltPrefix: "ภาพประกอบน้องมัตตะ",
+    articleListName: "บทความในคลังความรู้ MattaNutra",
     breadcrumbHome: "หน้าแรก",
     browse: "ดูคลังความรู้",
     categoryLabel: "หมวดหมู่",
@@ -209,11 +221,14 @@ const localizedLibraryCopy = {
     ctaBody:
       "ใช้เวลาไม่กี่นาทีเพื่อให้ MattaNutra เข้าใจบริบทของคุณ แล้วเปลี่ยนคำตอบกว้าง ๆ เป็นปริมาณที่พอดี",
     ctaButton: "ออกแบบปริมาณที่พอดีของคุณ",
+    ctaImageAlt: "น้องมัตตะกำลังฉลอง",
     ctaTitle: "พร้อมทำให้คำแนะนำเป็นของคุณจริง ๆ หรือยัง?",
     empty:
       "ยังไม่พบบทความที่ตรงกัน ลองคำอื่นหรือหมวดหมู่อื่น บทความเพิ่มเติมกำลังมา",
     eyebrow: "คลังความรู้ MattaNutra",
+    featuredListName: "บทความแนะนำจากคลังความรู้ MattaNutra",
     guide: "ไกด์ของคุณ",
+    guideImageAlt: "น้องมัตตะ ไกด์คลังความรู้ MattaNutra",
     guideName: "น้องมัตตะ",
     intro:
       "คำตอบเรื่องอาหารเสริมที่อ้างอิงหลักฐาน อ่านง่าย ใช้งานได้ และระมัดระวังพอให้เชื่อถือ",
@@ -228,6 +243,8 @@ const localizedLibraryCopy = {
   },
   "zh-CN": {
     allCategory: "全部",
+    articleImageAltPrefix: "Nong Matta 插图",
+    articleListName: "MattaNutra 知识库文章",
     breadcrumbHome: "首页",
     browse: "浏览知识库",
     categoryLabel: "分类",
@@ -235,10 +252,13 @@ const localizedLibraryCopy = {
     ctaBody:
       "几分钟就能让 MattaNutra 了解你的背景，把宽泛建议变成适合你的知量方案。",
     ctaButton: "开始设计你的知量方案",
+    ctaImageAlt: "Nong Matta 正在庆祝",
     ctaTitle: "准备让建议真正贴合你了吗？",
     empty: "暂时没有匹配文章。换个关键词或分类试试，更多内容正在准备中。",
     eyebrow: "MattaNutra 知识库",
+    featuredListName: "MattaNutra 知识库精选文章",
     guide: "你的向导",
+    guideImageAlt: "Nong Matta，MattaNutra 知识库向导",
     guideName: "Nong Matta",
     intro:
       "用证据意识回答常见补充剂问题：足够清楚，可以行动；足够谨慎，值得信任。",
@@ -593,7 +613,7 @@ export function libraryIndexJsonLd(input: Readonly<{
         position: index + 1,
         url: absoluteUrl(article.href)
       })),
-      name: `${copy.eyebrow} articles`
+      name: copy.articleListName
     },
     name: copy.eyebrow,
     url
@@ -601,16 +621,20 @@ export function libraryIndexJsonLd(input: Readonly<{
 }
 
 export function libraryFeaturedJsonLd(articles: readonly LibraryArticleSummary[]) {
+  const locale = articles[0]?.locale ?? defaultLocale;
+  const copy = getLibraryCopy(locale);
+
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
+    inLanguage: localeHtmlLang(locale),
     itemListElement: articles.map((article, index) => ({
       "@type": "ListItem",
       name: article.title,
       position: index + 1,
       url: absoluteUrl(article.href)
     })),
-    name: "The MattaNutra Library - Featured articles"
+    name: copy.featuredListName
   };
 }
 

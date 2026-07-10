@@ -594,6 +594,24 @@
     "translatable": true,
     "variables": []
   },
+  "customer.libraryArticleActions.copiedLabel": {
+    "audience": "customer",
+    "defaultMessage": "Copied",
+    "description": "Screen-reader and fallback prompt label shown after copying a Library article link.",
+    "namespace": "customer.libraryArticleActions",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryArticleActions.shareLabel": {
+    "audience": "customer",
+    "defaultMessage": "Share",
+    "description": "Accessible label for the Library article share action.",
+    "namespace": "customer.libraryArticleActions",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
   "customer.footer.body": {
     "audience": "customer",
     "defaultMessage": "Personalised wellness plans, designed in Chiang Mai for Southeast Asian lives. Ancient wisdom · modern science.",

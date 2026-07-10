@@ -912,7 +912,7 @@ export function LandingPage({
           >
             <div className="flex items-center gap-4">
               <Image
-                alt="Nong Matta, the MattaNutra Library guide"
+                alt={libraryCopy.guideImageAlt}
                 className="hidden h-24 w-auto sm:block"
                 height={466}
                 src="/assets/library/nong/nong-open.webp"
@@ -963,7 +963,7 @@ export function LandingPage({
                     )} px-5 pt-5`}
                   >
                     <Image
-                      alt={`Nong Matta illustration - ${post.category.label}`}
+                      alt={`${libraryCopy.articleImageAltPrefix} - ${post.category.label}`}
                       className="h-[150px] w-auto object-contain"
                       height={674}
                       loading="lazy"

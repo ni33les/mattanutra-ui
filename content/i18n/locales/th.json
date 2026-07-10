@@ -64,6 +64,8 @@
   "customer.blogArticleCta.primaryLabel": "เริ่มทำแบบประเมิน",
   "customer.blogArticleCta.secondaryLabel": "กลับหน้าหลัก",
   "customer.blogArticleCta.title": "เริ่มจากคะแนนสุขภาพของคุณ แล้วค่อยๆ สร้างแผนที่เหมาะกับคุณ",
+  "customer.libraryArticleActions.copiedLabel": "คัดลอกแล้ว",
+  "customer.libraryArticleActions.shareLabel": "แชร์",
   "customer.footer.body": "แผนสุขภาพเฉพาะบุคคลจากเชียงใหม่ เพื่อชีวิตในเอเชียตะวันออกเฉียงใต้ ภูมิปัญญาเดิม · วิทยาศาสตร์สมัยใหม่",
   "customer.footer.columns.0.links.0.0": "โปรโตคอลชีวิต",
   "customer.footer.columns.0.links.0.1": "/#living-protocol",
