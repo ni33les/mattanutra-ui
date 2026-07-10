@@ -201,6 +201,7 @@ export function localizedAlternates(input: Readonly<{
 
 export function localizedMetadata(input: Readonly<{
   description: string;
+  image?: string;
   indexable?: boolean;
   locale: Locale;
   path: string;
@@ -214,6 +215,7 @@ export function localizedMetadata(input: Readonly<{
   });
   const currentCanonicalPath =
     input.translatedPaths?.[input.locale] ?? localizedPath(input.locale, input.path);
+  const imageUrl = input.image ? absoluteUrl(input.image) : undefined;
 
   return {
     alternates: indexable
@@ -225,6 +227,13 @@ export function localizedMetadata(input: Readonly<{
     description: input.description,
     openGraph: {
       description: input.description,
+      images: imageUrl
+        ? [
+            {
+              url: imageUrl
+            }
+          ]
+        : undefined,
       locale: localeHtmlLang(input.locale).replace("-", "_"),
       title: input.title,
       type: "website",
@@ -236,7 +245,15 @@ export function localizedMetadata(input: Readonly<{
           follow: false,
           index: false
         },
-    title: input.title
+    title: input.title,
+    twitter: imageUrl
+      ? {
+          card: "summary_large_image",
+          description: input.description,
+          images: [imageUrl],
+          title: input.title
+        }
+      : undefined
   };
 }
 

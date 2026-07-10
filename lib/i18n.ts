@@ -83,7 +83,7 @@ const en = {
   meta: {
     title: "MattaNutra — Stop guessing. Start knowing.",
     description:
-      "AI-powered personalised supplement and wellness plans, designed in Chiang Mai for Southeast Asian lives. Stop guessing. Start knowing."
+      "Personalised supplement and wellness plans, designed in Chiang Mai for Southeast Asian lives. Stop guessing. Start knowing."
   },
   hero: {
     eyebrow: "MattaNutra",
@@ -92,7 +92,7 @@ const en = {
     subtitleAccent: "your body needs",
     subtitleMuted: "no guesswork",
     followOn:
-      "AI powered plans for supplements, sleep, nutrition and more - Tailored to YOU",
+      "Personalised plans for supplements, sleep, nutrition and more - Tailored to YOU",
     followOnAccent: "YOU",
     cta: "Design your future health",
     secondaryCta: "How it works",
@@ -126,9 +126,9 @@ const en = {
           "Share your goals for energy, sleep, focus, calm, recovery, or healthy aging in a 2 minute questionnaire."
       },
       {
-        name: "AI Powered Plan",
+        name: "Personalized Plan",
         description:
-          "We generate a comprehensive AI powered supplement plan tailored to you."
+          "We generate a comprehensive supplement plan tailored to you."
       },
       {
         name: "Buy with confidence",
@@ -182,7 +182,7 @@ const zhCn = {
   meta: {
     title: "MattaNutra | 别再猜测，开始了解。",
     description:
-      "由 AI 驱动的补充剂与健康计划，贴合你的身体、目标、生活方式和不断变化的日常。"
+      "个性化补充剂与健康计划，贴合你的身体、目标、生活方式和不断变化的日常。"
   },
   hero: {
     eyebrow: "MattaNutra",
@@ -191,7 +191,7 @@ const zhCn = {
     subtitleAccent: "身体真正需要什么",
     subtitleMuted: "不用猜",
     followOn:
-      "面向补充剂、睡眠、营养等方面的 AI 计划 - 为你量身定制",
+      "面向补充剂、睡眠、营养等方面的个性化计划 - 为你量身定制",
     followOnAccent: "你",
     cta: "设计你的未来健康",
     secondaryCta: "了解流程",
@@ -225,9 +225,9 @@ const zhCn = {
           "用 2 分钟问卷分享你在精力、睡眠、专注、平静、恢复或健康老龄化方面的目标。"
       },
       {
-        name: "AI 驱动计划",
+        name: "个性化计划",
         description:
-          "我们会生成一份全面、贴合你的 AI 补充剂计划。"
+          "我们会生成一份全面、贴合你的个性化补充剂计划。"
       },
       {
         name: "更安心地购买",
@@ -282,7 +282,7 @@ const dictionaries = {
     meta: {
       title: "MattaNutra | เลิกเดา เริ่มรู้",
       description:
-        "แผนอาหารเสริมและสุขภาพด้วย AI ที่ออกแบบให้เข้ากับร่างกาย เป้าหมาย ไลฟ์สไตล์ และชีวิตที่เปลี่ยนไปของคุณ"
+        "แผนอาหารเสริมและสุขภาพเฉพาะบุคคลที่ออกแบบให้เข้ากับร่างกาย เป้าหมาย ไลฟ์สไตล์ และชีวิตที่เปลี่ยนไปของคุณ"
     },
     hero: {
       eyebrow: "MattaNutra",
@@ -291,7 +291,7 @@ const dictionaries = {
       subtitleAccent: "ร่างกายของคุณต้องการอะไร",
       subtitleMuted: "ไม่ต้องเดา",
       followOn:
-        "แผนด้วย AI สำหรับอาหารเสริม การนอนหลับ โภชนาการ และอื่นๆ - ออกแบบเพื่อคุณ",
+        "แผนเฉพาะบุคคลสำหรับอาหารเสริม การนอนหลับ โภชนาการ และอื่นๆ - ออกแบบเพื่อคุณ",
       followOnAccent: "คุณ",
       cta: "ออกแบบสุขภาพอนาคตของคุณ",
       secondaryCta: "วิธีการทำงาน",
@@ -332,9 +332,9 @@ const dictionaries = {
             "บอกเป้าหมายของคุณเรื่องพลังงาน การนอนหลับ สมาธิ ความสงบ การฟื้นตัว หรือการสูงวัยอย่างมีสุขภาพดี ผ่านแบบสอบถาม 2 นาที"
         },
         {
-          name: "แผนจาก AI",
+          name: "แผนเฉพาะบุคคล",
           description:
-            "เราสร้างแผนอาหารเสริมด้วย AI ที่ครอบคลุมและปรับให้เหมาะกับคุณ"
+            "เราสร้างแผนอาหารเสริมเฉพาะบุคคลที่ครอบคลุมและปรับให้เหมาะกับคุณ"
         },
         {
           name: "ซื้อได้อย่างมั่นใจ",

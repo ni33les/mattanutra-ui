@@ -190,17 +190,17 @@
       "rowHash": "cb44d3987dbe03be",
       "section": "导航栏",
       "label": "Nav item 4",
-      "english": "Journal",
-      "zhCN": "健康日志",
+      "english": "Library",
+      "zhCN": "知识库",
       "status": "implemented_catalog",
       "catalogChecks": [
         {
           "id": "customer.titleBar.links.3.1",
-          "zhCN": "健康日志"
+          "zhCN": "知识库"
         },
         {
           "id": "customer.footer.columns.1.links.0.0",
-          "zhCN": "健康日志"
+          "zhCN": "MattaNutra 知识库"
         }
       ]
     },
@@ -255,8 +255,8 @@
       "rowHash": "81c52dcc24e55930",
       "section": "主视觉区（Hero）",
       "label": "Subtitle",
-      "english": "AI-powered supplement and wellness plans built around your body, your lifestyle, and the goals that actually matter to you and that adapt as your life does.",
-      "zhCN": "你的身体，你的生活，你的目标。 AI 为你量身定制保健品方案，随你而变，始终合身。",
+      "english": "Personalized supplement and wellness plans built around your body, your lifestyle, and the goals that actually matter to you and that adapt as your life does.",
+      "zhCN": "你的身体，你的生活，你的目标。个性化保健品方案，随你而变，始终合身。",
       "status": "implemented_catalog",
       "catalogIds": [
         "customer.landing.hero.intro"
@@ -2387,29 +2387,29 @@
     },
     {
       "rowHash": "f69ab9f136f86e33",
-      "section": "健康日志",
+      "section": "知识库",
       "label": "Section label",
-      "english": "Journal",
-      "zhCN": "健康日志",
+      "english": "Library",
+      "zhCN": "知识库",
       "status": "implemented_catalog",
       "catalogChecks": [
         {
           "id": "customer.landing.journal.tag",
-          "zhCN": "健康日志"
+          "zhCN": "知识库"
         },
         {
           "id": "customer.titleBar.links.3.1",
-          "zhCN": "健康日志"
+          "zhCN": "知识库"
         },
         {
           "id": "customer.footer.columns.1.links.0.0",
-          "zhCN": "健康日志"
+          "zhCN": "MattaNutra 知识库"
         }
       ]
     },
     {
       "rowHash": "8db98b99edcc6ad5",
-      "section": "健康日志",
+      "section": "知识库",
       "label": "H2",
       "english": "Learn the right amount.",
       "zhCN": "学习知量之道。",
@@ -2427,10 +2427,10 @@
     },
     {
       "rowHash": "e63eddc7cd62fffc",
-      "section": "健康日志",
+      "section": "知识库",
       "label": "CTA link",
-      "english": "Browse all articles",
-      "zhCN": "查看全部健康日志",
+      "english": "Browse the Library",
+      "zhCN": "浏览知识库",
       "status": "implemented_catalog",
       "catalogIds": [
         "customer.landing.journal.browse"

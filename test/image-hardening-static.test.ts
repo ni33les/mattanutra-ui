@@ -221,9 +221,14 @@ describe("image hardening", () => {
           /src=(?:"|')\//.test(node.text) ||
           /\.startsWith\("\/"\)/.test(node.text) ||
           (rel === "components/landing-page.tsx" &&
-            /src=\{(?:assets\.[^}]+|card\.image|testimonial\.image|src)\}/.test(
+          /src=\{(?:assets\.[^}]+|card\.image|testimonial\.image|src)\}/.test(
               node.text
-            ));
+            )) ||
+          (rel === "components/visual-knowledge-article.tsx" &&
+            /src=\{visual\.shareImage\}/.test(node.text)) ||
+          (rel === "components/library-visual-page.tsx" &&
+            /src=\{node\.src\}/.test(node.text)) ||
+          /src=\{nongPoseAsset\([^)]+\)\}/.test(node.text);
 
         if (!isQrSurface && !isLocalPublicAsset) {
           offenders.push(`${rel}:${node.line}`);

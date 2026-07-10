@@ -28,8 +28,8 @@ function pageEventForPath(pathname: string) {
     return { eventName: "formulation_page_viewed", eventType: "formulation" };
   }
 
-  if (new RegExp(`^/(${localePattern})/blog/`).test(pathname)) {
-    return { eventName: "blog_article_viewed", eventType: "content" };
+  if (new RegExp(`^/(${localePattern})/library/`).test(pathname)) {
+    return { eventName: "library_article_viewed", eventType: "content" };
   }
 
   if (new RegExp(`^/(${localePattern})/(privacy|terms)`).test(pathname)) {

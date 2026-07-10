@@ -14,12 +14,20 @@ import {
 } from "lucide-react";
 import { LandingReveal } from "@/components/landing-reveal";
 import { assets, content } from "@/components/landing-page-copy";
-import type { BlogPostSummary, BlogTestimonial } from "@/lib/blog";
+import type { BlogTestimonial } from "@/lib/blog";
 import type { Locale } from "@/lib/i18n";
+import {
+  getLibraryCategories,
+  getLibraryCopy,
+  libraryFeaturedJsonLd,
+  nongPoseAsset,
+  type LibraryArticleSummary,
+  type LibraryCategorySlug
+} from "@/lib/library";
 
 type LandingPageProps = Readonly<{
   assessmentPath: string;
-  blogPosts: BlogPostSummary[];
+  libraryArticles: LibraryArticleSummary[];
   locale: Locale;
   testimonials: BlogTestimonial[];
 }>;
@@ -82,13 +90,40 @@ function CheckItem({
 
 const promiseIconComponents = [Search, Leaf, UserRound, Heart] as const;
 
+function libraryCategoryTone(slug: LibraryCategorySlug) {
+  switch (slug) {
+    case "foundations":
+      return "from-[var(--mn-mint)] to-[var(--mn-cream)]";
+    case "vitamins":
+      return "from-[var(--mn-gold-tint)] to-[var(--mn-cream)]";
+    case "minerals":
+      return "from-[var(--mn-sand-soft)] to-[var(--mn-cream)]";
+    case "sleep-recovery":
+      return "from-[var(--mn-mint-deep)] to-[var(--mn-cream)]";
+    case "energy-longevity":
+      return "from-[color-mix(in_srgb,var(--mn-teal-glow)_70%,transparent)] to-[var(--mn-cream)]";
+    case "everyday-nutrition":
+      return "from-[var(--mn-cream-deep)] to-[var(--mn-mint)]";
+    case "brain-focus":
+      return "from-[var(--mn-gold-tint)] to-[var(--mn-mint)]";
+    case "joints-mobility":
+      return "from-[var(--mn-sand-soft)] to-[var(--mn-mint-deep)]";
+    case "stress-adaptogens":
+      return "from-[color-mix(in_srgb,var(--mn-teal-glow)_60%,transparent)] to-[var(--mn-gold-tint)]";
+    case "testing-personalisation":
+      return "from-[var(--mn-paper)] to-[var(--mn-mint-deep)]";
+  }
+}
+
 export function LandingPage({
   assessmentPath,
-  blogPosts,
+  libraryArticles,
   locale,
   testimonials,
 }: LandingPageProps) {
   const copy = content[locale];
+  const libraryCopy = getLibraryCopy(locale);
+  const libraryCategories = getLibraryCategories(locale);
   const testimonialCards =
     testimonials.length > 0
       ? testimonials.map((testimonial) => ({
@@ -104,21 +139,7 @@ export function LandingPage({
           ...testimonial,
           imageAlt: testimonial.imageAlt,
         }));
-  const journalCards =
-    blogPosts.length > 0
-      ? blogPosts.map((post) => ({
-          body: post.excerpt,
-          href: post.href,
-          tag: post.primaryTag || copy.journal.tag,
-          title: post.title,
-        }))
-      : copy.journal.fallback.map(([tag, title, body]) => ({
-          body,
-          href: "#journal",
-          tag,
-          title,
-        }));
-  const browseHref = blogPosts[0]?.href ?? "#journal";
+  const browseHref = `/${locale}/library`;
 
   return (
     <div className="flex-1">
@@ -861,7 +882,7 @@ export function LandingPage({
 
       <section
         className="mn-v15-section border-y border-[var(--mn-line)] bg-[var(--mn-paper)]"
-        id="journal"
+        id="library"
       >
         <div className="mn-v15-container">
           <div
@@ -869,38 +890,146 @@ export function LandingPage({
             data-reveal
           >
             <div>
-              <p className="mn-v15-eyebrow">{copy.journal.eyebrow}</p>
+              <p className="mn-v15-eyebrow">{libraryCopy.eyebrow}</p>
               <h2 className="mn-v15-heading mt-3 text-left">
-                {copy.journal.title} <span>{copy.journal.accent}</span>
+                {libraryCopy.title}
               </h2>
+              <p className="mt-5 max-w-2xl text-[17px] leading-[1.7] text-[var(--mn-ink-soft)]">
+                {libraryCopy.sectionIntro}
+              </p>
             </div>
             <Link
               className="inline-flex items-center gap-2 font-semibold text-[var(--mn-teal-deep)] hover:text-[var(--mn-ink)]"
               href={browseHref}
             >
-              {copy.journal.browse}
+              {libraryCopy.browse}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
           </div>
-          <div className="grid gap-7 md:grid-cols-3">
-            {journalCards.map((post, index) => (
+          <div
+            className="mb-8 flex flex-wrap items-center justify-between gap-5 rounded-[20px] border border-[var(--mn-line)] bg-[var(--mn-cream)] px-5 py-4"
+            data-reveal
+          >
+            <div className="flex items-center gap-4">
+              <Image
+                alt="Nong Matta, the MattaNutra Library guide"
+                className="hidden h-24 w-auto sm:block"
+                height={466}
+                src="/assets/library/nong/nong-open.webp"
+                unoptimized={true}
+                width={340}
+              />
+              <div>
+                <p className="mb-1 text-[13px] text-[var(--mn-ash)]">
+                  {libraryCopy.guide},{" "}
+                  <b className="text-[var(--mn-teal-deep)]">
+                    {libraryCopy.guideName}
+                  </b>
+                </p>
+                <Link
+                  className="inline-flex items-center gap-2 font-semibold text-[var(--mn-teal-deep)] transition-colors hover:text-[var(--mn-ink)]"
+                  href={browseHref}
+                >
+                  {libraryCopy.browse}
+                  <ArrowRight aria-hidden className="size-4" />
+                </Link>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Link
-                className="mn-v15-journal-card group"
-                data-reveal
-                href={post.href}
-                key={post.title}
+                className="rounded-pill bg-[var(--mn-teal-deep)] px-4 py-2 text-[13px] font-semibold text-white transition-colors"
+                href={browseHref}
               >
-                <span data-journal-tone={index % 3} />
-                <div>
-                  <p>{post.tag}</p>
-                  <h3>{post.title}</h3>
-                  <p>{post.body}</p>
-                </div>
+                {libraryCopy.allCategory}
               </Link>
-            ))}
+              {libraryCategories.map((category) => (
+                <Link
+                  className="rounded-pill border border-[var(--mn-line)] px-4 py-2 text-[13px] font-semibold text-[var(--mn-ink-soft)] transition-colors hover:border-[var(--mn-teal)] hover:text-[var(--mn-teal-deep)]"
+                  href={`${browseHref}#${category.slug}`}
+                  key={category.slug}
+                >
+                  {category.label}
+                </Link>
+              ))}
+            </div>
           </div>
+          <div className="grid gap-7 md:grid-cols-3">
+            {libraryArticles.map((post) => {
+              const card = (
+                <>
+                  <div
+                    className={`flex h-44 items-end justify-center bg-gradient-to-br ${libraryCategoryTone(
+                      post.category.slug
+                    )} px-5 pt-5`}
+                  >
+                    <Image
+                      alt={`Nong Matta illustration - ${post.category.label}`}
+                      className="h-[150px] w-auto object-contain"
+                      height={674}
+                      loading="lazy"
+                      src={nongPoseAsset(post.pose)}
+                      unoptimized={true}
+                      width={340}
+                    />
+                  </div>
+                  <div className="p-5">
+                    <p className="mb-2 text-[11px] font-bold tracking-[0.18em] text-[var(--mn-teal-deep)] uppercase">
+                      {post.category.label}
+                    </p>
+                    <h3 className="text-[20px] leading-snug font-semibold text-[var(--mn-ink)] transition-colors group-hover:text-[var(--mn-teal-deep)]">
+                      {post.title}
+                    </h3>
+                    <p className="mt-3 text-[14px] leading-relaxed text-[var(--mn-ash)]">
+                      {post.excerpt}
+                    </p>
+                  </div>
+                </>
+              );
+              const cardClass = post.hasContent
+                ? "group overflow-hidden rounded-[20px] border border-[var(--mn-line)] bg-[var(--mn-cream)] transition-all hover:-translate-y-1 hover:shadow-[var(--mn-shadow-soft)]"
+                : "overflow-hidden rounded-[20px] border border-[var(--mn-line)] bg-[var(--mn-cream)]";
+
+              return post.hasContent ? (
+                <Link
+                  className={cardClass}
+                  data-home-library-card={true}
+                  data-reveal
+                  href={post.href}
+                  key={post.title}
+                >
+                  {card}
+                </Link>
+              ) : (
+                <article
+                  className={cardClass}
+                  data-home-library-card={true}
+                  data-reveal
+                  key={post.title}
+                >
+                  {card}
+                </article>
+              );
+            })}
+          </div>
+          {libraryArticles.length === 0 ? (
+            <p className="mt-8 text-center text-[var(--mn-ash)]">
+              {libraryCopy.noContentNote}
+            </p>
+          ) : null}
         </div>
       </section>
+
+      {libraryArticles.length > 0 ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(libraryFeaturedJsonLd(libraryArticles)).replace(
+              /</g,
+              "\\u003c"
+            )
+          }}
+        />
+      ) : null}
 
       <section className="mn-v15-section" id="faq">
         <div className="mx-auto max-w-5xl px-7">

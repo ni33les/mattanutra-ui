@@ -100,6 +100,7 @@ const nextConfig: NextConfig = {
         pathname: "/**"
       }
     ],
+    minimumCacheTTL: 31536000,
     remotePatterns: imageRemotePatterns
   },
   typescript: {
@@ -110,6 +111,15 @@ const nextConfig: NextConfig = {
       {
         headers: securityHeaders,
         source: "/(.*)"
+      },
+      {
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable"
+          }
+        ],
+        source: "/assets/library/:path*"
       },
       {
         headers: [

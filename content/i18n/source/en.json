@@ -596,7 +596,7 @@
   },
   "customer.footer.body": {
     "audience": "customer",
-    "defaultMessage": "AI-powered personalised wellness plans, designed in Chiang Mai for Southeast Asian lives. Ancient wisdom · modern science.",
+    "defaultMessage": "Personalised wellness plans, designed in Chiang Mai for Southeast Asian lives. Ancient wisdom · modern science.",
     "description": "customer.footer copy for customer.footer.body.",
     "namespace": "customer.footer",
     "surface": "footer",
@@ -686,7 +686,7 @@
   },
   "customer.footer.columns.1.links.0.0": {
     "audience": "customer",
-    "defaultMessage": "Journal",
+    "defaultMessage": "The MattaNutra Library",
     "description": "customer.footer copy for customer.footer.columns.1.links.0.0.",
     "namespace": "customer.footer",
     "surface": "footer",
@@ -695,7 +695,7 @@
   },
   "customer.footer.columns.1.links.0.1": {
     "audience": "customer",
-    "defaultMessage": "/#journal",
+    "defaultMessage": "/library",
     "description": "customer.footer copy for customer.footer.columns.1.links.0.1.",
     "namespace": "customer.footer",
     "surface": "footer",
@@ -812,7 +812,7 @@
   },
   "customer.footer.copyright": {
     "audience": "customer",
-    "defaultMessage": "© 2026 MattaNutra · AI-powered personalised wellness plans · Chiang Mai, Thailand",
+    "defaultMessage": "© 2026 MattaNutra · Personalised wellness plans · Chiang Mai, Thailand",
     "description": "customer.footer copy for customer.footer.copyright.",
     "namespace": "customer.footer",
     "surface": "footer",
@@ -3053,7 +3053,7 @@
   },
   "customer.landing.hero.intro": {
     "audience": "customer",
-    "defaultMessage": "AI-powered supplement and wellness plans built around your body, your lifestyle, and the goals that actually matter to you — and that adapt as your life does.",
+    "defaultMessage": "Supplement and wellness plans built around your body, your lifestyle, and the goals that actually matter to you — and that adapt as your life does.",
     "description": "Landing page copy for customer.landing.hero.intro.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3278,7 +3278,7 @@
   },
   "customer.landing.journal.eyebrow": {
     "audience": "customer",
-    "defaultMessage": "From the Journal",
+    "defaultMessage": "The MattaNutra Library",
     "description": "Landing page copy for customer.landing.journal.eyebrow.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3377,7 +3377,7 @@
   },
   "customer.landing.journal.tag": {
     "audience": "customer",
-    "defaultMessage": "Journal",
+    "defaultMessage": "Library",
     "description": "Landing page copy for customer.landing.journal.tag.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -4159,7 +4159,7 @@
   },
   "customer.landing.pricing.trust.3.0": {
     "audience": "customer",
-    "defaultMessage": "AI + human oversight",
+    "defaultMessage": "Human-reviewed safeguards",
     "description": "Landing page copy for customer.landing.pricing.trust.3.0.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -4168,7 +4168,7 @@
   },
   "customer.landing.pricing.trust.3.1": {
     "audience": "customer",
-    "defaultMessage": "AI-powered guidance with human-reviewed safeguards.",
+    "defaultMessage": "Personalised guidance with human-reviewed safeguards.",
     "description": "Landing page copy for customer.landing.pricing.trust.3.1.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -7712,7 +7712,7 @@
   },
   "customer.titleBar.links.3.0": {
     "audience": "customer",
-    "defaultMessage": "#journal",
+    "defaultMessage": "#library",
     "description": "customer.titleBar copy for customer.titleBar.links.3.0.",
     "namespace": "customer.titleBar",
     "surface": "navigation",
@@ -7721,7 +7721,7 @@
   },
   "customer.titleBar.links.3.1": {
     "audience": "customer",
-    "defaultMessage": "Journal",
+    "defaultMessage": "Library",
     "description": "customer.titleBar copy for customer.titleBar.links.3.1.",
     "namespace": "customer.titleBar",
     "surface": "navigation",
@@ -8144,7 +8144,7 @@
   },
   "seo.routes.home.description": {
     "audience": "public",
-    "defaultMessage": "AI-powered personalised supplement and wellness plans, designed in Chiang Mai for Southeast Asian lives. Stop guessing. Start knowing.",
+    "defaultMessage": "Personalised supplement and wellness plans, designed in Chiang Mai for Southeast Asian lives. Stop guessing. Start knowing.",
     "description": "SEO description for the localized homepage.",
     "namespace": "seo.routes",
     "surface": "seo",

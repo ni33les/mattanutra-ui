@@ -196,7 +196,7 @@ function contentHref(row: AdminContentInventoryRow, accessToken: string) {
     row.status === "published" &&
     row.workflowStatus === "published"
   ) {
-    return `/${locale}/blog/${encodeURIComponent(row.slug)}`;
+    return `/${locale}/library/${encodeURIComponent(row.slug)}`;
   }
 
   const params = new URLSearchParams({

@@ -228,7 +228,7 @@ function editorInput(body: Record<string, unknown>, creating: boolean) {
         : textOrNull(body.contentMarkdown ?? body.content_markdown, 100000);
 
     if (creating && (!title || !slug || !excerpt)) {
-      return { error: "Blog posts require title, slug, and excerpt" } as const;
+      return { error: "Library articles require title, slug, and excerpt" } as const;
     }
 
     if (imageUrl && !imageAlt) {

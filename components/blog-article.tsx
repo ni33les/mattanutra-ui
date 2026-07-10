@@ -83,13 +83,13 @@ const pointIcons: ComponentType<{
 
 const blogArticleCopy = {
   en: {
-    journal: "MattaNutra Journal"
+    journal: "The MattaNutra Library"
   },
   th: {
-    journal: "บทความ MattaNutra"
+    journal: "คลังความรู้ MattaNutra"
   },
   "zh-CN": {
-    journal: "MattaNutra 文章"
+    journal: "MattaNutra 知识库"
   }
 } satisfies Partial<Record<LocaleCode, { journal: string }>>;
 
@@ -145,7 +145,7 @@ function BlogAssessmentCta({
           <div className="mt-10 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-x-6">
             <Link
               href={href}
-              data-bpm-event="blog_assessment_cta_clicked"
+              data-bpm-event="library_assessment_cta_clicked"
               data-bpm-label={primaryLabel}
               data-bpm-target={href}
               data-bpm-type="funnel"
@@ -155,7 +155,7 @@ function BlogAssessmentCta({
             </Link>
             <Link
               href={secondaryHref}
-              data-bpm-event="blog_home_cta_clicked"
+              data-bpm-event="library_index_cta_clicked"
               data-bpm-label={secondaryLabel}
               data-bpm-target={secondaryHref}
               data-bpm-type="content"

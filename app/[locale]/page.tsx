@@ -2,14 +2,13 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { LandingPage } from "@/components/landing-page";
 import { SiteFooter } from "@/components/site-footer";
-import { ServiceIssue } from "@/components/service-issue";
 import { TitleBar } from "@/components/title-bar";
 import {
-  getHomepageBlogPosts,
   getHomepageTestimonials
 } from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
+import { getFeaturedLibraryArticles } from "@/lib/library";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { siteBaseUrl } from "@/lib/site-url";
@@ -64,7 +63,7 @@ export default async function Home({ params }: HomeProps) {
         />
         <LandingPage
           assessmentPath={assessmentPath}
-          blogPosts={[]}
+          libraryArticles={[]}
           locale={locale}
           testimonials={[]}
         />
@@ -75,25 +74,10 @@ export default async function Home({ params }: HomeProps) {
 
   const databaseReady = await checkDatabaseConnection();
 
-  if (!databaseReady) {
-    return (
-      <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
-        <TitleBar
-          currentLocale={locale}
-          currentPath={`/${locale}`}
-          title={dictionary.hero.eyebrow}
-          variant="landing"
-        />
-        <ServiceIssue href={`/${locale}`} locale={locale} />
-        <SiteFooter content={dictionary.footer} locale={locale} />
-      </main>
-    );
-  }
-
-  const [blogPosts, testimonials] = await Promise.all([
-    getHomepageBlogPosts(locale, 3),
-    getHomepageTestimonials(locale, 4)
-  ]);
+  const libraryArticles = await getFeaturedLibraryArticles(locale, 30);
+  const testimonials = databaseReady
+    ? await getHomepageTestimonials(locale, 4)
+    : [];
   const baseUrl = siteBaseUrl();
   const jsonLd = {
     "@context": "https://schema.org",
@@ -137,7 +121,7 @@ export default async function Home({ params }: HomeProps) {
       />
       <LandingPage
         assessmentPath={assessmentPath}
-        blogPosts={blogPosts}
+        libraryArticles={libraryArticles}
         locale={locale}
         testimonials={testimonials}
       />

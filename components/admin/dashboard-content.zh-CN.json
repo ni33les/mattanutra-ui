@@ -47,7 +47,7 @@
     "actions": "操作",
     "all": "全部",
     "authorName": "作者名称",
-    "blogPosts": "博客文章",
+    "blogPosts": "知识库文章",
     "cancel": "取消",
     "contentMarkdown": "Markdown",
     "created": "创建时间",
@@ -70,7 +70,7 @@
     "imageUrl": "图片 URL",
     "lastViewed": "最后查看",
     "locale": "区域设置",
-    "newBlogPost": "新建博客文章",
+    "newBlogPost": "新建知识库文章",
     "newTestimonial": "新建见证",
     "pageViews": "页面浏览量",
     "publishAction": "发布",
@@ -628,7 +628,7 @@
   "administrationTitle": "管理",
   "contentNavigation": [
     {
-      "name": "博客",
+      "name": "知识库",
       "view": "blogs"
     },
     {
@@ -723,7 +723,7 @@
     "agents": "代理",
     "alerts": "技术警报",
     "audit": "审计",
-    "blogs": "博客",
+    "blogs": "知识库",
     "campaigns": "营销活动",
     "content": "内容",
     "customer-insights": "客户洞察",

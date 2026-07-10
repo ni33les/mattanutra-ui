@@ -50,6 +50,16 @@ const localizationAuditScript = readFileSync(
 );
 const packageJson = readFileSync(new URL("../package.json", import.meta.url), "utf8");
 
+function expectedAbsoluteUrl(path: string) {
+  const origin = (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.MATTANUTRA_PUBLIC_SITE_URL ||
+    "https://www.mattanutra.com"
+  ).replace(/\/+$/, "");
+
+  return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 describe("locale registry and SEO helpers", () => {
   it("keeps current public locales registry driven", () => {
     assert.equal(defaultLocale, "en");
@@ -100,16 +110,16 @@ describe("locale registry and SEO helpers", () => {
     );
 
     assert.equal(landing.hero.accent, "开始知量。");
-    assert.equal(landing.journal.eyebrow, "健康日志");
+    assert.equal(landing.journal.eyebrow, "MattaNutra 知识库");
   });
 
   it("builds localized canonical and alternates only for indexable pages", () => {
     const alternates = localizedAlternates({ path: "/terms" });
 
-    assert.equal(alternates.languages["en"], "https://www.mattanutra.com/en/terms");
-    assert.equal(alternates.languages["th"], "https://www.mattanutra.com/th/terms");
-    assert.equal(alternates.languages["zh-CN"], "https://www.mattanutra.com/zh-CN/terms");
-    assert.equal(alternates.languages["x-default"], "https://www.mattanutra.com/en/terms");
+    assert.equal(alternates.languages["en"], expectedAbsoluteUrl("/en/terms"));
+    assert.equal(alternates.languages["th"], expectedAbsoluteUrl("/th/terms"));
+    assert.equal(alternates.languages["zh-CN"], expectedAbsoluteUrl("/zh-CN/terms"));
+    assert.equal(alternates.languages["x-default"], expectedAbsoluteUrl("/en/terms"));
     assert.equal(localizedPath("th", "/nutrition/quiz"), "/th/nutrition/quiz");
     assert.equal(localizedPath("zh-CN", "/nutrition/quiz"), "/zh-CN/nutrition/quiz");
 
@@ -145,11 +155,11 @@ describe("locale registry and SEO helpers", () => {
     assert.equal(reveal.openGraph?.locale, "zh_CN");
     assert.equal(
       reveal.alternates?.canonical,
-      "https://www.mattanutra.com/zh-CN/nutrition/reveal"
+      expectedAbsoluteUrl("/zh-CN/nutrition/reveal")
     );
     assert.equal(
       reveal.alternates?.languages?.["zh-CN"],
-      "https://www.mattanutra.com/zh-CN/nutrition/reveal"
+      expectedAbsoluteUrl("/zh-CN/nutrition/reveal")
     );
 
     const privateCheckout = localizedRouteMetadata({
@@ -176,9 +186,9 @@ describe("locale registry and SEO helpers", () => {
     ).map((entry) => entry.url);
 
     assert.equal(urls.length, publicLocales.length * indexableSeoRouteKeys.length);
-    assert.ok(urls.includes("https://www.mattanutra.com/zh-CN/nutrition/healthscore"));
-    assert.ok(urls.includes("https://www.mattanutra.com/zh-CN/nutrition/reveal"));
-    assert.ok(urls.includes("https://www.mattanutra.com/th/privacy"));
+    assert.ok(urls.includes(expectedAbsoluteUrl("/zh-CN/nutrition/healthscore")));
+    assert.ok(urls.includes(expectedAbsoluteUrl("/zh-CN/nutrition/reveal")));
+    assert.ok(urls.includes(expectedAbsoluteUrl("/th/privacy")));
     assert.equal(urls.some((url) => url.includes("/admin")), false);
     assert.equal(urls.some((url) => url.includes("/basket/checkout")), false);
     assert.equal(urls.some((url) => url.includes("/nutrition/payment")), false);
@@ -238,7 +248,7 @@ describe("locale registry and SEO helpers", () => {
 
   it("keeps homepage build-time rendering off the remote database", () => {
     assert.match(homePage, /NEXT_PHASE === "phase-production-build"/);
-    assert.match(homePage, /blogPosts=\{\[\]\}/);
+    assert.match(homePage, /libraryArticles=\{\[\]\}/);
     assert.match(homePage, /testimonials=\{\[\]\}/);
     assert.ok(
       homePage.indexOf("isProductionBuildPhase()") <

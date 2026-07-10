@@ -47,6 +47,8 @@ export type BlogPostSummary = Readonly<{
   id: string;
   imageAlt: string;
   imageUrl: string;
+  locale: Locale;
+  metadata: postgres.JSONValue;
   primaryTag: string;
   slug: string;
   title: string;
@@ -321,7 +323,7 @@ function localizeThaiPublishedBody(
 }
 
 function hrefForPost(locale: Locale, slug: string) {
-  return `/${locale}/blog/${slug}`;
+  return `/${locale}/library/${slug}`;
 }
 
 function mapTestimonial(row: TestimonialRow | BlogPostRow): BlogTestimonial | null {
@@ -384,6 +386,7 @@ function mapPost(row: BlogPostRow, localeOverride?: Locale): BlogPost {
     imageAlt: row.image_alt ?? "",
     imageUrl: row.image_url ?? "",
     locale,
+    metadata: toMetadata(row.metadata),
     primaryTag: row.tags?.[0] ?? "",
     seoDescription: localizeThaiPublishedText(
       row.seo_description ?? row.excerpt ?? "",
@@ -413,6 +416,7 @@ function blogSelectSql() {
       p.body,
       p.image_url,
       p.image_alt,
+      p.metadata,
       p.published_at,
       p.tags,
       p.seo_title,
@@ -429,11 +433,14 @@ function blogSelectSql() {
   `;
 }
 
-export async function getPublishedBlogPosts(locale: Locale, limit = 3) {
+export async function getPublishedBlogPosts(
+  locale: Locale,
+  limit = 3
+): Promise<BlogPost[]> {
   const sql = getSql();
 
   if (!sql) {
-    return [] as BlogPostSummary[];
+    return [];
   }
 
   try {
@@ -449,7 +456,7 @@ export async function getPublishedBlogPosts(locale: Locale, limit = 3) {
     return rows.map((row) => mapPost(row));
   } catch (error) {
     console.error("Unable to load blog posts", error);
-    return [] as BlogPostSummary[];
+    return [];
   }
 }
 

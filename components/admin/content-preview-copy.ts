@@ -11,7 +11,7 @@ export const adminContentPreviewCopy = {
     },
     tokens: {
       archived: "Deleted",
-      blog_post: "Blog post",
+      blog_post: "Library article",
       deleted: "Deleted",
       draft: "Draft",
       published: "Published",
@@ -37,7 +37,7 @@ export const adminContentPreviewCopy = {
     },
     tokens: {
       archived: "ลบแล้ว",
-      blog_post: "บทความ",
+      blog_post: "บทความคลังความรู้",
       deleted: "ลบแล้ว",
       draft: "ฉบับร่าง",
       published: "เผยแพร่แล้ว",
@@ -63,7 +63,7 @@ export const adminContentPreviewCopy = {
     },
     tokens: {
       archived: "已删除",
-      blog_post: "博客文章",
+      blog_post: "知识库文章",
       deleted: "已删除",
       draft: "草稿",
       published: "已发布",

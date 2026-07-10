@@ -420,7 +420,9 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
       promo_code,
       min(occurred_at) as first_seen_at,
       max(occurred_at) as last_seen_at,
-      count(distinct subject) filter (where event_name in ('home_viewed', 'blog_article_viewed'))::int as landed,
+      count(distinct subject) filter (
+        where event_name in ('home_viewed', 'blog_article_viewed', 'library_article_viewed')
+      )::int as landed,
       count(distinct subject) filter (where event_name = 'assessment_started')::int as assessment_starts,
       count(distinct subject) filter (where event_name in ('assessment_submitted', 'assessment_captured', 'assessment_recaptured'))::int as assessment_completions,
       count(distinct subject) filter (where event_name = 'healthscore_viewed')::int as healthscore_views,
@@ -541,7 +543,11 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
         (array_agg(event_name order by occurred_at desc))[1] as last_event,
         min(occurred_at) as first_seen_at,
         max(occurred_at) as last_seen_at,
-        bool_or(event_name in ('home_viewed', 'blog_article_viewed')) as landed,
+        bool_or(event_name in (
+          'home_viewed',
+          'blog_article_viewed',
+          'library_article_viewed'
+        )) as landed,
         bool_or(event_name = 'assessment_started') as started,
         bool_or(event_name in ('assessment_submitted', 'assessment_captured', 'assessment_recaptured')) as submitted,
         bool_or(event_name in ('assessment_resume_requested', 'assessment_resume_email_sent', 'assessment_resume_opened')) as assessment_resume_requested,
@@ -866,10 +872,12 @@ async function getContentInventory(params: QueryParams) {
           count(*)::int as page_views,
           max(occurred_at) as last_viewed_at
         from public.bpm
-        where event_name = 'blog_article_viewed'
+        where event_name in ('blog_article_viewed', 'library_article_viewed')
           ${start ? sql`and occurred_at >= ${start}` : sql``}
           and (
-            path = '/' || blog_posts.locale || '/blog/' || blog_posts.slug
+            path = '/' || blog_posts.locale || '/library/' || blog_posts.slug
+            or path = '/' || blog_posts.locale || '/blog/' || blog_posts.slug
+            or source_url like '%' || '/library/' || blog_posts.slug || '%'
             or source_url like '%' || '/blog/' || blog_posts.slug || '%'
           )
       ) view_stats on true

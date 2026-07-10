@@ -482,7 +482,11 @@ function isPaidEvent(row: FlowRow) {
 }
 
 function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
-  if (row.event_name === "home_viewed" || row.event_name === "blog_article_viewed") {
+  if (
+    row.event_name === "home_viewed" ||
+    row.event_name === "blog_article_viewed" ||
+    row.event_name === "library_article_viewed"
+  ) {
     return ["landingViewed"];
   }
 
@@ -786,6 +790,7 @@ export async function getAdminFlowData(
                 'free_email_sent',
                 'healthscore_viewed',
                 'home_viewed',
+                'library_article_viewed',
                 'product_clicked',
                 'plan_selected',
                 'order_tracking_viewed',
@@ -843,6 +848,7 @@ export async function getAdminFlowData(
               'free_email_sent',
               'healthscore_viewed',
               'home_viewed',
+              'library_article_viewed',
               'product_clicked',
               'plan_selected',
               'order_tracking_viewed',

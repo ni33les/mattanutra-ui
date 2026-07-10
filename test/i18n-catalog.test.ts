@@ -169,9 +169,9 @@ describe("central ICU i18n catalog", () => {
     assert.equal(zhCnCatalog["customer.landing.hero.title"], "停止猜测，");
     assert.equal(zhCnCatalog["customer.landing.hero.accent"], "开始知量。");
     assert.equal(zhCnCatalog["customer.landing.questionnaire.cta"], "免费测我的健康评分");
-    assert.equal(zhCnCatalog["customer.landing.journal.browse"], "查看全部健康日志");
+    assert.equal(zhCnCatalog["customer.landing.journal.browse"], "浏览知识库");
     assert.equal(zhCnCatalog["customer.landing.final.quote"], "Mattaññutā 知量，知健康。");
-    assert.equal(zhCnCatalog["customer.titleBar.links.3.1"], "健康日志");
+    assert.equal(zhCnCatalog["customer.titleBar.links.3.1"], "知识库");
     assert.equal(zhCnCatalog["customer.landing.results.fallback.2.name"], "Wanida P.（วนิดา）");
     assert.deepEqual(
       sourceCatalog["customer.landing.practice.steps.0.0"].approvedGlossaryOverrides,
