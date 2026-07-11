@@ -1472,6 +1472,8 @@ body {
 }
 
 .mn-library-visual .nong-card .tags {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   border-radius: 0 0 18px 18px;
   background: #fff;

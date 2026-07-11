@@ -124,6 +124,18 @@ export function LandingPage({
   const copy = content[locale];
   const libraryCopy = getLibraryCopy(locale);
   const libraryCategories = getLibraryCategories(locale);
+  const landingLibraryCategories = ([
+    "foundations",
+    "vitamins",
+    "minerals",
+    "sleep-recovery",
+    "energy-longevity",
+    "everyday-nutrition",
+  ] as const satisfies readonly LibraryCategorySlug[]).flatMap((slug) => {
+    const category = libraryCategories.find((item) => item.slug === slug);
+
+    return category ? [category] : [];
+  });
   const testimonialCards =
     testimonials.length > 0
       ? testimonials.map((testimonial) => ({
@@ -881,39 +893,28 @@ export function LandingPage({
       </section>
 
       <section
-        className="mn-v15-section border-y border-[var(--mn-line)] bg-[var(--mn-paper)]"
+        className="mn-v15-section scroll-mt-48 border-y border-[var(--mn-line)] bg-[var(--mn-paper)] md:scroll-mt-36"
         id="library"
       >
         <div className="mn-v15-container">
           <div
-            className="mb-12 flex flex-wrap items-end justify-between gap-6"
+            className="mb-9 grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_auto]"
             data-reveal
           >
-            <div>
+            <div className="max-w-3xl">
               <p className="mn-v15-eyebrow">{libraryCopy.eyebrow}</p>
               <h2 className="mn-v15-heading mt-3 text-left">
-                {libraryCopy.title}
+                {libraryCopy.landingTitle}{" "}
+                <span>{libraryCopy.landingTitleAccent}</span>
               </h2>
-              <p className="mt-5 max-w-2xl text-[17px] leading-[1.7] text-[var(--mn-ink-soft)]">
-                {libraryCopy.sectionIntro}
+              <p className="mt-5 max-w-2xl text-[17px] leading-[1.65] text-[var(--mn-ink-soft)]">
+                {libraryCopy.landingIntro}
               </p>
             </div>
-            <Link
-              className="inline-flex items-center gap-2 font-semibold text-[var(--mn-teal-deep)] hover:text-[var(--mn-ink)]"
-              href={browseHref}
-            >
-              {libraryCopy.browse}
-              <ArrowRight aria-hidden className="size-4" />
-            </Link>
-          </div>
-          <div
-            className="mb-8 flex flex-wrap items-center justify-between gap-5 rounded-[20px] border border-[var(--mn-line)] bg-[var(--mn-cream)] px-5 py-4"
-            data-reveal
-          >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 lg:pb-4">
               <Image
                 alt={libraryCopy.guideImageAlt}
-                className="hidden h-24 w-auto sm:block"
+                className="h-20 w-auto"
                 height={466}
                 src="/assets/library/nong/nong-open.webp"
                 unoptimized={true}
@@ -935,23 +936,23 @@ export function LandingPage({
                 </Link>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+          </div>
+          <div className="mb-10 flex flex-wrap gap-2.5" data-reveal>
+            <Link
+              className="rounded-pill bg-[var(--mn-teal-deep)] px-4 py-2 text-[13px] font-semibold text-white transition-colors"
+              href={browseHref}
+            >
+              {libraryCopy.allCategory}
+            </Link>
+            {landingLibraryCategories.map((category) => (
               <Link
-                className="rounded-pill bg-[var(--mn-teal-deep)] px-4 py-2 text-[13px] font-semibold text-white transition-colors"
-                href={browseHref}
+                className="rounded-pill border border-[var(--mn-line)] bg-[var(--mn-cream)] px-4 py-2 text-[13px] font-semibold text-[var(--mn-ink-soft)] transition-colors hover:border-[var(--mn-teal)] hover:text-[var(--mn-teal-deep)]"
+                href={`${browseHref}#${category.slug}`}
+                key={category.slug}
               >
-                {libraryCopy.allCategory}
+                {category.label}
               </Link>
-              {libraryCategories.map((category) => (
-                <Link
-                  className="rounded-pill border border-[var(--mn-line)] px-4 py-2 text-[13px] font-semibold text-[var(--mn-ink-soft)] transition-colors hover:border-[var(--mn-teal)] hover:text-[var(--mn-teal-deep)]"
-                  href={`${browseHref}#${category.slug}`}
-                  key={category.slug}
-                >
-                  {category.label}
-                </Link>
-              ))}
-            </div>
+            ))}
           </div>
           <div className="grid gap-7 md:grid-cols-3">
             {libraryArticles.map((post) => {
@@ -986,8 +987,8 @@ export function LandingPage({
                 </>
               );
               const cardClass = post.hasContent
-                ? "group overflow-hidden rounded-[20px] border border-[var(--mn-line)] bg-[var(--mn-cream)] transition-all hover:-translate-y-1 hover:shadow-[var(--mn-shadow-soft)]"
-                : "overflow-hidden rounded-[20px] border border-[var(--mn-line)] bg-[var(--mn-cream)]";
+                ? "group flex min-h-[420px] flex-col overflow-hidden rounded-[20px] border border-[var(--mn-line)] bg-[var(--mn-cream)] transition-all hover:-translate-y-1 hover:shadow-[var(--mn-shadow-soft)]"
+                : "flex min-h-[420px] flex-col overflow-hidden rounded-[20px] border border-[var(--mn-line)] bg-[var(--mn-cream)]";
 
               return post.hasContent ? (
                 <Link

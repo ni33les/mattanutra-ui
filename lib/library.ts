@@ -99,6 +99,9 @@ type LibraryCopy = Readonly<{
   guideImageAlt: string;
   guideName: string;
   intro: string;
+  landingIntro: string;
+  landingTitle: string;
+  landingTitleAccent: string;
   loadMore: string;
   noContentNote: string;
   result: string;
@@ -201,6 +204,10 @@ const localizedLibraryCopy = {
     guideName: "Nong Matta",
     intro:
       "Evidence-aware answers to common supplement questions - clear enough to use, careful enough to trust.",
+    landingIntro:
+      "Clear, evidence-aware answers to the supplement questions people actually ask - so you can decide from knowing, not guessing.",
+    landingTitle: "Learn the",
+    landingTitleAccent: "right amount.",
     loadMore: "Load more articles",
     noContentNote: "Full Library article content is being prepared for this locale.",
     result: "article",
@@ -232,6 +239,10 @@ const localizedLibraryCopy = {
     guideName: "น้องมัตตะ",
     intro:
       "คำตอบเรื่องอาหารเสริมที่อ้างอิงหลักฐาน อ่านง่าย ใช้งานได้ และระมัดระวังพอให้เชื่อถือ",
+    landingIntro:
+      "คำตอบเรื่องอาหารเสริมที่คนถามจริง อ้างอิงหลักฐานและเข้าใจง่าย เพื่อให้คุณตัดสินใจจากความรู้ ไม่ใช่การเดา",
+    landingTitle: "เรียนรู้",
+    landingTitleAccent: "ปริมาณที่พอดี",
     loadMore: "โหลดบทความเพิ่ม",
     noContentNote: "เนื้อหาบทความฉบับเต็มสำหรับภาษานี้กำลังเตรียมอยู่",
     result: "บทความ",
@@ -262,6 +273,10 @@ const localizedLibraryCopy = {
     guideName: "Nong Matta",
     intro:
       "用证据意识回答常见补充剂问题：足够清楚，可以行动；足够谨慎，值得信任。",
+    landingIntro:
+      "用清楚、有证据意识的方式回答人们真正会问的补充剂问题，让你基于了解来决定，而不是靠猜。",
+    landingTitle: "了解",
+    landingTitleAccent: "知量",
     loadMore: "加载更多文章",
     noContentNote: "该语言的完整知识库文章内容正在准备中。",
     result: "篇文章",
@@ -474,6 +489,27 @@ export async function getLibraryArticles(locale: Locale) {
 
 export async function getFeaturedLibraryArticles(locale: Locale, limit = 3) {
   return (await getLibraryArticles(locale)).slice(0, Math.max(1, limit));
+}
+
+function shuffledArticles<T>(articles: readonly T[]) {
+  const shuffled = [...articles];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [
+      shuffled[swapIndex],
+      shuffled[index]
+    ];
+  }
+
+  return shuffled;
+}
+
+export async function getRandomLibraryArticles(locale: Locale, limit = 3) {
+  return shuffledArticles(await getLibraryArticles(locale)).slice(
+    0,
+    Math.max(1, limit)
+  );
 }
 
 export async function getRenderableLibraryArticles(locale: Locale) {

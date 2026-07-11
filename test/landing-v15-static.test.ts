@@ -65,7 +65,7 @@ describe("landing page v16 library-only port", () => {
 
   it("keeps homepage navigation, footer, and generated links on Library", () => {
     assert.match(homepage, /variant="landing"/);
-    assert.match(homepage, /getFeaturedLibraryArticles\(locale,\s*30\)/);
+    assert.match(homepage, /getRandomLibraryArticles\(locale,\s*3\)/);
     assert.match(homepage, /libraryArticles=\{libraryArticles\}/);
     assert.match(landingPage, /data-home-library-card=\{true\}/);
     assert.match(libraryIndexPage, /<LibraryIndex articles=\{articles\} locale=\{locale\}/);
@@ -305,7 +305,11 @@ describe("landing page v16 library-only port", () => {
     assert.match(librarySource, /getStaticLibraryArticle/);
     assert.match(librarySource, /getStaticLibraryCanonicalSlug/);
     assert.match(librarySource, /export async function getLibraryArticles/);
-    assert.match(librarySource, /export async function getFeaturedLibraryArticles/);
+    assert.match(librarySource, /export async function getRandomLibraryArticles/);
+    assert.match(
+      librarySource,
+      /getRandomLibraryArticles[\s\S]*shuffledArticles\(await getLibraryArticles\(locale\)\)/
+    );
     assert.match(librarySource, /export async function getLibraryArticle/);
     assert.match(librarySource, /export async function getLibraryArticleLocalePaths/);
     assert.match(librarySource, /metadata\.contentSurface === "library"/);

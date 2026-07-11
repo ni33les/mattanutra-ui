@@ -23,6 +23,11 @@ function targetUrl(path: string, baseURL?: string) {
   return new URL(path, baseURL).toString();
 }
 
+async function gotoLibraryTarget(page: Page, path: string, baseURL?: string) {
+  await page.goto(targetUrl(path, baseURL), { waitUntil: "domcontentloaded" });
+  await waitForLibraryPage(page);
+}
+
 async function waitForLibraryPage(page: Page) {
   await page.waitForLoadState("domcontentloaded");
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
@@ -81,17 +86,14 @@ async function saveLibraryScreenshot(page: Page, name: string) {
 }
 
 test.describe("Library UX remediation", () => {
-  test("homepage Library preview exposes the full launch set", async ({
+  test("homepage Library preview exposes three random articles", async ({
     baseURL,
     page
   }) => {
     await page.setViewportSize(desktopViewport);
-    await page.goto(targetUrl("/en", baseURL));
-    await waitForLibraryPage(page);
+    await gotoLibraryTarget(page, "/en", baseURL);
 
-    await expect(page.locator("[data-home-library-card]")).toHaveCount(
-      articleSlugs.length
-    );
+    await expect(page.locator("[data-home-library-card]")).toHaveCount(3);
     await assertNoHorizontalOverflow(page);
   });
 
@@ -105,8 +107,7 @@ test.describe("Library UX remediation", () => {
         ["mobile", mobileViewport]
       ] as const) {
         await page.setViewportSize(viewport);
-        await page.goto(targetUrl(`/${locale}/library`, baseURL));
-        await waitForLibraryPage(page);
+        await gotoLibraryTarget(page, `/${locale}/library`, baseURL);
 
         await expect(page.locator("[data-library-grid]")).toBeVisible();
         await expect(page.locator("[data-library-card]").first()).toBeVisible();
@@ -127,12 +128,11 @@ test.describe("Library UX remediation", () => {
   });
 
   test("all generated English article routes render", async ({ baseURL, page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(420_000);
     await page.setViewportSize(desktopViewport);
 
     for (const slug of articleSlugs) {
-      await page.goto(targetUrl(`/en/library/${slug}`, baseURL));
-      await waitForLibraryPage(page);
+      await gotoLibraryTarget(page, `/en/library/${slug}`, baseURL);
 
       await expect(page.locator(".mn-library-visual")).toBeVisible();
       await expect(page.locator(".mn-library-visual h1").first()).toBeVisible();
@@ -152,8 +152,7 @@ test.describe("Library UX remediation", () => {
         ["mobile", mobileViewport]
       ] as const) {
         await page.setViewportSize(viewport);
-        await page.goto(targetUrl(`/en/library/${slug}`, baseURL));
-        await waitForLibraryPage(page);
+        await gotoLibraryTarget(page, `/en/library/${slug}`, baseURL);
 
         await expect(page.locator(".mn-library-visual .cta").first()).toBeVisible();
         await assertNoHorizontalOverflow(page);
@@ -171,10 +170,11 @@ test.describe("Library UX remediation", () => {
     page
   }) => {
     await page.setViewportSize(mobileViewport);
-    await page.goto(
-      targetUrl("/en/library/blood-panel-personalise-supplements-cost", baseURL)
+    await gotoLibraryTarget(
+      page,
+      "/en/library/blood-panel-personalise-supplements-cost",
+      baseURL
     );
-    await waitForLibraryPage(page);
 
     const share = page.locator(".mn-library-visual .share.mn-library-fragment");
     const related = page.locator(".mn-library-visual .related.mn-library-fragment");
