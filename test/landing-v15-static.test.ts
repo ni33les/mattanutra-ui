@@ -82,8 +82,10 @@ describe("landing page v16 library-only port", () => {
     }>("en", "customer.titleBar");
     assert.deepEqual(
       titleBarCopy.links.map(([href]) => href),
-      ["#living-protocol", "#how-it-works", "#promises", "#library"]
+      ["#living-protocol", "#how-it-works", "#promises", "/library"]
     );
+    assert.match(titleBar, /function titleBarHref/);
+    assert.match(titleBar, /`\/\$\{locale\}\$\{href\}`/);
     assert.match(titleBar, /const titleCtaHref = assessmentPath/);
     assert.doesNotMatch(titleBar, /Free questionnaire/);
 

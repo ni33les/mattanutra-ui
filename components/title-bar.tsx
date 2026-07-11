@@ -28,8 +28,18 @@ type TitleBarCopy = Readonly<{
   navAria: string;
 }>;
 
-function homeAnchor(locale: Locale, href: string) {
-  return href.startsWith("#") ? `/${locale}${href}` : href;
+function titleBarHref(locale: Locale, href: string) {
+  if (href.startsWith("#")) {
+    return `/${locale}${href}`;
+  }
+
+  if (href.startsWith("/")) {
+    return href.startsWith(`/${locale}/`) || href === `/${locale}`
+      ? href
+      : `/${locale}${href}`;
+  }
+
+  return href;
 }
 
 function isAssessmentStartedPath(currentPath: string, locale: Locale) {
@@ -134,7 +144,7 @@ export function TitleBar({
         >
           {copy.links.map(([href, label]) => (
             <Link
-              href={homeAnchor(currentLocale, href)}
+              href={titleBarHref(currentLocale, href)}
               key={href}
               className="mn-titlebar-link"
             >
@@ -160,7 +170,7 @@ export function TitleBar({
             <div className="mn-titlebar-mobile-panel">
               {copy.links.map(([href, label]) => (
                 <Link
-                  href={homeAnchor(currentLocale, href)}
+                  href={titleBarHref(currentLocale, href)}
                   key={href}
                   className="mn-titlebar-mobile-link"
                 >

@@ -7730,7 +7730,7 @@
   },
   "customer.titleBar.links.3.0": {
     "audience": "customer",
-    "defaultMessage": "#library",
+    "defaultMessage": "/library",
     "description": "customer.titleBar copy for customer.titleBar.links.3.0.",
     "namespace": "customer.titleBar",
     "surface": "navigation",
