@@ -39,6 +39,20 @@ function hasClass(value: unknown, className: string) {
   return classList(value).includes(className);
 }
 
+function shouldPreserveCaptionBreaks(className: string | null) {
+  return ["note", "sticky-note", "mug", "price-badge"].some((captionClass) =>
+    hasClass(className, captionClass)
+  );
+}
+
+function restoreCaptionBreaks(children: ReactNode[], key: string) {
+  return children.flatMap((child, index) =>
+    index < children.length - 1
+      ? [child, <br aria-hidden={true} key={`${key}:br:${index}`} />]
+      : [child]
+  );
+}
+
 function attrString(
   attrs: Readonly<Record<string, string | boolean>> | undefined,
   key: string
@@ -351,9 +365,12 @@ export function LibraryVisualPage({
       inHero: context.inHero || hasClass(tagClassName, "hero"),
       questionId: hasClass(tagClassName, "q") ? `q:${key}` : context.questionId
     };
-    const children = node.children.map((child, index) =>
+    const renderedChildren = node.children.map((child, index) =>
       renderNode(child, `${key}:${index}`, nextContext)
     );
+    const children = shouldPreserveCaptionBreaks(tagClassName)
+      ? restoreCaptionBreaks(renderedChildren, key)
+      : renderedChildren;
 
     if (node.tag === "a") {
       const rawHref = attrString(attrs, "href") ?? "#";

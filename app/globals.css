@@ -1845,6 +1845,7 @@ body {
 .mn-library-visual .note {
   position: absolute;
   z-index: 3;
+  max-width: min(36%, 180px);
   border: 1px solid #e6c86a;
   border-radius: 4px;
   background: #ffe9a8;
@@ -1854,6 +1855,7 @@ body {
   font-size: 0.76rem;
   font-weight: 600;
   line-height: 1.3;
+  overflow-wrap: anywhere;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
 }
 
@@ -1882,7 +1884,8 @@ body {
 .mn-library-visual .note.b,
 .mn-library-visual .n2 {
   left: 14px;
-  top: 150px;
+  top: 180px;
+  max-width: min(32%, 160px);
   width: auto;
   margin-top: 0;
   margin-left: 0;
@@ -1909,8 +1912,9 @@ body {
   )
   .hero-art
   .n2 {
-  left: 44px;
-  top: 160px;
+  left: 14px;
+  top: 220px;
+  max-width: 150px;
   background: #ffd7c9;
   color: #7b2c20;
   transform: rotate(-5deg);
@@ -1921,6 +1925,7 @@ body {
   right: 22px;
   bottom: 66px;
   z-index: 3;
+  max-width: 86px;
   border: 2.5px solid #14231b;
   border-radius: 8px;
   background: #fff;
@@ -1928,6 +1933,7 @@ body {
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1.05;
+  overflow-wrap: anywhere;
   text-align: center;
   box-shadow: 0 6px 0 rgba(20, 35, 27, 0.07);
 }
@@ -1937,6 +1943,7 @@ body {
   left: 18px;
   bottom: 24px;
   z-index: 3;
+  max-width: 190px;
   border: 2px solid #14231b;
   border-radius: 16px;
   background: #fff;
@@ -1945,10 +1952,12 @@ body {
   font-size: 0.86rem;
   font-weight: 800;
   line-height: 1.2;
+  overflow-wrap: anywhere;
   box-shadow: 0 6px 0 rgba(20, 35, 27, 0.07);
 }
 
 .mn-library-visual .money-line {
+  display: block;
   color: var(--mn-vk-forest-deep);
   font-family: var(--mn-font-display), Georgia, serif;
   font-size: 1.15rem;
@@ -2178,6 +2187,77 @@ body {
 
   .mn-library-visual .hero-art.sleep-hero .nong-sleep {
     border-radius: 18px;
+  }
+
+  .mn-library-visual .hero-art {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    min-height: 0;
+    height: auto !important;
+    padding: 16px;
+  }
+
+  .mn-library-visual .hero-art .bubble,
+  .mn-library-visual .hero-art .note,
+  .mn-library-visual .hero-art .sticky-note,
+  .mn-library-visual .hero-art .price-badge,
+  .mn-library-visual .hero-art .mug,
+  .mn-library-visual .hero-art .sleep-note {
+    position: relative;
+    inset: auto;
+    z-index: 3;
+    max-width: 100%;
+    width: auto;
+    transform: none;
+  }
+
+  .mn-library-visual .hero-art .bubble {
+    order: 1;
+    width: auto;
+    border-radius: 20px;
+  }
+
+  .mn-library-visual .hero-art .bubble::after {
+    content: none;
+  }
+
+  .mn-library-visual .hero-art .note,
+  .mn-library-visual .hero-art .sticky-note {
+    order: 2;
+    align-self: flex-start;
+    width: auto;
+    font-size: 0.72rem;
+  }
+
+  .mn-library-visual .hero-art .note.b,
+  .mn-library-visual .hero-art .n2 {
+    order: 3;
+  }
+
+  .mn-library-visual .hero-art .price-badge,
+  .mn-library-visual .hero-art .mug,
+  .mn-library-visual .hero-art .sleep-note {
+    order: 4;
+    align-self: flex-start;
+    width: auto;
+    max-width: min(100%, 220px);
+  }
+
+  .mn-library-visual .hero-art .nong,
+  .mn-library-visual .hero-art .nong-sleep {
+    order: 10;
+    align-self: center;
+    width: auto;
+    max-width: 92%;
+    height: auto !important;
+    max-height: 390px;
+  }
+
+  .mn-library-visual .hero-art.sleep-hero .nong-sleep {
+    max-width: 100%;
+    max-height: none;
   }
 }
 
