@@ -557,17 +557,6 @@ async function applyAlignment(sql: Db, tables: SnapshotTables, staleProductIds: 
       deletedChildren[tableName] = await deleteTableRows(sql, tableName);
     }
 
-    for (const tableName of PLATFORM_CATALOGUE_INSERT_ORDER) {
-      if (!PLATFORM_CATALOGUE_ROOT_TABLES.includes(tableName)) {
-        continue;
-      }
-
-      const spec = tableSpec(tableName);
-      upserted[tableName] = await upsertRows(sql, tableName, tables[tableName] ?? [], [
-        spec.idColumn
-      ]);
-    }
-
     for (const tableName of PLATFORM_CATALOGUE_DELETE_ORDER) {
       if (!PLATFORM_CATALOGUE_ROOT_TABLES.includes(tableName)) {
         continue;
@@ -579,6 +568,17 @@ async function applyAlignment(sql: Db, tables: SnapshotTables, staleProductIds: 
         sourceIds: sourceIds(tables[tableName] ?? [], spec.idColumn),
         tableName
       });
+    }
+
+    for (const tableName of PLATFORM_CATALOGUE_INSERT_ORDER) {
+      if (!PLATFORM_CATALOGUE_ROOT_TABLES.includes(tableName)) {
+        continue;
+      }
+
+      const spec = tableSpec(tableName);
+      upserted[tableName] = await upsertRows(sql, tableName, tables[tableName] ?? [], [
+        spec.idColumn
+      ]);
     }
 
     for (const tableName of PLATFORM_CATALOGUE_INSERT_ORDER) {
