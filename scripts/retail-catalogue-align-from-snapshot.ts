@@ -246,6 +246,21 @@ async function assertProductsExist(sql: Db, ids: readonly string[]) {
   }
 }
 
+async function approvedProductIds(sql: Db, ids: readonly string[]) {
+  if (ids.length < 1) {
+    return new Set<string>();
+  }
+
+  const rows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.products
+    where id = any(${[...ids]}::uuid[])
+      and status = 'approved'
+  `;
+
+  return new Set(rows.map((row) => row.id));
+}
+
 async function fetchTargetRows(
   sql: Db,
   tableName: string,
@@ -459,7 +474,7 @@ async function main() {
     targetSlugs
   );
   const targetOrgIds = [...targetOrgBySlug.values()];
-  const sourceRows = {
+  const rawSourceRows = {
     retail_product_stock: remapRows(
       rowsForTargetSlugs(normalizeRows(snapshot.tables?.retail_product_stock), {
         sourceOrgById,
@@ -483,12 +498,28 @@ async function main() {
   };
   const allProductIds = [
     ...new Set([
-      ...productIds(sourceRows.retail_product_stock),
-      ...productIds(sourceRows.retail_sellable_products)
+      ...productIds(rawSourceRows.retail_product_stock),
+      ...productIds(rawSourceRows.retail_sellable_products)
     ])
   ];
 
   await assertProductsExist(sql, allProductIds);
+
+  const approvedIds = await approvedProductIds(sql, allProductIds);
+  const sourceRows = {
+    retail_product_stock: rawSourceRows.retail_product_stock.filter(
+      (row: Row) => typeof row.product_id === "string" && approvedIds.has(row.product_id)
+    ),
+    retail_sellable_products: rawSourceRows.retail_sellable_products.filter(
+      (row: Row) => typeof row.product_id === "string" && approvedIds.has(row.product_id)
+    )
+  };
+  const rejectedSourceRows = {
+    retail_product_stock:
+      rawSourceRows.retail_product_stock.length - sourceRows.retail_product_stock.length,
+    retail_sellable_products:
+      rawSourceRows.retail_sellable_products.length - sourceRows.retail_sellable_products.length
+  };
 
   const sourceKeys = Object.fromEntries(
     RETAIL_CATALOGUE_TABLES.map((tableName) => [
@@ -504,6 +535,7 @@ async function main() {
         return [
           tableName,
           {
+            rejectedSourceRows: rejectedSourceRows[tableName],
             sourceRows: sourceRows[tableName].length,
             targetRows: targetRows.filter((row) => row.status !== "deleted").length,
             targetOnlyRows: targetRows.filter(

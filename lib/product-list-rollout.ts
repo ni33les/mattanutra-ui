@@ -1154,6 +1154,35 @@ async function replaceIdentifiers(productId: string, row: ProductListRolloutRow)
   }
 }
 
+async function productApprovedForRetail(productId: string) {
+  const sql = getSql();
+
+  if (!sql) throw new Error("Database is not configured");
+
+  const rows = await sql<Array<{ approved: boolean }>>`
+    select exists (
+      select 1
+      from public.products
+      where id = ${productId}::uuid
+        and status = 'approved'
+    ) as approved
+  `;
+
+  return Boolean(rows[0]?.approved);
+}
+
+async function approveProductForRetail(productId: string) {
+  const sql = getSql();
+
+  if (!sql) throw new Error("Database is not configured");
+
+  await sql`
+    update public.products
+    set status = 'approved', updated_at = now()
+    where id = ${productId}::uuid
+  `;
+}
+
 async function upsertRetailSellables(input: Readonly<{
   organisationIds: readonly string[];
   row: ProductListRolloutRow;
@@ -1164,6 +1193,10 @@ async function upsertRetailSellables(input: Readonly<{
 
   let sellables = 0;
   let stockRows = 0;
+
+  if (!(await productApprovedForRetail(input.row.canonicalProductId))) {
+    throw new Error("Retail product list rollout can only activate approved platform products");
+  }
 
   for (const organisationId of input.organisationIds) {
     await sql`
@@ -1607,6 +1640,8 @@ export async function runProductListRollout(input: RunProductListRolloutInput) {
       productRowsUpdated += result.created ? 0 : 1;
 
       if (row.selectedRetail) {
+        await approveProductForRetail(row.canonicalProductId);
+
         const retail = await upsertRetailSellables({
           organisationIds: [orgs.delight, orgs.enchanted],
           row

@@ -618,6 +618,45 @@ async function checkDatabase() {
       `sellable=${delight?.sellable_count ?? 0} stock_rows=${delight?.stock_count ?? 0} stock_sum=${delight?.stock_quantity_sum ?? 0}`,
     );
 
+    const unapprovedRetailRows = await sql`
+      select
+        count(*) filter (
+          where source.table_name = 'retail_sellable_products'
+        )::int as sellable_count,
+        count(*) filter (
+          where source.table_name = 'retail_product_stock'
+        )::int as stock_count
+      from (
+        select
+          'retail_sellable_products'::text as table_name,
+          retail_sellable_products.organisation_id,
+          retail_sellable_products.product_id
+        from public.retail_sellable_products
+        where retail_sellable_products.status = 'active'
+        union all
+        select
+          'retail_product_stock'::text as table_name,
+          retail_product_stock.organisation_id,
+          retail_product_stock.product_id
+        from public.retail_product_stock
+        where retail_product_stock.status = 'active'
+      ) source
+      join public.organisations
+        on organisations.id = source.organisation_id
+      join public.products
+        on products.id = source.product_id
+      where organisations.slug in ('delight-pharmacy', 'enchanted-pharmacy')
+        and products.status <> 'approved'
+    `;
+    const unapprovedRetail = unapprovedRetailRows[0];
+
+    record(
+      "retail approved-only catalogue",
+      Number(unapprovedRetail?.sellable_count ?? 0) === 0 &&
+        Number(unapprovedRetail?.stock_count ?? 0) === 0,
+      `unapproved_sellable=${unapprovedRetail?.sellable_count ?? 0} unapproved_stock=${unapprovedRetail?.stock_count ?? 0}`,
+    );
+
     const workerRows = await sql`
       select
         expected.env_key,

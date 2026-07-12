@@ -1346,10 +1346,23 @@ async function applyDelightSellables(input: Readonly<{
   }
 
   const organisation = await findDelightOrganisationId(input.organisationName);
-  const matched = input.matches.filter((match) =>
+  const matchedCandidates = input.matches.filter((match) =>
     match.productId &&
     match.matchKind !== "ambiguous" &&
     match.row.sellingPriceAmount !== null
+  );
+  const candidateProductIds = [...new Set(matchedCandidates.map((match) => match.productId!))];
+  const approvedRows = candidateProductIds.length > 0
+    ? await sql<Array<{ id: string }>>`
+        select id::text
+        from public.products
+        where id = any(${candidateProductIds}::uuid[])
+          and status = 'approved'
+      `
+    : [];
+  const approvedProductIds = new Set(approvedRows.map((row) => row.id));
+  const matched = matchedCandidates.filter((match) =>
+    Boolean(match.productId && approvedProductIds.has(match.productId))
   );
   const matchedProductIds = [...new Set(matched.map((match) => match.productId!))];
   let updated = 0;

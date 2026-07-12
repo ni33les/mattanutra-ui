@@ -423,6 +423,23 @@ function retailStatusFromColumn(value: string | null) {
     : "active";
 }
 
+async function productApprovedForRetail(productId: string) {
+  const sql = getSql();
+
+  if (!sql) throw new Error("Database is not configured");
+
+  const rows = await sql<Array<{ approved: boolean }>>`
+    select exists (
+      select 1
+      from public.products
+      where id = ${productId}::uuid
+        and status = 'approved'
+    ) as approved
+  `;
+
+  return Boolean(rows[0]?.approved);
+}
+
 function backorderPolicyFromColumn(value: string | null) {
   const normalized = value?.trim().toLowerCase();
 
@@ -1096,15 +1113,21 @@ export async function buildRetailProductCatalogueJson(
 
   const rows = await sql<RetailProductCatalogueJsonRow[]>`
     with retail_products as (
-      select product_id
+      select retail_product_stock.product_id
       from public.retail_product_stock
-      where organisation_id = ${organisationId}::uuid
-        and status <> 'deleted'
+      join public.products
+        on products.id = retail_product_stock.product_id
+      where retail_product_stock.organisation_id = ${organisationId}::uuid
+        and retail_product_stock.status <> 'deleted'
+        and products.status = 'approved'
       union
-      select product_id
+      select retail_sellable_products.product_id
       from public.retail_sellable_products
-      where organisation_id = ${organisationId}::uuid
-        and status <> 'deleted'
+      join public.products
+        on products.id = retail_sellable_products.product_id
+      where retail_sellable_products.organisation_id = ${organisationId}::uuid
+        and retail_sellable_products.status <> 'deleted'
+        and products.status = 'approved'
     )
     select
       products.id::text as product_id,
@@ -1616,6 +1639,14 @@ export async function applyProductCatalogueCsvImport(
       }
 
       if (input.scope === "retail" && scopedOrganisationId && productId) {
+        if (!(await productApprovedForRetail(productId))) {
+          result.invalidRows.push({
+            reason: "Retail catalogue import can only activate approved platform products",
+            rowNumber: row.rowNumber,
+          });
+          continue;
+        }
+
         const stockQuantity = integerFromColumn(row, [
           "quantity in stock",
           "stock quantity",

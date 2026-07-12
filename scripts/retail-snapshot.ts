@@ -20,7 +20,9 @@ const RETAIL_SNAPSHOT_TABLES = [
       select sellable.*
       from public.retail_sellable_products sellable
       join public.organisations organisation on organisation.id = sellable.organisation_id
+      join public.products products on products.id = sellable.product_id
       where organisation.slug in ('delight-pharmacy', 'enchanted-pharmacy')
+        and products.status = 'approved'
         ${includeDeleted ? "" : "and sellable.status <> 'deleted'"}
       order by sellable.organisation_id, sellable.product_id
     `
@@ -31,7 +33,9 @@ const RETAIL_SNAPSHOT_TABLES = [
       select stock.*
       from public.retail_product_stock stock
       join public.organisations organisation on organisation.id = stock.organisation_id
+      join public.products products on products.id = stock.product_id
       where organisation.slug in ('delight-pharmacy', 'enchanted-pharmacy')
+        and products.status = 'approved'
         ${includeDeleted ? "" : "and stock.status <> 'deleted'"}
       order by stock.organisation_id, stock.product_id
     `

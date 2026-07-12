@@ -83,18 +83,31 @@ describe("catalogue alignment rollout tooling", () => {
       packageJson,
       platformScript,
       retailScript,
+      approvedOnlyCleanup,
       parityScript,
-      retailSnapshot
+      retailSnapshot,
+      prdSmoke,
+      uatSmoke,
+      productListRollout,
+      delightManufacturerCoverage,
+      productCatalogueCsv
     ] = await Promise.all([
       readFile("package.json", "utf8"),
       readFile("scripts/catalogue-align-from-snapshot.ts", "utf8"),
       readFile("scripts/retail-catalogue-align-from-snapshot.ts", "utf8"),
+      readFile("scripts/retail-approved-only-cleanup.ts", "utf8"),
       readFile("scripts/catalogue-parity-report.ts", "utf8"),
-      readFile("scripts/retail-snapshot.ts", "utf8")
+      readFile("scripts/retail-snapshot.ts", "utf8"),
+      readFile("scripts/prd-smoke.mjs", "utf8"),
+      readFile("scripts/uat-smoke.mjs", "utf8"),
+      readFile("lib/product-list-rollout.ts", "utf8"),
+      readFile("lib/delight-manufacturer-coverage.ts", "utf8"),
+      readFile("lib/product-catalogue-csv.ts", "utf8")
     ]);
 
     assert.match(packageJson, /"catalogue:align"/);
     assert.match(packageJson, /"retail:catalogue-align"/);
+    assert.match(packageJson, /"retail:approved-only-cleanup"/);
     assert.match(packageJson, /"catalogue:parity"/);
 
     for (const source of [platformScript, retailScript]) {
@@ -112,8 +125,21 @@ describe("catalogue alignment rollout tooling", () => {
     assert.match(platformScript, /product_recommendation_items_no_update_delete/);
     assert.match(retailScript, /MATTANUTRA_CONFIRM_PRD_RETAIL_CATALOGUE_ALIGN/);
     assert.match(retailScript, /RETAIL_STOCK_LIVE_COLUMNS/);
+    assert.match(retailScript, /approvedProductIds/);
+    assert.match(retailScript, /rejectedSourceRows/);
     assert.match(parityScript, /normalizedRetailRows/);
     assert.match(retailSnapshot, /organisations/);
     assert.match(retailSnapshot, /include-deleted/);
+    assert.match(retailSnapshot, /products\.status = 'approved'/);
+    assert.match(approvedOnlyCleanup, /MATTANUTRA_CONFIRM_PRD_RETAIL_APPROVED_ONLY_CLEANUP/);
+    assert.match(approvedOnlyCleanup, /MATTANUTRA_CONFIRM_UAT_RETAIL_APPROVED_ONLY_CLEANUP/);
+    assert.match(approvedOnlyCleanup, /MATTANUTRA_CONFIRM_DEV_RETAIL_APPROVED_ONLY_CLEANUP/);
+    assert.match(approvedOnlyCleanup, /retail_approved_only_cleanup/);
+    assert.match(approvedOnlyCleanup, /stockQuantity !== 0/);
+    assert.match(prdSmoke, /retail approved-only catalogue/);
+    assert.match(uatSmoke, /retail approved-only catalogue/);
+    assert.match(productListRollout, /Retail product list rollout can only activate approved platform products/);
+    assert.match(delightManufacturerCoverage, /products[\s\S]*status = 'approved'/);
+    assert.match(productCatalogueCsv, /Retail catalogue import can only activate approved platform products/);
   });
 });
