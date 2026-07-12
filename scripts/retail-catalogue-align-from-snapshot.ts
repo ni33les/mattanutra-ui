@@ -481,6 +481,11 @@ async function main() {
   if (apply) {
     applyReport = await sql.begin(async (transaction) => {
       const tx = transaction as unknown as Db;
+
+      if (environment.startsWith("prd")) {
+        await tx`set transaction isolation level repeatable read`;
+      }
+
       const protectedBefore = environment.startsWith("prd")
         ? await captureProtectedDataSnapshot(tx)
         : null;
