@@ -144,13 +144,17 @@ async function targetOrganisations(sql: Db, slugs: readonly string[]) {
   const missing = slugs.filter((slug) => !bySlug.has(slug));
 
   if (missing.length > 0) {
+    if (hasArg("target-existing-orgs-only") && bySlug.size > 0) {
+      return bySlug;
+    }
+
     throw new Error(`Target is missing tenant organisation(s): ${missing.join(", ")}`);
   }
 
   return bySlug;
 }
 
-function sourceOrganisationMap(snapshotRows: readonly Row[]) {
+function sourceOrganisationMap(snapshotRows: readonly Row[], slugs: readonly string[]) {
   const byId = new Map<string, string>();
 
   for (const row of snapshotRows) {
@@ -159,7 +163,7 @@ function sourceOrganisationMap(snapshotRows: readonly Row[]) {
     }
   }
 
-  const missing = RETAIL_CATALOGUE_ORG_SLUGS.filter(
+  const missing = slugs.filter(
     (slug) => ![...byId.values()].includes(slug)
   );
 
@@ -170,6 +174,21 @@ function sourceOrganisationMap(snapshotRows: readonly Row[]) {
   }
 
   return byId;
+}
+
+function rowsForTargetSlugs(
+  rows: readonly Row[],
+  input: Readonly<{
+    sourceOrgById: ReadonlyMap<string, string>;
+    targetSlugs: ReadonlySet<string>;
+  }>
+) {
+  return rows.filter((row) => {
+    const sourceOrgId = typeof row.organisation_id === "string" ? row.organisation_id : "";
+    const slug = input.sourceOrgById.get(sourceOrgId);
+
+    return Boolean(slug && input.targetSlugs.has(slug));
+  });
 }
 
 function remapRows(
@@ -428,19 +447,39 @@ async function main() {
     throw new Error("Database is not configured.");
   }
 
-  const snapshot = JSON.parse(await readFile(inputPath, "utf8")) as RetailSnapshot;
-  const sourceOrgById = sourceOrganisationMap(normalizeRows(snapshot.tables?.organisations));
   const targetOrgBySlug = await targetOrganisations(sql, RETAIL_CATALOGUE_ORG_SLUGS);
+  const targetSlugs = [...targetOrgBySlug.keys()];
+  const targetSlugSet = new Set(targetSlugs);
+  const missingTargetOrganisationSlugs = RETAIL_CATALOGUE_ORG_SLUGS.filter(
+    (slug) => !targetOrgBySlug.has(slug)
+  );
+  const snapshot = JSON.parse(await readFile(inputPath, "utf8")) as RetailSnapshot;
+  const sourceOrgById = sourceOrganisationMap(
+    normalizeRows(snapshot.tables?.organisations),
+    targetSlugs
+  );
   const targetOrgIds = [...targetOrgBySlug.values()];
   const sourceRows = {
-    retail_product_stock: remapRows(normalizeRows(snapshot.tables?.retail_product_stock), {
-      sourceOrgById,
-      targetOrgBySlug
-    }),
-    retail_sellable_products: remapRows(normalizeRows(snapshot.tables?.retail_sellable_products), {
-      sourceOrgById,
-      targetOrgBySlug
-    })
+    retail_product_stock: remapRows(
+      rowsForTargetSlugs(normalizeRows(snapshot.tables?.retail_product_stock), {
+        sourceOrgById,
+        targetSlugs: targetSlugSet
+      }),
+      {
+        sourceOrgById,
+        targetOrgBySlug
+      }
+    ),
+    retail_sellable_products: remapRows(
+      rowsForTargetSlugs(normalizeRows(snapshot.tables?.retail_sellable_products), {
+        sourceOrgById,
+        targetSlugs: targetSlugSet
+      }),
+      {
+        sourceOrgById,
+        targetOrgBySlug
+      }
+    )
   };
   const allProductIds = [
     ...new Set([
@@ -529,6 +568,7 @@ async function main() {
     dryRun: !apply,
     generatedAt: new Date().toISOString(),
     inputPath,
+    missingTargetOrganisationSlugs,
     protectedIssues,
     report: dryRunReport,
     targetEnv: environment
