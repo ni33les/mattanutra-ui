@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import ts from "typescript";
+import zhCnCatalog from "../content/i18n/locales/zh-CN.json" with { type: "json" };
+import { assessmentUiCopy } from "../components/assessment-flow-copy.ts";
+import { zhCn as assessmentZhCn } from "../components/assessment-flow-copy-zh-cn.ts";
+import { pageCopy } from "../components/nutrition-flow/healthscore-panel-copy.ts";
 
 const customerCopyFiles = [
   "../components/assessment-flow.tsx",
@@ -108,6 +112,80 @@ function zhCnStringValues(path: string) {
 }
 
 describe("zh-CN localization guardrails", () => {
+  it("uses the professional Mandarin catalog phrases for public customer surfaces", () => {
+    assert.equal(zhCnCatalog["customer.landing.hero.eyebrow"], "古老智慧 · 现代科学");
+    assert.equal(zhCnCatalog["customer.landing.hero.paliTitle"], "Mattaññutā（知量）");
+    assert.equal(
+      zhCnCatalog["customer.landing.how.steps.0.2"],
+      "一组真正有深度的问题——涵盖你的健康目标与优先事项、生活方式与运动习惯、当前用药、预算，以及你真正在意的事。足够深入，才能精准定制你的知量方案；没有术语，没有废话。"
+    );
+    assert.equal(
+      zhCnCatalog["customer.landing.protocol.eyebrow"],
+      "Living Protocol（动态健康方案）· 90 天持续支持"
+    );
+    assert.equal(
+      zhCnCatalog["customer.landing.questionnaire.body"],
+      "下面展示问卷如何通过综合多项回答，估算单一营养素——维生素 D，这只是算法评估的 120+ 种营养成分之一。完整版问卷共分六个简短模块。"
+    );
+    assert.equal(
+      zhCnCatalog["customer.paymentCheckout.body"],
+      "我们很在意你的支付安全和个人隐私。支付由 Stripe 安全处理，我们只保存你的支付状态、选择的方案，以及交易联系信息。别的，不留。"
+    );
+  });
+
+  it("keeps the professional Mandarin questionnaire and HealthScore copy in typed modules", () => {
+    assert.equal(assessmentUiCopy["zh-CN"].privacyGate.title, "你的信息，绝不外泄");
+    assert.equal(assessmentUiCopy["zh-CN"].formulaPrecision, "配方精准度");
+    assert.match(
+      assessmentUiCopy["zh-CN"].precisionHint(2, 36),
+      /精准度 2% · 还差 36 项关键数据 · 继续完善，解锁专属配方/
+    );
+    assert.equal(assessmentZhCn.about.title, "一切答案，都在你身上");
+    assert.equal(assessmentZhCn.about.firstName, "怎么称呼您？");
+    assert.equal(assessmentZhCn.fixedAction.generate, "看看我的身体底子多少分");
+
+    const healthScoreZh = pageCopy["zh-CN"];
+
+    assert.equal(
+      healthScoreZh.defaultHeroBody,
+      "每一条回答，都为你运转了一遍。一个分数，看清身体底层到底怎么了。"
+    );
+    assert.equal(healthScoreZh.pillarLabels.activity, "运动与体能");
+    assert.equal(healthScoreZh.methodEyebrow, "知量配方怎么算");
+    assert.equal(
+      healthScoreZh.priceHero.service,
+      "后续采购、配送，MattaNutra 合作药房帮你搞定，直送上门。"
+    );
+  });
+
+  it("does not fall back to obvious English marketing terms where professional zh-CN copy exists", () => {
+    const healthScoreZh = pageCopy["zh-CN"];
+    const publicZhSources = [
+      zhCnCatalog["customer.landing.hero.paliTitle"],
+      zhCnCatalog["customer.landing.hero.primary"],
+      zhCnCatalog["customer.landing.protocol.eyebrow"],
+      zhCnCatalog["customer.landing.questionnaire.cta"],
+      assessmentUiCopy["zh-CN"].formulaPrecision,
+      assessmentUiCopy["zh-CN"].privacyGate.title,
+      assessmentZhCn.fixedAction.generate,
+      healthScoreZh.heroCta,
+      healthScoreZh.scoreLabel,
+      healthScoreZh.priceHero.title,
+      healthScoreZh.plans.map((plan) => [plan.name, plan.cta, plan.description].join(" ")).join(" ")
+    ].join("\n");
+
+    for (const phrase of [
+      "Right Amount Formula",
+      "Your HealthScore",
+      "Formula precision",
+      "Start designing your Right Amount",
+      "Ancient wisdom Modern science",
+      "Living Protocol （动态健康方案）"
+    ]) {
+      assert.doesNotMatch(publicZhSources, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
+  });
+
   it("does not map Chinese admin or customer copy back to English", () => {
     assert.doesNotMatch(
       source("../components/admin/dashboard-content.tsx"),

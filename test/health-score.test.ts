@@ -233,7 +233,7 @@ describe("HealthScore v4 deterministic scoring", () => {
       },
       "zh-CN": {
         bandPill: "正在建立基础",
-        shortlisted: "按您的分数筛选"
+        shortlisted: "进入你的备选"
       }
     } as const;
 

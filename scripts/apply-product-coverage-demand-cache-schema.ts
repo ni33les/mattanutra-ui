@@ -41,46 +41,78 @@ const sql = postgres(connection, {
   ...(shouldUseSsl(connection) ? { ssl: "require" } : {})
 });
 
+async function tableExists(tableName: string) {
+  const rows = await sql<Array<{ exists: boolean }>>`
+    select to_regclass(${`public.${tableName}`}) is not null as exists
+  `;
+
+  return rows[0]?.exists === true;
+}
+
+async function indexExists(indexName: string) {
+  const rows = await sql<Array<{ exists: boolean }>>`
+    select to_regclass(${`public.${indexName}`}) is not null as exists
+  `;
+
+  return rows[0]?.exists === true;
+}
+
+async function createIndexIfMissing(indexName: string, createSql: string) {
+  if (await indexExists(indexName)) {
+    return;
+  }
+
+  await sql.unsafe(createSql);
+}
+
 try {
-  await sql`
-    create table if not exists public.admin_product_coverage_demand_profile_cache (
-      id uuid primary key default gen_random_uuid(),
-      questionnaire_key text not null,
-      demand_key text not null,
-      sample_index integer not null check (sample_index >= 0 and sample_index < 256),
-      country_code text not null,
-      seed text not null,
-      archetype_id text not null,
-      archetype_name text not null,
-      answers jsonb null,
-      needs jsonb null,
-      profile jsonb null,
-      status text not null default 'ready'
-        check (status in ('generating', 'ready', 'failed')),
-      error_message text null,
-      cache_metadata jsonb not null default '{}'::jsonb,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      unique (demand_key, sample_index)
-    )
-  `;
-
-  await sql`
-    create index if not exists admin_product_coverage_demand_profile_questionnaire_idx
-      on public.admin_product_coverage_demand_profile_cache (
-        questionnaire_key,
-        sample_index
+  if (!(await tableExists("admin_product_coverage_demand_profile_cache"))) {
+    await sql`
+      create table public.admin_product_coverage_demand_profile_cache (
+        id uuid primary key default gen_random_uuid(),
+        questionnaire_key text not null,
+        demand_key text not null,
+        sample_index integer not null check (sample_index >= 0 and sample_index < 256),
+        country_code text not null,
+        seed text not null,
+        archetype_id text not null,
+        archetype_name text not null,
+        answers jsonb null,
+        needs jsonb null,
+        profile jsonb null,
+        status text not null default 'ready'
+          check (status in ('generating', 'ready', 'failed')),
+        error_message text null,
+        cache_metadata jsonb not null default '{}'::jsonb,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        unique (demand_key, sample_index)
       )
-  `;
+    `;
+  }
 
-  await sql`
-    create index if not exists admin_product_coverage_demand_profile_ready_idx
-      on public.admin_product_coverage_demand_profile_cache (
-        demand_key,
-        status,
-        sample_index
-      )
-  `;
+  await createIndexIfMissing(
+    "admin_product_coverage_demand_profile_questionnaire_idx",
+    `
+      create index admin_product_coverage_demand_profile_questionnaire_idx
+        on public.admin_product_coverage_demand_profile_cache (
+          questionnaire_key,
+          sample_index
+        )
+    `
+  );
+
+  await createIndexIfMissing(
+    "admin_product_coverage_demand_profile_ready_idx",
+    `
+      create index admin_product_coverage_demand_profile_ready_idx
+        on public.admin_product_coverage_demand_profile_cache (
+          demand_key,
+          status,
+          sample_index
+        )
+    `
+  );
 
   console.log(
     JSON.stringify({

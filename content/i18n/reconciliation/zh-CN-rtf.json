@@ -190,8 +190,8 @@
       "rowHash": "cb44d3987dbe03be",
       "section": "导航栏",
       "label": "Nav item 4",
-      "english": "Library",
-      "zhCN": "知识库",
+      "english": "Journal",
+      "zhCN": "健康日志",
       "status": "implemented_catalog",
       "catalogChecks": [
         {
@@ -229,8 +229,11 @@
       "english": "Ancient wisdom Modern science",
       "zhCN": "古老智慧 现代科学",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.hero.eyebrow"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.hero.eyebrow",
+          "zhCN": "古老智慧 · 现代科学"
+        }
       ]
     },
     {
@@ -255,11 +258,14 @@
       "rowHash": "81c52dcc24e55930",
       "section": "主视觉区（Hero）",
       "label": "Subtitle",
-      "english": "Personalized supplement and wellness plans built around your body, your lifestyle, and the goals that actually matter to you and that adapt as your life does.",
-      "zhCN": "你的身体，你的生活，你的目标。个性化保健品方案，随你而变，始终合身。",
+      "english": "AI-powered supplement and wellness plans built around your body, your lifestyle, and the goals that actually matter to you and that adapt as your life does.",
+      "zhCN": "你的身体，你的生活，你的目标。 AI 为你量身定制保健品方案，随你而变，始终合身。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.hero.intro"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.hero.intro",
+          "zhCN": "你的身体，你的生活，你的目标。AI 为你量身定制保健品方案，随你而变，始终合身。"
+        }
       ]
     },
     {
@@ -269,8 +275,11 @@
       "english": "Mattaññutā",
       "zhCN": "Mattaññutā （知量）",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.hero.paliTitle"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.hero.paliTitle",
+          "zhCN": "Mattaññutā（知量）"
+        }
       ]
     },
     {
@@ -280,8 +289,11 @@
       "english": "Pāli for the wisdom of knowing the right amount that wellbeing comes not from more, but from exactly enough.",
       "zhCN": "适量之道 — 健康，不在多，在恰到好处。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.hero.pali"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.hero.pali",
+          "zhCN": "适量之道 —— 健康，不在多，在恰到好处。"
+        }
       ]
     },
     {
@@ -368,8 +380,11 @@
       "english": "Medicine Science Technology",
       "zhCN": "医学 科学 技术",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.proof.0.body"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.proof.0.body",
+          "zhCN": "医学 · 科学 · 技术"
+        }
       ]
     },
     {
@@ -390,8 +405,11 @@
       "english": "Mahidol Princeton Stanford Harvard",
       "zhCN": "Mahidol Princeton Stanford Harvard",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.proof.1.body"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.proof.1.body",
+          "zhCN": "Mahidol · Princeton · Stanford · Harvard"
+        }
       ]
     },
     {
@@ -452,8 +470,11 @@
       "english": "Walk into a drugstore or look online and it's overwhelming. MattaNutra narrows hundreds of choices down to the few that are right for you, personalised and exactly enough.",
       "zhCN": "走进药店或上网一搜，满目琳琅，却让人无从下手。 MattaNutra 从上百种产品里，精准筛选出真正适合你的那几样 — 量身定制，恰到好处。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.clarity.body"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.clarity.body",
+          "zhCN": "走进药店或上网一搜，满目琳琅，却让人无从下手。MattaNutra 从上百种产品里，精准筛选出真正适合你的那几样——量身定制，恰到好处。"
+        }
       ]
     },
     {
@@ -664,8 +685,11 @@
       "english": "A genuinely detailed set of questions your goals & health priorities, lifestyle & activity, current medications, budget, and what you truly care about. Thorough enough to personalise your formula, with no jargon and no fluff.",
       "zhCN": "一组真正有深度的问题 — 涵盖你的健康目标与优先事项、生活方式与运动习惯、当前用药、预算，以及你真正在意的事。足够深入，才能精准定制你的知量方案；没有术语，没有废话。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.how.steps.0.2"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.how.steps.0.2",
+          "zhCN": "一组真正有深度的问题——涵盖你的健康目标与优先事项、生活方式与运动习惯、当前用药、预算，以及你真正在意的事。足够深入，才能精准定制你的知量方案；没有术语，没有废话。"
+        }
       ]
     },
     {
@@ -730,8 +754,11 @@
       "english": "Your formula is dispensed through a partner pharmacy with registered pharmacists real people you can ask, not a guess in the aisle.",
       "zhCN": "你的知量方案由合作药房的持证药师亲手调配 — 是真实可咨询的专业人士，而不是在货架前自己摸索。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.how.steps.2.2"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.how.steps.2.2",
+          "zhCN": "你的知量方案由合作药房的持证药师亲手调配——是真实可咨询的专业人士，而不是在货架前自己摸索。"
+        }
       ]
     },
     {
@@ -763,8 +790,11 @@
       "english": "With Living Protocol, your plan adapts as your goals, symptoms and lifestyle change.",
       "zhCN": "借助 Living Protocol （动态健康方案），你的配方会随目标、症状和生活方式的变化，持续优化调整。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.how.steps.3.2"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.how.steps.3.2",
+          "zhCN": "借助 Living Protocol（动态健康方案），你的配方会随目标、症状和生活方式的变化，持续优化调整。"
+        }
       ]
     },
     {
@@ -785,8 +815,11 @@
       "english": "Living Protocol 90-day support",
       "zhCN": "Living Protocol （动态健康方案） 90 天持续支持",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.eyebrow"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.eyebrow",
+          "zhCN": "Living Protocol（动态健康方案）· 90 天持续支持"
+        }
       ]
     },
     {
@@ -825,8 +858,11 @@
       "english": "Sleep, stress, travel and shifting routines all change what your body needs. Living Protocol keeps your supplements and the food behind them aligned with real life, so what's right today is still right next week.",
       "zhCN": "睡眠、压力、出差、作息变化 — 生活一乱，身体需求就变。 Living Protocol （动态健康方案）让你的保健品 — 以及背后的日常饮食 — 始终与真实生活同步。今天的知量，下周依然精准。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.intro"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.intro",
+          "zhCN": "睡眠、压力、出差、作息变化——生活一乱，身体需求就变。Living Protocol（动态健康方案）让你的保健品——以及背后的日常饮食——始终与真实生活同步。今天的知量，下周依然精准。"
+        }
       ]
     },
     {
@@ -836,8 +872,11 @@
       "english": "Built by physicians every adjustment is checked against your medications and labs",
       "zhCN": "由医师团队主导构建 — 每次调整都对照你的用药记录与化验数据",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.ticks.0"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.ticks.0",
+          "zhCN": "由医师团队主导构建——每次调整都对照你的用药记录与化验数据"
+        }
       ]
     },
     {
@@ -925,8 +964,11 @@
       "english": "Anything different this week sleep, stress, travel or routine?",
       "zhCN": "这周有什么变化吗 — 睡眠、压力、出行或者日常作息？",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.chat.0"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.chat.0",
+          "zhCN": "这周有什么变化吗——睡眠、压力、出行或者日常作息？"
+        }
       ]
     },
     {
@@ -947,8 +989,11 @@
       "english": "Got it Tokyo, 6 days, expecting sleep disruption. I've made 3 small adjustments. Everything else stays the same. Here's your plan for the trip.",
       "zhCN": "收到 — 东京六天，预计有睡眠干扰。帮你做了三处小调整，其余不变。以下是你此行的方案。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.chat.2"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.chat.2",
+          "zhCN": "收到——东京六天，预计有睡眠干扰。帮你做了三处小调整，其余不变。以下是你此行的方案。"
+        }
       ]
     },
     {
@@ -958,8 +1003,11 @@
       "english": "Your Tokyo trip 3 small adjustments",
       "zhCN": "你的东京行程 —3 处小调整",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.tripTitle"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.tripTitle",
+          "zhCN": "你的东京行程——3 处小调整"
+        }
       ]
     },
     {
@@ -972,7 +1020,7 @@
       "catalogChecks": [
         {
           "id": "customer.landing.protocol.updates.0",
-          "zhCN": "镁剂稍早服用 — 当地时间 19:30，而非 21:30"
+          "zhCN": "镁剂稍早服用——当地时间 19:30，而非 21:30"
         }
       ]
     },
@@ -1042,8 +1090,11 @@
       "english": "Earlier magnesium helps you shift with the time zone and wind down earlier.",
       "zhCN": "镁剂提前 — 帮助你随时差调整，提前进入放松状态。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.reasoning.0"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.reasoning.0",
+          "zhCN": "镁剂提前——帮助你随时差调整，提前进入放松状态。"
+        }
       ]
     },
     {
@@ -1053,8 +1104,11 @@
       "english": "Added electrolytes supports hydration during the flight and increased walking in the city.",
       "zhCN": "增加电解质 — 支持飞行途中及城市步行增加时的水分平衡。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.reasoning.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.reasoning.1",
+          "zhCN": "增加电解质——支持飞行途中及城市步行增加时的水分平衡。"
+        }
       ]
     },
     {
@@ -1064,8 +1118,11 @@
       "english": "Adaptogen unchanged your stress is elevated but sleep has been inconsistent recently, so no stacking adjustments yet.",
       "zhCN": "适应原保持不变 — 你的压力虽有上升，但近期睡眠已不稳定，因此暂不叠加调整。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.reasoning.2"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.reasoning.2",
+          "zhCN": "适应原保持不变——你的压力虽有上升，但近期睡眠已不稳定，因此暂不叠加调整。"
+        }
       ]
     },
     {
@@ -1075,8 +1132,11 @@
       "english": "One more thing your last check showed magnesium slightly low. It's already in your plan, but you can also get it from food:",
       "zhCN": "还有一件事 — 你上次检查显示镁水平略低。我已纳入你的方案，你也可以通过天然食物补充：",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.foodNudge"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.foodNudge",
+          "zhCN": "还有一件事——你上次检查显示镁水平略低。我已纳入你的方案，你也可以通过天然食物补充："
+        }
       ]
     },
     {
@@ -1108,8 +1168,11 @@
       "english": "Oh, I didn't know that. What about my Vitamin C should I take extra?",
       "zhCN": "哦，这个我还真不知道。那我的维生素 C— 需要额外补充吗？",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.vitaminQuestion"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.vitaminQuestion",
+          "zhCN": "哦，这个我还真不知道。那我的维生素 C——需要额外补充吗？"
+        }
       ]
     },
     {
@@ -1119,8 +1182,11 @@
       "english": "Honestly? You probably don't need to. Your fruit and veg this week already covers it. Save this one food's got it.",
       "zhCN": "说实话？你可能不需要。这周的水果蔬菜已经够了。省着 — 食物帮你搞定了。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocol.vitaminAnswer"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.vitaminAnswer",
+          "zhCN": "说实话？你可能不需要。这周的水果蔬菜已经够了。省着——食物帮你搞定了。"
+        }
       ]
     },
     {
@@ -1148,8 +1214,11 @@
       "english": "Travel, stress, poor sleep and shifting routines all change what your body needs. Your foundation stays the same but small adjustments around it move with you.",
       "zhCN": "出行、压力、睡眠不足和作息变化，都会影响身体营养需求。你的基础配方不变 — 但围绕它的微小调整，会随之而动。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.protocolBand.body"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocolBand.body",
+          "zhCN": "出行、压力、睡眠不足和作息变化，都会影响身体营养需求。你的基础配方不变——但围绕它的微小调整，会随之而动。"
+        }
       ]
     },
     {
@@ -1210,8 +1279,11 @@
       "english": "Send a short message on Line or WhatsApp no forms, no tracking, no new app to learn.",
       "zhCN": "通过 Line / WhatsApp 发一条简短消息即可 — 无需填表，无需打卡，无需下载新应用。微信版本即将推出。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.practice.steps.0.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.0.1",
+          "zhCN": "通过 Line / WhatsApp 发一条简短消息即可——无需填表，无需打卡，无需下载新应用。微信版本即将推出。"
+        }
       ]
     },
     {
@@ -1274,8 +1346,11 @@
       "english": "Based on your current formula, goals and safety flags, it turns what you shared into a few precise changes timing, dosage, or a temporary addition and tells you which everyday foods support what your body needs right now.",
       "zhCN": "基于你当前的营养方案、健康目标与安全标记， MattaNutra 将你的消息转化为几处精准调整 — 服用时间、剂量调整，或临时增项 — 并同步推荐能支持当下身体需求的日常食物。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.practice.steps.1.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.1.1",
+          "zhCN": "基于你当前的营养方案、健康目标与安全标记，MattaNutra 将你的消息转化为几处精准调整——服用时间、剂量调整，或临时增项——并同步推荐能支持当下身体需求的日常食物。"
+        }
       ]
     },
     {
@@ -1338,8 +1413,11 @@
       "english": "When life gets busy, you don't need to research, second-guess or start over. You just do a few simple things and trust they're right for you.",
       "zhCN": "生活一忙，你不需要重新研究、反复纠结，也不需要从头开始。只需做几件简单的事 — 并相信，它们就是专为你准备的。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.practice.steps.2.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.2.1",
+          "zhCN": "生活一忙，你不需要重新研究、反复纠结，也不需要从头开始。只需做几件简单的事——并相信，它们就是专为你准备的。"
+        }
       ]
     },
     {
@@ -1420,8 +1498,11 @@
       "english": "Supplements fill the gaps but food fills them first. When Living Protocol identifies something your body needs, it doesn't just recommend a capsule. It tells you which everyday foods naturally contain it, so you can choose: add it at dinner, or take it from a bottle. Either way, you're knowing, not guessing.",
       "zhCN": "保健品填补缺口 — 但食物才是第一道防线。当动态健康方案发现你的身体需要某种营养素时，它不会只推荐胶囊。它会告诉你哪些日常食物天然富含该成分，让你自己选择：在饭桌上补，还是从瓶子里补。无论哪种方式，你都在真正知量，而不是瞎猜。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.food.intro"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.food.intro",
+          "zhCN": "保健品填补缺口——但食物才是第一道防线。当动态健康方案发现你的身体需要某种营养素时，它不会只推荐胶囊。它会告诉你哪些日常食物天然富含该成分，让你自己选择：在饭桌上补，还是从瓶子里补。无论哪种方式，你都在真正知量，而不是瞎猜。"
+        }
       ]
     },
     {
@@ -1486,8 +1567,11 @@
       "english": "It shows up in unexpected places grape juice, broccoli, and whole grains.",
       "zhCN": "它出现在意想不到的地方 — 葡萄汁、西兰花和全谷物。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.food.cards.1.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.food.cards.1.1",
+          "zhCN": "它出现在意想不到的地方——葡萄汁、西兰花和全谷物。"
+        }
       ]
     },
     {
@@ -1530,8 +1614,11 @@
       "english": "If your regular diet already covers what you need, Living Protocol will tell you to skip it saving you time and money.",
       "zhCN": "如果你的日常饮食已能满足需求，动态健康方案会直接告诉你省掉这一项 — 省时也省钱。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.food.cards.2.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.food.cards.2.1",
+          "zhCN": "如果你的日常饮食已能满足需求，动态健康方案会直接告诉你省掉这一项——省时也省钱。"
+        }
       ]
     },
     {
@@ -1552,8 +1639,11 @@
       "english": "No food diary. No calorie counting. Just quick answers when there's a question, and a small nudge toward food when it helps.",
       "zhCN": "无需写食物日记，无需计算热量。只需在有疑问时给你快速解答，需要时轻轻推你一把 — 往餐桌那边。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.food.note"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.food.note",
+          "zhCN": "无需写食物日记，无需计算热量。只需在有疑问时给你快速解答，需要时轻轻推你一把——往餐桌那边。"
+        }
       ]
     },
     {
@@ -1592,8 +1682,11 @@
       "english": "Anyone can look up whether travel affects magnesium. The hard part is knowing how it affects your plan your stack, your medications, what your past few weeks looked like and what you should actually do about it. That's what Living Protocol handles.",
       "zhCN": "旅行会影响镁的吸收 — 这个答案网上随手可查。真正的难点在于：了解这件事具体如何影响你的方案 — 你的营养组合、用药情况、过去几周的状态 — 以及你实际应该怎么做。这正是动态健康方案为你处理的。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.difference.paragraphs.0"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.difference.paragraphs.0",
+          "zhCN": "旅行会影响镁的吸收——这个答案网上随手可查。真正的难点在于：了解这件事具体如何影响你的方案——你的营养组合、用药情况、过去几周的状态——以及你实际应该怎么做。这正是动态健康方案为你处理的。"
+        }
       ]
     },
     {
@@ -1603,8 +1696,11 @@
       "english": "It already knows your full stack, so you never have to re-explain when something changes. Every adjustment recommendation is safety-checked against your medication list and lab flags a safeguard that only works when the guidance is built entirely around you. Over 90 days, it starts to recognise your patterns, and suggestions reflect what's been happening over weeks, not just today. You also don't need to know the right questions to ask you just tell it what happened, and Living Protocol does the thinking.",
       "zhCN": "它已掌握你所有的营养信息，因此每次变化发生时，你无需从头解释。每次调整建议都会对照你的用药记录与化验标记进行安全核查 — 这种保障，只有在指导方案完全围绕你构建时才能奏效。 90 天内，系统逐渐识别你的健康规律，给出的建议不只反映本周状况，更折射出背后的整体趋势。你也无需思考该问什么 — 只要告诉它发生了什么，动态健康方案就会替你思考。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.difference.paragraphs.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.difference.paragraphs.1",
+          "zhCN": "它已掌握你所有的营养信息，因此每次变化发生时，你无需从头解释。每次调整建议都会对照你的用药记录与化验标记进行安全核查——这种保障，只有在指导方案完全围绕你构建时才能奏效。90 天内，系统逐渐识别你的健康规律，给出的建议不只反映本周状况，更折射出背后的整体趋势。你也无需思考该问什么——只要告诉它发生了什么，动态健康方案就会替你思考。"
+        }
       ]
     },
     {
@@ -1636,8 +1732,11 @@
       "english": "Start with a short, detailed questionnaire and your free Health Score. Your personalised Right Amount Formula and optional Living Protocol support is ready when you are.",
       "zhCN": "只需几分钟回答几个问题，免费拿到健康评分和初步方向。你的个性化知量方案 — 以及可选的动态健康方案支持 — 随时为你开启。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.bridge.body"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.bridge.body",
+          "zhCN": "只需几分钟回答几个问题，免费拿到健康评分和初步方向。你的个性化知量方案——以及可选的动态健康方案支持——随时为你开启。"
+        }
       ]
     },
     {
@@ -1658,8 +1757,11 @@
       "english": "Completely free No credit card",
       "zhCN": "完全免费 无需绑定信用卡 约 3 分钟",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.bridge.note"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.bridge.note",
+          "zhCN": "完全免费 · 无需绑定信用卡 · 约 3 分钟"
+        }
       ]
     },
     {
@@ -1708,7 +1810,7 @@
       "catalogChecks": [
         {
           "id": "customer.landing.results.fallback.0.quote",
-          "zhCN": "快四十岁的时候，我一直说想改变，却始终不知从何下手。抽屉里塞满了随手买的维生素，根本没有真正的计划。 MattaNutra 给了我一个清晰的起点，整个过程一点也不让人觉得负担。"
+          "zhCN": "快四十岁的时候，我一直说想改变，却始终不知从何下手。抽屉里塞满了随手买的维生素，根本没有真正的计划。MattaNutra 给了我一个清晰的起点，整个过程一点也不让人觉得负担。"
         }
       ]
     },
@@ -1750,7 +1852,7 @@
       "catalogChecks": [
         {
           "id": "customer.landing.results.fallback.1.quote",
-          "zhCN": "工作、出差、顾家，我的健康习惯早就变成了 ' 记得就做 '。 MattaNutra 帮我把那一堆乱七八糟的保健品，变成了一个真正适合忙碌生活的简单计划。"
+          "zhCN": "工作、出差、顾家，我的健康习惯早就变成了'记得就做'。MattaNutra 帮我把那一堆乱七八糟的保健品，变成了一个真正适合忙碌生活的简单计划。"
         }
       ]
     },
@@ -1792,7 +1894,7 @@
       "catalogChecks": [
         {
           "id": "customer.landing.results.fallback.2.quote",
-          "zhCN": "医生说我的血压开始偏高，需要做出改变。我在网上查了好几个小时的资料，结果越查越迷糊。 MattaNutra 帮我过滤掉所有噪音，给我做了一套真正适合自己生活的方案。"
+          "zhCN": "医生说我的血压开始偏高，需要做出改变。我在网上查了好几个小时的资料，结果越查越迷糊。MattaNutra 帮我过滤掉所有噪音，给我做了一套真正适合自己生活的方案。"
         }
       ]
     },
@@ -1834,7 +1936,7 @@
       "catalogChecks": [
         {
           "id": "customer.landing.results.fallback.3.quote",
-          "zhCN": "我在诊所工作，大家都默认我知道该怎么补。可说实话，我读的资料越多，越不确定该怎么做。 MattaNutra 终于给了我一套清晰、靠谱的方案 — 这次是为我自己，不是为我的病人。"
+          "zhCN": "我在诊所工作，大家都默认我知道该怎么补。可说实话，我读的资料越多，越不确定该怎么做。MattaNutra 终于给了我一套清晰、靠谱的方案——这次是为我自己，不是为我的病人。"
         }
       ]
     },
@@ -1921,8 +2023,11 @@
       "english": "MattaNutra was born in northern Thailand. For centuries, this part of the world has quietly practised a philosophy of the right amount eating just enough, resting at the right moment, moving with the body's natural rhythms. A wisdom refined over generations.",
       "zhCN": "MattaNutra 发源于泰国北部清迈。几个世纪以来，这片土地上静静流传着一种适度的生活哲学 — 吃得恰到好处、在正确的时刻休息、顺应身体的自然节律。这份智慧，在岁月中被一点一点地打磨与传承。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.origin.body"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.origin.body",
+          "zhCN": "MattaNutra 发源于泰国北部清迈。几个世纪以来，这片土地上静静流传着一种适度的生活哲学——吃得恰到好处、在正确的时刻休息、顺应身体的自然节律。这份智慧，在岁月中被一点一点地打磨与传承。"
+        }
       ]
     },
     {
@@ -1932,8 +2037,11 @@
       "english": "We built MattaNutra to turn that quiet wisdom into something modern, measurable and genuinely personal a plan that knows your body, adjusts as your life does, and never asks you to become someone else.",
       "zhCN": "我们创建 MattaNutra，正是为了将这份宁静的智慧，转化为现代、可量化且真正个性化的健康方案：一个真正了解你的身体、随生活变化持续调整、从不要求你做一个 \" 别人 \" 的方案。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.origin.body2"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.origin.body2",
+          "zhCN": "我们创建 MattaNutra，正是为了将这份宁静的智慧，转化为现代、可量化且真正个性化的健康方案：一个真正了解你的身体、随生活变化持续调整、从不要求你做一个\"别人\"的方案。"
+        }
       ]
     },
     {
@@ -1965,8 +2073,11 @@
       "english": "MattaNutra was founded by an international, multidisciplinary team with an unusually broad depth of background: two physician-scientists with MD–PhD qualifications from Mahidol, Princeton, Stanford and Harvard; a software engineer whose career began at CERN and now focuses on AI and decentralised systems, with experience at Goldman Sachs and UBS; a PhD economist with a global corporate background spanning public markets and early-stage ventures; and a younger founder who keeps us closely connected to the generation we serve.",
       "zhCN": "MattaNutra 由一支国际跨学科团队创立，团队拥有罕见的深度与广度：两位拥有 MD–PhD 双料学位的医师，毕业于 Mahidol、 Princeton、 Stanford 和 Harvard 等顶尖研究机构；一位软件工程师，职业起点是欧洲核子研究组织（CERN），现专注于 AI 与去中心化系统，曾服务于高盛、瑞银等顶级金融机构；一位经济学博士，深耕公开市场与前沿创业；以及一位年轻创始人，让我们始终与自己所服务的那一代人保持紧密连接。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.origin.founderParagraphs.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.origin.founderParagraphs.1",
+          "zhCN": "MattaNutra 由一支国际跨学科团队创立，团队拥有罕见的深度与广度：两位拥有 MD–PhD 双料学位的医师，毕业于 Mahidol、Princeton、Stanford 和 Harvard 等顶尖研究机构；一位软件工程师，职业起点是欧洲核子研究组织（CERN），现专注于 AI 与去中心化系统，曾服务于高盛、瑞银等顶级金融机构；一位经济学博士，深耕公开市场与前沿创业；以及一位年轻创始人，让我们始终与自己所服务的那一代人保持紧密连接。"
+        }
       ]
     },
     {
@@ -1976,8 +2087,11 @@
       "english": "Between us, we've accumulated more than a hundred years of professional practice in medicine, science, technology, and building products that stand up over time.",
       "zhCN": "我们之间，积累了超过百年的专业实践 — 在医学、科学、技术领域，以及打造经得起时间考验的产品这件事上。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.origin.founderParagraphs.2"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.origin.founderParagraphs.2",
+          "zhCN": "我们之间，积累了超过百年的专业实践——在医学、科学、技术领域，以及打造经得起时间考验的产品这件事上。"
+        }
       ]
     },
     {
@@ -1994,7 +2108,7 @@
         },
         {
           "id": "customer.landing.origin.tagline",
-          "zhCN": "古老智慧 现代科学"
+          "zhCN": "古老智慧 · 现代科学"
         }
       ]
     },
@@ -2034,8 +2148,11 @@
       "english": "Here's how the questionnaire estimates just one ingredient Vitamin D, one of 120+ the algorithm evaluates by combining several answers. The full questionnaire runs across six short modules.",
       "zhCN": "下面展示问卷如何通过综合多项回答，估算单一营养素 — 维生素 D，这只是算法评估的 120+ 种营养成分之一。完整版问卷共分六个简短模块。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.questionnaire.body"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.body",
+          "zhCN": "下面展示问卷如何通过综合多项回答，估算单一营养素——维生素 D，这只是算法评估的 120+ 种营养成分之一。完整版问卷共分六个简短模块。"
+        }
       ]
     },
     {
@@ -2099,8 +2216,11 @@
       "english": "You're 8% through keep going through Foundations.",
       "zhCN": "你已完成 8%— 继续填写基础信息。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.questionnaire.progressNote"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.progressNote",
+          "zhCN": "你已完成 8%——继续填写基础信息。"
+        }
       ]
     },
     {
@@ -2220,8 +2340,11 @@
       "english": "Skin tone, sun exposure and sunscreen together your Vitamin D isn't guessed. It's estimated for your life.",
       "zhCN": "肤色、日晒与防晒三者综合考量 — 你的维生素 D 不是猜出来的，而是为你的生活量身估算的。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.questionnaire.insight"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.insight",
+          "zhCN": "肤色、日晒与防晒三者综合考量——你的维生素 D 不是猜出来的，而是为你的生活量身估算的。"
+        }
       ]
     },
     {
@@ -2291,8 +2414,11 @@
       "english": "✓ Completely free ✓ No credit card ✓ Takes about 3 minutes",
       "zhCN": "✓ 完全免费 ✓ 无需绑定信用卡 ✓ 约需 3 分钟",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.questionnaire.reassurance"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.reassurance",
+          "zhCN": "✓ 完全免费 · ✓ 无需绑定信用卡 · ✓ 约需 3 分钟"
+        }
       ]
     },
     {
@@ -2387,10 +2513,10 @@
     },
     {
       "rowHash": "f69ab9f136f86e33",
-      "section": "知识库",
+      "section": "健康日志",
       "label": "Section label",
-      "english": "Library",
-      "zhCN": "知识库",
+      "english": "Journal",
+      "zhCN": "健康日志",
       "status": "implemented_catalog",
       "catalogChecks": [
         {
@@ -2409,7 +2535,7 @@
     },
     {
       "rowHash": "8db98b99edcc6ad5",
-      "section": "知识库",
+      "section": "健康日志",
       "label": "H2",
       "english": "Learn the right amount.",
       "zhCN": "学习知量之道。",
@@ -2427,13 +2553,16 @@
     },
     {
       "rowHash": "e63eddc7cd62fffc",
-      "section": "知识库",
+      "section": "健康日志",
       "label": "CTA link",
-      "english": "Browse the Library",
-      "zhCN": "浏览知识库",
+      "english": "Browse all articles",
+      "zhCN": "查看全部健康日志",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.journal.browse"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.journal.browse",
+          "zhCN": "浏览知识库"
+        }
       ]
     },
     {
@@ -2653,8 +2782,11 @@
       "english": "Your formula is dispensed through a network of partner pharmacies with registered pharmacists so you get exactly what your plan calls for, without guessing in the aisle. We don't manufacture supplements. We match you to products worth trusting and pharmacists worth asking.",
       "zhCN": "你的知量方案由合作药房网络中的持证药师进行调配 — 你拿到的正是你方案所需的产品，无需在货架前盲目猜测。我们不自行生产保健品；我们为你匹配可信赖的产品和可以为你答疑的药剂师。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.faq.items.2.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.faq.items.2.1",
+          "zhCN": "你的知量方案由合作药房网络中的持证药师进行调配——你拿到的正是你方案所需的产品，无需在货架前盲目猜测。我们不自行生产保健品；我们为你匹配可信赖的产品和可以为你答疑的药剂师。"
+        }
       ]
     },
     {
@@ -2675,8 +2807,11 @@
       "english": "Yes. The questionnaire and Health Score are completely free with no credit card required. You'll see where you stand and an initial sense of direction. If you choose to go further, your full personalised Right Amount Formula and optional Living Protocol support is there when you're ready.",
       "zhCN": "是的。问卷和健康评分完全免费，无需绑定信用卡。完成评估后，你会看到自己的健康状况概览和初步方向。完整的个性化知量方案 — 以及可选的动态健康方案支持 — 随时可以开启。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.faq.items.3.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.faq.items.3.1",
+          "zhCN": "是的。问卷和健康评分完全免费，无需绑定信用卡。完成评估后，你会看到自己的健康状况概览和初步方向。完整的个性化知量方案——以及可选的动态健康方案支持——随时可以开启。"
+        }
       ]
     },
     {
@@ -2697,8 +2832,11 @@
       "english": "Mattaññutā means the wisdom of knowing the right amount. It comes from a 2,500-year-old tradition of practical wisdom about moderation and balance that real flourishing comes not from more, but from exactly enough. The name is our promise: we help you find your right amount, not sell you more than you need.",
       "zhCN": "Mattaññutā，意为「知量之慧」 — 知晓适量的智慧。它源自两千五百年来关于适度与平衡的生活哲思：真正的活力，从不在于「更多」，而在于「恰好」。这个名字是我们的承诺：帮助你找到属于自己的知量，而不是卖给你不需要的。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.faq.items.4.1"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.faq.items.4.1",
+          "zhCN": "Mattaññutā，意为「知量之慧」——知晓适量的智慧。它源自两千五百年来关于适度与平衡的生活哲思：真正的活力，从不在于「更多」，而在于「恰好」。这个名字是我们的承诺：帮助你找到属于自己的知量，而不是卖给你不需要的。"
+        }
       ]
     },
     {
@@ -2726,8 +2864,11 @@
       "english": "Answer a focused set of questions, get a free Health Score, and receive a personalised starting point built around your body, your goals and your daily life.",
       "zhCN": "回答一套精准的问卷，获取免费健康评分，收到你的个性化起始方案 — 围绕你的身体、你的目标、你的每一天而设计。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.final.body"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.final.body",
+          "zhCN": "回答一套精准的问卷，获取免费健康评分，收到你的个性化起始方案——围绕你的身体、你的目标、你的每一天而设计。"
+        }
       ]
     },
     {
@@ -2759,8 +2900,11 @@
       "english": "Mattaññutā knowing the right amount.",
       "zhCN": "Mattaññutā 知量，知健康。",
       "status": "implemented_catalog",
-      "catalogIds": [
-        "customer.landing.final.quote"
+      "catalogChecks": [
+        {
+          "id": "customer.landing.final.quote",
+          "zhCN": "Mattaññutā — 知量，知健康。"
+        }
       ]
     }
   ]

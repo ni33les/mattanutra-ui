@@ -27,6 +27,7 @@ const footer = source("../components/site-footer.tsx");
 const homepage = source("../app/[locale]/page.tsx");
 const libraryIndexPage = source("../app/[locale]/library/page.tsx");
 const libraryArticlePage = source("../app/[locale]/library/[slug]/page.tsx");
+const libraryIndex = source("../components/library-index.tsx");
 const libraryIndexClient = source("../components/library-index-client.tsx");
 const legacyBlogArticlePage = source("../app/[locale]/blog/[slug]/page.tsx");
 const librarySource = source("../lib/library.ts");
@@ -101,6 +102,31 @@ describe("landing page v16 library-only port", () => {
     assert.doesNotMatch(footer, /#pricing|#journal/);
     assert.doesNotMatch(JSON.stringify(titleBarCopy), /#pricing|#journal|Journal|Blog/);
     assert.doesNotMatch(JSON.stringify(footerCopy), /#pricing|#journal|Journal|Blog/);
+  });
+
+  it("keeps Library index chrome in the first-class i18n catalog", () => {
+    const forbiddenHeaderCopy = [
+      "Home",
+      "Learn the",
+      "right amount",
+      "Guided by",
+      "The MattaNutra Library"
+    ];
+
+    for (const phrase of forbiddenHeaderCopy) {
+      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      assert.doesNotMatch(libraryIndex, new RegExp(`["'\`]${escaped}["'\`]`));
+    }
+
+    assert.match(libraryIndex, /copy\.breadcrumbLabel/);
+    assert.match(libraryIndex, /copy\.headerTitle/);
+    assert.match(libraryIndex, /copy\.headerIntro/);
+    assert.match(libraryIndex, /copy\.headerGuide/);
+    assert.match(librarySource, /from "@\/lib\/i18n-messages"/);
+    assert.match(librarySource, /customer\.libraryIndex\.headerTitle/);
+    assert.match(librarySource, /customer\.libraryCategories\.sleepRecovery/);
+    assert.doesNotMatch(librarySource, /localizedLibraryCopy|localizedCategoryLabels/);
   });
 
   it("sends primary homepage CTAs straight to the questionnaire", () => {

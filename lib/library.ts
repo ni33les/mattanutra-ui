@@ -11,6 +11,7 @@ import {
   type Locale,
   type LocaleCode
 } from "@/lib/i18n";
+import { t, type MessageId } from "@/lib/i18n-messages";
 import {
   getStaticLibraryArticle,
   getStaticLibraryCanonicalSlug,
@@ -85,6 +86,7 @@ type LibraryCopy = Readonly<{
   articleImageAltPrefix: string;
   articleListName: string;
   breadcrumbHome: string;
+  breadcrumbLabel: string;
   browse: string;
   categoryLabel: string;
   clearSearch: string;
@@ -98,6 +100,11 @@ type LibraryCopy = Readonly<{
   guide: string;
   guideImageAlt: string;
   guideName: string;
+  headerGuide: string;
+  headerIntro: string;
+  headerIntroEmphasis: string;
+  headerTitle: string;
+  headerTitleAccent: string;
   intro: string;
   landingIntro: string;
   landingTitle: string;
@@ -125,44 +132,18 @@ export const libraryCategories = [
   { label: "Testing & Personalisation", slug: "testing-personalisation" }
 ] as const satisfies readonly LibraryCategory[];
 
-const localizedCategoryLabels = {
-  en: {
-    "brain-focus": "Brain & Focus",
-    "energy-longevity": "Energy & Longevity",
-    "everyday-nutrition": "Everyday Nutrition",
-    foundations: "Foundations",
-    "joints-mobility": "Joints & Mobility",
-    minerals: "Minerals",
-    "sleep-recovery": "Sleep & Recovery",
-    "stress-adaptogens": "Stress & Adaptogens",
-    "testing-personalisation": "Testing & Personalisation",
-    vitamins: "Vitamins"
-  },
-  th: {
-    "brain-focus": "สมองและสมาธิ",
-    "energy-longevity": "พลังงานและอายุยืน",
-    "everyday-nutrition": "โภชนาการประจำวัน",
-    foundations: "พื้นฐาน",
-    "joints-mobility": "ข้อต่อและการเคลื่อนไหว",
-    minerals: "แร่ธาตุ",
-    "sleep-recovery": "การนอนและการฟื้นตัว",
-    "stress-adaptogens": "ความเครียดและสารปรับสมดุล",
-    "testing-personalisation": "การตรวจและการปรับให้เหมาะกับคุณ",
-    vitamins: "วิตามิน"
-  },
-  "zh-CN": {
-    "brain-focus": "大脑与专注",
-    "energy-longevity": "能量与长寿",
-    "everyday-nutrition": "日常营养",
-    foundations: "基础知识",
-    "joints-mobility": "关节与活动力",
-    minerals: "矿物质",
-    "sleep-recovery": "睡眠与恢复",
-    "stress-adaptogens": "压力与适应原",
-    "testing-personalisation": "检测与个性化",
-    vitamins: "维生素"
-  }
-} satisfies Record<Locale, Record<LibraryCategorySlug, string>>;
+const libraryCategoryMessageIds = {
+  "brain-focus": "customer.libraryCategories.brainFocus",
+  "energy-longevity": "customer.libraryCategories.energyLongevity",
+  "everyday-nutrition": "customer.libraryCategories.everydayNutrition",
+  foundations: "customer.libraryCategories.foundations",
+  "joints-mobility": "customer.libraryCategories.jointsMobility",
+  minerals: "customer.libraryCategories.minerals",
+  "sleep-recovery": "customer.libraryCategories.sleepRecovery",
+  "stress-adaptogens": "customer.libraryCategories.stressAdaptogens",
+  "testing-personalisation": "customer.libraryCategories.testingPersonalisation",
+  vitamins: "customer.libraryCategories.vitamins"
+} satisfies Record<LibraryCategorySlug, MessageId>;
 
 const categoryBySlug = new Map<LibraryCategorySlug, LibraryCategory>(
   libraryCategories.map((category) => [category.slug, category])
@@ -181,123 +162,57 @@ export const launchLibraryArticles = staticLibraryArticles
 
 const staticSlugs = new Set(staticLibraryArticles.map((article) => article.slug));
 
-const localizedLibraryCopy = {
-  en: {
-    allCategory: "All",
-    articleImageAltPrefix: "Nong Matta illustration",
-    articleListName: "The MattaNutra Library articles",
-    breadcrumbHome: "Home",
-    browse: "Browse the Library",
-    categoryLabel: "Category",
-    clearSearch: "Clear search",
-    ctaBody:
-      "A few minutes gives MattaNutra the context it needs to turn broad answers into your Right Amount.",
-    ctaButton: "Start designing your Right Amount",
-    ctaImageAlt: "Nong Matta celebrating",
-    ctaTitle: "Ready to make the guidance personal?",
-    empty:
-      "No articles match yet - try a different word or category. More are on the way.",
-    eyebrow: "The MattaNutra Library",
-    featuredListName: "The MattaNutra Library - Featured articles",
-    guide: "Your guide",
-    guideImageAlt: "Nong Matta, the MattaNutra Library guide",
-    guideName: "Nong Matta",
-    intro:
-      "Evidence-aware answers to common supplement questions - clear enough to use, careful enough to trust.",
-    landingIntro:
-      "Clear, evidence-aware answers to the supplement questions people actually ask - so you can decide from knowing, not guessing.",
-    landingTitle: "Learn the",
-    landingTitleAccent: "right amount.",
-    loadMore: "Load more articles",
-    noContentNote: "Full Library article content is being prepared for this locale.",
-    result: "article",
-    results: "articles",
-    searchLabel: "Search the Library",
-    searchPlaceholder: "Search the Library - try \"magnesium\" or \"sleep\"",
-    sectionIntro: "Plain-language supplement answers, guided by Nong Matta.",
-    title: "Evidence-aware answers to your supplement questions"
-  },
-  th: {
-    allCategory: "ทั้งหมด",
-    articleImageAltPrefix: "ภาพประกอบน้องมัตตะ",
-    articleListName: "บทความในคลังความรู้ MattaNutra",
-    breadcrumbHome: "หน้าแรก",
-    browse: "ดูคลังความรู้",
-    categoryLabel: "หมวดหมู่",
-    clearSearch: "ล้างคำค้นหา",
-    ctaBody:
-      "ใช้เวลาไม่กี่นาทีเพื่อให้ MattaNutra เข้าใจบริบทของคุณ แล้วเปลี่ยนคำตอบกว้าง ๆ เป็นปริมาณที่พอดี",
-    ctaButton: "ออกแบบปริมาณที่พอดีของคุณ",
-    ctaImageAlt: "น้องมัตตะกำลังฉลอง",
-    ctaTitle: "พร้อมทำให้คำแนะนำเป็นของคุณจริง ๆ หรือยัง?",
-    empty:
-      "ยังไม่พบบทความที่ตรงกัน ลองคำอื่นหรือหมวดหมู่อื่น บทความเพิ่มเติมกำลังมา",
-    eyebrow: "คลังความรู้ MattaNutra",
-    featuredListName: "บทความแนะนำจากคลังความรู้ MattaNutra",
-    guide: "ไกด์ของคุณ",
-    guideImageAlt: "น้องมัตตะ ไกด์คลังความรู้ MattaNutra",
-    guideName: "น้องมัตตะ",
-    intro:
-      "คำตอบเรื่องอาหารเสริมที่อ้างอิงหลักฐาน อ่านง่าย ใช้งานได้ และระมัดระวังพอให้เชื่อถือ",
-    landingIntro:
-      "คำตอบเรื่องอาหารเสริมที่คนถามจริง อ้างอิงหลักฐานและเข้าใจง่าย เพื่อให้คุณตัดสินใจจากความรู้ ไม่ใช่การเดา",
-    landingTitle: "เรียนรู้",
-    landingTitleAccent: "ปริมาณที่พอดี",
-    loadMore: "โหลดบทความเพิ่ม",
-    noContentNote: "เนื้อหาบทความฉบับเต็มสำหรับภาษานี้กำลังเตรียมอยู่",
-    result: "บทความ",
-    results: "บทความ",
-    searchLabel: "ค้นหาคลังความรู้",
-    searchPlaceholder: "ค้นหาคลังความรู้ เช่น \"แมกนีเซียม\" หรือ \"การนอน\"",
-    sectionIntro: "คำตอบเรื่องอาหารเสริมแบบเข้าใจง่าย โดยมีน้องมัตตะเป็นไกด์",
-    title: "คำตอบที่อ้างอิงหลักฐานสำหรับคำถามเรื่องอาหารเสริมของคุณ"
-  },
-  "zh-CN": {
-    allCategory: "全部",
-    articleImageAltPrefix: "Nong Matta 插图",
-    articleListName: "MattaNutra 知识库文章",
-    breadcrumbHome: "首页",
-    browse: "浏览知识库",
-    categoryLabel: "分类",
-    clearSearch: "清除搜索",
-    ctaBody:
-      "几分钟就能让 MattaNutra 了解你的背景，把宽泛建议变成适合你的知量方案。",
-    ctaButton: "开始设计你的知量方案",
-    ctaImageAlt: "Nong Matta 正在庆祝",
-    ctaTitle: "准备让建议真正贴合你了吗？",
-    empty: "暂时没有匹配文章。换个关键词或分类试试，更多内容正在准备中。",
-    eyebrow: "MattaNutra 知识库",
-    featuredListName: "MattaNutra 知识库精选文章",
-    guide: "你的向导",
-    guideImageAlt: "Nong Matta，MattaNutra 知识库向导",
-    guideName: "Nong Matta",
-    intro:
-      "用证据意识回答常见补充剂问题：足够清楚，可以行动；足够谨慎，值得信任。",
-    landingIntro:
-      "用清楚、有证据意识的方式回答人们真正会问的补充剂问题，让你基于了解来决定，而不是靠猜。",
-    landingTitle: "了解",
-    landingTitleAccent: "知量",
-    loadMore: "加载更多文章",
-    noContentNote: "该语言的完整知识库文章内容正在准备中。",
-    result: "篇文章",
-    results: "篇文章",
-    searchLabel: "搜索知识库",
-    searchPlaceholder: "搜索知识库，例如“镁”或“睡眠”",
-    sectionIntro: "由 Nong Matta 引导，用通俗语言解释补充剂问题。",
-    title: "用证据意识回答你的补充剂问题"
-  }
-} satisfies Record<Locale, LibraryCopy>;
+const libraryCopyMessageIds = {
+  allCategory: "customer.libraryIndex.allCategory",
+  articleImageAltPrefix: "customer.libraryIndex.articleImageAltPrefix",
+  articleListName: "customer.libraryIndex.articleListName",
+  breadcrumbHome: "customer.libraryIndex.breadcrumbHome",
+  breadcrumbLabel: "customer.libraryIndex.breadcrumbLabel",
+  browse: "customer.libraryIndex.browse",
+  categoryLabel: "customer.libraryIndex.categoryLabel",
+  clearSearch: "customer.libraryIndex.clearSearch",
+  ctaBody: "customer.libraryIndex.ctaBody",
+  ctaButton: "customer.libraryIndex.ctaButton",
+  ctaImageAlt: "customer.libraryIndex.ctaImageAlt",
+  ctaTitle: "customer.libraryIndex.ctaTitle",
+  empty: "customer.libraryIndex.empty",
+  eyebrow: "customer.libraryIndex.eyebrow",
+  featuredListName: "customer.libraryIndex.featuredListName",
+  guide: "customer.libraryIndex.guide",
+  guideImageAlt: "customer.libraryIndex.guideImageAlt",
+  guideName: "customer.libraryIndex.guideName",
+  headerGuide: "customer.libraryIndex.headerGuide",
+  headerIntro: "customer.libraryIndex.headerIntro",
+  headerIntroEmphasis: "customer.libraryIndex.headerIntroEmphasis",
+  headerTitle: "customer.libraryIndex.headerTitle",
+  headerTitleAccent: "customer.libraryIndex.headerTitleAccent",
+  intro: "customer.libraryIndex.intro",
+  landingIntro: "customer.libraryIndex.landingIntro",
+  landingTitle: "customer.libraryIndex.landingTitle",
+  landingTitleAccent: "customer.libraryIndex.landingTitleAccent",
+  loadMore: "customer.libraryIndex.loadMore",
+  noContentNote: "customer.libraryIndex.noContentNote",
+  result: "customer.libraryIndex.result",
+  results: "customer.libraryIndex.results",
+  searchLabel: "customer.libraryIndex.searchLabel",
+  searchPlaceholder: "customer.libraryIndex.searchPlaceholder",
+  sectionIntro: "customer.libraryIndex.sectionIntro",
+  title: "customer.libraryIndex.title"
+} satisfies Record<keyof LibraryCopy, MessageId>;
 
 export function getLibraryCopy(locale: LocaleCode): LibraryCopy {
-  return localizedLibraryCopy[locale as Locale] ?? localizedLibraryCopy[defaultLocale];
+  const copy = {} as Record<keyof LibraryCopy, string>;
+
+  for (const key of Object.keys(libraryCopyMessageIds) as Array<keyof LibraryCopy>) {
+    copy[key] = t(locale, libraryCopyMessageIds[key]);
+  }
+
+  return copy as LibraryCopy;
 }
 
 export function getLibraryCategories(locale: LocaleCode): readonly LibraryCategory[] {
-  const labels =
-    localizedCategoryLabels[locale as Locale] ?? localizedCategoryLabels[defaultLocale];
-
   return libraryCategories.map((category) => ({
-    label: labels[category.slug],
+    label: t(locale, libraryCategoryMessageIds[category.slug]),
     slug: category.slug
   }));
 }

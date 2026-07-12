@@ -16,6 +16,27 @@ const focusedSlugs = [
   "blood-panel-personalise-supplements-cost"
 ] as const;
 const indexLocales = ["en", "th", "zh-CN"] as const;
+const indexExpectations = {
+  en: {
+    guide: "Nong Matta",
+    intro: "magnesium, vitamin D, omega-3",
+    title: "Learn the right amount."
+  },
+  th: {
+    guide: "น้องมัตตะ",
+    intro: "แมกนีเซียม",
+    title: "เรียนรู้ปริมาณที่พอดี"
+  },
+  "zh-CN": {
+    guide: "Nong Matta",
+    intro: "镁",
+    title: "了解知量"
+  }
+} satisfies Record<(typeof indexLocales)[number], {
+  guide: string;
+  intro: string;
+  title: string;
+}>;
 const desktopViewport = { height: 900, width: 1280 };
 const mobileViewport = { height: 844, width: 390 };
 
@@ -109,12 +130,30 @@ test.describe("Library UX remediation", () => {
         await page.setViewportSize(viewport);
         await gotoLibraryTarget(page, `/${locale}/library`, baseURL);
 
+        const expected = indexExpectations[locale];
+        const header = page.locator("[data-library-index-header]");
+        const breadcrumb = page.locator("[data-library-breadcrumb]");
+
+        await expect(breadcrumb).toBeVisible();
+        await expect(breadcrumb.locator("a").first()).toHaveAttribute(
+          "href",
+          `/${locale}`
+        );
+        await expect(header).toBeVisible();
+        await expect(header.locator("h1")).toContainText(expected.title);
+        await expect(header).toContainText(expected.intro);
+        await expect(header).toContainText(expected.guide);
+        await expect(header.locator("img")).toHaveCount(0);
         await expect(page.locator("[data-library-grid]")).toBeVisible();
         await expect(page.locator("[data-library-card]").first()).toBeVisible();
         await expect(page.locator("[data-library-card]")).toHaveCount(
           articleSlugs.length
         );
         await assertNoHorizontalOverflow(page);
+        await assertNoVisibleTextOverflow(
+          page,
+          "[data-library-index-header] h1, [data-library-index-header] p, [data-library-breadcrumb]"
+        );
         await assertNoVisibleTextOverflow(
           page,
           "[data-library-card], [data-library-card] h2, [data-library-card] p"

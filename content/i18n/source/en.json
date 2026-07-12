@@ -612,6 +612,411 @@
     "translatable": true,
     "variables": []
   },
+  "customer.libraryCategories.brainFocus": {
+    "audience": "customer",
+    "defaultMessage": "Brain & Focus",
+    "description": "Library category label for brain and focus articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.energyLongevity": {
+    "audience": "customer",
+    "defaultMessage": "Energy & Longevity",
+    "description": "Library category label for energy and longevity articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.everydayNutrition": {
+    "audience": "customer",
+    "defaultMessage": "Everyday Nutrition",
+    "description": "Library category label for everyday nutrition articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.foundations": {
+    "audience": "customer",
+    "defaultMessage": "Foundations",
+    "description": "Library category label for foundations articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.jointsMobility": {
+    "audience": "customer",
+    "defaultMessage": "Joints & Mobility",
+    "description": "Library category label for joints and mobility articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.minerals": {
+    "audience": "customer",
+    "defaultMessage": "Minerals",
+    "description": "Library category label for minerals articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.sleepRecovery": {
+    "audience": "customer",
+    "defaultMessage": "Sleep & Recovery",
+    "description": "Library category label for sleep and recovery articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.stressAdaptogens": {
+    "audience": "customer",
+    "defaultMessage": "Stress & Adaptogens",
+    "description": "Library category label for stress and adaptogen articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.testingPersonalisation": {
+    "audience": "customer",
+    "defaultMessage": "Testing & Personalisation",
+    "description": "Library category label for testing and personalisation articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.vitamins": {
+    "audience": "customer",
+    "defaultMessage": "Vitamins",
+    "description": "Library category label for vitamins articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.allCategory": {
+    "audience": "customer",
+    "defaultMessage": "All",
+    "description": "Label for the all-categories Library filter.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.articleImageAltPrefix": {
+    "audience": "customer",
+    "defaultMessage": "Nong Matta illustration",
+    "description": "Prefix for Library card illustration alt text.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.articleListName": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library articles",
+    "description": "Accessible name for the Library article list.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.breadcrumbHome": {
+    "audience": "customer",
+    "defaultMessage": "Home",
+    "description": "Home breadcrumb label on the Library index page.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.breadcrumbLabel": {
+    "audience": "customer",
+    "defaultMessage": "Breadcrumb",
+    "description": "Accessible label for the Library breadcrumb navigation.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.browse": {
+    "audience": "customer",
+    "defaultMessage": "Browse the Library",
+    "description": "Homepage Library preview link label.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.categoryLabel": {
+    "audience": "customer",
+    "defaultMessage": "Category",
+    "description": "Accessible label for Library category filters.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.clearSearch": {
+    "audience": "customer",
+    "defaultMessage": "Clear search",
+    "description": "Accessible label for clearing Library search.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.ctaBody": {
+    "audience": "customer",
+    "defaultMessage": "A few minutes gives MattaNutra the context it needs to turn broad answers into your Right Amount.",
+    "description": "Body copy for the Library index bottom CTA.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.ctaButton": {
+    "audience": "customer",
+    "defaultMessage": "Start designing your Right Amount",
+    "description": "Button label for the Library index bottom CTA.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.ctaImageAlt": {
+    "audience": "customer",
+    "defaultMessage": "Nong Matta celebrating",
+    "description": "Alt text for the Library index bottom CTA illustration.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.ctaTitle": {
+    "audience": "customer",
+    "defaultMessage": "Ready to make the guidance personal?",
+    "description": "Heading for the Library index bottom CTA.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.empty": {
+    "audience": "customer",
+    "defaultMessage": "No articles match yet - try a different word or category. More are on the way.",
+    "description": "Empty state shown when Library filters return no articles.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.eyebrow": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library",
+    "description": "Library index eyebrow and breadcrumb current-page label.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.featuredListName": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library - Featured articles",
+    "description": "Accessible name for featured Library articles.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.guide": {
+    "audience": "customer",
+    "defaultMessage": "Your guide",
+    "description": "Short guide label for the homepage Library preview.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.guideImageAlt": {
+    "audience": "customer",
+    "defaultMessage": "Nong Matta, the MattaNutra Library guide",
+    "description": "Alt text for Nong Matta as the Library guide.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.guideName": {
+    "audience": "customer",
+    "defaultMessage": "Nong Matta",
+    "description": "Name of the Library guide character.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerGuide": {
+    "audience": "customer",
+    "defaultMessage": "Guided by Nong Matta, our resident wellness sprout.",
+    "description": "Guide line in the Library index header.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerIntro": {
+    "audience": "customer",
+    "defaultMessage": "Clear, evidence-aware answers to the supplement questions people actually ask - magnesium, vitamin D, omega-3, sleep and more. Every page is written to help you decide from knowing, not guessing.",
+    "description": "Main introductory paragraph in the Library index header.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerIntroEmphasis": {
+    "audience": "customer",
+    "defaultMessage": "knowing",
+    "description": "Emphasized phrase inside the Library index header intro.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerTitle": {
+    "audience": "customer",
+    "defaultMessage": "Learn the right amount.",
+    "description": "Main Library index header title.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerTitleAccent": {
+    "audience": "customer",
+    "defaultMessage": "right amount.",
+    "description": "Emphasized phrase inside the Library index header title.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.intro": {
+    "audience": "customer",
+    "defaultMessage": "Evidence-aware answers to common supplement questions - clear enough to use, careful enough to trust.",
+    "description": "SEO and metadata description for the Library index page.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.landingIntro": {
+    "audience": "customer",
+    "defaultMessage": "Clear, evidence-aware answers to the supplement questions people actually ask - so you can decide from knowing, not guessing.",
+    "description": "Homepage Library preview intro copy.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.landingTitle": {
+    "audience": "customer",
+    "defaultMessage": "Learn the",
+    "description": "Homepage Library preview title prefix.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.landingTitleAccent": {
+    "audience": "customer",
+    "defaultMessage": "right amount.",
+    "description": "Homepage Library preview title accent.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.loadMore": {
+    "audience": "customer",
+    "defaultMessage": "Load more articles",
+    "description": "Button label for loading more Library articles.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.noContentNote": {
+    "audience": "customer",
+    "defaultMessage": "Full Library article content is being prepared for this locale.",
+    "description": "Note shown on Library cards whose full content is unavailable in the current locale.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.result": {
+    "audience": "customer",
+    "defaultMessage": "article",
+    "description": "Singular result noun for Library filter counts.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.results": {
+    "audience": "customer",
+    "defaultMessage": "articles",
+    "description": "Plural result noun for Library filter counts.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.searchLabel": {
+    "audience": "customer",
+    "defaultMessage": "Search the Library",
+    "description": "Accessible label for Library search and back-to-search link text.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.searchPlaceholder": {
+    "audience": "customer",
+    "defaultMessage": "Search the Library - try \"magnesium\" or \"sleep\"",
+    "description": "Placeholder text for Library search.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.sectionIntro": {
+    "audience": "customer",
+    "defaultMessage": "Plain-language supplement answers, guided by Nong Matta.",
+    "description": "Short Library section intro used by structured data.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.title": {
+    "audience": "customer",
+    "defaultMessage": "Evidence-aware answers to your supplement questions",
+    "description": "SEO and fallback Library index title.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
   "customer.footer.body": {
     "audience": "customer",
     "defaultMessage": "Personalised wellness plans, designed in Chiang Mai for Southeast Asian lives. Ancient wisdom · modern science.",

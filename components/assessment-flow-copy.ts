@@ -124,36 +124,36 @@ export const assessmentUiCopy = {
   "zh-CN": {
     back: "返回",
     continue: "继续",
-    countryHint: "用于本地背景和产品可用性。",
+    countryHint: "你所在的地方，决定了有些产品能不能送到你手上。",
     devDefaults: "开发默认值",
-    formulaPrecision: "配方精度",
+    formulaPrecision: "配方精准度",
     heightWeight: "身高和体重",
     infoLabel: "提示",
     nameGreeting: (name: string) => `很高兴认识你，${name}。`,
     precisionHint: (progress: number, remaining: number) =>
       remaining > 0
-        ? `已完成 ${progress}%。进入精准层前还剩 ${remaining} 项核心信息。`
-        : `已完成 ${progress}%。核心信息已准备好；可选精准数据能进一步优化配方。`,
+        ? `精准度 ${progress}% · 还差 ${remaining} 项关键数据 · 继续完善，解锁专属配方`
+        : `精准度 ${progress}% · 核心信息已完成 · 可选精准数据能进一步优化配方`,
     precisionMarks: ["开始", "核心 -> 80%", "精准 -> 100%"],
     privacyGate: {
-      acceptedPrompt: "谢谢，你的答案已受到保护。现在可以开始。",
+      acceptedPrompt: "谢谢，你已知晓并同意。现在可以开始。",
       body:
-        "这份评估会询问你的健康情况，包括正在服用的内容、身体感受以及过敏或不适反应。我们只用它来建立并安全检查你的配方，不会出售数据，你也可以随时撤回。",
-      checkbox: "使用我的健康答案来建立并安全检查我的配方",
+        "你填的健康状况、服用习惯、身体反应，只用于两件事：为你定制专属营养配方，并确保配方对你安全。我们不会卖你的数据，也不会发垃圾广告。随时可以退出，数据随时可删。",
+      checkbox: "我已知晓并同意使用我的健康答案来定制并安全核查配方",
       eyebrow: "私密 · 加密",
-      helper: "你的个性化配方将基于这些信息建立。",
+      helper: "你的信息，绝不外泄。",
       link: "阅读完整隐私声明 ->",
-      prompt: "勾选上方复选框即可开始评估。",
+      prompt: "勾选上方复选框即可开始问卷。",
       required: "必填",
-      title: "你的答案只留在我们之间。"
+      title: "你的信息，绝不外泄"
     },
     stagesAria: "评估步骤",
     processingError: "目前无法开始处理。",
     scoreProcessingSubtitle: "我们正在根据你的回答评估主要健康维度。",
-    scoreProcessingTitle: "正在准备你的 HealthScore",
+    scoreProcessingTitle: "正在生成你的健康评分",
     scoreGate: {
-      planDescription: "这是根据你的回答计算出的确定性 HealthScore。",
-      title: "你的 HealthScore 已准备好"
+      planDescription: "这是根据你的回答计算出的健康评分。",
+      title: "你的健康评分已准备好"
     },
     retry: "重试",
     resume: {
@@ -172,7 +172,7 @@ export const assessmentUiCopy = {
     },
     section: (current: number, total: number) => `第 ${current} / ${total} 步`,
     selectCountry: "选择国家",
-    sunHint: "帮助调整维生素 D 和日晒背景。",
+    sunHint: "这关系到你的维生素 D 怎么补。",
     vo2Placeholder: "例如 45 ml/kg/min"
   }
 } satisfies Record<Locale, {

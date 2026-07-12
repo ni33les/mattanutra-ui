@@ -11,6 +11,30 @@ import {
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import type { Locale } from "@/lib/i18n";
 
+function HighlightedText({
+  className,
+  highlight,
+  text
+}: Readonly<{
+  className: string;
+  highlight: string;
+  text: string;
+}>) {
+  const index = highlight ? text.indexOf(highlight) : -1;
+
+  if (index < 0) {
+    return <>{text}</>;
+  }
+
+  return (
+    <>
+      {text.slice(0, index)}
+      <span className={className}>{highlight}</span>
+      {text.slice(index + highlight.length)}
+    </>
+  );
+}
+
 export function LibraryIndex({
   articles,
   locale
@@ -22,6 +46,12 @@ export function LibraryIndex({
   const categories = getLibraryCategories(locale);
   const jsonLd = libraryIndexJsonLd({ articles, locale });
   const denseLocale = locale !== "en";
+  const titleClassName = denseLocale
+    ? "text-[42px] leading-[1.12] sm:text-[58px] lg:text-[72px]"
+    : "text-[56px] leading-[0.96] sm:text-[76px] lg:text-[104px]";
+  const introClassName = denseLocale
+    ? "text-[20px] leading-[1.65] sm:text-[24px] lg:text-[28px]"
+    : "text-[22px] leading-[1.6] sm:text-[28px] lg:text-[36px]";
 
   return (
     <>
@@ -33,48 +63,45 @@ export function LibraryIndex({
       />
       <div id="top" className="bg-cream">
         <nav
-          aria-label="Breadcrumb"
-          className="mx-auto max-w-container px-7 pt-8 text-[13px] text-ash"
+          aria-label={copy.breadcrumbLabel}
+          className="mx-auto max-w-container px-7 pt-8 text-[18px] text-ash md:pt-12 md:text-[26px]"
+          data-library-breadcrumb={true}
         >
           <Link className="transition-colors hover:text-forest-deep" href={`/${locale}`}>
             {copy.breadcrumbHome}
           </Link>
-          <span className="mx-1.5 text-ash-soft">/</span>
-          <span className="font-medium text-ink-soft">{copy.eyebrow}</span>
+          <span className="mx-2 text-ash-soft md:mx-4">/</span>
+          <span className="font-medium text-ink">{copy.eyebrow}</span>
         </nav>
 
-        <section className="border-b border-line bg-cream">
-          <div className="mx-auto flex max-w-container items-center justify-between gap-10 px-7 py-14 md:py-18">
-            <div className="max-w-[760px]">
-              <p className="mb-4 text-xs font-semibold tracking-[0.22em] text-forest-deep uppercase">
+        <section className="border-b border-line bg-cream" data-library-index-header={true}>
+          <div className="mx-auto max-w-container px-7 py-18 md:py-28">
+            <div className="max-w-[1280px]">
+              <p className="mb-8 text-sm leading-tight font-semibold tracking-[0.28em] text-forest-deep uppercase md:text-[24px]">
                 {copy.eyebrow}
               </p>
-              <h1
-                className={`max-w-[800px] break-words font-display leading-[1.08] text-ink ${
-                  denseLocale
-                    ? "text-[clamp(30px,4.2vw,50px)]"
-                    : "text-[clamp(32px,4.6vw,54px)]"
-                }`}
-              >
-                {copy.title}
+              <h1 className={`max-w-full break-words font-display font-medium text-ink ${titleClassName}`}>
+                <HighlightedText
+                  className="font-normal italic text-forest-deep"
+                  highlight={copy.headerTitleAccent}
+                  text={copy.headerTitle}
+                />
               </h1>
-              <p className="mt-5 max-w-[620px] text-[18px] leading-[1.7] text-ink-soft">
-                {copy.intro}
+              <p className={`mt-10 max-w-[1260px] text-ink-soft ${introClassName}`}>
+                <HighlightedText
+                  className="italic text-forest-deep"
+                  highlight={copy.headerIntroEmphasis}
+                  text={copy.headerIntro}
+                />
               </p>
-              <p className="mt-4 text-[14px] text-ash">
-                {copy.guide}{" "}
-                <b className="text-forest-deep">{copy.guideName}</b>.
+              <p className="mt-10 max-w-[860px] text-[19px] leading-[1.6] text-ash md:text-[28px]">
+                <HighlightedText
+                  className="font-bold text-forest-deep"
+                  highlight={copy.guideName}
+                  text={copy.headerGuide}
+                />
               </p>
             </div>
-            <Image
-              alt={copy.guideImageAlt}
-              className="hidden h-40 w-auto md:block"
-              height={466}
-              priority={true}
-              src="/assets/library/nong/nong-open.webp"
-              unoptimized={true}
-              width={340}
-            />
           </div>
         </section>
 

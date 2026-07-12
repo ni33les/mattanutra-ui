@@ -2,11 +2,11 @@ import type { Copy } from "@/components/assessment-flow-copy-types";
 
 export const zhCn: Copy = {
     "about": {
-      "title": "全是关于你",
-      "subtitle": "先了解你的基本情况。几步轻触即可开始。这将为你的知量方案奠定基础。",
-      "firstName": "名字",
-      "firstNameHint": "以便我们为您个性化合适的剂量。",
-      "firstNameOptional": "选填",
+      "title": "一切答案，都在你身上",
+      "subtitle": "先明确自己的身体画像。轻松点几下，打个底——这是你自己的配方底盘，后面一切都从这儿出发。",
+      "firstName": "怎么称呼您？",
+      "firstNameHint": "让知量方案带上你的名字。",
+      "firstNameOptional": "可选项",
       "honestyBody": "没有对错之分，只有真实的答案。回答越诚实，你的知量方案就越精准，也越能安全地配合你正在服用的产品。",
       "sex": "性别",
       "sexOptions": [
@@ -75,7 +75,7 @@ export const zhCn: Copy = {
           "value": "VI"
         }
       ],
-      "country": "国家/地区",
+      "country": "所在国家",
       "countryOptions": [
         {
           "label": "泰国",
@@ -150,7 +150,7 @@ export const zhCn: Copy = {
           "value": "OTHER"
         }
       ],
-      "sun": "日晒（分钟/天）",
+      "sun": "日晒时长（分钟/天）",
       "sunOptions": [
         {
           "label": "15 分钟以下",
@@ -169,7 +169,7 @@ export const zhCn: Copy = {
           "value": "60+"
         }
       ],
-      "sunscreen": "防晒霜使用情况",
+      "sunscreen": "你平时防晒吗？",
       "sunscreenOptions": [
         {
           "label": "很少",
@@ -184,8 +184,8 @@ export const zhCn: Copy = {
           "value": "daily"
         }
       ],
-      "femaleTitle": "女性健康背景",
-      "reproStatus": "怀孕/哺乳状态",
+      "femaleTitle": "女性健康信息",
+      "reproStatus": "孕期/哺乳期状态",
       "reproStatusOptions": [
         {
           "label": "无",
@@ -244,32 +244,32 @@ export const zhCn: Copy = {
       ],
       "trustItems": [
         {
-          "body": "每份方案均与你的用药、化验结果及合规产品进行安全交叉检查。",
-          "title": "安全加密"
+          "body": "每一份知量方案，都会跟你在用的药、你的检测数据交叉比对，再经过泰国 FDA 注册审核——多重核验，安全才通过。",
+          "title": "安全把关"
         },
         {
-          "body": "你的回答仅与你的方案绑定。我们不会出售，也不会与广告商共享。",
+          "body": "你的回答，只属于你的知量方案。不卖、不传、不拿来骚扰你。",
           "title": "默认私密"
         },
         {
-          "body": "MattaNutra 提供健康指导，不替代医疗诊断。",
-          "title": "健康指导，非诊断"
+          "body": "给你的建议是为了帮你达成健康目标，随时可以拿给你的医生一起参考。",
+          "title": "健康调理，不做诊疗"
         }
       ]
     },
     "coach": {
-      "allergies": "食物过敏背景可让补充剂保持简洁实用，无需添加自由文本回避字段。",
+      "allergies": "用于补充剂安全核查，不需要填写自由文本。",
       "foodFrequency": "食物频率可改善微量营养素缺口估算，而无需将食物匹配重新加入活跃产品引擎。",
-      "goals": "最多选择三项。配方会将这些作为优先事项，而非尝试平均优化所有内容。",
+      "goals": "不搞大而全。你选什么，知量方案就重点解决什么。",
       "labs": "单位很重要。我们会在将数据发送给 AI 前保留数值和单位。",
-      "medications": "这不是用于诊断。它为 AI 和确定性安全层提供所需上下文，以添加注意事项。",
-      "precision": "这些可选字段可提升最后 20% 的精准度。",
-      "sex": "性别和生殖背景会影响剂量注意事项、铁逻辑和产品受众筛选。",
-      "sun": "肤色、日晒和防晒霜使用情况有助于更真实地估算维生素 D 背景。"
+      "medications": "填了，知量方案会自动避开相冲成分；不填，跳过就好。只做安全提示，不做诊断。",
+      "precision": "最后这几步，能把精准度从“够用”拉到“完全为你”。嫌麻烦，跳过，当前方案已经够好。",
+      "sex": "性别不同，剂量安全线和铁的需求都不一样，推荐的产品也会有区别。",
+      "sun": "这几个信息凑在一起，才知道你身体里 D 到底是什么情况——不缺、刚好，还是差得远。"
     },
     "daily": {
-      "title": "您的日常生活",
-      "subtitle": "这会将配方从通用堆栈转变为适合您日常习惯的内容。",
+      "title": "你的日常",
+      "subtitle": "同样补营养，熬大夜和早睡的人，需要的配方不一样。下面这些，就是帮知量方案对上你的生活节奏。",
       "sleepHrs": "每晚睡眠时长（小时）",
       "sleepOptions": [
         {
@@ -481,43 +481,43 @@ export const zhCn: Copy = {
       ]
     },
     "fixedAction": {
-      "generate": "生成我的健康评分"
+      "generate": "看看我的身体底子多少分"
     },
     "food": {
-      "title": "饮食与营养",
-      "subtitle": "饮食背景可优化补充剂简报，即使产品匹配仍仅限于补充剂。",
-      "diet": "饮食模式",
+      "title": "饮食 & 营养",
+      "subtitle": "问这些不是为了让你改菜单。吃什么是你的自由，我们只负责把缺的那块精准补上。",
+      "diet": "你的饮食偏哪种？",
       "dietOptions": [
         {
-          "label": "无固定模式",
+          "label": "没固定模式，随意吃",
           "value": "none"
         },
         {
-          "label": "加工食品为主",
+          "label": "外卖/加工食品居多",
           "value": "processed"
         },
         {
-          "label": "均衡",
+          "label": "荤素搭配，比较均衡",
           "value": "balanced"
         },
         {
-          "label": "全食物",
+          "label": "偏清淡，天然食材为主",
           "value": "whole"
         },
         {
-          "label": "地中海式",
+          "label": "地中海式（多鱼、橄榄油、坚果）",
           "value": "mediterranean"
         },
         {
-          "label": "植物性",
+          "label": "素食为主，很少吃肉",
           "value": "plant"
         },
         {
-          "label": "纯素",
+          "label": "纯素，蛋奶都不吃",
           "value": "vegan"
         },
         {
-          "label": "肉食",
+          "label": "以肉食为主",
           "value": "carnivore"
         }
       ],
@@ -667,10 +667,10 @@ export const zhCn: Copy = {
       "disclosureBody": "MattaNutra 指导支持一般健康，不替代医疗建议。"
     },
     "goals": {
-      "title": "您的目标与感受",
-      "subtitle": "您的首要优先事项和当前症状将指导配方的排序。",
-      "goals": "主要健康目标",
-      "goalHint": "最多选择 3 项",
+      "title": "你的目标 你的起点",
+      "subtitle": "你最想改善什么和现在的身体状况，决定了知量方案从哪里开始入手。",
+      "goals": "你最想改善什么？",
+      "goalHint": "最多选 3 项",
       "goalOptions": [
         {
           "label": "精力",
@@ -685,7 +685,7 @@ export const zhCn: Copy = {
           "value": "focus"
         },
         {
-          "label": "长寿",
+          "label": "长寿抗衰",
           "value": "longevity"
         },
         {
@@ -693,7 +693,7 @@ export const zhCn: Copy = {
           "value": "immunity"
         },
         {
-          "label": "健身",
+          "label": "体能",
           "value": "fitness"
         },
         {
@@ -717,7 +717,7 @@ export const zhCn: Copy = {
           "value": "skin"
         },
         {
-          "label": "激素",
+          "label": "荷尔蒙",
           "value": "hormones"
         }
       ],
@@ -729,11 +729,11 @@ export const zhCn: Copy = {
           "value": "fatigue"
         },
         {
-          "label": "脑雾",
+          "label": "脑雾/注意力差",
           "value": "brainfog"
         },
         {
-          "label": "情绪",
+          "label": "情绪不稳定",
           "value": "mood"
         },
         {
@@ -749,11 +749,11 @@ export const zhCn: Copy = {
           "value": "sleep"
         },
         {
-          "label": "压力",
+          "label": "压力大",
           "value": "stress"
         },
         {
-          "label": "皮肤",
+          "label": "皮肤差",
           "value": "skin"
         },
         {
@@ -775,8 +775,8 @@ export const zhCn: Copy = {
       ]
     },
     "precision": {
-      "title": "您的偏好",
-      "subtitle": "先设置实际限制，再添加可选精准信息（如有）。",
+      "title": "你的偏好",
+      "subtitle": "先圈底线，再调细节。知量方案绝不越界。",
       "budget": "每月补充剂预算（泰铢）",
       "budgetOptions": [
         {
@@ -834,9 +834,9 @@ export const zhCn: Copy = {
           "value": "mixed"
         }
       ],
-      "optionalBanner": "可选精准层级",
-      "optionalBody": "添加您已知的任何细节，以提升最终 20% 的精准度。",
-      "protein": "蛋白质（克/公斤/天）",
+      "optionalBanner": "再精准一点？（选填）",
+      "optionalBody": "最后这几步，能把精准度从“够用”拉到“完全为你”。嫌麻烦，跳过，当前方案已经够好。",
+      "protein": "蛋白质吃够了吗？（克/公斤体重/天）",
       "proteinOptions": [
         {
           "label": "1 以下",
@@ -920,7 +920,7 @@ export const zhCn: Copy = {
       "vo2EstimateReady": (value) => `根据当前答案估算为 ${value} ml/kg/min。`,
       "hrv": "平均心率变异性",
       "labs": "近期化验值",
-      "labsHint": "仅在您有化验结果时填写。单位很重要。",
+      "labsHint": "仅在你有化验结果时填写。单位很重要。",
       "labFields": [
         {
           "label": "维生素 D",
@@ -972,10 +972,10 @@ export const zhCn: Copy = {
       ]
     },
     "safety": {
-      "title": "药物与安全",
-      "subtitle": "这些回答用于注意事项和确定性安全检查。",
-      "medications": "您是否正在服用任何药物？",
-      "medicationHint": "仅用于注意事项。",
+      "title": "安全第一",
+      "subtitle": "你在用药吗？告诉我们就好，知量方案会自动绕开不该碰的成分。",
+      "medications": "你在用药吗？",
+      "medicationHint": "填了，知量方案会自动避开相冲成分；不填，跳过就好。只做安全提示，不做诊断。",
       "medicationOptions": [
         {
           "label": "无",
@@ -986,18 +986,18 @@ export const zhCn: Copy = {
           "value": "yes"
         }
       ],
-      "medicationType": "药物类型",
+      "medicationType": "药物类型（可多选）",
       "medicationTypeOptions": [
         {
-          "label": "他汀类",
+          "label": "他汀类（降脂药）",
           "value": "statin"
         },
         {
-          "label": "二甲双胍",
+          "label": "二甲双胍（降糖药）",
           "value": "metformin"
         },
         {
-          "label": "PPI / 奥美拉唑",
+          "label": "质子泵抑制剂 / 奥美拉唑（胃药）",
           "value": "ppi"
         },
         {
@@ -1013,7 +1013,7 @@ export const zhCn: Copy = {
           "value": "antidepressant"
         },
         {
-          "label": "血液稀释剂 / 阿司匹林",
+          "label": "抗凝药 / 阿司匹林",
           "value": "bloodthinner"
         },
         {
@@ -1021,7 +1021,7 @@ export const zhCn: Copy = {
           "value": "thyroid"
         },
         {
-          "label": "血压药",
+          "label": "降压药",
           "value": "bp"
         },
         {
@@ -1034,10 +1034,10 @@ export const zhCn: Copy = {
         }
       ],
       "otherMedPlaceholder": "请描述药物及其用途",
-      "suppAllergies": "补充剂成分过敏或不耐受",
+      "suppAllergies": "对哪些营养品成分过敏或不耐受",
       "suppAllergyOptions": [
         {
-          "label": "无已知",
+          "label": "没有",
           "value": "none"
         },
         {
@@ -1120,43 +1120,43 @@ export const zhCn: Copy = {
       "supplements": "您目前服用的补充剂",
       "supplementsOptions": [
         {
-          "label": "无",
+          "label": "没吃",
           "value": "none"
         },
         {
-          "label": "基础复合维生素",
+          "label": "多维片",
           "value": "basic"
         },
         {
-          "label": "D3 / Omega-3",
+          "label": "维生素 D3 / 鱼油",
           "value": "d3omega"
         },
         {
-          "label": "多种针对性补充剂",
+          "label": "好几种针对性营养品",
           "value": "targeted"
         }
       ]
     },
     "sectionNotes": [
-      "我们对您的了解越多，推荐就越精准。",
       "",
-      "",
-      "",
-      "",
-      ""
+      "你最想改善什么和现在的身体状况，决定知量方案从哪里开始入手。",
+      "同样补营养，熬大夜和早睡的人，需要的配方不一样。",
+      "吃什么是你的自由，我们只负责把缺的那块精准补上。",
+      "只做安全提示，不做诊断。",
+      "先圈底线，再调细节。知量方案绝不越界。"
     ],
     "stagePhases": [
-      "全为您量身定制",
-      "基础",
-      "基础",
-      "基础",
-      "安全",
+      "一切答案，都在你身上",
+      "基础信息",
+      "基础信息",
+      "基础信息",
+      "安全第一",
       "个性化"
     ],
     "stages": [
-      "关于您",
+      "基础信息",
       "目标",
-      "日常生活",
+      "日常",
       "饮食",
       "安全",
       "精准"

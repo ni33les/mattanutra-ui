@@ -5,22 +5,34 @@ import { getSql } from "@/lib/db";
 
 const RETAIL_SNAPSHOT_TABLES = [
   {
-    name: "retail_sellable_products",
+    name: "organisations",
     selectSql: `
+      select id, slug
+      from public.organisations
+      where slug in ('delight-pharmacy', 'enchanted-pharmacy')
+        and organisation_type = 'tenant'
+      order by slug
+    `
+  },
+  {
+    name: "retail_sellable_products",
+    selectSql: (includeDeleted: boolean) => `
       select sellable.*
       from public.retail_sellable_products sellable
       join public.organisations organisation on organisation.id = sellable.organisation_id
       where organisation.slug in ('delight-pharmacy', 'enchanted-pharmacy')
+        ${includeDeleted ? "" : "and sellable.status <> 'deleted'"}
       order by sellable.organisation_id, sellable.product_id
     `
   },
   {
     name: "retail_product_stock",
-    selectSql: `
+    selectSql: (includeDeleted: boolean) => `
       select stock.*
       from public.retail_product_stock stock
       join public.organisations organisation on organisation.id = stock.organisation_id
       where organisation.slug in ('delight-pharmacy', 'enchanted-pharmacy')
+        ${includeDeleted ? "" : "and stock.status <> 'deleted'"}
       order by stock.organisation_id, stock.product_id
     `
   }
@@ -57,6 +69,7 @@ const outputPath = resolve(
     `/private/tmp/mattanutra-retail-snapshot-${slug}.json`
 );
 const includeDbBackup = !hasArg("no-db-backup");
+const includeDeleted = hasArg("include-deleted");
 const schemaName = backupSchemaName(argValue("schema", slug) ?? slug);
 const tables: Record<string, unknown[]> = {};
 const counts: Record<string, number> = {};
@@ -67,14 +80,16 @@ if (includeDbBackup) {
 
 for (const table of RETAIL_SNAPSHOT_TABLES) {
   const tableIdentifier = sql(table.name);
-  const rows = await sql.unsafe(table.selectSql);
+  const selectSql =
+    typeof table.selectSql === "function" ? table.selectSql(includeDeleted) : table.selectSql;
+  const rows = await sql.unsafe(selectSql);
 
   tables[table.name] = rows;
   counts[table.name] = rows.length;
 
   if (includeDbBackup) {
     await sql`drop table if exists ${sql(schemaName)}.${tableIdentifier}`;
-    await sql.unsafe(`create table "${schemaName}"."${table.name}" as ${table.selectSql}`);
+    await sql.unsafe(`create table "${schemaName}"."${table.name}" as ${selectSql}`);
   }
 }
 
@@ -83,6 +98,7 @@ const payload = {
   dbBackupSchema: includeDbBackup ? schemaName : null,
   formatVersion: 1,
   organisationSlugs: ["delight-pharmacy", "enchanted-pharmacy"],
+  includeDeleted,
   source: {
     database: "DB_URL",
     script: "retail:snapshot"

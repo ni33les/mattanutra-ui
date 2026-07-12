@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
 import sourceCatalog from "../content/i18n/source/en.json" with { type: "json" };
+import thCatalog from "../content/i18n/locales/th.json" with { type: "json" };
 import zhCnCatalog from "../content/i18n/locales/zh-CN.json" with { type: "json" };
 import zhCnRtfMatrix from "../content/i18n/reconciliation/zh-CN-rtf.json" with { type: "json" };
 import { zhCn as assessmentZhCn } from "../components/assessment-flow-copy-zh-cn.ts";
@@ -32,7 +33,7 @@ describe("central ICU i18n catalog", () => {
     );
     assert.equal(
       t("zh-CN", "outbound.panya.quota.standard", { limit: 12 }),
-      "你今天已用完 12 条 Panya 消息。你仍可查看方案和订单；如果需要持续跟进和调整，Living Protocol 会解锁更深入的支持。"
+      "你今天已用完 12 条 Panya 消息。你仍可查看方案和订单；如果需要持续跟进和调整，动态健康方案会解锁更深入的支持。"
     );
 
     const status = tStatus("zh-CN", "customer.nutritionPublicShell.reveal.primary");
@@ -63,6 +64,70 @@ describe("central ICU i18n catalog", () => {
       zhCnCatalog["customer.revealFallbacks.foodSupportNote"],
       "{name} 可通过食物层面支持 {requirements}"
     );
+  });
+
+  it("keeps Library index UI chrome in the central catalog for every public locale", () => {
+    const libraryMessageIds = [
+      "customer.libraryCategories.brainFocus",
+      "customer.libraryCategories.energyLongevity",
+      "customer.libraryCategories.everydayNutrition",
+      "customer.libraryCategories.foundations",
+      "customer.libraryCategories.jointsMobility",
+      "customer.libraryCategories.minerals",
+      "customer.libraryCategories.sleepRecovery",
+      "customer.libraryCategories.stressAdaptogens",
+      "customer.libraryCategories.testingPersonalisation",
+      "customer.libraryCategories.vitamins",
+      "customer.libraryIndex.allCategory",
+      "customer.libraryIndex.articleImageAltPrefix",
+      "customer.libraryIndex.articleListName",
+      "customer.libraryIndex.breadcrumbHome",
+      "customer.libraryIndex.breadcrumbLabel",
+      "customer.libraryIndex.browse",
+      "customer.libraryIndex.categoryLabel",
+      "customer.libraryIndex.clearSearch",
+      "customer.libraryIndex.ctaBody",
+      "customer.libraryIndex.ctaButton",
+      "customer.libraryIndex.ctaImageAlt",
+      "customer.libraryIndex.ctaTitle",
+      "customer.libraryIndex.empty",
+      "customer.libraryIndex.eyebrow",
+      "customer.libraryIndex.featuredListName",
+      "customer.libraryIndex.guide",
+      "customer.libraryIndex.guideImageAlt",
+      "customer.libraryIndex.guideName",
+      "customer.libraryIndex.headerGuide",
+      "customer.libraryIndex.headerIntro",
+      "customer.libraryIndex.headerIntroEmphasis",
+      "customer.libraryIndex.headerTitle",
+      "customer.libraryIndex.headerTitleAccent",
+      "customer.libraryIndex.intro",
+      "customer.libraryIndex.landingIntro",
+      "customer.libraryIndex.landingTitle",
+      "customer.libraryIndex.landingTitleAccent",
+      "customer.libraryIndex.loadMore",
+      "customer.libraryIndex.noContentNote",
+      "customer.libraryIndex.result",
+      "customer.libraryIndex.results",
+      "customer.libraryIndex.searchLabel",
+      "customer.libraryIndex.searchPlaceholder",
+      "customer.libraryIndex.sectionIntro",
+      "customer.libraryIndex.title"
+    ] as const;
+
+    for (const id of libraryMessageIds) {
+      assert.equal(sourceCatalog[id].surface, "library");
+      assert.equal(sourceCatalog[id].translatable, true);
+      assert.ok(thCatalog[id]?.trim(), `${id} is missing Thai copy`);
+      assert.ok(zhCnCatalog[id]?.trim(), `${id} is missing Simplified Chinese copy`);
+    }
+
+    assert.match(
+      t("en", "customer.libraryIndex.headerTitle"),
+      /Learn the right amount\./
+    );
+    assert.match(t("th", "customer.libraryIndex.headerTitle"), /ปริมาณที่พอดี/);
+    assert.match(t("zh-CN", "customer.libraryIndex.headerTitle"), /知量/);
   });
 
   it("ships translator workflow scripts with stable CSV contract and validation", () => {
@@ -170,7 +235,7 @@ describe("central ICU i18n catalog", () => {
     assert.equal(zhCnCatalog["customer.landing.hero.accent"], "开始知量。");
     assert.equal(zhCnCatalog["customer.landing.questionnaire.cta"], "免费测我的健康评分");
     assert.equal(zhCnCatalog["customer.landing.journal.browse"], "浏览知识库");
-    assert.equal(zhCnCatalog["customer.landing.final.quote"], "Mattaññutā 知量，知健康。");
+    assert.equal(zhCnCatalog["customer.landing.final.quote"], "Mattaññutā — 知量，知健康。");
     assert.equal(zhCnCatalog["customer.titleBar.links.3.1"], "知识库");
     assert.equal(zhCnCatalog["customer.landing.results.fallback.2.name"], "Wanida P.（วนิดา）");
     assert.deepEqual(
@@ -187,10 +252,10 @@ describe("central ICU i18n catalog", () => {
   });
 
   it("keeps the live zh-CN quiz intro aligned with the supplied Mandarin brief", () => {
-    assert.equal(assessmentZhCn.about.title, "全是关于你");
+    assert.equal(assessmentZhCn.about.title, "一切答案，都在你身上");
     assert.equal(
       assessmentZhCn.about.subtitle,
-      "先了解你的基本情况。几步轻触即可开始。这将为你的知量方案奠定基础。"
+      "先明确自己的身体画像。轻松点几下，打个底——这是你自己的配方底盘，后面一切都从这儿出发。"
     );
     assert.equal(
       assessmentZhCn.about.honestyBody,
@@ -200,5 +265,6 @@ describe("central ICU i18n catalog", () => {
       assessmentUiCopy["zh-CN"].resume.body,
       "留下邮箱，我们会发送专属链接，方便你随时回来继续（仅用于此目的）。"
     );
+    assert.equal(assessmentUiCopy["zh-CN"].formulaPrecision, "配方精准度");
   });
 });
