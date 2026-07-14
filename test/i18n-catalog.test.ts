@@ -10,6 +10,7 @@ import zhCnCatalog from "../content/i18n/locales/zh-CN.json" with { type: "json"
 import zhCnRtfMatrix from "../content/i18n/reconciliation/zh-CN-rtf.json" with { type: "json" };
 import { zhCn as assessmentZhCn } from "../components/assessment-flow-copy-zh-cn.ts";
 import { assessmentUiCopy } from "../components/assessment-flow-copy.ts";
+import { pageCopy } from "../components/nutrition-flow/healthscore-panel-copy.ts";
 import {
   assertCatalogComplete,
   catalogIntegrityReport,
@@ -128,6 +129,83 @@ describe("central ICU i18n catalog", () => {
     );
     assert.match(t("th", "customer.libraryIndex.headerTitle"), /ปริมาณที่พอดี/);
     assert.match(t("zh-CN", "customer.libraryIndex.headerTitle"), /知量/);
+  });
+
+  it("keeps Thai public copy aligned to the pre-Mandarin-refresh baseline", () => {
+    assert.equal(
+      thCatalog["customer.footer.body"],
+      "แผนสุขภาพเฉพาะบุคคลที่ใช้ AI ช่วยออกแบบจากเชียงใหม่ เพื่อชีวิตในเอเชียตะวันออกเฉียงใต้ ภูมิปัญญาเดิม · วิทยาศาสตร์สมัยใหม่"
+    );
+    assert.equal(
+      thCatalog["customer.footer.copyright"],
+      "© 2026 MattaNutra · แผนสุขภาพเฉพาะบุคคลด้วย AI · เชียงใหม่ ประเทศไทย"
+    );
+    assert.equal(
+      thCatalog["customer.landing.hero.intro"],
+      "แผนอาหารเสริมและสุขภาพที่ใช้ AI ช่วยออกแบบให้เข้ากับร่างกาย ไลฟ์สไตล์ และเป้าหมายที่สำคัญกับคุณจริง ๆ และปรับตามชีวิตที่เปลี่ยนไป"
+    );
+    assert.equal(thCatalog["customer.landing.pricing.trust.3.0"], "AI + คนดูแล");
+    assert.equal(
+      thCatalog["customer.landing.pricing.trust.3.1"],
+      "คำแนะนำด้วย AI พร้อมระบบตรวจทานโดยคน"
+    );
+    assert.equal(
+      thCatalog["seo.routes.home.description"],
+      "แผนอาหารเสริมและสุขภาพเฉพาะบุคคลด้วย AI ออกแบบจากเชียงใหม่เพื่อชีวิตในเอเชียตะวันออกเฉียงใต้ เลิกเดา เริ่มรู้"
+    );
+
+    assert.equal(
+      thCatalog["customer.landing.origin.founders"],
+      "ก่อตั้งโดยแพทย์ นักวิทยาศาสตร์ และนักคิดด้าน AI"
+    );
+    assert.equal(
+      thCatalog["customer.landing.origin.founderParagraphs.0"],
+      "สิ่งที่เข้าสู่ร่างกายควรถูกออกแบบโดยคนที่เข้าใจว่าข้างในนั้นเกิดอะไรขึ้น"
+    );
+    assert.equal(
+      thCatalog["customer.landing.origin.founderParagraphs.1"],
+      "ทีมของเรามีพื้นฐานหลากหลายทั้งแพทยศาสตร์ วิทยาศาสตร์ เทคโนโลยี เศรษฐศาสตร์ และการสร้างสิ่งที่อยู่ได้นาน"
+    );
+    assert.equal(
+      thCatalog["customer.landing.origin.founderParagraphs.2"],
+      "รวมกันแล้วมีประสบการณ์มากกว่าร้อยปีในงานแพทย์ วิทยาศาสตร์ เทคโนโลยี และการสร้างสิ่งที่ใช้งานได้จริง"
+    );
+
+    assert.equal(
+      thCatalog["customer.landing.bridge.cta"],
+      "ออกแบบปริมาณที่พอดีของคุณ"
+    );
+    assert.equal(
+      thCatalog["customer.landing.results.cta"],
+      "ออกแบบปริมาณที่พอดีของคุณ"
+    );
+    assert.equal(
+      thCatalog["customer.landing.questionnaire.cta"],
+      "ออกแบบปริมาณที่พอดีของคุณ"
+    );
+
+    const healthScoreTh = pageCopy.th;
+
+    assert.equal(
+      healthScoreTh.trustCard[0].title,
+      "ผู้ก่อตั้งมีประสบการณ์รวมกว่า 100 ปี"
+    );
+    assert.equal(healthScoreTh.priceHero.ctaEyebrow, "เลือกขั้นต่อไป");
+    assert.equal(healthScoreTh.plans[0].cta, "รับสูตรปริมาณที่พอดี");
+    assert.equal(healthScoreTh.plans[1].cta, "เริ่ม Living Protocol");
+
+    assert.equal(thCatalog["customer.footer.columns.1.links.0.0"], "คลังความรู้ MattaNutra");
+    assert.equal(thCatalog["customer.footer.columns.1.links.0.1"], "/library");
+    assert.equal(thCatalog["customer.titleBar.links.3.0"], "/library");
+    assert.equal(thCatalog["customer.titleBar.links.3.1"], "คลังความรู้");
+
+    const publicThaiValues = Object.entries(thCatalog).filter(([id]) =>
+      /^(customer|seo|outbound)\./.test(id)
+    );
+
+    for (const [id, value] of publicThaiValues) {
+      assert.doesNotMatch(value, /\p{Script=Han}/u, `${id} contains Mandarin text`);
+    }
   });
 
   it("ships translator workflow scripts with stable CSV contract and validation", () => {
