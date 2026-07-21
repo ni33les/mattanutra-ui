@@ -21,9 +21,16 @@ import {
   finalizeAssessmentResumeDraft,
   finalizeAssessmentResumeDraftForContact
 } from "@/lib/assessment-resume-store";
+import { createLogger } from "@/lib/logger";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api.assessment");
 
 function reassessmentEmailFromAnswers(answers: unknown) {
   if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
@@ -65,6 +72,12 @@ function healthScoreBpmFields(snapshot: { healthScore?: ReturnType<typeof comput
 }
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, publicRateLimits.assessmentPost);
+
+  if (limited) {
+    return limited;
+  }
+
   let body: {
     answers?: unknown;
     contactEmail?: unknown;
@@ -202,7 +215,7 @@ export async function POST(request: Request) {
     }
 
   } catch (error) {
-    console.error("Unable to persist assessment submission", error);
+    log.error("Unable to persist assessment submission", { error });
     await writeBpmEvent({
       actorType: "system",
       attribution: bpm.attribution,

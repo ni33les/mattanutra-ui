@@ -34,10 +34,17 @@ export function shouldRedirectToHttps(input: {
     return false;
   }
 
+  // Prefer the first hop of x-forwarded-proto (DigitalOcean / reverse proxies).
+  // When the edge terminates TLS, the app often sees protocol "http:" while
+  // x-forwarded-proto is "https" — do not redirect that traffic.
   const forwardedProto = input.xForwardedProto
     ?.split(",")[0]
     ?.trim()
     .toLowerCase();
 
-  return forwardedProto === "http" || input.protocol === "http:";
+  if (forwardedProto === "https" || forwardedProto === "http") {
+    return forwardedProto === "http";
+  }
+
+  return input.protocol === "http:";
 }

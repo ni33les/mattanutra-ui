@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { writeBpmEvent } from "@/lib/bpm";
 import { isUuid } from "@/lib/assessment-store";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -17,6 +21,12 @@ function textOrNull(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, publicRateLimits.productClick);
+
+  if (limited) {
+    return limited;
+  }
+
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const planId = textOrNull(body.planId);
   const productId = textOrNull(body.productId);

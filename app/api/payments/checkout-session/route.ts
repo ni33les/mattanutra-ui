@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { queuePlatformAdminCommunication } from "@/lib/communications";
 import { isLocale } from "@/lib/i18n";
+import { createLogger } from "@/lib/logger";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 import {
   createStripeCheckoutSession,
   normalizePaymentPlan,
@@ -9,6 +14,8 @@ import {
 } from "@/lib/stripe-payments";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api.payments.checkout-session");
 
 function record(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -21,6 +28,12 @@ function text(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, publicRateLimits.checkoutSession);
+
+  if (limited) {
+    return limited;
+  }
+
   let body: Record<string, unknown> = {};
 
   try {
@@ -34,7 +47,7 @@ export async function POST(request: Request) {
   const planId = text(body.planId);
 
   if (!locale || !selectedPlan || (planId && !isUuid(planId))) {
-    console.warn("Invalid Stripe checkout session request", {
+    log.warn("Invalid Stripe checkout session request", {
       hasLocale: Boolean(locale),
       hasPlan: Boolean(selectedPlan),
       hasValidPlanId: !planId || isUuid(planId)
@@ -52,7 +65,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    console.info("Stripe checkout session requested", {
+    log.info("Stripe checkout session requested", {
       hasPlanId: Boolean(planId),
       locale,
       selectedPlan,
@@ -73,7 +86,7 @@ export async function POST(request: Request) {
       }
     });
   } catch (error) {
-    console.error("Unable to create Stripe checkout session", error);
+    log.error("Unable to create Stripe checkout session", { error });
     try {
       await queuePlatformAdminCommunication({
         eventKey: "platform_checkout_failed",
@@ -90,7 +103,9 @@ export async function POST(request: Request) {
         resourceType: isUuid(planId) ? "assessment_plan" : "checkout_session_request"
       });
     } catch (notificationError) {
-      console.warn("Unable to queue platform checkout failure notification", notificationError);
+      log.warn("Unable to queue platform checkout failure notification", {
+        error: notificationError
+      });
     }
 
     return NextResponse.json(

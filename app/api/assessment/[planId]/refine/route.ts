@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 import { enqueueNutritionPlanRefinementTask } from "@/lib/task-worker";
 
 type RefinePlanRouteProps = Readonly<{
@@ -10,9 +14,18 @@ type RefinePlanRouteProps = Readonly<{
 }>;
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: RefinePlanRouteProps
 ) {
+  const limited = enforceRateLimit(
+    request,
+    publicRateLimits.assessmentPlanMutation
+  );
+
+  if (limited) {
+    return limited;
+  }
+
   const { planId } = await params;
   const sql = getSql();
 

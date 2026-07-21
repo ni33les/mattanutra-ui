@@ -10,11 +10,27 @@ import {
 } from "@/lib/assessment-resume-store";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import { isLocale } from "@/lib/i18n";
+import { createLogger } from "@/lib/logger";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 
 export const runtime = "nodejs";
 
+const log = createLogger("api.assessment.resume-link");
+
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(
+    request,
+    publicRateLimits.assessmentResumeLink
+  );
+
+  if (limited) {
+    return limited;
+  }
+
   let body: {
     answers?: unknown;
     contactEmail?: unknown;
@@ -102,7 +118,9 @@ export async function POST(request: Request) {
     const schemaMissing = isAssessmentResumeSchemaError(error);
 
     if (schemaMissing) {
-      console.error("[assessment-resume] schema missing", error);
+      log.error("Assessment resume schema missing", { error });
+    } else {
+      log.warn("Assessment resume link failed", { error });
     }
 
     await writeBpmEvent({

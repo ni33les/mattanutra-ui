@@ -3,6 +3,10 @@ import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { normalizeProductStackPreference } from "@/lib/product-recommendations";
 import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
+import {
   enqueueFoodGapSupportTask,
   enqueueProductRecommendationsTask
 } from "@/lib/task-worker";
@@ -17,6 +21,15 @@ export async function POST(
   request: Request,
   { params }: ProductRecommendationsRouteProps
 ) {
+  const limited = enforceRateLimit(
+    request,
+    publicRateLimits.assessmentPlanMutation
+  );
+
+  if (limited) {
+    return limited;
+  }
+
   const { planId } = await params;
   const sql = getSql();
 

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { queuePlatformAdminCommunication } from "@/lib/communications";
+import { createLogger } from "@/lib/logger";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 import {
   createRetailCheckoutSession,
   isRetailCheckoutLocale,
@@ -8,6 +13,8 @@ import {
 } from "@/lib/retail-product-checkout";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api.retail.checkout.session");
 
 function record(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -22,6 +29,15 @@ function stringArray(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(
+    request,
+    publicRateLimits.retailCheckoutSession
+  );
+
+  if (limited) {
+    return limited;
+  }
+
   let body: Record<string, unknown> = {};
 
   try {
@@ -78,8 +94,12 @@ export async function POST(request: Request) {
         resourceType: isUuid(planId) ? "assessment_plan" : "retail_checkout_request"
       });
     } catch (notificationError) {
-      console.warn("Unable to queue platform retail checkout failure notification", notificationError);
+      log.warn("Unable to queue platform retail checkout failure notification", {
+        error: notificationError
+      });
     }
+
+    log.warn("Unable to create basket checkout", { error, planId });
 
     return NextResponse.json(
       {

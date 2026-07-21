@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 import { completeMockPayment } from "@/lib/stripe-payments";
 
 export const runtime = "nodejs";
@@ -13,6 +17,15 @@ export async function POST(
   request: Request,
   { params }: MockPaymentRouteProps
 ) {
+  const limited = enforceRateLimit(
+    request,
+    publicRateLimits.mockPaymentComplete
+  );
+
+  if (limited) {
+    return limited;
+  }
+
   const { paymentId } = await params;
 
   try {

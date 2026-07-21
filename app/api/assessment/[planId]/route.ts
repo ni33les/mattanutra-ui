@@ -21,9 +21,16 @@ import {
   finalizeAssessmentResumeDraft,
   finalizeAssessmentResumeDraftForContact
 } from "@/lib/assessment-resume-store";
+import { createLogger } from "@/lib/logger";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api.assessment.plan");
 
 function reassessmentEmailFromAnswers(answers: unknown) {
   if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
@@ -167,6 +174,15 @@ export async function PATCH(
   request: Request,
   { params }: AssessmentStatusRouteProps
 ) {
+  const limited = enforceRateLimit(
+    request,
+    publicRateLimits.assessmentPlanMutation
+  );
+
+  if (limited) {
+    return limited;
+  }
+
   const { planId } = await params;
   let body: {
     answers?: unknown;
@@ -346,7 +362,7 @@ export async function PATCH(
       }
     });
   } catch (error) {
-    console.error("Unable to persist assessment plan selection", error);
+    log.error("Unable to persist assessment plan selection", { error, planId });
     await writeBpmEvent({
       actorType: "system",
       attribution: bpm.attribution,

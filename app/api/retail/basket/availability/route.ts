@@ -8,6 +8,10 @@ import { writeBpmEvent } from "@/lib/bpm";
 import { isUuid } from "@/lib/assessment-store";
 import { isLocale } from "@/lib/i18n";
 import { normalizeProductCountryCode } from "@/lib/product-countries";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,6 +41,15 @@ function linesValue(value: unknown): RegionalBasketLineInput[] {
 }
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(
+    request,
+    publicRateLimits.retailBasketAvailability
+  );
+
+  if (limited) {
+    return limited;
+  }
+
   let body: Record<string, unknown>;
 
   try {

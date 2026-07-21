@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/logger";
 import {
   handleStripeWebhookPayload,
   normalizeStripeWebhookPayloadShape
 } from "@/lib/stripe-payments";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api.stripe.webhook");
 
 type StripeWebhookRouteProps = Readonly<{
   params: Promise<{
@@ -48,7 +51,7 @@ export async function POST(
       }
     });
   } catch (error) {
-    console.error("Stripe webhook failed", error);
+    log.error("Stripe webhook failed", { error, payloadShape });
 
     return NextResponse.json(
       {

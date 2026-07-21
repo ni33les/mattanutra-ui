@@ -5,6 +5,10 @@ import {
   type BpmSeverity
 } from "@/lib/bpm";
 import { isLocale } from "@/lib/i18n";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -27,6 +31,12 @@ function eventType(value: unknown): BpmEventType | undefined {
 }
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, publicRateLimits.bpmPost);
+
+  if (limited) {
+    return limited;
+  }
+
   let body: Record<string, unknown> = {};
 
   try {

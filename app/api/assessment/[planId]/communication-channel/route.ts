@@ -7,6 +7,10 @@ import {
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import { validateLeadEmail } from "@/lib/email-validation";
+import {
+  enforceRateLimit,
+  publicRateLimits
+} from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -68,6 +72,15 @@ export async function POST(
   request: Request,
   { params }: CommunicationChannelRouteProps
 ) {
+  const limited = enforceRateLimit(
+    request,
+    publicRateLimits.assessmentPlanMutation
+  );
+
+  if (limited) {
+    return limited;
+  }
+
   const { planId } = await params;
 
   if (!isUuid(planId)) {
