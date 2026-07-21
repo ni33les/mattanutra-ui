@@ -1348,6 +1348,10 @@ describe("product coverage workflow", () => {
       "components/admin/product-coverage-view.tsx",
       "utf8"
     );
+    const viewHelpers = readFileSync(
+      "components/admin/product-coverage-view-helpers.ts",
+      "utf8"
+    );
     const simulationInputRoute = readFileSync(
       "app/api/admin/product-coverage/simulation-input/route.ts",
       "utf8"
@@ -1472,33 +1476,38 @@ describe("product coverage workflow", () => {
     assert.match(schema, /status = ANY \(ARRAY\['allowed'::text, 'blocked'::text\]\)/);
     assert.match(simulationModel, /recommendProductStackFullBeam/);
     assert.match(simulationModel, /demandProfiles/);
-    assert.match(view, /SIMULATOR_STORAGE_KEY/);
-    assert.match(view, /admin-plan-coverage-simulator:v4/);
-    assert.match(view, /SIMULATOR_DEMAND_STORAGE_KEY/);
-    assert.match(view, /SIMULATOR_DURABLE_DB_NAME/);
-    assert.match(view, /window\.indexedDB\.open/);
-    assert.match(view, /durableSimulationKey/);
-    assert.match(view, /durableOptimizationKey/);
-    assert.match(view, /saveSimulationStateToDurable/);
-    assert.match(view, /loadSavedSimulationStateFromDurable/);
-    assert.match(view, /loadSavedCatalogueOptimizationFromDurable/);
-    assert.match(view, /supplementGovernanceHash: data\.input\.supplementGovernanceHash/);
+    // Durable storage + pure helpers live in product-coverage-view-helpers.
+    assert.match(viewHelpers, /SIMULATOR_STORAGE_KEY/);
+    assert.match(viewHelpers, /admin-plan-coverage-simulator:v4/);
+    assert.match(viewHelpers, /SIMULATOR_DEMAND_STORAGE_KEY/);
+    assert.match(viewHelpers, /SIMULATOR_DURABLE_DB_NAME/);
+    assert.match(viewHelpers, /window\.indexedDB\.open/);
+    assert.match(viewHelpers, /durableSimulationKey/);
+    assert.match(viewHelpers, /durableOptimizationKey/);
+    assert.match(viewHelpers, /saveSimulationStateToDurable/);
+    assert.match(viewHelpers, /loadSavedSimulationStateFromDurable/);
+    assert.match(viewHelpers, /loadSavedCatalogueOptimizationFromDurable/);
+    assert.match(viewHelpers, /type SavedDemandProfilesEntry/);
+    assert.match(viewHelpers, /savedDemandProfileEntriesFromStorage/);
+    assert.match(viewHelpers, /version: 3\s*\n\s*}\s+satisfies SavedDemandProfilesState/);
+    assert.match(viewHelpers, /function loadSavedDemandProfiles\(expectedDemandKey\?: string\)/);
+    assert.match(viewHelpers, /entry\.demandKey === expectedDemandKey/);
+    assert.match(viewHelpers, /existingEntry\.profiles\.length > currentProfiles\.length/);
+    assert.match(viewHelpers, /function savedDemandProfiles/);
+    assert.match(viewHelpers, /SIMULATOR_INPUT_TIMEOUT_MS/);
+    assert.match(viewHelpers, /version: 5/);
+    assert.match(viewHelpers, /function productResultRows/);
+    assert.match(viewHelpers, /supplementGovernanceHash: data\.input\.supplementGovernanceHash/);
     assert.doesNotMatch(view, /demandProfiles: data\.input\.demandProfiles\.map/);
     assert.match(view, /sanitizeDemandProfilesForSimulationSupplements/);
-    assert.match(view, /type SavedDemandProfilesEntry/);
-    assert.match(view, /savedDemandProfileEntriesFromStorage/);
-    assert.match(view, /version: 3\s*\n\s*}\s+satisfies SavedDemandProfilesState/);
-    assert.match(view, /function loadSavedDemandProfiles\(expectedDemandKey\?: string\)/);
-    assert.match(view, /entry\.demandKey === expectedDemandKey/);
     assert.match(view, /saveDemandProfiles\(demandKey, savedProfiles\)/);
     assert.match(view, /saveSimulationState\(inputKey, runner, \{ demandKey \}\)/);
     assert.doesNotMatch(view, /saveSimulationState\(simulationInputKey\(nextData\), runner\)/);
-    assert.match(view, /existingEntry\.profiles\.length > currentProfiles\.length/);
-    assert.match(view, /pruneSavedDemandProfileEntries\(options\?\.demandKey\)/);
-    assert.match(view, /pruneSavedCatalogueOptimizationEntries\(0\)/);
+    assert.match(viewHelpers, /pruneSavedDemandProfileEntries\(options\?\.demandKey\)/);
+    assert.match(viewHelpers, /pruneSavedCatalogueOptimizationEntries\(0\)/);
+    assert.match(viewHelpers, /return writeSavedSimulationState\(nextState\)/);
+    assert.match(viewHelpers, /\.slice\(0, 2\)/);
     assert.match(view, /clearSavedDemandProfiles\(\)/);
-    assert.match(view, /return writeSavedSimulationState\(nextState\)/);
-    assert.match(view, /\.slice\(0, 2\)/);
     assert.match(view, /const shouldReplaceVisibleData = !hydrated \|\| !sameSelectedCountry/);
     assert.match(view, /shouldReplaceVisibleData \? current && sameSelectedCountry : current/);
     assert.match(view, /setInputData\(payload\)/);
@@ -1508,18 +1517,14 @@ describe("product coverage workflow", () => {
     );
     assert.doesNotMatch(view, /parsed\.demandKey !== expectedDemandKey/);
     assert.doesNotMatch(view, /useState<\s*AdminPlanCoverageDemandProfile\[\]\s*>\(\s*loadSavedDemandProfiles\s*\)/);
-    assert.match(view, /function savedDemandProfiles/);
-    assert.match(view, /clearSavedDemandProfiles\(\)/);
-    assert.match(view, /\/api\/admin\/product-coverage\/simulation-input/);
+    assert.match(viewHelpers, /\/api\/admin\/product-coverage\/simulation-input/);
     assert.match(view, /cache: "no-store"/);
     assert.match(view, /inputStatus !== "ready"/);
-    assert.match(view, /SIMULATOR_INPUT_TIMEOUT_MS/);
     assert.match(view, /new AbortController\(\)/);
     assert.match(view, /signal: controller\.signal/);
     assert.match(view, /inputStatusRef\.current === "loading"/);
     assert.match(view, /retrySimulatorInput/);
     assert.match(view, />\s*Retry\s*</);
-    assert.match(view, /version: 5/);
     assert.match(view, /sampleTraces/);
     assert.match(view, /runnerInputKeyRef/);
     assert.match(view, /simulationDataRef/);
@@ -1541,8 +1546,8 @@ describe("product coverage workflow", () => {
     assert.match(view, /window\.addEventListener\("pageshow"/);
     assert.match(view, /visibilitychange/);
     assert.match(view, /eligible products/);
-    assert.match(view, /\/api\/admin\/product-coverage\/demand-profile/);
-    assert.match(view, /\/api\/admin\/product-coverage\/demand-profiles/);
+    assert.match(viewHelpers, /\/api\/admin\/product-coverage\/demand-profile/);
+    assert.match(viewHelpers, /\/api\/admin\/product-coverage\/demand-profiles/);
     assert.match(view, /fetchCachedDemandProfilesForSamples/);
     assert.match(view, /answerHitSampleIndexes/);
     assert.match(view, /generated this run/);
@@ -1572,7 +1577,7 @@ describe("product coverage workflow", () => {
     assert.match(view, /productCountryOptions/);
     assert.match(view, /changeSimulatorCountry/);
     assert.match(view, /updateSimulatorCountryUrl/);
-    assert.match(view, /mode === "optimisation" \? "product-optimisation" : "plan-coverage-simulator"/);
+    assert.match(viewHelpers, /mode === "optimisation" \? "product-optimisation" : "plan-coverage-simulator"/);
     assert.match(view, /popstate/);
     assert.match(view, /Product performance/);
     assert.match(view, /Optimum product basket/);
@@ -1585,10 +1590,10 @@ describe("product coverage workflow", () => {
     assert.match(view, /productOptimisationMode \? \(/);
     assert.doesNotMatch(view, /catalogueOptimizationHref/);
     assert.match(view, /catalogueOptimizationJobHref/);
-    assert.match(view, /\/api\/admin\/product-coverage\/catalogue-optimization\/jobs/);
+    assert.match(viewHelpers, /\/api\/admin\/product-coverage\/catalogue-optimization\/jobs/);
     assert.match(view, /Starting shared optimum basket job/);
-    assert.match(view, /Preparing potential catalogue/);
-    assert.match(view, /Evaluating potential basket/);
+    assert.match(viewHelpers, /Preparing potential catalogue/);
+    assert.match(viewHelpers, /Evaluating potential basket/);
     assert.match(view, /productOptimisationSimulationComplete/);
     assert.match(view, /simulationData\.sampleSize >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES/);
     assert.match(view, /simulationData\.sampleTraces\.length >= ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES/);
@@ -1618,19 +1623,19 @@ describe("product coverage workflow", () => {
     assert.match(view, /durationText/);
     assert.match(view, /Optimum basket request failed/);
     assert.doesNotMatch(view, /Minimum catalogue request failed/);
-    assert.match(view, /SIMULATOR_OPTIMIZATION_STORAGE_KEY/);
+    assert.match(viewHelpers, /SIMULATOR_OPTIMIZATION_STORAGE_KEY/);
     assert.match(view, /saveCatalogueOptimization/);
     assert.match(view, /loadSavedCatalogueOptimization/);
     assert.match(view, /requestCatalogueOptimizationJob/);
     assert.match(view, /applyCatalogueOptimizationJob/);
     assert.match(view, /saveSimulationState\(inputKey, runnerRef\.current, \{ demandKey \}\)/);
     assert.match(view, /catalogueOptimizationJobCachedProgress/);
-    assert.match(view, /cacheKey: job\.cacheKey/);
+    assert.match(viewHelpers, /cacheKey: job\.cacheKey/);
     assert.match(view, /catalogueOptimizationCachedProgress\?\.cacheKey === catalogueOptimizationRunKey/);
     assert.match(view, /job\.cacheKey === requestKey \? job : null/);
     assert.match(view, /restoreSavedSimulationIfNewer\(\s*job\.optimization\.sampleSize/);
     assert.match(view, /cacheKey: requestKey/);
-    assert.match(view, /existing\.sampleSize > runner\.sampleSize/);
+    assert.match(viewHelpers, /existing\.sampleSize > runner\.sampleSize/);
     assert.match(view, /Include pending-review products/);
     assert.doesNotMatch(
       view,
@@ -1739,7 +1744,7 @@ describe("product coverage workflow", () => {
     assert.match(view, /\["cost", deltas\.expectedCostPercent\]/);
     assert.doesNotMatch(view, /changed average coverage by/);
     assert.match(view, /Useful runs/);
-    assert.match(view, /version: 5/);
+    assert.match(viewHelpers, /version: 5/);
     assert.match(simulationModel, /AdminPlanCoverageSimulationConvergence/);
     assert.match(simulationModel, /AdminCatalogueOptimizationData/);
     assert.match(simulationModel, /AdminCataloguePotentialOptimizationData/);
