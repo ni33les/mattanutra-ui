@@ -43,6 +43,7 @@ test("revoked admin passkeys cannot be used or reactivated by registration", () 
 
 test("owner passkey recovery revokes passkeys and sessions before issuing one-time invite", () => {
   const access = source("lib/admin-access.ts");
+  const shared = source("lib/admin-access-shared.ts");
   const route = source("app/api/admin/access/route.ts");
   const view = source("components/admin/access-view.tsx");
 
@@ -57,7 +58,7 @@ test("owner passkey recovery revokes passkeys and sessions before issuing one-ti
   assert.match(access, /status = 'revoked'[\s\S]*revoked_invitation_id = invite\.id::uuid/);
   assert.match(access, /with target as \(/);
   assert.match(access, /update public\.admin_sessions[\s\S]*set revoked_at = coalesce\(revoked_at, now\(\)\)/);
-  assert.match(access, /const recoveryInviteMinutes = 60/);
+  assert.match(shared, /const recoveryInviteMinutes = 60/);
   assert.match(access, /admin\.passkey_recovery_started/);
   assert.match(access, /admin\.passkey_recovery_accepted/);
 
