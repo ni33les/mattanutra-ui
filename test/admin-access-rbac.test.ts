@@ -246,6 +246,7 @@ describe("admin RBAC", () => {
 	  it("authenticates agent keys through active organisation memberships", () => {
 	    const resolver = readFileSync("lib/access-principal.ts", "utf8");
 	    const access = readFileSync("lib/admin-access.ts", "utf8");
+	    const agents = readFileSync("lib/admin-access-agents.ts", "utf8");
 	    const route = readFileSync("app/api/admin/access/route.ts", "utf8");
 	    const accessView = readFileSync("components/admin/access-view.tsx", "utf8");
 	    const stockPlanner = readFileSync("lib/retail-stock-planner-agent.ts", "utf8");
@@ -256,13 +257,15 @@ describe("admin RBAC", () => {
 	    assert.match(resolver, /organisation_memberships\.id = agent_credentials\.membership_id/);
 	    assert.match(resolver, /organisation_memberships\.status = 'active'/);
 	    assert.match(resolver, /membershipId: row\.membership_id/);
-    assert.match(access, /export async function inviteAgent/);
-    assert.match(access, /action: "admin\.agent_invited"/);
-    assert.match(access, /export async function addAgentMembership/);
-    assert.match(access, /action: "admin\.agent_membership_added"/);
-    assert.match(access, /export async function deleteAgentMembership/);
-    assert.match(access, /status = 'deleted'/);
-	    assert.match(access, /resourceType: "agent_credential"/);
+    // Agent lifecycle lives in admin-access-agents; facade re-exports from admin-access.
+    assert.match(agents, /export async function inviteAgent/);
+    assert.match(agents, /action: "admin\.agent_invited"/);
+    assert.match(agents, /export async function addAgentMembership/);
+    assert.match(agents, /action: "admin\.agent_membership_added"/);
+    assert.match(agents, /export async function deleteAgentMembership/);
+    assert.match(agents, /status = 'deleted'/);
+	    assert.match(agents, /resourceType: "agent_credential"/);
+    assert.match(access, /export \{\s*[\s\S]*inviteAgent[\s\S]*\} from "@\/lib\/admin-access-agents"/);
 	    assert.match(route, /action === "invite_agent"/);
 	    assert.match(route, /action === "add_agent_membership"/);
 	    assert.match(route, /membershipId: text\(body\.membershipId\)/);
@@ -392,6 +395,7 @@ describe("admin RBAC", () => {
 
   it("audits every successful RBAC mutation path with clear admin actions", () => {
     const access = readFileSync("lib/admin-access.ts", "utf8");
+    const agents = readFileSync("lib/admin-access-agents.ts", "utf8");
     const route = readFileSync("app/api/admin/access/route.ts", "utf8");
     const shared = readFileSync("components/admin/dashboard-shared.tsx", "utf8");
 
@@ -405,11 +409,11 @@ describe("admin RBAC", () => {
     assert.match(access, /action: "admin\.membership_deleted"/);
     assert.match(access, /action: "admin\.invite_created"/);
     assert.match(access, /action: "admin\.invite_deleted"/);
-    assert.match(access, /action: "admin\.agent_invited"/);
-    assert.match(access, /action: "admin\.agent_membership_added"/);
-    assert.match(access, /action: "admin\.agent_membership_updated"/);
-    assert.match(access, /action: "admin\.agent_credential_generated"/);
-    assert.match(access, /action: "admin\.agent_credential_revoked"/);
+    assert.match(agents, /action: "admin\.agent_invited"/);
+    assert.match(agents, /action: "admin\.agent_membership_added"/);
+    assert.match(agents, /action: "admin\.agent_membership_updated"/);
+    assert.match(agents, /action: "admin\.agent_credential_generated"/);
+    assert.match(agents, /action: "admin\.agent_credential_revoked"/);
     assert.match(shared, /replaceAll\("\.", " "\)/);
   });
 
