@@ -8,7 +8,7 @@ type LegacyBlogArticlePageProps = Readonly<{
   }>;
 }>;
 
-export const dynamic = "force-dynamic";
+// Legacy blog URLs permanently redirect to library; no dynamic data needed.
 
 export default async function LegacyBlogArticlePage({
   params

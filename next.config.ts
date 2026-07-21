@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { localeRoutePattern } from "./lib/i18n";
 import { firstPartyImageHosts } from "./lib/first-party-image-rules";
+import { noStoreLocaleRootSegments } from "./lib/public-cache-policy";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 const skipBuildTypecheck = process.env.NEXT_BUILD_SKIP_TYPECHECK === "1";
@@ -21,6 +22,20 @@ const noStoreHeaders = [
     value: "no-store"
   }
 ];
+
+/** No-store only on personal/admin/funnel segments — not all locale routes. */
+const localeNoStoreHeaderSources = noStoreLocaleRootSegments.flatMap(
+  (segment) => [
+    {
+      headers: noStoreHeaders,
+      source: `/:locale(${publicLocaleRoutePattern})/${segment}`
+    },
+    {
+      headers: noStoreHeaders,
+      source: `/:locale(${publicLocaleRoutePattern})/${segment}/:path*`
+    }
+  ]
+);
 
 const imageRemotePatterns = [
   ...firstPartyImageHosts.map((hostname) => ({
@@ -130,14 +145,7 @@ const nextConfig: NextConfig = {
         ],
         source: "/uploads/:path*"
       },
-      {
-        headers: noStoreHeaders,
-        source: `/:locale(${publicLocaleRoutePattern})`
-      },
-      {
-        headers: noStoreHeaders,
-        source: `/:locale(${publicLocaleRoutePattern})/:path*`
-      },
+      ...localeNoStoreHeaderSources,
       {
         headers: noStoreHeaders,
         source: "/api/:path*"

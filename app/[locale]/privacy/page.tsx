@@ -17,6 +17,9 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
+// Static legal copy; long revalidate is fine if content ever becomes DB-backed.
+export const revalidate = 3600;
+
 export async function generateMetadata({
   params
 }: PrivacyPageProps): Promise<Metadata> {

@@ -32,7 +32,10 @@ type ArticleCta = {
   title: string;
 };
 
-export const dynamic = "force-dynamic";
+// Library articles are public content; revalidate rather than force-dynamic.
+// Keep in sync with marketingPageRevalidateSeconds in lib/public-cache-policy.ts
+// (Next segment config requires a static numeric literal).
+export const revalidate = 300;
 
 function getArticleCta(locale: LocaleCode) {
   return {

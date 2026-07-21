@@ -399,8 +399,24 @@ describe("landing page v16 library-only port", () => {
     assert.match(nextConfig, /minimumCacheTTL:\s*31536000/);
     assert.match(nextConfig, /source:\s*"\/assets\/library\/:path\*"/);
     assert.match(nextConfig, /public,\s*max-age=31536000,\s*immutable/);
-    assert.match(nextConfig, /source:\s*`\/:locale\(\$\{publicLocaleRoutePattern\}\)\/:path\*`/);
+    // No-store is scoped to personal/admin funnel segments only, not all locale paths.
+    assert.match(nextConfig, /noStoreLocaleRootSegments/);
+    assert.match(nextConfig, /localeNoStoreHeaderSources/);
     assert.match(nextConfig, /private,\s*no-store,\s*no-cache/);
+    assert.doesNotMatch(
+      nextConfig,
+      /source:\s*`\/:locale\(\$\{publicLocaleRoutePattern\}\)\/:path\*`/
+    );
+  });
+
+  it("keeps marketing pages on ISR instead of layout-wide force-dynamic", () => {
+    assert.doesNotMatch(homepage, /export const dynamic = "force-dynamic"/);
+    assert.match(homepage, /export const revalidate = 300/);
+    assert.doesNotMatch(libraryIndexPage, /export const dynamic = "force-dynamic"/);
+    assert.match(libraryIndexPage, /export const revalidate = 300/);
+    assert.doesNotMatch(libraryArticlePage, /export const dynamic = "force-dynamic"/);
+    assert.match(libraryArticlePage, /export const revalidate = 300/);
+    assert.doesNotMatch(legacyBlogArticlePage, /export const dynamic = "force-dynamic"/);
   });
 
   it("keeps sitemap, robots, analytics, and admin preview links Library-oriented", () => {
@@ -408,6 +424,8 @@ describe("landing page v16 library-only port", () => {
     assert.match(sitemapSource, /`\/\$\{locale\}\/library`/);
     assert.doesNotMatch(sitemapSource, /\/blog\//);
     assert.match(robotsSource, /sitemap:\s*absoluteUrl\("\/sitemap\.xml"\)/);
+    assert.match(robotsSource, /robotsDisallowPaths/);
+    assert.match(robotsSource, /disallow:\s*robotsDisallowPaths\(\)/);
     assert.match(bpmTracker, /\/library\//);
     assert.match(bpmTracker, /library_article_viewed/);
     assert.match(adminContentView, /\/library\//);

@@ -6,6 +6,7 @@ import {
   type Locale
 } from "@/lib/i18n";
 import { shouldRedirectToHttps } from "@/lib/https-redirect";
+import { localePathRequiresNoStore } from "@/lib/public-cache-policy";
 
 const publicFile = /\.(.*)$/;
 const removedLocales = new Set(["es"]);
@@ -107,7 +108,15 @@ export function proxy(request: NextRequest) {
   const pathnameLocale = pathname.split("/")[1];
 
   if (isLocale(pathnameLocale)) {
-    return withNoStore(NextResponse.next());
+    const response = NextResponse.next();
+
+    // Only stamp no-store on personal/admin/funnel locale paths.
+    // Marketing pages (home, library, terms, privacy) keep default/ISR cache policy.
+    if (localePathRequiresNoStore(pathname)) {
+      return withNoStore(response);
+    }
+
+    return response;
   }
 
   if (removedLocales.has(pathnameLocale)) {
@@ -116,6 +125,7 @@ export function proxy(request: NextRequest) {
 
   const locale = getPreferredLocale(request);
 
+  // Locale redirects stay no-store so preference changes are not sticky-cached.
   return redirectToPath(
     request,
     `/${locale}${pathname === "/" ? "" : pathname}`,

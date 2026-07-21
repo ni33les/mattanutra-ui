@@ -18,7 +18,9 @@ import {
   localeHtmlLang
 } from "@/lib/i18n";
 
-export const dynamic = "force-dynamic";
+// Marketing pages under this layout use ISR / default caching.
+// Personal funnels (admin, assessment, basket, nutrition, order) set
+// force-dynamic on their own route segments.
 
 type LocaleLayoutProps = Readonly<{
   children: ReactNode;

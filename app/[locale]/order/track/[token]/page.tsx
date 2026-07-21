@@ -209,6 +209,9 @@ function latestEta(lines: readonly { etaDate: string | null }[]) {
     .at(-1) ?? null;
 }
 
+// Personal order tracking — never cache at the route layer.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale: raw } = await params;
   const locale: Locale = isLocale(raw) ? raw : "en";

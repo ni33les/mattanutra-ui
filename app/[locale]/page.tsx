@@ -23,7 +23,10 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-export const dynamic = "force-dynamic";
+// Homepage is marketing content: short ISR so testimonials / library teasers refresh.
+// Keep in sync with marketingPageRevalidateSeconds in lib/public-cache-policy.ts
+// (Next segment config requires a static numeric literal).
+export const revalidate = 300;
 
 function isProductionBuildPhase() {
   return process.env.NEXT_PHASE === "phase-production-build";
