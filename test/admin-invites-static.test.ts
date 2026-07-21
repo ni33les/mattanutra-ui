@@ -27,14 +27,17 @@ test("admin invites do not silently overwrite existing membership roles", () => 
 
 test("admin invites can recover existing members who still need a passkey", () => {
   const access = source("lib/admin-access.ts");
+  const auth = source("lib/admin-access-auth.ts");
 
   assert.match(access, /admin_passkey_credentials credentials/);
   assert.match(access, /passkeyCount < 1/);
   assert.match(access, /shouldCreatePasskeyInviteForExistingMember = true/);
   assert.match(access, /admin\.invite_existing_member_passkey/);
-  assert.match(access, /when public\.organisation_memberships\.status = 'invited' then excluded\.role/);
-  assert.match(access, /when public\.organisation_memberships\.status = 'invited' then 'active'/);
+  // Invited membership activation on first passkey registration lives in auth.
+  assert.match(auth, /when public\.organisation_memberships\.status = 'invited' then excluded\.role/);
+  assert.match(auth, /when public\.organisation_memberships\.status = 'invited' then 'active'/);
   assert.doesNotMatch(access, /role\s*=\s*excluded\.role/);
+  assert.doesNotMatch(auth, /role\s*=\s*excluded\.role/);
 });
 
 test("admin invite login renders setup and sign-in as exclusive modes", () => {

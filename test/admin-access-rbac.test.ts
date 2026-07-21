@@ -422,6 +422,7 @@ describe("admin RBAC", () => {
 
   it("expires and deletes pending admin invitations before they can be accepted", () => {
     const access = readFileSync("lib/admin-access.ts", "utf8");
+    const auth = readFileSync("lib/admin-access-auth.ts", "utf8");
     const shared = readFileSync("lib/admin-access-shared.ts", "utf8");
     const route = readFileSync("app/api/admin/access/route.ts", "utf8");
 
@@ -431,7 +432,7 @@ describe("admin RBAC", () => {
     assert.match(access, /export async function deleteAdminInvitation/);
     assert.match(access, /status in \('pending', 'expired'\)/);
     assert.match(access, /set status = 'revoked', updated_at = now\(\)/);
-    assert.match(access, /Registration invite expired or was deleted/);
+    assert.match(auth, /Registration invite expired or was deleted/);
     assert.match(route, /action === "delete_invitation"/);
     assert.match(route, /deleteAdminInvitation/);
   });
@@ -470,9 +471,11 @@ describe("admin RBAC", () => {
   });
 
   it("stores admin access metadata as JSON objects, not encoded JSON strings", () => {
-    const source = readFileSync("lib/admin-access.ts", "utf8");
+    const access = readFileSync("lib/admin-access.ts", "utf8");
+    const auth = readFileSync("lib/admin-access-auth.ts", "utf8");
+    const surface = `${access}\n${auth}`;
 
-    assert.doesNotMatch(source, /JSON\.stringify\([^)]*metadata[^)]*\)::jsonb/);
-    assert.match(source, /\$\{sql\.json\(toJsonValue\(metadata \?\? \{\}\)\)\}::jsonb/);
+    assert.doesNotMatch(surface, /JSON\.stringify\([^)]*metadata[^)]*\)::jsonb/);
+    assert.match(surface, /\$\{sql\.json\(toJsonValue\(metadata \?\? \{\}\)\)\}::jsonb/);
   });
 });

@@ -32,35 +32,37 @@ test("admin passkey schema supports revocation without deleting credentials", ()
 });
 
 test("revoked admin passkeys cannot be used or reactivated by registration", () => {
-  const access = source("lib/admin-access.ts");
+  const auth = source("lib/admin-access-auth.ts");
 
-  assert.match(access, /where person_id = \$\{personId\}::uuid[\s\S]*status = 'active'[\s\S]*revoked_at is null/);
-  assert.match(access, /where credential_id = \$\{credentialId\}[\s\S]*status = 'active'[\s\S]*revoked_at is null/);
-  assert.match(access, /on conflict \(credential_id\) do nothing/);
-  assert.match(access, /already registered or was previously revoked/);
-  assert.doesNotMatch(access, /admin_passkey_credentials[\s\S]{0,900}on conflict \(credential_id\) do update set/);
+  assert.match(auth, /where person_id = \$\{personId\}::uuid[\s\S]*status = 'active'[\s\S]*revoked_at is null/);
+  assert.match(auth, /where credential_id = \$\{credentialId\}[\s\S]*status = 'active'[\s\S]*revoked_at is null/);
+  assert.match(auth, /on conflict \(credential_id\) do nothing/);
+  assert.match(auth, /already registered or was previously revoked/);
+  assert.doesNotMatch(auth, /admin_passkey_credentials[\s\S]{0,900}on conflict \(credential_id\) do update set/);
 });
 
 test("owner passkey recovery revokes passkeys and sessions before issuing one-time invite", () => {
   const access = source("lib/admin-access.ts");
+  const auth = source("lib/admin-access-auth.ts");
   const shared = source("lib/admin-access-shared.ts");
   const route = source("app/api/admin/access/route.ts");
   const view = source("components/admin/access-view.tsx");
 
-  assert.match(access, /export async function createAdminPasskeyRecovery/);
-  assert.match(access, /actor\.isLegacy/);
-  assert.match(access, /actor\.actorMembership\.role !== "platform_owner"/);
-  assert.match(access, /actor\.actorPerson\.id === personId/);
-  assert.match(access, /metadata->>'reason' = 'passkey_recovery'/);
-  assert.match(access, /'revokedByPersonId', \$\{actor\.actorPerson\.id\}::text/);
-  assert.match(access, /'source', \$\{source\}::text/);
-  assert.match(access, /'revokedSource', \$\{source\}::text/);
-  assert.match(access, /status = 'revoked'[\s\S]*revoked_invitation_id = invite\.id::uuid/);
-  assert.match(access, /with target as \(/);
-  assert.match(access, /update public\.admin_sessions[\s\S]*set revoked_at = coalesce\(revoked_at, now\(\)\)/);
+  assert.match(access, /createAdminPasskeyRecovery/);
+  assert.match(auth, /export async function createAdminPasskeyRecovery/);
+  assert.match(auth, /actor\.isLegacy/);
+  assert.match(auth, /actor\.actorMembership\.role !== "platform_owner"/);
+  assert.match(auth, /actor\.actorPerson\.id === personId/);
+  assert.match(auth, /metadata->>'reason' = 'passkey_recovery'/);
+  assert.match(auth, /'revokedByPersonId', \$\{actor\.actorPerson\.id\}::text/);
+  assert.match(auth, /'source', \$\{source\}::text/);
+  assert.match(auth, /'revokedSource', \$\{source\}::text/);
+  assert.match(auth, /status = 'revoked'[\s\S]*revoked_invitation_id = invite\.id::uuid/);
+  assert.match(auth, /with target as \(/);
+  assert.match(auth, /update public\.admin_sessions[\s\S]*set revoked_at = coalesce\(revoked_at, now\(\)\)/);
   assert.match(shared, /const recoveryInviteMinutes = 60/);
-  assert.match(access, /admin\.passkey_recovery_started/);
-  assert.match(access, /admin\.passkey_recovery_accepted/);
+  assert.match(auth, /admin\.passkey_recovery_started/);
+  assert.match(auth, /admin\.passkey_recovery_accepted/);
 
   assert.match(route, /action === "recover_passkey"/);
   assert.match(route, /context\.isLegacy/);
@@ -125,15 +127,18 @@ test("passkey recovery modal copy is localized for admin access views", () => {
 
 test("admins can add an extra passkey only from an existing passkey session", () => {
   const access = source("lib/admin-access.ts");
+  const auth = source("lib/admin-access-auth.ts");
   const optionsRoute = source("app/api/admin/auth/passkey/add/options/route.ts");
   const verifyRoute = source("app/api/admin/auth/passkey/add/verify/route.ts");
   const settings = source("components/admin/settings-view.tsx");
 
   assert.match(access, /createAdditionalPasskeyRegistrationOptions/);
   assert.match(access, /verifyAdditionalPasskeyRegistration/);
-  assert.match(access, /context\.isLegacy/);
-  assert.match(access, /mode: "add_passkey"/);
-  assert.match(access, /admin\.passkey_added/);
+  assert.match(auth, /export async function createAdditionalPasskeyRegistrationOptions/);
+  assert.match(auth, /export async function verifyAdditionalPasskeyRegistration/);
+  assert.match(auth, /context\.isLegacy/);
+  assert.match(auth, /mode: "add_passkey"/);
+  assert.match(auth, /admin\.passkey_added/);
   assert.match(optionsRoute, /resolveAdminSession/);
   assert.match(verifyRoute, /resolveAdminSession/);
   assert.match(settings, /startRegistration/);
