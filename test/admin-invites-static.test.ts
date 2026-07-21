@@ -11,14 +11,16 @@ function source(path: string) {
 
 test("admin invites do not silently overwrite existing membership roles", () => {
   const access = source("lib/admin-access.ts");
+  const invites = source("lib/admin-access-invites.ts");
   const route = source("app/api/admin/access/route.ts");
   const view = source("components/admin/access-view.tsx");
 
-  assert.match(access, /existingAccess/);
-  assert.match(access, /membershipAdded/);
-  assert.match(access, /admin\.invite_existing_member_blocked/);
-  assert.match(access, /admin\.membership_added/);
-  assert.doesNotMatch(access, /role\s*=\s*excluded\.role/);
+  assert.match(access, /createAdminInvitation/);
+  assert.match(invites, /existingAccess/);
+  assert.match(invites, /membershipAdded/);
+  assert.match(invites, /admin\.invite_existing_member_blocked/);
+  assert.match(invites, /admin\.membership_added/);
+  assert.doesNotMatch(invites, /role\s*=\s*excluded\.role/);
   assert.match(route, /const invitationResult = await createAdminInvitation/);
   assert.match(route, /accessResponse\(request, context, invitationResult\)/);
   assert.match(view, /labels\.access\.alreadyMember/);
@@ -26,17 +28,17 @@ test("admin invites do not silently overwrite existing membership roles", () => 
 });
 
 test("admin invites can recover existing members who still need a passkey", () => {
-  const access = source("lib/admin-access.ts");
+  const invites = source("lib/admin-access-invites.ts");
   const auth = source("lib/admin-access-auth.ts");
 
-  assert.match(access, /admin_passkey_credentials credentials/);
-  assert.match(access, /passkeyCount < 1/);
-  assert.match(access, /shouldCreatePasskeyInviteForExistingMember = true/);
-  assert.match(access, /admin\.invite_existing_member_passkey/);
+  assert.match(invites, /admin_passkey_credentials credentials/);
+  assert.match(invites, /passkeyCount < 1/);
+  assert.match(invites, /shouldCreatePasskeyInviteForExistingMember = true/);
+  assert.match(invites, /admin\.invite_existing_member_passkey/);
   // Invited membership activation on first passkey registration lives in auth.
   assert.match(auth, /when public\.organisation_memberships\.status = 'invited' then excluded\.role/);
   assert.match(auth, /when public\.organisation_memberships\.status = 'invited' then 'active'/);
-  assert.doesNotMatch(access, /role\s*=\s*excluded\.role/);
+  assert.doesNotMatch(invites, /role\s*=\s*excluded\.role/);
   assert.doesNotMatch(auth, /role\s*=\s*excluded\.role/);
 });
 

@@ -301,41 +301,43 @@ describe("admin RBAC", () => {
   });
 
   it("does not let impersonation turn a platform admin into a platform owner", () => {
-    const source = readFileSync("lib/admin-access.ts", "utf8");
+    const invites = readFileSync("lib/admin-access-invites.ts", "utf8");
 
-    assert.match(source, /actor\.actorMembership\.role !== "platform_owner"/);
-    assert.match(source, /target\.role === "platform_owner"/);
-    assert.match(source, /Platform Admin cannot assume Platform Owner access/);
-    assert.doesNotMatch(source, /actor\.role !== "platform_owner"/);
+    assert.match(invites, /actor\.actorMembership\.role !== "platform_owner"/);
+    assert.match(invites, /target\.role === "platform_owner"/);
+    assert.match(invites, /Platform Admin cannot assume Platform Owner access/);
+    assert.doesNotMatch(invites, /actor\.role !== "platform_owner"/);
   });
 
   it("does not let platform admins alter platform-owner people through invites", () => {
-    const source = readFileSync("lib/admin-access.ts", "utf8");
+    const invites = readFileSync("lib/admin-access-invites.ts", "utf8");
     const shared = readFileSync("lib/admin-access-shared.ts", "utf8");
 
     assert.match(shared, /function personHasPlatformOwnerMembership/);
     assert.match(
-      source,
+      invites,
       /createAdminInvitation[\s\S]*personHasPlatformOwnerMembership\(sql, existingPerson\.id\)/
     );
-    assert.match(source, /Platform Admin cannot change Platform Owner users/);
+    assert.match(invites, /Platform Admin cannot change Platform Owner users/);
   });
 
   it("scopes retail admin access data and writes to the effective organisation", () => {
     const access = readFileSync("lib/admin-access.ts", "utf8");
+    const invites = readFileSync("lib/admin-access-invites.ts", "utf8");
     const shared = readFileSync("lib/admin-access-shared.ts", "utf8");
     const route = readFileSync("app/api/admin/access/route.ts", "utf8");
     const page = readFileSync("app/[locale]/admin/dashboard/page.tsx", "utf8");
 
     assert.match(shared, /function scopedAccessOrganisationId/);
     assert.match(shared, /context\.effectiveOrganisation\.id/);
-    assert.match(access, /Retail admins can only invite people to their own organisation/);
-    assert.match(access, /Retail admins can only update memberships in their own organisation/);
-    assert.match(access, /Retail admins can only delete memberships in their own organisation/);
-    assert.match(access, /Retail admins can only delete invites in their own organisation/);
+    assert.match(invites, /Retail admins can only invite people to their own organisation/);
+    assert.match(invites, /Retail admins can only update memberships in their own organisation/);
+    assert.match(invites, /Retail admins can only delete memberships in their own organisation/);
+    assert.match(invites, /Retail admins can only delete invites in their own organisation/);
     assert.match(route, /getAdminAccessData\(context\)/);
     assert.match(page, /getAdminAccessData\(adminContext\)/);
     assert.match(route, /context\.effectiveOrganisation\.type !== "platform"/);
+    assert.match(access, /export \{\s*[\s\S]*createAdminInvitation[\s\S]*\} from "@\/lib\/admin-access-invites"/);
   });
 
   it("keeps retail organisation settings separate from platform-only invites", () => {
@@ -399,6 +401,7 @@ describe("admin RBAC", () => {
   it("audits every successful RBAC mutation path with clear admin actions", () => {
     const access = readFileSync("lib/admin-access.ts", "utf8");
     const agents = readFileSync("lib/admin-access-agents.ts", "utf8");
+    const invites = readFileSync("lib/admin-access-invites.ts", "utf8");
     const route = readFileSync("app/api/admin/access/route.ts", "utf8");
     const shared = readFileSync("components/admin/dashboard-shared.tsx", "utf8");
 
@@ -407,11 +410,11 @@ describe("admin RBAC", () => {
     assert.match(access, /action: "admin\.organisation_created"/);
     assert.match(access, /action: "admin\.organisation_updated"/);
     assert.match(access, /action: "admin\.person_updated"/);
-    assert.match(access, /action: "admin\.membership_updated"/);
-    assert.match(access, /action: "admin\.membership_added"/);
-    assert.match(access, /action: "admin\.membership_deleted"/);
-    assert.match(access, /action: "admin\.invite_created"/);
-    assert.match(access, /action: "admin\.invite_deleted"/);
+    assert.match(invites, /action: "admin\.membership_updated"/);
+    assert.match(invites, /action: "admin\.membership_added"/);
+    assert.match(invites, /action: "admin\.membership_deleted"/);
+    assert.match(invites, /action: "admin\.invite_created"/);
+    assert.match(invites, /action: "admin\.invite_deleted"/);
     assert.match(agents, /action: "admin\.agent_invited"/);
     assert.match(agents, /action: "admin\.agent_membership_added"/);
     assert.match(agents, /action: "admin\.agent_membership_updated"/);
@@ -423,15 +426,17 @@ describe("admin RBAC", () => {
   it("expires and deletes pending admin invitations before they can be accepted", () => {
     const access = readFileSync("lib/admin-access.ts", "utf8");
     const auth = readFileSync("lib/admin-access-auth.ts", "utf8");
+    const invites = readFileSync("lib/admin-access-invites.ts", "utf8");
     const shared = readFileSync("lib/admin-access-shared.ts", "utf8");
     const route = readFileSync("app/api/admin/access/route.ts", "utf8");
 
     assert.match(shared, /function expirePendingAdminInvitations/);
     assert.match(shared, /const inviteDays = 7/);
     assert.match(shared, /set status = 'expired', updated_at = now\(\)/);
-    assert.match(access, /export async function deleteAdminInvitation/);
-    assert.match(access, /status in \('pending', 'expired'\)/);
-    assert.match(access, /set status = 'revoked', updated_at = now\(\)/);
+    assert.match(access, /deleteAdminInvitation/);
+    assert.match(invites, /export async function deleteAdminInvitation/);
+    assert.match(invites, /status in \('pending', 'expired'\)/);
+    assert.match(invites, /set status = 'revoked', updated_at = now\(\)/);
     assert.match(auth, /Registration invite expired or was deleted/);
     assert.match(route, /action === "delete_invitation"/);
     assert.match(route, /deleteAdminInvitation/);
@@ -439,31 +444,33 @@ describe("admin RBAC", () => {
 
   it("soft deletes memberships with active-session and platform-owner safeguards", () => {
     const access = readFileSync("lib/admin-access.ts", "utf8");
+    const invites = readFileSync("lib/admin-access-invites.ts", "utf8");
     const route = readFileSync("app/api/admin/access/route.ts", "utf8");
     const schema = readFileSync("scripts/admin-access-schema.ts", "utf8");
     const view = readFileSync("components/admin/access-view.tsx", "utf8");
 
-    assert.match(access, /export async function addAdminMembership/);
-    assert.match(access, /Retail admins can only add memberships in their own organisation/);
+    assert.match(access, /addAdminMembership/);
+    assert.match(invites, /export async function addAdminMembership/);
+    assert.match(invites, /Retail admins can only add memberships in their own organisation/);
     assert.match(route, /action === "add_membership"/);
     assert.match(route, /addAdminMembership/);
     assert.match(view, /labels\.access\.addMembership/);
     assert.match(view, /<option value="deleted">\{labels\.access\.deleted\}<\/option>/);
     assert.doesNotMatch(view, /labels\.access\.deleteMembership/);
-    assert.match(access, /export async function deleteAdminMembership/);
-    assert.match(access, /if \(status === "deleted"\)/);
-    assert.match(access, /status = 'deleted'/);
-    assert.match(access, /status <> 'deleted'/);
-    assert.match(access, /'deletedAt', now\(\)/);
-    assert.match(access, /'deletedStatus', status/);
-    assert.match(access, /metadata \? 'deletedAt'/);
-    assert.doesNotMatch(access, /delete from public\.organisation_memberships/);
+    assert.match(invites, /export async function deleteAdminMembership/);
+    assert.match(invites, /if \(status === "deleted"\)/);
+    assert.match(invites, /status = 'deleted'/);
+    assert.match(invites, /status <> 'deleted'/);
+    assert.match(invites, /'deletedAt', now\(\)/);
+    assert.match(invites, /'deletedStatus', status/);
+    assert.match(invites, /metadata \? 'deletedAt'/);
+    assert.doesNotMatch(invites, /delete from public\.organisation_memberships/);
     assert.match(schema, /organisation_memberships_status_check check \(status in \('active', 'deleted', 'disabled', 'invited'\)\)/);
     assert.match(schema, /set status = 'deleted'\s+where metadata \? 'deletedAt'/);
-    assert.match(access, /You cannot delete the active session membership/);
-    assert.match(access, /Platform Admin cannot change Platform Owner access/);
-    assert.match(access, /At least one active Platform Owner membership is required/);
-    assert.match(access, /action: "admin\.membership_deleted"/);
+    assert.match(invites, /You cannot delete the active session membership/);
+    assert.match(invites, /Platform Admin cannot change Platform Owner access/);
+    assert.match(invites, /At least one active Platform Owner membership is required/);
+    assert.match(invites, /action: "admin\.membership_deleted"/);
     assert.match(route, /status !== "deleted"/);
     assert.match(route, /action === "delete_membership"/);
     assert.match(route, /deleteAdminMembership/);
@@ -473,7 +480,8 @@ describe("admin RBAC", () => {
   it("stores admin access metadata as JSON objects, not encoded JSON strings", () => {
     const access = readFileSync("lib/admin-access.ts", "utf8");
     const auth = readFileSync("lib/admin-access-auth.ts", "utf8");
-    const surface = `${access}\n${auth}`;
+    const invites = readFileSync("lib/admin-access-invites.ts", "utf8");
+    const surface = `${access}\n${auth}\n${invites}`;
 
     assert.doesNotMatch(surface, /JSON\.stringify\([^)]*metadata[^)]*\)::jsonb/);
     assert.match(surface, /\$\{sql\.json\(toJsonValue\(metadata \?\? \{\}\)\)\}::jsonb/);

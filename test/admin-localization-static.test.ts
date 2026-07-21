@@ -241,6 +241,7 @@ test("platform task visibility shows organisation and assignee context", () => {
 
 test("admin organisations hide type controls and expose only platform and retail roles", () => {
   const access = source("lib/admin-access.ts");
+  const invites = source("lib/admin-access-invites.ts");
   const rbac = source("lib/admin-rbac.ts");
   const route = source("app/api/admin/access/route.ts");
   const view = source("components/admin/access-view.tsx");
@@ -253,11 +254,11 @@ test("admin organisations hide type controls and expose only platform and retail
   assert.match(rbac, /retail_admin/);
   assert.match(rbac, /retail_agent/);
   assert.match(rbac, /retail_assistant/);
-  assert.match(access, /adminRoleAllowedForOrganisationType/);
-  assert.match(access, /Platform Admin cannot change Platform Owner users/);
-  assert.match(access, /Platform Admin cannot grant Platform Owner access/);
-  assert.match(access, /Platform Admin cannot change Platform Owner access/);
-  assert.match(access, /Platform Admin cannot assume Platform Owner access/);
+  assert.match(invites, /adminRoleAllowedForOrganisationType/);
+  assert.match(invites, /Platform Admin cannot change Platform Owner users/);
+  assert.match(invites, /Platform Admin cannot grant Platform Owner access/);
+  assert.match(invites, /Platform Admin cannot change Platform Owner access/);
+  assert.match(invites, /Platform Admin cannot assume Platform Owner access/);
   assert.match(route, /type: "tenant"/);
   assert.match(view, /rolesForAdminOrganisationType/);
   assert.match(view, /context\.actorMembership\.role === "platform_owner"/);
