@@ -74,9 +74,9 @@ describe("questionnaire V4 first name capture", () => {
   it("renders the opening privacy gate before questionnaire controls", () => {
     assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*Your answers stay between us\./);
     assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"Thanks — your answers are protected\. You can begin\."/);
-    assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"ขอบคุณ คำตอบของคุณได้รับการปกป้องแล้ว คุณเริ่มได้เลย"/);
+    assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"ขอบคุณ — คำตอบของคุณได้รับการปกป้องแล้ว คุณเริ่มได้เลย"/);
     assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"谢谢，你已知晓并同意。现在可以开始。"/);
-    assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*คำตอบของคุณอยู่ระหว่างเราเท่านั้น/);
+    assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*คำตอบของคุณเป็นเรื่องส่วนตัวระหว่างเรา/);
     assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*你的信息，绝不外泄/);
     assert.match(assessmentFlow, /function renderPrivacyGate\(\)/);
     assert.match(assessmentFlow, /className="consent-wrap"[\s\S]*className="consent"[\s\S]*className="consent-eyebrow"[\s\S]*className="consent-title"[\s\S]*className="consent-lede"/);
@@ -105,7 +105,7 @@ describe("questionnaire V4 first name capture", () => {
     for (const label of ["About you", "Goals", "Daily life", "Food", "Safety", "Precision"]) {
       assert.match(assessmentFlowCopyEn, new RegExp(label));
     }
-    for (const label of ["เกี่ยวกับคุณ", "เป้าหมาย", "ชีวิตประจำวัน", "อาหาร", "ความปลอดภัย", "ความแม่นยำ"]) {
+    for (const label of ["ข้อมูลพื้นฐาน", "เป้าหมาย", "ชีวิตประจำวัน", "อาหาร", "ความปลอดภัย", "ความแม่นยำ"]) {
       assert.match(assessmentFlowCopyTh, new RegExp(label));
     }
     for (const label of ["基础信息", "目标", "日常", "饮食", "安全", "精准"]) {
