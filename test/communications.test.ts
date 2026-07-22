@@ -177,6 +177,7 @@ describe("communications channel selection", () => {
       facade,
       shared,
       organisation,
+      dispatch,
       workItems,
       execution,
       agents,
@@ -189,6 +190,7 @@ describe("communications channel selection", () => {
       readFile("lib/communications.ts", "utf8"),
       readFile("lib/communications-shared.ts", "utf8"),
       readFile("lib/communications-organisation.ts", "utf8"),
+      readFile("lib/communications-dispatch.ts", "utf8"),
       readFile("lib/task-work-items.ts", "utf8"),
       readFile("lib/task-execution.ts", "utf8"),
       readFile("lib/system-agents.ts", "utf8"),
@@ -198,7 +200,7 @@ describe("communications channel selection", () => {
       readFile("components/admin/communications-view.tsx", "utf8")
     ]);
     // Combined communications surface after module split.
-    const service = `${facade}\n${shared}\n${organisation}`;
+    const service = `${facade}\n${shared}\n${organisation}\n${dispatch}`;
     const adminQueryData = await readFile("lib/admin-query-data.ts", "utf8");
     const adminQueryRoute = await readFile("app/api/admin/query/[view]/route.ts", "utf8");
     const organisationApi = await readFile(
@@ -258,6 +260,7 @@ describe("communications channel selection", () => {
     assert.doesNotMatch(service, /configured retailer channels/);
     assert.match(facade, /from "@\/lib\/communications-shared"/);
     assert.match(facade, /from "@\/lib\/communications-organisation"/);
+    assert.match(facade, /from "@\/lib\/communications-dispatch"/);
     assert.match(workItems, /buildAdminCommunicationRouteWorkItem/);
     assert.match(workItems, /payloadText\(payload, "targetOrganisationId"\)/);
     assert.match(workItems, /buildCommunicationDispatchWorkItem/);

@@ -82,7 +82,10 @@ describe("retail plan insert static wiring", () => {
 
   it("attaches the insert to retailer order-created emails without blocking send", () => {
     const checkout = read("lib/retail-product-checkout.ts");
-    const communications = read("lib/communications.ts");
+    const communications = [
+      read("lib/communications.ts"),
+      read("lib/communications-dispatch.ts")
+    ].join("\n");
     const smtp = read("lib/smtp-email.ts");
 
     assert.match(checkout, /planInsertOrderId: order\.id/);
