@@ -1344,14 +1344,20 @@ describe("product coverage workflow", () => {
       "lib/admin-product-coverage-simulation.ts",
       "utf8"
     );
-    const view = readFileSync(
+    const coverageView = readFileSync(
       "components/admin/product-coverage-view.tsx",
+      "utf8"
+    );
+    const simulatorView = readFileSync(
+      "components/admin/product-coverage-simulator-view.tsx",
       "utf8"
     );
     const viewHelpers = readFileSync(
       "components/admin/product-coverage-view-helpers.ts",
       "utf8"
     );
+    // Combined UI surface after view/simulator split.
+    const view = `${coverageView}\n${simulatorView}`;
     const simulationInputRoute = readFileSync(
       "app/api/admin/product-coverage/simulation-input/route.ts",
       "utf8"
