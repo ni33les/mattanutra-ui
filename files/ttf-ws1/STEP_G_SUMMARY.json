@@ -1,0 +1,52 @@
+{
+  "step": "G",
+  "completedAt": "2026-07-22T08:31:03.278490+00:00",
+  "status": "ok",
+  "gates": {
+    "manifestChecksum": "PASS (186 files)",
+    "offlineIntegrity": {
+      "script": "scripts/verify-ttf-ws1-integrity.py",
+      "checks": 363,
+      "failures": 0,
+      "status": "ok"
+    },
+    "i18nAudit": "ok (0 findings)",
+    "unitTests": {
+      "files": [
+        "test/ttf-ws1-assets-static.test.ts",
+        "test/ttf-ws1-featured-static.test.ts",
+        "test/ttf-ws1-landing-chrome-static.test.ts",
+        "test/ttf-ws1-typography-static.test.ts",
+        "test/ttf-ws1-integrity-static.test.ts",
+        "test/library-content-static.test.ts",
+        "test/landing-v15-static.test.ts",
+        "test/i18n-catalog.test.ts"
+      ],
+      "result": "45/45 pass"
+    },
+    "handOffLintTh": "skipped (BeautifulSoup/bs4 not installed in environment)"
+  },
+  "productState": {
+    "articles": 35,
+    "categories": 6,
+    "featured": [
+      "which-supplements-should-you-take",
+      "sleep-support-without-sleeping-pills",
+      "vitamin-d-in-thailand"
+    ]
+  },
+  "commands": [
+    "python3 scripts/extract-ttf-ws1.py --verify",
+    "python3 scripts/install-ttf-ws1-assets.py",
+    "python3 scripts/build-library-from-handoff.py",
+    "python3 scripts/verify-ttf-ws1-integrity.py",
+    "npm run i18n:audit",
+    "node --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs --test test/ttf-ws1-*.test.ts test/library-content-static.test.ts test/landing-v15-static.test.ts test/i18n-catalog.test.ts"
+  ],
+  "outOfScopeRemaining": [
+    "Workstream 2 questionnaire Thai",
+    "Staging live --compare against deployed HTML",
+    "Pharmacist clinical review",
+    "Thai legal pages body rewrite"
+  ]
+}

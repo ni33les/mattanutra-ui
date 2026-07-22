@@ -3,7 +3,8 @@ import {
   DM_Sans,
   Fraunces,
   JetBrains_Mono,
-  Noto_Sans_Thai
+  Noto_Sans_Thai,
+  Noto_Serif_Thai
 } from "next/font/google";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -60,6 +61,13 @@ const thaiFont = Noto_Sans_Thai({
   display: "swap"
 });
 
+const thaiSerifFont = Noto_Serif_Thai({
+  subsets: ["thai"],
+  weight: ["400", "500", "600"],
+  variable: "--mn-font-thai-serif",
+  display: "swap"
+});
+
 export async function generateMetadata({
   params
 }: Pick<LocaleLayoutProps, "params">): Promise<Metadata> {
@@ -94,7 +102,8 @@ export default async function LocaleLayout({
           bodyFont.variable,
           displayFont.variable,
           monoFont.variable,
-          thaiFont.variable
+          thaiFont.variable,
+          thaiSerifFont.variable
         ].join(" ")}
       >
         <BpmTracker locale={locale} />

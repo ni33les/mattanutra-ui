@@ -66,7 +66,7 @@ describe("landing page v16 library-only port", () => {
 
   it("keeps homepage navigation, footer, and generated links on Library", () => {
     assert.match(homepage, /variant="landing"/);
-    assert.match(homepage, /getRandomLibraryArticles\(locale,\s*3\)/);
+    assert.match(homepage, /getFeaturedLibraryArticles\(locale,\s*3\)/);
     assert.match(homepage, /libraryArticles=\{libraryArticles\}/);
     assert.match(landingPage, /data-home-library-card=\{true\}/);
     assert.match(libraryIndexPage, /<LibraryIndex articles=\{articles\} locale=\{locale\}/);
@@ -269,16 +269,16 @@ describe("landing page v16 library-only port", () => {
     const slugs = new Set(launchLibraryArticles.map((article) => article.slug));
     const dates = launchLibraryArticles.map((article) => article.datePublished);
 
-    assert.equal(staticLibraryArticleCount, 30);
-    assert.equal(visualKnowledgeLibrary.generatedFrom, "files/library/*.zip");
+    assert.equal(staticLibraryArticleCount, 35);
+    assert.equal(visualKnowledgeLibrary.generatedFrom, "files/ttf.zip#ws1-handoff");
     assert.deepEqual(visualKnowledgeLibrary.canonicalRedirects, {
       "coq10-who-is-it-actually-for": "coq10-who-is-it-for",
       "health-check-leave-out-biomarkers": "expensive-health-check-leave-out",
       "omega-3-every-day": "should-you-take-omega-3-every-day",
       "vitamin-d-thailand": "vitamin-d-in-thailand"
     });
-    assert.equal(launchLibraryArticles.length, 30);
-    assert.equal(slugs.size, 30);
+    assert.equal(launchLibraryArticles.length, 35);
+    assert.equal(slugs.size, 35);
     assert.deepEqual([...dates], [...dates].sort().reverse());
 
     for (const article of launchLibraryArticles) {
@@ -333,7 +333,12 @@ describe("landing page v16 library-only port", () => {
     assert.match(librarySource, /getStaticLibraryArticle/);
     assert.match(librarySource, /getStaticLibraryCanonicalSlug/);
     assert.match(librarySource, /export async function getLibraryArticles/);
+    assert.match(librarySource, /export async function getFeaturedLibraryArticles/);
     assert.match(librarySource, /export async function getRandomLibraryArticles/);
+    assert.match(
+      librarySource,
+      /article\.featured/
+    );
     assert.match(
       librarySource,
       /getRandomLibraryArticles[\s\S]*shuffledArticles\(await getLibraryArticles\(locale\)\)/

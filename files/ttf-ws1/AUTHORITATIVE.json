@@ -1,0 +1,446 @@
+{
+  "workstream": 1,
+  "title": "Thai Landing + Library hand-off — authoritative freeze",
+  "rule": "Thai (and shipped EN library index/article HTML for this package) is authoritative. Do not retype, rephrase, machine-translate, or formatter-mutate text nodes. Copy-paste only into product surfaces.",
+  "sourceArchive": "files/ttf.zip",
+  "sourceArchiveSha256": "36efe2d8d9eba2fb84a7c7aa389cf7768fcd77e256a4034eda376684c7100005",
+  "extractCommand": "python3 scripts/extract-ttf-ws1.py --verify",
+  "extractRoot": ".cache/ttf-ws1/MattaNutra_TH_Localization_Handoff_2026-07-19",
+  "doNotEdit": [
+    "landing/MattaNutra_Landing_Page_TH_v20_FINAL.html",
+    "library-manifest.json",
+    "library/library-th.html",
+    "library/library-en.html",
+    "library/th/blood-panel-personalise-supplements-cost.html",
+    "library/th/blood-test-personalise-supplements.html",
+    "library/th/brain-supplements-real-reason-routine.html",
+    "library/th/citicoline-vs-alpha-gpc.html",
+    "library/th/collagen-skin-joints-or-hype.html",
+    "library/th/coq10-who-is-it-for.html",
+    "library/th/curcumin-when-is-it-worth-taking.html",
+    "library/th/do-you-need-a-probiotic.html",
+    "library/th/do-you-really-need-a-multivitamin.html",
+    "library/th/expensive-health-check-leave-out.html",
+    "library/th/expensive-health-check-nutrition.html",
+    "library/th/food4me-study-personalised-nutrition.html",
+    "library/th/glycinate-vs-citrate.html",
+    "library/th/gut-absorption-supplements.html",
+    "library/th/gut-health-supplements-when-make-sense.html",
+    "library/th/how-much-turmeric-equals-150mg-curcumin.html",
+    "library/th/is-creatine-just-for-bodybuilders.html",
+    "library/th/joint-supplements-glucosamine-collagen-curcumin.html",
+    "library/th/l-carnitine-and-your-energy.html",
+    "library/th/lions-mane-supplement-worth-it.html",
+    "library/th/magnesium-for-sleep.html",
+    "library/th/magnesium-glycine-theanine-gaba-sleep-support.html",
+    "library/th/rhodiola-energy-support-or-stress-support.html",
+    "library/th/rhodiola-vs-caffeine-coffee.html",
+    "library/th/should-you-take-magnesium-every-day.html",
+    "library/th/should-you-take-omega-3-every-day.html",
+    "library/th/signs-you-may-be-low-in-magnesium.html",
+    "library/th/sleep-support-without-sleeping-pills.html",
+    "library/th/spicy-food-thailand-supplement-routine.html",
+    "library/th/vitamin-d-in-thailand.html",
+    "library/th/vitamin-d-magnesium-zinc.html",
+    "library/th/which-supplements-do-vegans-actually-need.html",
+    "library/th/which-supplements-should-you-take.html",
+    "library/th/why-stress-changes-your-supplement-needs.html",
+    "library/th/zinc-supplements-helpful-or-overused.html",
+    "library/en/blood-panel-personalise-supplements-cost.html",
+    "library/en/blood-test-personalise-supplements.html",
+    "library/en/brain-supplements-real-reason-routine.html",
+    "library/en/citicoline-vs-alpha-gpc.html",
+    "library/en/collagen-skin-joints-or-hype.html",
+    "library/en/coq10-who-is-it-for.html",
+    "library/en/curcumin-when-is-it-worth-taking.html",
+    "library/en/do-you-need-a-probiotic.html",
+    "library/en/do-you-really-need-a-multivitamin.html",
+    "library/en/expensive-health-check-leave-out.html",
+    "library/en/expensive-health-check-nutrition.html",
+    "library/en/food4me-study-personalised-nutrition.html",
+    "library/en/glycinate-vs-citrate.html",
+    "library/en/gut-absorption-supplements.html",
+    "library/en/gut-health-supplements-when-make-sense.html",
+    "library/en/how-much-turmeric-equals-150mg-curcumin.html",
+    "library/en/is-creatine-just-for-bodybuilders.html",
+    "library/en/joint-supplements-glucosamine-collagen-curcumin.html",
+    "library/en/l-carnitine-and-your-energy.html",
+    "library/en/lions-mane-supplement-worth-it.html",
+    "library/en/magnesium-for-sleep.html",
+    "library/en/magnesium-glycine-theanine-gaba-sleep-support.html",
+    "library/en/rhodiola-energy-support-or-stress-support.html",
+    "library/en/rhodiola-vs-caffeine-coffee.html",
+    "library/en/should-you-take-magnesium-every-day.html",
+    "library/en/should-you-take-omega-3-every-day.html",
+    "library/en/signs-you-may-be-low-in-magnesium.html",
+    "library/en/sleep-support-without-sleeping-pills.html",
+    "library/en/spicy-food-thailand-supplement-routine.html",
+    "library/en/vitamin-d-in-thailand.html",
+    "library/en/vitamin-d-magnesium-zinc.html",
+    "library/en/which-supplements-do-vegans-actually-need.html",
+    "library/en/which-supplements-should-you-take.html",
+    "library/en/why-stress-changes-your-supplement-needs.html",
+    "library/en/zinc-supplements-helpful-or-overused.html",
+    "verification/MANIFEST.sha256",
+    "reference/Thai_Editorial_Style_Guide_v4_notes.md"
+  ],
+  "counts": {
+    "doNotEditFiles": 76,
+    "thaiArticles": 35,
+    "englishArticles": 35,
+    "manifestArticles": 35,
+    "shareImages": 35,
+    "nongWebp": 20
+  },
+  "outOfScopeThisWorkstream": [
+    "questionnaire hand-off (Workstream 2)",
+    "admin RBAC / agents / tasks / workers",
+    "assessment-flow-copy-th.ts",
+    "zh-CN copy rewrite",
+    "legal terms/privacy body rewrite"
+  ],
+  "featuredSlugs": [
+    "which-supplements-should-you-take",
+    "sleep-support-without-sleeping-pills",
+    "vitamin-d-in-thailand"
+  ],
+  "newArticleSlugs": [
+    "gut-absorption-supplements",
+    "gut-health-supplements-when-make-sense",
+    "l-carnitine-and-your-energy",
+    "spicy-food-thailand-supplement-routine",
+    "which-supplements-do-vegans-actually-need"
+  ],
+  "categories": [
+    {
+      "id": "foundations",
+      "label": {
+        "en": "Foundations",
+        "th": "พื้นฐาน"
+      }
+    },
+    {
+      "id": "vitamins",
+      "label": {
+        "en": "Vitamins",
+        "th": "วิตามิน"
+      }
+    },
+    {
+      "id": "minerals",
+      "label": {
+        "en": "Minerals",
+        "th": "แร่ธาตุ"
+      }
+    },
+    {
+      "id": "sleep-recovery",
+      "label": {
+        "en": "Sleep & Recovery",
+        "th": "การนอนและการฟื้นตัว"
+      }
+    },
+    {
+      "id": "energy-longevity",
+      "label": {
+        "en": "Energy & Longevity",
+        "th": "พลังงานและสุขภาพระยะยาว"
+      }
+    },
+    {
+      "id": "everyday-nutrition",
+      "label": {
+        "en": "Everyday Nutrition",
+        "th": "โภชนาการประจำวัน"
+      }
+    }
+  ],
+  "articleImageMap": [
+    {
+      "slug": "blood-panel-personalise-supplements-cost",
+      "shareImage": "/assets/library/share/share-blood-panel-personalise-supplements-cost.jpg",
+      "nongPose": "nong_money",
+      "category": "foundations",
+      "featured": false
+    },
+    {
+      "slug": "blood-test-personalise-supplements",
+      "shareImage": "/assets/library/share/share-blood-test-personalise-supplements.jpg",
+      "nongPose": "nong_thinking",
+      "category": "foundations",
+      "featured": false
+    },
+    {
+      "slug": "brain-supplements-real-reason-routine",
+      "shareImage": "/assets/library/share/share-brain-supplements-real-reason.jpg",
+      "nongPose": "nong_thinking",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "citicoline-vs-alpha-gpc",
+      "shareImage": "/assets/library/share/share-citicoline-vs-alpha-gpc.jpg",
+      "nongPose": "nong_comparing",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "collagen-skin-joints-or-hype",
+      "shareImage": "/assets/library/share/share-collagen-skin-joints-hype.jpg",
+      "nongPose": "nong_kneeling",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "coq10-who-is-it-for",
+      "shareImage": "/assets/library/share/share-coq10-who-is-it-for.jpg",
+      "nongPose": "nong_measuring",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "curcumin-when-is-it-worth-taking",
+      "shareImage": "/assets/library/share/share-curcumin-worth-taking.jpg",
+      "nongPose": "nong_measuring",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "do-you-need-a-probiotic",
+      "shareImage": "/assets/library/share/share-do-you-need-a-probiotic.jpg",
+      "nongPose": "nong_reassuring",
+      "category": "everyday-nutrition",
+      "featured": false
+    },
+    {
+      "slug": "do-you-really-need-a-multivitamin",
+      "shareImage": "/assets/library/share/share-do-you-really-need-a-multivitamin.jpg",
+      "nongPose": "nong_measuring",
+      "category": "foundations",
+      "featured": false
+    },
+    {
+      "slug": "expensive-health-check-leave-out",
+      "shareImage": "/assets/library/share/share-expensive-health-check-leave-out.jpg",
+      "nongPose": "nong_money",
+      "category": "foundations",
+      "featured": false
+    },
+    {
+      "slug": "expensive-health-check-nutrition",
+      "shareImage": "/assets/library/share/share-expensive-health-check-nutrition.jpg",
+      "nongPose": "nong_money",
+      "category": "foundations",
+      "featured": false
+    },
+    {
+      "slug": "food4me-study-personalised-nutrition",
+      "shareImage": "/assets/library/share/share-food4me-study-personalised-nutrition.jpg",
+      "nongPose": "nong_thinking",
+      "category": "foundations",
+      "featured": false
+    },
+    {
+      "slug": "glycinate-vs-citrate",
+      "shareImage": "/assets/library/share/share-glycinate-vs-citrate.jpg",
+      "nongPose": "nong_open",
+      "category": "minerals",
+      "featured": false
+    },
+    {
+      "slug": "gut-absorption-supplements",
+      "shareImage": "/assets/library/share/share-gut-absorption-supplements.jpg",
+      "nongPose": "nong_bloated",
+      "category": "everyday-nutrition",
+      "featured": false
+    },
+    {
+      "slug": "gut-health-supplements-when-make-sense",
+      "shareImage": "/assets/library/share/share-gut-health-supplements-when-make-sense.jpg",
+      "nongPose": "nong_gut_bloated",
+      "category": "everyday-nutrition",
+      "featured": false
+    },
+    {
+      "slug": "how-much-turmeric-equals-150mg-curcumin",
+      "shareImage": "/assets/library/share/share-turmeric-curcumin-equivalent.jpg",
+      "nongPose": "nong_measuring",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "is-creatine-just-for-bodybuilders",
+      "shareImage": "/assets/library/share/share-is-creatine-just-for-bodybuilders.jpg",
+      "nongPose": "nong_muscular",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "joint-supplements-glucosamine-collagen-curcumin",
+      "shareImage": "/assets/library/share/share-joint-supplements-glucosamine-collagen-curcumin.jpg",
+      "nongPose": "nong_kneeling",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "l-carnitine-and-your-energy",
+      "shareImage": "/assets/library/share/share-l-carnitine-and-your-energy.jpg",
+      "nongPose": "nong_energetic",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "lions-mane-supplement-worth-it",
+      "shareImage": "/assets/library/share/share-lions-mane-supplement-worth-it.jpg",
+      "nongPose": "nong_thinking",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "magnesium-for-sleep",
+      "shareImage": "/assets/library/share/share-magnesium-sleep.jpg",
+      "nongPose": "nong_open",
+      "category": "sleep-recovery",
+      "featured": false
+    },
+    {
+      "slug": "magnesium-glycine-theanine-gaba-sleep-support",
+      "shareImage": "/assets/library/share/share-sleep-support-fits-you.jpg",
+      "nongPose": "nong_reassuring",
+      "category": "sleep-recovery",
+      "featured": false
+    },
+    {
+      "slug": "rhodiola-energy-support-or-stress-support",
+      "shareImage": "/assets/library/share/share-rhodiola-energy-stress.jpg",
+      "nongPose": "nong_stressed",
+      "category": "sleep-recovery",
+      "featured": false
+    },
+    {
+      "slug": "rhodiola-vs-caffeine-coffee",
+      "shareImage": "/assets/library/share/share-rhodiola-vs-caffeine.jpg",
+      "nongPose": "nong_coffee",
+      "category": "energy-longevity",
+      "featured": false
+    },
+    {
+      "slug": "should-you-take-magnesium-every-day",
+      "shareImage": "/assets/library/share/share-magnesium-every-day.jpg",
+      "nongPose": "nong_open",
+      "category": "minerals",
+      "featured": false
+    },
+    {
+      "slug": "should-you-take-omega-3-every-day",
+      "shareImage": "/assets/library/share/share-should-you-take-omega-3-every-day.jpg",
+      "nongPose": "nong_explaining",
+      "category": "everyday-nutrition",
+      "featured": false
+    },
+    {
+      "slug": "signs-you-may-be-low-in-magnesium",
+      "shareImage": "/assets/library/share/share-signs-low-magnesium.jpg",
+      "nongPose": "nong_open",
+      "category": "minerals",
+      "featured": false
+    },
+    {
+      "slug": "sleep-support-without-sleeping-pills",
+      "shareImage": "/assets/library/share/share-sleep-without-sleeping-pills.jpg",
+      "nongPose": "nong_reassuring",
+      "category": "sleep-recovery",
+      "featured": true
+    },
+    {
+      "slug": "spicy-food-thailand-supplement-routine",
+      "shareImage": "/assets/library/share/share-spicy-food-thailand-supplement-routine.jpg",
+      "nongPose": "nong_spicy_bloated",
+      "category": "everyday-nutrition",
+      "featured": false
+    },
+    {
+      "slug": "vitamin-d-in-thailand",
+      "shareImage": "/assets/library/share/share-vitamin-d-thailand.jpg",
+      "nongPose": "nong_open",
+      "category": "vitamins",
+      "featured": true
+    },
+    {
+      "slug": "vitamin-d-magnesium-zinc",
+      "shareImage": "/assets/library/share/share-vitamin-d-magnesium-zinc.jpg",
+      "nongPose": "nong_comparing",
+      "category": "foundations",
+      "featured": false
+    },
+    {
+      "slug": "which-supplements-do-vegans-actually-need",
+      "shareImage": "/assets/library/share/share-which-supplements-do-vegans-actually-need.jpg",
+      "nongPose": "nong_vegan",
+      "category": "everyday-nutrition",
+      "featured": false
+    },
+    {
+      "slug": "which-supplements-should-you-take",
+      "shareImage": "/assets/library/share/share-which-supplements-guessing.jpg",
+      "nongPose": "nong_ask",
+      "category": "foundations",
+      "featured": true
+    },
+    {
+      "slug": "why-stress-changes-your-supplement-needs",
+      "shareImage": "/assets/library/share/share-stress-supplement-needs.jpg",
+      "nongPose": "nong_stressed",
+      "category": "sleep-recovery",
+      "featured": false
+    },
+    {
+      "slug": "zinc-supplements-helpful-or-overused",
+      "shareImage": "/assets/library/share/share-zinc-helpful-overused.jpg",
+      "nongPose": "nong_warning",
+      "category": "minerals",
+      "featured": false
+    }
+  ],
+  "contentHashes": {
+    "landing/MattaNutra_Landing_Page_TH_v20_FINAL.html": "94145b59cfab8cc425f7f77d081d2b4e3585d9b581501b604440ce6c33651650",
+    "library-manifest.json": "df72a03a27db08d7b13166e223167a6d12efd87afb92bbb92523861bfcb197c8",
+    "library/library-th.html": "b1a1f87e079541211810fa6a4c9a75fa26f76435324a7b1df66b7d909ea35d8d",
+    "library/library-en.html": "6444bdd783af310c099d40d7e7ad81e4a1dd50932f6340d18e7a5ad7c7af3f00",
+    "library/th/blood-panel-personalise-supplements-cost.html": "fafef702a86b404a0fbde764f35689b48e6676f946c57f3dadad0748fe1ab4b6",
+    "library/th/blood-test-personalise-supplements.html": "1cbc420158fecdf5fa9e4800c1fa822af4d87d09b121bc5b1e648add2981b79e",
+    "library/th/brain-supplements-real-reason-routine.html": "a1bd2e36f8c1b5e0a5360c7b68d930824897104f2aecda2e72469a454aca7e39",
+    "library/th/citicoline-vs-alpha-gpc.html": "6be458e237da1754b9bc429297806d51dd28148f6271b32b223ab07472a2aeb0",
+    "library/th/collagen-skin-joints-or-hype.html": "7c32769939d36c29fb3b2c6e2f94299c9c33b6a10388e4b0215bc8f135ca8e19",
+    "library/th/coq10-who-is-it-for.html": "0184f9de121ab71c03eea488e2e846df5e1dffb31f3bf1353bf3d08ba9f9ea2d",
+    "library/th/curcumin-when-is-it-worth-taking.html": "6122c2f02bc88a6e7fbc1eb080d05bd5b4b0bc4a2c16476d24270aa84bb20740",
+    "library/th/do-you-need-a-probiotic.html": "7f97444aca69ee4072a94668f8714c71314586c6aa276fa97b31ca40b64a0f6b",
+    "library/th/do-you-really-need-a-multivitamin.html": "da3b8279c0231c9d6a7bba57e73037e6277e4fe02f5c9590497d3acde19e041e",
+    "library/th/expensive-health-check-leave-out.html": "2c13cf256678c311eba9c7565635645e48fed4927dcfb52f872400b8418c15e4",
+    "library/th/expensive-health-check-nutrition.html": "d24f0ebc07595c99321f4b7b2423dcbfee6cd20ea38eab8eaea71a95a20ec6b3",
+    "library/th/food4me-study-personalised-nutrition.html": "99bcdc1f9bb62c99c689382a7b71e4eccce37afae6ef6eedfb5cda57d5f77ec1",
+    "library/th/glycinate-vs-citrate.html": "d5d6227ee6c325334bf94b83bb54c91e0ab4b2fa06625624aadfc687c8fe4adb",
+    "library/th/gut-absorption-supplements.html": "d1e4b1143e41a2a58c6edad8f1b6b106fce7017e9392604f4f47c89ee8d7b846",
+    "library/th/gut-health-supplements-when-make-sense.html": "260c1c6efee340bd6eb11ec2ab0de63d9ee26eaa72cf4e83d32ed60fd87a450b",
+    "library/th/how-much-turmeric-equals-150mg-curcumin.html": "2d8d8c8aa917363ecab7418f1550952e594e91407b179482ed99d6f842e27196",
+    "library/th/is-creatine-just-for-bodybuilders.html": "9fe3d63eed0969f8a9c96762f1e593c35fd1893439d4595a42061cfa1292375c",
+    "library/th/joint-supplements-glucosamine-collagen-curcumin.html": "57d7962800ef59256bf2024dda786edbcb85db29b6a9b2381cb078b7ca35aeb3",
+    "library/th/l-carnitine-and-your-energy.html": "4a18c4f1ecec4712202769958130e16d9fd1c287cad005b5a9e35bd110b066c0",
+    "library/th/lions-mane-supplement-worth-it.html": "a170d5b4ca4e6e08a1886f2b38a50ee120fd01abd8cdda103512d24f4d573376",
+    "library/th/magnesium-for-sleep.html": "4cceee3840b97071c33b2f3e6f8578fee01e53179f5f67fe98f7a23445085b8c",
+    "library/th/magnesium-glycine-theanine-gaba-sleep-support.html": "564c4dc531be9a0e5666d01466d89951444c422fa1dccfce410290c4c08907ea",
+    "library/th/rhodiola-energy-support-or-stress-support.html": "76e34350c0aa0394f4147f1433e319819ee3cca95d08d288ac2ca11a71edc723",
+    "library/th/rhodiola-vs-caffeine-coffee.html": "c8ccce5252dea713a1861f491134e1a48519d566208cbf16d7d9148b8aea6d1e",
+    "library/th/should-you-take-magnesium-every-day.html": "29c643ef7bc7b47c24a3f8595190cf0cc8248cc0e458e7dd47ffb7c5469e1176",
+    "library/th/should-you-take-omega-3-every-day.html": "7ae0871ac75e3ab6bd28ca351ded64c08a74b30f082a1b927996ec4187d551cf",
+    "library/th/signs-you-may-be-low-in-magnesium.html": "c405900a96d5dd9fe84be13eae9d0e6499429e18cd75345429c33b87656d9cdd",
+    "library/th/sleep-support-without-sleeping-pills.html": "4e361faf07cbb188045cea39b20d073bf4eb8a8083427740eb21bc8a6558e1c0",
+    "library/th/spicy-food-thailand-supplement-routine.html": "02f67dc2438a5fbfc34c93243d90168eaf5442cc387443f0a8b94ace85ee2af5",
+    "library/th/vitamin-d-in-thailand.html": "66e6695d93bebe48eb92b9cc021449a9ead62d81db53aa5ba3360ed9d77116b1",
+    "library/th/vitamin-d-magnesium-zinc.html": "57970d338e4916d69b2f7fe5505630b65de5b89d160a742ea0455c6057a52e22",
+    "library/th/which-supplements-do-vegans-actually-need.html": "81eefba186791fbc4510f5400d1ee3cf554de42ee8a568fa9b67dd4388c1f30e",
+    "library/th/which-supplements-should-you-take.html": "b509930edfdcb546a65d427ce1b94e5966f6833958fd30623584f5586a76fc26",
+    "library/th/why-stress-changes-your-supplement-needs.html": "3bf7d32c3f377bc5bdd17dbcd9d5ef05405a133a543685cad0fa2bf4d43e9327",
+    "library/th/zinc-supplements-helpful-or-overused.html": "0f58876173651bd5ce182ed613ace94d0540bf06f9b4920a0960698210be6681"
+  }
+}

@@ -29,3 +29,6 @@ reports/
 
 # system
 .DS_Store
+
+# hand-off extract cache (source of truth remains files/ttf.zip)
+.cache/

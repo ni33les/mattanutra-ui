@@ -12,7 +12,6 @@ const articleSlugs = new Set(staticLibraryArticles.map((article) => article.slug
 const redirectSlugs = new Set(Object.keys(visualKnowledgeLibrary.canonicalRedirects ?? {}));
 const resolvableLibrarySlugs = new Set([...articleSlugs, ...redirectSlugs]);
 const missingLaunchSlugs = new Set([
-  "gut-health-supplements",
   "vitamin-c-daily-essential"
 ]);
 
@@ -41,9 +40,9 @@ function visitNode(
 
 describe("static Library content integrity", () => {
   it("keeps generated zip content resolvable across locales", () => {
-    assert.equal(visualKnowledgeLibrary.articleCount, 30);
-    assert.equal(staticLibraryArticles.length, 30);
-    assert.equal(articleSlugs.size, 30);
+    assert.equal(visualKnowledgeLibrary.articleCount, 35);
+    assert.equal(staticLibraryArticles.length, 35);
+    assert.equal(articleSlugs.size, 35);
     assert.deepEqual(visualKnowledgeLibrary.canonicalRedirects, {
       "coq10-who-is-it-actually-for": "coq10-who-is-it-for",
       "health-check-leave-out-biomarkers": "expensive-health-check-leave-out",

@@ -131,7 +131,7 @@ describe("central ICU i18n catalog", () => {
     assert.match(t("zh-CN", "customer.libraryIndex.headerTitle"), /知量/);
   });
 
-  it("keeps Thai public copy aligned to the pre-Mandarin-refresh baseline", () => {
+  it("keeps Thai public copy aligned to the ttf hand-off baseline", () => {
     assert.equal(
       thCatalog["customer.footer.body"],
       "แผนสุขภาพเฉพาะบุคคลที่ใช้ AI ช่วยออกแบบจากเชียงใหม่ เพื่อชีวิตในเอเชียตะวันออกเฉียงใต้ ภูมิปัญญาเดิม · วิทยาศาสตร์สมัยใหม่"
@@ -142,7 +142,7 @@ describe("central ICU i18n catalog", () => {
     );
     assert.equal(
       thCatalog["customer.landing.hero.intro"],
-      "แผนอาหารเสริมและสุขภาพที่ใช้ AI ช่วยออกแบบให้เข้ากับร่างกาย ไลฟ์สไตล์ และเป้าหมายที่สำคัญกับคุณจริง ๆ และปรับตามชีวิตที่เปลี่ยนไป"
+      "แผนอาหารเสริมและการดูแลสุขภาพที่ออกแบบให้เหมาะกับร่างกาย ไลฟ์สไตล์ และเป้าหมายที่สำคัญกับคุณจริง ๆ พร้อมปรับให้เข้ากับจังหวะชีวิตที่เปลี่ยนไป"
     );
     assert.equal(thCatalog["customer.landing.pricing.trust.3.0"], "AI + คนดูแล");
     assert.equal(
@@ -151,7 +151,7 @@ describe("central ICU i18n catalog", () => {
     );
     assert.equal(
       thCatalog["seo.routes.home.description"],
-      "แผนอาหารเสริมและสุขภาพเฉพาะบุคคลด้วย AI ออกแบบจากเชียงใหม่เพื่อชีวิตในเอเชียตะวันออกเฉียงใต้ เลิกเดา เริ่มรู้"
+      "แผนอาหารเสริมและการดูแลสุขภาพเฉพาะบุคคล ออกแบบจากเชียงใหม่เพื่อชีวิตคนเอเชียตะวันออกเฉียงใต้ เลิกเดา เริ่มรู้จริง"
     );
 
     assert.equal(
@@ -171,17 +171,11 @@ describe("central ICU i18n catalog", () => {
       "รวมกันแล้วมีประสบการณ์มากกว่าร้อยปีในงานแพทย์ วิทยาศาสตร์ เทคโนโลยี และการสร้างสิ่งที่ใช้งานได้จริง"
     );
 
-    assert.equal(
-      thCatalog["customer.landing.bridge.cta"],
-      "ออกแบบปริมาณที่พอดีของคุณ"
-    );
-    assert.equal(
-      thCatalog["customer.landing.results.cta"],
-      "ออกแบบปริมาณที่พอดีของคุณ"
-    );
+    assert.equal(thCatalog["customer.landing.bridge.cta"], "เริ่มประเมินฟรี");
+    assert.equal(thCatalog["customer.landing.results.cta"], "เริ่มประเมินฟรี");
     assert.equal(
       thCatalog["customer.landing.questionnaire.cta"],
-      "ออกแบบปริมาณที่พอดีของคุณ"
+      "เริ่มประเมินฟรี"
     );
 
     const healthScoreTh = pageCopy.th;

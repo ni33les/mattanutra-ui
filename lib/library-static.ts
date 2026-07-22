@@ -123,6 +123,7 @@ export type StaticLibraryArticleContent = Readonly<{
   citations: readonly string[];
   dateModified: string;
   datePublished: string;
+  featured?: boolean;
   nongPose?: string;
   pose: string;
   redirects?: readonly string[];

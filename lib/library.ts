@@ -23,15 +23,11 @@ import {
 import { absoluteUrl } from "@/lib/seo";
 
 export type LibraryCategorySlug =
-  | "brain-focus"
   | "energy-longevity"
   | "everyday-nutrition"
   | "foundations"
-  | "joints-mobility"
   | "minerals"
   | "sleep-recovery"
-  | "stress-adaptogens"
-  | "testing-personalisation"
   | "vitamins";
 
 export type LibraryCategory = Readonly<{
@@ -41,10 +37,13 @@ export type LibraryCategory = Readonly<{
 
 export type NongPose =
   | "ask"
+  | "bloated"
   | "celebrate"
   | "comparing"
   | "coffee"
+  | "energetic"
   | "explaining"
+  | "gut-bloated"
   | "kneeling"
   | "measuring"
   | "money"
@@ -52,9 +51,59 @@ export type NongPose =
   | "open"
   | "reassuring"
   | "sleep-supine"
+  | "spicy-bloated"
   | "stressed"
   | "thinking"
+  | "vegan"
   | "warning";
+
+const nongPoses = [
+  "ask",
+  "bloated",
+  "celebrate",
+  "comparing",
+  "coffee",
+  "energetic",
+  "explaining",
+  "gut-bloated",
+  "kneeling",
+  "measuring",
+  "money",
+  "muscular",
+  "open",
+  "reassuring",
+  "sleep-supine",
+  "spicy-bloated",
+  "stressed",
+  "thinking",
+  "vegan",
+  "warning"
+] as const satisfies readonly NongPose[];
+
+const nongPoseSet = new Set<string>(nongPoses);
+
+function normalizeNongPoseToken(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  const withoutPrefix = trimmed.startsWith("nong_")
+    ? trimmed.slice("nong_".length)
+    : trimmed.startsWith("nong-")
+      ? trimmed.slice("nong-".length)
+      : trimmed;
+  return withoutPrefix.replaceAll("_", "-");
+}
+
+function isNongPose(value: unknown): value is NongPose {
+  return typeof value === "string" && nongPoseSet.has(normalizeNongPoseToken(value));
+}
+
+function toNongPose(value: unknown): NongPose {
+  if (typeof value !== "string") {
+    return "thinking";
+  }
+
+  const normalized = normalizeNongPoseToken(value);
+  return nongPoseSet.has(normalized) ? (normalized as NongPose) : "thinking";
+}
 
 export type LibraryArticleSource = "blog" | "static";
 
@@ -124,24 +173,16 @@ export const libraryCategories = [
   { label: "Vitamins", slug: "vitamins" },
   { label: "Minerals", slug: "minerals" },
   { label: "Sleep & Recovery", slug: "sleep-recovery" },
-  { label: "Everyday Nutrition", slug: "everyday-nutrition" },
   { label: "Energy & Longevity", slug: "energy-longevity" },
-  { label: "Stress & Adaptogens", slug: "stress-adaptogens" },
-  { label: "Brain & Focus", slug: "brain-focus" },
-  { label: "Joints & Mobility", slug: "joints-mobility" },
-  { label: "Testing & Personalisation", slug: "testing-personalisation" }
+  { label: "Everyday Nutrition", slug: "everyday-nutrition" }
 ] as const satisfies readonly LibraryCategory[];
 
 const libraryCategoryMessageIds = {
-  "brain-focus": "customer.libraryCategories.brainFocus",
   "energy-longevity": "customer.libraryCategories.energyLongevity",
   "everyday-nutrition": "customer.libraryCategories.everydayNutrition",
   foundations: "customer.libraryCategories.foundations",
-  "joints-mobility": "customer.libraryCategories.jointsMobility",
   minerals: "customer.libraryCategories.minerals",
   "sleep-recovery": "customer.libraryCategories.sleepRecovery",
-  "stress-adaptogens": "customer.libraryCategories.stressAdaptogens",
-  "testing-personalisation": "customer.libraryCategories.testingPersonalisation",
   vitamins: "customer.libraryCategories.vitamins"
 } satisfies Record<LibraryCategorySlug, MessageId>;
 
@@ -256,30 +297,6 @@ function isCategorySlug(value: unknown): value is LibraryCategorySlug {
 
 function toCategorySlug(value: unknown): LibraryCategorySlug {
   return isCategorySlug(value) ? value : "foundations";
-}
-
-function isNongPose(value: unknown): value is NongPose {
-  return (
-    value === "ask" ||
-    value === "celebrate" ||
-    value === "comparing" ||
-    value === "coffee" ||
-    value === "explaining" ||
-    value === "kneeling" ||
-    value === "measuring" ||
-    value === "money" ||
-    value === "muscular" ||
-    value === "open" ||
-    value === "reassuring" ||
-    value === "sleep-supine" ||
-    value === "stressed" ||
-    value === "thinking" ||
-    value === "warning"
-  );
-}
-
-function toNongPose(value: unknown): NongPose {
-  return isNongPose(value) ? value : "thinking";
 }
 
 function hasStructuredBody(body: BlogArticleBody) {
@@ -403,7 +420,45 @@ export async function getLibraryArticles(locale: Locale) {
 }
 
 export async function getFeaturedLibraryArticles(locale: Locale, limit = 3) {
-  return (await getLibraryArticles(locale)).slice(0, Math.max(1, limit));
+  const safeLimit = Math.max(1, limit);
+  const articles = await getLibraryArticles(locale);
+  const bySlug = new Map(articles.map((article) => [article.slug, article]));
+
+  // Hand-off rule: prefer manifest featured:true, then fill by datePublished desc.
+  const featuredFromManifest = staticLibraryArticles
+    .filter((article) => article.featured)
+    .map((article) => bySlug.get(article.slug))
+    .filter((article): article is LibraryArticleSummary => Boolean(article));
+
+  const selected: LibraryArticleSummary[] = [];
+  const seen = new Set<string>();
+
+  for (const article of featuredFromManifest) {
+    if (seen.has(article.slug)) {
+      continue;
+    }
+    selected.push(article);
+    seen.add(article.slug);
+    if (selected.length >= safeLimit) {
+      return selected;
+    }
+  }
+
+  const remainder = articles
+    .filter((article) => !seen.has(article.slug))
+    .sort((first, second) => {
+      const dateSort = second.datePublished.localeCompare(first.datePublished);
+      return dateSort || first.title.localeCompare(second.title);
+    });
+
+  for (const article of remainder) {
+    selected.push(article);
+    if (selected.length >= safeLimit) {
+      break;
+    }
+  }
+
+  return selected;
 }
 
 function shuffledArticles<T>(articles: readonly T[]) {

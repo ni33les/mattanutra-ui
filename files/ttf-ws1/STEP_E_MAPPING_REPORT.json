@@ -1,0 +1,541 @@
+{
+  "updates": 178,
+  "unmatched": [
+    {
+      "key": "customer.libraryArticleActions.copiedLabel",
+      "en": "Copied"
+    },
+    {
+      "key": "customer.libraryArticleActions.shareLabel",
+      "en": "Share"
+    },
+    {
+      "key": "customer.libraryCategories.brainFocus",
+      "en": "Brain & Focus"
+    },
+    {
+      "key": "customer.libraryCategories.jointsMobility",
+      "en": "Joints & Mobility"
+    },
+    {
+      "key": "customer.libraryCategories.stressAdaptogens",
+      "en": "Stress & Adaptogens"
+    },
+    {
+      "key": "customer.libraryCategories.testingPersonalisation",
+      "en": "Testing & Personalisation"
+    },
+    {
+      "key": "customer.libraryIndex.articleImageAltPrefix",
+      "en": "Nong Matta illustration"
+    },
+    {
+      "key": "customer.libraryIndex.articleListName",
+      "en": "The MattaNutra Library articles"
+    },
+    {
+      "key": "customer.libraryIndex.breadcrumbLabel",
+      "en": "Breadcrumb"
+    },
+    {
+      "key": "customer.libraryIndex.categoryLabel",
+      "en": "Category"
+    },
+    {
+      "key": "customer.libraryIndex.clearSearch",
+      "en": "Clear search"
+    },
+    {
+      "key": "customer.libraryIndex.ctaBody",
+      "en": "A few minutes gives MattaNutra the context it needs to turn broad answers into your Right Amount."
+    },
+    {
+      "key": "customer.libraryIndex.ctaTitle",
+      "en": "Ready to make the guidance personal?"
+    },
+    {
+      "key": "customer.libraryIndex.featuredListName",
+      "en": "The MattaNutra Library - Featured articles"
+    },
+    {
+      "key": "customer.libraryIndex.guide",
+      "en": "Your guide"
+    },
+    {
+      "key": "customer.libraryIndex.headerGuide",
+      "en": "Guided by Nong Matta, our resident wellness sprout."
+    },
+    {
+      "key": "customer.libraryIndex.headerIntro",
+      "en": "Clear, evidence-aware answers to the supplement questions people actually ask - magnesium, vitamin D"
+    },
+    {
+      "key": "customer.libraryIndex.intro",
+      "en": "Evidence-aware answers to common supplement questions - clear enough to use, careful enough to trust"
+    },
+    {
+      "key": "customer.libraryIndex.noContentNote",
+      "en": "Full Library article content is being prepared for this locale."
+    },
+    {
+      "key": "customer.libraryIndex.result",
+      "en": "article"
+    },
+    {
+      "key": "customer.libraryIndex.results",
+      "en": "articles"
+    },
+    {
+      "key": "customer.libraryIndex.searchPlaceholder",
+      "en": "Search the Library - try \"magnesium\" or \"sleep\""
+    },
+    {
+      "key": "customer.libraryIndex.sectionIntro",
+      "en": "Plain-language supplement answers, guided by Nong Matta."
+    },
+    {
+      "key": "customer.libraryIndex.title",
+      "en": "Evidence-aware answers to your supplement questions"
+    },
+    {
+      "key": "customer.landing.faq.accent",
+      "en": "honest answers."
+    },
+    {
+      "key": "customer.landing.faq.title",
+      "en": "Good questions,"
+    },
+    {
+      "key": "customer.landing.food.imageAlt",
+      "en": "A nourishing bowl with fish, greens, broccoli, black beans, brown rice and pumpkin seeds"
+    },
+    {
+      "key": "customer.landing.journal.browse",
+      "en": "Browse all articles"
+    },
+    {
+      "key": "customer.landing.journal.fallback.0.1",
+      "en": "Why \"more\" is rarely the answer with supplements"
+    },
+    {
+      "key": "customer.landing.journal.fallback.0.2",
+      "en": "The science of sufficiency — and why your body often needs less than the label suggests."
+    },
+    {
+      "key": "customer.landing.journal.fallback.1.0",
+      "en": "Nutrition"
+    },
+    {
+      "key": "customer.landing.journal.fallback.1.1",
+      "en": "Eight everyday foods richer in magnesium than you'd think"
+    },
+    {
+      "key": "customer.landing.journal.fallback.1.2",
+      "en": "Before you reach for a capsule, check your plate — these staples do a lot of quiet work."
+    },
+    {
+      "key": "customer.landing.journal.fallback.2.0",
+      "en": "Living well"
+    },
+    {
+      "key": "customer.landing.journal.fallback.2.1",
+      "en": "How travel quietly changes what your body needs"
+    },
+    {
+      "key": "customer.landing.journal.fallback.2.2",
+      "en": "Timezones, sleep and hydration all shift the maths — here's how to adjust without overthinking."
+    },
+    {
+      "key": "customer.landing.journal.readMore",
+      "en": "Read article"
+    },
+    {
+      "key": "customer.landing.origin.accent",
+      "en": "where the right amount is a way of life."
+    },
+    {
+      "key": "customer.landing.origin.body",
+      "en": "MattaNutra began in northern Thailand, where traditions of moderation — eating just enough, resting "
+    },
+    {
+      "key": "customer.landing.origin.body2",
+      "en": "We built MattaNutra to translate that quiet wisdom into something modern, measurable, and personal: "
+    },
+    {
+      "key": "customer.landing.origin.buildAlt",
+      "en": "The MattaNutra logo, built in five stages from outline to finished mark"
+    },
+    {
+      "key": "customer.landing.origin.founderParagraphs.0",
+      "en": "What goes into your body should be designed by people who understand what's actually in it."
+    },
+    {
+      "key": "customer.landing.origin.founderParagraphs.1",
+      "en": "MattaNutra was founded by an international group with an unusually broad foundation: two physicians "
+    },
+    {
+      "key": "customer.landing.origin.founderParagraphs.2",
+      "en": "Between us, more than a hundred years of professional practice — in medicine, in science, in technol"
+    },
+    {
+      "key": "customer.landing.origin.founders",
+      "en": "Founded by physicians, scientists, and innovative AI thinkers."
+    },
+    {
+      "key": "customer.landing.origin.signoff",
+      "en": "From Chiang Mai, with care."
+    },
+    {
+      "key": "customer.landing.origin.title",
+      "en": "Designed in Chiang Mai,"
+    },
+    {
+      "key": "customer.landing.practice.accent",
+      "en": "No apps to learn."
+    },
+    {
+      "key": "customer.landing.practice.steps.0.2.0",
+      "en": "Sleeping badly this week."
+    },
+    {
+      "key": "customer.landing.practice.steps.0.2.1",
+      "en": "Travelling for work tomorrow."
+    },
+    {
+      "key": "customer.landing.practice.steps.0.2.2",
+      "en": "Started training harder lately."
+    },
+    {
+      "key": "customer.landing.practice.steps.1.2.0",
+      "en": "Move magnesium slightly earlier this week."
+    },
+    {
+      "key": "customer.landing.practice.steps.1.2.1",
+      "en": "Pumpkin seeds are a great natural source of magnesium."
+    },
+    {
+      "key": "customer.landing.practice.steps.1.2.2",
+      "en": "Hold your adaptogen steady until sleep settles."
+    },
+    {
+      "key": "customer.landing.practice.steps.2.2.0",
+      "en": "No need to rethink your routine every time life shifts."
+    },
+    {
+      "key": "customer.landing.practice.steps.2.2.1",
+      "en": "Small adjustments keep your plan realistic."
+    },
+    {
+      "key": "customer.landing.practice.steps.2.2.2",
+      "en": "Your right amount stays right."
+    },
+    {
+      "key": "customer.landing.practice.title",
+      "en": "Three steps."
+    },
+    {
+      "key": "customer.landing.pricing.accent",
+      "en": "Upgrade when ready."
+    },
+    {
+      "key": "customer.landing.pricing.eyebrow",
+      "en": "Simple pricing"
+    },
+    {
+      "key": "customer.landing.pricing.intro",
+      "en": "Take the free questionnaire to get a starting plan. Upgrade only when you want deeper precision or o"
+    },
+    {
+      "key": "customer.landing.pricing.offer",
+      "en": "Limited time offer"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.badge",
+      "en": "One-time plan"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.best",
+      "en": "People who want a clear, confident starting point — the right amount, made for them."
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.cta",
+      "en": "Get the Right Amount Formula"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.desc",
+      "en": "Your personalised supplement formula with precise dosing, timing, and product guidance."
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.features.0",
+      "en": "Personalised supplement formula"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.features.1",
+      "en": "Body-size adjusted dose ranges"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.features.2",
+      "en": "Timing and usage instructions"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.features.3",
+      "en": "Medication and lab safety flags"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.features.4",
+      "en": "Recommended products and alternatives"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.features.5",
+      "en": "60-day reassessment prompt"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.guarantee",
+      "en": "If your plan doesn't feel clear and useful, we'll make it right or refund you within 7 days."
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.guaranteeTitle",
+      "en": "Clarity Guarantee."
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.name",
+      "en": "Right Amount Formula"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.plan",
+      "en": "precision"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.saving",
+      "en": "Save 30%"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.term",
+      "en": "One-time payment · Lifetime access"
+    },
+    {
+      "key": "customer.landing.pricing.plans.0.termLabel",
+      "en": "One-time"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.badge",
+      "en": "Premium · 90-day support"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.best",
+      "en": "People who want their plan to keep up with the reality of everyday life."
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.cta",
+      "en": "Start Living Protocol"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.desc",
+      "en": "Keep your right amount right as life changes. Everything in the Right Amount Formula, plus ongoing a"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.features.0",
+      "en": "Includes your full Right Amount Formula"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.features.1",
+      "en": "Learn which everyday foods give you what you need"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.features.2",
+      "en": "Adjusts timing and dosage as life changes"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.features.3",
+      "en": "Every change checked against your medications and labs"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.features.4",
+      "en": "Remembers your patterns over 90 days"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.features.5",
+      "en": "Just message when something changes — no apps, no tracking"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.features.6",
+      "en": "Stay consistent through travel, stress and disrupted sleep"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.guarantee",
+      "en": "Give Living Protocol a real try. If anything's not right, tell us — we'll fix it, or refund you in f"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.guaranteeTitle",
+      "en": "7-Day Satisfaction Guarantee."
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.plan",
+      "en": "pro"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.popular",
+      "en": "Most popular"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.saving",
+      "en": "Save 16%"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.term",
+      "en": "One payment · 90 days of support · Renew anytime"
+    },
+    {
+      "key": "customer.landing.pricing.plans.1.termLabel",
+      "en": "For 90 days"
+    },
+    {
+      "key": "customer.landing.pricing.title",
+      "en": "Start free."
+    },
+    {
+      "key": "customer.landing.pricing.trust.0.0",
+      "en": "Secure & private"
+    },
+    {
+      "key": "customer.landing.pricing.trust.0.1",
+      "en": "Your data is encrypted and never shared."
+    },
+    {
+      "key": "customer.landing.pricing.trust.1.0",
+      "en": "Science-backed"
+    },
+    {
+      "key": "customer.landing.pricing.trust.1.1",
+      "en": "Personalised recommendations based on trusted evidence."
+    },
+    {
+      "key": "customer.landing.pricing.trust.2.0",
+      "en": "Adapt & improve"
+    },
+    {
+      "key": "customer.landing.pricing.trust.2.1",
+      "en": "Plans evolve as your body and goals change."
+    },
+    {
+      "key": "customer.landing.pricing.trust.3.0",
+      "en": "Human-reviewed safeguards"
+    },
+    {
+      "key": "customer.landing.pricing.trust.3.1",
+      "en": "Personalised guidance with human-reviewed safeguards."
+    },
+    {
+      "key": "customer.landing.problem.accent",
+      "en": "Too little certainty."
+    },
+    {
+      "key": "customer.landing.problem.body",
+      "en": "Walk into any pharmacy and the wall of supplements is overwhelming. Hundreds of options, conflicting"
+    },
+    {
+      "key": "customer.landing.problem.body2",
+      "en": "Most people end up guessing — buying too much of what they don't need, missing what they do, and qui"
+    },
+    {
+      "key": "customer.landing.problem.eyebrow",
+      "en": "The problem"
+    },
+    {
+      "key": "customer.landing.problem.imageAlt",
+      "en": "Shopper overwhelmed by supplement choices"
+    },
+    {
+      "key": "customer.landing.problem.title",
+      "en": "Too many bottles."
+    },
+    {
+      "key": "customer.landing.promises.eyebrow",
+      "en": "What you can expect"
+    },
+    {
+      "key": "customer.landing.promises.intro",
+      "en": "What every MattaNutra plan is designed to deliver."
+    },
+    {
+      "key": "customer.landing.questionnaire.body",
+      "en": "Here’s how the questionnaire estimates just your vitamin D — one of 120+ ingredients the algorithm w"
+    },
+    {
+      "key": "customer.landing.questionnaire.quote",
+      "en": "There are no right or wrong answers here, only true ones. The more honestly you answer, the more exa"
+    },
+    {
+      "key": "customer.landing.questionnaire.title",
+      "en": "A glimpse inside the questionnaire."
+    },
+    {
+      "key": "customer.landing.results.fallback.0.imageAlt",
+      "en": "Daniel L. sitting by a window"
+    },
+    {
+      "key": "customer.landing.results.fallback.1.imageAlt",
+      "en": "Mei Lin T. smiling on a school walkway"
+    },
+    {
+      "key": "customer.landing.results.fallback.2.imageAlt",
+      "en": "Wanida P. in her shop"
+    },
+    {
+      "key": "customer.landing.results.fallback.3.imageAlt",
+      "en": "Malee S. seated in a garden courtyard"
+    },
+    {
+      "key": "customer.landing.results.fallback.3.place",
+      "en": "41, Phuket"
+    },
+    {
+      "key": "customer.landing.results.fallback.3.role",
+      "en": "Nurse Aide"
+    },
+    {
+      "key": "customer.landing.results.join",
+      "en": "Make smarter, more confident choices for your health."
+    },
+    {
+      "key": "seo.routes.home.description",
+      "en": "Personalised supplement and wellness plans, designed in Chiang Mai for Southeast Asian lives. Stop g"
+    },
+    {
+      "key": "seo.routes.home.title",
+      "en": "MattaNutra — Stop guessing. Start knowing."
+    }
+  ],
+  "sampleUpdates": {
+    "customer.libraryIndex.browse": "เข้าชมคลังความรู้",
+    "customer.libraryIndex.ctaButton": "เริ่มประเมินฟรี",
+    "customer.libraryIndex.ctaImageAlt": "Nong Matta celebrating",
+    "customer.libraryIndex.empty": "ยังไม่พบบทความที่ตรงกับการค้นหา ลองเปลี่ยนคำค้นหรือหมวดหมู่ดู แล้วเราจะทยอยเพิ่มบทความใหม่เรื่อย ๆ",
+    "customer.libraryIndex.guideImageAlt": "Nong Matta, the MattaNutra Library guide",
+    "customer.libraryIndex.guideName": "Nong Matta",
+    "customer.libraryIndex.headerIntroEmphasis": "การรู้จริง",
+    "customer.libraryIndex.headerTitle": "เรียนรู้ ปริมาณที่พอดี",
+    "customer.libraryIndex.landingIntro": "คำตอบที่ชัดเจนและอ้างอิงหลักฐาน สำหรับคำถามเรื่องอาหารเสริมที่ผู้คนถามกันจริง ๆ - เพื่อให้คุณตัดสินใจจากความรู้ ไม่ใช่การเดา",
+    "customer.libraryIndex.loadMore": "ดูบทความเพิ่มเติม",
+    "customer.libraryIndex.searchLabel": "ค้นหาในคลังความรู้",
+    "customer.landing.bridge.body": "เริ่มจากแบบสอบถามสั้น ๆ ที่ละเอียด พร้อม Health Score ฟรี แผนเฉพาะบุคคลของคุณ - และตัวเลือกเสริม Living Protocol - อยู่ห่างออกไปเพียงก้าวเดียว",
+    "customer.landing.bridge.cta": "เริ่มประเมินฟรี",
+    "customer.landing.bridge.note": "เริ่มฟรี - ไม่ต้องใช้บัตรเครดิต",
+    "customer.landing.bridge.title": "พร้อมเริ่มประเมินฟรีหรือยัง?",
+    "customer.landing.clarity.accent": "ให้ MattaNutra ช่วยให้ทุกอย่างชัดเจน",
+    "customer.landing.clarity.body": "เดินเข้าร้านขายยาหรือค้นหาออนไลน์ทีไร ก็มีแต่ความสับสน MattaNutra พาคุณจากตัวเลือกนับร้อย เหลือเพียงไม่กี่อย่างที่ใช่และเหมาะกับคุณโดยเฉพาะ นี่แหละคือ การรู้ปริมาณที่พอดี",
+    "customer.landing.clarity.cards.0.body": "ตัวเลือกนับร้อย แต่ไม่มีคำตอบที่ชัดเจน",
+    "customer.landing.clarity.cards.0.imageAlt": "สับสนอยู่หน้าชั้นวางอาหารเสริม",
+    "customer.landing.clarity.cards.0.title": "สับสนไปหมด",
+    "customer.landing.clarity.cards.1.body": "คำแนะนำที่ออกแบบมาเพื่อคุณโดยเฉพาะ",
+    "customer.landing.clarity.cards.1.imageAlt": "เริ่มเห็นทางที่ชัดเจน",
+    "customer.landing.clarity.cards.1.title": "เริ่มเห็นทางที่ชัดเจน",
+    "customer.landing.clarity.cards.2.body": "เหลือเพียงสิ่งที่ร่างกายคุณต้องการจริง ๆ",
+    "customer.landing.clarity.cards.2.imageAlt": "คัดให้เหลือเฉพาะสิ่งที่สำคัญ",
+    "customer.landing.clarity.cards.2.title": "คัดให้เหลือสิ่งที่ใช่",
+    "customer.landing.clarity.cards.3.body": "ปริมาณที่พอดี - อยู่ในมือคุณแล้ว",
+    "customer.landing.clarity.cards.3.imageAlt": "ได้สิ่งที่ต้องการอย่างพอดี อยู่ในมือ",
+    "customer.landing.clarity.cards.3.title": "พอดีอย่างแท้จริง",
+    "customer.landing.clarity.eyebrow": "จากความสับสน สู่ความชัดเจน"
+  }
+}

@@ -8,7 +8,7 @@ import {
 } from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
-import { getRandomLibraryArticles } from "@/lib/library";
+import { getFeaturedLibraryArticles } from "@/lib/library";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { siteBaseUrl } from "@/lib/site-url";
@@ -77,7 +77,7 @@ export default async function Home({ params }: HomeProps) {
 
   const databaseReady = await checkDatabaseConnection();
 
-  const libraryArticles = await getRandomLibraryArticles(locale, 3);
+  const libraryArticles = await getFeaturedLibraryArticles(locale, 3);
   const testimonials = databaseReady
     ? await getHomepageTestimonials(locale, 4)
     : [];

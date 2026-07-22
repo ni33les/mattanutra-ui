@@ -1,0 +1,211 @@
+{
+  "capturedAt": "2026-07-22T07:08:10.892285+00:00",
+  "workstream": 1,
+  "purpose": "Pre-implementation snapshot before Workstream 1 Thai landing+library port",
+  "library": {
+    "articleCount": 30,
+    "slugs": [
+      "blood-panel-personalise-supplements-cost",
+      "blood-test-personalise-supplements",
+      "brain-supplements-real-reason-routine",
+      "citicoline-vs-alpha-gpc",
+      "collagen-skin-joints-or-hype",
+      "coq10-who-is-it-for",
+      "curcumin-when-is-it-worth-taking",
+      "do-you-need-a-probiotic",
+      "do-you-really-need-a-multivitamin",
+      "expensive-health-check-leave-out",
+      "expensive-health-check-nutrition",
+      "food4me-study-personalised-nutrition",
+      "glycinate-vs-citrate",
+      "how-much-turmeric-equals-150mg-curcumin",
+      "is-creatine-just-for-bodybuilders",
+      "joint-supplements-glucosamine-collagen-curcumin",
+      "lions-mane-supplement-worth-it",
+      "magnesium-for-sleep",
+      "magnesium-glycine-theanine-gaba-sleep-support",
+      "rhodiola-energy-support-or-stress-support",
+      "rhodiola-vs-caffeine-coffee",
+      "should-you-take-magnesium-every-day",
+      "should-you-take-omega-3-every-day",
+      "signs-you-may-be-low-in-magnesium",
+      "sleep-support-without-sleeping-pills",
+      "vitamin-d-in-thailand",
+      "vitamin-d-magnesium-zinc",
+      "which-supplements-should-you-take",
+      "why-stress-changes-your-supplement-needs",
+      "zinc-supplements-helpful-or-overused"
+    ],
+    "categories": [
+      {
+        "slug": "foundations",
+        "labels": {
+          "en": "Foundations",
+          "th": "พื้นฐาน",
+          "zh-CN": "基础知识"
+        }
+      },
+      {
+        "slug": "vitamins",
+        "labels": {
+          "en": "Vitamins",
+          "th": "วิตามิน",
+          "zh-CN": "维生素"
+        }
+      },
+      {
+        "slug": "minerals",
+        "labels": {
+          "en": "Minerals",
+          "th": "แร่ธาตุ",
+          "zh-CN": "矿物质"
+        }
+      },
+      {
+        "slug": "sleep-recovery",
+        "labels": {
+          "en": "Sleep & Recovery",
+          "th": "การนอนและการฟื้นตัว",
+          "zh-CN": "睡眠与恢复"
+        }
+      },
+      {
+        "slug": "energy-longevity",
+        "labels": {
+          "en": "Energy & Longevity",
+          "th": "พลังงานและอายุยืน",
+          "zh-CN": "能量与长寿"
+        }
+      },
+      {
+        "slug": "everyday-nutrition",
+        "labels": {
+          "en": "Everyday Nutrition",
+          "th": "โภชนาการประจำวัน",
+          "zh-CN": "日常营养"
+        }
+      },
+      {
+        "slug": "stress-adaptogens",
+        "labels": {
+          "en": "Stress & Adaptogens",
+          "th": "ความเครียดและสารปรับสมดุล",
+          "zh-CN": "压力与适应原"
+        }
+      },
+      {
+        "slug": "brain-focus",
+        "labels": {
+          "en": "Brain & Focus",
+          "th": "สมองและสมาธิ",
+          "zh-CN": "大脑与专注"
+        }
+      },
+      {
+        "slug": "joints-mobility",
+        "labels": {
+          "en": "Joints & Mobility",
+          "th": "ข้อต่อและการเคลื่อนไหว",
+          "zh-CN": "关节与活动力"
+        }
+      },
+      {
+        "slug": "testing-personalisation",
+        "labels": {
+          "en": "Testing & Personalisation",
+          "th": "การตรวจและการปรับให้เหมาะกับคุณ",
+          "zh-CN": "检测与个性化"
+        }
+      }
+    ],
+    "missingVsManifest": [
+      "gut-absorption-supplements",
+      "gut-health-supplements-when-make-sense",
+      "l-carnitine-and-your-energy",
+      "spicy-food-thailand-supplement-routine",
+      "which-supplements-do-vegans-actually-need"
+    ],
+    "extraVsManifest": [],
+    "shareImagesPublic": [
+      "share-blood-panel-personalise-supplements-cost.jpg",
+      "share-blood-test-personalise-supplements.jpg",
+      "share-brain-supplements-real-reason.jpg",
+      "share-citicoline-vs-alpha-gpc.jpg",
+      "share-collagen-skin-joints-hype.jpg",
+      "share-coq10-who-is-it-for.jpg",
+      "share-curcumin-worth-taking.jpg",
+      "share-do-you-need-a-probiotic.jpg",
+      "share-do-you-really-need-a-multivitamin.jpg",
+      "share-expensive-health-check-leave-out.jpg",
+      "share-expensive-health-check-nutrition.jpg",
+      "share-food4me-study-personalised-nutrition.jpg",
+      "share-glycinate-vs-citrate.jpg",
+      "share-is-creatine-just-for-bodybuilders.jpg",
+      "share-joint-supplements-glucosamine-collagen-curcumin.jpg",
+      "share-lions-mane-supplement-worth-it.jpg",
+      "share-magnesium-every-day.jpg",
+      "share-magnesium-sleep.jpg",
+      "share-rhodiola-energy-stress.jpg",
+      "share-rhodiola-vs-caffeine.jpg",
+      "share-should-you-take-omega-3-every-day.jpg",
+      "share-signs-low-magnesium.jpg",
+      "share-sleep-support-fits-you.jpg",
+      "share-sleep-without-sleeping-pills.jpg",
+      "share-stress-supplement-needs.jpg",
+      "share-turmeric-curcumin-equivalent.jpg",
+      "share-vitamin-d-magnesium-zinc.jpg",
+      "share-vitamin-d-thailand.jpg",
+      "share-which-supplements-guessing.jpg",
+      "share-zinc-helpful-overused.jpg"
+    ],
+    "nongAssetsPublic": [
+      "nong-ask.webp",
+      "nong-celebrate.webp",
+      "nong-coffee.webp",
+      "nong-comparing.webp",
+      "nong-explaining.webp",
+      "nong-kneeling.webp",
+      "nong-measuring.webp",
+      "nong-money.webp",
+      "nong-muscular.webp",
+      "nong-open.webp",
+      "nong-reassuring.webp",
+      "nong-sleep-supine.webp",
+      "nong-stressed.png",
+      "nong-stressed.webp",
+      "nong-thinking.webp",
+      "nong-warning.webp"
+    ],
+    "shareImageCount": 30,
+    "nongAssetCount": 16,
+    "homepageLibrarySelection": "getRandomLibraryArticles (not curated featured)",
+    "featuredRuleImplemented": false
+  },
+  "landingThaiSamples": {
+    "customer.landing.hero.title": "เลิกเดา.",
+    "customer.landing.hero.primary": "ออกแบบปริมาณที่พอดีของคุณ",
+    "customer.landing.hero.intro": "แผนอาหารเสริมและสุขภาพที่ใช้ AI ช่วยออกแบบให้เข้ากับร่างกาย ไลฟ์สไตล์ และเป้าหมายที่สำคัญกับคุณจริง ๆ และปรับตามชีวิตที่เปลี่ยนไป",
+    "customer.libraryIndex.headerTitle": "เรียนรู้ปริมาณที่พอดี",
+    "seo.routes.home.title": "MattaNutra | เลิกเดา เริ่มรู้"
+  },
+  "handoffLockSamples": {
+    "landingTitle": "MattaNutra — เลิกเดา เริ่มรู้จริง",
+    "landingH1": "เลิกเดาเริ่มรู้จริง",
+    "featured": [
+      "which-supplements-should-you-take",
+      "sleep-support-without-sleeping-pills",
+      "vitamin-d-in-thailand"
+    ]
+  },
+  "architectureBoundaries": {
+    "i18n": "content/i18n/* + visual-knowledge.json only for customer copy",
+    "rbac": "do not modify lib/admin-access* or lib/admin-rbac*",
+    "agents": "do not modify agent registry/workers",
+    "tasks": "do not modify task schemas/queue"
+  },
+  "manifestCheck": {
+    "entries": 186,
+    "result": "PASS",
+    "command": "python3 scripts/extract-ttf-ws1.py --verify"
+  }
+}
