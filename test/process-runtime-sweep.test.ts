@@ -328,14 +328,19 @@ describe("process runtime technical debt sweep", () => {
   });
 
   it("keeps admin communications as low-priority broadcast tasks for every enabled channel", async () => {
-    const communications = await readFile("lib/communications.ts", "utf8");
-    const queue = functionBody(communications, "queueAdminOrganisationCommunication");
-    const route = functionBody(communications, "routeAdminCommunication");
+    const [facade, shared, organisation] = await Promise.all([
+      readFile("lib/communications.ts", "utf8"),
+      readFile("lib/communications-shared.ts", "utf8"),
+      readFile("lib/communications-organisation.ts", "utf8")
+    ]);
+    const communications = `${facade}\n${shared}\n${organisation}`;
+    const queue = functionBody(facade, "queueAdminOrganisationCommunication");
+    const route = functionBody(facade, "routeAdminCommunication");
     const dispatchTaskType = functionBody(
-      communications,
+      organisation,
       "adminCommunicationDispatchTaskType"
     );
-    const dispatch = functionBody(communications, "queueCommunicationMessageDispatchTask");
+    const dispatch = functionBody(organisation, "queueCommunicationMessageDispatchTask");
 
     assert.match(communications, /ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY = 300/);
     assert.match(queue, /taskType: "route_admin_communication"/);

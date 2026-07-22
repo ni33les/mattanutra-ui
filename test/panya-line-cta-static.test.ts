@@ -4,13 +4,16 @@ import { describe, it } from "node:test";
 
 describe("reveal Panya LINE CTA", () => {
   it("places Panya as a top-level reveal section instead of a checkout widget", async () => {
-    const [reveal, cta, route, chatLinks, communications] = await Promise.all([
+    const [reveal, cta, route, chatLinks, communicationsFacade, communicationsShared] =
+      await Promise.all([
       readFile("components/reveal-final-results.tsx", "utf8"),
       readFile("components/living-protocol-line-cta.tsx", "utf8"),
       readFile("app/api/assessment/[planId]/line-connect/route.ts", "utf8"),
       readFile("lib/chat-links.ts", "utf8"),
       readFile("lib/communications.ts", "utf8"),
+      readFile("lib/communications-shared.ts", "utf8"),
     ]);
+    const communications = `${communicationsFacade}\n${communicationsShared}`;
 
     assert.match(reveal, /function RevealPanyaFinalSection/);
     assert.match(reveal, /id="panya-support"/);

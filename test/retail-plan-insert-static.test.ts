@@ -66,7 +66,10 @@ describe("retail plan insert static wiring", () => {
   });
 
   it("keeps reveal LINE codes short but makes shipping insert codes last 90 days", () => {
-    const communications = read("lib/communications.ts");
+    const communications = [
+      read("lib/communications.ts"),
+      read("lib/communications-organisation.ts")
+    ].join("\n");
     const revealRoute = read("app/api/assessment/[planId]/line-connect/route.ts");
     const insert = read("lib/retail-plan-insert.tsx");
 
