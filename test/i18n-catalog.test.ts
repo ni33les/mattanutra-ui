@@ -134,11 +134,11 @@ describe("central ICU i18n catalog", () => {
   it("keeps Thai public copy aligned to the ttf hand-off baseline", () => {
     assert.equal(
       thCatalog["customer.footer.body"],
-      "แผนสุขภาพเฉพาะบุคคลที่ใช้ AI ช่วยออกแบบจากเชียงใหม่ เพื่อชีวิตในเอเชียตะวันออกเฉียงใต้ ภูมิปัญญาเดิม · วิทยาศาสตร์สมัยใหม่"
+      "แผนดูแลสุขภาพเฉพาะบุคคล ออกแบบจากเชียงใหม่เพื่อชีวิตคนเอเชียตะวันออกเฉียงใต้ ภูมิปัญญาโบราณ · วิทยาศาสตร์สมัยใหม่"
     );
     assert.equal(
       thCatalog["customer.footer.copyright"],
-      "© 2026 MattaNutra · แผนสุขภาพเฉพาะบุคคลด้วย AI · เชียงใหม่ ประเทศไทย"
+      "© 2026 MattaNutra · แผนดูแลสุขภาพเฉพาะบุคคล · เชียงใหม่ ประเทศไทย"
     );
     assert.equal(
       thCatalog["customer.landing.hero.intro"],
@@ -156,19 +156,19 @@ describe("central ICU i18n catalog", () => {
 
     assert.equal(
       thCatalog["customer.landing.origin.founders"],
-      "ก่อตั้งโดยแพทย์ นักวิทยาศาสตร์ และนักคิดด้าน AI"
+      "ก่อตั้งโดยแพทย์ นักวิทยาศาสตร์ และนักคิดด้าน AI ผู้สร้างสรรค์สิ่งใหม่"
     );
     assert.equal(
       thCatalog["customer.landing.origin.founderParagraphs.0"],
-      "สิ่งที่เข้าสู่ร่างกายควรถูกออกแบบโดยคนที่เข้าใจว่าข้างในนั้นเกิดอะไรขึ้น"
+      "สิ่งที่คุณรับเข้าสู่ร่างกายควรได้รับการออกแบบโดยผู้ที่เข้าใจทั้งส่วนประกอบ หลักฐานทางวิทยาศาสตร์ และผลที่อาจเกิดขึ้นต่อร่างกาย"
     );
     assert.equal(
       thCatalog["customer.landing.origin.founderParagraphs.1"],
-      "ทีมของเรามีพื้นฐานหลากหลายทั้งแพทยศาสตร์ วิทยาศาสตร์ เทคโนโลยี เศรษฐศาสตร์ และการสร้างสิ่งที่อยู่ได้นาน"
+      "MattaNutra ก่อตั้งโดยทีมผู้เชี่ยวชาญจากหลายประเทศและหลากหลายสาขา ประกอบด้วยแพทย์สองท่านที่ผ่านการศึกษาและฝึกอบรมระดับ แพทยศาสตร์ควบปริญญาเอก (MD–PhD) จากสถาบันวิจัยชั้นนำ ได้แก่ Mahidol, Princeton, Stanford และ Harvard"
     );
     assert.equal(
       thCatalog["customer.landing.origin.founderParagraphs.2"],
-      "รวมกันแล้วมีประสบการณ์มากกว่าร้อยปีในงานแพทย์ วิทยาศาสตร์ เทคโนโลยี และการสร้างสิ่งที่ใช้งานได้จริง"
+      "ทีมยังมีวิศวกรซอฟต์แวร์ที่เริ่มต้นอาชีพที่ CERN และมีประสบการณ์ด้าน AI และระบบกระจายศูนย์กับองค์กรอย่าง Goldman Sachs และ UBS รวมถึงนักเศรษฐศาสตร์ระดับปริญญาเอกที่มีประสบการณ์ในตลาดทุนและธุรกิจเกิดใหม่ระดับโลก"
     );
 
     assert.equal(thCatalog["customer.landing.bridge.cta"], "เริ่มประเมินฟรี");

@@ -1,0 +1,37 @@
+{
+  "completedAt": "2026-07-22T08:47:30.359953+00:00",
+  "status": "ok",
+  "summary": "Thorough reconciliation of ttf.zip Workstream 1 Thai copy against product surfaces.",
+  "articleBodies": {
+    "count": 35,
+    "h1Fidelity": "match after NFC/ws normalize (parser preserves hand-off text)",
+    "titleExcerptVsManifest": "0 diffs",
+    "faqVsJsonLd": "aligned at build",
+    "deadHrefs": "none"
+  },
+  "landingChrome": {
+    "method": "Re-imported drifted sections from hand-off HTML (origin, protocol chat/reasoning/updates, FAQ, promises cards, food/clarity alts, footer, questionnaire body/title, CTAs)",
+    "locks": [
+      "hero: เลิกเดา / เริ่มรู้จริง / เริ่มประเมินฟรี",
+      "FAQ title/accent from h2",
+      "protocol strings with em dashes from hand-off",
+      "origin founders paragraphs from hand-off",
+      "promises four cards from #promises strip"
+    ],
+    "intentionallyNotInHandoff": [
+      "customer.landing.problem.* (section not in TH v20 hand-off HTML; retained prior catalog)",
+      "customer.landing.promises.eyebrow/intro (not rendered in hand-off promises strip)",
+      "customer.landing.journal.* (legacy journal section)",
+      "customer.landing.pricing.* (not part of this hand-off surface)"
+    ]
+  },
+  "libraryChrome": {
+    "headerTitle": "เรียนรู้ปริมาณที่พอดี",
+    "searchPlaceholder": "from library-th.html (unescaped entities)",
+    "categories": "from library-manifest.json TH labels"
+  },
+  "gates": {
+    "verify-ttf-ws1-integrity.py": "363 checks, 0 failures",
+    "unitTests": "45/45 pass"
+  }
+}
