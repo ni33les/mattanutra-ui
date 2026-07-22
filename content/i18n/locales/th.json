@@ -955,5 +955,11 @@
   "seo.routes.privacy.title": "นโยบายความเป็นส่วนตัว | MattaNutra",
   "seo.routes.terms.description": "อ่านเงื่อนไขการใช้บริการ MattaNutra สำหรับแบบประเมิน แผน คำแนะนำผลิตภัณฑ์ และบริการแพลตฟอร์ม",
   "seo.routes.terms.title": "เงื่อนไขการใช้บริการ | MattaNutra",
-  "customer.landing.questionnaire.cta": "เริ่มประเมินฟรี"
+  "customer.landing.questionnaire.cta": "เริ่มประเมินฟรี",
+  "customer.libraryIndex.openGraphTitle": "คลังความรู้ MattaNutra — Evidence-Aware Supplement Answers",
+  "customer.libraryIndex.openGraphDescription": "Clear, evidence-aware answers to common supplement questions. Learn what actually fits your body.",
+  "customer.titleBar.logoAlt": "โลโก้ MattaNutra",
+  "seo.routes.home.openGraphDescription": "อาหารเสริมที่ออกแบบเฉพาะคุณ จากแบบประเมินที่ละเอียดและตรงประเด็น พร้อมการดูแลและปรับแผนต่อเนื่อง 90 วัน",
+  "seo.routes.home.twitterDescription": "อาหารเสริมที่ออกแบบเฉพาะคุณ จากแบบประเมินที่ละเอียดและตรงประเด็น",
+  "customer.landing.hero.figureAlt": "สัญลักษณ์ MattaNutra"
 }

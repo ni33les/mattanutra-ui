@@ -109,10 +109,18 @@ export type VisualKnowledgeTranslation = Readonly<{
   excerpt: string;
   faqs: readonly VisualKnowledgeFaq[];
   imageAlt: string;
+  /** Open Graph description from hand-off HTML (often shorter than meta description). */
+  ogDescription?: string;
+  /** Open Graph title from hand-off HTML (bare title, no library suffix). */
+  ogTitle?: string;
   page?: LibraryVisualPage;
   quiz: VisualKnowledgeQuiz;
   seoTitle: string;
   title: string;
+  /** Twitter description from hand-off HTML when distinct from og:description. */
+  twitterDescription?: string;
+  /** Twitter title from hand-off HTML when distinct from og:title. */
+  twitterTitle?: string;
 }>;
 
 export type StaticLibraryArticleContent = Readonly<{

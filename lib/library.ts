@@ -124,8 +124,12 @@ export type LibraryArticleSummary = Readonly<{
 export type LibraryArticle = LibraryArticleSummary &
   Readonly<{
     post?: BlogPost;
+    ogDescription?: string;
+    ogTitle?: string;
     seoDescription: string;
     seoTitle: string;
+    twitterDescription?: string;
+    twitterTitle?: string;
     visual?: StaticLibraryArticleContent;
     visualTranslation?: VisualKnowledgeTranslation;
   }>;
@@ -147,6 +151,8 @@ type LibraryCopy = Readonly<{
   documentTitle: string;
   empty: string;
   eyebrow: string;
+  openGraphDescription: string;
+  openGraphTitle: string;
   featuredListName: string;
   guide: string;
   guideImageAlt: string;
@@ -222,6 +228,8 @@ const libraryCopyMessageIds = {
   documentTitle: "customer.libraryIndex.documentTitle",
   empty: "customer.libraryIndex.empty",
   eyebrow: "customer.libraryIndex.eyebrow",
+  openGraphDescription: "customer.libraryIndex.openGraphDescription",
+  openGraphTitle: "customer.libraryIndex.openGraphTitle",
   featuredListName: "customer.libraryIndex.featuredListName",
   guide: "customer.libraryIndex.guide",
   guideImageAlt: "customer.libraryIndex.guideImageAlt",
@@ -509,8 +517,16 @@ export async function getLibraryArticle(
 
     return {
       ...summary,
+      ogDescription: translation.ogDescription ?? translation.description,
+      ogTitle: translation.ogTitle ?? translation.seoTitle,
       seoDescription: translation.description,
       seoTitle: translation.seoTitle,
+      twitterDescription:
+        translation.twitterDescription ??
+        translation.ogDescription ??
+        translation.description,
+      twitterTitle:
+        translation.twitterTitle ?? translation.ogTitle ?? translation.seoTitle,
       visual: staticArticle,
       visualTranslation: translation
     } satisfies LibraryArticle;

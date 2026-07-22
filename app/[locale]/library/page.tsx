@@ -27,7 +27,12 @@ export async function generateMetadata({
 
   return localizedMetadata({
     description: copy.documentDescription,
+    // Hand-off library index ships an OG image and no twitter:* tags.
+    image: "/en/assets/mattanutra-og.png",
+    includeTwitter: false,
     locale,
+    openGraphDescription: copy.openGraphDescription,
+    openGraphTitle: copy.openGraphTitle,
     path: "/library",
     // Hand-off index titles use an em dash, not "| MattaNutra"
     title: copy.documentTitle

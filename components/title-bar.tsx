@@ -23,6 +23,7 @@ type TitleBarCopy = Readonly<{
   comingSoonCountries: readonly (readonly [string, string])[];
   homeAria: string;
   links: readonly (readonly [string, string])[];
+  logoAlt: string;
   logoTagline: string;
   menu: string;
   navAria: string;
@@ -110,7 +111,7 @@ export function TitleBar({
             <span className="inline-flex w-max items-center gap-3">
               <Image
                 src="/v15/logo.png"
-                alt=""
+                alt={copy.logoAlt}
                 width={96}
                 height={150}
                 priority

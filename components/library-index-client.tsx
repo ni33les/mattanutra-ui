@@ -217,7 +217,7 @@ export function LibraryIndexClient({
                   )} px-5 pt-4`}
                 >
                   <Image
-                    alt={`${articleImageAltPrefix} - ${article.category.label}`}
+                    alt={`${articleImageAltPrefix} — ${article.category.label}`}
                     className="h-[120px] w-auto object-contain sm:h-[136px]"
                     height={674}
                     loading="lazy"

@@ -71,15 +71,25 @@ export async function generateMetadata({
   );
 
   const libraryCopy = getLibraryCopy(locale);
+  const openGraphTitle = article.ogTitle ?? article.seoTitle;
+  const openGraphDescription = article.ogDescription ?? article.seoDescription;
+  const twitterTitle = article.twitterTitle ?? openGraphTitle;
+  const twitterDescription =
+    article.twitterDescription ?? openGraphDescription;
 
   return localizedMetadata({
     description: article.seoDescription,
     image: article.shareImage,
     locale,
+    openGraphDescription,
+    openGraphTitle,
     path: `/library/${article.slug}`,
     // Hand-off document titles: "<seoTitle> | คลังความรู้ MattaNutra" / "| The MattaNutra Library"
     title: `${article.seoTitle} | ${libraryCopy.eyebrow}`,
-    translatedPaths
+    translatedPaths,
+    // Hand-off social titles are bare (no library suffix); descriptions often differ.
+    twitterDescription,
+    twitterTitle
   });
 }
 

@@ -221,7 +221,7 @@ export function LandingPage({
             <span className="mn-v15-hero-orb" />
             <span className="mn-v15-hero-orb-inner" />
             <Image
-              alt="MattaNutra emblem"
+              alt={copy.hero.figureAlt}
               className="mn-v15-hero-figure"
               height={465}
               priority
@@ -956,7 +956,7 @@ export function LandingPage({
                     )} px-5 pt-5`}
                   >
                     <Image
-                      alt={`${libraryCopy.articleImageAltPrefix} - ${post.category.label}`}
+                      alt={`${libraryCopy.articleImageAltPrefix} — ${post.category.label}`}
                       className="h-[150px] w-auto object-contain"
                       height={674}
                       loading="lazy"

@@ -8771,5 +8771,59 @@
     "surface": "landing",
     "variables": [],
     "translatable": true
+  },
+  "customer.libraryIndex.openGraphTitle": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library — Evidence-Aware Supplement Answers",
+    "description": "Library index og:title from hand-off (shorter than document title).",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.openGraphDescription": {
+    "audience": "customer",
+    "defaultMessage": "Clear, evidence-aware answers to common supplement questions. Learn what actually fits your body.",
+    "description": "Library index og:description from hand-off.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.titleBar.logoAlt": {
+    "audience": "customer",
+    "defaultMessage": "MattaNutra logo",
+    "description": "Accessible alt text for the site logo in the title bar.",
+    "namespace": "customer.titleBar",
+    "surface": "chrome",
+    "translatable": true,
+    "variables": []
+  },
+  "seo.routes.home.openGraphDescription": {
+    "audience": "public",
+    "defaultMessage": "Personalised supplements from a detailed assessment, with ongoing guidance and a 90-day plan.",
+    "description": "Homepage og:description from hand-off when distinct from meta description.",
+    "namespace": "seo.routes",
+    "surface": "seo",
+    "translatable": true,
+    "variables": []
+  },
+  "seo.routes.home.twitterDescription": {
+    "audience": "public",
+    "defaultMessage": "Personalised supplements from a detailed, relevant assessment.",
+    "description": "Homepage twitter:description from hand-off when distinct from og:description.",
+    "namespace": "seo.routes",
+    "surface": "seo",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.landing.hero.figureAlt": {
+    "audience": "customer",
+    "defaultMessage": "MattaNutra emblem",
+    "description": "Alt text for the landing hero MattaNutra emblem illustration.",
+    "namespace": "customer.landing.hero",
+    "surface": "landing",
+    "translatable": true,
+    "variables": []
   }
 }

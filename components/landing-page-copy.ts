@@ -78,6 +78,7 @@ type LandingContent = Readonly<{
     readonly accent: string;
     readonly checks: readonly string[];
     readonly eyebrow: string;
+    readonly figureAlt: string;
     readonly ingredientPills: readonly string[];
     readonly intro: string;
     readonly microcopy: string;

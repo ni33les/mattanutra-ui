@@ -165,7 +165,8 @@ export function localizedPath(locale: LocaleCode, path = "/") {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
   if (normalizedPath === "/" || normalizedPath === "") {
-    return `/${locale}`;
+    // Hand-off and many SEO crawlers treat the locale home as `/{locale}/`.
+    return `/${locale}/`;
   }
 
   return `/${locale}${normalizedPath}`;
@@ -204,9 +205,22 @@ export function localizedMetadata(input: Readonly<{
   image?: string;
   indexable?: boolean;
   locale: Locale;
+  /**
+   * When false, omit twitter:* tags (hand-off library index has og only).
+   * Defaults to true.
+   */
+  includeTwitter?: boolean;
+  /** Open Graph description; defaults to description. */
+  openGraphDescription?: string;
+  /** Open Graph title; defaults to title (document title). */
+  openGraphTitle?: string;
   path: string;
   title: string;
   translatedPaths?: Partial<Record<LocaleCode, string>>;
+  /** Twitter description; defaults to openGraphDescription then description. */
+  twitterDescription?: string;
+  /** Twitter title; defaults to openGraphTitle then title. */
+  twitterTitle?: string;
 }>): Metadata {
   const indexable = input.indexable !== false && indexableLocales.includes(input.locale);
   const alternates = localizedAlternates({
@@ -216,6 +230,11 @@ export function localizedMetadata(input: Readonly<{
   const currentCanonicalPath =
     input.translatedPaths?.[input.locale] ?? localizedPath(input.locale, input.path);
   const imageUrl = input.image ? absoluteUrl(input.image) : undefined;
+  const openGraphTitle = input.openGraphTitle ?? input.title;
+  const openGraphDescription = input.openGraphDescription ?? input.description;
+  const twitterTitle = input.twitterTitle ?? openGraphTitle;
+  const twitterDescription = input.twitterDescription ?? openGraphDescription;
+  const includeTwitter = input.includeTwitter !== false;
 
   return {
     alternates: indexable
@@ -226,7 +245,7 @@ export function localizedMetadata(input: Readonly<{
       : undefined,
     description: input.description,
     openGraph: {
-      description: input.description,
+      description: openGraphDescription,
       images: imageUrl
         ? [
             {
@@ -235,7 +254,7 @@ export function localizedMetadata(input: Readonly<{
           ]
         : undefined,
       locale: localeHtmlLang(input.locale).replace("-", "_"),
-      title: input.title,
+      title: openGraphTitle,
       type: "website",
       url: absoluteUrl(currentCanonicalPath)
     },
@@ -246,12 +265,12 @@ export function localizedMetadata(input: Readonly<{
           index: false
         },
     title: input.title,
-    twitter: imageUrl
+    twitter: includeTwitter
       ? {
-          card: "summary_large_image",
-          description: input.description,
-          images: [imageUrl],
-          title: input.title
+          card: imageUrl ? "summary_large_image" : "summary",
+          description: twitterDescription,
+          images: imageUrl ? [imageUrl] : undefined,
+          title: twitterTitle
         }
       : undefined
   };
@@ -280,6 +299,36 @@ export function localizedRouteMetadata(input: Readonly<{
     route.indexable &&
     input.indexable !== false &&
     input.fallbackUsed !== true;
+
+  // Homepage hand-off uses distinct og/twitter descriptions and a social image.
+  if (input.routeKey === "home") {
+    const openGraphDescription = t(
+      input.locale,
+      "seo.routes.home.openGraphDescription"
+    );
+    const twitterDescription = t(
+      input.locale,
+      "seo.routes.home.twitterDescription"
+    );
+    const homeImage =
+      input.locale === "th"
+        ? "/assets/og/mattanutra-th.jpg"
+        : "/assets/og/mattanutra-og.png";
+
+    return localizedMetadata({
+      description: route.description,
+      image: homeImage,
+      indexable,
+      locale: input.locale,
+      openGraphDescription,
+      openGraphTitle: route.title,
+      path: input.path ?? route.path,
+      title: route.title,
+      translatedPaths: input.translatedPaths,
+      twitterDescription,
+      twitterTitle: route.title
+    });
+  }
 
   return localizedMetadata({
     description: route.description,
