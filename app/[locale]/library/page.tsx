@@ -26,10 +26,11 @@ export async function generateMetadata({
   const copy = getLibraryCopy(locale);
 
   return localizedMetadata({
-    description: copy.intro,
+    description: copy.documentDescription,
     locale,
     path: "/library",
-    title: `${copy.eyebrow} | MattaNutra`
+    // Hand-off index titles use an em dash, not "| MattaNutra"
+    title: copy.documentTitle
   });
 }
 

@@ -9,6 +9,7 @@ import { getNamespace } from "@/lib/i18n-messages";
 import {
   getLibraryArticle,
   getLibraryArticleLocalePaths,
+  getLibraryCopy,
   libraryArticleBreadcrumbJsonLd,
   libraryArticleFaqJsonLd,
   libraryArticleJsonLd
@@ -69,12 +70,15 @@ export async function generateMetadata({
     article.slug
   );
 
+  const libraryCopy = getLibraryCopy(locale);
+
   return localizedMetadata({
     description: article.seoDescription,
     image: article.shareImage,
     locale,
     path: `/library/${article.slug}`,
-    title: `MattaNutra | ${article.seoTitle}`,
+    // Hand-off document titles: "<seoTitle> | คลังความรู้ MattaNutra" / "| The MattaNutra Library"
+    title: `${article.seoTitle} | ${libraryCopy.eyebrow}`,
     translatedPaths
   });
 }

@@ -49,14 +49,6 @@ function categoryTone(slug: LibraryCategorySlug) {
       return "from-forest-glow/70 to-cream";
     case "everyday-nutrition":
       return "from-cream-deep to-mint";
-    case "brain-focus":
-      return "from-gold-tint to-mint";
-    case "joints-mobility":
-      return "from-sand-soft to-mint-deep";
-    case "stress-adaptogens":
-      return "from-forest-glow/60 to-gold-tint";
-    case "testing-personalisation":
-      return "from-paper to-mint-deep";
   }
 }
 

@@ -603,6 +603,24 @@
     "translatable": true,
     "variables": []
   },
+  "customer.libraryArticleActions.copyLinkLabel": {
+    "audience": "customer",
+    "defaultMessage": "Copy link",
+    "description": "Label for the Library article copy-link control.",
+    "namespace": "customer.libraryArticleActions",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryArticleActions.shareHeading": {
+    "audience": "customer",
+    "defaultMessage": "Share this guide:",
+    "description": "Heading shown above Library article share controls.",
+    "namespace": "customer.libraryArticleActions",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
   "customer.libraryArticleActions.shareLabel": {
     "audience": "customer",
     "defaultMessage": "Share",
@@ -805,6 +823,24 @@
     "audience": "customer",
     "defaultMessage": "Ready to make the guidance personal?",
     "description": "Heading for the Library index bottom CTA.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.documentDescription": {
+    "audience": "customer",
+    "defaultMessage": "Clear, evidence-aware answers to common supplement questions — magnesium, vitamin D, omega-3, sleep and more. Learn what actually fits your body, guided by MattaNutra.",
+    "description": "Library index meta description matching the hand-off.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.documentTitle": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library — Evidence-Aware Answers to Your Supplement Questions",
+    "description": "Library index document title matching the hand-off <title>.",
     "namespace": "customer.libraryIndex",
     "surface": "library",
     "translatable": true,

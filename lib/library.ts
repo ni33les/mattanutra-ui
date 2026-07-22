@@ -143,6 +143,8 @@ type LibraryCopy = Readonly<{
   ctaButton: string;
   ctaImageAlt: string;
   ctaTitle: string;
+  documentDescription: string;
+  documentTitle: string;
   empty: string;
   eyebrow: string;
   featuredListName: string;
@@ -216,6 +218,8 @@ const libraryCopyMessageIds = {
   ctaButton: "customer.libraryIndex.ctaButton",
   ctaImageAlt: "customer.libraryIndex.ctaImageAlt",
   ctaTitle: "customer.libraryIndex.ctaTitle",
+  documentDescription: "customer.libraryIndex.documentDescription",
+  documentTitle: "customer.libraryIndex.documentTitle",
   empty: "customer.libraryIndex.empty",
   eyebrow: "customer.libraryIndex.eyebrow",
   featuredListName: "customer.libraryIndex.featuredListName",

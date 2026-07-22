@@ -91,6 +91,8 @@ describe("central ICU i18n catalog", () => {
       "customer.libraryIndex.ctaButton",
       "customer.libraryIndex.ctaImageAlt",
       "customer.libraryIndex.ctaTitle",
+      "customer.libraryIndex.documentDescription",
+      "customer.libraryIndex.documentTitle",
       "customer.libraryIndex.empty",
       "customer.libraryIndex.eyebrow",
       "customer.libraryIndex.featuredListName",

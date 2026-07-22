@@ -19,9 +19,11 @@ type RenderContext = Readonly<{
 type LibraryVisualPageProps = Readonly<{
   articleUrl: string;
   copiedLabel: string;
+  copyLinkLabel: string;
   locale: Locale;
   nodes: readonly VisualKnowledgeNode[];
   quiz: VisualKnowledgeQuiz;
+  shareHeading: string;
   shareLabel: string;
   slug: string;
 }>;
@@ -93,25 +95,77 @@ function nodeHasElement(
   return false;
 }
 
-function isShareFragment(node: Extract<VisualKnowledgeNode, { type: "fragment" }>) {
-  const text = textFromNode(node).trim().replace(/\s+/g, " ");
+function isShareControlElement(element: VisualKnowledgeElementNode) {
+  const id = attrString(element.attrs, "id");
 
   return (
-    /^(Share this guide|แชร์|分享本指南)/i.test(text) ||
-    nodeHasElement(node, (element) => {
-      const id = attrString(element.attrs, "id");
-
-      return (
-        id === "share-line" ||
-        id === "share-facebook" ||
-        id === "shareBtn" ||
-        id === "shareBottom" ||
-        id === "copyBtn" ||
-        "data-share" in (element.attrs ?? {}) ||
-        "data-copy" in (element.attrs ?? {})
-      );
-    })
+    id === "share-line" ||
+    id === "share-facebook" ||
+    id === "shareBtn" ||
+    id === "shareBottom" ||
+    id === "copyBtn" ||
+    "data-share" in (element.attrs ?? {}) ||
+    "data-copy" in (element.attrs ?? {})
   );
+}
+
+function isShareFragment(node: VisualKnowledgeNode): boolean {
+  if (node.type === "element") {
+    const className = attrString(node.attrs, "className") ?? attrString(node.attrs, "class");
+    if (hasClass(className, "share") || isShareControlElement(node)) {
+      return true;
+    }
+    return node.children.some((child) => isShareFragment(child));
+  }
+
+  if (node.type === "fragment") {
+    const text = textFromNode(node).trim().replace(/\s+/g, " ");
+    return (
+      /^(Share this guide|แชร์|分享本指南)/i.test(text) ||
+      nodeHasElement(node, isShareControlElement) ||
+      node.children.some((child) => isShareFragment(child))
+    );
+  }
+
+  return false;
+}
+
+function nodeHasShareTrio(node: VisualKnowledgeNode): boolean {
+  let hasLine = false;
+  let hasFacebook = false;
+  let hasCopy = false;
+
+  const visit = (current: VisualKnowledgeNode) => {
+    if (current.type === "element") {
+      const id = attrString(current.attrs, "id");
+      if (id === "share-line") {
+        hasLine = true;
+      }
+      if (id === "share-facebook") {
+        hasFacebook = true;
+      }
+      if (id === "copyBtn" || "data-copy" in (current.attrs ?? {})) {
+        hasCopy = true;
+      }
+      for (const child of current.children) {
+        visit(child);
+      }
+      return;
+    }
+
+    if (current.type === "fragment") {
+      for (const child of current.children) {
+        visit(child);
+      }
+    }
+  };
+
+  visit(node);
+  return hasLine && hasFacebook && hasCopy;
+}
+
+function nodesHaveShareTrio(nodes: readonly VisualKnowledgeNode[]) {
+  return nodes.some((node) => nodeHasShareTrio(node));
 }
 
 function isRelatedFragment(
@@ -227,9 +281,11 @@ function imageClassName(node: Extract<VisualKnowledgeNode, { type: "image" }>) {
 export function LibraryVisualPage({
   articleUrl,
   copiedLabel,
+  copyLinkLabel,
   locale,
   nodes,
   quiz,
+  shareHeading,
   shareLabel,
   slug
 }: LibraryVisualPageProps) {
@@ -247,6 +303,10 @@ export function LibraryVisualPage({
     articleUrl
   )}`;
   const quizCtaLabel = quiz.cta.trim();
+  const hasShareSurface = useMemo(
+    () => nodes.some((node) => isShareFragment(node) || nodeHasShareTrio(node)),
+    [nodes]
+  );
 
   async function copyArticleUrl() {
     try {
@@ -287,6 +347,31 @@ export function LibraryVisualPage({
     );
   }
 
+  function renderShareControls(key: string) {
+    return (
+      <div aria-label={shareLabel} className="share mn-library-fragment" key={key}>
+        <span>{shareHeading}</span>
+        <button aria-label={shareLabel} data-share="" type="button" onClick={shareArticle}>
+          {shareLabel}
+        </button>
+        <a href={lineShareHref} id="share-line" rel="noopener noreferrer" target="_blank">
+          LINE
+        </a>
+        <a
+          href={facebookShareHref}
+          id="share-facebook"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Facebook
+        </a>
+        <button data-copy="" type="button" onClick={copyArticleUrl}>
+          {copied ? copiedLabel : copyLinkLabel}
+        </button>
+      </div>
+    );
+  }
+
   function renderNode(
     node: VisualKnowledgeNode,
     key: string,
@@ -296,8 +381,16 @@ export function LibraryVisualPage({
       return node.text;
     }
 
+    if (node.type === "element" && isShareFragment(node) && !nodeHasShareTrio(node)) {
+      return renderShareControls(key);
+    }
+
     if (node.type === "fragment") {
       if (isShareFragment(node)) {
+        if (!nodeHasShareTrio(node)) {
+          return renderShareControls(key);
+        }
+
         return (
           <div className="share mn-library-fragment" key={key}>
             {node.children.map((child, index) =>
@@ -503,6 +596,7 @@ export function LibraryVisualPage({
       </div>
       <div className="wrap">
         {nodes.map((node, index) => renderNode(node, `node:${index}`))}
+        {hasShareSurface ? null : renderShareControls("share-fallback")}
       </div>
     </article>
   );

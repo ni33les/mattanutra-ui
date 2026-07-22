@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync
 } from "node:fs";
@@ -107,6 +108,54 @@ function orderedArticles() {
   );
 
   return [...highRisk, ...remaining];
+}
+
+function listFilesRecursive(root: string): string[] {
+  const entries = readdirSync(root, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listFilesRecursive(path));
+      continue;
+    }
+    files.push(path);
+  }
+
+  return files;
+}
+
+function extractZipTree(zipPath: string, destination: string) {
+  mkdirSync(destination, { recursive: true });
+  execFileSync("unzip", ["-q", "-o", zipPath, "-d", destination]);
+
+  // WS1 ships as files/ttf.zip with a nested localization hand-off zip.
+  for (const path of listFilesRecursive(destination)) {
+    if (!path.endsWith(".zip")) {
+      continue;
+    }
+    if (!/Localization|Library|Hand-off|Handoff/i.test(path)) {
+      continue;
+    }
+    execFileSync("unzip", ["-q", "-o", path, "-d", destination]);
+  }
+}
+
+function resolveSourceHtmlPath(extractRoot: string, sourceHtmlFile: string): string {
+  const normalized = sourceHtmlFile.replaceAll("\\", "/");
+  const direct = join(extractRoot, normalized);
+  if (existsSync(direct)) {
+    return direct;
+  }
+
+  const suffix = `/${normalized}`.replaceAll("//", "/");
+  const match = listFilesRecursive(extractRoot).find((path) => {
+    const asPosix = path.replaceAll("\\", "/");
+    return asPosix.endsWith(suffix) || asPosix.endsWith(normalized);
+  });
+
+  return match ?? direct;
 }
 
 function normalizeImageName(src: string | null) {
@@ -334,16 +383,21 @@ test.describe("Library Nong Matta image parity", () => {
 
     try {
       for (const article of orderedArticles()) {
-        const zipPath = join("files", "library", article.sourcePackage);
+        // sourcePackage may be a path root ("files/ttf.zip") or a files/library basename.
+        const zipPath = article.sourcePackage.includes("/")
+          ? article.sourcePackage
+          : join("files", "library", article.sourcePackage);
 
-        expect(existsSync(zipPath), `${article.slug} source zip`).toBe(true);
+        expect(existsSync(zipPath), `${article.slug} source zip (${zipPath})`).toBe(true);
         expect(article.sourceHtmlFile, `${article.slug} source HTML`).toBeTruthy();
 
         const articleExtractDir = join(extractDir, article.slug);
-        mkdirSync(articleExtractDir, { recursive: true });
-        execFileSync("unzip", ["-q", zipPath, "-d", articleExtractDir]);
+        extractZipTree(zipPath, articleExtractDir);
 
-        const sourceHtmlPath = join(articleExtractDir, article.sourceHtmlFile ?? "");
+        const sourceHtmlPath = resolveSourceHtmlPath(
+          articleExtractDir,
+          article.sourceHtmlFile ?? ""
+        );
 
         expect(existsSync(sourceHtmlPath), `${article.slug} extracted HTML`).toBe(true);
 

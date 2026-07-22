@@ -104,14 +104,6 @@ function libraryCategoryTone(slug: LibraryCategorySlug) {
       return "from-[color-mix(in_srgb,var(--mn-teal-glow)_70%,transparent)] to-[var(--mn-cream)]";
     case "everyday-nutrition":
       return "from-[var(--mn-cream-deep)] to-[var(--mn-mint)]";
-    case "brain-focus":
-      return "from-[var(--mn-gold-tint)] to-[var(--mn-mint)]";
-    case "joints-mobility":
-      return "from-[var(--mn-sand-soft)] to-[var(--mn-mint-deep)]";
-    case "stress-adaptogens":
-      return "from-[color-mix(in_srgb,var(--mn-teal-glow)_60%,transparent)] to-[var(--mn-gold-tint)]";
-    case "testing-personalisation":
-      return "from-[var(--mn-paper)] to-[var(--mn-mint-deep)]";
   }
 }
 
