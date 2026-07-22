@@ -1,119 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowTopRightOnSquareIcon,
-  ChevronDownIcon,
-  PlusIcon,
-  TrashIcon
-} from "@heroicons/react/24/outline";
+import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import type {
-  AdminCatalogueOptimizationData,
-  AdminCatalogueOptimizationProgress,
-  AdminPlanCoverageDemandProfile,
-  AdminPlanCoverageSimulationData,
   AdminProductCoverageData,
-  AdminPlanCoverageSimulationRunner,
-  AdminSimulationNextMoveRow,
-  AdminSimulationProductUsefulnessRow,
   AdminSupplementCoverageProductRow,
-  AdminSupplementCoverageRow,
-  SyntheticPlanArchetype
+  AdminSupplementCoverageRow
 } from "@/lib/admin-product-coverage";
-import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import type { Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
   classNames,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
-import { AdminModal } from "@/components/admin/ui";
 import { SafeImage } from "@/components/safe-image";
 import {
-  productCountryLabel,
-  productCountryOptions
-} from "@/lib/product-countries";
-import {
-  ADMIN_PLAN_COVERAGE_CONVERGENCE_MIN_SAMPLES,
-  ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
-  SIMULATION_ARCHETYPES,
-  adminPlanCoverageSimulationDataFromRunner,
-  buildSimulationNextMoveRows,
-  createAdminPlanCoverageSimulationRunner,
-  emptyAdminPlanCoverageSimulationData,
-  normalizeDemandProfiles,
-  runNextAdminPlanCoverageSimulationSample,
-  sanitizeDemandProfilesForSimulationSupplements
-} from "@/lib/admin-product-coverage-simulation";
-import type { AdminCatalogueOptimizationJobView } from "@/lib/admin-catalogue-optimization-jobs";
-
-import {
-  SIMULATOR_INPUT_TIMEOUT_MS,
-  numberText,
-  emptyDemandProfileCacheSummary,
-  allDemandProfileSampleIndexes,
-  percentText,
-  durationText,
-  dateTimeText,
-  compactListText,
   moneyText,
-  amountText,
-  normalizedSimulatorCountryCode,
-  updateSimulatorCountryUrl,
-  hashText,
-  simulationInputKey,
-  demandProfilesKey,
-  draftFromArchetype,
-  archetypeFromDraft,
-  newArchetypeDraft,
-  loadSavedSyntheticArchetypes,
-  saveSyntheticArchetypes,
-  simulationDataWithArchetypes,
-  saveDemandProfiles,
-  clearSavedDemandProfiles,
-  loadSavedDemandProfiles,
-  writeSavedSimulationState,
-  saveSimulationState,
-  clearSavedSimulationState,
-  loadSavedCatalogueOptimization,
-  loadSavedCatalogueOptimizationFromDurable,
-  catalogueOptimizationMatchesSampleSize,
-  saveCatalogueOptimization,
-  clearSavedCatalogueOptimization,
-  loadSavedSimulationState,
-  loadSavedSimulationStateFromDurable,
-  runnerFromSavedState,
-  initialSimulationData,
-  simulatorInputReady,
-  productResultRows,
-  priceBandClassName,
-  priceBandLabel,
-  productScatterRows,
-  waitForNextSample,
-  simulatorInputErrorMessage,
-  runnerWithDemandProfiles,
+  numberText,
   productDetailHref,
-  simulatorInputHref,
-  demandProfileHref,
-  demandProfilesHref,
-  catalogueOptimizationJobHref,
-  catalogueOptimizationJobCachedProgress,
-  catalogueOptimizationProgressFromJob,
-  timestampMillis,
-  catalogueOptimizationJobStartedAt,
-  stateLabel,
   stateClassName,
-  type ArchetypeDraft,
-  type CatalogueOptimizationCachedProgress,
-  type SimulatorInputStatus,
-  type SimulatorClearTarget,
-  type CatalogueOptimizationStatus,
-  type PlanCoverageSimulatorMode,
-  type SimulatorProgressDisplay,
-  type DemandProfileCacheSummary,
-  type DemandProfileCacheBatchResponse,
-  type DemandProfileResponse,
-  type ProductPerformanceScatterRow,
+  stateLabel
 } from "@/components/admin/product-coverage-view-helpers";
 
 function Badge({
