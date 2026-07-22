@@ -170,7 +170,7 @@ describe("database transaction boundaries", () => {
   });
 
   it("keeps communication retry transaction-free", async () => {
-    const source = await readFile("lib/communications.ts", "utf8");
+    const source = await readFile("lib/communications-dispatch.ts", "utf8");
     const claimBody = functionBody(source, "claimCommunicationRetry");
     const retryBody = functionBody(source, "retryCommunicationMessage");
 
