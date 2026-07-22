@@ -248,7 +248,8 @@ describe("locale registry and SEO helpers", () => {
 
   it("keeps homepage build-time rendering off the remote database", () => {
     assert.match(homePage, /NEXT_PHASE === "phase-production-build"/);
-    assert.match(homePage, /libraryArticles=\{\[\]\}/);
+    // Static Library featured cards are allowed at build; testimonials stay empty (DB).
+    assert.match(homePage, /getFeaturedLibraryArticles\(locale, 3\)/);
     assert.match(homePage, /testimonials=\{\[\]\}/);
     assert.ok(
       homePage.indexOf("isProductionBuildPhase()") <

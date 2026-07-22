@@ -55,6 +55,10 @@ export default async function Home({ params }: HomeProps) {
   const dictionary = getDictionary(locale);
   const assessmentPath = nutritionQuizPath(locale);
 
+  // Featured Library cards are static file-backed content (safe at build time).
+  // Testimonials stay empty during the production build phase to avoid DB access.
+  const libraryArticles = await getFeaturedLibraryArticles(locale, 3);
+
   if (isProductionBuildPhase()) {
     return (
       <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -66,7 +70,7 @@ export default async function Home({ params }: HomeProps) {
         />
         <LandingPage
           assessmentPath={assessmentPath}
-          libraryArticles={[]}
+          libraryArticles={libraryArticles}
           locale={locale}
           testimonials={[]}
         />
@@ -76,8 +80,6 @@ export default async function Home({ params }: HomeProps) {
   }
 
   const databaseReady = await checkDatabaseConnection();
-
-  const libraryArticles = await getFeaturedLibraryArticles(locale, 3);
   const testimonials = databaseReady
     ? await getHomepageTestimonials(locale, 4)
     : [];

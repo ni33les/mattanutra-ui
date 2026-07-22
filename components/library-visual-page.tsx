@@ -109,21 +109,19 @@ function isShareControlElement(element: VisualKnowledgeElementNode) {
   );
 }
 
-function isShareFragment(node: VisualKnowledgeNode): boolean {
+/** Top-level share region only — never individual LINE/FB/copy controls. */
+function isShareContainer(node: VisualKnowledgeNode): boolean {
   if (node.type === "element") {
-    const className = attrString(node.attrs, "className") ?? attrString(node.attrs, "class");
-    if (hasClass(className, "share") || isShareControlElement(node)) {
-      return true;
-    }
-    return node.children.some((child) => isShareFragment(child));
+    const className =
+      attrString(node.attrs, "className") ?? attrString(node.attrs, "class");
+    return hasClass(className, "share");
   }
 
   if (node.type === "fragment") {
     const text = textFromNode(node).trim().replace(/\s+/g, " ");
     return (
       /^(Share this guide|แชร์|分享本指南)/i.test(text) ||
-      nodeHasElement(node, isShareControlElement) ||
-      node.children.some((child) => isShareFragment(child))
+      nodeHasElement(node, isShareControlElement)
     );
   }
 
@@ -304,7 +302,7 @@ export function LibraryVisualPage({
   )}`;
   const quizCtaLabel = quiz.cta.trim();
   const hasShareSurface = useMemo(
-    () => nodes.some((node) => isShareFragment(node) || nodeHasShareTrio(node)),
+    () => nodes.some((node) => isShareContainer(node) || nodeHasShareTrio(node)),
     [nodes]
   );
 
@@ -381,12 +379,22 @@ export function LibraryVisualPage({
       return node.text;
     }
 
-    if (node.type === "element" && isShareFragment(node) && !nodeHasShareTrio(node)) {
-      return renderShareControls(key);
+    if (node.type === "element" && isShareContainer(node)) {
+      if (!nodeHasShareTrio(node)) {
+        return renderShareControls(key);
+      }
+
+      return (
+        <div className="share mn-library-fragment" key={key} {...elementProps(node.attrs)}>
+          {node.children.map((child, index) =>
+            renderNode(child, `${key}:${index}`, context)
+          )}
+        </div>
+      );
     }
 
     if (node.type === "fragment") {
-      if (isShareFragment(node)) {
+      if (isShareContainer(node)) {
         if (!nodeHasShareTrio(node)) {
           return renderShareControls(key);
         }

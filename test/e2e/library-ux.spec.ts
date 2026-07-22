@@ -23,7 +23,8 @@ const indexExpectations = {
     title: "Learn the right amount."
   },
   th: {
-    guide: "น้องมัตตะ",
+    // Hand-off library index uses Latin "Nong Matta" even on Thai pages.
+    guide: "Nong Matta",
     intro: "แมกนีเซียม",
     title: "เรียนรู้ปริมาณที่พอดี"
   },
