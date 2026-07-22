@@ -28,7 +28,7 @@ function requestWithIp(ip: string) {
 }
 
 const previousTrustProxy = process.env.TRUST_PROXY;
-const previousNodeEnv = process.env.NODE_ENV;
+const previousTrustedClientIpHeader = process.env.TRUSTED_CLIENT_IP_HEADER;
 
 afterEach(() => {
   resetRateLimitStoreForTests();
@@ -38,10 +38,10 @@ afterEach(() => {
   } else {
     process.env.TRUST_PROXY = previousTrustProxy;
   }
-  if (previousNodeEnv === undefined) {
-    delete process.env.NODE_ENV;
+  if (previousTrustedClientIpHeader === undefined) {
+    delete process.env.TRUSTED_CLIENT_IP_HEADER;
   } else {
-    process.env.NODE_ENV = previousNodeEnv;
+    process.env.TRUSTED_CLIENT_IP_HEADER = previousTrustedClientIpHeader;
   }
 });
 
@@ -131,8 +131,10 @@ describe("rate limit", () => {
   });
 
   it("collapses untrusted forwarded IPs onto a shared unknown bucket", () => {
+    // Do not mutate NODE_ENV (read-only under tsc). Clear trust flags so
+    // headers are ignored outside production.
     delete process.env.TRUST_PROXY;
-    process.env.NODE_ENV = "test";
+    delete process.env.TRUSTED_CLIENT_IP_HEADER;
 
     assert.equal(
       rateLimitClientKey(requestWithIp("203.0.113.9"), "assessment-post"),
