@@ -42,8 +42,8 @@ function hasClass(value: unknown, className: string) {
 }
 
 function shouldPreserveCaptionBreaks(className: string | null) {
-  return ["note", "sticky-note", "mug", "price-badge"].some((captionClass) =>
-    hasClass(className, captionClass)
+  return ["bubble", "note", "sticky-note", "mug", "price-badge"].some(
+    (captionClass) => hasClass(className, captionClass)
   );
 }
 
@@ -269,6 +269,11 @@ function imageClassName(node: Extract<VisualKnowledgeNode, { type: "image" }>) {
     classes.push("mn-nong-img");
   }
 
+  // Hand-off sometimes uses class="matta" for the hero Nong figure.
+  if (classes.includes("matta") && !classes.includes("nong")) {
+    classes.push("nong");
+  }
+
   if (nongMatch) {
     classes.push(`mn-nong-${nongMatch[1]}`);
   }
@@ -438,7 +443,16 @@ export function LibraryVisualPage({
     }
 
     if (node.type === "image") {
-      const priority = context.inHero || classList(node.className).includes("av");
+      const classes = classList(node.className);
+      // Eager-load library Nong assets so below-the-fold CTA/quiz images keep
+      // intrinsic geometry (lazy Next/Image otherwise reports 0×0 until scroll).
+      const priority =
+        context.inHero ||
+        context.inCta ||
+        classes.includes("av") ||
+        classes.includes("nong") ||
+        classes.includes("nong-sleep") ||
+        node.src.includes("/assets/library/nong/");
 
       return (
         <Image
@@ -446,6 +460,7 @@ export function LibraryVisualPage({
           className={imageClassName(node)}
           height={node.height}
           key={key}
+          loading={priority ? "eager" : "lazy"}
           priority={priority}
           sizes={
             priority

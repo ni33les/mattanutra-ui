@@ -1,14 +1,16 @@
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
-  rmSync
+  rmSync,
+  symlinkSync
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
@@ -69,7 +71,8 @@ const landmarkSelectors: Record<LandmarkName, string> = {
   bubble: ".hero-art .bubble",
   ctaNong: ".cta .nong",
   heroArt: ".hero-art",
-  heroNong: ".hero-art .nong, .hero-art .nong-sleep",
+  // Hand-off spicy article uses class="matta" instead of "nong".
+  heroNong: ".hero-art .nong, .hero-art .nong-sleep, .hero-art .matta",
   mug: ".hero-art .mug",
   nongCard: ".nong-card",
   noteA: ".hero-art .note.a, .hero-art .n1",
@@ -126,6 +129,62 @@ function listFilesRecursive(root: string): string[] {
   return files;
 }
 
+function ensureSymlink(linkPath: string, targetPath: string) {
+  mkdirSync(dirname(linkPath), { recursive: true });
+
+  if (existsSync(linkPath) || existsSync(linkPath.replace(/\/$/, ""))) {
+    try {
+      if (lstatSync(linkPath).isSymbolicLink()) {
+        return;
+      }
+    } catch {
+      // fall through and recreate
+    }
+  }
+
+  try {
+    rmSync(linkPath, { recursive: true, force: true });
+  } catch {
+    // ignore
+  }
+
+  symlinkSync(targetPath, linkPath);
+}
+
+/**
+ * Hand-off HTML references mattanutra_library_assets/* relative to each
+ * library/{en,th} page, but the package stores media under top-level assets/.
+ */
+function wireHandoffLibraryAssets(destination: string) {
+  for (const path of listFilesRecursive(destination)) {
+    const asPosix = path.replaceAll("\\", "/");
+    if (!asPosix.endsWith("/library-manifest.json") && !asPosix.endsWith("library-manifest.json")) {
+      continue;
+    }
+
+    const handoffRoot = dirname(path);
+    const assetsDir = join(handoffRoot, "assets");
+    const libraryRoot = join(handoffRoot, "library");
+    if (!existsSync(assetsDir) || !existsSync(libraryRoot)) {
+      continue;
+    }
+
+    for (const locale of ["en", "th"]) {
+      const localeDir = join(libraryRoot, locale);
+      if (!existsSync(localeDir)) {
+        continue;
+      }
+
+      ensureSymlink(
+        join(localeDir, "mattanutra_library_assets"),
+        relative(localeDir, assetsDir) || "."
+      );
+    }
+
+    ensureSymlink(join(handoffRoot, "mattanutra_library_assets"), "assets");
+  }
+}
+
 function extractZipTree(zipPath: string, destination: string) {
   mkdirSync(destination, { recursive: true });
   execFileSync("unzip", ["-q", "-o", zipPath, "-d", destination]);
@@ -140,6 +199,8 @@ function extractZipTree(zipPath: string, destination: string) {
     }
     execFileSync("unzip", ["-q", "-o", path, "-d", destination]);
   }
+
+  wireHandoffLibraryAssets(destination);
 }
 
 function resolveSourceHtmlPath(extractRoot: string, sourceHtmlFile: string): string {
@@ -284,6 +345,28 @@ function compareLandmark(
 async function waitForPage(page: Page) {
   await page.waitForLoadState("domcontentloaded");
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
+  await page
+    .evaluate(async () => {
+      const images = Array.from(document.images);
+      await Promise.race([
+        Promise.all(
+          images.map((img) => {
+            if (img.complete) {
+              return undefined;
+            }
+
+            return new Promise<void>((resolve) => {
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            });
+          })
+        ),
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 8_000);
+        })
+      ]);
+    })
+    .catch(() => undefined);
 }
 
 async function measureLandmarks(page: Page) {
@@ -376,7 +459,7 @@ test.describe("Library Nong Matta image parity", () => {
     baseURL,
     browser
   }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(900_000);
 
     const extractDir = mkdtempSync(join(tmpdir(), "library-nong-parity-"));
     const mismatches: string[] = [];
