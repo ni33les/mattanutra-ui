@@ -19,13 +19,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import os
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTENT_PATH = REPO_ROOT / "content" / "library" / "visual-knowledge.json"
-PACKAGE_ROOT = (
+# Prefer checked-in tl.zip extract (files/ttf-ws1-tl), then env override, then legacy cache.
+_DEFAULT_PACKAGE = REPO_ROOT / "files" / "ttf-ws1-tl"
+_LEGACY_PACKAGE = (
     REPO_ROOT / ".cache" / "ttf-ws1" / "MattaNutra_TH_Localization_Handoff_2026-07-19"
 )
+_env_root = os.environ.get("TTF_WS1_ROOT", "").strip()
+PACKAGE_ROOT = Path(_env_root) if _env_root else (
+    _DEFAULT_PACKAGE if _DEFAULT_PACKAGE.is_dir() else _LEGACY_PACKAGE
+)
 MANIFEST_PATH = PACKAGE_ROOT / "library-manifest.json"
-EXTRACT_HINT = "python3 scripts/extract-ttf-ws1.py --verify"
+EXTRACT_HINT = "unzip files/tl.zip and set TTF_WS1_ROOT, or use files/ttf-ws1-tl/"
 
 LOCALES = ("en", "th", "zh-CN")
 CANONICAL_REDIRECTS = {
