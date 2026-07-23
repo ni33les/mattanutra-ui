@@ -43,7 +43,11 @@ export type GovernedGrokChatCompletionInput = Omit<
     timeoutMs: number;
   }>;
 
-export const DEFAULT_GROK_MODEL = "grok-4.3";
+export { DEFAULT_GROK_MODEL } from "@/lib/grok-task-config";
+import { DEFAULT_GROK_MODEL as DEFAULT_GROK_MODEL_VALUE } from "@/lib/grok-task-config";
+
+// Re-export is the public API; local alias keeps configuredGrokModel working.
+const FALLBACK_GROK_MODEL = DEFAULT_GROK_MODEL_VALUE;
 
 const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -65,7 +69,7 @@ export function getRequiredXaiApiKey() {
 export function configuredGrokModel(...candidates: Array<string | undefined>) {
   return candidates
     .map(configuredGrokValue)
-    .find(Boolean) || DEFAULT_GROK_MODEL;
+    .find(Boolean) || FALLBACK_GROK_MODEL;
 }
 
 export async function callGrokChatCompletion({

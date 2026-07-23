@@ -20,6 +20,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n-messages";
 import {
@@ -749,7 +750,8 @@ async function generatePanyaWelcome(input: Readonly<{
     model,
     purpose: "panya welcome greeting",
     reasoningEffort:
-      configuredGrokValue(process.env.PANYA_WELCOME_REASONING_EFFORT) || "none",
+      configuredGrokValue(process.env.PANYA_WELCOME_REASONING_EFFORT) ||
+      grokTaskReasoningDefault("panyaWelcome"),
     temperature: 0.55,
     timeoutMs: 8_000
   });

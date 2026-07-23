@@ -14,6 +14,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import { type Locale } from "@/lib/i18n";
 
 type AnalysisAuditEvent = {
@@ -45,7 +46,7 @@ type AnalysisResult = Readonly<{
   usage?: unknown;
 }>;
 
-const DEFAULT_REASONING_EFFORT = "low";
+const DEFAULT_REASONING_EFFORT = grokTaskReasoningDefault("foodGuidance");
 const DEFAULT_PROMPT_VERSION = "v1";
 const MAX_ATTEMPTS = 3;
 const MAX_RESPONSE_TOKENS = 5_000;

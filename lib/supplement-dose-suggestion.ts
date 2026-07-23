@@ -18,6 +18,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import type { Locale } from "@/lib/i18n";
 
 export type SupplementDoseSuggestionInput = Readonly<{
@@ -45,7 +46,7 @@ export type SupplementDoseSuggestion = Readonly<{
   safetyNotes: string;
 }>;
 
-const DEFAULT_REASONING_EFFORT = "low";
+const DEFAULT_REASONING_EFFORT = grokTaskReasoningDefault("supplementDose");
 const REQUEST_TIMEOUT_MS = 120_000;
 const displayLocaleNames = {
   en: "English",

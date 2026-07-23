@@ -9,6 +9,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import { type Locale, isLocale } from "@/lib/i18n";
 import {
   panyaEntitlementLabel,
@@ -915,7 +916,7 @@ async function enrichCustomerInsightSegments(
       purpose: "customer insights segment enrichment",
       reasoningEffort:
         configuredGrokValue(process.env.CUSTOMER_INSIGHTS_REASONING_EFFORT) ||
-        "none",
+        grokTaskReasoningDefault("customerInsights"),
       temperature: 0.35,
       timeoutMs: 8_000
     });

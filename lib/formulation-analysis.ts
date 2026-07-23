@@ -18,6 +18,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -49,7 +50,8 @@ type AnalysisResult = Readonly<{
   usage?: unknown;
 }>;
 
-const DEFAULT_FORMULATION_REASONING_EFFORT = "low";
+const DEFAULT_FORMULATION_REASONING_EFFORT =
+  grokTaskReasoningDefault("formulation");
 const DEFAULT_PROMPT_VERSION = "v1";
 const MAX_ATTEMPTS = 3;
 const MAX_RESPONSE_TOKENS = 8_000;

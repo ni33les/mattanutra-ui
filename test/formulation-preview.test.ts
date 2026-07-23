@@ -138,8 +138,8 @@ const baseResult: FormulationResult = {
 
 describe("free formulation preview", () => {
   it("recognizes example formulation model versions", () => {
-    assert.equal(isExampleFormulationModelVersion("grok-4.3:example"), true);
-    assert.equal(isExampleFormulationModelVersion("grok-4.3"), false);
+    assert.equal(isExampleFormulationModelVersion("grok-4.5:example"), true);
+    assert.equal(isExampleFormulationModelVersion("grok-4.5"), false);
     assert.equal(isExampleFormulationModelVersion(null), false);
   });
 

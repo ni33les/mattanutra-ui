@@ -4,6 +4,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import {
   getActivePanyaConfig,
   panyaToolContext,
@@ -53,7 +54,8 @@ function panyaConfig() {
       configuredGrokValue(process.env.NUTRITION_ADVISOR_PROMPT_VERSION) ||
       DEFAULT_PROMPT_VERSION,
     reasoningEffort:
-      configuredGrokValue(process.env.PANYA_REASONING_EFFORT) || "low"
+      configuredGrokValue(process.env.PANYA_REASONING_EFFORT) ||
+      grokTaskReasoningDefault("panyaChat")
   };
 }
 

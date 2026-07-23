@@ -5,6 +5,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import type { Locale } from "@/lib/i18n";
 
 export type FoodReviewSuggestionInput = Readonly<{
@@ -25,7 +26,7 @@ export type FoodReviewSuggestion = Readonly<{
   serving: string;
 }>;
 
-const DEFAULT_REASONING_EFFORT = "low";
+const DEFAULT_REASONING_EFFORT = grokTaskReasoningDefault("foodReview");
 const REQUEST_TIMEOUT_MS = 90_000;
 const displayLocaleNames = {
   en: "English",

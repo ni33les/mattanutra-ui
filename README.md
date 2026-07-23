@@ -61,7 +61,7 @@ UI-blocking work such as HealthScore analysis and paid formulation uses the inte
 
 The same tick queues a `sync_digitalocean_billing` worker task when `DIGITALOCEAN_ACCESS_TOKEN` and `DIGITALOCEAN_PROJECT_NAME` are configured. The external hosting worker calls `/v2/customers/my/invoices/preview`, returns invoice items to the platform, and the platform writes nominal `hosting` ledger rows with deterministic `source_ref` values so repeated 15-minute runs update existing rows.
 
-AI cost accounting is written when Grok calls return usage metadata. Task-backed Grok calls also store the originating task id on the cost entry. Token prices default to the current `grok-4.3` rates and can be overridden with `XAI_INPUT_USD_PER_MILLION_TOKENS`, `XAI_OUTPUT_USD_PER_MILLION_TOKENS`, and `XAI_CACHED_INPUT_USD_PER_MILLION_TOKENS`.
+AI cost accounting is written when Grok calls return usage metadata. Task-backed Grok calls also store the originating task id on the cost entry. The default chat model is `grok-4.5` (`DEFAULT_GROK_MODEL` / `GROK_MODEL`). Token prices can be overridden with `XAI_INPUT_USD_PER_MILLION_TOKENS`, `XAI_OUTPUT_USD_PER_MILLION_TOKENS`, and `XAI_CACHED_INPUT_USD_PER_MILLION_TOKENS`. Per-task reasoning defaults live in `lib/grok-task-config.ts` and can be overridden with `*_REASONING_EFFORT` env vars.
 
 Financial rows default to `nominal`, which is used for fine-grained cost accruals and estimates. Use `actual` rows only for real money flows such as monthly provider invoice payments.
 

@@ -11,6 +11,7 @@ import {
   type AdminRole
 } from "@/lib/admin-rbac";
 import { configuredGrokModel, configuredGrokValue } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCode
@@ -165,23 +166,32 @@ export function configuredAgentReasoningLevel(
   }
 
   if (model === "grok:formulation") {
-    return configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) || "low";
+    return (
+      configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
+      grokTaskReasoningDefault("formulation")
+    );
   }
 
   if (model === "grok:food-guidance") {
     return (
       configuredGrokValue(process.env.FOOD_GUIDANCE_REASONING_EFFORT) ||
       configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
-      "low"
+      grokTaskReasoningDefault("foodGuidance")
     );
   }
 
   if (model === "grok:healthscore") {
-    return configuredGrokValue(process.env.HEALTHSCORE_REASONING_EFFORT) || "none";
+    return (
+      configuredGrokValue(process.env.HEALTHSCORE_REASONING_EFFORT) ||
+      grokTaskReasoningDefault("healthScoreCopy")
+    );
   }
 
   if (model === "grok:nutrition-advisor") {
-    return configuredGrokValue(process.env.NUTRITION_ADVISOR_REASONING_EFFORT) || null;
+    return (
+      configuredGrokValue(process.env.NUTRITION_ADVISOR_REASONING_EFFORT) ||
+      grokTaskReasoningDefault("nutritionAdvisor")
+    );
   }
 
   return null;

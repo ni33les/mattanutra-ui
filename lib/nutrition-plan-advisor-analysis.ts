@@ -21,6 +21,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import { normalizePlanFeedbackItems } from "@/lib/plan-feedback";
 import { publicLocales, type Locale, type LocaleCode } from "@/lib/i18n";
 
@@ -84,7 +85,7 @@ const revealPageSlotGuide: Record<string, string> = {
     "Legacy slot. The UI renders the locked safety headline from deterministic safety context; keep this semantically identical if included."
 };
 
-function getGrokConfig(defaultReasoningEffort: "low" | "medium") {
+function getGrokConfig(defaultReasoningEffort: "low" | "medium" = "medium") {
   return {
     apiKey: getRequiredXaiApiKey(),
     model: configuredGrokModel(process.env.GROK_MODEL),
@@ -94,7 +95,8 @@ function getGrokConfig(defaultReasoningEffort: "low" | "medium") {
       DEFAULT_PROMPT_VERSION,
     reasoningEffort:
       configuredGrokValue(process.env.NUTRITION_ADVISOR_REASONING_EFFORT) ||
-      defaultReasoningEffort
+      defaultReasoningEffort ||
+      grokTaskReasoningDefault("nutritionAdvisor")
   };
 }
 

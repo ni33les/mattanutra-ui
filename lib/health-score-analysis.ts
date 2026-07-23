@@ -16,6 +16,10 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import {
+  DEFAULT_GROK_MODEL,
+  grokTaskReasoningDefault
+} from "@/lib/grok-task-config";
 import type { Locale } from "@/lib/i18n";
 
 export { validateHealthScoreAiResponse };
@@ -31,8 +35,9 @@ export type HealthScoreAdviceAnalysis = Readonly<{
   usage?: unknown;
 }>;
 
-const DEFAULT_HEALTHSCORE_COPY_MODEL = "grok-4.3";
-const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "none";
+const DEFAULT_HEALTHSCORE_COPY_MODEL = DEFAULT_GROK_MODEL;
+const DEFAULT_HEALTHSCORE_REASONING_EFFORT =
+  grokTaskReasoningDefault("healthScoreCopy");
 const DEFAULT_PROMPT_VERSION = "v8-single-display-locale";
 const CACHE_TYPE = "healthscore_page_copy";
 const CACHE_TTL_DAYS = 7;

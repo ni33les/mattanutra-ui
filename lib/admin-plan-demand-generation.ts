@@ -10,6 +10,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import {
   DEFAULT_SIMULATION_SEED,
   ADMIN_PLAN_COVERAGE_SIMULATION_MAX_SAMPLES,
@@ -28,7 +29,9 @@ import {
 } from "@/lib/supplement-country-availability";
 
 const REQUEST_TIMEOUT_MS = 120_000;
-const DEFAULT_REASONING_EFFORT = "low";
+const DEFAULT_REASONING_EFFORT = grokTaskReasoningDefault(
+  "productCoverageDemand"
+);
 export const ADMIN_PRODUCT_COVERAGE_QUESTIONNAIRE_SCHEMA_VERSION = "v1";
 export const ADMIN_PRODUCT_COVERAGE_QUESTIONNAIRE_PROMPT_VERSION = "v1";
 export const ADMIN_PRODUCT_COVERAGE_FORMULATION_CACHE_VERSION = "v1";

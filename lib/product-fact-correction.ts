@@ -19,6 +19,7 @@ import {
   getRequiredXaiApiKey,
   type GrokChatCompletion
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 
 type ProductForCorrection = Readonly<{
   brandName: string | null;
@@ -99,7 +100,7 @@ export type ProductCatalogueEnrichmentDraftResult = Readonly<{
   warnings: string[];
 }>;
 
-const DEFAULT_REASONING_EFFORT = "low";
+const DEFAULT_REASONING_EFFORT = grokTaskReasoningDefault("productFactCorrection");
 const REQUEST_TIMEOUT_MS = 120_000;
 
 function config() {

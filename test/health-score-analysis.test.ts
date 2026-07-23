@@ -116,7 +116,7 @@ describe("HealthScore AI copy validator", () => {
     assert.match(source, /Return only the requested display locale/);
     assert.doesNotMatch(source, /Every localized field must include these locale keys/);
     assert.doesNotMatch(source, /requiredOutputLocales/);
-    assert.match(source, /DEFAULT_HEALTHSCORE_REASONING_EFFORT = "none"/);
+    assert.match(source, /grokTaskReasoningDefault\("healthScoreCopy"\)/);
     assert.match(source, /maxTokens: MAX_RESPONSE_TOKENS/);
     assert.doesNotMatch(source, /paywallFeatures: "Exactly 3 localized feature cards/);
   });

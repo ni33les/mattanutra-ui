@@ -11,6 +11,7 @@ import {
   getRequiredXaiApiKey,
   type GrokChatCompletion
 } from "@/lib/grok-client";
+import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import { normalizeLocaleCode, type LocaleCode } from "@/lib/i18n";
 
 type ProductForCopyTranslation = Readonly<{
@@ -46,7 +47,9 @@ export type ProductCopyTranslationUpdateResult = Readonly<{
   row: AdminProductRow;
 }>;
 
-const DEFAULT_REASONING_EFFORT = "low";
+const DEFAULT_REASONING_EFFORT = grokTaskReasoningDefault(
+  "productCopyTranslation"
+);
 const REQUEST_TIMEOUT_MS = 120_000;
 
 type ProductCopyTranslationValue = Readonly<{
