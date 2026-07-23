@@ -1,0 +1,115 @@
+{
+  "locked": {
+    "score": 47,
+    "band": "Building foundation",
+    "percentile": 4,
+    "median": 60,
+    "pillars": [
+      {
+        "label": "Health Habits",
+        "value": 90,
+        "goal_linked": false,
+        "tag": null
+      },
+      {
+        "label": "Sleep & Recovery",
+        "value": 67,
+        "goal_linked": true,
+        "tag": "energy"
+      },
+      {
+        "label": "Nutrition & Diet",
+        "value": 67,
+        "goal_linked": true,
+        "tag": "heart"
+      },
+      {
+        "label": "Activity & Fitness",
+        "value": 43,
+        "goal_linked": true,
+        "tag": "all 3 goals"
+      },
+      {
+        "label": "Stress & Balance",
+        "value": 38,
+        "goal_linked": false,
+        "tag": null
+      }
+    ],
+    "flag_codes": [
+      "STATIN_COQ10",
+      "VITD_ROUTINE"
+    ],
+    "nutrients_chosen": 8,
+    "nutrients_evaluated": 120
+  },
+  "copy": {
+    "goal_mirror": "You came here for energy, a stronger heart, and a real way back to fitness.",
+    "band_line": "A 47 isn’t a verdict on your health. It’s a starting line — and the rare thing is, we can see <em>exactly</em> where the line sits.",
+    "relativity": {
+      "mode": "gap",
+      "gap": 13,
+      "headline": "The average person who finishes this assessment scores about 60. Your gap is 13 points — and none of them are about age.",
+      "sub": "Those 13 points aren’t genetics, and they aren’t willpower. They are a few specific, recoverable things — and the biggest are exactly the goals you told us mattered most.",
+      "spectrum_you": 47,
+      "spectrum_median": 60
+    },
+    "gap_trio": [
+      {
+        "tag": "GAP 01 · STRESS & BALANCE",
+        "value": "38%",
+        "headline": "Your lowest pillar by far",
+        "body": "A high stress load is quietly taxing the very energy and focus you came here for. It is the single biggest drag on your score right now."
+      },
+      {
+        "tag": "GAP 02 · ACTIVITY & FITNESS",
+        "value": "43%",
+        "headline": "Movement is the lever you are not pulling",
+        "body": "Your activity sits low — and it is the pillar most of your goals route through, which makes it your highest-return change."
+      },
+      {
+        "tag": "GAP 03 · HOW YOU FEEL",
+        "value": "3",
+        "headline": "The symptoms dragging on everything",
+        "body": "Fatigue, bloating, and restless sleep pull down your whole score at once — and they are the felt signals your plan is built to address first."
+      }
+    ],
+    "highest_leverage": {
+      "pillar": "Activity & Fitness",
+      "value": 43,
+      "text": "<b>Your highest-leverage move:</b> Activity & Fitness sits at 43% — and every one of your goals routes through it. Lift this one pillar and energy, a stronger heart, and a real way back to fitness all move together. That is not a coincidence in your results; it is the shape of your answers."
+    },
+    "strength_note": "A note worth hearing: your Health Habits score is 90%. Whatever you have been telling yourself, this was never a discipline problem — you have a strong foundation, it is just pointed in slightly the wrong direction.",
+    "findings": [
+      {
+        "code": "STATIN_COQ10",
+        "icon": "✦",
+        "headline": "Your statin answer changed the entire review.",
+        "body": "Because you reported a statin <em>and</em> low energy, your plan does not get a generic “men’s health” stack. It specifically reviews CoQ10 — which statins are known to deplete — alongside heart-aware nutrient choices. This is the kind of interaction a one-size quiz never checks, and it is why your formula will look different from your friend’s."
+      },
+      {
+        "code": "ENERGY_UPSTREAM",
+        "icon": "◎",
+        "headline": "Your energy problem isn’t a caffeine problem.",
+        "body": "Your low energy lines up with high stress and light activity — not a missing stimulant. So your plan works the actual sequence: steady the stress load, support deeper sleep, and ease movement back in, with nutrients chosen to support that chain. More caffeine would only paper over it."
+      },
+      {
+        "code": "VITD_ROUTINE",
+        "icon": "☼",
+        "headline": "Your daily routine shapes your formula.",
+        "body": "Daily sunscreen, limited time in the sun, and low oily-fish intake all point the same way — so your plan leans into vitamin D and omega-3 support rather than guessing. Your formula is built around how you actually live, not just your age and sex."
+      }
+    ],
+    "findings_mode": "caught",
+    "subtraction": {
+      "evaluated": 120,
+      "set_aside": 112,
+      "chosen": 8
+    }
+  },
+  "meta": {
+    "engine_score": 47,
+    "finding_count": 3,
+    "relativity_mode": "gap"
+  }
+}

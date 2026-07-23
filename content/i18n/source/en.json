@@ -1386,7 +1386,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.BLOODTHINNER.body": {
-    "defaultMessage": "Because you reported a blood thinner, your plan is routed carefully around vitamin K and high-dose fish oil, which can interact with it. Safety is applied first, before anything is recommended.",
+    "defaultMessage": "Because you reported a blood thinner, your plan is routed carefully around vitamin K and high-dose fish oil, which can interact with it. Safety here is applied first, before anything is recommended.",
     "description": "HealthScore finding body for BLOODTHINNER.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1422,7 +1422,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.ENERGY_UPSTREAM.body": {
-    "defaultMessage": "Your low energy lines up with {energy_causes}, not a missing stimulant. Your plan works the actual sequence: steady the stress load, support deeper sleep, and ease movement back in.",
+    "defaultMessage": "Your low energy lines up with {energy_causes} — not a missing stimulant. So your plan works the actual sequence: steady the stress load, support deeper sleep, and ease movement back in, with nutrients chosen to support that chain. More caffeine would only paper over it.",
     "description": "HealthScore finding body for ENERGY_UPSTREAM.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1433,7 +1433,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.ENERGY_UPSTREAM.headline": {
-    "defaultMessage": "Your energy problem is not a caffeine problem.",
+    "defaultMessage": "Your energy problem isn’t a caffeine problem.",
     "description": "HealthScore finding headline for ENERGY_UPSTREAM.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1442,7 +1442,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.KIDNEY_CEILING.body": {
-    "defaultMessage": "Because you reported reduced kidney function, several minerals are kept within careful dose ceilings. Your plan is built to support you without crossing that line.",
+    "defaultMessage": "Because you reported reduced kidney function, several minerals are kept within careful dose ceilings. Your plan is built to support you without ever crossing that line.",
     "description": "HealthScore finding body for KIDNEY_CEILING.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1460,7 +1460,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.LIVER_ROUTING.body": {
-    "defaultMessage": "With a liver condition noted, certain botanicals and doses are handled with extra caution. Safety is applied as a filter first.",
+    "defaultMessage": "With a liver condition noted, certain botanicals and doses are handled with extra caution. Safety is applied as a filter first, before any recommendation.",
     "description": "HealthScore finding body for LIVER_ROUTING.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1478,7 +1478,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.METFORMIN_B12.body": {
-    "defaultMessage": "Long-term metformin use is associated with lower vitamin B12 over time. Your plan factors that in, so your formula reflects how your body handles nutrients.",
+    "defaultMessage": "Long-term metformin use is associated with lower vitamin B12 over time. Your plan factors that in, so your formula reflects how your body actually handles nutrients — not a generic template.",
     "description": "HealthScore finding body for METFORMIN_B12.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1496,7 +1496,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.PLANT_OMEGA_B12.body": {
-    "defaultMessage": "Eating mostly plant-based with little oily fish makes omega-3 and vitamin B12 the two nutrients worth getting right. Your plan emphasises exactly these.",
+    "defaultMessage": "Eating mostly plant-based with little oily fish makes omega-3 (EPA/DHA) and vitamin B12 the two nutrients worth getting right. Your plan emphasises exactly these, so the way you eat stays an asset, not a gap.",
     "description": "HealthScore finding body for PLANT_OMEGA_B12.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1514,7 +1514,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.PPI_B12_MAG.body": {
-    "defaultMessage": "You reported a PPI, which over time can affect how well you absorb vitamin B12 and magnesium. Your plan accounts for that rather than assuming everything you take is fully absorbed.",
+    "defaultMessage": "You reported a PPI (acid-reducing medication), which over time can blunt how well you absorb vitamin B12 and magnesium. Your plan accounts for that directly rather than assuming everything you take is fully absorbed.",
     "description": "HealthScore finding body for PPI_B12_MAG.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1532,7 +1532,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.PREGNANCY.body": {
-    "defaultMessage": "Because you are pregnant or breastfeeding, every ingredient is screened against strict safety rules. This is the most conservative routing we apply.",
+    "defaultMessage": "Because you are pregnant or breastfeeding, every ingredient is screened against strict safety rules. Nothing is recommended that is not appropriate for this stage — this is the most conservative routing we apply.",
     "description": "HealthScore finding body for PREGNANCY.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1550,7 +1550,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.SLEEP_UPSTREAM.body": {
-    "defaultMessage": "Your answers put short or restless sleep at the centre of the pattern. Your plan treats it as the lever it is because lifting sleep tends to pull energy, focus, and mood up with it.",
+    "defaultMessage": "Your answers put short or restless sleep at the centre of the pattern. Your plan treats it as the lever it is — because lifting sleep tends to pull energy, focus and mood up with it.",
     "description": "HealthScore finding body for SLEEP_UPSTREAM.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1568,7 +1568,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.STATIN_COQ10.body": {
-    "defaultMessage": "Because you reported a statin and low energy, your plan does not get a generic stack. It specifically reviews CoQ10 alongside heart-aware nutrient choices.",
+    "defaultMessage": "Because you reported a statin <em>and</em> low energy, your plan does not get a generic “men’s health” stack. It specifically reviews CoQ10 — which statins are known to deplete — alongside heart-aware nutrient choices. This is the kind of interaction a one-size quiz never checks, and it is why your formula will look different from your friend’s.",
     "description": "HealthScore finding body for STATIN_COQ10.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1586,7 +1586,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.VITD_ROUTINE.body": {
-    "defaultMessage": "Daily sunscreen, limited time in the sun, and low oily-fish intake all point the same way. Your formula is built around how you actually live, not just your age and sex.",
+    "defaultMessage": "Daily sunscreen, limited time in the sun, and low oily-fish intake all point the same way — so your plan leans into vitamin D and omega-3 support rather than guessing. Your formula is built around how you actually live, not just your age and sex.",
     "description": "HealthScore finding body for VITD_ROUTINE.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1604,7 +1604,7 @@
     "translatable": true
   },
   "customer.healthScore.findings.WEIGHT_PATTERN.body": {
-    "defaultMessage": "Your pattern points less to willpower and more to the daily rhythm around movement, sleep, and meals. Your plan targets that rhythm rather than handing you another restrictive rulebook.",
+    "defaultMessage": "Your pattern points less to willpower and more to the daily rhythm around movement, sleep and meals. Your plan targets that rhythm rather than handing you another restrictive rulebook.",
     "description": "HealthScore finding body for WEIGHT_PATTERN.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1847,7 +1847,7 @@
     "translatable": true
   },
   "customer.healthScore.page.bandLine.buildingFoundation": {
-    "defaultMessage": "A {score} is not a verdict on your health. It is a starting line, and the rare thing is that we can see exactly where the line sits.",
+    "defaultMessage": "A {score} isn’t a verdict on your health. It’s a starting line — and the rare thing is, we can see <em>exactly</em> where the line sits.",
     "description": "Band line for buildingFoundation.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1858,7 +1858,7 @@
     "translatable": true
   },
   "customer.healthScore.page.bandLine.excellent": {
-    "defaultMessage": "A {score} is excellent. Your plan is about protecting and sharpening what you have built.",
+    "defaultMessage": "A {score} is excellent — you are in rare company. Your plan is about protecting and sharpening what you have built.",
     "description": "Band line for excellent.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1880,7 +1880,7 @@
     "translatable": true
   },
   "customer.healthScore.page.bandLine.goodClearGap": {
-    "defaultMessage": "A {score} is a genuinely solid base, with one clear, nameable gap between you and the next level.",
+    "defaultMessage": "A {score} is a genuinely solid base — with one clear, nameable gap between you and the next level.",
     "description": "Band line for goodClearGap.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -1891,7 +1891,7 @@
     "translatable": true
   },
   "customer.healthScore.page.bandLine.needsAttention": {
-    "defaultMessage": "This is a starting line, not a verdict, and we can see exactly where to begin.",
+    "defaultMessage": "This is a starting line, not a verdict — and we can see exactly where to begin.",
     "description": "Band line for needsAttention.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2118,7 +2118,7 @@
     "translatable": true
   },
   "customer.healthScore.page.highestLeverage.text": {
-    "defaultMessage": "Your highest-leverage move: {pillar} sits at {value}% and every one of your goals routes through it. Lift this one pillar and {goalList} all move together. That is not a coincidence in your results; it is the shape of your answers.",
+    "defaultMessage": "Your highest-leverage move: {pillar} sits at {value}% — and every one of your goals routes through it. Lift this one pillar and {goal_list} all move together. That is not a coincidence in your results; it is the shape of your answers.",
     "description": "Highest-leverage pillar explanation.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2281,7 +2281,7 @@
     "translatable": true
   },
   "customer.healthScore.page.relativity.gap.headline": {
-    "defaultMessage": "The average person who finishes this assessment scores about {median}. Your gap is {gap} points, and none of them are about age.",
+    "defaultMessage": "The average person who finishes this assessment scores about {median}. Your gap is {gap} points — and none of them are about age.",
     "description": "Relative gap headline when score is below median.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2320,7 +2320,7 @@
     "translatable": true
   },
   "customer.healthScore.page.relativity.gap.sub": {
-    "defaultMessage": "Those {gap} points are a few specific, recoverable things, and the biggest are exactly the goals you told us mattered most.",
+    "defaultMessage": "Those {gap} points aren’t genetics, and they aren’t willpower. They are a few specific, recoverable things — and the biggest are exactly the goals you told us mattered most.",
     "description": "Relative gap subcopy when score is below median.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2369,7 +2369,7 @@
     "translatable": true
   },
   "customer.healthScore.page.relativity.rank.sub": {
-    "defaultMessage": "You are clearly doing a lot right. What is left is refinement, a few targeted points between you and your personal best.",
+    "defaultMessage": "You are clearly doing a lot right. What is left is refinement — a few targeted points between you and your personal best.",
     "description": "Relative rank subcopy when score is above median.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2520,7 +2520,7 @@
     "translatable": true
   },
   "customer.healthScore.pillar.gap.activity.body": {
-    "defaultMessage": "Your activity sits low, and it is the pillar most of your goals route through. That makes it your highest-return change.",
+    "defaultMessage": "Your activity sits low — and it is the pillar most of your goals route through, which makes it your highest-return change.",
     "description": "Gap card body for Activity & Fitness.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2538,7 +2538,7 @@
     "translatable": true
   },
   "customer.healthScore.pillar.gap.habits.body": {
-    "defaultMessage": "Small, specific habit changes, not a lifestyle overhaul, would lift this pillar and the score with it.",
+    "defaultMessage": "Small, specific habit changes — not a lifestyle overhaul — would lift this pillar and the score with it.",
     "description": "Gap card body for Health Habits.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2556,7 +2556,7 @@
     "translatable": true
   },
   "customer.healthScore.pillar.gap.nutrition.body": {
-    "defaultMessage": "A few targeted shifts in what you eat would move this pillar quickly. Your plan shows exactly which ones matter for you.",
+    "defaultMessage": "A few targeted shifts in what you eat would move this pillar quickly — your plan shows exactly which ones matter for you.",
     "description": "Gap card body for Nutrition & Diet.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2574,7 +2574,7 @@
     "translatable": true
   },
   "customer.healthScore.pillar.gap.sleep.body": {
-    "defaultMessage": "Short or broken sleep is limiting how much everything else can work. It is one of the most movable parts of your score.",
+    "defaultMessage": "Short or broken sleep is capping how much everything else can work. It is one of the most movable parts of your score.",
     "description": "Gap card body for Sleep & Recovery.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2592,7 +2592,7 @@
     "translatable": true
   },
   "customer.healthScore.pillar.gap.stress.body": {
-    "defaultMessage": "A high stress load is quietly taxing the energy and focus you came here for. It is the single biggest drag on your score right now.",
+    "defaultMessage": "A high stress load is quietly taxing the very energy and focus you came here for. It is the single biggest drag on your score right now.",
     "description": "Gap card body for Stress & Balance.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2666,7 +2666,7 @@
     "translatable": true
   },
   "customer.healthScore.pillar.strength.habits": {
-    "defaultMessage": "A note worth hearing: your Health Habits score is {value}%. You have a strong foundation; it just needs to be pointed in the right direction.",
+    "defaultMessage": "A note worth hearing: your Health Habits score is {value}%. Whatever you have been telling yourself, this was never a discipline problem — you have a strong foundation, it is just pointed in slightly the wrong direction.",
     "description": "Strength finding body for Health Habits.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2688,7 +2688,7 @@
     "translatable": true
   },
   "customer.healthScore.pillar.strength.sleep": {
-    "defaultMessage": "Your sleep is genuinely solid at {value}%. Your plan builds on it rather than fixing it.",
+    "defaultMessage": "Your sleep is genuinely solid at {value}% — a real asset most people your age do not have. Your plan builds on it rather than fixing it.",
     "description": "Strength finding body for Sleep & Recovery.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2699,7 +2699,7 @@
     "translatable": true
   },
   "customer.healthScore.pillar.strength.stress": {
-    "defaultMessage": "You manage stress well at {value}%, a quiet advantage that makes every other change easier to sustain.",
+    "defaultMessage": "You manage stress well at {value}% — a quiet advantage that makes every other change easier to sustain.",
     "description": "Strength finding body for Stress & Balance.",
     "namespace": "customer.healthScore",
     "audience": "customer",

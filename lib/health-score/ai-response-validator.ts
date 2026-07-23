@@ -334,6 +334,17 @@ function walkStrings(value: unknown, visit: (item: string) => void) {
   }
 }
 
+function extractIntegerLiterals(text: string): Set<number> {
+  return new Set(
+    [...text.matchAll(/\b\d+\b/g)].map((match) => Number(match[0]))
+  );
+}
+
+function onlyAllowedHtml(text: string) {
+  const stripped = text.replace(/<\/?em>/gi, "");
+  return !/<\/?[a-z][\s\S]*>/i.test(stripped);
+}
+
 function validateNoForbiddenCopy(value: unknown, errors: string[]) {
   walkStrings(value, (item) => {
     const lower = item.toLowerCase();
@@ -345,12 +356,71 @@ function validateNoForbiddenCopy(value: unknown, errors: string[]) {
       errors.push(`copy contains forbidden term: ${found}`);
     }
 
-    if (/<\/?[a-z][\s\S]*>/i.test(item)) {
-      errors.push("copy must not include HTML tags");
+    // Handoff Stage 6: only <em> tags are allowed in polished prose.
+    if (!onlyAllowedHtml(item)) {
+      errors.push("copy may only include <em> HTML tags");
     }
 
     if (/\b1\s+things\b/i.test(item)) {
       errors.push("copy must use singular grammar for 1 thing");
+    }
+  });
+}
+
+/**
+ * Handoff §07: polished text must not introduce integer literals that were not
+ * present in the deterministic engine seed (prevents score/hallucination drift).
+ */
+function collectSeedIntegers(seed: unknown, into: Set<number>) {
+  if (typeof seed === "number" && Number.isFinite(seed)) {
+    into.add(Math.trunc(seed));
+    return;
+  }
+
+  if (typeof seed === "string") {
+    for (const value of extractIntegerLiterals(seed)) {
+      into.add(value);
+    }
+    return;
+  }
+
+  if (Array.isArray(seed)) {
+    for (const item of seed) {
+      collectSeedIntegers(item, into);
+    }
+    return;
+  }
+
+  if (isRecord(seed)) {
+    for (const item of Object.values(seed)) {
+      collectSeedIntegers(item, into);
+    }
+  }
+}
+
+function validateNumericLiteralsSubset(
+  polished: unknown,
+  seed: unknown,
+  errors: string[]
+) {
+  if (seed === undefined || seed === null) {
+    return;
+  }
+
+  const seedInts = new Set<number>();
+  collectSeedIntegers(seed, seedInts);
+  // Calibration constants that appear in spectrum/relativity chrome.
+  for (const value of [30, 60, 92, 96, 100]) {
+    seedInts.add(value);
+  }
+
+  walkStrings(polished, (item) => {
+    for (const value of extractIntegerLiterals(item)) {
+      if (!seedInts.has(value)) {
+        errors.push(
+          `copy introduced integer literal ${value} not present in engine seed`
+        );
+      }
     }
   });
 }
@@ -514,6 +584,16 @@ export function validateHealthScoreAiResponse({
       } satisfies HealthScoreAdvice;
 
   validateNoForbiddenCopy({ advice, pageCopy }, errors);
+  validateNumericLiteralsSubset(
+    { advice, pageCopy },
+    {
+      band: healthScore.band,
+      copySeeds: pageContent?.copySeeds,
+      domains: healthScore.domains,
+      score: healthScore.score
+    },
+    errors
+  );
 
   return errors.length > 0
     ? { errors }
