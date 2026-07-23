@@ -203,6 +203,8 @@ export function localizedAlternates(input: Readonly<{
 export function localizedMetadata(input: Readonly<{
   description: string;
   image?: string;
+  /** Optional alt for og:image:alt / twitter:image:alt. */
+  imageAlt?: string;
   indexable?: boolean;
   locale: Locale;
   /**
@@ -237,12 +239,26 @@ export function localizedMetadata(input: Readonly<{
   const currentCanonicalPath =
     input.translatedPaths?.[input.locale] ?? localizedPath(input.locale, input.path);
   const imageUrl = input.image ? absoluteUrl(input.image) : undefined;
+  const imageAlt = input.imageAlt?.trim() || undefined;
   const openGraphTitle = input.openGraphTitle ?? input.title;
   const openGraphDescription = input.openGraphDescription ?? input.description;
   const twitterTitle = input.twitterTitle ?? openGraphTitle;
   const twitterDescription = input.twitterDescription ?? openGraphDescription;
   const includeTwitter = input.includeTwitter !== false;
   const manualSocialTags = input.manualSocialTags === true;
+  const openGraphImages = imageUrl
+    ? [
+        {
+          alt: imageAlt,
+          url: imageUrl
+        }
+      ]
+    : undefined;
+  const twitterImages = imageUrl
+    ? imageAlt
+      ? [{ alt: imageAlt, url: imageUrl }]
+      : [imageUrl]
+    : undefined;
 
   return {
     alternates: indexable
@@ -256,13 +272,7 @@ export function localizedMetadata(input: Readonly<{
       ? undefined
       : {
           description: openGraphDescription,
-          images: imageUrl
-            ? [
-                {
-                  url: imageUrl
-                }
-              ]
-            : undefined,
+          images: openGraphImages,
           locale: localeHtmlLang(input.locale).replace("-", "_"),
           title: openGraphTitle,
           type: "website",
@@ -281,7 +291,7 @@ export function localizedMetadata(input: Readonly<{
         : {
             card: imageUrl ? "summary_large_image" : "summary",
             description: twitterDescription,
-            images: imageUrl ? [imageUrl] : undefined,
+            images: twitterImages,
             title: twitterTitle
           }
   };
@@ -327,6 +337,7 @@ export function getSeoRouteCopy(routeKey: SeoRouteKey, locale: LocaleCode): SeoR
 export function localizedRouteMetadata(input: Readonly<{
   fallbackUsed?: boolean;
   image?: string;
+  imageAlt?: string;
   indexable?: boolean;
   locale: Locale;
   path?: string;
@@ -357,6 +368,7 @@ export function localizedRouteMetadata(input: Readonly<{
     return localizedMetadata({
       description: route.description,
       image: homeImage,
+      imageAlt: input.imageAlt,
       indexable,
       locale: input.locale,
       openGraphDescription,
@@ -372,6 +384,7 @@ export function localizedRouteMetadata(input: Readonly<{
   return localizedMetadata({
     description: route.description,
     image: input.image,
+    imageAlt: input.imageAlt,
     indexable,
     locale: input.locale,
     path: input.path ?? route.path,

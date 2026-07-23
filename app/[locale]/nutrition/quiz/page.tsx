@@ -39,13 +39,19 @@ export async function generateMetadata({
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
   const hasPrivateState = Boolean(query.plan || query.resume || query.payment);
 
-  // Hand-off WS2 share card path (asset only; visible title/description stay in i18n catalog).
-  const nutritionQuizOgByLocale = {
+  // Hand-off WS2 share card (Thai-only asset + alt; other locales keep default quiz SEO).
+  const nutritionQuizOgByLocale: Partial<Record<Locale, string>> = {
     th: "/assets/og/mattanutra-questionnaire-th.jpg"
-  } as const satisfies Partial<Record<Locale, string>>;
+  };
+  const nutritionQuizOgAltByLocale: Partial<Record<Locale, string>> = {
+    th: "MattaNutra — รู้ปริมาณที่พอดี"
+  };
+  const ogImage = hasPrivateState ? undefined : nutritionQuizOgByLocale[locale];
+  const ogImageAlt = ogImage ? nutritionQuizOgAltByLocale[locale] : undefined;
 
   return localizedRouteMetadata({
-    image: hasPrivateState ? undefined : nutritionQuizOgByLocale[locale],
+    image: ogImage,
+    imageAlt: ogImageAlt,
     indexable: !hasPrivateState,
     locale,
     routeKey: "nutritionQuiz"

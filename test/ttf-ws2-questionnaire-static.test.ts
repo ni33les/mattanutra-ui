@@ -124,7 +124,7 @@ describe("ttf ws2 Thai questionnaire port", () => {
     );
   });
 
-  it("wires Thai OG image on the quiz route metadata", () => {
+  it("wires Thai OG image and image alt on the quiz route metadata", () => {
     const page = readFileSync(
       new URL("../app/[locale]/nutrition/quiz/page.tsx", import.meta.url),
       "utf8"
@@ -132,7 +132,36 @@ describe("ttf ws2 Thai questionnaire port", () => {
     const seo = readFileSync(new URL("../lib/seo.ts", import.meta.url), "utf8");
     assert.match(page, /mattanutra-questionnaire-th\.jpg/);
     assert.match(page, /nutritionQuizOgByLocale/);
+    assert.match(page, /Partial<Record<Locale, string>>/);
+    assert.match(page, /MattaNutra — รู้ปริมาณที่พอดี/);
+    assert.match(page, /imageAlt:/);
     assert.match(seo, /image\?: string/);
+    assert.match(seo, /imageAlt\?: string/);
+    assert.match(seo, /alt:\s*imageAlt/);
+  });
+
+  it("documents intentional product deltas vs the hand-off food step", () => {
+    const reconciliation = JSON.parse(
+      readFileSync(
+        new URL("../files/ttf-ws2/RECONCILIATION_RAW.json", import.meta.url),
+        "utf8"
+      )
+    ) as { accepted_deltas: Array<{ msg: string; value?: string }> };
+    const readme = readFileSync(
+      new URL("../files/ttf-ws2/README.txt", import.meta.url),
+      "utf8"
+    );
+    const msgs = reconciliation.accepted_deltas.map((d) => d.msg);
+    assert.ok(
+      reconciliation.accepted_deltas.some(
+        (d) => d.value === "อาหารที่ต้องหลีกเลี่ยงหรือไม่ชอบ"
+      )
+    );
+    assert.ok(msgs.some((m) => /avoidNote free-text field not in React product schema/i.test(m)));
+    assert.ok(msgs.some((m) => /food disclosure UI not rendered/i.test(m)));
+    assert.match(readme, /Explicitly accepted product deltas/);
+    assert.match(readme, /อาหารที่ต้องหลีกเลี่ยงหรือไม่ชอบ/);
+    assert.match(readme, /privacy gate/);
   });
 
   it("exports th through the locale copy registry", () => {
