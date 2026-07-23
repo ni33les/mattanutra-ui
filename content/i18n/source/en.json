@@ -8792,7 +8792,7 @@
   },
   "customer.titleBar.logoAlt": {
     "audience": "customer",
-    "defaultMessage": "MattaNutra logo",
+    "defaultMessage": "MattaNutra",
     "description": "Accessible alt text for the site logo in the title bar.",
     "namespace": "customer.titleBar",
     "surface": "chrome",

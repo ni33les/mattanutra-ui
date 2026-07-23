@@ -5,7 +5,10 @@ import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getLibraryArticles, getLibraryCopy } from "@/lib/library";
-import { localizedMetadata } from "@/lib/seo";
+import {
+  libraryIndexManualSocialMeta,
+  localizedMetadata
+} from "@/lib/seo";
 
 type LibraryPageProps = Readonly<{
   params: Promise<{
@@ -18,6 +21,8 @@ type LibraryPageProps = Readonly<{
 // (Next segment config requires a static numeric literal).
 export const revalidate = 300;
 
+const libraryIndexOgImage = "/en/assets/mattanutra-og.png";
+
 export async function generateMetadata({
   params
 }: LibraryPageProps): Promise<Metadata> {
@@ -27,10 +32,12 @@ export async function generateMetadata({
 
   return localizedMetadata({
     description: copy.documentDescription,
-    // Hand-off library index ships an OG image and no twitter:* tags.
-    image: "/en/assets/mattanutra-og.png",
+    // Emit OG + twitter:card via hoisted <meta> so Next cannot auto-fill
+    // twitter:title / twitter:description / twitter:image from openGraph.
+    image: libraryIndexOgImage,
     includeTwitter: false,
     locale,
+    manualSocialTags: true,
     openGraphDescription: copy.openGraphDescription,
     openGraphTitle: copy.openGraphTitle,
     path: "/library",
@@ -50,9 +57,27 @@ export default async function LibraryPage({ params }: LibraryPageProps) {
   const dictionary = getDictionary(locale);
   const currentPath = `/${locale}/library`;
   const articles = await getLibraryArticles(locale);
+  const copy = getLibraryCopy(locale);
+  const social = libraryIndexManualSocialMeta({
+    description: copy.openGraphDescription,
+    image: libraryIndexOgImage,
+    locale,
+    title: copy.openGraphTitle
+  });
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+      {social.tags.map((tag) =>
+        "property" in tag ? (
+          <meta
+            content={tag.content}
+            key={tag.property}
+            property={tag.property}
+          />
+        ) : (
+          <meta content={tag.content} key={tag.name} name={tag.name} />
+        )
+      )}
       <TitleBar
         currentLocale={locale}
         currentPath={currentPath}

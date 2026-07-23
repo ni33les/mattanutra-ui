@@ -75,7 +75,7 @@ export function LibraryIndex({
         </nav>
 
         <section className="border-b border-line bg-cream" data-library-index-header={true}>
-          <div className="mx-auto max-w-container px-7 py-18 md:py-28">
+          <div className="mx-auto flex max-w-container items-end justify-between gap-10 px-7 py-18 md:py-28">
             <div className="max-w-[1280px]">
               <p className="mb-8 text-sm leading-tight font-semibold tracking-[0.28em] text-forest-deep uppercase md:text-[24px]">
                 {copy.eyebrow}
@@ -102,6 +102,14 @@ export function LibraryIndex({
                 />
               </p>
             </div>
+            <Image
+              alt={copy.guideImageAlt}
+              className="hidden h-40 w-auto md:block"
+              height={320}
+              src="/assets/library/nong/nong-open.webp"
+              unoptimized={true}
+              width={280}
+            />
           </div>
         </section>
 

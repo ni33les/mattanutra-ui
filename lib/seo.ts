@@ -206,10 +206,17 @@ export function localizedMetadata(input: Readonly<{
   indexable?: boolean;
   locale: Locale;
   /**
-   * When false, omit twitter:* tags (hand-off library index has og only).
-   * Defaults to true.
+   * When false, omit twitter title/description/image (and do not let Next
+   * auto-fill them from openGraph). Use with manualTags for hand-off pages
+   * that only ship twitter:card.
    */
   includeTwitter?: boolean;
+  /**
+   * When true, omit openGraph + twitter from the Metadata API so callers can
+   * emit exact hand-off tags via hoisted <meta> elements (avoids Next filling
+   * twitter:title/description/image from openGraph).
+   */
+  manualSocialTags?: boolean;
   /** Open Graph description; defaults to description. */
   openGraphDescription?: string;
   /** Open Graph title; defaults to title (document title). */
@@ -235,6 +242,7 @@ export function localizedMetadata(input: Readonly<{
   const twitterTitle = input.twitterTitle ?? openGraphTitle;
   const twitterDescription = input.twitterDescription ?? openGraphDescription;
   const includeTwitter = input.includeTwitter !== false;
+  const manualSocialTags = input.manualSocialTags === true;
 
   return {
     alternates: indexable
@@ -244,20 +252,22 @@ export function localizedMetadata(input: Readonly<{
         }
       : undefined,
     description: input.description,
-    openGraph: {
-      description: openGraphDescription,
-      images: imageUrl
-        ? [
-            {
-              url: imageUrl
-            }
-          ]
-        : undefined,
-      locale: localeHtmlLang(input.locale).replace("-", "_"),
-      title: openGraphTitle,
-      type: "website",
-      url: absoluteUrl(currentCanonicalPath)
-    },
+    openGraph: manualSocialTags
+      ? undefined
+      : {
+          description: openGraphDescription,
+          images: imageUrl
+            ? [
+                {
+                  url: imageUrl
+                }
+              ]
+            : undefined,
+          locale: localeHtmlLang(input.locale).replace("-", "_"),
+          title: openGraphTitle,
+          type: "website",
+          url: absoluteUrl(currentCanonicalPath)
+        },
     robots: indexable
       ? undefined
       : {
@@ -265,14 +275,42 @@ export function localizedMetadata(input: Readonly<{
           index: false
         },
     title: input.title,
-    twitter: includeTwitter
-      ? {
-          card: imageUrl ? "summary_large_image" : "summary",
-          description: twitterDescription,
-          images: imageUrl ? [imageUrl] : undefined,
-          title: twitterTitle
-        }
-      : undefined
+    twitter:
+      manualSocialTags || !includeTwitter
+        ? undefined
+        : {
+            card: imageUrl ? "summary_large_image" : "summary",
+            description: twitterDescription,
+            images: imageUrl ? [imageUrl] : undefined,
+            title: twitterTitle
+          }
+  };
+}
+
+/** Hand-off library index: OG fields + twitter:card only (no twitter title/desc/image). */
+export function libraryIndexManualSocialMeta(input: Readonly<{
+  description: string;
+  image: string;
+  locale: Locale;
+  title: string;
+  urlPath?: string;
+}>) {
+  const path = input.urlPath ?? localizedPath(input.locale, "/library");
+  const imageUrl = absoluteUrl(input.image);
+  const pageUrl = absoluteUrl(path);
+
+  return {
+    imageUrl,
+    pageUrl,
+    tags: [
+      { content: "website", property: "og:type" },
+      { content: "MattaNutra", property: "og:site_name" },
+      { content: input.title, property: "og:title" },
+      { content: input.description, property: "og:description" },
+      { content: pageUrl, property: "og:url" },
+      { content: imageUrl, property: "og:image" },
+      { content: "summary_large_image", name: "twitter:card" }
+    ] as const
   };
 }
 
