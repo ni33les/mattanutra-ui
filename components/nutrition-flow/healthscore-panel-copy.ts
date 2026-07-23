@@ -546,7 +546,7 @@ export const pageCopy = {
     spectrumGapBehind: "与典型完成者的差距",
     spectrumHeadroom: "到 92 分的提升空间",
     defaultBandLine:
-      "您的分数由五个加权支柱、安全标志、症状、目标以及您提供的任何已验证实验室或可穿戴设备数据共同构建。",
+      "你的分数由五个加权支柱、安全标志、症状、目标，以及你提供的任何已验证实验室或可穿戴设备数据共同构建。",
     bandLabels: {
       "Building foundation": "正在建立基础",
       "Needs attention": "需要关注",
@@ -652,7 +652,7 @@ export const pageCopy = {
       },
     ],
     priceHero: {
-      alt: "打开的 MattaNutra 盒子，内含匹配的补充剂瓶和感谢卡",
+      alt: "打开的 MattaNutra 盒子，内含匹配的营养品瓶和感谢卡",
       body:
         "THB 690 解锁你的专属知量方案。解锁后你会得到：精确到品牌和剂量的营养品清单、每天的服用时间、一份跟你用药做过安全核验的方案。不是建议，是方案。",
       boxCaptionPrefix:
@@ -692,7 +692,7 @@ export const pageCopy = {
     pricingBody:
       "选择一次性知量方案获得清晰答案，或选择 90 天动态健康方案，让方案在真实生活里持续跟上你。",
     preparing: "准备中...",
-    selectionError: "目前无法启动您的计划。",
+    selectionError: "目前无法启动你的计划。",
     plans: [
       {
         badge: "限时优惠",
@@ -712,7 +712,7 @@ export const pageCopy = {
         guaranteeBody: "7 天内，如果你觉得方案不够清晰、不够有用，我们负责调到你满意，或者退款。",
         name: "知量方案",
         price: "690",
-        save: "节省30%",
+        save: "立省 30%",
         term: "一次性",
         was: "THB 990",
       },
@@ -747,7 +747,7 @@ export const pageCopy = {
         includes: "包含完整知量方案。",
         name: "动态健康方案",
         price: "1,590",
-        save: "节省16%",
+        save: "立省 16%",
         term: "为期90天",
         was: "THB 1,890",
       },

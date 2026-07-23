@@ -152,19 +152,19 @@
     "translatable": true,
     "variables": []
   },
-  "admin.foodSafety.allergenFlags": {
+  "admin.foodSafety.allStatuses": {
     "audience": "operator",
-    "defaultMessage": "Allergen flags",
-    "description": "Admin food safety label admin.foodSafety.allergenFlags.",
+    "defaultMessage": "All statuses",
+    "description": "Admin food safety label admin.foodSafety.allStatuses.",
     "namespace": "admin.foodSafety",
     "surface": "admin",
     "translatable": true,
     "variables": []
   },
-  "admin.foodSafety.allStatuses": {
+  "admin.foodSafety.allergenFlags": {
     "audience": "operator",
-    "defaultMessage": "All statuses",
-    "description": "Admin food safety label admin.foodSafety.allStatuses.",
+    "defaultMessage": "Allergen flags",
+    "description": "Admin food safety label admin.foodSafety.allergenFlags.",
     "namespace": "admin.foodSafety",
     "surface": "admin",
     "translatable": true,
@@ -504,6 +504,412 @@
     "translatable": true,
     "variables": []
   },
+  "customer.assessmentUi.back": {
+    "audience": "customer",
+    "defaultMessage": "Back",
+    "description": "Assessment questionnaire UI chrome for back.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.continue": {
+    "audience": "customer",
+    "defaultMessage": "Continue",
+    "description": "Assessment questionnaire UI chrome for continue.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.countryHint": {
+    "audience": "customer",
+    "defaultMessage": "Used for local context and product availability.",
+    "description": "Assessment questionnaire UI chrome for countryHint.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.devDefaults": {
+    "audience": "customer",
+    "defaultMessage": "Dev defaults",
+    "description": "Assessment questionnaire UI chrome for devDefaults.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.formulaPrecision": {
+    "audience": "customer",
+    "defaultMessage": "Formula precision",
+    "description": "Assessment questionnaire UI chrome for formulaPrecision.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.heightWeight": {
+    "audience": "customer",
+    "defaultMessage": "Height and weight",
+    "description": "Assessment questionnaire UI chrome for heightWeight.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.infoLabel": {
+    "audience": "customer",
+    "defaultMessage": "Note",
+    "description": "Assessment questionnaire UI chrome for infoLabel.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.nameGreeting": {
+    "audience": "customer",
+    "defaultMessage": "Nice to meet you, {name}.",
+    "description": "Assessment questionnaire UI chrome for nameGreeting.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": [
+      "name"
+    ]
+  },
+  "customer.assessmentUi.precisionHint.done": {
+    "audience": "customer",
+    "defaultMessage": "{progress}% complete. Essentials are ready; optional precision data can refine the formula further.",
+    "description": "Assessment questionnaire UI chrome for precisionHint.done.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": [
+      "progress"
+    ]
+  },
+  "customer.assessmentUi.precisionHint.remaining": {
+    "audience": "customer",
+    "defaultMessage": "{progress}% complete. {remaining} essential signals left before the precision layer.",
+    "description": "Assessment questionnaire UI chrome for precisionHint.remaining.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": [
+      "progress",
+      "remaining"
+    ]
+  },
+  "customer.assessmentUi.precisionMarks.0": {
+    "audience": "customer",
+    "defaultMessage": "Start",
+    "description": "Assessment questionnaire UI chrome for precisionMarks.0.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.precisionMarks.1": {
+    "audience": "customer",
+    "defaultMessage": "Essentials -> 80%",
+    "description": "Assessment questionnaire UI chrome for precisionMarks.1.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.precisionMarks.2": {
+    "audience": "customer",
+    "defaultMessage": "Precision -> 100%",
+    "description": "Assessment questionnaire UI chrome for precisionMarks.2.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.acceptedPrompt": {
+    "audience": "customer",
+    "defaultMessage": "Thanks — your answers are protected. You can begin.",
+    "description": "Assessment questionnaire UI chrome for privacyGate.acceptedPrompt.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.body": {
+    "audience": "customer",
+    "defaultMessage": "This assessment asks about your health — what you take, how you feel, anything you react to. We use it only to build and safety-check your formula, never to sell, and you can withdraw any time.",
+    "description": "Assessment questionnaire UI chrome for privacyGate.body.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.checkbox": {
+    "audience": "customer",
+    "defaultMessage": "Use my health answers to build and safety-check my formula",
+    "description": "Assessment questionnaire UI chrome for privacyGate.checkbox.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.eyebrow": {
+    "audience": "customer",
+    "defaultMessage": "PRIVATE · ENCRYPTED",
+    "description": "Assessment questionnaire UI chrome for privacyGate.eyebrow.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.helper": {
+    "audience": "customer",
+    "defaultMessage": "This is what your personalised formula is built from.",
+    "description": "Assessment questionnaire UI chrome for privacyGate.helper.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.link": {
+    "audience": "customer",
+    "defaultMessage": "Read the full privacy notice ->",
+    "description": "Assessment questionnaire UI chrome for privacyGate.link.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.prompt": {
+    "audience": "customer",
+    "defaultMessage": "Tick the box above to begin your assessment.",
+    "description": "Assessment questionnaire UI chrome for privacyGate.prompt.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.required": {
+    "audience": "customer",
+    "defaultMessage": "Required",
+    "description": "Assessment questionnaire UI chrome for privacyGate.required.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.privacyGate.title": {
+    "audience": "customer",
+    "defaultMessage": "Your answers stay between us.",
+    "description": "Assessment questionnaire UI chrome for privacyGate.title.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.processingError": {
+    "audience": "customer",
+    "defaultMessage": "We could not start processing at this time.",
+    "description": "Assessment questionnaire UI chrome for processingError.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.body": {
+    "audience": "customer",
+    "defaultMessage": "Leave your email and we will send a private link back to this exact spot. That is all it is for.",
+    "description": "Assessment questionnaire UI chrome for resume.body.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.error": {
+    "audience": "customer",
+    "defaultMessage": "We could not send the private link at this time.",
+    "description": "Assessment questionnaire UI chrome for resume.error.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.inputLabel": {
+    "audience": "customer",
+    "defaultMessage": "Email address",
+    "description": "Assessment questionnaire UI chrome for resume.inputLabel.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.invalid": {
+    "audience": "customer",
+    "defaultMessage": "Enter a valid email address or leave this optional field blank.",
+    "description": "Assessment questionnaire UI chrome for resume.invalid.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.optional": {
+    "audience": "customer",
+    "defaultMessage": "Optional",
+    "description": "Assessment questionnaire UI chrome for resume.optional.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.placeholder": {
+    "audience": "customer",
+    "defaultMessage": "you@email.com (only if you want a way back)",
+    "description": "Assessment questionnaire UI chrome for resume.placeholder.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.privacy": {
+    "audience": "customer",
+    "defaultMessage": "Saved only to return you to your assessment. Never used for marketing without consent.",
+    "description": "Assessment questionnaire UI chrome for resume.privacy.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.send": {
+    "audience": "customer",
+    "defaultMessage": "Send private link",
+    "description": "Assessment questionnaire UI chrome for resume.send.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.sending": {
+    "audience": "customer",
+    "defaultMessage": "Sending...",
+    "description": "Assessment questionnaire UI chrome for resume.sending.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.sent": {
+    "audience": "customer",
+    "defaultMessage": "Private link sent. Check your inbox.",
+    "description": "Assessment questionnaire UI chrome for resume.sent.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.resume.title": {
+    "audience": "customer",
+    "defaultMessage": "Need to step away?",
+    "description": "Assessment questionnaire UI chrome for resume.title.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.retry": {
+    "audience": "customer",
+    "defaultMessage": "Try again",
+    "description": "Assessment questionnaire UI chrome for retry.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.scoreGate.planDescription": {
+    "audience": "customer",
+    "defaultMessage": "This is the deterministic HealthScore calculated from your answers.",
+    "description": "Assessment questionnaire UI chrome for scoreGate.planDescription.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.scoreGate.title": {
+    "audience": "customer",
+    "defaultMessage": "Your HealthScore is ready",
+    "description": "Assessment questionnaire UI chrome for scoreGate.title.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.scoreProcessingSubtitle": {
+    "audience": "customer",
+    "defaultMessage": "We are scoring your main wellness domains from your answers.",
+    "description": "Assessment questionnaire UI chrome for scoreProcessingSubtitle.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.scoreProcessingTitle": {
+    "audience": "customer",
+    "defaultMessage": "Preparing your HealthScore",
+    "description": "Assessment questionnaire UI chrome for scoreProcessingTitle.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.section": {
+    "audience": "customer",
+    "defaultMessage": "Step {current} / {total}",
+    "description": "Assessment questionnaire UI chrome for section.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": [
+      "current",
+      "total"
+    ]
+  },
+  "customer.assessmentUi.selectCountry": {
+    "audience": "customer",
+    "defaultMessage": "Select country",
+    "description": "Assessment questionnaire UI chrome for selectCountry.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.stagesAria": {
+    "audience": "customer",
+    "defaultMessage": "Assessment stages",
+    "description": "Assessment questionnaire UI chrome for stagesAria.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.sunHint": {
+    "audience": "customer",
+    "defaultMessage": "Helps tune vitamin D and sun exposure context.",
+    "description": "Assessment questionnaire UI chrome for sunHint.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.assessmentUi.vo2Placeholder": {
+    "audience": "customer",
+    "defaultMessage": "e.g. 45 ml/kg/min",
+    "description": "Assessment questionnaire UI chrome for vo2Placeholder.",
+    "namespace": "customer.assessmentUi",
+    "surface": "assessment",
+    "translatable": true,
+    "variables": []
+  },
   "customer.basketCheckout.back": {
     "audience": "customer",
     "defaultMessage": "Review recommendations",
@@ -591,465 +997,6 @@
     "description": "customer.blogArticleCta copy for customer.blogArticleCta.title.",
     "namespace": "customer.blogArticleCta",
     "surface": "blog",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryArticleActions.copiedLabel": {
-    "audience": "customer",
-    "defaultMessage": "Copied",
-    "description": "Screen-reader and fallback prompt label shown after copying a Library article link.",
-    "namespace": "customer.libraryArticleActions",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryArticleActions.copyLinkLabel": {
-    "audience": "customer",
-    "defaultMessage": "Copy link",
-    "description": "Label for the Library article copy-link control.",
-    "namespace": "customer.libraryArticleActions",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryArticleActions.shareHeading": {
-    "audience": "customer",
-    "defaultMessage": "Share this guide:",
-    "description": "Heading shown above Library article share controls.",
-    "namespace": "customer.libraryArticleActions",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryArticleActions.shareLabel": {
-    "audience": "customer",
-    "defaultMessage": "Share",
-    "description": "Accessible label for the Library article share action.",
-    "namespace": "customer.libraryArticleActions",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.brainFocus": {
-    "audience": "customer",
-    "defaultMessage": "Brain & Focus",
-    "description": "Library category label for brain and focus articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.energyLongevity": {
-    "audience": "customer",
-    "defaultMessage": "Energy & Longevity",
-    "description": "Library category label for energy and longevity articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.everydayNutrition": {
-    "audience": "customer",
-    "defaultMessage": "Everyday Nutrition",
-    "description": "Library category label for everyday nutrition articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.foundations": {
-    "audience": "customer",
-    "defaultMessage": "Foundations",
-    "description": "Library category label for foundations articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.jointsMobility": {
-    "audience": "customer",
-    "defaultMessage": "Joints & Mobility",
-    "description": "Library category label for joints and mobility articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.minerals": {
-    "audience": "customer",
-    "defaultMessage": "Minerals",
-    "description": "Library category label for minerals articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.sleepRecovery": {
-    "audience": "customer",
-    "defaultMessage": "Sleep & Recovery",
-    "description": "Library category label for sleep and recovery articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.stressAdaptogens": {
-    "audience": "customer",
-    "defaultMessage": "Stress & Adaptogens",
-    "description": "Library category label for stress and adaptogen articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.testingPersonalisation": {
-    "audience": "customer",
-    "defaultMessage": "Testing & Personalisation",
-    "description": "Library category label for testing and personalisation articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryCategories.vitamins": {
-    "audience": "customer",
-    "defaultMessage": "Vitamins",
-    "description": "Library category label for vitamins articles.",
-    "namespace": "customer.libraryCategories",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.allCategory": {
-    "audience": "customer",
-    "defaultMessage": "All",
-    "description": "Label for the all-categories Library filter.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.articleImageAltPrefix": {
-    "audience": "customer",
-    "defaultMessage": "Nong Matta illustration",
-    "description": "Prefix for Library card illustration alt text.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.articleListName": {
-    "audience": "customer",
-    "defaultMessage": "The MattaNutra Library articles",
-    "description": "Accessible name for the Library article list.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.breadcrumbHome": {
-    "audience": "customer",
-    "defaultMessage": "Home",
-    "description": "Home breadcrumb label on the Library index page.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.breadcrumbLabel": {
-    "audience": "customer",
-    "defaultMessage": "Breadcrumb",
-    "description": "Accessible label for the Library breadcrumb navigation.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.browse": {
-    "audience": "customer",
-    "defaultMessage": "Browse the Library",
-    "description": "Homepage Library preview link label.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.categoryLabel": {
-    "audience": "customer",
-    "defaultMessage": "Category",
-    "description": "Accessible label for Library category filters.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.clearSearch": {
-    "audience": "customer",
-    "defaultMessage": "Clear search",
-    "description": "Accessible label for clearing Library search.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.ctaBody": {
-    "audience": "customer",
-    "defaultMessage": "A few minutes gives MattaNutra the context it needs to turn broad answers into your Right Amount.",
-    "description": "Body copy for the Library index bottom CTA.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.ctaButton": {
-    "audience": "customer",
-    "defaultMessage": "Start designing your Right Amount",
-    "description": "Button label for the Library index bottom CTA.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.ctaImageAlt": {
-    "audience": "customer",
-    "defaultMessage": "Nong Matta celebrating",
-    "description": "Alt text for the Library index bottom CTA illustration.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.ctaTitle": {
-    "audience": "customer",
-    "defaultMessage": "Ready to make the guidance personal?",
-    "description": "Heading for the Library index bottom CTA.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.documentDescription": {
-    "audience": "customer",
-    "defaultMessage": "Clear, evidence-aware answers to common supplement questions — magnesium, vitamin D, omega-3, sleep and more. Learn what actually fits your body, guided by MattaNutra.",
-    "description": "Library index meta description matching the hand-off.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.documentTitle": {
-    "audience": "customer",
-    "defaultMessage": "The MattaNutra Library — Evidence-Aware Answers to Your Supplement Questions",
-    "description": "Library index document title matching the hand-off <title>.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.empty": {
-    "audience": "customer",
-    "defaultMessage": "No articles match yet - try a different word or category. More are on the way.",
-    "description": "Empty state shown when Library filters return no articles.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.eyebrow": {
-    "audience": "customer",
-    "defaultMessage": "The MattaNutra Library",
-    "description": "Library index eyebrow and breadcrumb current-page label.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.featuredListName": {
-    "audience": "customer",
-    "defaultMessage": "The MattaNutra Library - Featured articles",
-    "description": "Accessible name for featured Library articles.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.guide": {
-    "audience": "customer",
-    "defaultMessage": "Your guide",
-    "description": "Short guide label for the homepage Library preview.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.guideImageAlt": {
-    "audience": "customer",
-    "defaultMessage": "Nong Matta, the MattaNutra Library guide",
-    "description": "Alt text for Nong Matta as the Library guide.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.guideName": {
-    "audience": "customer",
-    "defaultMessage": "Nong Matta",
-    "description": "Name of the Library guide character.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.headerGuide": {
-    "audience": "customer",
-    "defaultMessage": "Guided by Nong Matta, our resident wellness sprout.",
-    "description": "Guide line in the Library index header.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.headerIntro": {
-    "audience": "customer",
-    "defaultMessage": "Clear, evidence-aware answers to the supplement questions people actually ask - magnesium, vitamin D, omega-3, sleep and more. Every page is written to help you decide from knowing, not guessing.",
-    "description": "Main introductory paragraph in the Library index header.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.headerIntroEmphasis": {
-    "audience": "customer",
-    "defaultMessage": "knowing",
-    "description": "Emphasized phrase inside the Library index header intro.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.headerTitle": {
-    "audience": "customer",
-    "defaultMessage": "Learn the right amount.",
-    "description": "Main Library index header title.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.headerTitleAccent": {
-    "audience": "customer",
-    "defaultMessage": "right amount.",
-    "description": "Emphasized phrase inside the Library index header title.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.intro": {
-    "audience": "customer",
-    "defaultMessage": "Evidence-aware answers to common supplement questions - clear enough to use, careful enough to trust.",
-    "description": "SEO and metadata description for the Library index page.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.landingIntro": {
-    "audience": "customer",
-    "defaultMessage": "Clear, evidence-aware answers to the supplement questions people actually ask - so you can decide from knowing, not guessing.",
-    "description": "Homepage Library preview intro copy.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.landingTitle": {
-    "audience": "customer",
-    "defaultMessage": "Learn the",
-    "description": "Homepage Library preview title prefix.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.landingTitleAccent": {
-    "audience": "customer",
-    "defaultMessage": "right amount.",
-    "description": "Homepage Library preview title accent.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.loadMore": {
-    "audience": "customer",
-    "defaultMessage": "Load more articles",
-    "description": "Button label for loading more Library articles.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.noContentNote": {
-    "audience": "customer",
-    "defaultMessage": "Full Library article content is being prepared for this locale.",
-    "description": "Note shown on Library cards whose full content is unavailable in the current locale.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.result": {
-    "audience": "customer",
-    "defaultMessage": "article",
-    "description": "Singular result noun for Library filter counts.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.results": {
-    "audience": "customer",
-    "defaultMessage": "articles",
-    "description": "Plural result noun for Library filter counts.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.searchLabel": {
-    "audience": "customer",
-    "defaultMessage": "Search the Library",
-    "description": "Accessible label for Library search and back-to-search link text.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.searchPlaceholder": {
-    "audience": "customer",
-    "defaultMessage": "Search the Library - try \"magnesium\" or \"sleep\"",
-    "description": "Placeholder text for Library search.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.sectionIntro": {
-    "audience": "customer",
-    "defaultMessage": "Plain-language supplement answers, guided by Nong Matta.",
-    "description": "Short Library section intro used by structured data.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.title": {
-    "audience": "customer",
-    "defaultMessage": "Evidence-aware answers to your supplement questions",
-    "description": "SEO and fallback Library index title.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
     "translatable": true,
     "variables": []
   },
@@ -3465,6 +3412,15 @@
     "translatable": true,
     "variables": []
   },
+  "customer.landing.hero.figureAlt": {
+    "audience": "customer",
+    "defaultMessage": "MattaNutra emblem",
+    "description": "Alt text for the landing hero MattaNutra emblem illustration.",
+    "namespace": "customer.landing.hero",
+    "surface": "landing",
+    "translatable": true,
+    "variables": []
+  },
   "customer.landing.hero.ingredientPills.0": {
     "audience": "customer",
     "defaultMessage": "Magnesium",
@@ -5174,6 +5130,15 @@
     "translatable": true,
     "variables": []
   },
+  "customer.landing.questionnaire.cta": {
+    "defaultMessage": "Start designing your Right Amount",
+    "description": "Landing questionnaire preview CTA.",
+    "namespace": "customer.landing",
+    "audience": "customer",
+    "surface": "landing",
+    "variables": [],
+    "translatable": true
+  },
   "customer.landing.questionnaire.eyebrow": {
     "audience": "customer",
     "defaultMessage": "The free questionnaire",
@@ -5747,6 +5712,483 @@
     "description": "customer.languageSwitcher copy for customer.languageSwitcher.aria.",
     "namespace": "customer.languageSwitcher",
     "surface": "navigation",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryArticleActions.copiedLabel": {
+    "audience": "customer",
+    "defaultMessage": "Copied",
+    "description": "Screen-reader and fallback prompt label shown after copying a Library article link.",
+    "namespace": "customer.libraryArticleActions",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryArticleActions.copyLinkLabel": {
+    "audience": "customer",
+    "defaultMessage": "Copy link",
+    "description": "Label for the Library article copy-link control.",
+    "namespace": "customer.libraryArticleActions",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryArticleActions.shareHeading": {
+    "audience": "customer",
+    "defaultMessage": "Share this guide:",
+    "description": "Heading shown above Library article share controls.",
+    "namespace": "customer.libraryArticleActions",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryArticleActions.shareLabel": {
+    "audience": "customer",
+    "defaultMessage": "Share",
+    "description": "Accessible label for the Library article share action.",
+    "namespace": "customer.libraryArticleActions",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.brainFocus": {
+    "audience": "customer",
+    "defaultMessage": "Brain & Focus",
+    "description": "Library category label for brain and focus articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.energyLongevity": {
+    "audience": "customer",
+    "defaultMessage": "Energy & Longevity",
+    "description": "Library category label for energy and longevity articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.everydayNutrition": {
+    "audience": "customer",
+    "defaultMessage": "Everyday Nutrition",
+    "description": "Library category label for everyday nutrition articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.foundations": {
+    "audience": "customer",
+    "defaultMessage": "Foundations",
+    "description": "Library category label for foundations articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.jointsMobility": {
+    "audience": "customer",
+    "defaultMessage": "Joints & Mobility",
+    "description": "Library category label for joints and mobility articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.minerals": {
+    "audience": "customer",
+    "defaultMessage": "Minerals",
+    "description": "Library category label for minerals articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.sleepRecovery": {
+    "audience": "customer",
+    "defaultMessage": "Sleep & Recovery",
+    "description": "Library category label for sleep and recovery articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.stressAdaptogens": {
+    "audience": "customer",
+    "defaultMessage": "Stress & Adaptogens",
+    "description": "Library category label for stress and adaptogen articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.testingPersonalisation": {
+    "audience": "customer",
+    "defaultMessage": "Testing & Personalisation",
+    "description": "Library category label for testing and personalisation articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryCategories.vitamins": {
+    "audience": "customer",
+    "defaultMessage": "Vitamins",
+    "description": "Library category label for vitamins articles.",
+    "namespace": "customer.libraryCategories",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.allCategory": {
+    "audience": "customer",
+    "defaultMessage": "All",
+    "description": "Label for the all-categories Library filter.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.articleImageAltPrefix": {
+    "audience": "customer",
+    "defaultMessage": "Nong Matta illustration",
+    "description": "Prefix for Library card illustration alt text.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.articleListName": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library articles",
+    "description": "Accessible name for the Library article list.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.breadcrumbHome": {
+    "audience": "customer",
+    "defaultMessage": "Home",
+    "description": "Home breadcrumb label on the Library index page.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.breadcrumbLabel": {
+    "audience": "customer",
+    "defaultMessage": "Breadcrumb",
+    "description": "Accessible label for the Library breadcrumb navigation.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.browse": {
+    "audience": "customer",
+    "defaultMessage": "Browse the Library",
+    "description": "Homepage Library preview link label.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.categoryLabel": {
+    "audience": "customer",
+    "defaultMessage": "Category",
+    "description": "Accessible label for Library category filters.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.clearSearch": {
+    "audience": "customer",
+    "defaultMessage": "Clear search",
+    "description": "Accessible label for clearing Library search.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.ctaBody": {
+    "audience": "customer",
+    "defaultMessage": "A few minutes gives MattaNutra the context it needs to turn broad answers into your Right Amount.",
+    "description": "Body copy for the Library index bottom CTA.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.ctaButton": {
+    "audience": "customer",
+    "defaultMessage": "Start designing your Right Amount",
+    "description": "Button label for the Library index bottom CTA.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.ctaImageAlt": {
+    "audience": "customer",
+    "defaultMessage": "Nong Matta celebrating",
+    "description": "Alt text for the Library index bottom CTA illustration.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.ctaTitle": {
+    "audience": "customer",
+    "defaultMessage": "Ready to make the guidance personal?",
+    "description": "Heading for the Library index bottom CTA.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.documentDescription": {
+    "audience": "customer",
+    "defaultMessage": "Clear, evidence-aware answers to common supplement questions — magnesium, vitamin D, omega-3, sleep and more. Learn what actually fits your body, guided by MattaNutra.",
+    "description": "Library index meta description matching the hand-off.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.documentTitle": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library — Evidence-Aware Answers to Your Supplement Questions",
+    "description": "Library index document title matching the hand-off <title>.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.empty": {
+    "audience": "customer",
+    "defaultMessage": "No articles match yet - try a different word or category. More are on the way.",
+    "description": "Empty state shown when Library filters return no articles.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.eyebrow": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library",
+    "description": "Library index eyebrow and breadcrumb current-page label.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.featuredListName": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library - Featured articles",
+    "description": "Accessible name for featured Library articles.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.guide": {
+    "audience": "customer",
+    "defaultMessage": "Your guide",
+    "description": "Short guide label for the homepage Library preview.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.guideImageAlt": {
+    "audience": "customer",
+    "defaultMessage": "Nong Matta, the MattaNutra Library guide",
+    "description": "Alt text for Nong Matta as the Library guide.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.guideName": {
+    "audience": "customer",
+    "defaultMessage": "Nong Matta",
+    "description": "Name of the Library guide character.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerGuide": {
+    "audience": "customer",
+    "defaultMessage": "Guided by Nong Matta, our resident wellness sprout.",
+    "description": "Guide line in the Library index header.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerIntro": {
+    "audience": "customer",
+    "defaultMessage": "Clear, evidence-aware answers to the supplement questions people actually ask - magnesium, vitamin D, omega-3, sleep and more. Every page is written to help you decide from knowing, not guessing.",
+    "description": "Main introductory paragraph in the Library index header.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerIntroEmphasis": {
+    "audience": "customer",
+    "defaultMessage": "knowing",
+    "description": "Emphasized phrase inside the Library index header intro.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerTitle": {
+    "audience": "customer",
+    "defaultMessage": "Learn the right amount.",
+    "description": "Main Library index header title.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.headerTitleAccent": {
+    "audience": "customer",
+    "defaultMessage": "right amount.",
+    "description": "Emphasized phrase inside the Library index header title.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.intro": {
+    "audience": "customer",
+    "defaultMessage": "Evidence-aware answers to common supplement questions - clear enough to use, careful enough to trust.",
+    "description": "SEO and metadata description for the Library index page.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.landingIntro": {
+    "audience": "customer",
+    "defaultMessage": "Clear, evidence-aware answers to the supplement questions people actually ask - so you can decide from knowing, not guessing.",
+    "description": "Homepage Library preview intro copy.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.landingTitle": {
+    "audience": "customer",
+    "defaultMessage": "Learn the",
+    "description": "Homepage Library preview title prefix.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.landingTitleAccent": {
+    "audience": "customer",
+    "defaultMessage": "right amount.",
+    "description": "Homepage Library preview title accent.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.loadMore": {
+    "audience": "customer",
+    "defaultMessage": "Load more articles",
+    "description": "Button label for loading more Library articles.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.noContentNote": {
+    "audience": "customer",
+    "defaultMessage": "Full Library article content is being prepared for this locale.",
+    "description": "Note shown on Library cards whose full content is unavailable in the current locale.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.openGraphDescription": {
+    "audience": "customer",
+    "defaultMessage": "Clear, evidence-aware answers to common supplement questions. Learn what actually fits your body.",
+    "description": "Library index og:description from hand-off.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.openGraphTitle": {
+    "audience": "customer",
+    "defaultMessage": "The MattaNutra Library — Evidence-Aware Supplement Answers",
+    "description": "Library index og:title from hand-off (shorter than document title).",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.result": {
+    "audience": "customer",
+    "defaultMessage": "article",
+    "description": "Singular result noun for Library filter counts.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.results": {
+    "audience": "customer",
+    "defaultMessage": "articles",
+    "description": "Plural result noun for Library filter counts.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.searchLabel": {
+    "audience": "customer",
+    "defaultMessage": "Search the Library",
+    "description": "Accessible label for Library search and back-to-search link text.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.searchPlaceholder": {
+    "audience": "customer",
+    "defaultMessage": "Search the Library - try \"magnesium\" or \"sleep\"",
+    "description": "Placeholder text for Library search.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.sectionIntro": {
+    "audience": "customer",
+    "defaultMessage": "Plain-language supplement answers, guided by Nong Matta.",
+    "description": "Short Library section intro used by structured data.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.libraryIndex.title": {
+    "audience": "customer",
+    "defaultMessage": "Evidence-aware answers to your supplement questions",
+    "description": "SEO and fallback Library index title.",
+    "namespace": "customer.libraryIndex",
+    "surface": "library",
     "translatable": true,
     "variables": []
   },
@@ -6528,6 +6970,47 @@
     ],
     "translatable": true
   },
+  "customer.revealCopy.productServingMatchTemplate": {
+    "defaultMessage": "Use {servings} {servingUnit}. Matches {covers} and accounts for {percent}% of the selected stack.",
+    "description": "Reveal page copy field productServingMatchTemplate.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [
+      "covers",
+      "percent",
+      "servingUnit",
+      "servings"
+    ],
+    "translatable": true
+  },
+  "customer.revealCopy.productServingUnit": {
+    "defaultMessage": "servings",
+    "description": "Reveal page copy field productServingUnit.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealCopy.productSingleServingUnit": {
+    "defaultMessage": "serving",
+    "description": "Reveal page copy field productSingleServingUnit.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealCopy.productVerified": {
+    "defaultMessage": "Matched",
+    "description": "Reveal page copy field productVerified.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
   "customer.revealCopy.productsAllTitleTemplate": {
     "defaultMessage": "{productSelectedText} bottles. All {supplementSelectedTextLower} nutrients.",
     "description": "Reveal page copy field productsAllTitleTemplate.",
@@ -6558,41 +7041,9 @@
     "variables": [],
     "translatable": true
   },
-  "customer.revealCopy.productServingMatchTemplate": {
-    "defaultMessage": "Use {servings} {servingUnit}. Matches {covers} and accounts for {percent}% of the selected stack.",
-    "description": "Reveal page copy field productServingMatchTemplate.",
-    "namespace": "customer.revealCopy",
-    "audience": "customer",
-    "surface": "reveal",
-    "variables": [
-      "covers",
-      "percent",
-      "servingUnit",
-      "servings"
-    ],
-    "translatable": true
-  },
-  "customer.revealCopy.productServingUnit": {
-    "defaultMessage": "servings",
-    "description": "Reveal page copy field productServingUnit.",
-    "namespace": "customer.revealCopy",
-    "audience": "customer",
-    "surface": "reveal",
-    "variables": [],
-    "translatable": true
-  },
   "customer.revealCopy.productsEyebrow": {
     "defaultMessage": "From shelves to certainty",
     "description": "Reveal page copy field productsEyebrow.",
-    "namespace": "customer.revealCopy",
-    "audience": "customer",
-    "surface": "reveal",
-    "variables": [],
-    "translatable": true
-  },
-  "customer.revealCopy.productSingleServingUnit": {
-    "defaultMessage": "serving",
-    "description": "Reveal page copy field productSingleServingUnit.",
     "namespace": "customer.revealCopy",
     "audience": "customer",
     "surface": "reveal",
@@ -6678,15 +7129,6 @@
   "customer.revealCopy.productsTitle": {
     "defaultMessage": "From shelves to certainty.",
     "description": "Reveal page copy field productsTitle.",
-    "namespace": "customer.revealCopy",
-    "audience": "customer",
-    "surface": "reveal",
-    "variables": [],
-    "translatable": true
-  },
-  "customer.revealCopy.productVerified": {
-    "defaultMessage": "Matched",
-    "description": "Reveal page copy field productVerified.",
     "namespace": "customer.revealCopy",
     "audience": "customer",
     "surface": "reveal",
@@ -8187,6 +8629,15 @@
     "translatable": true,
     "variables": []
   },
+  "customer.titleBar.logoAlt": {
+    "audience": "customer",
+    "defaultMessage": "MattaNutra",
+    "description": "Accessible alt text for the site logo in the title bar.",
+    "namespace": "customer.titleBar",
+    "surface": "chrome",
+    "translatable": true,
+    "variables": []
+  },
   "customer.titleBar.logoTagline": {
     "audience": "customer",
     "defaultMessage": "Knowing the right amount",
@@ -8610,10 +9061,28 @@
     "translatable": true,
     "variables": []
   },
+  "seo.routes.home.openGraphDescription": {
+    "audience": "public",
+    "defaultMessage": "Personalised supplements from a detailed assessment, with ongoing guidance and a 90-day plan.",
+    "description": "Homepage og:description from hand-off when distinct from meta description.",
+    "namespace": "seo.routes",
+    "surface": "seo",
+    "translatable": true,
+    "variables": []
+  },
   "seo.routes.home.title": {
     "audience": "public",
     "defaultMessage": "MattaNutra — Stop guessing. Start knowing.",
     "description": "SEO title for the localized homepage.",
+    "namespace": "seo.routes",
+    "surface": "seo",
+    "translatable": true,
+    "variables": []
+  },
+  "seo.routes.home.twitterDescription": {
+    "audience": "public",
+    "defaultMessage": "Personalised supplements from a detailed, relevant assessment.",
+    "description": "Homepage twitter:description from hand-off when distinct from og:description.",
     "namespace": "seo.routes",
     "surface": "seo",
     "translatable": true,
@@ -8760,69 +9229,6 @@
     "description": "SEO title for the terms of service page.",
     "namespace": "seo.routes",
     "surface": "seo",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.landing.questionnaire.cta": {
-    "defaultMessage": "Start designing your Right Amount",
-    "description": "Landing questionnaire preview CTA.",
-    "namespace": "customer.landing",
-    "audience": "customer",
-    "surface": "landing",
-    "variables": [],
-    "translatable": true
-  },
-  "customer.libraryIndex.openGraphTitle": {
-    "audience": "customer",
-    "defaultMessage": "The MattaNutra Library — Evidence-Aware Supplement Answers",
-    "description": "Library index og:title from hand-off (shorter than document title).",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.libraryIndex.openGraphDescription": {
-    "audience": "customer",
-    "defaultMessage": "Clear, evidence-aware answers to common supplement questions. Learn what actually fits your body.",
-    "description": "Library index og:description from hand-off.",
-    "namespace": "customer.libraryIndex",
-    "surface": "library",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.titleBar.logoAlt": {
-    "audience": "customer",
-    "defaultMessage": "MattaNutra",
-    "description": "Accessible alt text for the site logo in the title bar.",
-    "namespace": "customer.titleBar",
-    "surface": "chrome",
-    "translatable": true,
-    "variables": []
-  },
-  "seo.routes.home.openGraphDescription": {
-    "audience": "public",
-    "defaultMessage": "Personalised supplements from a detailed assessment, with ongoing guidance and a 90-day plan.",
-    "description": "Homepage og:description from hand-off when distinct from meta description.",
-    "namespace": "seo.routes",
-    "surface": "seo",
-    "translatable": true,
-    "variables": []
-  },
-  "seo.routes.home.twitterDescription": {
-    "audience": "public",
-    "defaultMessage": "Personalised supplements from a detailed, relevant assessment.",
-    "description": "Homepage twitter:description from hand-off when distinct from og:description.",
-    "namespace": "seo.routes",
-    "surface": "seo",
-    "translatable": true,
-    "variables": []
-  },
-  "customer.landing.hero.figureAlt": {
-    "audience": "customer",
-    "defaultMessage": "MattaNutra emblem",
-    "description": "Alt text for the landing hero MattaNutra emblem illustration.",
-    "namespace": "customer.landing.hero",
-    "surface": "landing",
     "translatable": true,
     "variables": []
   }

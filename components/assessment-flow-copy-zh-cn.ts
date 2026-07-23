@@ -258,7 +258,7 @@ export const zhCn: Copy = {
       ]
     },
     "coach": {
-      "allergies": "用于补充剂安全核查，不需要填写自由文本。",
+      "allergies": "用于营养品安全核查，不需要填写自由文本。",
       "foodFrequency": "食物频率可改善微量营养素缺口估算，而无需将食物匹配重新加入活跃产品引擎。",
       "goals": "不搞大而全。你选什么，知量方案就重点解决什么。",
       "labs": "单位很重要。我们会在将数据发送给 AI 前保留数值和单位。",
@@ -521,7 +521,7 @@ export const zhCn: Copy = {
           "value": "carnivore"
         }
       ],
-      "frequency": "您多久吃一次……",
+      "frequency": "你多久吃一次……",
       "frequencyTitles": {
         "dairy": "乳制品（份/天）",
         "eggs": "蛋类",
@@ -777,7 +777,7 @@ export const zhCn: Copy = {
     "precision": {
       "title": "你的偏好",
       "subtitle": "先圈底线，再调细节。知量方案绝不越界。",
-      "budget": "每月补充剂预算（泰铢）",
+      "budget": "每月营养品预算（泰铢）",
       "budgetOptions": [
         {
           "label": "1,000 以下",
@@ -1117,7 +1117,7 @@ export const zhCn: Copy = {
           "value": "yes"
         }
       ],
-      "supplements": "您目前服用的补充剂",
+      "supplements": "你目前在吃的营养品",
       "supplementsOptions": [
         {
           "label": "没吃",

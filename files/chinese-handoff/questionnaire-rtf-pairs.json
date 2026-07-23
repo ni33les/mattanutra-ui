@@ -1,0 +1,237 @@
+[
+  {
+    "english": "FORMULA PRECISION 配方精准度",
+    "zhCN": "2% complete. 36 essential signals left before the precision layer. 精准度 2% · 还差 36 项关键数据 · 继续完善，解锁专属配方",
+    "index": 0
+  },
+  {
+    "english": "There are no right or wrong answers here, only true ones. The more honestly you answer, the more exactly your formula fits, and the safer it is alongside anything you already take. 没有对错之分，只有真实的答案。回答越诚实，你的知量方案就越精准，也越能安全地配合你正在服用的产品。",
+    "zhCN": "First name Optional So we can personalise your Right Amount. 怎么称呼您？（可选项）让知量方案带上你的名字。",
+    "index": 1
+  },
+  {
+    "english": "Private by defaultYour answers stay tied to your plan. We do not sell them or share them with advertisers. 默认私密你的回答，只属于你的知量方案。不卖、不传、不拿来骚扰你。",
+    "zhCN": "Wellness, not diagnosisGuidance to support your goals, always shareable with your doctor. 健康调理，不做诊疗给你的建议是为了帮你达成健康目标，随时可以拿给你的医生一起参考。",
+    "index": 2
+  },
+  {
+    "english": "Female health context 女性健康信息",
+    "zhCN": "Pregnancy / breastfeeding status 孕期/哺乳期状态",
+    "index": 3
+  },
+  {
+    "english": "Primary health goalsPick up to 3Choose up to three. The formulation uses these as priorities rather than trying to optimise everything equally. 你最想改善什么？最多选3项不搞大而全。 你选什么，知量方案就重点解决什么",
+    "zhCN": "Longevity 长寿抗衰",
+    "index": 4
+  },
+  {
+    "english": "Your daily Life 你的日常",
+    "zhCN": "This turns the formula from a generic stack into something that fits your routine 同样补营养，熬大夜和早睡的人，需要的配方不一样。 下面这些，就是帮知量方案对上你的生活节奏",
+    "index": 5
+  },
+  {
+    "english": "Food & nutrition 饮食 & 营养",
+    "zhCN": "Food context sharpens the supplement brief, even while product matching remains supplement-only. 问这些不是为了让你改菜单。吃什么是你的自由，我们只负责把缺的那块精准补上。",
+    "index": 6
+  },
+  {
+    "english": "Medications & safety 安全第一",
+    "zhCN": "These answers are used for cautions and deterministic safety checks. 你在用药吗？告诉我们就好，知量方案会自动绕开不该碰的成分。",
+    "index": 7
+  },
+  {
+    "english": "Do you take any medications? 你在用药吗？",
+    "zhCN": "Used for cautions only.This is not for diagnosis. It gives the AI and deterministic safety layer the context needed to add cautions. 填了，知量方案会自动避开相冲成分；不填，跳过就好。只做安全提示，不做诊断。",
+    "index": 8
+  },
+  {
+    "english": "Contraceptive pill 避孕药",
+    "zhCN": "Antidepressant 抗抑郁药",
+    "index": 9
+  },
+  {
+    "english": "Thyroid medication 甲状腺药物",
+    "zhCN": "Blood pressure 降压药",
+    "index": 10
+  },
+  {
+    "english": "Basic Multi 多维片",
+    "zhCN": "D3/Omega-3 维生素 D3 / 鱼油",
+    "index": 11
+  },
+  {
+    "english": "Supplement ingredient allergies or intolerances 对那些营养品成分过敏或不耐受",
+    "zhCN": "Not known 没有",
+    "index": 12
+  },
+  {
+    "english": "Shellfish derived",
+    "zhCN": "贝类提取物",
+    "index": 13
+  },
+  {
+    "english": "Your preferences 你的偏好",
+    "zhCN": "Set practical constraints first, then add optional precision if you have it. 先圈底线，再调细节。 知量方案绝不越界。",
+    "index": 14
+  },
+  {
+    "english": "Optional precision tier 再精准一点？ （选填）",
+    "zhCN": "These optional fields move the last 20% of the precision meter. 最后这几步，能把精准度从 够用 拉到 完全为你 。嫌麻烦，跳过，当前方案已经够好",
+    "index": 15
+  },
+  {
+    "english": "Health Score Page Translation",
+    "zhCN": "We read your goals, daily routine, safety context, and the way you actually live, then turned them into one number and the pattern underneath it. 每一条回答，都为你运转了一遍。一个分数，看清身体底层到底怎么了。",
+    "index": 16
+  },
+  {
+    "english": "WHAT 64 ACTUALLY MEANS 64 分， 什么水平？",
+    "zhCN": "You are ahead of about 69% of people who finish this assessment. 你已领先 69% 的人，但你还可以更好。",
+    "index": 17
+  },
+  {
+    "english": "You are clearly doing a lot right. What is left is refinement, a few targeted points between you and your personal best. 差在哪？就几个关键点。下面告诉你是什么，再给你对应的调整方案。",
+    "zhCN": "Gap 01 - Activity & Fitness 缺口一 运动体能",
+    "index": 18
+  },
+  {
+    "english": "Movement is the lever you are not pulling 最被低估的一张牌：运动。",
+    "zhCN": "Your activity sits low, and it is the pillar most of your goals route through. That makes it your highest-return change. 你把它放一边，但你的健康目标全都在等它拉动。补上这个，收效最快。",
+    "index": 19
+  },
+  {
+    "english": "A few targeted shifts in what you eat would move this pillar quickly. Your plan shows exactly which ones matter for you. 缺什么、补多少，知量方案替你算好了。",
+    "zhCN": "YOUR PATTERN, PILLAR BY PILLAR 你的身体底子，逐项看",
+    "index": 20
+  },
+  {
+    "english": "Health Habits 健康习惯",
+    "zhCN": "Stress and balance 压力与平衡",
+    "index": 21
+  },
+  {
+    "english": "Your highest-leverage move: Activity & Fitness sits at 64% and every one of your goals routes through it. Lift this one pillar and energy all move together. That is not a coincidence in your results; it is the shape of your answers. 你没想到的一项，卡住了所有目标 运动体能， 64% 。你想要的，全得经过它。拉起来，整张分数都会变。这不是随便说的，是你自己的数据串起来的。",
+    "zhCN": "A note worth hearing: your Health Habits score is 93%. You have a strong foundation; it just needs to be pointed in the right direction. 有一说一 生活习惯这块， 93% 。底子够好，不用大动，方向调对就行。",
+    "index": 22
+  },
+  {
+    "english": "Daily sunscreen, limited time in the sun, and low oily-fish intake all point the same way. Your formula is built around how you actually live, not just your age and sex. 防晒、日晒少、油性鱼吃得不多 棗 几个信号，指向同一个方向。不套公式，照你的生活习惯配。",
+    "zhCN": "HOW YOUR FORMULA WAS BUILT 不是选进来，是筛出去",
+    "index": 23
+  },
+  {
+    "english": "177 evaluated 177 种成分",
+    "zhCN": "169 set aside for you 169 种被淘汰",
+    "index": 24
+  },
+  {
+    "english": "A good plan preview is not built by adding everything that might help. It first filters out what does not fit your score, a longer healthspan, and your safety profile before the final formula is generated 一份好的方案，不是加法，是减法。 不堆成分，只留对的。你的知量方案，就这么配。",
+    "zhCN": "HOW MATTANUTRA THINKS 知量配方怎么算",
+    "index": 25
+  },
+  {
+    "english": "A fixed scoring model across five domains, not a guess and not an average of strangers. 五个维度，一套模型。不算命、不凑数、不套模板。",
+    "zhCN": "1. Your goals set the direction A longer healthspan becomes the lens every other answer is read through, which is why goal-linked pillars carry more weight. 1. 你的目标，定方向 健康寿命是那把尺，你所有的回答，都放在它下面看。所以跟目标挂钩的支柱，权重更高。",
+    "index": 26
+  },
+  {
+    "english": "2. Your routine adds the contextSleep, stress, movement, diet, sunscreen, and fish intake all shift what belongs in your formula and what gets ruled out. 2. 你的日常，填细节 睡眠、压力、运动、饮食、防晒、吃鱼 棗 这些决定什么该进知量方案，什么该被筛出去。",
+    "zhCN": "3. Your safety profile draws the linesMedication, pregnancy, kidney, liver, and sensitivity answers draw boundaries the plan will not cross. 3. 你的安全，划边界 用药、孕期、肾脏、肝脏、过敏不耐受 棗 这些划出的线，方案绝不越过。",
+    "index": 27
+  },
+  {
+    "english": "Your number is computed by the same rules every time: traceable, point by point. This is wellness guidance, not a diagnosis, and it is built to be shared with your doctor. 你的分数，有据可查。同一套规则，次次一样。 不诊断，只调理。欢迎拿给医生看。",
+    "zhCN": "Founders with 100+ years' combined experienceMedicine Science TechnologyFormal education & trainingMahidol Princeton Stanford HarvardDispensed by local pharmacistsThrough licensed Thai pharmacy partners 谁在做 创始团队：医学 + 科学 + 技术，合计百余年经验。出身玛希隆、普林斯顿、斯坦福、哈佛。 谁在配 持牌药房，执业药师亲手调配。",
+    "index": 28
+  },
+  {
+    "english": "(Name ) CHOOSE YOUR NEXT STEP ( 名字 ), 就差一步了",
+    "zhCN": "Your personalised Right Amount Formula is ready to unlock.THB 690 unlocks them the exact supplements and brands, doses, and timing, with a safety review built around your profile. Your plan, ready to use every day on your quest for better health. • ✓ Built around your goals, diet, and labs ✓ Safety-checked against your medications From there, MattaNutra takes care of the rest sourcing each product through our pharmacy partner and sending it to your door 刚才填的那些，都算完了。 160 解锁你的专属知量方案。 解锁后你会得到： 精确到品牌和剂量的营养品清单、每天的服用时间、一份跟你用药做过安全核验的方案。不是建议，是方案。 后续采购、配送， MattaNutra 合作药房帮你搞定，直送上门。",
+    "index": 29
+  },
+  {
+    "english": "Your THB 690 covers the plan above. The matched supplements are a separate basket on the next page, billed by MattaNutra at the competitive prices our pharmacy partner gives us. 160 ，买的是方案。营养品在下一页，药房什么价，给你什么价。",
+    "zhCN": "Above image is an example box only. Unlock your formula to discover what supplements will be in YOUR personalised box. 这是示例，不是你的。你的那盒长什么样？解锁就看得到",
+    "index": 30
+  },
+  {
+    "english": "We have carefully determined your Right Amount. Now it is your turn to choose the plan that best fits your needs. 专属你的知量方案，已经就绪。",
+    "zhCN": "The plan itself is yours either way. What changes is whether MattaNutra walks alongside you for the first 90 days as life happens. 但接下来 90 天 棗 出差、聚餐、熬夜、生理期，这些都会影响你该吃什么、吃多少。到时候，方案跟不跟着调？你来选。",
+    "index": 31
+  },
+  {
+    "english": "Choose Right Amount Formula for a clear, one-time answer you act on yourself. The plan in full, today and you decide what comes next. 路径一 知量方案 完整方案，今天拿走。自己照着用，后面怎么走，你说了算。",
+    "zhCN": "Choose Living Protocol for ongoing, physician-built support your plan adapts when you travel, sleep poorly, or change your routine, with food-first guidance and safety-checks against your medications and labs. 路径二 动态方案 90 天，方案跟着你变。出差、睡不好、节奏乱了 棗Panya AI 营养管家自动重算。饮食优先指导，用药和数据持续核验，方案始终对应当下的你。",
+    "index": 32
+  },
+  {
+    "english": "Limited time offer 限时优惠",
+    "zhCN": "ONE-TIME PLAN ◎ 一次性方案",
+    "index": 33
+  },
+  {
+    "english": "Right Amount Formula 知量方案",
+    "zhCN": "Your personalised supplement formula with precise dosing, timing, and product guidance. 你的专属营养方案，精确到剂量、服用时间、产品推荐。",
+    "index": 34
+  },
+  {
+    "english": "One-time payment Lifetime access 一次性付费 永久查看",
+    "zhCN": "Get the right formula 获取知量方案",
+    "index": 35
+  },
+  {
+    "english": "Personalised supplement formula ✓ 专属营养方案",
+    "zhCN": "Body-size adjusted dose ranges ✓ 按体重校准的剂量范围",
+    "index": 36
+  },
+  {
+    "english": "Timing and usage instructions ✓ 服用时间与方式说明",
+    "zhCN": "Medication and lab safety flags ✓ 用药与检测安全标注",
+    "index": 37
+  },
+  {
+    "english": "Recommended products and alternatives ✓ 推荐产品及备选",
+    "zhCN": "60-day reassessment prompt ✓ 60 天后复测提醒",
+    "index": 38
+  },
+  {
+    "english": "90-day AI support ♡ 90 天 AI 陪伴",
+    "zhCN": "Living Protocol 动态方案",
+    "index": 39
+  },
+  {
+    "english": "One payment 90 days of support Renew anytime 一次付费 90 天支持 随时续",
+    "zhCN": "Start Living Protocol 开启动态方案",
+    "index": 40
+  },
+  {
+    "english": "Includes Right Amount Formula Plan. 包含完整知量方案",
+    "zhCN": "Plus 外加",
+    "index": 41
+  },
+  {
+    "english": "When something runs low, learn the everyday foods naturally rich in it, or skip the supplement when your meals already cover it. 缺什么，告诉你日常哪些食物能补上。吃够了少补，不够再精准补。",
+    "zhCN": "Sleep, Energy and Habits Guidance 动态健康管家提供实时指导",
+    "index": 42
+  },
+  {
+    "english": "Improve sleep quality, boost energy, and build better daily habits. 改善睡眠质量，提升精力，建立更好的日常习惯。",
+    "zhCN": "Learn which everyday foods give you what you need ✓ 日常食物营养指南",
+    "index": 43
+  },
+  {
+    "english": "Supplement timing and adherence support ✓ 营养品服用提醒",
+    "zhCN": "Weekly progress summaries ✓ 每周进展小结",
+    "index": 44
+  },
+  {
+    "english": "7-Day Satisfaction Guarantee. Give Living Protocol a real try. If anything is not right, tell us and we will fix it, or refund you in full within 7 days. 7 天满意保障：认真试试。不满意，调好或全额退。",
+    "zhCN": "Complete Payment 完成支付",
+    "index": 45
+  },
+  {
+    "english": "Right Amount Formula",
+    "zhCN": "知量方案",
+    "index": 46
+  }
+]

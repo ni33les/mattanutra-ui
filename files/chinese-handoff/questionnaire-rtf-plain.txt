@@ -1,0 +1,166 @@
+step 1/ 6
+Your answers stay between us.This assessment asks about your health what you take, how you feel, anything you react to. We use it only to build and safety-check your formula, never to sell, and you can withdraw any time. 你的信息，绝不外泄你填的健康状况、服用习惯、身体反应，只用于两件事：① 为你定制专属营养配方② 确保配方对你安全我们不会卖你的数据，也不会发垃圾广告。随时可以退出，数据随时可删。 ☑️ 我已知晓并同意
+FORMULA PRECISION 配方精准度
+2% complete. 36 essential signals left before the precision layer. 精准度 2% · 还差 36 项关键数据 · 继续完善，解锁专属配方
+IT'S ALL YOU First, the basics about youA few quick taps to start. This sets the baseline the rest of your formula is built on. 一切答案，都在你身上先明确自己的身体画像。轻松点几下，打个底——这是你自己的配方底盘，后面一切都从这儿出发。
+There are no right or wrong answers here, only true ones. The more honestly you answer, the more exactly your formula fits, and the safer it is alongside anything you already take. 没有对错之分，只有真实的答案。回答越诚实，你的知量方案就越精准，也越能安全地配合你正在服用的产品。
+First name Optional So we can personalise your Right Amount. 怎么称呼您？（可选项）让知量方案带上你的名字。
+SexSex and reproductive context affect dose caution, iron logic, and product audience filtering. 性别性别不同，剂量安全线和铁的需求都不一样，推荐的产品也会有区别。
+Sunscreen useHelps tune vitamin D and sun exposure context. 你平时防晒吗？这关系到你的维生素D怎么补。
+Sun exposure ( Min / day )Skin tone, sun, and sunscreen help estimate vitamin D context more honestly. 日晒时长（分钟/天）这几个信息凑在一起，才知道你身体里D到底是什么情况——不缺、刚好，还是差得远。
+CountryUsed for local context and product availability. 所在国家你所在的地方，决定了有些产品能不能送到你手上。
+Reviewed for safetyEvery formula is screened against your medicines, labs, and Thai FDA registration. 安全把关每一份知量方案，都会跟你在用的药、你的检测数据交叉比对，再经过泰国FDA注册审核——多重核验，安全才通过。
+Private by defaultYour answers stay tied to your plan. We do not sell them or share them with advertisers. 默认私密你的回答，只属于你的知量方案。不卖、不传、不拿来骚扰你。
+Wellness, not diagnosisGuidance to support your goals, always shareable with your doctor. 健康调理，不做诊疗给你的建议是为了帮你达成健康目标，随时可以拿给你的医生一起参考。
+Female health context 女性健康信息
+Pregnancy / breastfeeding status 孕期/哺乳期状态
+Sex and reproductive context affect dose caution, iron logic, and product audience filtering. 这直接关系到你的剂量安全、补铁策略，以及哪些产品适合现在的你。
+Step 2/6
+FOUNDATION Your goals & how you feelYour top priorities and current symptoms guide the order of the formulation. 基础信息你的目标 你的起点你最想改善什么和现在的身体状况 — 这些 决定了知量方案从哪里开始入手
+Primary health goalsPick up to 3Choose up to three. The formulation uses these as priorities rather than trying to optimise everything equally. 你最想改善什么？最多选3项不搞大而全。 你选什么，知量方案就重点解决什么
+Longevity 长寿抗衰
+Fitness 体能
+Hormones 荷尔蒙
+Brian fog 脑雾/注意力差
+Mood 情绪不稳定
+Stress 压力大
+Skin 皮肤差
+Step 3 / 6
+Foundation 基础信息
+Your daily Life 你的日常
+This turns the formula from a generic stack into something that fits your routine 同样补营养，熬大夜和早睡的人，需要的配方不一样。 下面这些，就是帮知量方案对上你的生活节奏
+Step 4/6
+Food & nutrition 饮食 & 营养
+Food context sharpens the supplement brief, even while product matching remains supplement-only. 问这些不是为了让你改菜单。吃什么是你的自由，我们只负责把缺的那块精准补上。
+Diet pattern 你的饮食偏哪种？
+No patten 没固定模式，随意吃
+Processed 外卖/加工食品居多
+Balanced 荤素搭配，比较均衡
+Whole foods 偏清淡，天然食材为主
+Mediterranean 地中海式（多鱼、橄榄油、坚果）
+Plant based 素食为主，很少吃肉
+Vegan 纯素，蛋奶都不吃
+Carnivore 以肉食为主
+Food allergy context keeps the supplement brief practical without adding a free-text avoidance field. Please remove Chinese translation here - English does not make sense.
+Step 5/6
+Medications & safety 安全第一
+These answers are used for cautions and deterministic safety checks. 你在用药吗？告诉我们就好，知量方案会自动绕开不该碰的成分。
+Do you take any medications? 你在用药吗？
+Used for cautions only.This is not for diagnosis. It gives the AI and deterministic safety layer the context needed to add cautions. 填了，知量方案会自动避开相冲成分；不填，跳过就好。只做安全提示，不做诊断。
+Medication type(s) 药物类型（可多选）
+Statin 他汀类（降脂药）
+Metformin 二甲双胍（降糖药）
+PPI / Omeprazole 质子泵抑制剂 / 奥美拉唑（胃药）
+Diuretic 利尿剂
+Contraceptive pill 避孕药
+Antidepressant 抗抑郁药
+Blood thinner / aspirin 抗凝药 / 阿司匹林
+Thyroid medication 甲状腺药物
+Blood pressure 降压药
+Corticosteroid 皮质类固醇
+Other 其他
+Supplements you take now 你目前在吃的营养品
+None 没吃
+Basic Multi 多维片
+D3/Omega-3 维生素 D3 / 鱼油
+Several Targeted 好几种针对性营养品
+Supplement ingredient allergies or intolerances 对那些营养品成分过敏或不耐受
+Not known 没有
+Soy derived 大豆提取物
+Shellfish derived 贝类提取物
+Step 6/6
+Your preferences 你的偏好
+Set practical constraints first, then add optional precision if you have it. 先圈底线，再调细节。 知量方案绝不越界。
+Optional precision tier 再精准一点？ （选填）
+These optional fields move the last 20% of the precision meter. 最后这几步，能把精准度从 够用 拉到 完全为你 。嫌麻烦，跳过，当前方案已经够好
+Protein ( G / kg / day ) 蛋白质吃够了吗？（克 / 公斤体重 / 天）
+These optional fields move the last 20% of the precision meter. 很多人以为自己吃够了，其实差得远。填个数，知量方案告诉你真实缺口在哪。
+Generate my health score 看看我的身体底子多少分
+Health Score Page Translation
+We read your goals, daily routine, safety context, and the way you actually live, then turned them into one number and the pattern underneath it. 每一条回答，都为你运转了一遍。一个分数，看清身体底层到底怎么了。
+A 66 is a genuinely solid base, with one clear, nameable gap between you and the next level. 66 分，底子在。就一个点拖了后腿。下面看看是什么，再用知量方案把它补上。
+WHAT 64 ACTUALLY MEANS 64 分， 什么水平？
+You are ahead of about 69% of people who finish this assessment. 你已领先 69% 的人，但你还可以更好。
+You are clearly doing a lot right. What is left is refinement, a few targeted points between you and your personal best. 差在哪？就几个关键点。下面告诉你是什么，再给你对应的调整方案。
+Gap 01 - Activity & Fitness 缺口一 运动体能
+Movement is the lever you are not pulling 最被低估的一张牌：运动。
+Your activity sits low, and it is the pillar most of your goals route through. That makes it your highest-return change. 你把它放一边，但你的健康目标全都在等它拉动。补上这个，收效最快。
+GAP 02 SLEEP & RECOVERY 缺口二 睡眠与恢复
+Your recovery is running short 你的身体，没时间好好恢复
+Short or broken sleep is limiting how much everything else can work. It is one of the most movable parts of your score. 睡得少或睡不好，其他方面再怎么努力，效果都打了折扣。这是你分数里，最容易拉动的一项。
+GAP 03 NUTRITION & DIET 缺口三 饮食营养
+Your plate is leaving value on the table 不是你吃得差，是身体要的你没给到。
+A few targeted shifts in what you eat would move this pillar quickly. Your plan shows exactly which ones matter for you. 缺什么、补多少，知量方案替你算好了。
+YOUR PATTERN, PILLAR BY PILLAR 你的身体底子，逐项看
+Your goal-linked pillars show where refinement still matters. 每项都对应你的健康目标。高分不用动，低分就是可提升的空间。标了 关联目标 的，知量方案优先调整。
+Sleep & RecoveryGoal-linked energy 睡眠与恢复 关联目标 精力
+Health Habits 健康习惯
+Stress and balance 压力与平衡
+Nutrition & Diet 饮食与营养 关联目标 精力
+Activity & Fitness GOAL-LINKED牱ENERGY 运动与体能 关联目标 精力
+Your highest-leverage move: Activity & Fitness sits at 64% and every one of your goals routes through it. Lift this one pillar and energy all move together. That is not a coincidence in your results; it is the shape of your answers. 你没想到的一项，卡住了所有目标 运动体能， 64% 。你想要的，全得经过它。拉起来，整张分数都会变。这不是随便说的，是你自己的数据串起来的。
+A note worth hearing: your Health Habits score is 93%. You have a strong foundation; it just needs to be pointed in the right direction. 有一说一 生活习惯这块， 93% 。底子够好，不用大动，方向调对就行。
+WHAT WE CAUGHT 你漏掉了什么
+1 thing a generic vitamin quiz would have missed. 普通营养测评不会告诉你的那件事。
+Laid out from the specific signals in your answers, nothing held back. 你的数据里藏着信号，我们把它揪出来了。全说，不兜圈子。
+Your daily routine shapes your formula. 你的日常，就是知量方案的底稿
+Daily sunscreen, limited time in the sun, and low oily-fish intake all point the same way. Your formula is built around how you actually live, not just your age and sex. 防晒、日晒少、油性鱼吃得不多 棗 几个信号，指向同一个方向。不套公式，照你的生活习惯配。
+HOW YOUR FORMULA WAS BUILT 不是选进来，是筛出去
+177 evaluated 177 种成分
+169 set aside for you 169 种被淘汰
+8 shortlisted for you score 只有 8 种惊了你的备选
+A good plan preview is not built by adding everything that might help. It first filters out what does not fit your score, a longer healthspan, and your safety profile before the final formula is generated 一份好的方案，不是加法，是减法。 不堆成分，只留对的。你的知量方案，就这么配。
+HOW MATTANUTRA THINKS 知量配方怎么算
+A fixed scoring model across five domains, not a guess and not an average of strangers. 五个维度，一套模型。不算命、不凑数、不套模板。
+1. Your goals set the direction A longer healthspan becomes the lens every other answer is read through, which is why goal-linked pillars carry more weight. 1. 你的目标，定方向 健康寿命是那把尺，你所有的回答，都放在它下面看。所以跟目标挂钩的支柱，权重更高。
+2. Your routine adds the contextSleep, stress, movement, diet, sunscreen, and fish intake all shift what belongs in your formula and what gets ruled out. 2. 你的日常，填细节 睡眠、压力、运动、饮食、防晒、吃鱼 棗 这些决定什么该进知量方案，什么该被筛出去。
+3. Your safety profile draws the linesMedication, pregnancy, kidney, liver, and sensitivity answers draw boundaries the plan will not cross. 3. 你的安全，划边界 用药、孕期、肾脏、肝脏、过敏不耐受 棗 这些划出的线，方案绝不越过。
+Your number is computed by the same rules every time: traceable, point by point. This is wellness guidance, not a diagnosis, and it is built to be shared with your doctor. 你的分数，有据可查。同一套规则，次次一样。 不诊断，只调理。欢迎拿给医生看。
+Founders with 100+ years' combined experienceMedicine Science TechnologyFormal education & trainingMahidol Princeton Stanford HarvardDispensed by local pharmacistsThrough licensed Thai pharmacy partners 谁在做 创始团队：医学 + 科学 + 技术，合计百余年经验。出身玛希隆、普林斯顿、斯坦福、哈佛。 谁在配 持牌药房，执业药师亲手调配。
+(Name ) CHOOSE YOUR NEXT STEP ( 名字 ), 就差一步了
+Your personalised Right Amount Formula is ready to unlock.THB 690 unlocks them the exact supplements and brands, doses, and timing, with a safety review built around your profile. Your plan, ready to use every day on your quest for better health. • ✓ Built around your goals, diet, and labs ✓ Safety-checked against your medications From there, MattaNutra takes care of the rest sourcing each product through our pharmacy partner and sending it to your door 刚才填的那些，都算完了。 160 解锁你的专属知量方案。 解锁后你会得到： 精确到品牌和剂量的营养品清单、每天的服用时间、一份跟你用药做过安全核验的方案。不是建议，是方案。 后续采购、配送， MattaNutra 合作药房帮你搞定，直送上门。
+Your THB 690 covers the plan above. The matched supplements are a separate basket on the next page, billed by MattaNutra at the competitive prices our pharmacy partner gives us. 160 ，买的是方案。营养品在下一页，药房什么价，给你什么价。
+Above image is an example box only. Unlock your formula to discover what supplements will be in YOUR personalised box. 这是示例，不是你的。你的那盒长什么样？解锁就看得到
+TWO PATHS ONE PLAN 两条路径 一份方案
+We have carefully determined your Right Amount. Now it is your turn to choose the plan that best fits your needs. 专属你的知量方案，已经就绪。
+The plan itself is yours either way. What changes is whether MattaNutra walks alongside you for the first 90 days as life happens. 但接下来 90 天 棗 出差、聚餐、熬夜、生理期，这些都会影响你该吃什么、吃多少。到时候，方案跟不跟着调？你来选。
+Choose Right Amount Formula for a clear, one-time answer you act on yourself. The plan in full, today and you decide what comes next. 路径一 知量方案 完整方案，今天拿走。自己照着用，后面怎么走，你说了算。
+Choose Living Protocol for ongoing, physician-built support your plan adapts when you travel, sleep poorly, or change your routine, with food-first guidance and safety-checks against your medications and labs. 路径二 动态方案 90 天，方案跟着你变。出差、睡不好、节奏乱了 棗Panya AI 营养管家自动重算。饮食优先指导，用药和数据持续核验，方案始终对应当下的你。
+Limited time offer 限时优惠
+ONE-TIME PLAN ◎ 一次性方案
+Right Amount Formula 知量方案
+Your personalised supplement formula with precise dosing, timing, and product guidance. 你的专属营养方案，精确到剂量、服用时间、产品推荐。
+~~230~~ 立省 30%
+160
+One-time payment Lifetime access 一次性付费 永久查看
+Get the right formula 获取知量方案
+Personalised supplement formula ✓ 专属营养方案
+Body-size adjusted dose ranges ✓ 按体重校准的剂量范围
+Timing and usage instructions ✓ 服用时间与方式说明
+Medication and lab safety flags ✓ 用药与检测安全标注
+Recommended products and alternatives ✓ 推荐产品及备选
+60-day reassessment prompt ✓ 60 天后复测提醒
+Clarity Guarantee. If your plan does not feel clear and useful, we will make it right or refund you within 7 days. 清晰承诺： 7 天内，如果你觉得方案不够清晰、不够有用，我们负责调到你满意，或者退款。
+MOST POPULAR 最受欢迎
+90-day AI support ♡ 90 天 AI 陪伴
+Living Protocol 动态方案
+Keep your right amount right as life changes, with food guidance and ongoing adjustments. 你的 AI 营养管家，就在 WhatsApp 或 Line 上。随时聊、随时调 棗 出差、熬夜、吃乱了，它帮你即时调整。
+~~430~~ 立省 16%
+360
+One payment 90 days of support Renew anytime 一次付费 90 天支持 随时续
+Start Living Protocol 开启动态方案
+Includes Right Amount Formula Plan. 包含完整知量方案
+Plus 外加
+💬 你的 AI 营养管家 在 WhatsApp 或 Line 上。你跟它聊日常、聊饮食、聊状态，它听着，帮你随时调方案。不是定时回访，是随时都在。
+Which Foods Give You What You Need 专属你的食物补给指南
+When something runs low, learn the everyday foods naturally rich in it, or skip the supplement when your meals already cover it. 缺什么，告诉你日常哪些食物能补上。吃够了少补，不够再精准补。
+Sleep, Energy and Habits Guidance 动态健康管家提供实时指导
+Improve sleep quality, boost energy, and build better daily habits. 改善睡眠质量，提升精力，建立更好的日常习惯。
+Learn which everyday foods give you what you need ✓ 日常食物营养指南
+Supplement timing and adherence support ✓ 营养品服用提醒
+Weekly progress summaries ✓ 每周进展小结
+Priority review as your data changes ✓ 数据变化时优先重新评估
+7-Day Satisfaction Guarantee. Give Living Protocol a real try. If anything is not right, tell us and we will fix it, or refund you in full within 7 days. 7 天满意保障：认真试试。不满意，调好或全额退。
+Complete Payment 完成支付
+Your payment is handled securely by Stripe. We only store the payment status, selected plan, and transactional contact details. 我们很在意你的支付安全和个人隐私。支付由 Stripe 安全处理，我们只保存你的支付状态、选择的方案，以及交易联系信息。别的，不留。
+Right Amount Formula 知量方案

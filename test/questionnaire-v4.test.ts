@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { t } from "../lib/i18n-messages.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const assessmentFlow = readFileSync(new URL("../components/assessment-flow.tsx", import.meta.url), "utf8");
@@ -72,12 +73,34 @@ describe("questionnaire V4 first name capture", () => {
   });
 
   it("renders the opening privacy gate before questionnaire controls", () => {
-    assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*Your answers stay between us\./);
-    assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"Thanks — your answers are protected\. You can begin\."/);
-    assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"ขอบคุณ — คำตอบของคุณได้รับการปกป้องแล้ว คุณเริ่มได้เลย"/);
-    assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"谢谢，你已知晓并同意。现在可以开始。"/);
-    assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*คำตอบของคุณเป็นเรื่องส่วนตัวระหว่างเรา/);
-    assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*你的信息，绝不外泄/);
+    // Privacy chrome lives in the i18n catalog (customer.assessmentUi.*) and is
+    // resolved through assessment-flow-copy.ts — assert catalog + wiring.
+    assert.match(assessmentFlowCopy, /getNamespace/);
+    assert.match(assessmentFlowCopy, /customer\.assessmentUi/);
+    assert.equal(
+      t("en", "customer.assessmentUi.privacyGate.title"),
+      "Your answers stay between us."
+    );
+    assert.equal(
+      t("en", "customer.assessmentUi.privacyGate.acceptedPrompt"),
+      "Thanks — your answers are protected. You can begin."
+    );
+    assert.equal(
+      t("th", "customer.assessmentUi.privacyGate.title"),
+      "คำตอบของคุณเป็นเรื่องส่วนตัวระหว่างเรา"
+    );
+    assert.equal(
+      t("th", "customer.assessmentUi.privacyGate.acceptedPrompt"),
+      "ขอบคุณ — คำตอบของคุณได้รับการปกป้องแล้ว คุณเริ่มได้เลย"
+    );
+    assert.equal(
+      t("zh-CN", "customer.assessmentUi.privacyGate.title"),
+      "你的信息，绝不外泄"
+    );
+    assert.equal(
+      t("zh-CN", "customer.assessmentUi.privacyGate.acceptedPrompt"),
+      "谢谢，你已知晓并同意。现在可以开始。"
+    );
     assert.match(assessmentFlow, /function renderPrivacyGate\(\)/);
     assert.match(assessmentFlow, /className="consent-wrap"[\s\S]*className="consent"[\s\S]*className="consent-eyebrow"[\s\S]*className="consent-title"[\s\S]*className="consent-lede"/);
     assert.match(assessmentFlow, /className="consent-check"[\s\S]*id="consentFormula"[\s\S]*type="checkbox"[\s\S]*className="consent-box"/);
