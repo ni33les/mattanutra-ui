@@ -326,6 +326,7 @@ export function getSeoRouteCopy(routeKey: SeoRouteKey, locale: LocaleCode): SeoR
 
 export function localizedRouteMetadata(input: Readonly<{
   fallbackUsed?: boolean;
+  image?: string;
   indexable?: boolean;
   locale: Locale;
   path?: string;
@@ -370,6 +371,7 @@ export function localizedRouteMetadata(input: Readonly<{
 
   return localizedMetadata({
     description: route.description,
+    image: input.image,
     indexable,
     locale: input.locale,
     path: input.path ?? route.path,

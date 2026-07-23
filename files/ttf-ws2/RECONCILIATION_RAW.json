@@ -1,0 +1,286 @@
+{
+  "source": "files/ttf.zip → MattaNutra_TH_Questionnaire_Handoff_2026-07-19",
+  "branch": "feat/ttf-ws2-thai-questionnaire",
+  "summary": {
+    "ok": 62,
+    "fail": 0,
+    "accepted_deltas": 5
+  },
+  "findings": [
+    {
+      "kind": "ok",
+      "msg": "OG image matches hand-off bytes",
+      "sha256": "edd871bedf9e4322305b3bf657415bdbe60b9167277d31c681eba7a787aaf1eb"
+    },
+    {
+      "kind": "ok",
+      "msg": "seo title",
+      "value": "แบบประเมินสูตรปริมาณที่พอดี · MattaNutra"
+    },
+    {
+      "kind": "ok",
+      "msg": "seo description",
+      "value": "แบบประเมินอาหารเสริมเฉพาะบุคคลของ MattaNutra ตอบตามความเป็นจริงเพื่อเพิ่มความแม่"
+    },
+    {
+      "kind": "ok",
+      "msg": "stage ข้อมูลพื้นฐาน"
+    },
+    {
+      "kind": "ok",
+      "msg": "stage เป้าหมาย"
+    },
+    {
+      "kind": "ok",
+      "msg": "stage ชีวิตประจำวัน"
+    },
+    {
+      "kind": "ok",
+      "msg": "stage อาหาร"
+    },
+    {
+      "kind": "ok",
+      "msg": "stage ความปลอดภัย"
+    },
+    {
+      "kind": "ok",
+      "msg": "stage ความแม่นยำ"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ชื่อ"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: เพศกำเนิด"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: อายุ"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ขณะนี้คุณอยู่ในภาวะใด"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: สถานะวัยหมดประจำเดือน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ปริมาณประจำเดือน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ส่วนสูงและน้ำหนัก"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: สีผิว"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ประเทศ"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: เวลาที่ได้รับแสงแดดต่อวัน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: การใช้ครีมกันแดด"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: เป้าหมายสุขภาพหลัก"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: อาการในปัจจุบัน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ชั่วโมงการนอนต่อคืน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ระดับพลังงาน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ระดับกิจกรรม"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ระดับความเครียด"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: การย่อยอาหารโดยทั่วไป"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: โรคทางเดินอาหารที่ได้รับการวินิจฉัย"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: การสูบบุหรี่"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: แอลกอฮอล์ต่อสัปดาห์"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: คาเฟอีนต่อวัน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: รูปแบบการกิน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: คุณรับประทานอาหารต่อไปนี้บ่อยเพียงใด"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: การแพ้อาหาร"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: คุณรับประทานยาอยู่หรือไม่?"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: การแพ้หรือไม่ทนต่อส่วนผสมในอาหารเสริม"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: การทำงานของไต"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ภาวะเกี่ยวกับตับ"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: มีแผนผ่าตัดภายใน 30 วันหรือไม่?"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ใช้ยาปฏิชีวนะในช่วง 3 เดือนที่ผ่านมาหรือไม่?"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: อาหารเสริมที่ใช้อยู่"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: งบประมาณอาหารเสริมต่อเดือน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: จำนวนเม็ดหรือแคปซูลสูงสุดต่อวัน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: รูปแบบผลิตภัณฑ์ที่ต้องการ"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: โปรตีนต่อวัน"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ประวัติสุขภาพในครอบครัว"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: อุปกรณ์ติดตามสุขภาพ"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: VO₂ max"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ค่า HRV เฉลี่ย"
+    },
+    {
+      "kind": "ok",
+      "msg": "field label: ผลตรวจทางห้องปฏิบัติการล่าสุด"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock medicationHint"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock labsHint"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock otherMedPlaceholder"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock generate"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock goals.subtitle"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock optionalBody"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock coach.sex"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock coach.sun"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock privacy.title"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock privacy.checkbox"
+    },
+    {
+      "kind": "ok",
+      "msg": "lock privacy.body"
+    },
+    {
+      "kind": "ok",
+      "msg": "option label mismatches on shared values: 0",
+      "hand_buttons": 194
+    }
+  ],
+  "accepted_deltas": [
+    {
+      "kind": "accepted_delta",
+      "msg": "avoidNote free-text field not in React product schema",
+      "value": "อาหารที่ต้องหลีกเลี่ยงหรือไม่ชอบ"
+    },
+    {
+      "kind": "accepted_delta",
+      "msg": "skin values stay I–VI product codes (hand-off swatches use 1–6)"
+    },
+    {
+      "kind": "accepted_delta",
+      "msg": "country values stay ISO codes; product has extra markets beyond hand-off select"
+    },
+    {
+      "kind": "accepted_delta",
+      "msg": "food disclosure UI not rendered; privacy gate is product consent surface"
+    },
+    {
+      "kind": "accepted_delta",
+      "msg": "generate CTA omits decorative alembic emoji from hand-off button"
+    }
+  ]
+}

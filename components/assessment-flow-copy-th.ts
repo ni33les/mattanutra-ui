@@ -5,20 +5,27 @@ export const th: Copy = {
   ...en,
   about: {
     ...en.about,
-    title: "ข้อมูลพื้นฐานของคุณ",
-    subtitle: "เริ่มด้วยการแตะไม่กี่ครั้ง เพื่อวางพื้นฐานให้สูตรส่วนถัดไปแม่นยำขึ้น",
-    firstName: "ชื่อเล่นหรือชื่อจริง",
-    firstNameHint: "ใช้เพื่อปรับข้อความในแผนของคุณเท่านั้น",
+    title: "เริ่มจากข้อมูลพื้นฐานเกี่ยวกับคุณ",
+    subtitle: "ตอบคำถามสั้น ๆ ไม่กี่ข้อเพื่อเริ่มต้น ข้อมูลนี้เป็นพื้นฐานในการออกแบบสูตรส่วนที่เหลือ",
+    firstName: "ชื่อ",
+    firstNameHint: "เพื่อให้เราปรับสูตรปริมาณที่พอดีให้เหมาะกับคุณ",
     firstNameOptional: "ไม่บังคับ",
     honestyBody:
-      "ไม่มีคำตอบที่ถูกหรือผิด มีแค่คำตอบที่ตรงกับคุณ ยิ่งตอบตามจริง สูตรก็ยิ่งเหมาะกับชีวิตจริงและปลอดภัยขึ้นเมื่อใช้ร่วมกับสิ่งที่คุณทานอยู่",
-    sex: "เพศ",
+      "ที่นี่ไม่มีคำตอบถูกหรือผิด มีเพียงคำตอบที่ตรงกับความเป็นจริงของคุณ ยิ่งตอบตามจริง สูตรของคุณก็ยิ่งเหมาะกับคุณและปลอดภัยยิ่งขึ้นเมื่อใช้ร่วมกับสิ่งที่รับประทานอยู่",
+    sex: "เพศกำเนิด",
     sexOptions: [
       { label: "ชาย", value: "male" },
       { label: "หญิง", value: "female" }
     ],
     age: "อายุ",
-    ageOptions: en.about.ageOptions,
+    ageOptions: [
+      { label: "18–25", value: "18-25" },
+      { label: "26–35", value: "26-35" },
+      { label: "36–45", value: "36-45" },
+      { label: "46–55", value: "46-55" },
+      { label: "56–65", value: "56-65" },
+      { label: "66+", value: "66+" }
+    ],
     height: "ส่วนสูง",
     weight: "น้ำหนัก",
     skin: "สีผิว",
@@ -51,32 +58,32 @@ export const th: Copy = {
       { label: "จีน", value: "CN" },
       { label: "อื่น ๆ", value: "OTHER" }
     ],
-    sun: "การได้รับแดด ( นาที / วัน )",
+    sun: "เวลาที่ได้รับแสงแดดต่อวัน",
     sunOptions: [
-      { label: "น้อยกว่า 15", value: "u15" },
-      { label: "15-30", value: "15-30" },
-      { label: "30-60", value: "30-60" },
-      { label: "60+", value: "60+" }
+      { label: "น้อยกว่า 15 นาที", value: "u15" },
+      { label: "15–30 นาที", value: "15-30" },
+      { label: "30–60 นาที", value: "30-60" },
+      { label: "60 นาทีขึ้นไป", value: "60+" }
     ],
-    sunscreen: "การใช้กันแดด",
+    sunscreen: "การใช้ครีมกันแดด",
     sunscreenOptions: [
       { label: "แทบไม่ใช้", value: "rarely" },
       { label: "บางครั้ง", value: "sometimes" },
       { label: "ทุกวัน", value: "daily" }
     ],
     femaleTitle: "บริบทสุขภาพผู้หญิง",
-    reproStatus: "สถานะตั้งครรภ์ / ให้นม",
+    reproStatus: "ขณะนี้คุณอยู่ในภาวะใด",
     reproStatusOptions: [
-      { label: "ไม่มี", value: "none" },
-      { label: "กำลังพยายามตั้งครรภ์", value: "ttc" },
-      { label: "ตั้งครรภ์", value: "pregnant" },
-      { label: "ให้นมบุตร", value: "breastfeeding" }
+      { label: "ไม่มีข้อใด", value: "none" },
+      { label: "กำลังวางแผนตั้งครรภ์", value: "ttc" },
+      { label: "กำลังตั้งครรภ์", value: "pregnant" },
+      { label: "กำลังให้นมบุตร", value: "breastfeeding" }
     ],
-    menopause: "ช่วงวัยหมดประจำเดือน",
+    menopause: "สถานะวัยหมดประจำเดือน",
     menopauseOptions: [
-      { label: "ก่อนวัยหมดประจำเดือน", value: "pre" },
-      { label: "วัยใกล้หมดประจำเดือน", value: "peri" },
-      { label: "หลังหมดประจำเดือน", value: "post" },
+      { label: "ยังไม่เข้าสู่วัยหมดประจำเดือน", value: "pre" },
+      { label: "อยู่ในช่วงใกล้วัยหมดประจำเดือน", value: "peri" },
+      { label: "เข้าสู่วัยหมดประจำเดือนแล้ว", value: "post" },
       { label: "ไม่แน่ใจ", value: "unsure" }
     ],
     flow: "ปริมาณประจำเดือน",
@@ -108,38 +115,38 @@ export const th: Copy = {
     labs: "หน่วยสำคัญมาก เราเก็บตัวเลขพร้อมหน่วยก่อนส่งให้ AI",
     medications: "ไม่ใช่การวินิจฉัย แต่ช่วยให้ AI และระบบตรวจความปลอดภัยเพิ่มข้อควรระวังได้",
     precision: "ช่องเสริมเหล่านี้เพิ่มความแม่นยำ 20% สุดท้าย",
-    sex: "เพศและบริบทการตั้งครรภ์มีผลต่อข้อควรระวัง ธาตุเหล็ก และการกรองสินค้า",
-    sun: "สีผิว แดด และกันแดดช่วยประเมินบริบทวิตามินดีอย่างซื่อตรงขึ้น"
+    sex: "ใช้ปรับความต้องการสารอาหารและแสดงคำถามด้านสุขภาพที่เกี่ยวข้องกับคุณ",
+    sun: "ช่วยประเมินการสังเคราะห์วิตามินดีควบคู่กับการได้รับแสงแดด"
   },
   fixedAction: {
-    generate: "สร้างคะแนนสุขภาพของฉัน"
+    generate: "สร้าง Health Score ของฉัน"
   },
   daily: {
     title: "ชีวิตประจำวันของคุณ",
-    subtitle: "ข้อมูลส่วนนี้ช่วยให้สูตรไม่ใช่แค่ชุดทั่วไป แต่เข้ากับกิจวัตรของคุณจริง ๆ",
-    sleepHrs: "เวลานอนต่อคืน ( ชั่วโมง )",
+    subtitle: "การนอน การเคลื่อนไหว ความเครียด และการย่อยอาหาร — จังหวะชีวิตที่มีผลต่อสิ่งที่ร่างกายดูดซึมและต้องการจริง ๆ",
+    sleepHrs: "ชั่วโมงการนอนต่อคืน",
     sleepOptions: [
-      { label: "น้อยกว่า 5", value: "u5" },
-      { label: "5-6", value: "5-6" },
-      { label: "6-7", value: "6-7" },
-      { label: "7-8", value: "7-8" },
-      { label: "8-9", value: "8-9" },
-      { label: "มากกว่า 9", value: "9+" }
+      { label: "น้อยกว่า 5 ชม.", value: "u5" },
+      { label: "5–6 ชม.", value: "5-6" },
+      { label: "6–7 ชม.", value: "6-7" },
+      { label: "7–8 ชม.", value: "7-8" },
+      { label: "8–9 ชม.", value: "8-9" },
+      { label: "9 ชม.ขึ้นไป", value: "9+" }
     ],
     energy: "ระดับพลังงาน",
     energyOptions: [
       { label: "หมดแรง", value: "drained", tone: "Low" },
-      { label: "ต่ำ", value: "low", tone: "Low" },
+      { label: "ค่อนข้างน้อย", value: "low", tone: "Low" },
       { label: "พอใช้", value: "ok", tone: "Mid" },
       { label: "ดี", value: "good", tone: "High" },
-      { label: "ดีเยี่ยม", value: "excellent", tone: "High" }
+      { label: "ดีมาก", value: "excellent", tone: "High" }
     ],
     activity: "ระดับกิจกรรม",
     activityOptions: [
       { label: "นั่งเป็นส่วนใหญ่", value: "sitting" },
-      { label: "เบา", value: "light" },
+      { label: "เล็กน้อย", value: "light" },
       { label: "ปานกลาง", value: "moderate" },
-      { label: "กระฉับกระเฉง", value: "active" },
+      { label: "เคลื่อนไหวมาก", value: "active" },
       { label: "นักกีฬา", value: "athlete" }
     ],
     stress: "ระดับความเครียด",
@@ -150,72 +157,72 @@ export const th: Copy = {
       { label: "สูง", value: "high", tone: "High" },
       { label: "สูงมาก", value: "extreme", tone: "High" }
     ],
-    digestion: "การย่อยอาหาร",
+    digestion: "การย่อยอาหารโดยทั่วไป",
     digestionOptions: [
       { label: "ไม่มีปัญหา", value: "none" },
       { label: "ท้องอืด", value: "bloating" },
       { label: "ท้องผูก", value: "constipation" },
       { label: "ถ่ายเหลว", value: "loose" }
     ],
-    digCondition: "ภาวะระบบทางเดินอาหาร",
+    digCondition: "โรคทางเดินอาหารที่ได้รับการวินิจฉัย",
     digConditionOptions: [
       { label: "ไม่มี", value: "none" },
       { label: "ลำไส้แปรปรวน (IBS)", value: "ibs" },
       { label: "โรคเซลิแอค", value: "celiac" },
-      { label: "ลำไส้อักเสบ (IBD)", value: "ibd" },
+      { label: "โรคลำไส้อักเสบ (โรคโครห์น / ลำไส้ใหญ่อักเสบเป็นแผล)", value: "ibd" },
       { label: "เคยผ่าตัดลดน้ำหนัก", value: "bariatric" }
     ],
     smoking: "การสูบบุหรี่",
     smokingOptions: [
       { label: "ไม่เคย", value: "never" },
-      { label: "เลิกมาเกิน 5 ปี", value: "ex5+" },
-      { label: "เลิกไม่ถึง 5 ปี", value: "ex5" },
-      { label: "สูบเป็นบางครั้ง", value: "occasional" },
-      { label: "สูบทุกวัน", value: "daily" }
+      { label: "เลิกแล้ว (เกิน 5 ปี)", value: "ex5+" },
+      { label: "เลิกแล้ว (ไม่เกิน 5 ปี)", value: "ex5" },
+      { label: "บางครั้ง", value: "occasional" },
+      { label: "ทุกวัน", value: "daily" }
     ],
-    alcohol: "แอลกอฮอล์ ( แก้ว / สัปดาห์ )",
+    alcohol: "แอลกอฮอล์ต่อสัปดาห์",
     alcoholOptions: [
-      { label: "ไม่ดื่ม", value: "none" },
-      { label: "1-3", value: "1-3" },
-      { label: "4-7", value: "4-7" },
+      { label: "ไม่มี", value: "none" },
+      { label: "1–3", value: "1-3" },
+      { label: "4–7", value: "4-7" },
       { label: "8+", value: "8+" }
     ],
-    caffeine: "คาเฟอีน ( แก้ว / วัน )",
+    caffeine: "คาเฟอีนต่อวัน",
     caffeineOptions: [
-      { label: "ไม่ดื่ม", value: "none" },
+      { label: "ไม่มี", value: "none" },
       { label: "1", value: "1" },
-      { label: "2-3", value: "2-3" },
+      { label: "2–3", value: "2-3" },
       { label: "4+", value: "4+" }
     ]
   },
   food: {
     title: "อาหารและโภชนาการ",
-    subtitle: "บริบทอาหารช่วยให้คำแนะนำอาหารเสริมแม่นขึ้น แม้การจับคู่ผลิตภัณฑ์จะยังเน้นอาหารเสริมเท่านั้น",
+    subtitle: "สิ่งที่คุณกินช่วยให้เราเห็นว่าสารอาหารใดอาจไม่เพียงพอ จึงแนะนำเฉพาะสิ่งที่อาหารของคุณยังขาด",
     diet: "รูปแบบการกิน",
     dietOptions: [
       { label: "ไม่มีรูปแบบเฉพาะ", value: "none" },
-      { label: "อาหารแปรรูปค่อนข้างมาก", value: "processed" },
-      { label: "ค่อนข้างสมดุล", value: "balanced" },
+      { label: "อาหารแปรรูปเป็นหลัก", value: "processed" },
+      { label: "สมดุล", value: "balanced" },
       { label: "อาหารไม่แปรรูปเป็นหลัก", value: "whole" },
       { label: "เมดิเตอร์เรเนียน", value: "mediterranean" },
-      { label: "เน้นพืช", value: "plant" },
+      { label: "เน้นพืชเป็นหลัก", value: "plant" },
       { label: "วีแกน", value: "vegan" },
-      { label: "คาร์นิวอร์", value: "carnivore" }
+      { label: "เนื้อสัตว์เป็นหลัก", value: "carnivore" }
     ],
-    frequency: "คุณกินบ่อยแค่ไหน...",
+    frequency: "คุณรับประทานอาหารต่อไปนี้บ่อยเพียงใด",
     frequencyTitles: {
-      dairy: "ผลิตภัณฑ์นม ( หน่วยบริโภค / วัน )",
+      dairy: "ผลิตภัณฑ์นม",
       eggs: "ไข่",
-      fish: "ปลาที่มีไขมัน",
-      fruitveg: "ผักและผลไม้ ( หน่วยบริโภค / วัน )",
-      legumes: "ถั่ว / ถั่วเปลือกแข็ง",
-      redmeat: "เนื้อแดง ( หน่วยบริโภค / สัปดาห์ )"
+      fish: "ปลาที่มีไขมันสูง",
+      fruitveg: "ผักและผลไม้",
+      legumes: "ถั่วเมล็ดแห้ง / ถั่วเปลือกแข็ง",
+      redmeat: "เนื้อแดง"
     },
     frequencyOptions: {
       dairy: [
         { label: "ไม่เคย", value: "never" },
-        { label: "1-2", value: "1-2" },
-        { label: "3+", value: "3+" }
+        { label: "1–2 ครั้ง/สัปดาห์", value: "1-2" },
+        { label: "3 ครั้งขึ้นไป/สัปดาห์", value: "3+" }
       ],
       eggs: [
         { label: "นาน ๆ ครั้ง", value: "rare" },
@@ -225,13 +232,13 @@ export const th: Copy = {
       fish: [
         { label: "ไม่เคย", value: "never" },
         { label: "นาน ๆ ครั้ง", value: "rare" },
-        { label: "ทุกสัปดาห์", value: "once" },
+        { label: "ประมาณสัปดาห์ละครั้ง", value: "once" },
         { label: "บ่อย", value: "often" }
       ],
       fruitveg: [
         { label: "ไม่ทุกวัน", value: "notdaily" },
-        { label: "1-2", value: "1-2" },
-        { label: "3+", value: "3+" }
+        { label: "1–2 ครั้ง/วัน", value: "1-2" },
+        { label: "3 ครั้งขึ้นไป/วัน", value: "3+" }
       ],
       legumes: [
         { label: "นาน ๆ ครั้ง", value: "rare" },
@@ -240,107 +247,107 @@ export const th: Copy = {
       ],
       redmeat: [
         { label: "ไม่เคย", value: "never" },
-        { label: "1-2", value: "1-2" },
-        { label: "3+", value: "3+" }
+        { label: "1–2 ส่วน/วัน", value: "1-2" },
+        { label: "3 ส่วนขึ้นไป/วัน", value: "3+" }
       ]
     },
-    allergies: "แพ้อาหาร",
+    allergies: "การแพ้อาหาร",
     allergyOptions: [
       { label: "ไม่มี", value: "none" },
       { label: "นม", value: "milk" },
       { label: "ไข่", value: "eggs" },
       { label: "ปลา", value: "fish" },
-      { label: "หอยและอาหารทะเลเปลือกแข็ง", value: "shellfish" },
+      { label: "สัตว์น้ำมีเปลือก", value: "shellfish" },
       { label: "ถั่วเปลือกแข็ง", value: "treenuts" },
       { label: "ถั่วลิสง", value: "peanuts" },
       { label: "ข้าวสาลี", value: "wheat" },
       { label: "ถั่วเหลือง", value: "soy" },
       { label: "งา", value: "sesame" }
     ],
-    disclosureTitle: "ฉันยืนยันว่าได้เปิดเผยข้อมูลแพ้ ภาวะสุขภาพ ยา และข้อจำกัดด้านอาหารที่เกี่ยวข้องแล้ว",
-    disclosureBody: "คำแนะนำของ MattaNutra สนับสนุนสุขภาวะทั่วไป และไม่แทนคำแนะนำทางการแพทย์"
+    disclosureTitle: "ฉันยืนยันว่าได้แจ้งข้อมูลการแพ้ ภาวะสุขภาพ ยาที่ใช้ และข้อจำกัดด้านอาหารที่เกี่ยวข้องครบถ้วนแล้ว",
+    disclosureBody: "คำแนะนำของ MattaNutra สนับสนุนสุขภาวะทั่วไปและไม่ใช้แทนคำแนะนำทางการแพทย์"
   },
   goals: {
-    title: "เป้าหมายและอาการของคุณ",
-    subtitle: "เป้าหมายหลักและอาการปัจจุบันช่วยกำหนดลำดับความสำคัญของสูตร",
+    title: "เป้าหมายและความรู้สึกของคุณ",
+    subtitle: "นี่คือสิ่งที่สูตรของคุณออกแบบมาเพื่อคุณโดยเฉพาะ — ตอบตามจริง เพราะคำตอบนี้จะกำหนดทุกส่วนของสูตร",
     goals: "เป้าหมายสุขภาพหลัก",
-    goalHint: "เลือกได้สูงสุด 3 ข้อ",
+    goalHint: "เลือกได้ไม่เกิน 3 ข้อ — เลือกสิ่งที่สำคัญกับคุณมากที่สุดในตอนนี้",
     goalOptions: [
-      { label: "พลังงาน", value: "energy" },
-      { label: "การนอน", value: "sleep" },
-      { label: "สมาธิ", value: "focus" },
-      { label: "อายุยืนอย่างมีคุณภาพ", value: "longevity" },
+      { label: "เพิ่มพลังงาน", value: "energy" },
+      { label: "นอนหลับดีขึ้น", value: "sleep" },
+      { label: "สมอง / สมาธิ", value: "focus" },
+      { label: "สุขภาพดีและอายุยืน", value: "longevity" },
       { label: "ภูมิคุ้มกัน", value: "immunity" },
-      { label: "ฟิตเนส", value: "fitness" },
-      { label: "น้ำหนัก", value: "weight" },
-      { label: "อารมณ์", value: "mood" },
-      { label: "หัวใจ", value: "heart" },
-      { label: "ข้อและกระดูก", value: "joints" },
-      { label: "ผิว", value: "skin" },
+      { label: "สมรรถภาพ / VO₂", value: "fitness" },
+      { label: "ลดน้ำหนัก", value: "weight" },
+      { label: "อารมณ์ / ความสงบ", value: "mood" },
+      { label: "สุขภาพหัวใจ", value: "heart" },
+      { label: "ข้อต่อ / กระดูก", value: "joints" },
+      { label: "ผิว / เส้นผม", value: "skin" },
       { label: "ฮอร์โมน", value: "hormones" }
     ],
-    symptoms: "อาการปัจจุบัน",
-    symptomHint: "เลือกได้ทุกข้อที่ตรงกับคุณ หากไม่มีอาการเด่น ให้เลือก รู้สึกดี",
+    symptoms: "อาการในปัจจุบัน",
+    symptomHint: "เลือกได้ทุกข้อที่ตรงกับคุณ รวมถึง “รู้สึกสุขภาพดี”",
     symptomOptions: [
       { label: "อ่อนเพลีย", value: "fatigue" },
-      { label: "สมองล้า / คิดไม่ชัด", value: "brainfog" },
-      { label: "อารมณ์", value: "mood" },
+      { label: "สมองตื้อ", value: "brainfog" },
+      { label: "อารมณ์ซึม", value: "mood" },
       { label: "ปวดข้อ", value: "joint" },
-      { label: "ระบบย่อย", value: "digestion" },
+      { label: "ปัญหาการย่อยอาหาร", value: "digestion" },
       { label: "นอนหลับไม่ดี", value: "sleep" },
-      { label: "เครียด", value: "stress" },
-      { label: "ผิว", value: "skin" },
+      { label: "เครียด / วิตกกังวล", value: "stress" },
+      { label: "ปัญหาผิว", value: "skin" },
       { label: "ผมร่วง", value: "hair" },
       { label: "ความต้องการทางเพศต่ำ", value: "libido" },
       { label: "เป็นหวัดบ่อย", value: "colds" },
-      { label: "รู้สึกดี", value: "great" }
+      { label: "รู้สึกสุขภาพดี", value: "great" }
     ]
   },
   precision: {
-    title: "ความชอบของคุณ",
-    subtitle: "กำหนดข้อจำกัดที่ใช้งานจริงก่อน แล้วค่อยเพิ่มข้อมูลเสริมถ้าคุณมี",
-    budget: "งบอาหารเสริมต่อเดือน ( THB )",
+    title: "ความต้องการของคุณ",
+    subtitle: "เพื่อให้สูตรเหมาะกับงบประมาณ กิจวัตร และรูปแบบการรับประทานที่คุณสะดวก",
+    budget: "งบประมาณอาหารเสริมต่อเดือน",
     budgetOptions: [
-      { label: "ต่ำกว่า 1,000", value: "u1000" },
-      { label: "1,000-2,500", value: "1000-2500" },
-      { label: "2,500-5,000", value: "2500-5000" },
-      { label: "5,000+", value: "5000+" }
+      { label: "ต่ำกว่า 1,000 บาท", value: "u1000" },
+      { label: "1,000–2,500 บาท", value: "1000-2500" },
+      { label: "2,500–5,000 บาท", value: "2500-5000" },
+      { label: "5,000 บาทขึ้นไป", value: "5000+" }
     ],
-    maxPills: "จำนวนเม็ด / แคปซูลสูงสุด ( ต่อวัน )",
+    maxPills: "จำนวนเม็ดหรือแคปซูลสูงสุดต่อวัน",
     maxPillsOptions: [
-      { label: "1-3", value: "1-3" },
-      { label: "4-6", value: "4-6" },
-      { label: "7-10", value: "7-10" },
+      { label: "1–3", value: "1-3" },
+      { label: "4–6", value: "4-6" },
+      { label: "7–10", value: "7-10" },
       { label: "ไม่จำกัด", value: "nolimit" }
     ],
-    form: "รูปแบบที่ชอบ",
+    form: "รูปแบบผลิตภัณฑ์ที่ต้องการ",
     formOptions: [
       { label: "แคปซูล", value: "capsules" },
-      { label: "ผง / เชค", value: "powder" },
+      { label: "ผงชง / เชค", value: "powder" },
       { label: "กัมมี่", value: "gummies" },
-      { label: "แบบผสมได้", value: "mixed" }
+      { label: "ใช้หลายรูปแบบได้", value: "mixed" }
     ],
-    optionalBanner: "ระดับความแม่นยำเพิ่มเติม",
-    optionalBody: "เพิ่มรายละเอียดที่คุณรู้ เพื่อเติมความแม่นยำ 20% สุดท้าย",
-    protein: "โปรตีน ( กรัม / กก. / วัน )",
+    optionalBanner: "ไม่บังคับ — เพิ่มความแม่นยำ",
+    optionalBody: "ส่วนนี้ไม่บังคับ คุณสร้าง Health Score ได้ทันทีด้วยระดับความแม่นยำปัจจุบัน หรือเพิ่มรายละเอียดอีกเล็กน้อยเพื่อเข้าใกล้ 100% ทุกคำตอบด้านล่างจะทำให้แถบความแม่นยำขยับขึ้น",
+    protein: "โปรตีนต่อวัน",
     proteinOptions: [
-      { label: "ต่ำกว่า 1", value: "u1" },
-      { label: "1-1.5", value: "1-1.5" },
-      { label: "1.5-2", value: "1.5-2" },
-      { label: "มากกว่า 2", value: "2+" }
+      { label: "ต่ำกว่า 1 กรัม/กก.", value: "u1" },
+      { label: "1–1.5 กรัม/กก.", value: "1-1.5" },
+      { label: "1.5–2 กรัม/กก.", value: "1.5-2" },
+      { label: "มากกว่า 2 กรัม/กก.", value: "2+" }
     ],
-    family: "ประวัติครอบครัว",
+    family: "ประวัติสุขภาพในครอบครัว",
     familyOptions: [
       { label: "โรคหัวใจ", value: "heart" },
-      { label: "อัลไซเมอร์", value: "alzheimers" },
+      { label: "โรคอัลไซเมอร์", value: "alzheimers" },
       { label: "เบาหวาน", value: "diabetes" },
       { label: "มะเร็ง", value: "cancer" },
-      { label: "กระดูกพรุน", value: "osteoporosis" },
-      { label: "ไม่มี", value: "none" }
+      { label: "โรคกระดูกพรุน", value: "osteoporosis" },
+      { label: "ไม่ใช้", value: "none" }
     ],
     tracker: "อุปกรณ์ติดตามสุขภาพ",
     trackerOptions: [
-      { label: "ไม่มีอุปกรณ์", value: "none" },
+      { label: "ไม่ทราบว่ามี", value: "none" },
       { label: "Garmin", value: "garmin" },
       { label: "Oura", value: "oura" },
       { label: "WHOOP", value: "whoop" },
@@ -348,14 +355,14 @@ export const th: Copy = {
       { label: "Fitbit", value: "fitbit" },
       { label: "อื่น ๆ", value: "other" }
     ],
-    vo2: "VO2 max",
+    vo2: "VO₂ max",
     vo2Estimate: "ตัวช่วยประเมิน VO2",
     vo2EstimateButton: "ใช้ค่าประเมิน",
     vo2EstimateNeeds: "ตอบเพศ อายุ ส่วนสูง น้ำหนัก และกิจกรรม เพื่อประเมิน VO2",
     vo2EstimateReady: (value) => `ประเมินได้ ${value} ml/kg/min จากคำตอบปัจจุบัน`,
     hrv: "ค่า HRV เฉลี่ย",
-    labs: "ค่าแล็บล่าสุด",
-    labsHint: "กรอกเฉพาะเมื่อมี หน่วยมีความสำคัญ",
+    labs: "ผลตรวจทางห้องปฏิบัติการล่าสุด",
+    labsHint: "กรอกเฉพาะค่าที่มี หน่วยมีความสำคัญ — เลือกหน่วยให้ถูกต้อง เพื่อให้ระบบอ่านค่าของคุณได้อย่างแม่นยำ",
     labFields: [
       { label: "วิตามิน D", value: "vitd", units: ["ng/mL", "nmol/L"] },
       { label: "วิตามิน B12", value: "b12", units: ["pg/mL", "pmol/L"] },
@@ -366,77 +373,77 @@ export const th: Copy = {
     ]
   },
   safety: {
-    title: "ยาและข้อควรระวัง",
-    subtitle: "ข้อมูลนี้ใช้สร้างข้อควรระวังและช่วยระบบตรวจความเหมาะสมแบบกำหนดตายตัว",
-    medications: "คุณใช้ยาอยู่หรือไม่?",
-    medicationHint: "ใช้เพื่อสร้างข้อควรระวังเท่านั้น",
+    title: "ยาและความปลอดภัย",
+    subtitle: "เราใช้ข้อมูลส่วนนี้เพื่อคัดกรองความปลอดภัย ตรวจสอบปฏิกิริยาระหว่างยาและอาหารเสริม และปรับสูตรของคุณเท่านั้น โดยไม่เปิดเผยข้อมูลนี้",
+    medications: "คุณรับประทานยาอยู่หรือไม่?",
+    medicationHint: "ใช้เพื่อตรวจสอบความปลอดภัยเท่านั้น",
     medicationOptions: [
-      { label: "ไม่ใช้", value: "none" },
-      { label: "ใช่", value: "yes" }
+      { label: "ไม่มี", value: "none" },
+      { label: "ใช้", value: "yes" }
     ],
     medicationType: "ประเภทยา",
     medicationTypeOptions: [
       { label: "ยากลุ่มสแตติน", value: "statin" },
       { label: "เมตฟอร์มิน", value: "metformin" },
-      { label: "ยา PPI / โอเมพราโซล", value: "ppi" },
+      { label: "ยาลดกรด PPI / โอเมพราโซล", value: "ppi" },
       { label: "ยาขับปัสสาวะ", value: "diuretic" },
       { label: "ยาคุมกำเนิด", value: "contraceptive" },
       { label: "ยาต้านซึมเศร้า", value: "antidepressant" },
-      { label: "ยาละลายลิ่มเลือด / แอสไพริน", value: "bloodthinner" },
+      { label: "ยาต้านการแข็งตัวของเลือด / แอสไพริน", value: "bloodthinner" },
       { label: "ยาไทรอยด์", value: "thyroid" },
-      { label: "ยาความดัน", value: "bp" },
-      { label: "คอร์ติโคสเตียรอยด์", value: "corticosteroid" },
+      { label: "ยาลดความดันโลหิต", value: "bp" },
+      { label: "ยาคอร์ติโคสเตียรอยด์", value: "corticosteroid" },
       { label: "อื่น ๆ", value: "other" }
     ],
-    otherMedPlaceholder: "โปรดระบุยาและใช้เพื่ออะไร",
-    suppAllergies: "แพ้หรือไม่ทนต่อส่วนผสมอาหารเสริม",
+    otherMedPlaceholder: "โปรดระบุชื่อยาและใช้เพื่ออะไร",
+    suppAllergies: "การแพ้หรือไม่ทนต่อส่วนผสมในอาหารเสริม",
     suppAllergyOptions: [
-      { label: "ไม่ทราบว่ามี", value: "none" },
+      { label: "ไม่มี", value: "none" },
       { label: "ไอโอดีน", value: "iodine" },
       { label: "ธาตุเหล็ก", value: "iron" },
       { label: "CoQ10", value: "coq10" },
       { label: "วิตามินบี", value: "bvit" },
-      { label: "มาจากถั่วเหลือง", value: "soyderived" },
-      { label: "มาจากหอย / อาหารทะเลเปลือกแข็ง", value: "shellfishderived" },
+      { label: "ส่วนผสมจากถั่วเหลือง", value: "soyderived" },
+      { label: "ส่วนผสมจากสัตว์น้ำมีเปลือก", value: "shellfishderived" },
       { label: "อื่น ๆ", value: "other" }
     ],
     kidney: "การทำงานของไต",
     kidneyOptions: [
-      { label: "ไม่มีปัญหาที่ทราบ", value: "normal" },
+      { label: "ไม่ทราบว่ามีปัญหา", value: "normal" },
       { label: "การทำงานลดลง", value: "reduced" },
       { label: "โรคไต", value: "disease" }
     ],
-    liver: "ภาวะตับ",
+    liver: "ภาวะเกี่ยวกับตับ",
     liverOptions: [
-      { label: "ไม่มีปัญหาที่ทราบ", value: "normal" },
+      { label: "ไม่ทราบว่ามีปัญหา", value: "normal" },
       { label: "มีภาวะเกี่ยวกับตับ", value: "condition" }
     ],
-    surgery: "มีผ่าตัดใน 30 วันข้างหน้าหรือไม่?",
+    surgery: "มีแผนผ่าตัดภายใน 30 วันหรือไม่?",
     surgeryOptions: [
       { label: "ไม่มี", value: "no" },
       { label: "มี", value: "yes" }
     ],
-    antibiotics: "ใช้ยาปฏิชีวนะใน 3 เดือนที่ผ่านมาไหม?",
+    antibiotics: "ใช้ยาปฏิชีวนะในช่วง 3 เดือนที่ผ่านมาหรือไม่?",
     antibioticsOptions: [
-      { label: "ไม่", value: "no" },
-      { label: "ใช่", value: "yes" }
+      { label: "ไม่ใช้", value: "no" },
+      { label: "ใช้", value: "yes" }
     ],
-    supplements: "อาหารเสริมที่ใช้อยู่ตอนนี้",
+    supplements: "อาหารเสริมที่ใช้อยู่",
     supplementsOptions: [
-      { label: "ไม่มี", value: "none" },
-      { label: "มัลติวิตามินพื้นฐาน", value: "basic" },
-      { label: "วิตามิน D3 / โอเมก้า-3", value: "d3omega" },
-      { label: "หลายตัวแบบเจาะจง", value: "targeted" }
+      { label: "ไม่ได้ใช้อุปกรณ์", value: "none" },
+      { label: "วิตามินรวมพื้นฐาน", value: "basic" },
+      { label: "วิตามินดี3 / โอเมก้า-3", value: "d3omega" },
+      { label: "หลายชนิดแบบเจาะจง", value: "targeted" }
     ]
   },
   sectionNotes: [
-    "ไม่มีคำตอบที่ถูกหรือผิด มีเพียงคำตอบที่ตรงกับความจริง บริบทที่ซื่อตรงช่วยให้สูตรพอดีกับคุณมากขึ้น และปลอดภัยขึ้นเมื่อใช้ร่วมกับสิ่งที่คุณรับประทานอยู่แล้ว",
+    "ที่นี่ไม่มีคำตอบถูกหรือผิด มีเพียงคำตอบที่ตรงกับความเป็นจริงของคุณ ยิ่งตอบตามจริง สูตรของคุณก็ยิ่งเหมาะกับคุณและปลอดภัยยิ่งขึ้นเมื่อใช้ร่วมกับสิ่งที่รับประทานอยู่",
     "",
     "",
     "",
     "",
     ""
   ],
-  stagePhases: ["พื้นฐาน", "พื้นฐาน", "พื้นฐาน", "พื้นฐาน", "ความปลอดภัย", "เฉพาะตัว"],
-  stages: ["เกี่ยวกับคุณ", "เป้าหมาย", "ชีวิตประจำวัน", "อาหาร", "ความปลอดภัย", "ความแม่นยำ"]
+  stagePhases: ["พื้นฐาน", "พื้นฐาน", "พื้นฐาน", "พื้นฐาน", "ความปลอดภัย", "ปรับเฉพาะคุณ"],
+  stages: ["ข้อมูลพื้นฐาน", "เป้าหมาย", "ชีวิตประจำวัน", "อาหาร", "ความปลอดภัย", "ความแม่นยำ"]
 };

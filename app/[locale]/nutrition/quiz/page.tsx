@@ -39,7 +39,13 @@ export async function generateMetadata({
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
   const hasPrivateState = Boolean(query.plan || query.resume || query.payment);
 
+  // Hand-off WS2 share card path (asset only; visible title/description stay in i18n catalog).
+  const nutritionQuizOgByLocale = {
+    th: "/assets/og/mattanutra-questionnaire-th.jpg"
+  } as const satisfies Partial<Record<Locale, string>>;
+
   return localizedRouteMetadata({
+    image: hasPrivateState ? undefined : nutritionQuizOgByLocale[locale],
     indexable: !hasPrivateState,
     locale,
     routeKey: "nutritionQuiz"
