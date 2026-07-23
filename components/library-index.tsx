@@ -136,7 +136,7 @@ export function LibraryIndex({
               <p className="text-xs font-semibold tracking-[0.22em] text-forest-glow uppercase">
                 {copy.eyebrow}
               </p>
-              <h2 className="mt-3 font-display text-[clamp(30px,4vw,46px)] leading-[1.08] text-white">
+              <h2 className="mt-3 font-display text-[clamp(30px,4vw,46px)] leading-[1.08] whitespace-pre-line text-white">
                 {copy.ctaTitle}
               </h2>
               <p className="mt-5 text-[17px] leading-[1.7] text-cream/80">

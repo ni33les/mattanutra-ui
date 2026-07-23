@@ -29,7 +29,8 @@ export const siteLocaleRegistry = [
     code: "th",
     direction: "ltr",
     fallbackLocale: "en",
-    htmlLang: "th",
+    // BCP 47 region form so Open Graph emits og:locale=th_TH (hand-off requirement).
+    htmlLang: "th-TH",
     isIndexable: true,
     isPublic: true,
     label: "TH",

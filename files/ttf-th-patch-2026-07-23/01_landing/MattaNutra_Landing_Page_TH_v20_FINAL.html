@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="th">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MattaNutra — เลิกเดา เริ่มรู้จริง</title>
+<meta content="แผนอาหารเสริมและการดูแลสุขภาพเฉพาะบุคคล ออกแบบจากเชียงใหม่เพื่อชีวิตคนเอเชียตะวันออกเฉียงใต้ เลิกเดา เริ่มรู้จริง" name="description"/>
+<!--
+  ============================================================================
+  MATTANUTRA LANDING PAGE — v16 · THAI (corrected, native-marketer polish)
+  ============================================================================
+  This is the Thai counterpart of the English v16 landing page. Structure,
+  classes, layout and assets are IDENTICAL to the English source — only the
+  human-readable copy is translated and the font stack + a few Thai-specific
+  niceties are added. Notes for production:
+
+  - FONTS: the brand's Latin fonts (Fraunces / DM Sans) are kept FIRST in each
+    stack so Latin brand words — "MattaNutra", "Mattaññutā", the Pāli name and
+    supplement names — render in the intended typeface. Thai webfonts
+    (Noto Serif Thai for display, Noto Sans Thai for body) are added as
+    fallbacks, so Thai glyphs pick them up automatically. This is deliberate:
+    it FIXES the broken "Mattaññutā" glyph seen on the current live /th, which
+    happened because a Thai-only font (lacking ñ / ā) was applied to the Latin
+    wordmark.
+  - `font-synthesis: none` stops the browser faking an italic slant on Thai
+    (Thai has no true italics), so Thai emphasis renders upright and premium
+    while real Fraunces italic still slants for Latin.
+  - Heading leading is relaxed slightly for Thai so upper/lower vowel and tone
+    marks are never clipped by the design's tight Latin line-heights.
+  ============================================================================
+-->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // ── PRODUCTION: copy this object into tailwind.config.js → theme.extend ──
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          // Core brand palette (first-class tokens — do not hard-code hexes elsewhere)
+          ink:        '#0A2540',   // primary navy ink
+          'ink-soft': '#1E3A5F',   // body copy on light
+          forest:     '#2D8F72',   // teal/forest — primary action
+          'forest-deep': '#1F6E58',
+          'forest-light':'#4DB497',
+          'forest-glow': '#B8E0CF',
+          gold:       '#B8943D',
+          'gold-soft':'#D4B871',
+          'gold-tint':'#F5EBC9',
+          cream:      '#FAF6EC',   // page background
+          'cream-deep':'#F2EBD8',
+          mint:       '#EAF3EC',
+          'mint-deep':'#DCE9DE',
+          paper:      '#FEFCF7',   // card surface
+          sand:       '#E8DCC1',
+          'sand-soft':'#F2E9D2',
+          'sand-deep':'#D8C9A8',
+          ash:        '#6B7280',
+          'ash-soft': '#9CA3AF',
+          line:       '#E5E1D4',
+          navy:       '#0A2540',
+          'navy-2':   '#0E2D4D',
+        },
+        fontFamily: {
+          // Latin brand fonts first; Thai webfonts as automatic per-glyph fallback.
+          display: ['Fraunces', '"Noto Serif Thai"', 'Georgia', 'serif'],
+          body:    ['"DM Sans"', '"Noto Sans Thai"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        },
+        borderRadius: { pill: '999px' },
+        maxWidth: { container: '1180px', narrow: '940px' },
+        boxShadow: {
+          soft: '0 18px 40px -20px rgba(10,37,64,0.18)',
+          lift: '0 40px 80px -44px rgba(10,37,64,0.55)',
+          cta:  '0 14px 30px -12px rgba(31,110,88,0.6)',
+        },
+        keyframes: {
+          'fade-up': { '0%': { opacity:'0', transform:'translateY(16px)' }, '100%': { opacity:'1', transform:'translateY(0)' } },
+          'float-slow': { '0%,100%': { transform:'translateY(0)' }, '50%': { transform:'translateY(-9px)' } },
+        },
+        animation: {
+          'fade-up': 'fade-up .7s cubic-bezier(.2,.7,.2,1) both',
+          'float-slow': 'float-slow 6s ease-in-out infinite',
+        },
+      },
+    },
+  };
+</script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&amp;family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&amp;family=Noto+Sans+Thai:wght@400;500;600;700&amp;family=Noto+Serif+Thai:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+  /* Small global niceties that are cleaner as CSS than utilities.
+     @layer base keeps them overridable by utilities. */
+  @layer base {
+    body { @apply font-body text-ink bg-cream antialiased; }
+    h1,h2,h3,h4 { @apply font-display font-normal tracking-tight; }
+  }
+  /* Staggered load-in helper. Reveals are OPTIONAL and progressive: content is
+     visible by default; only when JS adds `.js` to <html> do elements start
+     hidden and then animate in. Delete this block + the reveal script to ship
+     a no-JS, no-animation page with zero risk of hidden content. */
+  .js [data-reveal]{ opacity:0; }
+  .js [data-reveal].in{ animation: reveal-fade-up .7s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes reveal-fade-up { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+</style>
+<!-- Thai typography refinements. Keep these near the base layer. -->
+<style>
+  /* No fake bold/italic: Thai renders upright (native), Fraunces keeps real italic for Latin. */
+  body { font-synthesis: none; }
+  /* Relax tight Latin heading leading so Thai vowel/tone marks never clip. */
+  html:lang(th) h1 { line-height: 1.14; }
+  html:lang(th) h2 { line-height: 1.18; }
+  html:lang(th) h3 { line-height: 1.28; }
+  /* Thai body copy breathes a touch more than Latin. */
+  html:lang(th) p, html:lang(th) li, html:lang(th) summary { line-height: 1.7; }
+</style>
+<link href="https://www.mattanutra.com/th/" rel="canonical"/>
+<link href="https://www.mattanutra.com/en/" hreflang="en" rel="alternate"/>
+<link href="https://www.mattanutra.com/th/" hreflang="th" rel="alternate"/>
+<link href="https://www.mattanutra.com/zh-CN/" hreflang="zh" rel="alternate"/>
+<link href="https://www.mattanutra.com/en/" hreflang="x-default" rel="alternate"/>
+<meta content="th_TH" property="og:locale"/>
+<meta content="website" property="og:type"/>
+<meta content="MattaNutra" property="og:site_name"/>
+<meta content="https://www.mattanutra.com/th/" property="og:url"/>
+<meta content="MattaNutra — เลิกเดา เริ่มรู้จริง" property="og:title"/>
+<meta content="อาหารเสริมที่ออกแบบเฉพาะคุณ จากแบบประเมินที่ละเอียดและตรงประเด็น พร้อมการดูแลและปรับแผนต่อเนื่อง 90 วัน" property="og:description"/>
+<meta content="https://www.mattanutra.com/assets/og/mattanutra-th.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="MattaNutra — เลิกเดา เริ่มรู้จริง" name="twitter:title"/>
+<meta content="อาหารเสริมที่ออกแบบเฉพาะคุณ จากแบบประเมินที่ละเอียดและตรงประเด็น" name="twitter:description"/>
+<meta content="https://www.mattanutra.com/assets/og/mattanutra-th.jpg" name="twitter:image"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"MattaNutra","url":"https://www.mattanutra.com/th/","logo":"https://www.mattanutra.com/assets/logo.png","sameAs":["https://www.facebook.com/mattanutra"]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"MattaNutra","url":"https://www.mattanutra.com/th/","inLanguage":"th"}</script>
+</head>
+<body class="font-body text-ink bg-cream">
+<a class="skip sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-cream focus:text-ink focus:px-4 focus:py-2 focus:rounded-lg" href="#main">ข้ามไปยังเนื้อหาหลัก</a>
+<!-- ============================================================ -->
+<!-- AVAILABILITY BANNER                                          -->
+<!-- ============================================================ -->
+<div class="w-full bg-ink relative z-[51]">
+<div class="max-w-container mx-auto px-4 sm:px-7 py-2.5 flex items-center justify-center gap-x-2.5 gap-y-1.5 flex-wrap">
+<span class="inline-flex items-center gap-1.5">
+<span class="font-body text-[11px] sm:text-[11.5px] font-semibold tracking-[0.16em] uppercase text-forest-glow whitespace-nowrap">พร้อมให้บริการแล้วใน</span>
+<span class="inline-flex items-center gap-1.5 bg-white/[0.08] border border-white/10 rounded-pill px-2.5 py-[3px] text-[11px] sm:text-xs font-medium text-white/90 whitespace-nowrap"><span class="text-sm leading-none">🇹🇭</span>ไทย</span>
+</span>
+<span class="hidden sm:inline-block w-px h-3.5 bg-white/15 mx-0.5"></span>
+<span class="inline-flex items-center gap-1.5 opacity-60">
+<span class="font-body text-[11px] sm:text-[11.5px] font-semibold tracking-[0.16em] uppercase text-white/55 whitespace-nowrap">เปิดเร็ว ๆ นี้</span>
+<span class="inline-flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-pill px-2 py-[3px] text-[11px] sm:text-xs font-medium text-white/70 whitespace-nowrap"><span class="text-sm leading-none">🇸🇬</span><span class="hidden sm:inline">สิงคโปร์</span></span>
+<span class="inline-flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-pill px-2 py-[3px] text-[11px] sm:text-xs font-medium text-white/70 whitespace-nowrap"><span class="text-sm leading-none">🇲🇾</span><span class="hidden sm:inline">มาเลเซีย</span></span>
+<span class="inline-flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-pill px-2 py-[3px] text-[11px] sm:text-xs font-medium text-white/70 whitespace-nowrap"><span class="text-sm leading-none">🇵🇭</span><span class="hidden sm:inline">ฟิลิปปินส์</span></span>
+</span>
+</div>
+</div>
+<!-- ============================================================ -->
+<!-- NAVIGATION                                                   -->
+<!-- ============================================================ -->
+<nav class="sticky top-0 z-50 bg-cream/85 backdrop-blur-[14px] border-b border-line">
+<div class="max-w-container mx-auto px-7 flex items-center justify-between h-[76px]">
+<a class="flex items-center gap-3" href="#">
+<img alt="MattaNutra" class="h-9 w-9 object-contain" src="./assets/logo.png"/>
+<span class="flex flex-col leading-none">
+<span class="font-display text-[22px] font-medium text-ink">Matta<span class="text-forest">Nutra</span></span>
+<span class="text-[10px] font-semibold tracking-[0.22em] uppercase text-ash mt-0.5">รู้ปริมาณที่พอดี</span>
+</span>
+</a>
+<div class="hidden lg:flex items-center gap-8 text-[15px] text-ink-soft">
+<a class="hover:text-forest-deep transition-colors" href="#living-protocol">Living Protocol</a>
+<a class="hover:text-forest-deep transition-colors" href="#how-it-works">วิธีการทำงาน</a>
+<a class="hover:text-forest-deep transition-colors" href="#promises">คำมั่นของเรา</a>
+<a class="hover:text-forest-deep transition-colors" href="#library">คลังความรู้</a>
+</div>
+<div class="flex items-center gap-3 sm:gap-4">
+<div class="hidden sm:flex items-center rounded-pill border border-line overflow-hidden text-[13px]">
+<a class="px-3 py-1.5 text-ash" href="/en">EN</a>
+<a class="px-3 py-1.5 bg-ink text-cream font-semibold" href="#">TH</a>
+</div>
+<!-- Primary CTA — consistent label across the page -->
+<a class="rounded-pill bg-forest-deep text-white text-sm font-semibold px-5 py-3 hover:bg-ink transition-colors whitespace-nowrap" href="#assessment">
+<span class="hidden md:inline">เริ่มประเมินฟรี</span>
+<span class="md:hidden">ออกแบบ →</span>
+</a>
+<!-- Hamburger (mobile only) -->
+<button aria-controls="mobileMenu" aria-expanded="false" aria-label="เปิดเมนู" class="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-line text-ink-soft hover:bg-paper transition-colors" id="navToggle">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+</button>
+</div>
+</div>
+<!-- Mobile menu drawer -->
+<div class="hidden lg:hidden border-t border-line bg-cream/95 backdrop-blur-[14px]" id="mobileMenu">
+<div class="max-w-container mx-auto px-7 py-4 flex flex-col">
+<a class="py-3 text-[16px] text-ink-soft border-b border-line/60" href="#living-protocol">Living Protocol</a>
+<a class="py-3 text-[16px] text-ink-soft border-b border-line/60" href="#how-it-works">วิธีการทำงาน</a>
+<a class="py-3 text-[16px] text-ink-soft border-b border-line/60" href="#promises">คำมั่นของเรา</a>
+<a class="py-3 text-[16px] text-ink-soft border-b border-line/60" href="#library">คลังความรู้</a>
+<div class="flex items-center gap-3 pt-4">
+<a class="flex-1 text-center rounded-pill bg-forest-deep text-white text-sm font-semibold px-5 py-3" href="#assessment">เริ่มประเมินฟรี</a>
+<div class="flex items-center rounded-pill border border-line overflow-hidden text-[13px]">
+<a class="px-3 py-2 text-ash" href="/en">EN</a>
+<a class="px-3 py-2 bg-ink text-cream font-semibold" href="#">TH</a>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<!-- ============================================================ -->
+<!-- HERO                                                         -->
+<!-- BESPOKE: scatter composition. The supplement pills are       -->
+<!-- absolutely positioned around a radial halo + floating figure.-->
+<!-- This is intentionally NOT a flex row / grid — keep the        -->
+<!-- organic scatter. See design note at top of file.             -->
+<!-- ============================================================ -->
+<section class="relative overflow-hidden bg-cream border-b border-line" id="main" tabindex="-1">
+<!-- soft atmospheric glows -->
+<div class="pointer-events-none absolute -top-[280px] -right-[220px] w-[720px] h-[720px] rounded-full bg-[radial-gradient(circle,rgba(184,224,207,0.34),transparent_66%)]"></div>
+<div class="pointer-events-none absolute -bottom-[260px] -left-[160px] w-[520px] h-[520px] rounded-full bg-[radial-gradient(circle,rgba(245,235,201,0.7),transparent_68%)]"></div>
+<div class="relative z-[2] max-w-container mx-auto px-7 py-24 lg:py-28 grid lg:grid-cols-[1.02fr_0.98fr] gap-16 items-center">
+<!-- LEFT: copy -->
+<div>
+<p class="inline-flex items-center gap-2 text-gold font-semibold text-xs tracking-[0.22em] uppercase mb-6" data-reveal="">
+<span class="w-1.5 h-1.5 rounded-full bg-gold"></span>ภูมิปัญญาโบราณ · วิทยาศาสตร์สมัยใหม่
+      </p>
+<h1 class="text-[clamp(46px,7vw,82px)] leading-[1.02] tracking-[-0.025em] text-ink" data-reveal="">
+        เลิกเดา<br/><em class="not-italic font-[Fraunces] italic text-forest-deep">เริ่มรู้จริง</em>
+</h1>
+<p class="mt-7 max-w-[540px] text-[20px] leading-[1.55] text-ink-soft" data-reveal="">
+        แผนอาหารเสริมและการดูแลสุขภาพที่ออกแบบให้เหมาะกับร่างกาย ไลฟ์สไตล์ และเป้าหมายที่สำคัญกับคุณจริง ๆ พร้อมปรับให้เข้ากับจังหวะชีวิตที่เปลี่ยนไป
+      </p>
+<!-- Pāli etymology block -->
+<div class="mt-8 border-l-2 border-gold-soft pl-5 max-w-[540px]" data-reveal="">
+<div class="font-display italic text-[26px] text-gold">Mattaññutā</div>
+<p class="mt-1 text-[15px] leading-relaxed text-ink-soft">
+          คำภาษาบาลีที่หมายถึง “<em class="text-forest-deep not-italic italic">ปัญญาแห่งการรู้ปริมาณที่พอดี</em>” — สุขภาพที่ดีไม่ได้เกิดจากการมีมากขึ้น แต่อยู่ที่<em class="text-forest-deep not-italic italic">การมีอย่างพอดี</em>
+</p>
+</div>
+<div class="mt-9 flex flex-wrap gap-3.5" data-reveal="">
+<a class="inline-flex items-center gap-2.5 rounded-pill bg-gradient-to-br from-forest to-forest-deep text-white font-bold text-base px-8 py-4 shadow-cta hover:-translate-y-0.5 transition-transform" href="#assessment">
+          เริ่มประเมินฟรี
+          <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+</a>
+<a class="inline-flex items-center rounded-pill bg-transparent border border-sand-deep text-ink-soft font-bold text-base px-8 py-4 hover:bg-paper hover:-translate-y-px transition-all" href="#how-it-works">ดูวิธีการทำงาน</a>
+</div>
+<!-- Honest Health Score micro-copy (score is free; formula is paid) -->
+<p class="mt-4 max-w-[480px] text-[14.5px] leading-[1.55] text-ink-soft" data-reveal="">
+        เริ่มต้นด้วย Health Score ฟรี เพื่อดูว่าตอนนี้สุขภาพของคุณอยู่จุดไหน ส่วนสูตรปริมาณที่พอดีเฉพาะคุณพร้อมให้เลือกเมื่อคุณต้องการไปต่อ
+      </p>
+<div class="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-[13.5px] text-ash" data-reveal="">
+<span class="inline-flex items-center gap-1.5"><span class="text-forest font-bold">✓</span> ไม่ต้องใช้บัตรเครดิต</span>
+<span class="inline-flex items-center gap-1.5"><span class="text-forest font-bold">✓</span> ประเมินส่วนผสมมากกว่า 120 ชนิด</span>
+<span class="inline-flex items-center gap-1.5"><span class="text-forest font-bold">✓</span> มีการตรวจสอบความปลอดภัย</span>
+</div>
+</div>
+<!-- RIGHT: BESPOKE scatter visual — matches v12: centred 520px halo, centred -->
+<!-- 230px figure, 5 pills floating around the perimeter (never covering the   -->
+<!-- logo). On mobile: figure + halo centred, pills hidden (they can't be       -->
+<!-- placed on a narrow screen without overlapping). Pills use .hero-float.      -->
+<div class="relative h-[420px] md:h-[560px] flex items-center justify-center mt-2 md:mt-0" data-reveal="">
+<!-- outer halo (v12 .hero-orb: 520px, centred) -->
+<div class="absolute w-[280px] h-[280px] md:w-[520px] md:h-[520px] rounded-full bg-[radial-gradient(circle_at_50%_50%,rgba(232,242,234,0.9)_0%,rgba(220,233,222,0.6)_35%,rgba(184,224,207,0.25)_65%,transparent_80%)]"></div>
+<!-- inner glow (v12 .hero-orb-inner) -->
+<div class="absolute w-[200px] h-[200px] md:w-[380px] md:h-[380px] rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.85)_0%,rgba(245,235,201,0.18)_50%,transparent_75%)]"></div>
+<!-- the brand figure, centred + gentle breathe -->
+<img alt="สัญลักษณ์ MattaNutra" class="relative z-[2] w-[140px] md:w-[230px] hero-breathe drop-shadow-[0_12px_28px_rgba(31,78,168,0.18)]" src="./assets/hero-figure.png"/>
+<!-- floating pills — corner-tucked on mobile, v12 positions on md+ (the md: -->
+<!-- values override the mobile ones). Visible at all sizes. -->
+<span class="hero-float absolute top-[2%] left-[2%] md:top-[4%] md:left-[8%]" style="animation-delay:0s">Magnesium<span class="text-forest font-medium ml-px">?</span></span>
+<span class="hero-float absolute top-[2%] right-[2%] md:top-[14%] md:right-[4%]" style="animation-delay:1.4s">Vitamin D3<span class="text-forest font-medium ml-px">?</span></span>
+<span class="hero-float absolute top-[42%] left-[-1%] md:top-[46%] md:left-[-2%]" style="animation-delay:2.8s">Omega-3<span class="text-forest font-medium ml-px">?</span></span>
+<span class="hero-float absolute bottom-[2%] right-[2%] md:bottom-[28%] md:right-[-3%]" style="animation-delay:4.2s">Ashwagandha<span class="text-forest font-medium ml-px">?</span></span>
+<span class="hero-float absolute bottom-[2%] left-[2%] md:bottom-[8%] md:left-[14%]" style="animation-delay:5.6s">Zinc<span class="text-forest font-medium ml-px">?</span></span>
+</div>
+</div>
+</section>
+<!-- BESPOKE hero-visual styles (mirror v12: breathe + float-drift). Kept as plain
+     CSS because the staggered keyframe animation reads cleaner here than as
+     utilities; safe to move into your CSS entry file for production. -->
+<style>
+  .hero-breathe { animation: hero-breathe 6s ease-in-out infinite; }
+  @keyframes hero-breathe { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-6px) scale(1.015); } }
+  .hero-float {
+    z-index: 3;
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 13px;
+    color: #1E3A5F;
+    padding: 6px 12px;
+    background: rgba(254,252,247,0.92);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(220,213,195,0.7);
+    border-radius: 999px;
+    box-shadow: 0 8px 22px -10px rgba(10,37,64,0.18);
+    white-space: nowrap;
+    animation: float-drift 7s ease-in-out infinite;
+  }
+  /* full size on tablet/desktop */
+  @media (min-width: 768px) {
+    .hero-float { font-size: 17px; padding: 9px 18px; }
+  }
+  @keyframes float-drift { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-9px) rotate(1deg); } }
+  @media (prefers-reduced-motion: reduce) { .hero-breathe, .hero-float { animation: none; } }
+</style>
+<!-- ============================================================ -->
+<!-- TRUST CARD (green filled, contained; under hero)            -->
+<!-- ============================================================ -->
+<div class="bg-cream border-b border-line">
+<div class="max-w-container mx-auto px-6 py-9">
+<div class="max-w-[1020px] mx-auto rounded-2xl border border-gold-soft/40 text-cream shadow-[0_34px_70px_-34px_rgba(10,37,64,0.6)] bg-[radial-gradient(circle_at_85%_0%,rgba(45,143,114,0.28),transparent_55%),linear-gradient(160deg,#1F6E58_0%,#0E2D4D_100%)]" data-reveal="">
+<div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/15">
+<div class="flex items-start gap-3 px-6 py-5">
+<span class="flex-none w-9 h-9 rounded-full bg-white/10 inline-flex items-center justify-center text-forest-glow"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg></span>
+<span class="leading-snug"><span class="block text-[13.5px] font-semibold text-white">ทีมผู้ก่อตั้งที่มีประสบการณ์รวมกันกว่า 100 ปี</span><span class="block text-[12.5px] text-cream/90 mt-1">การแพทย์ · วิทยาศาสตร์ · เทคโนโลยี</span></span>
+</div>
+<div class="flex items-start gap-3 px-6 py-5">
+<span class="flex-none w-9 h-9 rounded-full bg-white/10 inline-flex items-center justify-center text-forest-glow"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5Z"></path><path d="M6 12v5c0 1 2.6 3 6 3s6-2 6-3v-5"></path></svg></span>
+<span class="leading-snug"><span class="block text-[13.5px] font-semibold text-white">การศึกษาและการฝึกอบรมจากสถาบันชั้นนำ</span><span class="block text-[12.5px] text-cream/90 mt-1"><b class="text-white font-semibold">Mahidol</b> · <b class="text-white font-semibold">Princeton</b> · <b class="text-white font-semibold">Stanford</b> · <b class="text-white font-semibold">Harvard</b></span></span>
+</div>
+<div class="flex items-start gap-3 px-6 py-5">
+<span class="flex-none w-9 h-9 rounded-full bg-white/10 inline-flex items-center justify-center text-forest-glow"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><rect height="17" rx="4" width="17" x="3.5" y="3.5"></rect><path d="M12 8.2v7.6M8.2 12h7.6"></path></svg></span>
+<span class="leading-snug"><span class="block text-[13.5px] font-semibold text-white">จัดจ่ายโดยเภสัชกรในพื้นที่</span><span class="block text-[12.5px] text-cream/90 mt-1">ผ่านเครือข่ายร้านขายยาพันธมิตรที่ได้รับอนุญาตในไทย</span></span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ============================================================ -->
+<!-- PROBLEM -> TRANSFORMATION (storyboard arc) + FOUR PROMISES   -->
+<!-- ============================================================ -->
+<section class="bg-paper border-b border-line">
+<div class="max-w-container mx-auto px-7 py-24">
+<div class="text-center max-w-[680px] mx-auto mb-12" data-reveal="">
+<p class="text-ash font-semibold text-xs tracking-[0.22em] uppercase mb-4">จากความสับสน สู่ความชัดเจน</p>
+<h2 class="text-[clamp(32px,4.4vw,52px)] leading-[1.08] tracking-[-0.02em]">ตัวเลือกมากมายจนไม่รู้จะเริ่มตรงไหน<br/><em class="italic text-forest-deep">ให้ MattaNutra ช่วยให้ทุกอย่างชัดเจน</em></h2>
+<p class="mt-5 text-[18px] leading-[1.6] text-ink-soft">เดินเข้าร้านขายยาหรือค้นหาออนไลน์ทีไร ก็มีแต่ความสับสน MattaNutra พาคุณจากตัวเลือกนับร้อย เหลือเพียงไม่กี่อย่างที่ใช่และเหมาะกับคุณโดยเฉพาะ นี่แหละคือ<em class="italic text-forest-deep">การรู้ปริมาณที่พอดี</em></p>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7 lg:gap-x-10 max-w-[1100px] mx-auto">
+<div class="relative" data-reveal="">
+<div class="rounded-[18px] overflow-hidden shadow-soft ring-1 ring-line">
+<img alt="สับสนอยู่หน้าชั้นวางอาหารเสริม" class="w-full aspect-[4/3] object-cover" src="./assets/storyboard-1.png"/>
+</div>
+<h4 class="font-display text-[19px] text-ink mt-4">สับสนไปหมด</h4>
+<p class="text-ash text-[13.5px] leading-[1.5] mt-1">ตัวเลือกนับร้อย แต่ไม่มีคำตอบที่ชัดเจน</p>
+</div>
+<div class="relative" data-reveal="">
+<div class="rounded-[18px] overflow-hidden shadow-soft ring-1 ring-line">
+<img alt="เริ่มเห็นทางที่ชัดเจน" class="w-full aspect-[4/3] object-cover" src="./assets/storyboard-2.png"/>
+</div>
+<h4 class="font-display text-[19px] text-ink mt-4">เริ่มเห็นทางที่ชัดเจน</h4>
+<p class="text-ash text-[13.5px] leading-[1.5] mt-1">คำแนะนำที่ออกแบบมาเพื่อคุณโดยเฉพาะ</p>
+</div>
+<div class="relative" data-reveal="">
+<div class="rounded-[18px] overflow-hidden shadow-soft ring-1 ring-line">
+<img alt="คัดให้เหลือเฉพาะสิ่งที่สำคัญ" class="w-full aspect-[4/3] object-cover" src="./assets/storyboard-3.png"/>
+</div>
+<h4 class="font-display text-[19px] text-ink mt-4">คัดให้เหลือสิ่งที่ใช่</h4>
+<p class="text-ash text-[13.5px] leading-[1.5] mt-1">เหลือเพียงสิ่งที่ร่างกายคุณต้องการจริง ๆ</p>
+</div>
+<div class="relative" data-reveal="">
+<div class="rounded-[18px] overflow-hidden shadow-soft ring-1 ring-line">
+<img alt="ได้สิ่งที่ต้องการอย่างพอดี อยู่ในมือ" class="w-full aspect-[4/3] object-cover" src="./assets/storyboard-4.png"/>
+</div>
+<h4 class="font-display text-[19px] text-ink mt-4">พอดีอย่างแท้จริง</h4>
+<p class="text-ash text-[13.5px] leading-[1.5] mt-1">ปริมาณที่พอดี — อยู่ในมือคุณแล้ว</p>
+</div>
+</div>
+<div class="mt-16 pt-10 border-t border-line max-w-[900px] mx-auto" id="promises">
+<p class="text-center font-display text-[20px] text-ink mb-7">สี่คำมั่น <em class="italic text-forest-deep">หนึ่งแผนที่เรียบง่าย</em></p>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-7">
+<div class="flex items-center gap-3 justify-center">
+<span class="flex-none w-9 h-9 rounded-full bg-mint flex items-center justify-center text-forest-deep"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></span>
+<span class="text-left"><span class="block font-display text-[16px] text-ink leading-tight">ความชัดเจน</span><span class="block text-ash text-[12.5px]">ท่ามกลางความสับสน</span></span>
+</div>
+<div class="flex items-center gap-3 justify-center">
+<span class="flex-none w-9 h-9 rounded-full bg-mint flex items-center justify-center text-forest-deep"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M11 20A7 7 0 0 1 4 13c0-3 2-6 7-9 5 3 7 6 7 9a7 7 0 0 1-7 7Z"></path><path d="M11 7v13"></path></svg></span>
+<span class="text-left"><span class="block font-display text-[16px] text-ink leading-tight">คำแนะนำ</span><span class="block text-ash text-[12.5px]">ที่วางใจได้</span></span>
+</div>
+<div class="flex items-center gap-3 justify-center">
+<span class="flex-none w-9 h-9 rounded-full bg-mint flex items-center justify-center text-forest-deep"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-7 8-7s8 3 8 7"></path></svg></span>
+<span class="text-left"><span class="block font-display text-[16px] text-ink leading-tight">เฉพาะบุคคล</span><span class="block text-ash text-[12.5px]">ออกแบบเฉพาะคุณ</span></span>
+</div>
+<div class="flex items-center gap-3 justify-center">
+<span class="flex-none w-9 h-9 rounded-full bg-mint flex items-center justify-center text-forest-deep"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 21s-7-4.5-7-11a4.5 4.5 0 0 1 7-3.6A4.5 4.5 0 0 1 19 10c0 6.5-7 11-7 11Z"></path></svg></span>
+<span class="text-left"><span class="block font-display text-[16px] text-ink leading-tight">มั่นใจ</span><span class="block text-ash text-[12.5px]">ในทุกการเลือก</span></span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- HOW IT WORKS  (4 steps; step 1 absorbs the questionnaire inputs) -->
+<!-- ============================================================ -->
+<section class="bg-paper border-b border-line" id="how-it-works">
+<div class="max-w-container mx-auto px-7 py-24">
+<div class="text-center max-w-[720px] mx-auto mb-16" data-reveal="">
+<p class="text-ash font-semibold text-xs tracking-[0.22em] uppercase mb-4">วิธีการทำงาน</p>
+<h2 class="text-[clamp(32px,4.4vw,52px)] leading-[1.08] tracking-[-0.02em]">ถามเท่าที่จำเป็น<br/><em class="italic text-forest-deep">ไม่มากเกินไป และไม่ตกหล่นเรื่องสำคัญ</em></h2>
+<p class="mt-4 text-[18px] text-ink-soft">จากแบบสอบถามสั้น ๆ ที่ตรงประเด็น สู่คำแนะนำที่คุณวางใจได้ — ในสี่ขั้นตอน</p>
+</div>
+<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- step 1 -->
+<div class="bg-cream border border-line rounded-[24px] p-8 hover:-translate-y-1 hover:shadow-soft transition-all" data-reveal="">
+<span class="inline-flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-br from-forest-deep to-forest text-white font-display text-[19px] mb-5 shadow-[0_6px_16px_-6px_rgba(45,143,114,0.5)]">1</span>
+<h4 class="font-display text-[22px] mb-2.5">ตอบ</h4>
+<p class="text-ash text-[14.5px] leading-[1.6]">แบบสอบถามที่ละเอียดและตรงประเด็น ครอบคลุมเป้าหมายและสิ่งที่คุณให้ความสำคัญด้านสุขภาพ ไลฟ์สไตล์ กิจกรรมประจำวัน ยาที่ใช้อยู่ งบประมาณ และสิ่งที่สำคัญกับคุณจริง ๆ ข้อมูลเหล่านี้เพียงพอสำหรับออกแบบสูตรเฉพาะคุณ โดยไม่ใช้ศัพท์ซับซ้อนหรือคำอธิบายเยิ่นเย้อ</p>
+<div class="mt-[18px] pt-4 border-t border-dashed border-line text-[12px] uppercase tracking-[0.06em] font-semibold text-ash-soft">ละเอียด แต่ไม่น่าเบื่อ</div>
+</div>
+<!-- step 2 -->
+<div class="bg-cream border border-line rounded-[24px] p-8 hover:-translate-y-1 hover:shadow-soft transition-all" data-reveal="">
+<span class="inline-flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-br from-forest-deep to-forest text-white font-display text-[19px] mb-5 shadow-[0_6px_16px_-6px_rgba(45,143,114,0.5)]">2</span>
+<h4 class="font-display text-[22px] mb-2.5">วิเคราะห์</h4>
+<p class="text-ash text-[14.5px] leading-[1.6]">อัลกอริทึมเฉพาะของเรา พัฒนาจากงานวิจัยทางคลินิกที่ได้รับการตีพิมพ์ ออกแบบให้ระบุลำดับความสำคัญของอาหารเสริมได้ใกล้เคียงกับสิ่งที่ผลตรวจเลือดอาจชี้ให้เห็น พร้อมช่วงปริมาณที่เหมาะสมและการตรวจสอบความปลอดภัย</p>
+<div class="mt-[18px] pt-4 border-t border-dashed border-line text-[12px] uppercase tracking-[0.06em] font-semibold text-ash-soft">ส่วนผสมมากกว่า 120 ชนิด</div>
+</div>
+<!-- step 3 -->
+<div class="bg-cream border border-line rounded-[24px] p-8 hover:-translate-y-1 hover:shadow-soft transition-all" data-reveal="">
+<span class="inline-flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-br from-forest-deep to-forest text-white font-display text-[19px] mb-5 shadow-[0_6px_16px_-6px_rgba(45,143,114,0.5)]">3</span>
+<h4 class="font-display text-[22px] mb-2.5">จับคู่</h4>
+<p class="text-ash text-[14.5px] leading-[1.6]">สูตรของคุณถูกจัดจ่ายผ่านร้านขายยาพันธมิตรที่มีเภสัชกรขึ้นทะเบียน — คุณจึงมีเภสัชกรตัวจริงให้สอบถาม และไม่ต้องยืนเดาอยู่หน้าชั้นวางสินค้า</p>
+<div class="mt-[18px] pt-4 border-t border-dashed border-line text-[12px] uppercase tracking-[0.06em] font-semibold text-ash-soft">จัดจ่ายโดยเภสัชกร</div>
+</div>
+<!-- step 4 -->
+<div class="bg-cream border border-line rounded-[24px] p-8 hover:-translate-y-1 hover:shadow-soft transition-all" data-reveal="">
+<span class="inline-flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-br from-forest-deep to-forest text-white font-display text-[19px] mb-5 shadow-[0_6px_16px_-6px_rgba(45,143,114,0.5)]">4</span>
+<h4 class="font-display text-[22px] mb-2.5">ปรับให้พอดี</h4>
+<p class="text-ash text-[14.5px] leading-[1.6]">ด้วย Living Protocol แผนของคุณจะปรับเปลี่ยนต่อเนื่อง เมื่อเป้าหมาย อาการ และไลฟ์สไตล์ของคุณเปลี่ยนไป</p>
+<div class="mt-[18px] pt-4 border-t border-dashed border-line text-[12px] uppercase tracking-[0.06em] font-semibold text-ash-soft">ส่วนหนึ่งของ Living Protocol</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- LIVING PROTOCOL                                              -->
+<!-- ============================================================ -->
+<section id="living-protocol">
+<!-- ── LP HERO ── -->
+<div class="relative overflow-hidden bg-cream border-b border-line">
+<div class="pointer-events-none absolute -top-[10%] -left-[8%] w-[380px] h-[380px] rounded-full bg-[radial-gradient(circle,rgba(216,201,168,0.35),transparent_65%)]"></div>
+<div class="relative z-[1] max-w-container mx-auto px-7 py-24 grid lg:grid-cols-2 gap-16 items-center">
+<!-- copy -->
+<div data-reveal="">
+<span class="inline-flex items-center gap-2 rounded-pill bg-mint text-forest-deep text-xs font-extrabold tracking-[0.2em] uppercase px-4 py-2 mb-6"><span class="w-1.5 h-1.5 rounded-full bg-gold"></span>Living Protocol · ดูแลต่อเนื่อง 90 วัน</span>
+<h2 class="text-[clamp(34px,5vw,64px)] leading-[1.04] tracking-[-0.02em] text-ink">ชีวิตเปลี่ยนแปลงอยู่เสมอ<br/><em class="italic text-forest-deep">แผนของคุณก็ปรับตามได้</em></h2>
+<p class="mt-6 max-w-[540px] text-[19px] leading-[1.55] text-ink-soft">การนอน ความเครียด การเดินทาง และจังหวะชีวิตที่เปลี่ยนไป ล้วนเปลี่ยนสิ่งที่ร่างกายต้องการ Living Protocol ช่วยปรับทั้งอาหารเสริมและอาหารในชีวิตประจำวันให้สอดคล้องกับชีวิตจริงของคุณ เพื่อให้ปริมาณที่พอดีในวันนี้ ยังคงพอดีในสัปดาห์หน้า</p>
+<div class="mt-8 flex flex-wrap gap-3.5">
+<a class="inline-flex items-center gap-2.5 rounded-pill bg-gradient-to-br from-forest to-forest-deep text-white font-bold text-base px-8 py-4 shadow-cta hover:-translate-y-0.5 transition-transform" href="#start-free">สำรวจ Living Protocol
+            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+<a class="inline-flex items-center rounded-pill border border-sand-deep text-ink-soft font-bold text-base px-8 py-4 hover:bg-paper transition-colors" href="#lp-practice">ดูวิธีการทำงาน</a>
+</div>
+<div class="mt-9 flex flex-col gap-3">
+<div class="flex items-start gap-3 text-[15.5px] text-ink-soft"><span class="flex-none w-[22px] h-[22px] rounded-full bg-forest inline-flex items-center justify-center mt-px"><svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg></span><span>ออกแบบโดยแพทย์ — ทุกการปรับแผนได้รับการตรวจสอบเทียบกับยาและผลตรวจของคุณ</span></div>
+<div class="flex items-start gap-3 text-[15.5px] text-ink-soft"><span class="flex-none w-[22px] h-[22px] rounded-full bg-forest inline-flex items-center justify-center mt-px"><svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg></span><span>แผนยังสอดคล้องกับชีวิตจริง แม้ในช่วงเดินทาง เครียด หรือนอนไม่พอ</span></div>
+<div class="flex items-start gap-3 text-[15.5px] text-ink-soft"><span class="flex-none w-[22px] h-[22px] rounded-full bg-forest inline-flex items-center justify-center mt-px"><svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg></span><span>ไม่ต้องกลับมาเดาใหม่ทุกครั้งที่ชีวิตเปลี่ยนไป</span></div>
+</div>
+</div>
+<!-- BESPOKE: phone / chat mockup. A styled conversation, not a table. -->
+<div class="max-w-[380px] mx-auto w-full bg-white rounded-[34px] border border-line shadow-lift overflow-hidden" data-reveal="">
+<div class="flex items-center gap-2.5 px-5 py-4 bg-navy text-white">
+<span class="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-forest-light to-forest-deep inline-flex items-center justify-center font-display text-base flex-none">M</span>
+<span class="flex flex-col leading-tight"><b class="text-[15px] font-semibold">MattaNutra</b><span class="text-[11.5px] text-forest-glow flex items-center gap-1.5 before:content-[''] before:w-1.5 before:h-1.5 before:rounded-full before:bg-forest-light">Living Protocol กำลังทำงาน</span></span>
+<span class="ml-auto text-[11px] text-ash-soft bg-white/[0.08] px-2.5 py-1 rounded-pill">LINE / WhatsApp</span>
+</div>
+<div class="p-4 bg-cream flex flex-col gap-3">
+<div class="self-start max-w-[84%] bg-white border border-line rounded-[18px] rounded-bl-[5px] px-3.5 py-3 text-sm leading-relaxed">สัปดาห์นี้มีอะไรเปลี่ยนไปไหม — การนอน ความเครียด การเดินทาง หรือกิจวัตร?</div>
+<div class="self-end max-w-[84%] bg-navy text-white rounded-[18px] rounded-br-[5px] px-3.5 py-3 text-sm leading-relaxed">พรุ่งนี้ต้องเดินทางไปโตเกียว สัปดาห์นี้คงนอนไม่ค่อยดีเลย</div>
+<div class="self-start max-w-[84%] bg-white border border-line rounded-[18px] rounded-bl-[5px] px-3.5 py-3 text-sm leading-relaxed">เข้าใจแล้ว — หกวันในโตเกียวและการนอนอาจสะดุดบ้าง เราได้ปรับแผน <b class="text-forest-deep font-semibold">เล็กน้อย 3 จุด</b> และคงส่วนที่เหลือไว้เหมือนเดิม นี่คือแผนสำหรับทริปของคุณ</div>
+<!-- protocol card -->
+<div class="self-stretch bg-white border border-line rounded-2xl overflow-hidden mt-0.5">
+<div class="px-4 py-3 bg-gradient-to-br from-forest-deep to-forest text-white">
+<div class="text-[10.5px] tracking-[0.16em] uppercase font-bold opacity-80">อัปเดตแผนของคุณ</div>
+<div class="font-display text-[18px] mt-0.5">ทริปโตเกียวของคุณ — ปรับ 3 จุดเล็ก ๆ</div>
+</div>
+<div class="px-4">
+<div class="flex items-start gap-3 py-3 border-b border-line">
+<span class="flex-none w-6 h-6 rounded-md bg-mint inline-flex items-center justify-center mt-px text-forest-deep"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+<span class="text-[13.5px] leading-snug">ทาน <b class="text-forest-deep">แมกนีเซียม</b> ให้เร็วขึ้นเล็กน้อย — เป็น 19:30 น. ตามเวลาท้องถิ่น แทน 21:30 น.</span>
+</div>
+<div class="flex items-start gap-3 py-3 border-b border-line">
+<span class="flex-none w-6 h-6 rounded-md bg-mint inline-flex items-center justify-center mt-px text-forest-deep"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M12 3v18M6 8h12M7 13h10"></path></svg></span>
+<span class="text-[13.5px] leading-snug">เพิ่ม <b class="text-forest-deep">เกลือแร่</b> ระหว่างเที่ยวบิน และทุกเช้าระหว่างทริป</span>
+</div>
+<div class="flex items-start gap-3 py-3">
+<span class="flex-none w-6 h-6 rounded-md bg-sand-soft inline-flex items-center justify-center mt-px text-gold"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M5 12h14"></path></svg></span>
+<span class="text-[13.5px] leading-snug">ส่วนที่เหลือ คงไว้เหมือนเดิมทุกอย่าง</span>
+</div>
+</div>
+<div class="px-4 py-3 bg-paper text-[11.5px] text-ash border-t border-line">อ้างอิงจาก: ทริป 6 วัน · การนอนอาจสะดุด · ประชุมหนัก · เดินมากขึ้น</div>
+<!-- BESPOKE: vanilla-JS toggle (see script at end of file) -->
+<button aria-controls="lp-reasons" aria-expanded="false" class="js-reason-toggle w-full text-left px-4 py-3 text-[12px] font-bold tracking-wide text-forest-deep border-t border-line flex items-center justify-between">
+<span class="js-reason-label">ดูเหตุผล</span>
+<svg class="js-reason-chevron w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+<div class="hidden bg-paper" id="lp-reasons">
+<div class="px-4 pt-1 pb-3 text-[12.5px] text-ink-soft leading-normal"><b class="text-forest-deep">เลื่อนเวลารับประทานแมกนีเซียมให้เร็วขึ้น</b> — ช่วยให้ร่างกายเริ่มผ่อนคลายเร็วขึ้น ขณะที่คุณปรับตัวเข้ากับเขตเวลาใหม่</div>
+<div class="px-4 pb-3 text-[12.5px] text-ink-soft leading-normal"><b class="text-forest-deep">เพิ่มเกลือแร่</b> — ช่วยรักษาสมดุลน้ำในร่างกายระหว่างเที่ยวบินและในวันที่ต้องเดินมากขึ้น</div>
+<div class="px-4 pb-3 text-[12.5px] text-ink-soft leading-normal"><b class="text-forest-deep">คงอะแดปโตเจนไว้เท่าเดิม</b> — ความเครียดของคุณกำลังสูงขึ้น แต่การนอนช่วงนี้ยังไม่นิ่ง เราจึงคงปริมาณไว้ แทนที่จะเปลี่ยนหลายอย่างพร้อมกัน</div>
+</div>
+</div>
+<!-- food exchange -->
+<div class="self-start max-w-[84%] bg-white border border-line rounded-[18px] rounded-bl-[5px] px-3.5 py-3 text-sm leading-relaxed">อีกเรื่องหนึ่ง — ผลตรวจครั้งล่าสุดของคุณพบว่าแมกนีเซียมค่อนข้างต่ำ เราได้รวมแมกนีเซียมไว้ในแผนแล้ว แต่คุณเติมจากอาหารตามธรรมชาติได้ด้วย:
+            <span class="inline-flex flex-wrap gap-1.5 mt-1.5 align-middle">
+<span class="inline-block bg-mint-deep text-forest-deep text-xs font-semibold px-2.5 py-[3px] rounded-pill">เมล็ดฟักทอง</span>
+<span class="inline-block bg-mint-deep text-forest-deep text-xs font-semibold px-2.5 py-[3px] rounded-pill">ผักโขม</span>
+<span class="inline-block bg-mint-deep text-forest-deep text-xs font-semibold px-2.5 py-[3px] rounded-pill">ถั่วดำ</span>
+</span> ล้วนอุดมไปด้วยแมกนีเซียม 🌱</div>
+<div class="self-end max-w-[84%] bg-navy text-white rounded-[18px] rounded-br-[5px] px-3.5 py-3 text-sm leading-relaxed">เยี่ยมเลย ไม่เคยรู้มาก่อน แล้ววิตามินซีของผมล่ะ — ต้องเสริมเพิ่มไหม?</div>
+<div class="self-start max-w-[84%] bg-white border border-line rounded-[18px] rounded-bl-[5px] px-3.5 py-3 text-sm leading-relaxed">พูดตรง ๆ คือ คุณน่าจะไม่จำเป็นต้องเสริมวิตามินซี ผักและผลไม้ที่รับประทานเป็นประจำให้วิตามินซีเพียงพออยู่แล้ว <b class="text-forest-deep font-semibold">เก็บเงินไว้</b> ดีกว่า — อาหารทำหน้าที่ได้ดีอยู่แล้ว</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ── TAGLINE BAND ── -->
+<div class="bg-mint border-y border-mint-deep py-20 text-center">
+<div class="max-w-container mx-auto px-7" data-reveal="">
+<h2 class="max-w-[880px] mx-auto text-[clamp(28px,4vw,48px)] leading-[1.1] tracking-[-0.02em]"><span class="text-ink">สูตรปริมาณที่พอดี คือรากฐานของคุณ</span><br/>Living Protocol <em class="italic text-forest-deep">ช่วยให้รากฐานนั้นสอดคล้องกับชีวิตจริง</em></h2>
+<p class="max-w-[620px] mx-auto mt-6 text-[18px] text-ink-soft">การเดินทาง ความเครียด การนอนไม่พอ และตารางชีวิตที่เปลี่ยนไป ล้วนเปลี่ยนสิ่งที่ร่างกายต้องการ พื้นฐานของแผนยังคงเดิม แต่รายละเอียดเล็กน้อยปรับตามสถานการณ์ได้</p>
+</div>
+</div>
+<!-- ── LIVING PROTOCOL IN PRACTICE (renamed from "How it works") ── -->
+<div class="bg-cream py-24" id="lp-practice">
+<div class="max-w-container mx-auto px-7">
+<div class="text-center max-w-[660px] mx-auto mb-14" data-reveal="">
+<span class="inline-flex items-center gap-2 rounded-pill bg-mint text-forest-deep text-xs font-extrabold tracking-[0.2em] uppercase px-4 py-2 mb-5"><span class="w-1.5 h-1.5 rounded-full bg-gold"></span>Living Protocol ในการใช้งานจริง</span>
+<h2 class="text-[clamp(32px,4.4vw,52px)] leading-[1.08] tracking-[-0.02em]">สามขั้นตอน ไม่ต้องเรียนรู้แอปใหม่</h2>
+<p class="mt-4 text-[18px] text-ink-soft">Living Protocol ทำงานผ่านแชตที่คุณใช้อยู่แล้ว แค่บอกว่าอะไรเปลี่ยนไป ที่เหลือให้เราจัดการ</p>
+</div>
+<div class="grid md:grid-cols-3 gap-7">
+<div class="bg-paper border border-line rounded-[24px] p-8" data-reveal="">
+<div class="font-display text-[15px] font-semibold text-gold tracking-[0.08em] mb-3.5">01</div>
+<h3 class="font-display text-[22px] mb-3">บอก MattaNutra ว่าอะไรเปลี่ยนไป</h3>
+<p class="text-ink-soft text-[15px] mb-4.5">แค่ข้อความสั้น ๆ ทาง LINE หรือ WhatsApp ก็พอ — ไม่ต้องกรอกฟอร์ม ไม่ต้องคอยบันทึก ไม่ต้องเรียนรู้แอปใหม่</p>
+<div class="flex flex-col gap-2.5">
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“ช่วงนี้นอนไม่ค่อยดีเลย”</span>
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“พรุ่งนี้ต้องเดินทางไปทำงาน”</span>
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“ช่วงนี้เริ่มออกกำลังหนักขึ้น”</span>
+</div>
+</div>
+<div class="bg-paper border border-line rounded-[24px] p-8" data-reveal="">
+<div class="font-display text-[15px] font-semibold text-gold tracking-[0.08em] mb-3.5">02</div>
+<h3 class="font-display text-[22px] mb-3">แผนของคุณปรับตามชีวิตที่เปลี่ยนไป</h3>
+<p class="text-ink-soft text-[15px] mb-4.5">MattaNutra ใช้ข้อมูลชุดอาหารเสริมที่คุณรับประทาน เป้าหมาย และข้อควรระวังด้านความปลอดภัย เพื่อปรับแผนอย่างแม่นยำเพียงไม่กี่จุด — ทั้งเวลา ปริมาณ หรือการเสริมชั่วคราว — พร้อมแนะนำอาหารประจำวันที่ช่วยเสริมสิ่งที่ร่างกายคุณต้องการ</p>
+<div class="flex flex-col gap-2.5">
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“สัปดาห์นี้เลื่อนแมกนีเซียมให้เร็วขึ้นเล็กน้อย”</span>
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“เมล็ดฟักทองเป็นแหล่งแมกนีเซียมตามธรรมชาติชั้นดี”</span>
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“คงอะแดปโตเจนไว้เท่าเดิมจนกว่าการนอนจะนิ่ง”</span>
+</div>
+</div>
+<div class="bg-paper border border-line rounded-[24px] p-8" data-reveal="">
+<div class="font-display text-[15px] font-semibold text-gold tracking-[0.08em] mb-3.5">03</div>
+<h3 class="font-display text-[22px] mb-3">ทำได้ต่อเนื่อง โดยไม่ต้องคิดมาก</h3>
+<p class="text-ink-soft text-[15px] mb-4.5">คุณไม่ต้องค้นคว้า ไม่ต้องลังเล หรือเริ่มต้นใหม่ทุกครั้งที่ชีวิตยุ่ง คุณจะได้รับคำแนะนำง่าย ๆ เพียงไม่กี่ข้อ — พร้อมความมั่นใจว่ามันเหมาะกับคุณ</p>
+<div class="flex flex-col gap-2.5">
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“ไม่ต้องวางแผนใหม่ทุกครั้งที่ชีวิตเปลี่ยน”</span>
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“การปรับเล็ก ๆ ช่วยให้แผนของคุณทำได้จริง”</span>
+<span class="text-[13.5px] italic text-ink-soft bg-cream rounded-[10px] px-3.5 py-2.5 border-l-2 border-forest-light">“ปริมาณที่เหมาะกับคุณยังคงเหมาะ แม้ชีวิตจะเปลี่ยนไป”</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ── FOOD & NUTRITION ── -->
+<div class="bg-sand-soft border-y border-sand-deep py-24">
+<div class="max-w-container mx-auto px-7">
+<div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center mb-16" data-reveal="">
+<div class="relative">
+<div class="absolute -inset-3 rounded-[28px] bg-gradient-to-br from-mint to-sand-soft/60 -z-10"></div>
+<img alt="ชามอาหารที่มีคุณค่า — ปลาย่าง ผักโขมผัด บรอกโคลี ถั่วดำ ข้าวกล้อง และเมล็ดฟักทอง พร้อมสมุนไพรไทยและมะนาว" class="rounded-[22px] w-full object-cover shadow-soft" src="./assets/food-bowl.jpg"/>
+</div>
+<div>
+<span class="inline-flex items-center gap-2 rounded-pill bg-mint text-forest-deep text-xs font-extrabold tracking-[0.2em] uppercase px-4 py-2 mb-5"><span class="w-1.5 h-1.5 rounded-full bg-gold"></span>อาหารและอาหารเสริมไปด้วยกัน</span>
+<h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] tracking-[-0.02em]">บางครั้ง แหล่งที่ดีที่สุด ก็อยู่ <em class="italic text-forest-deep">บนจานของคุณ</em></h2>
+<p class="mt-[18px] text-[18px] text-ink-soft">อาหารเสริมช่วยเติมสิ่งที่ขาด แต่ควรเริ่มจากอาหารก่อน เมื่อ Living Protocol พบว่าสารอาหารบางชนิดอาจไม่เพียงพอ ระบบจะพิจารณาอาหารที่มีสารนั้นสูงก่อนแนะนำผลิตภัณฑ์เสริม คุณจึงเลือกได้ว่าจะเพิ่มจากมื้ออาหารหรือเสริมด้วยผลิตภัณฑ์อาหารเสริม ไม่ว่าทางใด คุณก็<em class="italic text-forest-deep">รู้ว่าเหตุผลคืออะไร</em> ไม่ต้องเดา</p>
+</div>
+</div>
+<div class="grid md:grid-cols-3 gap-6">
+<div class="bg-paper border border-line rounded-[24px] p-8 flex flex-col" data-reveal="">
+<div class="font-display text-[21px] text-ink mb-3">อาจได้รับแมกนีเซียมไม่เพียงพอ?</div>
+<p class="text-[15px] text-ink-soft flex-1 mb-[18px]">เมล็ดฟักทอง ผักโขม และถั่วดำ เป็นอาหารที่มีแมกนีเซียมสูง</p>
+<div class="flex flex-wrap gap-1.5"><span class="bg-mint-deep text-forest-deep text-[12.5px] font-semibold px-3 py-[5px] rounded-pill">เมล็ดฟักทอง</span><span class="bg-mint-deep text-forest-deep text-[12.5px] font-semibold px-3 py-[5px] rounded-pill">ผักโขม</span><span class="bg-mint-deep text-forest-deep text-[12.5px] font-semibold px-3 py-[5px] rounded-pill">ถั่วดำ</span></div>
+</div>
+<div class="bg-paper border border-line rounded-[24px] p-8 flex flex-col" data-reveal="">
+<div class="font-display text-[21px] text-ink mb-3">ต้องการโครเมียมเพิ่ม?</div>
+<p class="text-[15px] text-ink-soft flex-1 mb-[18px]">พบได้ในที่ที่คาดไม่ถึง — น้ำองุ่น บรอกโคลี และธัญพืชเต็มเมล็ด</p>
+<div class="flex flex-wrap gap-1.5"><span class="bg-mint-deep text-forest-deep text-[12.5px] font-semibold px-3 py-[5px] rounded-pill">น้ำองุ่น</span><span class="bg-mint-deep text-forest-deep text-[12.5px] font-semibold px-3 py-[5px] rounded-pill">บรอกโคลี</span><span class="bg-mint-deep text-forest-deep text-[12.5px] font-semibold px-3 py-[5px] rounded-pill">ธัญพืชเต็มเมล็ด</span></div>
+</div>
+<div class="bg-mint border border-mint-deep rounded-[24px] p-8 flex flex-col" data-reveal="">
+<div class="font-display text-[21px] text-ink mb-3">ได้รับเพียงพอแล้ว?</div>
+<p class="text-[15px] text-ink-soft flex-1 mb-[18px]">ถ้ามื้ออาหารของคุณทำหน้าที่ได้ดีอยู่แล้ว Living Protocol จะบอกให้คุณข้ามอาหารเสริมตัวนั้น — และประหยัดเงินไปเลย</p>
+<div class="flex flex-wrap gap-1.5"><span class="bg-gold-tint text-gold text-[12.5px] font-semibold px-3 py-[5px] rounded-pill">มื้ออาหารก็เพียงพอแล้ว</span></div>
+</div>
+</div>
+<p class="text-center max-w-[640px] mx-auto mt-12 font-display italic text-[20px] leading-[1.5] text-ink-soft" data-reveal="">ไม่ต้องจดบันทึกอาหาร ไม่ต้องนับแคลอรี แค่ได้คำตอบเร็ว ๆ เมื่อคุณอยากรู้ และคำแนะนำง่าย ๆ ว่าควรเพิ่มอะไรในมื้ออาหารเมื่อจำเป็น</p>
+</div>
+</div>
+<!-- ── DIFFERENTIATOR (navy, prose) — BESPOKE: the page's one dramatic dark beat ── -->
+<div class="relative overflow-hidden text-cream py-24 border-t border-navy-2 bg-[radial-gradient(circle_at_20%_0%,rgba(45,143,114,0.18),transparent_45%),radial-gradient(circle_at_90%_100%,rgba(184,148,61,0.14),transparent_45%),linear-gradient(160deg,#0A2540_0%,#0E2D4D_100%)]">
+<div class="max-w-narrow mx-auto px-7">
+<span class="inline-flex items-center gap-2 rounded-pill bg-forest-glow/10 text-forest-light text-xs font-extrabold tracking-[0.2em] uppercase px-4 py-2 mb-6" data-reveal=""><span class="w-1.5 h-1.5 rounded-full bg-gold"></span>สิ่งที่ทำให้ Living Protocol แตกต่าง</span>
+<h2 class="max-w-[640px] text-[clamp(32px,4.4vw,52px)] leading-[1.08] tracking-[-0.02em] text-white" data-reveal="">มากกว่าแค่คำตอบ<br/><em class="italic text-forest-light">คือแผนที่รู้จักคุณ</em></h2>
+<p class="max-w-[640px] mt-6 text-[19px] leading-[1.6] text-[#f5f6f0]/[0.86]" data-reveal="">ใคร ๆ ก็ค้นได้ว่าการเดินทางมีผลต่อแมกนีเซียมไหม แต่สิ่งที่ยากกว่าคือการรู้ว่าควรปรับตรงไหนใน<em class="italic text-white">แผนของคุณ</em> เมื่อพิจารณาร่วมกับอาหารเสริมที่ใช้อยู่ ยาที่รับประทาน และสิ่งที่เกิดขึ้นในช่วงหลายสัปดาห์ที่ผ่านมา นั่นคือสิ่งที่ Living Protocol จัดการให้</p>
+<p class="max-w-[640px] mt-6 text-[17px] leading-[1.7] text-[#f5f6f0]/[0.78]" data-reveal="">ระบบมีข้อมูลยาและอาหารเสริมทั้งหมดที่คุณรับประทานอยู่แล้ว จึงไม่ต้องอธิบายใหม่ทุกครั้งที่มีอะไรเปลี่ยน <b class="text-white font-semibold">ทุกคำแนะนำที่ปรับเปลี่ยนจะได้รับการตรวจสอบเทียบกับยาที่คุณใช้และข้อมูลสำคัญจากผลตรวจทางห้องปฏิบัติการ</b> การตรวจสอบระดับนี้ทำได้เพราะคำแนะนำสร้างจากข้อมูลเฉพาะของคุณ ตลอด 90 วัน ระบบจะค่อย ๆ เรียนรู้แนวโน้มของคุณ จึงไม่ได้พิจารณาเพียงสิ่งที่เกิดขึ้นในสัปดาห์นี้ แต่ยังมองเห็นสิ่งที่สะสมมาตลอดช่วงที่ผ่านมา คุณไม่ต้องรู้ด้วยซ้ำว่าควรถามอะไร เพียงบอกว่าเกิดอะไรขึ้น แล้ว Living Protocol จะช่วยคิดต่อให้</p>
+<p class="max-w-[640px] mt-8 font-display italic text-[22px] leading-[1.4] text-white" data-reveal="">คุณไม่จำเป็นต้องเป็นเภสัชกรให้ตัวเอง แค่บอก MattaNutra ว่าอะไรเปลี่ยนไป แล้วระบบจะดูแลให้แผนของคุณพอดีอยู่เสมอ</p>
+</div>
+</div>
+<!-- ── LP CLOSING CTA (bridges to pricing; replaces the duplicate price grid) ── -->
+<div class="bg-mint border-t border-mint-deep py-20 text-center">
+<div class="max-w-narrow mx-auto px-7" data-reveal="">
+<h2 class="text-[clamp(28px,3.4vw,42px)] leading-tight tracking-[-0.02em] text-ink mb-4">พร้อมเริ่มประเมินฟรีหรือยัง?</h2>
+<p class="max-w-[560px] mx-auto text-[18px] leading-[1.6] text-ink-soft mb-7">เริ่มจากแบบสอบถามสั้น ๆ ที่ละเอียด พร้อม Health Score ฟรี แผนเฉพาะบุคคลของคุณ — และตัวเลือกเสริม Living Protocol — อยู่ห่างออกไปเพียงก้าวเดียว</p>
+<a class="inline-flex items-center gap-2.5 rounded-pill bg-gradient-to-br from-forest to-forest-deep text-white font-bold text-base px-8 py-4 shadow-cta hover:-translate-y-0.5 transition-transform" href="#assessment">เริ่มประเมินฟรี
+        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+<p class="text-[13.5px] text-ash mt-[18px]">เริ่มฟรี — ไม่ต้องใช้บัตรเครดิต</p>
+</div>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- TESTIMONIALS                                                 -->
+<!-- ============================================================ -->
+<section class="bg-cream py-24">
+<div class="max-w-container mx-auto px-7">
+<div class="text-center max-w-[680px] mx-auto mb-14" data-reveal="">
+<span class="inline-flex items-center gap-2 rounded-pill bg-mint text-forest-deep text-xs font-extrabold tracking-[0.2em] uppercase px-4 py-2 mb-5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>เรื่องราวที่หลายคนคุ้นเคย</span>
+<h2 class="text-[clamp(32px,4.4vw,52px)] leading-[1.08] tracking-[-0.02em]">ชีวิตที่ต่างกัน แต่ก้าวแรกเดียวกัน</h2>
+<p class="mt-4 text-[18px] text-ink-soft">ไลฟ์สไตล์ต่างกัน แต่เป้าหมายเดียวกัน: สุขภาพที่ดีขึ้น ความชัดเจนที่มากขึ้น และแผนที่ทำได้จริง</p>
+</div>
+<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- Daniel -->
+<div class="bg-paper border border-line rounded-[20px] p-3.5 pb-6 flex flex-col" data-reveal="">
+<div class="relative">
+<img alt="Daniel L." class="w-full aspect-[4/3] object-cover rounded-[14px]" src="./assets/testimonial-daniel.jpg"/>
+<span class="absolute -bottom-4 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-mint border border-mint-deep flex items-center justify-center font-display text-forest-deep text-xl">”</span>
+</div>
+<p class="text-[14.5px] leading-relaxed text-ink-soft mt-8 px-2 flex-1">พออายุ 40 ผมถึงได้รู้ว่า ที่ผ่านมาพูดเสมอว่าอยากดูแลตัวเองให้ดีขึ้น แต่ไม่รู้จะเริ่มตรงไหน ในลิ้นชักมีวิตามินสารพัดที่ซื้อสะสมไว้ แต่ไม่มีแผนจริง ๆ MattaNutra ช่วยให้ผมเห็นก้าวแรกที่ชัดเจน โดยไม่ทำให้เรื่องทั้งหมดดูยุ่งยากเกินไป</p>
+<div class="border-t border-line mt-5 pt-4 px-2 flex items-center gap-3">
+<span class="w-8 h-8 rounded-full bg-mint border border-gold/30 flex items-center justify-center text-gold flex-none"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M11 20A7 7 0 0 1 4 13c0-3 2-6 7-9 5 3 7 6 7 9a7 7 0 0 1-7 7Z"></path></svg></span>
+<span><span class="block font-semibold text-forest-deep text-[15px]">Daniel L.</span><span class="block text-ash text-[13px]">อายุ 40 ปี · กรุงเทพฯ</span></span>
+</div>
+<div class="px-2 mt-3"><span class="inline-block w-full text-center bg-mint text-ink-soft text-[13.5px] rounded-pill py-2">ผู้จัดการโครงการ</span></div>
+</div>
+<!-- Mei Lin -->
+<div class="bg-paper border border-line rounded-[20px] p-3.5 pb-6 flex flex-col" data-reveal="">
+<div class="relative">
+<img alt="Mei Lin T." class="w-full aspect-[4/3] object-cover rounded-[14px]" src="./assets/testimonial-meilin.jpg"/>
+<span class="absolute -bottom-4 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-mint border border-mint-deep flex items-center justify-center font-display text-forest-deep text-xl">”</span>
+</div>
+<p class="text-[14.5px] leading-relaxed text-ink-soft mt-8 px-2 flex-1">ทั้งงาน การเดินทาง และการดูแลครอบครัว ทำให้ฉันดูแลสุขภาพได้เพียงเท่าที่นึกขึ้นได้ในแต่ละวัน MattaNutra ช่วยเปลี่ยนชั้นวางอาหารเสริมที่รกไปหมดให้กลายเป็นแผนง่าย ๆ ที่เข้ากับชีวิตจริงในสิงคโปร์</p>
+<div class="border-t border-line mt-5 pt-4 px-2 flex items-center gap-3">
+<span class="w-8 h-8 rounded-full bg-mint border border-gold/30 flex items-center justify-center text-gold flex-none"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M11 20A7 7 0 0 1 4 13c0-3 2-6 7-9 5 3 7 6 7 9a7 7 0 0 1-7 7Z"></path></svg></span>
+<span><span class="block font-semibold text-forest-deep text-[15px]">Mei Lin T.</span><span class="block text-ash text-[13px]">อายุ 45 ปี · สิงคโปร์</span></span>
+</div>
+<div class="px-2 mt-3"><span class="inline-block w-full text-center bg-mint text-ink-soft text-[13.5px] rounded-pill py-2">หัวหน้าฝ่ายปฏิบัติการ</span></div>
+</div>
+<!-- Wanida -->
+<div class="bg-paper border border-line rounded-[20px] p-3.5 pb-6 flex flex-col" data-reveal="">
+<div class="relative">
+<img alt="Wanida P." class="w-full aspect-[4/3] object-cover rounded-[14px]" src="./assets/testimonial-wanida.jpg"/>
+<span class="absolute -bottom-4 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-mint border border-mint-deep flex items-center justify-center font-display text-forest-deep text-xl">”</span>
+</div>
+<p class="text-[14.5px] leading-relaxed text-ink-soft mt-8 px-2 flex-1">หมอบอกว่าความดันของฉันเริ่มสูงขึ้นและต้องปรับเปลี่ยนบางอย่าง ฉันใช้เวลาหลายชั่วโมงหาข้อมูลอาหารเสริมออนไลน์ แล้วยิ่งสับสนกว่าตอนเริ่มต้น MattaNutra ช่วยคัดข้อมูลที่ไม่จำเป็นออก และวางแผนที่เข้ากับชีวิตฉันได้จริง ๆ</p>
+<div class="border-t border-line mt-5 pt-4 px-2 flex items-center gap-3">
+<span class="w-8 h-8 rounded-full bg-mint border border-gold/30 flex items-center justify-center text-gold flex-none"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M11 20A7 7 0 0 1 4 13c0-3 2-6 7-9 5 3 7 6 7 9a7 7 0 0 1-7 7Z"></path></svg></span>
+<span><span class="block font-semibold text-forest-deep text-[15px]">Wanida P. <span class="font-normal text-ash">(วนิดา)</span></span><span class="block text-ash text-[13px]">อายุ 43 ปี · ขอนแก่น</span></span>
+</div>
+<div class="px-2 mt-3"><span class="inline-block w-full text-center bg-mint text-ink-soft text-[13.5px] rounded-pill py-2">เจ้าของร้าน</span></div>
+</div>
+<!-- Malee -->
+<div class="bg-paper border border-line rounded-[20px] p-3.5 pb-6 flex flex-col" data-reveal="">
+<div class="relative">
+<img alt="Malee S." class="w-full aspect-[4/3] object-cover rounded-[14px]" src="./assets/testimonial-malee.jpg"/>
+<span class="absolute -bottom-4 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-mint border border-mint-deep flex items-center justify-center font-display text-forest-deep text-xl">”</span>
+</div>
+<p class="text-[14.5px] leading-relaxed text-ink-soft mt-8 px-2 flex-1">ฉันทำงานในคลินิก ใคร ๆ เลยคิดว่าฉันต้องรู้ดีว่าควรกินอาหารเสริมอะไร แต่ความจริงคือยิ่งอ่านมากเท่าไหร่ ก็ยิ่งไม่มั่นใจ สุดท้าย MattaNutra ก็ให้แผนที่ชัดเจน มีเหตุผล และวางใจได้ — คราวนี้เพื่อตัวฉันเอง ไม่ใช่แค่คนไข้</p>
+<div class="border-t border-line mt-5 pt-4 px-2 flex items-center gap-3">
+<span class="w-8 h-8 rounded-full bg-mint border border-gold/30 flex items-center justify-center text-gold flex-none"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M11 20A7 7 0 0 1 4 13c0-3 2-6 7-9 5 3 7 6 7 9a7 7 0 0 1-7 7Z"></path></svg></span>
+<span><span class="block font-semibold text-forest-deep text-[15px]">Malee S. <span class="font-normal text-ash">(มาลี)</span></span><span class="block text-ash text-[13px]">อายุ 41 ปี · ภูเก็ต</span></span>
+</div>
+<div class="px-2 mt-3"><span class="inline-block w-full text-center bg-mint text-ink-soft text-[13.5px] rounded-pill py-2">ผู้ช่วยพยาบาล</span></div>
+</div>
+</div>
+<div class="text-center mt-14" data-reveal="">
+<p class="flex items-center justify-center gap-2 text-ink-soft text-[15px] mb-6"><span class="text-forest"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M11 20A7 7 0 0 1 4 13c0-3 2-6 7-9 5 3 7 6 7 9a7 7 0 0 1-7 7Z"></path></svg></span>ตัดสินใจเรื่องสุขภาพได้อย่างชาญฉลาดและมั่นใจยิ่งขึ้น</p>
+<a class="inline-flex items-center gap-2.5 rounded-pill bg-gradient-to-br from-forest to-forest-deep text-white font-bold text-base px-8 py-4 shadow-cta hover:-translate-y-0.5 transition-transform" href="#assessment">เริ่มประเมินฟรี
+        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+</div>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- OUR ORIGIN                                                   -->
+<!-- BESPOKE: five-stage logo "build" is a connected horizontal    -->
+<!-- sequence (dashed connectors), NOT four cards. Keep the flow.  -->
+<!-- ============================================================ -->
+<section class="relative overflow-hidden bg-sand-soft border-y border-sand-deep py-28" id="origin">
+<div class="pointer-events-none absolute -top-[10%] -left-[8%] w-[380px] h-[380px] rounded-full bg-[radial-gradient(circle,rgba(216,201,168,0.35),transparent_65%)]"></div>
+<div class="pointer-events-none absolute -bottom-[12%] -right-[10%] w-[420px] h-[420px] rounded-full bg-[radial-gradient(circle,rgba(184,148,61,0.10),transparent_65%)]"></div>
+<div class="relative z-[1] max-w-narrow mx-auto px-8">
+<!-- Chiang Mai opening -->
+<div class="max-w-[780px]" data-reveal="">
+<span class="inline-block text-ash font-bold text-xs tracking-[0.28em] uppercase mb-[18px]">จุดเริ่มต้นของเรา</span>
+<h2 class="text-[clamp(32px,4.4vw,52px)] leading-[1.08] tracking-[-0.02em] mb-7">ออกแบบในเชียงใหม่<br/>ที่ซึ่งความพอดี คือ <em class="italic text-forest-deep">วิถีชีวิต</em></h2>
+<p class="text-[18px] leading-[1.65] text-ink-soft mb-[18px]">MattaNutra เริ่มต้นขึ้นในภาคเหนือของไทย ที่ซึ่งวิถีแห่งความพอดี — การกินแต่พอดี การพักผ่อนในเวลาที่ควร และการอยู่กับจังหวะของร่างกายตนเอง — ได้รับการบ่มเพาะอย่างเงียบงันมา<em class="italic text-forest-deep font-medium">หลายศตวรรษ</em></p>
+<p class="text-[18px] leading-[1.65] text-ink-soft">เราสร้าง MattaNutra ขึ้นเพื่อนำภูมิปัญญาเรื่องความพอดีมาพัฒนาเป็นแนวทางดูแลสุขภาพที่ทันสมัย วัดผลได้ และออกแบบเฉพาะบุคคล — แผนที่อาศัยข้อมูลร่างกายของคุณ ปรับตามชีวิตที่เปลี่ยนไป และไม่บังคับให้คุณต้องเปลี่ยนวิถีชีวิตจนไม่เป็นตัวเอง</p>
+</div>
+<!-- BESPOKE five-stage build — horizontal connected sequence -->
+<div aria-label="โลโก้ MattaNutra สร้างขึ้นทีละขั้นทั้งห้าขั้น จากโครงร่างสู่สัญลักษณ์ที่สมบูรณ์" class="flex items-center justify-center my-16 flex-wrap md:flex-nowrap" data-reveal="" role="img">
+<img alt="" class="w-[110px] md:w-[100px] flex-none" src="./assets/origin-stage-1.png"/>
+<span class="hidden md:block flex-1 min-w-[28px] max-w-[56px] border-t border-dashed border-gold-soft mx-1.5"></span>
+<img alt="" class="w-[110px] md:w-[100px] flex-none" src="./assets/origin-stage-2.png"/>
+<span class="hidden md:block flex-1 min-w-[28px] max-w-[56px] border-t border-dashed border-gold-soft mx-1.5"></span>
+<img alt="" class="w-[110px] md:w-[100px] flex-none" src="./assets/origin-stage-3.png"/>
+<span class="hidden md:block flex-1 min-w-[28px] max-w-[56px] border-t border-dashed border-gold-soft mx-1.5"></span>
+<img alt="" class="w-[110px] md:w-[100px] flex-none" src="./assets/origin-stage-4.png"/>
+<span class="hidden md:block flex-1 min-w-[28px] max-w-[56px] border-t border-dashed border-gold-soft mx-1.5"></span>
+<img alt="" class="w-[110px] md:w-[100px] flex-none" src="./assets/origin-stage-5.png"/>
+</div>
+<!-- Founders block — paragraph broken for breathing room -->
+<div class="max-w-[780px]" data-reveal="">
+<h3 class="font-display text-[clamp(22px,2vw,28px)] font-medium mb-[22px] text-ink">ก่อตั้งโดยแพทย์ นักวิทยาศาสตร์ และนักคิดด้าน AI ผู้สร้างสรรค์สิ่งใหม่</h3>
+<p class="text-[18px] leading-[1.65] text-ink-soft mb-[18px]">สิ่งที่คุณรับเข้าสู่ร่างกายควรได้รับการออกแบบโดยผู้ที่เข้าใจทั้งส่วนประกอบ หลักฐานทางวิทยาศาสตร์ และผลที่อาจเกิดขึ้นต่อร่างกาย</p>
+<p class="text-[18px] leading-[1.65] text-ink-soft mb-[18px]">MattaNutra ก่อตั้งโดยทีมผู้เชี่ยวชาญจากหลายประเทศและหลากหลายสาขา ประกอบด้วยแพทย์สองท่านที่ผ่านการศึกษาและฝึกอบรมระดับ <b class="text-ink font-semibold">แพทยศาสตร์ควบปริญญาเอก (MD–PhD)</b> จากสถาบันวิจัยชั้นนำ ได้แก่ <b class="text-ink font-semibold">Mahidol, Princeton, Stanford และ Harvard</b></p>
+<p class="text-[18px] leading-[1.65] text-ink-soft mb-[18px]">ทีมยังมีวิศวกรซอฟต์แวร์ที่เริ่มต้นอาชีพที่ CERN และมีประสบการณ์ด้าน AI และระบบกระจายศูนย์กับองค์กรอย่าง <b class="text-ink font-semibold">Goldman Sachs และ UBS</b> รวมถึงนักเศรษฐศาสตร์ระดับปริญญาเอกที่มีประสบการณ์ในตลาดทุนและธุรกิจเกิดใหม่ระดับโลก</p>
+<p class="text-[18px] leading-[1.65] text-ink-soft mb-[18px]">และเรายังมีผู้ร่วมก่อตั้งรุ่นใหม่ ซึ่งช่วยให้ผลิตภัณฑ์ของเราสอดคล้องกับความต้องการของคนรุ่นต่อไป</p>
+<p class="text-[18px] leading-[1.65] text-ink-soft">รวมกันแล้ว ทีมของเรามีประสบการณ์วิชาชีพมากกว่าหนึ่งร้อยปี ครอบคลุมการแพทย์ วิทยาศาสตร์ เทคโนโลยี และการสร้างสิ่งที่มีคุณค่าและยั่งยืน</p>
+</div>
+<!-- signature seal -->
+<div class="max-w-[780px] mt-12 pt-[26px] border-t border-sand-deep flex items-center gap-3.5" data-reveal="">
+<span class="w-[38px] h-[38px] rounded-full border border-gold-soft inline-flex items-center justify-center bg-paper flex-none text-gold"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+<span class="flex flex-col leading-tight"><span class="font-display italic text-[17px] text-ink-soft font-medium">จากเชียงใหม่ ด้วยความใส่ใจ</span><span class="text-[12px] font-semibold tracking-[0.18em] uppercase text-ash mt-1">ภูมิปัญญาโบราณ · วิทยาศาสตร์สมัยใหม่</span></span>
+</div>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- QUESTIONNAIRE HOOK (replaces pricing; pricing -> Health Score)-->
+<!-- ============================================================ -->
+<section class="bg-cream py-24" id="start-free">
+<div class="max-w-container mx-auto px-7">
+<div class="text-center max-w-[680px] mx-auto mb-12" data-reveal="">
+<p class="text-forest-deep font-semibold text-xs tracking-[0.22em] uppercase mb-4">แบบสอบถามฟรี</p>
+<h2 class="text-[clamp(32px,4.4vw,52px)] leading-[1.08] tracking-[-0.02em] text-ink">ดูตัวอย่างการทำงานของ<em class="italic text-forest-deep">แบบสอบถาม</em></h2>
+<p class="mt-5 text-[18px] leading-[1.6] text-ink-soft">นี่คือตัวอย่างวิธีที่แบบสอบถามประเมิน <em class="italic text-forest-deep">วิตามินดี</em> เพียงหนึ่งชนิด — ซึ่งเป็นหนึ่งในส่วนผสมกว่า 120 ชนิดที่อัลกอริทึมนำมาประเมินร่วมกัน — โดยใช้คำตอบหลายข้อประกอบกัน ฉบับเต็มมีทั้งหมดหกส่วนสั้น ๆ</p>
+</div>
+<div class="max-w-[680px] mx-auto rounded-[24px] bg-paper ring-1 ring-line shadow-[0_40px_80px_-44px_rgba(10,37,64,0.55)] overflow-hidden" data-reveal=""><div class="flex items-center gap-2.5 px-5 py-3.5 border-b border-line bg-cream"><span class="w-6 h-6 rounded-full bg-gradient-to-br from-forest-light to-forest-deep grid place-items-center text-white font-display text-[12px] flex-none">M</span><span class="font-mono text-[10px] tracking-[0.18em] uppercase text-forest-deep">Formula Precision</span><span class="ml-auto inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-ash"><svg class="w-3.5 h-3.5 text-forest-deep" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"></path></svg>เป็นส่วนตัวและเข้ารหัส</span></div><div class="px-5 pt-4 pb-1 flex items-center gap-2"><span class="inline-flex items-center gap-1.5 rounded-pill bg-gold-tint text-gold border border-sand-deep px-2.5 py-1 font-mono text-[9.5px] tracking-[0.14em] uppercase">ตัวอย่าง</span><span class="text-[12px] text-ash">ประเมินส่วนผสมเพียง <b class="text-ink-soft">หนึ่ง</b> ชนิด</span></div><div class="px-5 pt-2"><div class="flex items-center justify-between mb-1.5"><span class="font-mono text-[10px] tracking-[0.16em] uppercase text-ash">เริ่มต้น → ข้อมูลพื้นฐาน → ความแม่นยำ</span><span class="font-display text-[15px] text-forest-deep">8%</span></div><div class="h-[9px] rounded-pill bg-cream-deep ring-1 ring-line overflow-hidden"><div class="h-full rounded-pill" style="width:8%;background:linear-gradient(90deg,#D4B871 0%,#4DB497 55%,#2D8F72 100%)"></div></div><p class="mt-1.5 text-[12.5px] text-ash-soft">คุณอยู่ที่ <b class="text-forest-deep">8%</b> — ไปต่อเพื่อให้ข้อมูลพื้นฐานครบถ้วน</p></div><div class="mx-5 mt-4 rounded-2xl border border-mint-deep border-l-4 border-l-forest bg-gradient-to-br from-mint to-cream px-5 py-4"><p class="font-display italic text-[15px] leading-[1.5] text-ink-soft">“ที่นี่ไม่มีคำตอบถูกหรือผิด มีเพียงคำตอบที่ตรงกับความเป็นจริงของคุณ ยิ่งคุณตอบอย่างตรงไปตรงมา สูตรของคุณก็ยิ่งเหมาะกับคุณและปลอดภัยยิ่งขึ้นเมื่อใช้ร่วมกับสิ่งที่รับประทานอยู่”</p></div><div class="px-5 pt-5 pb-1"><div class="flex items-baseline justify-between"><span class="font-display text-[16px] text-ink">สีผิว</span><span class="font-mono text-[10px] tracking-[0.14em] uppercase text-ash">ข้อมูลพื้นฐาน</span></div><p class="text-[13px] text-ash mt-0.5 mb-3">ช่วยประเมิน<b class="text-forest-deep">การสังเคราะห์วิตามินดี</b>ของคุณ ควบคู่กับการได้รับแสงแดด</p><div class="grid grid-cols-6 gap-2"><span class="h-10 rounded-lg ring-1 ring-black/5" style="background:#F3E0CE"></span><span class="h-10 rounded-lg ring-1 ring-black/5" style="background:#EBC9A6"></span><span class="h-10 rounded-lg ring-1 ring-black/5" style="background:#DDB892"></span><span class="h-10 rounded-lg ring-1 ring-black/5" style="background:#C49A6C"></span><span class="h-10 rounded-lg ring-1 ring-black/5" style="background:#A87B52"></span><span class="h-10 rounded-lg ring-1 ring-black/5" style="background:#7E5A3A"></span></div></div><div class="px-5 pt-4 grid sm:grid-cols-2 gap-4"><div><div class="text-[13px] font-semibold text-ink mb-2">เวลาที่ได้รับแสงแดดต่อวัน</div><div class="flex flex-wrap gap-1.5"><button class="rounded-pill border px-3.5 py-1.5 text-[13px] font-semibold bg-paper text-ink-soft border-line" type="button">น้อยกว่า 15 นาที</button><button class="rounded-pill border px-3.5 py-1.5 text-[13px] font-semibold bg-forest-deep text-white border-forest-deep" type="button">15–30 นาที</button><button class="rounded-pill border px-3.5 py-1.5 text-[13px] font-semibold bg-paper text-ink-soft border-line" type="button">30–60 นาที</button><button class="rounded-pill border px-3.5 py-1.5 text-[13px] font-semibold bg-paper text-ink-soft border-line" type="button">60 นาทีขึ้นไป</button></div></div><div><div class="text-[13px] font-semibold text-ink mb-2">การใช้ครีมกันแดด</div><div class="flex flex-wrap gap-1.5"><button class="rounded-pill border px-3.5 py-1.5 text-[13px] font-semibold bg-paper text-ink-soft border-line" type="button">แทบไม่ใช้</button><button class="rounded-pill border px-3.5 py-1.5 text-[13px] font-semibold bg-paper text-ink-soft border-line" type="button">บางครั้ง</button><button class="rounded-pill border px-3.5 py-1.5 text-[13px] font-semibold bg-forest-deep text-white border-forest-deep" type="button">ทุกวัน</button></div></div></div><div class="mx-5 mt-4 flex items-start gap-2.5 rounded-xl bg-sand-soft/70 px-4 py-3"><svg class="w-4 h-4 text-gold flex-none mt-0.5" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M17.7 6.3l1.4-1.4M4.9 19.1l1.4-1.4"></path><circle cx="12" cy="12" r="4"></circle></svg><p class="text-[12.5px] leading-[1.5] text-ink-soft">ระบบนำข้อมูลสีผิว ระยะเวลาที่ได้รับแสงแดด และการใช้ครีมกันแดดมา<i>ประเมินร่วมกัน</i> — การประเมินวิตามินดีจึงไม่ได้อาศัยการเดา แต่เป็นค่าประเมินที่ปรับให้สอดคล้องกับชีวิตของคุณ</p></div><div class="px-5 pt-4 pb-1"><p class="text-[11px] text-ash mb-2">หนึ่งคำถาม จากหกส่วน:</p><div class="flex flex-wrap gap-x-4 gap-y-2"><span class="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-ink"><span class="w-[15px] h-[15px] rounded-full grid place-items-center text-[8.5px] bg-ink text-cream">1</span>ข้อมูลพื้นฐาน</span><span class="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-ash"><span class="w-[15px] h-[15px] rounded-full grid place-items-center text-[8.5px] bg-cream-deep text-ash">2</span>เป้าหมาย</span><span class="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-ash"><span class="w-[15px] h-[15px] rounded-full grid place-items-center text-[8.5px] bg-cream-deep text-ash">3</span>ชีวิตประจำวัน</span><span class="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-ash"><span class="w-[15px] h-[15px] rounded-full grid place-items-center text-[8.5px] bg-cream-deep text-ash">4</span>อาหาร</span><span class="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-ash"><span class="w-[15px] h-[15px] rounded-full grid place-items-center text-[8.5px] bg-cream-deep text-ash">5</span>ความปลอดภัย</span><span class="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-ash"><span class="w-[15px] h-[15px] rounded-full grid place-items-center text-[8.5px] bg-cream-deep text-ash">6</span>ความแม่นยำ</span></div></div><div class="mt-4 px-5 py-3.5 border-t border-line bg-cream text-center"><span class="text-[12.5px] text-ink-soft">วิตามินดีเป็นหนึ่งในส่วนผสมกว่า <b class="text-forest-deep">120 ชนิด</b> ที่อัลกอริทึมของเราประเมิน</span></div></div>
+<div class="text-center mt-12" data-reveal="">
+<a class="inline-flex items-center gap-2.5 rounded-pill bg-gradient-to-br from-forest to-forest-deep text-white font-bold text-base px-8 py-4 shadow-cta hover:-translate-y-0.5 transition-transform" href="https://www.mattanutra.com/th/nutrition/quiz">เริ่มประเมินฟรี<svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+<p class="mt-4 flex items-center justify-center gap-x-5 gap-y-1 flex-wrap text-[13.5px] text-ash">
+<span class="inline-flex items-center gap-1.5"><span class="text-forest font-bold">✓</span> เริ่มฟรี</span>
+<span class="inline-flex items-center gap-1.5"><span class="text-forest font-bold">✓</span> ไม่ต้องใช้บัตรเครดิต</span>
+<span class="inline-flex items-center gap-1.5"><span class="text-forest font-bold">✓</span> ใช้เวลาประมาณ 3 นาที</span>
+</p>
+</div>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- THE MATTANUTRA LIBRARY (featured; replaces Journal)          -->
+<!-- Featured = newest 3 (auto). Cards + chips are data-driven.   -->
+<!-- ============================================================ -->
+<section class="bg-paper border-y border-line py-24" id="library">
+<div class="max-w-container mx-auto px-7">
+<div class="flex items-end justify-between flex-wrap gap-8 mb-8" data-reveal="">
+<div class="max-w-[640px]">
+<p class="text-ash font-semibold text-xs tracking-[0.22em] uppercase mb-4">คลังความรู้ MattaNutra</p>
+<h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] tracking-[-0.02em]">เรียนรู้ <em class="italic text-forest-deep">ปริมาณที่พอดี</em></h2>
+<p class="mt-4 text-[17px] text-ink-soft leading-[1.6]">คำตอบที่ชัดเจนและอ้างอิงหลักฐาน สำหรับคำถามเรื่องอาหารเสริมที่ผู้คนถามกันจริง ๆ — เพื่อให้คุณตัดสินใจจากความรู้ ไม่ใช่การเดา</p>
+</div>
+<div class="flex items-center gap-4">
+<img alt="น้องมัตตะ ผู้ช่วยประจำคลังความรู้ MattaNutra" class="h-24 w-auto hidden sm:block" src="./assets/nong-open.png"/>
+<div>
+<p class="text-[13px] text-ash mb-1">พบกับ <b class="text-forest-deep">น้องมัตตะ</b> ผู้ช่วยประจำคลังความรู้ของคุณ</p>
+<a class="text-forest-deep font-semibold hover:text-ink transition-colors inline-flex items-center gap-2" href="/th/library">เข้าชมคลังความรู้
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+</div>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 mb-10" data-reveal="">
+<a class="rounded-pill bg-forest-deep text-white text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="all" href="/th/library">ทั้งหมด</a>
+<a class="rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="foundations" href="/th/library#foundations">พื้นฐาน</a>
+<a class="rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="vitamins" href="/th/library#vitamins">วิตามิน</a>
+<a class="rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="minerals" href="/th/library#minerals">แร่ธาตุ</a>
+<a class="rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="sleep-recovery" href="/th/library#sleep-recovery">การนอนและการฟื้นตัว</a>
+<a class="rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="energy-longevity" href="/th/library#energy-longevity">พลังงานและอายุยืน</a>
+<a class="rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="everyday-nutrition" href="/th/library#everyday-nutrition">โภชนาการประจำวัน</a>
+</div>
+<div class="grid md:grid-cols-3 gap-7">
+<!-- FEATURED CARDS — rendered from library-manifest.json.
+     Rule: articles where featured=true (max 3); if fewer than 3 are flagged,
+     fill from the newest by datePublished. Do not hand-edit these three cards;
+     change the manifest instead so the index and the landing page stay in sync. -->
+<a class="group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-reveal="" href="https://www.mattanutra.com/th/library/which-supplements-should-you-take">
+<div class="h-44 bg-gradient-to-br from-mint-deep to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — การนอนและการฟื้นตัว" class="h-[150px] w-auto object-contain" loading="lazy" onerror="this.onerror=null;this.src='./assets/nong-open.png'" src="./assets/nong-ask.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h3 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">คุณควรกินอาหารเสริมอะไร? (และทำไมการเดาอาจมีต้นทุนมากกว่าที่คิด)</h3>
+<p class="text-[14.5px] text-ash leading-relaxed">คนส่วนใหญ่เลือกอาหารเสริมอย่างไร? เพื่อน ครอบครัว คำแนะนำจากเทรนเนอร์หรือคนในยิม โฆษณา และรายการออนไลน์ …</p>
+</div>
+</a>
+<a class="group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="vitamins" data-reveal="" href="https://www.mattanutra.com/th/library/vitamin-d-in-thailand">
+<div class="h-44 bg-gradient-to-br from-sand-soft to-sand-deep/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — แร่ธาตุ" class="h-[150px] w-auto object-contain" loading="lazy" onerror="this.onerror=null;this.src='./assets/nong-open.png'" src="./assets/nong-open.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">วิตามิน</span>
+<h3 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">วิตามินดีในประเทศไทย</h3>
+<p class="text-[14.5px] text-ash leading-relaxed">วิตามินดีในประเทศไทย: ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ MattaNutra ว่าด้วยการได้รับแสงแดด การใช้ชีวิตใ…</p>
+</div>
+</a>
+<a class="group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="sleep-recovery" data-reveal="" href="https://www.mattanutra.com/th/library/sleep-support-without-sleeping-pills">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและอายุยืน" class="h-[150px] w-auto object-contain" loading="lazy" onerror="this.onerror=null;this.src='./assets/nong-open.png'" src="./assets/nong-reassuring.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">การนอนและการฟื้นตัว</span>
+<h3 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">อาหารเสริมอะไรอาจช่วยให้นอนดีขึ้นโดยไม่ใช่ยานอนหลับ?</h3>
+<p class="text-[14.5px] text-ash leading-relaxed">อาหารเสริมอะไรอาจช่วยให้นอนดีขึ้นโดยไม่ใช่ยานอนหลับ? MattaNutra อธิบายแมกนีเซียม แอล-ธีอะนีน น้ำเชอร์รีเ…</p>
+</div>
+</a>
+</div>
+</div>
+</section>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "คลังความรู้ MattaNutra — บทความแนะนำ",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "url": "https://www.mattanutra.com/th/library/which-supplements-should-you-take",
+      "name": "คุณควรกินอาหารเสริมอะไร? (และทำไมการเดาอาจมีต้นทุนมากกว่าที่คิด)"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "url": "https://www.mattanutra.com/th/library/vitamin-d-in-thailand",
+      "name": "วิตามินดีในประเทศไทย"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "url": "https://www.mattanutra.com/th/library/sleep-support-without-sleeping-pills",
+      "name": "อาหารเสริมอะไรอาจช่วยให้นอนดีขึ้นโดยไม่ใช่ยานอนหลับ?"
+    }
+  ],
+  "numberOfItems": 3
+}</script>
+<!-- ============================================================ -->
+<!-- FAQ  (native <details> — no JS needed; objection-handlers)   -->
+<!-- ============================================================ -->
+<section class="bg-cream py-24">
+<div class="max-w-narrow mx-auto px-7">
+<div class="text-center max-w-[640px] mx-auto mb-12" data-reveal="">
+<p class="text-ash font-semibold text-xs tracking-[0.22em] uppercase mb-4">คำถาม</p>
+<h2 class="text-[clamp(32px,4.4vw,52px)] leading-[1.08] tracking-[-0.02em]">คำถามดี ๆ <em class="italic text-forest-deep">คำตอบที่ตรงไปตรงมา</em></h2>
+</div>
+<div class="flex flex-col gap-3.5">
+<details class="group bg-paper border border-line rounded-[16px] px-6 open:shadow-soft" data-reveal="">
+<summary class="flex items-center justify-between cursor-pointer list-none py-5 font-medium text-[17px] text-ink">ข้อมูลของฉันเป็นส่วนตัวไหม?<span class="text-gold text-2xl font-light transition-transform group-open:rotate-45">+</span></summary>
+<div class="pb-5 -mt-1 text-ink-soft text-[15.5px] leading-relaxed">เป็นส่วนตัวแน่นอน ข้อมูลจากแบบประเมินเป็นของคุณ เราไม่ขายข้อมูลของคุณ ไม่เปิดเผยข้อมูลแก่ผู้โฆษณา และคุณขอให้ลบข้อมูลได้ทุกเมื่อ บทสนทนาใน Living Protocol ถูกจัดเก็บไว้เพียงเพื่อความต่อเนื่องของแผนของคุณเท่านั้น</div>
+</details>
+<details class="group bg-paper border border-line rounded-[16px] px-6 open:shadow-soft" data-reveal="">
+<summary class="flex items-center justify-between cursor-pointer list-none py-5 font-medium text-[17px] text-ink">ฉันทานยาอยู่ — แบบนี้ปลอดภัยกับฉันไหม?<span class="text-gold text-2xl font-light transition-transform group-open:rotate-45">+</span></summary>
+<div class="pb-5 -mt-1 text-ink-soft text-[15.5px] leading-relaxed">MattaNutra คัดกรองปฏิกิริยาและข้อควรระวังที่พบบ่อยระหว่างยาและอาหารเสริม และแสดงคำเตือนที่เกี่ยวข้องไว้ในแผนของคุณ นี่คือคำแนะนำเพื่อสุขภาพ ไม่ใช่คำแนะนำทางการแพทย์ หากคุณใช้ยาตามใบสั่งแพทย์ กำลังตั้งครรภ์ ให้นมบุตร หรือมีโรคประจำตัวหรือภาวะสุขภาพที่ต้องดูแล ควรปรึกษาผู้เชี่ยวชาญด้านสุขภาพก่อนเริ่มแผนอาหารเสริมใด ๆ</div>
+</details>
+<details class="group bg-paper border border-line rounded-[16px] px-6 open:shadow-soft" data-reveal="">
+<summary class="flex items-center justify-between cursor-pointer list-none py-5 font-medium text-[17px] text-ink">ผลิตภัณฑ์ที่แนะนำมาจากไหน?<span class="text-gold text-2xl font-light transition-transform group-open:rotate-45">+</span></summary>
+<div class="pb-5 -mt-1 text-ink-soft text-[15.5px] leading-relaxed">สูตรของคุณถูกจัดจ่ายผ่านเครือข่ายร้านขายยาพันธมิตรที่มีเภสัชกรขึ้นทะเบียน คุณจึงได้รับผลิตภัณฑ์ตรงตามรายการและปริมาณที่กำหนดไว้ในแผน — โดยไม่ต้องเดาสุ่มหน้าชั้นวาง เราไม่ได้ผลิตอาหารเสริมเอง แต่จับคู่คุณกับผลิตภัณฑ์ที่เชื่อถือได้ และเภสัชกรที่พร้อมตอบทุกคำถามของคุณ</div>
+</details>
+<details class="group bg-paper border border-line rounded-[16px] px-6 open:shadow-soft" data-reveal="">
+<summary class="flex items-center justify-between cursor-pointer list-none py-5 font-medium text-[17px] text-ink">แบบประเมินฟรีนี้ ฟรีจริงไหม?<span class="text-gold text-2xl font-light transition-transform group-open:rotate-45">+</span></summary>
+<div class="pb-5 -mt-1 text-ink-soft text-[15.5px] leading-relaxed">ฟรีจริง ทั้งแบบสอบถามและ Health Score ของคุณ ไม่ต้องใช้บัตรเครดิต เมื่อทำเสร็จ คุณจะเห็นว่าตอนนี้อยู่จุดไหน พร้อมทิศทางเริ่มต้น ส่วนสูตร <em class="italic text-forest-deep">ปริมาณที่พอดี</em> เฉพาะบุคคลฉบับเต็ม — และบริการเสริม <em class="italic text-forest-deep">Living Protocol</em> — พร้อมให้บริการหากคุณเลือกไปต่อ</div>
+</details>
+<details class="group bg-paper border border-line rounded-[16px] px-6 open:shadow-soft" data-reveal="">
+<summary class="flex items-center justify-between cursor-pointer list-none py-5 font-medium text-[17px] text-ink">ทำไมจึงใช้ชื่อภาษาบาลี?<span class="text-gold text-2xl font-light transition-transform group-open:rotate-45">+</span></summary>
+<div class="pb-5 -mt-1 text-ink-soft text-[15.5px] leading-relaxed">“Mattaññutā” (มัตตัญญุตา) แปลว่า <em class="italic text-forest-deep">การรู้ปริมาณที่พอดี</em> มาจากภูมิปัญญาเชิงปฏิบัติอายุกว่า 2,500 ปี ว่าด้วยความพอประมาณและความสมดุล — แนวคิดที่ว่าความเจริญงอกงามไม่ได้มาจากการมีมากขึ้น แต่มาจากการมีพอดีอย่างแท้จริง ชื่อนี้คือคำมั่นของเรา: เราจะช่วยให้คุณค้นพบปริมาณที่พอดีของ <em class="italic text-forest-deep">คุณ</em> ไม่ใช่ขายสิ่งที่คุณไม่จำเป็นต้องใช้เพิ่ม</div>
+</details>
+</div>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- FINAL CTA                                                    -->
+<!-- ============================================================ -->
+<section class="relative overflow-hidden text-cream py-[140px] bg-[linear-gradient(160deg,#0A2540_0%,#0E2F4E_50%,#1F6E58_130%)]" id="assessment">
+<div class="pointer-events-none absolute top-0 right-0 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(184,224,207,0.12),transparent_65%)]"></div>
+<div class="relative z-[1] max-w-narrow mx-auto px-7 text-center" data-reveal="">
+<h2 class="text-[clamp(40px,6vw,72px)] leading-[1.05] tracking-[-0.02em] text-white">เลิกเดา<br/><span class="italic font-display text-forest-light">เริ่มรู้จริง</span></h2>
+<p class="max-w-[600px] mx-auto mt-7 text-[19px] leading-[1.6] text-[#f5f6f0]/[0.85]">ตอบแบบสอบถามที่กระชับแต่ละเอียด รับ Health Score ฟรี และรับแผนเริ่มต้นเฉพาะบุคคลที่ออกแบบให้เหมาะกับร่างกาย เป้าหมาย และชีวิตประจำวันของคุณ</p>
+<div class="mt-9 flex flex-wrap gap-3.5 justify-center">
+<a class="inline-flex items-center gap-2.5 rounded-pill bg-cream text-ink font-bold text-base px-8 py-4 hover:-translate-y-0.5 transition-transform" href="https://www.mattanutra.com/th/nutrition/quiz">เริ่มประเมินฟรี
+        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+<a class="inline-flex items-center rounded-pill border border-white/40 text-cream font-bold text-base px-8 py-4 hover:bg-white/[0.06] transition-colors" href="#how-it-works">วิธีการทำงาน</a>
+</div>
+<p class="mt-8 font-display text-[17px] text-gold-soft"><span class="font-medium">Mattaññutā</span> — การรู้ปริมาณที่พอดี</p>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- FOOTER                                                       -->
+<!-- ============================================================ -->
+<footer class="bg-ink text-cream/80 pt-20 pb-10">
+<div class="max-w-container mx-auto px-7">
+<div class="grid md:grid-cols-[1.6fr_1fr_1fr_1fr] gap-10 mb-14">
+<div>
+<div class="flex items-center gap-3 mb-4">
+<img alt="MattaNutra" class="h-9 w-9 object-contain" src="./assets/logo.png"/>
+<span class="font-display text-[22px] font-medium text-cream">Matta<span class="text-forest-light">Nutra</span></span>
+</div>
+<div class="font-display italic text-gold-soft text-[18px] mb-2">รู้ปริมาณที่พอดี</div>
+<p class="text-cream/60 text-[14.5px] leading-relaxed max-w-[340px]">แผนดูแลสุขภาพเฉพาะบุคคล ออกแบบจากเชียงใหม่เพื่อชีวิตคนเอเชียตะวันออกเฉียงใต้ ภูมิปัญญาโบราณ · วิทยาศาสตร์สมัยใหม่</p>
+</div>
+<div>
+<div class="text-cream font-semibold text-sm mb-4">ผลิตภัณฑ์</div>
+<ul class="flex flex-col gap-2.5 text-[14.5px] text-cream/65">
+<li><a class="hover:text-forest-light transition-colors" href="#living-protocol">Living Protocol</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#how-it-works">วิธีการทำงาน</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#start-free">แบบสอบถามฟรี</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#assessment">เริ่มประเมินฟรี</a></li>
+</ul>
+</div>
+<div>
+<div class="text-cream font-semibold text-sm mb-4">เรียนรู้</div>
+<ul class="flex flex-col gap-2.5 text-[14.5px] text-cream/65">
+<li><a class="hover:text-forest-light transition-colors" href="/th/library">คลังความรู้ MattaNutra</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#promises">คำมั่นของเรา</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#origin">จุดเริ่มต้นของเรา</a></li>
+</ul>
+</div>
+<div>
+<div class="text-cream font-semibold text-sm mb-4">บริษัท</div>
+<ul class="flex flex-col gap-2.5 text-[14.5px] text-cream/65">
+<li><a class="hover:text-forest-light transition-colors" href="#">ติดต่อเรา</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#">ข้อกำหนดการใช้บริการ</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#">นโยบายความเป็นส่วนตัว</a></li>
+</ul>
+</div>
+</div>
+<!-- Consolidated single disclaimer -->
+<div class="text-cream/45 text-[12.5px] leading-relaxed max-w-[920px] mb-8 pt-8 border-t border-white/10">
+      MattaNutra ช่วยสนับสนุนการตัดสินใจเรื่องอาหารเสริมและโภชนาการประจำวันของคุณ — เป็นแพลตฟอร์มให้คำแนะนำเพื่อสุขภาพ ไม่ใช่การวินิจฉัยทางการแพทย์ แผนการรักษา หรือการบำบัดทางโภชนาการเฉพาะบุคคล คำแนะนำด้านอาหารเป็นความรู้ด้านโภชนาการทั่วไป คำแนะนำทั้งหมดออกแบบโดยพิจารณาเป้าหมาย กิจวัตรประจำวัน และอาหารเสริมที่คุณใช้อยู่ พร้อมตรวจสอบเทียบกับยาและผลตรวจทางห้องปฏิบัติการของคุณเพื่อความปลอดภัย ผู้ที่กำลังตั้งครรภ์ ให้นมบุตร ใช้ยา หรือมีโรคประจำตัวหรือภาวะสุขภาพที่ต้องดูแล ควรปรึกษาผู้เชี่ยวชาญด้านสุขภาพก่อนเริ่มแผนอาหารเสริมใด ๆ
+    </div>
+<div class="flex items-center justify-between flex-wrap gap-4 text-[13px] text-cream/50">
+<span>© 2026 MattaNutra · แผนดูแลสุขภาพเฉพาะบุคคล · เชียงใหม่ ประเทศไทย</span>
+<div class="flex items-center rounded-pill border border-white/15 overflow-hidden">
+<a class="px-3 py-1.5" href="/en">EN</a>
+<a class="px-3 py-1.5 bg-cream/90 text-ink font-semibold" href="#">TH</a>
+</div>
+</div>
+</div>
+</footer>
+<!-- ============================================================ -->
+<!-- JS — minimal. (1) Living Protocol "see reasoning" toggle.    -->
+<!--      (2) OPTIONAL scroll-reveal. Delete the reveal block     -->
+<!--          + [data-reveal] attributes to ship a no-anim page.  -->
+<!-- ============================================================ -->
+<script>
+  // (0) Mobile menu toggle
+  (function () {
+    var btn = document.getElementById('navToggle');
+    var menu = document.getElementById('mobileMenu');
+    if (btn && menu) {
+      btn.addEventListener('click', function () {
+        var open = menu.classList.toggle('hidden') === false;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.setAttribute('aria-label', open ? 'ปิดเมนู' : 'เปิดเมนู');
+      });
+      // close on link tap
+      menu.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', function () {
+          menu.classList.add('hidden');
+          btn.setAttribute('aria-expanded', 'false');
+        });
+      });
+    }
+  })();
+
+  // (1) Reasoning toggle inside the Living Protocol chat card
+  (function () {
+    var btn = document.querySelector('.js-reason-toggle');
+    var panel = document.getElementById('lp-reasons');
+    if (btn && panel) {
+      btn.addEventListener('click', function () {
+        var open = panel.classList.toggle('hidden') === false;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.querySelector('.js-reason-label').textContent = open ? 'ซ่อนเหตุผล' : 'ดูเหตุผล';
+        btn.querySelector('.js-reason-chevron').style.transform = open ? 'rotate(180deg)' : '';
+      });
+    }
+  })();
+
+  // (2) OPTIONAL scroll-reveal — progressive enhancement, safe to remove.
+  // Mark <html> as JS-capable so the opacity:0 rule only applies when we can animate.
+  (function () {
+    document.documentElement.classList.add('js');
+    var els = document.querySelectorAll('[data-reveal]');
+    if (!('IntersectionObserver' in window) || !els.length) {
+      els.forEach(function (el) { el.classList.add('in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function (el) { io.observe(el); });
+    // Safety net: reveal anything still hidden after 1.2s (e.g. above-fold or odd viewports)
+    setTimeout(function () {
+      document.querySelectorAll('[data-reveal]:not(.in)').forEach(function (el) { el.classList.add('in'); });
+    }, 1200);
+  })();
+</script>
+</body>
+</html>

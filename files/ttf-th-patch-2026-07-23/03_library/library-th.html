@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="th">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>คลังความรู้ MattaNutra — คำตอบเรื่องอาหารเสริมที่อ้างอิงหลักฐาน</title>
+<meta content="คำตอบที่ชัดเจนและอ้างอิงหลักฐานสำหรับคำถามเรื่องอาหารเสริมที่คนถามกันจริง ๆ ทั้งแมกนีเซียม วิตามินดี โอเมกา-3 และการนอน เรียนรู้สิ่งที่พอดีกับร่างกายของคุณไปกับ MattaNutra" name="description"/>
+<!--
+  ============================================================================
+  MATTANUTRA LANDING PAGE — v16 (Tailwind build)
+  ============================================================================
+  HOW THIS FILE WORKS
+  - This preview uses the Tailwind *Play CDN* (script below) plus an inline
+    `tailwind.config` block. That is what makes this single file open and render
+    in a browser. The Play CDN prints a console notice "not for production" —
+    that is EXPECTED, not a bug.
+  - FOR PRODUCTION: lift the `tailwind.config = {...}` object below straight into
+    your real `tailwind.config.js` (theme.extend). Every utility class in this
+    file then compiles normally through your build. No class names change.
+  - IMAGES: referenced as ./assets/*.png|jpg. A fully self-contained copy with
+    images embedded as base64 is provided separately for previewing without the
+    assets folder. Use whichever your workflow prefers.
+
+  DESIGN INTENT — PLEASE READ BEFORE REFACTORING
+  - The brand look is refined/organic, NOT boxy. Several sections deliberately
+    AVOID a default card-grid: the hero uses an absolutely-positioned "scatter"
+    of floating pills around a radial halo; the Origin logo-build is a connected
+    horizontal sequence; the Living Protocol chat is a styled conversation, not
+    a table. These are marked with  "BESPOKE:"  comments throughout.
+    Please do not flatten them back into `grid grid-cols-n` cards — that is the
+    exact drift this rebuild was made to prevent.
+  ============================================================================
+-->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // ── PRODUCTION: copy this object into tailwind.config.js → theme.extend ──
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          // Core brand palette (first-class tokens — do not hard-code hexes elsewhere)
+          ink:        '#0A2540',   // primary navy ink
+          'ink-soft': '#1E3A5F',   // body copy on light
+          forest:     '#2D8F72',   // teal/forest — primary action
+          'forest-deep': '#1F6E58',
+          'forest-light':'#4DB497',
+          'forest-glow': '#B8E0CF',
+          gold:       '#B8943D',
+          'gold-soft':'#D4B871',
+          'gold-tint':'#F5EBC9',
+          cream:      '#FAF6EC',   // page background
+          'cream-deep':'#F2EBD8',
+          mint:       '#EAF3EC',
+          'mint-deep':'#DCE9DE',
+          paper:      '#FEFCF7',   // card surface
+          sand:       '#E8DCC1',
+          'sand-soft':'#F2E9D2',
+          'sand-deep':'#D8C9A8',
+          ash:        '#6B7280',
+          'ash-soft': '#9CA3AF',
+          line:       '#E5E1D4',
+          navy:       '#0A2540',
+          'navy-2':   '#0E2D4D',
+        },
+        fontFamily: {
+          // Distinctive display serif + refined humanist sans (NOT Inter/Arial)
+          display: ['Fraunces', 'Georgia', 'serif'],
+          body:    ['"DM Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        },
+        borderRadius: { pill: '999px' },
+        maxWidth: { container: '1180px', narrow: '940px' },
+        boxShadow: {
+          soft: '0 18px 40px -20px rgba(10,37,64,0.18)',
+          lift: '0 40px 80px -44px rgba(10,37,64,0.55)',
+          cta:  '0 14px 30px -12px rgba(31,110,88,0.6)',
+        },
+        keyframes: {
+          'fade-up': { '0%': { opacity:'0', transform:'translateY(16px)' }, '100%': { opacity:'1', transform:'translateY(0)' } },
+          'float-slow': { '0%,100%': { transform:'translateY(0)' }, '50%': { transform:'translateY(-9px)' } },
+        },
+        animation: {
+          'fade-up': 'fade-up .7s cubic-bezier(.2,.7,.2,1) both',
+          'float-slow': 'float-slow 6s ease-in-out infinite',
+        },
+      },
+    },
+  };
+</script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&amp;family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&amp;family=Noto+Sans+Thai:wght@400;500;600;700&amp;family=Noto+Serif+Thai:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+  /* Small global niceties that are cleaner as CSS than utilities.
+     @layer base keeps them overridable by utilities. */
+  @layer base {
+    body { @apply font-body text-ink bg-cream antialiased; }
+    h1,h2,h3,h4 { @apply font-display font-normal tracking-tight; }
+  }
+  /* Staggered load-in helper. Reveals are OPTIONAL and progressive: content is
+     visible by default; only when JS adds `.js` to <html> do elements start
+     hidden and then animate in. Delete this block + the reveal script to ship
+     a no-JS, no-animation page with zero risk of hidden content. */
+  .js [data-reveal]{ opacity:0; }
+  .js [data-reveal].in{ animation: reveal-fade-up .7s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes reveal-fade-up { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+</style>
+<link href="https://www.mattanutra.com/th/library" rel="canonical"/>
+<meta content="website" property="og:type"/>
+<meta content="MattaNutra" property="og:site_name"/>
+<meta content="คลังความรู้ MattaNutra — คำตอบเรื่องอาหารเสริมที่อ้างอิงหลักฐาน" property="og:title"/>
+<meta content="คำตอบเรื่องอาหารเสริมที่ชัดเจนและอ้างอิงหลักฐาน เรียนรู้สิ่งที่พอดีกับร่างกายของคุณ" property="og:description"/>
+<meta content="https://www.mattanutra.com/th/library" property="og:url"/>
+<meta content="https://www.mattanutra.com/assets/og/mattanutra-library-th.jpg" property="og:image"/>
+<meta content="image/jpeg" property="og:image:type"/>
+<meta content="1200" property="og:image:width"/>
+<meta content="630" property="og:image:height"/>
+<meta content="คลังความรู้ MattaNutra — เรียนรู้ปริมาณที่พอดี" property="og:image:alt"/>
+<meta content="th_TH" property="og:locale"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="คลังความรู้ MattaNutra — คำตอบเรื่องอาหารเสริมที่อ้างอิงหลักฐาน" name="twitter:title"/>
+<meta content="คำตอบเรื่องอาหารเสริมที่ชัดเจนและอ้างอิงหลักฐาน เรียนรู้สิ่งที่พอดีกับร่างกายของคุณ" name="twitter:description"/>
+<meta content="https://www.mattanutra.com/assets/og/mattanutra-library-th.jpg" name="twitter:image"/>
+<meta content="คลังความรู้ MattaNutra — เรียนรู้ปริมาณที่พอดี" name="twitter:image:alt"/>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "คลังความรู้ MattaNutra — คำตอบเรื่องอาหารเสริมที่อ้างอิงหลักฐาน",
+  "description": "คำตอบที่ชัดเจนและอ้างอิงหลักฐาน สำหรับคำถามเรื่องอาหารเสริมที่คนถามกันจริง ๆ เพื่อให้คุณตัดสินใจจากการรู้จริง ไม่ใช่การเดา",
+  "url": "https://www.mattanutra.com/th/library",
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "MattaNutra",
+    "url": "https://www.mattanutra.com"
+  },
+  "breadcrumb": {
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "หน้าแรก",
+        "item": "https://www.mattanutra.com/en"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "คลังความรู้ MattaNutra",
+        "item": "https://www.mattanutra.com/th/library"
+      }
+    ]
+  },
+  "mainEntity": {
+    "@type": "ItemList",
+    "name": "MattaNutra Library articles",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "url": "https://www.mattanutra.com/th/library/which-supplements-do-vegans-actually-need",
+        "name": "วีแกนจำเป็นต้องเสริมอะไรบ้างจริง ๆ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "url": "https://www.mattanutra.com/th/library/l-carnitine-and-your-energy",
+        "name": "แอล-คาร์นิทีนกับพลังงานของคุณ"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "url": "https://www.mattanutra.com/th/library/spicy-food-thailand-supplement-routine",
+        "name": "อาหารรสจัดในเมืองไทย ส่งผลต่อการกินอาหารเสริมของคุณอย่างไร?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 4,
+        "url": "https://www.mattanutra.com/th/library/gut-health-supplements-when-make-sense",
+        "name": "อาหารเสริมสุขภาพลำไส้: เมื่อใดจึงเหมาะกับคุณ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 5,
+        "url": "https://www.mattanutra.com/th/library/gut-absorption-supplements",
+        "name": "ลำไส้ของคุณกับการดูดซึมอาหารเสริม"
+      },
+      {
+        "@type": "ListItem",
+        "position": 6,
+        "url": "https://www.mattanutra.com/th/library/lions-mane-supplement-worth-it",
+        "name": "อาหารเสริมเห็ดหัวลิงคุ้มค่าไหม — และเลือกตัวที่ดีอย่างไร?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 7,
+        "url": "https://www.mattanutra.com/th/library/food4me-study-personalised-nutrition",
+        "name": "การศึกษา Food4Me คืออะไร — และทำไมจึงสำคัญต่ออาหารเสริมของคุณ"
+      },
+      {
+        "@type": "ListItem",
+        "position": 8,
+        "url": "https://www.mattanutra.com/th/library/expensive-health-check-nutrition",
+        "name": "แพ็กเกจตรวจสุขภาพราคาแพงประเมินภาวะโภชนาการได้จริงหรือ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 9,
+        "url": "https://www.mattanutra.com/th/library/expensive-health-check-leave-out",
+        "name": "แพ็กเกจตรวจสุขภาพราคาแพงยังไม่ได้ตรวจอะไรบ้าง?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 10,
+        "url": "https://www.mattanutra.com/th/library/do-you-need-a-probiotic",
+        "name": "คุณจำเป็นต้องกินโพรไบโอติกไหม?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 11,
+        "url": "https://www.mattanutra.com/th/library/blood-panel-personalise-supplements-cost",
+        "name": "จำเป็นต้องซื้อแพ็กเกจตรวจเลือดราคา 15,000 บาท เพื่อเลือกอาหารเสริมให้เหมาะกับคุณจริงหรือ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 12,
+        "url": "https://www.mattanutra.com/th/library/why-stress-changes-your-supplement-needs",
+        "name": "ทำไมความเครียดจึงเปลี่ยนความต้องการอาหารเสริมของคุณ"
+      },
+      {
+        "@type": "ListItem",
+        "position": 13,
+        "url": "https://www.mattanutra.com/th/library/rhodiola-vs-caffeine-coffee",
+        "name": "โรดิโอลาเทียบกับกาแฟ: แบบไหนเหมาะกับคุณมากกว่า?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 14,
+        "url": "https://www.mattanutra.com/th/library/rhodiola-energy-support-or-stress-support",
+        "name": "โรดิโอลา: ตัวช่วยด้านพลังงานหรือด้านความเครียด?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 15,
+        "url": "https://www.mattanutra.com/th/library/magnesium-glycine-theanine-gaba-sleep-support",
+        "name": "แมกนีเซียม ไกลซีน แอล-ธีอะนีน หรือ GABA: ตัวช่วยการนอนแบบไหนเหมาะกับคุณ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 16,
+        "url": "https://www.mattanutra.com/th/library/joint-supplements-glucosamine-collagen-curcumin",
+        "name": "อาหารเสริมข้อต่อ: กลูโคซามีน คอลลาเจน หรือเคอร์คูมิน?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 17,
+        "url": "https://www.mattanutra.com/th/library/is-creatine-just-for-bodybuilders",
+        "name": "ครีเอทีนมีไว้แค่สำหรับนักเพาะกายหรือ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 18,
+        "url": "https://www.mattanutra.com/th/library/how-much-turmeric-equals-150mg-curcumin",
+        "name": "ต้องใช้ขมิ้นชันเท่าไรจึงเท่ากับอาหารเสริมเคอร์คูมิน 150 มก.?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 19,
+        "url": "https://www.mattanutra.com/th/library/curcumin-when-is-it-worth-taking",
+        "name": "เคอร์คูมิน: เมื่อใดจึงคุ้มค่าที่จะกิน?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 20,
+        "url": "https://www.mattanutra.com/th/library/collagen-skin-joints-or-hype",
+        "name": "คอลลาเจน: บำรุงผิว ข้อต่อ หรือแค่กระแส?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 21,
+        "url": "https://www.mattanutra.com/th/library/citicoline-vs-alpha-gpc",
+        "name": "ซิติโคลีนกับ Alpha-GPC: ต่างกันอย่างไร?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 22,
+        "url": "https://www.mattanutra.com/th/library/brain-supplements-real-reason-routine",
+        "name": "อาหารเสริมบำรุงสมองชนิดใดเหมาะที่จะใช้เป็นประจำ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 23,
+        "url": "https://www.mattanutra.com/th/library/blood-test-personalise-supplements",
+        "name": "จำเป็นต้องตรวจเลือดเพื่อปรับอาหารเสริมให้เหมาะกับคุณจริงหรือ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 24,
+        "url": "https://www.mattanutra.com/th/library/zinc-supplements-helpful-or-overused",
+        "name": "อาหารเสริมสังกะสี: มีประโยชน์หรือใช้เกินจำเป็น?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 25,
+        "url": "https://www.mattanutra.com/th/library/which-supplements-should-you-take",
+        "name": "คุณควรกินอาหารเสริมอะไร? (และทำไมการเดาอาจมีต้นทุนมากกว่าที่คิด)"
+      },
+      {
+        "@type": "ListItem",
+        "position": 26,
+        "url": "https://www.mattanutra.com/th/library/vitamin-d-magnesium-zinc",
+        "name": "วิตามินดี + แมกนีเซียม + สังกะสี: ทำไมจึงมักถูกแนะนำให้ใช้ร่วมกัน?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 27,
+        "url": "https://www.mattanutra.com/th/library/sleep-support-without-sleeping-pills",
+        "name": "อาหารเสริมอะไรอาจช่วยให้นอนดีขึ้นโดยไม่ใช่ยานอนหลับ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 28,
+        "url": "https://www.mattanutra.com/th/library/should-you-take-omega-3-every-day",
+        "name": "ควรกินโอเมก้า-3 ทุกวันไหม?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 29,
+        "url": "https://www.mattanutra.com/th/library/do-you-really-need-a-multivitamin",
+        "name": "คุณจำเป็นต้องกินวิตามินรวมจริงหรือ?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 30,
+        "url": "https://www.mattanutra.com/th/library/coq10-who-is-it-for",
+        "name": "CoQ10: จริง ๆ แล้วเหมาะกับใคร?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 31,
+        "url": "https://www.mattanutra.com/th/library/vitamin-d-in-thailand",
+        "name": "วิตามินดีในประเทศไทย"
+      },
+      {
+        "@type": "ListItem",
+        "position": 32,
+        "url": "https://www.mattanutra.com/th/library/signs-you-may-be-low-in-magnesium",
+        "name": "สัญญาณว่าคุณอาจขาดแมกนีเซียม"
+      },
+      {
+        "@type": "ListItem",
+        "position": 33,
+        "url": "https://www.mattanutra.com/th/library/should-you-take-magnesium-every-day",
+        "name": "ควรกินแมกนีเซียมทุกวันไหม?"
+      },
+      {
+        "@type": "ListItem",
+        "position": 34,
+        "url": "https://www.mattanutra.com/th/library/magnesium-for-sleep",
+        "name": "แมกนีเซียมกับการนอน"
+      },
+      {
+        "@type": "ListItem",
+        "position": 35,
+        "url": "https://www.mattanutra.com/th/library/glycinate-vs-citrate",
+        "name": "แมกนีเซียมไกลซิเนต vs ซิเตรต"
+      }
+    ],
+    "numberOfItems": 35
+  }
+}</script>
+<style>
+  /* No fake bold/italic: Thai renders upright (native), Fraunces keeps real italic for Latin. */
+  body { font-synthesis: none; }
+  /* Relax tight Latin heading leading so Thai vowel/tone marks never clip. */
+  html:lang(th) h1 { line-height: 1.14; }
+  html:lang(th) h2 { line-height: 1.18; }
+  html:lang(th) h3 { line-height: 1.28; }
+  /* Thai body copy breathes a touch more than Latin. */
+  html:lang(th) p, html:lang(th) li, html:lang(th) summary { line-height: 1.7; }
+</style>
+</head>
+<body class="font-body text-ink bg-cream"><a class="skip sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-cream focus:text-ink focus:px-4 focus:py-2 focus:rounded-lg" href="#main">ข้ามไปยังเนื้อหาหลัก</a>
+<!-- ============================================================ -->
+<!-- AVAILABILITY BANNER                                          -->
+<!-- ============================================================ -->
+<div class="w-full bg-ink relative z-[51]">
+<div class="max-w-container mx-auto px-4 sm:px-7 py-2.5 flex items-center justify-center gap-x-2.5 gap-y-1.5 flex-wrap">
+<span class="inline-flex items-center gap-1.5">
+<span class="font-body text-[11px] sm:text-[11.5px] font-semibold tracking-[0.16em] uppercase text-forest-glow whitespace-nowrap">พร้อมให้บริการแล้วใน</span>
+<span class="inline-flex items-center gap-1.5 bg-white/[0.08] border border-white/10 rounded-pill px-2.5 py-[3px] text-[11px] sm:text-xs font-medium text-white/90 whitespace-nowrap"><span class="text-sm leading-none">🇹🇭</span>ไทย</span>
+</span>
+<span class="hidden sm:inline-block w-px h-3.5 bg-white/15 mx-0.5"></span>
+<span class="inline-flex items-center gap-1.5 opacity-60">
+<span class="font-body text-[11px] sm:text-[11.5px] font-semibold tracking-[0.16em] uppercase text-white/55 whitespace-nowrap">เปิดเร็ว ๆ นี้</span>
+<span class="inline-flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-pill px-2 py-[3px] text-[11px] sm:text-xs font-medium text-white/70 whitespace-nowrap"><span class="text-sm leading-none">🇸🇬</span><span class="hidden sm:inline">สิงคโปร์</span></span>
+<span class="inline-flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-pill px-2 py-[3px] text-[11px] sm:text-xs font-medium text-white/70 whitespace-nowrap"><span class="text-sm leading-none">🇲🇾</span><span class="hidden sm:inline">มาเลเซีย</span></span>
+<span class="inline-flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-pill px-2 py-[3px] text-[11px] sm:text-xs font-medium text-white/70 whitespace-nowrap"><span class="text-sm leading-none">🇵🇭</span><span class="hidden sm:inline">ฟิลิปปินส์</span></span>
+</span>
+</div>
+</div>
+<!-- ============================================================ -->
+<!-- NAVIGATION                                                   -->
+<!-- ============================================================ -->
+<nav class="sticky top-0 z-50 bg-cream/85 backdrop-blur-[14px] border-b border-line">
+<div class="max-w-container mx-auto px-7 flex items-center justify-between h-[76px]">
+<a class="flex items-center gap-3" href="#">
+<img alt="MattaNutra" class="h-9 w-9 object-contain" src="https://mattanutra.com/v15/logo.png"/>
+<span class="flex flex-col leading-none">
+<span class="font-display text-[22px] font-medium text-ink">Matta<span class="text-forest">Nutra</span></span>
+<span class="text-[10px] font-semibold tracking-[0.22em] uppercase text-ash mt-0.5">รู้ปริมาณที่พอดี</span>
+</span>
+</a>
+<div class="hidden lg:flex items-center gap-8 text-[15px] text-ink-soft">
+<a class="hover:text-forest-deep transition-colors" href="#living-protocol">Living Protocol</a>
+<a class="hover:text-forest-deep transition-colors" href="#how-it-works">วิธีการทำงาน</a>
+<a class="hover:text-forest-deep transition-colors" href="#promises">คำมั่นของเรา</a>
+<a class="hover:text-forest-deep transition-colors" href="#library">คลังความรู้</a>
+</div>
+<div class="flex items-center gap-3 sm:gap-4">
+<div class="hidden sm:flex items-center rounded-pill border border-line overflow-hidden text-[13px]">
+<a class="px-3 py-1.5 text-ash" href="/en">EN</a>
+<a class="px-3 py-1.5 bg-ink text-cream font-semibold" href="#">TH</a>
+</div>
+<!-- Primary CTA — consistent label across the page -->
+<a class="rounded-pill bg-forest-deep text-white text-sm font-semibold px-5 py-3 hover:bg-ink transition-colors whitespace-nowrap" href="#assessment">
+<span class="hidden md:inline">เริ่มประเมินฟรี</span>
+<span class="md:hidden">ออกแบบ →</span>
+</a>
+<!-- Hamburger (mobile only) -->
+<button aria-controls="mobileMenu" aria-expanded="false" aria-label="เปิดเมนู" class="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-line text-ink-soft hover:bg-paper transition-colors" id="navToggle">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+</button>
+</div>
+</div>
+<!-- Mobile menu drawer -->
+<div class="hidden lg:hidden border-t border-line bg-cream/95 backdrop-blur-[14px]" id="mobileMenu">
+<div class="max-w-container mx-auto px-7 py-4 flex flex-col">
+<a class="py-3 text-[16px] text-ink-soft border-b border-line/60" href="#living-protocol">Living Protocol</a>
+<a class="py-3 text-[16px] text-ink-soft border-b border-line/60" href="#how-it-works">วิธีการทำงาน</a>
+<a class="py-3 text-[16px] text-ink-soft border-b border-line/60" href="#promises">คำมั่นของเรา</a>
+<a class="py-3 text-[16px] text-ink-soft border-b border-line/60" href="#library">คลังความรู้</a>
+<div class="flex items-center gap-3 pt-4">
+<a class="flex-1 text-center rounded-pill bg-forest-deep text-white text-sm font-semibold px-5 py-3" href="#assessment">เริ่มประเมินฟรี</a>
+<div class="flex items-center rounded-pill border border-line overflow-hidden text-[13px]">
+<a class="px-3 py-2 text-ash" href="/en">EN</a>
+<a class="px-3 py-2 bg-ink text-cream font-semibold" href="#">TH</a>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<!-- ============================================================ -->
+<!-- LIBRARY INDEX — breadcrumb + hero + filter grid + CTA        -->
+<!-- ============================================================ -->
+<nav aria-label="Breadcrumb" class="max-w-container mx-auto px-7 pt-8 text-[13px] text-ash">
+<a class="hover:text-forest-deep transition-colors" href="/en">หน้าแรก</a><span class="mx-1.5 text-ash-soft">/</span><span class="text-ink-soft font-medium">คลังความรู้ MattaNutra</span>
+</nav>
+<header class="bg-cream border-b border-line" id="main" tabindex="-1">
+<div class="max-w-container mx-auto px-7 py-16 flex items-center justify-between gap-10 flex-wrap">
+<div class="max-w-[680px]">
+<p class="text-forest-deep font-semibold text-xs tracking-[0.22em] uppercase mb-4">คลังความรู้ MattaNutra</p>
+<h1 class="font-display text-[clamp(36px,5vw,60px)] leading-[1.05] tracking-[-0.02em] text-ink">เรียนรู้<em class="italic text-forest-deep">ปริมาณที่พอดี</em></h1>
+<p class="mt-5 text-[18px] leading-[1.6] text-ink-soft">คำตอบที่ชัดเจนและอ้างอิงหลักฐาน สำหรับคำถามเรื่องอาหารเสริมที่คนถามกันจริง ๆ ทั้งแมกนีเซียม วิตามินดี โอเมกา-3 การนอน และอื่น ๆ ทุกบทความเขียนขึ้นเพื่อช่วยให้คุณตัดสินใจจาก<em class="italic text-forest-deep">การรู้จริง</em> ไม่ใช่การเดา</p>
+<p class="mt-4 text-[14px] text-ash">พร้อมด้วย <b class="text-forest-deep">Nong Matta</b> ผู้ช่วยประจำคลังความรู้ของเรา</p>
+</div>
+<img alt="Nong Matta, the MattaNutra Library guide" class="h-40 w-auto hidden md:block" src="./assets/nong-open.png"/>
+</div>
+</header>
+<section class="bg-paper py-16">
+<div class="max-w-container mx-auto px-7">
+<div class="mb-6" data-reveal="">
+<label class="sr-only" for="lib-search">ค้นหาในคลังความรู้</label>
+<div class="relative max-w-[560px]">
+<svg class="w-5 h-5 text-ash absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.2-3.2"></path></svg>
+<input autocomplete="off" class="w-full rounded-pill border border-line bg-paper pl-11 pr-11 py-3.5 text-[15px] text-ink placeholder:text-ash-soft focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/20 transition" id="lib-search" placeholder="ค้นหาในคลังความรู้ &mdash; ลองพิมพ์ &ldquo;แมกนีเซียม&rdquo; หรือ &ldquo;การนอน&rdquo;" type="search"/>
+<button aria-label="Clear search" class="hidden absolute right-3.5 top-1/2 -translate-y-1/2 text-ash hover:text-ink transition-colors" id="lib-search-clear" type="button"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+</div>
+</div>
+<div class="flex flex-wrap items-center gap-2 mb-8">
+<span class="text-[12px] font-semibold uppercase tracking-[0.12em] text-ash mr-1">หมวดหมู่</span>
+<button class="chip rounded-pill bg-forest-deep text-white text-[13px] font-semibold px-4 py-2 border border-transparent transition-colors" data-chip="all" type="button">ทั้งหมด</button>
+<button class="chip rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="foundations" type="button">พื้นฐาน</button>
+<button class="chip rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="vitamins" type="button">วิตามิน</button>
+<button class="chip rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="minerals" type="button">แร่ธาตุ</button>
+<button class="chip rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="sleep-recovery" type="button">การนอนและการฟื้นตัว</button>
+<button class="chip rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="energy-longevity" type="button">พลังงานและสุขภาพระยะยาว</button>
+<button class="chip rounded-pill border border-line text-ink-soft hover:border-forest hover:text-forest-deep text-[13px] font-semibold px-4 py-2 transition-colors" data-chip="everyday-nutrition" type="button">โภชนาการประจำวัน</button>
+</div>
+<p class="text-[13px] text-ash mb-6" hidden="" id="lib-count"></p>
+<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-7" id="lib-grid">
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="everyday-nutrition" data-search="วีแกนจำเป็นต้องเสริมอะไรบ้างจริง ๆ? โภชนาการประจำวัน อาหารวีแกนที่วางแผนดีสามารถดีต่อสุขภาพและได้รับสารอาหารเพียงพอ แต่ยังมีสารอาหารกลุ่มเล็ก ๆ ที่ควรใส่ใจเป็นพิเศษ โดยเฉพาะวิตามินบี12 ไอโอดีน โอเมก้า-3 วิตามินดี ธาตุเหล็ก สังกะสี และแคลเซียม" href="https://www.mattanutra.com/th/library/which-supplements-do-vegans-actually-need">
+<div class="h-44 bg-gradient-to-br from-cream-deep to-sand-soft/40 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — โภชนาการประจำวัน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-vegan.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">โภชนาการประจำวัน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">วีแกนจำเป็นต้องเสริมอะไรบ้างจริง ๆ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">อาหารวีแกนที่วางแผนดีสามารถดีต่อสุขภาพและได้รับสารอาหารเพียงพอ แต่ยังมีสารอาหารกลุ่มเล็ก ๆ ที่ควรใส่ใจ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="แอล-คาร์นิทีนกับพลังงานของคุณ พลังงานและสุขภาพระยะยาว แอล-คาร์นิทีนช่วยลำเลียงกรดไขมันสายยาวเข้าสู่ไมโทคอนเดรียเพื่อสร้างพลังงาน แต่การเสริมจะมีประโยชน์มากที่สุดเมื่อเหมาะกับบุคคล เป้าหมาย และชนิดของคาร์นิทีนที่เลือกใช้" href="https://www.mattanutra.com/th/library/l-carnitine-and-your-energy">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-energetic.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">แอล-คาร์นิทีนกับพลังงานของคุณ</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ช่วยลำเลียงกรดไขมันสายยาวเข้าสู่ไมโทคอนเดรียเพื่อสร้างพลังงาน แต่การเสริมจะมีประโยชน์มากที่สุดเมื่อเหมาะกับ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="everyday-nutrition" data-search="อาหารรสจัดในเมืองไทย ส่งผลต่อการกินอาหารเสริมของคุณอย่างไร? โภชนาการประจำวัน อาหารไทยรสจัดอาจส่งผลต่อช่วงเวลาการกินอาหารเสริม การทนต่อผลิตภัณฑ์ และอาการไม่สบายท้อง มาเรียนรู้ว่าควรกินโพรไบโอติก วิตามินที่ละลายในไขมัน ธาตุเหล็ก สังกะสี และแคปซูลประจำวันเมื่อไรเมื่อกินอาหารรสจัดในเมืองไทย" href="https://www.mattanutra.com/th/library/spicy-food-thailand-supplement-routine">
+<div class="h-44 bg-gradient-to-br from-cream-deep to-sand-soft/40 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — โภชนาการประจำวัน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-spicy-bloated.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">โภชนาการประจำวัน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">อาหารรสจัดในเมืองไทย ส่งผลต่อการกินอาหารเสริมของคุณอย่างไร?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">อาหารไทยรสจัดอาจส่งผลต่อช่วงเวลาการกินอาหารเสริม การทนต่อผลิตภัณฑ์ และอาการไม่สบายท้อง มาเรียนรู้ว่าควรกินโพร…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="everyday-nutrition" data-search="อาหารเสริมสุขภาพลำไส้: เมื่อใดจึงเหมาะกับคุณ? โภชนาการประจำวัน อาหารเสริมสุขภาพลำไส้เหมาะที่สุดเมื่อใช้กับปัญหาหรือสถานการณ์เฉพาะ เช่น การใช้ยาปฏิชีวนะ การเดินทาง อาการคล้าย ibs หรือลำไส้ปั่นป่วนชั่วคราว ไม่ใช่ทางลัดที่เหมาะกับทุกคนที่กินทุกวันสำหรับทุกคน" href="https://www.mattanutra.com/th/library/gut-health-supplements-when-make-sense">
+<div class="h-44 bg-gradient-to-br from-cream-deep to-sand-soft/40 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — โภชนาการประจำวัน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-gut-bloated.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">โภชนาการประจำวัน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">อาหารเสริมสุขภาพลำไส้: เมื่อใดจึงเหมาะกับคุณ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">เหมาะที่สุดเมื่อใช้กับปัญหาหรือสถานการณ์เฉพาะ เช่น การใช้ยาปฏิชีวนะ การเดินทาง อาการคล้าย IBS หรือลำไส้…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="everyday-nutrition" data-search="ลำไส้ของคุณกับการดูดซึมอาหารเสริม โภชนาการประจำวัน ลำไส้และไมโครไบโอมของคุณมีผลต่อปริมาณอาหารเสริมที่ร่างกายดูดซึมได้จริง มาเรียนรู้ว่าทำไมชีวปริมาณออกฤทธิ์ (bioavailability) การย่อยอาหาร เยื่อบุลำไส้ ยาที่ใช้ และรูปแบบการขับถ่าย จึงสำคัญก่อนจะเพิ่มแคปซูล" href="https://www.mattanutra.com/th/library/gut-absorption-supplements">
+<div class="h-44 bg-gradient-to-br from-cream-deep to-sand-soft/40 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — โภชนาการประจำวัน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-bloated.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">โภชนาการประจำวัน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">ลำไส้ของคุณกับการดูดซึมอาหารเสริม</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ลำไส้และไมโครไบโอมของคุณมีผลต่อปริมาณอาหารเสริมที่ร่างกายดูดซึมได้จริง มาเรียนรู้ว่าทำไมชีวปริมาณออกฤทธิ์…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="อาหารเสริมเห็ดหัวลิงคุ้มค่าไหม — และเลือกตัวที่ดีอย่างไร? พลังงานและสุขภาพระยะยาว เห็ดหัวลิงอาจคุ้มค่าที่จะลองอย่างระมัดระวังสำหรับบางคน แต่คุณภาพ ปริมาณ การระบุเบตากลูแคนบนฉลาก การขึ้นทะเบียน อย. และความคาดหวังที่สมจริง สำคัญกว่ากระแสเรื่องเห็ด" href="https://www.mattanutra.com/th/library/lions-mane-supplement-worth-it">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-thinking.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">อาหารเสริมเห็ดหัวลิงคุ้มค่าไหม — และเลือกตัวที่ดีอย่างไร?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">เห็ดหัวลิงอาจคุ้มค่าที่จะลองอย่างระมัดระวังสำหรับบางคน แต่คุณภาพ ปริมาณ การระบุเบตากลูแคนบนฉลาก การขึ้นทะเบียน…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-search="การศึกษา food4me คืออะไร — และทำไมจึงสำคัญต่ออาหารเสริมของคุณ พื้นฐาน food4me พบว่าคำแนะนำโภชนาการเฉพาะบุคคลดีกว่าคำแนะนำทั่วไป แต่การเพิ่มตัวชี้วัดทางชีวภาพจากเลือดและการตรวจพันธุกรรมไม่ได้เพิ่มประโยชน์เหนือกว่าการปรับเฉพาะบุคคลด้วยอาหารและไลฟ์สไตล์" href="https://www.mattanutra.com/th/library/food4me-study-personalised-nutrition">
+<div class="h-44 bg-gradient-to-br from-mint to-forest-glow/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พื้นฐาน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-thinking.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">การศึกษา Food4Me คืออะไร — และทำไมจึงสำคัญต่ออาหารเสริมของคุณ</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">Food4Me พบว่าคำแนะนำโภชนาการเฉพาะบุคคลดีกว่าคำแนะนำทั่วไป แต่การเพิ่มตัวชี้วัดทางชีวภาพจากเลือดและการตรวจ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-search="แพ็กเกจตรวจสุขภาพราคาแพงประเมินภาวะโภชนาการได้จริงหรือ? พื้นฐาน การตรวจสุขภาพมีประโยชน์ได้ แต่ส่วนใหญ่ออกแบบมาเพื่อคัดกรองโรค ไม่ใช่เพื่อสำรวจตัวชี้วัดโภชนาการที่กำหนดการตัดสินใจเรื่องอาหารเสริม มาเรียนรู้ว่ามีการตรวจอะไร พลาดอะไร และเมื่อใดการตรวจจึงสำคัญ" href="https://www.mattanutra.com/th/library/expensive-health-check-nutrition">
+<div class="h-44 bg-gradient-to-br from-mint to-forest-glow/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พื้นฐาน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-money.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">แพ็กเกจตรวจสุขภาพราคาแพงประเมินภาวะโภชนาการได้จริงหรือ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">การตรวจสุขภาพมีประโยชน์ได้ แต่ส่วนใหญ่ออกแบบมาเพื่อคัดกรองโรค ไม่ใช่เพื่อสำรวจตัวชี้วัดโภชนาการที่กำหนด…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-search="แพ็กเกจตรวจสุขภาพราคาแพงยังไม่ได้ตรวจอะไรบ้าง? พื้นฐาน เราเปรียบเทียบแพ็กเกจตรวจสุขภาพจริงสามแบบกับชุดตัวชี้วัดทางชีวภาพด้านโภชนาการและเมแทบอลิซึมที่ครอบคลุม เพราะคำว่า “ละเอียด” ไม่ได้แปลว่า “ครบถ้วน”" href="https://www.mattanutra.com/th/library/expensive-health-check-leave-out">
+<div class="h-44 bg-gradient-to-br from-mint to-forest-glow/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พื้นฐาน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-money.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">แพ็กเกจตรวจสุขภาพราคาแพงยังไม่ได้ตรวจอะไรบ้าง?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">เราเปรียบเทียบแพ็กเกจตรวจสุขภาพจริงสามแบบกับชุดตัวชี้วัดทางชีวภาพด้านโภชนาการและเมแทบอลิซึมที่ครอบคลุม เพราะคำ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="everyday-nutrition" data-search="คุณจำเป็นต้องกินโพรไบโอติกไหม? โภชนาการประจำวัน คุณจำเป็นต้องกินโพรไบโอติกไหม? มาเรียนรู้ว่าเมื่อใดโพรไบโอติกจึงเหมาะ เมื่อใดการดูแลลำไส้โดยเริ่มจากอาหารก็เพียงพอ และทำไมสายพันธุ์ ปริมาณ และเป้าหมายจึงสำคัญ — พร้อมบริบทการเดินทางในประเทศไทย" href="https://www.mattanutra.com/th/library/do-you-need-a-probiotic">
+<div class="h-44 bg-gradient-to-br from-cream-deep to-sand-soft/40 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — โภชนาการประจำวัน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-reassuring.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">โภชนาการประจำวัน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">คุณจำเป็นต้องกินโพรไบโอติกไหม?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">มาเรียนรู้ว่าเมื่อใดโพรไบโอติกจึงเหมาะ เมื่อใดการดูแลลำไส้โดยเริ่มจากอาหารก็เพียงพอ และทำไมสายพันธุ์ ปริมาณ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-search="จำเป็นต้องซื้อแพ็กเกจตรวจเลือดราคา 15,000 บาท เพื่อเลือกอาหารเสริมให้เหมาะกับคุณจริงหรือ? พื้นฐาน คำแนะนำอาหารเสริมเฉพาะบุคคลไม่ควรมีราคาแพงกว่าตัวอาหารเสริมเอง มาเรียนรู้ว่าเมื่อใดแบบประเมินก็เพียงพอ เมื่อใดการตรวจเลือดจึงสำคัญ และจะเลี่ยงการตรวจเกินและซื้อเกินได้อย่างไร" href="https://www.mattanutra.com/th/library/blood-panel-personalise-supplements-cost">
+<div class="h-44 bg-gradient-to-br from-mint to-forest-glow/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พื้นฐาน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-money.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">จำเป็นต้องซื้อแพ็กเกจตรวจเลือดราคา 15,000 บาท เพื่อเลือกอาหารเสริมให้เหมาะกับคุณจริงหรือ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">คำแนะนำอาหารเสริมเฉพาะบุคคลไม่ควรมีราคาแพงกว่าตัวอาหารเสริมเอง มาเรียนรู้ว่าเมื่อใดแบบประเมินก็เพียงพอ เมื่อใด…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="sleep-recovery" data-search="ทำไมความเครียดจึงเปลี่ยนความต้องการอาหารเสริมของคุณ การนอนและการฟื้นตัว ความเครียดอาจเปลี่ยนความต้องการอาหารเสริมผ่านผลต่อการกิน การนอน การฟื้นตัว และความปลอดภัย mattanutra อธิบายว่าทำไมผู้ที่มีความเครียดอาจต้องการแผนอาหารเสริมเฉพาะบุคคลที่แตกต่างกัน" href="https://www.mattanutra.com/th/library/why-stress-changes-your-supplement-needs">
+<div class="h-44 bg-gradient-to-br from-mint-deep to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — การนอนและการฟื้นตัว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-stressed.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">การนอนและการฟื้นตัว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">ทำไมความเครียดจึงเปลี่ยนความต้องการอาหารเสริมของคุณ</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ความเครียดอาจเปลี่ยนความต้องการอาหารเสริมผ่านผลต่อการกิน การนอน การฟื้นตัว และความปลอดภัย MattaNutra อธิบายว่า…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="โรดิโอลาเทียบกับกาแฟ: แบบไหนเหมาะกับคุณมากกว่า? พลังงานและสุขภาพระยะยาว โรดิโอลาและคาเฟอีนต่างก็ช่วยให้รู้สึกเหนื่อยน้อยลงได้ แต่ทำงานต่างกันมาก มาเรียนรู้ว่าเมื่อใดกาแฟจึงเหมาะ เมื่อใดโรดิโอลาอาจเหมาะ และเมื่อใดที่ทั้งสองอย่างไม่ได้แก้ปัญหาที่แท้จริง" href="https://www.mattanutra.com/th/library/rhodiola-vs-caffeine-coffee">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-coffee.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">โรดิโอลาเทียบกับกาแฟ: แบบไหนเหมาะกับคุณมากกว่า?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">และคาเฟอีนต่างก็ช่วยให้รู้สึกเหนื่อยน้อยลงได้ แต่ทำงานต่างกันมาก มาเรียนรู้ว่าเมื่อใดกาแฟจึงเหมาะ เมื่อใดโรดิ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="sleep-recovery" data-search="โรดิโอลา: ตัวช่วยด้านพลังงานหรือด้านความเครียด? การนอนและการฟื้นตัว โรดิโอลาเป็นได้ทั้งตัวช่วยด้านพลังงานและด้านความเครียด ขึ้นอยู่กับว่าคุณอยู่ในภาวะอ่อนล้า เครียดจนล้น หรือเหนื่อยแต่ยังหยุดคิดไม่ได้ มาเรียนรู้ว่ามันอาจเหมาะกับใคร และใครควรระมัดระวัง" href="https://www.mattanutra.com/th/library/rhodiola-energy-support-or-stress-support">
+<div class="h-44 bg-gradient-to-br from-mint-deep to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — การนอนและการฟื้นตัว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-stressed.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">การนอนและการฟื้นตัว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">โรดิโอลา: ตัวช่วยด้านพลังงานหรือด้านความเครียด?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">เป็นได้ทั้งตัวช่วยด้านพลังงานและด้านความเครียด ขึ้นอยู่กับว่าคุณอยู่ในภาวะอ่อนล้า เครียดจนล้น หรือเหนื่อยแต่…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="sleep-recovery" data-search="แมกนีเซียม ไกลซีน แอล-ธีอะนีน หรือ gaba: ตัวช่วยการนอนแบบไหนเหมาะกับคุณ? การนอนและการฟื้นตัว แมกนีเซียม ไกลซีน แอล-ธีอะนีน หรือ gaba? mattanutra อธิบายว่าสารอาหารช่วยการนอนแต่ละชนิดเหมาะกับปัญหาการนอนคนละแบบอย่างไร และเหตุใดการเลือกที่เหมาะสมจึงควรปรับให้เข้ากับแต่ละคน" href="https://www.mattanutra.com/th/library/magnesium-glycine-theanine-gaba-sleep-support">
+<div class="h-44 bg-gradient-to-br from-mint-deep to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — การนอนและการฟื้นตัว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-reassuring.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">การนอนและการฟื้นตัว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">แมกนีเซียม ไกลซีน แอล-ธีอะนีน หรือ GABA: ตัวช่วยการนอนแบบไหนเหมาะกับคุณ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">MattaNutra อธิบายว่าสารอาหารช่วยการนอนแต่ละชนิดเหมาะกับปัญหาการนอนคนละแบบอย่างไร และเหตุใดการเลือกที่เหมาะสม…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="อาหารเสริมข้อต่อ: กลูโคซามีน คอลลาเจน หรือเคอร์คูมิน? พลังงานและสุขภาพระยะยาว เปรียบเทียบกลูโคซามีน คอลลาเจน และเคอร์คูมิน สำหรับการดูแลข้อต่อ มาเรียนรู้ว่าตัวเลือกใดอาจเหมาะกับอาการข้อฝืด การอักเสบ หรือการดูแลกระดูกอ่อน — และทำไมบริบทของแต่ละคนจึงสำคัญ" href="https://www.mattanutra.com/th/library/joint-supplements-glucosamine-collagen-curcumin">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-kneeling.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">อาหารเสริมข้อต่อ: กลูโคซามีน คอลลาเจน หรือเคอร์คูมิน?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">เปรียบเทียบกลูโคซามีน คอลลาเจน และเคอร์คูมิน สำหรับการดูแลข้อต่อ มาเรียนรู้ว่าตัวเลือกใดอาจเหมาะกับอาการข้อฝืด…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="ครีเอทีนมีไว้แค่สำหรับนักเพาะกายหรือ? พลังงานและสุขภาพระยะยาว คู่มือความรู้จาก mattanutra ว่าทำไมครีเอทีนอาจช่วยกล้ามเนื้อ พลังงานสมอง การดูแลสุขภาพเมื่ออายุมากขึ้น และความแข็งแรงของเซลล์ — ไม่ใช่แค่การเพาะกาย" href="https://www.mattanutra.com/th/library/is-creatine-just-for-bodybuilders">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-muscular.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">ครีเอทีนมีไว้แค่สำหรับนักเพาะกายหรือ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">คู่มือความรู้จาก MattaNutra ว่าทำไมครีเอทีนอาจช่วยกล้ามเนื้อ พลังงานสมอง การดูแลสุขภาพเมื่ออายุมากขึ้น และ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="ต้องใช้ขมิ้นชันเท่าไรจึงเท่ากับอาหารเสริมเคอร์คูมิน 150 มก.? พลังงานและสุขภาพระยะยาว การคำนวณเชิงปฏิบัติจาก mattanutra: ต้องใช้ผงขมิ้นชันเท่าไรจึงใกล้เคียงอาหารเสริมเคอร์คูมิน 150 มก. ทำไมคำตอบเป็นเพียงการประมาณ และทำไมการดูดซึมจึงยังสำคัญ" href="https://www.mattanutra.com/th/library/how-much-turmeric-equals-150mg-curcumin">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-measuring.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">ต้องใช้ขมิ้นชันเท่าไรจึงเท่ากับอาหารเสริมเคอร์คูมิน 150 มก.?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">การคำนวณเชิงปฏิบัติจาก MattaNutra: ต้องใช้ผงขมิ้นชันเท่าไรจึงใกล้เคียงอาหารเสริมเคอร์คูมิน 150 มก. ทำไมคำตอบ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="เคอร์คูมิน: เมื่อใดจึงคุ้มค่าที่จะกิน? พลังงานและสุขภาพระยะยาว เคอร์คูมินอาจคุ้มค่าที่จะพิจารณาสำหรับอาการหรือภาวะบางอย่างที่เกี่ยวข้องกับการอักเสบและสุขภาพข้อต่อ แต่เฉพาะเมื่อสูตรแก้ปัญหาข้อจำกัดด้านการดูดซึมได้ มาเรียนรู้ว่ามันเหมาะกับใคร ใครควรระมัดระวัง และทำไมมันจึงไม่ใช่ยาลดน้ำหนัก" href="https://www.mattanutra.com/th/library/curcumin-when-is-it-worth-taking">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-measuring.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">เคอร์คูมิน: เมื่อใดจึงคุ้มค่าที่จะกิน?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">อาจคุ้มค่าที่จะพิจารณาสำหรับอาการหรือภาวะบางอย่างที่เกี่ยวข้องกับการอักเสบและสุขภาพข้อต่อ แต่เฉพาะเมื่อสูตร…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="คอลลาเจน: บำรุงผิว ข้อต่อ หรือแค่กระแส? พลังงานและสุขภาพระยะยาว อาหารเสริมคอลลาเจนอาจช่วยเรื่องความชุ่มชื้นและความยืดหยุ่นของผิว และอาจเหมาะกับเป้าหมายด้านการดูแลข้อต่อบางอย่าง แต่ชนิด ปริมาณ กรอบเวลา และความคาดหวัง ล้วนสำคัญ" href="https://www.mattanutra.com/th/library/collagen-skin-joints-or-hype">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-kneeling.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">คอลลาเจน: บำรุงผิว ข้อต่อ หรือแค่กระแส?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">อาหารเสริมคอลลาเจนอาจช่วยเรื่องความชุ่มชื้นและความยืดหยุ่นของผิว และอาจเหมาะกับเป้าหมายด้านการดูแลข้อต่อ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="ซิติโคลีนกับ alpha-gpc: ต่างกันอย่างไร? พลังงานและสุขภาพระยะยาว ซิติโคลีนและ alpha-gpc ต่างก็เป็นแหล่งโคลีน แต่ทำงานไม่เหมือนกัน มาเรียนรู้ความต่าง ว่าใครอาจเหมาะกับแบบไหน และทำไมบริบทด้านความปลอดภัยจึงสำคัญ" href="https://www.mattanutra.com/th/library/citicoline-vs-alpha-gpc">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-comparing.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">ซิติโคลีนกับ Alpha-GPC: ต่างกันอย่างไร?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">และ Alpha-GPC ต่างก็เป็นแหล่งโคลีน แต่ทำงานไม่เหมือนกัน มาเรียนรู้ความต่าง ว่าใครอาจเหมาะกับแบบไหน และทำไม…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="อาหารเสริมบำรุงสมองชนิดใดเหมาะที่จะใช้เป็นประจำ? พลังงานและสุขภาพระยะยาว คู่มือความรู้จาก mattanutra ว่าด้วยเมื่อใดที่วิตามินรวม แอล-ธีอะนีน ซิติโคลีน และบาโคปา อาจเหมาะกับเป้าหมายด้านความจำ สมาธิ หรือการได้รับสารอาหารของแต่ละคน" href="https://www.mattanutra.com/th/library/brain-supplements-real-reason-routine">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-thinking.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">อาหารเสริมบำรุงสมองชนิดใดเหมาะที่จะใช้เป็นประจำ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">คู่มือความรู้จาก MattaNutra ว่าด้วยเมื่อใดที่วิตามินรวม แอล-ธีอะนีน ซิติโคลีน และบาโคปา อาจเหมาะกับเป้าหมาย…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-search="จำเป็นต้องตรวจเลือดเพื่อปรับอาหารเสริมให้เหมาะกับคุณจริงหรือ? พื้นฐาน ไม่เสมอไป แบบประเมินที่คิดมาอย่างดีสามารถบอกความต้องการอาหารเสริมได้เป็นส่วนใหญ่ เพื่อวางแผนเริ่มต้นที่เหมาะสม ส่วนการตรวจเลือดควรเพิ่มเข้ามาเมื่อผลจะเปลี่ยนการตัดสินใจจริง ๆ" href="https://www.mattanutra.com/th/library/blood-test-personalise-supplements">
+<div class="h-44 bg-gradient-to-br from-mint to-forest-glow/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พื้นฐาน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-thinking.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">จำเป็นต้องตรวจเลือดเพื่อปรับอาหารเสริมให้เหมาะกับคุณจริงหรือ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ไม่เสมอไป แบบประเมินที่คิดมาอย่างดีสามารถบอกความต้องการอาหารเสริมได้เป็นส่วนใหญ่ เพื่อวางแผนเริ่มต้นที่เหมาะสม…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="minerals" data-search="อาหารเสริมสังกะสี: มีประโยชน์หรือใช้เกินจำเป็น? แร่ธาตุ อาหารเสริมสังกะสีมีประโยชน์หรือใช้เกินจำเป็น? mattanutra อธิบายสังกะสีสำหรับการเสริมภูมิคุ้มกัน คำถามเรื่องไข้หวัด ความซ้ำซ้อนของผลิตภัณฑ์ และทำไมปริมาณที่พอดีจึงสำคัญ" href="https://www.mattanutra.com/th/library/zinc-supplements-helpful-or-overused">
+<div class="h-44 bg-gradient-to-br from-sand-soft to-sand-deep/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — แร่ธาตุ" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-warning.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">แร่ธาตุ</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">อาหารเสริมสังกะสี: มีประโยชน์หรือใช้เกินจำเป็น?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">มีประโยชน์หรือใช้เกินจำเป็น? MattaNutra อธิบายสังกะสีสำหรับการเสริมภูมิคุ้มกัน คำถามเรื่องไข้หวัด ความซ้ำซ้อน…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-search="คุณควรกินอาหารเสริมอะไร? (และทำไมการเดาอาจมีต้นทุนมากกว่าที่คิด) พื้นฐาน คนส่วนใหญ่เลือกอาหารเสริมอย่างไร? เพื่อน ครอบครัว คำแนะนำจากเทรนเนอร์หรือคนในยิม โฆษณา และรายการออนไลน์ มักนำไปสู่การเดา mattanutra อธิบายว่าทำไมแบบประเมินเฉพาะบุคคลและข้อควรระวังด้านความปลอดภัยจึงสำคัญ" href="https://www.mattanutra.com/th/library/which-supplements-should-you-take">
+<div class="h-44 bg-gradient-to-br from-mint to-forest-glow/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พื้นฐาน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-ask.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">คุณควรกินอาหารเสริมอะไร? (และทำไมการเดาอาจมีต้นทุนมากกว่าที่คิด)</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">คนส่วนใหญ่เลือกอาหารเสริมอย่างไร? เพื่อน ครอบครัว คำแนะนำจากเทรนเนอร์หรือคนในยิม โฆษณา และรายการออนไลน์ มัก…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-search="วิตามินดี + แมกนีเซียม + สังกะสี: ทำไมจึงมักถูกแนะนำให้ใช้ร่วมกัน? พื้นฐาน ทำไมวิตามินดี แมกนีเซียม และสังกะสีจึงมักถูกแนะนำให้ใช้ร่วมกัน? mattanutra อธิบายการทำงานร่วมกันของสารอาหาร ข้อผิดพลาดที่พบบ่อย และเหตุใดการผสมผสานที่เหมาะสมจึงขึ้นอยู่กับร่างกายและไลฟ์สไตล์ของคุณ" href="https://www.mattanutra.com/th/library/vitamin-d-magnesium-zinc">
+<div class="h-44 bg-gradient-to-br from-mint to-forest-glow/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พื้นฐาน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-comparing.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">วิตามินดี + แมกนีเซียม + สังกะสี: ทำไมจึงมักถูกแนะนำให้ใช้ร่วมกัน?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ทำไมวิตามินดี แมกนีเซียม และสังกะสีจึงมักถูกแนะนำให้ใช้ร่วมกัน? MattaNutra อธิบายการทำงานร่วมกันของสารอาหาร…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="sleep-recovery" data-search="อาหารเสริมอะไรอาจช่วยให้นอนดีขึ้นโดยไม่ใช่ยานอนหลับ? การนอนและการฟื้นตัว อาหารเสริมอะไรอาจช่วยให้นอนดีขึ้นโดยไม่ใช่ยานอนหลับ? mattanutra อธิบายแมกนีเซียม แอล-ธีอะนีน น้ำเชอร์รีเปรี้ยว และอะพิจีนิน และทำไมการเลือกตัวช่วยการนอนจึงควรเป็นแบบเฉพาะบุคคล" href="https://www.mattanutra.com/th/library/sleep-support-without-sleeping-pills">
+<div class="h-44 bg-gradient-to-br from-mint-deep to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — การนอนและการฟื้นตัว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-reassuring.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">การนอนและการฟื้นตัว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">อาหารเสริมอะไรอาจช่วยให้นอนดีขึ้นโดยไม่ใช่ยานอนหลับ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">MattaNutra อธิบายแมกนีเซียม แอล-ธีอะนีน น้ำเชอร์รีเปรี้ยว และอะพิจีนิน และทำไมการเลือกตัวช่วยการนอนจึงควรเป็น…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="everyday-nutrition" data-search="ควรกินโอเมก้า-3 ทุกวันไหม? โภชนาการประจำวัน ควรกินโอเมก้า-3 ทุกวันไหม? mattanutra อธิบายว่าใครอาจได้ประโยชน์ ใครอาจไม่จำเป็น และทำไมปริมาณที่พอดีจึงขึ้นอยู่กับการกินปลา เป้าหมาย ยาที่ใช้ และข้อควรระวังด้านความปลอดภัย" href="https://www.mattanutra.com/th/library/should-you-take-omega-3-every-day">
+<div class="h-44 bg-gradient-to-br from-cream-deep to-sand-soft/40 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — โภชนาการประจำวัน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-explaining.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">โภชนาการประจำวัน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">ควรกินโอเมก้า-3 ทุกวันไหม?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">MattaNutra อธิบายว่าใครอาจได้ประโยชน์ ใครอาจไม่จำเป็น และทำไมปริมาณที่พอดีจึงขึ้นอยู่กับการกินปลา เป้าหมาย ยา…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="foundations" data-search="คุณจำเป็นต้องกินวิตามินรวมจริงหรือ? พื้นฐาน คุณจำเป็นต้องกินวิตามินรวมจริงหรือ? mattanutra อธิบายว่าเมื่อใดวิตามินรวมอาจช่วยเติมช่องว่าง เมื่อใดที่อาจไม่จำเป็น และทำไมปริมาณที่พอดีจึงควรเป็นเรื่องเฉพาะบุคคล" href="https://www.mattanutra.com/th/library/do-you-really-need-a-multivitamin">
+<div class="h-44 bg-gradient-to-br from-mint to-forest-glow/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พื้นฐาน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-measuring.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พื้นฐาน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">คุณจำเป็นต้องกินวิตามินรวมจริงหรือ?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">MattaNutra อธิบายว่าเมื่อใดวิตามินรวมอาจช่วยเติมช่องว่าง เมื่อใดที่อาจไม่จำเป็น และทำไมปริมาณที่พอดีจึงควร…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="energy-longevity" data-search="coq10: จริง ๆ แล้วเหมาะกับใคร? พลังงานและสุขภาพระยะยาว จริง ๆ แล้ว coq10 เหมาะกับใคร? mattanutra อธิบายเรื่องการเสริมพลังงาน บริบทของสุขภาพหัวใจ คำถามเกี่ยวกับยากลุ่มสแตติน ข้อผิดพลาดที่พบบ่อย และเหตุผลที่ความเหมาะสมของ coq10 ขึ้นอยู่กับอายุ ระดับพลังงาน ยาที่ใช้ และเป้าหมายของแต่ละคน" href="https://www.mattanutra.com/th/library/coq10-who-is-it-for">
+<div class="h-44 bg-gradient-to-br from-forest-glow/50 to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — พลังงานและสุขภาพระยะยาว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-measuring.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">พลังงานและสุขภาพระยะยาว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">CoQ10: จริง ๆ แล้วเหมาะกับใคร?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">จริง ๆ แล้ว CoQ10 เหมาะกับใคร? MattaNutra อธิบายเรื่องการเสริมพลังงาน บริบทของสุขภาพหัวใจ คำถามเกี่ยวกับยา…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="vitamins" data-search="วิตามินดีในประเทศไทย วิตามิน วิตามินดีในประเทศไทย: ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ mattanutra ว่าด้วยการได้รับแสงแดด การใช้ชีวิตในร่ม รูปแบบการกินแบบไทย การตรวจ ข้อควรระวังด้านความปลอดภัย และการหาปริมาณที่พอดีของคุณ" href="https://www.mattanutra.com/th/library/vitamin-d-in-thailand">
+<div class="h-44 bg-gradient-to-br from-gold-tint to-gold-soft/25 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — วิตามิน" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-open.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">วิตามิน</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">วิตามินดีในประเทศไทย</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ MattaNutra ว่าด้วยการได้รับแสงแดด การใช้ชีวิตในร่ม รูปแบบการกินแบบไทย การ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="minerals" data-search="สัญญาณว่าคุณอาจขาดแมกนีเซียม แร่ธาตุ สัญญาณว่าคุณอาจขาดแมกนีเซียม: ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ mattanutra ว่าด้วยอาการ รูปแบบการกินแบบไทย ข้อควรระวังด้านความปลอดภัย และเหตุผลที่อาการเป็นเพียงสัญญาณ ไม่ใช่ข้อพิสูจน์" href="https://www.mattanutra.com/th/library/signs-you-may-be-low-in-magnesium">
+<div class="h-44 bg-gradient-to-br from-sand-soft to-sand-deep/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — แร่ธาตุ" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-open.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">แร่ธาตุ</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">สัญญาณว่าคุณอาจขาดแมกนีเซียม</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ MattaNutra ว่าด้วยอาการ รูปแบบการกินแบบไทย ข้อควรระวังด้านความปลอดภัย และ…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="minerals" data-search="ควรกินแมกนีเซียมทุกวันไหม? แร่ธาตุ ควรกินแมกนีเซียมทุกวันไหม? ไม่จำเป็นเสมอไป คำตอบที่ใช่ขึ้นอยู่กับอาหาร การนอน ตะคริว ความเครียด ยาที่ใช้ และปริมาณที่พอดีของคุณ ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ mattanutra" href="https://www.mattanutra.com/th/library/should-you-take-magnesium-every-day">
+<div class="h-44 bg-gradient-to-br from-sand-soft to-sand-deep/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — แร่ธาตุ" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-open.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">แร่ธาตุ</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">ควรกินแมกนีเซียมทุกวันไหม?</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ไม่จำเป็นเสมอไป คำตอบที่ใช่ขึ้นอยู่กับอาหาร การนอน ตะคริว ความเครียด ยาที่ใช้ และปริมาณที่พอดีของคุณ ความรู้…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="sleep-recovery" data-search="แมกนีเซียมกับการนอน การนอนและการฟื้นตัว แมกนีเซียมช่วยให้นอนหลับได้จริงไหม? ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ mattanutra ว่าด้วยคุณภาพการนอน ความเครียด ตะคริว คาเฟอีน แหล่งอาหาร ชนิดของแมกนีเซียม ความปลอดภัย และปริมาณที่พอดีของคุณ" href="https://www.mattanutra.com/th/library/magnesium-for-sleep">
+<div class="h-44 bg-gradient-to-br from-mint-deep to-mint flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — การนอนและการฟื้นตัว" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-open.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">การนอนและการฟื้นตัว</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">แมกนีเซียมกับการนอน</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">แมกนีเซียมช่วยให้นอนหลับได้จริงไหม? ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ MattaNutra ว่าด้วยคุณภาพการนอน…</p>
+</div>
+</a>
+<a class="lib-card group bg-cream border border-line rounded-[20px] overflow-hidden hover:-translate-y-1 hover:shadow-soft transition-all" data-cat="minerals" data-search="แมกนีเซียมไกลซิเนต vs ซิเตรต แร่ธาตุ แมกนีเซียมไกลซิเนต vs ซิเตรต: ชนิดไหนเหมาะกับเป้าหมายของคุณ? ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ mattanutra ที่เปรียบเทียบเรื่องการนอน ความสงบ การย่อยอาหาร ท้องผูก การตอบสนองต่อผลิตภัณฑ์ ความปลอดภัย และปริมาณที่พอดีของคุณ" href="https://www.mattanutra.com/th/library/glycinate-vs-citrate">
+<div class="h-44 bg-gradient-to-br from-sand-soft to-sand-deep/30 flex items-end justify-center overflow-hidden">
+<img alt="ภาพประกอบน้องมัตตะ — แร่ธาตุ" class="h-[150px] w-auto object-contain" loading="lazy" src="./assets/nong-open.png"/>
+</div>
+<div class="p-6">
+<span class="text-[12px] font-semibold tracking-[0.1em] uppercase text-gold">แร่ธาตุ</span>
+<h2 class="font-display text-[21px] mt-2 mb-2 text-ink group-hover:text-forest-deep transition-colors">แมกนีเซียมไกลซิเนต vs ซิเตรต</h2>
+<p class="text-[14.5px] text-ash leading-relaxed">ชนิดไหนเหมาะกับเป้าหมายของคุณ? ความรู้ฉบับเข้าใจง่ายจากคลังความรู้ MattaNutra ที่เปรียบเทียบเรื่องการนอน…</p>
+</div>
+</a>
+</div>
+<p class="text-center text-ash py-10" hidden="" id="lib-empty">ยังไม่พบบทความที่ตรงกับการค้นหา ลองเปลี่ยนคำค้นหรือหมวดหมู่ดู แล้วเราจะทยอยเพิ่มบทความใหม่เรื่อย ๆ</p>
+<div class="text-center mt-12">
+<button class="rounded-pill border border-forest text-forest-deep font-semibold text-[15px] px-7 py-3 hover:bg-forest-deep hover:text-white transition-colors" id="lib-more" type="button">ดูบทความเพิ่มเติม</button>
+</div>
+</div>
+</section>
+<section class="bg-[radial-gradient(circle_at_85%_0%,rgba(45,143,114,0.28),transparent_55%),linear-gradient(160deg,#1F6E58_0%,#0E2D4D_100%)] text-cream">
+<div class="max-w-container mx-auto px-7 py-20 flex items-center justify-between gap-10 flex-wrap">
+<div class="max-w-[560px]">
+<h2 class="font-display text-[clamp(28px,3.6vw,42px)] leading-[1.1] text-white">การอ่านคือจุดเริ่มต้นที่ดี <em class="italic text-forest-glow">แต่การรู้จริงดีกว่า</em></h2>
+<p class="mt-4 text-[17px] text-cream/90">เปลี่ยนสิ่งที่คุณได้เรียนรู้ ให้เป็นแผนที่ออกแบบเพื่อร่างกายของคุณ เริ่มต้นฟรี ไม่ต้องใช้บัตรเครดิต</p>
+<a class="mt-7 inline-flex items-center gap-2.5 rounded-pill bg-cream text-ink font-bold text-base px-8 py-4 hover:-translate-y-0.5 transition-transform" href="ASSESSMENT_URL_HERE">เริ่มประเมินฟรี<svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+</div>
+<img alt="Nong Matta celebrating" class="h-48 w-auto hidden md:block" src="./assets/nong-celebrate.png"/>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- FOOTER                                                       -->
+<!-- ============================================================ -->
+<footer class="bg-ink text-cream/80 pt-20 pb-10">
+<div class="max-w-container mx-auto px-7">
+<div class="grid md:grid-cols-[1.6fr_1fr_1fr_1fr] gap-10 mb-14">
+<div>
+<div class="flex items-center gap-3 mb-4">
+<img alt="MattaNutra" class="h-9 w-9 object-contain" src="https://mattanutra.com/v15/logo.png"/>
+<span class="font-display text-[22px] font-medium text-cream">Matta<span class="text-forest-light">Nutra</span></span>
+</div>
+<div class="font-display italic text-gold-soft text-[18px] mb-2">รู้ปริมาณที่พอดี</div>
+<p class="text-cream/60 text-[14.5px] leading-relaxed max-w-[340px]">แผนดูแลสุขภาพเฉพาะบุคคล ออกแบบจากเชียงใหม่เพื่อชีวิตคนเอเชียตะวันออกเฉียงใต้ ภูมิปัญญาโบราณ · วิทยาศาสตร์สมัยใหม่</p>
+</div>
+<div>
+<div class="text-cream font-semibold text-sm mb-4">ผลิตภัณฑ์</div>
+<ul class="flex flex-col gap-2.5 text-[14.5px] text-cream/65">
+<li><a class="hover:text-forest-light transition-colors" href="#living-protocol">Living Protocol</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#how-it-works">วิธีการทำงาน</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#start-free">แบบสอบถามฟรี</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#assessment">เริ่มประเมินฟรี</a></li>
+</ul>
+</div>
+<div>
+<div class="text-cream font-semibold text-sm mb-4">เรียนรู้</div>
+<ul class="flex flex-col gap-2.5 text-[14.5px] text-cream/65">
+<li><a class="hover:text-forest-light transition-colors" href="/th/library">คลังความรู้ MattaNutra</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#promises">คำมั่นของเรา</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#origin">จุดเริ่มต้นของเรา</a></li>
+</ul>
+</div>
+<div>
+<div class="text-cream font-semibold text-sm mb-4">บริษัท</div>
+<ul class="flex flex-col gap-2.5 text-[14.5px] text-cream/65">
+<li><a class="hover:text-forest-light transition-colors" href="#">ติดต่อเรา</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#">ข้อกำหนดการใช้บริการ</a></li>
+<li><a class="hover:text-forest-light transition-colors" href="#">นโยบายความเป็นส่วนตัว</a></li>
+</ul>
+</div>
+</div>
+<!-- Consolidated single disclaimer -->
+<div class="text-cream/45 text-[12.5px] leading-relaxed max-w-[920px] mb-8 pt-8 border-t border-white/10">
+      MattaNutra ช่วยสนับสนุนการตัดสินใจเรื่องอาหารเสริมและโภชนาการประจำวันของคุณ — เป็นแพลตฟอร์มให้คำแนะนำเพื่อสุขภาพ ไม่ใช่การวินิจฉัยทางการแพทย์ แผนการรักษา หรือการบำบัดทางโภชนาการเฉพาะบุคคล คำแนะนำด้านอาหารเป็นความรู้ด้านโภชนาการทั่วไป คำแนะนำทั้งหมดออกแบบโดยพิจารณาเป้าหมาย กิจวัตรประจำวัน และอาหารเสริมที่คุณใช้อยู่ พร้อมตรวจสอบเทียบกับยาและผลตรวจทางห้องปฏิบัติการของคุณเพื่อความปลอดภัย ผู้ที่กำลังตั้งครรภ์ ให้นมบุตร ใช้ยา หรือมีโรคประจำตัวหรือภาวะสุขภาพที่ต้องดูแล ควรปรึกษาผู้เชี่ยวชาญด้านสุขภาพก่อนเริ่มแผนอาหารเสริมใด ๆ
+    </div>
+<div class="flex items-center justify-between flex-wrap gap-4 text-[13px] text-cream/50">
+<span>© 2026 MattaNutra · แผนดูแลสุขภาพเฉพาะบุคคล · เชียงใหม่ ประเทศไทย</span>
+<div class="flex items-center rounded-pill border border-white/15 overflow-hidden">
+<a class="px-3 py-1.5" href="/en">EN</a>
+<a class="px-3 py-1.5 bg-cream/90 text-ink font-semibold" href="#">TH</a>
+</div>
+</div>
+</div>
+</footer>
+<!-- ============================================================ -->
+<!-- JS — minimal. (1) Living Protocol "see reasoning" toggle.    -->
+<!--      (2) OPTIONAL scroll-reveal. Delete the reveal block     -->
+<!--          + [data-reveal] attributes to ship a no-anim page.  -->
+<!-- ============================================================ -->
+<script>
+  // (0) Mobile menu toggle
+  (function () {
+    var btn = document.getElementById('navToggle');
+    var menu = document.getElementById('mobileMenu');
+    if (btn && menu) {
+      btn.addEventListener('click', function () {
+        var open = menu.classList.toggle('hidden') === false;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      });
+      // close on link tap
+      menu.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', function () {
+          menu.classList.add('hidden');
+          btn.setAttribute('aria-expanded', 'false');
+        });
+      });
+    }
+  })();
+
+  // (1) Reasoning toggle inside the Living Protocol chat card
+  (function () {
+    var btn = document.querySelector('.js-reason-toggle');
+    var panel = document.getElementById('lp-reasons');
+    if (btn && panel) {
+      btn.addEventListener('click', function () {
+        var open = panel.classList.toggle('hidden') === false;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.querySelector('.js-reason-label').textContent = open ? 'Hide the reasoning' : 'See the reasoning';
+        btn.querySelector('.js-reason-chevron').style.transform = open ? 'rotate(180deg)' : '';
+      });
+    }
+  })();
+
+  // (2) OPTIONAL scroll-reveal — progressive enhancement, safe to remove.
+  // Mark <html> as JS-capable so the opacity:0 rule only applies when we can animate.
+  (function () {
+    document.documentElement.classList.add('js');
+    var els = document.querySelectorAll('[data-reveal]');
+    if (!('IntersectionObserver' in window) || !els.length) {
+      els.forEach(function (el) { el.classList.add('in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function (el) { io.observe(el); });
+    // Safety net: reveal anything still hidden after 1.2s (e.g. above-fold or odd viewports)
+    setTimeout(function () {
+      document.querySelectorAll('[data-reveal]:not(.in)').forEach(function (el) { el.classList.add('in'); });
+    }, 1200);
+  })();
+</script>
+<script>
+(function(){
+  var cat='all', q='', limit=9;
+  var cards=[].slice.call(document.querySelectorAll('#lib-grid .lib-card'));
+  var chips=[].slice.call(document.querySelectorAll('.chip'));
+  var more=document.getElementById('lib-more');
+  var empty=document.getElementById('lib-empty');
+  var count=document.getElementById('lib-count');
+  var search=document.getElementById('lib-search');
+  var clear=document.getElementById('lib-search-clear');
+  function render(){
+    var shown=0, matches=0;
+    cards.forEach(function(c){
+      var okCat = (cat==='all')||(c.getAttribute('data-cat')===cat);
+      var okQ = (q==='')||(c.getAttribute('data-search').indexOf(q)!==-1);
+      if(okCat && okQ){ matches++; if(shown<limit){ c.style.display=''; shown++; } else { c.style.display='none'; } }
+      else { c.style.display='none'; }
+    });
+    more.style.display = (matches>shown) ? '' : 'none';
+    empty.hidden = matches>0;
+    // result count only while searching or filtering
+    if(q!=='' || cat!=='all'){
+      count.hidden=false;
+      count.textContent = 'พบ ' + matches + ' บทความ' + (q!==''?(' สำหรับ “'+search.value.trim()+'”'):'') + (cat!=='all'?' ในหมวดนี้':'');
+    } else { count.hidden=true; }
+    chips.forEach(function(ch){
+      var on = ch.getAttribute('data-chip')===cat;
+      ch.classList.toggle('bg-forest-deep', on);
+      ch.classList.toggle('text-white', on);
+      ch.classList.toggle('border-transparent', on);
+      ch.classList.toggle('border-line', !on);
+      ch.classList.toggle('text-ink-soft', !on);
+    });
+    clear.classList.toggle('hidden', q==='');
+  }
+  chips.forEach(function(ch){ ch.addEventListener('click', function(){
+    cat=ch.getAttribute('data-chip'); limit=9;
+    try{ history.replaceState(null,'', cat==='all' ? '/th/library' : '/th/library#'+cat); }catch(e){}
+    render();
+  });});
+  more.addEventListener('click', function(){ limit+=9; render(); });
+  search.addEventListener('input', function(){ q=search.value.trim().toLowerCase(); limit=9; render(); });
+  clear.addEventListener('click', function(){ search.value=''; q=''; limit=9; search.focus(); render(); });
+  var h=(location.hash||'').replace('#','');
+  if(h && chips.some(function(c){return c.getAttribute('data-chip')===h;})) cat=h;
+  render();
+})();
+</script>
+</body>
+</html>

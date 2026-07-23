@@ -46,8 +46,9 @@ describe("ttf ws2 Thai questionnaire port", () => {
       "ความปลอดภัย",
       "ความแม่นยำ"
     ]);
+    // Patch 2026-07-23: step-1 group label is เรื่องของคุณ (was พื้นฐาน).
     assert.deepEqual(th.stagePhases, [
-      "พื้นฐาน",
+      "เรื่องของคุณ",
       "พื้นฐาน",
       "พื้นฐาน",
       "พื้นฐาน",

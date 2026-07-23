@@ -22,7 +22,9 @@ import {
   clampFirstNameInput,
   foodFrequencyKeys,
   formatHeightImperial,
+  formatHeightMetric,
   formatWeightImperial,
+  formatWeightMetric,
   hasAny,
   hasText,
   isPregnantOrBreastfeeding,
@@ -619,7 +621,7 @@ export function AssessmentFlow({
                 <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--mn-ink)]">
                   <span>{copy.about.height}</span>
                   <span className="rounded-md bg-[color-mix(in_srgb,var(--mn-gold)_10%,transparent)] px-2 py-1 text-[var(--mn-gold)]">
-                    {answers.heightCm || "170"} cm
+                    {formatHeightMetric(answers.heightCm || "170", locale)}
                   </span>
                 </span>
                 <input
@@ -633,7 +635,7 @@ export function AssessmentFlow({
                 />
                 <span className="mt-2 flex justify-end">
                   <span className="rounded-md bg-[color-mix(in_srgb,var(--mn-gold)_10%,transparent)] px-2 py-1 text-xs font-semibold text-[var(--mn-gold)]">
-                    {formatHeightImperial(answers.heightCm || "170")}
+                    {formatHeightImperial(answers.heightCm || "170", locale)}
                   </span>
                 </span>
               </label>
@@ -641,7 +643,7 @@ export function AssessmentFlow({
                 <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--mn-ink)]">
                   <span>{copy.about.weight}</span>
                   <span className="rounded-md bg-[color-mix(in_srgb,var(--mn-gold)_10%,transparent)] px-2 py-1 text-[var(--mn-gold)]">
-                    {answers.weightKg || "70"} kg
+                    {formatWeightMetric(answers.weightKg || "70", locale)}
                   </span>
                 </span>
                 <input
@@ -655,7 +657,7 @@ export function AssessmentFlow({
                 />
                 <span className="mt-2 flex justify-end">
                   <span className="rounded-md bg-[color-mix(in_srgb,var(--mn-gold)_10%,transparent)] px-2 py-1 text-xs font-semibold text-[var(--mn-gold)]">
-                    {formatWeightImperial(answers.weightKg || "70")}
+                    {formatWeightImperial(answers.weightKg || "70", locale)}
                   </span>
                 </span>
               </label>

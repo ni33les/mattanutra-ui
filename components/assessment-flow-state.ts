@@ -359,7 +359,17 @@ export function precisionProgress(answers: Answers) {
   };
 }
 
-export function formatHeightImperial(value: string) {
+export function formatHeightMetric(value: string, locale = "en") {
+  const cm = Number(value);
+
+  if (!Number.isFinite(cm) || cm <= 0) {
+    return "";
+  }
+
+  return locale === "th" ? `${cm} ซม.` : `${cm} cm`;
+}
+
+export function formatHeightImperial(value: string, locale = "en") {
   const cm = Number(value);
 
   if (!Number.isFinite(cm) || cm <= 0) {
@@ -370,15 +380,28 @@ export function formatHeightImperial(value: string) {
   const feet = Math.floor(totalInches / 12);
   const inches = totalInches % 12;
 
-  return `${feet} ft ${inches} in`;
+  return locale === "th"
+    ? `${feet} ฟุต ${inches} นิ้ว`
+    : `${feet} ft ${inches} in`;
 }
 
-export function formatWeightImperial(value: string) {
+export function formatWeightMetric(value: string, locale = "en") {
   const kg = Number(value);
 
   if (!Number.isFinite(kg) || kg <= 0) {
     return "";
   }
 
-  return `${Math.round(kg * 2.20462)} lb`;
+  return locale === "th" ? `${kg} กก.` : `${kg} kg`;
+}
+
+export function formatWeightImperial(value: string, locale = "en") {
+  const kg = Number(value);
+
+  if (!Number.isFinite(kg) || kg <= 0) {
+    return "";
+  }
+
+  const lb = Math.round(kg * 2.20462);
+  return locale === "th" ? `${lb} ปอนด์` : `${lb} lb`;
 }

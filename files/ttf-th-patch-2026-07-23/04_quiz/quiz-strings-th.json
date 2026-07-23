@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-07-23",
+  "page": "/th/nutrition/quiz",
+  "note": "Corrected Thai for strings added or rewritten after the v4 delivery. verdict: replace = paste th_final, restore = paste th_final (the v4 copy), keep = live already correct. Copy-paste only — never retype Thai.",
+  "strings": [
+    { "id": "Q1",  "key": "progress.line",        "en": "{pct}% complete. {n} essential signals left before the precision layer.", "th_live": "เสร็จแล้ว 2% ยังเหลือข้อมูลหลัก 36 ข้อก่อนเข้าสู่ชั้นความแม่นยำ", "verdict": "replace", "th_final": "เสร็จแล้ว {pct}% — เหลือข้อมูลหลักอีก {n} ข้อ ก่อนเข้าสู่ขั้นความแม่นยำ" },
+    { "id": "Q2",  "key": "progress.stages",      "en": "Start / Essentials → 80% / Precision → 100%", "th_live": "เริ่มต้น / ข้อมูลหลัก → 80% / ความแม่นยำ → 100%", "verdict": "keep", "th_final": "เริ่มต้น / ข้อมูลหลัก → 80% / ความแม่นยำ → 100%" },
+    { "id": "Q3",  "key": "step1.groupLabel",     "en": "It's all you", "th_live": "พื้นฐาน", "verdict": "replace", "th_final": "เรื่องของคุณ" },
+    { "id": "Q4",  "key": "step1.name",           "en": "About you", "th_live": "ข้อมูลพื้นฐาน", "verdict": "keep", "th_final": "ข้อมูลพื้นฐาน" },
+    { "id": "Q5",  "key": "field.sunscreen.help", "en": "Helps tune vitamin D and sun exposure context.", "th_live": "ช่วยปรับบริบทวิตามินดีและการได้รับแดด", "verdict": "replace", "th_final": "ช่วยปรับการประเมินวิตามินดีร่วมกับการได้รับแสงแดด" },
+    { "id": "Q6",  "key": "field.country.help",   "en": "Used for local context and product availability.", "th_live": "ใช้เพื่อปรับบริบทพื้นที่และสินค้าที่พร้อมใช้งาน", "verdict": "replace", "th_final": "ใช้ปรับคำแนะนำตามพื้นที่และสินค้าที่มีจำหน่ายในประเทศของคุณ" },
+    { "id": "Q7",  "key": "field.country.placeholder", "en": "Select country", "th_live": "เลือกประเทศ", "verdict": "replace", "th_final": "เลือกประเทศ…" },
+    { "id": "Q8",  "key": "field.sex.help",       "en": "Sex and reproductive context affect dose caution, iron logic, and product audience filtering.", "th_live": "ใช้ปรับความต้องการสารอาหารและแสดงคำถามด้านสุขภาพที่เกี่ยวข้องกับคุณ", "verdict": "keep", "th_final": "ใช้ปรับความต้องการสารอาหารและแสดงคำถามด้านสุขภาพที่เกี่ยวข้องกับคุณ" },
+    { "id": "Q9",  "key": "field.sun.label",      "en": "Sun exposure (Min / day)", "th_live": "เวลาที่ได้รับแสงแดดต่อวัน", "verdict": "keep", "th_final": "เวลาที่ได้รับแสงแดดต่อวัน" },
+    { "id": "Q10", "key": "trust.safety.head",    "en": "Reviewed for safety", "th_live": "ตรวจเพื่อความปลอดภัย", "verdict": "restore", "th_final": "ตรวจสอบด้านความปลอดภัย" },
+    { "id": "Q11", "key": "trust.safety.body",    "en": "Every formula is screened against your medicines, labs, and Thai FDA registration.", "th_live": "สูตรถูกตรวจร่วมกับยา แล็บ และบริบททะเบียน อย. ไทย", "verdict": "restore", "th_final": "ทุกสูตรผ่านการคัดกรองเทียบกับยาที่ใช้ ผลตรวจทางห้องปฏิบัติการ และเลขทะเบียน อย. ไทย" },
+    { "id": "Q12", "key": "trust.privacy.head",   "en": "Private by default", "th_live": "เป็นส่วนตัวตั้งแต่ต้น", "verdict": "restore", "th_final": "ความเป็นส่วนตัวตั้งแต่ต้น" },
+    { "id": "Q13", "key": "trust.privacy.body",   "en": "Your answers stay tied to your plan. We do not sell them or share them with advertisers.", "th_live": "คำตอบผูกกับแผนของคุณ เราไม่ขายหรือส่งให้ผู้ลงโฆษณา", "verdict": "replace", "th_final": "คำตอบของคุณใช้เพื่อแผนของคุณเท่านั้น เราไม่ขายข้อมูลหรือเปิดเผยแก่ผู้โฆษณา" },
+    { "id": "Q14", "key": "trust.wellness.head",  "en": "Wellness, not diagnosis", "th_live": "สุขภาวะ ไม่ใช่การวินิจฉัย", "verdict": "restore", "th_final": "คำแนะนำเพื่อสุขภาวะ ไม่ใช่การวินิจฉัย" },
+    { "id": "Q15", "key": "trust.wellness.body",  "en": "Guidance to support your goals, always shareable with your doctor.", "th_live": "คำแนะนำเพื่อสนับสนุนเป้าหมายสุขภาวะ และนำไปคุยกับแพทย์ได้", "verdict": "restore", "th_final": "คำแนะนำเพื่อสนับสนุนเป้าหมายของคุณ และสามารถนำไปปรึกษาแพทย์ได้เสมอ" },
+    { "id": "Q16", "key": "email.help",           "en": "Leave your email and we will send a private link back to this exact spot. That is all it is for.", "th_live": "ฝากอีเมลไว้ แล้วเราจะส่งลิงก์ส่วนตัวเพื่อกลับมายังจุดนี้เท่านั้น", "verdict": "replace", "th_final": "ฝากอีเมลไว้ แล้วเราจะส่งลิงก์ส่วนตัวสำหรับกลับมาทำต่อจากจุดนี้ เราใช้อีเมลของคุณเพื่อการนี้เท่านั้น" },
+    { "id": "Q17", "key": "email.saved",          "en": "Saved only to return you to your assessment. Never used for marketing without consent.", "th_live": "บันทึกไว้เพื่อกลับมาทำแบบประเมินต่อเท่านั้น ไม่ใช้เพื่อการตลาดหากไม่ได้ยินยอม", "verdict": "replace", "th_final": "บันทึกไว้เพื่อพาคุณกลับมาทำแบบประเมินต่อเท่านั้น และจะไม่นำไปใช้ทางการตลาดโดยไม่ได้รับความยินยอม" },
+    { "id": "Q18", "key": "units.height",         "en": "cm / ft in", "th_live": "cm / ft in", "verdict": "replace", "th_final": "ซม. / ฟุต นิ้ว" },
+    { "id": "Q19", "key": "units.weight",         "en": "kg / lb", "th_live": "kg / lb", "verdict": "replace", "th_final": "กก. / ปอนด์" },
+    { "id": "Q20", "key": "meta.og:locale",       "en": "th", "th_live": "th", "verdict": "replace", "th_final": "th_TH" }
+  ],
+  "countryList": {
+    "verdict": "keep",
+    "values": ["ประเทศไทย", "สิงคโปร์", "มาเลเซีย", "อินโดนีเซีย", "ฟิลิปปินส์", "เวียดนาม", "เมียนมา", "สหรัฐอเมริกา", "ออสเตรเลีย", "สหราชอาณาจักร", "แคนาดา", "เยอรมนี", "ฝรั่งเศส", "ญี่ปุ่น", "เกาหลีใต้", "อินเดีย", "จีน", "อื่น ๆ"]
+  },
+  "doNotTouch": "Everything else on the page is the reviewed v4 copy — title, full meta block incl. og/twitter and the Thai share card, consent module, step-1 heading and subline, the no-right-answers quote, เพศกำเนิด label and helper, สีผิว, sun-exposure helper, and the footer."
+}

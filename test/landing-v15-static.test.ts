@@ -356,7 +356,7 @@ describe("landing page v16 library-only port", () => {
 
   it("renders archive articles through platform React and cached Library images", () => {
     assert.match(libraryArticlePage, /image:\s*article\.shareImage/);
-    assert.match(seoSource, /images:\s*imageUrl/);
+    assert.match(seoSource, /images:\s*openGraphImages|images:\s*twitterImages|images:\s*imageUrl/);
     assert.match(
       seoSource,
       /card:\s*imageUrl\s*\?\s*"summary_large_image"\s*:\s*"summary"/

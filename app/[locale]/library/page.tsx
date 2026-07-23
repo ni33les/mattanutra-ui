@@ -21,7 +21,14 @@ type LibraryPageProps = Readonly<{
 // (Next segment config requires a static numeric literal).
 export const revalidate = 300;
 
-const libraryIndexOgImage = "/en/assets/mattanutra-og.png";
+const libraryIndexOgImageByLocale: Partial<Record<Locale, string>> = {
+  th: "/assets/og/mattanutra-library-th.jpg"
+};
+const defaultLibraryIndexOgImage = "/en/assets/mattanutra-og.png";
+
+function libraryIndexOgImageFor(locale: Locale) {
+  return libraryIndexOgImageByLocale[locale] ?? defaultLibraryIndexOgImage;
+}
 
 export async function generateMetadata({
   params
@@ -29,6 +36,7 @@ export async function generateMetadata({
   const { locale: rawLocale } = await params;
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
   const copy = getLibraryCopy(locale);
+  const libraryIndexOgImage = libraryIndexOgImageFor(locale);
 
   return localizedMetadata({
     description: copy.documentDescription,
@@ -60,7 +68,7 @@ export default async function LibraryPage({ params }: LibraryPageProps) {
   const copy = getLibraryCopy(locale);
   const social = libraryIndexManualSocialMeta({
     description: copy.openGraphDescription,
-    image: libraryIndexOgImage,
+    image: libraryIndexOgImageFor(locale),
     locale,
     title: copy.openGraphTitle
   });

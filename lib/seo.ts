@@ -319,6 +319,10 @@ export function libraryIndexManualSocialMeta(input: Readonly<{
       { content: input.description, property: "og:description" },
       { content: pageUrl, property: "og:url" },
       { content: imageUrl, property: "og:image" },
+      {
+        content: localeHtmlLang(input.locale).replace("-", "_"),
+        property: "og:locale"
+      },
       { content: "summary_large_image", name: "twitter:card" }
     ] as const
   };
