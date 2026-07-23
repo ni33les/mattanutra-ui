@@ -78,6 +78,16 @@
   },
   "accepted_deltas": [
     "Keep TypeScript v4 scoring engine on platform; Python package is reference/parity",
-    "Stage 6 AI polish remains optional via analyze_healthscore task"
-  ]
+    "Stage 6 AI polish remains optional via analyze_healthscore task",
+    "Python engine remains reference; TS v4 is production scorer"
+  ],
+  "ui_phase": {
+    "status": "complete",
+    "spectrum_marker_order": "gap: YOU first; rank: MED first",
+    "reveal": "base visible + is-enhanced + 1800ms fallback",
+    "section_wrap": "section.wrap vertical padding (desktop clamp, mobile 96px 18px)",
+    "countup": "1100ms cubic ease-out 1-(1-p)^3",
+    "first_name": "normalizeAssessmentFirstName (text children, not innerHTML)",
+    "box_image": "/healthscore/box-v7.jpg (no base64)"
+  }
 }

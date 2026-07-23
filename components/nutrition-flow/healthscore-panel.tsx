@@ -127,7 +127,8 @@ function RevealBlock({
 function CountUpNumber({
   active = true,
   className,
-  duration = 900,
+  // Handoff 00_HANDOFF: cubic ease-out 1-(1-p)^3 over 1100ms.
+  duration = 1100,
   value,
 }: Readonly<{
   active?: boolean;
@@ -153,6 +154,7 @@ function CountUpNumber({
       }
 
       const progress = clamp((now - startedAt) / duration);
+      // Cubic ease-out matches the designed scorecard animation.
       const eased = 1 - Math.pow(1 - progress, 3);
 
       setDisplay(Math.round(value * eased));
@@ -612,6 +614,8 @@ function ScoreSpectrum({
 }>) {
   const { copy, median, score, spectrum } = model;
   const { ref, visible } = useInViewOnce<HTMLDivElement>();
+  // Handoff 06_GOTCHAS §3: render the leftward marker first so captions scan cleanly.
+  // gap-mode (score < median): YOU left → first; rank-mode: MED left → first.
   const ahead = score >= median;
   const medianMarkerElement = (
     <div
@@ -651,8 +655,17 @@ function ScoreSpectrum({
           className="spec-fill"
           style={{ width: visible ? `${spectrum.scoreMarker}%` : 0 }}
         />
-        {ahead ? medianMarkerElement : scoreMarkerElement}
-        {ahead ? scoreMarkerElement : medianMarkerElement}
+        {ahead ? (
+          <>
+            {medianMarkerElement}
+            {scoreMarkerElement}
+          </>
+        ) : (
+          <>
+            {scoreMarkerElement}
+            {medianMarkerElement}
+          </>
+        )}
       </div>
       <div className="spec-ends">
         <span>{copy.spectrumStart}</span>

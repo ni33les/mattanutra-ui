@@ -184,4 +184,23 @@ describe("HealthScore panel static guardrails", () => {
     assert.match(panelSource, /textFitsLocale/);
     assert.match(panelSource, /localizedLegacyText/);
   });
+
+  it("preserves handoff gotchas: spectrum order, reveal fallback, count-up easing", () => {
+    // 06_GOTCHAS §3 — gap-mode renders YOU before MED; rank-mode opposite.
+    assert.match(
+      panelSource,
+      /ahead \? \(\s*<>\s*\{medianMarkerElement\}\s*\{scoreMarkerElement\}/
+    );
+    assert.match(
+      panelSource,
+      /scoreMarkerElement\}\s*\{medianMarkerElement\}/
+    );
+    // 06_GOTCHAS §2 — 1.8s reveal safety timeout.
+    assert.match(panelSource, /setTimeout\(\(\) => setVisible\(true\), 1800\)/);
+    // 00_HANDOFF — cubic ease-out over 1100ms.
+    assert.match(panelSource, /duration = 1100/);
+    assert.match(panelSource, /1 - Math\.pow\(1 - progress, 3\)/);
+    // Progressive enhancement class.
+    assert.match(panelSource, /classList\.add\("is-enhanced"\)/);
+  });
 });

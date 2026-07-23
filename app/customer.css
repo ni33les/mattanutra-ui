@@ -4527,12 +4527,13 @@
       padding: 40px 18px 28px;
     }
 
+    /* Handoff 06_GOTCHAS §1/§9: section.wrap must carry vertical padding. */
     .mn-healthscore-v7 section.wrap {
-      padding: 72px 18px;
+      padding: 96px 18px;
     }
 
     .mn-healthscore-v7 .hero.wrap + section.wrap {
-      padding-top: 64px;
+      padding-top: 80px;
     }
 
     .mn-healthscore-v7 section.wrap.mn-hs-shortlist-section,
