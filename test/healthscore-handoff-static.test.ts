@@ -60,7 +60,11 @@ describe("healthscore handoff fixtures", () => {
       "utf8"
     );
     assert.match(validator, /onlyAllowedHtml|may only include <em>/);
-    assert.match(validator, /validateNumericLiteralsSubset|integer literal/);
+    assert.match(
+      validator,
+      /validatePageCopyAgainstSeeds|validatePolishedFieldAgainstSeed|integer literal/
+    );
+    assert.match(validator, /0\.5x–1\.5x|0\.5x-1\.5x|outside 0\.5x/);
     assert.match(validator, /HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS/);
   });
 

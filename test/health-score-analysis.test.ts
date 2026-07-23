@@ -2,12 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { computeHealthScore } from "../lib/health-score.ts";
+import type { HealthScoreResult } from "../lib/health-score.ts";
 import { validateHealthScoreAiResponse } from "../lib/health-score-analysis.ts";
-
-const text = {
-  en: "Specific copy anchored to this HealthScore result.",
-  th: "ข้อความเฉพาะที่ยึดกับผลคะแนนสุขภาพนี้"
-};
+import type { Locale } from "../lib/i18n.ts";
 
 function profileOne() {
   return {
@@ -30,71 +27,93 @@ function profileOne() {
   };
 }
 
-function localizedCards(count: number, titleKey: "headline" | "title" = "headline") {
-  return Array.from({ length: count }, (_, index) => ({
-      body: {
-      en: `Body ${index + 1} grounded in the selected assessment signals.`,
-      th: `รายละเอียด ${index + 1} ที่ยึดกับสัญญาณจากแบบประเมิน`
-    },
-    [titleKey]: {
-      en: `Card ${index + 1}`,
-      th: `การ์ด ${index + 1}`
-    }
-  }));
+function scoreFor(locale: Locale = "en") {
+  return computeHealthScore(profileOne(), locale);
 }
 
-function paywallFeatures() {
-  return localizedCards(3).map((card) => ({
-    description: card.body,
-    name: card.headline
-  }));
+/** Bilingual fixture: same seed text in en + th so length/numeric checks stay fair. */
+function bilingual(seed: string) {
+  return { en: seed, th: seed };
 }
 
-function validResponse() {
+function seedBasedPageCopy(healthScore: HealthScoreResult) {
+  const seeds = healthScore.pageContent?.copySeeds;
+  assert.ok(seeds, "expected copySeeds for profile fixture");
+
   return {
-    pageCopy: {
-      bandLine: text,
-      findingsHeadline: text,
-      findingsSub: text,
-      findings: localizedCards(3),
-      gapTrio: localizedCards(3),
-      heroBody: text,
-      heroTitle: text,
-      highestLeverageBody: text,
-      methodCards: localizedCards(3, "title"),
-      methodHeadline: text,
-      pillarHeadline: text,
-      relativityHeadline: text,
-      relativitySub: text,
-      strengthNote: text,
-      subtractionBody: text
-    }
+    bandLine: bilingual(seeds.bandLine),
+    findingsHeadline: bilingual(seeds.findingsHeadline),
+    findingsSub: bilingual(seeds.findingsSub),
+    findings: seeds.findings.map((card) => ({
+      body: bilingual(card.body),
+      headline: bilingual(card.headline)
+    })),
+    gapTrio: seeds.gapTrio.map((card) => ({
+      body: bilingual(card.body),
+      headline: bilingual(card.headline)
+    })),
+    heroBody: bilingual(seeds.heroBody),
+    heroTitle: bilingual("You came here for energy, a stronger heart, and fitness."),
+    highestLeverageBody: bilingual(
+      seeds.highestLeverage?.text ?? seeds.pillarHeadline
+    ),
+    methodCards: seeds.methodCards.map((card) => ({
+      body: bilingual(card.body),
+      title: bilingual(card.title)
+    })),
+    methodHeadline: bilingual(seeds.methodHeadline),
+    pillarHeadline: bilingual(seeds.pillarHeadline),
+    relativityHeadline: bilingual(seeds.relativity.headline),
+    relativitySub: bilingual(seeds.relativity.sub),
+    strengthNote: bilingual(seeds.strengthNote ?? seeds.pillarHeadline),
+    subtractionBody: bilingual(seeds.subtraction.body)
   };
 }
 
-function mutableResponse() {
-  return validResponse() as unknown as {
+function validResponse(healthScore: HealthScoreResult = scoreFor("en")) {
+  return {
+    pageCopy: seedBasedPageCopy(healthScore)
+  };
+}
+
+function mutableResponse(healthScore: HealthScoreResult = scoreFor("en")) {
+  return validResponse(healthScore) as unknown as {
     advice?: Record<string, unknown>;
     pageCopy: Record<string, unknown>;
   };
 }
 
-function addLegacyAdvice(response: ReturnType<typeof mutableResponse>) {
+function addLegacyAdvice(
+  response: ReturnType<typeof mutableResponse>,
+  healthScore: HealthScoreResult = scoreFor("en")
+) {
+  const seeds = healthScore.pageContent?.copySeeds;
+  assert.ok(seeds);
+
   response.advice = {
-    overview: text,
-    paywallEyebrow: text,
-    paywallFeatures: paywallFeatures(),
-    paywallSubtitle: text,
-    paywallTitle: text
+    overview: bilingual(seeds.heroBody),
+    paywallEyebrow: bilingual("Your plan is ready for the next step."),
+    paywallFeatures: seeds.methodCards.map((card) => ({
+      description: bilingual(card.body),
+      name: bilingual(card.title)
+    })),
+    paywallSubtitle: bilingual(
+      "Open the full plan to turn this score into the exact formula and product stack."
+    ),
+    paywallTitle: bilingual("Turn your HealthScore into a plan you can run.")
   };
 
   return response.advice;
 }
 
-function validate(value: unknown) {
+function validate(
+  value: unknown,
+  healthScore: HealthScoreResult = scoreFor("en"),
+  locale: Locale = "th"
+) {
   return validateHealthScoreAiResponse({
-    healthScore: computeHealthScore(profileOne(), "en"),
-    locale: "th",
+    healthScore,
+    locale,
     value
   });
 }
@@ -122,7 +141,9 @@ describe("HealthScore AI copy validator", () => {
   });
 
   it("accepts structured English and Thai page copy in locked slots", () => {
-    const validation = validate(validResponse());
+    const healthScore = scoreFor("en");
+    const response = validResponse(healthScore);
+    const validation = validate(response, healthScore);
 
     assert.deepEqual(validation.errors, []);
     assert.ok(validation.response);
@@ -130,71 +151,78 @@ describe("HealthScore AI copy validator", () => {
     assert.equal(validation.response.pageCopy.findings?.length, 3);
     assert.equal(
       (validation.response.advice.overview as { en: string }).en,
-      text.en
+      healthScore.pageContent?.copySeeds.heroBody
     );
   });
 
   it("accepts localized paywall feature cards from legacy cached responses", () => {
-    const response = mutableResponse();
-    const advice = addLegacyAdvice(response);
-    const grokPaywallFeatures = Array.from({ length: 3 }, (_, index) => ({
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
+    const advice = addLegacyAdvice(response, healthScore);
+    const seeds = healthScore.pageContent!.copySeeds;
+    const grokPaywallFeatures = seeds.methodCards.map((card) => ({
       en: {
-        description: `English paywall card ${index + 1}`,
-        name: `English card ${index + 1}`
+        description: card.body,
+        name: card.title
       },
       th: {
-        description: `รายละเอียดการ์ด ${index + 1}`,
-        name: `การ์ด ${index + 1}`
+        description: card.body,
+        name: card.title
       }
     }));
     advice.paywallFeatures = grokPaywallFeatures;
     response.pageCopy.paywallFeatures = grokPaywallFeatures;
 
-    const validation = validate(response);
+    const validation = validate(response, healthScore);
 
     assert.deepEqual(validation.errors, []);
     assert.equal(
       (validation.response?.advice.paywallFeatures?.[0]?.name as { en: string }).en,
-      "English card 1"
+      seeds.methodCards[0]?.title
     );
   });
 
   it("accepts localized paywall feature shorthand from legacy cached responses", () => {
-    const response = mutableResponse();
-    const advice = addLegacyAdvice(response);
-    const grokPaywallFeatures = Array.from({ length: 3 }, (_, index) => ({
-      en: `English paywall card ${index + 1}`,
-      th: `รายละเอียดการ์ด ${index + 1}`
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
+    const advice = addLegacyAdvice(response, healthScore);
+    const seeds = healthScore.pageContent!.copySeeds;
+    const grokPaywallFeatures = seeds.methodCards.map((card) => ({
+      en: card.body,
+      th: card.body
     }));
     advice.paywallFeatures = grokPaywallFeatures;
     response.pageCopy.paywallFeatures = grokPaywallFeatures;
 
-    const validation = validate(response);
+    const validation = validate(response, healthScore);
 
     assert.deepEqual(validation.errors, []);
     assert.equal(
       (validation.response?.pageCopy.paywallFeatures?.[0]?.description as { en: string }).en,
-      "English paywall card 1"
+      seeds.methodCards[0]?.body
     );
   });
 
   it("rejects missing required locales", () => {
-    const response = mutableResponse();
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
 
     response.pageCopy.heroTitle = { en: "English only" };
 
-    const validation = validate(response);
+    const validation = validate(response, healthScore);
 
     assert.ok(validation.errors.some((error) => error.includes("heroTitle.th")));
   });
 
   it("allows single display-locale copy when the current locale is English", () => {
-    const response = mutableResponse();
+    const healthScore = scoreFor("en");
+    const seeds = healthScore.pageContent!.copySeeds;
+    const response = mutableResponse(healthScore);
 
-    response.pageCopy.heroBody = { en: "English only" };
+    response.pageCopy.heroBody = { en: seeds.heroBody };
 
     const validation = validateHealthScoreAiResponse({
-      healthScore: computeHealthScore(profileOne(), "en"),
+      healthScore,
       locale: "en",
       value: response
     });
@@ -203,40 +231,43 @@ describe("HealthScore AI copy validator", () => {
   });
 
   it("allows single display-locale copy when the current locale is Chinese", () => {
-    const response = mutableResponse();
-    const chinese = "这是一段贴合当前健康分数的具体说明。";
+    const healthScore = scoreFor("zh-CN");
+    const seeds = healthScore.pageContent!.copySeeds;
+    const asLocale = (text: string) => text;
 
-    for (const key of [
-      "bandLine",
-      "findingsHeadline",
-      "findingsSub",
-      "heroBody",
-      "heroTitle",
-      "highestLeverageBody",
-      "methodHeadline",
-      "pillarHeadline",
-      "relativityHeadline",
-      "relativitySub",
-      "strengthNote",
-      "subtractionBody"
-    ]) {
-      response.pageCopy[key] = chinese;
-    }
-    response.pageCopy.findings = localizedCards(3).map(() => ({
-      body: chinese,
-      headline: chinese
-    }));
-    response.pageCopy.gapTrio = localizedCards(3).map(() => ({
-      body: chinese,
-      headline: chinese
-    }));
-    response.pageCopy.methodCards = localizedCards(3, "title").map(() => ({
-      body: chinese,
-      title: chinese
-    }));
+    const response = {
+      pageCopy: {
+        bandLine: asLocale(seeds.bandLine),
+        findingsHeadline: asLocale(seeds.findingsHeadline),
+        findingsSub: asLocale(seeds.findingsSub),
+        findings: seeds.findings.map((card) => ({
+          body: asLocale(card.body),
+          headline: asLocale(card.headline)
+        })),
+        gapTrio: seeds.gapTrio.map((card) => ({
+          body: asLocale(card.body),
+          headline: asLocale(card.headline)
+        })),
+        heroBody: asLocale(seeds.heroBody),
+        heroTitle: asLocale("你来这里是为了能量、更强的心脏和健身。"),
+        highestLeverageBody: asLocale(
+          seeds.highestLeverage?.text ?? seeds.pillarHeadline
+        ),
+        methodCards: seeds.methodCards.map((card) => ({
+          body: asLocale(card.body),
+          title: asLocale(card.title)
+        })),
+        methodHeadline: asLocale(seeds.methodHeadline),
+        pillarHeadline: asLocale(seeds.pillarHeadline),
+        relativityHeadline: asLocale(seeds.relativity.headline),
+        relativitySub: asLocale(seeds.relativity.sub),
+        strengthNote: asLocale(seeds.strengthNote ?? seeds.pillarHeadline),
+        subtractionBody: asLocale(seeds.subtraction.body)
+      }
+    };
 
     const validation = validateHealthScoreAiResponse({
-      healthScore: computeHealthScore(profileOne(), "zh-CN"),
+      healthScore,
       locale: "zh-CN",
       value: response
     });
@@ -245,15 +276,19 @@ describe("HealthScore AI copy validator", () => {
     assert.ok(validation.response);
     assert.equal(
       (validation.response.pageCopy.heroTitle as { "zh-CN": string })["zh-CN"],
-      chinese
+      "你来这里是为了能量、更强的心脏和健身。"
     );
   });
 
   it("rejects extra top-level fields that try to alter locked facts", () => {
-    const validation = validate({
-      ...validResponse(),
-      locked: { score: 99 }
-    });
+    const healthScore = scoreFor("en");
+    const validation = validate(
+      {
+        ...validResponse(healthScore),
+        locked: { score: 99 }
+      },
+      healthScore
+    );
 
     assert.ok(
       validation.errors.some((error) =>
@@ -263,14 +298,16 @@ describe("HealthScore AI copy validator", () => {
   });
 
   it("rejects banned copy substrings", () => {
-    const response = mutableResponse();
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
+    const seed = healthScore.pageContent!.copySeeds.subtraction.body;
 
     response.pageCopy.subtractionBody = {
-      en: "Get tested with bloodwork before doing anything.",
-      th: "ข้อความไทย"
+      en: `${seed} Get tested with bloodwork before doing anything.`,
+      th: `${seed} Get tested with bloodwork before doing anything.`
     };
 
-    const validation = validate(response);
+    const validation = validate(response, healthScore);
 
     assert.ok(
       validation.errors.some((error) => error.includes("forbidden term"))
@@ -278,14 +315,15 @@ describe("HealthScore AI copy validator", () => {
   });
 
   it("rejects singular/plural anomalies in localized copy", () => {
-    const response = mutableResponse();
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
 
     response.pageCopy.findingsHeadline = {
       en: "1 things a generic vitamin quiz would have missed.",
-      th: "1 เรื่องที่แบบทดสอบวิตามินทั่วไปมักมองข้าม"
+      th: "1 things a generic vitamin quiz would have missed."
     };
 
-    const validation = validate(response);
+    const validation = validate(response, healthScore);
 
     assert.ok(
       validation.errors.some((error) =>
@@ -295,11 +333,16 @@ describe("HealthScore AI copy validator", () => {
   });
 
   it("rejects wrong card counts", () => {
-    const response = mutableResponse();
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
+    const seeds = healthScore.pageContent!.copySeeds;
 
-    response.pageCopy.methodCards = localizedCards(2, "title");
+    response.pageCopy.methodCards = seeds.methodCards.slice(0, 2).map((card) => ({
+      body: bilingual(card.body),
+      title: bilingual(card.title)
+    }));
 
-    const validation = validate(response);
+    const validation = validate(response, healthScore);
 
     assert.ok(
       validation.errors.some((error) =>
@@ -309,17 +352,17 @@ describe("HealthScore AI copy validator", () => {
   });
 
   it("rejects schema drift inside cards", () => {
-    const response = mutableResponse();
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
+    const seeds = healthScore.pageContent!.copySeeds;
 
-    response.pageCopy.gapTrio = [
-      ...localizedCards(2),
-      {
-        ...localizedCards(1)[0],
-        lockedScore: 47
-      }
-    ];
+    response.pageCopy.gapTrio = seeds.gapTrio.map((card, index) => ({
+      body: bilingual(card.body),
+      headline: bilingual(card.headline),
+      ...(index === 2 ? { lockedScore: 47 } : {})
+    }));
 
-    const validation = validate(response);
+    const validation = validate(response, healthScore);
 
     assert.ok(
       validation.errors.some((error) =>
@@ -329,30 +372,104 @@ describe("HealthScore AI copy validator", () => {
   });
 
   it("strips harmless deterministic seed metadata echoed inside cards", () => {
-    const response = mutableResponse();
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
+    const seeds = healthScore.pageContent!.copySeeds;
 
-    response.pageCopy.gapTrio = localizedCards(3).map((card, index) => ({
-      ...card,
+    response.pageCopy.gapTrio = seeds.gapTrio.map((card, index) => ({
+      body: bilingual(card.body),
+      headline: bilingual(card.headline),
       tag: `GAP ${index + 1}`,
       value: `${index + 1}`
     }));
-    response.pageCopy.findings = localizedCards(3).map((card, index) => ({
-      ...card,
+    response.pageCopy.findings = seeds.findings.map((card, index) => ({
+      body: bilingual(card.body),
+      headline: bilingual(card.headline),
       code: `FINDING_${index + 1}`,
       icon: "*"
     }));
 
-    const validation = validate(response);
+    const validation = validate(response, healthScore);
 
     assert.deepEqual(validation.errors, []);
     assert.ok(validation.response);
     assert.equal(
       (validation.response.pageCopy.gapTrio?.[0]?.headline as { en: string }).en,
-      "Card 1"
+      seeds.gapTrio[0]?.headline
     );
     assert.equal(
       "tag" in (validation.response.pageCopy.gapTrio?.[0] ?? {}),
       false
+    );
+  });
+
+  it("rejects score numbers injected into unrelated rewritable fields", () => {
+    const healthScore = scoreFor("en");
+    assert.equal(healthScore.score, 47);
+
+    const response = mutableResponse(healthScore);
+    const seedHero = healthScore.pageContent!.copySeeds.heroBody;
+    // heroBody seed has no "47"; global seed still has it via bandLine/score.
+    assert.equal(/\b47\b/.test(seedHero), false);
+
+    const injected =
+      "Your 47 score shows up even though this hero sentence never had that number.";
+    response.pageCopy.heroBody = bilingual(injected);
+
+    const validation = validate(response, healthScore, "en");
+
+    assert.ok(
+      validation.errors.some(
+        (error) =>
+          error.includes("pageCopy.heroBody") &&
+          error.includes("integer literal 47") &&
+          error.includes("that field's engine seed")
+      ),
+      `expected per-field numeric rejection, got: ${validation.errors.join(" | ")}`
+    );
+  });
+
+  it("rejects polished copy outside the 0.5x–1.5x seed length band", () => {
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
+    const seedHero = healthScore.pageContent!.copySeeds.heroBody;
+    assert.ok(seedHero.length > 100);
+
+    const bloated = `${seedHero} ${"x".repeat(2100)}`;
+    assert.ok(bloated.length > seedHero.length * 1.5);
+    response.pageCopy.heroBody = bilingual(bloated);
+
+    const validation = validate(response, healthScore, "en");
+
+    assert.ok(
+      validation.errors.some(
+        (error) =>
+          error.includes("pageCopy.heroBody") &&
+          error.includes("outside 0.5x–1.5x")
+      ),
+      `expected length sanity rejection, got: ${validation.errors.join(" | ")}`
+    );
+  });
+
+  it("allows dropping a seed number but not moving it into another field", () => {
+    const healthScore = scoreFor("en");
+    const response = mutableResponse(healthScore);
+    const seeds = healthScore.pageContent!.copySeeds;
+
+    // Dropping the score from bandLine is allowed; introducing it into heroBody is not.
+    response.pageCopy.bandLine = bilingual(
+      seeds.bandLine.replace(/\b47\b/g, "score").replace(/\s+/g, " ").trim()
+    );
+
+    const validationOk = validate(response, healthScore, "en");
+    assert.deepEqual(validationOk.errors, []);
+
+    response.pageCopy.heroBody = bilingual(`${seeds.heroBody} Score 47.`);
+    const validationBad = validate(response, healthScore, "en");
+    assert.ok(
+      validationBad.errors.some((error) =>
+        error.includes("pageCopy.heroBody introduced integer literal 47")
+      )
     );
   });
 });

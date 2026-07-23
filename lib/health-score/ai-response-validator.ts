@@ -368,60 +368,148 @@ function validateNoForbiddenCopy(value: unknown, errors: string[]) {
 }
 
 /**
- * Handoff §07: polished text must not introduce integer literals that were not
- * present in the deterministic engine seed (prevents score/hallucination drift).
+ * Handoff §07 §4b/§4e: for each rewritable field, polished text may only use
+ * integer literals present in that field's engine seed, and must stay within
+ * 0.5x–1.5x of the seed length. Checks are per-field (not global seed allow-list).
  */
-function collectSeedIntegers(seed: unknown, into: Set<number>) {
-  if (typeof seed === "number" && Number.isFinite(seed)) {
-    into.add(Math.trunc(seed));
+function polishedStringsForLocales(
+  value: LocalizedHealthScoreText | undefined,
+  locales: readonly string[]
+): string[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  if (typeof value === "string") {
+    return value.trim() ? [value.trim()] : [];
+  }
+
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  const matched = locales
+    .map((locale) => value[locale])
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim());
+
+  if (matched.length > 0) {
+    return matched;
+  }
+
+  // Legacy multi-locale objects without the requested key still get checked.
+  return Object.values(value)
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim());
+}
+
+function validatePolishedFieldAgainstSeed({
+  errors,
+  locales,
+  path,
+  polished,
+  seed
+}: Readonly<{
+  errors: string[];
+  locales: readonly string[];
+  path: string;
+  polished: LocalizedHealthScoreText | undefined;
+  seed: string | null | undefined;
+}>) {
+  if (seed === undefined || seed === null || seed.length === 0) {
     return;
   }
 
-  if (typeof seed === "string") {
-    for (const value of extractIntegerLiterals(seed)) {
-      into.add(value);
+  const seedInts = extractIntegerLiterals(seed);
+  const seedLength = seed.length;
+
+  for (const text of polishedStringsForLocales(polished, locales)) {
+    for (const value of extractIntegerLiterals(text)) {
+      if (!seedInts.has(value)) {
+        errors.push(
+          `${path} introduced integer literal ${value} not present in that field's engine seed`
+        );
+      }
     }
-    return;
-  }
 
-  if (Array.isArray(seed)) {
-    for (const item of seed) {
-      collectSeedIntegers(item, into);
-    }
-    return;
-  }
-
-  if (isRecord(seed)) {
-    for (const item of Object.values(seed)) {
-      collectSeedIntegers(item, into);
+    const ratio = text.length / seedLength;
+    if (ratio < 0.5 || ratio > 1.5) {
+      errors.push(
+        `${path} length ${text.length} is outside 0.5x–1.5x of engine seed (${seedLength})`
+      );
     }
   }
 }
 
-function validateNumericLiteralsSubset(
-  polished: unknown,
-  seed: unknown,
-  errors: string[]
-) {
-  if (seed === undefined || seed === null) {
+function validatePageCopyAgainstSeeds({
+  errors,
+  locales,
+  pageContent,
+  pageCopy
+}: Readonly<{
+  errors: string[];
+  locales: readonly string[];
+  pageContent: HealthScoreResult["pageContent"];
+  pageCopy: HealthScorePageAiCopy;
+}>) {
+  const seeds = pageContent?.copySeeds;
+  if (!seeds) {
     return;
   }
 
-  const seedInts = new Set<number>();
-  collectSeedIntegers(seed, seedInts);
-  // Calibration constants that appear in spectrum/relativity chrome.
-  for (const value of [30, 60, 92, 96, 100]) {
-    seedInts.add(value);
-  }
+  const check = (
+    path: string,
+    polished: LocalizedHealthScoreText | undefined,
+    seed: string | null | undefined
+  ) =>
+    validatePolishedFieldAgainstSeed({
+      errors,
+      locales,
+      path,
+      polished,
+      seed
+    });
 
-  walkStrings(polished, (item) => {
-    for (const value of extractIntegerLiterals(item)) {
-      if (!seedInts.has(value)) {
-        errors.push(
-          `copy introduced integer literal ${value} not present in engine seed`
-        );
-      }
-    }
+  check("pageCopy.bandLine", pageCopy.bandLine, seeds.bandLine);
+  check("pageCopy.heroBody", pageCopy.heroBody, seeds.heroBody);
+  check("pageCopy.findingsHeadline", pageCopy.findingsHeadline, seeds.findingsHeadline);
+  check("pageCopy.findingsSub", pageCopy.findingsSub, seeds.findingsSub);
+  check(
+    "pageCopy.highestLeverageBody",
+    pageCopy.highestLeverageBody,
+    seeds.highestLeverage?.text
+  );
+  check("pageCopy.methodHeadline", pageCopy.methodHeadline, seeds.methodHeadline);
+  check("pageCopy.pillarHeadline", pageCopy.pillarHeadline, seeds.pillarHeadline);
+  check(
+    "pageCopy.relativityHeadline",
+    pageCopy.relativityHeadline,
+    seeds.relativity.headline
+  );
+  check("pageCopy.relativitySub", pageCopy.relativitySub, seeds.relativity.sub);
+  check("pageCopy.strengthNote", pageCopy.strengthNote, seeds.strengthNote);
+  check("pageCopy.subtractionBody", pageCopy.subtractionBody, seeds.subtraction.body);
+  // heroTitle / legacy overview+paywall slots have no direct engine seed string.
+
+  const gapTrio = pageCopy.gapTrio ?? [];
+  seeds.gapTrio.forEach((seedCard, index) => {
+    const polished = gapTrio[index];
+    check(`pageCopy.gapTrio[${index}].headline`, polished?.headline, seedCard.headline);
+    check(`pageCopy.gapTrio[${index}].body`, polished?.body, seedCard.body);
+  });
+
+  const findings = pageCopy.findings ?? [];
+  seeds.findings.forEach((seedCard, index) => {
+    const polished = findings[index];
+    check(`pageCopy.findings[${index}].headline`, polished?.headline, seedCard.headline);
+    check(`pageCopy.findings[${index}].body`, polished?.body, seedCard.body);
+  });
+
+  const methodCards = pageCopy.methodCards ?? [];
+  seeds.methodCards.forEach((seedCard, index) => {
+    const polished = methodCards[index];
+    check(`pageCopy.methodCards[${index}].title`, polished?.title, seedCard.title);
+    check(`pageCopy.methodCards[${index}].body`, polished?.body, seedCard.body);
   });
 }
 
@@ -584,16 +672,14 @@ export function validateHealthScoreAiResponse({
       } satisfies HealthScoreAdvice;
 
   validateNoForbiddenCopy({ advice, pageCopy }, errors);
-  validateNumericLiteralsSubset(
-    { advice, pageCopy },
-    {
-      band: healthScore.band,
-      copySeeds: pageContent?.copySeeds,
-      domains: healthScore.domains,
-      score: healthScore.score
-    },
-    errors
-  );
+  // Stage 6 §4b/§4e apply to rewritable pageCopy fields vs engine copySeeds.
+  // Legacy advice/paywall slots are not 1:1 with seed strings.
+  validatePageCopyAgainstSeeds({
+    errors,
+    locales,
+    pageContent,
+    pageCopy
+  });
 
   return errors.length > 0
     ? { errors }
