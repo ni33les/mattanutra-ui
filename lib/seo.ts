@@ -200,11 +200,20 @@ export function localizedAlternates(input: Readonly<{
   };
 }
 
+/** Default library / marketing share-card dimensions (hand-off OG assets). */
+export const SOCIAL_SHARE_IMAGE_WIDTH = 1200;
+export const SOCIAL_SHARE_IMAGE_HEIGHT = 630;
+export const SOCIAL_SITE_NAME = "MattaNutra";
+
 export function localizedMetadata(input: Readonly<{
   description: string;
   image?: string;
   /** Optional alt for og:image:alt / twitter:image:alt. */
   imageAlt?: string;
+  /** Optional explicit OG image height (defaults to 630 for library share cards). */
+  imageHeight?: number;
+  /** Optional explicit OG image width (defaults to 1200 for library share cards). */
+  imageWidth?: number;
   indexable?: boolean;
   locale: Locale;
   /**
@@ -223,7 +232,11 @@ export function localizedMetadata(input: Readonly<{
   openGraphDescription?: string;
   /** Open Graph title; defaults to title (document title). */
   openGraphTitle?: string;
+  /** Open Graph type; defaults to website. Use "article" for library posts. */
+  openGraphType?: "website" | "article";
   path: string;
+  /** Brand shown as og:site_name; defaults to MattaNutra. */
+  siteName?: string;
   title: string;
   translatedPaths?: Partial<Record<LocaleCode, string>>;
   /** Twitter description; defaults to openGraphDescription then description. */
@@ -240,17 +253,23 @@ export function localizedMetadata(input: Readonly<{
     input.translatedPaths?.[input.locale] ?? localizedPath(input.locale, input.path);
   const imageUrl = input.image ? absoluteUrl(input.image) : undefined;
   const imageAlt = input.imageAlt?.trim() || undefined;
+  const imageWidth = input.imageWidth ?? (imageUrl ? SOCIAL_SHARE_IMAGE_WIDTH : undefined);
+  const imageHeight = input.imageHeight ?? (imageUrl ? SOCIAL_SHARE_IMAGE_HEIGHT : undefined);
   const openGraphTitle = input.openGraphTitle ?? input.title;
   const openGraphDescription = input.openGraphDescription ?? input.description;
   const twitterTitle = input.twitterTitle ?? openGraphTitle;
   const twitterDescription = input.twitterDescription ?? openGraphDescription;
   const includeTwitter = input.includeTwitter !== false;
   const manualSocialTags = input.manualSocialTags === true;
+  const siteName = input.siteName?.trim() || SOCIAL_SITE_NAME;
+  const openGraphType = input.openGraphType ?? "website";
   const openGraphImages = imageUrl
     ? [
         {
           alt: imageAlt,
-          url: imageUrl
+          height: imageHeight,
+          url: imageUrl,
+          width: imageWidth
         }
       ]
     : undefined;
@@ -274,8 +293,9 @@ export function localizedMetadata(input: Readonly<{
           description: openGraphDescription,
           images: openGraphImages,
           locale: localeHtmlLang(input.locale).replace("-", "_"),
+          siteName,
           title: openGraphTitle,
-          type: "website",
+          type: openGraphType,
           url: absoluteUrl(currentCanonicalPath)
         },
     robots: indexable
@@ -314,11 +334,19 @@ export function libraryIndexManualSocialMeta(input: Readonly<{
     pageUrl,
     tags: [
       { content: "website", property: "og:type" },
-      { content: "MattaNutra", property: "og:site_name" },
+      { content: SOCIAL_SITE_NAME, property: "og:site_name" },
       { content: input.title, property: "og:title" },
       { content: input.description, property: "og:description" },
       { content: pageUrl, property: "og:url" },
       { content: imageUrl, property: "og:image" },
+      {
+        content: String(SOCIAL_SHARE_IMAGE_WIDTH),
+        property: "og:image:width"
+      },
+      {
+        content: String(SOCIAL_SHARE_IMAGE_HEIGHT),
+        property: "og:image:height"
+      },
       {
         content: localeHtmlLang(input.locale).replace("-", "_"),
         property: "og:locale"

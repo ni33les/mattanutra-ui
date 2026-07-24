@@ -398,16 +398,31 @@ def build_translation(
     quiz = parse_quiz_from_markup(markup, locale, defaults)
     faqs = extract_faqs(markup)
 
+    # Social tags from hand-off HTML (often shorter / better for LINE & messengers).
+    og_title = zb.meta_content(root, prop="og:title") or title
+    og_description = zb.meta_content(root, prop="og:description") or description
+    twitter_title = zb.meta_content(root, name="twitter:title") or og_title
+    twitter_description = (
+        zb.meta_content(root, name="twitter:description") or og_description
+    )
+    # Prefer bare social titles (zip is already bare; strip library suffix if present).
+    og_title = strip_title(og_title)
+    twitter_title = strip_title(twitter_title)
+
     return {
         "blocks": blocks,
         "description": description,
         "excerpt": excerpt,
         "faqs": faqs,
         "imageAlt": title,
+        "ogDescription": og_description,
+        "ogTitle": og_title,
         "page": {"nodes": nodes},
         "quiz": quiz,
         "seoTitle": title,
         "title": title,
+        "twitterDescription": twitter_description,
+        "twitterTitle": twitter_title,
     }
 
 
@@ -451,10 +466,19 @@ def clone_translation_with_locale_hrefs(
         "excerpt": source.get("excerpt") or source.get("description") or "",
         "faqs": source.get("faqs") or [],
         "imageAlt": source.get("imageAlt") or source.get("title") or slug,
+        "ogDescription": source.get("ogDescription") or source.get("description"),
+        "ogTitle": source.get("ogTitle") or source.get("seoTitle") or source.get("title"),
         "page": {"nodes": nodes},
         "quiz": quiz if locale == "en" else zb.existing_quiz(None, locale),
         "seoTitle": source.get("seoTitle") or source.get("title") or slug,
         "title": source.get("title") or slug,
+        "twitterDescription": source.get("twitterDescription")
+        or source.get("ogDescription")
+        or source.get("description"),
+        "twitterTitle": source.get("twitterTitle")
+        or source.get("ogTitle")
+        or source.get("seoTitle")
+        or source.get("title"),
     }
 
 

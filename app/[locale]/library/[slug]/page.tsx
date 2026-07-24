@@ -76,13 +76,21 @@ export async function generateMetadata({
   const twitterTitle = article.twitterTitle ?? openGraphTitle;
   const twitterDescription =
     article.twitterDescription ?? openGraphDescription;
+  const imageAlt =
+    article.visualTranslation?.imageAlt?.trim() || openGraphTitle;
 
   return localizedMetadata({
     description: article.seoDescription,
     image: article.shareImage,
+    imageAlt,
+    // Library share cards are hand-off 1200×630 assets.
+    imageHeight: 630,
+    imageWidth: 1200,
     locale,
     openGraphDescription,
     openGraphTitle,
+    // Zip hand-off uses og:type=article for knowledge posts.
+    openGraphType: "article",
     path: `/library/${article.slug}`,
     // Hand-off document titles: "<seoTitle> | คลังความรู้ MattaNutra" / "| The MattaNutra Library"
     title: `${article.seoTitle} | ${libraryCopy.eyebrow}`,
