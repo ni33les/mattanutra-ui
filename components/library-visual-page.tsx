@@ -13,8 +13,27 @@ import { nutritionQuizPath } from "@/lib/nutrition-paths";
 type RenderContext = Readonly<{
   inCta: boolean;
   inHero: boolean;
+  /** Parent element className — used to restore zip card wrappers for fragments. */
+  parentClassName?: string | null;
   questionId?: string;
 }>;
+
+/** Zip articles wrap grid cells in stance/benefit/insight/it; importer often uses bare fragments. */
+function fragmentCardClass(parentClassName: string | null | undefined) {
+  if (hasClass(parentClassName, "three")) {
+    return "stance";
+  }
+  if (hasClass(parentClassName, "benefits")) {
+    return "benefit";
+  }
+  if (hasClass(parentClassName, "own-grid")) {
+    return "insight";
+  }
+  if (hasClass(parentClassName, "trust")) {
+    return "it";
+  }
+  return null;
+}
 
 type LibraryVisualPageProps = Readonly<{
   articleUrl: string;
@@ -236,8 +255,12 @@ function elementProps(
   }
 
   for (const [key, value] of Object.entries(attrs)) {
-    if (
-      key === "className" ||
+    if (key === "class" || key === "className") {
+      // HTML importer may emit either; React needs className.
+      const previous =
+        typeof props.className === "string" ? props.className : "";
+      props.className = [previous, String(value)].filter(Boolean).join(" ");
+    } else if (
       key === "id" ||
       key === "role" ||
       key === "aria-label" ||
@@ -423,22 +446,81 @@ export function LibraryVisualPage({
         );
       }
 
+      // Prefer block wrappers: zip uses article/div cards; span collapses layout.
+      const cardClass = fragmentCardClass(context.parentClassName);
+      const fragmentClassName = [
+        cardClass,
+        "mn-library-fragment",
+        cardClass ? "reveal" : null
+      ]
+        .filter(Boolean)
+        .join(" ");
+
       return (
-        <span className="mn-library-fragment" key={key}>
+        <div className={fragmentClassName} key={key}>
           {node.children.map((child, index) =>
             renderNode(child, `${key}:${index}`, context)
           )}
-        </span>
+        </div>
       );
     }
 
     if (node.type === "icon") {
+      const iconClasses = classList(node.className);
+      if (!iconClasses.includes("ic")) {
+        iconClasses.unshift("ic");
+      }
+      const className = iconClasses.join(" ");
+      const shapes = "shapes" in node ? node.shapes : undefined;
+      const viewBox =
+        "viewBox" in node && typeof node.viewBox === "string"
+          ? node.viewBox
+          : "0 0 24 24";
+
+      // Zip SVGs are real icons; empty placeholders look broken in details/trust/ai.
+      if (shapes && shapes.length > 0) {
+        return (
+          <svg
+            aria-hidden={true}
+            className={className}
+            fill="none"
+            key={key}
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.9}
+            viewBox={viewBox}
+          >
+            {shapes.map((shape, index) => {
+              if (shape.type === "path") {
+                return <path d={shape.d} key={`${key}:p:${index}`} />;
+              }
+              if (shape.type === "circle") {
+                return (
+                  <circle
+                    cx={shape.cx}
+                    cy={shape.cy}
+                    key={`${key}:c:${index}`}
+                    r={shape.r}
+                  />
+                );
+              }
+              return (
+                <rect
+                  height={shape.height}
+                  key={`${key}:r:${index}`}
+                  width={shape.width}
+                  x={shape.x}
+                  y={shape.y}
+                />
+              );
+            })}
+          </svg>
+        );
+      }
+
       return (
-        <span
-          aria-hidden={true}
-          className={["ic", node.className].filter(Boolean).join(" ")}
-          key={key}
-        />
+        <span aria-hidden={true} className={className} key={key} />
       );
     }
 
@@ -453,32 +535,50 @@ export function LibraryVisualPage({
         classes.includes("nong") ||
         classes.includes("nong-sleep") ||
         node.src.includes("/assets/library/nong/");
+      // Zip CTA Nong is a small footer figure (~170px), not a full-hero portrait.
+      // HTML width/height from the asset (often 1024×1536) must not size the layout.
+      const inCta = context.inCta;
+      const className = [imageClassName(node), inCta ? "mn-cta-nong" : null]
+        .filter(Boolean)
+        .join(" ");
+      const displayWidth = inCta ? 200 : node.width;
+      const displayHeight = inCta
+        ? Math.max(1, Math.round((200 * node.height) / Math.max(node.width, 1)))
+        : node.height;
 
       return (
         <Image
           alt={node.alt}
-          className={imageClassName(node)}
-          height={node.height}
+          className={className}
+          height={displayHeight}
           key={key}
           loading={priority ? "eager" : "lazy"}
           priority={priority}
           sizes={
-            priority
-              ? "(min-width: 1024px) 520px, 82vw"
-              : "(min-width: 1024px) 360px, 82vw"
+            inCta
+              ? "(min-width: 1000px) 200px, 0px"
+              : priority
+                ? "(min-width: 1024px) 520px, 82vw"
+                : "(min-width: 1024px) 360px, 82vw"
           }
           src={node.src}
+          style={
+            inCta
+              ? { width: "auto", height: "auto", maxHeight: 170, maxWidth: 220 }
+              : undefined
+          }
           unoptimized={node.src.startsWith("/assets/library/")}
-          width={node.width}
+          width={displayWidth}
         />
       );
     }
 
     const attrs = node.attrs ?? {};
     const tagClassName = attrString(attrs, "className");
-    const nextContext = {
+    const nextContext: RenderContext = {
       inCta: context.inCta || hasClass(tagClassName, "cta"),
       inHero: context.inHero || hasClass(tagClassName, "hero"),
+      parentClassName: tagClassName,
       questionId: hasClass(tagClassName, "q") ? `q:${key}` : context.questionId
     };
     const renderedChildren = node.children.map((child, index) =>

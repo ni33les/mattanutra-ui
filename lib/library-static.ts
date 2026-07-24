@@ -40,6 +40,7 @@ export type VisualKnowledgeQuiz = Readonly<{
 
 type VisualKnowledgeElementTag =
   | "a"
+  | "article"
   | "aside"
   | "b"
   | "button"
@@ -71,6 +72,26 @@ type VisualKnowledgeElementTag =
   | "tr"
   | "ul";
 
+/** Lightweight SVG shape data preserved from zip icon markup. */
+export type VisualKnowledgeIconShape =
+  | Readonly<{
+      d: string;
+      type: "path";
+    }>
+  | Readonly<{
+      cx: string;
+      cy: string;
+      r: string;
+      type: "circle";
+    }>
+  | Readonly<{
+      height: string;
+      type: "rect";
+      width: string;
+      x: string;
+      y: string;
+    }>;
+
 export type VisualKnowledgeNode =
   | Readonly<{
       text: string;
@@ -82,7 +103,9 @@ export type VisualKnowledgeNode =
     }>
   | Readonly<{
       className?: string;
+      shapes?: readonly VisualKnowledgeIconShape[];
       type: "icon";
+      viewBox?: string;
     }>
   | Readonly<{
       alt: string;

@@ -48,6 +48,7 @@ VOID_TAGS = {
 SKIP_TAGS = {"script", "style"}
 RENDER_TAGS = {
     "a",
+    "article",  # zip stance/missing-card/package wrappers
     "aside",
     "b",
     "button",
@@ -621,9 +622,55 @@ def node_to_payload(
             "width": width,
         }
     if node.tag == "svg":
+        shapes: list[dict[str, str]] = []
+        for child in node.children:
+            if child.tag is None:
+                continue
+            if child.tag == "path" and child.attrs.get("d"):
+                shapes.append({"type": "path", "d": child.attrs["d"]})
+            elif child.tag == "circle" and child.attrs.get("r"):
+                shapes.append(
+                    {
+                        "type": "circle",
+                        "cx": child.attrs.get("cx", "0"),
+                        "cy": child.attrs.get("cy", "0"),
+                        "r": child.attrs["r"],
+                    }
+                )
+            elif child.tag == "rect":
+                shapes.append(
+                    {
+                        "type": "rect",
+                        "x": child.attrs.get("x", "0"),
+                        "y": child.attrs.get("y", "0"),
+                        "width": child.attrs.get("width", "0"),
+                        "height": child.attrs.get("height", "0"),
+                    }
+                )
+            # Nested groups / multi-path icons
+            elif child.children:
+                for grand in child.children:
+                    if grand.tag == "path" and grand.attrs.get("d"):
+                        shapes.append({"type": "path", "d": grand.attrs["d"]})
+                    elif grand.tag == "circle" and grand.attrs.get("r"):
+                        shapes.append(
+                            {
+                                "type": "circle",
+                                "cx": grand.attrs.get("cx", "0"),
+                                "cy": grand.attrs.get("cy", "0"),
+                                "r": grand.attrs["r"],
+                            }
+                        )
+        view_box = (
+            node.attrs.get("viewbox")
+            or node.attrs.get("viewBox")
+            or "0 0 24 24"
+        )
         return {
             "type": "icon",
             "className": node.attrs.get("class", "ic"),
+            "viewBox": view_box,
+            "shapes": shapes,
         }
     node_classes = node.attrs.get("class", "").split()
     child_inside_related = inside_related or "related" in node_classes
@@ -664,6 +711,14 @@ def node_to_payload(
         ]
         if not children:
             return None
+        # Preserve structural classes (e.g. rare tags) as a div so CSS modules still match.
+        if node.attrs.get("class"):
+            return {
+                "type": "element",
+                "tag": "div",
+                "attrs": renderable_attrs(node.attrs, locale, slug, memory, cache),
+                "children": children,
+            }
         return {"type": "fragment", "children": children}
     children = [
         child_payload
