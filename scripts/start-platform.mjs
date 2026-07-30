@@ -327,6 +327,10 @@ async function checkWorkerCredentials() {
   }
 
   try {
+    // --repair rewrites agent_credentials.credential_hash to match the live
+    // WORKER_*_AGENT_API_KEY values. On App Platform those keys are ENCRYPTED
+    // (EV[...]) at rest and only decrypt inside this runtime, so repair must
+    // run here — not from a laptop that only sees the ciphertext via the API.
     await runOneShotProcess(
       "worker auth preflight",
       process.execPath,
@@ -337,6 +341,7 @@ async function checkWorkerCredentials() {
         "./scripts/register-ts-path-loader.mjs",
         "scripts/workers-doctor.ts",
         "--configured-only",
+        "--repair",
         "--require-all",
       ],
       process.env,
@@ -348,7 +353,7 @@ async function checkWorkerCredentials() {
 
     console.error(`[platform] worker auth preflight failed: ${message}`);
     console.error(
-      "[platform] web is running without platform workers. Run npm run workers:doctor -- --repair --require-all with the same DB_URL and worker env, then redeploy.",
+      "[platform] web is running without platform workers. Credential repair runs at boot; if this persists, check WORKER_*_AGENT_API_KEY and DB_URL on the App Platform component, then redeploy.",
     );
 
     return false;
