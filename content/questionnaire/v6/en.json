@@ -1633,7 +1633,8 @@
     "processing": "Building your Health Score…",
     "processingError": "Something went wrong building your Health Score. Please try again.",
     "saved": "Saved",
-    "edit": "Edit"
+    "edit": "Edit",
+    "inThisSection": "In this section we…"
   },
   "meta": {
     "skinColors": [

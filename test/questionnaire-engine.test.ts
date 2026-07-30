@@ -57,7 +57,7 @@ describe("questionnaire engine v6", () => {
     assert.ok(started.events.some((e) => e.type === "chat_start"));
   });
 
-  it("shows Part 1 section after firstName, then goals", () => {
+  it("shows Part 1 section after firstName, then goals, with fresh section chat", () => {
     let { state } = startQuestionnaire(
       createInitialState({ locale: "en", channel: "agent" })
     );
@@ -68,9 +68,17 @@ describe("questionnaire engine v6", () => {
     }
 
     state = r.state;
-    assert.ok(state.log.some((m) => m.kind === "ack" && m.id === "meet"));
+    // Section open clears transcript — no lingering firstName bubbles
+    assert.ok(!state.log.some((m) => m.kind === "user"));
+    assert.ok(!state.log.some((m) => m.kind === "intro"));
     assert.ok(state.log.some((m) => m.kind === "section" && m.sectionIndex === 0));
+    const section = state.log.find((m) => m.kind === "section");
+    assert.ok(section && section.kind === "section");
+    if (section && section.kind === "section") {
+      assert.match(section.leadIn, /In this section/i);
+    }
     assert.equal(getNextPrompt(state).turn?.k, "goals");
+    assert.equal(state.answers.firstName, "Alex");
   });
 
   it("vegan diet autofills food frequencies and skips those turns", () => {

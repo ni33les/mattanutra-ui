@@ -96,8 +96,11 @@ export function ChatQuestionnaire({
 }: ChatQuestionnaireProps) {
   const router = useRouter();
   const logEndRef = useRef<HTMLDivElement | null>(null);
+  const logScrollRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [composerFocusPulse, setComposerFocusPulse] = useState(false);
   const [composerError, setComposerError] = useState("");
   const [multiSel, setMultiSel] = useState<string[]>([]);
   const [textValue, setTextValue] = useState("");
@@ -207,10 +210,15 @@ export function ChatQuestionnaire({
   }, [locale, returningPlanId, track]);
 
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const scroller = logScrollRef.current;
+    if (scroller) {
+      scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+    } else {
+      logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
   }, [state?.log.length, currentTurn?.k]);
 
-  // Reset composer draft when turn changes
+  // Reset composer draft when turn changes + pull focus to answers
   useEffect(() => {
     setComposerError("");
     setMultiSel([]);
@@ -240,7 +248,26 @@ export function ChatQuestionnaire({
       setVo2(String(state?.answers.vo2 ?? ""));
       setHrv(String(state?.answers.hrv ?? ""));
     }
-  }, [currentTurn?.k, currentTurn?.kind, definition.meta, state?.answers]);
+
+    // Draw attention to answer controls after each new question
+    const focusTimer = window.setTimeout(() => {
+      const root = composerRef.current;
+      if (!root || state?.phase !== "active") {
+        return;
+      }
+
+      setComposerFocusPulse(true);
+      window.setTimeout(() => setComposerFocusPulse(false), 900);
+
+      const target = root.querySelector<HTMLElement>(
+        "button.mn-chat-q__chip, button.mn-chat-q__swatch, button.mn-chat-q__primary, input, button.mn-chat-q__ghost"
+      );
+      target?.focus({ preventScroll: true });
+      root.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 80);
+
+    return () => window.clearTimeout(focusTimer);
+  }, [currentTurn?.k, currentTurn?.kind, definition.meta, state?.answers, state?.phase]);
 
   const finalize = useCallback(
     async (completed: QuestionnaireState) => {
@@ -433,6 +460,9 @@ export function ChatQuestionnaire({
           <div className="mn-chat-q__bubble">
             <div className="mn-chat-q__sec-eyebrow">{msg.eyebrow}</div>
             <div className="mn-chat-q__sec-title">{msg.title}</div>
+            <div className="mn-chat-q__sec-lead">
+              {msg.leadIn || ui.inThisSection || "In this section we…"}
+            </div>
             <div className="mn-chat-q__sec-desc">{msg.desc}</div>
           </div>
         </div>
@@ -941,23 +971,33 @@ export function ChatQuestionnaire({
         </div>
       </div>
 
-      <div className="mn-chat-q__log" role="log" aria-live="polite">
-        {state?.log.map((msg, index) => renderLogItem(msg, index))}
-        {processing ? (
-          <div className="mn-chat-q__processing">
-            <strong>{ui.processing || "Building your Health Score…"}</strong>
-            <span>
-              {(ui.doneBodyNoName || "Precision {pct}%")
-                .replace("{pct}", String(precision))
-                .replace("{name}", "")}
-            </span>
-          </div>
-        ) : null}
-        <div ref={logEndRef} />
-      </div>
+      <div className="mn-chat-q__frame">
+        <div
+          className="mn-chat-q__log"
+          role="log"
+          aria-live="polite"
+          ref={logScrollRef}
+        >
+          {state?.log.map((msg, index) => renderLogItem(msg, index))}
+          {processing ? (
+            <div className="mn-chat-q__processing">
+              <strong>{ui.processing || "Building your Health Score…"}</strong>
+              <span>
+                {(ui.doneBodyNoName || "Precision {pct}%")
+                  .replace("{pct}", String(precision))
+                  .replace("{name}", "")}
+              </span>
+            </div>
+          ) : null}
+          <div ref={logEndRef} />
+        </div>
 
-      <div className="mn-chat-q__composer">
-        <div className="mn-chat-q__composer-inner">{renderComposer()}</div>
+        <div
+          className={`mn-chat-q__composer${composerFocusPulse ? " mn-chat-q__composer--focus" : ""}`}
+          ref={composerRef}
+        >
+          <div className="mn-chat-q__composer-inner">{renderComposer()}</div>
+        </div>
       </div>
 
       {showDevShortcut && process.env.NODE_ENV !== "production" ? (

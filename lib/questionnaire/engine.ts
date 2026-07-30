@@ -262,6 +262,13 @@ function appendLog(
   return { ...state, log: [...state.log, ...messages] };
 }
 
+function sectionLeadIn(definition: QuestionnaireDefinition): string {
+  return (
+    definition.ui.inThisSection ||
+    (definition.lang === "th" ? "ในส่วนนี้เราจะ…" : "In this section we…")
+  );
+}
+
 function sectionMessage(
   definition: QuestionnaireDefinition,
   sectionIndex: number
@@ -274,7 +281,26 @@ function sectionMessage(
     eyebrow: section.eyebrow,
     title: section.title,
     desc: section.desc,
+    leadIn: sectionLeadIn(definition),
     pose: section.pose || "open"
+  };
+}
+
+/** Fresh chat pane for a section — answers stay; transcript resets. */
+function openSectionTranscript(
+  definition: QuestionnaireDefinition,
+  state: QuestionnaireState,
+  turnIndex: number
+): QuestionnaireState {
+  const turn = definition.turns[turnIndex]!;
+  const withTurn = { ...state, turnIndex };
+
+  return {
+    ...withTurn,
+    log: [
+      sectionMessage(definition, turn.sec),
+      botMessage(definition, withTurn, turnIndex)
+    ]
   };
 }
 
@@ -432,33 +458,19 @@ export function startQuestionnaire(state: QuestionnaireState): {
     events.push({ type: "chat_start", sessionId: next.sessionId });
   }
 
+  const introMessage: LogMessage = {
+    kind: "intro",
+    pose: "ask",
+    text: definition.ui.introHi,
+    hint: definition.ui.introHint
+  };
+
   next = {
     ...next,
     phase: "active",
     startedAt: next.startedAt ?? Date.now(),
-    log:
-      next.log.length === 0
-        ? [
-            {
-              kind: "intro",
-              pose: "ask",
-              text: definition.ui.introHi,
-              hint: definition.ui.introHint
-            }
-          ]
-        : next.log
+    log: [introMessage]
   };
-
-  if (!next.log.some((m) => m.kind === "intro")) {
-    next = appendLog(next, [
-      {
-        kind: "intro",
-        pose: "ask",
-        text: definition.ui.introHi,
-        hint: definition.ui.introHint
-      }
-    ]);
-  }
 
   const first = nextOpenIndex(definition, next, 0);
 
@@ -467,20 +479,23 @@ export function startQuestionnaire(state: QuestionnaireState): {
   }
 
   const turn = definition.turns[first]!;
-  const messages: LogMessage[] = [];
 
-  // Section intro only when not nosec
-  if (
-    !turn.nosec &&
-    !next.log.some((m) => m.kind === "section" && m.sectionIndex === turn.sec)
-  ) {
-    messages.push(sectionMessage(definition, turn.sec));
+  if (turn.nosec) {
+    // Warm-up (firstName) — intro + question only
+    next = { ...next, turnIndex: first };
+    next = appendLog(next, [botMessage(definition, next, first)]);
+  } else {
     events.push({ type: "chat_part_break", sectionIndex: turn.sec });
+    next = {
+      ...next,
+      turnIndex: first,
+      log: [
+        introMessage,
+        sectionMessage(definition, turn.sec),
+        botMessage(definition, { ...next, turnIndex: first }, first)
+      ]
+    };
   }
-
-  next = appendLog(next, messages);
-  next = { ...next, turnIndex: first };
-  next = appendLog(next, [botMessage(definition, next, first)]);
 
   return { state: next, events };
 }
@@ -925,23 +940,22 @@ function advanceFrom(
   }
 
   const nextTurn = definition.turns[nextIdx]!;
+  const enteringNewSection =
+    nextTurn.sec !== current.sec ||
+    (Boolean(current.nosec) &&
+      !nextTurn.nosec &&
+      !next.log.some(
+        (m) => m.kind === "section" && m.sectionIndex === nextTurn.sec
+      ));
 
-  if (nextTurn.sec !== current.sec) {
-    events.push({ type: "chat_section_done", sectionIndex: current.sec });
-    if (!nextTurn.nosec) {
-      events.push({ type: "chat_part_break", sectionIndex: nextTurn.sec });
-      next = appendLog(next, [sectionMessage(definition, nextTurn.sec)]);
+  if (enteringNewSection && !nextTurn.nosec) {
+    if (nextTurn.sec !== current.sec) {
+      events.push({ type: "chat_section_done", sectionIndex: current.sec });
     }
-  } else if (
-    !nextTurn.nosec &&
-    !next.log.some(
-      (m) => m.kind === "section" && m.sectionIndex === nextTurn.sec
-    ) &&
-    // first section intro may be delayed until after nosec firstName
-    current.nosec
-  ) {
     events.push({ type: "chat_part_break", sectionIndex: nextTurn.sec });
-    next = appendLog(next, [sectionMessage(definition, nextTurn.sec)]);
+    // Clear chat transcript — new section feels like a fresh start
+    next = openSectionTranscript(definition, next, nextIdx);
+    return { ok: true, state: next, events };
   }
 
   next = { ...next, turnIndex: nextIdx };

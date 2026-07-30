@@ -117,6 +117,8 @@ export type LogMessage =
       eyebrow: string;
       title: string;
       desc: string;
+      /** e.g. "In this section we…" — product lead-in before desc */
+      leadIn: string;
       pose: string;
     }>
   | Readonly<{

@@ -1633,7 +1633,8 @@
     "processing": "กำลังสร้าง Health Score ของคุณ…",
     "processingError": "สร้าง Health Score ไม่สำเร็จ ลองใหม่อีกครั้ง",
     "saved": "บันทึกแล้ว",
-    "edit": "แก้ไข"
+    "edit": "แก้ไข",
+    "inThisSection": "ในส่วนนี้เราจะ…"
   },
   "meta": {
     "skinColors": [
