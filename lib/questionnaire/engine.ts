@@ -5,11 +5,7 @@
  */
 
 import { getQuestionnaireDefinition } from "@/lib/questionnaire/definition";
-import {
-  isTurnVisible,
-  selectAck,
-  selectReaction
-} from "@/lib/questionnaire/reactions";
+import { isTurnVisible, selectReaction } from "@/lib/questionnaire/reactions";
 import type {
   ApplyAnswerResult,
   LogMessage,
@@ -286,23 +282,6 @@ function sectionMessage(
   };
 }
 
-/** Fresh chat pane for a section — answers stay; transcript resets. */
-function openSectionTranscript(
-  definition: QuestionnaireDefinition,
-  state: QuestionnaireState,
-  turnIndex: number
-): QuestionnaireState {
-  const turn = definition.turns[turnIndex]!;
-  const withTurn = { ...state, turnIndex };
-
-  return {
-    ...withTurn,
-    log: [
-      sectionMessage(definition, turn.sec),
-      botMessage(definition, withTurn, turnIndex)
-    ]
-  };
-}
 
 function botMessage(
   definition: QuestionnaireDefinition,
@@ -809,7 +788,7 @@ export function applyAnswer(
     }
   }
 
-  // firstName meet line
+  // firstName meet line (personalisation — not generic "got it" acks)
   if (turn.k === "firstName") {
     const name = firstNameToken(value);
     if (name && definition.meetLine) {
@@ -822,32 +801,6 @@ export function applyAnswer(
           id: "meet"
         }
       ]);
-      events.push({ type: "chat_ack", text });
-      next = { ...next, sinceAck: 0 };
-    } else {
-      next = { ...next, sinceAck: next.sinceAck + 1 };
-    }
-  } else {
-    const ack = selectAck(definition, turn.k, value, {
-      reacted,
-      sinceAck: next.sinceAck + 1
-    });
-
-    if (ack) {
-      next = appendLog(
-        { ...next, sinceAck: 0 },
-        [
-          {
-            kind: "ack",
-            pose: ack.pose,
-            text: ack.text,
-            id: `ack-${turn.k}-${next.log.length}`
-          }
-        ]
-      );
-      events.push({ type: "chat_ack", text: ack.text });
-    } else {
-      next = { ...next, sinceAck: next.sinceAck + 1 };
     }
   }
 
@@ -940,22 +893,19 @@ function advanceFrom(
   }
 
   const nextTurn = definition.turns[nextIdx]!;
-  const enteringNewSection =
-    nextTurn.sec !== current.sec ||
-    (Boolean(current.nosec) &&
-      !nextTurn.nosec &&
-      !next.log.some(
-        (m) => m.kind === "section" && m.sectionIndex === nextTurn.sec
-      ));
+  const needsSectionIntro =
+    !nextTurn.nosec &&
+    !next.log.some(
+      (m) => m.kind === "section" && m.sectionIndex === nextTurn.sec
+    );
 
-  if (enteringNewSection && !nextTurn.nosec) {
-    if (nextTurn.sec !== current.sec) {
-      events.push({ type: "chat_section_done", sectionIndex: current.sec });
-    }
+  if (nextTurn.sec !== current.sec) {
+    events.push({ type: "chat_section_done", sectionIndex: current.sec });
+  }
+
+  if (needsSectionIntro) {
     events.push({ type: "chat_part_break", sectionIndex: nextTurn.sec });
-    // Clear chat transcript — new section feels like a fresh start
-    next = openSectionTranscript(definition, next, nextIdx);
-    return { ok: true, state: next, events };
+    next = appendLog(next, [sectionMessage(definition, nextTurn.sec)]);
   }
 
   next = { ...next, turnIndex: nextIdx };

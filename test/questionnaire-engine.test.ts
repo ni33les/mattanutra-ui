@@ -57,7 +57,7 @@ describe("questionnaire engine v6", () => {
     assert.ok(started.events.some((e) => e.type === "chat_start"));
   });
 
-  it("shows Part 1 section after firstName, then goals, with fresh section chat", () => {
+  it("shows Part 1 section after firstName, then goals, keeping prior chat", () => {
     let { state } = startQuestionnaire(
       createInitialState({ locale: "en", channel: "agent" })
     );
@@ -68,15 +68,21 @@ describe("questionnaire engine v6", () => {
     }
 
     state = r.state;
-    // Section open clears transcript — no lingering firstName bubbles
-    assert.ok(!state.log.some((m) => m.kind === "user"));
-    assert.ok(!state.log.some((m) => m.kind === "intro"));
+    // Full transcript is kept (no section clear)
+    assert.ok(state.log.some((m) => m.kind === "intro"));
+    assert.ok(state.log.some((m) => m.kind === "user"));
     assert.ok(state.log.some((m) => m.kind === "section" && m.sectionIndex === 0));
     const section = state.log.find((m) => m.kind === "section");
     assert.ok(section && section.kind === "section");
     if (section && section.kind === "section") {
       assert.match(section.leadIn, /In this section/i);
     }
+    // No generic "got it" pool acks
+    assert.ok(
+      !state.log.some(
+        (m) => m.kind === "ack" && /got it|noted|okay|thanks for sharing/i.test(m.text)
+      )
+    );
     assert.equal(getNextPrompt(state).turn?.k, "goals");
     assert.equal(state.answers.firstName, "Alex");
   });

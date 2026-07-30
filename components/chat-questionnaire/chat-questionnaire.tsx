@@ -781,21 +781,20 @@ export function ChatQuestionnaire({
     if (turn.kind === "text") {
       return (
         <>
-          <div className="mn-chat-q__fieldbox">
-            <input
-              type="text"
-              maxLength={120}
-              placeholder={turn.ph || ""}
-              value={textValue}
-              onChange={(e) => setTextValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void onAnswer(textValue.trim());
-                }
-              }}
-            />
-          </div>
+          <input
+            className="mn-chat-q__text-input"
+            type="text"
+            maxLength={120}
+            placeholder={turn.ph || ""}
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void onAnswer(textValue.trim());
+              }
+            }}
+          />
           <div className="mn-chat-q__actions">
             <button
               type="button"
