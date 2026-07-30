@@ -68,7 +68,7 @@ describe("ttf ws2 Thai questionnaire port", () => {
 
   it("matches hand-off field labels, hints, and CTAs", () => {
     assert.equal(th.about.firstName, "ชื่อ");
-    assert.equal(th.about.sex, "เพศกำเนิด");
+    assert.equal(th.about.sex, "เพศ");
     assert.equal(th.about.sun, "เวลาที่ได้รับแสงแดดต่อวัน");
     assert.equal(th.about.sunscreen, "การใช้ครีมกันแดด");
     assert.equal(th.goals.title, "เป้าหมายและความรู้สึกของคุณ");

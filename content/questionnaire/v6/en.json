@@ -266,7 +266,7 @@
       "k": "sex",
       "sec": 1,
       "kind": "single",
-      "q": "What is your sex at birth?",
+      "q": "What is your sex?",
       "why": "Adjusts nutrient needs and which questions apply to you.",
       "opts": [
         {
