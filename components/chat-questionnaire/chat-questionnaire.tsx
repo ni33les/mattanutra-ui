@@ -979,13 +979,8 @@ export function ChatQuestionnaire({
         >
           {state?.log.map((msg, index) => renderLogItem(msg, index))}
           {processing ? (
-            <div className="mn-chat-q__processing">
-              <strong>{ui.processing || "Building your Health Score…"}</strong>
-              <span>
-                {(ui.doneBodyNoName || "Precision {pct}%")
-                  .replace("{pct}", String(precision))
-                  .replace("{name}", "")}
-              </span>
+            <div className="mn-chat-q__processing" aria-live="polite">
+              <span className="mn-chat-q__processing-dot" aria-hidden />
             </div>
           ) : null}
           <div ref={logEndRef} />

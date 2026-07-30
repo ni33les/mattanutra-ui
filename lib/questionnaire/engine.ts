@@ -914,6 +914,43 @@ function advanceFrom(
   return { ok: true, state: next, events };
 }
 
+function completeThanksText(
+  definition: QuestionnaireDefinition,
+  state: QuestionnaireState,
+  precision: number
+): string {
+  const name = firstNameToken(state.answers.firstName);
+  const template =
+    (name
+      ? definition.ui.doneBody
+      : definition.ui.doneBodyNoName || definition.ui.doneBody) ||
+    definition.ui.processing ||
+    "";
+
+  const withName = name
+    ? template
+        .replace("{name}", name)
+        .replace("{pct}", String(precision))
+    : (definition.ui.doneBodyNoName || template)
+        .replace("{name}", "")
+        .replace("{pct}", String(precision))
+        .replace(/\s+—\s+/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+
+  // Prefer explicit thank-you lead if template already has it; else stageDone prefix
+  if (/thank you|ขอบคุณ/i.test(withName)) {
+    return withName;
+  }
+
+  const thanks = definition.ui.stageDone || "";
+  if (!thanks) {
+    return withName;
+  }
+
+  return withName ? `${thanks} ${withName}` : thanks;
+}
+
 export function completeQuestionnaire(
   state: QuestionnaireState,
   priorEvents: QuestionnaireEvent[] = []
@@ -925,13 +962,18 @@ export function completeQuestionnaire(
     { type: "chat_complete", precision }
   ];
 
-  // Optional stageDone line from master UI (copy only — no extra icons)
   let next = cloneState(state);
-  if (definition.ui.stageDone) {
+  const text = completeThanksText(definition, next, precision);
+
+  // Nong Matta chat bubble — thank you + building Health Score
+  if (text) {
     next = appendLog(next, [
       {
-        kind: "system",
-        text: definition.ui.stageDone
+        kind: "bot",
+        turnKey: "__complete",
+        turnIndex: definition.turns.length,
+        pose: "celebrate",
+        question: text
       }
     ]);
   }

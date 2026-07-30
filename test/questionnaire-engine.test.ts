@@ -206,6 +206,37 @@ describe("questionnaire engine v6", () => {
     assert.ok(pct >= 8 && pct <= 100);
   });
 
+  it("completes with a Nong thank-you bubble that mentions building Health Score", () => {
+    let state = startQuestionnaire(
+      createInitialState({ locale: "en", channel: "agent" })
+    ).state;
+    state = {
+      ...state,
+      answers: { ...state.answers, firstName: "Alex" },
+      phase: "active"
+    };
+    const definition = getDefinition(state);
+    const gateIdx = definition.turns.findIndex((t) => t.k === "precisionGate");
+    state = { ...state, turnIndex: gateIdx };
+    const result = applyAnswer(state, "precisionGate", "skip");
+    assert.equal(result.ok, true);
+    if (!result.ok) {
+      return;
+    }
+
+    state = result.state;
+    assert.equal(state.phase, "complete");
+    const thanks = state.log.find(
+      (m) => m.kind === "bot" && m.turnKey === "__complete"
+    );
+    assert.ok(thanks && thanks.kind === "bot");
+    if (thanks && thanks.kind === "bot") {
+      assert.match(thanks.question, /thank you/i);
+      assert.match(thanks.question, /building your health score/i);
+      assert.equal(thanks.pose, "celebrate");
+    }
+  });
+
   it("female-only turns after sex female", () => {
     let { state } = startQuestionnaire(
       createInitialState({ locale: "en", channel: "agent" })
