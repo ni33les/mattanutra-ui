@@ -20,7 +20,8 @@
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
-  padding: 12px 12px 20px;
+  /* Bottom padding keeps the white chat frame off the page edge / footer */
+  padding: 12px 12px 36px;
   color: var(--cq-ink);
   background: var(--cq-paper);
   font-size: 16px;
