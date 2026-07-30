@@ -76,6 +76,7 @@ const assessmentTests = [
   "test/plan-feedback.test.ts",
   "test/plan-guidance-adjustments.test.ts",
   "test/plan-reveal-v3.test.ts",
+  "test/questionnaire-engine.test.ts",
   "test/questionnaire-v4.test.ts",
   "test/vo2-estimate.test.ts"
 ];

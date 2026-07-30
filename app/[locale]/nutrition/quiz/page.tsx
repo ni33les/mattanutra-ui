@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { AssessmentFlow } from "@/components/assessment-flow";
+import { ChatQuestionnaire } from "@/components/chat-questionnaire/chat-questionnaire";
 import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
@@ -12,6 +13,23 @@ import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
 import { getAssessmentResumeDraft } from "@/lib/assessment-resume-store";
 import { localizedRouteMetadata } from "@/lib/seo";
+
+/**
+ * Chat questionnaire v6-conversational is default-on for public quiz.
+ * Kill-switch: NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5=0 (legacy name) or
+ * NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6=0
+ */
+function chatQuestionnaireEnabled(locale: Locale) {
+  const flag =
+    process.env.NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6 ??
+    process.env.NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5;
+  if (flag === "0" || flag === "false") {
+    return false;
+  }
+
+  // zh-CN uses EN turns until a dedicated definition ships
+  return locale === "en" || locale === "th" || locale === "zh-CN";
+}
 
 type NutritionQuizPageProps = Readonly<{
   params: Promise<{
@@ -110,6 +128,8 @@ export default async function NutritionQuizPage({
     ? await getStoredAssessmentPrefill(effectivePlanId)
     : null;
 
+  const useChat = chatQuestionnaireEnabled(locale);
+
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
@@ -117,18 +137,30 @@ export default async function NutritionQuizPage({
         currentPath={currentPath}
         title={dictionary.hero.eyebrow}
       />
-      <AssessmentFlow
-        initialStage="quiz"
-        initialSectionIndex={resumeDraft?.sectionIndex}
-        locale={locale}
-        paymentId={paymentId || undefined}
-        prefillAnswers={resumeDraft?.answers ?? prefill?.answers ?? null}
-        prefillContactEmail={resumeDraft?.contactEmail ?? prefill?.contactEmail ?? null}
-        returningHealthScore={prefill?.healthScore ?? null}
-        returningPlanId={resumeDraft?.planId ?? prefill?.planId ?? undefined}
-        resumeToken={resumeToken || undefined}
-        showDevShortcut={showDevShortcut}
-      />
+      {useChat ? (
+        <ChatQuestionnaire
+          locale={locale}
+          paymentId={paymentId || undefined}
+          returningPlanId={
+            resumeDraft?.planId ?? prefill?.planId ?? (returningPlanId || undefined)
+          }
+          resumeToken={resumeToken || undefined}
+          showDevShortcut={showDevShortcut}
+        />
+      ) : (
+        <AssessmentFlow
+          initialStage="quiz"
+          initialSectionIndex={resumeDraft?.sectionIndex}
+          locale={locale}
+          paymentId={paymentId || undefined}
+          prefillAnswers={resumeDraft?.answers ?? prefill?.answers ?? null}
+          prefillContactEmail={resumeDraft?.contactEmail ?? prefill?.contactEmail ?? null}
+          returningHealthScore={prefill?.healthScore ?? null}
+          returningPlanId={resumeDraft?.planId ?? prefill?.planId ?? undefined}
+          resumeToken={resumeToken || undefined}
+          showDevShortcut={showDevShortcut}
+        />
+      )}
       <SiteFooter content={dictionary.footer} locale={locale} />
     </main>
   );

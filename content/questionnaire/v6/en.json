@@ -1,0 +1,1723 @@
+{
+  "version": "v6-conversational",
+  "lang": "en",
+  "sections": [
+    {
+      "eyebrow": "Part 1 of 6",
+      "title": "Your goals",
+      "desc": "Start with what matters most — your whole formula is designed around this.",
+      "pose": "ask"
+    },
+    {
+      "eyebrow": "Part 2 of 6",
+      "title": "About you",
+      "desc": "Two quick taps to set the baseline.",
+      "pose": "open"
+    },
+    {
+      "eyebrow": "Part 3 of 6",
+      "title": "Daily life",
+      "desc": "Sleep, movement and routine shape what your body actually needs.",
+      "pose": "open"
+    },
+    {
+      "eyebrow": "Part 4 of 6",
+      "title": "Food",
+      "desc": "What you eat shows which nutrients may be missing.",
+      "pose": "vegan"
+    },
+    {
+      "eyebrow": "Part 5 of 6",
+      "title": "Safety",
+      "desc": "The most important part — screening against your medications and health conditions.",
+      "pose": "explaining"
+    },
+    {
+      "eyebrow": "Part 6 of 6",
+      "title": "Your preferences",
+      "desc": "So the formula fits your budget and routine.",
+      "pose": "money"
+    }
+  ],
+  "react": {
+    "goals": [
+      "celebrate",
+      "Perfect! These goals become the spine of your formula — every answer from here is read through this lens."
+    ],
+    "symptoms_great": [
+      "celebrate",
+      "Love that! Your formula will focus on keeping you there."
+    ],
+    "sleep_low": [
+      "reassuring",
+      "Noted — short sleep hits energy directly. Your formula will weight this."
+    ],
+    "stress_high": [
+      "reassuring",
+      "I hear you — high stress quietly drains the very energy you want back. Your formula will address it."
+    ],
+    "digestion_bloat": [
+      "bloated",
+      "Very common — this helps choose the right magnesium and probiotic forms for you."
+    ],
+    "activity_high": [
+      "muscular",
+      "Impressive! That activity level changes your magnesium and electrolyte needs."
+    ],
+    "diet_plant": [
+      "vegan",
+      "Plant-powered! I’ll pay special attention to B12, iron and algae omega-3."
+    ],
+    "meds_yes": [
+      "reassuring",
+      "Thank you for telling me — this matters most. Every ingredient gets checked against your medications first."
+    ],
+    "statin": [
+      "thinking",
+      "Really important — statins can deplete CoQ10. Your formula will take this into account."
+    ],
+    "organ_flag": [
+      "reassuring",
+      "Thank you — certain minerals will be capped at levels safe specifically for you."
+    ],
+    "antibiotics_yes": [
+      "thinking",
+      "Noted — the gut takes time to recover after antibiotics. I’ll look at probiotic support."
+    ],
+    "caffeine_high": [
+      "coffee",
+      "A true coffee lover ☕ No need to quit — but your formula will work on the real energy underneath."
+    ],
+    "supp_targeted": [
+      "comparing",
+      "Great — I’ll cross-check what you already take so nothing overlaps or overshoots."
+    ]
+  },
+  "acks": {
+    "pool": [
+      "Got it ✓",
+      "Noted ✓",
+      "Okay!",
+      "Thanks for sharing ✓"
+    ],
+    "spec": {
+      "sleepHrs": {
+        "7-8": "Great sleep ✨",
+        "8-9": "Well rested ✨"
+      },
+      "energy": {
+        "good": "Love it ⚡",
+        "excellent": "Excellent ⚡"
+      },
+      "alcohol": {
+        "none": "Your body thanks you 💚"
+      },
+      "smoking": {
+        "never": "Great 💚"
+      },
+      "f_fruitveg": {
+        "3+": "🥦 Excellent"
+      }
+    }
+  },
+  "meetLine": "Lovely to meet you, {n} 💚",
+  "halfway": "Halfway there{n}! 🎉 Most of the rest is single taps",
+  "nameSuffix": ", {n}",
+  "nameFmt": "{n} — {t}",
+  "veganSkip": "Vegan! 😉 I’ll skip the meat, dairy, egg and fish questions — and pay special attention to B12, iron and algae omega-3.",
+  "turns": [
+    {
+      "k": "firstName",
+      "sec": 0,
+      "nosec": 1,
+      "kind": "text",
+      "q": "Before we start — what should I call you? (optional)",
+      "ph": "First name or nickname",
+      "pts": 0,
+      "req": 0,
+      "pose": "ask",
+      "optional": true
+    },
+    {
+      "k": "goals",
+      "sec": 0,
+      "kind": "multi",
+      "q": "What are your main health goals? (choose up to 3)",
+      "opts": [
+        {
+          "v": "energy",
+          "l": "More energy"
+        },
+        {
+          "v": "sleep",
+          "l": "Better sleep"
+        },
+        {
+          "v": "focus",
+          "l": "Brain / focus"
+        },
+        {
+          "v": "longevity",
+          "l": "Longevity"
+        },
+        {
+          "v": "immunity",
+          "l": "Immunity"
+        },
+        {
+          "v": "fitness",
+          "l": "Fitness / VO₂"
+        },
+        {
+          "v": "weight",
+          "l": "Weight loss"
+        },
+        {
+          "v": "mood",
+          "l": "Mood / calm"
+        },
+        {
+          "v": "heart",
+          "l": "Heart health"
+        },
+        {
+          "v": "joints",
+          "l": "Joints / bones"
+        },
+        {
+          "v": "skin",
+          "l": "Skin / hair"
+        },
+        {
+          "v": "hormones",
+          "l": "Hormones"
+        }
+      ],
+      "pts": 6,
+      "max": 3,
+      "req": 1,
+      "pose": "ask",
+      "optional": false
+    },
+    {
+      "k": "symptoms",
+      "sec": 0,
+      "kind": "multi",
+      "q": "Any current symptoms? (choose all that apply — including “feeling great”)",
+      "opts": [
+        {
+          "v": "fatigue",
+          "l": "Fatigue"
+        },
+        {
+          "v": "brainfog",
+          "l": "Brain fog"
+        },
+        {
+          "v": "mood",
+          "l": "Low mood"
+        },
+        {
+          "v": "joint",
+          "l": "Joint pain"
+        },
+        {
+          "v": "digestion",
+          "l": "Digestive issues"
+        },
+        {
+          "v": "sleep",
+          "l": "Poor sleep"
+        },
+        {
+          "v": "stress",
+          "l": "Stress / anxiety"
+        },
+        {
+          "v": "skin",
+          "l": "Skin issues"
+        },
+        {
+          "v": "hair",
+          "l": "Hair loss"
+        },
+        {
+          "v": "libido",
+          "l": "Low libido"
+        },
+        {
+          "v": "colds",
+          "l": "Frequent colds"
+        },
+        {
+          "v": "great",
+          "l": "Feeling great"
+        }
+      ],
+      "pts": 4,
+      "req": 1,
+      "pose": "ask",
+      "excl": [
+        "great"
+      ],
+      "optional": false
+    },
+    {
+      "k": "sex",
+      "sec": 1,
+      "kind": "single",
+      "q": "What is your sex at birth?",
+      "why": "Adjusts nutrient needs and which questions apply to you.",
+      "opts": [
+        {
+          "v": "male",
+          "l": "Male"
+        },
+        {
+          "v": "female",
+          "l": "Female"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "age",
+      "sec": 1,
+      "kind": "single",
+      "q": "Which age range are you in?",
+      "opts": [
+        {
+          "v": "18-25",
+          "l": "18-25"
+        },
+        {
+          "v": "26-35",
+          "l": "26-35"
+        },
+        {
+          "v": "36-45",
+          "l": "36-45"
+        },
+        {
+          "v": "46-55",
+          "l": "46-55"
+        },
+        {
+          "v": "56-65",
+          "l": "56-65"
+        },
+        {
+          "v": "66+",
+          "l": "66+"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "reproStatus",
+      "sec": 1,
+      "kind": "single",
+      "q": "Do any of these apply right now?",
+      "why": "Safety-critical — some ingredients must be adjusted or avoided in pregnancy and breastfeeding.",
+      "opts": [
+        {
+          "v": "none",
+          "l": "None of these"
+        },
+        {
+          "v": "ttc",
+          "l": "Planning a pregnancy"
+        },
+        {
+          "v": "pregnant",
+          "l": "Pregnant"
+        },
+        {
+          "v": "breastfeeding",
+          "l": "Breastfeeding"
+        }
+      ],
+      "pts": 4,
+      "req": 1,
+      "pose": "reassuring",
+      "cond": "female",
+      "optional": false
+    },
+    {
+      "k": "menopause",
+      "sec": 1,
+      "kind": "single",
+      "q": "Your menopause status?",
+      "opts": [
+        {
+          "v": "pre",
+          "l": "Not yet"
+        },
+        {
+          "v": "peri",
+          "l": "Perimenopause"
+        },
+        {
+          "v": "post",
+          "l": "Post-menopause"
+        },
+        {
+          "v": "unsure",
+          "l": "Not sure"
+        }
+      ],
+      "pts": 2,
+      "req": 0,
+      "pose": "open",
+      "cond": "female",
+      "optional": true
+    },
+    {
+      "k": "flow",
+      "sec": 1,
+      "kind": "single",
+      "q": "How would you describe your monthly flow?",
+      "why": "Helps estimate iron needs without a blood test.",
+      "opts": [
+        {
+          "v": "none",
+          "l": "No period"
+        },
+        {
+          "v": "light",
+          "l": "Light"
+        },
+        {
+          "v": "moderate",
+          "l": "Moderate"
+        },
+        {
+          "v": "heavy",
+          "l": "Heavy"
+        }
+      ],
+      "pts": 2,
+      "req": 0,
+      "pose": "open",
+      "cond": "femaleCycle",
+      "optional": true
+    },
+    {
+      "k": "sleepHrs",
+      "sec": 2,
+      "kind": "single",
+      "q": "About how many hours do you sleep a night?",
+      "opts": [
+        {
+          "v": "u5",
+          "l": "Under 5 h"
+        },
+        {
+          "v": "5-6",
+          "l": "5–6 h"
+        },
+        {
+          "v": "6-7",
+          "l": "6–7 h"
+        },
+        {
+          "v": "7-8",
+          "l": "7–8 h"
+        },
+        {
+          "v": "8-9",
+          "l": "8–9 h"
+        },
+        {
+          "v": "9+",
+          "l": "9+ h"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "ask",
+      "optional": false
+    },
+    {
+      "k": "energy",
+      "sec": 2,
+      "kind": "single",
+      "q": "How is your energy these days?",
+      "opts": [
+        {
+          "v": "drained",
+          "l": "Drained"
+        },
+        {
+          "v": "low",
+          "l": "Low"
+        },
+        {
+          "v": "ok",
+          "l": "OK"
+        },
+        {
+          "v": "good",
+          "l": "Good"
+        },
+        {
+          "v": "excellent",
+          "l": "Excellent"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "ask",
+      "optional": false
+    },
+    {
+      "k": "activity",
+      "sec": 2,
+      "kind": "single",
+      "q": "How active are you day to day?",
+      "opts": [
+        {
+          "v": "sitting",
+          "l": "Mostly sitting"
+        },
+        {
+          "v": "light",
+          "l": "Light"
+        },
+        {
+          "v": "moderate",
+          "l": "Moderate"
+        },
+        {
+          "v": "active",
+          "l": "Very active"
+        },
+        {
+          "v": "athlete",
+          "l": "Athlete"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "stress",
+      "sec": 2,
+      "kind": "single",
+      "q": "How stressed are you lately?",
+      "opts": [
+        {
+          "v": "verylow",
+          "l": "Very low"
+        },
+        {
+          "v": "low",
+          "l": "Low"
+        },
+        {
+          "v": "moderate",
+          "l": "Moderate"
+        },
+        {
+          "v": "high",
+          "l": "High"
+        },
+        {
+          "v": "extreme",
+          "l": "Very high"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "digestion",
+      "sec": 2,
+      "kind": "single",
+      "q": "How is your digestion in general?",
+      "opts": [
+        {
+          "v": "none",
+          "l": "No issues"
+        },
+        {
+          "v": "bloating",
+          "l": "Bloating"
+        },
+        {
+          "v": "constipation",
+          "l": "Constipation"
+        },
+        {
+          "v": "loose",
+          "l": "Loose stools"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "digCondition",
+      "sec": 2,
+      "kind": "single",
+      "q": "Any diagnosed digestive condition?",
+      "why": "These can reduce absorption of B12, iron, vitamin D and calcium.",
+      "opts": [
+        {
+          "v": "none",
+          "l": "None"
+        },
+        {
+          "v": "ibs",
+          "l": "IBS"
+        },
+        {
+          "v": "celiac",
+          "l": "Coeliac disease"
+        },
+        {
+          "v": "ibd",
+          "l": "IBD (Crohn’s / colitis)"
+        },
+        {
+          "v": "bariatric",
+          "l": "Bariatric surgery"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "thinking",
+      "optional": false
+    },
+    {
+      "k": "smoking",
+      "sec": 2,
+      "kind": "single",
+      "q": "And smoking?",
+      "opts": [
+        {
+          "v": "never",
+          "l": "Never"
+        },
+        {
+          "v": "ex5+",
+          "l": "Quit (5+ yrs ago)"
+        },
+        {
+          "v": "ex5",
+          "l": "Quit (within 5 yrs)"
+        },
+        {
+          "v": "occasional",
+          "l": "Occasionally"
+        },
+        {
+          "v": "daily",
+          "l": "Daily"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "alcohol",
+      "sec": 2,
+      "kind": "single",
+      "q": "About how many drinks a week?",
+      "opts": [
+        {
+          "v": "none",
+          "l": "None"
+        },
+        {
+          "v": "1-3",
+          "l": "1–3"
+        },
+        {
+          "v": "4-7",
+          "l": "4–7"
+        },
+        {
+          "v": "8+",
+          "l": "8+"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "caffeine",
+      "sec": 2,
+      "kind": "single",
+      "q": "How many coffees (or caffeine drinks) a day?",
+      "opts": [
+        {
+          "v": "none",
+          "l": "None"
+        },
+        {
+          "v": "1",
+          "l": "1"
+        },
+        {
+          "v": "2-3",
+          "l": "2–3"
+        },
+        {
+          "v": "4+",
+          "l": "4+"
+        }
+      ],
+      "pts": 1,
+      "req": 1,
+      "pose": "coffee",
+      "optional": false
+    },
+    {
+      "k": "hw",
+      "sec": 2,
+      "kind": "sliders",
+      "q": "Your height and weight, please — doses are sized to your body.",
+      "pts": 4,
+      "req": 1,
+      "pose": "measuring",
+      "optional": false
+    },
+    {
+      "k": "skin",
+      "sec": 2,
+      "kind": "swatch",
+      "q": "Which is closest to your skin tone?",
+      "why": "Helps estimate vitamin D synthesis alongside sun exposure.",
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "sun",
+      "sec": 2,
+      "kind": "single",
+      "q": "About how much sun do you get a day?",
+      "opts": [
+        {
+          "v": "u15",
+          "l": "Under 15 min"
+        },
+        {
+          "v": "15-30",
+          "l": "15–30 min"
+        },
+        {
+          "v": "30-60",
+          "l": "30–60 min"
+        },
+        {
+          "v": "60+",
+          "l": "60+ min"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "sunscreen",
+      "sec": 2,
+      "kind": "single",
+      "q": "How often do you use sunscreen?",
+      "opts": [
+        {
+          "v": "rarely",
+          "l": "Rarely"
+        },
+        {
+          "v": "sometimes",
+          "l": "Sometimes"
+        },
+        {
+          "v": "daily",
+          "l": "Daily"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "country",
+      "sec": 2,
+      "kind": "single",
+      "q": "Which country are you in?",
+      "opts": [
+        {
+          "v": "Thailand",
+          "l": "Thailand"
+        },
+        {
+          "v": "Singapore",
+          "l": "Singapore"
+        },
+        {
+          "v": "Malaysia",
+          "l": "Malaysia"
+        },
+        {
+          "v": "Vietnam",
+          "l": "Vietnam"
+        },
+        {
+          "v": "Indonesia",
+          "l": "Indonesia"
+        },
+        {
+          "v": "Philippines",
+          "l": "Philippines"
+        },
+        {
+          "v": "United Kingdom",
+          "l": "United Kingdom"
+        },
+        {
+          "v": "United States",
+          "l": "United States"
+        },
+        {
+          "v": "Australia",
+          "l": "Australia"
+        },
+        {
+          "v": "Other",
+          "l": "Other"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "diet",
+      "sec": 3,
+      "kind": "single",
+      "q": "Which best describes how you eat?",
+      "opts": [
+        {
+          "v": "none",
+          "l": "No particular pattern"
+        },
+        {
+          "v": "processed",
+          "l": "Mostly processed"
+        },
+        {
+          "v": "balanced",
+          "l": "Balanced"
+        },
+        {
+          "v": "whole",
+          "l": "Mostly whole foods"
+        },
+        {
+          "v": "mediterranean",
+          "l": "Mediterranean"
+        },
+        {
+          "v": "plant",
+          "l": "Plant-forward"
+        },
+        {
+          "v": "vegan",
+          "l": "Vegan"
+        },
+        {
+          "v": "carnivore",
+          "l": "Meat-heavy"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "explaining",
+      "optional": false
+    },
+    {
+      "k": "f_redmeat",
+      "sec": 3,
+      "kind": "single",
+      "q": "Red meat — how often?",
+      "opts": [
+        {
+          "v": "never",
+          "l": "Never"
+        },
+        {
+          "v": "1-2",
+          "l": "1–2 ×/week"
+        },
+        {
+          "v": "3+",
+          "l": "3+ ×/week"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "emoji": "🥩",
+      "optional": false
+    },
+    {
+      "k": "f_dairy",
+      "sec": 3,
+      "kind": "single",
+      "q": "Dairy?",
+      "opts": [
+        {
+          "v": "never",
+          "l": "Never"
+        },
+        {
+          "v": "1-2",
+          "l": "1–2 ×/day"
+        },
+        {
+          "v": "3+",
+          "l": "3+ ×/day"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "emoji": "🧀",
+      "optional": false
+    },
+    {
+      "k": "f_fruitveg",
+      "sec": 3,
+      "kind": "single",
+      "q": "Fruit and vegetables?",
+      "opts": [
+        {
+          "v": "notdaily",
+          "l": "Not daily"
+        },
+        {
+          "v": "1-2",
+          "l": "1–2 servings/day"
+        },
+        {
+          "v": "3+",
+          "l": "3+ servings/day"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "emoji": "🥦",
+      "optional": false
+    },
+    {
+      "k": "f_eggs",
+      "sec": 3,
+      "kind": "single",
+      "q": "Eggs?",
+      "opts": [
+        {
+          "v": "rare",
+          "l": "Rarely"
+        },
+        {
+          "v": "weekly",
+          "l": "Weekly"
+        },
+        {
+          "v": "most",
+          "l": "Most days"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "emoji": "🥚",
+      "optional": false
+    },
+    {
+      "k": "f_legumes",
+      "sec": 3,
+      "kind": "single",
+      "q": "Legumes or nuts?",
+      "opts": [
+        {
+          "v": "rare",
+          "l": "Rarely"
+        },
+        {
+          "v": "weekly",
+          "l": "Weekly"
+        },
+        {
+          "v": "most",
+          "l": "Most days"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "emoji": "🥜",
+      "optional": false
+    },
+    {
+      "k": "f_fish",
+      "sec": 3,
+      "kind": "single",
+      "q": "Oily fish — salmon, mackerel, sardines?",
+      "opts": [
+        {
+          "v": "never",
+          "l": "Never"
+        },
+        {
+          "v": "rare",
+          "l": "Rarely"
+        },
+        {
+          "v": "once",
+          "l": "About once a week"
+        },
+        {
+          "v": "often",
+          "l": "Often"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "emoji": "🐟",
+      "optional": false
+    },
+    {
+      "k": "allergies",
+      "sec": 3,
+      "kind": "multi",
+      "q": "Any food allergies?",
+      "opts": [
+        {
+          "v": "none",
+          "l": "None"
+        },
+        {
+          "v": "milk",
+          "l": "Milk"
+        },
+        {
+          "v": "eggs",
+          "l": "Eggs"
+        },
+        {
+          "v": "fish",
+          "l": "Fish"
+        },
+        {
+          "v": "shellfish",
+          "l": "Shellfish"
+        },
+        {
+          "v": "treenuts",
+          "l": "Tree nuts"
+        },
+        {
+          "v": "peanuts",
+          "l": "Peanuts"
+        },
+        {
+          "v": "wheat",
+          "l": "Wheat"
+        },
+        {
+          "v": "soy",
+          "l": "Soy"
+        },
+        {
+          "v": "sesame",
+          "l": "Sesame"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "ask",
+      "excl": [
+        "none"
+      ],
+      "optional": false
+    },
+    {
+      "k": "avoid",
+      "sec": 3,
+      "kind": "text",
+      "q": "Anything you avoid or dislike? (optional)",
+      "ph": "e.g. gluten, spicy food…",
+      "pts": 0,
+      "req": 0,
+      "pose": "open",
+      "optional": true
+    },
+    {
+      "k": "disclosure",
+      "sec": 3,
+      "kind": "confirm",
+      "q": "Please confirm you’ve told me about all relevant allergies, conditions, medications and dietary limits.",
+      "btn": "I confirm ✓",
+      "pts": 3,
+      "req": 1,
+      "pose": "explaining",
+      "optional": false
+    },
+    {
+      "k": "consentSafety",
+      "sec": 4,
+      "kind": "confirm",
+      "q": "Before we talk medications: may I use your health answers to build and safety-check your formula? They are never sold or shared with advertisers, and you can withdraw consent any time.",
+      "btn": "I agree ✓",
+      "pts": 0,
+      "req": 1,
+      "pose": "explaining",
+      "optional": false
+    },
+    {
+      "k": "meds",
+      "sec": 4,
+      "kind": "single",
+      "q": "Are you taking any medications?",
+      "why": "Used only for safety screening.",
+      "opts": [
+        {
+          "v": "none",
+          "l": "No"
+        },
+        {
+          "v": "yes",
+          "l": "Yes"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "reassuring",
+      "optional": false
+    },
+    {
+      "k": "medTypes",
+      "sec": 4,
+      "kind": "multi",
+      "q": "Which types? (choose all that apply)",
+      "opts": [
+        {
+          "v": "statin",
+          "l": "Statin"
+        },
+        {
+          "v": "metformin",
+          "l": "Metformin"
+        },
+        {
+          "v": "ppi",
+          "l": "PPI / omeprazole"
+        },
+        {
+          "v": "diuretic",
+          "l": "Diuretic"
+        },
+        {
+          "v": "contraceptive",
+          "l": "Contraceptive"
+        },
+        {
+          "v": "antidepressant",
+          "l": "Antidepressant"
+        },
+        {
+          "v": "bloodthinner",
+          "l": "Blood thinner / aspirin"
+        },
+        {
+          "v": "thyroid",
+          "l": "Thyroid medication"
+        },
+        {
+          "v": "bp",
+          "l": "Blood pressure medication"
+        },
+        {
+          "v": "corticosteroid",
+          "l": "Corticosteroid"
+        },
+        {
+          "v": "other",
+          "l": "Other"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "thinking",
+      "cond": "medsYes",
+      "optional": false
+    },
+    {
+      "k": "otherMed",
+      "sec": 4,
+      "kind": "text",
+      "q": "Other medication (type it here)",
+      "ph": "",
+      "pts": 0,
+      "req": 0,
+      "pose": "thinking",
+      "cond": "medOther",
+      "optional": true
+    },
+    {
+      "k": "suppAllergies",
+      "sec": 4,
+      "kind": "multi",
+      "q": "Any reactions to supplement ingredients?",
+      "opts": [
+        {
+          "v": "none",
+          "l": "None known"
+        },
+        {
+          "v": "iodine",
+          "l": "Iodine"
+        },
+        {
+          "v": "iron",
+          "l": "Iron"
+        },
+        {
+          "v": "coq10",
+          "l": "CoQ10"
+        },
+        {
+          "v": "bvit",
+          "l": "B vitamins"
+        },
+        {
+          "v": "soyderived",
+          "l": "Soy-derived"
+        },
+        {
+          "v": "shellfishderived",
+          "l": "Shellfish-derived"
+        },
+        {
+          "v": "other",
+          "l": "Other"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "comparing",
+      "excl": [
+        "none"
+      ],
+      "optional": false
+    },
+    {
+      "k": "otherSupp",
+      "sec": 4,
+      "kind": "text",
+      "q": "Other ingredient",
+      "ph": "",
+      "pts": 0,
+      "req": 0,
+      "pose": "comparing",
+      "cond": "suppOther",
+      "optional": true
+    },
+    {
+      "k": "kidney",
+      "sec": 4,
+      "kind": "single",
+      "q": "How is your kidney function?",
+      "why": "Sets safe limits on certain minerals.",
+      "opts": [
+        {
+          "v": "normal",
+          "l": "No known issues"
+        },
+        {
+          "v": "reduced",
+          "l": "Reduced function"
+        },
+        {
+          "v": "disease",
+          "l": "Kidney disease"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "thinking",
+      "optional": false
+    },
+    {
+      "k": "liver",
+      "sec": 4,
+      "kind": "single",
+      "q": "And your liver?",
+      "opts": [
+        {
+          "v": "normal",
+          "l": "No known issues"
+        },
+        {
+          "v": "condition",
+          "l": "Liver condition"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "thinking",
+      "optional": false
+    },
+    {
+      "k": "surgery",
+      "sec": 4,
+      "kind": "single",
+      "q": "Any surgery planned in the next 30 days?",
+      "why": "Some supplements increase bleeding risk and should be paused before surgery.",
+      "opts": [
+        {
+          "v": "no",
+          "l": "No"
+        },
+        {
+          "v": "yes",
+          "l": "Yes"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "thinking",
+      "optional": false
+    },
+    {
+      "k": "antibiotics",
+      "sec": 4,
+      "kind": "single",
+      "q": "Any antibiotics in the last 3 months?",
+      "opts": [
+        {
+          "v": "no",
+          "l": "No"
+        },
+        {
+          "v": "yes",
+          "l": "Yes"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "supplements",
+      "sec": 4,
+      "kind": "single",
+      "q": "What supplements do you take now?",
+      "opts": [
+        {
+          "v": "none",
+          "l": "None"
+        },
+        {
+          "v": "basic",
+          "l": "Basic multivitamin"
+        },
+        {
+          "v": "d3omega",
+          "l": "D3 / omega-3"
+        },
+        {
+          "v": "targeted",
+          "l": "Several targeted"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "comparing",
+      "optional": false
+    },
+    {
+      "k": "budget",
+      "sec": 5,
+      "kind": "single",
+      "q": "Your monthly supplement budget?",
+      "why": "Your formula will never exceed what you plan to spend.",
+      "opts": [
+        {
+          "v": "u1000",
+          "l": "Under THB 1,000"
+        },
+        {
+          "v": "1000-2500",
+          "l": "THB 1,000–2,500"
+        },
+        {
+          "v": "2500-5000",
+          "l": "THB 2,500–5,000"
+        },
+        {
+          "v": "5000+",
+          "l": "THB 5,000+"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "money",
+      "optional": false
+    },
+    {
+      "k": "maxPills",
+      "sec": 5,
+      "kind": "single",
+      "q": "Max pills or capsules per day?",
+      "opts": [
+        {
+          "v": "1-3",
+          "l": "1–3"
+        },
+        {
+          "v": "4-6",
+          "l": "4–6"
+        },
+        {
+          "v": "7-10",
+          "l": "7–10"
+        },
+        {
+          "v": "nolimit",
+          "l": "No limit"
+        }
+      ],
+      "pts": 3,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "form",
+      "sec": 5,
+      "kind": "single",
+      "q": "Which format do you prefer?",
+      "opts": [
+        {
+          "v": "capsules",
+          "l": "Capsules"
+        },
+        {
+          "v": "powder",
+          "l": "Powder / shake"
+        },
+        {
+          "v": "gummies",
+          "l": "Gummies"
+        },
+        {
+          "v": "mixed",
+          "l": "Mixed is fine"
+        }
+      ],
+      "pts": 2,
+      "req": 1,
+      "pose": "open",
+      "optional": false
+    },
+    {
+      "k": "precisionGate",
+      "sec": 5,
+      "kind": "gate",
+      "q": "This last part is optional — add a few details to push precision toward 100%, or skip straight to your Health Score.",
+      "pts": 0,
+      "req": 1,
+      "pose": "thinking",
+      "optional": false
+    },
+    {
+      "k": "protein",
+      "sec": 5,
+      "kind": "single",
+      "q": "About how much protein per day?",
+      "opts": [
+        {
+          "v": "u1",
+          "l": "Under 1 g/kg"
+        },
+        {
+          "v": "1-1.5",
+          "l": "1–1.5 g/kg"
+        },
+        {
+          "v": "1.5-2",
+          "l": "1.5–2 g/kg"
+        },
+        {
+          "v": "2+",
+          "l": "Over 2 g/kg"
+        }
+      ],
+      "pts": 2,
+      "req": 0,
+      "opt": 1,
+      "pose": "muscular",
+      "optional": true
+    },
+    {
+      "k": "family",
+      "sec": 5,
+      "kind": "multi",
+      "q": "Any family health history?",
+      "opts": [
+        {
+          "v": "heart",
+          "l": "Heart disease"
+        },
+        {
+          "v": "alzheimers",
+          "l": "Alzheimer’s"
+        },
+        {
+          "v": "diabetes",
+          "l": "Diabetes"
+        },
+        {
+          "v": "cancer",
+          "l": "Cancer"
+        },
+        {
+          "v": "osteoporosis",
+          "l": "Osteoporosis"
+        },
+        {
+          "v": "none",
+          "l": "None"
+        }
+      ],
+      "pts": 2,
+      "req": 0,
+      "opt": 1,
+      "pose": "thinking",
+      "excl": [
+        "none"
+      ],
+      "optional": true
+    },
+    {
+      "k": "tracker",
+      "sec": 5,
+      "kind": "single",
+      "q": "Do you use a health tracker?",
+      "opts": [
+        {
+          "v": "none",
+          "l": "No device"
+        },
+        {
+          "v": "garmin",
+          "l": "Garmin"
+        },
+        {
+          "v": "oura",
+          "l": "Oura"
+        },
+        {
+          "v": "whoop",
+          "l": "WHOOP"
+        },
+        {
+          "v": "apple",
+          "l": "Apple Watch"
+        },
+        {
+          "v": "fitbit",
+          "l": "Fitbit"
+        },
+        {
+          "v": "other",
+          "l": "Other"
+        }
+      ],
+      "pts": 1,
+      "req": 0,
+      "opt": 1,
+      "pose": "open",
+      "optional": true
+    },
+    {
+      "k": "otherTracker",
+      "sec": 5,
+      "kind": "text",
+      "q": "Other device",
+      "ph": "",
+      "pts": 0,
+      "req": 0,
+      "opt": 1,
+      "pose": "open",
+      "cond": "trackerOther",
+      "optional": true
+    },
+    {
+      "k": "fitness",
+      "sec": 5,
+      "kind": "fitness",
+      "q": "If you know your VO₂ max or average HRV, pop them in.",
+      "pts": 2,
+      "req": 0,
+      "opt": 1,
+      "pose": "muscular",
+      "optional": true
+    },
+    {
+      "k": "labs",
+      "sec": 5,
+      "kind": "labs",
+      "q": "Any recent lab results?",
+      "pts": 6,
+      "req": 0,
+      "opt": 1,
+      "pose": "comparing",
+      "optional": true
+    }
+  ],
+  "ui": {
+    "introHi": "Hi, I’m Nong Matta 🌿 Answer a few quick questions, one at a time, and I’ll work out your Right Amount — with a free Health Score at the end.",
+    "introHint": "Takes a few minutes · free · autosaves so you can pause any time",
+    "start": "Let’s begin →",
+    "resumeQ": "Welcome back! Want to pick up where you left off?",
+    "resumeYes": "Continue",
+    "resumeNo": "Start over",
+    "confirm": "Confirm",
+    "skip": "Skip this one",
+    "needAnswer": "Pick an answer first",
+    "pickMax3": "Up to 3 choices",
+    "precisionGo": "Boost precision",
+    "precisionSkip": "Skip to my Health Score →",
+    "labsHint": "Fill in only the values you have — and check the units.",
+    "height": "Height",
+    "weight": "Weight",
+    "cm": "cm",
+    "kg": "kg",
+    "stageDone": "Thank you 🙏",
+    "leftMany": "{n} to go in this section",
+    "leftLast": "Last one in this section",
+    "ftFmt": "{f} ft {i} in",
+    "lbFmt": "{p} lb",
+    "doneBody": "{name} — your formula precision is {pct}%. I'm analysing your answers and preparing your Health Score now.",
+    "doneBodyNoName": "Your formula precision is {pct}%. I'm analysing your answers and preparing your Health Score now.",
+    "toneLabel": "Tone {n}",
+    "processing": "Building your Health Score…",
+    "processingError": "Something went wrong building your Health Score. Please try again.",
+    "saved": "Saved",
+    "edit": "Edit"
+  },
+  "meta": {
+    "skinColors": [
+      "#F5DCC4",
+      "#EDC39B",
+      "#DBA672",
+      "#B97F4E",
+      "#8C5A33",
+      "#5C3A21"
+    ],
+    "skinValues": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "labs": [
+      {
+        "k": "lab_vitd",
+        "n": "Vitamin D",
+        "u": [
+          "ng/mL",
+          "nmol/L"
+        ]
+      },
+      {
+        "k": "lab_b12",
+        "n": "Vitamin B12",
+        "u": [
+          "pg/mL",
+          "pmol/L"
+        ]
+      },
+      {
+        "k": "lab_ferritin",
+        "n": "Ferritin",
+        "u": [
+          "ng/mL",
+          "µg/L"
+        ]
+      },
+      {
+        "k": "lab_hba1c",
+        "n": "HbA1c",
+        "u": [
+          "%",
+          "mmol/mol"
+        ]
+      },
+      {
+        "k": "lab_o3",
+        "n": "Omega-3 index",
+        "u": [
+          "%"
+        ]
+      },
+      {
+        "k": "lab_homo",
+        "n": "Homocysteine",
+        "u": [
+          "µmol/L",
+          "mg/L"
+        ]
+      }
+    ],
+    "height": {
+      "min": 140,
+      "max": 210,
+      "default": 175
+    },
+    "weight": {
+      "min": 40,
+      "max": 160,
+      "default": 72
+    },
+    "autofill": {
+      "f_redmeat": "never",
+      "f_fish": "never",
+      "f_dairy": "never",
+      "f_eggs": "rare"
+    },
+    "storageKey": "mn_state_v6",
+    "eventsKey": "mn_events_v6"
+  }
+}
