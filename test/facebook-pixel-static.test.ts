@@ -29,13 +29,24 @@ describe("facebook pixel mapping", () => {
     assert.ok(getFacebookPixelIds().includes("27629903823308584"));
   });
 
-  it("is wired into the locale layout", () => {
+  it("is wired into the locale layout with noscript fallback", () => {
     const layout = readFileSync(
       new URL("../app/[locale]/layout.tsx", import.meta.url),
       "utf8"
     );
     assert.match(layout, /FacebookPixel/);
+    assert.match(layout, /FacebookPixelNoscript/);
     assert.match(layout, /from "@\/components\/facebook-pixel"/);
+
+    const pixel = readFileSync(
+      new URL("../components/facebook-pixel.tsx", import.meta.url),
+      "utf8"
+    );
+    assert.match(pixel, /fbq\('init'/);
+    assert.match(pixel, /fbq\('track', 'PageView'\)/);
+    assert.match(pixel, /connect\.facebook\.net\/en_US\/fbevents\.js/);
+    assert.match(pixel, /www\.facebook\.com\/tr\?id=/);
+    assert.match(pixel, /27629903823308584/);
   });
 
   it("bpm client mirrors mapped events to the pixel helper", () => {

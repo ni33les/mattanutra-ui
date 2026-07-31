@@ -111,6 +111,7 @@ function loadPixelScript(): Promise<void> {
 
 /**
  * Init all configured pixels once (idempotent). Safe to call on every navigation.
+ * Compatible with the official Meta base snippet (init + PageView) when already loaded.
  */
 export async function initFacebookPixel() {
   if (typeof window === "undefined" || !facebookPixelEnabled()) {
@@ -118,6 +119,20 @@ export async function initFacebookPixel() {
   }
 
   const ids = configuredPixelIds();
+
+  // Official snippet may already have created window.fbq and loaded fbevents.js
+  if (window.fbq) {
+    for (const id of ids) {
+      if (!initializedIds.has(id)) {
+        // init is safe to call again; Meta ignores duplicate IDs in practice
+        window.fbq("init", id);
+        initializedIds.add(id);
+      }
+    }
+
+    return true;
+  }
+
   ensureFbqStub();
 
   try {

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  DEFAULT_FACEBOOK_PIXEL_ID,
   facebookPixelEnabled,
+  getFacebookPixelIds,
   initFacebookPixel,
   trackFacebookEvent,
   trackFacebookPageView
@@ -11,6 +14,28 @@ import {
 import { localeRoutePattern, type Locale } from "@/lib/i18n";
 
 const localePattern = localeRoutePattern();
+
+/** Official Meta noscript fallback (same ID as the JS snippet). */
+export function FacebookPixelNoscript() {
+  if (!facebookPixelEnabled()) {
+    return null;
+  }
+
+  const id = getFacebookPixelIds()[0] || DEFAULT_FACEBOOK_PIXEL_ID;
+
+  return (
+    <noscript>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        height="1"
+        width="1"
+        style={{ display: "none" }}
+        src={`https://www.facebook.com/tr?id=${encodeURIComponent(id)}&ev=PageView&noscript=1`}
+        alt=""
+      />
+    </noscript>
+  );
+}
 
 function contentCategoryForPath(pathname: string) {
   if (new RegExp(`^/(${localePattern})$`).test(pathname)) {
@@ -47,23 +72,46 @@ function contentCategoryForPath(pathname: string) {
 }
 
 /**
- * Loads Meta Pixel and fires PageView on client navigations.
- * Conversion events are fired via trackFacebookFromBpm / trackFacebookEvent.
+ * Meta Pixel install matching the official base code:
+ *   fbq('init', '27629903823308584');
+ *   fbq('track', 'PageView');
+ * plus SPA PageView + funnel events on client navigations.
  */
 export function FacebookPixel({ locale }: Readonly<{ locale: Locale }>) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const lastPageKey = useRef("");
+  const bootstrapped = useRef(false);
   const isAdminPath = new RegExp(`^/(${localePattern})/admin(/|$)`).test(
     pathname
   );
+
+  const pixelIds = getFacebookPixelIds();
+  const primaryId = pixelIds[0] || DEFAULT_FACEBOOK_PIXEL_ID;
+
+  // Official bootstrap: init + first PageView (same as Meta snippet)
+  const bootstrapScript = `
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window,document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+${pixelIds.map((id) => `fbq('init', '${id}');`).join("\n")}
+fbq('track', 'PageView');
+`.trim();
 
   useEffect(() => {
     if (isAdminPath || !facebookPixelEnabled()) {
       return;
     }
 
-    void initFacebookPixel();
+    // Mark primary IDs as initialised for helper tracking after official bootstrap
+    void initFacebookPixel().then(() => {
+      bootstrapped.current = true;
+    });
   }, [isAdminPath]);
 
   useEffect(() => {
@@ -73,6 +121,12 @@ export function FacebookPixel({ locale }: Readonly<{ locale: Locale }>) {
 
     const query = searchParams?.toString() || "";
     const pageKey = `${pathname}${query ? `?${query}` : ""}`;
+
+    // First PageView is fired by the official bootstrap script above.
+    if (!lastPageKey.current) {
+      lastPageKey.current = pageKey;
+      return;
+    }
 
     if (lastPageKey.current === pageKey) {
       return;
@@ -86,7 +140,6 @@ export function FacebookPixel({ locale }: Readonly<{ locale: Locale }>) {
       locale
     });
 
-    // Funnel-specific standard events on key pages
     const category = contentCategoryForPath(pathname);
 
     if (category === "assessment") {
@@ -116,5 +169,15 @@ export function FacebookPixel({ locale }: Readonly<{ locale: Locale }>) {
     }
   }, [isAdminPath, locale, pathname, searchParams]);
 
-  return null;
+  if (isAdminPath || !facebookPixelEnabled() || !primaryId) {
+    return null;
+  }
+
+  return (
+    <Script
+      id="facebook-pixel-base"
+      strategy="afterInteractive"
+      dangerouslySetInnerHTML={{ __html: bootstrapScript }}
+    />
+  );
 }
