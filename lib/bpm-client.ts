@@ -357,4 +357,31 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
   }).catch(() => {
     // Tracking must never affect the user journey.
   });
+
+  // Mirror key funnel events to Meta Pixel when configured (client-only).
+  void import("@/lib/facebook-pixel")
+    .then(({ facebookEventForInternal, trackFacebookEvent }) => {
+      const mapped = facebookEventForInternal(eventName);
+
+      if (!mapped) {
+        return;
+      }
+
+      // PageView is handled by FacebookPixel on route changes — skip duplicates.
+      if (mapped.event === "PageView") {
+        return;
+      }
+
+      return trackFacebookEvent(mapped.event, {
+        content_name: eventName,
+        locale: input.locale,
+        plan_id: input.planId ?? currentPlanId() ?? undefined,
+        value: input.valueAmount,
+        currency: input.valueCurrency,
+        ...(input.properties || {})
+      }, { custom: mapped.custom });
+    })
+    .catch(() => {
+      // Pixel must never break BPM or UX.
+    });
 }
