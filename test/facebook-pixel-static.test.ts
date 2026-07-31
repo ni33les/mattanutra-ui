@@ -24,9 +24,9 @@ describe("facebook pixel mapping", () => {
     assert.equal(facebookEventForInternal("random_internal_event"), null);
   });
 
-  it("is disabled without a configured pixel id", () => {
-    assert.equal(facebookPixelEnabled(), false);
-    assert.deepEqual(getFacebookPixelIds(), []);
+  it("uses the MattaNutra default pixel id when env is unset", () => {
+    assert.equal(facebookPixelEnabled(), true);
+    assert.ok(getFacebookPixelIds().includes("27629903823308584"));
   });
 
   it("is wired into the locale layout", () => {

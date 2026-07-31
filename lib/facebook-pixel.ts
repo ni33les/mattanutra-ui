@@ -22,11 +22,17 @@ type FacebookPixelFn = ((...args: unknown[]) => void) & {
 const SCRIPT_ID = "facebook-fbevents";
 const SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
 
+/**
+ * MattaNutra Meta Pixel (public client ID). Env overrides when set on App Platform.
+ * NEXT_PUBLIC_FACEBOOK_PIXEL_ID / NEXT_PUBLIC_META_PIXEL_ID / NEXT_PUBLIC_FACEBOOK_PIXEL_IDS
+ */
+export const DEFAULT_FACEBOOK_PIXEL_ID = "27629903823308584";
+
 function configuredPixelIds(): string[] {
   const primary =
     process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID?.trim() ||
     process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim() ||
-    "";
+    DEFAULT_FACEBOOK_PIXEL_ID;
   const extra = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_IDS?.trim() || "";
   const ids = [primary, ...extra.split(",")]
     .map((id) => id.trim())
