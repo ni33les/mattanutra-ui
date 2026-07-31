@@ -11,7 +11,8 @@ declare global {
   }
 }
 
-type FacebookPixelFn = ((...args: unknown[]) => void) & {
+type FacebookPixelFn = {
+  (...args: unknown[]): void;
   callMethod?: (...args: unknown[]) => void;
   queue?: unknown[];
   push?: FacebookPixelFn;
@@ -121,23 +122,19 @@ export async function initFacebookPixel() {
   const ids = configuredPixelIds();
 
   // Official snippet may already have created window.fbq and loaded fbevents.js
-  if (window.fbq) {
-    for (const id of ids) {
-      if (!initializedIds.has(id)) {
-        // init is safe to call again; Meta ignores duplicate IDs in practice
-        window.fbq("init", id);
-        initializedIds.add(id);
-      }
-    }
+  let fbq = window.fbq;
 
-    return true;
+  if (!fbq) {
+    ensureFbqStub();
+    try {
+      await loadPixelScript();
+    } catch {
+      return false;
+    }
+    fbq = window.fbq;
   }
 
-  ensureFbqStub();
-
-  try {
-    await loadPixelScript();
-  } catch {
+  if (!fbq) {
     return false;
   }
 
@@ -146,7 +143,8 @@ export async function initFacebookPixel() {
       continue;
     }
 
-    window.fbq?.("init", id);
+    // init is safe to call again; Meta ignores duplicate IDs in practice
+    fbq("init", id);
     initializedIds.add(id);
   }
 
@@ -176,16 +174,17 @@ export async function trackFacebookEvent(
   }
 
   const ready = await initFacebookPixel();
-  if (!ready || !window.fbq) {
+  const fbq = window.fbq;
+  if (!ready || !fbq) {
     return;
   }
 
   if (options?.custom) {
-    window.fbq("trackCustom", event, params || {});
+    fbq("trackCustom", event, params || {});
     return;
   }
 
-  window.fbq("track", event, params || {});
+  fbq("track", event, params || {});
 }
 
 export async function trackFacebookPageView(params?: Record<string, unknown>) {
