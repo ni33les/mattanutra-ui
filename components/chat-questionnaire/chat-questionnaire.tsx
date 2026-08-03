@@ -865,39 +865,6 @@ export function ChatQuestionnaire({
       );
     }
 
-    if (turn.kind === "text") {
-      return (
-        <>
-          <input
-            className="mn-chat-q__input"
-            value={textValue}
-            placeholder={turn.ph || ""}
-            onChange={(e) => setTextValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void onAnswer(textValue.trim(), textValue.trim() || "—");
-              }
-            }}
-          />
-          <div className="mn-chat-q__actions">
-            <button
-              type="button"
-              className="mn-chat-q__primary"
-              onClick={() => void onAnswer(textValue.trim(), textValue.trim() || "—")}
-            >
-              {ui.confirm}
-            </button>
-            {turn.req !== 1 || turn.optional || turn.opt ? (
-              <button type="button" className="mn-chat-q__ghost" onClick={() => void onSkip()}>
-                {ui.skip}
-              </button>
-            ) : null}
-          </div>
-        </>
-      );
-    }
-
     if (turn.kind === "confirm") {
       return (
         <div className="mn-chat-q__actions">
@@ -914,7 +881,7 @@ export function ChatQuestionnaire({
 
     if (turn.kind === "gate") {
       return (
-        <div className="mn-chat-q__actions">
+        <div className="mn-chat-q__actions mn-chat-q__actions--row">
           <button
             type="button"
             className="mn-chat-q__primary"
@@ -933,36 +900,76 @@ export function ChatQuestionnaire({
       );
     }
 
+    if (turn.kind === "swatch") {
+      return (
+        <div className="mn-chat-q__swatches">
+          {definition.meta.skinColors.map((color, ix) => {
+            const value = definition.meta.skinValues[ix] || String(ix + 1);
+            return (
+              <button
+                key={value}
+                type="button"
+                className="mn-chat-q__swatch"
+                style={{ background: color }}
+                aria-label={(ui.toneLabel || "Tone {n}").replace("{n}", value)}
+                onClick={() =>
+                  void onAnswer(
+                    value,
+                    (ui.toneLabel || "Tone {n}").replace("{n}", value)
+                  )
+                }
+              />
+            );
+          })}
+        </div>
+      );
+    }
+
     if (turn.kind === "sliders") {
+      const ftTotal = height / 2.54;
+      const ft = Math.floor(ftTotal / 12);
+      const inch = Math.round(ftTotal % 12);
+      const lb = Math.round(weight * 2.205);
       return (
         <>
-          <div className="mn-chat-q__sliders">
-            <label>
-              <span>{ui.height}</span>
-              <input
-                type="range"
-                min={definition.meta.height.min}
-                max={definition.meta.height.max}
-                value={height}
-                onChange={(e) => setHeight(Number(e.target.value))}
-              />
-              <strong>
-                {height} {ui.cm}
-              </strong>
-            </label>
-            <label>
-              <span>{ui.weight}</span>
-              <input
-                type="range"
-                min={definition.meta.weight.min}
-                max={definition.meta.weight.max}
-                value={weight}
-                onChange={(e) => setWeight(Number(e.target.value))}
-              />
-              <strong>
-                {weight} {ui.kg}
-              </strong>
-            </label>
+          <div className="mn-chat-q__fieldbox">
+            <div className="mn-chat-q__sliderline">
+              <small>{ui.height}</small>
+              <span>
+                <b>{height}</b> {ui.cm}{" "}
+                <small>
+                  ({(ui.ftFmt || "{f} ft {i} in")
+                    .replace("{f}", String(ft))
+                    .replace("{i}", String(inch))}
+                  )
+                </small>
+              </span>
+            </div>
+            <input
+              type="range"
+              min={definition.meta.height.min}
+              max={definition.meta.height.max}
+              value={height}
+              aria-label={ui.height}
+              onChange={(e) => setHeight(Number(e.target.value))}
+            />
+            <div className="mn-chat-q__sliderline" style={{ marginTop: 12 }}>
+              <small>{ui.weight}</small>
+              <span>
+                <b>{weight}</b> {ui.kg}{" "}
+                <small>
+                  ({(ui.lbFmt || "{p} lb").replace("{p}", String(lb))})
+                </small>
+              </span>
+            </div>
+            <input
+              type="range"
+              min={definition.meta.weight.min}
+              max={definition.meta.weight.max}
+              value={weight}
+              aria-label={ui.weight}
+              onChange={(e) => setWeight(Number(e.target.value))}
+            />
           </div>
           <div className="mn-chat-q__actions">
             <button
@@ -982,50 +989,73 @@ export function ChatQuestionnaire({
       );
     }
 
-    if (turn.kind === "swatch") {
+    if (turn.kind === "text") {
       return (
-        <div className="mn-chat-q__swatches">
-          {definition.meta.skinValues.map((value, index) => (
-            <button
-              key={value}
-              type="button"
-              className="mn-chat-q__swatch"
-              style={{ background: definition.meta.skinColors[index] }}
-              onClick={() =>
-                void onAnswer(
-                  value,
-                  (ui.toneLabel || "Tone {n}").replace("{n}", String(index + 1))
-                )
+        <>
+          <input
+            className="mn-chat-q__text-input"
+            type="text"
+            maxLength={120}
+            placeholder={turn.ph || ""}
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void onAnswer(textValue.trim(), textValue.trim() || "—");
               }
-              aria-label={(ui.toneLabel || "Tone {n}").replace("{n}", String(index + 1))}
-            />
-          ))}
-        </div>
+            }}
+          />
+          <div className="mn-chat-q__actions">
+            <button
+              type="button"
+              className="mn-chat-q__primary"
+              onClick={() => void onAnswer(textValue.trim(), textValue.trim() || "—")}
+            >
+              {ui.confirm}
+            </button>
+            {turn.optional || turn.req === 0 || turn.opt ? (
+              <button type="button" className="mn-chat-q__ghost" onClick={() => void onSkip()}>
+                {ui.skip}
+              </button>
+            ) : null}
+          </div>
+        </>
       );
     }
 
     if (turn.kind === "fitness") {
       return (
         <>
-          <div className="mn-chat-q__fitgrid">
-            <label>
-              VO₂ max
-              <input
-                className="mn-chat-q__input"
-                value={vo2}
-                onChange={(e) => setVo2(e.target.value)}
-                inputMode="decimal"
-              />
-            </label>
-            <label>
-              HRV
-              <input
-                className="mn-chat-q__input"
-                value={hrv}
-                onChange={(e) => setHrv(e.target.value)}
-                inputMode="decimal"
-              />
-            </label>
+          <div className="mn-chat-q__fieldbox">
+            <div className="mn-chat-q__fitgrid">
+              <div className="mn-chat-q__field">
+                <label htmlFor="cq-vo2">VO₂ max</label>
+                <input
+                  id="cq-vo2"
+                  className="mn-chat-q__text-input"
+                  type="number"
+                  inputMode="decimal"
+                  min={10}
+                  max={90}
+                  value={vo2}
+                  onChange={(e) => setVo2(e.target.value)}
+                />
+              </div>
+              <div className="mn-chat-q__field">
+                <label htmlFor="cq-hrv">HRV</label>
+                <input
+                  id="cq-hrv"
+                  className="mn-chat-q__text-input"
+                  type="number"
+                  inputMode="decimal"
+                  min={5}
+                  max={250}
+                  value={hrv}
+                  onChange={(e) => setHrv(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
           <div className="mn-chat-q__actions">
             <button
@@ -1053,21 +1083,21 @@ export function ChatQuestionnaire({
     if (turn.kind === "labs") {
       return (
         <>
-          <p className="mn-chat-q__hint">{ui.labsHint}</p>
-          <div className="mn-chat-q__labs">
+          <div className="mn-chat-q__fieldbox">
+            <div className="mn-chat-q__why">{ui.labsHint}</div>
             {definition.meta.labs.map((lab) => (
               <div key={lab.k} className="mn-chat-q__labrow">
-                <label>
-                  {lab.n}
-                  <input
-                    className="mn-chat-q__input"
-                    value={labValues[lab.k] || ""}
-                    onChange={(e) =>
-                      setLabValues((prev) => ({ ...prev, [lab.k]: e.target.value }))
-                    }
-                    inputMode="decimal"
-                  />
-                </label>
+                <span className="mn-chat-q__labname">{lab.n}</span>
+                <input
+                  className="mn-chat-q__text-input"
+                  type="number"
+                  inputMode="decimal"
+                  value={labValues[lab.k] || ""}
+                  aria-label={lab.n}
+                  onChange={(e) =>
+                    setLabValues((prev) => ({ ...prev, [lab.k]: e.target.value }))
+                  }
+                />
                 <div className="mn-chat-q__unitseg">
                   {lab.u.map((unit) => (
                     <button
