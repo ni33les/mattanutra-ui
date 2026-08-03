@@ -1071,6 +1071,136 @@ export function isQuestionnaireComplete(state: QuestionnaireState): boolean {
   return true;
 }
 
+/**
+ * Re-open a previously answered turn for editing (review panel).
+ * Clears that turn and all later answers so branching stays consistent.
+ */
+export function reopenTurn(
+  state: QuestionnaireState,
+  turnKey: string
+): ApplyAnswerResult {
+  const definition = getDefinition(state);
+  const turnIndex = definition.turns.findIndex((t) => t.k === turnKey);
+
+  if (turnIndex < 0) {
+    return { ok: false, error: "Unknown question", state };
+  }
+
+  if (state.phase === "complete" || state.phase === "completing") {
+    return { ok: false, error: "Questionnaire already complete", state };
+  }
+
+  let next = cloneState(state);
+  const answers = { ...next.answers };
+  const earned = { ...next.earned };
+
+  for (let i = turnIndex; i < definition.turns.length; i += 1) {
+    const key = definition.turns[i]!.k;
+    delete answers[key];
+    delete earned[key];
+
+    // Clear lab / fitness nested keys that live beside the turn key
+    if (key === "labs") {
+      for (const lab of definition.meta.labs) {
+        delete answers[lab.k];
+        delete answers[`unit_${lab.k.slice(4)}`];
+        delete earned[lab.k];
+      }
+    }
+
+    if (key === "fitness") {
+      delete answers.vo2;
+      delete answers.hrv;
+    }
+
+    if (key === "hw") {
+      delete answers.height;
+      delete answers.weight;
+      delete answers.h;
+      delete answers.w;
+    }
+
+    if (key === "precisionGate") {
+      next = { ...next, precisionGate: null };
+    }
+  }
+
+  // Drop auto-filled food keys if diet itself is being reopened
+  let autoFilled = [...next.autoFilled];
+  if (turnKey === "diet" || autoFilled.some((k) => answers[k] === undefined)) {
+    autoFilled = autoFilled.filter((k) => answers[k] !== undefined);
+  }
+
+  // Keep log messages before this turn's user answer / bot re-ask
+  const keptLog: LogMessage[] = [];
+  for (const msg of next.log) {
+    if (msg.kind === "user" && msg.turnIndex >= turnIndex) {
+      break;
+    }
+
+    if (msg.kind === "bot" && msg.turnIndex > turnIndex) {
+      break;
+    }
+
+    if (
+      msg.kind === "bot" &&
+      msg.turnIndex === turnIndex &&
+      msg.turnKey === turnKey
+    ) {
+      // Drop prior bot prompt for this turn; re-append fresh below
+      continue;
+    }
+
+    if (
+      (msg.kind === "react" || msg.kind === "ack") &&
+      keptLog.length > 0
+    ) {
+      // Keep reactions only if they sit before the reopen point
+      const lastUser = [...keptLog].reverse().find((m) => m.kind === "user");
+      if (lastUser && lastUser.kind === "user" && lastUser.turnIndex >= turnIndex) {
+        break;
+      }
+    }
+
+    keptLog.push(msg);
+  }
+
+  next = {
+    ...next,
+    answers,
+    earned,
+    autoFilled,
+    phase: "active",
+    turnIndex,
+    completedAt: null,
+    log: keptLog
+  };
+
+  // Ensure a bot prompt exists for the reopened turn
+  const hasBot = next.log.some(
+    (m) => m.kind === "bot" && m.turnKey === turnKey && m.turnIndex === turnIndex
+  );
+  if (!hasBot) {
+    next = appendLog(next, [botMessage(definition, next, turnIndex)]);
+  }
+
+  return { ok: true, state: next, events: [] };
+}
+
+/** Summarize an answer for the review panel. */
+export function summarizeAnswer(
+  state: QuestionnaireState,
+  turnKey: string
+): string | null {
+  const definition = getDefinition(state);
+  const turn = definition.turns.find((t) => t.k === turnKey);
+  if (!turn || state.answers[turnKey] === undefined) {
+    return null;
+  }
+
+  return labelForValue(turn, state.answers[turnKey], definition);
+}
+
 export function serializeState(state: QuestionnaireState): string {
   return JSON.stringify(state);
 }

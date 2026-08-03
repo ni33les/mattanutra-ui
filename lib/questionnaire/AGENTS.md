@@ -1,6 +1,8 @@
 # Questionnaire agent group
 
-Deterministic chat questionnaire (**v6-conversational**, master `files/c-q.zip`) designed so **web, LINE, and AI chats** share one turn protocol.
+Deterministic chat questionnaire (**v6-conversational** schema; **v14** web UX with welcome landing + start CTA, calculating screen, review/edit). Reference: `files/v14.html`. Shared turn protocol for **web, LINE, and AI chats**.
+
+Web chat must never show **sex at birth** — always **sex**. Do not auto-start chat on page load; require the welcome CTA (no `/begin|start/i` auto-click).
 
 Copy/emojis come only from definition JSON (extracted from the guide). Do not invent extra icons in chrome.
 

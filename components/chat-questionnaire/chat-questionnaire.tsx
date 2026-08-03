@@ -9,9 +9,12 @@ import {
   deserializeState,
   getDefinition,
   getNextPrompt,
+  isVisibleTurn,
+  reopenTurn,
   serializeState,
   skipTurn,
-  startQuestionnaire
+  startQuestionnaire,
+  summarizeAnswer
 } from "@/lib/questionnaire/engine";
 import { finalizeAssessmentCapture } from "@/lib/questionnaire/agents/capture-agent";
 import { emitQuestionnaireEvents } from "@/lib/questionnaire/agents/progress-agent";
@@ -28,9 +31,19 @@ import {
   nutritionHealthScorePath,
   nutritionRevealPath
 } from "@/lib/nutrition-paths";
+import {
+  getWelcomeCopy,
+  QuestionnaireWelcome
+} from "@/components/chat-questionnaire/questionnaire-welcome";
+import {
+  QuestionnaireCalculating,
+  type CalculatingStatus
+} from "@/components/chat-questionnaire/questionnaire-calculating";
 import "./chat-questionnaire.css";
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
+const CALC_FALLBACK_MS = 15_000;
+const UX_VERSION = "v14-landing";
 
 type ChatQuestionnaireProps = Readonly<{
   locale: Locale;
@@ -39,6 +52,8 @@ type ChatQuestionnaireProps = Readonly<{
   resumeToken?: string;
   showDevShortcut?: boolean;
 }>;
+
+type UiScreen = "welcome" | "chat" | "calculating";
 
 function storageKey(locale: string) {
   return `mn_state_v6_${locale}`;
@@ -87,6 +102,16 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function resultsPath(
+  locale: Locale,
+  planId: string,
+  paymentId?: string
+) {
+  return paymentId
+    ? nutritionRevealPath(locale, planId)
+    : nutritionHealthScorePath(locale, planId);
+}
+
 export function ChatQuestionnaire({
   locale,
   paymentId,
@@ -98,6 +123,11 @@ export function ChatQuestionnaire({
   const logEndRef = useRef<HTMLDivElement | null>(null);
   const logScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
+  const finalizing = useRef(false);
+  const fallbackTimer = useRef<number | null>(null);
+  const readyPlanId = useRef<string | null>(null);
+
+  const [uiScreen, setUiScreen] = useState<UiScreen>("welcome");
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [composerFocusPulse, setComposerFocusPulse] = useState(false);
@@ -110,9 +140,14 @@ export function ChatQuestionnaire({
   const [hrv, setHrv] = useState("");
   const [labValues, setLabValues] = useState<Record<string, string>>({});
   const [labUnits, setLabUnits] = useState<Record<string, string>>({});
-  const [processing, setProcessing] = useState(false);
   const [processingError, setProcessingError] = useState("");
-  const finalizing = useRef(false);
+  const [calcStatus, setCalcStatus] = useState<CalculatingStatus>("building");
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  const chrome = useMemo(
+    () => getWelcomeCopy(locale === "zh-CN" ? "en" : locale),
+    [locale]
+  );
 
   const definition = useMemo(
     () => (state ? getDefinition(state) : getDefinition(createInitialState({ locale }))),
@@ -172,20 +207,25 @@ export function ChatQuestionnaire({
     [locale, returningPlanId]
   );
 
-  // Boot
+  // Boot: welcome gate unless in-progress resume
   useEffect(() => {
     const saved = loadLocalState(locale);
     trackBpmEvent("chat_view", {
       eventType: "funnel",
       locale,
-      properties: { channel: "web", questionnaireVersion: "v6-conversational" }
+      properties: {
+        channel: "web",
+        questionnaireVersion: "v6-conversational",
+        uxVersion: UX_VERSION
+      }
     });
 
     if (
       saved &&
       saved.version === "v6-conversational" &&
       Object.keys(saved.answers).length > 0 &&
-      saved.phase !== "complete"
+      saved.phase !== "complete" &&
+      saved.phase !== "completing"
     ) {
       setState({
         ...saved,
@@ -195,31 +235,39 @@ export function ChatQuestionnaire({
         halfwayDone: saved.halfwayDone ?? false,
         sinceAck: saved.sinceAck ?? 0
       });
+      setUiScreen("chat");
       return;
     }
 
-    const initial = createInitialState({
-      locale,
-      channel: "web",
-      planId: returningPlanId ?? null
-    });
-    const started = startQuestionnaire(initial);
-    setState(started.state);
-    void track(started.events);
-    saveLocalState(locale, started.state);
-  }, [locale, returningPlanId, track]);
+    setState(
+      createInitialState({
+        locale,
+        channel: "web",
+        planId: returningPlanId ?? null
+      })
+    );
+    setUiScreen("welcome");
+  }, [locale, returningPlanId]);
 
   useEffect(() => {
+    if (uiScreen !== "chat") {
+      return;
+    }
+
     const scroller = logScrollRef.current;
     if (scroller) {
       scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
     } else {
       logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [state?.log.length, currentTurn?.k]);
+  }, [state?.log.length, currentTurn?.k, uiScreen]);
 
   // Reset composer draft when turn changes + pull focus to answers
   useEffect(() => {
+    if (uiScreen !== "chat") {
+      return;
+    }
+
     setComposerError("");
     setMultiSel([]);
     setTextValue("");
@@ -249,7 +297,6 @@ export function ChatQuestionnaire({
       setHrv(String(state?.answers.hrv ?? ""));
     }
 
-    // Draw attention to answer controls after each new question
     const focusTimer = window.setTimeout(() => {
       const root = composerRef.current;
       if (!root || state?.phase !== "active") {
@@ -267,18 +314,80 @@ export function ChatQuestionnaire({
     }, 80);
 
     return () => window.clearTimeout(focusTimer);
-  }, [currentTurn?.k, currentTurn?.kind, definition.meta, state?.answers, state?.phase]);
+  }, [
+    currentTurn?.k,
+    currentTurn?.kind,
+    definition.meta,
+    state?.answers,
+    state?.phase,
+    uiScreen
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (fallbackTimer.current) {
+        window.clearTimeout(fallbackTimer.current);
+      }
+    };
+  }, []);
+
+  const armCalcFallback = useCallback(() => {
+    if (fallbackTimer.current) {
+      window.clearTimeout(fallbackTimer.current);
+    }
+
+    fallbackTimer.current = window.setTimeout(() => {
+      setCalcStatus((prev) => (prev === "ready" ? prev : "slow"));
+    }, CALC_FALLBACK_MS);
+  }, []);
+
+  const pollHealthScore = useCallback(
+    async (planId: string) => {
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const response = await fetchWithTimeout(
+          `/api/assessment/${encodeURIComponent(planId)}?view=healthscore&locale=${encodeURIComponent(locale)}`,
+          { cache: "no-store" }
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to load HealthScore");
+        }
+
+        const payload = (await response.json()) as {
+          status?: string;
+          healthScore?: unknown;
+        };
+
+        if (payload.status === "ready" && payload.healthScore) {
+          return true;
+        }
+
+        if (payload.status === "failed") {
+          throw new Error("HealthScore analysis failed");
+        }
+
+        await sleep(1500);
+      }
+
+      return false;
+    },
+    [locale]
+  );
 
   const finalize = useCallback(
     async (completed: QuestionnaireState) => {
-      setProcessing(true);
+      setUiScreen("calculating");
+      setCalcStatus("building");
       setProcessingError("");
+      armCalcFallback();
+
       trackBpmEvent("assessment_submitted", {
         eventType: "funnel",
         locale,
         properties: {
           channel: "web",
           questionnaireVersion: "v6-conversational",
+          uxVersion: UX_VERSION,
           precision: computePrecision(getDefinition(completed), completed),
           sessionId: completed.sessionId
         }
@@ -298,41 +407,21 @@ export function ChatQuestionnaire({
           throw new Error(captured.error || "Capture failed");
         }
 
-        let healthScore = captured.healthScore;
-        let status = captured.status;
+        readyPlanId.current = captured.planId;
+        let ready =
+          captured.status === "ready" && Boolean(captured.healthScore);
 
-        if (status !== "ready" || !healthScore) {
-          for (let attempt = 0; attempt < 40; attempt += 1) {
-            const response = await fetchWithTimeout(
-              `/api/assessment/${encodeURIComponent(captured.planId)}?view=healthscore&locale=${encodeURIComponent(locale)}`,
-              { cache: "no-store" }
-            );
-
-            if (!response.ok) {
-              throw new Error("Unable to load HealthScore");
-            }
-
-            const payload = (await response.json()) as {
-              status?: string;
-              healthScore?: unknown;
-            };
-            status = payload.status;
-            healthScore = payload.healthScore;
-
-            if (status === "ready" && healthScore) {
-              break;
-            }
-
-            if (status === "failed") {
-              throw new Error("HealthScore analysis failed");
-            }
-
-            await sleep(1500);
-          }
+        if (!ready) {
+          ready = await pollHealthScore(captured.planId);
         }
 
-        if (!healthScore) {
-          throw new Error("HealthScore missing");
+        if (!ready) {
+          setCalcStatus("slow");
+          return;
+        }
+
+        if (fallbackTimer.current) {
+          window.clearTimeout(fallbackTimer.current);
         }
 
         clearLocalState(locale);
@@ -340,22 +429,29 @@ export function ChatQuestionnaire({
           eventType: "funnel",
           locale,
           planId: captured.planId,
-          properties: { channel: "web", questionnaireVersion: "v6-conversational" }
+          properties: {
+            channel: "web",
+            questionnaireVersion: "v6-conversational",
+            uxVersion: UX_VERSION
+          }
         });
-
-        router.replace(
-          paymentId
-            ? nutritionRevealPath(locale, captured.planId)
-            : nutritionHealthScorePath(locale, captured.planId)
-        );
+        setCalcStatus("ready");
       } catch {
         finalizing.current = false;
-        setProcessing(false);
+        setCalcStatus("error");
         setProcessingError(ui.processingError || "Something went wrong");
         setState((prev) => (prev ? { ...prev, phase: "complete" } : prev));
       }
     },
-    [locale, paymentId, resumeToken, returningPlanId, router, ui.processingError]
+    [
+      armCalcFallback,
+      locale,
+      paymentId,
+      pollHealthScore,
+      resumeToken,
+      returningPlanId,
+      ui.processingError
+    ]
   );
 
   const commitState = useCallback(
@@ -383,6 +479,32 @@ export function ChatQuestionnaire({
     },
     [finalize, persistCheckpoint, track]
   );
+
+  function beginFromWelcome() {
+    trackBpmEvent("welcome_cta", {
+      eventType: "funnel",
+      locale,
+      properties: {
+        channel: "web",
+        questionnaireVersion: "v6-conversational",
+        uxVersion: UX_VERSION
+      }
+    });
+
+    const initial =
+      state && state.phase === "intro"
+        ? state
+        : createInitialState({
+            locale,
+            channel: "web",
+            planId: returningPlanId ?? null
+          });
+    const started = startQuestionnaire(initial);
+    setState(started.state);
+    setUiScreen("chat");
+    void track(started.events);
+    saveLocalState(locale, started.state);
+  }
 
   async function onAnswer(value: unknown, label?: string) {
     if (!state || !currentTurn) {
@@ -423,15 +545,100 @@ export function ChatQuestionnaire({
 
   function resumeRestart() {
     clearLocalState(locale);
-    const initial = createInitialState({
+    finalizing.current = false;
+    readyPlanId.current = null;
+    setCalcStatus("building");
+    setState(
+      createInitialState({
+        locale,
+        channel: "web",
+        planId: returningPlanId ?? null
+      })
+    );
+    setUiScreen("welcome");
+  }
+
+  function onReviewEdit(turnKey: string) {
+    if (!state) {
+      return;
+    }
+
+    const result = reopenTurn(state, turnKey);
+    if (!result.ok) {
+      setComposerError(result.error);
+      return;
+    }
+
+    setReviewOpen(false);
+    setState(result.state);
+    saveLocalState(locale, result.state);
+  }
+
+  const reviewItems = useMemo(() => {
+    if (!state) {
+      return [] as Array<{ key: string; question: string; answer: string }>;
+    }
+
+    const def = getDefinition(state);
+    const items: Array<{ key: string; question: string; answer: string }> = [];
+
+    for (const turn of def.turns) {
+      if (!isVisibleTurn(def, turn, state.answers)) {
+        continue;
+      }
+
+      if (state.answers[turn.k] === undefined || state.answers[turn.k] === null) {
+        continue;
+      }
+
+      const answer = summarizeAnswer(state, turn.k);
+      if (!answer) {
+        continue;
+      }
+
+      items.push({
+        key: turn.k,
+        question: turn.q.replace(/<[^>]+>/g, ""),
+        answer
+      });
+    }
+
+    return items;
+  }, [state]);
+
+  async function onFallbackEmail(email: string) {
+    const planId = readyPlanId.current || returningPlanId || state?.planId;
+    trackBpmEvent("email_capture", {
+      eventType: "funnel",
       locale,
-      channel: "web",
-      planId: returningPlanId ?? null
+      planId: planId || undefined,
+      properties: {
+        channel: "web",
+        questionnaireVersion: "v6-conversational",
+        uxVersion: UX_VERSION,
+        source: "calc_fallback"
+      }
     });
-    const started = startQuestionnaire(initial);
-    setState(started.state);
-    void track(started.events);
-    saveLocalState(locale, started.state);
+
+    if (!planId) {
+      return;
+    }
+
+    try {
+      await fetchWithTimeout(`/api/assessment/${encodeURIComponent(planId)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contactEmail: email,
+          intent: "capture",
+          locale
+        }),
+        cache: "no-store",
+        keepalive: true
+      });
+    } catch {
+      /* non-blocking */
+    }
   }
 
   function renderLogItem(msg: LogMessage, index: number) {
@@ -530,7 +737,7 @@ export function ChatQuestionnaire({
   }
 
   function renderComposer() {
-    if (!state || processing) {
+    if (!state || uiScreen !== "chat") {
       return null;
     }
 
@@ -599,7 +806,10 @@ export function ChatQuestionnaire({
           <div className="mn-chat-q__chips">
             {turn.opts?.map((o) => {
               const selected = multiSel.includes(o.v);
-              const capped = Boolean(max && multiSel.length >= max && !selected);
+              const capped =
+                Boolean(max) &&
+                !selected &&
+                multiSel.filter((v) => !excl.includes(v)).length >= (max || 0);
               return (
                 <button
                   key={o.v}
@@ -607,23 +817,22 @@ export function ChatQuestionnaire({
                   className={`mn-chat-q__chip${selected ? " mn-chat-q__chip--sel" : ""}${capped ? " mn-chat-q__chip--disabled" : ""}`}
                   onClick={() => {
                     setMultiSel((prev) => {
-                      if (prev.includes(o.v)) {
-                        return prev.filter((x) => x !== o.v);
-                      }
-
-                      let next = [...prev];
                       if (excl.includes(o.v)) {
-                        next = [];
-                      } else {
-                        next = next.filter((x) => !excl.includes(x));
+                        return selected ? [] : [o.v];
                       }
 
-                      if (max && next.length >= max) {
-                        setComposerError(ui.pickMax3 || "");
-                        return prev;
+                      const withoutExcl = prev.filter((v) => !excl.includes(v));
+                      if (selected) {
+                        return withoutExcl.filter((v) => v !== o.v);
                       }
 
-                      return [...next, o.v];
+                      if (max && withoutExcl.length >= max) {
+                        setComposerError(ui.pickMax3 || "Too many choices");
+                        return withoutExcl;
+                      }
+
+                      setComposerError("");
+                      return [...withoutExcl, o.v];
                     });
                   }}
                 >
@@ -632,24 +841,59 @@ export function ChatQuestionnaire({
               );
             })}
           </div>
+          {composerError ? <div className="mn-chat-q__err">{composerError}</div> : null}
           <div className="mn-chat-q__actions">
             <button
               type="button"
               className="mn-chat-q__primary"
-              disabled={multiSel.length === 0}
               onClick={() => {
-                const labels =
-                  turn.opts
-                    ?.filter((o) => multiSel.includes(o.v))
-                    .map((o) => o.l)
-                    .join(" · ") || multiSel.join(" · ");
+                if (!multiSel.length) {
+                  setComposerError(ui.needAnswer || "Pick an answer first");
+                  return;
+                }
+
+                const labels = multiSel
+                  .map((v) => turn.opts?.find((o) => o.v === v)?.l || v)
+                  .join(" · ");
                 void onAnswer(multiSel, labels);
               }}
             >
               {ui.confirm}
             </button>
           </div>
-          {composerError ? <div className="mn-chat-q__err">{composerError}</div> : null}
+        </>
+      );
+    }
+
+    if (turn.kind === "text") {
+      return (
+        <>
+          <input
+            className="mn-chat-q__input"
+            value={textValue}
+            placeholder={turn.ph || ""}
+            onChange={(e) => setTextValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void onAnswer(textValue.trim(), textValue.trim() || "—");
+              }
+            }}
+          />
+          <div className="mn-chat-q__actions">
+            <button
+              type="button"
+              className="mn-chat-q__primary"
+              onClick={() => void onAnswer(textValue.trim(), textValue.trim() || "—")}
+            >
+              {ui.confirm}
+            </button>
+            {turn.req !== 1 || turn.optional || turn.opt ? (
+              <button type="button" className="mn-chat-q__ghost" onClick={() => void onSkip()}>
+                {ui.skip}
+              </button>
+            ) : null}
+          </div>
         </>
       );
     }
@@ -670,7 +914,7 @@ export function ChatQuestionnaire({
 
     if (turn.kind === "gate") {
       return (
-        <div className="mn-chat-q__actions mn-chat-q__actions--row">
+        <div className="mn-chat-q__actions">
           <button
             type="button"
             className="mn-chat-q__primary"
@@ -689,76 +933,36 @@ export function ChatQuestionnaire({
       );
     }
 
-    if (turn.kind === "swatch") {
-      return (
-        <div className="mn-chat-q__swatches">
-          {definition.meta.skinColors.map((color, ix) => {
-            const value = definition.meta.skinValues[ix] || String(ix + 1);
-            return (
-              <button
-                key={value}
-                type="button"
-                className="mn-chat-q__swatch"
-                style={{ background: color }}
-                aria-label={(ui.toneLabel || "Tone {n}").replace("{n}", value)}
-                onClick={() =>
-                  void onAnswer(
-                    value,
-                    (ui.toneLabel || "Tone {n}").replace("{n}", value)
-                  )
-                }
-              />
-            );
-          })}
-        </div>
-      );
-    }
-
     if (turn.kind === "sliders") {
-      const ftTotal = height / 2.54;
-      const ft = Math.floor(ftTotal / 12);
-      const inch = Math.round(ftTotal % 12);
-      const lb = Math.round(weight * 2.205);
       return (
         <>
-          <div className="mn-chat-q__fieldbox">
-            <div className="mn-chat-q__sliderline">
-              <small>{ui.height}</small>
-              <span>
-                <b>{height}</b> {ui.cm}{" "}
-                <small>
-                  ({(ui.ftFmt || "{f} ft {i} in")
-                    .replace("{f}", String(ft))
-                    .replace("{i}", String(inch))}
-                  )
-                </small>
-              </span>
-            </div>
-            <input
-              type="range"
-              min={definition.meta.height.min}
-              max={definition.meta.height.max}
-              value={height}
-              aria-label={ui.height}
-              onChange={(e) => setHeight(Number(e.target.value))}
-            />
-            <div className="mn-chat-q__sliderline" style={{ marginTop: 12 }}>
-              <small>{ui.weight}</small>
-              <span>
-                <b>{weight}</b> {ui.kg}{" "}
-                <small>
-                  ({(ui.lbFmt || "{p} lb").replace("{p}", String(lb))})
-                </small>
-              </span>
-            </div>
-            <input
-              type="range"
-              min={definition.meta.weight.min}
-              max={definition.meta.weight.max}
-              value={weight}
-              aria-label={ui.weight}
-              onChange={(e) => setWeight(Number(e.target.value))}
-            />
+          <div className="mn-chat-q__sliders">
+            <label>
+              <span>{ui.height}</span>
+              <input
+                type="range"
+                min={definition.meta.height.min}
+                max={definition.meta.height.max}
+                value={height}
+                onChange={(e) => setHeight(Number(e.target.value))}
+              />
+              <strong>
+                {height} {ui.cm}
+              </strong>
+            </label>
+            <label>
+              <span>{ui.weight}</span>
+              <input
+                type="range"
+                min={definition.meta.weight.min}
+                max={definition.meta.weight.max}
+                value={weight}
+                onChange={(e) => setWeight(Number(e.target.value))}
+              />
+              <strong>
+                {weight} {ui.kg}
+              </strong>
+            </label>
           </div>
           <div className="mn-chat-q__actions">
             <button
@@ -766,7 +970,7 @@ export function ChatQuestionnaire({
               className="mn-chat-q__primary"
               onClick={() =>
                 void onAnswer(
-                  { h: String(height), w: String(weight) },
+                  { h: String(height), w: String(weight), height, weight },
                   `${height} ${ui.cm} · ${weight} ${ui.kg}`
                 )
               }
@@ -778,83 +982,62 @@ export function ChatQuestionnaire({
       );
     }
 
-    if (turn.kind === "text") {
+    if (turn.kind === "swatch") {
       return (
-        <>
-          <input
-            className="mn-chat-q__text-input"
-            type="text"
-            maxLength={120}
-            placeholder={turn.ph || ""}
-            value={textValue}
-            onChange={(e) => setTextValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void onAnswer(textValue.trim());
-              }
-            }}
-          />
-          <div className="mn-chat-q__actions">
+        <div className="mn-chat-q__swatches">
+          {definition.meta.skinValues.map((value, index) => (
             <button
+              key={value}
               type="button"
-              className="mn-chat-q__primary"
-              onClick={() => void onAnswer(textValue.trim())}
-            >
-              {ui.confirm}
-            </button>
-            {turn.optional || turn.req === 0 ? (
-              <button type="button" className="mn-chat-q__ghost" onClick={() => void onSkip()}>
-                {ui.skip}
-              </button>
-            ) : null}
-          </div>
-        </>
+              className="mn-chat-q__swatch"
+              style={{ background: definition.meta.skinColors[index] }}
+              onClick={() =>
+                void onAnswer(
+                  value,
+                  (ui.toneLabel || "Tone {n}").replace("{n}", String(index + 1))
+                )
+              }
+              aria-label={(ui.toneLabel || "Tone {n}").replace("{n}", String(index + 1))}
+            />
+          ))}
+        </div>
       );
     }
 
     if (turn.kind === "fitness") {
       return (
         <>
-          <div className="mn-chat-q__fieldbox">
-            <div className="mn-chat-q__fitgrid">
-              <div>
-                <label htmlFor="cq-vo2">VO₂ max</label>
-                <input
-                  id="cq-vo2"
-                  type="number"
-                  inputMode="decimal"
-                  min={10}
-                  max={90}
-                  value={vo2}
-                  onChange={(e) => setVo2(e.target.value)}
-                />
-              </div>
-              <div>
-                <label htmlFor="cq-hrv">HRV</label>
-                <input
-                  id="cq-hrv"
-                  type="number"
-                  inputMode="decimal"
-                  min={5}
-                  max={250}
-                  value={hrv}
-                  onChange={(e) => setHrv(e.target.value)}
-                />
-              </div>
-            </div>
+          <div className="mn-chat-q__fitgrid">
+            <label>
+              VO₂ max
+              <input
+                className="mn-chat-q__input"
+                value={vo2}
+                onChange={(e) => setVo2(e.target.value)}
+                inputMode="decimal"
+              />
+            </label>
+            <label>
+              HRV
+              <input
+                className="mn-chat-q__input"
+                value={hrv}
+                onChange={(e) => setHrv(e.target.value)}
+                inputMode="decimal"
+              />
+            </label>
           </div>
           <div className="mn-chat-q__actions">
             <button
               type="button"
               className="mn-chat-q__primary"
               onClick={() => {
-                if (!vo2 && !hrv) {
+                if (!vo2.trim() && !hrv.trim()) {
                   void onSkip();
                   return;
                 }
 
-                void onAnswer({ vo2: vo2 || undefined, hrv: hrv || undefined });
+                void onAnswer({ vo2: vo2.trim(), hrv: hrv.trim() });
               }}
             >
               {ui.confirm}
@@ -870,19 +1053,21 @@ export function ChatQuestionnaire({
     if (turn.kind === "labs") {
       return (
         <>
-          <div className="mn-chat-q__fieldbox">
-            <div className="mn-chat-q__why">{ui.labsHint}</div>
+          <p className="mn-chat-q__hint">{ui.labsHint}</p>
+          <div className="mn-chat-q__labs">
             {definition.meta.labs.map((lab) => (
               <div key={lab.k} className="mn-chat-q__labrow">
-                <span className="mn-chat-q__labname">{lab.n}</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={labValues[lab.k] || ""}
-                  onChange={(e) =>
-                    setLabValues((prev) => ({ ...prev, [lab.k]: e.target.value }))
-                  }
-                />
+                <label>
+                  {lab.n}
+                  <input
+                    className="mn-chat-q__input"
+                    value={labValues[lab.k] || ""}
+                    onChange={(e) =>
+                      setLabValues((prev) => ({ ...prev, [lab.k]: e.target.value }))
+                    }
+                    inputMode="decimal"
+                  />
+                </label>
                 <div className="mn-chat-q__unitseg">
                   {lab.u.map((unit) => (
                     <button
@@ -920,12 +1105,10 @@ export function ChatQuestionnaire({
                   return;
                 }
 
-                // stash units on state via answers merge in onAnswer object
                 for (const lab of definition.meta.labs) {
                   const unitKey = `unit_${lab.k.slice(4)}`;
                   if (labUnits[lab.k]) {
-                    // applied via extended object
-                    (payload as Record<string, string>)[unitKey] = labUnits[lab.k]!;
+                    payload[unitKey] = labUnits[lab.k]!;
                   }
                 }
 
@@ -945,6 +1128,45 @@ export function ChatQuestionnaire({
     return null;
   }
 
+  if (uiScreen === "welcome") {
+    return (
+      <QuestionnaireWelcome
+        locale={locale}
+        onStart={beginFromWelcome}
+        paymentId={paymentId}
+        returningPlanId={returningPlanId}
+        resumeToken={resumeToken}
+      />
+    );
+  }
+
+  if (uiScreen === "calculating") {
+    return (
+      <QuestionnaireCalculating
+        locale={locale}
+        status={calcStatus}
+        onSeeResults={() => {
+          const planId = readyPlanId.current;
+          if (!planId) {
+            return;
+          }
+
+          router.replace(resultsPath(locale, planId, paymentId));
+        }}
+        onRetry={() => {
+          if (!state) {
+            return;
+          }
+
+          finalizing.current = false;
+          setCalcStatus("building");
+          void finalize(state);
+        }}
+        onEmailSubmit={onFallbackEmail}
+      />
+    );
+  }
+
   return (
     <div className="mn-chat-q" data-testid="chat-questionnaire">
       <div className="mn-chat-q__header">
@@ -952,6 +1174,14 @@ export function ChatQuestionnaire({
           <div className="mn-chat-q__wordmark">
             Matta<b>Nutra</b>
           </div>
+          <button
+            type="button"
+            className="mn-chat-q__review-btn"
+            onClick={() => setReviewOpen(true)}
+            disabled={!reviewItems.length}
+          >
+            {chrome.reviewBtn}
+          </button>
           <span className={`mn-chat-q__saved${savedFlash ? " show" : ""}`}>
             {ui.saved || "Saved"}
           </span>
@@ -978,11 +1208,6 @@ export function ChatQuestionnaire({
           ref={logScrollRef}
         >
           {state?.log.map((msg, index) => renderLogItem(msg, index))}
-          {processing ? (
-            <div className="mn-chat-q__processing" aria-live="polite">
-              <span className="mn-chat-q__processing-dot" aria-hidden />
-            </div>
-          ) : null}
           <div ref={logEndRef} />
         </div>
 
@@ -994,9 +1219,58 @@ export function ChatQuestionnaire({
         </div>
       </div>
 
+      {reviewOpen ? (
+        <div
+          className="mn-chat-q__review-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mn-chat-q-review-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setReviewOpen(false);
+            }
+          }}
+        >
+          <div className="mn-chat-q__review-panel">
+            <div className="mn-chat-q__review-head">
+              <h2 id="mn-chat-q-review-title">{chrome.reviewTitle}</h2>
+              <button
+                type="button"
+                className="mn-chat-q__review-close"
+                aria-label={chrome.reviewClose}
+                onClick={() => setReviewOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="mn-chat-q__review-list">
+              {reviewItems.length === 0 ? (
+                <p className="mn-chat-q__review-empty">{chrome.reviewEmpty}</p>
+              ) : (
+                reviewItems.map((item) => (
+                  <div key={item.key} className="mn-chat-q__review-item">
+                    <div>
+                      <b>{item.question}</b>
+                      <div className="mn-chat-q__review-answer">{item.answer}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="mn-chat-q__review-edit"
+                      onClick={() => onReviewEdit(item.key)}
+                    >
+                      {chrome.reviewEdit}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showDevShortcut && process.env.NODE_ENV !== "production" ? (
         <div style={{ padding: 8, fontSize: 12, opacity: 0.5 }}>
-          chat-q v6 · {state?.phase} · t{state?.turnIndex}
+          chat-q v14 · {state?.phase} · t{state?.turnIndex} · {uiScreen}
         </div>
       ) : null}
     </div>
