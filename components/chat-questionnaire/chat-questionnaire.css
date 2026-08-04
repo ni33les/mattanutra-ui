@@ -190,7 +190,7 @@
   padding-right: 20px;
 }
 
-.mn-chat-q__row--user {
+.mn-chat-q__row.mn-chat-q__row--user {
   justify-content: flex-end;
   padding-left: 48px;
 }
@@ -1376,7 +1376,7 @@
   }
 }
 
-/* Stage flash between parts — enter / hold / exit */
+/* Stage flash between parts — enter / hold / exit (snappier than first pass) */
 .mn-quiz-stage {
   position: fixed;
   inset: 0;
@@ -1391,8 +1391,8 @@
   background: rgba(248, 245, 236, 0.96);
   opacity: 0;
   transition:
-    opacity 0.42s cubic-bezier(0.22, 0.82, 0.28, 1),
-    backdrop-filter 0.42s ease;
+    opacity 0.3s cubic-bezier(0.22, 0.82, 0.28, 1),
+    backdrop-filter 0.3s ease;
   backdrop-filter: blur(0);
 }
 
@@ -1403,15 +1403,15 @@
 
 .mn-quiz-stage--hold {
   opacity: 1;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(5px);
 }
 
 .mn-quiz-stage--exit {
   opacity: 0;
   backdrop-filter: blur(0);
   transition:
-    opacity 0.38s cubic-bezier(0.4, 0, 0.2, 1),
-    backdrop-filter 0.38s ease;
+    opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    backdrop-filter 0.28s ease;
 }
 
 .mn-quiz-stage__card {
@@ -1419,16 +1419,16 @@
   flex-direction: column;
   align-items: center;
   max-width: min(420px, 92vw);
-  padding: 28px 26px 30px;
+  padding: 26px 24px 28px;
   border-radius: 26px;
-  background: rgba(255, 253, 248, 0.92);
+  background: rgba(255, 253, 248, 0.94);
   border: 1px solid rgba(229, 224, 210, 0.9);
-  box-shadow: 0 25px 60px rgba(34, 48, 78, 0.12);
+  box-shadow: 0 22px 50px rgba(34, 48, 78, 0.11);
   opacity: 0;
-  transform: translateY(14px) scale(0.94);
+  transform: translateY(10px) scale(0.97);
   transition:
-    opacity 0.42s cubic-bezier(0.22, 0.82, 0.28, 1),
-    transform 0.5s cubic-bezier(0.22, 1.15, 0.28, 1);
+    opacity 0.3s cubic-bezier(0.22, 0.82, 0.28, 1),
+    transform 0.36s cubic-bezier(0.22, 1.05, 0.28, 1);
 }
 
 .mn-quiz-stage--hold .mn-quiz-stage__card {
@@ -1438,10 +1438,10 @@
 
 .mn-quiz-stage--exit .mn-quiz-stage__card {
   opacity: 0;
-  transform: translateY(-8px) scale(0.97);
+  transform: translateY(-6px) scale(0.98);
   transition:
-    opacity 0.36s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.36s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mn-quiz-stage img {
@@ -1449,12 +1449,12 @@
   max-height: 180px;
   height: auto;
   object-fit: contain;
-  filter: drop-shadow(0 14px 22px rgba(16, 43, 61, 0.12));
+  filter: drop-shadow(0 12px 18px rgba(16, 43, 61, 0.1));
   opacity: 0;
-  transform: scale(0.72);
+  transform: scale(0.88);
   transition:
-    opacity 0.45s cubic-bezier(0.22, 0.82, 0.28, 1),
-    transform 0.55s cubic-bezier(0.22, 1.2, 0.28, 1);
+    opacity 0.32s cubic-bezier(0.22, 0.82, 0.28, 1),
+    transform 0.38s cubic-bezier(0.22, 1.1, 0.28, 1);
 }
 
 .mn-quiz-stage--hold img {
@@ -1464,10 +1464,10 @@
 
 .mn-quiz-stage--exit img {
   opacity: 0;
-  transform: scale(0.92);
+  transform: scale(0.96);
   transition:
-    opacity 0.32s ease,
-    transform 0.32s ease;
+    opacity 0.24s ease,
+    transform 0.24s ease;
 }
 
 .mn-quiz-stage__eyebrow {
@@ -1478,10 +1478,10 @@
   color: #b08c46;
   font-weight: 700;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(6px);
   transition:
-    opacity 0.4s ease 0.12s,
-    transform 0.45s cubic-bezier(0.22, 0.82, 0.28, 1) 0.12s;
+    opacity 0.28s ease 0.06s,
+    transform 0.32s cubic-bezier(0.22, 0.82, 0.28, 1) 0.06s;
 }
 
 .mn-quiz-stage__title {
@@ -1492,10 +1492,10 @@
   color: #22304e;
   line-height: 1.2;
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(7px);
   transition:
-    opacity 0.42s ease 0.18s,
-    transform 0.48s cubic-bezier(0.22, 0.82, 0.28, 1) 0.18s;
+    opacity 0.3s ease 0.1s,
+    transform 0.34s cubic-bezier(0.22, 0.82, 0.28, 1) 0.1s;
 }
 
 .mn-quiz-stage--hold .mn-quiz-stage__eyebrow,
@@ -1507,10 +1507,10 @@
 .mn-quiz-stage--exit .mn-quiz-stage__eyebrow,
 .mn-quiz-stage--exit .mn-quiz-stage__title {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-3px);
   transition:
-    opacity 0.28s ease,
-    transform 0.28s ease;
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 /* Leaf burst */
@@ -1537,7 +1537,10 @@
   .mn-chat-q__avatar img,
   .mn-chat-q__avatar--celebrate img,
   .mn-chat-q__typing i,
-  .mn-quiz-welcome__mascot {
+  .mn-quiz-welcome__mascot,
+  .mn-chat-q__row,
+  .mn-chat-q__row--bot .mn-chat-q__bubble,
+  .mn-chat-q__row--user .mn-chat-q__bubble {
     animation: none !important;
   }
 
