@@ -106,6 +106,13 @@ export function QuestionnaireWelcome({
             <article>
               <span>1</span>
               <div>
+                <div className="mn-quiz-welcome__stepicon" aria-hidden>
+                  <svg viewBox="0 0 24 24">
+                    <path d="M9 5h6M9 9h6M9 13h4" />
+                    <rect x="5" y="3" width="14" height="18" rx="2" />
+                    <path d="M8 3.5V2m8 1.5V2" />
+                  </svg>
+                </div>
                 <strong>{copy.s1t}</strong>
                 <small>{copy.s1d}</small>
               </div>
@@ -114,6 +121,12 @@ export function QuestionnaireWelcome({
             <article>
               <span>2</span>
               <div>
+                <div className="mn-quiz-welcome__stepicon" aria-hidden>
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7" />
+                    <path d="M3 20h18" />
+                  </svg>
+                </div>
                 <strong>{copy.s2t}</strong>
                 <small>{copy.s2d}</small>
               </div>
@@ -122,6 +135,13 @@ export function QuestionnaireWelcome({
             <article>
               <span>3</span>
               <div>
+                <div className="mn-quiz-welcome__stepicon" aria-hidden>
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 3l1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3Z" />
+                    <path d="M18.5 13.5l.7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" />
+                    <path d="M5 14l.8 2.5L8.3 17l-2.5.8L5 20.3l-.8-2.5L1.7 17l2.5-.5L5 14Z" />
+                  </svg>
+                </div>
                 <strong>{copy.s3t}</strong>
                 <small>{copy.s3d}</small>
               </div>
