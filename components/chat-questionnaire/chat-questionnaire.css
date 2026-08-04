@@ -37,22 +37,12 @@
 .mn-chat-q__brandrow {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
 }
 
-.mn-chat-q__wordmark {
-  font-family: var(--font-display, Georgia, serif);
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.mn-chat-q__wordmark b {
-  color: var(--cq-matta);
-  font-weight: 600;
-}
-
 .mn-chat-q__saved {
-  margin-left: 8px;
+  margin-left: auto;
   font-size: 0.72rem;
   color: var(--cq-matta-deep);
   opacity: 0;
@@ -688,74 +678,22 @@
   }
 }
 
-/* ---------- v14 welcome landing ---------- */
+/* ---------- v14 welcome landing (content only; site TitleBar owns chrome) ---------- */
 .mn-quiz-welcome {
-  min-height: 100vh;
   width: 100%;
-  padding: 18px;
+  padding: 12px 18px 28px;
   background:
     radial-gradient(860px 440px at 0 0, rgba(73, 143, 110, 0.16), transparent 62%),
     radial-gradient(720px 420px at 100% 3%, rgba(68, 94, 170, 0.08), transparent 58%),
     #f8f5ec;
   color: #102b3d;
   box-sizing: border-box;
+  flex: 1;
 }
 
 .mn-quiz-welcome__shell {
   max-width: 1040px;
   margin: 0 auto;
-}
-
-.mn-quiz-welcome__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 3px 2px 18px;
-}
-
-.mn-quiz-welcome__brand {
-  text-decoration: none;
-  color: #102b3d;
-}
-
-.mn-quiz-welcome__wordmark {
-  font-family: var(--font-display, Georgia, serif);
-  font-size: 1.48rem;
-  font-weight: 700;
-}
-
-.mn-quiz-welcome__wordmark b {
-  color: #2e7d5b;
-  font-weight: 700;
-}
-
-.mn-quiz-welcome__lang {
-  display: flex;
-  border: 1px solid #e1ded4;
-  border-radius: 12px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.75);
-}
-
-.mn-quiz-welcome__lang-btn {
-  border: 0;
-  border-right: 1px solid #e1ded4;
-  background: transparent;
-  padding: 9px 12px;
-  font: 700 0.84rem inherit;
-  color: #5e6d7e;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.mn-quiz-welcome__lang-btn:last-child {
-  border-right: 0;
-}
-
-.mn-quiz-welcome__lang-btn.is-active {
-  background: #2e7d5b;
-  color: #fff;
 }
 
 .mn-quiz-welcome__card {
@@ -1232,7 +1170,7 @@
 
 /* ---------- review answers ---------- */
 .mn-chat-q__review-btn {
-  margin-left: auto;
+  margin-left: 0;
   border: 1px solid var(--cq-line);
   border-radius: 999px;
   background: #fff;
@@ -1386,9 +1324,5 @@
   .mn-quiz-welcome__card {
     padding: 20px 15px 24px;
     border-radius: 23px;
-  }
-
-  .mn-quiz-welcome__lang-btn {
-    padding: 8px 10px;
   }
 }

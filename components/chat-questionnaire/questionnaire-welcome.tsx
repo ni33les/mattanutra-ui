@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 import type { Locale } from "@/lib/i18n";
-import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { nongPoseSrc } from "@/lib/questionnaire/poses";
 import welcomePack from "@/content/questionnaire/v6/welcome.json";
 
@@ -23,18 +21,6 @@ function welcomeKeyForLocale(locale: Locale): WelcomeLang {
   return "en";
 }
 
-function localeForWelcomeLang(lang: WelcomeLang): Locale {
-  if (lang === "th") {
-    return "th";
-  }
-
-  if (lang === "zh") {
-    return "zh-CN";
-  }
-
-  return "en";
-}
-
 export function getWelcomeCopy(locale: Locale): WelcomeCopy {
   return welcomePack[welcomeKeyForLocale(locale)] as WelcomeCopy;
 }
@@ -42,29 +28,15 @@ export function getWelcomeCopy(locale: Locale): WelcomeCopy {
 type QuestionnaireWelcomeProps = Readonly<{
   locale: Locale;
   onStart: () => void;
-  paymentId?: string;
-  returningPlanId?: string;
-  resumeToken?: string;
 }>;
 
-function quizHref(
-  locale: Locale,
-  paymentId?: string,
-  returningPlanId?: string,
-  resumeToken?: string
-) {
-  return nutritionQuizPath(locale, returningPlanId, {
-    payment: paymentId,
-    resume: resumeToken
-  });
-}
-
+/**
+ * Welcome content only — site TitleBar owns brand + language switching
+ * so we do not double the header chrome on /nutrition/quiz.
+ */
 export function QuestionnaireWelcome({
   locale,
-  onStart,
-  paymentId,
-  returningPlanId,
-  resumeToken
+  onStart
 }: QuestionnaireWelcomeProps) {
   const activeLang = welcomeKeyForLocale(locale);
   const copy = useMemo(() => getWelcomeCopy(locale), [locale]);
@@ -77,48 +49,6 @@ export function QuestionnaireWelcome({
       data-testid="questionnaire-welcome"
     >
       <div className="mn-quiz-welcome__shell">
-        <header className="mn-quiz-welcome__top">
-          <Link
-            className="mn-quiz-welcome__brand"
-            href={`/${locale}`}
-            aria-label={copy.brandHomeAria}
-          >
-            <span className="mn-quiz-welcome__wordmark">
-              Matta<b>Nutra</b>
-            </span>
-          </Link>
-          <div className="mn-quiz-welcome__lang" role="group" aria-label={copy.langAria}>
-            {(
-              [
-                { lang: "en" as const, label: "EN" },
-                { lang: "th" as const, label: "ไทย" },
-                { lang: "zh" as const, label: "中文" }
-              ] as const
-            ).map(({ lang, label }) => {
-              const targetLocale = localeForWelcomeLang(lang);
-              const href = quizHref(
-                targetLocale,
-                paymentId,
-                returningPlanId,
-                resumeToken
-              );
-              const isActive = activeLang === lang;
-
-              return (
-                <Link
-                  key={lang}
-                  href={href}
-                  className={`mn-quiz-welcome__lang-btn${isActive ? " is-active" : ""}`}
-                  aria-current={isActive ? "true" : undefined}
-                  prefetch={false}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </div>
-        </header>
-
         <main className="mn-quiz-welcome__card">
           <section className="mn-quiz-welcome__hero">
             <div className="mn-quiz-welcome__mascot-wrap">

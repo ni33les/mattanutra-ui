@@ -1160,13 +1160,7 @@ export function ChatQuestionnaire({
 
   if (uiScreen === "welcome") {
     return (
-      <QuestionnaireWelcome
-        locale={locale}
-        onStart={beginFromWelcome}
-        paymentId={paymentId}
-        returningPlanId={returningPlanId}
-        resumeToken={resumeToken}
-      />
+      <QuestionnaireWelcome locale={locale} onStart={beginFromWelcome} />
     );
   }
 
@@ -1201,9 +1195,7 @@ export function ChatQuestionnaire({
     <div className="mn-chat-q" data-testid="chat-questionnaire">
       <div className="mn-chat-q__header">
         <div className="mn-chat-q__brandrow">
-          <div className="mn-chat-q__wordmark">
-            Matta<b>Nutra</b>
-          </div>
+          {/* Site TitleBar already shows brand + language; keep only quiz chrome here. */}
           <button
             type="button"
             className="mn-chat-q__review-btn"

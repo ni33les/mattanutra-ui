@@ -25,6 +25,11 @@ function getLocalizedPath(currentPath: string, locale: Locale) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/** Latin short codes stay uppercase (EN); script labels (ไทย, 中文) stay as-is. */
+function isLatinLocaleLabel(label: string) {
+  return /^[A-Za-z]+$/.test(label);
+}
+
 export function LanguageSwitcher({
   currentLocale,
   currentPath,
@@ -39,6 +44,8 @@ export function LanguageSwitcher({
         const isActive = locale === currentLocale;
         const next = localizedPaths?.[locale] ?? getLocalizedPath(currentPath, locale);
         const label = localeLabels[locale];
+        const keepNaturalCase =
+          isCjkLocale(locale) || locale === "th" || !isLatinLocaleLabel(label);
 
         return (
           <a
@@ -46,8 +53,8 @@ export function LanguageSwitcher({
             href={next}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "px-3 py-1.5 mn-font-body text-xs font-semibold uppercase tracking-normal transition",
-              isCjkLocale(locale) && "normal-case tracking-normal",
+              "px-3 py-1.5 mn-font-body text-xs font-semibold tracking-normal transition",
+              keepNaturalCase ? "normal-case" : "uppercase",
               isActive
                 ? "bg-[var(--mn-ink)] text-[var(--mn-paper)] shadow-sm"
                 : "text-[var(--mn-ash)] hover:bg-[var(--mn-cream)] hover:text-[var(--mn-teal-deep)]"

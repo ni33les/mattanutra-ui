@@ -106,6 +106,23 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.match(chat, /reopenTurn|reviewOpen/);
   });
 
+  it("does not double brand/lang chrome inside the quiz welcome", () => {
+    const welcome = readFileSync(
+      join(root, "components/chat-questionnaire/questionnaire-welcome.tsx"),
+      "utf8"
+    );
+    assert.doesNotMatch(welcome, /mn-quiz-welcome__lang\b/);
+    assert.doesNotMatch(welcome, /mn-quiz-welcome__brand\b/);
+    assert.doesNotMatch(welcome, /data-wlang/);
+    assert.doesNotMatch(welcome, /LanguageSwitcher/);
+  });
+
+  it("shows Thai script in the public language switcher label", async () => {
+    const { localeLabels } = await import("../lib/i18n.ts");
+    assert.equal(localeLabels.th, "ไทย");
+    assert.doesNotMatch(localeLabels.th, /^TH$/i);
+  });
+
   it("starts only after explicit startQuestionnaire and supports reopenTurn", () => {
     const initial = createInitialState({ locale: "en", channel: "web" });
     assert.equal(initial.phase, "intro");

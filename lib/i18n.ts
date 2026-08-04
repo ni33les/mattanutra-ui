@@ -33,7 +33,8 @@ export const siteLocaleRegistry = [
     htmlLang: "th-TH",
     isIndexable: true,
     isPublic: true,
-    label: "TH",
+    // Customer language switcher shows this label (Thai script, not Latin "TH").
+    label: "ไทย",
     nativeLabel: "ไทย",
     sortOrder: 20
   },
