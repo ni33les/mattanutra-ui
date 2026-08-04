@@ -1,6 +1,7 @@
-/* Chat questionnaire v6 — white chat box, bottom answers, unclipped Nong */
+/* Chat questionnaire — colors aligned to files/v14.html */
 .mn-chat-q {
-  --cq-paper: #f3f0e6;
+  /* v14 :root tokens */
+  --cq-paper: #f8f5ec;
   --cq-card: #ffffff;
   --cq-ink: #22304e;
   --cq-ink-soft: #5b6883;
@@ -11,22 +12,37 @@
   --cq-gold: #b08c46;
   --cq-line: #e5e0d2;
   --cq-radius: 18px;
-  --cq-shadow: 0 1px 2px rgba(34, 48, 78, 0.06), 0 8px 24px rgba(34, 48, 78, 0.07);
+  --cq-shadow: 0 1px 2px rgba(34, 48, 78, 0.06), 0 6px 18px rgba(34, 48, 78, 0.06);
 
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  /* Full-bleed paper so site shell cream does not frame the quiz */
   width: 100%;
-  max-width: 640px;
-  margin: 0 auto;
-  /* Bottom padding keeps the white chat frame off the page edge / footer */
+  max-width: none;
+  margin: 0;
+  /* Bottom padding keeps the chat off the page edge / footer */
   padding: 12px 12px 36px;
   color: var(--cq-ink);
-  background: var(--cq-paper);
+  background-color: var(--cq-paper);
+  /* v14 body wash */
+  background-image: radial-gradient(
+    1200px 500px at 50% -200px,
+    #eff5ee 0%,
+    var(--cq-paper) 60%
+  );
   font-size: 16px;
   line-height: 1.55;
   box-sizing: border-box;
+}
+
+/* Constrain chat content column (v14 .wrap ≈ 600px) */
+.mn-chat-q__header,
+.mn-chat-q__frame {
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
 }
 
 .mn-chat-q__header {
@@ -89,16 +105,16 @@
   color: var(--cq-ink-soft);
 }
 
-/* White chat shell: log + answers */
+/* Chat shell sits on paper (v14 has no separate white log card) */
 .mn-chat-q__frame {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--cq-card);
-  border: 1px solid var(--cq-line);
-  border-radius: 22px;
-  box-shadow: var(--cq-shadow);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
   margin-bottom: 8px;
 }
@@ -108,11 +124,12 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 20px 16px 12px;
+  padding: 18px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   scroll-behavior: smooth;
+  background: transparent;
 }
 
 .mn-chat-q__row {
@@ -170,13 +187,14 @@
   transform: none;
 }
 
+/* Bot content boxes = pure white cards (v14 .bubble) */
 .mn-chat-q__bubble {
-  background: #faf8f2;
+  background: var(--cq-card);
   border: 1px solid var(--cq-line);
   border-radius: var(--cq-radius);
   border-bottom-left-radius: 6px;
-  padding: 12px 14px;
-  box-shadow: none;
+  padding: 13px 15px;
+  box-shadow: var(--cq-shadow);
   max-width: 100%;
 }
 
@@ -211,6 +229,7 @@
   padding: 3px 10px;
 }
 
+/* Insight / react — warm cream (v14 .react .bubble) */
 .mn-chat-q__row--react .mn-chat-q__bubble {
   background: #fbf7ec;
   border-color: #eae0c6;
@@ -221,30 +240,34 @@
   font-size: 0.95rem;
 }
 
+/* Acks — transparent like v14 .ack .bubble */
 .mn-chat-q__row--ack .mn-chat-q__bubble {
-  background: #f7faf8;
-  border-color: #d8e8de;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 2px 4px;
 }
 
 .mn-chat-q__row--ack .mn-chat-q__q {
   font-weight: 500;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
+  color: var(--cq-matta-deep);
 }
 
-/* Section open — distinct, roomy */
+/* Section open — v14 .secintro is open on paper (no filled card) */
 .mn-chat-q__row--sec {
   align-items: flex-start;
   margin: 4px 0 8px;
 }
 
 .mn-chat-q__row--sec .mn-chat-q__bubble {
-  background: linear-gradient(180deg, #f4faf6 0%, #fbfaf6 100%);
-  border: 1px solid #d5e6db;
-  border-radius: 16px;
-  border-bottom-left-radius: 16px;
-  padding: 16px 16px 14px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 4px 2px;
   width: 100%;
-  box-shadow: 0 1px 0 rgba(46, 125, 91, 0.04);
 }
 
 .mn-chat-q__sec-eyebrow {
@@ -286,11 +309,11 @@
   line-height: 1.45;
 }
 
-/* Answers docked at bottom of white frame */
+/* Answers docked at bottom on paper (chips are white cards) */
 .mn-chat-q__composer {
   flex: 0 0 auto;
-  border-top: 1px solid var(--cq-line);
-  background: linear-gradient(180deg, #fcfbf7 0%, #fff 40%);
+  border-top: 1px solid color-mix(in srgb, var(--cq-line) 80%, transparent);
+  background: color-mix(in srgb, var(--cq-paper) 92%, white);
 }
 
 .mn-chat-q__composer-inner {
@@ -682,11 +705,12 @@
 .mn-quiz-welcome {
   width: 100%;
   padding: 12px 18px 28px;
-  background:
-    radial-gradient(860px 440px at 0 0, rgba(73, 143, 110, 0.16), transparent 62%),
-    radial-gradient(720px 420px at 100% 3%, rgba(68, 94, 170, 0.08), transparent 58%),
-    #f8f5ec;
-  color: #102b3d;
+  background-color: #f8f5ec;
+  background-image:
+    radial-gradient(1200px 500px at 50% -200px, #eff5ee 0%, #f8f5ec 60%),
+    radial-gradient(860px 440px at 0 0, rgba(73, 143, 110, 0.12), transparent 62%),
+    radial-gradient(720px 420px at 100% 3%, rgba(68, 94, 170, 0.06), transparent 58%);
+  color: #22304e;
   box-sizing: border-box;
   flex: 1;
 }
@@ -1016,6 +1040,14 @@
   max-width: 640px;
   margin: 0 auto;
   color: var(--cq-ink, #22304e);
+  background-color: #f8f5ec;
+  background-image: radial-gradient(
+    1200px 500px at 50% -200px,
+    #eff5ee 0%,
+    #f8f5ec 60%
+  );
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .mn-quiz-calc__nong {
