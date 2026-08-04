@@ -1341,70 +1341,141 @@
   }
 }
 
-/* Stage flash between parts */
+/* Stage flash between parts — enter / hold / exit */
 .mn-quiz-stage {
   position: fixed;
   inset: 0;
   z-index: 70;
-  display: none;
+  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   pointer-events: none;
-  background: rgba(248, 245, 236, 0.9);
   padding: 24px;
+  background: rgba(248, 245, 236, 0.96);
+  opacity: 0;
+  transition:
+    opacity 0.42s cubic-bezier(0.22, 0.82, 0.28, 1),
+    backdrop-filter 0.42s ease;
+  backdrop-filter: blur(0);
 }
 
-.mn-quiz-stage.show {
+.mn-quiz-stage--prep {
+  opacity: 0;
+  backdrop-filter: blur(0);
+}
+
+.mn-quiz-stage--hold {
+  opacity: 1;
+  backdrop-filter: blur(6px);
+}
+
+.mn-quiz-stage--exit {
+  opacity: 0;
+  backdrop-filter: blur(0);
+  transition:
+    opacity 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    backdrop-filter 0.38s ease;
+}
+
+.mn-quiz-stage__card {
   display: flex;
-  animation: mn-cq-stagein 0.22s ease-out;
+  flex-direction: column;
+  align-items: center;
+  max-width: min(420px, 92vw);
+  padding: 28px 26px 30px;
+  border-radius: 26px;
+  background: rgba(255, 253, 248, 0.92);
+  border: 1px solid rgba(229, 224, 210, 0.9);
+  box-shadow: 0 25px 60px rgba(34, 48, 78, 0.12);
+  opacity: 0;
+  transform: translateY(14px) scale(0.94);
+  transition:
+    opacity 0.42s cubic-bezier(0.22, 0.82, 0.28, 1),
+    transform 0.5s cubic-bezier(0.22, 1.15, 0.28, 1);
+}
+
+.mn-quiz-stage--hold .mn-quiz-stage__card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.mn-quiz-stage--exit .mn-quiz-stage__card {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
+  transition:
+    opacity 0.36s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.36s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mn-quiz-stage img {
   width: 180px;
+  max-height: 180px;
   height: auto;
-  animation: mn-cq-pop 0.55s cubic-bezier(0.2, 0.9, 0.3, 1);
+  object-fit: contain;
+  filter: drop-shadow(0 14px 22px rgba(16, 43, 61, 0.12));
+  opacity: 0;
+  transform: scale(0.72);
+  transition:
+    opacity 0.45s cubic-bezier(0.22, 0.82, 0.28, 1),
+    transform 0.55s cubic-bezier(0.22, 1.2, 0.28, 1);
+}
+
+.mn-quiz-stage--hold img {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.mn-quiz-stage--exit img {
+  opacity: 0;
+  transform: scale(0.92);
+  transition:
+    opacity 0.32s ease,
+    transform 0.32s ease;
 }
 
 .mn-quiz-stage__eyebrow {
-  margin-top: 10px;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  margin-top: 12px;
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: #b08c46;
   font-weight: 700;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.4s ease 0.12s,
+    transform 0.45s cubic-bezier(0.22, 0.82, 0.28, 1) 0.12s;
 }
 
 .mn-quiz-stage__title {
   margin-top: 6px;
   font-family: var(--font-display, Georgia, serif);
-  font-size: clamp(1.4rem, 4vw, 1.9rem);
+  font-size: clamp(1.45rem, 4vw, 1.85rem);
   font-weight: 600;
   color: #22304e;
+  line-height: 1.2;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.42s ease 0.18s,
+    transform 0.48s cubic-bezier(0.22, 0.82, 0.28, 1) 0.18s;
 }
 
-@keyframes mn-cq-stagein {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.mn-quiz-stage--hold .mn-quiz-stage__eyebrow,
+.mn-quiz-stage--hold .mn-quiz-stage__title {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-@keyframes mn-cq-pop {
-  0% {
-    transform: scale(0.5);
-    opacity: 0;
-  }
-  70% {
-    transform: scale(1.06);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-  }
+.mn-quiz-stage--exit .mn-quiz-stage__eyebrow,
+.mn-quiz-stage--exit .mn-quiz-stage__title {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease;
 }
 
 /* Leaf burst */
@@ -1431,13 +1502,16 @@
   .mn-chat-q__avatar img,
   .mn-chat-q__avatar--celebrate img,
   .mn-chat-q__typing i,
-  .mn-quiz-stage img,
   .mn-quiz-welcome__mascot {
     animation: none !important;
   }
 
-  .mn-quiz-stage.show {
-    animation: none;
+  .mn-quiz-stage,
+  .mn-quiz-stage__card,
+  .mn-quiz-stage img,
+  .mn-quiz-stage__eyebrow,
+  .mn-quiz-stage__title {
+    transition: none !important;
   }
 }
 

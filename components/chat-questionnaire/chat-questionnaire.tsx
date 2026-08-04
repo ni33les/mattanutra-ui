@@ -43,8 +43,11 @@ import "./chat-questionnaire.css";
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const CALC_FALLBACK_MS = 15_000;
-const TYPE_MS = 380;
-const STAGE_MS = 900;
+const TYPE_MS = 420;
+/** Stage overlay: enter → hold image → exit fade (totals ~2.3s). */
+const STAGE_ENTER_MS = 420;
+const STAGE_HOLD_MS = 1500;
+const STAGE_EXIT_MS = 380;
 const UX_VERSION = "v14-landing";
 const DELIVERY_EMAIL_KEY = "mn_healthscore_delivery_email";
 
@@ -176,8 +179,11 @@ export function ChatQuestionnaire({
     pose: string;
     eyebrow: string;
     title: string;
+    /** prep = mounted at rest; hold = fully visible; exit = fading out */
+    phase: "prep" | "hold" | "exit";
   }>(null);
   const pendingEmail = useRef<string | null>(null);
+  const stageTimers = useRef<number[]>([]);
 
 
   const chrome = useMemo(
@@ -410,26 +416,65 @@ export function ChatQuestionnaire({
     [locale]
   );
 
+  const clearStageTimers = useCallback(() => {
+    for (const id of stageTimers.current) {
+      window.clearTimeout(id);
+      window.cancelAnimationFrame(id);
+    }
+    stageTimers.current = [];
+  }, []);
+
+  useEffect(() => () => clearStageTimers(), [clearStageTimers]);
+
   const showStageFlash = useCallback(
     (sectionIndex: number) => {
-      if (prefersReducedMotion()) {
-        return;
-      }
       const def = getDefinition(
         state ?? createInitialState({ locale, channel: "web" })
       );
       const section = def.sections[sectionIndex];
       if (!section) {
-        return;
+        return Promise.resolve();
       }
-      setStageFlash({
-        pose: section.pose || "open",
-        eyebrow: section.eyebrow,
-        title: section.title
+
+      if (prefersReducedMotion()) {
+        return Promise.resolve();
+      }
+
+      clearStageTimers();
+
+      return new Promise<void>((resolve) => {
+        const payload = {
+          pose: section.pose || "open",
+          eyebrow: section.eyebrow,
+          title: section.title
+        };
+
+        // 1) Mount at rest (opacity 0) so the next frame can transition in.
+        setStageFlash({ ...payload, phase: "prep" });
+
+        const enterRaf = window.requestAnimationFrame(() => {
+          const enterRaf2 = window.requestAnimationFrame(() => {
+            // 2) Smooth fade/scale in and hold the image.
+            setStageFlash({ ...payload, phase: "hold" });
+          });
+          stageTimers.current.push(enterRaf2);
+        });
+
+        // 3) After a longer hold, fade out, then unmount.
+        const exitTimer = window.setTimeout(() => {
+          setStageFlash({ ...payload, phase: "exit" });
+        }, STAGE_ENTER_MS + STAGE_HOLD_MS);
+
+        const doneTimer = window.setTimeout(() => {
+          setStageFlash(null);
+          stageTimers.current = [];
+          resolve();
+        }, STAGE_ENTER_MS + STAGE_HOLD_MS + STAGE_EXIT_MS);
+
+        stageTimers.current = [enterRaf, exitTimer, doneTimer];
       });
-      window.setTimeout(() => setStageFlash(null), STAGE_MS);
     },
-    [locale, state]
+    [clearStageTimers, locale, state]
   );
 
   const finalize = useCallback(
@@ -533,8 +578,9 @@ export function ChatQuestionnaire({
       events: readonly QuestionnaireEvent[]
     ) => {
       const partBreak = events.find((e) => e.type === "chat_part_break");
+      // Hold the stage fully (enter → hold → exit) before revealing next turns
       if (partBreak && partBreak.type === "chat_part_break") {
-        showStageFlash(partBreak.sectionIndex);
+        await showStageFlash(partBreak.sectionIndex);
       }
 
       const shouldType =
@@ -1300,11 +1346,16 @@ export function ChatQuestionnaire({
   return (
     <div className="mn-chat-q" data-testid="chat-questionnaire">
       {stageFlash ? (
-        <div className="mn-quiz-stage show" aria-hidden>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={nongPoseSrc(stageFlash.pose)} alt="" />
-          <div className="mn-quiz-stage__eyebrow">{stageFlash.eyebrow}</div>
-          <div className="mn-quiz-stage__title">{stageFlash.title}</div>
+        <div
+          className={`mn-quiz-stage mn-quiz-stage--${stageFlash.phase}`}
+          aria-hidden
+        >
+          <div className="mn-quiz-stage__card">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={nongPoseSrc(stageFlash.pose)} alt="" />
+            <div className="mn-quiz-stage__eyebrow">{stageFlash.eyebrow}</div>
+            <div className="mn-quiz-stage__title">{stageFlash.title}</div>
+          </div>
         </div>
       ) : null}
       <div className="mn-chat-q__header">
