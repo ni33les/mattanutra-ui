@@ -36,10 +36,10 @@ export function HealthspanLogo({
     <div
       role="img"
       aria-label={copy.aria}
-      className={cn("inline-flex w-max items-center gap-3", className)}
+      className={cn("inline-flex max-w-full min-w-0 items-center gap-2 sm:gap-3", className)}
       {...props}
     >
-      <span className={cn("mn-logo-mark-frame", isV14 && "mn-logo-mark-frame--v14")}>
+      <span className={cn("mn-logo-mark-frame shrink-0", isV14 && "mn-logo-mark-frame--v14")}>
         <Image
           src="/v11/brand-mark.png"
           alt=""
@@ -52,15 +52,17 @@ export function HealthspanLogo({
         />
       </span>
 
-      <span className="inline-grid leading-none">
-        <span className="mn-logo-wordmark inline-flex items-baseline whitespace-nowrap text-[22px] font-medium tracking-normal sm:text-[23px]">
+      <span className="inline-grid min-w-0 leading-none">
+        <span className="mn-logo-wordmark inline-flex items-baseline whitespace-nowrap text-[18px] font-medium tracking-normal sm:text-[22px] md:text-[23px]">
           <span className="text-[var(--mn-logo-ink,var(--mn-ink))]">Matta</span>
           <span className="text-[var(--mn-teal)]">Nutra</span>
         </span>
         <span
           className={cn(
-            "mn-logo-tagline mt-1 text-[10px] font-medium text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:text-[10.5px]",
-            locale === "zh-CN" ? "normal-case tracking-normal" : "uppercase tracking-[0.16em]"
+            "mn-logo-tagline mt-0.5 truncate text-[9px] font-medium text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:mt-1 sm:text-[10px] md:text-[10.5px]",
+            locale === "zh-CN"
+              ? "normal-case tracking-normal"
+              : "uppercase tracking-[0.12em] sm:tracking-[0.16em]"
           )}
         >
           {copy.tagline}

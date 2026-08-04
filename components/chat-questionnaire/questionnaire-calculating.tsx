@@ -34,7 +34,7 @@ export function QuestionnaireCalculating({
 
   async function submitEmail() {
     const trimmed = email.trim();
-    if (!/.+@.+\..+/.test(trimmed) || emailBusy) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) || emailBusy) {
       return;
     }
 
@@ -42,6 +42,11 @@ export function QuestionnaireCalculating({
     try {
       await onEmailSubmit(trimmed);
       setEmailSent(true);
+      try {
+        window.localStorage.setItem("mn_healthscore_delivery_email", trimmed);
+      } catch {
+        /* ignore */
+      }
     } finally {
       setEmailBusy(false);
     }
@@ -96,6 +101,36 @@ export function QuestionnaireCalculating({
             : copy.calcKeepOpen}
       </p>
 
+      {/* Always-on email capture (v14 done emailbox parity) */}
+      <div className="mn-quiz-calc__emailbox" data-testid="calc-emailbox">
+        <input
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder={copy.calcEmailPlaceholder}
+          value={email}
+          disabled={emailSent || emailBusy}
+          onChange={(event) => setEmail(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void submitEmail();
+            }
+          }}
+          aria-label={copy.calcEmailPlaceholder}
+        />
+        <button
+          type="button"
+          disabled={emailSent || emailBusy}
+          onClick={() => void submitEmail()}
+        >
+          {emailSent ? "✓" : "→"}
+        </button>
+      </div>
+      {emailSent ? (
+        <p className="mn-quiz-calc__email-thanks">{copy.calcEmailThanks}</p>
+      ) : null}
+
       <div className="mn-quiz-calc__support">
         <a href={LINE_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
           {copy.calcLine}
@@ -112,28 +147,6 @@ export function QuestionnaireCalculating({
               {copy.calcRetry}
             </button>
           </div>
-          <div className="mn-quiz-calc__email">
-            <input
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder={copy.calcEmailPlaceholder}
-              value={email}
-              disabled={emailSent || emailBusy}
-              onChange={(event) => setEmail(event.target.value)}
-              aria-label={copy.calcEmailPlaceholder}
-            />
-            <button
-              type="button"
-              disabled={emailSent || emailBusy}
-              onClick={() => void submitEmail()}
-            >
-              {emailSent ? "✓" : copy.calcSend}
-            </button>
-          </div>
-          {emailSent ? (
-            <p className="mn-quiz-calc__email-thanks">{copy.calcEmailThanks}</p>
-          ) : null}
         </div>
       ) : null}
     </div>

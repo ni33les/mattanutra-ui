@@ -46,7 +46,7 @@
     "calcLine": "Contact MattaNutra on LINE",
     "calcSend": "Send when ready",
     "calcEmailPlaceholder": "Email",
-    "calcEmailThanks": "We'll email your HealthScore when it's ready.",
+    "calcEmailThanks": "Email saved ✓ — we'll send your HealthScore when ready.",
     "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your medicines or supplements.",
     "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved."
   },
@@ -97,7 +97,7 @@
     "calcLine": "ติดต่อ MattaNutra ทาง LINE",
     "calcSend": "ส่งให้เมื่อพร้อม",
     "calcEmailPlaceholder": "อีเมล",
-    "calcEmailThanks": "เราจะส่ง HealthScore ให้ทางอีเมลเมื่อพร้อมค่ะ",
+    "calcEmailThanks": "บันทึกอีเมลแล้ว ✓ — จะส่ง HealthScore ให้เมื่อพร้อมค่ะ",
     "calcDisclaimer": "แบบประเมินนี้ใช้เพื่อสนับสนุนสุขภาพทั่วไป ไม่ใช่การวินิจฉัยหรือการรักษา และไม่ใช่คำแนะนำให้เริ่มหรือหยุดยา โปรดปรึกษาแพทย์หรือเภสัชกรก่อนปรับเปลี่ยนยาและอาหารเสริมนะคะ",
     "calcError": "การสร้าง HealthScore ใช้เวลานานกว่าที่คาด แต่คำตอบของคุณได้รับการบันทึกไว้อย่างปลอดภัยแล้วค่ะ"
   },
@@ -148,7 +148,7 @@
     "calcLine": "Contact MattaNutra on LINE",
     "calcSend": "Send when ready",
     "calcEmailPlaceholder": "Email",
-    "calcEmailThanks": "We'll email your HealthScore when it's ready.",
+    "calcEmailThanks": "Email saved ✓ — we'll send your HealthScore when ready.",
     "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your medicines or supplements.",
     "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved."
   }

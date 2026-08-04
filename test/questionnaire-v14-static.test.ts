@@ -71,6 +71,27 @@ describe("questionnaire v14 UX on v6 schema", () => {
     );
   });
 
+  it("matches v14 intro UI strings (EN/TH)", () => {
+    const en = getQuestionnaireDefinition("en");
+    const th = getQuestionnaireDefinition("th");
+    assert.equal(
+      en.ui.introHi,
+      "Ready. Let’s begin with what matters most to you."
+    );
+    assert.equal(
+      en.ui.introHint,
+      "One question at a time · your progress saves automatically"
+    );
+    assert.equal(
+      th.ui.introHi,
+      "พร้อมแล้วค่ะ เริ่มจากสิ่งที่สำคัญที่สุดสำหรับคุณกันเลยนะคะ"
+    );
+    assert.equal(
+      th.ui.introHint,
+      "ทีละคำถาม · ระบบบันทึกความคืบหน้าให้อัตโนมัติ"
+    );
+  });
+
   it("ships welcome copy for en/th/zh with CTA", () => {
     for (const lang of ["en", "th", "zh"] as const) {
       const pack = welcomePack[lang];

@@ -73,17 +73,19 @@ export function TitleBar({
   return (
     <header className={isLanding ? "mn-titlebar mn-titlebar--landing" : "mn-titlebar"}>
       <div className="mn-availability-bar" aria-label={copy.availability}>
-        <span className="mn-availability-label">{copy.availability}</span>
-        <span className="mn-availability-pills">
-          {copy.availableCountries.map(([flag, country]) => (
-            <span key={country} className="mn-availability-pill">
-              <span aria-hidden>{flag}</span>
-              <span>{country}</span>
-            </span>
-          ))}
-        </span>
-        <span className="hidden h-3.5 w-px bg-white/15 sm:inline-block" />
-        <span className="mn-availability-coming">
+        <div className="mn-availability-group">
+          <span className="mn-availability-label">{copy.availability}</span>
+          <span className="mn-availability-pills">
+            {copy.availableCountries.map(([flag, country]) => (
+              <span key={country} className="mn-availability-pill">
+                <span aria-hidden>{flag}</span>
+                <span className="mn-availability-pill-name">{country}</span>
+              </span>
+            ))}
+          </span>
+        </div>
+        <span className="mn-availability-sep" aria-hidden />
+        <div className="mn-availability-group mn-availability-group--soon">
           <span className="mn-availability-label mn-availability-label--muted">
             {copy.comingSoon}
           </span>
@@ -91,11 +93,11 @@ export function TitleBar({
             {copy.comingSoonCountries.map(([flag, country]) => (
               <span key={country} className="mn-availability-pill mn-availability-pill--soon">
                 <span aria-hidden>{flag}</span>
-                <span>{country}</span>
+                <span className="mn-availability-pill-name">{country}</span>
               </span>
             ))}
           </span>
-        </span>
+        </div>
       </div>
       <div className="mn-titlebar-main">
         <Link
@@ -105,30 +107,30 @@ export function TitleBar({
           data-bpm-target={`/${currentLocale}`}
           data-bpm-type="traffic"
           aria-label={copy.homeAria}
-          className="flex min-w-0 items-center text-foreground transition hover:text-[var(--mn-teal-deep)]"
+          className="mn-titlebar-brand flex min-w-0 items-center text-foreground transition hover:text-[var(--mn-teal-deep)]"
         >
           {isLanding ? (
-            <span className="inline-flex w-max items-center gap-3">
+            <span className="mn-titlebar-brand-inner inline-flex min-w-0 items-center gap-2 sm:gap-3">
               <Image
                 src="/v15/logo.png"
                 alt={copy.logoAlt}
                 width={96}
                 height={150}
                 priority
-                className="h-9 w-9 object-contain"
+                className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
                 aria-hidden="true"
                 unoptimized={true}
               />
-              <span className="inline-grid leading-none">
-                <span className="mn-logo-wordmark inline-flex items-baseline whitespace-nowrap text-[22px] font-medium tracking-normal">
+              <span className="inline-grid min-w-0 leading-none">
+                <span className="mn-logo-wordmark inline-flex items-baseline whitespace-nowrap text-[18px] font-medium tracking-normal sm:text-[22px]">
                   <span className="text-[var(--mn-logo-ink,var(--mn-ink))]">Matta</span>
                   <span className="text-[var(--mn-teal)]">Nutra</span>
                 </span>
                 <span
                   className={
                     currentLocale === "zh-CN"
-                      ? "mn-logo-tagline mt-1 text-[10px] font-medium normal-case tracking-normal text-[var(--mn-logo-tagline,var(--muted-foreground))]"
-                      : "mn-logo-tagline mt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--mn-logo-tagline,var(--muted-foreground))]"
+                      ? "mn-logo-tagline mt-0.5 truncate text-[9px] font-medium normal-case tracking-normal text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:mt-1 sm:text-[10px]"
+                      : "mn-logo-tagline mt-0.5 truncate text-[9px] font-medium uppercase tracking-[0.12em] text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:mt-1 sm:text-[10px] sm:tracking-[0.16em]"
                   }
                 >
                   {copy.logoTagline}
@@ -136,7 +138,11 @@ export function TitleBar({
               </span>
             </span>
           ) : (
-            <HealthspanLogo className="shrink-0" locale={currentLocale} variant="v14" />
+            <HealthspanLogo
+              className="mn-titlebar-logo min-w-0"
+              locale={currentLocale}
+              variant="v14"
+            />
           )}
         </Link>
         <nav
@@ -159,11 +165,14 @@ export function TitleBar({
               {copy.assessment}
             </Link>
           ) : null}
-          <LanguageSwitcher
-            currentLocale={currentLocale}
-            currentPath={currentPath}
-            localizedPaths={localizedPaths}
-          />
+          {/* Desktop/tablet only — mobile uses the menu panel switcher to avoid logo overlap */}
+          <div className="mn-titlebar-lang-desktop">
+            <LanguageSwitcher
+              currentLocale={currentLocale}
+              currentPath={currentPath}
+              localizedPaths={localizedPaths}
+            />
+          </div>
           <details className="mn-titlebar-mobile-menu">
             <summary aria-label={copy.menu}>
               <Menu aria-hidden className="size-5" />

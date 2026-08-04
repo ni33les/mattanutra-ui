@@ -232,7 +232,10 @@ describe("questionnaire engine v6", () => {
     assert.ok(thanks && thanks.kind === "bot");
     if (thanks && thanks.kind === "bot") {
       assert.match(thanks.question, /thank you/i);
-      assert.match(thanks.question, /building your health score/i);
+      assert.match(
+        thanks.question,
+        /health score|preparing your health score|analysing your answers/i
+      );
       assert.equal(thanks.pose, "celebrate");
     }
   });

@@ -1700,7 +1700,7 @@
     min-height: 2.5rem;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
+    gap: 0.75rem 1rem;
     flex-wrap: wrap;
     border-bottom: 1px solid color-mix(in srgb, white 10%, transparent);
     background: var(--mn-ink);
@@ -1710,6 +1710,27 @@
     font-weight: 700;
     line-height: 1rem;
     text-align: center;
+  }
+
+  .mn-customer-shell .mn-availability-group {
+    display: inline-flex;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem 0.625rem;
+  }
+
+  .mn-customer-shell .mn-availability-group--soon {
+    opacity: 0.78;
+  }
+
+  .mn-customer-shell .mn-availability-sep {
+    display: none;
+    width: 1px;
+    height: 0.875rem;
+    flex-shrink: 0;
+    background: color-mix(in srgb, white 15%, transparent);
   }
 
   .mn-customer-shell .mn-availability-label {
@@ -1752,11 +1773,62 @@
     color: color-mix(in srgb, white 70%, transparent);
   }
 
-  .mn-customer-shell .mn-availability-coming {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    opacity: 0.72;
+  /* Mobile: two clear rows (available / coming soon), tighter type */
+  @media (max-width: 639px) {
+    .mn-customer-shell .mn-availability-bar {
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      min-height: 0;
+      padding: 0.45rem 0.75rem 0.55rem;
+    }
+
+    .mn-customer-shell .mn-availability-sep {
+      display: none;
+    }
+
+    .mn-customer-shell .mn-availability-group {
+      width: 100%;
+      gap: 0.35rem 0.5rem;
+    }
+
+    .mn-customer-shell .mn-availability-label {
+      font-size: 0.625rem;
+      letter-spacing: 0.08em;
+    }
+
+    :lang(th) .mn-customer-shell .mn-availability-label,
+    :lang(zh) .mn-customer-shell .mn-availability-label,
+    :lang(zh-CN) .mn-customer-shell .mn-availability-label {
+      letter-spacing: 0.02em;
+      text-transform: none;
+    }
+
+    .mn-customer-shell .mn-availability-pill {
+      gap: 0.25rem;
+      padding: 0.125rem 0.45rem;
+      font-size: 0.6875rem;
+    }
+  }
+
+  @media (max-width: 379px) {
+    .mn-customer-shell .mn-availability-pill-name {
+      display: none;
+    }
+
+    .mn-customer-shell .mn-availability-pill {
+      padding: 0.125rem 0.35rem;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .mn-customer-shell .mn-availability-sep {
+      display: inline-block;
+    }
+
+    .mn-customer-shell .mn-availability-bar {
+      flex-wrap: nowrap;
+    }
   }
 
   .mn-customer-shell .mn-titlebar-main {
@@ -1767,8 +1839,56 @@
     margin-inline: auto;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem;
     padding: 0.75rem 1rem;
+  }
+
+  .mn-customer-shell .mn-titlebar-brand {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .mn-customer-shell .mn-titlebar-lang-desktop {
+    display: none;
+  }
+
+  @media (min-width: 1024px) {
+    .mn-customer-shell .mn-titlebar-lang-desktop {
+      display: block;
+    }
+  }
+
+  /* Below lg: language lives in the hamburger panel only */
+  @media (max-width: 1023px) {
+    .mn-customer-shell .mn-titlebar-main {
+      gap: 0.5rem;
+      min-height: 3.75rem;
+      padding: 0.5rem 0.75rem;
+    }
+
+    .mn-customer-shell .mn-titlebar-logo {
+      max-width: 100%;
+    }
+
+    .mn-customer-shell .mn-titlebar-logo .mn-logo-wordmark {
+      font-size: 1.05rem;
+    }
+
+    .mn-customer-shell .mn-titlebar-logo .mn-logo-tagline {
+      max-width: 11rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mn-customer-shell .mn-titlebar .mn-logo-mark-frame {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+
+    .mn-customer-shell .mn-titlebar .mn-logo-mark-image {
+      height: 2.15rem;
+    }
   }
 
   .mn-customer-shell .mn-titlebar .mn-logo-mark-frame {

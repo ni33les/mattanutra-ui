@@ -43,7 +43,35 @@ import "./chat-questionnaire.css";
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const CALC_FALLBACK_MS = 15_000;
+const TYPE_MS = 380;
+const STAGE_MS = 900;
 const UX_VERSION = "v14-landing";
+const DELIVERY_EMAIL_KEY = "mn_healthscore_delivery_email";
+
+function prefersReducedMotion() {
+  if (typeof window === "undefined" || !window.matchMedia) {
+    return false;
+  }
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function runLeafBurst(count = 8) {
+  if (typeof document === "undefined" || prefersReducedMotion()) {
+    return;
+  }
+  const w = window.innerWidth;
+  const y = window.innerHeight * 0.55;
+  for (let i = 0; i < count; i += 1) {
+    const leaf = document.createElement("span");
+    leaf.className = "mn-quiz-leaf";
+    leaf.textContent = Math.random() < 0.5 ? "🌿" : "🍃";
+    leaf.style.left = `${w / 2 + (Math.random() * 160 - 80)}px`;
+    leaf.style.top = `${y + Math.random() * 60}px`;
+    leaf.style.animationDelay = `${Math.random() * 0.25}s`;
+    document.body.appendChild(leaf);
+    window.setTimeout(() => leaf.remove(), 2000);
+  }
+}
 
 type ChatQuestionnaireProps = Readonly<{
   locale: Locale;
@@ -143,6 +171,14 @@ export function ChatQuestionnaire({
   const [processingError, setProcessingError] = useState("");
   const [calcStatus, setCalcStatus] = useState<CalculatingStatus>("building");
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [stageFlash, setStageFlash] = useState<null | {
+    pose: string;
+    eyebrow: string;
+    title: string;
+  }>(null);
+  const pendingEmail = useRef<string | null>(null);
+
 
   const chrome = useMemo(
     () => getWelcomeCopy(locale === "zh-CN" ? "en" : locale),
@@ -374,12 +410,44 @@ export function ChatQuestionnaire({
     [locale]
   );
 
+  const showStageFlash = useCallback(
+    (sectionIndex: number) => {
+      if (prefersReducedMotion()) {
+        return;
+      }
+      const def = getDefinition(
+        state ?? createInitialState({ locale, channel: "web" })
+      );
+      const section = def.sections[sectionIndex];
+      if (!section) {
+        return;
+      }
+      setStageFlash({
+        pose: section.pose || "open",
+        eyebrow: section.eyebrow,
+        title: section.title
+      });
+      window.setTimeout(() => setStageFlash(null), STAGE_MS);
+    },
+    [locale, state]
+  );
+
   const finalize = useCallback(
     async (completed: QuestionnaireState) => {
+      runLeafBurst(10);
       setUiScreen("calculating");
       setCalcStatus("building");
       setProcessingError("");
       armCalcFallback();
+
+      let queuedEmail = pendingEmail.current;
+      if (!queuedEmail) {
+        try {
+          queuedEmail = window.localStorage.getItem(DELIVERY_EMAIL_KEY);
+        } catch {
+          queuedEmail = null;
+        }
+      }
 
       trackBpmEvent("assessment_submitted", {
         eventType: "funnel",
@@ -399,6 +467,7 @@ export function ChatQuestionnaire({
           planId: returningPlanId || completed.planId,
           paymentId,
           resumeToken,
+          contactEmail: queuedEmail,
           bpm: getBpmPayload(),
           fetchImpl: fetchWithTimeout as typeof fetch
         });
@@ -408,6 +477,10 @@ export function ChatQuestionnaire({
         }
 
         readyPlanId.current = captured.planId;
+        if (queuedEmail) {
+          void persistDeliveryEmail(queuedEmail, captured.planId);
+        }
+
         let ready =
           captured.status === "ready" && Boolean(captured.healthScore);
 
@@ -459,10 +532,25 @@ export function ChatQuestionnaire({
       next: QuestionnaireState,
       events: readonly QuestionnaireEvent[]
     ) => {
+      const partBreak = events.find((e) => e.type === "chat_part_break");
+      if (partBreak && partBreak.type === "chat_part_break") {
+        showStageFlash(partBreak.sectionIndex);
+      }
+
+      const shouldType =
+        !prefersReducedMotion() &&
+        next.phase === "active" &&
+        next.log.length > (state?.log.length ?? 0);
+
+      if (shouldType) {
+        setIsTyping(true);
+        await sleep(TYPE_MS);
+        setIsTyping(false);
+      }
+
       setState(next);
       void track(events);
       const sectionDone = events.find((e) => e.type === "chat_section_done");
-      const partBreak = events.find((e) => e.type === "chat_part_break");
       await persistCheckpoint(
         next,
         sectionDone && sectionDone.type === "chat_section_done"
@@ -477,7 +565,7 @@ export function ChatQuestionnaire({
         await finalize(next);
       }
     },
-    [finalize, persistCheckpoint, track]
+    [finalize, persistCheckpoint, showStageFlash, state?.log.length, track]
   );
 
   function beginFromWelcome() {
@@ -606,30 +694,38 @@ export function ChatQuestionnaire({
     return items;
   }, [state]);
 
-  async function onFallbackEmail(email: string) {
-    const planId = readyPlanId.current || returningPlanId || state?.planId;
+  async function persistDeliveryEmail(email: string, planId?: string | null) {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      return;
+    }
+    pendingEmail.current = trimmed;
+    try {
+      window.localStorage.setItem(DELIVERY_EMAIL_KEY, trimmed);
+    } catch {
+      /* ignore */
+    }
     trackBpmEvent("email_capture", {
       eventType: "funnel",
       locale,
-      planId: planId || undefined,
+      planId: planId || readyPlanId.current || returningPlanId || undefined,
       properties: {
         channel: "web",
         questionnaireVersion: "v6-conversational",
         uxVersion: UX_VERSION,
-        source: "calc_fallback"
+        source: "calc_emailbox"
       }
     });
-
-    if (!planId) {
+    const id = planId || readyPlanId.current || returningPlanId || state?.planId;
+    if (!id) {
       return;
     }
-
     try {
-      await fetchWithTimeout(`/api/assessment/${encodeURIComponent(planId)}`, {
+      await fetchWithTimeout(`/api/assessment/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          contactEmail: email,
+          contactEmail: trimmed,
           intent: "capture",
           locale
         }),
@@ -641,11 +737,21 @@ export function ChatQuestionnaire({
     }
   }
 
+  async function onFallbackEmail(email: string) {
+    await persistDeliveryEmail(email);
+  }
+
+  function avatarClass(pose?: string) {
+    return pose === "celebrate"
+      ? "mn-chat-q__avatar mn-chat-q__avatar--celebrate"
+      : "mn-chat-q__avatar";
+  }
+
   function renderLogItem(msg: LogMessage, index: number) {
     if (msg.kind === "intro") {
       return (
         <div key={`intro-${index}`} className="mn-chat-q__row mn-chat-q__row--bot">
-          <div className="mn-chat-q__avatar">
+          <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={nongPoseSrc(msg.pose)} alt="" />
           </div>
@@ -660,7 +766,7 @@ export function ChatQuestionnaire({
     if (msg.kind === "section") {
       return (
         <div key={`sec-${msg.sectionIndex}-${index}`} className="mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--sec">
-          <div className="mn-chat-q__avatar">
+          <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={nongPoseSrc(msg.pose)} alt="" />
           </div>
@@ -679,7 +785,7 @@ export function ChatQuestionnaire({
     if (msg.kind === "bot") {
       return (
         <div key={`bot-${msg.turnKey}-${index}`} className="mn-chat-q__row mn-chat-q__row--bot">
-          <div className="mn-chat-q__avatar">
+          <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={nongPoseSrc(msg.pose)} alt="" />
           </div>
@@ -712,7 +818,7 @@ export function ChatQuestionnaire({
           key={`${msg.kind}-${msg.id}-${index}`}
           className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--react${msg.kind === "ack" ? " mn-chat-q__row--ack" : ""}`}
         >
-          <div className="mn-chat-q__avatar">
+          <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={nongPoseSrc(msg.pose)} alt="" />
           </div>
@@ -1193,6 +1299,14 @@ export function ChatQuestionnaire({
 
   return (
     <div className="mn-chat-q" data-testid="chat-questionnaire">
+      {stageFlash ? (
+        <div className="mn-quiz-stage show" aria-hidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={nongPoseSrc(stageFlash.pose)} alt="" />
+          <div className="mn-quiz-stage__eyebrow">{stageFlash.eyebrow}</div>
+          <div className="mn-quiz-stage__title">{stageFlash.title}</div>
+        </div>
+      ) : null}
       <div className="mn-chat-q__header">
         <div className="mn-chat-q__brandrow">
           {/* Site TitleBar already shows brand + language; keep only quiz chrome here. */}
@@ -1230,6 +1344,21 @@ export function ChatQuestionnaire({
           ref={logScrollRef}
         >
           {state?.log.map((msg, index) => renderLogItem(msg, index))}
+          {isTyping ? (
+            <div className="mn-chat-q__row mn-chat-q__row--bot" aria-hidden>
+              <div className="mn-chat-q__avatar">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={nongPoseSrc("thinking")} alt="" />
+              </div>
+              <div className="mn-chat-q__bubble">
+                <span className="mn-chat-q__typing">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              </div>
+            </div>
+          ) : null}
           <div ref={logEndRef} />
         </div>
 
