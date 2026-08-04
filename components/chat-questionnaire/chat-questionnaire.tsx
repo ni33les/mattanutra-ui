@@ -43,11 +43,11 @@ import "./chat-questionnaire.css";
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const CALC_FALLBACK_MS = 15_000;
-const TYPE_MS = 420;
-/** Stage overlay: enter → hold image → exit fade (totals ~2.3s). */
-const STAGE_ENTER_MS = 420;
-const STAGE_HOLD_MS = 1500;
-const STAGE_EXIT_MS = 380;
+const TYPE_MS = 280;
+/** Stage overlay: enter → hold image → exit (totals ~1.65s — snappier, still smooth). */
+const STAGE_ENTER_MS = 300;
+const STAGE_HOLD_MS = 1100;
+const STAGE_EXIT_MS = 280;
 const UX_VERSION = "v14-landing";
 const DELIVERY_EMAIL_KEY = "mn_healthscore_delivery_email";
 

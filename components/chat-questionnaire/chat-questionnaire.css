@@ -137,17 +137,52 @@
   gap: 12px;
   align-items: flex-end;
   max-width: 100%;
-  animation: mn-cq-in 0.28s ease-out;
+  animation: mn-cq-in 0.38s cubic-bezier(0.22, 0.82, 0.28, 1) both;
+}
+
+.mn-chat-q__row--user {
+  animation-duration: 0.28s;
+}
+
+.mn-chat-q__row--bot .mn-chat-q__bubble {
+  animation: mn-cq-bubble-in 0.42s cubic-bezier(0.22, 0.82, 0.28, 1) both;
+}
+
+.mn-chat-q__row--user .mn-chat-q__bubble {
+  animation: mn-cq-bubble-in-user 0.3s cubic-bezier(0.22, 0.82, 0.28, 1) both;
 }
 
 @keyframes mn-cq-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Soft bubble rise — less “clumsy pop” than a hard jump */
+@keyframes mn-cq-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes mn-cq-bubble-in-user {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
