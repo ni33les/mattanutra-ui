@@ -36,6 +36,7 @@ describe("questionnaire v14 UX on v6 schema", () => {
   it("keeps turn keys aligned and sex wording without 'at birth'", () => {
     const en = getQuestionnaireDefinition("en");
     const th = getQuestionnaireDefinition("th");
+    const zh = getQuestionnaireDefinition("zh-CN");
     assert.equal(en.turns.length, 53);
     assert.deepEqual(
       en.turns.map((t) => t.k),
@@ -44,10 +45,17 @@ describe("questionnaire v14 UX on v6 schema", () => {
 
     const sexEn = en.turns.find((t) => t.k === "sex");
     const sexTh = th.turns.find((t) => t.k === "sex");
+    const sexZh = zh.turns.find((t) => t.k === "sex");
     assert.equal(sexEn?.q, "What is your sex?");
-    assert.ok(sexTh?.q);
+    assert.equal(sexTh?.q, "เพศของคุณคือ");
+    // zh-CN falls back to EN turns until a dedicated pack ships
+    assert.equal(sexZh?.q, "What is your sex?");
     assert.doesNotMatch(sexEn?.q || "", /at birth/i);
-    assert.doesNotMatch(sexTh?.q || "", /เพศกำเนิด/);
+    assert.doesNotMatch(sexTh?.q || "", /เพศกำเนิด|at birth/i);
+    assert.doesNotMatch(sexZh?.q || "", /at birth|出生|生理性别/i);
+    assert.doesNotMatch(JSON.stringify(sexTh), /เพศกำเนิด/);
+    assert.doesNotMatch(JSON.stringify(sexEn), /sex at birth/i);
+    assert.doesNotMatch(JSON.stringify(sexZh), /sex at birth|出生时的性别|出生性别/i);
   });
 
   it("syncs precisionGate / fitness / labs copy from v14 (not sex)", () => {
@@ -102,17 +110,25 @@ describe("questionnaire v14 UX on v6 schema", () => {
     }
   });
 
-  it("forbids sex-at-birth wording in questionnaire sources", () => {
+  it("forbids sex-at-birth wording in questionnaire sources (EN/TH/zh)", () => {
     const dirs = [
       join(root, "content/questionnaire"),
       join(root, "components/chat-questionnaire"),
       join(root, "lib/questionnaire")
     ];
-    const files = dirs.flatMap((d) => walkSources(d));
+    const extra = [
+      join(root, "components/assessment-flow-copy-en.ts"),
+      join(root, "components/assessment-flow-copy-th.ts"),
+      join(root, "components/assessment-flow-copy-zh-cn.ts"),
+      join(root, "files/v14.html")
+    ];
+    const files = [...dirs.flatMap((d) => walkSources(d)), ...extra];
     for (const file of files) {
       const source = readFileSync(file, "utf8");
       assert.doesNotMatch(source, /sex at birth/i, file);
       assert.doesNotMatch(source, /เพศกำเนิด/, file);
+      // Chinese “sex at birth” phrasings must not appear in live copy sources
+      assert.doesNotMatch(source, /出生时的性别|出生時的性別|出生性别|出生性別/, file);
     }
   });
 
