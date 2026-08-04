@@ -1581,11 +1581,13 @@
   .mn-quiz-welcome__journey > i {
     transform: rotate(90deg);
     line-height: 1;
+    font-size: 1.6rem;
   }
 
   .mn-quiz-welcome__journey article {
     justify-content: flex-start;
     text-align: left;
+    min-height: 78px;
   }
 }
 
