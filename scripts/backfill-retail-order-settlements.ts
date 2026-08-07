@@ -155,6 +155,8 @@ if (!sql) {
 }
 
 try {
+  // Checkout + admin/manual orders. Repair missing settlements, missing payable
+  // metadata, zero-amount settlements, and overpaid paid_amount rows.
   const orders = await sql<OrderRow[]>`
     select
       retail_customer_orders.id::text,
@@ -169,10 +171,12 @@ try {
     from public.retail_customer_orders
     left join public.retail_order_settlements
       on retail_order_settlements.retail_customer_order_id = retail_customer_orders.id
-    where retail_customer_orders.source = 'checkout'
+    where retail_customer_orders.source in ('checkout', 'manual')
       and retail_customer_orders.status not in ('draft')
       and (
         retail_order_settlements.id is null
+        or retail_order_settlements.retailer_payable_amount = 0
+        or retail_order_settlements.gross_customer_amount = 0
         or exists (
           select 1
           from public.retail_customer_order_lines
@@ -201,7 +205,10 @@ try {
         retail_customer_order_lines.quantity_ordered,
         retail_customer_order_lines.retail_price_amount,
         retail_customer_order_lines.metadata,
-        sellable.wholesale_price_amount
+        coalesce(
+          sellable.wholesale_price_amount,
+          stock.wholesale_price_amount
+        ) as wholesale_price_amount
       from public.retail_customer_order_lines
       left join public.products
         on products.id = retail_customer_order_lines.product_id
@@ -211,9 +218,22 @@ try {
         where retail_sellable_products.organisation_id = ${order.organisation_id}::uuid
           and retail_sellable_products.product_id = retail_customer_order_lines.product_id
           and retail_sellable_products.status <> 'deleted'
+          and retail_sellable_products.wholesale_price_amount is not null
+          and retail_sellable_products.wholesale_price_amount >= 0
         order by retail_sellable_products.updated_at desc
         limit 1
       ) sellable on true
+      left join lateral (
+        select retail_product_stock.wholesale_price_amount
+        from public.retail_product_stock
+        where retail_product_stock.organisation_id = ${order.organisation_id}::uuid
+          and retail_product_stock.product_id = retail_customer_order_lines.product_id
+          and retail_product_stock.status <> 'deleted'
+          and retail_product_stock.wholesale_price_amount is not null
+          and retail_product_stock.wholesale_price_amount >= 0
+        order by retail_product_stock.updated_at desc nulls last
+        limit 1
+      ) stock on true
       where retail_customer_order_lines.customer_order_id = ${order.id}::uuid
       order by retail_customer_order_lines.created_at asc
     `;
@@ -252,11 +272,21 @@ try {
       retailerPayableSource: line.retailerPayableSource,
       unitPriceAmount: line.unitPriceAmount
     }));
-    const grossCustomerAmountMicros = repairedLines.reduce(
-      (total, line) =>
-        total + Math.round(line.grossAmount * AMOUNT_MICROS_PER_UNIT),
-      0
-    );
+    const orderPricing = await sql<Array<{
+      total_amount: number | string | null;
+    }>>`
+      select nullif(
+        retail_customer_orders.metadata #>> '{pricingSnapshot,totalAmount}',
+        ''
+      )::numeric as total_amount
+      from public.retail_customer_orders
+      where id = ${order.id}::uuid
+      limit 1
+    `;
+    const snapshotTotal = moneyOrNull(orderPricing[0]?.total_amount);
+    const lineGross = repairedLines.reduce((total, line) => total + line.grossAmount, 0);
+    const grossMajor = snapshotTotal !== null && snapshotTotal > 0 ? snapshotTotal : lineGross;
+    const grossCustomerAmountMicros = Math.round(grossMajor * AMOUNT_MICROS_PER_UNIT);
     const settlementId = await createPendingRetailOrderSettlement(sql, {
       checkoutPaymentId: order.checkout_payment_id,
       currency: order.currency,

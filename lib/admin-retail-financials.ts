@@ -184,14 +184,61 @@ function amountToMicros(value: number) {
   return Math.max(0, Math.round(value * AMOUNT_MICROS_PER_UNIT));
 }
 
-function positiveMicrosFromMajor(value: unknown) {
+function majorCurrencyAmount(value: unknown) {
   if (value === null || value === undefined || value === "") {
     return null;
   }
 
   const parsed = Number(value);
 
-  return Number.isFinite(parsed) && parsed >= 0 ? amountToMicros(parsed) : null;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function positiveMicrosFromMajor(value: unknown) {
+  const major = majorCurrencyAmount(value);
+
+  return major === null ? null : amountToMicros(major);
+}
+
+/**
+ * Unit retailer payable in major currency units.
+ * Prefer sellable wholesale (checkout source of truth), then stock wholesale.
+ */
+export async function resolveRetailerPayableUnitAmount(
+  sql: RetailFinancialsDb,
+  organisationId: string,
+  productId: string
+) {
+  const sellableRows = await sql<Array<{ wholesale_price_amount: number | string | null }>>`
+    select wholesale_price_amount
+    from public.retail_sellable_products
+    where organisation_id = ${organisationId}::uuid
+      and product_id = ${productId}::uuid
+      and status <> 'deleted'
+      and wholesale_price_amount is not null
+      and wholesale_price_amount >= 0
+    order by updated_at desc nulls last
+    limit 1
+  `;
+  const fromSellable = majorCurrencyAmount(sellableRows[0]?.wholesale_price_amount);
+
+  if (fromSellable !== null) {
+    return fromSellable;
+  }
+
+  const stockRows = await sql<Array<{ wholesale_price_amount: number | string | null }>>`
+    select wholesale_price_amount
+    from public.retail_product_stock
+    where organisation_id = ${organisationId}::uuid
+      and product_id = ${productId}::uuid
+      and status <> 'deleted'
+      and wholesale_price_amount is not null
+      and wholesale_price_amount >= 0
+    order by updated_at desc nulls last
+    limit 1
+  `;
+
+  return majorCurrencyAmount(stockRows[0]?.wholesale_price_amount);
 }
 
 function formatMicrosAmount(amountMicros: number | string | null | undefined, currency: string) {
@@ -632,11 +679,11 @@ export async function createPendingRetailOrderSettlement(
         excluded.retail_checkout_payment_id
       ),
       finance_account_id = excluded.finance_account_id,
+      -- Re-resolve can clear needs_review once payable prices exist; never demote paid/due/voided.
       status = case
-        when excluded.status = 'needs_review'
-          and public.retail_order_settlements.status <> 'voided'
-          then 'needs_review'
-        else public.retail_order_settlements.status
+        when public.retail_order_settlements.status in ('paid', 'confirmed', 'due', 'voided')
+          then public.retail_order_settlements.status
+        else excluded.status
       end,
       gross_customer_amount = excluded.gross_customer_amount,
       retailer_payable_amount = excluded.retailer_payable_amount,
@@ -754,17 +801,29 @@ async function orderSettlementAmounts(
   sql: RetailFinancialsDb,
   orderId: string
 ) {
-  // Prefer line metadata retailerPayableAmount (unit currency), else stock wholesale.
-  // Admin/manual orders historically omitted metadata, which left finance empty on ship.
+  // Payable: line metadata → sellable wholesale (checkout source) → stock wholesale.
+  // Gross: order pricingSnapshot.totalAmount when present, else line RRP subtotal.
   const rows = await sql<RetailOrderAmountRow[]>`
     select
       retail_customer_orders.organisation_id::text,
       retail_customer_orders.order_number,
       retail_customer_orders.currency,
-      coalesce(sum(
-        retail_customer_order_lines.quantity_ordered
-        * coalesce(retail_customer_order_lines.retail_price_amount, 0)
-      ), 0) as gross_customer_amount,
+      coalesce(
+        case
+          when nullif(retail_customer_orders.metadata #>> '{pricingSnapshot,totalAmount}', '')
+            ~ '^[0-9]+(\\.[0-9]+)?$'
+            then nullif(
+              retail_customer_orders.metadata #>> '{pricingSnapshot,totalAmount}',
+              ''
+            )::numeric
+          else null
+        end,
+        sum(
+          retail_customer_order_lines.quantity_ordered
+          * coalesce(retail_customer_order_lines.retail_price_amount, 0)
+        ),
+        0
+      ) as gross_customer_amount,
       coalesce(sum(
         retail_customer_order_lines.quantity_ordered
         * coalesce(
@@ -773,6 +832,7 @@ async function orderSettlementAmounts(
               then nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '')::numeric
             else null
           end,
+          sellable_wholesale.wholesale_price_amount,
           stock_wholesale.wholesale_price_amount,
           0
         )
@@ -780,12 +840,24 @@ async function orderSettlementAmounts(
       count(*) filter (
         where not (
           nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
+          or sellable_wholesale.wholesale_price_amount is not null
           or stock_wholesale.wholesale_price_amount is not null
         )
       ) as missing_payable_line_count
     from public.retail_customer_orders
     left join public.retail_customer_order_lines
       on retail_customer_order_lines.customer_order_id = retail_customer_orders.id
+    left join lateral (
+      select retail_sellable_products.wholesale_price_amount
+      from public.retail_sellable_products
+      where retail_sellable_products.organisation_id = retail_customer_orders.organisation_id
+        and retail_sellable_products.product_id = retail_customer_order_lines.product_id
+        and retail_sellable_products.status <> 'deleted'
+        and retail_sellable_products.wholesale_price_amount is not null
+        and retail_sellable_products.wholesale_price_amount >= 0
+      order by retail_sellable_products.updated_at desc nulls last
+      limit 1
+    ) sellable_wholesale on true
     left join lateral (
       select retail_product_stock.wholesale_price_amount
       from public.retail_product_stock
@@ -892,21 +964,28 @@ export async function markRetailOrderSettlementDue(
           then excluded.status
         else public.retail_order_settlements.status
       end,
+      -- Refresh zero / pre-paid settlements when recompute finds real amounts.
       gross_customer_amount = case
+        when public.retail_order_settlements.status in ('paid', 'confirmed')
+          then public.retail_order_settlements.gross_customer_amount
         when public.retail_order_settlements.gross_customer_amount = 0
-          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review')
+          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review', 'due')
           then excluded.gross_customer_amount
         else public.retail_order_settlements.gross_customer_amount
       end,
       retailer_payable_amount = case
+        when public.retail_order_settlements.status in ('paid', 'confirmed')
+          then public.retail_order_settlements.retailer_payable_amount
         when public.retail_order_settlements.retailer_payable_amount = 0
-          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review')
+          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review', 'due')
           then excluded.retailer_payable_amount
         else public.retail_order_settlements.retailer_payable_amount
       end,
       mattanutra_margin_amount = case
+        when public.retail_order_settlements.status in ('paid', 'confirmed')
+          then public.retail_order_settlements.mattanutra_margin_amount
         when public.retail_order_settlements.mattanutra_margin_amount = 0
-          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review')
+          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review', 'due')
           then excluded.mattanutra_margin_amount
         else public.retail_order_settlements.mattanutra_margin_amount
       end,

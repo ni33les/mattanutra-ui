@@ -82,10 +82,16 @@ describe("retail financial settlements", () => {
     assert.match(customerOrders, /voidPendingRetailOrderSettlement/);
     assert.match(customerOrders, /markRetailOrderSettlementNeedsReview/);
     assert.doesNotMatch(stock, /markRetailOrderSettlementDue/);
-    // Ship path re-resolves payable from line metadata or stock wholesale, and can
-    // advance needs_review/pending settlements to due once prices exist.
+    // Ship re-resolves payable: metadata → sellable wholesale → stock wholesale.
+    assert.match(financials, /sellable_wholesale\.wholesale_price_amount/);
     assert.match(financials, /stock_wholesale\.wholesale_price_amount/);
+    assert.match(financials, /pricingSnapshot,totalAmount/);
     assert.match(financials, /status in \('pending', 'voided', 'needs_review', 'due'\)/);
+    // Zero-amount due/pending rows are refreshed when recompute finds prices.
+    assert.match(
+      financials,
+      /retailer_payable_amount = 0[\s\S]*status in \('pending', 'voided', 'needs_review', 'due'\)/
+    );
   });
 
   it("records pending settlement and nominal revenue for admin-created retail orders", () => {
@@ -95,7 +101,11 @@ describe("retail financial settlements", () => {
     assert.match(customerOrders, /source: "admin_retail_operations"/);
     assert.match(customerOrders, /admin-retail-order:\$\{orderId\}:customer-inflow/);
     assert.match(customerOrders, /retailerPayableAmount/);
-    assert.match(customerOrders, /wholesale_price_amount/);
+    // Prefer availability sellable wholesale (checkout parity), then shared resolver.
+    assert.match(customerOrders, /wholesalePriceAmount: availability\.wholesalePriceAmount/);
+    assert.match(customerOrders, /resolveRetailerPayableUnitAmount/);
+    assert.match(financials, /export async function resolveRetailerPayableUnitAmount/);
+    assert.match(financials, /from public\.retail_sellable_products[\s\S]*from public\.retail_product_stock/);
     // Checkout remains responsible for Stripe-backed finance; admin path must not double-post.
     assert.match(customerOrders, /if \(orderSource !== "checkout"\)/);
   });
@@ -219,13 +229,18 @@ describe("retail financial settlements", () => {
 
   it("ships an idempotent settlement backfill for pre-existing checkout orders", () => {
     assert.match(backfillScript, /retail_order_settlements\.id is null/);
-    assert.match(backfillScript, /retail_customer_orders\.source = 'checkout'/);
+    // Includes admin/manual orders and zero-amount settlements, not checkout-only.
+    assert.match(backfillScript, /source in \('checkout', 'manual'\)/);
+    assert.match(backfillScript, /retailer_payable_amount = 0/);
+    assert.match(backfillScript, /gross_customer_amount = 0/);
     assert.match(backfillScript, /createPendingRetailOrderSettlement/);
     assert.match(backfillScript, /markRetailOrderSettlementDue/);
     assert.match(backfillScript, /markRetailOrderSettlementNeedsReview/);
     assert.match(backfillScript, /voidPendingRetailOrderSettlement/);
     assert.match(backfillScript, /retailerPayableAmount/);
     assert.match(backfillScript, /wholesale_price/);
+    assert.match(backfillScript, /retail_sellable_products/);
+    assert.match(backfillScript, /retail_product_stock/);
     assert.match(backfillScript, /missing_retailer_payable_price/);
     assert.match(backfillScript, /paid_amount > retailer_payable_amount/);
     assert.match(backfillScript, /paidAmountRepairedAt/);

@@ -8,6 +8,7 @@ import {
   createPendingRetailOrderSettlement,
   markRetailOrderSettlementDue,
   markRetailOrderSettlementNeedsReview,
+  resolveRetailerPayableUnitAmount,
   voidPendingRetailOrderSettlement
 } from "@/lib/admin-retail-financials";
 import { FINANCE_ACCOUNT_IDS, recordFinanceTransaction } from "@/lib/finance-ledger";
@@ -195,7 +196,9 @@ export async function createRetailCustomerOrder(
       priceAmount,
       quantityAvailableNow: availability.quantityAvailableNow,
       reason: availability.reason,
-      retailSellableProductId: availability.retailSellableProductId
+      retailSellableProductId: availability.retailSellableProductId,
+      // Prefer sellable wholesale from availability (same source as checkout).
+      wholesalePriceAmount: availability.wholesalePriceAmount
     });
   }
 
@@ -314,26 +317,23 @@ export async function createRetailCustomerOrder(
     throw new Error("Customer order could not be created");
   }
 
+  // Payable: availability sellable wholesale → shared resolver (sellable then stock).
   const wholesaleByProduct = new Map<string, number | null>();
   for (const preparedLine of preparedLines) {
     const productId = preparedLine.line.productId.trim();
     if (wholesaleByProduct.has(productId)) {
       continue;
     }
-    const stockRows = await sql<Array<{ wholesale_price_amount: number | string | null }>>`
-      select wholesale_price_amount
-      from public.retail_product_stock
-      where organisation_id = ${organisation.id}::uuid
-        and product_id = ${productId}::uuid
-        and status <> 'deleted'
-      limit 1
-    `;
-    const raw = stockRows[0]?.wholesale_price_amount;
-    const parsed = raw === null || raw === undefined ? null : Number(raw);
-    wholesaleByProduct.set(
-      productId,
-      parsed !== null && Number.isFinite(parsed) && parsed >= 0 ? parsed : null
-    );
+    const fromAvailability =
+      preparedLine.wholesalePriceAmount !== null &&
+      Number.isFinite(preparedLine.wholesalePriceAmount) &&
+      preparedLine.wholesalePriceAmount >= 0
+        ? preparedLine.wholesalePriceAmount
+        : null;
+    const resolved =
+      fromAvailability ??
+      (await resolveRetailerPayableUnitAmount(sql, organisation.id, productId));
+    wholesaleByProduct.set(productId, resolved);
   }
 
   for (const preparedLine of preparedLines) {

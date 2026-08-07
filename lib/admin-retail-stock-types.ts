@@ -555,6 +555,8 @@ export type RetailCustomerOrderLineAvailability = Readonly<{
   quantityAvailableNow: number;
   reason: string;
   retailSellableProductId: string | null;
+  /** Unit wholesale in major currency; null when missing on sellable/stock. */
+  wholesalePriceAmount: number | null;
 }>;
 
 export type CreateRetailCustomerOrderInput = Readonly<{
