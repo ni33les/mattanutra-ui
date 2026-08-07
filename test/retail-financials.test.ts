@@ -107,6 +107,11 @@ describe("retail financial settlements", () => {
     assert.match(financials, /export async function resolveRetailerPayableUnitAmount/);
     assert.match(financials, /from public\.retail_sellable_products[\s\S]*from public\.retail_product_stock/);
     // When wholesale is missing, provisionally use unit retail so receivable is not zero.
+    // Number(null) === 0 must not be treated as a valid zero payable.
+    assert.match(
+      financials,
+      /rawPayable !== null && rawPayable !== undefined && rawPayable !== ""/
+    );
     assert.match(
       financials,
       /quoteLineRetailerPayableMicros[\s\S]*unitPriceAmount[\s\S]*missing: true/
