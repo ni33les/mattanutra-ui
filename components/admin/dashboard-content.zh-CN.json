@@ -407,7 +407,9 @@
     "reorderBackorders": "欠货订单",
     "reorderBackordersDescription": "这些项目用于满足当前有效客户订单。",
     "reorderRecommendations": "建议",
-    "reorderRecommendationsDescription": "根据近期需求和补货风险建议的可选采购。"
+    "reorderRecommendationsDescription": "根据近期需求和补货风险建议的可选采购。",
+    "movementAdd": "增加",
+    "movementRemove": "减少"
   },
   "generated": "生成时间",
   "financials": {

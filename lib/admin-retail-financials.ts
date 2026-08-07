@@ -754,6 +754,8 @@ async function orderSettlementAmounts(
   sql: RetailFinancialsDb,
   orderId: string
 ) {
+  // Prefer line metadata retailerPayableAmount (unit currency), else stock wholesale.
+  // Admin/manual orders historically omitted metadata, which left finance empty on ship.
   const rows = await sql<RetailOrderAmountRow[]>`
     select
       retail_customer_orders.organisation_id::text,
@@ -765,20 +767,36 @@ async function orderSettlementAmounts(
       ), 0) as gross_customer_amount,
       coalesce(sum(
         retail_customer_order_lines.quantity_ordered
-        * coalesce(case
-          when nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
-            then nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '')::numeric
-          else null
-        end, 0)
+        * coalesce(
+          case
+            when nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
+              then nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '')::numeric
+            else null
+          end,
+          stock_wholesale.wholesale_price_amount,
+          0
+        )
       ), 0) as retailer_payable_amount,
       count(*) filter (
         where not (
           nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
+          or stock_wholesale.wholesale_price_amount is not null
         )
       ) as missing_payable_line_count
     from public.retail_customer_orders
     left join public.retail_customer_order_lines
       on retail_customer_order_lines.customer_order_id = retail_customer_orders.id
+    left join lateral (
+      select retail_product_stock.wholesale_price_amount
+      from public.retail_product_stock
+      where retail_product_stock.organisation_id = retail_customer_orders.organisation_id
+        and retail_product_stock.product_id = retail_customer_order_lines.product_id
+        and retail_product_stock.status <> 'deleted'
+        and retail_product_stock.wholesale_price_amount is not null
+        and retail_product_stock.wholesale_price_amount >= 0
+      order by retail_product_stock.updated_at desc nulls last
+      limit 1
+    ) stock_wholesale on true
     where retail_customer_orders.id = ${orderId}::uuid
     group by retail_customer_orders.id
     limit 1
@@ -822,6 +840,8 @@ export async function markRetailOrderSettlementDue(
     sql,
     amounts.organisationId
   );
+  const nextStatus: RetailSettlementStatus =
+    amounts.missingPayableLineCount > 0 ? "needs_review" : "due";
   const rows = await sql<Array<{
     finance_account_id: string | null;
     id: string;
@@ -846,7 +866,7 @@ export async function markRetailOrderSettlementDue(
       ${amounts.organisationId}::uuid,
       ${input.orderId}::uuid,
       ${financeAccountId}::uuid,
-      'due',
+      ${nextStatus},
       ${amounts.grossCustomerAmount},
       ${amounts.retailerPayableAmount},
       ${amounts.mattanutraMarginAmount},
@@ -866,19 +886,28 @@ export async function markRetailOrderSettlementDue(
     on conflict (retail_customer_order_id) do update set
       finance_account_id = coalesce(public.retail_order_settlements.finance_account_id, excluded.finance_account_id),
       status = case
-        when public.retail_order_settlements.status in ('pending', 'voided') then 'due'
+        when public.retail_order_settlements.status in ('paid', 'confirmed')
+          then public.retail_order_settlements.status
+        when public.retail_order_settlements.status in ('pending', 'voided', 'needs_review', 'due')
+          then excluded.status
         else public.retail_order_settlements.status
       end,
       gross_customer_amount = case
-        when public.retail_order_settlements.gross_customer_amount = 0 then excluded.gross_customer_amount
+        when public.retail_order_settlements.gross_customer_amount = 0
+          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review')
+          then excluded.gross_customer_amount
         else public.retail_order_settlements.gross_customer_amount
       end,
       retailer_payable_amount = case
-        when public.retail_order_settlements.retailer_payable_amount = 0 then excluded.retailer_payable_amount
+        when public.retail_order_settlements.retailer_payable_amount = 0
+          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review')
+          then excluded.retailer_payable_amount
         else public.retail_order_settlements.retailer_payable_amount
       end,
       mattanutra_margin_amount = case
-        when public.retail_order_settlements.mattanutra_margin_amount = 0 then excluded.mattanutra_margin_amount
+        when public.retail_order_settlements.mattanutra_margin_amount = 0
+          or public.retail_order_settlements.status in ('pending', 'voided', 'needs_review')
+          then excluded.mattanutra_margin_amount
         else public.retail_order_settlements.mattanutra_margin_amount
       end,
       currency = excluded.currency,

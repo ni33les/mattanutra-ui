@@ -442,13 +442,15 @@ describe("retail stock and FX infrastructure", () => {
 				      /\{labels\.stock\.importCsv\}[\s\S]*\{labels\.stock\.exportCsv\}[\s\S]*\{labels\.stock\.exportPdf\}/
 				    );
 				    assert.match(view, /createShoppingListFromSelection/);
-				    assert.match(view, /shoppingListIdFromResult\(created\.result\)/);
-				    assert.match(view, /setSelectedShoppingListId\(createdShoppingListId\)/);
+				    assert.doesNotMatch(view, /shoppingListIdFromResult\(created\.result\)/);
+				    assert.doesNotMatch(view, /setSelectedShoppingListId\(createdShoppingListId\)/);
 				    assert.match(view, /if \(!activeShoppingList\) \{[\s\S]*return;[\s\S]*setShoppingListDraftLines\(nextLines\)/);
-				    assert.match(view, /if \(!activeShoppingList \|\| !pendingShoppingList\) \{[\s\S]*return;[\s\S]*setPendingShoppingList\(null\)/);
-				    assert.doesNotMatch(
+				    assert.doesNotMatch(view, /pendingShoppingList/);
+				    assert.doesNotMatch(view, /setPendingShoppingList/);
+				    // Create succeeds silently; modal opens only when user selects an existing list.
+				    assert.match(
 				      view,
-				      /if \(created\) \{[\s\S]*setSelectedShoppingListId\(createdShoppingListId\)[\s\S]*\}\s*setPendingShoppingList\(null\);/
+				      /if \(created\) \{[\s\S]*setSelectedShoppingListId\(""\)[\s\S]*refreshRetailStockData/
 				    );
 				    assert.doesNotMatch(view, /applyShoppingListDraft/);
 				    assert.doesNotMatch(view, /apply_shopping_list/);
@@ -777,27 +779,33 @@ describe("retail stock and FX infrastructure", () => {
 				    assert.match(view, /view === "retail-stock-advice" \|\| view === "retail-reorder"/);
 				    assert.doesNotMatch(view, /panel === "reorder"/);
 				    assert.doesNotMatch(view, /labels\.stock\.purchasePlan/);
-				    assert.match(view, /labels\.stock\.reorderRecommendations/);
+				    assert.doesNotMatch(view, /reorderRecommendationItems/);
 				    assert.match(view, /labels\.stock\.reorderBackordersDescription/);
-				    assert.match(view, /labels\.stock\.reorderRecommendationsDescription/);
 				    assert.match(view, /labels\.stock\.reorderBackorders[\s\S]*<p className="mt-1 text-sm font-normal leading-6 text-gray-600">[\s\S]*labels\.stock\.reorderBackordersDescription/);
-				    assert.match(view, /labels\.stock\.reorderRecommendations[\s\S]*<p className="mt-1 text-sm font-normal leading-6 text-gray-600">[\s\S]*labels\.stock\.reorderRecommendationsDescription/);
+				    assert.doesNotMatch(view, /labels\.stock\.reorderRecommendations[\s\S]*<p className="mt-1 text-sm font-normal leading-6 text-gray-600">[\s\S]*labels\.stock\.reorderRecommendationsDescription/);
 				    assert.doesNotMatch(view, /<p className="mb-4 max-w-3xl text-sm leading-6 text-gray-600">/);
 				    assert.match(view, /defaultOutstandingPurchaseKeys[\s\S]*reorderPurchaseItems\[0\]\?\.organisationId/);
 				    assert.match(view, /return reorderPurchaseItems[\s\S]*orgProductKey\(item\.organisationId, item\.productId\)/);
 				    assert.doesNotMatch(view, /<th className="py-2 pl-3 pr-3" \/>[\s\S]*<th className="py-2 pr-3">\{labels\.stock\.product\}<\/th>[\s\S]*<th className="py-2 pr-3">Brand<\/th>[\s\S]*<th className="py-2 pr-3">\{labels\.stock\.quantity\}<\/th>/);
 				    assert.doesNotMatch(view, /<th className="py-2 pl-3 pr-3">\s*\{labels\.stock\.selectProduct\}\s*<\/th>/);
 				    assert.match(view, /className="px-3 pb-3 pt-5"/);
-				    assert.match(view, /<table className="min-w-\[640px\] w-full table-fixed text-left text-sm">[\s\S]*<colgroup>[\s\S]*labels\.stock\.reorderBackorders[\s\S]*border-t border-gray-200[\s\S]*labels\.stock\.reorderRecommendations/);
+				    assert.match(view, /<table className="min-w-\[640px\] w-full table-fixed text-left text-sm">[\s\S]*<colgroup>[\s\S]*labels\.stock\.reorderBackorders/);
+				    assert.doesNotMatch(view, /labels\.stock\.reorderBackorders[\s\S]*border-t border-gray-200[\s\S]*labels\.stock\.reorderRecommendations/);
 				    assert.match(view, /rounded-md bg-white p-4 ring-1 ring-gray-200[\s\S]*text-lg font-semibold text-gray-900[\s\S]*labels\.stock\.shoppingLists/);
 				    assert.doesNotMatch(view, /labels\.stock\.shoppingListsDescription/);
-				    assert.match(view, /reorderRecommendationItems/);
 				    assert.match(view, /shoppingListCandidateItems/);
-				    assert.match(view, /labels\.stock\.reorderRecommendations[\s\S]*labels\.stock\.createShoppingList[\s\S]*labels\.stock\.shoppingLists/);
-				    assert.match(view, /pendingShoppingList/);
-				    assert.match(view, /setPendingShoppingList\(\{/);
-				    assert.match(view, /const shoppingListModalList = activeShoppingList \?\? pendingShoppingList/);
+				    assert.match(view, /shoppingListCandidateItems = useMemo\(\s*\(\) => reorderPurchaseItems/);
+				    assert.match(view, /labels\.stock\.createShoppingList[\s\S]*labels\.stock\.shoppingLists/);
+				    assert.doesNotMatch(view, /pendingShoppingList/);
+				    assert.doesNotMatch(view, /setPendingShoppingList/);
+				    assert.match(view, /const shoppingListModalList = activeShoppingList/);
 				    assert.match(view, /shoppingListModalList \? \(/);
+				    assert.match(view, /movementAdd/);
+				    assert.match(view, /movementRemove/);
+				    assert.match(view, /type: "receive" as const, label: labels\.stock\.movementAdd/);
+				    assert.match(view, /type: "adjustment" as const, label: labels\.stock\.movementRemove/);
+				    assert.doesNotMatch(view, /"transfer_in"/);
+				    assert.doesNotMatch(view, /"expiry_write_off"/);
 				    assert.doesNotMatch(view, /min-w-\[680px\]/);
 				    assert.match(view, /labels\.stock\.shoppingLists/);
 				    assert.match(view, /labels\.stock\.quantity/);
@@ -926,7 +934,8 @@ describe("retail stock and FX infrastructure", () => {
 						    assert.doesNotMatch(content, /addCheckedToShoppingList/);
 						    assert.match(content, /reorderBackorders: "Backorders"/);
 						    assert.match(content, /reorderBackordersDescription:\s*"These items are required to cover active customer orders\."/);
-						    assert.match(content, /reorderRecommendations: "Recommendations"/);
+						    assert.match(content, /movementAdd: "Add"/);
+						    assert.match(content, /movementRemove: "Remove"/);
 						    assert.match(content, /shoppingLists: "Shopping Lists"/);
 						    assert.doesNotMatch(content, /shoppingListsDescription:/);
 					    assert.doesNotMatch(content, /purchaseOrderDetails: "Purchase order details"/);

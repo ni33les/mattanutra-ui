@@ -82,6 +82,22 @@ describe("retail financial settlements", () => {
     assert.match(customerOrders, /voidPendingRetailOrderSettlement/);
     assert.match(customerOrders, /markRetailOrderSettlementNeedsReview/);
     assert.doesNotMatch(stock, /markRetailOrderSettlementDue/);
+    // Ship path re-resolves payable from line metadata or stock wholesale, and can
+    // advance needs_review/pending settlements to due once prices exist.
+    assert.match(financials, /stock_wholesale\.wholesale_price_amount/);
+    assert.match(financials, /status in \('pending', 'voided', 'needs_review', 'due'\)/);
+  });
+
+  it("records pending settlement and nominal revenue for admin-created retail orders", () => {
+    assert.match(customerOrders, /createPendingRetailOrderSettlement/);
+    assert.match(customerOrders, /recordFinanceTransaction/);
+    assert.match(customerOrders, /orderSource !== "checkout"/);
+    assert.match(customerOrders, /source: "admin_retail_operations"/);
+    assert.match(customerOrders, /admin-retail-order:\$\{orderId\}:customer-inflow/);
+    assert.match(customerOrders, /retailerPayableAmount/);
+    assert.match(customerOrders, /wholesale_price_amount/);
+    // Checkout remains responsible for Stripe-backed finance; admin path must not double-post.
+    assert.match(customerOrders, /if \(orderSource !== "checkout"\)/);
   });
 
   it("records BPM, audit, and useful organisation notifications for settlement changes", () => {

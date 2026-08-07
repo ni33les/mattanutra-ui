@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import type {
   AdminRetailCustomerOrder,
-  AdminRetailShoppingList,
   AdminRetailStockData,
   AdminRetailStockMovement,
   AdminRetailStockProductOption,
@@ -89,8 +88,6 @@ import {
   activeShoppingListCoverageUnits,
   activeShoppingListReturnedDemandUnits,
   orgProductKey,
-  reorderRiskRank,
-  shoppingListIdFromResult,
   type ReorderPurchaseItem
 } from "@/components/admin/retail-stock/shopping-list-view-model";
 import {
@@ -374,8 +371,6 @@ export function AdminRetailStockView({
   const [shoppingListDraftLines, setShoppingListDraftLines] = useState<
     ShoppingListLineDraft[]
   >([]);
-  const [pendingShoppingList, setPendingShoppingList] =
-    useState<AdminRetailShoppingList | null>(null);
   const [selectedShoppingListId, setSelectedShoppingListId] = useState("");
   const [customerOrderDraft, setCustomerOrderDraft] =
     useState<CustomerOrderDraft | null>(null);
@@ -830,63 +825,15 @@ export function AdminRetailStockView({
     selectedOrganisationId,
     stockRowByOrgProduct
   ]);
+  // Shopping list is backorder demand only (no predictive recommendations).
   const reorderPurchaseItems = useMemo(
     () =>
       outstandingPurchaseItems.filter((item) => item.unassignedDemandUnits > 0),
     [outstandingPurchaseItems]
   );
-  const reorderPurchaseItemKeys = useMemo(
-    () =>
-      new Set(
-        reorderPurchaseItems.map((item) =>
-          orgProductKey(item.organisationId, item.productId)
-        )
-      ),
-    [reorderPurchaseItems]
-  );
-  const reorderRecommendationItems = useMemo<ReorderPurchaseItem[]>(
-    () =>
-      adviceRows
-        .filter(
-          (advice) =>
-            advice.suggestedOrderQuantity > 0 &&
-            advice.riskLevel !== "ok" &&
-            !reorderPurchaseItemKeys.has(
-              orgProductKey(advice.organisationId, advice.productId)
-            )
-        )
-        .map((advice) => {
-          const key = orgProductKey(advice.organisationId, advice.productId);
-          const row = stockRowByOrgProduct.get(key);
-          const product = productOptionById.get(advice.productId);
-
-          return {
-            assignedActiveUnits: 0,
-            amountToBuyUnits: advice.suggestedOrderQuantity,
-            brandName: product?.brandName ?? null,
-            currentStockQuantity: row?.stockQuantity ?? advice.currentStockQuantity,
-            organisationId: advice.organisationId,
-            productId: advice.productId,
-            productTitle: advice.productTitle,
-            recommendationPressureCount: advice.recommendationPressureCount,
-            riskLevel: advice.riskLevel,
-            source: "recommendation" as const,
-            unassignedDemandUnits: advice.suggestedOrderQuantity,
-            unorderedNeedUnits: 0,
-            wholesalePriceAmount: row?.wholesalePriceAmount ?? null
-          };
-        })
-        .sort(
-          (left, right) =>
-            reorderRiskRank(left.riskLevel) - reorderRiskRank(right.riskLevel) ||
-            right.amountToBuyUnits - left.amountToBuyUnits ||
-            left.productTitle.localeCompare(right.productTitle)
-        ),
-    [adviceRows, productOptionById, reorderPurchaseItemKeys, stockRowByOrgProduct]
-  );
   const shoppingListCandidateItems = useMemo(
-    () => [...reorderPurchaseItems, ...reorderRecommendationItems],
-    [reorderPurchaseItems, reorderRecommendationItems]
+    () => reorderPurchaseItems,
+    [reorderPurchaseItems]
   );
   const defaultOutstandingPurchaseKeys = useMemo(() => {
     const targetOrganisationId =
@@ -951,7 +898,7 @@ export function AdminRetailStockView({
       visibleShoppingLists.find((list) => list.id === selectedShoppingListId) ?? null,
     [selectedShoppingListId, visibleShoppingLists]
   );
-  const shoppingListModalList = activeShoppingList ?? pendingShoppingList;
+  const shoppingListModalList = activeShoppingList;
   const activeShoppingListLines = useMemo(
     () =>
       activeShoppingList
@@ -1034,14 +981,6 @@ export function AdminRetailStockView({
 
     queueMicrotask(() => setShoppingListDraftLines(nextLines));
   }, [activeShoppingList, activeShoppingListLines]);
-
-  useEffect(() => {
-    if (!activeShoppingList || !pendingShoppingList) {
-      return;
-    }
-
-    queueMicrotask(() => setPendingShoppingList(null));
-  }, [activeShoppingList, pendingShoppingList]);
 
   useEffect(() => {
     const draft = customerOrderDraft;
@@ -1271,14 +1210,6 @@ export function AdminRetailStockView({
       return;
     }
 
-    const organisation = data.organisations.find(
-      (candidate) => candidate.id === organisationId
-    );
-    const organisationCurrency =
-      rows.find((row) => row.organisationId === organisationId)?.currency ??
-      rows[0]?.currency ??
-      "THB";
-    const createdAt = new Date().toISOString();
     const selectedLineInputs = selectedOutstandingPurchaseItems.map((item) => {
       const row = stockRowByOrgProduct.get(
         orgProductKey(item.organisationId, item.productId)
@@ -1299,59 +1230,10 @@ export function AdminRetailStockView({
         unorderedNeedQuantity
       };
     });
-    const draftLines: ShoppingListLineDraft[] = selectedLineInputs.map(
-      ({
-        assignedQuantity,
-        currentStockQuantity,
-        item,
-        requiredQuantity,
-        unorderedNeedQuantity
-      }) => ({
-        actualQuantity: String(assignedQuantity),
-        assignedQuantity: String(assignedQuantity),
-        brandName: item.brandName,
-        currentStockQuantity: String(currentStockQuantity),
-        ean13: null,
-        id: `pending:${orgProductKey(item.organisationId, item.productId)}`,
-        manufacturerSku: null,
-        productId: item.productId,
-        productTitle: item.productTitle,
-        requiredQuantity: String(requiredQuantity),
-        retailPriceAmount: "",
-        stockedQuantity: String(currentStockQuantity),
-        unorderedNeedQuantity: String(unorderedNeedQuantity),
-        wholesalePriceAmount:
-          item.wholesalePriceAmount === null
-            ? ""
-            : String(item.wholesalePriceAmount)
-      })
-    );
 
+    // Create silently — no create popup (previous pending modal was non-dismissible).
     setSelectedShoppingListId("");
-    setShoppingListDraftLines(draftLines);
-    setPendingShoppingList({
-      actualUnits: selectedLineInputs.reduce(
-        (total, line) => total + line.assignedQuantity,
-        0
-      ),
-      createdAt,
-      currency: organisationCurrency,
-      id: "pending-shopping-list",
-      lineCount: draftLines.length,
-      listNumber: labels.stock.createShoppingList,
-      organisationId,
-      organisationName: organisation?.name ?? organisationId,
-      requiredUnits: selectedLineInputs.reduce(
-        (total, line) => total + line.requiredQuantity,
-        0
-      ),
-      status: "active",
-      stockedUnits: selectedLineInputs.reduce(
-        (total, line) => total + line.currentStockQuantity,
-        0
-      ),
-      updatedAt: createdAt
-    });
+    setShoppingListDraftLines([]);
 
     const created = await runRetailAction(
       {
@@ -1380,13 +1262,12 @@ export function AdminRetailStockView({
     );
 
     if (created) {
-      const createdShoppingListId = shoppingListIdFromResult(created.result);
-
       setSelectedOutstandingPurchaseKeys(null);
-
-      if (createdShoppingListId) {
-        setSelectedShoppingListId(createdShoppingListId);
-      }
+      setSelectedShoppingListId("");
+      // Refresh so the new list appears in the table; open only on explicit row click.
+      void refreshRetailStockData().catch((error) => {
+        setError(actionErrorMessage(error, labels.stock.saveError));
+      });
     }
   }
 
@@ -1604,7 +1485,15 @@ export function AdminRetailStockView({
             locale,
             movementType: movementEditor.draft.movementType,
             notes: movementEditor.draft.notes,
-            quantity: numberOrNull(movementEditor.draft.quantity),
+            // UI only offers Add (receive +) and Remove (adjustment -).
+            quantity: (() => {
+              const qty = numberOrNull(movementEditor.draft.quantity);
+              if (qty === null) return null;
+              const absolute = Math.abs(qty);
+              return movementEditor.draft.movementType === "adjustment"
+                ? -absolute
+                : absolute;
+            })(),
             reason: movementEditor.draft.reason,
             stockId: movementEditor.row.id,
             unitCostAmount: numberOrNull(movementEditor.draft.unitCostAmount)
@@ -3434,82 +3323,7 @@ export function AdminRetailStockView({
                         </td>
                       </tr>
                     ) : null}
-                    {reorderRecommendationItems.length > 0 ? (
-                      <>
-                        <tr className="border-t border-gray-200">
-                          <td className="px-3 pb-3 pt-5" colSpan={4}>
-                            <h3
-                              className={classNames(
-                                "text-lg font-semibold text-gray-900",
-                                adminLocaleTextClass(locale, "heading")
-                              )}
-                            >
-                              {labels.stock.reorderRecommendations}
-                            </h3>
-                            <p className="mt-1 text-sm font-normal leading-6 text-gray-600">
-                              {labels.stock.reorderRecommendationsDescription}
-                            </p>
-                          </td>
-                        </tr>
-                        {reorderRecommendationItems.map((item) => {
-                          const itemKey = orgProductKey(
-                            item.organisationId,
-                            item.productId
-                          );
-                          const selected =
-                            outstandingPurchaseSelectionKeys.includes(itemKey);
-                          const canSelectItem =
-                            data.canWrite && !busyId && item.amountToBuyUnits > 0;
 
-                          return (
-                            <tr
-                              className={classNames(
-                                canSelectItem
-                                  ? "cursor-pointer hover:bg-[#F8FAFC]"
-                                  : "bg-gray-50 text-gray-500"
-                              )}
-                              key={itemKey}
-                              onClick={() =>
-                                canSelectItem
-                                  ? toggleOutstandingPurchaseItem(item)
-                                  : undefined
-                              }
-                            >
-                              <td className="py-2 pl-3 pr-3">
-                                <input
-                                  aria-label={`${labels.stock.selectProduct}: ${item.productTitle}`}
-                                  checked={selected}
-                                  className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
-                                  disabled={!canSelectItem}
-                                  onClick={(event) => event.stopPropagation()}
-                                  onChange={() => toggleOutstandingPurchaseItem(item)}
-                                  type="checkbox"
-                                />
-                              </td>
-                              <td className="py-2 pr-3 font-semibold text-gray-900">
-                                {item.productTitle}
-                                {showOrganisationContext ? (
-                                  <div className="mt-0.5 text-xs font-normal text-gray-500">
-                                    {
-                                      data.organisations.find(
-                                        (organisation) =>
-                                          organisation.id === item.organisationId
-                                      )?.name
-                                    }
-                                  </div>
-                                ) : null}
-                              </td>
-                              <td className="py-2 pr-3 text-gray-600">
-                                {item.brandName ?? emptyRetailField}
-                              </td>
-                              <td className="py-2 pr-3 font-semibold text-gray-900">
-                                {item.amountToBuyUnits}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </>
-                    ) : null}
                   </tbody>
                 </table>
               </div>
@@ -3638,13 +3452,12 @@ export function AdminRetailStockView({
         ) : null}
       {shoppingListModalList ? (
         <RetailShoppingListModal
-          busy={Boolean(busyId) || !activeShoppingList}
+          busy={Boolean(busyId)}
           labels={labels}
           lines={shoppingListDraftLines}
           list={shoppingListModalList}
           onClose={() => {
             setSelectedShoppingListId("");
-            setPendingShoppingList(null);
           }}
           onLinesChange={setShoppingListDraftLines}
           onReopen={() => void reopenShoppingList()}
@@ -4499,17 +4312,12 @@ export function AdminRetailStockView({
                     >
                       {(
                         [
-                          "receive",
-                          "adjustment",
-                          "return",
-                          "sale",
-                          "transfer_in",
-                          "transfer_out",
-                          "expiry_write_off"
+                          { type: "receive" as const, label: labels.stock.movementAdd },
+                          { type: "adjustment" as const, label: labels.stock.movementRemove }
                         ] as const
-                      ).map((type) => (
-                        <option key={type} value={type}>
-                          {movementLabel(labels, type)}
+                      ).map((option) => (
+                        <option key={option.type} value={option.type}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
@@ -4517,11 +4325,7 @@ export function AdminRetailStockView({
                   <StockNumberInput
                     disabled={Boolean(busyId)}
                     label={labels.stock.quantity}
-                    min={
-                      movementEditor.draft.movementType === "adjustment"
-                        ? -999999
-                        : 1
-                    }
+                    min={1}
                     onChange={(value) => updateMovementDraft({ quantity: value })}
                     value={movementEditor.draft.quantity}
                   />

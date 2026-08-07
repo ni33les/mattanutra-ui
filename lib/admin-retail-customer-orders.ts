@@ -5,10 +5,13 @@ import { type Locale } from "@/lib/i18n";
 import { addTaskEvent } from "@/lib/task-service";
 import { resolveUsdRateForCurrency } from "@/lib/finance-fx";
 import {
+  createPendingRetailOrderSettlement,
   markRetailOrderSettlementDue,
   markRetailOrderSettlementNeedsReview,
   voidPendingRetailOrderSettlement
 } from "@/lib/admin-retail-financials";
+import { FINANCE_ACCOUNT_IDS, recordFinanceTransaction } from "@/lib/finance-ledger";
+import { AMOUNT_MICROS_PER_UNIT } from "@/lib/stripe-payment-config";
 import { recordRetailOrderBpmEvent } from "@/lib/admin-retail-order-bpm-events";
 import { canReadAllRetailStock, canWriteRetailStock } from "@/lib/admin-retail-stock-access";
 import {
@@ -311,8 +314,32 @@ export async function createRetailCustomerOrder(
     throw new Error("Customer order could not be created");
   }
 
+  const wholesaleByProduct = new Map<string, number | null>();
+  for (const preparedLine of preparedLines) {
+    const productId = preparedLine.line.productId.trim();
+    if (wholesaleByProduct.has(productId)) {
+      continue;
+    }
+    const stockRows = await sql<Array<{ wholesale_price_amount: number | string | null }>>`
+      select wholesale_price_amount
+      from public.retail_product_stock
+      where organisation_id = ${organisation.id}::uuid
+        and product_id = ${productId}::uuid
+        and status <> 'deleted'
+      limit 1
+    `;
+    const raw = stockRows[0]?.wholesale_price_amount;
+    const parsed = raw === null || raw === undefined ? null : Number(raw);
+    wholesaleByProduct.set(
+      productId,
+      parsed !== null && Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+    );
+  }
+
   for (const preparedLine of preparedLines) {
     const line = preparedLine.line;
+    const productId = line.productId.trim();
+    const retailerPayableAmount = wholesaleByProduct.get(productId) ?? null;
 
     await sql`
       insert into public.retail_customer_order_lines (
@@ -329,7 +356,7 @@ export async function createRetailCustomerOrder(
       values (
         ${orderId}::uuid,
         ${organisation.id}::uuid,
-        ${line.productId.trim()}::uuid,
+        ${productId}::uuid,
         ${integerOrDefault(line.quantityOrdered, 1)},
         ${preparedLine.priceAmount},
         ${line.notes?.trim() || null},
@@ -346,6 +373,9 @@ export async function createRetailCustomerOrder(
           quantityAvailableNow: preparedLine.quantityAvailableNow,
           reason: preparedLine.reason,
           retailSellableProductId: preparedLine.retailSellableProductId,
+          retailerPayableAmount,
+          retailerPayableSource:
+            retailerPayableAmount === null ? "missing" : "wholesale_price",
           shippingAmount,
           shippingSource: shipping.source,
           source:
@@ -434,6 +464,72 @@ export async function createRetailCustomerOrder(
     orderId,
     organisationId: organisation.id
   });
+
+  // Finance: pending settlement + nominal customer revenue for admin/manual orders.
+  // Checkout path already records Stripe revenue + settlement in retail-product-checkout.
+  if (orderSource !== "checkout") {
+    try {
+      const grossCustomerAmountMicros = Math.max(
+        0,
+        Math.round(totalAmount * AMOUNT_MICROS_PER_UNIT)
+      );
+
+      await createPendingRetailOrderSettlement(sql, {
+        checkoutPaymentId: null,
+        currency: orderCurrency,
+        grossCustomerAmountMicros,
+        metadata: {
+          orderNumber: orderNumberValue,
+          source: "admin_retail_operations"
+        },
+        orderId,
+        organisationId: organisation.id,
+        quoteLines: preparedLines.map((preparedLine) => {
+          const productId = preparedLine.line.productId.trim();
+          const quantity = integerOrDefault(preparedLine.line.quantityOrdered, 1);
+          const wholesale = wholesaleByProduct.get(productId) ?? null;
+          return {
+            productId,
+            productTitle: null,
+            quantity,
+            retailerPayableAmount: wholesale,
+            retailerPayableNeedsReviewReason:
+              wholesale === null ? "missing_wholesale_price" : null,
+            retailerPayableSource:
+              wholesale === null ? "missing" : "wholesale_price",
+            unitPriceAmount: preparedLine.priceAmount
+          };
+        })
+      });
+
+      if (grossCustomerAmountMicros > 0) {
+        await recordFinanceTransaction({
+          amount: grossCustomerAmountMicros,
+          category: "revenue",
+          currency: orderCurrency,
+          description: `Admin retail order ${orderNumberValue}`,
+          entryType: "nominal",
+          from: `customer:${input.customerEmail?.trim() || orderId}`,
+          metadata: {
+            orderId,
+            orderNumber: orderNumberValue,
+            organisationId: organisation.id,
+            source: "admin_retail_operations"
+          },
+          provider: "admin",
+          source: "admin_retail_order",
+          sourceRef: `admin-retail-order:${orderId}:customer-inflow`,
+          sql,
+          to: "mattanutra:retail-revenue",
+          toAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
+          fxRateId: fx.fxRateId,
+          usdRate: fx.usdRate
+        });
+      }
+    } catch (error) {
+      console.warn("Unable to record admin retail order finance", error);
+    }
+  }
 
   try {
     await queueAdminOrganisationCommunication({

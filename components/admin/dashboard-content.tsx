@@ -400,9 +400,11 @@ export type AdminContent = Readonly<{
     leadTimeDays: string;
     lowStock: string;
     lots: string;
+    movementAdd: string;
     movementAdjustment: string;
     movementExpiryWriteOff: string;
     movementReceive: string;
+    movementRemove: string;
     movementReturn: string;
     movementSale: string;
     movementTransferIn: string;
@@ -1129,9 +1131,11 @@ const baseContent = {
       leadTimeDays: "Lead time",
       lowStock: "Low stock",
       lots: "Lots",
+      movementAdd: "Add",
       movementAdjustment: "Adjustment",
       movementExpiryWriteOff: "Expiry write-off",
       movementReceive: "Receive",
+      movementRemove: "Remove",
       movementReturn: "Return",
       movementSale: "Sale",
       movementTransferIn: "Transfer in",
@@ -2005,9 +2009,11 @@ const baseContent = {
       leadTimeDays: "ระยะเวลานำ",
       lowStock: "สต็อกต่ำ",
       lots: "ล็อต",
+      movementAdd: "เพิ่ม",
       movementAdjustment: "ปรับปรุง",
       movementExpiryWriteOff: "ตัดจำหน่ายหมดอายุ",
       movementReceive: "รับเข้า",
+      movementRemove: "ลด",
       movementReturn: "คืนสินค้า",
       movementSale: "ขาย",
       movementTransferIn: "โอนเข้า",
