@@ -110,15 +110,20 @@ function repairedLine(line: LineRow): RepairedLine {
   const wholesalePayable = moneyOrNull(line.wholesale_price_amount);
   const existingPayable = moneyOrNull(metadata[RETAILER_PAYABLE_KEY]);
   const legacyPayable = legacyPayableAmount(metadata, unitPriceAmount);
-  const retailerPayableAmount =
+  const confirmedPayable =
     wholesalePayable ??
     (existingPayable !== null && existingPayable < unitPriceAmount ? existingPayable : null) ??
     legacyPayable;
+  // When wholesale is unset, provisionally use unit retail so financials are not blank.
+  const retailerPayableAmount = confirmedPayable ?? unitPriceAmount;
+  const missingPayable = confirmedPayable === null;
   const retailerPayableSource = wholesalePayable !== null
     ? "wholesale_price"
-    : retailerPayableAmount !== null
+    : confirmedPayable !== null
       ? "legacy_metadata"
-      : "missing";
+      : unitPriceAmount > 0
+        ? "provisional_unit_retail"
+        : "missing";
   const nextMetadata = { ...metadata };
 
   for (const key of LEGACY_PAYABLE_KEYS) {
@@ -128,7 +133,7 @@ function repairedLine(line: LineRow): RepairedLine {
   nextMetadata[RETAILER_PAYABLE_KEY] = retailerPayableAmount;
   nextMetadata[RETAILER_PAYABLE_SOURCE_KEY] = retailerPayableSource;
 
-  if (retailerPayableAmount === null) {
+  if (missingPayable) {
     nextMetadata[RETAILER_PAYABLE_REVIEW_KEY] = "missing_retailer_payable_price";
   } else {
     delete nextMetadata[RETAILER_PAYABLE_REVIEW_KEY];
@@ -138,7 +143,7 @@ function repairedLine(line: LineRow): RepairedLine {
     grossAmount: unitPriceAmount * quantity,
     lineId: line.id,
     metadata: nextMetadata,
-    missingPayable: retailerPayableAmount === null,
+    missingPayable,
     productId: line.product_id,
     productTitle: line.product_title,
     quantity,
@@ -265,7 +270,9 @@ try {
       productId: line.productId,
       productTitle: line.productTitle,
       quantity: line.quantity,
-      retailerPayableAmount: line.retailerPayableAmount,
+      // Only pass confirmed wholesale/legacy as retailerPayableAmount so createPending
+      // can still flag missing while using unitPriceAmount as provisional amount.
+      retailerPayableAmount: line.missingPayable ? null : line.retailerPayableAmount,
       retailerPayableNeedsReviewReason: line.missingPayable
         ? "missing_retailer_payable_price"
         : null,
@@ -308,6 +315,8 @@ try {
 
     createdOrUpdated += 1;
 
+    // Only clamp overpaid amounts when payable is positive — amount 0 violates
+    // finance_transactions_amount_check (amount > 0).
     const repairedPaidRows = await sql<Array<{
       actual_finance_transaction_id: string | null;
       retailer_payable_amount: number | string;
@@ -323,6 +332,7 @@ try {
         updated_at = now()
       where retail_customer_order_id = ${order.id}::uuid
         and paid_amount is not null
+        and retailer_payable_amount > 0
         and paid_amount > retailer_payable_amount
       returning
         actual_finance_transaction_id::text,
@@ -334,10 +344,15 @@ try {
         continue;
       }
 
+      const payableMicros = Math.round(Number(row.retailer_payable_amount));
+      if (!Number.isFinite(payableMicros) || payableMicros < 1) {
+        continue;
+      }
+
       await sql`
         update public.finance_transactions
         set
-          amount = ${row.retailer_payable_amount},
+          amount = ${payableMicros},
           metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json(toJsonValue({
             amountRepairedAt: new Date().toISOString(),
             amountRepairReason: "retailer_settlement_paid_amount_repaired",

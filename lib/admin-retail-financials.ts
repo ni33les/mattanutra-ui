@@ -590,14 +590,25 @@ function quoteLineRetailerPayableMicros(line: RetailSettlementQuoteLineInput) {
     : 1;
   const parsedPayable = Number(line.retailerPayableAmount);
 
-  if (!Number.isFinite(parsedPayable) || parsedPayable < 0) {
-    return { amount: 0, missing: true };
+  // Wholesale (or explicit payable) is preferred.
+  if (Number.isFinite(parsedPayable) && parsedPayable >= 0) {
+    return {
+      amount: amountToMicros(parsedPayable * quantity),
+      missing: false
+    };
   }
 
-  return {
-    amount: amountToMicros(parsedPayable * quantity),
-    missing: false
-  };
+  // UAT/catalog often lack wholesale: provisionally use unit retail so receivable
+  // is not blank, and flag missing so settlement stays needs_review.
+  const unitPrice = Number(line.unitPriceAmount);
+  if (Number.isFinite(unitPrice) && unitPrice >= 0) {
+    return {
+      amount: amountToMicros(unitPrice * quantity),
+      missing: true
+    };
+  }
+
+  return { amount: 0, missing: true };
 }
 
 export async function createPendingRetailOrderSettlement(
@@ -834,6 +845,8 @@ async function orderSettlementAmounts(
           end,
           sellable_wholesale.wholesale_price_amount,
           stock_wholesale.wholesale_price_amount,
+          -- Provisional: unit retail when wholesale is unset (keeps receivable non-zero).
+          retail_customer_order_lines.retail_price_amount,
           0
         )
       ), 0) as retailer_payable_amount,

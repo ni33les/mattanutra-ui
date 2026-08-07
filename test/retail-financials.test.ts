@@ -106,6 +106,15 @@ describe("retail financial settlements", () => {
     assert.match(customerOrders, /resolveRetailerPayableUnitAmount/);
     assert.match(financials, /export async function resolveRetailerPayableUnitAmount/);
     assert.match(financials, /from public\.retail_sellable_products[\s\S]*from public\.retail_product_stock/);
+    // When wholesale is missing, provisionally use unit retail so receivable is not zero.
+    assert.match(
+      financials,
+      /quoteLineRetailerPayableMicros[\s\S]*unitPriceAmount[\s\S]*missing: true/
+    );
+    assert.match(
+      financials,
+      /sellable_wholesale\.wholesale_price_amount[\s\S]*stock_wholesale\.wholesale_price_amount[\s\S]*retail_customer_order_lines\.retail_price_amount/
+    );
     // Checkout remains responsible for Stripe-backed finance; admin path must not double-post.
     assert.match(customerOrders, /if \(orderSource !== "checkout"\)/);
   });
