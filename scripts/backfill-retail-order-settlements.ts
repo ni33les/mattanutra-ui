@@ -45,7 +45,11 @@ type RepairedLine = Readonly<{
   productTitle: string | null;
   quantity: number;
   retailerPayableAmount: number | null;
-  retailerPayableSource: "legacy_metadata" | "missing" | "wholesale_price";
+  retailerPayableSource:
+    | "legacy_metadata"
+    | "missing"
+    | "provisional_unit_retail"
+    | "wholesale_price";
   unitPriceAmount: number;
 }>;
 

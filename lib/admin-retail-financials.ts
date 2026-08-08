@@ -589,29 +589,24 @@ function quoteLineRetailerPayableMicros(line: RetailSettlementQuoteLineInput) {
     ? Math.max(1, Math.round(parsedQuantity))
     : 1;
 
-  // Number(null) === 0 — treat null/undefined/"" as missing, not zero payable.
+  // Number(null) === 0 — only treat real numbers as explicit payable.
+  // (null/undefined mean missing; never coerce null to 0.)
   const rawPayable = line.retailerPayableAmount;
-  if (rawPayable !== null && rawPayable !== undefined && rawPayable !== "") {
-    const parsedPayable = Number(rawPayable);
-    if (Number.isFinite(parsedPayable) && parsedPayable >= 0) {
-      return {
-        amount: amountToMicros(parsedPayable * quantity),
-        missing: false
-      };
-    }
+  if (typeof rawPayable === "number" && Number.isFinite(rawPayable) && rawPayable >= 0) {
+    return {
+      amount: amountToMicros(rawPayable * quantity),
+      missing: false
+    };
   }
 
   // UAT/catalog often lack wholesale: provisionally use unit retail so receivable
   // is not blank, and flag missing so settlement stays needs_review.
   const rawUnit = line.unitPriceAmount;
-  if (rawUnit !== null && rawUnit !== undefined && rawUnit !== "") {
-    const unitPrice = Number(rawUnit);
-    if (Number.isFinite(unitPrice) && unitPrice >= 0) {
-      return {
-        amount: amountToMicros(unitPrice * quantity),
-        missing: true
-      };
-    }
+  if (typeof rawUnit === "number" && Number.isFinite(rawUnit) && rawUnit >= 0) {
+    return {
+      amount: amountToMicros(rawUnit * quantity),
+      missing: true
+    };
   }
 
   return { amount: 0, missing: true };

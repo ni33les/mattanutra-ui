@@ -110,7 +110,11 @@ describe("retail financial settlements", () => {
     // Number(null) === 0 must not be treated as a valid zero payable.
     assert.match(
       financials,
-      /rawPayable !== null && rawPayable !== undefined && rawPayable !== ""/
+      /typeof rawPayable === "number" && Number\.isFinite\(rawPayable\)/
+    );
+    assert.match(
+      financials,
+      /typeof rawUnit === "number" && Number\.isFinite\(rawUnit\)/
     );
     assert.match(
       financials,
