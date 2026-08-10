@@ -61,7 +61,7 @@ export function QuestionnaireCalculating({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className="mn-quiz-calc__nong"
-        src={nongPoseSrc("reassuring")}
+        src={nongPoseSrc("wai")}
         alt=""
       />
       <div className="mn-quiz-calc__kicker">{copy.calcKicker}</div>

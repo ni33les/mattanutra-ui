@@ -863,12 +863,18 @@ export function ChatQuestionnaire({
   }
 
   function renderLogItem(msg: LogMessage, index: number) {
+    // v14 HTML collapses prior log rows once the halfway health-preview appears.
+    const halfwayAt =
+      state?.log.findIndex((entry) => entry.kind === "halfway") ?? -1;
+    const historyClass =
+      halfwayAt >= 0 && index < halfwayAt ? " mn-chat-q__row--history-collapsed" : "";
+
     if (msg.kind === "intro") {
       // v14 HTML: intro is bubble-first (no mascot avatar beside the greeting).
       return (
         <div
           key={`intro-${index}`}
-          className="mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--no-avatar"
+          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--no-avatar${historyClass}`}
         >
           <div className="mn-chat-q__bubble">
             <div className="mn-chat-q__q">{msg.text}</div>
@@ -880,7 +886,10 @@ export function ChatQuestionnaire({
 
     if (msg.kind === "section") {
       return (
-        <div key={`sec-${msg.sectionIndex}-${index}`} className="mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--sec">
+        <div
+          key={`sec-${msg.sectionIndex}-${index}`}
+          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--sec${historyClass}`}
+        >
           <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={nongPoseSrc(msg.pose)} alt="" />
@@ -899,7 +908,10 @@ export function ChatQuestionnaire({
 
     if (msg.kind === "bot") {
       return (
-        <div key={`bot-${msg.turnKey}-${index}`} className="mn-chat-q__row mn-chat-q__row--bot">
+        <div
+          key={`bot-${msg.turnKey}-${index}`}
+          className={`mn-chat-q__row mn-chat-q__row--bot${historyClass}`}
+        >
           <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={nongPoseSrc(msg.pose)} alt="" />
@@ -917,7 +929,10 @@ export function ChatQuestionnaire({
 
     if (msg.kind === "user") {
       return (
-        <div key={`user-${msg.turnKey}-${index}`} className="mn-chat-q__row mn-chat-q__row--user">
+        <div
+          key={`user-${msg.turnKey}-${index}`}
+          className={`mn-chat-q__row mn-chat-q__row--user${historyClass}`}
+        >
           <div className="mn-chat-q__bubble">
             <div className="mn-chat-q__q" style={{ fontWeight: 500 }}>
               {msg.label}
@@ -931,7 +946,7 @@ export function ChatQuestionnaire({
       return (
         <div
           key={`${msg.kind}-${msg.id}-${index}`}
-          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--react${msg.kind === "ack" ? " mn-chat-q__row--ack" : ""}`}
+          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--react${msg.kind === "ack" ? " mn-chat-q__row--ack" : ""}${historyClass}`}
         >
           <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -944,9 +959,41 @@ export function ChatQuestionnaire({
       );
     }
 
+    if (msg.kind === "halfway") {
+      return (
+        <div
+          key={`halfway-${index}`}
+          className="mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--health-preview"
+          data-testid="halfway-health-preview"
+        >
+          <div className={avatarClass(msg.pose)}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={nongPoseSrc(msg.pose)} alt="" />
+          </div>
+          <div className="mn-chat-q__bubble mn-chat-q__bubble--health-preview">
+            <div className="mn-chat-q__health-preview-title">{msg.title}</div>
+            {msg.text ? (
+              <div className="mn-chat-q__health-preview-lede">{msg.text}</div>
+            ) : null}
+            <div className="mn-chat-q__preview-lines">
+              {msg.lines.map((line) => (
+                <div key={line.label} className="mn-chat-q__preview-line">
+                  <span>{line.label}</span>
+                  <b>{line.value}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (msg.kind === "system") {
       return (
-        <div key={`sys-${index}`} className="mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--sec">
+        <div
+          key={`sys-${index}`}
+          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--sec${historyClass}`}
+        >
           <div className="mn-chat-q__bubble">
             <div className="mn-chat-q__sec-desc">{msg.text}</div>
           </div>
@@ -1282,7 +1329,7 @@ export function ChatQuestionnaire({
               </div>
             </div>
           </div>
-          <div className="mn-chat-q__actions">
+          <div className="mn-chat-q__actions mn-chat-q__actions--inline">
             <button
               type="button"
               className="mn-chat-q__primary"
@@ -1297,7 +1344,11 @@ export function ChatQuestionnaire({
             >
               {ui.confirm}
             </button>
-            <button type="button" className="mn-chat-q__ghost" onClick={() => void onSkip()}>
+            <button
+              type="button"
+              className="mn-chat-q__skip-link"
+              onClick={() => void onSkip()}
+            >
               {ui.skip}
             </button>
           </div>
@@ -1340,7 +1391,7 @@ export function ChatQuestionnaire({
               </div>
             ))}
           </div>
-          <div className="mn-chat-q__actions">
+          <div className="mn-chat-q__actions mn-chat-q__actions--inline">
             <button
               type="button"
               className="mn-chat-q__primary"
@@ -1372,7 +1423,11 @@ export function ChatQuestionnaire({
             >
               {ui.confirm}
             </button>
-            <button type="button" className="mn-chat-q__ghost" onClick={() => void onSkip()}>
+            <button
+              type="button"
+              className="mn-chat-q__skip-link"
+              onClick={() => void onSkip()}
+            >
               {ui.skip}
             </button>
           </div>

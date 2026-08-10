@@ -14,7 +14,10 @@ const POSE_FILES: Record<string, string> = {
   thinking: "nong-thinking.webp",
   vegan: "nong-vegan.webp",
   warning: "nong-warning.webp",
-  stressed: "nong-stressed.webp"
+  stressed: "nong-stressed.webp",
+  /** Closest asset to HTML calc “wai” pose */
+  wai: "nong-kneeling.webp",
+  kneeling: "nong-kneeling.webp"
 };
 
 const DEFAULT_POSE = "open";

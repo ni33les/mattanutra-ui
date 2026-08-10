@@ -377,6 +377,52 @@ function applyVeganAutofill(
   return { state: next, didAutofill: false, veganReact: null };
 }
 
+const HALFWAY_SAFETY_KEYS = [
+  "reproStatus",
+  "allergies",
+  "meds",
+  "kidney",
+  "liver",
+  "antibiotics",
+  "consentSafety"
+] as const;
+
+/** Copy for the v14 health-preview card (not in turn packs). */
+export function halfwayPreviewCopy(locale: string): {
+  title: string;
+  assessed: string;
+  assessedOf: string;
+  strongest: string;
+  emerging: string;
+  safety: string;
+  opportunity: string;
+  revealed: string;
+} {
+  if (locale === "th") {
+    return {
+      title: "HealthScore ของคุณกำลังเป็นรูปเป็นร่าง",
+      assessed: "ประเมินพื้นฐานสุขภาพแล้ว",
+      assessedOf: "{n} จาก 6 ด้าน",
+      strongest: "รูปแบบที่ชัดที่สุด",
+      emerging: "เริ่มปรากฏ",
+      safety: "ตรวจความปลอดภัยแล้ว",
+      opportunity: "โอกาสสำคัญของคุณ",
+      revealed: "เปิดเผยเมื่อเสร็จสมบูรณ์"
+    };
+  }
+
+  return {
+    title: "Your HealthScore is taking shape",
+    assessed: "Health foundations assessed",
+    assessedOf: "{n} of 6",
+    strongest: "Strongest pattern",
+    emerging: "Beginning to emerge",
+    safety: "Safety checks completed",
+    opportunity: "Your biggest opportunity",
+    revealed: "Revealed at completion"
+  };
+}
+
 function maybeHalfway(
   definition: QuestionnaireDefinition,
   state: QuestionnaireState
@@ -406,19 +452,53 @@ function maybeHalfway(
     ? (definition.nameSuffix || "").replace("{n}", name)
     : "";
   const text = (definition.halfway || "").replace("{n}", nameBit);
+  const copy = halfwayPreviewCopy(state.locale);
 
-  if (!text) {
-    return { ...state, halfwayDone: true };
+  const completedSections = new Set(
+    definition.turns
+      .filter(
+        (turn) => turn.req && state.answers[turn.k] !== undefined
+      )
+      .map((turn) => turn.sec)
+  ).size;
+
+  const safetyChecks = HALFWAY_SAFETY_KEYS.filter((key) => {
+    const value = state.answers[key];
+    return value !== undefined && value !== null;
+  }).length;
+
+  const lines: { label: string; value: string }[] = [
+    {
+      label: copy.assessed,
+      value: copy.assessedOf.replace("{n}", String(completedSections))
+    },
+    {
+      label: copy.strongest,
+      value: copy.emerging
+    }
+  ];
+
+  if (safetyChecks > 0) {
+    lines.push({
+      label: copy.safety,
+      value: String(safetyChecks)
+    });
   }
+
+  lines.push({
+    label: copy.opportunity,
+    value: copy.revealed
+  });
 
   return appendLog(
     { ...state, halfwayDone: true },
     [
       {
-        kind: "ack",
+        kind: "halfway",
         pose: "celebrate",
-        text,
-        id: "halfway"
+        title: copy.title,
+        text: text || undefined,
+        lines
       }
     ]
   );

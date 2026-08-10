@@ -178,12 +178,15 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.match(chat, /progressPart|Part \{n\} of 6/);
     assert.match(chat, /mn-chat-q__skip-link/);
     assert.match(chat, /privacyFooter/);
+    assert.match(chat, /halfway-health-preview|kind === \"halfway\"/);
+    assert.match(chat, /history-collapsed/);
     const calc = readFileSync(
       join(root, "components/chat-questionnaire/questionnaire-calculating.tsx"),
       "utf8"
     );
     assert.match(calc, /showFallback/);
     assert.match(calc, /calc-emailbox/);
+    assert.match(calc, /nongPoseSrc\(\"wai\"\)/);
     // Email only inside fallback branch (not always-on)
     assert.match(
       calc,
@@ -195,6 +198,13 @@ describe("questionnaire v14 UX on v6 schema", () => {
     );
     assert.match(css, /mn-quiz-cta-sheen|mn-quiz-cta-shadow-pulse/);
     assert.match(css, /cursor:\s*default/);
+    assert.match(css, /health-preview/);
+    assert.match(css, /history-collapsed/);
+    const engine = readFileSync(join(root, "lib/questionnaire/engine.ts"), "utf8");
+    assert.match(engine, /kind:\s*\"halfway\"/);
+    assert.match(engine, /Your HealthScore is taking shape/);
+    const poses = readFileSync(join(root, "lib/questionnaire/poses.ts"), "utf8");
+    assert.match(poses, /wai:\s*\"nong-kneeling/);
   });
 
   it("shows Thai script in the public language switcher label", async () => {

@@ -149,6 +149,15 @@ export type LogMessage =
       id: string;
     }>
   | Readonly<{
+      /** v14 HTML health-preview card at 50% progress */
+      kind: "halfway";
+      pose: string;
+      title: string;
+      /** Optional personalized line from definition.halfway */
+      text?: string;
+      lines: readonly Readonly<{ label: string; value: string }>[];
+    }>
+  | Readonly<{
       kind: "system";
       text: string;
     }>;

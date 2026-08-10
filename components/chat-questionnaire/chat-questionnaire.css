@@ -277,16 +277,16 @@
   padding-left: 48px;
 }
 
-/* Nong pose — no circular frame */
+/* Nong pose — v14 circular avatar frame */
 .mn-chat-q__avatar {
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  border-radius: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  overflow: visible;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 50%;
+  background: var(--cq-card);
+  border: 1.5px solid var(--cq-line);
+  box-shadow: var(--cq-shadow);
+  overflow: hidden;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -295,13 +295,75 @@
 }
 
 .mn-chat-q__avatar img {
-  width: 48px;
+  width: 42px;
   height: auto;
-  max-height: 52px;
+  max-height: 46px;
   object-fit: contain;
   object-position: center bottom;
   display: block;
   transform: none;
+}
+
+.mn-chat-q__row--health-preview .mn-chat-q__avatar {
+  width: 76px;
+  height: 76px;
+  flex-basis: 76px;
+}
+
+.mn-chat-q__row--health-preview .mn-chat-q__avatar img {
+  width: 72px;
+  max-height: 72px;
+}
+
+.mn-chat-q__row--history-collapsed {
+  display: none !important;
+}
+
+.mn-chat-q__bubble--health-preview {
+  background: linear-gradient(135deg, #eef8f3, #fffdf7);
+  border-color: #cce3d6;
+  width: 100%;
+}
+
+.mn-chat-q__health-preview-title {
+  font-family: var(--mn-font-display), Fraunces, Georgia, serif;
+  font-size: 1.22rem;
+  font-weight: 650;
+  margin-bottom: 8px;
+  color: var(--cq-ink);
+}
+
+.mn-chat-q__health-preview-lede {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--cq-ink-soft);
+  margin-bottom: 12px;
+}
+
+.mn-chat-q__preview-lines {
+  display: grid;
+  gap: 7px;
+  font-size: 0.86rem;
+  color: var(--cq-ink-soft);
+}
+
+.mn-chat-q__preview-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid rgba(16, 43, 61, 0.08);
+  padding-top: 7px;
+}
+
+.mn-chat-q__preview-line:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.mn-chat-q__preview-line b {
+  color: var(--cq-matta-deep);
+  text-align: right;
+  font-weight: 700;
 }
 
 /* Bot content boxes = pure white cards (v14 .bubble) */
@@ -810,11 +872,12 @@
     width: 44px;
     height: 44px;
     flex-basis: 44px;
+    border-radius: 50%;
   }
 
   .mn-chat-q__avatar img {
-    width: 44px;
-    max-height: 48px;
+    width: 40px;
+    max-height: 44px;
   }
 }
 

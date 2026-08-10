@@ -6,6 +6,7 @@ import {
   createInitialState,
   getDefinition,
   getNextPrompt,
+  halfwayPreviewCopy,
   isQuestionnaireComplete,
   skipTurn,
   startQuestionnaire
@@ -55,6 +56,16 @@ describe("questionnaire engine v6", () => {
     assert.equal(prompt.turn?.k, "firstName");
     assert.ok(!started.state.log.some((m) => m.kind === "section"));
     assert.ok(started.events.some((e) => e.type === "chat_start"));
+  });
+
+  it("ships v14 halfway health-preview copy for EN and TH", () => {
+    const en = halfwayPreviewCopy("en");
+    const th = halfwayPreviewCopy("th");
+    assert.equal(en.title, "Your HealthScore is taking shape");
+    assert.match(en.assessedOf, /\{n\} of 6/);
+    assert.equal(en.emerging, "Beginning to emerge");
+    assert.match(th.title, /HealthScore/);
+    assert.match(th.assessedOf, /\{n\} จาก 6/);
   });
 
   it("shows Part 1 section after firstName, then goals, keeping prior chat", () => {
