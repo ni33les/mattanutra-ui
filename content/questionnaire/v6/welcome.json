@@ -47,7 +47,7 @@
     "calcSend": "Send when ready",
     "calcEmailPlaceholder": "Email",
     "calcEmailThanks": "Email saved ✓ — we'll send your HealthScore when ready.",
-    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your supplements.",
+    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your medicines or supplements.",
     "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved.",
     "trust": [
       {
@@ -78,7 +78,17 @@
       }
     ],
     "calcSendWhenReady": "Send when ready",
-    "calcThanks": "Thank you"
+    "calcThanks": "Thank you",
+    "brandsub": "Building your free HealthScore",
+    "progressPart": "Part {n} of 6 · {pct}%",
+    "progressEncourage0": "A strong start",
+    "progressEncourage25": "Your profile is taking shape",
+    "progressEncourage50": "Excellent progress",
+    "progressEncourage75": "Nearly there",
+    "progressRemainingOne": " · 1 question remains in this section",
+    "progressRemainingMany": " · {n} questions remain in this section",
+    "privacyFooter": "Private · encrypted ·",
+    "privacyFooterLink": "Privacy policy"
   },
   "th": {
     "badge": "HealthScore ส่วนบุคคลฟรีของคุณ",
@@ -159,7 +169,17 @@
       }
     ],
     "calcSendWhenReady": "ส่งให้เมื่อพร้อม",
-    "calcThanks": "ขอบคุณค่ะ"
+    "calcThanks": "ขอบคุณค่ะ",
+    "brandsub": "กำลังสร้าง HealthScore ฟรีของคุณ",
+    "progressPart": "ส่วนที่ {n} จาก 6 · {pct}%",
+    "progressEncourage0": "เริ่มต้นได้ดี",
+    "progressEncourage25": "โปรไฟล์ของคุณเริ่มชัดขึ้น",
+    "progressEncourage50": "คืบหน้าได้ยอดเยี่ยม",
+    "progressEncourage75": "ใกล้เสร็จแล้ว",
+    "progressRemainingOne": " · เหลือ 1 คำถามในส่วนนี้",
+    "progressRemainingMany": " · เหลือ {n} คำถามในส่วนนี้",
+    "privacyFooter": "เป็นส่วนตัว · เข้ารหัส ·",
+    "privacyFooterLink": "นโยบายความเป็นส่วนตัว"
   },
   "zh": {
     "badge": "您的免费个人 HealthScore",
@@ -209,7 +229,7 @@
     "calcSend": "Send when ready",
     "calcEmailPlaceholder": "Email",
     "calcEmailThanks": "Email saved ✓ — we'll send your HealthScore when ready.",
-    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your supplements.",
+    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your medicines or supplements.",
     "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved.",
     "trust": [
       {
@@ -240,6 +260,16 @@
       }
     ],
     "calcSendWhenReady": "Send when ready",
-    "calcThanks": "Thank you"
+    "calcThanks": "Thank you",
+    "brandsub": "Building your free HealthScore",
+    "progressPart": "Part {n} of 6 · {pct}%",
+    "progressEncourage0": "A strong start",
+    "progressEncourage25": "Your profile is taking shape",
+    "progressEncourage50": "Excellent progress",
+    "progressEncourage75": "Nearly there",
+    "progressRemainingOne": " · 1 question remains in this section",
+    "progressRemainingMany": " · {n} questions remain in this section",
+    "privacyFooter": "Private · encrypted ·",
+    "privacyFooterLink": "Privacy policy"
   }
 }

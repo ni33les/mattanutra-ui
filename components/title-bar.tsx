@@ -12,7 +12,8 @@ type TitleBarProps = Readonly<{
   currentPath?: string;
   localizedPaths?: Partial<Record<LocaleCode, string>>;
   title: string;
-  variant?: "default" | "landing";
+  /** quiz = compact logo + language only (v14 focused shell, no markets/nav/footer chrome). */
+  variant?: "default" | "landing" | "quiz";
 }>;
 
 type TitleBarCopy = Readonly<{
@@ -69,36 +70,44 @@ export function TitleBar({
   const titleCtaHref = assessmentPath;
   const showAssessmentCta = !isAssessmentStartedPath(currentPath, currentLocale);
   const isLanding = variant === "landing";
+  const isQuiz = variant === "quiz";
+  const headerClass = isQuiz
+    ? "mn-titlebar mn-titlebar--quiz"
+    : isLanding
+      ? "mn-titlebar mn-titlebar--landing"
+      : "mn-titlebar";
 
   return (
-    <header className={isLanding ? "mn-titlebar mn-titlebar--landing" : "mn-titlebar"}>
-      <div className="mn-availability-bar" aria-label={copy.availability}>
-        <div className="mn-availability-group">
-          <span className="mn-availability-label">{copy.availability}</span>
-          <span className="mn-availability-pills">
-            {copy.availableCountries.map(([flag, country]) => (
-              <span key={country} className="mn-availability-pill">
-                <span aria-hidden>{flag}</span>
-                <span className="mn-availability-pill-name">{country}</span>
-              </span>
-            ))}
-          </span>
+    <header className={headerClass}>
+      {!isQuiz ? (
+        <div className="mn-availability-bar" aria-label={copy.availability}>
+          <div className="mn-availability-group">
+            <span className="mn-availability-label">{copy.availability}</span>
+            <span className="mn-availability-pills">
+              {copy.availableCountries.map(([flag, country]) => (
+                <span key={country} className="mn-availability-pill">
+                  <span aria-hidden>{flag}</span>
+                  <span className="mn-availability-pill-name">{country}</span>
+                </span>
+              ))}
+            </span>
+          </div>
+          <span className="mn-availability-sep" aria-hidden />
+          <div className="mn-availability-group mn-availability-group--soon">
+            <span className="mn-availability-label mn-availability-label--muted">
+              {copy.comingSoon}
+            </span>
+            <span className="mn-availability-pills">
+              {copy.comingSoonCountries.map(([flag, country]) => (
+                <span key={country} className="mn-availability-pill mn-availability-pill--soon">
+                  <span aria-hidden>{flag}</span>
+                  <span className="mn-availability-pill-name">{country}</span>
+                </span>
+              ))}
+            </span>
+          </div>
         </div>
-        <span className="mn-availability-sep" aria-hidden />
-        <div className="mn-availability-group mn-availability-group--soon">
-          <span className="mn-availability-label mn-availability-label--muted">
-            {copy.comingSoon}
-          </span>
-          <span className="mn-availability-pills">
-            {copy.comingSoonCountries.map(([flag, country]) => (
-              <span key={country} className="mn-availability-pill mn-availability-pill--soon">
-                <span aria-hidden>{flag}</span>
-                <span className="mn-availability-pill-name">{country}</span>
-              </span>
-            ))}
-          </span>
-        </div>
-      </div>
+      ) : null}
       <div className="mn-titlebar-main">
         <Link
           href={`/${currentLocale}`}
@@ -145,62 +154,66 @@ export function TitleBar({
             />
           )}
         </Link>
-        <nav
-          aria-label={copy.navAria}
-          className="mn-titlebar-nav"
-        >
-          {copy.links.map(([href, label]) => (
-            <Link
-              href={titleBarHref(currentLocale, href)}
-              key={href}
-              className="mn-titlebar-link"
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
+        {!isQuiz ? (
+          <nav
+            aria-label={copy.navAria}
+            className="mn-titlebar-nav"
+          >
+            {copy.links.map(([href, label]) => (
+              <Link
+                href={titleBarHref(currentLocale, href)}
+                key={href}
+                className="mn-titlebar-link"
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
         <div className="mn-titlebar-actions">
-          {showAssessmentCta ? (
+          {!isQuiz && showAssessmentCta ? (
             <Link className="mn-titlebar-cta" href={titleCtaHref}>
               {copy.assessment}
             </Link>
           ) : null}
-          {/* Desktop/tablet only — mobile uses the menu panel switcher to avoid logo overlap */}
-          <div className="mn-titlebar-lang-desktop">
+          {/* Quiz: always show site locale switcher. Default: desktop only (mobile uses menu). */}
+          <div className={isQuiz ? "mn-titlebar-lang-quiz" : "mn-titlebar-lang-desktop"}>
             <LanguageSwitcher
               currentLocale={currentLocale}
               currentPath={currentPath}
               localizedPaths={localizedPaths}
             />
           </div>
-          <details className="mn-titlebar-mobile-menu">
-            <summary aria-label={copy.menu}>
-              <Menu aria-hidden className="size-5" />
-            </summary>
-            <div className="mn-titlebar-mobile-panel">
-              {copy.links.map(([href, label]) => (
-                <Link
-                  href={titleBarHref(currentLocale, href)}
-                  key={href}
-                  className="mn-titlebar-mobile-link"
-                >
-                  {label}
-                </Link>
-              ))}
-              <div className="mn-titlebar-mobile-actions">
-                {showAssessmentCta ? (
-                  <Link className="mn-titlebar-mobile-cta" href={titleCtaHref}>
-                    {copy.assessment}
+          {!isQuiz ? (
+            <details className="mn-titlebar-mobile-menu">
+              <summary aria-label={copy.menu}>
+                <Menu aria-hidden className="size-5" />
+              </summary>
+              <div className="mn-titlebar-mobile-panel">
+                {copy.links.map(([href, label]) => (
+                  <Link
+                    href={titleBarHref(currentLocale, href)}
+                    key={href}
+                    className="mn-titlebar-mobile-link"
+                  >
+                    {label}
                   </Link>
-                ) : null}
-                <LanguageSwitcher
-                  currentLocale={currentLocale}
-                  currentPath={currentPath}
-                  localizedPaths={localizedPaths}
-                />
+                ))}
+                <div className="mn-titlebar-mobile-actions">
+                  {showAssessmentCta ? (
+                    <Link className="mn-titlebar-mobile-cta" href={titleCtaHref}>
+                      {copy.assessment}
+                    </Link>
+                  ) : null}
+                  <LanguageSwitcher
+                    currentLocale={currentLocale}
+                    currentPath={currentPath}
+                    localizedPaths={localizedPaths}
+                  />
+                </div>
               </div>
-            </div>
-          </details>
+            </details>
+          ) : null}
         </div>
       </div>
     </header>

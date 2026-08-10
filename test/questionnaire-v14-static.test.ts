@@ -157,6 +157,46 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.doesNotMatch(welcome, /LanguageSwitcher/);
   });
 
+  it("uses quiz-focused shell (compact titlebar, no site footer)", () => {
+    const page = readFileSync(
+      join(root, "app/[locale]/nutrition/quiz/page.tsx"),
+      "utf8"
+    );
+    assert.match(page, /variant=\"quiz\"/);
+    assert.match(page, /mn-customer-shell--quiz/);
+    assert.doesNotMatch(page, /SiteFooter/);
+    const titleBar = readFileSync(join(root, "components/title-bar.tsx"), "utf8");
+    assert.match(titleBar, /\"quiz\"/);
+    assert.match(titleBar, /isQuiz/);
+  });
+
+  it("ports v14 progress meter and skip-link / calc fallback email", () => {
+    const chat = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.tsx"),
+      "utf8"
+    );
+    assert.match(chat, /progressPart|Part \{n\} of 6/);
+    assert.match(chat, /mn-chat-q__skip-link/);
+    assert.match(chat, /privacyFooter/);
+    const calc = readFileSync(
+      join(root, "components/chat-questionnaire/questionnaire-calculating.tsx"),
+      "utf8"
+    );
+    assert.match(calc, /showFallback/);
+    assert.match(calc, /calc-emailbox/);
+    // Email only inside fallback branch (not always-on)
+    assert.match(
+      calc,
+      /showFallback \? \([\s\S]*calc-emailbox/
+    );
+    const css = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.css"),
+      "utf8"
+    );
+    assert.match(css, /mn-quiz-cta-sheen|mn-quiz-cta-shadow-pulse/);
+    assert.match(css, /cursor:\s*default/);
+  });
+
   it("shows Thai script in the public language switcher label", async () => {
     const { localeLabels } = await import("../lib/i18n.ts");
     assert.equal(localeLabels.th, "ไทย");

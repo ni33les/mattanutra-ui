@@ -7153,3 +7153,35 @@
     }
   }
 }
+
+
+/* quiz-focused titlebar (v14 shell parity) */
+.mn-customer-shell--quiz {
+  background-color: #f8f5ec;
+  background-image: radial-gradient(1200px 500px at 50% -200px, #eff5ee 0%, #f8f5ec 60%);
+}
+.mn-customer-shell .mn-titlebar--quiz {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(248, 245, 236, 0.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e5e0d2;
+}
+.mn-customer-shell .mn-titlebar--quiz .mn-titlebar-main {
+  min-height: 56px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.mn-customer-shell .mn-titlebar--quiz .mn-titlebar-nav,
+.mn-customer-shell .mn-titlebar--quiz .mn-titlebar-cta,
+.mn-customer-shell .mn-titlebar--quiz .mn-titlebar-mobile-menu {
+  display: none !important;
+}
+.mn-customer-shell .mn-titlebar--quiz .mn-titlebar-lang-quiz {
+  display: block;
+}
+.mn-customer-shell .mn-titlebar--quiz .mn-logo-tagline {
+  display: none;
+}
+

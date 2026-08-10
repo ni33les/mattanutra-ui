@@ -101,36 +101,6 @@ export function QuestionnaireCalculating({
             : copy.calcKeepOpen}
       </p>
 
-      {/* Always-on email capture (v14 done emailbox parity) */}
-      <div className="mn-quiz-calc__emailbox" data-testid="calc-emailbox">
-        <input
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          placeholder={copy.calcEmailPlaceholder}
-          value={email}
-          disabled={emailSent || emailBusy}
-          onChange={(event) => setEmail(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void submitEmail();
-            }
-          }}
-          aria-label={copy.calcEmailPlaceholder}
-        />
-        <button
-          type="button"
-          disabled={emailSent || emailBusy}
-          onClick={() => void submitEmail()}
-        >
-          {emailSent ? "✓" : "→"}
-        </button>
-      </div>
-      {emailSent ? (
-        <p className="mn-quiz-calc__email-thanks">{copy.calcEmailThanks}</p>
-      ) : null}
-
       <div className="mn-quiz-calc__support">
         <a href={LINE_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
           {copy.calcLine}
@@ -139,6 +109,7 @@ export function QuestionnaireCalculating({
 
       <p className="mn-quiz-calc__disclaimer">{copy.calcDisclaimer}</p>
 
+      {/* HTML parity: email capture only on slow/error fallback (~15s), not always-on */}
       {showFallback ? (
         <div className="mn-quiz-calc__fallback" data-testid="calc-fallback">
           <p>{status === "error" ? copy.calcError : copy.calcLonger}</p>
@@ -147,6 +118,34 @@ export function QuestionnaireCalculating({
               {copy.calcRetry}
             </button>
           </div>
+          <div className="mn-quiz-calc__emailbox" data-testid="calc-emailbox">
+            <input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              placeholder={copy.calcEmailPlaceholder}
+              value={email}
+              disabled={emailSent || emailBusy}
+              onChange={(event) => setEmail(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void submitEmail();
+                }
+              }}
+              aria-label={copy.calcEmailPlaceholder}
+            />
+            <button
+              type="button"
+              disabled={emailSent || emailBusy}
+              onClick={() => void submitEmail()}
+            >
+              {emailSent ? "✓" : copy.calcSendWhenReady || copy.calcSend || "→"}
+            </button>
+          </div>
+          {emailSent ? (
+            <p className="mn-quiz-calc__email-thanks">{copy.calcEmailThanks}</p>
+          ) : null}
         </div>
       ) : null}
     </div>

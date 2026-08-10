@@ -200,6 +200,74 @@ export function ChatQuestionnaire({
   const precision = state ? computePrecision(definition, state) : 8;
   const currentTurn: TurnDef | null = prompt?.turn ?? null;
 
+  /** Premium progress meter (v14 HTML): Part N of 6 · % + encouragement + remaining. */
+  const progressMeta = useMemo(() => {
+    if (!state) {
+      return {
+        barPct: 8,
+        partLabel: chrome.progressPart
+          .replace("{n}", "1")
+          .replace("{pct}", "0"),
+        detail: chrome.progressEncourage0
+      };
+    }
+
+    const core = definition.turns.filter(
+      (turn) =>
+        turn.req &&
+        !turn.opt &&
+        turn.kind !== "gate" &&
+        isVisibleTurn(definition, turn, state.answers)
+    );
+    const answered = core.filter(
+      (turn) => state.answers[turn.k] !== undefined
+    ).length;
+    const pct = core.length ? Math.round((answered / core.length) * 100) : 0;
+    const active =
+      currentTurn ??
+      definition.turns.find(
+        (turn) =>
+          isVisibleTurn(definition, turn, state.answers) &&
+          state.answers[turn.k] === undefined
+      ) ??
+      definition.turns[definition.turns.length - 1];
+    const sec = Math.min(5, active?.sec ?? 0);
+    const sectionTurns = definition.turns.filter(
+      (turn) =>
+        turn.sec === sec &&
+        turn.req &&
+        !turn.opt &&
+        turn.kind !== "gate" &&
+        isVisibleTurn(definition, turn, state.answers)
+    );
+    const sectionAnswered = sectionTurns.filter(
+      (turn) => state.answers[turn.k] !== undefined
+    ).length;
+    const remaining = Math.max(0, sectionTurns.length - sectionAnswered);
+    const encourage =
+      pct < 25
+        ? chrome.progressEncourage0
+        : pct < 50
+          ? chrome.progressEncourage25
+          : pct < 75
+            ? chrome.progressEncourage50
+            : chrome.progressEncourage75;
+    const remainBit =
+      remaining <= 0
+        ? ""
+        : remaining === 1
+          ? chrome.progressRemainingOne
+          : chrome.progressRemainingMany.replace("{n}", String(remaining));
+
+    return {
+      barPct: Math.max(8, pct || precision),
+      partLabel: chrome.progressPart
+        .replace("{n}", String(sec + 1))
+        .replace("{pct}", String(pct)),
+      detail: `${encourage}${remainBit}`
+    };
+  }, [state, definition, currentTurn, chrome, precision]);
+
   const track = useCallback(
     async (events: readonly QuestionnaireEvent[]) => {
       await emitQuestionnaireEvents(
@@ -796,12 +864,12 @@ export function ChatQuestionnaire({
 
   function renderLogItem(msg: LogMessage, index: number) {
     if (msg.kind === "intro") {
+      // v14 HTML: intro is bubble-first (no mascot avatar beside the greeting).
       return (
-        <div key={`intro-${index}`} className="mn-chat-q__row mn-chat-q__row--bot">
-          <div className={avatarClass(msg.pose)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={nongPoseSrc(msg.pose)} alt="" />
-          </div>
+        <div
+          key={`intro-${index}`}
+          className="mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--no-avatar"
+        >
           <div className="mn-chat-q__bubble">
             <div className="mn-chat-q__q">{msg.text}</div>
             {msg.hint ? <div className="mn-chat-q__hint">{msg.hint}</div> : null}
@@ -1159,7 +1227,7 @@ export function ChatQuestionnaire({
               }
             }}
           />
-          <div className="mn-chat-q__actions">
+          <div className="mn-chat-q__actions mn-chat-q__actions--inline">
             <button
               type="button"
               className="mn-chat-q__primary"
@@ -1168,7 +1236,11 @@ export function ChatQuestionnaire({
               {ui.confirm}
             </button>
             {turn.optional || turn.req === 0 || turn.opt ? (
-              <button type="button" className="mn-chat-q__ghost" onClick={() => void onSkip()}>
+              <button
+                type="button"
+                className="mn-chat-q__skip-link"
+                onClick={() => void onSkip()}
+              >
                 {ui.skip}
               </button>
             ) : null}
@@ -1361,7 +1433,12 @@ export function ChatQuestionnaire({
       ) : null}
       <div className="mn-chat-q__header">
         <div className="mn-chat-q__brandrow">
-          {/* Site TitleBar already shows brand + language; keep only quiz chrome here. */}
+          <div className="mn-chat-q__brandcopy">
+            <div className="mn-chat-q__brandsub">{chrome.brandsub}</div>
+          </div>
+          <span className={`mn-chat-q__saved${savedFlash ? " show" : ""}`}>
+            {ui.saved ? `${ui.saved} ✓` : "Saved ✓"}
+          </span>
           <button
             type="button"
             className="mn-chat-q__review-btn"
@@ -1370,20 +1447,17 @@ export function ChatQuestionnaire({
           >
             {chrome.reviewBtn}
           </button>
-          <span className={`mn-chat-q__saved${savedFlash ? " show" : ""}`}>
-            {ui.saved || "Saved"}
-          </span>
         </div>
-        <div className="mn-chat-q__vial" aria-label="Precision">
+        <div className="mn-chat-q__vial" aria-label={progressMeta.partLabel}>
           <div className="mn-chat-q__vial-track">
             <div
               className="mn-chat-q__vial-fill"
-              style={{ width: `${precision}%` }}
+              style={{ width: `${progressMeta.barPct}%` }}
             />
           </div>
           <div className="mn-chat-q__vial-pct">
-            {precision}
-            <small>%</small>
+            <b>{progressMeta.partLabel}</b>
+            <small>{progressMeta.detail}</small>
           </div>
         </div>
       </div>
@@ -1420,6 +1494,13 @@ export function ChatQuestionnaire({
         >
           <div className="mn-chat-q__composer-inner">{renderComposer()}</div>
         </div>
+
+        <p className="mn-chat-q__privacy-footer">
+          {chrome.privacyFooter}{" "}
+          <a href={`/${locale === "zh-CN" ? "en" : locale}/privacy`}>
+            {chrome.privacyFooterLink}
+          </a>
+        </p>
       </div>
 
       {reviewOpen ? (

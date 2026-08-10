@@ -25,7 +25,11 @@ content + components — do not reintroduce an HTML document route or Next rewri
 - Product exception: sex question uses **“What is your sex?”** /
   **“เพศของคุณคือ”** (never “sex at birth” / “เพศกำเนิด”).
 - Do not auto-click begin/start via regex; welcome CTA is explicit.
-- Site `TitleBar` owns brand + language chrome (no double header in welcome).
+- **Quiz-focused shell:** logo + site locale switcher only (no markets bar,
+  primary nav, or site footer on the quiz route).
+- Mid-quiz language uses the **site locale switcher** (route change), not a
+  second in-welcome lang control.
+- Calc email capture matches HTML: **only on slow/error fallback**, not always-on.
 
 ## Integrity
 

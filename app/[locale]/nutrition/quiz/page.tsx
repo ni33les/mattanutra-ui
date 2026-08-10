@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import { AssessmentFlow } from "@/components/assessment-flow";
 import { ChatQuestionnaire } from "@/components/chat-questionnaire/chat-questionnaire";
 import { ServiceIssue } from "@/components/service-issue";
-import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { checkDatabaseConnection } from "@/lib/db";
 import { devShortcutsEnabledForHost } from "@/lib/dev-shortcuts";
@@ -110,14 +109,14 @@ export default async function NutritionQuizPage({
 
   if (!databaseReady) {
     return (
-      <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+      <main className="mn-customer-shell mn-customer-shell--quiz flex min-h-screen flex-col bg-background text-foreground">
         <TitleBar
           currentLocale={locale}
           currentPath={currentPath}
           title={dictionary.hero.eyebrow}
+          variant="quiz"
         />
         <ServiceIssue href={currentPath} locale={locale} />
-        <SiteFooter content={dictionary.footer} locale={locale} />
       </main>
     );
   }
@@ -132,12 +131,15 @@ export default async function NutritionQuizPage({
 
   const useChat = chatQuestionnaireEnabled(locale);
 
+  // Quiz-focused shell (v14 HTML parity): compact titlebar (logo + site locale
+  // switcher only) and no site footer — full marketing chrome is on landing pages.
   return (
-    <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+    <main className="mn-customer-shell mn-customer-shell--quiz flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
         currentLocale={locale}
         currentPath={currentPath}
         title={dictionary.hero.eyebrow}
+        variant="quiz"
       />
       {useChat ? (
         <ChatQuestionnaire
@@ -163,7 +165,6 @@ export default async function NutritionQuizPage({
           showDevShortcut={showDevShortcut}
         />
       )}
-      <SiteFooter content={dictionary.footer} locale={locale} />
     </main>
   );
 }
