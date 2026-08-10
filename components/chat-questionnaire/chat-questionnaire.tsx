@@ -45,11 +45,12 @@ const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const CALC_FALLBACK_MS = 15_000;
 const TYPE_MS = 280;
 /**
- * v14 HTML STAGE_MS = 950ms for section / finish overlays.
- * Single-shot show (no multi-phase scale morph — that caused appear/disappear glitches).
+ * Section / finish stage overlay timing.
+ * Hold long enough to read Part N + title (HTML was 950ms — felt too snappy in React).
+ * Single-shot show: opacity fade only (no scale morph).
  */
-const STAGE_MS = 950;
-const STAGE_FADE_OUT_MS = 180;
+const STAGE_MS = 1800;
+const STAGE_FADE_OUT_MS = 280;
 const UX_VERSION = "v14-landing";
 const DELIVERY_EMAIL_KEY = "mn_healthscore_delivery_email";
 

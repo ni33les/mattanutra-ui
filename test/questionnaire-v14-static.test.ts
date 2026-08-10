@@ -181,8 +181,8 @@ describe("questionnaire v14 UX on v6 schema", () => {
     );
     const engine = readFileSync(join(root, "lib/questionnaire/engine.ts"), "utf8");
 
-    // Single-shot HTML-like timing (no multi-phase scale morph)
-    assert.match(chat, /STAGE_MS\s*=\s*950/);
+    // Single-shot opacity fade; hold long enough to read (not sub-second)
+    assert.match(chat, /STAGE_MS\s*=\s*1800/);
     assert.match(chat, /phase:\s*\"show\"/);
     assert.doesNotMatch(chat, /phase:\s*\"prep\"|phase:\s*\"hold\"/);
     // Finish stage uses wai + stageDone before calc
