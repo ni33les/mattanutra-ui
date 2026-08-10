@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, MessageCircle, X } from "lucide-react";
+import { trackBpmEvent } from "@/lib/bpm-client";
 import type { Locale } from "@/lib/i18n";
 
 type LivingProtocolLineCtaProps = Readonly<{
@@ -241,12 +242,23 @@ export function LivingProtocolLineCta({
         expiresAt: String(payload.expiresAt ?? ""),
         lineUrl: String(payload.lineUrl)
       });
+
+      // Meta Subscribe + BPM: connect code issued (user starting LINE link).
+      trackBpmEvent("line_connected", {
+        eventType: "funnel",
+        locale,
+        planId,
+        properties: {
+          channel: "web",
+          source
+        }
+      });
     } catch {
       setError(labels.error);
     } finally {
       setLoading(false);
     }
-  }, [connect, labels.error, loading, planId, retailCustomerOrderId, source]);
+  }, [connect, labels.error, loading, locale, planId, retailCustomerOrderId, source]);
 
   useEffect(() => {
     if (presentation !== "inline_qr") {

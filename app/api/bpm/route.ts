@@ -4,6 +4,7 @@ import {
   type BpmEventType,
   type BpmSeverity
 } from "@/lib/bpm";
+import { mirrorBpmEventToFacebookCapi } from "@/lib/facebook-capi";
 import { isLocale } from "@/lib/i18n";
 import {
   enforceRateLimit,
@@ -59,10 +60,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const properties = record(body.properties);
+  const attribution = record(body.attribution);
+  const planId = text(body.planId);
+  const email = text(body.email);
+  const valueAmount = number(body.valueAmount);
+  const valueCurrency = text(body.valueCurrency);
+
   const eventId = await writeBpmEvent({
     actorType: "visitor",
-    attribution: record(body.attribution),
-    email: text(body.email),
+    attribution,
+    email,
     eventName,
     eventStatus: text(body.eventStatus),
     eventType: eventType(body.eventType),
@@ -71,15 +79,39 @@ export async function POST(request: Request) {
     locale: isLocale(body.locale) ? body.locale : undefined,
     lowestDomain: text(body.lowestDomain),
     metrics: record(body.metrics),
-    planId: text(body.planId),
-    properties: record(body.properties),
+    planId,
+    properties,
     ray: text(body.ray),
     request,
     scoreBand: text(body.scoreBand),
     selectedPlan: text(body.selectedPlan),
     severity: text(body.severity) as BpmSeverity | undefined,
-    valueAmount: number(body.valueAmount),
-    valueCurrency: text(body.valueCurrency)
+    valueAmount,
+    valueCurrency
+  });
+
+  // Server-side Meta CAPI mirror (deduped with browser via facebookEventId).
+  // Never block the BPM response on Meta.
+  const facebookEventId =
+    text(properties.facebookEventId) || text(body.facebookEventId);
+  const eventSourceUrl =
+    text(properties.sourceUrl) ||
+    text(attribution.sourceUrl) ||
+    request.headers.get("referer");
+
+  void mirrorBpmEventToFacebookCapi({
+    email,
+    eventName,
+    eventSourceUrl,
+    facebookEventId,
+    planId,
+    phone: text(properties.phone) || text(body.phone),
+    properties,
+    request,
+    valueAmount,
+    valueCurrency
+  }).catch(() => {
+    // CAPI must never affect tracking or UX.
   });
 
   return NextResponse.json(

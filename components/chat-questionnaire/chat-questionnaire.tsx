@@ -544,6 +544,7 @@ export function ChatQuestionnaire({
 
         clearLocalState(locale);
         trackBpmEvent("healthscore_ready", {
+          email: queuedEmail || undefined,
           eventType: "funnel",
           locale,
           planId: captured.planId,

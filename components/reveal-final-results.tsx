@@ -62,6 +62,7 @@ import type {
   ProductStackPreference,
   RecommendedProduct,
 } from "@/lib/formulation-types";
+import { trackBpmEvent } from "@/lib/bpm-client";
 import { localeHtmlLang, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n-messages";
 import { organisationDispatchCity } from "@/lib/organisation-dispatch";
@@ -2133,6 +2134,16 @@ function RevealPanyaFinalSection({
         command: String(payload.command),
         expiresAt: String(payload.expiresAt ?? ""),
         lineUrl: String(payload.lineUrl),
+      });
+
+      trackBpmEvent("line_connected", {
+        eventType: "funnel",
+        locale,
+        planId,
+        properties: {
+          channel: "web",
+          source: "reveal_panya_support",
+        },
       });
     } catch {
       connectRequestStartedRef.current = false;

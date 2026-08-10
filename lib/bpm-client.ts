@@ -338,11 +338,22 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
     return;
   }
 
+  // Shared browser/CAPI dedupe key (Meta event_id / eventID).
+  const facebookEventId = randomRay();
+  const planId = input.planId ?? currentPlanId();
+  const properties = {
+    ...(input.properties || {}),
+    facebookEventId,
+    sourceUrl:
+      typeof window !== "undefined" ? window.location.href : undefined
+  };
+
   const payload = {
     ...input,
     attribution: getBpmAttribution(),
     eventName,
-    planId: input.planId ?? currentPlanId(),
+    planId,
+    properties,
     ray: getBpmRay()
   };
 
@@ -360,27 +371,47 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
 
   // Mirror key funnel events to Meta Pixel when configured (client-only).
   void import("@/lib/facebook-pixel")
-    .then(({ facebookEventForInternal, trackFacebookEvent }) => {
-      const mapped = facebookEventForInternal(eventName);
+    .then(
+      ({
+        claimFacebookLeadOnce,
+        facebookEventForInternal,
+        trackFacebookEvent
+      }) => {
+        const mapped = facebookEventForInternal(eventName);
 
-      if (!mapped) {
-        return;
+        if (!mapped) {
+          return;
+        }
+
+        // PageView is handled by FacebookPixel on route changes — skip duplicates.
+        if (mapped.event === "PageView") {
+          return;
+        }
+
+        // Lead once per plan per session (results ready).
+        if (mapped.event === "Lead" && !claimFacebookLeadOnce(planId)) {
+          return;
+        }
+
+        const params: Record<string, unknown> = {
+          content_name: eventName,
+          locale: input.locale,
+          plan_id: planId ?? undefined,
+          value: input.valueAmount,
+          currency: input.valueCurrency,
+          ...(input.properties || {})
+        };
+
+        if (mapped.event === "ViewContent" && eventName === "healthscore_viewed") {
+          params.content_category = "healthscore";
+        }
+
+        return trackFacebookEvent(mapped.event, params, {
+          custom: mapped.custom,
+          eventID: facebookEventId
+        });
       }
-
-      // PageView is handled by FacebookPixel on route changes — skip duplicates.
-      if (mapped.event === "PageView") {
-        return;
-      }
-
-      return trackFacebookEvent(mapped.event, {
-        content_name: eventName,
-        locale: input.locale,
-        plan_id: input.planId ?? currentPlanId() ?? undefined,
-        value: input.valueAmount,
-        currency: input.valueCurrency,
-        ...(input.properties || {})
-      }, { custom: mapped.custom });
-    })
+    )
     .catch(() => {
       // Pixel must never break BPM or UX.
     });

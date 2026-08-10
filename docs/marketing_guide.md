@@ -61,6 +61,48 @@ https://mattanutra.com/th/assessment?utm_source=facebook&utm_medium=paid_social&
 
 Facebook usually appends `fbclid` automatically. BPM will capture it where present.
 
+## Meta Pixel + Conversions API (quiz funnel)
+
+MattaNutra loads the Meta Pixel on customer pages and mirrors key BPM milestones to Meta.
+
+### Primary ad optimisation event
+
+| Goal | Meta event | When it fires |
+| --- | --- | --- |
+| **Quiz finisher (use for Leads campaigns)** | **`Lead`** | HealthScore results ready (`healthscore_ready`) — not quiz open |
+| Quiz opened | Custom `QuizStart` | Assessment / chat view or start |
+| Quiz answers locked | Custom `QuizSubmitted` | Assessment submitted / calculating |
+| Email captured | Custom `EmailCapture` | Delivery email on results path |
+| Results page view | `ViewContent` | HealthScore page viewed |
+| LINE connect code issued | `Subscribe` | Successful LINE connect CTA |
+| Retail checkout | `InitiateCheckout` | Product basket checkout viewed |
+| Paid conversion | `Purchase` | Payment succeeded |
+
+Browser + server use the same `event_id` (`facebookEventId`) so Meta can dedupe.
+
+### Environment
+
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_FACEBOOK_PIXEL_ID` | Client | Pixel ID (default in code) |
+| `FACEBOOK_CAPI_ACCESS_TOKEN` | Server only | Conversions API access token |
+| `FACEBOOK_PIXEL_ID` | Server only | Optional; defaults to public pixel id |
+| `FACEBOOK_CAPI_TEST_EVENT_CODE` | Server only | Events Manager Test Events code |
+
+Without `FACEBOOK_CAPI_ACCESS_TOKEN`, browser Pixel still works; server CAPI is a no-op.
+
+### Test checklist (Events Manager → Test Events)
+
+1. Set `FACEBOOK_CAPI_TEST_EVENT_CODE` on UAT if testing CAPI.
+2. Open the quiz → expect `PageView` + `QuizStart` (not `Lead`).
+3. Complete the quiz through HealthScore ready → expect **`Lead`**.
+4. Optional: LINE CTA success → expect `Subscribe`.
+5. Confirm browser and server rows share the same event id / are deduped.
+
+### Campaign setup
+
+In Ads Manager: objective **Leads**, optimise for the **`Lead`** event (quiz results), not landing-page clicks alone.
+
 ## Affiliate Link Example
 
 ```text

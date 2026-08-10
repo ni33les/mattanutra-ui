@@ -2,6 +2,9 @@
  * Meta (Facebook) Pixel helpers — client-side only.
  * Enable with NEXT_PUBLIC_FACEBOOK_PIXEL_ID (digits). Optional second ID:
  * NEXT_PUBLIC_FACEBOOK_PIXEL_IDS=comma,separated
+ *
+ * Funnel: Lead fires when HealthScore results are ready (healthscore_ready),
+ * not when the quiz is opened. CAPI uses the same event_id for dedupe.
  */
 
 declare global {
@@ -22,6 +25,7 @@ type FacebookPixelFn = {
 
 const SCRIPT_ID = "facebook-fbevents";
 const SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
+const LEAD_ONCE_PREFIX = "mattanutra:fb:lead:";
 
 /**
  * MattaNutra Meta Pixel (public client ID). Env overrides when set on App Platform.
@@ -164,10 +168,16 @@ export type FacebookStandardEvent =
   | "Contact"
   | "Subscribe";
 
+export type TrackFacebookEventOptions = Readonly<{
+  custom?: boolean;
+  /** Meta browser/server dedupe key (eventID). */
+  eventID?: string;
+}>;
+
 export async function trackFacebookEvent(
   event: FacebookStandardEvent | string,
   params?: Record<string, unknown>,
-  options?: { custom?: boolean }
+  options?: TrackFacebookEventOptions
 ) {
   if (typeof window === "undefined" || !facebookPixelEnabled()) {
     return;
@@ -179,16 +189,53 @@ export async function trackFacebookEvent(
     return;
   }
 
+  const payload = params || {};
+  const eventOptions = options?.eventID
+    ? { eventID: options.eventID }
+    : undefined;
+
   if (options?.custom) {
-    fbq("trackCustom", event, params || {});
+    if (eventOptions) {
+      fbq("trackCustom", event, payload, eventOptions);
+    } else {
+      fbq("trackCustom", event, payload);
+    }
     return;
   }
 
-  fbq("track", event, params || {});
+  if (eventOptions) {
+    fbq("track", event, payload, eventOptions);
+  } else {
+    fbq("track", event, payload);
+  }
 }
 
 export async function trackFacebookPageView(params?: Record<string, unknown>) {
   await trackFacebookEvent("PageView", params);
+}
+
+/**
+ * Prevent double Lead for the same plan in one browser session (refresh / back).
+ * Returns true if this is the first Lead claim for the plan (or no planId).
+ */
+export function claimFacebookLeadOnce(planId: string | null | undefined) {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  const key = planId?.trim()
+    ? `${LEAD_ONCE_PREFIX}${planId.trim()}`
+    : `${LEAD_ONCE_PREFIX}anonymous`;
+
+  try {
+    if (window.sessionStorage.getItem(key)) {
+      return false;
+    }
+    window.sessionStorage.setItem(key, "1");
+    return true;
+  } catch {
+    return true;
+  }
 }
 
 /** Map internal BPM / funnel events → Meta standard or custom events. */
@@ -201,20 +248,26 @@ export function facebookEventForInternal(
       return { event: "PageView" };
     case "library_article_viewed":
     case "legal_page_viewed":
+    case "formulation_page_viewed":
       return { event: "ViewContent" };
     case "assessment_viewed":
     case "chat_view":
     case "assessment_started":
     case "chat_start":
-      return { event: "InitiateCheckout" };
+      return { event: "QuizStart", custom: true };
+    case "email_capture":
+      return { event: "EmailCapture", custom: true };
     case "assessment_submitted":
     case "chat_complete":
+      return { event: "QuizSubmitted", custom: true };
+    // Primary ad optimisation goal: results ready (not quiz open).
+    case "healthscore_ready":
       return { event: "Lead" };
     case "healthscore_viewed":
-    case "healthscore_ready":
-      return { event: "CompleteRegistration" };
-    case "formulation_page_viewed":
       return { event: "ViewContent" };
+    case "line_connected":
+    case "customer_line_connected":
+      return { event: "Subscribe" };
     case "retail_product_checkout_viewed":
       return { event: "InitiateCheckout" };
     case "payment_succeeded":

@@ -8,7 +8,6 @@ import {
   facebookPixelEnabled,
   getFacebookPixelIds,
   initFacebookPixel,
-  trackFacebookEvent,
   trackFacebookPageView
 } from "@/lib/facebook-pixel";
 import { localeRoutePattern, type Locale } from "@/lib/i18n";
@@ -72,16 +71,14 @@ function contentCategoryForPath(pathname: string) {
 }
 
 /**
- * Meta Pixel install matching the official base code:
- *   fbq('init', '27629903823308584');
- *   fbq('track', 'PageView');
- * plus SPA PageView + funnel events on client navigations.
+ * Meta Pixel base code (init + first PageView) plus SPA PageView on navigations.
+ * Conversion events (Lead, Subscribe, etc.) fire only from BPM milestones via
+ * trackBpmEvent — not from pathname heuristics.
  */
 export function FacebookPixel({ locale }: Readonly<{ locale: Locale }>) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const lastPageKey = useRef("");
-  const bootstrapped = useRef(false);
   const isAdminPath = new RegExp(`^/(${localePattern})/admin(/|$)`).test(
     pathname
   );
@@ -108,10 +105,7 @@ fbq('track', 'PageView');
       return;
     }
 
-    // Mark primary IDs as initialised for helper tracking after official bootstrap
-    void initFacebookPixel().then(() => {
-      bootstrapped.current = true;
-    });
+    void initFacebookPixel();
   }, [isAdminPath]);
 
   useEffect(() => {
@@ -139,34 +133,6 @@ fbq('track', 'PageView');
       content_category: contentCategoryForPath(pathname),
       locale
     });
-
-    const category = contentCategoryForPath(pathname);
-
-    if (category === "assessment") {
-      void trackFacebookEvent("InitiateCheckout", {
-        content_name: "questionnaire",
-        content_category: "assessment",
-        locale
-      });
-    }
-
-    if (category === "healthscore") {
-      void trackFacebookEvent("CompleteRegistration", {
-        content_name: "healthscore",
-        content_category: "healthscore",
-        locale,
-        status: true
-      });
-    }
-
-    if (category === "library") {
-      void trackFacebookEvent("ViewContent", {
-        content_name: document.title,
-        content_category: "library",
-        content_type: "article",
-        locale
-      });
-    }
   }, [isAdminPath, locale, pathname, searchParams]);
 
   if (isAdminPath || !facebookPixelEnabled() || !primaryId) {
