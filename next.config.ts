@@ -64,7 +64,8 @@ const securityHeaders = [
       isDevelopment
         ? "connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:*"
         : "connect-src 'self' https://api.stripe.com https://checkout.stripe.com https://r.stripe.com",
-      "font-src 'self' data:",
+      // v14 questionnaire HTML loads Prompt/Fraunces from Google Fonts.
+      "font-src 'self' data: https://fonts.gstatic.com",
       "form-action 'self'",
       "frame-ancestors 'none'",
       "frame-src 'self' https://checkout.stripe.com https://hooks.stripe.com https://js.stripe.com",
@@ -74,7 +75,7 @@ const securityHeaders = [
       isDevelopment
         ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
         : "script-src 'self' 'unsafe-inline' https://js.stripe.com",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "worker-src 'self' blob:",
       ...(isDevelopment ? [] : ["upgrade-insecure-requests"])
     ].join("; ")
@@ -120,6 +121,22 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: skipBuildTypecheck
+  },
+  async rewrites() {
+    // Approved v14 HTML is the EN/TH quiz frontend (immutable asset + config inject).
+    // Served via API document route so Next does not wrap React chrome around it.
+    return {
+      beforeFiles: [
+        {
+          source: "/:locale(en|th)/nutrition/quiz",
+          destination: "/api/questionnaire/v14/document?locale=:locale"
+        },
+        {
+          source: "/:locale(en|th)/nutrition/quiz/",
+          destination: "/api/questionnaire/v14/document?locale=:locale"
+        }
+      ]
+    };
   },
   async headers() {
     return [
