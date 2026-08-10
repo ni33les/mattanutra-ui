@@ -375,6 +375,7 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
       ({
         claimFacebookLeadOnce,
         facebookEventForInternal,
+        resolveMattanutraRuntimeEnv,
         trackFacebookEvent
       }) => {
         const mapped = facebookEventForInternal(eventName);
@@ -393,12 +394,17 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
           return;
         }
 
+        const mnEnv = resolveMattanutraRuntimeEnv();
+        // Stamp BPM payload for server CAPI isolation tags (best-effort; request already in flight).
+        properties.mn_env = mnEnv;
+
         const params: Record<string, unknown> = {
           content_name: eventName,
           locale: input.locale,
           plan_id: planId ?? undefined,
           value: input.valueAmount,
           currency: input.valueCurrency,
+          mn_env: mnEnv,
           ...(input.properties || {})
         };
 

@@ -10,7 +10,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   DEFAULT_FACEBOOK_PIXEL_ID,
-  facebookEventForInternal
+  facebookEventForInternal,
+  getPrimaryFacebookPixelId,
+  resolveMattanutraRuntimeEnv
 } from "@/lib/facebook-pixel";
 
 const GRAPH_VERSION = "v21.0";
@@ -35,20 +37,62 @@ export type FacebookCapiEventInput = Readonly<{
   userData?: FacebookCapiUserData;
 }>;
 
+/**
+ * Pixel for CAPI — same isolation rules as browser (UAT cannot inherit PRD default).
+ * Prefer server FACEBOOK_PIXEL_ID, else shared resolver (explicit env / PRD default only).
+ */
 function configuredPixelId() {
-  return (
-    process.env.FACEBOOK_PIXEL_ID?.trim() ||
-    process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID?.trim() ||
-    process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim() ||
-    DEFAULT_FACEBOOK_PIXEL_ID
-  );
+  const runtimeEnv = resolveMattanutraRuntimeEnv();
+  const allowShared =
+    process.env.FACEBOOK_ALLOW_SHARED_PIXEL?.trim() === "true" ||
+    process.env.NEXT_PUBLIC_FACEBOOK_ALLOW_SHARED_PIXEL?.trim() === "true";
+  const serverOnly = process.env.FACEBOOK_PIXEL_ID?.trim() || "";
+
+  if (serverOnly && /^\d{5,20}$/.test(serverOnly)) {
+    // Block PRD default on UAT/dev unless intentionally shared.
+    if (
+      runtimeEnv !== "prd" &&
+      !allowShared &&
+      serverOnly === DEFAULT_FACEBOOK_PIXEL_ID
+    ) {
+      return "";
+    }
+    return serverOnly;
+  }
+
+  return getPrimaryFacebookPixelId();
 }
 
 function configuredAccessToken() {
-  return process.env.FACEBOOK_CAPI_ACCESS_TOKEN?.trim() || "";
+  // Prefer env-specific tokens when set (prevents accidental shared secrets).
+  const runtimeEnv = resolveMattanutraRuntimeEnv();
+  const envSpecific =
+    runtimeEnv === "uat"
+      ? process.env.FACEBOOK_CAPI_ACCESS_TOKEN_UAT?.trim()
+      : runtimeEnv === "prd"
+        ? process.env.FACEBOOK_CAPI_ACCESS_TOKEN_PRD?.trim()
+        : process.env.FACEBOOK_CAPI_ACCESS_TOKEN_DEV?.trim();
+
+  return (
+    envSpecific ||
+    process.env.FACEBOOK_CAPI_ACCESS_TOKEN?.trim() ||
+    ""
+  );
 }
 
 function configuredTestEventCode() {
+  const runtimeEnv = resolveMattanutraRuntimeEnv();
+  if (runtimeEnv === "uat") {
+    return (
+      process.env.FACEBOOK_CAPI_TEST_EVENT_CODE_UAT?.trim() ||
+      process.env.FACEBOOK_CAPI_TEST_EVENT_CODE?.trim() ||
+      ""
+    );
+  }
+  // Never apply a UAT test code on PRD via a shared env by mistake.
+  if (runtimeEnv === "prd") {
+    return process.env.FACEBOOK_CAPI_TEST_EVENT_CODE_PRD?.trim() || "";
+  }
   return process.env.FACEBOOK_CAPI_TEST_EVENT_CODE?.trim() || "";
 }
 
@@ -290,8 +334,15 @@ export async function mirrorBpmEventToFacebookCapi(input: Readonly<{
     return { ok: false as const, reason: "unmapped" as const };
   }
 
+  const props = input.properties ?? {};
+  const mnEnv =
+    (typeof props.mn_env === "string" && props.mn_env.trim()) ||
+    resolveMattanutraRuntimeEnv();
+
   const customData: Record<string, unknown> = {
-    content_name: input.eventName
+    content_name: input.eventName,
+    // Always tag environment so UAT and PRD never look identical in Meta.
+    mn_env: mnEnv
   };
 
   if (input.planId) {
@@ -309,7 +360,6 @@ export async function mirrorBpmEventToFacebookCapi(input: Readonly<{
     customData.currency = input.valueCurrency.trim().toUpperCase();
   }
 
-  const props = input.properties ?? {};
   if (typeof props.content_category === "string") {
     customData.content_category = props.content_category;
   }

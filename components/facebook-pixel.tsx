@@ -4,10 +4,11 @@ import { useEffect, useRef } from "react";
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  DEFAULT_FACEBOOK_PIXEL_ID,
   facebookPixelEnabled,
   getFacebookPixelIds,
+  getPrimaryFacebookPixelId,
   initFacebookPixel,
+  resolveMattanutraRuntimeEnv,
   trackFacebookPageView
 } from "@/lib/facebook-pixel";
 import { localeRoutePattern, type Locale } from "@/lib/i18n";
@@ -20,7 +21,10 @@ export function FacebookPixelNoscript() {
     return null;
   }
 
-  const id = getFacebookPixelIds()[0] || DEFAULT_FACEBOOK_PIXEL_ID;
+  const id = getPrimaryFacebookPixelId();
+  if (!id) {
+    return null;
+  }
 
   return (
     <noscript>
@@ -84,7 +88,7 @@ export function FacebookPixel({ locale }: Readonly<{ locale: Locale }>) {
   );
 
   const pixelIds = getFacebookPixelIds();
-  const primaryId = pixelIds[0] || DEFAULT_FACEBOOK_PIXEL_ID;
+  const primaryId = getPrimaryFacebookPixelId();
 
   // Official bootstrap: init + first PageView (same as Meta snippet)
   const bootstrapScript = `
@@ -131,7 +135,8 @@ fbq('track', 'PageView');
     void trackFacebookPageView({
       content_name: document.title,
       content_category: contentCategoryForPath(pathname),
-      locale
+      locale,
+      mn_env: resolveMattanutraRuntimeEnv()
     });
   }, [isAdminPath, locale, pathname, searchParams]);
 

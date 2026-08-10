@@ -80,16 +80,20 @@ MattaNutra loads the Meta Pixel on customer pages and mirrors key BPM milestones
 
 Browser + server use the same `event_id` (`facebookEventId`) so Meta can dedupe.
 
-### Environment
+### Environment (keep UAT and PRD separate)
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `NEXT_PUBLIC_FACEBOOK_PIXEL_ID` | Client | Pixel ID (default in code) |
-| `FACEBOOK_CAPI_ACCESS_TOKEN` | Server only | Conversions API access token |
-| `FACEBOOK_PIXEL_ID` | Server only | Optional; defaults to public pixel id |
-| `FACEBOOK_CAPI_TEST_EVENT_CODE` | Server only | Events Manager Test Events code |
+| `MATTANUTRA_ENV` / `NEXT_PUBLIC_MATTANUTRA_ENV` | App | `uat` or `prd` — required for isolation |
+| `NEXT_PUBLIC_FACEBOOK_PIXEL_ID` | Client | Pixel ID — **use a different Pixel for UAT vs PRD** |
+| `FACEBOOK_CAPI_ACCESS_TOKEN` or `_UAT` / `_PRD` | Server | CAPI token — **separate per environment** |
+| `FACEBOOK_PIXEL_ID` | Server | Optional server pixel id (same isolation rules) |
+| `FACEBOOK_CAPI_TEST_EVENT_CODE` / `_UAT` | Server UAT | Test Events code (never on PRD) |
+| `FACEBOOK_ALLOW_SHARED_PIXEL=true` | Rare | Opt-in only if UAT must share the production Pixel |
 
-Without `FACEBOOK_CAPI_ACCESS_TOKEN`, browser Pixel still works; server CAPI is a no-op.
+The production default Pixel (`27629903823308584`) is applied **only on PRD**. UAT will not use it unless `FACEBOOK_ALLOW_SHARED_PIXEL=true`. Events are also tagged with `mn_env`.
+
+Without `FACEBOOK_CAPI_ACCESS_TOKEN` (for that env), browser Pixel still works if configured; server CAPI is a no-op.
 
 ### Test checklist (Events Manager → Test Events)
 

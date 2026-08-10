@@ -99,6 +99,7 @@ export async function POST(request: Request) {
     text(attribution.sourceUrl) ||
     request.headers.get("referer");
 
+  // Prefer client mn_env when present; CAPI also resolves server env for isolation.
   void mirrorBpmEventToFacebookCapi({
     email,
     eventName,
@@ -106,7 +107,10 @@ export async function POST(request: Request) {
     facebookEventId,
     planId,
     phone: text(properties.phone) || text(body.phone),
-    properties,
+    properties: {
+      ...properties,
+      mn_env: text(properties.mn_env) || text(body.mn_env)
+    },
     request,
     valueAmount,
     valueCurrency

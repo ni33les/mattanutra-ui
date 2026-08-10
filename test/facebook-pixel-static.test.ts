@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { describe, it } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import {
+  DEFAULT_FACEBOOK_PIXEL_ID,
   facebookEventForInternal,
   facebookPixelEnabled,
-  getFacebookPixelIds
+  getFacebookPixelIds,
+  getPrimaryFacebookPixelId,
+  resolveMattanutraRuntimeEnv
 } from "../lib/facebook-pixel.ts";
 import {
   hashEmailForFacebook,
@@ -13,6 +16,37 @@ import {
   normalisePhoneForFacebook,
   sha256Hex
 } from "../lib/facebook-capi.ts";
+
+const env = process.env as Record<string, string | undefined>;
+
+function withEnv(
+  overrides: Record<string, string | undefined>,
+  run: () => void
+) {
+  const keys = Object.keys(overrides);
+  const previous: Record<string, string | undefined> = {};
+  for (const key of keys) {
+    previous[key] = env[key];
+    const next = overrides[key];
+    if (next === undefined) {
+      delete env[key];
+    } else {
+      env[key] = next;
+    }
+  }
+  try {
+    run();
+  } finally {
+    for (const key of keys) {
+      const prev = previous[key];
+      if (prev === undefined) {
+        delete env[key];
+      } else {
+        env[key] = prev;
+      }
+    }
+  }
+}
 
 describe("facebook pixel mapping", () => {
   it("maps funnel BPM events so Lead means results ready", () => {
@@ -48,9 +82,72 @@ describe("facebook pixel mapping", () => {
     assert.equal(facebookEventForInternal("random_internal_event"), null);
   });
 
-  it("uses the MattaNutra default pixel id when env is unset", () => {
-    assert.equal(facebookPixelEnabled(), true);
-    assert.ok(getFacebookPixelIds().includes("27629903823308584"));
+  it("uses the production default pixel only on prd when env is unset", () => {
+    withEnv(
+      {
+        MATTANUTRA_ENV: "prd",
+        NEXT_PUBLIC_MATTANUTRA_ENV: "prd",
+        NEXT_PUBLIC_FACEBOOK_PIXEL_ID: undefined,
+        NEXT_PUBLIC_META_PIXEL_ID: undefined,
+        FACEBOOK_PIXEL_ID: undefined,
+        FACEBOOK_ALLOW_SHARED_PIXEL: undefined,
+        NEXT_PUBLIC_FACEBOOK_ALLOW_SHARED_PIXEL: undefined
+      },
+      () => {
+        assert.equal(resolveMattanutraRuntimeEnv(), "prd");
+        assert.equal(facebookPixelEnabled(), true);
+        assert.ok(getFacebookPixelIds().includes(DEFAULT_FACEBOOK_PIXEL_ID));
+      }
+    );
+  });
+
+  it("does not send UAT into the production default pixel", () => {
+    withEnv(
+      {
+        MATTANUTRA_ENV: "uat",
+        NEXT_PUBLIC_MATTANUTRA_ENV: "uat",
+        NEXT_PUBLIC_FACEBOOK_PIXEL_ID: DEFAULT_FACEBOOK_PIXEL_ID,
+        FACEBOOK_PIXEL_ID: DEFAULT_FACEBOOK_PIXEL_ID,
+        FACEBOOK_ALLOW_SHARED_PIXEL: undefined,
+        NEXT_PUBLIC_FACEBOOK_ALLOW_SHARED_PIXEL: undefined
+      },
+      () => {
+        assert.equal(resolveMattanutraRuntimeEnv(), "uat");
+        assert.equal(facebookPixelEnabled(), false);
+        assert.equal(getPrimaryFacebookPixelId(), "");
+      }
+    );
+  });
+
+  it("allows a dedicated UAT pixel id", () => {
+    withEnv(
+      {
+        MATTANUTRA_ENV: "uat",
+        NEXT_PUBLIC_MATTANUTRA_ENV: "uat",
+        NEXT_PUBLIC_FACEBOOK_PIXEL_ID: "111111111111111",
+        FACEBOOK_ALLOW_SHARED_PIXEL: undefined
+      },
+      () => {
+        assert.equal(resolveMattanutraRuntimeEnv(), "uat");
+        assert.equal(facebookPixelEnabled(), true);
+        assert.deepEqual(getFacebookPixelIds(), ["111111111111111"]);
+      }
+    );
+  });
+
+  it("allows shared production pixel on UAT only with explicit opt-in", () => {
+    withEnv(
+      {
+        MATTANUTRA_ENV: "uat",
+        NEXT_PUBLIC_MATTANUTRA_ENV: "uat",
+        NEXT_PUBLIC_FACEBOOK_PIXEL_ID: DEFAULT_FACEBOOK_PIXEL_ID,
+        FACEBOOK_ALLOW_SHARED_PIXEL: "true"
+      },
+      () => {
+        assert.equal(facebookPixelEnabled(), true);
+        assert.ok(getFacebookPixelIds().includes(DEFAULT_FACEBOOK_PIXEL_ID));
+      }
+    );
   });
 
   it("is wired into the locale layout with noscript fallback", () => {
@@ -70,12 +167,14 @@ describe("facebook pixel mapping", () => {
     assert.match(pixel, /fbq\('track', 'PageView'\)/);
     assert.match(pixel, /connect\.facebook\.net\/en_US\/fbevents\.js/);
     assert.match(pixel, /www\.facebook\.com\/tr\?id=/);
-    assert.match(pixel, /DEFAULT_FACEBOOK_PIXEL_ID/);
+    assert.match(pixel, /getPrimaryFacebookPixelId|getFacebookPixelIds/);
     const helper = readFileSync(
       new URL("../lib/facebook-pixel.ts", import.meta.url),
       "utf8"
     );
     assert.match(helper, /27629903823308584/);
+    assert.match(helper, /resolveMattanutraRuntimeEnv/);
+    assert.match(helper, /FACEBOOK_ALLOW_SHARED_PIXEL|ALLOW_SHARED/);
     // Conversions must not fire from path alone.
     assert.doesNotMatch(pixel, /trackFacebookEvent\("Lead"/);
     assert.doesNotMatch(pixel, /trackFacebookEvent\("CompleteRegistration"/);
@@ -92,6 +191,7 @@ describe("facebook pixel mapping", () => {
     assert.match(bpm, /facebookEventId/);
     assert.match(bpm, /eventID: facebookEventId/);
     assert.match(bpm, /claimFacebookLeadOnce/);
+    assert.match(bpm, /mn_env/);
   });
 
   it("supports eventID on the browser pixel helper", () => {
@@ -103,13 +203,20 @@ describe("facebook pixel mapping", () => {
     assert.match(helper, /trackCustom[\s\S]*eventID|eventID[\s\S]*trackCustom/);
   });
 
-  it("wires server CAPI from the BPM route", () => {
+  it("wires server CAPI from the BPM route with env isolation helpers", () => {
     const route = readFileSync(
       new URL("../app/api/bpm/route.ts", import.meta.url),
       "utf8"
     );
     assert.match(route, /mirrorBpmEventToFacebookCapi/);
     assert.match(route, /facebookEventId/);
+    const capi = readFileSync(
+      new URL("../lib/facebook-capi.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(capi, /mn_env/);
+    assert.match(capi, /FACEBOOK_CAPI_ACCESS_TOKEN_UAT|ACCESS_TOKEN_UAT/);
+    assert.match(capi, /resolveMattanutraRuntimeEnv/);
   });
 
   it("fires line_connected after LINE connect success", () => {
