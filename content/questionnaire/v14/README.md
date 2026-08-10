@@ -1,35 +1,35 @@
-# Questionnaire v14 (immutable frontend)
+# Questionnaire v14 (reference asset)
 
-**Source of truth:** `V14_Questionnaire_v3_EN_TH_Final_v1.html` (from business package `files/qv14.zip`).
+**Approved package:** `V14_Questionnaire_v3_EN_TH_Final_v1.html` (from business package `files/qv14.zip`).
 
-## Rules
+## Role in the codebase
 
-- Do **not** regenerate, rewrite, retranslate, or re-port this HTML via an LLM.
-- Do **not** rename question keys or option values.
-- Thai and English strings in this file are the approved production copy.
+This HTML is a **reference / content source of truth** for the approved EN/TH
+questionnaire UX and copy. It is **not served** in production.
 
-## Integration (IT only)
+Production quiz routes (`/en/nutrition/quiz`, `/th/nutrition/quiz`) use the
+React `ChatQuestionnaire` stack:
 
-At serve time (`lib/questionnaire/v14/serve.ts`) we inject only:
+- Content: `content/questionnaire/v6/{en,th,welcome}.json`
+- Engine: `lib/questionnaire/*`
+- UI: `components/chat-questionnaire/*`
+- Page: `app/[locale]/nutrition/quiz/page.tsx`
 
-- `MN_CONFIG.endpoint` → `/api/questionnaire/v14/submit`
-- `MN_CONFIG.trackEndpoint` → `/api/questionnaire/v14/track`
-- Logo placeholder → `/v15/logo.png` **only if** the package still contains the placeholder string
+When business delivers an updated HTML package, port carefully into the React
+content + components — do not reintroduce an HTML document route or Next rewrite.
 
-EN/TH quiz URLs rewrite to this document (`next.config.ts` beforeFiles).
+## Port rules
+
+- Preserve question keys (`k`) and option values (`v`).
+- Prefer approved EN/TH strings from this package for copy parity.
+- Product exception: sex question uses **“What is your sex?”** /
+  **“เพศของคุณคือ”** (never “sex at birth” / “เพศกำเนิด”).
+- Do not auto-click begin/start via regex; welcome CTA is explicit.
+- Site `TitleBar` owns brand + language chrome (no double header in welcome).
 
 ## Integrity
 
 ```bash
 sha256sum V14_Questionnaire_v3_EN_TH_Final_v1.html
 # must match V14_Questionnaire_v3_EN_TH_Final_v1.html.sha256
-```
-
-## Verify after deploy
-
-In browser console on `/en/nutrition/quiz` or `/th/nutrition/quiz`:
-
-```js
-MattaNutraProductionReadiness()
-// both endpoints should be true
 ```

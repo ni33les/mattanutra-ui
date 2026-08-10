@@ -15,21 +15,12 @@ import { getAssessmentResumeDraft } from "@/lib/assessment-resume-store";
 import { localizedRouteMetadata } from "@/lib/seo";
 
 /**
- * Production EN/TH quiz is the approved v14 HTML document
- * (rewritten in next.config to /api/questionnaire/v14/document).
- * This page remains the fallback for zh-CN and emergency React rollback.
+ * Production quiz is the React ChatQuestionnaire (v6 schema + v14 UX/copy).
+ * Source content lives in content/questionnaire/v6; the approved HTML under
+ * content/questionnaire/v14 is a reference asset only (not served).
  *
- * Force React for EN/TH only with NEXT_PUBLIC_QUESTIONNAIRE_V14_HTML=0.
- * Chat kill-switch: NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6=0
+ * Chat kill-switch: NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6=0 (falls back to AssessmentFlow).
  */
-function v14HtmlEnabled(locale: Locale) {
-  const flag = process.env.NEXT_PUBLIC_QUESTIONNAIRE_V14_HTML;
-  if (flag === "0" || flag === "false") {
-    return false;
-  }
-  return locale === "en" || locale === "th";
-}
-
 function chatQuestionnaireEnabled(locale: Locale) {
   const flag =
     process.env.NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6 ??
@@ -138,15 +129,6 @@ export default async function NutritionQuizPage({
   const prefill = effectivePlanId && !resumeDraft
     ? await getStoredAssessmentPrefill(effectivePlanId)
     : null;
-
-  // EN/TH production path is the v14 HTML rewrite (next.config beforeFiles).
-  // If that rewrite is disabled, this page remains a React fallback.
-  if (v14HtmlEnabled(locale)) {
-    // Rewrite should have handled the request. If we still land here (e.g. RSC
-    // prefetch edge case), render a minimal client navigation to the document API
-    // is unnecessary — rewrite handles navigations. Fall through to React only when
-    // explicitly disabled via flag.
-  }
 
   const useChat = chatQuestionnaireEnabled(locale);
 

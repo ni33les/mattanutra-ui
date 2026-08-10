@@ -119,10 +119,13 @@ describe("questionnaire v14 UX on v6 schema", () => {
     const extra = [
       join(root, "components/assessment-flow-copy-en.ts"),
       join(root, "components/assessment-flow-copy-th.ts"),
-      join(root, "components/assessment-flow-copy-zh-cn.ts"),
-      join(root, "files/v14.html")
+      join(root, "components/assessment-flow-copy-zh-cn.ts")
     ];
-    const files = [...dirs.flatMap((d) => walkSources(d)), ...extra];
+    // Live React sources only — content/questionnaire/v14 HTML is reference-only
+    // and may contain legacy “sex at birth” wording from the business package.
+    const files = [...dirs.flatMap((d) => walkSources(d)), ...extra].filter(
+      (file) => !file.includes(`${join("content", "questionnaire", "v14")}`)
+    );
     for (const file of files) {
       const source = readFileSync(file, "utf8");
       assert.doesNotMatch(source, /sex at birth/i, file);

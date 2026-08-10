@@ -47,8 +47,38 @@
     "calcSend": "Send when ready",
     "calcEmailPlaceholder": "Email",
     "calcEmailThanks": "Email saved ✓ — we'll send your HealthScore when ready.",
-    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your medicines or supplements.",
-    "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved."
+    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your supplements.",
+    "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved.",
+    "trust": [
+      {
+        "title": "Founders with 100+ years' combined experience",
+        "body": "Medicine · Science · Technology"
+      },
+      {
+        "title": "Formal education & training",
+        "body": "Mahidol · Princeton · Stanford · Harvard"
+      },
+      {
+        "title": "Dispensed by local pharmacists",
+        "body": "Through licensed Thai pharmacy partners"
+      }
+    ],
+    "steps": [
+      {
+        "title": "Answer",
+        "body": "Six short sections"
+      },
+      {
+        "title": "See your free HealthScore",
+        "body": "Your patterns and priorities"
+      },
+      {
+        "title": "Choose your Right Formula",
+        "body": "If you wish, receive your personalised Right Formula."
+      }
+    ],
+    "calcSendWhenReady": "Send when ready",
+    "calcThanks": "Thank you"
   },
   "th": {
     "badge": "HealthScore ส่วนบุคคลฟรีของคุณ",
@@ -78,8 +108,8 @@
     "mascotAlt": "น้องมัทต้าต้อนรับคุณ",
     "trustAria": "ทำไมจึงวางใจ MattaNutra",
     "journeyAria": "ขั้นตอนการใช้งาน",
-    "reviewBtn": "ตรวจคำตอบ",
-    "reviewTitle": "ตรวจคำตอบของคุณ",
+    "reviewBtn": "ตรวจทานคำตอบ",
+    "reviewTitle": "ตรวจทานคำตอบของคุณ",
     "reviewEdit": "แก้ไข",
     "reviewClose": "ปิด",
     "reviewEmpty": "ยังไม่มีคำตอบ",
@@ -99,7 +129,37 @@
     "calcEmailPlaceholder": "อีเมล",
     "calcEmailThanks": "บันทึกอีเมลแล้ว ✓ — จะส่ง HealthScore ให้เมื่อพร้อมค่ะ",
     "calcDisclaimer": "แบบประเมินนี้ใช้เพื่อสนับสนุนสุขภาพทั่วไป ไม่ใช่การวินิจฉัยหรือการรักษา และไม่ใช่คำแนะนำให้เริ่มหรือหยุดยา โปรดปรึกษาแพทย์หรือเภสัชกรก่อนปรับเปลี่ยนยาและอาหารเสริมนะคะ",
-    "calcError": "การสร้าง HealthScore ใช้เวลานานกว่าที่คาด แต่คำตอบของคุณได้รับการบันทึกไว้อย่างปลอดภัยแล้วค่ะ"
+    "calcError": "การสร้าง HealthScore ใช้เวลานานกว่าที่คาด แต่คำตอบของคุณได้รับการบันทึกไว้อย่างปลอดภัยแล้วค่ะ",
+    "trust": [
+      {
+        "title": "ทีมผู้ก่อตั้งมีประสบการณ์รวมกันมากกว่า 100 ปี",
+        "body": "การแพทย์ · วิทยาศาสตร์ · เทคโนโลยี"
+      },
+      {
+        "title": "ผ่านการศึกษาและฝึกอบรมจากสถาบันชั้นนำ",
+        "body": "มหิดล · พรินซ์ตัน · สแตนฟอร์ด · ฮาร์วาร์ด"
+      },
+      {
+        "title": "ดูแลโดยเภสัชกรในพื้นที่",
+        "body": "ผ่านร้านขายยาคู่ค้าที่ได้รับอนุญาตในประเทศไทย"
+      }
+    ],
+    "steps": [
+      {
+        "title": "ตอบคำถาม",
+        "body": "6 ส่วนสั้น ๆ"
+      },
+      {
+        "title": "ดู HealthScore ฟรี",
+        "body": "รูปแบบและจุดสำคัญของคุณ"
+      },
+      {
+        "title": "เลือก Right Formula",
+        "body": "หากคุณต้องการ รับ Right Formula เฉพาะบุคคลของคุณ"
+      }
+    ],
+    "calcSendWhenReady": "ส่งให้เมื่อพร้อม",
+    "calcThanks": "ขอบคุณค่ะ"
   },
   "zh": {
     "badge": "您的免费个人 HealthScore",
@@ -149,7 +209,37 @@
     "calcSend": "Send when ready",
     "calcEmailPlaceholder": "Email",
     "calcEmailThanks": "Email saved ✓ — we'll send your HealthScore when ready.",
-    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your medicines or supplements.",
-    "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved."
+    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your supplements.",
+    "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved.",
+    "trust": [
+      {
+        "title": "创始团队拥有超过 100 年综合经验",
+        "body": "医学 · 科学 · 技术"
+      },
+      {
+        "title": "正规教育与专业培训",
+        "body": "玛希隆 · 普林斯顿 · 斯坦福 · 哈佛"
+      },
+      {
+        "title": "由当地药剂师配发",
+        "body": "通过持牌泰国合作药房"
+      }
+    ],
+    "steps": [
+      {
+        "title": "回答",
+        "body": "六个简短部分"
+      },
+      {
+        "title": "查看免费 HealthScore",
+        "body": "您的健康模式与重点"
+      },
+      {
+        "title": "选择 Right Formula",
+        "body": "如您愿意，可获得您的个性化 Right Formula。"
+      }
+    ],
+    "calcSendWhenReady": "Send when ready",
+    "calcThanks": "Thank you"
   }
 }

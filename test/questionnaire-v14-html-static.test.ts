@@ -1,34 +1,72 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import {
-  buildV14HtmlDocument,
-  expectedV14HtmlSha256FromFile,
-  readV14HtmlSource,
-  v14HtmlSha256,
-  V14_HTML_RELATIVE_PATH,
-  V14_LOGO_SRC
-} from "../lib/questionnaire/v14/serve.ts";
 
 const root = process.cwd();
+const V14_DIR = join(root, "content/questionnaire/v14");
+const V14_HTML = join(
+  V14_DIR,
+  "V14_Questionnaire_v3_EN_TH_Final_v1.html"
+);
+const V14_SHA = join(
+  V14_DIR,
+  "V14_Questionnaire_v3_EN_TH_Final_v1.html.sha256"
+);
 
-describe("questionnaire v14 immutable HTML", () => {
-  it("vendors the approved HTML with a matching sha256 checksum", () => {
-    const path = join(root, V14_HTML_RELATIVE_PATH);
-    assert.equal(existsSync(path), true);
-    const expected = expectedV14HtmlSha256FromFile();
-    assert.ok(expected.length === 64, "checksum file should contain sha256");
-    assert.equal(v14HtmlSha256(), expected);
+describe("questionnaire v14 HTML as reference-only asset", () => {
+  it("keeps the approved HTML with matching sha256 (not served)", () => {
+    assert.equal(existsSync(V14_HTML), true);
+    assert.equal(existsSync(V14_SHA), true);
+    const expected = readFileSync(V14_SHA, "utf8").trim().split(/\s+/)[0];
+    assert.equal(expected.length, 64);
+    const actual = createHash("sha256")
+      .update(readFileSync(V14_HTML))
+      .digest("hex");
+    assert.equal(actual, expected);
+  });
+
+  it("documents reference-only role (no HTML document serve path)", () => {
+    const readme = readFileSync(join(V14_DIR, "README.md"), "utf8");
+    assert.match(readme, /reference/i);
+    assert.match(readme, /not served/i);
+    assert.match(readme, /ChatQuestionnaire|React/i);
+
     assert.equal(
-      createHash("sha256").update(readFileSync(path)).digest("hex"),
-      expected
+      existsSync(join(root, "app/api/questionnaire/v14")),
+      false,
+      "v14 document/submit/track API routes must not exist"
+    );
+    assert.equal(
+      existsSync(join(root, "lib/questionnaire/v14")),
+      false,
+      "v14 serve/adapter lib must not exist"
+    );
+
+    const nextConfig = readFileSync(join(root, "next.config.ts"), "utf8");
+    assert.doesNotMatch(
+      nextConfig,
+      /\/api\/questionnaire\/v14\/document/
+    );
+    assert.doesNotMatch(
+      nextConfig,
+      /source:\s*"\/:locale\(en\|th\)\/nutrition\/quiz"/
     );
   });
 
-  it("keeps MN_CONFIG, readiness helper, and HealthScore-ready contract", () => {
-    const html = readV14HtmlSource();
+  it("quiz page renders React ChatQuestionnaire for EN/TH", () => {
+    const page = readFileSync(
+      join(root, "app/[locale]/nutrition/quiz/page.tsx"),
+      "utf8"
+    );
+    assert.match(page, /ChatQuestionnaire/);
+    assert.doesNotMatch(page, /v14HtmlEnabled|QUESTIONNAIRE_V14_HTML/);
+    assert.doesNotMatch(page, /buildV14HtmlDocument|v14\/document/);
+  });
+
+  it("keeps approved pack contracts inside the reference HTML", () => {
+    const html = readFileSync(V14_HTML, "utf8");
     assert.match(
       html,
       /const MN_CONFIG = \{ endpoint: '', trackEndpoint: '', version: 'v6-conversational' \};/
@@ -36,76 +74,6 @@ describe("questionnaire v14 immutable HTML", () => {
     assert.match(html, /MattaNutraProductionReadiness/);
     assert.match(html, /MattaNutraHealthScoreReady/);
     assert.match(html, /healthScoreUrl/);
-    assert.match(html, /healthscoreUrl/);
-    assert.match(html, /resultUrl/);
-    assert.match(html, /mn:healthscore-email-request/);
     assert.match(html, /mn_state_v5/);
-    assert.match(html, /\/en\/privacy/);
-    assert.match(html, /\/th\/privacy/);
-    assert.match(html, /MN_LOGO=/);
-  });
-
-  it("injects only endpoints at serve time (source stays unconfigured)", () => {
-    const served = buildV14HtmlDocument({
-      locale: "en",
-      origin: "https://uat.mattanutra.com"
-    });
-    assert.match(
-      served,
-      /endpoint: 'https:\/\/uat\.mattanutra\.com\/api\/questionnaire\/v14\/submit'/
-    );
-    assert.match(
-      served,
-      /trackEndpoint: 'https:\/\/uat\.mattanutra\.com\/api\/questionnaire\/v14\/track'/
-    );
-    // Source file remains unconfigured
-    const source = readV14HtmlSource();
-    assert.match(
-      source,
-      /const MN_CONFIG = \{ endpoint: '', trackEndpoint: '', version: 'v6-conversational' \};/
-    );
-    assert.doesNotMatch(
-      source,
-      /endpoint: 'https:\/\/uat\.mattanutra\.com/
-    );
-  });
-
-  it("wires document + submit + track API routes", () => {
-    const documentRoute = readFileSync(
-      join(root, "app/api/questionnaire/v14/document/route.ts"),
-      "utf8"
-    );
-    const submitRoute = readFileSync(
-      join(root, "app/api/questionnaire/v14/submit/route.ts"),
-      "utf8"
-    );
-    const trackRoute = readFileSync(
-      join(root, "app/api/questionnaire/v14/track/route.ts"),
-      "utf8"
-    );
-    const nextConfig = readFileSync(join(root, "next.config.ts"), "utf8");
-
-    assert.match(documentRoute, /buildV14HtmlDocument/);
-    assert.match(submitRoute, /submitV14Questionnaire/);
-    assert.match(trackRoute, /trackV14Event/);
-    assert.match(
-      nextConfig,
-      /source: "\/:locale\(en\|th\)\/nutrition\/quiz"/
-    );
-    assert.match(
-      nextConfig,
-      /destination: "\/api\/questionnaire\/v14\/document\?locale=:locale"/
-    );
-  });
-
-  it("adapter returns healthScoreUrl and persists answers as-is", () => {
-    const adapter = readFileSync(
-      join(root, "lib/questionnaire/v14/adapter.ts"),
-      "utf8"
-    );
-    assert.match(adapter, /healthScoreUrl/);
-    assert.match(adapter, /persistAssessmentSubmission/);
-    assert.match(adapter, /computeHealthScore\(answers/);
-    assert.match(adapter, /payload\.answers/);
   });
 });
