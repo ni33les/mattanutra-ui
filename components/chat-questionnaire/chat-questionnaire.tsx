@@ -45,9 +45,10 @@ const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const CALC_FALLBACK_MS = 15_000;
 const TYPE_MS = 280;
 /** Stage overlay: enter → hold image → exit (totals ~1.65s — snappier, still smooth). */
-const STAGE_ENTER_MS = 300;
-const STAGE_HOLD_MS = 1100;
-const STAGE_EXIT_MS = 280;
+/** v14 HTML STAGE_MS ≈ 950ms total show time for section / finish overlays. */
+const STAGE_ENTER_MS = 180;
+const STAGE_HOLD_MS = 550;
+const STAGE_EXIT_MS = 220;
 const UX_VERSION = "v14-landing";
 const DELIVERY_EMAIL_KEY = "mn_healthscore_delivery_email";
 
@@ -494,16 +495,8 @@ export function ChatQuestionnaire({
 
   useEffect(() => () => clearStageTimers(), [clearStageTimers]);
 
-  const showStageFlash = useCallback(
-    (sectionIndex: number) => {
-      const def = getDefinition(
-        state ?? createInitialState({ locale, channel: "web" })
-      );
-      const section = def.sections[sectionIndex];
-      if (!section) {
-        return Promise.resolve();
-      }
-
+  const showStageOverlay = useCallback(
+    (payload: { pose: string; eyebrow: string; title: string }) => {
       if (prefersReducedMotion()) {
         return Promise.resolve();
       }
@@ -511,24 +504,18 @@ export function ChatQuestionnaire({
       clearStageTimers();
 
       return new Promise<void>((resolve) => {
-        const payload = {
-          pose: section.pose || "open",
-          eyebrow: section.eyebrow,
-          title: section.title
-        };
-
         // 1) Mount at rest (opacity 0) so the next frame can transition in.
         setStageFlash({ ...payload, phase: "prep" });
 
         const enterRaf = window.requestAnimationFrame(() => {
           const enterRaf2 = window.requestAnimationFrame(() => {
-            // 2) Smooth fade/scale in and hold the image.
+            // 2) Fade/scale in and hold (total ≈ HTML STAGE_MS 950ms).
             setStageFlash({ ...payload, phase: "hold" });
           });
           stageTimers.current.push(enterRaf2);
         });
 
-        // 3) After a longer hold, fade out, then unmount.
+        // 3) Fade out, then unmount.
         const exitTimer = window.setTimeout(() => {
           setStageFlash({ ...payload, phase: "exit" });
         }, STAGE_ENTER_MS + STAGE_HOLD_MS);
@@ -542,8 +529,39 @@ export function ChatQuestionnaire({
         stageTimers.current = [enterRaf, exitTimer, doneTimer];
       });
     },
-    [clearStageTimers, locale, state]
+    [clearStageTimers]
   );
+
+  const showStageFlash = useCallback(
+    (sectionIndex: number) => {
+      const def = getDefinition(
+        state ?? createInitialState({ locale, channel: "web" })
+      );
+      const section = def.sections[sectionIndex];
+      if (!section) {
+        return Promise.resolve();
+      }
+
+      return showStageOverlay({
+        pose: section.pose || "open",
+        eyebrow: section.eyebrow,
+        title: section.title
+      });
+    },
+    [locale, showStageOverlay, state]
+  );
+
+  /** v14 finish(): showStage('wai', '', stageDone) before done/calc screen. */
+  const showFinishStage = useCallback(() => {
+    const def = getDefinition(
+      state ?? createInitialState({ locale, channel: "web" })
+    );
+    return showStageOverlay({
+      pose: "wai",
+      eyebrow: "",
+      title: def.ui.stageDone || (locale === "th" ? "ขอบคุณค่ะ 🙏" : "Thank you 🙏")
+    });
+  }, [locale, showStageOverlay, state]);
 
   const finalize = useCallback(
     async (completed: QuestionnaireState) => {
@@ -647,7 +665,7 @@ export function ChatQuestionnaire({
       events: readonly QuestionnaireEvent[]
     ) => {
       const partBreak = events.find((e) => e.type === "chat_part_break");
-      // Hold the stage fully (enter → hold → exit) before revealing next turns
+      // Section stage only on true part boundaries (engine chat_part_break).
       if (partBreak && partBreak.type === "chat_part_break") {
         await showStageFlash(partBreak.sectionIndex);
       }
@@ -677,10 +695,19 @@ export function ChatQuestionnaire({
 
       if (next.phase === "complete" && !finalizing.current) {
         finalizing.current = true;
+        // Match HTML finish() stage before calculating / done screen.
+        await showFinishStage();
         await finalize(next);
       }
     },
-    [finalize, persistCheckpoint, showStageFlash, state?.log.length, track]
+    [
+      finalize,
+      persistCheckpoint,
+      showFinishStage,
+      showStageFlash,
+      state?.log.length,
+      track
+    ]
   );
 
   function beginFromWelcome() {
@@ -1481,7 +1508,9 @@ export function ChatQuestionnaire({
           <div className="mn-quiz-stage__card">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={nongPoseSrc(stageFlash.pose)} alt="" />
-            <div className="mn-quiz-stage__eyebrow">{stageFlash.eyebrow}</div>
+            {stageFlash.eyebrow ? (
+              <div className="mn-quiz-stage__eyebrow">{stageFlash.eyebrow}</div>
+            ) : null}
             <div className="mn-quiz-stage__title">{stageFlash.title}</div>
           </div>
         </div>

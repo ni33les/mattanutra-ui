@@ -68,6 +68,46 @@ describe("questionnaire engine v6", () => {
     assert.match(th.assessedOf, /\{n\} จาก 6/);
   });
 
+  it("emits section stage part_break only when section index increases", () => {
+    let { state } = startQuestionnaire(
+      createInitialState({ locale: "en", channel: "web" })
+    );
+    // firstName (sec 0, nosec) → goals (sec 0): section card, no part_break stage
+    const r1 = applyAnswer(state, "firstName", "Alex");
+    assert.equal(r1.ok, true);
+    if (!r1.ok) {
+      return;
+    }
+    assert.ok(!r1.events.some((e) => e.type === "chat_part_break"));
+    assert.ok(r1.state.log.some((m) => m.kind === "section" && m.sectionIndex === 0));
+    state = r1.state;
+
+    // Drive to end of sec 0 essentials is heavy; jump via sex if reachable after goals+symptoms
+    const goals = applyAnswer(state, "goals", ["energy", "sleep"]);
+    assert.equal(goals.ok, true);
+    if (!goals.ok) {
+      return;
+    }
+    state = goals.state;
+    const symptoms = applyAnswer(state, "symptoms", ["great"]);
+    assert.equal(symptoms.ok, true);
+    if (!symptoms.ok) {
+      return;
+    }
+    // symptoms → sex crosses sec 0 → sec 1
+    assert.ok(
+      symptoms.events.some(
+        (e) => e.type === "chat_part_break" && e.sectionIndex === 1
+      ),
+      "expected part_break for Part 2 (About you)"
+    );
+    assert.ok(
+      symptoms.events.some(
+        (e) => e.type === "chat_section_done" && e.sectionIndex === 0
+      )
+    );
+  });
+
   it("shows Part 1 section after firstName, then goals, keeping prior chat", () => {
     let { state } = startQuestionnaire(
       createInitialState({ locale: "en", channel: "agent" })

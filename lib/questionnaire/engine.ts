@@ -984,7 +984,12 @@ function advanceFrom(
   }
 
   if (needsSectionIntro) {
-    events.push({ type: "chat_part_break", sectionIndex: nextTurn.sec });
+    // v14 HTML only shows the stage overlay when section index increases
+    // (lastSec >= 0 && t.sec > lastSec) — not for the first in-section card
+    // after a nosec warm-up (firstName → goals, both sec 0).
+    if (nextTurn.sec !== current.sec) {
+      events.push({ type: "chat_part_break", sectionIndex: nextTurn.sec });
+    }
     next = appendLog(next, [sectionMessage(definition, nextTurn.sec)]);
   }
 

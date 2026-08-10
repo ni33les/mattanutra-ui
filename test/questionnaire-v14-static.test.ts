@@ -170,6 +170,36 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.match(titleBar, /isQuiz/);
   });
 
+  it("aligns section stage overlays with v14 HTML behaviour", () => {
+    const chat = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.tsx"),
+      "utf8"
+    );
+    const css = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.css"),
+      "utf8"
+    );
+    const engine = readFileSync(join(root, "lib/questionnaire/engine.ts"), "utf8");
+
+    // Timing constants sum to HTML STAGE_MS (~950)
+    assert.match(chat, /STAGE_ENTER_MS\s*=\s*180/);
+    assert.match(chat, /STAGE_HOLD_MS\s*=\s*550/);
+    assert.match(chat, /STAGE_EXIT_MS\s*=\s*220/);
+    // Finish stage uses wai + stageDone before calc
+    assert.match(chat, /showFinishStage/);
+    assert.match(chat, /pose:\s*\"wai\"/);
+    // Site fonts only (no Prompt)
+    assert.match(css, /--mn-font-display/);
+    assert.doesNotMatch(css, /['\"]Prompt['\"]/);
+    assert.match(css, /letter-spacing:\s*0\.18em/);
+    assert.match(css, /font-size:\s*1\.6rem/);
+    // Stage only when section index increases (not firstName→goals same sec)
+    assert.match(
+      engine,
+      /nextTurn\.sec !== current\.sec[\s\S]{0,120}chat_part_break/
+    );
+  });
+
   it("ports v14 progress meter and skip-link / calc fallback email", () => {
     const chat = readFileSync(
       join(root, "components/chat-questionnaire/chat-questionnaire.tsx"),
