@@ -341,7 +341,7 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
   // Shared browser/CAPI dedupe key (Meta event_id / eventID).
   const facebookEventId = randomRay();
   const planId = input.planId ?? currentPlanId();
-  const properties = {
+  const properties: Record<string, unknown> = {
     ...(input.properties || {}),
     facebookEventId,
     sourceUrl:
@@ -395,9 +395,6 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
         }
 
         const mnEnv = resolveMattanutraRuntimeEnv();
-        // Stamp BPM payload for server CAPI isolation tags (best-effort; request already in flight).
-        properties.mn_env = mnEnv;
-
         const params: Record<string, unknown> = {
           content_name: eventName,
           locale: input.locale,
