@@ -44,11 +44,12 @@ import "./chat-questionnaire.css";
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const CALC_FALLBACK_MS = 15_000;
 const TYPE_MS = 280;
-/** Stage overlay: enter → hold image → exit (totals ~1.65s — snappier, still smooth). */
-/** v14 HTML STAGE_MS ≈ 950ms total show time for section / finish overlays. */
-const STAGE_ENTER_MS = 180;
-const STAGE_HOLD_MS = 550;
-const STAGE_EXIT_MS = 220;
+/**
+ * v14 HTML STAGE_MS = 950ms for section / finish overlays.
+ * Single-shot show (no multi-phase scale morph — that caused appear/disappear glitches).
+ */
+const STAGE_MS = 950;
+const STAGE_FADE_OUT_MS = 180;
 const UX_VERSION = "v14-landing";
 const DELIVERY_EMAIL_KEY = "mn_healthscore_delivery_email";
 
@@ -180,11 +181,13 @@ export function ChatQuestionnaire({
     pose: string;
     eyebrow: string;
     title: string;
-    /** prep = mounted at rest; hold = fully visible; exit = fading out */
-    phase: "prep" | "hold" | "exit";
+    /** show = visible; exit = opacity fade only (no scale morph) */
+    phase: "show" | "exit";
   }>(null);
   const pendingEmail = useRef<string | null>(null);
   const stageTimers = useRef<number[]>([]);
+  /** Bumps when a new stage starts so stale timeouts cannot clear a newer overlay. */
+  const stageGeneration = useRef(0);
 
 
   const chrome = useMemo(
@@ -502,31 +505,32 @@ export function ChatQuestionnaire({
       }
 
       clearStageTimers();
+      const generation = stageGeneration.current + 1;
+      stageGeneration.current = generation;
 
       return new Promise<void>((resolve) => {
-        // 1) Mount at rest (opacity 0) so the next frame can transition in.
-        setStageFlash({ ...payload, phase: "prep" });
+        // Mount already "shown" at full size — CSS keyframe fades opacity only
+        // (matches HTML #stage.show). Avoid prep/hold/exit scale morphs.
+        setStageFlash({ ...payload, phase: "show" });
 
-        const enterRaf = window.requestAnimationFrame(() => {
-          const enterRaf2 = window.requestAnimationFrame(() => {
-            // 2) Fade/scale in and hold (total ≈ HTML STAGE_MS 950ms).
-            setStageFlash({ ...payload, phase: "hold" });
-          });
-          stageTimers.current.push(enterRaf2);
-        });
-
-        // 3) Fade out, then unmount.
         const exitTimer = window.setTimeout(() => {
+          if (stageGeneration.current !== generation) {
+            return;
+          }
           setStageFlash({ ...payload, phase: "exit" });
-        }, STAGE_ENTER_MS + STAGE_HOLD_MS);
+        }, STAGE_MS);
 
         const doneTimer = window.setTimeout(() => {
+          if (stageGeneration.current !== generation) {
+            resolve();
+            return;
+          }
           setStageFlash(null);
           stageTimers.current = [];
           resolve();
-        }, STAGE_ENTER_MS + STAGE_HOLD_MS + STAGE_EXIT_MS);
+        }, STAGE_MS + STAGE_FADE_OUT_MS);
 
-        stageTimers.current = [enterRaf, exitTimer, doneTimer];
+        stageTimers.current = [exitTimer, doneTimer];
       });
     },
     [clearStageTimers]
@@ -1504,10 +1508,16 @@ export function ChatQuestionnaire({
         <div
           className={`mn-quiz-stage mn-quiz-stage--${stageFlash.phase}`}
           aria-hidden
+          data-testid="section-stage-overlay"
         >
           <div className="mn-quiz-stage__card">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={nongPoseSrc(stageFlash.pose)} alt="" />
+            <img
+              src={nongPoseSrc(stageFlash.pose)}
+              alt=""
+              width={180}
+              height={180}
+            />
             {stageFlash.eyebrow ? (
               <div className="mn-quiz-stage__eyebrow">{stageFlash.eyebrow}</div>
             ) : null}
