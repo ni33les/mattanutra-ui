@@ -951,40 +951,51 @@ export function ChatQuestionnaire({
       return false;
     }
 
-    // Show only the most recent react/ack if it sits after the current bot
-    // (includes meetLine / name react after answering firstName, etc.)
+    // Insight / meet-line bubbles (HTML keeps .react rows when collapsing).
+    // Show every react/ack that sits between the previous bot and the current
+    // question bot so “Why that mattered” appears with the next page.
     if (msg.kind === "react" || msg.kind === "ack") {
-      const lastBotIdx = (() => {
-        for (let i = log.length - 1; i >= 0; i -= 1) {
-          const entry = log[i];
-          if (
-            entry?.kind === "bot" &&
-            entry.turnIndex === state.turnIndex
-          ) {
-            return i;
-          }
+      let currentBotIdx = -1;
+      for (let i = log.length - 1; i >= 0; i -= 1) {
+        const entry = log[i];
+        if (
+          entry?.kind === "bot" &&
+          entry.turnIndex === state.turnIndex &&
+          entry.turnKey === currentTurn?.k
+        ) {
+          currentBotIdx = i;
+          break;
         }
-        return -1;
-      })();
-      // If we just answered and already advanced, still show the latest react
-      // that is the newest message (brief beat) — otherwise only after current bot.
-      if (lastBotIdx >= 0 && index > lastBotIdx) {
-        for (let i = log.length - 1; i > index; i -= 1) {
-          const entry = log[i];
-          if (entry?.kind === "react" || entry?.kind === "ack") {
+      }
+
+      // No current question yet (e.g. reaction alone mid-transition): show if trailing
+      if (currentBotIdx < 0) {
+        return index === log.length - 1 || msg.kind === "react";
+      }
+
+      let prevBotIdx = -1;
+      for (let i = currentBotIdx - 1; i >= 0; i -= 1) {
+        if (log[i]?.kind === "bot") {
+          prevBotIdx = i;
+          break;
+        }
+      }
+
+      // Between previous question and current question (standard path after advance)
+      if (index > prevBotIdx && index < currentBotIdx) {
+        return true;
+      }
+
+      // Also show reacts appended after the current bot (before next advance)
+      if (index > currentBotIdx) {
+        for (let i = currentBotIdx + 1; i < log.length; i += 1) {
+          if (log[i]?.kind === "bot") {
             return false;
           }
-          if (entry?.kind === "bot") {
-            break;
-          }
         }
         return true;
       }
-      // Reaction for previous turn: show only if it's the newest log entry
-      // (before the next bot is appended) so meetLine is not dropped.
-      if (index === log.length - 1) {
-        return true;
-      }
+
       return false;
     }
 
@@ -1040,16 +1051,22 @@ export function ChatQuestionnaire({
     }
 
     if (msg.kind === "react" || msg.kind === "ack") {
+      const insightLabel =
+        locale === "th" ? "คำตอบนี้สำคัญอย่างไร" : "Why that mattered";
       return (
         <div
           key={`${msg.kind}-${msg.id}-${index}`}
           className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--react${msg.kind === "ack" ? " mn-chat-q__row--ack" : ""}`}
+          data-testid={msg.kind === "react" ? "insight-react" : "insight-ack"}
         >
           <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={nongPoseSrc(msg.pose)} alt="" />
           </div>
           <div className="mn-chat-q__bubble">
+            {msg.kind === "react" ? (
+              <div className="mn-chat-q__insight-label">{insightLabel}</div>
+            ) : null}
             <div className="mn-chat-q__q">{msg.text}</div>
           </div>
         </div>

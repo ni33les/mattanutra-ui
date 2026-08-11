@@ -437,15 +437,36 @@
   padding: 3px 10px;
 }
 
-/* Insight / react — warm cream (v14 .react .bubble) */
+/* Insight / react — warm cream (v14 .react .bubble) + enter animation */
+.mn-chat-q__row--react {
+  animation: mn-cq-in 0.42s cubic-bezier(0.22, 0.82, 0.28, 1) both;
+}
+
 .mn-chat-q__row--react .mn-chat-q__bubble {
-  background: #fbf7ec;
-  border-color: #eae0c6;
+  background: linear-gradient(135deg, #fffdf7, #f2faf6);
+  border-color: #d5e8dd;
+  animation: mn-cq-bubble-in 0.48s cubic-bezier(0.22, 0.82, 0.28, 1) both;
+}
+
+.mn-chat-q__insight-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--cq-matta);
+  font-weight: 700;
+  margin-bottom: 6px;
 }
 
 .mn-chat-q__row--react .mn-chat-q__q {
   font-weight: 500;
   font-size: 1.05rem;
+  color: #365667;
+  line-height: 1.45;
+}
+
+/* Celebrate pose bobs on insight cards (goals, etc.) */
+.mn-chat-q__row--react .mn-chat-q__avatar--celebrate img {
+  animation: mn-cq-wiggle 0.7s ease-in-out 0.15s 1 both;
 }
 
 /* Acks — transparent like v14 .ack .bubble */

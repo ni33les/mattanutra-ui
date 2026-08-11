@@ -321,4 +321,47 @@ describe("questionnaire v14 UX on v6 schema", () => {
       /kind === \"intro\"[\s\S]{0,80}!log\.some\(\(entry\) => entry\.kind === \"bot\"\)/
     );
   });
+
+  it("shows Why that mattered insight reacts with pose (not filtered out after advance)", () => {
+    const chat = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.tsx"),
+      "utf8"
+    );
+    const css = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.css"),
+      "utf8"
+    );
+    assert.match(chat, /insight-react/);
+    assert.match(chat, /Why that mattered/);
+    assert.match(chat, /คำตอบนี้สำคัญอย่างไร/);
+    assert.match(chat, /mn-chat-q__insight-label/);
+    // Visible between previous bot and current bot after advance
+    assert.match(chat, /index > prevBotIdx && index < currentBotIdx/);
+    assert.match(css, /mn-chat-q__insight-label/);
+    assert.match(css, /mn-cq-wiggle/);
+
+    // Engine still emits goals react with celebrate pose
+    let { state } = startQuestionnaire(
+      createInitialState({ locale: "en", channel: "web" })
+    );
+    const name = applyAnswer(state, "firstName", "Alex");
+    assert.equal(name.ok, true);
+    if (!name.ok) {
+      return;
+    }
+    state = name.state;
+    const goals = applyAnswer(state, "goals", ["energy", "sleep"]);
+    assert.equal(goals.ok, true);
+    if (!goals.ok) {
+      return;
+    }
+    const react = goals.state.log.find(
+      (m) => m.kind === "react" && m.id === "goals"
+    );
+    assert.ok(react && react.kind === "react");
+    if (react && react.kind === "react") {
+      assert.equal(react.pose, "celebrate");
+      assert.match(react.text, /spine of your formula/i);
+    }
+  });
 });
