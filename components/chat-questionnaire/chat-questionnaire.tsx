@@ -821,9 +821,10 @@ export function ChatQuestionnaire({
         continue;
       }
 
+      const qText = turn.q.replace(/<[^>]+>/g, "");
       items.push({
         key: turn.k,
-        question: turn.q.replace(/<[^>]+>/g, ""),
+        question: turn.emoji ? `${turn.emoji} ${qText}` : qText,
         answer
       });
     }
