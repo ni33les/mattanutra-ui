@@ -176,8 +176,8 @@ export function TitleBar({
               {copy.assessment}
             </Link>
           ) : null}
-          {/* Quiz: always show site locale switcher. Default: desktop only (mobile uses menu). */}
-          <div className={isQuiz ? "mn-titlebar-lang-quiz" : "mn-titlebar-lang-desktop"}>
+          {/* Site-wide: language switcher always visible (including collapsed iPhone). */}
+          <div className="mn-titlebar-lang-always">
             <LanguageSwitcher
               currentLocale={currentLocale}
               currentPath={currentPath}
@@ -205,11 +205,6 @@ export function TitleBar({
                       {copy.assessment}
                     </Link>
                   ) : null}
-                  <LanguageSwitcher
-                    currentLocale={currentLocale}
-                    currentPath={currentPath}
-                    localizedPaths={localizedPaths}
-                  />
                 </div>
               </div>
             </details>

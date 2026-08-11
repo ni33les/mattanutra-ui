@@ -265,13 +265,14 @@ export function ChatQuestionnaire({
           : chrome.progressRemainingMany.replace("{n}", String(remaining));
 
     return {
-      barPct: Math.max(8, pct || precision),
+      // Fill tracks answered progress (not precision floor) so the meter moves visibly
+      barPct: Math.max(4, pct),
       partLabel: chrome.progressPart
         .replace("{n}", String(sec + 1))
         .replace("{pct}", String(pct)),
       detail: `${encourage}${remainBit}`
     };
-  }, [state, definition, currentTurn, chrome, precision]);
+  }, [state, definition, currentTurn, chrome]);
 
   const track = useCallback(
     async (events: readonly QuestionnaireEvent[]) => {
@@ -894,19 +895,108 @@ export function ChatQuestionnaire({
       : "mn-chat-q__avatar";
   }
 
+  /**
+   * Paged single-question mode (HTML collapse parity):
+   * show only the current turn's question / reaction / halfway card —
+   * not a scrolling transcript of prior answers.
+   */
+  function isLogItemVisibleOnPage(msg: LogMessage, index: number): boolean {
+    if (!state) {
+      return true;
+    }
+
+    const log = state.log;
+    const lastHalfway = [...log]
+      .map((entry, i) => ({ entry, i }))
+      .reverse()
+      .find((item) => item.entry.kind === "halfway");
+
+    // After halfway fires, show only the halfway card until the next bot question
+    // exists after it; then show only post-halfway current content.
+    if (lastHalfway && lastHalfway.i === index && msg.kind === "halfway") {
+      const hasLaterBot = log
+        .slice(lastHalfway.i + 1)
+        .some((entry) => entry.kind === "bot");
+      return !hasLaterBot;
+    }
+
+    if (msg.kind === "halfway") {
+      return false;
+    }
+
+    // Only the latest bot prompt for the active turn
+    if (msg.kind === "bot") {
+      return (
+        state.phase === "active" &&
+        msg.turnIndex === state.turnIndex &&
+        msg.turnKey === currentTurn?.k
+      );
+    }
+
+    // Hide prior user answers from the page (they live in Review)
+    if (msg.kind === "user") {
+      return false;
+    }
+
+    // Intro only on first screen before any bot question
+    if (msg.kind === "intro") {
+      return !log.some((entry) => entry.kind === "bot");
+    }
+
+    // Section cards are replaced by the full-screen stage overlay
+    if (msg.kind === "section") {
+      return false;
+    }
+
+    // Show only the most recent react/ack if it sits after the current bot
+    if (msg.kind === "react" || msg.kind === "ack") {
+      const lastBotIdx = (() => {
+        for (let i = log.length - 1; i >= 0; i -= 1) {
+          const entry = log[i];
+          if (
+            entry?.kind === "bot" &&
+            entry.turnIndex === state.turnIndex
+          ) {
+            return i;
+          }
+        }
+        return -1;
+      })();
+      if (lastBotIdx < 0 || index <= lastBotIdx) {
+        return false;
+      }
+      // Only the last reaction after current bot
+      for (let i = log.length - 1; i > index; i -= 1) {
+        const entry = log[i];
+        if (entry?.kind === "react" || entry?.kind === "ack") {
+          return false;
+        }
+        if (entry?.kind === "bot") {
+          break;
+        }
+      }
+      return true;
+    }
+
+    if (msg.kind === "system") {
+      return index === log.length - 1;
+    }
+
+    return false;
+  }
+
   function renderLogItem(msg: LogMessage, index: number) {
-    // v14 HTML collapses prior log rows once the halfway health-preview appears.
-    const halfwayAt =
-      state?.log.findIndex((entry) => entry.kind === "halfway") ?? -1;
-    const historyClass =
-      halfwayAt >= 0 && index < halfwayAt ? " mn-chat-q__row--history-collapsed" : "";
+    if (!isLogItemVisibleOnPage(msg, index)) {
+      return null;
+    }
 
     if (msg.kind === "intro") {
       // v14 HTML: intro is bubble-first (no mascot avatar beside the greeting).
       return (
         <div
           key={`intro-${index}`}
-          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--no-avatar${historyClass}`}
+          className="mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--no-avatar"
+          data-testid="paged-question"
         >
           <div className="mn-chat-q__bubble">
             <div className="mn-chat-q__q">{msg.text}</div>
@@ -916,33 +1006,12 @@ export function ChatQuestionnaire({
       );
     }
 
-    if (msg.kind === "section") {
-      return (
-        <div
-          key={`sec-${msg.sectionIndex}-${index}`}
-          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--sec${historyClass}`}
-        >
-          <div className={avatarClass(msg.pose)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={nongPoseSrc(msg.pose)} alt="" />
-          </div>
-          <div className="mn-chat-q__bubble">
-            <div className="mn-chat-q__sec-eyebrow">{msg.eyebrow}</div>
-            <div className="mn-chat-q__sec-title">{msg.title}</div>
-            <div className="mn-chat-q__sec-lead">
-              {msg.leadIn || ui.inThisSection || "In this section we…"}
-            </div>
-            <div className="mn-chat-q__sec-desc">{msg.desc}</div>
-          </div>
-        </div>
-      );
-    }
-
     if (msg.kind === "bot") {
       return (
         <div
           key={`bot-${msg.turnKey}-${index}`}
-          className={`mn-chat-q__row mn-chat-q__row--bot${historyClass}`}
+          className="mn-chat-q__row mn-chat-q__row--bot"
+          data-testid="paged-question"
         >
           <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -959,26 +1028,11 @@ export function ChatQuestionnaire({
       );
     }
 
-    if (msg.kind === "user") {
-      return (
-        <div
-          key={`user-${msg.turnKey}-${index}`}
-          className={`mn-chat-q__row mn-chat-q__row--user${historyClass}`}
-        >
-          <div className="mn-chat-q__bubble">
-            <div className="mn-chat-q__q" style={{ fontWeight: 500 }}>
-              {msg.label}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     if (msg.kind === "react" || msg.kind === "ack") {
       return (
         <div
           key={`${msg.kind}-${msg.id}-${index}`}
-          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--react${msg.kind === "ack" ? " mn-chat-q__row--ack" : ""}${historyClass}`}
+          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--react${msg.kind === "ack" ? " mn-chat-q__row--ack" : ""}`}
         >
           <div className={avatarClass(msg.pose)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1024,7 +1078,7 @@ export function ChatQuestionnaire({
       return (
         <div
           key={`sys-${index}`}
-          className={`mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--sec${historyClass}`}
+          className="mn-chat-q__row mn-chat-q__row--bot mn-chat-q__row--sec"
         >
           <div className="mn-chat-q__bubble">
             <div className="mn-chat-q__sec-desc">{msg.text}</div>
@@ -1526,28 +1580,33 @@ export function ChatQuestionnaire({
           </div>
         </div>
       ) : null}
-      <div className="mn-chat-q__header">
+      <div className="mn-chat-q__header" data-testid="quiz-progress-header">
         <div className="mn-chat-q__brandrow">
           <div className="mn-chat-q__brandcopy">
             <div className="mn-chat-q__brandsub">{chrome.brandsub}</div>
           </div>
-          <span className={`mn-chat-q__saved${savedFlash ? " show" : ""}`}>
+          <span
+            className={`mn-chat-q__saved${savedFlash ? " show" : ""}`}
+            aria-live="polite"
+          >
             {ui.saved ? `${ui.saved} ✓` : "Saved ✓"}
           </span>
           <button
             type="button"
             className="mn-chat-q__review-btn"
+            data-testid="review-answers-btn"
             onClick={() => setReviewOpen(true)}
-            disabled={!reviewItems.length}
+            aria-haspopup="dialog"
           >
-            {chrome.reviewBtn}
+            <span className="mn-chat-q__review-btn-full">{chrome.reviewBtn}</span>
+            <span className="mn-chat-q__review-btn-short">Review</span>
           </button>
         </div>
         <div className="mn-chat-q__vial" aria-label={progressMeta.partLabel}>
           <div className="mn-chat-q__vial-track">
             <div
               className="mn-chat-q__vial-fill"
-              style={{ width: `${progressMeta.barPct}%` }}
+              style={{ width: `${Math.max(6, progressMeta.barPct)}%` }}
             />
           </div>
           <div className="mn-chat-q__vial-pct">

@@ -1848,17 +1848,22 @@
     flex: 1 1 auto;
   }
 
+  /* Language switcher is always visible in the header (site-wide), including mobile. */
+  .mn-customer-shell .mn-titlebar-lang-always {
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .mn-customer-shell .mn-titlebar-lang-always .mn-language-switcher a {
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
+  }
+
+  /* Legacy class kept for safety if any caller still uses it */
   .mn-customer-shell .mn-titlebar-lang-desktop {
-    display: none;
+    display: block;
   }
 
-  @media (min-width: 1024px) {
-    .mn-customer-shell .mn-titlebar-lang-desktop {
-      display: block;
-    }
-  }
-
-  /* Below lg: language lives in the hamburger panel only */
   @media (max-width: 1023px) {
     .mn-customer-shell .mn-titlebar-main {
       gap: 0.5rem;
@@ -7178,8 +7183,8 @@
 .mn-customer-shell .mn-titlebar--quiz .mn-titlebar-mobile-menu {
   display: none !important;
 }
-.mn-customer-shell .mn-titlebar--quiz .mn-titlebar-lang-quiz {
-  display: block;
+.mn-customer-shell .mn-titlebar--quiz .mn-titlebar-lang-always {
+  display: block !important;
 }
 .mn-customer-shell .mn-titlebar--quiz .mn-logo-tagline {
   display: none;

@@ -209,10 +209,17 @@ describe("questionnaire v14 UX on v6 schema", () => {
       "utf8"
     );
     assert.match(chat, /progressPart|Part \{n\} of 6/);
+    assert.match(chat, /quiz-progress-header/);
     assert.match(chat, /mn-chat-q__skip-link/);
     assert.match(chat, /privacyFooter/);
     assert.match(chat, /halfway-health-preview|kind === \"halfway\"/);
-    assert.match(chat, /history-collapsed/);
+    assert.match(chat, /isLogItemVisibleOnPage|paged-question/);
+    assert.match(chat, /review-answers-btn/);
+    // Review always openable (not disabled when empty)
+    assert.doesNotMatch(
+      chat,
+      /review-answers-btn[\s\S]{0,120}disabled=\{!reviewItems/
+    );
     const calc = readFileSync(
       join(root, "components/chat-questionnaire/questionnaire-calculating.tsx"),
       "utf8"
@@ -230,14 +237,20 @@ describe("questionnaire v14 UX on v6 schema", () => {
       "utf8"
     );
     assert.match(css, /mn-quiz-cta-sheen|mn-quiz-cta-shadow-pulse/);
+    // CTA sheen starts promptly (not 1.2s delay)
+    assert.match(css, /mn-quiz-cta-sheen 2\.2s ease-in-out 0\.1s infinite/);
+    assert.doesNotMatch(css, /1\.2s infinite/);
     assert.match(css, /cursor:\s*default/);
     assert.match(css, /health-preview/);
-    assert.match(css, /history-collapsed/);
     const engine = readFileSync(join(root, "lib/questionnaire/engine.ts"), "utf8");
     assert.match(engine, /kind:\s*\"halfway\"/);
     assert.match(engine, /Your HealthScore is taking shape/);
     const poses = readFileSync(join(root, "lib/questionnaire/poses.ts"), "utf8");
     assert.match(poses, /wai:\s*\"nong-kneeling/);
+    const titleBar = readFileSync(join(root, "components/title-bar.tsx"), "utf8");
+    assert.match(titleBar, /mn-titlebar-lang-always/);
+    const customerCss = readFileSync(join(root, "app/customer.css"), "utf8");
+    assert.match(customerCss, /mn-titlebar-lang-always/);
   });
 
   it("shows Thai script in the public language switcher label", async () => {
