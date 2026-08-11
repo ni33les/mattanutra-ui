@@ -43,7 +43,7 @@ import "./chat-questionnaire.css";
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const CALC_FALLBACK_MS = 15_000;
-const TYPE_MS = 280;
+
 /**
  * Section / finish stage overlay timing.
  * Hold long enough to read Part N + title (HTML was 950ms — felt too snappy in React).
@@ -177,7 +177,7 @@ export function ChatQuestionnaire({
   const [processingError, setProcessingError] = useState("");
   const [calcStatus, setCalcStatus] = useState<CalculatingStatus>("building");
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+
   const [stageFlash, setStageFlash] = useState<null | {
     pose: string;
     eyebrow: string;
@@ -675,17 +675,7 @@ export function ChatQuestionnaire({
         await showStageFlash(partBreak.sectionIndex);
       }
 
-      const shouldType =
-        !prefersReducedMotion() &&
-        next.phase === "active" &&
-        next.log.length > (state?.log.length ?? 0);
-
-      if (shouldType) {
-        setIsTyping(true);
-        await sleep(TYPE_MS);
-        setIsTyping(false);
-      }
-
+      // No typing-indicator bubble (ellipsis flash) between questions.
       setState(next);
       void track(events);
       const sectionDone = events.find((e) => e.type === "chat_section_done");
@@ -1642,21 +1632,6 @@ export function ChatQuestionnaire({
         <div className="mn-chat-q__page" ref={logScrollRef}>
           <div className="mn-chat-q__log" role="log" aria-live="polite">
             {state?.log.map((msg, index) => renderLogItem(msg, index))}
-            {isTyping ? (
-              <div className="mn-chat-q__row mn-chat-q__row--bot" aria-hidden>
-                <div className="mn-chat-q__avatar">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={nongPoseSrc("thinking")} alt="" />
-                </div>
-                <div className="mn-chat-q__bubble">
-                  <span className="mn-chat-q__typing">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                </div>
-              </div>
-            ) : null}
             <div ref={logEndRef} />
           </div>
 
