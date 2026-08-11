@@ -181,16 +181,16 @@ describe("questionnaire v14 UX on v6 schema", () => {
     );
     const engine = readFileSync(join(root, "lib/questionnaire/engine.ts"), "utf8");
 
-    // Single-shot opacity fade; hold long enough to read (not sub-second)
+    // Stage hold + enter animations (fade + Nong pop)
     assert.match(chat, /STAGE_MS\s*=\s*1800/);
     assert.match(chat, /phase:\s*\"show\"/);
     assert.doesNotMatch(chat, /phase:\s*\"prep\"|phase:\s*\"hold\"/);
-    // Finish stage uses wai + stageDone before calc
     assert.match(chat, /showFinishStage/);
     assert.match(chat, /pose:\s*\"wai\"/);
-    // Opacity-only animation; fixed card size (shape glitch fix)
+    assert.match(chat, /hasUsableHealthScore/);
     assert.match(css, /mn-quiz-stage-fade-in/);
-    assert.match(css, /never animate width\/scale|Stable box/);
+    assert.match(css, /mn-quiz-stage-pop/);
+    assert.match(css, /mn-quiz-stage-card-in/);
     // Site fonts only (no Prompt)
     assert.match(css, /--mn-font-display/);
     assert.doesNotMatch(css, /['\"]Prompt['\"]/);

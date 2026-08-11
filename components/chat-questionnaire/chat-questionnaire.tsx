@@ -42,7 +42,10 @@ import {
 import "./chat-questionnaire.css";
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
-const CALC_FALLBACK_MS = 15_000;
+/** Surface the slow-path UI sooner so calc never looks infinitely hung. */
+const CALC_FALLBACK_MS = 12_000;
+const POLL_ATTEMPTS = 20;
+const POLL_INTERVAL_MS = 1_200;
 
 /**
  * Section / finish stage overlay timing.
@@ -136,6 +139,42 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+/** True when the API payload has a usable score (analysis may still be enriching). */
+function hasUsableHealthScore(payload: {
+  status?: string;
+  healthScore?: unknown;
+  planId?: string;
+}): boolean {
+  if (!payload.planId && payload.status === "failed") {
+    return false;
+  }
+
+  const hs = payload.healthScore;
+  if (!hs || typeof hs !== "object") {
+    return false;
+  }
+
+  const score = (hs as { score?: unknown }).score;
+  if (typeof score !== "number" || Number.isNaN(score)) {
+    return false;
+  }
+
+  // Full analysis ready, or base score available while content prepares
+  if (payload.status === "ready" || payload.status === "captured") {
+    return true;
+  }
+
+  if (
+    payload.status === "preparing" ||
+    payload.status === "queued" ||
+    payload.status === undefined
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function resultsPath(
   locale: Locale,
   planId: string,
@@ -162,6 +201,7 @@ export function ChatQuestionnaire({
   const readyPlanId = useRef<string | null>(null);
 
   const [uiScreen, setUiScreen] = useState<UiScreen>("welcome");
+  const [resultPlanId, setResultPlanId] = useState<string | null>(null);
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -458,7 +498,7 @@ export function ChatQuestionnaire({
 
   const pollHealthScore = useCallback(
     async (planId: string) => {
-      for (let attempt = 0; attempt < 40; attempt += 1) {
+      for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
         const response = await fetchWithTimeout(
           `/api/assessment/${encodeURIComponent(planId)}?view=healthscore&locale=${encodeURIComponent(locale)}`,
           { cache: "no-store" }
@@ -471,9 +511,10 @@ export function ChatQuestionnaire({
         const payload = (await response.json()) as {
           status?: string;
           healthScore?: unknown;
+          planId?: string;
         };
 
-        if (payload.status === "ready" && payload.healthScore) {
+        if (hasUsableHealthScore({ ...payload, planId })) {
           return true;
         }
 
@@ -481,7 +522,7 @@ export function ChatQuestionnaire({
           throw new Error("HealthScore analysis failed");
         }
 
-        await sleep(1500);
+        await sleep(POLL_INTERVAL_MS);
       }
 
       return false;
@@ -613,18 +654,26 @@ export function ChatQuestionnaire({
         }
 
         readyPlanId.current = captured.planId;
+        setResultPlanId(captured.planId);
         if (queuedEmail) {
           void persistDeliveryEmail(queuedEmail, captured.planId);
         }
 
-        let ready =
-          captured.status === "ready" && Boolean(captured.healthScore);
+        // Capture often returns status "captured"/"preparing" while a base score
+        // already exists — treat that as ready so the UI does not hang waiting
+        // for optional analysis enrichment tasks.
+        let ready = hasUsableHealthScore({
+          status: captured.status,
+          healthScore: captured.healthScore,
+          planId: captured.planId
+        });
 
         if (!ready) {
           ready = await pollHealthScore(captured.planId);
         }
 
         if (!ready) {
+          // Still have a plan — keep planId so user can open results; show slow UI
           setCalcStatus("slow");
           return;
         }
@@ -1575,22 +1624,14 @@ export function ChatQuestionnaire({
       <QuestionnaireCalculating
         locale={locale}
         status={calcStatus}
+        canOpenResults={Boolean(resultPlanId || readyPlanId.current)}
         onSeeResults={() => {
-          const planId = readyPlanId.current;
+          const planId = readyPlanId.current || resultPlanId;
           if (!planId) {
             return;
           }
 
           router.replace(resultsPath(locale, planId, paymentId));
-        }}
-        onRetry={() => {
-          if (!state) {
-            return;
-          }
-
-          finalizing.current = false;
-          setCalcStatus("building");
-          void finalize(state);
         }}
         onEmailSubmit={onFallbackEmail}
       />

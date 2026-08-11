@@ -13,6 +13,8 @@ type QuestionnaireCalculatingProps = Readonly<{
   locale: Locale;
   status: CalculatingStatus;
   onSeeResults: () => void;
+  /** When true, slow path can still open results (plan already created). */
+  canOpenResults?: boolean;
   /** @deprecated Retry control removed from UI; kept optional for call-site compatibility. */
   onRetry?: () => void;
   onEmailSubmit: (email: string) => Promise<void> | void;
@@ -22,6 +24,7 @@ export function QuestionnaireCalculating({
   locale,
   status,
   onSeeResults,
+  canOpenResults = false,
   onEmailSubmit
 }: QuestionnaireCalculatingProps) {
   const copy = getWelcomeCopy(locale === "zh-CN" ? "en" : locale);
@@ -31,6 +34,8 @@ export function QuestionnaireCalculating({
 
   const showFallback = status === "slow" || status === "error";
   const isReady = status === "ready";
+  const isBuilding = status === "building";
+  const showResultsBtn = isReady || (status === "slow" && canOpenResults);
 
   async function submitEmail() {
     const trimmed = email.trim();
@@ -74,15 +79,20 @@ export function QuestionnaireCalculating({
             <span aria-hidden>✓</span>
             <span>{copy.calcReady}</span>
           </>
-        ) : (
+        ) : isBuilding ? (
           <>
             <span className="mn-quiz-calc__spinner" aria-hidden />
             <span>{copy.calcBuilding}</span>
           </>
+        ) : (
+          <>
+            <span aria-hidden>…</span>
+            <span>{copy.calcLonger}</span>
+          </>
         )}
       </div>
 
-      {isReady ? (
+      {showResultsBtn ? (
         <button
           type="button"
           className="mn-quiz-calc__ready-btn"
@@ -93,10 +103,10 @@ export function QuestionnaireCalculating({
         </button>
       ) : null}
 
-      {!showFallback ? (
-        <p className="mn-quiz-calc__note">
-          {isReady ? copy.calcReadyNote : copy.calcKeepOpen}
-        </p>
+      {isBuilding ? (
+        <p className="mn-quiz-calc__note">{copy.calcKeepOpen}</p>
+      ) : isReady ? (
+        <p className="mn-quiz-calc__note">{copy.calcReadyNote}</p>
       ) : null}
 
       <div className="mn-quiz-calc__support">
