@@ -218,16 +218,24 @@
   margin-bottom: 8px;
 }
 
-.mn-chat-q__log {
+/* Scrollable page: question + answers as one unit (not a bottom dock). */
+.mn-chat-q__page {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 18px 14px 12px;
+  scroll-behavior: smooth;
+  padding: 18px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.mn-chat-q__log {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  scroll-behavior: smooth;
   background: transparent;
 }
 
@@ -505,29 +513,44 @@
   line-height: 1.45;
 }
 
-/* Answers docked at bottom on paper (chips are white cards) */
+/*
+ * Answers sit under the question (HTML .answers: margin-left ~56px),
+ * not as a full-width base-page dock. No border/box around the group.
+ */
 .mn-chat-q__composer {
   flex: 0 0 auto;
-  border-top: 1px solid color-mix(in srgb, var(--cq-line) 80%, transparent);
-  background: color-mix(in srgb, var(--cq-paper) 92%, white);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.mn-chat-q__composer--under-q {
+  /* Align with bubble column: avatar 46px + gap 12px */
+  margin: 6px 0 18px;
+  padding: 0 20px 0 58px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .mn-chat-q__composer-inner {
-  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .mn-chat-q__composer-inner:focus-within {
   outline: none;
-}
-
-.mn-chat-q__composer--focus {
-  box-shadow: inset 0 0 0 2px rgba(46, 125, 91, 0.28);
+  box-shadow: none;
 }
 
 .mn-chat-q__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  justify-content: flex-start;
+  align-content: flex-start;
 }
 
 .mn-chat-q__chip {
@@ -650,7 +673,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 4px;
 }
 
 .mn-chat-q__actions--row {

@@ -215,6 +215,9 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.match(chat, /halfway-health-preview|kind === \"halfway\"/);
     assert.match(chat, /isLogItemVisibleOnPage|paged-question/);
     assert.match(chat, /review-answers-btn/);
+    // Answers under the question (not a base-page dock with focus ring box)
+    assert.match(chat, /composer--under-q|question-answers/);
+    assert.doesNotMatch(chat, /composerFocusPulse|composer--focus/);
     // Review always openable (not disabled when empty)
     assert.doesNotMatch(
       chat,
@@ -236,6 +239,8 @@ describe("questionnaire v14 UX on v6 schema", () => {
       join(root, "components/chat-questionnaire/chat-questionnaire.css"),
       "utf8"
     );
+    assert.match(css, /composer--under-q/);
+    assert.doesNotMatch(css, /composer--focus/);
     assert.match(css, /mn-quiz-cta-sheen|mn-quiz-cta-shadow-pulse/);
     // CTA sheen starts promptly (not 1.2s delay)
     assert.match(css, /mn-quiz-cta-sheen 2\.2s ease-in-out 0\.1s infinite/);

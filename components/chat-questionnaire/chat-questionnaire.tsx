@@ -164,7 +164,7 @@ export function ChatQuestionnaire({
   const [uiScreen, setUiScreen] = useState<UiScreen>("welcome");
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [composerFocusPulse, setComposerFocusPulse] = useState(false);
+
   const [composerError, setComposerError] = useState("");
   const [multiSel, setMultiSel] = useState<string[]>([]);
   const [textValue, setTextValue] = useState("");
@@ -419,11 +419,10 @@ export function ChatQuestionnaire({
         return;
       }
 
-      setComposerFocusPulse(true);
-      window.setTimeout(() => setComposerFocusPulse(false), 900);
-
+      // Focus first control only — no temporary focus ring/box on the whole group
+      // (that looked like a strange box flashing around the answers).
       const target = root.querySelector<HTMLElement>(
-        "button.mn-chat-q__chip, button.mn-chat-q__swatch, button.mn-chat-q__primary, input, button.mn-chat-q__ghost"
+        "button.mn-chat-q__chip, button.mn-chat-q__swatch, button.mn-chat-q__primary, input, button.mn-chat-q__ghost, button.mn-chat-q__skip-link"
       );
       target?.focus({ preventScroll: true });
       root.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1617,36 +1616,35 @@ export function ChatQuestionnaire({
       </div>
 
       <div className="mn-chat-q__frame">
-        <div
-          className="mn-chat-q__log"
-          role="log"
-          aria-live="polite"
-          ref={logScrollRef}
-        >
-          {state?.log.map((msg, index) => renderLogItem(msg, index))}
-          {isTyping ? (
-            <div className="mn-chat-q__row mn-chat-q__row--bot" aria-hidden>
-              <div className="mn-chat-q__avatar">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={nongPoseSrc("thinking")} alt="" />
+        {/* Single scroll page: question + answers together (not a bottom dock). */}
+        <div className="mn-chat-q__page" ref={logScrollRef}>
+          <div className="mn-chat-q__log" role="log" aria-live="polite">
+            {state?.log.map((msg, index) => renderLogItem(msg, index))}
+            {isTyping ? (
+              <div className="mn-chat-q__row mn-chat-q__row--bot" aria-hidden>
+                <div className="mn-chat-q__avatar">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={nongPoseSrc("thinking")} alt="" />
+                </div>
+                <div className="mn-chat-q__bubble">
+                  <span className="mn-chat-q__typing">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </div>
               </div>
-              <div className="mn-chat-q__bubble">
-                <span className="mn-chat-q__typing">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              </div>
-            </div>
-          ) : null}
-          <div ref={logEndRef} />
-        </div>
+            ) : null}
+            <div ref={logEndRef} />
+          </div>
 
-        <div
-          className={`mn-chat-q__composer${composerFocusPulse ? " mn-chat-q__composer--focus" : ""}`}
-          ref={composerRef}
-        >
-          <div className="mn-chat-q__composer-inner">{renderComposer()}</div>
+          <div
+            className="mn-chat-q__composer mn-chat-q__composer--under-q"
+            ref={composerRef}
+            data-testid="question-answers"
+          >
+            <div className="mn-chat-q__composer-inner">{renderComposer()}</div>
+          </div>
         </div>
 
         <p className="mn-chat-q__privacy-footer">
