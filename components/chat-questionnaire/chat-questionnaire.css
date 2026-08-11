@@ -903,9 +903,14 @@
     padding: 8px 8px 28px;
   }
 
-  .mn-chat-q__log {
-    padding: 16px 12px 10px;
-    gap: 14px;
+  .mn-chat-q__page {
+    padding: 14px 10px 8px;
+  }
+
+  .mn-chat-q__composer--under-q {
+    /* avatar 44px + gap 12px on small screens */
+    padding-left: 56px;
+    padding-right: 12px;
   }
 
   .mn-chat-q__avatar {
