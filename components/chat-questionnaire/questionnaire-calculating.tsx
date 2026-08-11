@@ -13,7 +13,8 @@ type QuestionnaireCalculatingProps = Readonly<{
   locale: Locale;
   status: CalculatingStatus;
   onSeeResults: () => void;
-  onRetry: () => void;
+  /** @deprecated Retry control removed from UI; kept optional for call-site compatibility. */
+  onRetry?: () => void;
   onEmailSubmit: (email: string) => Promise<void> | void;
 }>;
 
@@ -21,7 +22,6 @@ export function QuestionnaireCalculating({
   locale,
   status,
   onSeeResults,
-  onRetry,
   onEmailSubmit
 }: QuestionnaireCalculatingProps) {
   const copy = getWelcomeCopy(locale === "zh-CN" ? "en" : locale);
@@ -93,13 +93,11 @@ export function QuestionnaireCalculating({
         </button>
       ) : null}
 
-      <p className="mn-quiz-calc__note">
-        {isReady
-          ? copy.calcReadyNote
-          : showFallback
-            ? copy.calcSavedNote
-            : copy.calcKeepOpen}
-      </p>
+      {!showFallback ? (
+        <p className="mn-quiz-calc__note">
+          {isReady ? copy.calcReadyNote : copy.calcKeepOpen}
+        </p>
+      ) : null}
 
       <div className="mn-quiz-calc__support">
         <a href={LINE_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
@@ -109,16 +107,14 @@ export function QuestionnaireCalculating({
 
       <p className="mn-quiz-calc__disclaimer">{copy.calcDisclaimer}</p>
 
-      {/* HTML parity: email capture only on slow/error fallback (~15s), not always-on */}
+      {/* Slow/error: message + stacked email + submit (no retry). */}
       {showFallback ? (
         <div className="mn-quiz-calc__fallback" data-testid="calc-fallback">
-          <p>{status === "error" ? copy.calcError : copy.calcLonger}</p>
-          <div className="mn-quiz-calc__actions">
-            <button type="button" onClick={onRetry}>
-              {copy.calcRetry}
-            </button>
-          </div>
-          <div className="mn-quiz-calc__emailbox" data-testid="calc-emailbox">
+          <p className="mn-quiz-calc__fallback-msg">
+            {status === "error" ? copy.calcError : copy.calcLonger}
+          </p>
+          <p className="mn-quiz-calc__fallback-saved">{copy.calcSavedNote}</p>
+          <div className="mn-quiz-calc__email-stack" data-testid="calc-emailbox">
             <input
               type="email"
               inputMode="email"
@@ -137,10 +133,13 @@ export function QuestionnaireCalculating({
             />
             <button
               type="button"
+              className="mn-quiz-calc__email-submit"
               disabled={emailSent || emailBusy}
               onClick={() => void submitEmail()}
             >
-              {emailSent ? "✓" : copy.calcSendWhenReady || copy.calcSend || "→"}
+              {emailSent
+                ? "✓"
+                : copy.calcSendWhenReady || copy.calcSend || "Send when ready"}
             </button>
           </div>
           {emailSent ? (

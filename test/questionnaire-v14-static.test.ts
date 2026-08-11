@@ -228,12 +228,16 @@ describe("questionnaire v14 UX on v6 schema", () => {
       "utf8"
     );
     assert.match(calc, /showFallback/);
-    assert.match(calc, /calc-emailbox/);
+    assert.match(calc, /calc-emailbox|email-stack/);
     assert.match(calc, /nongPoseSrc\(\"wai\"\)/);
+    // No retry button in fallback UI
+    assert.doesNotMatch(calc, /calcRetry/);
+    assert.doesNotMatch(calc, /onClick=\{onRetry\}/);
+    assert.match(calc, /email-stack|email-submit/);
     // Email only inside fallback branch (not always-on)
     assert.match(
       calc,
-      /showFallback \? \([\s\S]*calc-emailbox/
+      /showFallback \? \([\s\S]*email/
     );
     const css = readFileSync(
       join(root, "components/chat-questionnaire/chat-questionnaire.css"),

@@ -1560,78 +1560,80 @@
 }
 
 .mn-quiz-calc__fallback {
-  margin-top: 18px;
+  margin-top: 22px;
   max-width: 420px;
   width: 100%;
-  padding: 15px;
+  padding: 18px 16px 20px;
   border-radius: 14px;
   background: #fff8e8;
   border: 1px solid #eadfbf;
+  text-align: left;
+  box-sizing: border-box;
 }
 
-.mn-quiz-calc__fallback p {
-  font-size: 0.84rem;
+.mn-quiz-calc__fallback-msg {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #5c5340;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.mn-quiz-calc__fallback-saved {
+  font-size: 0.88rem;
+  line-height: 1.45;
   color: #6d624a;
-  margin: 0 0 10px;
+  margin: 0 0 16px;
 }
 
-.mn-quiz-calc__actions {
+/* Stacked: email on its own row, submit on the next */
+.mn-quiz-calc__email-stack {
   display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
 }
 
-.mn-quiz-calc__actions button,
-.mn-quiz-calc__email button {
-  border: 1px solid #cdd9d2;
-  border-radius: 999px;
-  background: #fff;
-  color: #315f4e;
-  padding: 9px 13px;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.mn-quiz-calc__emailbox {
-  display: flex;
-  gap: 8px;
-  width: min(340px, 100%);
-  margin: 18px auto 0;
-}
-
-.mn-quiz-calc__emailbox input {
-  flex: 1;
-  min-width: 0;
+.mn-quiz-calc__email-stack input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   border: 1.5px solid var(--cq-line, #e5e0d2);
   border-radius: 12px;
-  padding: 11px 12px;
+  padding: 12px 14px;
   font: inherit;
+  font-size: 1rem;
   background: #fff;
+  color: #22304e;
 }
 
-.mn-quiz-calc__emailbox button {
+.mn-quiz-calc__email-submit {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   border: 0;
   border-radius: 12px;
-  padding: 0 16px;
+  padding: 13px 16px;
   background: #22304e;
   color: #fff;
   font: inherit;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 700;
   cursor: pointer;
+  text-align: center;
 }
 
-.mn-quiz-calc__emailbox button:disabled {
+.mn-quiz-calc__email-submit:disabled {
   opacity: 0.7;
+  cursor: default;
 }
 
 .mn-quiz-calc__email-thanks {
-  margin: 8px 0 0 !important;
-  color: #1f5c42 !important;
+  margin: 12px 0 0;
+  color: #1f5c42;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 /* Typing indicator */
