@@ -898,6 +898,9 @@ export function ChatQuestionnaire({
    * Paged single-question mode (HTML collapse parity):
    * show only the current turn's question / reaction / halfway card —
    * not a scrolling transcript of prior answers.
+   *
+   * First page special case: intro greeting stays with the first question
+   * ("Ready. Let's begin…" + firstName) until the user advances.
    */
   function isLogItemVisibleOnPage(msg: LogMessage, index: number): boolean {
     if (!state) {
@@ -905,6 +908,17 @@ export function ChatQuestionnaire({
     }
 
     const log = state.log;
+    const firstBot = log.find(
+      (entry): entry is Extract<LogMessage, { kind: "bot" }> =>
+        entry.kind === "bot"
+    );
+    const onFirstQuestionPage =
+      state.phase === "active" &&
+      firstBot != null &&
+      state.turnIndex === firstBot.turnIndex &&
+      currentTurn?.k === firstBot.turnKey &&
+      Object.keys(state.answers).length === 0;
+
     const lastHalfway = [...log]
       .map((entry, i) => ({ entry, i }))
       .reverse()
@@ -923,6 +937,11 @@ export function ChatQuestionnaire({
       return false;
     }
 
+    // Intro greeting: with the first question on page 1 (not only before the bot exists)
+    if (msg.kind === "intro") {
+      return onFirstQuestionPage || (!firstBot && state.phase === "active");
+    }
+
     // Only the latest bot prompt for the active turn
     if (msg.kind === "bot") {
       return (
@@ -937,17 +956,13 @@ export function ChatQuestionnaire({
       return false;
     }
 
-    // Intro only on first screen before any bot question
-    if (msg.kind === "intro") {
-      return !log.some((entry) => entry.kind === "bot");
-    }
-
     // Section cards are replaced by the full-screen stage overlay
     if (msg.kind === "section") {
       return false;
     }
 
     // Show only the most recent react/ack if it sits after the current bot
+    // (includes meetLine / name react after answering firstName, etc.)
     if (msg.kind === "react" || msg.kind === "ack") {
       const lastBotIdx = (() => {
         for (let i = log.length - 1; i >= 0; i -= 1) {
@@ -961,22 +976,29 @@ export function ChatQuestionnaire({
         }
         return -1;
       })();
-      if (lastBotIdx < 0 || index <= lastBotIdx) {
-        return false;
-      }
-      // Only the last reaction after current bot
-      for (let i = log.length - 1; i > index; i -= 1) {
-        const entry = log[i];
-        if (entry?.kind === "react" || entry?.kind === "ack") {
-          return false;
+      // If we just answered and already advanced, still show the latest react
+      // that is the newest message (brief beat) — otherwise only after current bot.
+      if (lastBotIdx >= 0 && index > lastBotIdx) {
+        for (let i = log.length - 1; i > index; i -= 1) {
+          const entry = log[i];
+          if (entry?.kind === "react" || entry?.kind === "ack") {
+            return false;
+          }
+          if (entry?.kind === "bot") {
+            break;
+          }
         }
-        if (entry?.kind === "bot") {
-          break;
-        }
+        return true;
       }
-      return true;
+      // Reaction for previous turn: show only if it's the newest log entry
+      // (before the next bot is appended) so meetLine is not dropped.
+      if (index === log.length - 1) {
+        return true;
+      }
+      return false;
     }
 
+    // Transient system lines (e.g. vegan skip) — only while newest
     if (msg.kind === "system") {
       return index === log.length - 1;
     }

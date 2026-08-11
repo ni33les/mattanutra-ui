@@ -273,6 +273,22 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.equal(started.state.phase, "active");
     assert.equal(getDefinition(started.state).turns[0]?.k, "firstName");
 
+    // First page must keep intro greeting + first question together
+    assert.ok(
+      started.state.log.some((m) => m.kind === "intro"),
+      "engine should emit intro bubble"
+    );
+    assert.ok(
+      started.state.log.some((m) => m.kind === "bot" && m.turnKey === "firstName"),
+      "engine should emit firstName bot on start"
+    );
+    const intro = started.state.log.find((m) => m.kind === "intro");
+    assert.ok(intro && intro.kind === "intro");
+    if (intro && intro.kind === "intro") {
+      assert.match(intro.text, /Ready|matters most/i);
+      assert.match(intro.hint || "", /One question at a time/i);
+    }
+
     let { state } = started;
     const r1 = applyAnswer(state, "firstName", "Alex");
     assert.equal(r1.ok, true);
@@ -290,5 +306,19 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.equal(reopened.state.answers.firstName, undefined);
     assert.equal(reopened.state.turnIndex, 0);
     assert.equal(reopened.state.phase, "active");
+  });
+
+  it("paged mode keeps intro visible with the first question in source", () => {
+    const chat = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.tsx"),
+      "utf8"
+    );
+    assert.match(chat, /onFirstQuestionPage/);
+    assert.match(chat, /kind === \"intro\"/);
+    // Must not hide intro merely because a bot row exists
+    assert.doesNotMatch(
+      chat,
+      /kind === \"intro\"[\s\S]{0,80}!log\.some\(\(entry\) => entry\.kind === \"bot\"\)/
+    );
   });
 });
