@@ -302,6 +302,7 @@ function botMessage(
     turnIndex,
     pose: turn.pose || "open",
     question: turn.q,
+    emoji: turn.emoji,
     why: turn.why,
     remainingHint: turn.nosec ? undefined : remainingHint(definition, remaining)
   };

@@ -1029,6 +1029,10 @@ export function ChatQuestionnaire({
     }
 
     if (msg.kind === "bot") {
+      // Prefer log emoji; fall back to turn def (older saved sessions)
+      const turnEmoji =
+        msg.emoji ||
+        definition.turns.find((t) => t.k === msg.turnKey)?.emoji;
       return (
         <div
           key={`bot-${msg.turnKey}-${index}`}
@@ -1040,7 +1044,14 @@ export function ChatQuestionnaire({
             <img src={nongPoseSrc(msg.pose)} alt="" />
           </div>
           <div className="mn-chat-q__bubble">
-            <div className="mn-chat-q__q">{msg.question}</div>
+            <div className="mn-chat-q__q">
+              {turnEmoji ? (
+                <span className="mn-chat-q__em" aria-hidden>
+                  {turnEmoji}
+                </span>
+              ) : null}
+              {msg.question}
+            </div>
             {msg.why ? <div className="mn-chat-q__why">{msg.why}</div> : null}
             {msg.remainingHint ? (
               <span className="mn-chat-q__countchip">{msg.remainingHint}</span>

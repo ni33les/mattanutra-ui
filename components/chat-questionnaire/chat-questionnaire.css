@@ -420,6 +420,15 @@
   line-height: 1.42;
 }
 
+/* Food-frequency and similar question leading emojis (HTML .em) */
+.mn-chat-q__em {
+  display: inline-block;
+  margin-right: 0.4em;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1;
+}
+
 .mn-chat-q__why {
   font-size: 0.92rem;
   color: var(--cq-ink-soft);
@@ -552,9 +561,9 @@
 }
 
 .mn-chat-q__composer--under-q {
-  /* Align with bubble column: avatar 46px + gap 12px */
+  /* Align with bubble column: avatar 52px + gap 12px */
   margin: 6px 0 18px;
-  padding: 0 20px 0 58px;
+  padding: 0 20px 0 64px;
   max-width: 100%;
   box-sizing: border-box;
 }
@@ -943,21 +952,21 @@
   }
 
   .mn-chat-q__composer--under-q {
-    /* avatar 44px + gap 12px on small screens */
-    padding-left: 56px;
+    /* avatar 48px + gap 12px on small screens */
+    padding-left: 60px;
     padding-right: 12px;
   }
 
   .mn-chat-q__avatar {
-    width: 44px;
-    height: 44px;
-    flex-basis: 44px;
-    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+    border-radius: 0;
   }
 
   .mn-chat-q__avatar img {
-    width: 40px;
-    max-height: 44px;
+    width: 48px;
+    max-height: 52px;
   }
 }
 

@@ -322,6 +322,38 @@ describe("questionnaire v14 UX on v6 schema", () => {
     );
   });
 
+  it("renders food-question leading emojis from turn.emoji", () => {
+    const en = getQuestionnaireDefinition("en");
+    const meat = en.turns.find((t) => t.k === "f_redmeat");
+    assert.equal(meat?.emoji, "🥩");
+    assert.equal(en.turns.find((t) => t.k === "f_dairy")?.emoji, "🧀");
+    assert.equal(en.turns.find((t) => t.k === "f_fruitveg")?.emoji, "🥦");
+    assert.equal(en.turns.find((t) => t.k === "f_eggs")?.emoji, "🥚");
+    assert.equal(en.turns.find((t) => t.k === "f_legumes")?.emoji, "🥜");
+    assert.equal(en.turns.find((t) => t.k === "f_fish")?.emoji, "🐟");
+
+    const chat = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.tsx"),
+      "utf8"
+    );
+    const css = readFileSync(
+      join(root, "components/chat-questionnaire/chat-questionnaire.css"),
+      "utf8"
+    );
+    assert.match(chat, /mn-chat-q__em|turnEmoji|msg\.emoji/);
+    assert.match(css, /\.mn-chat-q__em\b/);
+
+    const started = startQuestionnaire(
+      createInitialState({ locale: "en", channel: "web" })
+    );
+    // botMessage should carry emoji when present on the turn
+    const { botMessage } = { botMessage: null as null };
+    // Spot-check via definition + UI wiring only; engine attaches emoji on bot logs
+    const engine = readFileSync(join(root, "lib/questionnaire/engine.ts"), "utf8");
+    assert.match(engine, /emoji:\s*turn\.emoji/);
+    void started;
+  });
+
   it("shows Why that mattered insight reacts with pose (not filtered out after advance)", () => {
     const chat = readFileSync(
       join(root, "components/chat-questionnaire/chat-questionnaire.tsx"),

@@ -33,6 +33,8 @@ export type TurnOption = Readonly<{
 export type TurnDef = Readonly<{
   btn?: string;
   cond?: TurnCondition | string;
+  /** Leading emoji on the question (e.g. food frequency 🥩 🧀). */
+  emoji?: string;
   excl?: readonly string[];
   finish?: number | boolean;
   k: string;
@@ -127,6 +129,8 @@ export type LogMessage =
       turnIndex: number;
       pose: string;
       question: string;
+      /** Leading emoji from turn def (food questions, etc.). */
+      emoji?: string;
       why?: string;
       remainingHint?: string;
     }>
