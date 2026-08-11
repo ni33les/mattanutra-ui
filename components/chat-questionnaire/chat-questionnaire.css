@@ -303,16 +303,16 @@
   padding-left: 48px;
 }
 
-/* Nong pose — v14 circular avatar frame */
+/* Nong pose — free-standing (no circular crop/frame) */
 .mn-chat-q__avatar {
-  width: 46px;
-  height: 46px;
-  flex: 0 0 46px;
-  border-radius: 50%;
-  background: var(--cq-card);
-  border: 1.5px solid var(--cq-line);
-  box-shadow: var(--cq-shadow);
-  overflow: hidden;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -321,13 +321,14 @@
 }
 
 .mn-chat-q__avatar img {
-  width: 42px;
+  width: 52px;
   height: auto;
-  max-height: 46px;
+  max-height: 56px;
   object-fit: contain;
   object-position: center bottom;
   display: block;
   transform: none;
+  filter: drop-shadow(0 4px 8px rgba(16, 43, 61, 0.1));
 }
 
 .mn-chat-q__row--health-preview .mn-chat-q__avatar {
@@ -337,8 +338,8 @@
 }
 
 .mn-chat-q__row--health-preview .mn-chat-q__avatar img {
-  width: 72px;
-  max-height: 72px;
+  width: 76px;
+  max-height: 80px;
 }
 
 .mn-chat-q__row--history-collapsed {
