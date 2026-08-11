@@ -23,7 +23,7 @@
   max-width: none;
   margin: 0;
   /* Bottom padding keeps the chat off the page edge / footer */
-  padding: 12px 12px 36px;
+  padding: 12px 16px 36px;
   color: var(--cq-ink);
   background-color: var(--cq-paper);
   /* v14 body wash */
@@ -32,16 +32,17 @@
     #eff5ee 0%,
     var(--cq-paper) 60%
   );
-  font-size: 16px;
+  /* Roomier than first pass — business: column felt too thin / type too small */
+  font-size: 17px;
   line-height: 1.55;
   box-sizing: border-box;
 }
 
-/* Constrain chat content column (v14 .wrap ≈ 600px) */
+/* Wider content column (HTML later override .wrap max-width: 680px; we go slightly wider) */
 .mn-chat-q__header,
 .mn-chat-q__frame {
   width: 100%;
-  max-width: 600px;
+  max-width: 720px;
   margin-inline: auto;
 }
 
