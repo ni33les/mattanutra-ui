@@ -8,7 +8,7 @@ import {
   normalizeFinancialPage,
   normalizeFinancialPageSize,
   signedUsdForRow
-} from "../lib/admin-financials.ts";
+} from "../lib/admin-financials-display.ts";
 
 const stripePayments = readFileSync(
   new URL("../lib/stripe-payments.ts", import.meta.url),

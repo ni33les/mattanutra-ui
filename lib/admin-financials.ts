@@ -2,6 +2,17 @@ import {
   adminDashboardRangeStart,
   type AdminDashboardRange
 } from "@/lib/admin-dashboard-data";
+import {
+  financialDirection,
+  formatLedgerMoney,
+  normalizeFinancialEntryBasis,
+  normalizeFinancialPage,
+  normalizeFinancialPageSize,
+  signedUsdForRow,
+  type AdminFinancialCategory,
+  type AdminFinancialDirection,
+  type AdminFinancialEntryBasis
+} from "@/lib/admin-financials-display";
 import { getSql } from "@/lib/db";
 
 export type AdminFinancialMetricId =
@@ -12,16 +23,19 @@ export type AdminFinancialMetricId =
   | "transactions";
 
 export type AdminFinancialEntryType = "actual" | "nominal";
-export type AdminFinancialEntryBasis = "nominal" | "actual" | "all";
-export type AdminFinancialDirection = "in" | "out" | "neutral";
-export type AdminFinancialCategory =
-  | "ai"
-  | "hosting"
-  | "other"
-  | "payment_fee"
-  | "payout"
-  | "refund"
-  | "revenue";
+export type {
+  AdminFinancialCategory,
+  AdminFinancialDirection,
+  AdminFinancialEntryBasis
+};
+export {
+  financialDirection,
+  formatLedgerMoney,
+  normalizeFinancialEntryBasis,
+  normalizeFinancialPage,
+  normalizeFinancialPageSize,
+  signedUsdForRow
+};
 
 export type AdminFinancialTransactionRow = Readonly<{
   amount: number;
@@ -293,105 +307,6 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {};
 }
 
-export function normalizeFinancialEntryBasis(
-  value: string | null | undefined
-): AdminFinancialEntryBasis {
-  if (value === "actual" || value === "all") {
-    return value;
-  }
-
-  return "nominal";
-}
-
-export function normalizeFinancialPage(value: number | string | null | undefined) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return 1;
-  }
-
-  return Math.floor(parsed);
-}
-
-export function normalizeFinancialPageSize(
-  value: number | string | null | undefined
-) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return DEFAULT_PAGE_SIZE;
-  }
-
-  return Math.min(MAX_PAGE_SIZE, Math.floor(parsed));
-}
-
-/**
- * Direction for signed display. Outflows render in parentheses.
- * Stripe bank transfers (other + stripe_payout) are neutral — not sales.
- */
-export function financialDirection(
-  category: AdminFinancialCategory,
-  metadata: Record<string, unknown> = {}
-): AdminFinancialDirection {
-  if (category === "revenue") {
-    return "in";
-  }
-
-  if (
-    category === "payout" ||
-    category === "refund" ||
-    category === "payment_fee" ||
-    category === "ai" ||
-    category === "hosting"
-  ) {
-    return "out";
-  }
-
-  if (metadata.accountingBasis === "stripe_payout" || metadata.voided === true) {
-    return "neutral";
-  }
-
-  return "neutral";
-}
-
-export function signedUsdForRow(
-  amountUsd: number,
-  direction: AdminFinancialDirection
-) {
-  if (direction === "out") {
-    return -Math.abs(amountUsd);
-  }
-
-  if (direction === "in") {
-    return Math.abs(amountUsd);
-  }
-
-  return 0;
-}
-
-/**
- * Format ledger amounts: outflows as ($x.xx), inflows as $x.xx.
- */
-export function formatLedgerMoney(
-  amountUsd: number,
-  direction: AdminFinancialDirection,
-  locale: string,
-  currency = "USD"
-) {
-  const absolute = Math.abs(amountUsd);
-  const formatted = new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2
-  }).format(absolute);
-
-  if (direction === "out") {
-    return `(${formatted})`;
-  }
-
-  return formatted;
-}
-
 export function emptyFinancials(
   range: AdminDashboardRange,
   options: Readonly<{
@@ -402,7 +317,10 @@ export function emptyFinancials(
 ): AdminFinancialsData {
   const entryBasis = options.entryBasis ?? "nominal";
   const page = options.page ?? 1;
-  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+  const pageSize = options.pageSize ?? normalizeFinancialPageSize(undefined, {
+    defaultSize: DEFAULT_PAGE_SIZE,
+    maxSize: MAX_PAGE_SIZE
+  });
   const buckets = buildBuckets(range, []);
   const empty = buckets.map(() => 0);
 
@@ -491,7 +409,10 @@ export async function getAdminFinancialsData(
   const range = query.range;
   const entryBasis = normalizeFinancialEntryBasis(query.entryBasis);
   const page = normalizeFinancialPage(query.page);
-  const pageSize = normalizeFinancialPageSize(query.pageSize);
+  const pageSize = normalizeFinancialPageSize(query.pageSize, {
+    defaultSize: DEFAULT_PAGE_SIZE,
+    maxSize: MAX_PAGE_SIZE
+  });
   const sql = getSql();
 
   if (!sql) {

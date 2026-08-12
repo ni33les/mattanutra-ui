@@ -4,14 +4,16 @@ import { useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import type {
-  AdminFinancialCategory,
-  AdminFinancialDirection,
-  AdminFinancialEntryBasis,
   AdminFinancialMetricId,
   AdminFinancialTransactionRow,
   AdminFinancialsData
 } from "@/lib/admin-financials";
-import { formatLedgerMoney } from "@/lib/admin-financials";
+import {
+  formatLedgerMoney,
+  type AdminFinancialCategory,
+  type AdminFinancialDirection,
+  type AdminFinancialEntryBasis
+} from "@/lib/admin-financials-display";
 import type { Locale } from "@/lib/i18n";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import {
