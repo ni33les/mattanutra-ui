@@ -73,7 +73,6 @@ import {
 import {
   addressDisplayLines,
   addressNoteLines,
-  billingAddressForOrder,
   deliveryAddressForOrder,
   emptyRetailField,
   formatDate,
@@ -2030,22 +2029,12 @@ export function AdminRetailStockView({
   const customerOrderDeliveryAddress = customerOrderDetail
     ? deliveryAddressForOrder(customerOrderDetail)
     : null;
-  const customerOrderBillingAddress = customerOrderDetail
-    ? billingAddressForOrder(customerOrderDetail)
-    : null;
   const customerOrderDeliveryAddressLines = addressDisplayLines(
     customerOrderDeliveryAddress
-  );
-  const customerOrderBillingAddressLines = addressDisplayLines(
-    customerOrderBillingAddress
   );
   const customerOrderDeliveryNoteLines = addressNoteLines(
     labels,
     customerOrderDeliveryAddress
-  );
-  const customerOrderBillingNoteLines = addressNoteLines(
-    labels,
-    customerOrderBillingAddress
   );
   const customerOrderWorkflowSteps = customerOrderDetail
     ? buildCustomerOrderWorkflowSteps(labels, customerOrderDetail)
@@ -2770,7 +2759,7 @@ export function AdminRetailStockView({
                   >
                     {labels.stock.deliveryDetails}
                   </h3>
-                  <div className="mt-3 grid gap-4 text-sm text-gray-600 md:grid-cols-2">
+                  <div className="mt-3 grid gap-4 text-sm text-gray-600 md:grid-cols-1">
                     <div className="rounded-md bg-gray-50 p-3 ring-1 ring-gray-100">
                       <div className="text-xs font-semibold uppercase text-gray-500">
                         {labels.stock.deliveryAddress}
@@ -2787,36 +2776,6 @@ export function AdminRetailStockView({
                       {customerOrderDeliveryNoteLines.length > 0 ? (
                         <div className="mt-3 space-y-1 border-t border-gray-200 pt-3 text-xs text-gray-500">
                           {customerOrderDeliveryNoteLines.map((line) => (
-                            <div key={line}>{line}</div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="rounded-md bg-gray-50 p-3 ring-1 ring-gray-100">
-                      <div className="text-xs font-semibold uppercase text-gray-500">
-                        {labels.stock.billingAddress}
-                      </div>
-                      {customerOrderDetail.deliveryDetails
-                        ?.billingSameAsShipping ? (
-                        <div className="mt-2 text-sm font-medium text-gray-800">
-                          {labels.stock.billingSameAsDelivery}
-                        </div>
-                      ) : null}
-                      <div className="mt-2 space-y-1 text-gray-800">
-                        {customerOrderBillingAddressLines.length > 0 ? (
-                          customerOrderBillingAddressLines.map((line) => (
-                            <div key={line}>{line}</div>
-                          ))
-                        ) : customerOrderDetail.deliveryDetails
-                            ?.billingSameAsShipping ? (
-                          null
-                        ) : (
-                          <div className="text-gray-500">{emptyRetailField}</div>
-                        )}
-                      </div>
-                      {customerOrderBillingNoteLines.length > 0 ? (
-                        <div className="mt-3 space-y-1 border-t border-gray-200 pt-3 text-xs text-gray-500">
-                          {customerOrderBillingNoteLines.map((line) => (
                             <div key={line}>{line}</div>
                           ))}
                         </div>

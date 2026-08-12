@@ -72,14 +72,6 @@ export function deliveryAddressForOrder(order: AdminRetailCustomerOrder) {
   );
 }
 
-export function billingAddressForOrder(order: AdminRetailCustomerOrder) {
-  if (order.deliveryDetails?.billingSameAsShipping) {
-    return null;
-  }
-
-  return order.deliveryDetails?.billingAddress ?? null;
-}
-
 export function addressDisplayLines(address: AdminRetailCustomerOrderAddress | null) {
   if (!address) {
     return [];
@@ -289,11 +281,8 @@ export function printRetailOrderDocument({
   const documentTitle = retailOrderDocumentTitle(labels, kind);
   const includePrices = kind === "invoice" || kind === "order";
   const shippingAddress = deliveryAddressForOrder(order);
-  const billingAddress = billingAddressForOrder(order);
   const shippingLines = addressDisplayLines(shippingAddress);
   const shippingContactLines = addressContactLines(labels, shippingAddress);
-  const billingLines = addressDisplayLines(billingAddress);
-  const billingContactLines = addressContactLines(labels, billingAddress);
   const expectedDate =
     formatDate(
       order.fulfillmentPromise?.etaDate ??
@@ -312,14 +301,6 @@ export function printRetailOrderDocument({
     shippingLines,
     shippingContactLines,
     emptyRetailField
-  );
-  const billingSection = addressBlockHtml(
-    labels.stock.billingAddress,
-    billingLines,
-    billingContactLines,
-    order.deliveryDetails?.billingSameAsShipping
-      ? labels.stock.billingSameAsDelivery
-      : emptyRetailField
   );
   const summarySection = `
     <section class="panel">
@@ -434,11 +415,7 @@ export function printRetailOrderDocument({
     `;
   };
 
-  const standardSheetHtml = (
-    sheetTitle: string,
-    showPrices: boolean,
-    showBilling: boolean
-  ) => `
+  const standardSheetHtml = (sheetTitle: string, showPrices: boolean) => `
     <main class="sheet">
       <header>
         <div>
@@ -450,7 +427,6 @@ export function printRetailOrderDocument({
       <div class="grid">
         ${summarySection}
         ${deliverySection}
-        ${showBilling ? billingSection : ""}
       </div>
       <section class="panel">
         <h2>${escapeHtml(labels.stock.orderItems)}</h2>
@@ -466,18 +442,14 @@ export function printRetailOrderDocument({
   const standardBody =
     kind === "order-pack"
       ? [
-          standardSheetHtml(labels.stock.printOrder, true, true),
-          standardSheetHtml(labels.stock.packingSheet, false, false),
+          standardSheetHtml(labels.stock.printOrder, true),
+          standardSheetHtml(labels.stock.packingSheet, false),
           shippingLabelSheetHtml(),
-          standardSheetHtml(labels.stock.invoice, true, true)
+          standardSheetHtml(labels.stock.invoice, true)
         ].join("")
       : kind === "shipping-label"
         ? shippingLabelSheetHtml()
-        : standardSheetHtml(
-            documentTitle,
-            includePrices,
-            kind === "invoice" || kind === "order"
-          );
+        : standardSheetHtml(documentTitle, includePrices);
   const html = `
     <!doctype html>
     <html>

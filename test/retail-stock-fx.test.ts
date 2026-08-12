@@ -362,8 +362,10 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /customerOrderRetailValue\(customerOrderDetail\)/);
 	    assert.match(view, /printRetailOrderDocument/);
 	    assert.match(view, /deliveryAddressForOrder\(customerOrderDetail\)/);
-	    assert.match(view, /billingAddressForOrder\(customerOrderDetail\)/);
-	    assert.match(orderDocuments, /billingSameAsShipping\) \{\s*return null;\s*\}/);
+	    assert.doesNotMatch(view, /billingAddressForOrder/);
+	    assert.doesNotMatch(view, /labels\.stock\.billingAddress/);
+	    assert.doesNotMatch(view, /customerOrderBilling/);
+	    assert.doesNotMatch(orderDocuments, /billingAddressForOrder|billingSection|showBilling/);
 	    assert.match(view, /labels\.stock\.downloadPdf/);
 	    assert.match(view, /labels\.stock\.packingSheet/);
 	    assert.match(orderDocuments, /labels\.stock\.shippingLabel/);
@@ -384,12 +386,11 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /labels\.stock\.deliveryDetails/);
 	    assert.match(orderDocuments, /function addressNoteLines/);
 	    assert.match(view, /customerOrderDeliveryNoteLines\.map/);
-	    assert.match(view, /customerOrderBillingNoteLines\.map/);
 	    assert.match(view, /kind: "order-pack"/);
-	    assert.match(orderDocuments, /standardSheetHtml\(labels\.stock\.printOrder, true, true\)/);
-	    assert.match(orderDocuments, /standardSheetHtml\(labels\.stock\.packingSheet, false, false\)/);
+	    assert.match(orderDocuments, /standardSheetHtml\(labels\.stock\.printOrder, true\)/);
+	    assert.match(orderDocuments, /standardSheetHtml\(labels\.stock\.packingSheet, false\)/);
 	    assert.match(orderDocuments, /shippingLabelSheetHtml\(\)/);
-	    assert.match(orderDocuments, /standardSheetHtml\(labels\.stock\.invoice, true, true\)/);
+	    assert.match(orderDocuments, /standardSheetHtml\(labels\.stock\.invoice, true\)/);
 	    assert.match(view, /grid gap-x-3 gap-y-4 text-sm text-gray-600 sm:grid-cols-4/);
 	    assert.match(view, /<FileDown aria-hidden="true"/);
 	    assert.match(view, /<PackageCheck aria-hidden="true"/);
@@ -509,7 +510,7 @@ describe("retail stock and FX infrastructure", () => {
 		    assert.doesNotMatch(view, /downloadStockCsv\(rows, labels, showOrganisationContext\)/);
 		    assert.doesNotMatch(view, /includeOrganisation[\s\S]*labels\.stock\.organisation/);
 	    assert.match(view, /showOrganisationContext \? \([\s\S]*labels\.stock\.organisation/);
-	    assert.match(view, /colSpan=\{showOrganisationContext \? 10 : 9\}/);
+	    assert.match(view, /colSpan=\{showOrganisationContext \? 11 : 10\}/);
 			    assert.match(view, /colSpan=\{showOrganisationContext \? 7 : 6\}/);
 		    assert.doesNotMatch(content, /Wholesale\s+price/);
 		    assert.match(content, /wholesalePrice: "Wholesale"/);
