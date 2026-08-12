@@ -133,9 +133,45 @@ type RetailStockPanel =
 
 type RetailStockFilter =
   | "all"
+  | "eligible_for_sale"
+  | "ineligible_for_sale"
   | "in_stock"
   | "low_stock"
   | "out_of_stock";
+
+/** Sale eligibility: active + RRP > 0 + (in stock or backorder allowed). */
+function stockRowEligibleForSale(row: AdminRetailStockRow): boolean {
+  if (row.status !== "active") {
+    return false;
+  }
+
+  const rrp = row.retailPriceAmount;
+  if (typeof rrp !== "number" || !Number.isFinite(rrp) || rrp <= 0) {
+    return false;
+  }
+
+  return row.stockQuantity > 0 || row.backorderPolicy !== "deny";
+}
+
+function stockRowIneligibleReason(
+  row: AdminRetailStockRow,
+  labels: AdminContent["stock"]
+): string {
+  if (row.status !== "active") {
+    return labels.ineligibleInactive ?? "Inactive";
+  }
+
+  const rrp = row.retailPriceAmount;
+  if (typeof rrp !== "number" || !Number.isFinite(rrp) || rrp <= 0) {
+    return labels.ineligibleMissingRrp ?? "Missing RRP";
+  }
+
+  if (row.stockQuantity <= 0 && row.backorderPolicy === "deny") {
+    return labels.ineligibleNoStock ?? "Out of stock, no backorder";
+  }
+
+  return labels.ineligibleForSale ?? "Ineligible for sale";
+}
 
 type MovementDraft = Readonly<{
   expiresAt: string;
@@ -432,14 +468,22 @@ export function AdminRetailStockView({
     () =>
       organisationStockRows
         .filter((row) => {
-          if (selectedStockFilter !== "all") {
-            return (
-              stockAvailabilityStatus(row, adviceByStockId.get(row.id)) ===
-              selectedStockFilter
-            );
+          if (selectedStockFilter === "all") {
+            return true;
           }
 
-          return true;
+          if (selectedStockFilter === "eligible_for_sale") {
+            return stockRowEligibleForSale(row);
+          }
+
+          if (selectedStockFilter === "ineligible_for_sale") {
+            return !stockRowEligibleForSale(row);
+          }
+
+          return (
+            stockAvailabilityStatus(row, adviceByStockId.get(row.id)) ===
+            selectedStockFilter
+          );
         })
         .filter((row) =>
           searchMatches(stockSearch, [
@@ -587,8 +631,13 @@ export function AdminRetailStockView({
   }, [adviceRows, rows]);
 
   const stockSummary = useMemo(() => {
-    const summary: Record<RetailStockAvailabilityStatus, number> = {
+    const summary: Record<RetailStockAvailabilityStatus, number> & {
+      eligible_for_sale: number;
+      ineligible_for_sale: number;
+    } = {
+      eligible_for_sale: 0,
       in_stock: 0,
+      ineligible_for_sale: 0,
       low_stock: 0,
       out_of_stock: 0
     };
@@ -602,6 +651,12 @@ export function AdminRetailStockView({
       if (availabilityStatus) {
         summary[availabilityStatus] += 1;
       }
+
+      if (stockRowEligibleForSale(row)) {
+        summary.eligible_for_sale += 1;
+      } else {
+        summary.ineligible_for_sale += 1;
+      }
     }
 
     return summary;
@@ -613,6 +668,20 @@ export function AdminRetailStockView({
       label: labels.stock.all,
       series: [],
       value: formatNumber(organisationStockRows.length, locale)
+    },
+    {
+      color: businessMetricColors.succeeded,
+      id: "eligible_for_sale",
+      label: labels.stock.eligibleForSale ?? "Eligible for sale",
+      series: [],
+      value: formatNumber(stockSummary.eligible_for_sale, locale)
+    },
+    {
+      color: businessMetricColors.failed,
+      id: "ineligible_for_sale",
+      label: labels.stock.ineligibleForSale ?? "Ineligible for sale",
+      series: [],
+      value: formatNumber(stockSummary.ineligible_for_sale, locale)
     },
     {
       color: businessMetricColors.succeeded,
@@ -2244,6 +2313,9 @@ export function AdminRetailStockView({
                   {showOrganisationContext ? (
                     <th className="py-2 pr-4">{labels.stock.organisation}</th>
                   ) : null}
+                  <th className="py-2 pr-4">
+                    {labels.stock.eligibleForSale ?? "Eligible for sale"}
+                  </th>
                   <th className="py-2 pr-4">{labels.stock.stockQuantity}</th>
                   <th className="py-2 pr-4">{wholesaleHeader}</th>
                   <th className="py-2 pr-4">{retailHeader}</th>
@@ -2269,6 +2341,7 @@ export function AdminRetailStockView({
 		                  row,
 		                  adviceByStockId.get(row.id)
 		                );
+                const eligibleForSale = stockRowEligibleForSale(row);
 
                 return (
                   <tr
@@ -2308,6 +2381,30 @@ export function AdminRetailStockView({
                         {row.organisationName}
                       </td>
                     ) : null}
+                    <td className="whitespace-nowrap py-3 pr-4">
+                      <span
+                        className={classNames(
+                          "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
+                          eligibleForSale
+                            ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
+                            : "bg-amber-50 text-amber-800 ring-amber-100"
+                        )}
+                        title={
+                          eligibleForSale
+                            ? labels.stock.eligibleForSale ?? "Eligible for sale"
+                            : stockRowIneligibleReason(row, labels.stock)
+                        }
+                      >
+                        {eligibleForSale
+                          ? labels.stock.eligibleForSaleShort ?? "Eligible"
+                          : labels.stock.ineligibleForSaleShort ?? "Ineligible"}
+                      </span>
+                      {!eligibleForSale ? (
+                        <div className="mt-1 max-w-[10rem] text-xs text-gray-500">
+                          {stockRowIneligibleReason(row, labels.stock)}
+                        </div>
+                      ) : null}
+                    </td>
 	                    <td className="whitespace-nowrap py-3 pr-4">
 	                      <div className="font-medium text-gray-900">
 	                        {row.stockQuantity}
@@ -2370,7 +2467,7 @@ export function AdminRetailStockView({
                 <tr>
                   <td
                     className="py-8 text-center text-sm text-gray-500"
-                    colSpan={showOrganisationContext ? 10 : 9}
+                    colSpan={showOrganisationContext ? 11 : 10}
                   >
                     {labels.stock.empty}
                   </td>
@@ -3232,7 +3329,20 @@ export function AdminRetailStockView({
         {panel === "stock-advice" ? (
           <div className="mt-5 space-y-6">
             <section className="rounded-md bg-white p-4 ring-1 ring-gray-200">
-              <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
+              <header className="mb-4">
+                <h3
+                  className={classNames(
+                    "text-lg font-semibold text-gray-900",
+                    adminLocaleTextClass(locale, "heading")
+                  )}
+                >
+                  {labels.stock.reorderBackorders}
+                </h3>
+                <p className="mt-1 text-sm font-normal leading-6 text-gray-600">
+                  {labels.stock.reorderBackordersDescription}
+                </p>
+              </header>
+              <div className="overflow-x-auto">
                 <table className="min-w-[640px] w-full table-fixed text-left text-sm">
                   <colgroup>
                     <col className="w-16" />
@@ -3240,22 +3350,19 @@ export function AdminRetailStockView({
                     <col className="w-48" />
                     <col className="w-28" />
                   </colgroup>
-                  <tbody className="divide-y divide-gray-200 bg-white">
+                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                      <td className="px-3 pb-3 pt-5" colSpan={4}>
-                        <h3
-                          className={classNames(
-                            "text-lg font-semibold text-gray-900",
-                            adminLocaleTextClass(locale, "heading")
-                          )}
-                        >
-                          {labels.stock.reorderBackorders}
-                        </h3>
-                        <p className="mt-1 text-sm font-normal leading-6 text-gray-600">
-                          {labels.stock.reorderBackordersDescription}
-                        </p>
-                      </td>
+                      <th className="py-2 pl-3 pr-3">
+                        <span className="sr-only">
+                          {labels.stock.selectProduct}
+                        </span>
+                      </th>
+                      <th className="py-2 pr-3">{labels.stock.product}</th>
+                      <th className="py-2 pr-3">{labels.stock.brand ?? "Brand"}</th>
+                      <th className="py-2 pr-3">{labels.stock.quantity}</th>
                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
                     {reorderPurchaseItems.map((item) => {
                       const itemKey = orgProductKey(
                         item.organisationId,
@@ -3277,7 +3384,9 @@ export function AdminRetailStockView({
                           )}
                           key={itemKey}
                           onClick={() =>
-                            canSelectItem ? toggleOutstandingPurchaseItem(item) : undefined
+                            canSelectItem
+                              ? toggleOutstandingPurchaseItem(item)
+                              : undefined
                           }
                         >
                           <td className="py-2 pl-3 pr-3">
@@ -3287,7 +3396,9 @@ export function AdminRetailStockView({
                               className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
                               disabled={!canSelectItem}
                               onClick={(event) => event.stopPropagation()}
-                              onChange={() => toggleOutstandingPurchaseItem(item)}
+                              onChange={() =>
+                                toggleOutstandingPurchaseItem(item)
+                              }
                               type="checkbox"
                             />
                           </td>
@@ -3323,24 +3434,24 @@ export function AdminRetailStockView({
                         </td>
                       </tr>
                     ) : null}
-
                   </tbody>
                 </table>
               </div>
-            </section>
-            <div className="flex flex-wrap items-center justify-end gap-3">
               {data.canWrite ? (
-                <AdminButton
-                  disabled={
-                    Boolean(busyId) ||
-                    selectedOutstandingPurchaseItems.length === 0
-                  }
-                  onClick={createShoppingListFromSelection}
-                >
-                  {labels.stock.createShoppingList}
-                </AdminButton>
+                <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+                  <AdminButton
+                    disabled={
+                      Boolean(busyId) ||
+                      selectedOutstandingPurchaseItems.length === 0
+                    }
+                    onClick={createShoppingListFromSelection}
+                  >
+                    {labels.stock.createShoppingList}
+                  </AdminButton>
+                </div>
               ) : null}
-            </div>
+            </section>
+
             <section className="rounded-md bg-white p-4 ring-1 ring-gray-200">
               <div className="mb-3">
                 <h3
@@ -3352,22 +3463,22 @@ export function AdminRetailStockView({
                   {labels.stock.shoppingLists}
                 </h3>
               </div>
-              <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
-	                <table className="min-w-[560px] w-full text-left text-sm">
+              <div className="overflow-x-auto">
+                <table className="min-w-[560px] w-full text-left text-sm">
                   <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-	                      <th className="py-2 pl-3 pr-3">List number</th>
-	                      <th className="py-2 pr-3">{labels.stock.status}</th>
-	                      <th className="py-2 pr-3">{labels.stock.quantity}</th>
-	                      <th className="py-2 pr-3">Created</th>
-	                    </tr>
+                      <th className="py-2 pl-3 pr-3">List number</th>
+                      <th className="py-2 pr-3">{labels.stock.status}</th>
+                      <th className="py-2 pr-3">{labels.stock.quantity}</th>
+                      <th className="py-2 pr-3">Created</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {visibleShoppingLists.map((list) => {
                       const listLines = data.shoppingListLines.filter(
                         (line) => line.shoppingListId === list.id
                       );
-	                      return (
+                      return (
                         <tr
                           className="cursor-pointer hover:bg-[#F8FAFC]"
                           key={list.id}
@@ -3388,18 +3499,18 @@ export function AdminRetailStockView({
                               {readableToken(list.status)}
                             </span>
                           </td>
-	                          <td className="py-2 pr-3">{listLines.length}</td>
-	                          <td className="py-2 pr-3 text-gray-600">
-	                            {formatDateTime(list.createdAt, locale)}
-	                          </td>
-	                        </tr>
+                          <td className="py-2 pr-3">{listLines.length}</td>
+                          <td className="py-2 pr-3 text-gray-600">
+                            {formatDateTime(list.createdAt, locale)}
+                          </td>
+                        </tr>
                       );
                     })}
                     {visibleShoppingLists.length === 0 ? (
                       <tr>
                         <td
                           className="px-3 py-8 text-center text-sm text-gray-500"
-	                          colSpan={4}
+                          colSpan={4}
                         >
                           {labels.stock.empty}
                         </td>

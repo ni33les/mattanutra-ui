@@ -397,6 +397,14 @@ export type AdminContent = Readonly<{
     importCsv: string;
 	    inStock: string;
 	    chooseProduct: string;
+    eligibleForSale: string;
+    eligibleForSaleShort: string;
+    ineligibleForSale: string;
+    ineligibleForSaleShort: string;
+    ineligibleInactive: string;
+    ineligibleMissingRrp: string;
+    ineligibleNoStock: string;
+    brand: string;
     leadTimeDays: string;
     lowStock: string;
     lots: string;
@@ -1128,6 +1136,14 @@ const baseContent = {
       importCsv: "Import CSV",
       inStock: "Stock OK",
       chooseProduct: "Choose product",
+      eligibleForSale: "Eligible for sale",
+      eligibleForSaleShort: "Eligible",
+      ineligibleForSale: "Ineligible for sale",
+      ineligibleForSaleShort: "Ineligible",
+      ineligibleInactive: "Inactive",
+      ineligibleMissingRrp: "Missing RRP",
+      ineligibleNoStock: "Out of stock, no backorder",
+      brand: "Brand",
       leadTimeDays: "Lead time",
       lowStock: "Low stock",
       lots: "Lots",
@@ -2006,6 +2022,14 @@ const baseContent = {
       importCsv: "นำเข้า CSV",
       inStock: "สต็อกปกติ",
       chooseProduct: "เลือกสินค้า",
+      eligibleForSale: "พร้อมขาย",
+      eligibleForSaleShort: "พร้อมขาย",
+      ineligibleForSale: "ไม่พร้อมขาย",
+      ineligibleForSaleShort: "ไม่พร้อมขาย",
+      ineligibleInactive: "ปิดใช้งาน",
+      ineligibleMissingRrp: "ไม่มีราคา RRP",
+      ineligibleNoStock: "หมดสต็อกและไม่รับ backorder",
+      brand: "แบรนด์",
       leadTimeDays: "ระยะเวลานำ",
       lowStock: "สต็อกต่ำ",
       lots: "ล็อต",
