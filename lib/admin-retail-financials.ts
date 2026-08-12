@@ -73,6 +73,8 @@ export type AdminRetailFinancialsRow = Readonly<{
   paidReference: string | null;
   paymentId: string | null;
   retailerPayableAmount: number;
+  /** Processing/shipping fee retained by platform (customer paid, not retailer payable). */
+  shippingFeeAmount: number;
   shippedAt: string | null;
   status: RetailSettlementStatus;
   updatedAt: string;
@@ -142,6 +144,8 @@ type SettlementRow = Readonly<{
   paid_reference: string | null;
   payment_id: string | null;
   retailer_payable_amount: number | string;
+  settlement_metadata: unknown;
+  shipping_fee_amount: number | string | null;
   shipped_at: Date | string | null;
   status: string;
   updated_at: Date | string;
@@ -441,7 +445,54 @@ function emptySummary() {
   };
 }
 
+function settlementShippingFeeMicros(row: SettlementRow) {
+  const metadata =
+    row.settlement_metadata &&
+    typeof row.settlement_metadata === "object" &&
+    !Array.isArray(row.settlement_metadata)
+      ? (row.settlement_metadata as Record<string, unknown>)
+      : {};
+  const fromMetadata = Number(metadata.shippingAmountMicros);
+
+  if (Number.isFinite(fromMetadata) && fromMetadata >= 0) {
+    return Math.round(fromMetadata);
+  }
+
+  const fromSnapshot = Number(row.shipping_fee_amount);
+
+  if (Number.isFinite(fromSnapshot) && fromSnapshot >= 0) {
+    return amountToMicros(fromSnapshot);
+  }
+
+  return 0;
+}
+
+/**
+ * Gross = customer paid total.
+ * Payable = pharmacy RRP.
+ * Shipping fee = processing fee retained by platform.
+ * Margin = platform product cut = gross − payable − shipping.
+ */
+function settlementPlatformSplit(row: SettlementRow) {
+  const grossMicros = Math.max(0, Math.round(Number(row.gross_customer_amount ?? 0)));
+  const payableMicros = Math.max(0, Math.round(Number(row.retailer_payable_amount ?? 0)));
+  const shippingMicros = Math.min(
+    grossMicros,
+    Math.max(0, settlementShippingFeeMicros(row))
+  );
+  const marginMicros = Math.max(0, grossMicros - payableMicros - shippingMicros);
+
+  return {
+    grossCustomerAmount: microsToAmount(grossMicros),
+    mattanutraMarginAmount: microsToAmount(marginMicros),
+    retailerPayableAmount: microsToAmount(payableMicros),
+    shippingFeeAmount: microsToAmount(shippingMicros)
+  };
+}
+
 function mapSettlementRow(row: SettlementRow): AdminRetailFinancialsRow {
+  const split = settlementPlatformSplit(row);
+
   return {
     actualFinanceTransactionId: row.actual_finance_transaction_id,
     confirmedAt: dateIso(row.confirmed_at),
@@ -450,10 +501,10 @@ function mapSettlementRow(row: SettlementRow): AdminRetailFinancialsRow {
     currency: row.currency,
     customerEmail: row.customer_email,
     customerName: row.customer_name,
-    grossCustomerAmount: microsToAmount(row.gross_customer_amount),
+    grossCustomerAmount: split.grossCustomerAmount,
     id: row.id,
     itemCount: Number(row.item_count ?? 0),
-    mattanutraMarginAmount: microsToAmount(row.mattanutra_margin_amount),
+    mattanutraMarginAmount: split.mattanutraMarginAmount,
     nominalFinanceTransactionId: row.nominal_finance_transaction_id,
     orderId: row.order_id,
     orderNumber: row.order_number,
@@ -465,7 +516,8 @@ function mapSettlementRow(row: SettlementRow): AdminRetailFinancialsRow {
     paidMethod: row.paid_method,
     paidReference: row.paid_reference,
     paymentId: row.payment_id,
-    retailerPayableAmount: microsToAmount(row.retailer_payable_amount),
+    retailerPayableAmount: split.retailerPayableAmount,
+    shippingFeeAmount: split.shippingFeeAmount,
     shippedAt: dateIso(row.shipped_at),
     status: settlementStatus(row.status),
     updatedAt: new Date(row.updated_at).toISOString()
@@ -624,6 +676,8 @@ export async function createPendingRetailOrderSettlement(
     orderId: string;
     organisationId: string;
     quoteLines: readonly RetailSettlementQuoteLineInput[];
+    /** Processing/shipping fee in micros (platform retained, not retailer payable). */
+    shippingAmountMicros?: number | null;
   }>
 ) {
   if (!(await retailFinancialTablesAvailable(sql))) {
@@ -646,9 +700,14 @@ export async function createPendingRetailOrderSettlement(
     ? "missing_retailer_payable_price"
     : null;
   const grossCustomerAmount = Math.max(0, Math.round(input.grossCustomerAmountMicros));
+  const shippingAmountMicros = Math.max(
+    0,
+    Math.round(Number(input.shippingAmountMicros) || 0)
+  );
+  // Platform product margin only — shipping/processing fee is separate.
   const mattanutraMarginAmount = Math.max(
     0,
-    grossCustomerAmount - retailerPayableAmount
+    grossCustomerAmount - retailerPayableAmount - shippingAmountMicros
   );
   const rows = await sql<Array<{ id: string }>>`
     insert into public.retail_order_settlements (
@@ -682,7 +741,8 @@ export async function createPendingRetailOrderSettlement(
         accountingBasis: "pending_customer_order_settlement",
         lineCount: input.quoteLines.length,
         missingRetailerPayableCount: missingPayableLineCount,
-        reviewReason
+        reviewReason,
+        shippingAmountMicros
       }))}::jsonb,
       now(),
       now()
@@ -815,9 +875,13 @@ async function orderSettlementAmounts(
   sql: RetailFinancialsDb,
   orderId: string
 ) {
-  // Payable: line metadata → sellable wholesale (checkout source) → stock wholesale.
-  // Gross: order pricingSnapshot.totalAmount when present, else line RRP subtotal.
-  const rows = await sql<RetailOrderAmountRow[]>`
+  // Gross: pricingSnapshot.totalAmount (customer paid).
+  // Payable: RRP from line metadata / sellable RRP (not wholesale).
+  // Shipping: pricingSnapshot.shippingAmount (processing fee).
+  // Margin: gross − payable − shipping.
+  const rows = await sql<Array<RetailOrderAmountRow & {
+    shipping_amount: number | string | null;
+  }>>`
     select
       retail_customer_orders.organisation_id::text,
       retail_customer_orders.order_number,
@@ -838,53 +902,53 @@ async function orderSettlementAmounts(
         ),
         0
       ) as gross_customer_amount,
+      coalesce(
+        case
+          when nullif(retail_customer_orders.metadata #>> '{pricingSnapshot,shippingAmount}', '')
+            ~ '^[0-9]+(\\.[0-9]+)?$'
+            then nullif(
+              retail_customer_orders.metadata #>> '{pricingSnapshot,shippingAmount}',
+              ''
+            )::numeric
+          else null
+        end,
+        0
+      ) as shipping_amount,
       coalesce(sum(
         retail_customer_order_lines.quantity_ordered
         * coalesce(
           case
+            when nullif(retail_customer_order_lines.metadata ->> 'rrpPriceAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
+              then nullif(retail_customer_order_lines.metadata ->> 'rrpPriceAmount', '')::numeric
             when nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
               then nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '')::numeric
             else null
           end,
-          sellable_wholesale.wholesale_price_amount,
-          stock_wholesale.wholesale_price_amount,
-          -- Provisional: unit retail when wholesale is unset (keeps receivable non-zero).
-          retail_customer_order_lines.retail_price_amount,
+          sellable_rrp.rrp_price_amount,
           0
         )
       ), 0) as retailer_payable_amount,
       count(*) filter (
         where not (
-          nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
-          or sellable_wholesale.wholesale_price_amount is not null
-          or stock_wholesale.wholesale_price_amount is not null
+          nullif(retail_customer_order_lines.metadata ->> 'rrpPriceAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
+          or nullif(retail_customer_order_lines.metadata ->> 'retailerPayableAmount', '') ~ '^[0-9]+(\\.[0-9]+)?$'
+          or sellable_rrp.rrp_price_amount is not null
         )
       ) as missing_payable_line_count
     from public.retail_customer_orders
     left join public.retail_customer_order_lines
       on retail_customer_order_lines.customer_order_id = retail_customer_orders.id
     left join lateral (
-      select retail_sellable_products.wholesale_price_amount
+      select retail_sellable_products.rrp_price_amount
       from public.retail_sellable_products
       where retail_sellable_products.organisation_id = retail_customer_orders.organisation_id
         and retail_sellable_products.product_id = retail_customer_order_lines.product_id
         and retail_sellable_products.status <> 'deleted'
-        and retail_sellable_products.wholesale_price_amount is not null
-        and retail_sellable_products.wholesale_price_amount >= 0
+        and retail_sellable_products.rrp_price_amount is not null
+        and retail_sellable_products.rrp_price_amount > 0
       order by retail_sellable_products.updated_at desc nulls last
       limit 1
-    ) sellable_wholesale on true
-    left join lateral (
-      select retail_product_stock.wholesale_price_amount
-      from public.retail_product_stock
-      where retail_product_stock.organisation_id = retail_customer_orders.organisation_id
-        and retail_product_stock.product_id = retail_customer_order_lines.product_id
-        and retail_product_stock.status <> 'deleted'
-        and retail_product_stock.wholesale_price_amount is not null
-        and retail_product_stock.wholesale_price_amount >= 0
-      order by retail_product_stock.updated_at desc nulls last
-      limit 1
-    ) stock_wholesale on true
+    ) sellable_rrp on true
     where retail_customer_orders.id = ${orderId}::uuid
     group by retail_customer_orders.id
     limit 1
@@ -897,18 +961,23 @@ async function orderSettlementAmounts(
 
   const grossCustomerAmount = amountToMicros(Number(row.gross_customer_amount ?? 0));
   const retailerPayableAmount = amountToMicros(Number(row.retailer_payable_amount ?? 0));
+  const shippingAmountMicros = amountToMicros(Number(row.shipping_amount ?? 0));
 
   return {
     currency: row.currency,
     grossCustomerAmount,
-    mattanutraMarginAmount: Math.max(0, grossCustomerAmount - retailerPayableAmount),
+    mattanutraMarginAmount: Math.max(
+      0,
+      grossCustomerAmount - retailerPayableAmount - shippingAmountMicros
+    ),
     missingPayableLineCount: Math.max(
       0,
       Math.round(Number(row.missing_payable_line_count ?? 0))
     ),
     orderNumber: row.order_number,
     organisationId: row.organisation_id,
-    retailerPayableAmount
+    retailerPayableAmount,
+    shippingAmountMicros
   };
 }
 
@@ -966,6 +1035,7 @@ export async function markRetailOrderSettlementDue(
         reviewReason: amounts.missingPayableLineCount > 0
           ? "missing_retailer_payable_price"
           : null,
+        shippingAmountMicros: amounts.shippingAmountMicros,
         source: "retail_order_shipped"
       }))}::jsonb,
       now(),
@@ -973,6 +1043,7 @@ export async function markRetailOrderSettlementDue(
     )
     on conflict (retail_customer_order_id) do update set
       finance_account_id = coalesce(public.retail_order_settlements.finance_account_id, excluded.finance_account_id),
+      metadata = public.retail_order_settlements.metadata || excluded.metadata,
       status = case
         when public.retail_order_settlements.status in ('paid', 'confirmed')
           then public.retail_order_settlements.status
@@ -1613,6 +1684,7 @@ export async function getAdminRetailFinancialsData(
           retail_order_settlements.confirmed_reference,
           retail_order_settlements.nominal_finance_transaction_id::text,
           retail_order_settlements.actual_finance_transaction_id::text,
+          retail_order_settlements.metadata as settlement_metadata,
           retail_order_settlements.created_at,
           retail_order_settlements.updated_at,
           retail_customer_orders.order_number,
@@ -1620,6 +1692,15 @@ export async function getAdminRetailFinancialsData(
           retail_customer_orders.customer_name,
           retail_customer_orders.customer_email,
           retail_customer_orders.shipped_at,
+          case
+            when nullif(retail_customer_orders.metadata #>> '{pricingSnapshot,shippingAmount}', '')
+              ~ '^[0-9]+(\\.[0-9]+)?$'
+              then nullif(
+                retail_customer_orders.metadata #>> '{pricingSnapshot,shippingAmount}',
+                ''
+              )::numeric
+            else null
+          end as shipping_fee_amount,
           organisations.name as organisation_name,
           count(retail_customer_order_lines.id)::int as item_count
         from public.retail_order_settlements
@@ -1666,6 +1747,7 @@ export async function getAdminRetailFinancialsData(
           retail_order_settlements.confirmed_reference,
           retail_order_settlements.nominal_finance_transaction_id::text,
           retail_order_settlements.actual_finance_transaction_id::text,
+          retail_order_settlements.metadata as settlement_metadata,
           retail_order_settlements.created_at,
           retail_order_settlements.updated_at,
           retail_customer_orders.order_number,
@@ -1673,6 +1755,15 @@ export async function getAdminRetailFinancialsData(
           retail_customer_orders.customer_name,
           retail_customer_orders.customer_email,
           retail_customer_orders.shipped_at,
+          case
+            when nullif(retail_customer_orders.metadata #>> '{pricingSnapshot,shippingAmount}', '')
+              ~ '^[0-9]+(\\.[0-9]+)?$'
+              then nullif(
+                retail_customer_orders.metadata #>> '{pricingSnapshot,shippingAmount}',
+                ''
+              )::numeric
+            else null
+          end as shipping_fee_amount,
           organisations.name as organisation_name,
           count(retail_customer_order_lines.id)::int as item_count
         from public.retail_order_settlements
@@ -1775,6 +1866,7 @@ export function retailFinancialsCsv(
         labels.shippedAt,
         amountHeader(labels.grossCustomerAmount),
         amountHeader(labels.retailerPayableAmount),
+        amountHeader(labels.shippingFee),
         amountHeader(labels.mattanutraMarginAmount),
         amountHeader(labels.paidAmount),
         labels.paidAt,
@@ -1810,7 +1902,9 @@ export function retailFinancialsCsv(
     const financial = data.isPlatformScope
       ? [
           row.grossCustomerAmount,
-          row.retailerPayableAmount
+          row.retailerPayableAmount,
+          row.shippingFeeAmount,
+          row.mattanutraMarginAmount
         ]
       : [row.retailerPayableAmount];
     const payment = [
@@ -1827,7 +1921,6 @@ export function retailFinancialsCsv(
           row.organisationName,
           ...base,
           ...financial,
-          row.mattanutraMarginAmount,
           ...payment
         ]
       : [...base, ...financial, ...payment];

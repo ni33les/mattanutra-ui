@@ -60,6 +60,7 @@ export type RetailFinancialsLabelSet = Readonly<{
   settlementStatement: string;
   settlementUpdateFailed: string;
   settlements: string;
+  shippingFee: string;
   shipped: string;
   shippedAt: string;
   status: string;
@@ -130,6 +131,7 @@ const retailFinancialsLabelSets: Record<Locale, RetailFinancialsLabelSet> = {
     settlementStatement: "Settlement statement",
     settlementUpdateFailed: "Settlement update failed",
     settlements: "Settlements",
+    shippingFee: "Shipping fee",
     shipped: "Shipped",
     shippedAt: "Shipped At",
     status: "Status",
@@ -199,6 +201,7 @@ const retailFinancialsLabelSets: Record<Locale, RetailFinancialsLabelSet> = {
     settlementStatement: "รายการชำระร้านค้า",
     settlementUpdateFailed: "อัปเดตรายการชำระไม่สำเร็จ",
     settlements: "รายการชำระ",
+    shippingFee: "ค่าจัดส่ง",
     shipped: "จัดส่งแล้ว",
     shippedAt: "จัดส่งเมื่อ",
     status: "สถานะ",
@@ -268,6 +271,7 @@ const retailFinancialsLabelSets: Record<Locale, RetailFinancialsLabelSet> = {
     settlementStatement: "结算明细",
     settlementUpdateFailed: "结算更新失败",
     settlements: "结算",
+    shippingFee: "运费",
     shipped: "已发货",
     shippedAt: "发货时间",
     status: "状态",

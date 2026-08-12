@@ -1026,6 +1026,17 @@ async function recordRetailCheckoutFinance(
   });
 
   if (payment.selected_retailer_organisation_id) {
+    const productSubtotalMicros = quoteLines.reduce(
+      (total, line) =>
+        total +
+        Math.max(
+          0,
+          Math.round(line.unitPriceAmount * line.quantity * AMOUNT_MICROS_PER_UNIT)
+        ),
+      0
+    );
+    const shippingAmountMicros = Math.max(0, amount - productSubtotalMicros);
+
     await createPendingRetailOrderSettlement(sql, {
       checkoutPaymentId: payment.id,
       currency: payment.currency,
@@ -1045,7 +1056,8 @@ async function recordRetailCheckoutFinance(
         retailerPayableSource: line.retailerPayableSource,
         rrpPriceAmount: line.rrpPriceAmount ?? line.retailerPayableAmount,
         unitPriceAmount: line.unitPriceAmount
-      }))
+      })),
+      shippingAmountMicros
     });
   }
 }

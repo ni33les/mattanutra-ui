@@ -61,9 +61,11 @@ describe("retail financial settlements", () => {
   it("creates pending settlements at payment and no longer records checkout payout rows", () => {
     assert.match(checkout, /createPendingRetailOrderSettlement/);
     assert.match(checkout, /retailerPayableAmount/);
-    assert.match(checkout, /wholesale_price_amount/);
+    assert.match(checkout, /shippingAmountMicros/);
+    assert.match(checkout, /rrpPriceAmount/);
     assert.match(financials, /retailerPayableAmount/);
     assert.match(financials, /missing_retailer_payable_price/);
+    assert.match(financials, /shippingAmountMicros/);
     assert.doesNotMatch(checkout, new RegExp(["retailer", "Settlement", "Amount"].join("")));
     assert.doesNotMatch(financials, new RegExp(["retailer", "Settlement", "Amount"].join("")));
     const oldTenant = ["Del", "ight"].join("");
@@ -82,9 +84,9 @@ describe("retail financial settlements", () => {
     assert.match(customerOrders, /voidPendingRetailOrderSettlement/);
     assert.match(customerOrders, /markRetailOrderSettlementNeedsReview/);
     assert.doesNotMatch(stock, /markRetailOrderSettlementDue/);
-    // Ship re-resolves payable: metadata → sellable wholesale → stock wholesale.
-    assert.match(financials, /sellable_wholesale\.wholesale_price_amount/);
-    assert.match(financials, /stock_wholesale\.wholesale_price_amount/);
+    // Ship re-resolves payable from RRP (+ shipping fee separate from platform margin).
+    assert.match(financials, /sellable_rrp\.rrp_price_amount/);
+    assert.match(financials, /pricingSnapshot,shippingAmount/);
     assert.match(financials, /pricingSnapshot,totalAmount/);
     assert.match(financials, /status in \('pending', 'voided', 'needs_review', 'due'\)/);
     // Zero-amount due/pending rows are refreshed when recompute finds prices.
@@ -101,29 +103,14 @@ describe("retail financial settlements", () => {
     assert.match(customerOrders, /source: "admin_retail_operations"/);
     assert.match(customerOrders, /admin-retail-order:\$\{orderId\}:customer-inflow/);
     assert.match(customerOrders, /retailerPayableAmount/);
-    // Prefer availability sellable wholesale (checkout parity), then shared resolver.
-    assert.match(customerOrders, /wholesalePriceAmount: availability\.wholesalePriceAmount/);
-    assert.match(customerOrders, /resolveRetailerPayableUnitAmount/);
     assert.match(financials, /export async function resolveRetailerPayableUnitAmount/);
-    assert.match(financials, /from public\.retail_sellable_products[\s\S]*from public\.retail_product_stock/);
-    // When wholesale is missing, provisionally use unit retail so receivable is not zero.
-    // Number(null) === 0 must not be treated as a valid zero payable.
+    // Pharmacy payable is RRP; missing RRP flags needs_review (no silent unit-price fallback).
     assert.match(
       financials,
       /typeof rawPayable === "number" && Number\.isFinite\(rawPayable\)/
     );
-    assert.match(
-      financials,
-      /typeof rawUnit === "number" && Number\.isFinite\(rawUnit\)/
-    );
-    assert.match(
-      financials,
-      /quoteLineRetailerPayableMicros[\s\S]*unitPriceAmount[\s\S]*missing: true/
-    );
-    assert.match(
-      financials,
-      /sellable_wholesale\.wholesale_price_amount[\s\S]*stock_wholesale\.wholesale_price_amount[\s\S]*retail_customer_order_lines\.retail_price_amount/
-    );
+    assert.match(financials, /Pharmacy is paid RRP/);
+    assert.match(financials, /sellable_rrp\.rrp_price_amount/);
     // Checkout remains responsible for Stripe-backed finance; admin path must not double-post.
     assert.match(customerOrders, /if \(orderSource !== "checkout"\)/);
   });
@@ -232,7 +219,7 @@ describe("retail financial settlements", () => {
     assert.match(retailFinancialsView, /filteredRows\.map\(\(row\) =>/);
     assert.match(dashboardContent, /view: "settlements"/);
     assert.match(dashboard, /scope=\{view === "settlements" \? "platform" : "retail"\}/);
-    assert.match(financials, /const header = data\.isPlatformScope[\s\S]*labels\.mattanutraMarginAmount[\s\S]*amountHeader\(labels\.paidAmount\)[\s\S]*: \[[\s\S]*labels\.orderNumber[\s\S]*amountHeader\(labels\.receivable\)[\s\S]*amountHeader\(labels\.received\)/);
+    assert.match(financials, /const header = data\.isPlatformScope[\s\S]*shippingFee[\s\S]*mattanutraMarginAmount[\s\S]*amountHeader\(labels\.paidAmount\)[\s\S]*: \[[\s\S]*labels\.orderNumber[\s\S]*amountHeader\(labels\.receivable\)[\s\S]*amountHeader\(labels\.received\)/);
     assert.doesNotMatch(financials, /: \[\s*labels\.orderNumber,[\s\S]*labels\.grossCustomerAmount/);
     assert.doesNotMatch(financials, /: \[\s*labels\.orderNumber,[\s\S]*labels\.retailerPayableAmount/);
     assert.doesNotMatch(financials, /: \[\s*labels\.orderNumber,[\s\S]*labels\.paidAmount/);
@@ -240,7 +227,11 @@ describe("retail financial settlements", () => {
     assert.doesNotMatch(financials, /labels\.actualPayouts/);
     assert.match(financials, /const amountHeader = \(label: string\) => `\$\{label\} \(\$\{data\.currency\}\)`/);
     assert.doesNotMatch(financials, /labels\.currency,[\s\S]*labels\.grossCustomerAmount/);
-    assert.match(financials, /return data\.isPlatformScope[\s\S]*row\.mattanutraMarginAmount[\s\S]*: \[\.\.\.base, \.\.\.financial, \.\.\.payment\]/);
+    assert.match(financials, /shippingFeeAmount/);
+    assert.match(financials, /return data\.isPlatformScope[\s\S]*: \[\.\.\.base, \.\.\.financial, \.\.\.payment\]/);
+    assert.match(retailFinancialsView, /text\.shippingFee/);
+    assert.match(retailFinancialsView, /row\.shippingFeeAmount/);
+    assert.match(retailFinancialsView, /adminHref\([\s\S]*retail-customer-orders[\s\S]*orderId: row\.orderId/);
     assert.match(retailFinancialsApi, /isLocale\(requestedLocale\)/);
     assert.match(retailFinancialsApi, /retailFinancialsCsv\(data, locale\)/);
   });

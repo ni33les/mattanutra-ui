@@ -8,6 +8,7 @@ import type {
   RetailSettlementStatus
 } from "@/lib/admin-retail-financials";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
+import { emptyAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import type { Locale } from "@/lib/i18n";
 import {
   retailFinancialsLabels,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/retail-financials-labels";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import {
+  adminHref,
   BusinessStatsGrid,
   classNames,
   formatGeneratedAt,
@@ -124,6 +126,7 @@ function statementHtml({
         labels.customer,
         labels.gross,
         labels.payable,
+        labels.shippingFee,
         labels.margin,
         labels.reference
       ]
@@ -145,6 +148,7 @@ function statementHtml({
       <td>${row.customerName ?? row.customerEmail ?? ""}</td>
       ${showPlatformColumns ? `<td class="number">${amount(row.grossCustomerAmount)}</td>` : ""}
       <td class="number">${amount(row.retailerPayableAmount)}</td>
+      ${showPlatformColumns ? `<td class="number">${amount(row.shippingFeeAmount)}</td>` : ""}
       ${showPlatformColumns ? `<td class="number">${amount(row.mattanutraMarginAmount)}</td>` : ""}
       ${!showPlatformColumns ? `<td class="number">${row.paidAmount ? amount(row.paidAmount) : ""}</td>` : ""}
       <td>${row.paidReference ?? ""}</td>
@@ -155,6 +159,7 @@ function statementHtml({
       heading.startsWith(`${labels.gross} (`) ||
       heading.startsWith(`${labels.payable} (`) ||
       heading.startsWith(`${labels.margin} (`) ||
+      heading.startsWith(`${labels.shippingFee} (`) ||
       heading.startsWith(`${labels.nominal} (`) ||
       heading.startsWith(`${labels.actual} (`) ||
       heading.startsWith(`${labels.paid} (`) ||
@@ -164,6 +169,7 @@ function statementHtml({
       heading === labels.payable ||
       heading === labels.receivable ||
       heading === labels.margin ||
+      heading === labels.shippingFee ||
       heading === labels.paid ||
       heading === labels.received;
 
@@ -361,6 +367,7 @@ export function AdminRetailFinancialsView({
         text.customer,
         text.gross,
         text.payable,
+        text.shippingFee,
         text.margin,
         text.paid,
         text.action
@@ -603,7 +610,19 @@ export function AdminRetailFinancialsView({
                   <tr key={row.id}>
                     <td className="whitespace-nowrap px-5 py-4 text-sm">
                       <div className="font-semibold text-gray-900">
-                        {row.orderNumber}
+                        <a
+                          className="text-[#126B4F] transition hover:text-[#0F513C] hover:underline"
+                          href={adminHref(
+                            locale,
+                            accessToken,
+                            range,
+                            "retail-customer-orders",
+                            emptyAdminDashboardFilters,
+                            { orderId: row.orderId }
+                          )}
+                        >
+                          {row.orderNumber}
+                        </a>
                       </div>
                       <div className="mt-1 text-xs text-gray-400">
                         {row.shippedAt
@@ -643,6 +662,9 @@ export function AdminRetailFinancialsView({
                     </td>
                     {showPlatformColumns ? (
                       <>
+                        <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-600">
+                          {formatMoneyNumber(row.shippingFeeAmount, locale)}
+                        </td>
                         <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-600">
                           {formatMoneyNumber(row.mattanutraMarginAmount, locale)}
                         </td>
