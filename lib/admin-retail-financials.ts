@@ -44,6 +44,8 @@ export type RetailSettlementQuoteLineInput = Readonly<{
   retailerPayableAmount?: number | null;
   retailerPayableNeedsReviewReason?: string | null;
   retailerPayableSource?: string | null;
+  /** Pharmacy list price (RRP); preferred payable basis. */
+  rrpPriceAmount?: number | null;
   unitPriceAmount?: number | null;
 }>;
 
@@ -589,26 +591,26 @@ function quoteLineRetailerPayableMicros(line: RetailSettlementQuoteLineInput) {
     ? Math.max(1, Math.round(parsedQuantity))
     : 1;
 
+  // Pharmacy is paid RRP (stored as retailerPayableAmount on quote lines).
   // Number(null) === 0 — only treat real numbers as explicit payable.
-  // (null/undefined mean missing; never coerce null to 0.)
   const rawPayable = line.retailerPayableAmount;
-  if (typeof rawPayable === "number" && Number.isFinite(rawPayable) && rawPayable >= 0) {
+  if (typeof rawPayable === "number" && Number.isFinite(rawPayable) && rawPayable > 0) {
     return {
       amount: amountToMicros(rawPayable * quantity),
       missing: false
     };
   }
 
-  // UAT/catalog often lack wholesale: provisionally use unit retail so receivable
-  // is not blank, and flag missing so settlement stays needs_review.
-  const rawUnit = line.unitPriceAmount;
-  if (typeof rawUnit === "number" && Number.isFinite(rawUnit) && rawUnit >= 0) {
+  // Prefer explicit RRP if present on the line payload.
+  const rawRrp = line.rrpPriceAmount;
+  if (typeof rawRrp === "number" && Number.isFinite(rawRrp) && rawRrp > 0) {
     return {
-      amount: amountToMicros(rawUnit * quantity),
-      missing: true
+      amount: amountToMicros(rawRrp * quantity),
+      missing: false
     };
   }
 
+  // Missing RRP: cannot settle cleanly — flag needs_review (do not use customer unit).
   return { amount: 0, missing: true };
 }
 

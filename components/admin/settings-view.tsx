@@ -496,6 +496,9 @@ export function AdminSettingsView({
                   type="number"
                   value={customerPriceMarginPercent}
                 />
+                <span className="text-[11px] font-normal leading-5 text-gray-400">
+                  Customer pays RRP × (1 + this %). Pharmacy is paid RRP. Catalogue RRP is not changed.
+                </span>
               </label>
             ) : null}
             <div className="grid gap-1 text-xs font-semibold text-gray-500">

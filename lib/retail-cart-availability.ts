@@ -206,19 +206,19 @@ export function resolveRetailCartLineAvailabilityFromRow(input: Readonly<{
     };
   }
 
-  const retailOverridePriceAmount = moneyOrNull(row.retail_override_price_amount);
-  const unitPriceAmount =
-    retailOverridePriceAmount ??
-    customerPriceFromRpp(
-      moneyOrNull(row.rrp_price_amount),
-      input.marginPercent ?? 10
-    );
   const policy = backorderPolicy(row.backorder_policy);
   const leadTimeDays = integerOrDefault(row.lead_time_days, 0);
   const stockQuantity = integerOrDefault(row.stock_quantity, 0);
   const allocatedQuantity = integerOrDefault(row.allocated_quantity, 0);
   const availableNow = Math.max(0, stockQuantity - allocatedQuantity);
   const backorderQuantity = Math.max(0, requested - availableNow);
+  // Customer pays RRP + platform % (admin config). Never treat RRP as a fixed override.
+  const unitPriceAmount = customerPriceFromRpp(
+    moneyOrNull(row.rrp_price_amount),
+    input.marginPercent ?? 10
+  );
+  const wholesalePriceAmount = moneyOrNull(row.wholesale_price_amount);
+  const rrpPriceAmount = moneyOrNull(row.rrp_price_amount);
 
   if (row.product_status !== "approved") {
     return {
@@ -235,11 +235,11 @@ export function resolveRetailCartLineAvailabilityFromRow(input: Readonly<{
       reason: "Master product is not approved for sale.",
       retailSellableProductId: row.id,
       unitPriceAmount,
-      wholesalePriceAmount: moneyOrNull(row.wholesale_price_amount)
+      wholesalePriceAmount
     };
   }
 
-  if (row.status !== "active" || unitPriceAmount === null) {
+  if (row.status !== "active") {
     return {
       availabilityStatus: "unavailable",
       backorderPolicy: policy,
@@ -254,7 +254,27 @@ export function resolveRetailCartLineAvailabilityFromRow(input: Readonly<{
       reason: "Retailer product is not currently sellable.",
       retailSellableProductId: row.id,
       unitPriceAmount,
-      wholesalePriceAmount: moneyOrNull(row.wholesale_price_amount)
+      wholesalePriceAmount
+    };
+  }
+
+  // Hard gate: no RRP → not sellable (and not full-beam eligible).
+  if (rrpPriceAmount === null || rrpPriceAmount <= 0 || unitPriceAmount === null) {
+    return {
+      availabilityStatus: "unavailable",
+      backorderPolicy: policy,
+      backorderQuantity: requested,
+      canCheckout: false,
+      currency: row.currency,
+      etaDate: null,
+      leadTimeDays,
+      productId: row.product_id ?? input.productId,
+      quantityAvailableNow: availableNow,
+      quantityRequested: requested,
+      reason: "Missing retail price (RRP).",
+      retailSellableProductId: row.id,
+      unitPriceAmount,
+      wholesalePriceAmount
     };
   }
 
@@ -332,7 +352,6 @@ export async function getRetailCartLineAvailability(input: Readonly<{
       sellable.id::text,
       sellable.product_id::text,
       sellable.status,
-      sellable.rrp_price_amount as retail_override_price_amount,
       sellable.rrp_price_amount as rrp_price_amount,
       sellable.wholesale_price_amount,
       sellable.currency as currency,
@@ -629,7 +648,6 @@ export async function resolveRegionalBasketAvailability(input: Readonly<{
       sellable.id::text,
       sellable.product_id::text,
       sellable.status,
-      sellable.rrp_price_amount as retail_override_price_amount,
       sellable.rrp_price_amount as rrp_price_amount,
       sellable.wholesale_price_amount,
       sellable.currency as currency,

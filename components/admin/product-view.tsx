@@ -1765,6 +1765,9 @@ function ProductDetailPanel({
                 <tr>
                   <th className="px-3 py-2 font-semibold">Shop</th>
                   <th className="px-3 py-2 font-semibold">{viewLabels.status}</th>
+                  <th className="px-3 py-2 font-semibold">
+                    {viewLabels.sellable ?? "Sellable"}
+                  </th>
                   <th className="px-3 py-2 font-semibold">{viewLabels.stock}</th>
                   <th className="px-3 py-2 font-semibold">{viewLabels.retailPrice}</th>
                   <th className="px-3 py-2 font-semibold">Wholesale</th>
@@ -1772,13 +1775,48 @@ function ProductDetailPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {draft.shopAvailability.map((shop) => (
+                {draft.shopAvailability.map((shop) => {
+                  const hasRrp =
+                    typeof shop.retailPriceAmount === "number" &&
+                    shop.retailPriceAmount > 0;
+                  const active = String(shop.status).toLowerCase() === "active";
+                  const stockOk =
+                    shop.stockQuantity > 0 || shop.backorderPolicy !== "deny";
+                  const eligible = active && hasRrp && stockOk;
+                  const why = !active
+                    ? "Inactive"
+                    : !hasRrp
+                      ? "Missing RRP"
+                      : !stockOk
+                        ? "Out of stock, no backorder"
+                        : "OK";
+
+                  return (
                   <tr key={shop.organisationId}>
                     <td className="px-3 py-2 font-semibold text-gray-900">
                       {shop.organisationName}
                     </td>
                     <td className="px-3 py-2 text-gray-600">
                       {productStatusLabel(shop.status, locale)}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      <span
+                        className={
+                          eligible
+                            ? "font-semibold text-emerald-700"
+                            : "font-semibold text-amber-700"
+                        }
+                        title={why}
+                      >
+                        {eligible
+                          ? viewLabels.sellable ?? "Sellable"
+                          : viewLabels.ineligible ?? "Ineligible"}
+                      </span>
+                      {!eligible ? (
+                        <span className="mt-0.5 block text-[11px] text-gray-500">
+                          {why}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2 text-gray-600">
                       {shop.stockQuantity}
@@ -1800,7 +1838,8 @@ function ProductDetailPanel({
                         : ""}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

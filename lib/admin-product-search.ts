@@ -49,7 +49,7 @@ type RetailProductCandidateRow = Readonly<{
   organisation_name: string;
   organisation_slug: string | null;
   product_id: string;
-  retail_override_price_amount: number | string | null;
+  product_status: string | null;
   retail_sellable_product_id: string;
   rrp_price_amount: number | string | null;
   stock_quantity: number | string | null;
@@ -320,11 +320,11 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       organisations.metadata as organisation_metadata,
       sellable.id::text as retail_sellable_product_id,
       sellable.product_id::text,
-      sellable.rrp_price_amount as retail_override_price_amount,
       sellable.rrp_price_amount as rrp_price_amount,
       sellable.currency as currency,
       sellable.lead_time_days,
       sellable.backorder_policy,
+      products.status as product_status,
       coalesce(stock.stock_quantity, 0)::int as stock_quantity,
       coalesce(active_allocations.quantity_allocated, 0)::int as allocated_quantity
     from public.organisations
@@ -372,21 +372,25 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
     const allocatedQuantity = integerOrDefault(retailRow.allocated_quantity, 0);
     const availableNow = Math.max(0, stockQuantity - allocatedQuantity);
     const backorderAllowed = retailRow.backorder_policy !== "deny";
+    const rrpPriceAmount = moneyOrNull(retailRow.rrp_price_amount);
+    // Full-beam / sale eligibility: RRP set + (in stock or backorder).
+    // Customer price = RRP + platform % from admin (never bake margin into RRP).
+    const priceAmount =
+      rrpPriceAmount !== null && rrpPriceAmount > 0
+        ? customerPriceFromRpp(rrpPriceAmount, customerPriceMarginPercent)
+        : null;
 
-    if (availableNow <= 0 && !backorderAllowed) {
+    if (
+      priceAmount === null ||
+      (availableNow <= 0 && !backorderAllowed) ||
+      String(retailRow.product_status ?? "").toLowerCase() === "deleted"
+    ) {
       continue;
     }
 
-    const retailOverridePriceAmount = moneyOrNull(
-      retailRow.retail_override_price_amount
-    );
-    const masterPriceAmount = customerPriceFromRpp(
-      moneyOrNull(retailRow.rrp_price_amount),
-      customerPriceMarginPercent
-    );
-    const priceAmount = retailOverridePriceAmount ?? masterPriceAmount;
-
-    if (priceAmount === null) {
+    if (
+      String(retailRow.product_status ?? "approved").toLowerCase() !== "approved"
+    ) {
       continue;
     }
 
@@ -406,9 +410,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
           "THB",
         etaDate,
         priceAmount,
-        priceSource: retailOverridePriceAmount === null
-          ? "master_list_country_rrp_margin"
-          : "retail_override",
+        priceSource: "master_list_country_rrp_margin",
         retailSellableProductId: retailRow.retail_sellable_product_id,
         selectedRetailerName: retailRow.organisation_name,
         selectedRetailerOrganisationId: retailRow.organisation_id

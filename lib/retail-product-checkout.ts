@@ -97,10 +97,13 @@ type QuoteLine = Readonly<{
   productId: string;
   productTitle: string;
   quantity: number;
+  platformMarginPercent?: number | null;
   retailerPayableAmount: number | null;
   retailerPayableNeedsReviewReason?: string | null;
-  retailerPayableSource: "missing" | "wholesale_price";
+  /** Pharmacy is paid RRP (list price); platform cut is customer − RRP. */
+  retailerPayableSource: "missing" | "rrp" | "wholesale_price";
   retailSellableProductId: string | null;
+  rrpPriceAmount?: number | null;
   unitPriceAmount: number;
 }>;
 
@@ -398,16 +401,17 @@ async function latestRecommendations(
   return rows;
 }
 
-async function retailerPayableAmounts(
+/** Pharmacy payable basis is RRP (list price), not wholesale. */
+async function pharmacyRrpPayableAmounts(
   sql: RetailCheckoutDb,
   organisationId: string,
   productIds: readonly string[]
 ) {
   const rows = await sql<Array<{
     product_id: string;
-    wholesale_price_amount: number | string | null;
+    rrp_price_amount: number | string | null;
   }>>`
-    select product_id::text, wholesale_price_amount
+    select product_id::text, rrp_price_amount
     from public.retail_sellable_products
     where organisation_id = ${organisationId}::uuid
       and product_id = any(${[...productIds]}::uuid[])
@@ -418,7 +422,8 @@ async function retailerPayableAmounts(
 
   for (const row of rows) {
     if (!amounts.has(row.product_id)) {
-      amounts.set(row.product_id, money(row.wholesale_price_amount));
+      const rrp = money(row.rrp_price_amount);
+      amounts.set(row.product_id, rrp !== null && rrp > 0 ? rrp : null);
     }
   }
 
@@ -476,7 +481,9 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   }
 
   const retailerId = availability.selectedRetailer.organisationId;
-  const payableByProductId = await retailerPayableAmounts(
+  const { getCustomerPriceMarginPercent } = await import("@/lib/customer-pricing");
+  const platformMarginPercent = await getCustomerPriceMarginPercent({ sql });
+  const rrpByProductId = await pharmacyRrpPayableAmounts(
     sql,
     retailerId,
     selectedProductIds
@@ -492,23 +499,27 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       throw new Error("Selected product is missing checkout pricing");
     }
 
-    const retailerPayableAmount = payableByProductId.get(line.productId) ?? null;
+    // Pharmacy is paid RRP; customer unit price already includes platform %.
+    const rrpPriceAmount = rrpByProductId.get(line.productId) ?? null;
+    const retailerPayableAmount = rrpPriceAmount;
+
+    if (retailerPayableAmount === null) {
+      throw new Error("Selected product is missing retail price (RRP)");
+    }
 
     return {
       currency: line.currency ?? availability.currency ?? "THB",
       etaDate: line.etaDate,
       imageUrl: recommendation.image_url,
+      platformMarginPercent,
       productId: line.productId,
       productTitle: recommendation.title,
       quantity: 1,
       retailerPayableAmount,
-      retailerPayableNeedsReviewReason: retailerPayableAmount === null
-        ? "missing_retailer_payable_price"
-        : null,
-      retailerPayableSource: retailerPayableAmount === null
-        ? "missing"
-        : "wholesale_price",
+      retailerPayableNeedsReviewReason: null,
+      retailerPayableSource: "rrp",
       retailSellableProductId: line.retailSellableProductId,
+      rrpPriceAmount,
       unitPriceAmount
     };
   });
@@ -891,12 +902,15 @@ async function createRetailCustomerOrderFromPayment(
         ${sql.json(toJsonValue({
           checkoutPaymentId: payment.id,
           currency: line.currency,
+          customerUnitPriceAmount: line.unitPriceAmount,
           etaDate: line.etaDate,
           lineSubtotalAmount: line.unitPriceAmount * line.quantity,
+          platformMarginPercent: line.platformMarginPercent ?? null,
           retailerPayableAmount: line.retailerPayableAmount,
           retailerPayableNeedsReviewReason: line.retailerPayableNeedsReviewReason ?? null,
           retailerPayableSource: line.retailerPayableSource,
           retailSellableProductId: line.retailSellableProductId,
+          rrpPriceAmount: line.rrpPriceAmount ?? line.retailerPayableAmount,
           source: "retail_product_checkout"
         }))}::jsonb,
         now(),
@@ -1029,6 +1043,7 @@ async function recordRetailCheckoutFinance(
         retailerPayableAmount: line.retailerPayableAmount,
         retailerPayableNeedsReviewReason: line.retailerPayableNeedsReviewReason,
         retailerPayableSource: line.retailerPayableSource,
+        rrpPriceAmount: line.rrpPriceAmount ?? line.retailerPayableAmount,
         unitPriceAmount: line.unitPriceAmount
       }))
     });

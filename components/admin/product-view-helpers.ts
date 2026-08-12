@@ -42,6 +42,8 @@ export type ProductMetricFilter =
   | "productsMissingFacts"
   | "productsMissingImages"
   | "productsPendingReview"
+  | "productsSellable"
+  | "productsIneligible"
   | "productsTotal";
 
 export type ProductCardRow =
@@ -166,6 +168,8 @@ export const productViewLabels = {
     regulatoryApprovalsHint:
       "Country and regional product registration numbers used for catalogue governance.",
     regulatoryApproved: "Regulatory approvals",
+    sellable: "Sellable",
+    ineligible: "Ineligible",
     noRegulatoryApprovals: "No regulatory approvals recorded yet.",
     notAvailable: "Not available",
     ean13: "EAN-13 barcode",
@@ -321,6 +325,8 @@ export const productViewLabels = {
     regulatoryApprovalsHint:
       "เลขทะเบียนสินค้าแยกตามประเทศหรือภูมิภาคสำหรับการกำกับดูแลแคตตาล็อก",
     regulatoryApproved: "มีข้อมูลอนุมัติ",
+    sellable: "ขายได้",
+    ineligible: "ขายไม่ได้",
     noRegulatoryApprovals: "ยังไม่มีข้อมูลการอนุมัติ",
     notAvailable: "ไม่มีข้อมูล",
     ean13: "บาร์โค้ด EAN-13",
@@ -475,6 +481,8 @@ export const productViewLabels = {
     regulatoryApprovals: "国家/地区监管批准",
     regulatoryApprovalsHint: "按国家或区域记录的产品注册编号，用于目录治理。",
     regulatoryApproved: "监管批准",
+    sellable: "可售",
+    ineligible: "不可售",
     noRegulatoryApprovals: "尚未记录监管批准。",
     notAvailable: "不可用",
     ean13: "EAN-13 条码",
@@ -662,7 +670,45 @@ export function productMatchesMetricFilter(
     return hasEffectiveRegulatoryApproval(row);
   }
 
+  if (metric === "productsSellable") {
+    return productIsCustomerSellable(row);
+  }
+
+  if (metric === "productsIneligible") {
+    return !productIsCustomerSellable(row);
+  }
+
   return true;
+}
+
+/**
+ * Customer-sellable for ≥1 pharmacy: active sellable, RRP > 0, in stock or backorder.
+ * Falls back to list-row flag when shopAvailability is not loaded.
+ */
+export function productIsCustomerSellable(row: ProductCardRow): boolean {
+  const listFlag = (row as { isCustomerSellable?: boolean }).isCustomerSellable;
+  if (typeof listFlag === "boolean" && !("shopAvailability" in row)) {
+    return listFlag;
+  }
+
+  const shops = "shopAvailability" in row ? row.shopAvailability ?? [] : [];
+  if (shops.length < 1) {
+    return typeof listFlag === "boolean" ? listFlag : false;
+  }
+
+  if (productBusinessState(row) !== "approved") {
+    return false;
+  }
+
+  return shops.some((shop) => {
+    const rrp = shop.retailPriceAmount;
+    const hasRrp = typeof rrp === "number" && Number.isFinite(rrp) && rrp > 0;
+    const active = String(shop.status ?? "").toLowerCase() === "active";
+    const inStock = (shop.stockQuantity ?? 0) > 0;
+    const backorderOk = shop.backorderPolicy !== "deny";
+
+    return active && hasRrp && (inStock || backorderOk);
+  });
 }
 
 const unknownProductManufacturerKey = "__unknown_manufacturer__";
@@ -682,10 +728,12 @@ type ProductSummaryCounts = {
   approved: number;
   dirtyData: number;
   ignored: number;
+  ineligible: number;
   missingFacts: number;
   missingImage: number;
   pendingReview: number;
   regulatoryApproved: number;
+  sellable: number;
   total: number;
 };
 
@@ -766,6 +814,11 @@ export function productSummaryCounts(
       counts.ignored += state === "ignored" ? 1 : 0;
       counts.pendingReview += state === "pending_review" ? 1 : 0;
       counts.regulatoryApproved += hasEffectiveRegulatoryApproval(row) ? 1 : 0;
+      if (productIsCustomerSellable(row)) {
+        counts.sellable += 1;
+      } else {
+        counts.ineligible += 1;
+      }
 
       return counts;
     },
@@ -773,10 +826,12 @@ export function productSummaryCounts(
       approved: 0,
       dirtyData: 0,
       ignored: 0,
+      ineligible: 0,
       missingFacts: 0,
       missingImage: 0,
       pendingReview: 0,
       regulatoryApproved: 0,
+      sellable: 0,
       total: 0,
     },
   );
@@ -843,6 +898,20 @@ export function productMetricCards({
       locale,
       value: summary.regulatoryApproved,
     }),
+    safetyMetric({
+      color: businessMetricColors.succeeded,
+      id: "productsSellable",
+      label: viewLabels.sellable ?? "Sellable",
+      locale,
+      value: summary.sellable,
+    }),
+    safetyMetric({
+      color: businessMetricColors.failed,
+      id: "productsIneligible",
+      label: viewLabels.ineligible ?? "Ineligible",
+      locale,
+      value: summary.ineligible,
+    }),
   ];
 }
 
@@ -852,7 +921,16 @@ export function productMetricCardsFromSummary({
   viewLabels,
 }: Readonly<{
   locale: Locale;
-  summary: ProductSummaryCounts;
+  summary: Partial<ProductSummaryCounts> &
+    Pick<
+      ProductSummaryCounts,
+      | "approved"
+      | "ignored"
+      | "missingFacts"
+      | "missingImage"
+      | "pendingReview"
+      | "total"
+    > & { regulatoryApproved?: number };
   viewLabels: (typeof productViewLabels)[Locale];
 }>): BusinessMetric[] {
   return [
@@ -903,7 +981,21 @@ export function productMetricCardsFromSummary({
       id: "productsRegulatoryApproved",
       label: viewLabels.regulatoryApproved,
       locale,
-      value: summary.regulatoryApproved,
+      value: summary.regulatoryApproved ?? 0,
+    }),
+    safetyMetric({
+      color: businessMetricColors.succeeded,
+      id: "productsSellable",
+      label: viewLabels.sellable ?? "Sellable",
+      locale,
+      value: summary.sellable ?? 0,
+    }),
+    safetyMetric({
+      color: businessMetricColors.failed,
+      id: "productsIneligible",
+      label: viewLabels.ineligible ?? "Ineligible",
+      locale,
+      value: summary.ineligible ?? 0,
     }),
   ];
 }
