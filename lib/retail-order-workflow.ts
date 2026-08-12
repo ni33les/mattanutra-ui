@@ -478,6 +478,212 @@ async function recordOrderWorkflowEmailBpm(input: Readonly<{
   });
 }
 
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    )
+  );
+}
+
+function lineRecordForEvent(
+  event: RetailOrderWorkflowEmailEvent,
+  value: unknown
+) {
+  const lines = objectValue(objectValue(value).orderWorkflowLine);
+
+  return objectValue(lines[event]);
+}
+
+/**
+ * Push a customer-visible order milestone over LINE when the plan has an
+ * active LINE channel. No-ops (with BPM) when plan/channel is missing.
+ * Called from the same customer-visible events as order workflow email.
+ */
+export async function queueRetailOrderCustomerLineUpdate(input: Readonly<{
+  event: RetailOrderWorkflowEmailEvent;
+  locale?: unknown;
+  orderId: string;
+  paymentId?: string | null;
+  planId?: string | null;
+  sql: RetailOrderWorkflowDb;
+}>) {
+  const locale = normalizedLocale(input.locale);
+  const orderRows = await input.sql<Array<{
+    id: string;
+    metadata: unknown;
+    order_number: string;
+    status: string;
+  }>>`
+    select
+      id::text,
+      order_number,
+      status,
+      metadata
+    from public.retail_customer_orders
+    where id = ${input.orderId}::uuid
+    limit 1
+  `;
+  const order = orderRows[0];
+
+  if (!order) {
+    return { reason: "order_not_found", sent: false as const };
+  }
+
+  const existing = lineRecordForEvent(input.event, order.metadata);
+
+  if (existing.queued === true || existing.sent === true) {
+    return { reason: "already_queued", sent: false as const };
+  }
+
+  let planId = isUuid(input.planId) ? input.planId : null;
+
+  if (!planId && isUuid(input.paymentId)) {
+    const paymentRows = await input.sql<Array<{ plan_id: string | null }>>`
+      select plan_id::text
+      from public.retail_checkout_payments
+      where id = ${input.paymentId}::uuid
+      limit 1
+    `;
+    planId = isUuid(paymentRows[0]?.plan_id) ? paymentRows[0]!.plan_id : null;
+  }
+
+  if (!planId) {
+    const paymentRows = await input.sql<Array<{ plan_id: string | null }>>`
+      select plan_id::text
+      from public.retail_checkout_payments
+      where retail_customer_order_id = ${order.id}::uuid
+      order by created_at desc
+      limit 1
+    `;
+    planId = isUuid(paymentRows[0]?.plan_id) ? paymentRows[0]!.plan_id : null;
+  }
+
+  const url = trackingUrl(locale, order.order_number);
+  const copy = emailCopy[input.event];
+  const body = [
+    copy.headline,
+    "",
+    copy.intro,
+    "",
+    `Order: ${order.order_number}`,
+    `Status: ${customerOrderStatusLabel(order.status)}`,
+    `Track: ${url}`
+  ].join("\n");
+
+  if (!planId) {
+    await writeBpmEvent({
+      actorType: "system",
+      emittedBy: "retail_order_workflow",
+      eventName: `retail_order_${input.event}_line_skipped`,
+      eventStatus: "skipped",
+      eventType: "chat",
+      locale,
+      properties: {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        reason: "plan_id_missing"
+      },
+      severity: "low",
+      sql: input.sql
+    });
+
+    return { reason: "plan_id_missing", sent: false as const };
+  }
+
+  const { queueCustomerChatCommunicationDispatchTask, sendCommunication } =
+    await import("@/lib/communications");
+
+  const prepared = await sendCommunication({
+    body,
+    channelType: "line",
+    messageType: `retail_order_${input.event}`,
+    metadata: {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      orderWorkflowEvent: input.event,
+      source: "retail_order_workflow",
+      trackingUrl: url
+    },
+    planId,
+    subject: copy.subject
+  });
+
+  if (prepared.message.status === "no_channel" || !prepared.channel) {
+    await writeBpmEvent({
+      actorType: "system",
+      emittedBy: "retail_order_workflow",
+      eventName: `retail_order_${input.event}_line_no_channel`,
+      eventStatus: "no_channel",
+      eventType: "chat",
+      locale,
+      planId,
+      properties: {
+        messageId: prepared.message.id,
+        orderId: order.id,
+        orderNumber: order.order_number
+      },
+      severity: "low",
+      sql: input.sql
+    });
+
+    return { reason: "no_channel", sent: false as const };
+  }
+
+  if (prepared.message.status === "queued") {
+    await queueCustomerChatCommunicationDispatchTask({
+      messageId: prepared.message.id,
+      planId
+    });
+  }
+
+  const record = {
+    attemptedAt: new Date().toISOString(),
+    event: input.event,
+    messageId: prepared.message.id,
+    queued: prepared.message.status === "queued",
+    status: prepared.message.status,
+    trackingUrl: url
+  };
+
+  await input.sql`
+    update public.retail_customer_orders
+    set metadata = jsonb_set(
+        coalesce(metadata, '{}'::jsonb),
+        array['orderWorkflowLine', ${input.event}]::text[],
+        ${input.sql.json(toJsonValue(record))}::jsonb,
+        true
+      ),
+      updated_at = now()
+    where id = ${order.id}::uuid
+  `;
+
+  await writeBpmEvent({
+    actorType: "system",
+    emittedBy: "retail_order_workflow",
+    eventName: `retail_order_${input.event}_line_queued`,
+    eventStatus: prepared.message.status,
+    eventType: "chat",
+    locale,
+    planId,
+    properties: {
+      messageId: prepared.message.id,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      orderWorkflowEvent: input.event
+    },
+    severity: "low",
+    sql: input.sql
+  });
+
+  return {
+    messageId: prepared.message.id,
+    reason: "queued",
+    sent: false as const
+  };
+}
+
 export async function queueRetailOrderWorkflowEmail(input: Readonly<{
   event: RetailOrderWorkflowEmailEvent;
   locale?: unknown;
@@ -536,6 +742,34 @@ export async function queueRetailOrderWorkflowEmail(input: Readonly<{
     },
     severity: "low"
   });
+
+  // Customer-visible milestones also flow through LINE when connected.
+  try {
+    await queueRetailOrderCustomerLineUpdate({
+      event: input.event,
+      locale,
+      orderId: input.orderId,
+      paymentId: input.paymentId ?? null,
+      planId: input.planId ?? null,
+      sql: input.sql
+    });
+  } catch (error) {
+    console.warn("Unable to queue retail order LINE update", error);
+    await writeBpmEvent({
+      actorType: "system",
+      emittedBy: "retail_order_workflow",
+      eventName: `retail_order_${input.event}_line_failed`,
+      eventStatus: "failed",
+      eventType: "chat",
+      locale,
+      planId: input.planId ?? null,
+      properties: {
+        orderId: input.orderId,
+        reason: error instanceof Error ? error.message : "line_queue_failed"
+      },
+      severity: "medium"
+    });
+  }
 
   return {
     reason: created ? "queued" : "already_queued",

@@ -18,15 +18,22 @@ const orderTrackingCopy = {
     address: "Delivery address",
     bookmark: "Bookmark tracking page",
     bookmarkCopied: "Tracking link copied",
+    bookmarkCopyLink: "Copy tracking link",
+    bookmarkHintDesktop:
+      "Press {shortcut} to bookmark this page in your browser. You can also copy the link below.",
+    bookmarkHintMobile:
+      "Use your browser Share menu → Add Bookmark (or Add to Home Screen) to save this page. You can also copy the link below.",
     carrier: "Carrier",
     customer: "Customer",
-    eta: "Estimated arrival",
     footer:
       "MattaNutra x your retail partner - Your personalized nutrition, delivered with care.",
     invalidBody:
       "This tracking link is missing or no longer valid. Please use the link from your confirmation message, or contact your retail partner for help.",
     invalidTitle: "We could not open this tracking link",
     lastUpdated: "Last updated",
+    lineConnectedBody:
+      "You are connected on LINE. Pharmacy and delivery updates for this order will be sent through your LINE chat when status changes.",
+    lineConnectedTitle: "LINE updates on",
     order: "Order",
     paid: "Payment received",
     preparing: "Pharmacy preparing",
@@ -52,15 +59,22 @@ const orderTrackingCopy = {
     address: "ที่อยู่จัดส่ง",
     bookmark: "บันทึกหน้าติดตาม",
     bookmarkCopied: "คัดลอกลิงก์ติดตามแล้ว",
+    bookmarkCopyLink: "คัดลอกลิงก์ติดตาม",
+    bookmarkHintDesktop:
+      "กด {shortcut} เพื่อบันทึกหน้านี้ในเบราว์เซอร์ หรือคัดลอกลิงก์ด้านล่าง",
+    bookmarkHintMobile:
+      "ใช้เมนูแชร์ของเบราว์เซอร์ → เพิ่มบุ๊กมาร์ก (หรือเพิ่มไปยังหน้าจอหลัก) เพื่อบันทึกหน้านี้ หรือคัดลอกลิงก์ด้านล่าง",
     carrier: "ผู้ให้บริการขนส่ง",
     customer: "ลูกค้า",
-    eta: "เวลาถึงโดยประมาณ",
     footer:
       "MattaNutra x พาร์ทเนอร์ร้านค้าของคุณ - โภชนาการเฉพาะบุคคล ส่งถึงคุณอย่างใส่ใจ",
     invalidBody:
       "ลิงก์ติดตามนี้ไม่ครบถ้วนหรือไม่สามารถใช้งานได้แล้ว โปรดใช้ลิงก์จากข้อความยืนยัน หรือติดต่อพาร์ทเนอร์ร้านค้าของคุณเพื่อขอความช่วยเหลือ",
     invalidTitle: "ไม่สามารถเปิดลิงก์ติดตามนี้ได้",
     lastUpdated: "อัปเดตล่าสุด",
+    lineConnectedBody:
+      "คุณเชื่อมต่อ LINE แล้ว อัปเดตจากร้านขายยาและการจัดส่งของคำสั่งซื้อนี้จะถูกส่งผ่านแชท LINE เมื่อสถานะเปลี่ยน",
+    lineConnectedTitle: "อัปเดตผ่าน LINE",
     order: "คำสั่งซื้อ",
     paid: "รับชำระเงินแล้ว",
     preparing: "ร้านขายยากำลังเตรียมสินค้า",
@@ -86,20 +100,26 @@ const orderTrackingCopy = {
     address: "配送地址",
     bookmark: "收藏追踪页面",
     bookmarkCopied: "追踪链接已复制",
+    bookmarkCopyLink: "复制追踪链接",
+    bookmarkHintDesktop: "按 {shortcut} 将此页加入浏览器书签。你也可以复制下方链接。",
+    bookmarkHintMobile:
+      "使用浏览器的分享菜单 → 添加书签（或添加到主屏幕）保存此页。你也可以复制下方链接。",
     carrier: "承运商",
     customer: "客户",
-    eta: "预计送达",
     footer: "MattaNutra x 你的零售伙伴 - 你的个性化营养方案，安心送达。",
     invalidBody:
       "这个追踪链接缺失或已失效。请使用确认消息中的链接，或联系你的零售伙伴获取帮助。",
     invalidTitle: "无法打开此追踪链接",
     lastUpdated: "最后更新",
+    lineConnectedBody:
+      "你已连接 LINE。订单的药房与配送更新会在状态变化时通过 LINE 聊天发送。",
+    lineConnectedTitle: "已开启 LINE 更新",
     order: "订单",
     paid: "已收到付款",
     preparing: "药房正在准备",
     questions: "此页面安全且仅对应你的订单。请收藏此页面以查看更新。",
     retailer: "药房",
-    shipped: "你的订单正在配送中",
+    shipped: "配送中",
     shipment: "配送",
     shipmentPending:
       "你的订单正在配送中。如果有快递追踪信息，你的零售伙伴会更新此页面。",
@@ -201,12 +221,59 @@ function displayOrderStatus(order: Awaited<ReturnType<typeof getTrackingOrderByR
   return order.status;
 }
 
-function latestEta(lines: readonly { etaDate: string | null }[]) {
-  return lines
-    .map((line) => line.etaDate)
-    .filter((value): value is string => Boolean(value))
-    .sort()
-    .at(-1) ?? null;
+/** Cumulative customer timeline milestones — dots only light when that stage is reached. */
+function trackingTimelineActive(status: string) {
+  if (status === "cancelled") {
+    return { paid: true, preparing: false, shipped: false };
+  }
+
+  const preparingStatuses = new Set([
+    "placed",
+    "awaiting_stock",
+    "allocated",
+    "picking",
+    "packed",
+    "pickup_booked",
+    "shipped",
+    "delivered",
+    "returned"
+  ]);
+  const shippedStatuses = new Set(["shipped", "delivered", "returned"]);
+
+  return {
+    paid: true,
+    preparing: preparingStatuses.has(status),
+    shipped: shippedStatuses.has(status)
+  };
+}
+
+function buildOrderTrackingTimeline(input: Readonly<{
+  copy: (typeof orderTrackingCopy)[Locale];
+  displayStatus: string;
+  locale: Locale;
+  retailerName: string;
+  totalAmount: number;
+  currency: string;
+}>) {
+  const active = trackingTimelineActive(input.displayStatus);
+
+  return [
+    {
+      active: active.paid,
+      label: input.copy.paid,
+      meta: formatAmount(input.locale, input.totalAmount, input.currency)
+    },
+    {
+      active: active.preparing,
+      label: input.copy.preparing,
+      meta: input.retailerName
+    },
+    {
+      active: active.shipped,
+      label: input.copy.shipped,
+      meta: statusLabel(input.locale, input.displayStatus)
+    }
+  ];
 }
 
 // Personal order tracking — never cache at the route layer.
@@ -253,15 +320,16 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
     );
   }
 
-  const eta = latestEta(order.lines);
   const displayStatus = displayOrderStatus(order);
   const retailerName = order.retailerName ?? copy.retailer.toLowerCase();
-  const timeline = [
-    { active: true, label: copy.paid, meta: formatAmount(locale, order.totalAmount, order.currency) },
-    { active: true, label: copy.preparing, meta: retailerName },
-    { active: true, label: copy.status, meta: statusLabel(locale, displayStatus) },
-    { active: Boolean(eta), label: copy.eta, meta: eta ?? "-" }
-  ];
+  const timeline = buildOrderTrackingTimeline({
+    copy,
+    currency: order.currency,
+    displayStatus,
+    locale,
+    retailerName,
+    totalAmount: order.totalAmount
+  });
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -283,6 +351,9 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
           </div>
           <BookmarkTrackingButton
             copiedLabel={copy.bookmarkCopied}
+            copyLinkLabel={copy.bookmarkCopyLink}
+            hintDesktop={copy.bookmarkHintDesktop}
+            hintMobile={copy.bookmarkHintMobile}
             label={copy.bookmark}
           />
         </div>
@@ -305,7 +376,7 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
               <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
                 {copy.timeline}
               </h2>
-              <ol className="mt-5 grid gap-3 sm:grid-cols-4">
+              <ol className="mt-5 grid gap-3 sm:grid-cols-3">
                 {timeline.map((item, index) => (
                   <li
                     className="rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]"
@@ -347,7 +418,6 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                       <p className="font-semibold text-[var(--mn-ink)]">{line.productTitle}</p>
                       <p className="text-xs text-[var(--mn-ink-soft)]">
                         {formatAmount(locale, line.unitPriceAmount, line.currency)}
-                        {line.etaDate ? ` · ${copy.eta} ${line.etaDate}` : ""}
                       </p>
                     </div>
                     <div className="font-mono text-sm text-[var(--mn-ink)]">x{line.quantity}</div>
@@ -400,7 +470,14 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                   source="order_tracking"
                 />
               </section>
-            ) : null}
+            ) : (
+              <section className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">
+                <p className={labelClass(locale)}>{copy.lineConnectedTitle}</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                  {copy.lineConnectedBody}
+                </p>
+              </section>
+            )}
 
             {order.shipment || order.status === "shipped" ? (
               <section className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">

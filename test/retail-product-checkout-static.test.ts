@@ -72,6 +72,35 @@ describe("retail product checkout static contracts", () => {
     assert.match(trackingPage, /presentation="inline_qr"/);
     assert.match(trackingPage, /showEyebrow=\{false\}/);
     assert.match(trackingPage, /source="order_tracking"/);
+    assert.match(trackingPage, /lineConnectedBody/);
+    assert.match(trackingPage, /lineConnectedTitle/);
+  });
+
+  it("drives tracking timeline dots from order status and omits estimated delivery", () => {
+    assert.match(trackingPage, /function trackingTimelineActive/);
+    assert.match(trackingPage, /function buildOrderTrackingTimeline/);
+    assert.match(trackingPage, /sm:grid-cols-3/);
+    assert.doesNotMatch(trackingPage, /active: true, label: copy\.paid/);
+    assert.doesNotMatch(trackingPage, /copy\.eta/);
+    assert.doesNotMatch(trackingPage, /latestEta/);
+    assert.doesNotMatch(trackingPage, /line\.etaDate/);
+    assert.match(trackingPage, /shippedStatuses/);
+  });
+
+  it("bookmarks tracking with browser instructions instead of clipboard-only", () => {
+    const bookmarkButton = readFileSync(
+      new URL("../components/retail-checkout/bookmark-tracking-button.tsx", import.meta.url),
+      "utf8"
+    );
+    assert.match(trackingPage, /BookmarkTrackingButton/);
+    assert.match(trackingPage, /hintDesktop=\{copy\.bookmarkHintDesktop\}/);
+    assert.match(trackingPage, /copyLinkLabel=\{copy\.bookmarkCopyLink\}/);
+    assert.match(bookmarkButton, /tryLegacyBookmark/);
+    assert.match(bookmarkButton, /copyLinkLabel/);
+    assert.doesNotMatch(
+      bookmarkButton,
+      /onClick=\{async \(\) => \{\s*await navigator\.clipboard/
+    );
   });
 
   it("surfaces shipment metadata on tracking and shipped emails", () => {
@@ -141,6 +170,16 @@ describe("retail product checkout static contracts", () => {
     assert.match(workflowService, /sendTransactionalEmail/);
     assert.match(workflowService, /orderWorkflowEmails/);
     assert.match(workflowService, /customer_email_missing/);
+  });
+
+  it("flows customer-visible order milestones through LINE when connected", () => {
+    assert.match(workflowService, /queueRetailOrderCustomerLineUpdate/);
+    assert.match(workflowService, /channelType: "line"/);
+    assert.match(workflowService, /queueCustomerChatCommunicationDispatchTask/);
+    assert.match(workflowService, /orderWorkflowLine/);
+    assert.match(workflowService, /retail_order_\$\{input\.event\}_line_queued/);
+    assert.match(workflowService, /retail_order_\$\{input\.event\}_line_no_channel/);
+    assert.match(workflowService, /await queueRetailOrderCustomerLineUpdate/);
   });
 
 	it("uses customer-facing wording for awaiting-stock order updates", () => {
