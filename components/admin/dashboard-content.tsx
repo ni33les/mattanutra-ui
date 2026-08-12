@@ -436,7 +436,9 @@ export type AdminContent = Readonly<{
     placeOrder: string;
     pipelineUnavailable: string;
     placedAt: string;
+    processingFee: string;
     product: string;
+    subtotal: string;
     priceOverride: string;
     profitImpact: string;
     actualQuantity: string;
@@ -1175,7 +1177,9 @@ const baseContent = {
       placeOrder: "Place order",
       pipelineUnavailable: "Pipeline unavailable. Recheck workflow.",
       placedAt: "Placed",
+      processingFee: "Processing fee",
       product: "Product",
+      subtotal: "Subtotal",
       priceOverride: "Retail Price",
       profitImpact: "Profit impact",
       actualQuantity: "Actual quantity",
@@ -2061,7 +2065,9 @@ const baseContent = {
       placeOrder: "สั่งซื้อ",
       pipelineUnavailable: "ไม่มีข้อมูลไปป์ไลน์ ตรวจสอบเวิร์กโฟลว์อีกครั้ง",
       placedAt: "เวลาสั่งซื้อ",
+      processingFee: "ค่าดำเนินการ",
       product: "สินค้า",
+      subtotal: "ยอดรวมสินค้า",
       priceOverride: "ราคาขายปลีก",
       profitImpact: "ผลกระทบกำไร",
       actualQuantity: "จำนวนจริง",

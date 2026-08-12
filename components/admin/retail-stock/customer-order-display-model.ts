@@ -57,6 +57,30 @@ export function customerOrderRetailValue(order: AdminRetailCustomerOrder) {
   return order.pricingSnapshot?.totalAmount ?? order.totalRetailAmount;
 }
 
+/** Line-items subtotal from pricing snapshot (excludes processing fee). */
+export function customerOrderSubtotalAmount(order: AdminRetailCustomerOrder) {
+  const snapshot = order.pricingSnapshot;
+  if (snapshot && typeof snapshot.subtotalAmount === "number") {
+    return snapshot.subtotalAmount;
+  }
+
+  return order.totalRetailAmount;
+}
+
+/**
+ * Platform flat shipping stored on the order, shown to retail as processing fee.
+ */
+export function customerOrderProcessingFeeAmount(
+  order: AdminRetailCustomerOrder
+) {
+  const snapshot = order.pricingSnapshot;
+  if (snapshot && typeof snapshot.shippingAmount === "number") {
+    return Math.max(0, snapshot.shippingAmount);
+  }
+
+  return 0;
+}
+
 export function customerOrderHasPickupBooked(order: AdminRetailCustomerOrder) {
   const providerStatus = order.shipment?.pickupProviderStatus?.trim().toLowerCase();
 

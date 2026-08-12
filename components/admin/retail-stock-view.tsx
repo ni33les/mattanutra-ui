@@ -61,8 +61,10 @@ import {
   customerOrderIncludedInAllMetric,
   customerOrderMatchesFilter,
   customerOrderMetricColor,
+  customerOrderProcessingFeeAmount,
   customerOrderRetailValue,
   customerOrderStatusDisplay,
+  customerOrderSubtotalAmount,
   customerOrderStatusFilterLabel,
   customerOrderStatusFilters,
   customerOrderStatusMetricKey,
@@ -2506,6 +2508,18 @@ export function AdminRetailStockView({
                     ) ?? emptyRetailField}
                   </span>
                 </div>
+                {customerOrderProcessingFeeAmount(customerOrderDetail) > 0 ? (
+                  <div className="mt-1 text-xs font-semibold text-gray-600">
+                    {labels.stock.processingFee ?? "Processing fee"}:{" "}
+                    <span className="text-gray-900">
+                      {formatPrice(
+                        locale,
+                        customerOrderDetail.currency,
+                        customerOrderProcessingFeeAmount(customerOrderDetail)
+                      ) ?? emptyRetailField}
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <div className="flex flex-col gap-3 lg:items-end">
                 <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -2991,6 +3005,46 @@ export function AdminRetailStockView({
                         </div>
                       );
                     })}
+                  </div>
+                  <div className="rounded-md bg-white p-4 ring-1 ring-gray-200">
+                    <dl className="ml-auto grid max-w-sm gap-2 text-sm">
+                      <div className="flex justify-between gap-6">
+                        <dt className="text-gray-500">
+                          {labels.stock.subtotal ?? "Subtotal"}
+                        </dt>
+                        <dd className="font-semibold text-gray-900">
+                          {formatPrice(
+                            locale,
+                            customerOrderDetail.currency,
+                            customerOrderSubtotalAmount(customerOrderDetail)
+                          ) ?? emptyRetailField}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-6">
+                        <dt className="text-gray-500">
+                          {labels.stock.processingFee ?? "Processing fee"}
+                        </dt>
+                        <dd className="font-semibold text-gray-900">
+                          {formatPrice(
+                            locale,
+                            customerOrderDetail.currency,
+                            customerOrderProcessingFeeAmount(customerOrderDetail)
+                          ) ?? emptyRetailField}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-t border-gray-100 pt-2 text-base">
+                        <dt className="font-semibold text-gray-900">
+                          {labels.stock.total}
+                        </dt>
+                        <dd className="font-semibold text-gray-900">
+                          {formatPrice(
+                            locale,
+                            customerOrderDetail.currency,
+                            customerOrderRetailValue(customerOrderDetail)
+                          ) ?? emptyRetailField}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
                 </section>
               </section>

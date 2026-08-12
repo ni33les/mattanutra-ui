@@ -7,7 +7,11 @@ import type { Locale } from "@/lib/i18n";
 import { productCountryLabel } from "@/lib/product-countries";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import { formatPrice } from "@/components/admin/retail-stock-formatters";
-import { customerOrderRetailValue } from "@/components/admin/retail-stock/customer-order-display-model";
+import {
+  customerOrderProcessingFeeAmount,
+  customerOrderRetailValue,
+  customerOrderSubtotalAmount
+} from "@/components/admin/retail-stock/customer-order-display-model";
 
 export type RetailOrderDocumentKind =
   | "invoice"
@@ -293,9 +297,19 @@ export function printRetailOrderDocument({
   const placedAt = formatDateTime(order.placedAt, locale) ?? emptyRetailField;
   const generatedAt =
     formatDateTime(new Date().toISOString(), locale) ?? new Date().toISOString();
+  const orderSubtotal =
+    formatPrice(locale, order.currency, customerOrderSubtotalAmount(order)) ??
+    emptyRetailField;
+  const orderProcessingFee =
+    formatPrice(
+      locale,
+      order.currency,
+      customerOrderProcessingFeeAmount(order)
+    ) ?? emptyRetailField;
   const orderTotal =
     formatPrice(locale, order.currency, customerOrderRetailValue(order)) ??
     emptyRetailField;
+  const processingFeeAmount = customerOrderProcessingFeeAmount(order);
   const deliverySection = addressBlockHtml(
     labels.stock.deliveryAddress,
     shippingLines,
@@ -434,7 +448,13 @@ export function printRetailOrderDocument({
       </section>
       ${
         showPrices
-          ? `<section class="totals"><span>${escapeHtml(labels.stock.total)}</span><strong>${escapeHtml(orderTotal)}</strong></section>`
+          ? `<section class="totals-stack">
+              <div class="totals-row"><span>${escapeHtml(labels.stock.subtotal ?? "Subtotal")}</span><strong>${escapeHtml(orderSubtotal)}</strong></div>
+              <div class="totals-row"><span>${escapeHtml(labels.stock.processingFee ?? "Processing fee")}</span><strong>${escapeHtml(
+                processingFeeAmount > 0 ? orderProcessingFee : emptyRetailField
+              )}</strong></div>
+              <div class="totals-row totals-row-total"><span>${escapeHtml(labels.stock.total)}</span><strong>${escapeHtml(orderTotal)}</strong></div>
+            </section>`
           : ""
       }
     </main>
@@ -478,6 +498,10 @@ export function printRetailOrderDocument({
           .panel { border: 1px solid #d1d5db; border-radius: 8px; margin-bottom: 12px; padding: 14px; }
           .sheet + .sheet, .sheet + .label, .label + .sheet { border-top: 1px dashed #d1d5db; }
           .totals { align-items: center; display: flex; font-size: 18px; gap: 16px; justify-content: flex-end; margin-top: 16px; }
+          .totals-stack { display: grid; gap: 8px; justify-items: end; margin-top: 16px; }
+          .totals-row { align-items: baseline; display: flex; font-size: 14px; gap: 24px; justify-content: flex-end; min-width: 280px; }
+          .totals-row span { color: #4b5563; }
+          .totals-row-total { border-top: 1px solid #d1d5db; font-size: 18px; margin-top: 4px; padding-top: 10px; }
           .label { min-height: 70vh; padding: 32px; position: relative; }
           .label h1 { border-bottom: 2px solid #111827; font-size: 22px; padding-bottom: 10px; }
           .label-address { font-size: 28px; font-weight: 700; line-height: 1.35; margin-top: 28px; }

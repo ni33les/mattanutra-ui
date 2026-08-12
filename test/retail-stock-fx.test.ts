@@ -353,6 +353,12 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /line\.manufacturerSku/);
 	    assert.match(view, /customerOrderLinesByOrderId/);
 	    assert.match(customerOrderDisplay, /function customerOrderRetailValue/);
+	    assert.match(customerOrderDisplay, /function customerOrderProcessingFeeAmount/);
+	    assert.match(customerOrderDisplay, /function customerOrderSubtotalAmount/);
+	    assert.match(orderDocuments, /processingFee|Processing fee/);
+	    assert.match(orderDocuments, /totals-stack/);
+	    assert.match(view, /customerOrderProcessingFeeAmount/);
+	    assert.match(view, /customerOrderSubtotalAmount/);
 	    assert.match(view, /order\.orderNumber/);
 	    assert.match(view, /order\.customerName/);
 	    assert.match(view, /labels\.stock\.retailValue/);
