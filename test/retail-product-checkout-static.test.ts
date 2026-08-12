@@ -87,20 +87,10 @@ describe("retail product checkout static contracts", () => {
     assert.match(trackingPage, /shippedStatuses/);
   });
 
-  it("bookmarks tracking with browser instructions instead of clipboard-only", () => {
-    const bookmarkButton = readFileSync(
-      new URL("../components/retail-checkout/bookmark-tracking-button.tsx", import.meta.url),
-      "utf8"
-    );
-    assert.match(trackingPage, /BookmarkTrackingButton/);
-    assert.match(trackingPage, /hintDesktop=\{copy\.bookmarkHintDesktop\}/);
-    assert.match(trackingPage, /copyLinkLabel=\{copy\.bookmarkCopyLink\}/);
-    assert.match(bookmarkButton, /tryLegacyBookmark/);
-    assert.match(bookmarkButton, /copyLinkLabel/);
-    assert.doesNotMatch(
-      bookmarkButton,
-      /onClick=\{async \(\) => \{\s*await navigator\.clipboard/
-    );
+  it("does not render a bookmark tracking button", () => {
+    assert.doesNotMatch(trackingPage, /BookmarkTrackingButton/);
+    assert.doesNotMatch(trackingPage, /bookmark-tracking-button/);
+    assert.doesNotMatch(trackingPage, /Bookmark tracking page/);
   });
 
   it("surfaces shipment metadata on tracking and shipped emails", () => {

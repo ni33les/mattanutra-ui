@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { LivingProtocolLineCta } from "@/components/living-protocol-line-cta";
-import { BookmarkTrackingButton } from "@/components/retail-checkout/bookmark-tracking-button";
 import { SafeImage } from "@/components/safe-image";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
@@ -16,13 +15,6 @@ type Props = {
 const orderTrackingCopy = {
   en: {
     address: "Delivery address",
-    bookmark: "Bookmark tracking page",
-    bookmarkCopied: "Tracking link copied",
-    bookmarkCopyLink: "Copy tracking link",
-    bookmarkHintDesktop:
-      "Press {shortcut} to bookmark this page in your browser. You can also copy the link below.",
-    bookmarkHintMobile:
-      "Use your browser Share menu → Add Bookmark (or Add to Home Screen) to save this page. You can also copy the link below.",
     carrier: "Carrier",
     customer: "Customer",
     footer:
@@ -38,7 +30,7 @@ const orderTrackingCopy = {
     paid: "Payment received",
     preparing: "Pharmacy preparing",
     questions:
-      "This page is secure and unique to your order. Keep it bookmarked for updates.",
+      "This page is secure and unique to your order. Keep this link for updates.",
     retailer: "Pharmacy",
     shipped: "Out for delivery",
     shipment: "Shipment",
@@ -47,7 +39,7 @@ const orderTrackingCopy = {
     status: "Status",
     subtotal: "Paid total",
     subtitle:
-      "Your order is confirmed. Bookmark this page for pharmacy updates and delivery progress.",
+      "Your order is confirmed. Check this page for pharmacy updates and delivery progress.",
     timeline: "Order timeline",
     title: "Your Order",
     trackShipment: "Track shipment",
@@ -57,13 +49,6 @@ const orderTrackingCopy = {
   },
   th: {
     address: "ที่อยู่จัดส่ง",
-    bookmark: "บันทึกหน้าติดตาม",
-    bookmarkCopied: "คัดลอกลิงก์ติดตามแล้ว",
-    bookmarkCopyLink: "คัดลอกลิงก์ติดตาม",
-    bookmarkHintDesktop:
-      "กด {shortcut} เพื่อบันทึกหน้านี้ในเบราว์เซอร์ หรือคัดลอกลิงก์ด้านล่าง",
-    bookmarkHintMobile:
-      "ใช้เมนูแชร์ของเบราว์เซอร์ → เพิ่มบุ๊กมาร์ก (หรือเพิ่มไปยังหน้าจอหลัก) เพื่อบันทึกหน้านี้ หรือคัดลอกลิงก์ด้านล่าง",
     carrier: "ผู้ให้บริการขนส่ง",
     customer: "ลูกค้า",
     footer:
@@ -79,7 +64,7 @@ const orderTrackingCopy = {
     paid: "รับชำระเงินแล้ว",
     preparing: "ร้านขายยากำลังเตรียมสินค้า",
     questions:
-      "หน้านี้ปลอดภัยและผูกกับคำสั่งซื้อของคุณโดยเฉพาะ โปรดบันทึกหน้านี้ไว้เพื่อติดตามอัปเดต",
+      "หน้านี้ปลอดภัยและผูกกับคำสั่งซื้อของคุณโดยเฉพาะ โปรดเก็บลิงก์นี้ไว้เพื่อติดตามอัปเดต",
     retailer: "ร้านขายยา",
     shipped: "กำลังจัดส่ง",
     shipment: "การจัดส่ง",
@@ -88,7 +73,7 @@ const orderTrackingCopy = {
     status: "สถานะ",
     subtotal: "ยอดชำระ",
     subtitle:
-      "คำสั่งซื้อของคุณได้รับการยืนยันแล้ว โปรดบันทึกหน้านี้เพื่อติดตามอัปเดตจากร้านขายยาและการจัดส่ง",
+      "คำสั่งซื้อของคุณได้รับการยืนยันแล้ว ตรวจสอบหน้านี้เพื่อติดตามอัปเดตจากร้านขายยาและการจัดส่ง",
     timeline: "ไทม์ไลน์คำสั่งซื้อ",
     title: "คำสั่งซื้อของคุณ",
     trackShipment: "ติดตามพัสดุ",
@@ -98,12 +83,6 @@ const orderTrackingCopy = {
   },
   "zh-CN": {
     address: "配送地址",
-    bookmark: "收藏追踪页面",
-    bookmarkCopied: "追踪链接已复制",
-    bookmarkCopyLink: "复制追踪链接",
-    bookmarkHintDesktop: "按 {shortcut} 将此页加入浏览器书签。你也可以复制下方链接。",
-    bookmarkHintMobile:
-      "使用浏览器的分享菜单 → 添加书签（或添加到主屏幕）保存此页。你也可以复制下方链接。",
     carrier: "承运商",
     customer: "客户",
     footer: "MattaNutra x 你的零售伙伴 - 你的个性化营养方案，安心送达。",
@@ -117,7 +96,7 @@ const orderTrackingCopy = {
     order: "订单",
     paid: "已收到付款",
     preparing: "药房正在准备",
-    questions: "此页面安全且仅对应你的订单。请收藏此页面以查看更新。",
+    questions: "此页面安全且仅对应你的订单。请保留此链接以查看更新。",
     retailer: "药房",
     shipped: "配送中",
     shipment: "配送",
@@ -125,7 +104,7 @@ const orderTrackingCopy = {
       "你的订单正在配送中。如果有快递追踪信息，你的零售伙伴会更新此页面。",
     status: "状态",
     subtotal: "支付总额",
-    subtitle: "你的订单已确认。请收藏此页面，查看药房更新和配送进度。",
+    subtitle: "你的订单已确认。请查看此页面了解药房更新和配送进度。",
     timeline: "订单时间线",
     title: "你的订单",
     trackShipment: "追踪配送",
@@ -339,23 +318,14 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
         title={dictionary.hero.eyebrow}
       />
       <section className="mx-auto w-full max-w-6xl flex-1 px-6 py-12 sm:px-8 lg:py-16">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div className="max-w-3xl">
-            <p className={labelClass(locale)}>{copy.status}</p>
-            <h1 className="mt-3 font-serif text-5xl font-medium leading-tight text-[var(--mn-ink)]">
-              {copy.title}
-            </h1>
-            <p className="mt-4 text-base leading-7 text-[var(--mn-ink-soft)]">
-              {copy.subtitle}
-            </p>
-          </div>
-          <BookmarkTrackingButton
-            copiedLabel={copy.bookmarkCopied}
-            copyLinkLabel={copy.bookmarkCopyLink}
-            hintDesktop={copy.bookmarkHintDesktop}
-            hintMobile={copy.bookmarkHintMobile}
-            label={copy.bookmark}
-          />
+        <div className="mb-8 max-w-3xl">
+          <p className={labelClass(locale)}>{copy.status}</p>
+          <h1 className="mt-3 font-serif text-5xl font-medium leading-tight text-[var(--mn-ink)]">
+            {copy.title}
+          </h1>
+          <p className="mt-4 text-base leading-7 text-[var(--mn-ink-soft)]">
+            {copy.subtitle}
+          </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
