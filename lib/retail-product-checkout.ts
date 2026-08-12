@@ -1002,18 +1002,21 @@ async function recordRetailCheckoutFinance(
   const amount = Number(payment.amount);
   const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
 
+  // Completed product sales are recognised as nominal revenue (sales basis).
+  // Cash bank transfers and fees are separate actual rows — never double-count.
   await recordFinanceTransaction({
     amount,
     category: "revenue",
     currency: payment.currency,
     description: "Retail product checkout customer payment",
-    entryType: payment.stripe_mode === "mock" ? "nominal" : "actual",
+    entryType: "nominal",
     from: `customer:${payment.customer_email ?? payment.id}`,
     metadata: {
       checkoutPaymentId: payment.id,
       orderId,
       planId: payment.plan_id,
-      source: "retail_product_checkout"
+      source: "retail_product_checkout",
+      stripeMode: payment.stripe_mode
     },
     provider: payment.stripe_mode === "mock" ? "mock" : "stripe",
     source: "retail_product_checkout",

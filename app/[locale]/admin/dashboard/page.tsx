@@ -319,7 +319,12 @@ export default async function LocalizedAdminDashboardPage({
       firstParam(query.conversation)
     );
   } else if (view === "financials") {
-    financialsData = await getAdminFinancialsData(range);
+    financialsData = await getAdminFinancialsData({
+      entryBasis: firstParam(query.entryBasis),
+      page: firstParam(query.page),
+      pageSize: firstParam(query.pageSize),
+      range
+    });
   } else if (view === "settlements") {
     retailFinancialsData = await getAdminRetailFinancialsData(adminContext, range);
   } else if (view === "flow") {

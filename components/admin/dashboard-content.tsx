@@ -548,14 +548,25 @@ export type AdminContent = Readonly<{
   financials: {
     aiCost: string;
     amount: string;
+    basisActual: string;
+    basisAll: string;
+    basisAllHint: string;
+    basisNominal: string;
     billingPeriod: string;
     category: string;
     description: string;
     details: string;
     empty: string;
+    entryBasis: string;
     entryType: string;
     from: string;
     hostingCost: string;
+    net: string;
+    nextPage: string;
+    operatingCost: string;
+    pageOf: string;
+    payouts: string;
+    previousPage: string;
     product: string;
     project: string;
     provider: string;
@@ -563,6 +574,8 @@ export type AdminContent = Readonly<{
     region: string;
     resource: string;
     resourceType: string;
+    revenue: string;
+    showing: string;
     source: string;
     task: string;
     time: string;
@@ -1288,14 +1301,25 @@ const baseContent = {
     financials: {
       aiCost: "AI cost",
       amount: "Amount",
+      basisActual: "Actual (cash)",
+      basisAll: "All (audit)",
+      basisAllHint: "Audit list only — totals are not a P&L (avoids double-counting).",
+      basisNominal: "Nominal (sales & accruals)",
       billingPeriod: "Billing period",
       category: "Category",
       description: "Description",
       details: "Details",
       empty: "No ledger entries in this timeframe.",
+      entryBasis: "Entry basis",
       entryType: "Basis",
       from: "Cost center",
       hostingCost: "Hosting cost",
+      net: "Net",
+      nextPage: "Next",
+      operatingCost: "Operating costs",
+      pageOf: "Page {page} of {pages}",
+      payouts: "Payouts",
+      previousPage: "Previous",
       product: "Product",
       project: "Project",
       provider: "Provider",
@@ -1303,6 +1327,8 @@ const baseContent = {
       region: "Region",
       resource: "Resource",
       resourceType: "Resource type",
+      revenue: "Revenue",
+      showing: "Showing {from}–{to} of {total}",
       source: "Source",
       task: "Task",
       time: "Time",
@@ -2176,14 +2202,25 @@ const baseContent = {
     financials: {
       aiCost: "ค่า AI",
       amount: "จำนวนเงิน",
+      basisActual: "จริง (เงินสด)",
+      basisAll: "ทั้งหมด (ตรวจสอบ)",
+      basisAllHint: "รายการตรวจสอบเท่านั้น — ยอดรวมไม่ใช่กำไรขาดทุน (กันนับซ้ำ)",
+      basisNominal: "ตามบัญชี (ยอดขายและค้าง)",
       billingPeriod: "รอบบิล",
       category: "หมวดหมู่",
       description: "รายละเอียด",
       details: "รายละเอียด",
       empty: "ไม่มีรายการบัญชีในช่วงเวลานี้",
-      entryType: "ฐานรายการ",
+      entryBasis: "ฐานรายการ",
+      entryType: "ฐาน",
       from: "ศูนย์ต้นทุน",
       hostingCost: "ค่าโฮสติ้ง",
+      net: "สุทธิ",
+      nextPage: "ถัดไป",
+      operatingCost: "ต้นทุนดำเนินงาน",
+      pageOf: "หน้า {page} จาก {pages}",
+      payouts: "การจ่าย",
+      previousPage: "ก่อนหน้า",
       product: "ผลิตภัณฑ์",
       project: "โปรเจกต์",
       provider: "ผู้ให้บริการ",
@@ -2191,6 +2228,8 @@ const baseContent = {
       region: "ภูมิภาค",
       resource: "รีซอร์ส",
       resourceType: "ประเภทรีซอร์ส",
+      revenue: "รายได้",
+      showing: "แสดง {from}–{to} จาก {total}",
       source: "แหล่งข้อมูล",
       task: "งาน",
       time: "เวลา",

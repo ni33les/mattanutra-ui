@@ -1092,8 +1092,8 @@ export async function markRetailOrderSettlementDue(
       orderId: input.orderId,
       reason: "missing_retailer_payable_price"
     });
-
-    return settlement.id;
+    // Continue: still post nominal payout when payable amount is known so
+    // the ledger reflects retailer liability even while lines need review.
   }
 
   if (settlement.nominal_finance_transaction_id) {
@@ -1105,6 +1105,8 @@ export async function markRetailOrderSettlementDue(
   }
 
   const fx = await resolveUsdRateForCurrency(amounts.currency, { sql });
+  // Single source_ref per settlement: nominal on due, transitions to actual on paid
+  // so Nominal|Actual summary switches never double-count the same payout.
   const transactionId = await recordFinanceTransaction({
     amount: amounts.retailerPayableAmount,
     category: "payout",
@@ -1123,7 +1125,7 @@ export async function markRetailOrderSettlementDue(
     },
     provider: "retail_settlement",
     source: "retail_order_settlement",
-    sourceRef: `retail-settlement:${settlement.id}:nominal-payout`,
+    sourceRef: `retail-settlement:${settlement.id}:payout`,
     sql,
     to: `retailer:${amounts.organisationId}:settlement`,
     toAccountId: financeAccountId,
@@ -1412,6 +1414,7 @@ export async function markRetailSettlementPaid(
   }
 
   const fx = await resolveUsdRateForCurrency(settlement.currency, { sql });
+  // Transition the same payout source_ref from nominal → actual (no second row).
   const transactionId = await recordFinanceTransaction({
     amount: paidAmount,
     category: "payout",
@@ -1430,7 +1433,7 @@ export async function markRetailSettlementPaid(
     },
     provider: "manual",
     source: "retail_order_settlement",
-    sourceRef: `retail-settlement:${settlement.id}:actual-payout`,
+    sourceRef: `retail-settlement:${settlement.id}:payout`,
     sql,
     to: `retailer:${settlement.organisation_id}:settlement`,
     toAccountId: financeAccountId,
@@ -1447,6 +1450,10 @@ export async function markRetailSettlementPaid(
       paid_reference = ${cleanText(input.paidReference) || null},
       paid_by_person_id = ${persistedPersonId(context.actorPerson.id)}::uuid,
       actual_finance_transaction_id = ${transactionId ?? null}::uuid,
+      nominal_finance_transaction_id = coalesce(
+        nominal_finance_transaction_id,
+        ${transactionId ?? null}::uuid
+      ),
       updated_at = now()
     where id = ${settlement.id}::uuid
       and status in ('due', 'paid', 'needs_review')

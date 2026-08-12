@@ -8,9 +8,12 @@ export type AdminFinancialMetricId =
   | "operatingCost"
   | "payout"
   | "revenue"
+  | "net"
   | "transactions";
 
 export type AdminFinancialEntryType = "actual" | "nominal";
+export type AdminFinancialEntryBasis = "nominal" | "actual" | "all";
+export type AdminFinancialDirection = "in" | "out" | "neutral";
 export type AdminFinancialCategory =
   | "ai"
   | "hosting"
@@ -26,12 +29,14 @@ export type AdminFinancialTransactionRow = Readonly<{
   category: AdminFinancialCategory;
   currency: string;
   description: string;
+  direction: AdminFinancialDirection;
   entryType: AdminFinancialEntryType;
   from: string;
   id: string;
   metadata: Record<string, unknown>;
   occurredAt: string;
   provider: string | null;
+  signedAmountUsd: number;
   source: string;
   sourceRef: string | null;
   taskId: string | null;
@@ -42,7 +47,10 @@ export type AdminFinancialTransactionRow = Readonly<{
 export type AdminFinancialsData = Readonly<{
   bucketLabels: string[];
   databaseAvailable: boolean;
+  entryBasis: AdminFinancialEntryBasis;
   generatedAt: string;
+  page: number;
+  pageSize: number;
   range: AdminDashboardRange;
   rows: AdminFinancialTransactionRow[];
   series: Readonly<Record<AdminFinancialMetricId, number[]>>;
@@ -50,8 +58,19 @@ export type AdminFinancialsData = Readonly<{
     operatingCostUsd: number;
     payoutUsd: number;
     revenueUsd: number;
+    netUsd: number;
     transactions: number;
+    /** When entryBasis is "all", KPIs are audit-only (not a P&L). */
+    kpiDisabled: boolean;
   }>;
+  totalCount: number;
+}>;
+
+export type AdminFinancialsQuery = Readonly<{
+  entryBasis?: AdminFinancialEntryBasis | string | null;
+  page?: number | string | null;
+  pageSize?: number | string | null;
+  range: AdminDashboardRange;
 }>;
 
 type FinanceRow = Readonly<{
@@ -77,6 +96,10 @@ type Bucket = Readonly<{
   label: string;
   start: Date;
 }>;
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
+const MAX_ROWS_FOR_SUMMARY = 50_000;
 
 function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60_000);
@@ -239,7 +262,7 @@ function usdAmount(row: FinanceRow) {
   return (Number(row.amount) * Number(row.usd_rate)) / 1_000_000;
 }
 
-function financeCategory(value: string | null | undefined): AdminFinancialCategory {
+export function financeCategory(value: string | null | undefined): AdminFinancialCategory {
   if (value === "ai") {
     return "ai";
   }
@@ -270,44 +293,167 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {};
 }
 
-export function emptyFinancials(range: AdminDashboardRange): AdminFinancialsData {
+export function normalizeFinancialEntryBasis(
+  value: string | null | undefined
+): AdminFinancialEntryBasis {
+  if (value === "actual" || value === "all") {
+    return value;
+  }
+
+  return "nominal";
+}
+
+export function normalizeFinancialPage(value: number | string | null | undefined) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 1;
+  }
+
+  return Math.floor(parsed);
+}
+
+export function normalizeFinancialPageSize(
+  value: number | string | null | undefined
+) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return DEFAULT_PAGE_SIZE;
+  }
+
+  return Math.min(MAX_PAGE_SIZE, Math.floor(parsed));
+}
+
+/**
+ * Direction for signed display. Outflows render in parentheses.
+ * Stripe bank transfers (other + stripe_payout) are neutral — not sales.
+ */
+export function financialDirection(
+  category: AdminFinancialCategory,
+  metadata: Record<string, unknown> = {}
+): AdminFinancialDirection {
+  if (category === "revenue") {
+    return "in";
+  }
+
+  if (
+    category === "payout" ||
+    category === "refund" ||
+    category === "payment_fee" ||
+    category === "ai" ||
+    category === "hosting"
+  ) {
+    return "out";
+  }
+
+  if (metadata.accountingBasis === "stripe_payout" || metadata.voided === true) {
+    return "neutral";
+  }
+
+  return "neutral";
+}
+
+export function signedUsdForRow(
+  amountUsd: number,
+  direction: AdminFinancialDirection
+) {
+  if (direction === "out") {
+    return -Math.abs(amountUsd);
+  }
+
+  if (direction === "in") {
+    return Math.abs(amountUsd);
+  }
+
+  return 0;
+}
+
+/**
+ * Format ledger amounts: outflows as ($x.xx), inflows as $x.xx.
+ */
+export function formatLedgerMoney(
+  amountUsd: number,
+  direction: AdminFinancialDirection,
+  locale: string,
+  currency = "USD"
+) {
+  const absolute = Math.abs(amountUsd);
+  const formatted = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2
+  }).format(absolute);
+
+  if (direction === "out") {
+    return `(${formatted})`;
+  }
+
+  return formatted;
+}
+
+export function emptyFinancials(
+  range: AdminDashboardRange,
+  options: Readonly<{
+    entryBasis?: AdminFinancialEntryBasis;
+    page?: number;
+    pageSize?: number;
+  }> = {}
+): AdminFinancialsData {
+  const entryBasis = options.entryBasis ?? "nominal";
+  const page = options.page ?? 1;
+  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
   const buckets = buildBuckets(range, []);
   const empty = buckets.map(() => 0);
 
   return {
     bucketLabels: buckets.map((bucket) => bucket.label),
     databaseAvailable: false,
+    entryBasis,
     generatedAt: new Date().toISOString(),
+    page,
+    pageSize,
     range,
     rows: [],
     series: {
       operatingCost: empty,
       payout: empty,
       revenue: empty,
+      net: empty,
       transactions: empty
     },
     summary: {
       operatingCostUsd: 0,
       payoutUsd: 0,
       revenueUsd: 0,
-      transactions: 0
-    }
+      netUsd: 0,
+      transactions: 0,
+      kpiDisabled: entryBasis === "all"
+    },
+    totalCount: 0
   };
 }
 
 function mapRow(row: FinanceRow): AdminFinancialTransactionRow {
+  const category = financeCategory(row.category);
+  const metadata = objectValue(row.metadata);
+  const amountUsd = usdAmount(row);
+  const direction = financialDirection(category, metadata);
+
   return {
     amount: Number(row.amount),
-    amountUsd: usdAmount(row),
-    category: financeCategory(row.category),
+    amountUsd,
+    category,
     currency: row.currency,
     description: row.description,
+    direction,
     entryType: row.entry_type === "actual" ? "actual" : "nominal",
     from: row.from_account,
     id: row.id,
-    metadata: objectValue(row.metadata),
+    metadata,
     occurredAt: new Date(row.occurred_at).toISOString(),
     provider: row.provider,
+    signedAmountUsd: signedUsdForRow(amountUsd, direction),
     source: row.source,
     sourceRef: row.source_ref,
     taskId: row.task_id,
@@ -322,13 +468,34 @@ function bucketIndex(buckets: Bucket[], date: Date) {
   );
 }
 
+function matchesEntryBasis(
+  row: FinanceRow,
+  entryBasis: AdminFinancialEntryBasis
+) {
+  if (entryBasis === "all") {
+    return true;
+  }
+
+  const entryType = row.entry_type === "actual" ? "actual" : "nominal";
+
+  return entryType === entryBasis;
+}
+
 export async function getAdminFinancialsData(
-  range: AdminDashboardRange
+  rangeOrQuery: AdminDashboardRange | AdminFinancialsQuery
 ): Promise<AdminFinancialsData> {
+  const query: AdminFinancialsQuery =
+    typeof rangeOrQuery === "string"
+      ? { range: rangeOrQuery }
+      : rangeOrQuery;
+  const range = query.range;
+  const entryBasis = normalizeFinancialEntryBasis(query.entryBasis);
+  const page = normalizeFinancialPage(query.page);
+  const pageSize = normalizeFinancialPageSize(query.pageSize);
   const sql = getSql();
 
   if (!sql) {
-    return emptyFinancials(range);
+    return emptyFinancials(range, { entryBasis, page, pageSize });
   }
 
   try {
@@ -354,7 +521,7 @@ export async function getAdminFinancialsData(
           from public.finance_transactions
           where occurred_at >= ${start}
           order by occurred_at desc
-          limit 50000
+          limit ${MAX_ROWS_FOR_SUMMARY}
         `
       : await sql<FinanceRow[]>`
           select
@@ -375,73 +542,101 @@ export async function getAdminFinancialsData(
             metadata
           from public.finance_transactions
           order by occurred_at desc
-          limit 50000
+          limit ${MAX_ROWS_FOR_SUMMARY}
         `;
 
-    const buckets = buildBuckets(range, rows);
+    const basisRows = rows.filter((row) => matchesEntryBasis(row, entryBasis));
+    const buckets = buildBuckets(range, basisRows);
     const operatingCost = buckets.map(() => 0);
     const payout = buckets.map(() => 0);
     const revenue = buckets.map(() => 0);
+    const net = buckets.map(() => 0);
     const transactions = buckets.map(() => 0);
     let operatingCostUsd = 0;
     let payoutUsd = 0;
     let revenueUsd = 0;
+    let netUsd = 0;
+    const kpiDisabled = entryBasis === "all";
 
-    for (const row of rows) {
+    for (const row of basisRows) {
       const amountUsd = usdAmount(row);
       const index = bucketIndex(buckets, new Date(row.occurred_at));
       const category = financeCategory(row.category);
+      const metadata = objectValue(row.metadata);
+      const direction = financialDirection(category, metadata);
+      const signed = signedUsdForRow(amountUsd, direction);
 
-      if (category === "revenue") {
-        revenueUsd += amountUsd;
-      }
-
-      if (category === "payout") {
-        payoutUsd += amountUsd;
-      }
-
-      if (isOperatingCostCategory(category)) {
-        operatingCostUsd += amountUsd;
-      }
-
-      if (index >= 0) {
+      if (!kpiDisabled) {
         if (category === "revenue") {
-          revenue[index] += amountUsd;
+          revenueUsd += amountUsd;
         }
 
         if (category === "payout") {
-          payout[index] += amountUsd;
+          payoutUsd += amountUsd;
         }
 
         if (isOperatingCostCategory(category)) {
-          operatingCost[index] += amountUsd;
+          operatingCostUsd += amountUsd;
+        }
+
+        netUsd += signed;
+      }
+
+      if (index >= 0) {
+        if (!kpiDisabled) {
+          if (category === "revenue") {
+            revenue[index] += amountUsd;
+          }
+
+          if (category === "payout") {
+            payout[index] += amountUsd;
+          }
+
+          if (isOperatingCostCategory(category)) {
+            operatingCost[index] += amountUsd;
+          }
+
+          net[index] += signed;
         }
 
         transactions[index] += 1;
       }
     }
 
+    const totalCount = basisRows.length;
+    const maxPage = Math.max(1, Math.ceil(totalCount / pageSize) || 1);
+    const safePage = Math.min(page, maxPage);
+    const offset = (safePage - 1) * pageSize;
+    const pageRows = basisRows.slice(offset, offset + pageSize).map(mapRow);
+
     return {
       bucketLabels: buckets.map((bucket) => bucket.label),
       databaseAvailable: true,
+      entryBasis,
       generatedAt: new Date().toISOString(),
+      page: safePage,
+      pageSize,
       range,
-      rows: rows.slice(0, 100).map(mapRow),
+      rows: pageRows,
       series: {
         operatingCost,
         payout,
         revenue,
+        net,
         transactions
       },
       summary: {
         operatingCostUsd,
         payoutUsd,
         revenueUsd,
-        transactions: rows.length
-      }
+        netUsd,
+        transactions: totalCount,
+        kpiDisabled
+      },
+      totalCount
     };
   } catch (error) {
     console.error("Unable to load financials data", error);
-    return emptyFinancials(range);
+    return emptyFinancials(range, { entryBasis, page, pageSize });
   }
 }

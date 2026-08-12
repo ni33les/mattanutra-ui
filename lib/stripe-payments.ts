@@ -439,15 +439,8 @@ async function insertPayment(
     join appended_version on appended_version.payment_id = inserted_payment.id
   `;
 
-  if (rows[0]) {
-    await recordStripePaymentNominalRevenue(sql, rows[0], {
-      accountingBasis: "payment_created",
-      mattanutraEnv: input.config.env,
-      sourceSurface: input.sourceSurface,
-      stripeMode: input.config.mode
-    });
-  }
-
+  // Revenue is booked only after checkout completes (paid). Open/created
+  // sessions must not post countable nominal revenue.
   return rows[0];
 }
 
@@ -457,7 +450,11 @@ function paymentCustomerLedgerAccount(payment: PaymentRow) {
     : `payment:${payment.id}:unbound-customer`;
 }
 
-async function recordStripePaymentNominalRevenue(
+/**
+ * Book completed plan sale as nominal revenue (sales recognition).
+ * Only call after payment is paid/confirmed — never on create/expire/cancel.
+ */
+async function recordStripePaymentCompletedRevenue(
   sql: Db,
   payment: PaymentRow,
   metadata: Record<string, unknown> = {}
@@ -468,7 +465,7 @@ async function recordStripePaymentNominalRevenue(
     amount: payment.amount,
     category: "revenue",
     currency: payment.currency,
-    description: `Nominal Stripe ${payment.selected_plan} payment`,
+    description: `Stripe ${payment.selected_plan} payment`,
     entryType: "nominal",
     from: paymentCustomerLedgerAccount(payment),
     metadata: {
@@ -485,7 +482,66 @@ async function recordStripePaymentNominalRevenue(
     },
     provider: "stripe",
     source: "stripe",
+    // Stable source_ref for historical rows that used :nominal-revenue
     sourceRef: `stripe:payment:${payment.id}:nominal-revenue`,
+    sql,
+    to: "mattanutra:revenue",
+    toAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
+    fxRateId: fx.fxRateId,
+    usdRate: fx.usdRate
+  });
+}
+
+/**
+ * Void any prior revenue booking for an abandoned/failed checkout so it
+ * cannot inflate sales totals. No-op when no revenue row exists (new path
+ * never books until paid).
+ */
+async function voidStripePaymentRevenue(
+  sql: Db,
+  payment: PaymentRow,
+  metadata: Record<string, unknown> = {}
+) {
+  const sourceRef = `stripe:payment:${payment.id}:nominal-revenue`;
+  const existing = await sql<Array<{ id: string; category: string }>>`
+    select id::text, category
+    from public.finance_transactions
+    where source = 'stripe'
+      and source_ref = ${sourceRef}
+    limit 1
+  `;
+
+  if (!existing[0] || existing[0].category !== "revenue") {
+    return null;
+  }
+
+  const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
+  // amount must stay > 0 for ledger constraint; reclassify out of revenue.
+  const amount = Math.max(1, Math.round(Number(payment.amount) || 1));
+
+  return recordFinanceTransaction({
+    amount,
+    category: "other",
+    currency: payment.currency,
+    description: `Voided Stripe ${payment.selected_plan} checkout (${String(metadata.accountingBasis ?? "voided")})`,
+    entryType: "nominal",
+    from: paymentCustomerLedgerAccount(payment),
+    metadata: {
+      ...fxMetadata(fx),
+      paymentId: payment.id,
+      paymentStatus: payment.status,
+      planId: payment.plan_id,
+      selectedPlan: payment.selected_plan,
+      sourceSurface: payment.source_surface,
+      stripeCheckoutSessionId: payment.stripe_checkout_session_id,
+      stripeCustomerId: payment.stripe_customer_id,
+      stripePaymentIntentId: payment.stripe_payment_intent_id,
+      voided: true,
+      ...metadata
+    },
+    provider: "stripe",
+    source: "stripe",
+    sourceRef,
     sql,
     to: "mattanutra:revenue",
     toAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
@@ -585,7 +641,7 @@ async function recordStripePaymentAccounting(
     payment.stripe_payment_intent_id;
 
   try {
-    await recordStripePaymentNominalRevenue(sql, payment, {
+    await recordStripePaymentCompletedRevenue(sql, payment, {
       accountingBasis: "payment_confirmed",
       amountMicros,
       stripeCheckoutSessionId: checkoutSessionId,
@@ -700,9 +756,10 @@ async function recordStripePayoutAccounting(
 
   const fx = await resolveUsdRateForCurrency(currency, { sql });
 
+  // Internal Stripe clearing → bank transfer. Not customer revenue.
   await recordFinanceTransaction({
     amount: amountMicros,
-    category: "revenue",
+    category: "other",
     currency,
     description: `Stripe transfer to MattaNutra bank ${payout.id}`,
     entryType: "actual",
@@ -1331,7 +1388,8 @@ export async function markPaymentCancelled(input: Readonly<{
           reason: "visitor_cancelled_checkout",
           status: "cancelled"
         });
-  await recordStripePaymentNominalRevenue(sql, updated ?? payment, {
+  // Abandoned checkout: ensure any prior revenue row is voided (not countable).
+  await voidStripePaymentRevenue(sql, updated ?? payment, {
     accountingBasis: "payment_cancelled"
   });
 
@@ -2244,9 +2302,8 @@ export async function bindPaidReservationToAssessment(input: Readonly<{
   });
   const nextPayment = bound ?? payment;
 
-  await recordStripePaymentNominalRevenue(sql, nextPayment, {
-    accountingBasis: "reservation_bound"
-  });
+  // Reservation binding is post-payment bookkeeping only — revenue was
+  // already booked at payment confirmation as nominal sales recognition.
   await storeStripeEmail(sql, nextPayment, payment.customer_email);
   await startPaidAssessmentPlan({
     locale: input.locale,
@@ -2326,7 +2383,8 @@ export async function markStripePaymentFailure(input: Readonly<{
     reason: input.reason,
     status: input.eventStatus
   });
-  await recordStripePaymentNominalRevenue(sql, updated ?? payment, {
+  // Expired/failed checkouts must not count as revenue.
+  await voidStripePaymentRevenue(sql, updated ?? payment, {
     accountingBasis: input.eventStatus === "expired" ? "payment_expired" : "payment_failed",
     failureReason: input.reason,
     stripeEventId: input.stripeEventId
