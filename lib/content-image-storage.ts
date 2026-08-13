@@ -142,7 +142,7 @@ function digitalOceanSecretFromKey(value: string) {
 
 /**
  * Spaces access key id used by the MattaNutra bucket (non-secret identifier).
- * Keep in sync with lib/first-party-image-mirror.ts — secret stays in DO_SPACES_KEY.
+ * Keep in sync with lib/first-party-image-mirror.ts.
  */
 const DEFAULT_DO_SPACES_KEY_ID = "DO801NRCNL3HYHXKRJEG";
 
@@ -157,38 +157,28 @@ function digitalOceanCredentialsFromEnv() {
     "DO_SPACES_SECRET_KEY"
   );
   const digitalOceanSecretKey = envValue("DO_SPACES_KEY");
-  const secretAccessKey = explicitSecretAccessKey || (
-    explicitAccessKeyId && digitalOceanSecretKey
+
+  const secretAccessKey =
+    explicitSecretAccessKey ||
+    (digitalOceanSecretKey
       ? digitalOceanSecretFromKey(digitalOceanSecretKey)
-      : ""
-  );
+      : "");
 
-  if (explicitAccessKeyId || secretAccessKey) {
-    if (!explicitAccessKeyId || !secretAccessKey) {
-      throw new Error(
-        "Set both DO_SPACES_KEY_ID and DO_SPACES_KEY, or DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY, for DigitalOcean Spaces storage."
-      );
-    }
-
-    return {
-      accessKeyId: explicitAccessKeyId,
-      secretAccessKey
-    };
-  }
-
-  const legacyCredential = digitalOceanSecretKey;
-
-  if (!legacyCredential) {
+  if (!secretAccessKey && !digitalOceanSecretKey && !explicitAccessKeyId) {
     return null;
   }
 
-  if (legacyCredential.includes(":") || legacyCredential.includes("|")) {
-    return digitalOceanCredentialPair(legacyCredential);
+  if (!secretAccessKey) {
+    throw new Error(
+      "Set DO_SPACES_KEY (secret or access:secret) or DO_SPACES_SECRET_ACCESS_KEY for DigitalOcean Spaces storage."
+    );
   }
 
+  const accessKeyId = explicitAccessKeyId || DEFAULT_DO_SPACES_KEY_ID;
+
   return {
-    accessKeyId: DEFAULT_DO_SPACES_KEY_ID,
-    secretAccessKey: legacyCredential
+    accessKeyId,
+    secretAccessKey
   };
 }
 
@@ -266,7 +256,8 @@ async function uploadCloudContentImage(
     },
     endpoint: config.endpoint ?? undefined,
     forcePathStyle: config.forcePathStyle,
-    region: config.region
+    // DO Spaces: AWS SDKs expect an AWS region name for signing.
+    region: "us-east-1"
   });
 
   await client.send(

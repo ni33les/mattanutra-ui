@@ -318,4 +318,24 @@ describe("first-party image mirroring", () => {
     assert.equal(config?.secretAccessKey, "only-one-half");
     assert.equal(config?.bucket, "mattanutra");
   });
+
+  it("uses project key id with secret half of legacy access:secret KEY when KEY_ID is absent", () => {
+    const config = withEnv(
+      {
+        DO_SPACES_ACCESS_KEY: undefined,
+        DO_SPACES_ACCESS_KEY_ID: undefined,
+        DO_SPACES_CDN_ENDPOINT: "https://cdn.example.com",
+        DO_SPACES_ENDPOINT: "https://mattanutra.sgp1.digitaloceanspaces.com",
+        DO_SPACES_KEY: "stale-access:digitalocean-secret",
+        DO_SPACES_KEY_ID: undefined,
+        DO_SPACES_SECRET_KEY: undefined,
+        DO_SPACES_SECRET_ACCESS_KEY: undefined
+      },
+      () => firstPartyImageStorageConfigFromEnv()
+    );
+
+    // Stale access prefix in KEY is ignored; secret half is kept.
+    assert.equal(config?.accessKeyId, "DO801NRCNL3HYHXKRJEG");
+    assert.equal(config?.secretAccessKey, "digitalocean-secret");
+  });
 });

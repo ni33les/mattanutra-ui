@@ -125,7 +125,7 @@ async function deleteProbeObject(input: Readonly<{
     },
     endpoint: input.endpoint,
     forcePathStyle: false,
-    region: input.region
+    region: "us-east-1"
   });
 
   await client.send(

@@ -298,9 +298,10 @@ function digitalOceanSecretFromKey(value: string) {
 
 /**
  * Spaces access key id used by the MattaNutra bucket (non-secret identifier).
- * Secret stays in DO_SPACES_KEY. Needed when KEY is secret-only rather than
- * legacy access:secret — PRD historically omitted DO_SPACES_KEY_ID while UAT
- * set it explicitly.
+ * UAT sets DO_SPACES_KEY_ID explicitly; PRD historically only set DO_SPACES_KEY.
+ * Always prefer this project key id over any access-key prefix embedded in KEY
+ * (legacy access:secret pairs can have a stale access half and still carry a
+ * valid secret after the separator).
  */
 const DEFAULT_DO_SPACES_KEY_ID = "DO801NRCNL3HYHXKRJEG";
 
@@ -315,40 +316,32 @@ function digitalOceanCredentialsFromEnv() {
     "DO_SPACES_SECRET_KEY"
   );
   const digitalOceanSecretKey = envValue("DO_SPACES_KEY");
-  const secretAccessKey = explicitSecretAccessKey || (
-    explicitAccessKeyId && digitalOceanSecretKey
+
+  // Resolve secret the same way UAT does with KEY_ID set: secret-only KEY is
+  // used whole; access:secret KEY contributes only the secret half.
+  const secretAccessKey =
+    explicitSecretAccessKey ||
+    (digitalOceanSecretKey
       ? digitalOceanSecretFromKey(digitalOceanSecretKey)
-      : ""
-  );
+      : "");
 
-  if (explicitAccessKeyId || secretAccessKey) {
-    if (!explicitAccessKeyId || !secretAccessKey) {
-      throw new Error(
-        "Set both DO_SPACES_KEY_ID and DO_SPACES_KEY, or DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY, for DigitalOcean Spaces storage."
-      );
-    }
-
-    return {
-      accessKeyId: explicitAccessKeyId,
-      secretAccessKey
-    };
-  }
-
-  const legacyCredential = digitalOceanSecretKey;
-
-  if (!legacyCredential) {
+  if (!secretAccessKey && !digitalOceanSecretKey && !explicitAccessKeyId) {
     return null;
   }
 
-  // Prefer access:secret / access|secret. If KEY is secret-only (no separator),
-  // pair it with DO_SPACES_KEY_ID when present, else the known project key id.
-  if (legacyCredential.includes(":") || legacyCredential.includes("|")) {
-    return digitalOceanCredentialPair(legacyCredential);
+  if (!secretAccessKey) {
+    throw new Error(
+      "Set DO_SPACES_KEY (secret or access:secret) or DO_SPACES_SECRET_ACCESS_KEY for DigitalOcean Spaces storage."
+    );
   }
 
+  // Access key id: explicit env wins, else project default (never trust a
+  // possibly-stale access prefix inside DO_SPACES_KEY alone).
+  const accessKeyId = explicitAccessKeyId || DEFAULT_DO_SPACES_KEY_ID;
+
   return {
-    accessKeyId: DEFAULT_DO_SPACES_KEY_ID,
-    secretAccessKey: legacyCredential
+    accessKeyId,
+    secretAccessKey
   };
 }
 
@@ -533,7 +526,9 @@ async function uploadFirstPartyImageToSpaces(
     },
     endpoint: input.config.endpoint,
     forcePathStyle: false,
-    region: input.config.region
+    // DO Spaces: AWS SDKs expect an AWS region name for signing; the real
+    // region is selected via the custom endpoint (sgp1, etc.).
+    region: "us-east-1"
   });
 
   await client.send(
