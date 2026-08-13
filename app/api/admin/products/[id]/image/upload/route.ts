@@ -153,28 +153,57 @@ export async function POST(
       { headers: routeHeaders(requestId) },
     );
   } catch (error) {
+    const storage = adminProductImageStorageDiagnostics();
+    const details = adminProductImageErrorDetails(error);
+    const code =
+      error instanceof AdminProductImageError ? error.code : "failed";
+    const provider =
+      details && typeof details === "object"
+        ? (details as { code?: unknown; name?: unknown; message?: unknown })
+        : null;
+    const providerCode =
+      typeof provider?.code === "string"
+        ? provider.code
+        : typeof provider?.name === "string"
+          ? provider.name
+          : null;
+    const message =
+      error instanceof AdminProductImageError
+        ? error.message
+        : "Could not upload this image";
+
     console.error("Admin product image upload failed", {
-      error: adminProductImageErrorDetails(error),
+      code,
+      error: details,
       fileName: file.name,
       productId: id,
+      providerCode,
       requestId,
       size: file.size,
-      storage: adminProductImageStorageDiagnostics()
+      storage
     });
 
     return NextResponse.json(
       {
+        code,
         image: {
           requestId,
-          reason:
-            error instanceof AdminProductImageError ? error.code : "failed",
+          reason: code,
           status: "failed",
         },
-        message:
-          error instanceof AdminProductImageError
-            ? error.message
-            : "Could not upload this image",
+        // Safe operator diagnostics (no secrets). Helps correlate UI failures
+        // with DO runtime logs via requestId.
+        message,
+        providerCode,
         requestId,
+        storage: {
+          credentialMode: storage.credentialMode,
+          environment: storage.environment,
+          keyShape: storage.keyShape,
+          readiness: storage.readiness,
+          resolvedCredentials: storage.resolvedCredentials,
+          storage: storage.storage
+        }
       },
       {
         headers: routeHeaders(requestId),

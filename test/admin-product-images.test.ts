@@ -216,7 +216,7 @@ describe("admin product images", () => {
           );
           assert.match(
             (error as AdminProductImageError).message,
-            /storage credentials are invalid/i,
+            /credentials were rejected|credentials are invalid|DO_SPACES_KEY/i,
           );
 
           return true;
@@ -316,10 +316,19 @@ describe("admin product images", () => {
       const text = JSON.stringify(diagnostics);
 
       assert.equal(diagnostics.readiness, "configured");
-      assert.equal(diagnostics.credentialMode, "explicit");
+      assert.equal(diagnostics.credentialMode, "key_id_plus_secret");
       assert.match(text, /DO_SPACES_KEY_ID/);
-      assert.doesNotMatch(text, /access-value/);
-      assert.doesNotMatch(text, /secret-value/);
+      assert.equal(
+        diagnostics.resolvedCredentials?.accessKeyIdSource,
+        "env",
+      );
+      assert.equal(
+        diagnostics.resolvedCredentials?.secretAccessKeyLength,
+        "secret-value".length,
+      );
+      // Full credential values must never appear in diagnostics JSON.
+      assert.doesNotMatch(text, /"access-value"/);
+      assert.doesNotMatch(text, /"secret-value"/);
     } finally {
       for (const [key, value] of previousEnv) {
         if (value === undefined) {

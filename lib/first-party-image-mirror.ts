@@ -519,28 +519,80 @@ async function uploadFirstPartyImageToSpaces(
     key: string;
   }>
 ) {
+  const signingRegion = "us-east-1";
+  const accessKeyId = input.config.accessKeyId.trim();
+  const secretAccessKey = input.config.secretAccessKey.trim();
+
+  console.info("Spaces PutObject attempt", {
+    accessKeyIdPrefix: accessKeyId.slice(0, 4),
+    accessKeyIdSuffix: accessKeyId.slice(-4),
+    accessKeyIdLength: accessKeyId.length,
+    bucket: input.config.bucket,
+    contentType: input.contentType,
+    endpoint: input.config.endpoint,
+    forcePathStyle: false,
+    key: input.key,
+    publicBaseUrl: input.config.publicBaseUrl,
+    regionFromEndpoint: input.config.region,
+    secretAccessKeyLength: secretAccessKey.length,
+    signingRegion,
+    size: input.bytes.length
+  });
+
   const client = new S3Client({
     credentials: {
-      accessKeyId: input.config.accessKeyId,
-      secretAccessKey: input.config.secretAccessKey
+      accessKeyId,
+      secretAccessKey
     },
     endpoint: input.config.endpoint,
     forcePathStyle: false,
     // DO Spaces: AWS SDKs expect an AWS region name for signing; the real
     // region is selected via the custom endpoint (sgp1, etc.).
-    region: "us-east-1"
+    region: signingRegion
   });
 
-  await client.send(
-    new PutObjectCommand({
-      ACL: "public-read",
-      Body: input.bytes,
-      Bucket: input.config.bucket,
-      CacheControl: input.cacheControl,
-      ContentType: input.contentType,
-      Key: input.key
-    })
-  );
+  try {
+    await client.send(
+      new PutObjectCommand({
+        ACL: "public-read",
+        Body: input.bytes,
+        Bucket: input.config.bucket,
+        CacheControl: input.cacheControl,
+        ContentType: input.contentType,
+        Key: input.key
+      })
+    );
+  } catch (error) {
+    const record = error as Error & {
+      $metadata?: {
+        extendedRequestId?: string;
+        httpStatusCode?: number;
+        requestId?: string;
+      };
+      code?: string;
+      Code?: string;
+    };
+
+    console.error("Spaces PutObject failed", {
+      accessKeyIdPrefix: accessKeyId.slice(0, 4),
+      accessKeyIdSuffix: accessKeyId.slice(-4),
+      accessKeyIdLength: accessKeyId.length,
+      bucket: input.config.bucket,
+      code: record.code ?? record.Code ?? record.name,
+      endpoint: input.config.endpoint,
+      httpStatusCode: record.$metadata?.httpStatusCode ?? null,
+      key: input.key,
+      message: record.message,
+      name: record.name,
+      providerRequestId: record.$metadata?.requestId ?? null,
+      providerExtendedRequestId: record.$metadata?.extendedRequestId ?? null,
+      regionFromEndpoint: input.config.region,
+      secretAccessKeyLength: secretAccessKey.length,
+      signingRegion
+    });
+
+    throw error;
+  }
 
   return {
     key: input.key,

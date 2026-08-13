@@ -109,7 +109,14 @@ function storageCredentialError(error: unknown) {
 
 function storageUnavailableMessage(error: unknown) {
   if (storageCredentialError(error)) {
-    return "Product image storage credentials are invalid. Check DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY, or legacy DO_SPACES_KEY=access:secret.";
+    const provider =
+      error instanceof Error
+        ? error.name ||
+          (error as Error & { code?: string }).code ||
+          "credential_error"
+        : "credential_error";
+
+    return `Product image storage credentials were rejected by Spaces (${provider}). Verify DO_SPACES_KEY_ID matches DO_SPACES_KEY, and both match the Mattanutra Spaces key pair.`;
   }
 
   return "Product image storage is not configured correctly for this environment.";
@@ -119,6 +126,51 @@ function storageEnvPresent(name: string) {
   return Boolean(process.env[name]?.trim());
 }
 
+function storageEnvRaw(name: string) {
+  return process.env[name]?.trim() ?? "";
+}
+
+/** Safe fingerprint — never logs secret material. */
+function credentialFingerprint(value: string | null | undefined) {
+  const text = value?.trim() ?? "";
+
+  if (!text) {
+    return {
+      empty: true,
+      length: 0,
+      prefix: null as string | null,
+      suffix: null as string | null
+    };
+  }
+
+  return {
+    empty: false,
+    length: text.length,
+    prefix: text.slice(0, Math.min(4, text.length)),
+    suffix: text.length > 4 ? text.slice(-4) : text
+  };
+}
+
+function spacesKeyShape() {
+  const key = storageEnvRaw("DO_SPACES_KEY");
+  const separator = key.includes(":")
+    ? ":"
+    : key.includes("|")
+      ? "|"
+      : "";
+
+  return {
+    hasKey: Boolean(key),
+    hasSeparator: Boolean(separator),
+    keyLength: key.length,
+    // When KEY is access:secret, only the half after the separator is used as secret.
+    secretHalfLength: separator
+      ? key.slice(key.indexOf(separator) + 1).trim().length
+      : key.length,
+    separator: separator || null
+  };
+}
+
 function storageCredentialMode() {
   const hasExplicitAccess =
     storageEnvPresent("DO_SPACES_ACCESS_KEY_ID") ||
@@ -126,16 +178,18 @@ function storageCredentialMode() {
     storageEnvPresent("DO_SPACES_KEY_ID");
   const hasExplicitSecret =
     storageEnvPresent("DO_SPACES_SECRET_ACCESS_KEY") ||
-    storageEnvPresent("DO_SPACES_SECRET_KEY") ||
-    (hasExplicitAccess && storageEnvPresent("DO_SPACES_KEY"));
+    storageEnvPresent("DO_SPACES_SECRET_KEY");
+  const hasKey = storageEnvPresent("DO_SPACES_KEY");
 
-  if (hasExplicitAccess || hasExplicitSecret) {
-    return hasExplicitAccess && hasExplicitSecret
-      ? "explicit"
-      : "partial_explicit";
+  if (hasExplicitAccess && (hasExplicitSecret || hasKey)) {
+    return "key_id_plus_secret";
   }
 
-  return storageEnvPresent("DO_SPACES_KEY") ? "legacy" : "missing";
+  if (hasExplicitAccess || hasExplicitSecret) {
+    return "partial_explicit";
+  }
+
+  return hasKey ? "key_only" : "missing";
 }
 
 function safeUrlSummary(value: string | null | undefined) {
@@ -176,6 +230,7 @@ function metadataDetails(value: unknown) {
 
   return {
     attempts: metadata.attempts,
+    cfId: metadata.cfId,
     extendedRequestId: metadata.extendedRequestId,
     httpStatusCode: metadata.httpStatusCode,
     requestId: metadata.requestId,
@@ -189,10 +244,14 @@ export function adminProductImageErrorDetails(error: unknown, depth = 0): unknow
   }
 
   const record = error as Error & {
+    $fault?: unknown;
     $metadata?: unknown;
+    $response?: unknown;
     cause?: unknown;
     code?: unknown;
     Code?: unknown;
+    errno?: unknown;
+    syscall?: unknown;
   };
 
   return {
@@ -201,9 +260,16 @@ export function adminProductImageErrorDetails(error: unknown, depth = 0): unknow
         ? adminProductImageErrorDetails(record.cause, depth + 1)
         : undefined,
     code: record.code ?? record.Code,
+    errno: record.errno,
+    fault: record.$fault,
     message: error.message,
     metadata: metadataDetails(record.$metadata),
     name: error.name,
+    stack:
+      process.env.NODE_ENV === "production"
+        ? undefined
+        : error.stack?.split("\n").slice(0, 8),
+    syscall: record.syscall
   };
 }
 
@@ -211,6 +277,7 @@ export function adminProductImageStorageDiagnostics() {
   const envKeyPresence = Object.fromEntries(
     storageCredentialEnvKeys.map((key) => [key, storageEnvPresent(key)])
   );
+  const keyShape = spacesKeyShape();
   const diagnostics = {
     cdnEndpointConfigured:
       storageEnvPresent("DO_SPACES_CDN_ENDPOINT") ||
@@ -221,7 +288,19 @@ export function adminProductImageStorageDiagnostics() {
     envKeyPresence,
     environment: runtimeImageEnvironment(),
     fallbackAllowed: localProductImageFallbackAllowed(),
+    keyShape,
     readiness: "missing" as "configured" | "malformed" | "missing",
+    resolvedCredentials: null as null | {
+      accessKeyId: ReturnType<typeof credentialFingerprint>;
+      accessKeyIdSource: "env" | "default";
+      secretAccessKeyLength: number;
+      secretSource:
+        | "DO_SPACES_SECRET_ACCESS_KEY"
+        | "DO_SPACES_SECRET_KEY"
+        | "DO_SPACES_KEY"
+        | "unknown";
+      signingRegion: "us-east-1";
+    },
     storage: null as null | {
       bucket: string;
       endpoint: ReturnType<typeof safeUrlSummary>;
@@ -238,9 +317,30 @@ export function adminProductImageStorageDiagnostics() {
       return diagnostics;
     }
 
+    const secretSource = storageEnvPresent("DO_SPACES_SECRET_ACCESS_KEY")
+      ? ("DO_SPACES_SECRET_ACCESS_KEY" as const)
+      : storageEnvPresent("DO_SPACES_SECRET_KEY")
+        ? ("DO_SPACES_SECRET_KEY" as const)
+        : storageEnvPresent("DO_SPACES_KEY")
+          ? ("DO_SPACES_KEY" as const)
+          : ("unknown" as const);
+    const accessKeyIdSource =
+      storageEnvPresent("DO_SPACES_ACCESS_KEY_ID") ||
+      storageEnvPresent("DO_SPACES_ACCESS_KEY") ||
+      storageEnvPresent("DO_SPACES_KEY_ID")
+        ? ("env" as const)
+        : ("default" as const);
+
     return {
       ...diagnostics,
       readiness: "configured" as const,
+      resolvedCredentials: {
+        accessKeyId: credentialFingerprint(config.accessKeyId),
+        accessKeyIdSource,
+        secretAccessKeyLength: config.secretAccessKey.length,
+        secretSource,
+        signingRegion: "us-east-1" as const
+      },
       storage: {
         bucket: config.bucket,
         endpoint: safeUrlSummary(config.endpoint),
@@ -365,13 +465,14 @@ async function storeUploadedProductImage(input: Readonly<{
   requestId?: string | null;
 }>) {
   const logContext = imageUploadLogContext(input);
+  const storageDiagnostics = adminProductImageStorageDiagnostics();
 
   console.info("Admin product image storage attempt", {
     ...logContext,
     contentType: input.contentType,
     originalFileName: input.originalFileName,
     size: input.bytes.length,
-    storage: adminProductImageStorageDiagnostics()
+    storage: storageDiagnostics
   });
 
   try {
@@ -407,6 +508,8 @@ async function storeUploadedProductImage(input: Readonly<{
       url: stored.url,
     };
   } catch (error) {
+    // Echo resolved credential fingerprints so PRD SignatureDoesNotMatch can
+    // be correlated with KEY_ID / secret length without leaking secrets.
     console.error("Admin product image storage failed", {
       ...logContext,
       error: adminProductImageErrorDetails(error),

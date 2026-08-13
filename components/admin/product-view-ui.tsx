@@ -395,12 +395,14 @@ export function ProductImageDropzone({
           }
         })()
       : {}) as {
+      code?: string;
       image?: {
         requestId?: string;
         reason?: string;
         status?: "ready" | "failed";
       };
       message?: string;
+      providerCode?: string;
       requestId?: string;
       row?: AdminProductRow;
       url?: string;
@@ -411,17 +413,28 @@ export function ProductImageDropzone({
         : typeof result.image?.requestId === "string"
           ? result.image.requestId
           : response.headers.get("x-request-id");
-    const message =
+    const providerCode =
+      typeof result.providerCode === "string" ? result.providerCode : null;
+    const code =
+      typeof result.code === "string"
+        ? result.code
+        : typeof result.image?.reason === "string"
+          ? result.image.reason
+          : null;
+    const baseMessage =
       typeof result.message === "string" && result.message.trim()
         ? result.message.trim()
         : rawText && !rawText.trim().startsWith("<")
           ? rawText.trim().slice(0, 240)
           : fallback;
+    const message = [baseMessage, providerCode ? `provider ${providerCode}` : null]
+      .filter(Boolean)
+      .join(" · ");
 
     return {
       image: result.image ?? null,
       message,
-      reason: result.image?.reason ?? null,
+      reason: code ?? result.image?.reason ?? null,
       requestId,
       row: result.row ?? null,
       url: typeof result.url === "string" ? result.url : null,
@@ -433,15 +446,20 @@ export function ProductImageDropzone({
     fallback: string,
   ) {
     const headline = fallback.replace(/\.$/, "");
+    const detail =
+      typeof result.message === "string" ? result.message.trim() : "";
+    // Avoid "Could not upload this image: Could not upload this image · …"
+    const sameAsHeadline =
+      detail.replace(/\.$/, "").toLowerCase() === headline.toLowerCase();
     const parts = [
-      result.message,
+      sameAsHeadline ? null : detail || null,
       result.reason && result.reason !== "failed"
         ? result.reason.replaceAll("_", " ")
         : null,
       result.requestId ? `request ${result.requestId}` : null,
     ].filter(Boolean);
 
-    return `${headline}: ${parts.join(" · ")}`;
+    return parts.length > 0 ? `${headline}: ${parts.join(" · ")}` : `${headline}.`;
   }
 
   async function applyImageUrl(nextImageUrl: string | null) {
