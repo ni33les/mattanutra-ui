@@ -299,23 +299,23 @@ describe("first-party image mirroring", () => {
     assert.equal(config?.secretAccessKey, "digitalocean-secret");
   });
 
-  it("rejects malformed legacy DigitalOcean Spaces credentials", () => {
-    assert.throws(
-      () =>
-        withEnv(
-          {
-            DO_SPACES_ACCESS_KEY: undefined,
-            DO_SPACES_ACCESS_KEY_ID: undefined,
-            DO_SPACES_CDN_ENDPOINT: "https://cdn.example.com",
-            DO_SPACES_ENDPOINT: "https://mattanutra.sgp1.digitaloceanspaces.com",
-            DO_SPACES_KEY: "only-one-half",
-            DO_SPACES_KEY_ID: undefined,
-            DO_SPACES_SECRET_KEY: undefined,
-            DO_SPACES_SECRET_ACCESS_KEY: undefined
-          },
-          () => firstPartyImageStorageConfigFromEnv()
-        ),
-      /DO_SPACES_KEY must include both access and secret/
+  it("accepts secret-only DO_SPACES_KEY with the project Spaces access key id fallback", () => {
+    const config = withEnv(
+      {
+        DO_SPACES_ACCESS_KEY: undefined,
+        DO_SPACES_ACCESS_KEY_ID: undefined,
+        DO_SPACES_CDN_ENDPOINT: "https://cdn.example.com",
+        DO_SPACES_ENDPOINT: "https://mattanutra.sgp1.digitaloceanspaces.com",
+        DO_SPACES_KEY: "only-one-half",
+        DO_SPACES_KEY_ID: undefined,
+        DO_SPACES_SECRET_KEY: undefined,
+        DO_SPACES_SECRET_ACCESS_KEY: undefined
+      },
+      () => firstPartyImageStorageConfigFromEnv()
     );
+
+    assert.equal(config?.accessKeyId, "DO801NRCNL3HYHXKRJEG");
+    assert.equal(config?.secretAccessKey, "only-one-half");
+    assert.equal(config?.bucket, "mattanutra");
   });
 });

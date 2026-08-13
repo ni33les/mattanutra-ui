@@ -296,6 +296,14 @@ function digitalOceanSecretFromKey(value: string) {
   return secretAccessKey;
 }
 
+/**
+ * Spaces access key id used by the MattaNutra bucket (non-secret identifier).
+ * Secret stays in DO_SPACES_KEY. Needed when KEY is secret-only rather than
+ * legacy access:secret — PRD historically omitted DO_SPACES_KEY_ID while UAT
+ * set it explicitly.
+ */
+const DEFAULT_DO_SPACES_KEY_ID = "DO801NRCNL3HYHXKRJEG";
+
 function digitalOceanCredentialsFromEnv() {
   const explicitAccessKeyId = envValue(
     "DO_SPACES_ACCESS_KEY_ID",
@@ -328,9 +336,20 @@ function digitalOceanCredentialsFromEnv() {
 
   const legacyCredential = digitalOceanSecretKey;
 
-  return legacyCredential
-    ? digitalOceanCredentialPair(legacyCredential)
-    : null;
+  if (!legacyCredential) {
+    return null;
+  }
+
+  // Prefer access:secret / access|secret. If KEY is secret-only (no separator),
+  // pair it with DO_SPACES_KEY_ID when present, else the known project key id.
+  if (legacyCredential.includes(":") || legacyCredential.includes("|")) {
+    return digitalOceanCredentialPair(legacyCredential);
+  }
+
+  return {
+    accessKeyId: DEFAULT_DO_SPACES_KEY_ID,
+    secretAccessKey: legacyCredential
+  };
 }
 
 export function firstPartyImageStorageEnvironment(

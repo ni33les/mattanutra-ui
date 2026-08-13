@@ -140,6 +140,12 @@ function digitalOceanSecretFromKey(value: string) {
   return secretAccessKey;
 }
 
+/**
+ * Spaces access key id used by the MattaNutra bucket (non-secret identifier).
+ * Keep in sync with lib/first-party-image-mirror.ts — secret stays in DO_SPACES_KEY.
+ */
+const DEFAULT_DO_SPACES_KEY_ID = "DO801NRCNL3HYHXKRJEG";
+
 function digitalOceanCredentialsFromEnv() {
   const explicitAccessKeyId = envValue(
     "DO_SPACES_ACCESS_KEY_ID",
@@ -172,9 +178,18 @@ function digitalOceanCredentialsFromEnv() {
 
   const legacyCredential = digitalOceanSecretKey;
 
-  return legacyCredential
-    ? digitalOceanCredentialPair(legacyCredential)
-    : null;
+  if (!legacyCredential) {
+    return null;
+  }
+
+  if (legacyCredential.includes(":") || legacyCredential.includes("|")) {
+    return digitalOceanCredentialPair(legacyCredential);
+  }
+
+  return {
+    accessKeyId: DEFAULT_DO_SPACES_KEY_ID,
+    secretAccessKey: legacyCredential
+  };
 }
 
 function safeFileStem(fileName: string) {
