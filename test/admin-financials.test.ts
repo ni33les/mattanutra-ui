@@ -40,30 +40,31 @@ describe("admin financials money-flow rules", () => {
     assert.match(stripePayments, /Revenue is booked only after checkout completes/);
   });
 
-  it("books completed plan sales as nominal revenue and voids abandoned ones", () => {
+  it("books completed plan sales as nominal revenue and removes abandoned ones", () => {
     assert.match(stripePayments, /recordStripePaymentCompletedRevenue/);
     assert.match(
       stripePayments,
       /async function recordStripePaymentCompletedRevenue[\s\S]*?entryType: "nominal"/
     );
-    assert.match(stripePayments, /voidStripePaymentRevenue/);
-    assert.match(stripePayments, /"payment_expired"/);
+    assert.match(stripePayments, /removeStripePaymentRevenue/);
     assert.match(
       stripePayments,
-      /async function voidStripePaymentRevenue[\s\S]*?category: "other"/
-    );
-  });
-
-  it("does not treat Stripe bank transfers as customer revenue", () => {
-    assert.match(stripePayments, /Internal Stripe clearing → bank transfer/);
-    assert.match(stripePayments, /accountingBasis: "stripe_payout"/);
-    assert.match(
-      stripePayments,
-      /async function recordStripePayoutAccounting[\s\S]*?category: "other"[\s\S]*?stripe:payout:\$\{payout\.id\}:net/
+      /async function removeStripePaymentRevenue[\s\S]*?delete from public\.finance_transactions/
     );
     assert.doesNotMatch(
       stripePayments,
-      /async function recordStripePayoutAccounting[\s\S]*?category: "revenue"/
+      /async function removeStripePaymentRevenue[\s\S]*?category: "other"/
+    );
+  });
+
+  it("does not post Stripe bank transfers to the sales ledger", () => {
+    assert.match(
+      stripePayments,
+      /async function recordStripePayoutAccounting[\s\S]*?not posted to the sales ledger/
+    );
+    assert.doesNotMatch(
+      stripePayments,
+      /async function recordStripePayoutAccounting[\s\S]*?recordFinanceTransaction/
     );
   });
 

@@ -493,61 +493,20 @@ async function recordStripePaymentCompletedRevenue(
 }
 
 /**
- * Void any prior revenue booking for an abandoned/failed checkout so it
- * cannot inflate sales totals. No-op when no revenue row exists (new path
- * never books until paid).
+ * Remove any prior revenue booking for an abandoned/failed checkout.
+ * Failed/expired payments are not accounted for on the ledger — only
+ * completed payments keep a nominal revenue row. No "other"/void rows.
  */
-async function voidStripePaymentRevenue(
-  sql: Db,
-  payment: PaymentRow,
-  metadata: Record<string, unknown> = {}
-) {
+async function removeStripePaymentRevenue(sql: Db, payment: PaymentRow) {
   const sourceRef = `stripe:payment:${payment.id}:nominal-revenue`;
-  const existing = await sql<Array<{ id: string; category: string }>>`
-    select id::text, category
-    from public.finance_transactions
+  const rows = await sql<Array<{ id: string }>>`
+    delete from public.finance_transactions
     where source = 'stripe'
       and source_ref = ${sourceRef}
-    limit 1
+    returning id::text
   `;
 
-  if (!existing[0] || existing[0].category !== "revenue") {
-    return null;
-  }
-
-  const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
-  // amount must stay > 0 for ledger constraint; reclassify out of revenue.
-  const amount = Math.max(1, Math.round(Number(payment.amount) || 1));
-
-  return recordFinanceTransaction({
-    amount,
-    category: "other",
-    currency: payment.currency,
-    description: `Voided Stripe ${payment.selected_plan} checkout (${String(metadata.accountingBasis ?? "voided")})`,
-    entryType: "nominal",
-    from: paymentCustomerLedgerAccount(payment),
-    metadata: {
-      ...fxMetadata(fx),
-      paymentId: payment.id,
-      paymentStatus: payment.status,
-      planId: payment.plan_id,
-      selectedPlan: payment.selected_plan,
-      sourceSurface: payment.source_surface,
-      stripeCheckoutSessionId: payment.stripe_checkout_session_id,
-      stripeCustomerId: payment.stripe_customer_id,
-      stripePaymentIntentId: payment.stripe_payment_intent_id,
-      voided: true,
-      ...metadata
-    },
-    provider: "stripe",
-    source: "stripe",
-    sourceRef,
-    sql,
-    to: "mattanutra:revenue",
-    toAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
-    fxRateId: fx.fxRateId,
-    usdRate: fx.usdRate
-  });
+  return rows[0]?.id ?? null;
 }
 
 async function queuePlatformPaymentNotification(input: Readonly<{
@@ -754,40 +713,8 @@ async function recordStripePayoutAccounting(
     throw new Error("Stripe payout amount or currency is invalid");
   }
 
-  const fx = await resolveUsdRateForCurrency(currency, { sql });
-
-  // Internal Stripe clearing → bank transfer. Not customer revenue.
-  await recordFinanceTransaction({
-    amount: amountMicros,
-    category: "other",
-    currency,
-    description: `Stripe transfer to MattaNutra bank ${payout.id}`,
-    entryType: "actual",
-    from: `stripe:payout:${payout.id}`,
-    fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
-    metadata: {
-      ...fxMetadata(fx),
-      accountingBasis: "stripe_payout",
-      arrivalDate: payout.arrival_date ?? null,
-      balanceTransactionId: stringId(payout.balance_transaction),
-      mattanutraEnv: input.config.env,
-      stripeMode: input.config.mode,
-      stripePayoutId: payout.id,
-      stripePayoutStatus: payout.status
-    },
-    occurredAt: payout.arrival_date
-      ? new Date(payout.arrival_date * 1000)
-      : new Date(),
-    provider: "stripe",
-    source: "stripe",
-    sourceRef: `stripe:payout:${payout.id}:net`,
-    sql,
-    to: "mattanutra:bank",
-    toAccountId: FINANCE_ACCOUNT_IDS.mattanutraBank,
-    fxRateId: fx.fxRateId,
-    usdRate: fx.usdRate
-  });
-
+  // Internal Stripe clearing → bank transfer is not customer revenue and is
+  // not posted to the sales ledger (avoids category "other" clutter). BPM only.
   await writePaymentBpmEvent({
     actorType: "system",
     eventName: "payment_payout_recorded",
@@ -1388,10 +1315,8 @@ export async function markPaymentCancelled(input: Readonly<{
           reason: "visitor_cancelled_checkout",
           status: "cancelled"
         });
-  // Abandoned checkout: ensure any prior revenue row is voided (not countable).
-  await voidStripePaymentRevenue(sql, updated ?? payment, {
-    accountingBasis: "payment_cancelled"
-  });
+  // Abandoned checkout: remove any prior revenue row (do not reclassify as other).
+  await removeStripePaymentRevenue(sql, updated ?? payment);
 
   await writePaymentBpmEvent({
     actorType: "visitor",
@@ -2383,12 +2308,8 @@ export async function markStripePaymentFailure(input: Readonly<{
     reason: input.reason,
     status: input.eventStatus
   });
-  // Expired/failed checkouts must not count as revenue.
-  await voidStripePaymentRevenue(sql, updated ?? payment, {
-    accountingBasis: input.eventStatus === "expired" ? "payment_expired" : "payment_failed",
-    failureReason: input.reason,
-    stripeEventId: input.stripeEventId
-  });
+  // Expired/failed checkouts are not ledgered — delete any stray revenue row.
+  await removeStripePaymentRevenue(sql, updated ?? payment);
 
   await writePaymentBpmEvent({
     actorType: "system",

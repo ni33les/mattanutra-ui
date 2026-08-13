@@ -1,9 +1,10 @@
 /**
- * Idempotent PRD finance_transactions repair:
- * - Void expired/failed/cancelled plan revenue
+ * Idempotent finance_transactions cleanup for sales ledger accuracy:
+ * - DELETE abandoned/expired/failed/cancelled plan revenue rows (no "other")
+ * - DELETE voided "other" rows left by earlier repairs
+ * - DELETE Stripe bank-transfer rows (not customer sales)
  * - Keep paid plan sales as nominal revenue
  * - Retail product revenue → nominal
- * - Stripe bank payouts → category other
  * - Backfill missing retailer nominal payouts when payable > 0
  *
  * Usage:
@@ -29,188 +30,110 @@ const sql = postgres(connection, {
   connect_timeout: 30
 });
 
-type CountRow = { n: number };
-
 async function main() {
-  console.log(dryRun ? "[dry-run] PRD finance ledger repair" : "[apply] PRD finance ledger repair");
+  console.log(
+    dryRun ? "[dry-run] finance ledger cleanup" : "[apply] finance ledger cleanup"
+  );
 
   const before = await sql`
     select
+      count(*)::int as total_n,
       count(*) filter (where category = 'revenue')::int as revenue_n,
-      count(*) filter (
-        where category = 'revenue'
-          and entry_type = 'nominal'
-          and (
-            metadata->>'paymentStatus' in ('expired', 'failed', 'cancelled')
-            or metadata->>'accountingBasis' in (
-              'payment_expired', 'payment_failed', 'payment_cancelled', 'payment_created'
-            )
-          )
-      )::int as expired_revenue_n,
-      count(*) filter (
-        where category = 'revenue' and metadata->>'accountingBasis' = 'stripe_payout'
-      )::int as bank_as_revenue_n,
-      count(*) filter (
-        where category = 'revenue'
-          and source = 'retail_product_checkout'
-          and entry_type = 'actual'
-      )::int as retail_actual_n,
+      count(*) filter (where category = 'other')::int as other_n,
       count(*) filter (where category = 'payout')::int as payout_n
     from public.finance_transactions
   `;
   console.log("before", before[0]);
 
-  // 1) Void non-completed plan revenue (expired / failed / cancelled / open create)
-  const voidCandidates = await sql<{
-    id: string;
-    source_ref: string;
-    amount: number;
-    currency: string;
-    usd_rate: number;
-    description: string;
-  }[]>`
-    select
-      id::text,
-      source_ref,
-      amount,
-      currency,
-      usd_rate,
-      description
+  // 1) Delete non-completed plan revenue (and legacy voided "other" payment rows)
+  const deleteAbandoned = await sql`
+    select id::text, source_ref, category, description
     from public.finance_transactions
-    where category = 'revenue'
-      and source = 'stripe'
+    where source = 'stripe'
       and source_ref like 'stripe:payment:%:nominal-revenue'
       and (
-        metadata->>'paymentStatus' in ('expired', 'failed', 'cancelled')
+        category = 'other'
+        or metadata->>'voided' = 'true'
+        or metadata->>'paymentStatus' in ('expired', 'failed', 'cancelled')
         or metadata->>'accountingBasis' in (
-          'payment_expired', 'payment_failed', 'payment_cancelled', 'payment_created'
+          'payment_expired',
+          'payment_failed',
+          'payment_cancelled',
+          'payment_created',
+          'payment_voided'
+        )
+        or exists (
+          select 1
+          from public.payments p
+          where source_ref = 'stripe:payment:' || p.id::text || ':nominal-revenue'
+            and p.status not in ('paid', 'bound')
         )
       )
   `;
+  console.log(`abandoned/void payment rows to delete: ${deleteAbandoned.length}`);
 
-  console.log(`void candidates: ${voidCandidates.length}`);
-
-  if (!dryRun) {
-    for (const row of voidCandidates) {
-      await sql`
-        update public.finance_transactions
-        set
-          category = 'other',
-          description = ${`Voided abandoned checkout (${row.description})`},
-          metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json({
-            voided: true,
-            accountingBasis: "payment_voided",
-            repairedAt: new Date().toISOString(),
-            repairScript: "repair-prd-finance-ledger"
-          })},
-          updated_at = now()
-        where id = ${row.id}::uuid
-      `;
-    }
-  }
-
-  // 2) Paid plans stay nominal revenue (ensure entry_type + clean description)
-  const paidPlans = await sql<{
-    payment_id: string;
-    finance_id: string | null;
-  }[]>`
-    select
-      p.id::text as payment_id,
-      ft.id::text as finance_id
-    from public.payments p
-    left join public.finance_transactions ft
-      on ft.source = 'stripe'
-      and ft.source_ref = 'stripe:payment:' || p.id::text || ':nominal-revenue'
-    where p.status = 'paid'
-  `;
-
-  console.log(`paid plan payments: ${paidPlans.length}`);
-
-  if (!dryRun) {
-    for (const row of paidPlans) {
-      if (!row.finance_id) {
-        console.warn("missing revenue row for paid payment", row.payment_id);
-        continue;
-      }
-
-      await sql`
-        update public.finance_transactions
-        set
-          category = 'revenue',
-          entry_type = 'nominal',
-          description = replace(description, 'Nominal Stripe', 'Stripe'),
-          metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json({
-            paymentStatus: "paid",
-            accountingBasis: "payment_confirmed",
-            repairedAt: new Date().toISOString(),
-            repairScript: "repair-prd-finance-ledger"
-          })},
-          updated_at = now()
-        where id = ${row.finance_id}::uuid
-      `;
-    }
-  }
-
-  // 3) Retail product revenue → nominal
-  const retailActual = await sql<CountRow[]>`
-    select count(*)::int as n
+  // 2) Delete Stripe bank-transfer ledger rows (internal, not sales)
+  const deleteBank = await sql`
+    select id::text, source_ref
     from public.finance_transactions
-    where category = 'revenue'
-      and source = 'retail_product_checkout'
-      and entry_type = 'actual'
+    where source_ref like 'stripe:payout:%:net'
+      or metadata->>'accountingBasis' = 'stripe_payout'
   `;
-  console.log(`retail actual→nominal: ${retailActual[0]?.n ?? 0}`);
+  console.log(`bank transfer rows to delete: ${deleteBank.length}`);
 
   if (!dryRun) {
+    const ids = [
+      ...deleteAbandoned.map((r) => r.id),
+      ...deleteBank.map((r) => r.id)
+    ];
+
+    if (ids.length > 0) {
+      const deleted = await sql`
+        delete from public.finance_transactions
+        where id = any(${ids}::uuid[])
+        returning id::text
+      `;
+      console.log(`deleted ${deleted.length} rows`);
+    }
+
+    // Paid plans: ensure remaining revenue rows are nominal + clean
     await sql`
-      update public.finance_transactions
+      update public.finance_transactions ft
+      set
+        category = 'revenue',
+        entry_type = 'nominal',
+        description = replace(ft.description, 'Nominal Stripe', 'Stripe'),
+        metadata = coalesce(ft.metadata, '{}'::jsonb) || ${sql.json({
+          paymentStatus: "paid",
+          accountingBasis: "payment_confirmed",
+          repairedAt: new Date().toISOString(),
+          repairScript: "repair-prd-finance-ledger"
+        })},
+        updated_at = now()
+      from public.payments p
+      where ft.source = 'stripe'
+        and ft.source_ref = 'stripe:payment:' || p.id::text || ':nominal-revenue'
+        and p.status in ('paid', 'bound')
+    `;
+
+    // Retail product revenue → nominal
+    await sql`
+      update public.finance_transactions ft
       set
         entry_type = 'nominal',
-        metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json({
+        metadata = coalesce(ft.metadata, '{}'::jsonb) || ${sql.json({
           repairedAt: new Date().toISOString(),
           repairScript: "repair-prd-finance-ledger",
           entryTypeRepair: "actual_to_nominal"
         })},
         updated_at = now()
-      where category = 'revenue'
-        and source = 'retail_product_checkout'
-        and entry_type = 'actual'
+      where ft.category = 'revenue'
+        and ft.source = 'retail_product_checkout'
+        and ft.entry_type = 'actual'
     `;
   }
 
-  // 4) Bank payouts out of revenue
-  const bankAsRevenue = await sql<CountRow[]>`
-    select count(*)::int as n
-    from public.finance_transactions
-    where (
-      metadata->>'accountingBasis' = 'stripe_payout'
-      or source_ref like 'stripe:payout:%:net'
-    )
-    and category = 'revenue'
-  `;
-  console.log(`bank payout reclassify: ${bankAsRevenue[0]?.n ?? 0}`);
-
-  if (!dryRun) {
-    await sql`
-      update public.finance_transactions
-      set
-        category = 'other',
-        entry_type = 'actual',
-        metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json({
-          accountingBasis: "stripe_payout",
-          repairedAt: new Date().toISOString(),
-          repairScript: "repair-prd-finance-ledger"
-        })},
-        updated_at = now()
-      where (
-        metadata->>'accountingBasis' = 'stripe_payout'
-        or source_ref like 'stripe:payout:%:net'
-      )
-      and category = 'revenue'
-    `;
-  }
-
-  // 5) Backfill missing nominal retailer payouts
+  // 3) Backfill missing nominal retailer payouts
   const missingPayouts = await sql<{
     settlement_id: string;
     order_number: string;
@@ -299,28 +222,12 @@ async function main() {
 
   const after = await sql`
     select
+      count(*)::int as total_n,
       count(*) filter (where category = 'revenue')::int as revenue_n,
-      round(sum(case when category = 'revenue' then amount else 0 end)::numeric / 1000000, 2) as revenue_thb_major_sum,
-      count(*) filter (
-        where category = 'revenue' and entry_type = 'nominal'
-      )::int as revenue_nominal_n,
-      count(*) filter (
-        where category = 'revenue' and entry_type = 'actual'
-      )::int as revenue_actual_n,
+      count(*) filter (where category = 'other')::int as other_n,
       count(*) filter (where category = 'payout')::int as payout_n,
-      round(sum(case when category = 'payout' then amount else 0 end)::numeric / 1000000, 2) as payout_thb_major_sum,
-      count(*) filter (
-        where category = 'revenue'
-          and (
-            metadata->>'paymentStatus' in ('expired', 'failed', 'cancelled')
-            or metadata->>'accountingBasis' in (
-              'payment_expired', 'payment_failed', 'payment_cancelled', 'payment_created'
-            )
-          )
-      )::int as expired_still_revenue_n,
-      count(*) filter (
-        where category = 'revenue' and metadata->>'accountingBasis' = 'stripe_payout'
-      )::int as bank_still_revenue_n
+      round(sum(case when category = 'revenue' then amount else 0 end)::numeric / 1000000, 2)
+        as revenue_major_sum
     from public.finance_transactions
   `;
 
@@ -329,7 +236,7 @@ async function main() {
       source,
       entry_type,
       count(*)::int as n,
-      round(sum(amount)::numeric / 1000000, 2) as thb
+      round(sum(amount)::numeric / 1000000, 2) as major
     from public.finance_transactions
     where category = 'revenue'
     group by 1, 2
@@ -341,7 +248,7 @@ async function main() {
   console.log(
     dryRun
       ? "Dry run complete — re-run without DRY_RUN=1 to apply."
-      : "Repair applied."
+      : "Cleanup applied."
   );
 }
 
