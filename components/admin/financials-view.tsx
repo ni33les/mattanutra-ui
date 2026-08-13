@@ -424,37 +424,23 @@ export function AdminFinancialsView({
                       role="button"
                       tabIndex={0}
                     >
-                      <td className="whitespace-nowrap py-4 pl-5 pr-3 text-sm text-gray-500">
+                      <td className="whitespace-nowrap py-4 pl-5 pr-3 text-sm text-gray-500 tabular-nums">
                         {formatGeneratedAt(row.occurredAt, locale)}
                       </td>
-                      <td className="min-w-96 px-3 py-4 text-sm">
-                        <div className="font-medium text-gray-900">
+                      <td className="min-w-72 max-w-xl px-3 py-4 text-sm">
+                        <div className="truncate font-medium text-gray-900">
                           {row.description}
-                        </div>
-                        <div className="mt-1 max-w-xl truncate text-xs text-gray-400">
-                          {financialResourceSummary(row) ||
-                            row.sourceRef ||
-                            row.source}
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
                         {categoryLabel(row.category)}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
-                        <span
-                          className={classNames(
-                            row.entryType === "actual"
-                              ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-                              : "bg-gray-50 text-gray-600 ring-gray-200",
-                            "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
-                          )}
-                        >
-                          {readableToken(row.entryType)}
-                        </span>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+                        {readableToken(row.entryType)}
                       </td>
                       <td
                         className={classNames(
-                          "whitespace-nowrap py-4 pl-3 pr-5 text-right text-sm font-semibold",
+                          "whitespace-nowrap py-4 pl-3 pr-5 text-right text-sm font-semibold tabular-nums",
                           row.direction === "out"
                             ? "text-rose-700"
                             : "text-gray-900"
@@ -564,17 +550,35 @@ function FinancialTransactionDetailModal({
           value={readableToken(row.entryType)}
         />
         <FinancialDetailRow
-          label={labels.financials.amount}
-          value={formatLedgerMoney(
-            row.amount / 1_000_000,
-            row.direction,
-            locale === "th" ? "th-TH" : "en-GB",
-            row.currency
-          )}
+          label={`${labels.financials.amount} (${row.currency})`}
+          value={
+            <span
+              className={classNames(
+                "tabular-nums font-semibold",
+                row.direction === "out" ? "text-rose-700" : "text-gray-900"
+              )}
+            >
+              {formatLedgerMoney(
+                row.amount / 1_000_000,
+                row.direction,
+                locale === "th" ? "th-TH" : "en-GB",
+                row.currency
+              )}
+            </span>
+          }
         />
         <FinancialDetailRow
-          label={labels.financials.usd}
-          value={formatSignedMoney(row.amountUsd, row.direction, locale)}
+          label={`${labels.financials.amount} (${labels.financials.usd})`}
+          value={
+            <span
+              className={classNames(
+                "tabular-nums font-semibold",
+                row.direction === "out" ? "text-rose-700" : "text-gray-900"
+              )}
+            >
+              {formatSignedMoney(row.amountUsd, row.direction, locale)}
+            </span>
+          }
         />
         <FinancialDetailRow
           label={labels.financials.provider}

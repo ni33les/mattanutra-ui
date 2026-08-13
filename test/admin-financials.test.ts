@@ -140,15 +140,17 @@ describe("admin financials helpers", () => {
     assert.equal(signedUsdForRow(12.5, "neutral"), 0);
   });
 
-  it("formats amounts without parentheses and keeps micro precision", () => {
+  it("formats plain amounts without currency symbols and keeps micro precision", () => {
     const inflow = formatLedgerMoney(12.5, "in", "en-GB");
     const outflow = formatLedgerMoney(12.5, "out", "en-GB");
     const micro = formatLedgerMoney(0.000203, "out", "en-GB");
-    assert.match(inflow, /12\.50|US\$12\.50|\$12\.50/);
-    assert.equal(outflow.includes("(") || outflow.includes(")"), false);
-    assert.match(outflow, /12\.50/);
-    // AI-scale costs must not round to $0.00
-    assert.doesNotMatch(micro, /\$0\.00$|US\$0\.00$/);
+    assert.equal(inflow, "12.50");
+    assert.equal(outflow, "12.50");
+    // No $ / currency symbol — currency lives in the column header.
+    assert.doesNotMatch(inflow, /\$|USD|US\$/);
+    assert.doesNotMatch(outflow, /\(|\)/);
+    // AI-scale costs must not round to 0.00
+    assert.doesNotMatch(micro, /^0\.00$/);
     assert.match(micro, /0\.000203/);
   });
 });

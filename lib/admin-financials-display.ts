@@ -54,11 +54,11 @@ export function signedUsdForRow(
 }
 
 /**
- * Adaptive USD fraction digits so micro AI costs are not rounded to $0.00.
- * - ≥ $1 → 2 dp
- * - ≥ $0.01 → 2–4 dp
- * - ≥ $0.0001 → 4–6 dp
- * - smaller → 6–8 dp (micros of a dollar)
+ * Adaptive fraction digits so micro AI costs are not rounded to 0.00.
+ * - ≥ 1 → 2 dp
+ * - ≥ 0.01 → 2–4 dp
+ * - ≥ 0.0001 → 4–6 dp
+ * - smaller → 6–8 dp
  */
 export function ledgerMoneyFractionDigits(amount: number) {
   const absolute = Math.abs(amount);
@@ -83,23 +83,23 @@ export function ledgerMoneyFractionDigits(amount: number) {
 }
 
 /**
- * Format ledger amounts as currency.
- * Outflows keep the absolute magnitude (UI styles them red); no parentheses.
+ * Format ledger amounts as plain numbers (no $ / currency symbol).
+ * Currency belongs in the column header (e.g. USD). Outflows stay absolute;
+ * the UI styles them red.
  */
 export function formatLedgerMoney(
   amountUsd: number,
-  direction: AdminFinancialDirection,
+  _direction: AdminFinancialDirection,
   locale: string,
-  currency = "USD"
+  _currency = "USD"
 ) {
   const absolute = Math.abs(amountUsd);
   const fractionDigits = ledgerMoneyFractionDigits(absolute);
 
   return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
     maximumFractionDigits: fractionDigits.maximumFractionDigits,
-    minimumFractionDigits: fractionDigits.minimumFractionDigits
+    minimumFractionDigits: fractionDigits.minimumFractionDigits,
+    useGrouping: true
   }).format(absolute);
 }
 
