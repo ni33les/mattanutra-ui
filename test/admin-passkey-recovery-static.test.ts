@@ -146,6 +146,40 @@ test("admins can add an extra passkey only from an existing passkey session", ()
   assert.match(settings, /\/api\/admin\/auth\/passkey\/add\/verify/);
 });
 
+test("add-device invite does not revoke existing passkeys or sessions", () => {
+  const access = source("lib/admin-access.ts");
+  const auth = source("lib/admin-access-auth.ts");
+  const shared = source("lib/admin-access-shared.ts");
+  const route = source("app/api/admin/access/route.ts");
+  const view = source("components/admin/access-view.tsx");
+  const content = source("components/admin/dashboard-content.tsx");
+  const login = source("components/admin-login.tsx");
+  const loginPage = source("app/[locale]/admin/login/page.tsx");
+
+  assert.match(access, /createAdminPasskeyAddDeviceInvite/);
+  assert.match(auth, /export async function createAdminPasskeyAddDeviceInvite/);
+  assert.match(auth, /'reason', 'passkey_add_device'/);
+  assert.match(auth, /admin\.passkey_add_device_started/);
+  assert.match(auth, /admin\.passkey_add_device_accepted/);
+  assert.match(auth, /intent=add_device/);
+  assert.match(shared, /const addDeviceInviteDays = 7/);
+  assert.match(route, /action === "add_device_passkey"/);
+  assert.match(view, /add_device_passkey/);
+  assert.match(view, /labels\.access\.addAnotherDevice/);
+  assert.match(content, /addAnotherDevice:/);
+  assert.match(login, /addDeviceHeading/);
+  assert.match(loginPage, /inviteIntent/);
+
+  const addDeviceFn = auth.slice(
+    auth.indexOf("export async function createAdminPasskeyAddDeviceInvite")
+  );
+  const nextExport = addDeviceFn.indexOf("\nexport async function", 10);
+  const body = nextExport === -1 ? addDeviceFn : addDeviceFn.slice(0, nextExport);
+  assert.doesNotMatch(body, /revoked_passkeys/);
+  assert.doesNotMatch(body, /update public\.admin_passkey_credentials/);
+  assert.doesNotMatch(body, /update public\.admin_sessions/);
+});
+
 test("break-glass passkey recovery is operator-confirmed and platform-owner only", () => {
   const script = source("scripts/create-admin-passkey-recovery.ts");
   const pkg = source("package.json");

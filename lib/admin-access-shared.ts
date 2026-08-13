@@ -36,6 +36,7 @@ export const registrationChallengeMinutes = 10;
 export const loginChallengeMinutes = 5;
 export const inviteDays = 7;
 export const recoveryInviteMinutes = 60;
+export const addDeviceInviteDays = 7;
 export const defaultPlatformOrgSlug = "mattanutra";
 
 export function normalizeEmail(email: string) {

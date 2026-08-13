@@ -27,6 +27,7 @@ import {
   platformBootstrapEmail,
   platformOrganisation,
   recoveryInviteMinutes,
+  addDeviceInviteDays,
   registrationChallengeMinutes,
   requestRpId,
   roleValue,
@@ -550,11 +551,12 @@ export async function verifyRegistrationAndCreateSession({
   });
 
   if (
-    challenge.metadata.reason === "passkey_recovery" &&
+    (challenge.metadata.reason === "passkey_recovery" ||
+      challenge.metadata.reason === "passkey_add_device") &&
     recoveryPersonId &&
     recoveryPersonId !== savedPerson.id
   ) {
-    throw new Error("Recovery invite does not match this admin person");
+    throw new Error("Invite does not match this admin person");
   }
 
   await insertAdminPasskeyCredential({
@@ -586,7 +588,9 @@ export async function verifyRegistrationAndCreateSession({
   await recordAdminAudit({
     action: challenge.metadata.reason === "passkey_recovery"
       ? "admin.passkey_recovery_accepted"
-      : "admin.passkey_registered",
+      : challenge.metadata.reason === "passkey_add_device"
+        ? "admin.passkey_add_device_accepted"
+        : "admin.passkey_registered",
     actorPersonId: savedPerson.id,
     organisationId,
     resourceId: savedPerson.id,
@@ -1072,6 +1076,158 @@ export async function createAdminPasskeyRecovery({
       role: roleValue(
         recovery.role,
         recovery.organisation_type === "tenant" ? "tenant" : "platform"
+      ),
+      status: "pending" as const
+    },
+    inviteUrl,
+    sent: delivery.sent
+  };
+}
+
+export async function createAdminPasskeyAddDeviceInvite({
+  actor,
+  personId
+}: Readonly<{
+  actor: AdminSessionContext;
+  personId: string;
+}>) {
+  if (actor.isLegacy) {
+    throw new Error("A passkey session is required to add a device");
+  }
+
+  if (
+    actor.actorMembership.role !== "platform_owner" &&
+    actor.actorMembership.role !== "platform_admin"
+  ) {
+    throw new Error("Only platform admins can send add-device invites");
+  }
+
+  const sql = await sqlOrThrow();
+  const token = randomAdminToken();
+  const rows = await sql<Array<{
+    email: string;
+    expires_at: Date | string;
+    id: string;
+    organisation_id: string;
+    organisation_type: string;
+    person_id: string;
+    preferred_locale: string;
+    role: string;
+  }>>`
+    with target as (
+      select
+        people.id::text as person_id,
+        people.email,
+        people.preferred_locale,
+        organisations.id::text as organisation_id,
+        organisations.organisation_type,
+        organisation_memberships.role
+      from public.people
+      join public.organisation_memberships
+        on organisation_memberships.person_id = people.id
+      join public.organisations
+        on organisations.id = organisation_memberships.organisation_id
+      where people.id = ${personId}::uuid
+        and people.status = 'active'
+        and organisations.status = 'active'
+        and organisation_memberships.principal_type = 'person'
+        and organisation_memberships.status = 'active'
+      order by
+        case organisation_memberships.role
+          when 'platform_owner' then 0
+          when 'platform_admin' then 1
+          else 2
+        end,
+        organisation_memberships.created_at asc
+      limit 1
+    ),
+    revoked_stale_invites as (
+      update public.admin_invitations
+      set status = 'revoked', updated_at = now()
+      from target
+      where admin_invitations.email = target.email
+        and status = 'pending'
+        and metadata->>'reason' = 'passkey_add_device'
+      returning admin_invitations.id
+    ),
+    invite as (
+      insert into public.admin_invitations (
+        organisation_id,
+        email,
+        role,
+        invited_by_person_id,
+        token_hash,
+        preferred_locale,
+        status,
+        metadata,
+        expires_at
+      )
+      select
+        target.organisation_id::uuid,
+        target.email,
+        target.role,
+        ${actor.actorPerson.id}::uuid,
+        ${hashAdminToken(token)},
+        target.preferred_locale,
+        'pending',
+        jsonb_build_object(
+          'personId', target.person_id,
+          'reason', 'passkey_add_device',
+          'invitedByPersonId', ${actor.actorPerson.id}::text
+        ),
+        now() + (${addDeviceInviteDays}::text || ' days')::interval
+      from target
+      returning id::text, organisation_id::text, email, role, preferred_locale, expires_at
+    )
+    select
+      invite.id,
+      invite.organisation_id,
+      invite.email,
+      invite.role,
+      invite.preferred_locale,
+      invite.expires_at,
+      target.person_id,
+      target.organisation_type
+    from invite
+    join target on true
+  `;
+  const invite = rows[0];
+
+  if (!invite) {
+    throw new Error("Active admin person not found");
+  }
+
+  const preferredLocale = localeValue(invite.preferred_locale);
+  const inviteUrl = `${siteBaseUrl()}/${preferredLocale}/admin/login?invite=${encodeURIComponent(token)}&email=${encodeURIComponent(invite.email)}&intent=add_device`;
+  const delivery = await sendTransactionalEmail({
+    html: `<p>Add another device to your MattaNutra Admin account.</p><p>Open this link on the phone or computer you want to use, then create a passkey.</p><p><a href="${inviteUrl}">Add a passkey on this device</a></p><p>This link expires in ${addDeviceInviteDays} days. Your existing devices keep working.</p>`,
+    subject: "Add another device to MattaNutra Admin",
+    to: invite.email
+  });
+
+  await recordAdminAudit({
+    action: "admin.passkey_add_device_started",
+    actorPersonId: actor.actorPerson.id,
+    organisationId: invite.organisation_id,
+    resourceId: invite.person_id,
+    resourceType: "person",
+    metadata: {
+      invitationId: invite.id,
+      reason: delivery.reason,
+      sent: delivery.sent
+    }
+  });
+
+  return {
+    invite: {
+      email: invite.email,
+      expiresAt: new Date(invite.expires_at).toISOString(),
+      id: invite.id,
+      organisationId: invite.organisation_id,
+      preferredLocale,
+      role: roleValue(
+        invite.role,
+        invite.organisation_type === "tenant" ? "tenant" : "platform"
       ),
       status: "pending" as const
     },

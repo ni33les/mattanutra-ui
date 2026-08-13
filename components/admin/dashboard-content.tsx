@@ -307,6 +307,10 @@ export type AdminContent = Readonly<{
     role: string;
     revoked: string;
     recoverPasskey: string;
+    addAnotherDevice: string;
+    addDeviceInviteHint: string;
+    addDeviceInviteSent: string;
+    resetAllDevices: string;
     revokeKey: string;
     rotateKey: string;
     save: string;
@@ -1056,7 +1060,12 @@ const baseContent = {
       reasoningLevel: "Reasoning",
       role: "Role",
       revoked: "Revoked",
-      recoverPasskey: "Recover",
+      recoverPasskey: "Reset all devices",
+      addAnotherDevice: "Add another device",
+      addDeviceInviteHint:
+        "Sends a link she can open on her phone or laptop to create a new passkey. Existing devices keep working.",
+      addDeviceInviteSent: "Add-device link (share this; she opens it on the new device)",
+      resetAllDevices: "Reset all devices",
       revokeKey: "Revoke key",
       rotateKey: "Rotate key",
       save: "Save",
@@ -1957,7 +1966,12 @@ const baseContent = {
       reasoningLevel: "ระดับ reasoning",
       role: "บทบาท",
       revoked: "ยกเลิกแล้ว",
-      recoverPasskey: "กู้คืน",
+      recoverPasskey: "รีเซ็ตทุกอุปกรณ์",
+      addAnotherDevice: "เพิ่มอุปกรณ์อื่น",
+      addDeviceInviteHint:
+        "ส่งลิงก์ให้เปิดบนโทรศัพท์หรือแล็ปท็อปเพื่อสร้าง passkey ใหม่ อุปกรณ์เดิมยังใช้ได้",
+      addDeviceInviteSent: "ลิงก์เพิ่มอุปกรณ์ (ส่งให้เปิดบนเครื่องใหม่)",
+      resetAllDevices: "รีเซ็ตทุกอุปกรณ์",
       revokeKey: "ยกเลิกคีย์",
       rotateKey: "หมุนคีย์",
       save: "บันทึก",

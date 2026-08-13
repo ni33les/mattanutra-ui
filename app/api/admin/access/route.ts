@@ -7,6 +7,7 @@ import {
   addAdminMembership,
   clientAdminSessionContext,
   createAdminInvitation,
+  createAdminPasskeyAddDeviceInvite,
   createAdminPasskeyRecovery,
   createOrganisation,
   deleteAdminInvitation,
@@ -341,6 +342,29 @@ export async function POST(request: NextRequest) {
       });
 
       return accessResponse(request, context, recoveryResult);
+    }
+
+    if (action === "add_device_passkey") {
+      if (context.isLegacy) {
+        return NextResponse.json(
+          { error: "A passkey session is required to add a device" },
+          { status: 400 }
+        );
+      }
+
+      if (
+        context.actorMembership.role !== "platform_owner" &&
+        context.actorMembership.role !== "platform_admin"
+      ) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const addDeviceResult = await createAdminPasskeyAddDeviceInvite({
+        actor: context,
+        personId: text(body.personId)
+      });
+
+      return accessResponse(request, context, addDeviceResult);
     }
 
     if (action === "add_membership") {

@@ -77,6 +77,7 @@ export {
 } from "@/lib/admin-access-agents";
 export {
   createAdditionalPasskeyRegistrationOptions,
+  createAdminPasskeyAddDeviceInvite,
   createAdminPasskeyRecovery,
   createAuthenticationOptions,
   createRegistrationOptions,

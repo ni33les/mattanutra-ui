@@ -15,6 +15,7 @@ import {
 type AdminLoginProps = Readonly<{
   accessToken: string;
   email: string;
+  inviteIntent?: string;
   inviteToken: string;
   locale: Locale;
   nextPath: string;
@@ -28,6 +29,8 @@ const loginCopy = {
     email: "Email",
     linkTokenHint: "Setup token supplied by this link.",
     inviteHint: "Accept your invite by creating a passkey.",
+    addDeviceHint: "Add a passkey on this device. Your other devices keep working.",
+    addDeviceHeading: "Add a passkey on this device",
     login: "Sign in with passkey",
     loginHint: "Use your registered passkey to open the admin dashboard.",
     language: "Admin language",
@@ -43,6 +46,8 @@ const loginCopy = {
     email: "อีเมล",
     linkTokenHint: "ลิงก์นี้มี setup token แล้ว",
     inviteHint: "รับคำเชิญโดยสร้าง passkey",
+    addDeviceHint: "เพิ่ม passkey บนอุปกรณ์นี้ อุปกรณ์อื่นยังใช้ได้",
+    addDeviceHeading: "เพิ่ม passkey บนอุปกรณ์นี้",
     login: "เข้าสู่ระบบด้วย passkey",
     loginHint: "ใช้ passkey ที่ลงทะเบียนแล้วเพื่อเปิดแดชบอร์ดแอดมิน",
     language: "ภาษาแอดมิน",
@@ -58,6 +63,8 @@ const loginCopy = {
     email: "邮箱",
     linkTokenHint: "此链接已包含设置令牌。",
     inviteHint: "创建 passkey 以接受邀请。",
+    addDeviceHint: "在此设备上添加 passkey。其他设备仍可使用。",
+    addDeviceHeading: "在此设备上添加 passkey",
     login: "使用 passkey 登录",
     loginHint: "使用已注册的 passkey 打开管理仪表盘。",
     language: "管理语言",
@@ -126,6 +133,7 @@ function replaceSetupUrlWithLoginUrl(email: string) {
 export function AdminLogin({
   accessToken,
   email: initialEmail,
+  inviteIntent = "",
   inviteToken,
   locale,
   nextPath,
@@ -154,6 +162,10 @@ export function AdminLogin({
 
     if (inviteToken && registrationMode) {
       params.set("invite", inviteToken);
+    }
+
+    if (inviteIntent && registrationMode) {
+      params.set("intent", inviteIntent);
     }
 
     if (setupMode && registrationMode) {
@@ -305,10 +317,16 @@ export function AdminLogin({
               <form onSubmit={register} className="space-y-4">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
-                    {labels.setupHeading}
+                    {inviteIntent === "add_device"
+                      ? labels.addDeviceHeading
+                      : labels.setupHeading}
                   </h2>
                   <p className="mt-1 text-sm text-gray-500">
-                    {inviteToken ? labels.inviteHint : labels.accessHint}
+                    {inviteIntent === "add_device"
+                      ? labels.addDeviceHint
+                      : inviteToken
+                        ? labels.inviteHint
+                        : labels.accessHint}
                   </p>
                 </div>
                 <label className="block">

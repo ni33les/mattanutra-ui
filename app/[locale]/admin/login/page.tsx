@@ -59,6 +59,7 @@ export default async function AdminLoginPage({
     <AdminLogin
       accessToken={firstParam(query.access_token) ?? ""}
       email={firstParam(query.email) ?? ""}
+      inviteIntent={firstParam(query.intent) ?? ""}
       inviteToken={firstParam(query.invite) ?? ""}
       locale={locale}
       nextPath={safeNextPath(locale, firstParam(query.next))}

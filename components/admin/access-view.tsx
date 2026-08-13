@@ -330,6 +330,10 @@ export function AdminAccessView({
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
   const canManageOwners = context.actorMembership.role === "platform_owner";
+  const canSendAddDeviceInvite =
+    !context.isLegacy &&
+    (context.actorMembership.role === "platform_owner" ||
+      context.actorMembership.role === "platform_admin");
   const selectedPersonProtected = selectedPerson
     ? ownerPersonIds.has(selectedPerson.id) && !canManageOwners
     : false;
@@ -516,7 +520,11 @@ export function AdminAccessView({
       } else if (result.membershipDeleted) {
         setMessage(labels.access.membershipDeleted);
       } else if (result.inviteUrl) {
-        setMessage(`${labels.access.inviteUrl}: ${result.inviteUrl}`);
+        const prefix =
+          String(body.action) === "add_device_passkey"
+            ? labels.access.addDeviceInviteSent
+            : labels.access.inviteUrl;
+        setMessage(`${prefix}: ${result.inviteUrl}`);
       } else if (result.membershipAdded) {
         setMessage(
           [
@@ -770,6 +778,13 @@ export function AdminAccessView({
       setPasskeyRecoveryPersonId(null);
       setSelectedPersonId(null);
     }
+  }
+
+  async function addDevicePasskey(personId: string) {
+    await mutate({
+      action: "add_device_passkey",
+      personId
+    });
   }
 
   return (
@@ -2413,16 +2428,33 @@ export function AdminAccessView({
                 <h3 className="text-sm font-semibold text-gray-900">
                   {labels.access.activePasskeys}
                 </h3>
-                {canStartPasskeyRecovery(selectedPerson) &&
+                {(canSendAddDeviceInvite ||
+                  canStartPasskeyRecovery(selectedPerson)) &&
                 passkeyRecoveryPersonId !== selectedPerson.id ? (
-                  <button
-                    className={actionButtonClass("delete")}
-                    disabled={busy}
-                    onClick={() => setPasskeyRecoveryPersonId(selectedPerson.id)}
-                    type="button"
-                  >
-                    {labels.access.recoverPasskey}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    {canSendAddDeviceInvite &&
+                    selectedPerson.status === "active" ? (
+                      <button
+                        className={actionButtonClass("save")}
+                        disabled={busy}
+                        onClick={() => void addDevicePasskey(selectedPerson.id)}
+                        title={labels.access.addDeviceInviteHint}
+                        type="button"
+                      >
+                        {labels.access.addAnotherDevice}
+                      </button>
+                    ) : null}
+                    {canStartPasskeyRecovery(selectedPerson) ? (
+                      <button
+                        className={actionButtonClass("delete")}
+                        disabled={busy}
+                        onClick={() => setPasskeyRecoveryPersonId(selectedPerson.id)}
+                        type="button"
+                      >
+                        {labels.access.recoverPasskey}
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
               {selectedPersonActivePasskeys.length > 0 ? (
