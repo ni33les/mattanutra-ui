@@ -13,7 +13,11 @@ const passkeyRecoveryLabels = [
   "passkeyRecoveryWarning",
   "passkeySummary",
   "recoverPasskey",
-  "sendRecoveryInvite"
+  "sendRecoveryInvite",
+  "addDevice",
+  "deviceLinkFor",
+  "copyLink",
+  "copied"
 ] as const;
 
 test("admin passkey schema supports revocation without deleting credentials", () => {
@@ -166,7 +170,23 @@ test("add-device invite does not revoke existing passkeys or sessions", () => {
   assert.match(route, /action === "add_device_passkey"/);
   assert.match(view, /add_device_passkey/);
   assert.match(view, /labels\.access\.addAnotherDevice/);
+  assert.match(view, /labels\.access\.addDevice/);
+  assert.match(view, /labels\.access\.deviceLinkFor/);
+  assert.match(view, /labels\.access\.copyLink/);
+  assert.match(view, /setDeviceLink/);
+  assert.match(view, /startPasskeyRecovery/);
+  assert.match(view, /stopPeopleRowActivation/);
+  assert.match(view, /<Menu>/);
+  assert.match(view, /text-red-700[\s\S]*labels\.access\.recoverPasskey/);
+  assert.doesNotMatch(
+    view,
+    /addDeviceInviteSent[\s\S]{0,80}setMessage\(`\$\{prefix\}: \$\{result\.inviteUrl\}`\)/
+  );
   assert.match(content, /addAnotherDevice:/);
+  assert.match(content, /addDevice:/);
+  assert.match(content, /deviceLinkFor:/);
+  assert.match(content, /copyLink:/);
+  assert.match(content, /copied:/);
   assert.match(login, /addDeviceHeading/);
   assert.match(loginPage, /inviteIntent/);
 

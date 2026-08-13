@@ -308,8 +308,12 @@ export type AdminContent = Readonly<{
     revoked: string;
     recoverPasskey: string;
     addAnotherDevice: string;
+    addDevice: string;
     addDeviceInviteHint: string;
     addDeviceInviteSent: string;
+    deviceLinkFor: string;
+    copyLink: string;
+    copied: string;
     resetAllDevices: string;
     revokeKey: string;
     rotateKey: string;
@@ -1062,9 +1066,13 @@ const baseContent = {
       revoked: "Revoked",
       recoverPasskey: "Reset all devices",
       addAnotherDevice: "Add another device",
+      addDevice: "Add device",
       addDeviceInviteHint:
         "Sends a link she can open on her phone or laptop to create a new passkey. Existing devices keep working.",
       addDeviceInviteSent: "Add-device link (share this; she opens it on the new device)",
+      deviceLinkFor: "Device link for {email}",
+      copyLink: "Copy link",
+      copied: "Copied",
       resetAllDevices: "Reset all devices",
       revokeKey: "Revoke key",
       rotateKey: "Rotate key",
@@ -1968,9 +1976,13 @@ const baseContent = {
       revoked: "ยกเลิกแล้ว",
       recoverPasskey: "รีเซ็ตทุกอุปกรณ์",
       addAnotherDevice: "เพิ่มอุปกรณ์อื่น",
+      addDevice: "เพิ่มอุปกรณ์",
       addDeviceInviteHint:
         "ส่งลิงก์ให้เปิดบนโทรศัพท์หรือแล็ปท็อปเพื่อสร้าง passkey ใหม่ อุปกรณ์เดิมยังใช้ได้",
       addDeviceInviteSent: "ลิงก์เพิ่มอุปกรณ์ (ส่งให้เปิดบนเครื่องใหม่)",
+      deviceLinkFor: "ลิงก์อุปกรณ์สำหรับ {email}",
+      copyLink: "คัดลอกลิงก์",
+      copied: "คัดลอกแล้ว",
       resetAllDevices: "รีเซ็ตทุกอุปกรณ์",
       revokeKey: "ยกเลิกคีย์",
       rotateKey: "หมุนคีย์",

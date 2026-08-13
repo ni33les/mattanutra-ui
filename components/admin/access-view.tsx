@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import {
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems
+} from "@headlessui/react";
+import { EllipsisVerticalIcon } from "@heroicons/react/20/solid";
 import type {
   AdminAccessData,
   AdminClientSessionContext,
@@ -301,6 +308,11 @@ export function AdminAccessView({
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [passkeyRecoveryPersonId, setPasskeyRecoveryPersonId] =
     useState<string | null>(null);
+  const [deviceLink, setDeviceLink] = useState<{
+    email: string;
+    url: string;
+  } | null>(null);
+  const [copiedDeviceLink, setCopiedDeviceLink] = useState(false);
   const [agentFilterOrganisationId, setAgentFilterOrganisationId] = useState("");
   const [selectedAgentMembershipId, setSelectedAgentMembershipId] =
     useState<string | null>(null);
@@ -362,6 +374,15 @@ export function AdminAccessView({
   );
   const [agentAssociationOrganisationId, setAgentAssociationOrganisationId] =
     useState(() => accessData.organisations[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!copiedDeviceLink) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setCopiedDeviceLink(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copiedDeviceLink]);
   const inviteOrganisation =
     organisationById.get(inviteOrganisationId) ?? accessData.organisations[0];
   const membershipOrganisation =
@@ -497,10 +518,38 @@ export function AdminAccessView({
     );
   }
 
+  function canAddDevicePasskey(person: { status: string }) {
+    return canSendAddDeviceInvite && person.status === "active";
+  }
+
+  function stopPeopleRowActivation(event: { stopPropagation(): void }) {
+    event.stopPropagation();
+  }
+
+  const listRecoveryPerson =
+    passkeyRecoveryPersonId && passkeyRecoveryPersonId !== selectedPersonId
+      ? personById.get(passkeyRecoveryPersonId) ?? null
+      : null;
+
+  async function copyDeviceLink() {
+    if (!deviceLink) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(deviceLink.url);
+      setCopiedDeviceLink(true);
+    } catch {
+      window.prompt(labels.access.copyLink, deviceLink.url);
+    }
+  }
+
   async function mutate(body: Record<string, unknown>) {
     setBusy(true);
     setError("");
     setMessage("");
+    setDeviceLink(null);
+    setCopiedDeviceLink(false);
 
     try {
       const result = await postAccess({
@@ -520,11 +569,18 @@ export function AdminAccessView({
       } else if (result.membershipDeleted) {
         setMessage(labels.access.membershipDeleted);
       } else if (result.inviteUrl) {
-        const prefix =
-          String(body.action) === "add_device_passkey"
-            ? labels.access.addDeviceInviteSent
-            : labels.access.inviteUrl;
-        setMessage(`${prefix}: ${result.inviteUrl}`);
+        const action = String(body.action);
+        if (action === "add_device_passkey" || action === "recover_passkey") {
+          const person = personById.get(String(body.personId));
+          setDeviceLink({
+            email: person?.email ?? "",
+            url: result.inviteUrl
+          });
+          setSelectedPersonId(null);
+          setPasskeyRecoveryPersonId(null);
+        } else {
+          setMessage(`${labels.access.inviteUrl}: ${result.inviteUrl}`);
+        }
       } else if (result.membershipAdded) {
         setMessage(
           [
@@ -781,10 +837,17 @@ export function AdminAccessView({
   }
 
   async function addDevicePasskey(personId: string) {
+    setSelectedPersonId(null);
+    setPasskeyRecoveryPersonId(null);
     await mutate({
       action: "add_device_passkey",
       personId
     });
+  }
+
+  function startPasskeyRecovery(personId: string) {
+    setSelectedPersonId(null);
+    setPasskeyRecoveryPersonId(personId);
   }
 
   return (
@@ -1039,6 +1102,44 @@ export function AdminAccessView({
 
       {view === "people" ? (
         <>
+          {deviceLink ? (
+            <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900">
+                    {localizedTemplate(labels.access.deviceLinkFor, {
+                      email: deviceLink.email
+                    })}
+                  </h2>
+                  <p className="mt-3 break-all font-mono text-sm text-gray-900">
+                    {deviceLink.url}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button
+                    className={actionButtonClass("primary")}
+                    onClick={() => void copyDeviceLink()}
+                    type="button"
+                  >
+                    {copiedDeviceLink
+                      ? labels.access.copied
+                      : labels.access.copyLink}
+                  </button>
+                  <button
+                    className={actionButtonClass("save")}
+                    onClick={() => {
+                      setCopiedDeviceLink(false);
+                      setDeviceLink(null);
+                    }}
+                    type="button"
+                  >
+                    {labels.contentPages.cancel}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <Panel
             action={
               canInvitePeople ? (
@@ -1215,6 +1316,34 @@ export function AdminAccessView({
             </AdminModal>
           ) : null}
 
+          {listRecoveryPerson ? (
+            <div className="rounded-2xl bg-red-50 p-5 text-sm text-red-900 shadow-sm ring-1 ring-red-100">
+              <h2 className="text-base font-semibold">
+                {listRecoveryPerson.displayName}
+              </h2>
+              <p className="mt-1">{listRecoveryPerson.email}</p>
+              <p className="mt-3">{labels.access.passkeyRecoveryWarning}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className={actionButtonClass("delete")}
+                  disabled={busy}
+                  onClick={() => void recoverPasskey(listRecoveryPerson.id)}
+                  type="button"
+                >
+                  {labels.access.sendRecoveryInvite}
+                </button>
+                <button
+                  className={actionButtonClass("save")}
+                  disabled={busy}
+                  onClick={() => setPasskeyRecoveryPersonId(null)}
+                  type="button"
+                >
+                  {labels.contentPages.cancel}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <Panel title={labels.access.people}>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -1224,7 +1353,8 @@ export function AdminAccessView({
                     <th className="py-2 pr-4">{labels.access.email}</th>
                     <th className="py-2 pr-4">{labels.access.preferredLocale}</th>
                     <th className="py-2 pr-4">{labels.access.status}</th>
-                    <th className="py-2">{labels.access.activePasskeys}</th>
+                    <th className="py-2 pr-4">{labels.access.activePasskeys}</th>
+                    <th className="py-2 text-right">{labels.contentPages.actions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1260,8 +1390,62 @@ export function AdminAccessView({
                           {statusLabel(labels, person.status)}
                         </span>
                       </td>
-                      <td className="py-3 text-gray-600">
+                      <td className="py-3 pr-4 text-gray-600">
                         {passkeySummary(person)}
+                      </td>
+                      <td
+                        className="py-3 text-right"
+                        onClick={stopPeopleRowActivation}
+                        onKeyDown={stopPeopleRowActivation}
+                        onPointerDown={stopPeopleRowActivation}
+                      >
+                        {canAddDevicePasskey(person) ||
+                        canStartPasskeyRecovery(person) ? (
+                          <Menu>
+                            <MenuButton
+                              aria-label={`${labels.contentPages.actions}: ${person.displayName}`}
+                              className="inline-flex size-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-wait disabled:opacity-70"
+                              disabled={busy}
+                            >
+                              <EllipsisVerticalIcon
+                                aria-hidden="true"
+                                className="size-5"
+                              />
+                            </MenuButton>
+                            <MenuItems
+                              anchor="bottom end"
+                              className="z-50 w-48 rounded-md bg-white py-1 shadow-lg outline-1 outline-black/5"
+                            >
+                              {canAddDevicePasskey(person) ? (
+                                <MenuItem>
+                                  <button
+                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 data-focus:bg-gray-100 data-focus:text-gray-900"
+                                    disabled={busy}
+                                    onClick={() => void addDevicePasskey(person.id)}
+                                    type="button"
+                                  >
+                                    {labels.access.addDevice}
+                                  </button>
+                                </MenuItem>
+                              ) : null}
+                              {canStartPasskeyRecovery(person) ? (
+                                <MenuItem>
+                                  <button
+                                    className={classNames(
+                                      "block w-full px-4 py-2 text-left text-sm text-red-700 data-focus:bg-red-50 data-focus:text-red-800",
+                                      canAddDevicePasskey(person) ? "mt-2" : ""
+                                    )}
+                                    disabled={busy}
+                                    onClick={() => startPasskeyRecovery(person.id)}
+                                    type="button"
+                                  >
+                                    {labels.access.recoverPasskey}
+                                  </button>
+                                </MenuItem>
+                              ) : null}
+                            </MenuItems>
+                          </Menu>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
