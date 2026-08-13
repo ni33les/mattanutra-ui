@@ -24,8 +24,6 @@ import {
   classNames,
   compactId,
   formatGeneratedAt,
-  formatMoney,
-  formatMoneyNumber,
   formatNumber,
   readableToken,
   type BusinessMetric
@@ -212,7 +210,11 @@ export function AdminFinancialsView({
       series: data.series.revenue,
       value: kpiDisabled
         ? "—"
-        : formatMoneyNumber(data.summary.revenueUsd, locale)
+        : formatLedgerMoney(
+            data.summary.revenueUsd,
+            "in",
+            locale === "th" ? "th-TH" : "en-GB"
+          )
     },
     {
       color: businessMetricColors.queued,
@@ -563,11 +565,12 @@ function FinancialTransactionDetailModal({
         />
         <FinancialDetailRow
           label={labels.financials.amount}
-          value={
-            row.direction === "out"
-              ? `(${formatMoney(row.amount / 1_000_000, row.currency, locale)})`
-              : formatMoney(row.amount / 1_000_000, row.currency, locale)
-          }
+          value={formatLedgerMoney(
+            row.amount / 1_000_000,
+            row.direction,
+            locale === "th" ? "th-TH" : "en-GB",
+            row.currency
+          )}
         />
         <FinancialDetailRow
           label={labels.financials.usd}

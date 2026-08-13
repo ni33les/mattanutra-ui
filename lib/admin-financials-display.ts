@@ -54,7 +54,37 @@ export function signedUsdForRow(
 }
 
 /**
- * Format ledger amounts: outflows as ($x.xx), inflows as $x.xx.
+ * Adaptive USD fraction digits so micro AI costs are not rounded to $0.00.
+ * - ≥ $1 → 2 dp
+ * - ≥ $0.01 → 2–4 dp
+ * - ≥ $0.0001 → 4–6 dp
+ * - smaller → 6–8 dp (micros of a dollar)
+ */
+export function ledgerMoneyFractionDigits(amount: number) {
+  const absolute = Math.abs(amount);
+
+  if (!Number.isFinite(absolute) || absolute === 0) {
+    return { maximumFractionDigits: 2, minimumFractionDigits: 2 };
+  }
+
+  if (absolute >= 1) {
+    return { maximumFractionDigits: 2, minimumFractionDigits: 2 };
+  }
+
+  if (absolute >= 0.01) {
+    return { maximumFractionDigits: 4, minimumFractionDigits: 2 };
+  }
+
+  if (absolute >= 0.0001) {
+    return { maximumFractionDigits: 6, minimumFractionDigits: 4 };
+  }
+
+  return { maximumFractionDigits: 8, minimumFractionDigits: 6 };
+}
+
+/**
+ * Format ledger amounts as currency.
+ * Outflows keep the absolute magnitude (UI styles them red); no parentheses.
  */
 export function formatLedgerMoney(
   amountUsd: number,
@@ -63,17 +93,14 @@ export function formatLedgerMoney(
   currency = "USD"
 ) {
   const absolute = Math.abs(amountUsd);
-  const formatted = new Intl.NumberFormat(locale, {
+  const fractionDigits = ledgerMoneyFractionDigits(absolute);
+
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
-    maximumFractionDigits: 2
+    maximumFractionDigits: fractionDigits.maximumFractionDigits,
+    minimumFractionDigits: fractionDigits.minimumFractionDigits
   }).format(absolute);
-
-  if (direction === "out") {
-    return `(${formatted})`;
-  }
-
-  return formatted;
 }
 
 export function normalizeFinancialEntryBasis(
