@@ -31,6 +31,15 @@ export function isPaymentScenario(value: unknown): value is PaymentEventScenario
   return typeof value === "string" && SCENARIOS.includes(value as PaymentEventScenario);
 }
 
+export function scenarioSubmitsOms(scenario: PaymentEventScenario) {
+  return (
+    scenario === "success" ||
+    scenario === "processing_then_success" ||
+    scenario === "three_ds_succeeded" ||
+    scenario === "duplicate_success"
+  );
+}
+
 export async function simulatePayment(input: Readonly<{
   config: AgenticConfig;
   now: string;
@@ -89,7 +98,9 @@ export async function simulatePayment(input: Readonly<{
     await applyVerifiedPaymentEvent({ event, now: input.now, store: input.store });
   }
 
-  await processOmsOutbox({ now: input.now, store: input.store });
+  if (scenarioSubmitsOms(input.scenario)) {
+    await processOmsOutbox({ now: input.now, store: input.store });
+  }
 
   return orderTool({
     config: input.config,

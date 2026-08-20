@@ -71,6 +71,12 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
       updatedAt: input.now
     };
     await input.store.updateOrder(next);
+    await input.store.insertPaymentAudit({
+      createdAt: input.now,
+      id: randomUUID(),
+      orderId: order.id,
+      type: input.event.status === "unavailable" ? "payment_unavailable" : "payment_declined"
+    });
     return { applied: true, order: next };
   }
 

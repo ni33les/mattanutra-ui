@@ -191,6 +191,27 @@ create table if not exists public.agentic_feedback (
   rating integer,
   created_at timestamptz not null default now()
 );
+
+create table if not exists public.agentic_qa_scenario_runs (
+  id uuid primary key,
+  handle_hash text not null unique,
+  idempotency_key text not null,
+  owner_scope text not null,
+  request_hash text not null,
+  scenario text not null,
+  resource_type text not null,
+  resource_id uuid,
+  resource_fingerprint text not null,
+  status text not null,
+  assertions jsonb not null default '[]'::jsonb,
+  evidence_handle_hash text,
+  evidence_checksum text,
+  evidence_payload jsonb,
+  accepted_at timestamptz not null,
+  started_at timestamptz,
+  completed_at timestamptz,
+  unique (owner_scope, idempotency_key)
+);
 `;
 
 const sql = getSql();

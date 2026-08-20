@@ -43,3 +43,35 @@ export async function processOmsOutbox(input: Readonly<{
     await input.store.markOutboxProcessed(event.id, input.now);
   }
 }
+
+export async function advanceFulfilment(input: Readonly<{
+  now: string;
+  status: "processing" | "shipped" | "delivered" | "cancelled";
+  store: AgenticStore;
+  orderId: string;
+}>) {
+  const order = await input.store.getOrder(input.orderId);
+
+  if (!order) {
+    return null;
+  }
+
+  await input.store.updateOrder({
+    ...order,
+    fulfilmentStatus: input.status,
+    orderStatus: input.status === "cancelled" ? "cancelled" : order.orderStatus,
+    updatedAt: input.now
+  });
+  await input.store.insertFulfilmentEvent({
+    createdAt: input.now,
+    id: randomUUID(),
+    orderId: order.id,
+    payload:
+      input.status === "shipped"
+        ? { status: "shipped", tracking: "TH-QA-TRACK" }
+        : { status: input.status },
+    status: input.status
+  });
+
+  return input.store.getOrder(input.orderId);
+}

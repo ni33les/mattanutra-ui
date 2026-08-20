@@ -105,6 +105,24 @@ function retailerAdapterForEnv(environment: AgenticEnvironment): RetailerAdapter
   return environment === "dev" ? "mock_thailand" : "thailand_uat";
 }
 
+export function assertInternalQaHarness(config: AgenticConfig) {
+  if (!config.internalQaHarness || config.environment !== "dev") {
+    throw Object.assign(new Error("Not found."), { reasonCode: "not_found" as const });
+  }
+
+  if (config.paymentProvider !== "mock" || config.thailandRetailerAdapter !== "mock_thailand") {
+    throw Object.assign(new Error("Adapter mismatch."), {
+      reasonCode: "adapter_mismatch" as const
+    });
+  }
+
+  if (config.continuation !== "polling_only") {
+    throw Object.assign(new Error("Adapter mismatch."), {
+      reasonCode: "adapter_mismatch" as const
+    });
+  }
+}
+
 export function loadAgenticConfig(request?: Request): AgenticConfig {
   const environment = resolveAgenticEnvironment(request);
   const paymentProvider = paymentProviderForEnv(environment);
@@ -128,8 +146,18 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
     throw new Error("Live Stripe is not allowed in DEV or UAT");
   }
 
-  if (internalQaHarness && environment !== "dev") {
-    throw new Error("Internal QA harness is only allowed in DEV");
+  if (internalQaHarness) {
+    if (environment !== "dev") {
+      throw new Error("Internal QA harness is only allowed in DEV");
+    }
+
+    if (paymentProvider !== "mock") {
+      throw new Error("Internal QA harness requires MockPaymentAdapter");
+    }
+
+    if (thailandRetailerAdapter !== "mock_thailand") {
+      throw new Error("Internal QA harness requires mock Thailand OMS");
+    }
   }
 
   if (thailandRetailerAdapter === "mock_thailand" && environment !== "dev") {
