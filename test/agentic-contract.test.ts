@@ -75,6 +75,7 @@ describe("agentic MCP contract 3.0.0", () => {
       (result.serverInfo as { version: string }).version,
       "3.0.0"
     );
+    assert.equal((result.serverInfo as { name: string }).name, "mattanutra_dev");
   });
 
   it("tools/list returns the six schemas with additionalProperties false", async () => {

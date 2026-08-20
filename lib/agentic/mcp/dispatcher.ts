@@ -34,6 +34,38 @@ function record(value: unknown) {
     : {};
 }
 
+export function canonicalPublicToolName(raw: string): AgenticPublicToolName | null {
+  const trimmed = raw.trim();
+
+  if (AGENTIC_PUBLIC_TOOLS.includes(trimmed as AgenticPublicToolName)) {
+    return trimmed as AgenticPublicToolName;
+  }
+
+  const separator = trimmed.lastIndexOf(".");
+  if (separator <= 0) {
+    return null;
+  }
+
+  const suffix = trimmed.slice(separator + 1);
+  if (AGENTIC_PUBLIC_TOOLS.includes(suffix as AgenticPublicToolName)) {
+    return suffix as AgenticPublicToolName;
+  }
+
+  return null;
+}
+
+function mcpServerInfoName(environment: AgenticRuntime["config"]["environment"]) {
+  if (environment === "dev") {
+    return "mattanutra_dev";
+  }
+
+  if (environment === "uat") {
+    return "mattanutra_uat";
+  }
+
+  return AGENTIC_SERVICE_NAME;
+}
+
 function toolList() {
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: AGENTIC_TOOL_DESCRIPTIONS[name],
@@ -123,7 +155,9 @@ async function callTool(
   name: string,
   rawArgs: unknown
 ) {
-  if (!AGENTIC_PUBLIC_TOOLS.includes(name as AgenticPublicToolName)) {
+  const canonical = canonicalPublicToolName(name);
+
+  if (!canonical) {
     return {
       error: {
         code: -32601,
@@ -132,7 +166,7 @@ async function callTool(
     };
   }
 
-  const schema = AGENTIC_TOOL_SCHEMAS[name as AgenticPublicToolName];
+  const schema = AGENTIC_TOOL_SCHEMAS[canonical];
   const args = rawArgs === undefined ? {} : rawArgs;
   const issue = validateToolInput(schema, args);
 
@@ -145,7 +179,7 @@ async function callTool(
 
   let value: unknown;
 
-  switch (name) {
+  switch (canonical) {
     case "info":
       value = infoTool({
         config: runtime.config,
@@ -261,7 +295,7 @@ export async function handleJsonRpc(
         instructions: AGENTIC_SERVER_INSTRUCTIONS,
         protocolVersion: "2025-03-26",
         serverInfo: {
-          name: AGENTIC_SERVICE_NAME,
+          name: mcpServerInfoName(runtime.config.environment),
           version: AGENTIC_SERVICE_VERSION
         }
       }

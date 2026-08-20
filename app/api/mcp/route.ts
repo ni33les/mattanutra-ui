@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
-import { handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
+import { canonicalPublicToolName, handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 
 export const runtime = "nodejs";
@@ -26,7 +26,8 @@ function mcpNeedsRateLimit(body: unknown) {
 
   if (method === "tools/call") {
     const name = (body as { params?: { name?: unknown } }).params?.name;
-    return name !== "info" && name !== "order";
+    const canonical = typeof name === "string" ? canonicalPublicToolName(name) : null;
+    return canonical !== "info" && canonical !== "order";
   }
 
   return true;

@@ -278,6 +278,22 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(body.passed, true);
     assert.ok(body.checks.length > 0);
 
+    const prefixedInfo = await handleJsonRpc(runtime, {
+      id: 4,
+      method: "tools/call",
+      params: { arguments: {}, name: "mattanutra_dev.info" }
+    });
+    assert.equal(
+      (prefixedInfo?.result?.structuredContent as { ok?: boolean })?.ok,
+      true
+    );
+    const prefixedQa = await handleJsonRpc(runtime, {
+      id: 5,
+      method: "tools/call",
+      params: { arguments: {}, name: "mattanutra_dev.packProof" }
+    });
+    assert.equal(prefixedQa?.error?.code, -32601);
+
     const continuity = await handleQaJsonRpc(runtime, {
       id: 3,
       method: "tools/call",
