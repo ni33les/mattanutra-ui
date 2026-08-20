@@ -7,6 +7,7 @@ import { simulatePayment } from "@/lib/agentic/qa/simulate";
 import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
+import { addMinor, asMinor, asMinorOr, formatMinor, TH_MOCK_TAX_MINOR } from "@/lib/agentic/money";
 
 function supplementId(name: string) {
   const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
@@ -164,6 +165,46 @@ export async function checkoutContinuityProof(runtime: AgenticRuntime) {
   if (isAgenticErrorResult(executed)) {
     return { buildId: runtime.config.buildId, checks, ok: true as const, passed: false };
   }
+
+  const capabilityForPayable = await resolveCapability({
+    action: "order.read",
+    config: runtime.config,
+    handle: executed.orderHandle,
+    now,
+    resourceType: "order",
+    scope: runtime.scope,
+    store: runtime.store
+  });
+  const payableOrder = capabilityForPayable
+    ? await runtime.store.getOrder(capabilityForPayable.resourceId)
+    : null;
+  const payableCheckout = payableOrder
+    ? await runtime.store.getCheckoutByOrderId(payableOrder.id)
+    : null;
+  const frozen =
+    payableOrder?.frozenPlan && typeof payableOrder.frozenPlan === "object"
+      ? (payableOrder.frozenPlan as Record<string, unknown>)
+      : {};
+  const subtotalMinor = asMinor(frozen.subtotalMinor ?? 0);
+  const shippingMinor = asMinorOr(payableCheckout?.shippingMinor, 0);
+  const taxMinor = asMinorOr(payableCheckout?.taxMinor, TH_MOCK_TAX_MINOR);
+  const payableMinor = asMinor(payableOrder?.totalPriceMinor ?? 0);
+  const formatted = formatMinor(payableMinor, payableOrder?.currency ?? "THB", "en-US");
+
+  checks.push({
+    name: "payable_includes_shipping",
+    passed:
+      Boolean(payableOrder) &&
+      subtotalMinor > 0 &&
+      payableMinor === addMinor(subtotalMinor, shippingMinor, taxMinor) &&
+      payableMinor === asMinor(frozen.totalPriceMinor ?? -1)
+  });
+  checks.push({
+    name: "formatted_total_not_concat",
+    passed:
+      !formatted.includes("231,000,500") &&
+      (subtotalMinor !== 231000 || formatted.includes("2,360.00"))
+  });
 
   const declined = await simulatePayment({
     config: runtime.config,

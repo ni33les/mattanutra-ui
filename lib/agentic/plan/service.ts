@@ -41,7 +41,6 @@ export type PlanToolSuccess = ReturnType<typeof publicPlanFields> &
     ok: true;
     optimizationEvidence: Readonly<{
       mode: PlanResult["optimizationEvidence"]["mode"];
-      tieBreak: readonly string[];
     }>;
     planHandle: string;
     revision: number;
@@ -372,7 +371,7 @@ export async function planTool(input: Readonly<{
           }
         : {}),
       ok: true,
-      optimizationEvidence: { mode: result.optimizationEvidence.mode, tieBreak: [] },
+      optimizationEvidence: { mode: result.optimizationEvidence.mode },
       planHandle,
       revision
     };

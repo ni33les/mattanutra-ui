@@ -11,6 +11,12 @@ import {
   type AgenticRuntime
 } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
+import {
+  addMinor,
+  asMinor,
+  formatMinor,
+  payableSnapshot
+} from "../lib/agentic/money.ts";
 
 function supplementId(name: string) {
   const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
@@ -290,5 +296,139 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(cont.passed, true);
     assert.equal(cont.evidence.paymentConfirmedCount, 1);
     assert.equal(cont.evidence.omsSubmitCount, 1);
+    assert.ok(
+      (continuity?.result?.structuredContent as { checks: Array<{ name: string; passed: boolean }> })
+        .checks.some((item) => item.name === "payable_includes_shipping" && item.passed)
+    );
+  });
+
+  it("never concatenates bigint shipping onto satang subtotal", () => {
+    assert.equal(asMinor("5000"), 5000);
+    assert.equal(asMinor("0"), 0);
+    assert.equal(addMinor(asMinor(231000), asMinor("5000"), asMinor("0")), 236000);
+    assert.equal(String(231000 + "5000" + "0"), "23100050000");
+    const payable = payableSnapshot({
+      shippingMinor: "5000",
+      subtotalMinor: 231000,
+      taxMinor: "0"
+    });
+    assert.equal(payable.totalPriceMinor, 236000);
+    assert.match(formatMinor(236000, "THB", "en-US"), /2,360\.00/);
+    assert.equal(formatMinor(236000, "THB", "en-US").includes("231,000,500"), false);
+  });
+
+  it("emits J4 cumulative zinc upper-limit guidance at 40 mg", async () => {
+    const runtime = runtimeFor();
+    const result = await call(runtime, "plan", {
+      idempotencyKey: "p1-j4-zinc-00000001",
+      request: {
+        currency: "THB",
+        currentSupplements: [
+          {
+            dailyAmount: 15,
+            name: "Zinc",
+            supplementId: supplementId("Zinc"),
+            unit: "mg"
+          }
+        ],
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 50, name: "Zinc", supplementId: supplementId("Zinc"), unit: "mg" }
+        ]
+      }
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, "needs_input");
+    const row = (result.coverage as Array<Record<string, unknown>>)[0];
+    assert.equal(row.unit, "mg");
+    assert.equal(row.requestedAmount, 50);
+    assert.equal(row.currentAmount, 15);
+    assert.equal(row.deliveredAmount, 25);
+    assert.equal(row.totalExposureAmount, 40);
+    assert.equal(row.upperLimitAmount, 40);
+    assert.equal(row.status, "upper_limit_risk");
+    const codes = (result.safetyGuidance as Array<{ code: string }>).map((item) => item.code);
+    assert.ok(codes.includes("dose_review_required"));
+    assert.ok(codes.includes("duplicate_or_overlap"));
+    assert.equal(JSON.stringify(result).includes('"effect"'), false);
+  });
+
+  it("returns a summary in MCP text, not a JSON dump", async () => {
+    const runtime = runtimeFor();
+    const response = await handleJsonRpc(runtime, {
+      id: 1,
+      method: "tools/call",
+      params: {
+        arguments: {
+          idempotencyKey: "p1-text-summary-00001",
+          request: {
+            currency: "THB",
+            destinationCountry: "TH",
+            locale: "en",
+            optimization: "balanced",
+            profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+            requirements: {},
+            targets: [
+              {
+                amount: 2000,
+                name: "Vitamin D3",
+                supplementId: supplementId("Vitamin D3"),
+                unit: "IU"
+              }
+            ]
+          }
+        },
+        name: "plan"
+      }
+    });
+    const text = (response?.result?.content as Array<{ text: string }>)[0]?.text;
+    const body = response?.result?.structuredContent as { summary: string; status: string };
+    assert.equal(body.status, "ready");
+    assert.equal(text, body.summary);
+    assert.equal(text.trim().startsWith("{"), false);
+  });
+
+  it("freezes payable grand total as subtotal plus shipping", async () => {
+    const runtime = runtimeFor();
+    const created = await call(runtime, "plan", {
+      idempotencyKey: "p1-payable-plan-000001",
+      request: {
+        currency: "THB",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" },
+          { amount: 1000, name: "Omega-3", supplementId: supplementId("Omega-3"), unit: "mg" },
+          { amount: 300, name: "Magnesium", supplementId: supplementId("Magnesium"), unit: "mg" },
+          { amount: 1000, name: "Vitamin B12", supplementId: supplementId("Vitamin B12"), unit: "mcg" },
+          { amount: 1000, name: "Vitamin C", supplementId: supplementId("Vitamin C"), unit: "mg" }
+        ]
+      }
+    });
+    assert.equal(created.status, "ready");
+    const executed = await call(runtime, "execute", {
+      expectedRevision: created.revision,
+      idempotencyKey: "p1-payable-exec-000001",
+      planHandle: created.planHandle
+    });
+    const frozen = executed.frozenPlan as {
+      shippingMinor: number;
+      subtotalMinor: number;
+      taxMinor: number;
+      totalPriceMinor: number;
+    };
+    assert.equal(frozen.subtotalMinor, 231000);
+    assert.equal(frozen.shippingMinor, 5000);
+    assert.equal(frozen.taxMinor, 0);
+    assert.equal(frozen.totalPriceMinor, 236000);
+    assert.match(formatMinor(frozen.totalPriceMinor, "THB", "en-US"), /2,360\.00/);
   });
 });

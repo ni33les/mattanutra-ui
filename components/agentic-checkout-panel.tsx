@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { agenticMessage } from "@/lib/agentic/i18n";
+import { asMinor, formatMinor } from "@/lib/agentic/money";
 
 export type AgenticCheckoutItem = Readonly<{
   dailyPills: number;
@@ -22,6 +23,7 @@ type AgenticCheckoutPanelProps = Readonly<{
   orderReference: string;
   paid: boolean;
   shippingMinor: number;
+  subtotalMinor: number;
   taxMinor: number;
   totalPriceMinor: number;
 }>;
@@ -36,13 +38,6 @@ type AddressState = {
   postalCode: string;
   province: string;
 };
-
-function formatMinor(amount: number, currency: string) {
-  return new Intl.NumberFormat(undefined, {
-    currency,
-    style: "currency"
-  }).format(amount / 100);
-}
 
 const emptyAddress: AddressState = {
   addressLine1: "",
@@ -62,7 +57,10 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [agentAuthorized, setAgentAuthorized] = useState(false);
   const [address, setAddress] = useState<AddressState>(emptyAddress);
-  const grandTotal = props.totalPriceMinor + props.shippingMinor + props.taxMinor;
+  const subtotalMinor = asMinor(props.subtotalMinor);
+  const shippingMinor = asMinor(props.shippingMinor);
+  const taxMinor = asMinor(props.taxMinor);
+  const totalPriceMinor = asMinor(props.totalPriceMinor);
 
   const formComplete = useMemo(() => {
     return Boolean(
@@ -156,23 +154,27 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
               </p>
             </div>
             <p className="text-sm font-medium">
-              {formatMinor(item.lineTotalMinor, props.currency)}
+              {formatMinor(item.lineTotalMinor, props.currency, props.locale)}
             </p>
           </li>
         ))}
       </ul>
       <dl className="space-y-1 text-sm">
         <div className="flex justify-between">
+          <dt>{agenticMessage(props.locale, "checkout.subtotal")}</dt>
+          <dd>{formatMinor(subtotalMinor, props.currency, props.locale)}</dd>
+        </div>
+        <div className="flex justify-between">
           <dt>{agenticMessage(props.locale, "checkout.shipping")}</dt>
-          <dd>{formatMinor(props.shippingMinor, props.currency)}</dd>
+          <dd>{formatMinor(shippingMinor, props.currency, props.locale)}</dd>
         </div>
         <div className="flex justify-between">
           <dt>{agenticMessage(props.locale, "checkout.tax")}</dt>
-          <dd>{formatMinor(props.taxMinor, props.currency)}</dd>
+          <dd>{formatMinor(taxMinor, props.currency, props.locale)}</dd>
         </div>
         <div className="flex justify-between text-base font-semibold">
           <dt>{agenticMessage(props.locale, "checkout.total")}</dt>
-          <dd>{formatMinor(grandTotal, props.currency)}</dd>
+          <dd>{formatMinor(totalPriceMinor, props.currency, props.locale)}</dd>
         </div>
       </dl>
       <fieldset className="space-y-3 rounded-2xl border border-[var(--color-forest-glow)] bg-white p-5">

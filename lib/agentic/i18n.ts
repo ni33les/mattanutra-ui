@@ -89,6 +89,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "จังหวัด",
     "zh-CN": "府"
   },
+  "checkout.subtotal": {
+    en: "Subtotal",
+    th: "ยอดสินค้า",
+    "zh-CN": "小计"
+  },
   "checkout.shipping": {
     en: "Shipping",
     th: "ค่าจัดส่ง",

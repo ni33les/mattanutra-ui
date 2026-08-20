@@ -7,6 +7,13 @@ import { hashCapability } from "@/lib/agentic/capabilities";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { localizedRouteMetadata } from "@/lib/seo";
+import {
+  TH_MOCK_SHIPPING_MINOR,
+  TH_MOCK_TAX_MINOR,
+  addMinor,
+  asMinor,
+  asMinorOr
+} from "@/lib/agentic/money";
 
 type PageProps = Readonly<{
   params: Promise<{ checkoutAccess: string; locale: string }>;
@@ -51,6 +58,23 @@ export default async function AgenticCheckoutPage({ params }: PageProps) {
   }
 
   const expired = checkout.expiresAt <= new Date().toISOString();
+  const frozen =
+    order.frozenPlan && typeof order.frozenPlan === "object"
+      ? (order.frozenPlan as Record<string, unknown>)
+      : {};
+  const shippingMinor = asMinorOr(
+    checkout.shippingMinor ?? frozen.shippingMinor,
+    TH_MOCK_SHIPPING_MINOR
+  );
+  const taxMinor = asMinorOr(checkout.taxMinor ?? frozen.taxMinor, TH_MOCK_TAX_MINOR);
+  const subtotalMinor =
+    frozen.subtotalMinor == null
+      ? asMinor(order.totalPriceMinor)
+      : asMinor(frozen.subtotalMinor);
+  const totalPriceMinor =
+    frozen.totalPriceMinor == null
+      ? addMinor(subtotalMinor, shippingMinor, taxMinor)
+      : asMinor(frozen.totalPriceMinor);
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -75,9 +99,10 @@ export default async function AgenticCheckoutPage({ params }: PageProps) {
           locale={locale}
           orderReference={order.reference}
           paid={order.paymentStatus === "paid"}
-          shippingMinor={checkout.shippingMinor ?? 5000}
-          taxMinor={checkout.taxMinor ?? 0}
-          totalPriceMinor={order.totalPriceMinor}
+          shippingMinor={shippingMinor}
+          subtotalMinor={subtotalMinor}
+          taxMinor={taxMinor}
+          totalPriceMinor={totalPriceMinor}
         />
       </section>
       <SiteFooter content={dictionary.footer} locale={locale} />

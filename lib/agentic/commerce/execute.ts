@@ -14,6 +14,11 @@ import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { publicFrozenItems } from "@/lib/agentic/public-mapper";
 import type { PlanResult } from "@/lib/agentic/plan/types";
+import {
+  TH_MOCK_SHIPPING_MINOR,
+  TH_MOCK_TAX_MINOR,
+  payableSnapshot
+} from "@/lib/agentic/money";
 
 export type ExecuteSuccess = Readonly<{
   checkoutExpiresAt: string;
@@ -108,6 +113,11 @@ export async function executeTool(input: Readonly<{
       });
     }
 
+    const payable = payableSnapshot({
+      shippingMinor: TH_MOCK_SHIPPING_MINOR,
+      subtotalMinor: selected.totalPriceMinor,
+      taxMinor: TH_MOCK_TAX_MINOR
+    });
     const orderId = randomUUID();
     const reference = humanOrderReference(orderId);
     const checkoutIssued = await issueCapability({
@@ -138,7 +148,10 @@ export async function executeTool(input: Readonly<{
         items: publicFrozenItems(selected.basket),
         planRevision: plan.currentRevision,
         safetyGuidanceIds: result.safetyGuidance.map((item) => item.guidanceId),
-        totalPriceMinor: selected.totalPriceMinor
+        shippingMinor: payable.shippingMinor,
+        subtotalMinor: payable.subtotalMinor,
+        taxMinor: payable.taxMinor,
+        totalPriceMinor: payable.totalPriceMinor
       },
       fulfilmentStatus: "not_started" as const,
       id: orderId,
@@ -153,7 +166,7 @@ export async function executeTool(input: Readonly<{
       reference,
       stateVersion: 1,
       tenantScope: input.scope.tenantScope,
-      totalPriceMinor: selected.totalPriceMinor,
+      totalPriceMinor: payable.totalPriceMinor,
       updatedAt: input.now
     };
 
@@ -197,8 +210,8 @@ export async function executeTool(input: Readonly<{
       id: randomUUID(),
       orderId,
       providerSessionId: session.providerSessionId,
-      shippingMinor: 5000,
-      taxMinor: 0
+      shippingMinor: payable.shippingMinor,
+      taxMinor: payable.taxMinor
     });
 
     const orderCapability = await issueCapability({

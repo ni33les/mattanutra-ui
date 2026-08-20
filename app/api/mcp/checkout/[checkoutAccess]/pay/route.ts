@@ -7,6 +7,7 @@ import { mockEventForScenario } from "@/lib/agentic/commerce/payment";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { asMinor } from "@/lib/agentic/money";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,7 +84,7 @@ export async function POST(request: Request, { params }: RouteProps) {
 
   await applyVerifiedPaymentEvent({
     event: mockEventForScenario({
-      amountMinor: order.totalPriceMinor,
+      amountMinor: asMinor(order.totalPriceMinor),
       currency: order.currency,
       orderId: order.id,
       providerSessionId: order.providerSessionId,

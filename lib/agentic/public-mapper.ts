@@ -56,6 +56,20 @@ export function publicOption(option: StackOption) {
   };
 }
 
+export function publicQuestions(
+  questions: PlanResult["questions"]
+) {
+  return questions.map((question) => ({
+    choices: question.choices.map((choice) => ({
+      choice: choice.choice,
+      label: choice.label
+    })),
+    prompt: question.prompt,
+    promptKey: question.promptKey,
+    questionId: question.questionId
+  }));
+}
+
 export function publicPlanFields(result: Pick<
   PlanResult,
   | "alternatives"
@@ -79,7 +93,7 @@ export function publicPlanFields(result: Pick<
     changeSummary: result.changeSummary,
     coverage: result.coverage.map(publicCoverage),
     guidanceRulesVersion: result.guidanceRulesVersion,
-    questions: result.questions,
+    questions: publicQuestions(result.questions),
     requestSnapshot: result.requestSnapshot,
     safetyGuidance: result.safetyGuidance,
     status: result.status,

@@ -1,8 +1,11 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
+import { upperLimitAmount } from "@/lib/agentic/plan/limits";
+import { doseComparable, fromComparable, roundDose } from "@/lib/agentic/plan/units";
 import type {
   CanonicalPlanState,
+  CoverageRow,
   PlanQuestion,
   SafetyGuidance,
   StackOption
@@ -47,6 +50,52 @@ function guidance(input: Readonly<{
   };
 }
 
+function zincExposure(
+  selected: StackOption | null,
+  state: CanonicalPlanState
+): Pick<
+  CoverageRow,
+  | "currentAmount"
+  | "deliveredAmount"
+  | "name"
+  | "requestedAmount"
+  | "supplementId"
+  | "totalExposureAmount"
+  | "unit"
+> | null {
+  const row = selected?.coverage.find((item) => /zinc/i.test(item.name));
+
+  if (row) {
+    return row;
+  }
+
+  const current = state.currentSupplements.filter(
+    (item) => /zinc/i.test(item.name)
+  );
+  const first = current[0];
+
+  if (!first) {
+    return null;
+  }
+
+  const unit = first.unit;
+  const currentComparable = current.reduce(
+    (sum, item) => sum + doseComparable(item.dailyAmount, item.unit, item.name),
+    0
+  );
+  const currentAmount = roundDose(fromComparable(currentComparable, unit, "Zinc"));
+
+  return {
+    currentAmount,
+    deliveredAmount: 0,
+    name: "Zinc",
+    requestedAmount: 0,
+    supplementId: first.supplementId,
+    totalExposureAmount: currentAmount,
+    unit
+  };
+}
+
 export function evaluateSafety(input: Readonly<{
   locale: Locale;
   selected: StackOption | null;
@@ -60,7 +109,7 @@ export function evaluateSafety(input: Readonly<{
   const magnesiumIds = input.state.targets
     .filter((item) => /magnesium/i.test(item.name))
     .map((item) => item.supplementId);
-  const zincCoverage = input.selected?.coverage.find((row) => /zinc/i.test(row.name));
+  const zincCoverage = zincExposure(input.selected, input.state);
   const ironCoverage = input.selected?.coverage.find((row) => /iron/i.test(row.name));
 
   const omegaCoverage = input.selected?.coverage.find((row) => /omega/i.test(row.name));
@@ -93,14 +142,10 @@ export function evaluateSafety(input: Readonly<{
   }
 
   const zincLimit = zincCoverage
-    ? zincCoverage.unit === "mg"
-      ? 40
-      : zincCoverage.unit === "mcg"
-        ? 40_000
-        : 40
+    ? upperLimitAmount(zincCoverage.name, zincCoverage.unit)
     : null;
 
-  if (zincCoverage && zincLimit != null && zincCoverage.totalExposureAmount > zincLimit) {
+  if (zincCoverage && zincLimit != null && zincCoverage.totalExposureAmount >= zincLimit) {
     items.push(guidance({
       action: "acknowledge",
       code: "dose_review_required",
@@ -111,6 +156,23 @@ export function evaluateSafety(input: Readonly<{
       severity: "high",
       supplementIds: [zincCoverage.supplementId],
       threshold: zincLimit
+    }));
+  }
+
+  if (
+    zincCoverage &&
+    zincCoverage.currentAmount > 0 &&
+    zincCoverage.deliveredAmount > 0
+  ) {
+    items.push(guidance({
+      action: "acknowledge",
+      code: "duplicate_or_overlap",
+      exposure: zincCoverage.totalExposureAmount,
+      locale: input.locale,
+      productIds,
+      requested: zincCoverage.requestedAmount,
+      severity: "high",
+      supplementIds: [zincCoverage.supplementId]
     }));
   }
 

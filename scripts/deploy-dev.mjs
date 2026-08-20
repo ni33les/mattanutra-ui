@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
 
 const serviceName = "mattanutra-ui-dev.service";
@@ -104,6 +105,16 @@ async function main() {
   console.log(`[deploy:dev] Branch: ${branch}`);
   await npmRun("verify:dev");
   await applyOrVerifyRuntimeSchema();
+  const sha = (await runCapture("git", ["rev-parse", "HEAD"])).trim();
+  const dropInDir = "/etc/systemd/system/mattanutra-ui-dev.service.d";
+  await mkdir(dropInDir, { recursive: true });
+  await writeFile(
+    `${dropInDir}/agentic-build.conf`,
+    `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\n`,
+    "utf8"
+  );
+  await run("systemctl", ["daemon-reload"]);
+  console.log(`[deploy:dev] AGENTIC_BUILD_ID=${sha}`);
   console.log(`[deploy:dev] Restarting ${serviceName}...`);
   await run("systemctl", ["restart", serviceName]);
   await run("systemctl", ["is-active", "--quiet", serviceName]);

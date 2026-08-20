@@ -42,11 +42,54 @@ function toolList() {
   }));
 }
 
+function toolText(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return String(value);
+  }
+
+  const recordValue = value as Record<string, unknown>;
+  const error = recordValue.error;
+
+  if (recordValue.ok === false && error && typeof error === "object") {
+    const message = (error as { message?: unknown }).message;
+    return typeof message === "string" ? message : "Request failed.";
+  }
+
+  if (typeof recordValue.summary === "string" && recordValue.summary.trim()) {
+    const questions = recordValue.questions;
+    const first =
+      Array.isArray(questions) && questions[0] && typeof questions[0] === "object"
+        ? (questions[0] as { prompt?: unknown }).prompt
+        : null;
+    return typeof first === "string" && first.trim()
+      ? `${recordValue.summary}\n${first}`
+      : recordValue.summary;
+  }
+
+  if (typeof recordValue.orderReference === "string" && recordValue.checkoutUrl) {
+    return `Checkout ready for ${recordValue.orderReference}. Poll the order; the browser is not payment truth.`;
+  }
+
+  if (typeof recordValue.paymentStatus === "string") {
+    return `Order paymentStatus=${recordValue.paymentStatus} stateVersion=${recordValue.stateVersion ?? "?"}.`;
+  }
+
+  if (typeof recordValue.serviceName === "string") {
+    return `${recordValue.serviceName} ${recordValue.environment ?? ""} contract ${recordValue.contractVersion ?? ""}`.trim();
+  }
+
+  if (typeof recordValue.message === "string") {
+    return recordValue.message;
+  }
+
+  return "ok";
+}
+
 function toolResult(value: unknown, isError = false) {
   return {
     content: [
       {
-        text: JSON.stringify(value, null, 2),
+        text: toolText(value),
         type: "text"
       }
     ],

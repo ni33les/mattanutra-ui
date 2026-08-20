@@ -2,6 +2,7 @@
 import { getSql } from "@/lib/db";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { createMemoryStore } from "@/lib/agentic/store/memory";
+import { asMinor } from "@/lib/agentic/money";
 
 type Sql = NonNullable<ReturnType<typeof getSql>>;
 type AnySql = ((strings: TemplateStringsArray, ...params: unknown[]) => Promise<Array<Record<string, unknown>>>) & {
@@ -118,7 +119,7 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
         dailyPills: Number(row.daily_pills),
         form: row.form,
         id: row.id,
-        lineTotalMinor: Number(row.line_total_minor),
+        lineTotalMinor: asMinor(row.line_total_minor),
         orderId: row.order_id,
         productId: row.product_id,
         productName: row.product_name,
@@ -126,7 +127,7 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
         retailerSku: row.retailer_sku,
         sellerId: row.seller_id,
         sellerName: row.seller_name,
-        unitPriceMinor: Number(row.unit_price_minor)
+        unitPriceMinor: asMinor(row.unit_price_minor)
       }));
     },
     async getOutboxPending() {
@@ -488,8 +489,8 @@ function mapCheckout(row: Record<string, any>) {
     id: row.id,
     orderId: row.order_id,
     providerSessionId: row.provider_session_id,
-    shippingMinor: row.shipping_minor,
-    taxMinor: row.tax_minor
+    shippingMinor: row.shipping_minor == null ? null : asMinor(row.shipping_minor),
+    taxMinor: row.tax_minor == null ? null : asMinor(row.tax_minor)
   };
 }
 
@@ -519,7 +520,7 @@ function mapOrder(row: Record<string, any>) {
     reference: row.reference,
     stateVersion: row.state_version,
     tenantScope: row.tenant_scope,
-    totalPriceMinor: Number(row.total_price_minor),
+    totalPriceMinor: asMinor(row.total_price_minor),
     updatedAt: toIso(row.updated_at)
   };
 }

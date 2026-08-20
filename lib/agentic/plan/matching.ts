@@ -3,6 +3,7 @@ import { parseDose } from "@/lib/dose-conversion";
 import { recommendProductStackFullBeam } from "@/lib/product-recommendations";
 import type { ProductRecommendationNeed } from "@/lib/product-recommendation-types";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
+import { upperLimitAmount } from "@/lib/agentic/plan/limits";
 import {
   doseComparable,
   fromComparable,
@@ -119,19 +120,29 @@ function coverageFor(
     const deliveredAmount = roundDose(
       fromComparable(deliveredComparable, target.unit, target.name)
     );
+    const totalExposureAmount = roundDose(currentAmount + deliveredAmount);
+    const limit = upperLimitAmount(target.name, target.unit);
+    const percentOfUpperLimit =
+      limit != null && limit > 0
+        ? Math.round((totalExposureAmount / limit) * 100)
+        : null;
+
+    if (limit != null && totalExposureAmount >= limit) {
+      status = "upper_limit_risk";
+    }
 
     return {
       coveragePercent,
       currentAmount,
       deliveredAmount,
       name: target.name,
-      percentOfUpperLimit: null,
+      percentOfUpperLimit,
       requestedAmount,
       status,
       supplementId: target.supplementId,
-      totalExposureAmount: roundDose(currentAmount + deliveredAmount),
+      totalExposureAmount,
       unit: target.unit,
-      upperLimitAmount: null
+      upperLimitAmount: limit
     };
   });
 }
