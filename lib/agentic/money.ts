@@ -3,7 +3,7 @@ export const TH_MOCK_TAX_MINOR = 0;
 
 export function asMinor(value: unknown): number {
   if (typeof value === "bigint") {
-    if (value < 0n) {
+    if (value < BigInt(0)) {
       throw new Error("Invalid minor amount");
     }
     const asNumber = Number(value);

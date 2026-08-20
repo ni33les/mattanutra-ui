@@ -240,7 +240,7 @@ export async function planTool(input: Readonly<{
         appliedRequirements: nextResult.appliedRequirements,
         assumptions: nextResult.assumptions,
         ok: true,
-        optimizationEvidence: { mode: nextResult.optimizationEvidence.mode, tieBreak: [] },
+        optimizationEvidence: { mode: nextResult.optimizationEvidence.mode },
         planHandle: input.payload.planHandle!,
         revision: nextRevision
       };
