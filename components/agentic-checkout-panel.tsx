@@ -95,6 +95,10 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
           D9 cancelled uses another unpaid checkout: POST scenario=three_ds_cancelled and poll
           until orderStatus=cancelled.
         </li>
+        <li>
+          D7-09 uses a different paid checkout: POST scenario=success, then POST scenario=refund
+          and poll paymentStatus=refunded. Do not refund the D8 paid order.
+        </li>
       </ol>
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">{props.orderReference}</p>

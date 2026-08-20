@@ -711,6 +711,7 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /name="agentAuthorized"/);
     assert.match(panel, /scenario=expire/);
     assert.match(panel, /three_ds_cancelled/);
+    assert.match(panel, /scenario=refund/);
   });
 
   it("accepts Creatine by official name and does not call it a legacy ID", async () => {
@@ -1105,5 +1106,132 @@ describe("agentic P1 pack fixes", () => {
       (stale as { error?: { reasonCode?: string } }).error?.reasonCode,
       "revision_conflict"
     );
+  });
+
+  it("scores D1-09 from info schemaChecksum and migrationVersion", async () => {
+    const runtime = runtimeFor();
+    const info = await call(runtime, "info", { locale: "en" });
+    assert.equal(typeof info.schemaChecksum, "string");
+    assert.equal((info.schemaChecksum as string).length, 64);
+    assert.equal(info.migrationVersion, "agentic-3.0.0");
+    assert.equal("supplements" in info, false);
+  });
+
+  it("reuses one planHandle twice for D5-08 and D5-09", async () => {
+    const runtime = runtimeFor();
+    const first = await call(runtime, "plan", {
+      idempotencyKey: "p1-d5-08-create-0001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const second = await call(runtime, "plan", {
+      expectedRevision: first.revision,
+      idempotencyKey: "p1-d5-08-revise-0001",
+      planHandle: first.planHandle,
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "lowest_cost",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    assert.equal(second.ok, true);
+    assert.ok((second.revision as number) > (first.revision as number));
+    const third = await call(runtime, "plan", {
+      expectedRevision: second.revision,
+      idempotencyKey: "p1-d5-09-reuse-00001",
+      planHandle: first.planHandle,
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "fewest_pills",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    assert.equal(third.ok, true);
+    assert.equal(third.planHandle, first.planHandle);
+    assert.ok((third.revision as number) > (second.revision as number));
+  });
+
+  it("refunds a separate paid checkout for D7-09", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "p1-d709-plan-0000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const executed = await call(runtime, "execute", {
+      expectedRevision: plan.revision,
+      idempotencyKey: "p1-d709-exec-0000001",
+      planHandle: plan.planHandle
+    });
+    await simulatePayment({
+      config: runtime.config,
+      now: new Date().toISOString(),
+      orderHandle: String(executed.orderHandle),
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const refunded = await simulatePayment({
+      config: runtime.config,
+      now: new Date().toISOString(),
+      orderHandle: String(executed.orderHandle),
+      scenario: "refund",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.equal((refunded as { paymentStatus?: string }).paymentStatus, "refunded");
+  });
+
+  it("executes the same ready revision twice with different idempotency keys", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "p1-d1010-plan-000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const first = await call(runtime, "execute", {
+      expectedRevision: plan.revision,
+      idempotencyKey: "p1-d1010-exec-a-0001",
+      planHandle: plan.planHandle
+    });
+    const second = await call(runtime, "execute", {
+      expectedRevision: plan.revision,
+      idempotencyKey: "p1-d1010-exec-b-0001",
+      planHandle: plan.planHandle
+    });
+    const firstOk = first.ok === true && typeof first.orderHandle === "string";
+    const secondOk = second.ok === true && typeof second.orderHandle === "string";
+    const secondConflict =
+      second.ok === false &&
+      (second.error as { reasonCode?: string } | undefined)?.reasonCode === "revision_conflict";
+    assert.equal(firstOk, true);
+    assert.ok(secondOk || secondConflict);
+    if (secondOk) {
+      assert.notEqual(second.orderHandle, first.orderHandle);
+    }
   });
 });
