@@ -9,6 +9,7 @@ import {
   latencyProof,
   orderEvidence
 } from "@/lib/agentic/qa/proofs";
+import { packProof } from "@/lib/agentic/qa/pack-proof";
 import type { JsonRpcRequest, JsonRpcResponse } from "@/lib/agentic/mcp/dispatcher";
 
 const QA_TOOLS = [
@@ -16,7 +17,8 @@ const QA_TOOLS = [
   "evidence",
   "isolationProof",
   "checkoutContinuityProof",
-  "latencyProof"
+  "latencyProof",
+  "packProof"
 ] as const;
 
 function record(value: unknown) {
@@ -92,6 +94,11 @@ function toolList() {
       description: "Measure in-process info, order and feedback p95 against spec budgets.",
       inputSchema: { additionalProperties: false, properties: {}, type: "object" },
       name: "latencyProof"
+    },
+    {
+      description: "Run the authorized DEV pack-ID evidence bundle for previously untested checks.",
+      inputSchema: { additionalProperties: false, properties: {}, type: "object" },
+      name: "packProof"
     }
   ];
 }
@@ -162,6 +169,10 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
     return { result: toolResult(await latencyProof(runtime)) };
   }
 
+  if (name === "packProof") {
+    return { result: toolResult(await packProof(runtime)) };
+  }
+
   return { error: { code: -32601, message: `Unknown tool: ${name}` } };
 }
 
@@ -180,7 +191,7 @@ export async function handleQaJsonRpc(
       result: {
         capabilities: { tools: { listChanged: false } },
         instructions:
-          "DEV-only MattaNutra QA harness. Public customer tools live on /api/mcp. Use simulate, evidence, isolationProof, checkoutContinuityProof and latencyProof here.",
+          "DEV-only MattaNutra QA harness. Public customer tools live on /api/mcp. Use packProof for the authorized evidence bundle covering previously untested pack IDs.",
         protocolVersion: "2025-03-26",
         serverInfo: {
           name: `${AGENTIC_SERVICE_NAME} QA`,

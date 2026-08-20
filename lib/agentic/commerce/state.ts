@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import type { AgenticStore, OrderRecord } from "@/lib/agentic/store/types";
 import type { VerifiedPaymentEvent } from "@/lib/agentic/commerce/payment";
+import { publicFrozenOrder } from "@/lib/agentic/public-mapper";
 
 export type PaymentApplyResult = Readonly<{
   applied: boolean;
@@ -184,7 +185,7 @@ export function orderPollView(input: Readonly<{
   return {
     checkoutExpiresAt: order.checkoutExpiresAt,
     checkoutUrl: input.checkoutUrl,
-    frozenOrder: order.frozenPlan,
+    frozenOrder: publicFrozenOrder(order.frozenPlan),
     fulfilment: {
       deliveryWindow: null,
       status: order.fulfilmentStatus,

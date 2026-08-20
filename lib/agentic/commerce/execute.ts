@@ -14,6 +14,7 @@ import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { publicFrozenItems } from "@/lib/agentic/public-mapper";
 import type { PlanResult } from "@/lib/agentic/plan/types";
+import { getCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
   TH_MOCK_SHIPPING_MINOR,
   TH_MOCK_TAX_MINOR,
@@ -105,8 +106,20 @@ export async function executeTool(input: Readonly<{
 
     const result = revision.result as PlanResult;
     const selected = result.selected;
+    const snapshot = getCatalogueSnapshot();
+    const unavailable = Boolean(
+      selected?.basket.some((item) => {
+        const product = snapshot.products.find((row) => row.productId === item.productId);
+        return (
+          item.incompleteCommercialFacts ||
+          !product ||
+          !product.orderable ||
+          product.incompleteCommercialFacts
+        );
+      })
+    );
 
-    if (!selected || selected.basket.some((item) => item.incompleteCommercialFacts)) {
+    if (!selected || unavailable) {
       return businessError({
         message: "Availability changed. Create a new plan revision before checkout.",
         reasonCode: "availability_changed"

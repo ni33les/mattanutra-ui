@@ -1,8 +1,23 @@
+import { createHash } from "node:crypto";
 import type { AgenticConfig } from "@/lib/agentic/config";
-import { AGENTIC_CONTRACT_VERSION, AGENTIC_POLL_AFTER_SECONDS, AGENTIC_SERVICE_NAME, AGENTIC_SERVICE_VERSION, GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
-import { getCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
-import { ACTIVE_MARKET_COUNTRY, ACTIVE_MARKET_CURRENCY, ACTIVE_MARKET_NAME } from "@/lib/agentic/catalogue/market";
+import {
+  AGENTIC_CONTRACT_VERSION,
+  AGENTIC_MIGRATION_VERSION,
+  AGENTIC_POLL_AFTER_SECONDS,
+  AGENTIC_SERVICE_NAME,
+  AGENTIC_SERVICE_VERSION
+} from "@/lib/agentic/config";
+import { AGENTIC_TOOL_SCHEMAS } from "@/lib/agentic/contract";
+import {
+  ACTIVE_MARKET_COUNTRY,
+  ACTIVE_MARKET_CURRENCY,
+  ACTIVE_MARKET_NAME
+} from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
+
+export const AGENTIC_SCHEMA_CHECKSUM = createHash("sha256")
+  .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
+  .digest("hex");
 
 let infoCache: {
   key: string;
@@ -13,31 +28,23 @@ function buildInfo(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
 }>) {
-  const snapshot = getCatalogueSnapshot();
   void negotiateLocale(input.locale);
 
   return {
     authenticationMode: "anonymous_capability_handles",
-    availabilityAsOf: snapshot.availabilityAsOf,
     buildId: input.config.buildId,
-    catalogueVersion: snapshot.catalogueVersion,
     checkoutBuild: input.config.buildId,
     checkoutMode: "external_merchant_hosted",
     continuation: "polling_only",
     contractVersion: AGENTIC_CONTRACT_VERSION,
     coreFlow: "plan -> execute -> external checkout -> order polling",
     environment: input.config.environment,
-    guidanceRulesVersion: GUIDANCE_RULES_VERSION,
+    migrationVersion: AGENTIC_MIGRATION_VERSION,
     ok: true as const,
     pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
+    schemaChecksum: AGENTIC_SCHEMA_CHECKSUM,
     serviceName: AGENTIC_SERVICE_NAME,
     serviceVersion: AGENTIC_SERVICE_VERSION,
-    supplements: snapshot.supplements.map((item) => ({
-      acceptedUnits: item.acceptedUnits,
-      aliases: item.aliases,
-      name: item.name,
-      supplementId: item.supplementId
-    })),
     supportAvailable: true,
     supportedCountries: [
       {
@@ -55,8 +62,7 @@ export function infoTool(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
 }>) {
-  const snapshot = getCatalogueSnapshot();
-  const key = `${input.config.buildId}:${snapshot.catalogueVersion}:${input.config.environment}`;
+  const key = `${input.config.buildId}:${input.config.environment}`;
 
   if (infoCache?.key === key) {
     return infoCache.value;

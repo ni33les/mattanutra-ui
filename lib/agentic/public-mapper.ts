@@ -1,6 +1,5 @@
 import type {
   BasketItem,
-  CanonicalPlanState,
   CoverageRow,
   PlanResult,
   StackOption
@@ -50,15 +49,61 @@ export function publicCoverage(row: CoverageRow) {
   };
 }
 
-export function publicOption(option: StackOption) {
+export function publicTradeOffs(
+  option: StackOption,
+  selected: StackOption | null
+) {
+  const productCount = option.basket.length;
+
+  if (!selected) {
+    return {
+      coverageDeltaPercent: 0,
+      pillDelta: 0,
+      priceDeltaMinor: 0,
+      productCountDelta: 0,
+      summary: option.reason
+    };
+  }
+
+  const priceDeltaMinor = option.totalPriceMinor - selected.totalPriceMinor;
+  const coverageDeltaPercent = option.coveragePercent - selected.coveragePercent;
+  const pillDelta = option.dailyPills - selected.dailyPills;
+  const productCountDelta = productCount - selected.basket.length;
+  const parts: string[] = [];
+
+  if (priceDeltaMinor !== 0) {
+    parts.push(`${priceDeltaMinor > 0 ? "+" : ""}${priceDeltaMinor} satang`);
+  }
+  if (coverageDeltaPercent !== 0) {
+    parts.push(`${coverageDeltaPercent > 0 ? "+" : ""}${coverageDeltaPercent}% coverage`);
+  }
+  if (pillDelta !== 0) {
+    parts.push(`${pillDelta > 0 ? "+" : ""}${pillDelta} pills`);
+  }
+  if (productCountDelta !== 0) {
+    parts.push(`${productCountDelta > 0 ? "+" : ""}${productCountDelta} products`);
+  }
+
+  return {
+    coverageDeltaPercent,
+    pillDelta,
+    priceDeltaMinor,
+    productCountDelta,
+    summary: parts.join("; ") || option.reason
+  };
+}
+
+export function publicOption(option: StackOption, selected: StackOption | null) {
   return {
     basket: option.basket.map(publicBasketItem),
     coverage: option.coverage.map(publicCoverage),
     coveragePercent: option.coveragePercent,
     dailyPills: option.dailyPills,
     optionId: option.optionId,
+    productCount: option.basket.length,
     reason: option.reason,
-    totalPriceMinor: option.totalPriceMinor
+    totalPriceMinor: option.totalPriceMinor,
+    tradeOffs: publicTradeOffs(option, selected)
   };
 }
 
@@ -76,63 +121,33 @@ export function publicQuestions(
   }));
 }
 
-export function publicRequestSnapshot(state: CanonicalPlanState) {
-  return {
-    currency: state.currency,
-    destinationCountry: state.destinationCountry,
-    locale: state.locale,
-    optimization: state.optimization,
-    profile: state.profile,
-    requirements: state.requirements,
-    targets: state.targets.map((item) => ({
-      amount: item.amount,
-      name: item.name,
-      supplementId: item.supplementId,
-      unit: item.unit
-    })),
-    ...(state.currentSupplements.length > 0
-      ? { currentSupplements: state.currentSupplements }
-      : {}),
-    ...(state.medicationCodes.length > 0
-      ? { medicationCodes: state.medicationCodes }
-      : {}),
-    ...(state.conditionCodes.length > 0
-      ? { conditionCodes: state.conditionCodes }
-      : {}),
-    ...(state.acceptedGaps.length > 0 ? { acceptedGaps: state.acceptedGaps } : {}),
-    ...(state.safetyAcknowledgement
-      ? { safetyAcknowledgement: state.safetyAcknowledgement }
-      : {})
-  };
-}
-
 export function publicPlanFields(result: Pick<
   PlanResult,
   | "alternatives"
-  | "availabilityAsOf"
   | "basket"
-  | "catalogueVersion"
   | "changeSummary"
   | "coverage"
-  | "guidanceRulesVersion"
   | "questions"
-  | "requestSnapshot"
   | "safetyGuidance"
   | "selected"
   | "status"
   | "summary"
   | "unmetRequirements"
 >) {
+  const selected = result.selected;
+
   return {
-    availabilityAsOf: result.availabilityAsOf,
     basket: result.basket.map(publicBasketItem),
-    catalogueVersion: result.catalogueVersion,
     coverage: result.coverage.map(publicCoverage),
-    guidanceRulesVersion: result.guidanceRulesVersion,
-    requestSnapshot: publicRequestSnapshot(result.requestSnapshot),
+    productCount: result.basket.length,
     status: result.status,
     summary: result.summary,
-    ...(result.selected ? { optionId: result.selected.optionId } : {}),
+    ...(selected
+      ? {
+          optionId: selected.optionId,
+          tradeOffs: publicTradeOffs(selected, selected)
+        }
+      : {}),
     ...(result.changeSummary.length > 0
       ? { changeSummary: result.changeSummary }
       : {}),
@@ -146,11 +161,59 @@ export function publicPlanFields(result: Pick<
       ? { unmetRequirements: result.unmetRequirements }
       : {}),
     ...(result.alternatives.length > 0
-      ? { alternatives: result.alternatives.map(publicOption) }
+      ? {
+          alternatives: result.alternatives.map((item) =>
+            publicOption(item, selected)
+          )
+        }
       : {})
   };
 }
 
 export function publicFrozenItems(items: readonly BasketItem[]) {
   return items.map(publicBasketItem);
+}
+
+export function publicFrozenOrder(frozen: unknown) {
+  if (!frozen || typeof frozen !== "object") {
+    return frozen;
+  }
+
+  const record = frozen as Record<string, unknown>;
+  const rawItems = Array.isArray(record.items) ? record.items : [];
+
+  return {
+    coveragePercent: record.coveragePercent,
+    currency: record.currency,
+    dailyPills: record.dailyPills,
+    items: rawItems.map((item) => {
+      if (!item || typeof item !== "object") {
+        return item;
+      }
+      const row = item as BasketItem;
+      return publicBasketItem({
+        availabilityAsOf: "",
+        contributionSupplementIds: [],
+        currency: "THB",
+        dailyPills: Number(row.dailyPills) || 0,
+        deliveryWindow: null,
+        form: String(row.form ?? ""),
+        incompleteCommercialFacts: false,
+        lineTotalMinor: Number(row.lineTotalMinor) || 0,
+        productId: String(row.productId ?? ""),
+        productName: String(row.productName ?? ""),
+        quantity: Number(row.quantity) || 1,
+        retailerSku: "",
+        sellerId: "",
+        sellerName: "",
+        stockStatus: "in_stock",
+        unitPriceMinor: Number(row.unitPriceMinor) || 0
+      });
+    }),
+    planRevision: record.planRevision,
+    shippingMinor: record.shippingMinor,
+    subtotalMinor: record.subtotalMinor,
+    taxMinor: record.taxMinor,
+    totalPriceMinor: record.totalPriceMinor
+  };
 }

@@ -74,7 +74,6 @@ export type PlanRequestCurrent = Readonly<{
 export type PlanRequest = Readonly<{
   answers?: readonly PlanAnswer[];
   conditionCodes?: readonly string[];
-  currency?: string;
   currentSupplements?: readonly PlanRequestCurrent[];
   destinationCountry: string;
   locale: string;

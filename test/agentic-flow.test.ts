@@ -19,7 +19,6 @@ function supplementId(name: string) {
 
 function j1Request(overrides: Record<string, unknown> = {}) {
   return {
-    currency: "THB",
     destinationCountry: "TH",
     locale: "en",
     optimization: "balanced",

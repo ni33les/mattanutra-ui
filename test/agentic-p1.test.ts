@@ -11,6 +11,7 @@ import {
   type AgenticRuntime
 } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
+import { simulatePayment } from "../lib/agentic/qa/simulate.ts";
 import {
   addMinor,
   asMinor,
@@ -56,7 +57,6 @@ describe("agentic P1 pack fixes", () => {
     const result = await call(runtime, "plan", {
       idempotencyKey: "p1-d3-units-0000001",
       request: {
-        currency: "THB",
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
@@ -82,7 +82,6 @@ describe("agentic P1 pack fixes", () => {
     const result = await call(runtime, "plan", {
       idempotencyKey: "p1-retain-zinc-00001",
       request: {
-        currency: "THB",
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
@@ -110,7 +109,6 @@ describe("agentic P1 pack fixes", () => {
     const first = await call(runtime, "plan", {
       idempotencyKey: "p1-ack-first-0000001",
       request: {
-        currency: "THB",
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
@@ -134,7 +132,6 @@ describe("agentic P1 pack fixes", () => {
       idempotencyKey: "p1-ack-second-000001",
       planHandle: first.planHandle,
       request: {
-        currency: "THB",
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
@@ -158,7 +155,6 @@ describe("agentic P1 pack fixes", () => {
       idempotencyKey: "p1-ack-third-0000001",
       planHandle: first.planHandle,
       request: {
-        currency: "THB",
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
@@ -183,7 +179,6 @@ describe("agentic P1 pack fixes", () => {
     const first = await call(runtime, "plan", {
       idempotencyKey: "p1-fb-first-00000001",
       request: {
-        currency: "THB",
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
@@ -199,7 +194,6 @@ describe("agentic P1 pack fixes", () => {
       idempotencyKey: "p1-fb-second-0000001",
       planHandle: first.planHandle,
       request: {
-        currency: "THB",
         destinationCountry: "TH",
         locale: "en",
         optimization: "lowest_cost",
@@ -322,7 +316,6 @@ describe("agentic P1 pack fixes", () => {
     const result = await call(runtime, "plan", {
       idempotencyKey: "p1-j4-zinc-00000001",
       request: {
-        currency: "THB",
         currentSupplements: [
           {
             dailyAmount: 15,
@@ -367,7 +360,6 @@ describe("agentic P1 pack fixes", () => {
         arguments: {
           idempotencyKey: "p1-text-summary-00001",
           request: {
-            currency: "THB",
             destinationCountry: "TH",
             locale: "en",
             optimization: "balanced",
@@ -398,7 +390,6 @@ describe("agentic P1 pack fixes", () => {
     const created = await call(runtime, "plan", {
       idempotencyKey: "p1-payable-plan-000001",
       request: {
-        currency: "THB",
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
@@ -453,13 +444,12 @@ describe("agentic P1 pack fixes", () => {
     });
     assert.equal(result.ok, true);
     assert.equal(result.status, "ready");
-    assert.equal(
-      (result.requestSnapshot as { currency?: string }).currency,
-      "THB"
-    );
+    assert.equal("requestSnapshot" in result, false);
+    assert.equal("supplements" in result, false);
+    assert.equal(typeof result.productCount, "number");
   });
 
-  it("rejects a currency that does not match TH", async () => {
+  it("rejects agent-supplied currency as an unexpected property", async () => {
     const runtime = runtimeFor();
     const result = await call(runtime, "plan", {
       idempotencyKey: "p1-usd-currency-000001",
@@ -474,7 +464,7 @@ describe("agentic P1 pack fixes", () => {
       }
     });
     assert.equal(result.ok, false);
-    assert.equal((result.error as { reasonCode: string }).reasonCode, "unsupported_currency");
+    assert.equal((result.error as { reasonCode: string }).reasonCode, "unexpected_property");
   });
 
   it("asks one budget question when a covered stack is over maxPriceMinor", async () => {
@@ -558,5 +548,97 @@ describe("agentic P1 pack fixes", () => {
       (item) => item.questionId.startsWith("q_gap_")
     );
     assert.equal(leftover.length, 0);
+  });
+
+  it("keeps info minimal and plan free of internal snapshots", async () => {
+    const runtime = runtimeFor();
+    const info = await call(runtime, "info", {});
+    assert.equal("supplements" in info, false);
+    assert.equal("catalogueVersion" in info, false);
+    assert.equal(typeof info.schemaChecksum, "string");
+    assert.equal(info.migrationVersion, "agentic-3.0.0");
+
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "p1-public-slim-0000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    assert.equal("requestSnapshot" in plan, false);
+    assert.equal("catalogueVersion" in plan, false);
+    assert.equal("optimizationEvidence" in plan, false);
+    assert.equal("availabilityAsOf" in plan, false);
+    assert.ok((plan.productCount as number) >= 1);
+    const alternatives = (plan.alternatives as Array<{ productCount?: number; tradeOffs?: unknown }>) ?? [];
+    for (const option of alternatives) {
+      assert.equal(typeof option.productCount, "number");
+      assert.equal(typeof option.tradeOffs, "object");
+    }
+  });
+
+  it("describes a paid order as completed, not checkout-ready", async () => {
+    const runtime = runtimeFor();
+    const created = await call(runtime, "plan", {
+      idempotencyKey: "p1-paid-text-plan-0001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const executed = await call(runtime, "execute", {
+      expectedRevision: created.revision,
+      idempotencyKey: "p1-paid-text-exec-0001",
+      planHandle: created.planHandle
+    });
+    await simulatePayment({
+      config: runtime.config,
+      now: new Date().toISOString(),
+      orderHandle: String(executed.orderHandle),
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const polled = await handleJsonRpc(runtime, {
+      id: 8,
+      method: "tools/call",
+      params: {
+        arguments: { orderHandle: executed.orderHandle },
+        name: "order"
+      }
+    });
+    const text = (polled?.result?.content as Array<{ text: string }>)[0]?.text ?? "";
+    assert.equal(text.includes("Checkout ready"), false);
+    assert.match(text, /paid|completed|confirmed/i);
+  });
+
+  it("returns every untested pack ID from packProof", async () => {
+    const runtime = runtimeFor();
+    const proof = await handleQaJsonRpc(runtime, {
+      id: 9,
+      method: "tools/call",
+      params: { arguments: {}, name: "packProof" }
+    });
+    const body = proof?.result?.structuredContent as {
+      checks: Array<{ id: string; passed: boolean }>;
+      passed: boolean;
+      untestedIds: string[];
+    };
+    assert.ok(body.untestedIds.length >= 50);
+    assert.equal(body.checks.length, body.untestedIds.length);
+    const missing = body.untestedIds.filter(
+      (id) => !body.checks.some((item) => item.id === id)
+    );
+    assert.deepEqual(missing, []);
+    const failed = body.checks.filter((item) => !item.passed).map((item) => item.id);
+    assert.deepEqual(failed, [], failed.join(","));
   });
 });

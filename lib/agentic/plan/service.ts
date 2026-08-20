@@ -35,13 +35,8 @@ export type PlanToolInput = Readonly<{
 
 export type PlanToolSuccess = ReturnType<typeof publicPlanFields> &
   Readonly<{
-    appliedRequirements?: readonly string[];
-    assumptions?: readonly string[];
     feedbackInvitation?: Readonly<{ prompt: string; promptKey: string }>;
     ok: true;
-    optimizationEvidence: Readonly<{
-      mode: PlanResult["optimizationEvidence"]["mode"];
-    }>;
     planHandle: string;
     revision: number;
   }>;
@@ -279,11 +274,7 @@ export async function planTool(input: Readonly<{
 
       const response: PlanToolSuccess = {
         ...publicPlanFields(nextResult),
-        ...(nextResult.appliedRequirements.length > 0
-          ? { appliedRequirements: nextResult.appliedRequirements }
-          : {}),
         ok: true,
-        optimizationEvidence: { mode: nextResult.optimizationEvidence.mode },
         planHandle: input.payload.planHandle!,
         revision: nextRevision
       };
@@ -403,9 +394,6 @@ export async function planTool(input: Readonly<{
 
     const response: PlanToolSuccess = {
       ...publicPlanFields(result),
-      ...(result.appliedRequirements.length > 0
-        ? { appliedRequirements: result.appliedRequirements }
-        : {}),
       ...(result.status === "ready"
         ? {
             feedbackInvitation: {
@@ -415,7 +403,6 @@ export async function planTool(input: Readonly<{
           }
         : {}),
       ok: true,
-      optimizationEvidence: { mode: result.optimizationEvidence.mode },
       planHandle,
       revision
     };

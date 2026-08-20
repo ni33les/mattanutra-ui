@@ -9,13 +9,30 @@ export const dynamic = "force-dynamic";
 
 const log = createLogger("api.mcp");
 
-export async function POST(request: Request) {
-  const limited = enforceRateLimit(request, publicRateLimits.mcp);
-
-  if (limited) {
-    return limited;
+function mcpNeedsRateLimit(body: unknown) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return true;
   }
 
+  const method = (body as { method?: unknown }).method;
+  if (
+    method === "initialize" ||
+    method === "tools/list" ||
+    method === "ping" ||
+    method === "notifications/initialized"
+  ) {
+    return false;
+  }
+
+  if (method === "tools/call") {
+    const name = (body as { params?: { name?: unknown } }).params?.name;
+    return name !== "info" && name !== "order";
+  }
+
+  return true;
+}
+
+export async function POST(request: Request) {
   let body: unknown;
 
   try {
@@ -28,6 +45,14 @@ export async function POST(request: Request) {
       },
       { status: 400 }
     );
+  }
+
+  if (mcpNeedsRateLimit(body)) {
+    const limited = enforceRateLimit(request, publicRateLimits.mcp);
+
+    if (limited) {
+      return limited;
+    }
   }
 
   const runtime = getLiveAgenticRuntime(request);

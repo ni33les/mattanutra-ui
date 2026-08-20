@@ -30,6 +30,7 @@ export async function issueCapability(input: Readonly<{
   now: string;
   resourceId: string;
   resourceType: ResourceType;
+  revokedAt?: string | null;
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<IssuedCapability> {
@@ -45,7 +46,7 @@ export async function issueCapability(input: Readonly<{
     principalScope: input.scope.principalScope,
     resourceId: input.resourceId,
     resourceType: input.resourceType,
-    revokedAt: null,
+    revokedAt: input.revokedAt ?? null,
     tenantScope: input.scope.tenantScope
   };
 

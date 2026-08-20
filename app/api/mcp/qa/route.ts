@@ -71,7 +71,14 @@ export async function GET(request: Request) {
 
   return NextResponse.json(
     {
-      tools: ["simulate", "evidence", "isolationProof", "checkoutContinuityProof"],
+      tools: [
+        "simulate",
+        "evidence",
+        "isolationProof",
+        "checkoutContinuityProof",
+        "latencyProof",
+        "packProof"
+      ],
       transport: "streamable-http"
     },
     { headers: { "Cache-Control": "no-store" } }

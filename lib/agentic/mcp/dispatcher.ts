@@ -66,7 +66,27 @@ function toolText(value: unknown) {
       : recordValue.summary;
   }
 
-  if (typeof recordValue.orderReference === "string" && recordValue.checkoutUrl) {
+  if (
+    recordValue.lookupStatus === "found" &&
+    typeof recordValue.message === "string" &&
+    recordValue.message.trim()
+  ) {
+    return recordValue.message;
+  }
+
+  const paid =
+    recordValue.paymentStatus === "paid" ||
+    recordValue.orderStatus === "completed";
+
+  if (paid && typeof recordValue.orderReference === "string") {
+    return `Order ${recordValue.orderReference} is completed and paid.`;
+  }
+
+  if (
+    typeof recordValue.orderReference === "string" &&
+    recordValue.checkoutUrl &&
+    recordValue.paymentStatus !== "paid"
+  ) {
     return `Checkout ready for ${recordValue.orderReference}. Poll the order; the browser is not payment truth.`;
   }
 

@@ -22,7 +22,6 @@ function supplementId(name: string) {
 
 export function goldenPlanRequest() {
   return {
-    currency: "THB",
     destinationCountry: "TH",
     locale: "en",
     optimization: "balanced" as const,

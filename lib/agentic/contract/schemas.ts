@@ -21,10 +21,6 @@ const PLAN_REQUEST: JsonSchema = {
       type: "array",
       uniqueItems: true
     },
-    currency: {
-      pattern: "^[A-Z]{3}$",
-      type: "string"
-    },
     currentSupplements: {
       items: {
         additionalProperties: false,
