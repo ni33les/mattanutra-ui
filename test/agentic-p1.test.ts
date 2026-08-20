@@ -703,6 +703,8 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /<select/);
     assert.match(panel, /method="post"/);
     assert.match(panel, /type="submit"/);
+    assert.match(panel, /native HTML form/);
+    assert.match(panel, /application\/x-www-form-urlencoded/);
     assert.match(panel, /name="customerName"/);
     assert.match(panel, /name="agentAuthorized"/);
   });

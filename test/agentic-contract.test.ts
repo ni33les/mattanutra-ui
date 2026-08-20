@@ -79,6 +79,11 @@ describe("agentic MCP contract 3.0.0", () => {
     );
     assert.match(String(result.instructions), /Never prefix mattanutra_dev/);
     assert.match(String(result.instructions), /mattanutra_dev\.mattanutra_dev\.\*/);
+    assert.match(String(result.instructions), /NATIVE HTML FORM/);
+    assert.match(String(result.instructions), /application\/x-www-form-urlencoded/);
+    assert.match(String(result.instructions), /customerName, phone, customerEmail, addressLine1/);
+    assert.match(String(result.instructions), /scenario=decline_insufficient_funds/);
+    assert.match(String(result.instructions), /scenario=success/);
     assert.equal(
       (result.serverInfo as { version: string }).version,
       "3.0.0"

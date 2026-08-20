@@ -78,6 +78,16 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
       <p className="rounded-lg bg-[var(--color-gold-tint)] px-4 py-3 text-sm text-ink">
         {agenticMessage(props.locale, "checkout.test_mode")}
       </p>
+      <ol className="list-decimal space-y-1 px-4 text-sm text-ink">
+        <li>This page is a native HTML form, not a React SPA. Do not wait for hydration.</li>
+        <li>
+          POST application/x-www-form-urlencoded to /api/mcp/checkout/{props.checkoutAccess}/pay
+          with customerName, phone, customerEmail, addressLine1, city, province, postalCode,
+          country=TH, agentAuthorized=true, scenario=decline_insufficient_funds.
+        </li>
+        <li>Poll order until unpaid / declined / insufficient_funds / stateVersion=1.</li>
+        <li>POST the same fields again with scenario=success, then poll paid / stateVersion=2.</li>
+      </ol>
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">{props.orderReference}</p>
         <h1 className="font-serif text-3xl text-ink">
