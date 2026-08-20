@@ -114,6 +114,11 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
           orderReference={order.reference}
           lastResult={lastResult || null}
           paid={order.paymentStatus === "paid"}
+          refundable={
+            order.paymentStatus === "paid" ||
+            order.paymentStatus === "refunded" ||
+            order.paymentStatus === "partially_refunded"
+          }
           shippingMinor={shippingMinor}
           subtotalMinor={subtotalMinor}
           taxMinor={taxMinor}

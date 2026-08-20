@@ -23,6 +23,10 @@ export function issueHandle() {
   return `cap_${randomBytes(HANDLE_BYTES).toString("base64url")}`;
 }
 
+export function isOpaqueCapabilityHandle(value: string) {
+  return value.startsWith("cap_") && value.length >= 36;
+}
+
 export async function issueCapability(input: Readonly<{
   allowedActions: readonly string[];
   config: AgenticConfig;

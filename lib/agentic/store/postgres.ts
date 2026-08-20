@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { getSql } from "@/lib/db";
+import { getSql, keepDatabaseWarm } from "@/lib/db";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { createMemoryStore } from "@/lib/agentic/store/memory";
 import { asMinor } from "@/lib/agentic/money";
@@ -554,6 +554,6 @@ export function createRuntimeStore() {
     return createMemoryStore();
   }
 
-  void sql`select 1`.catch(() => null);
+  void keepDatabaseWarm();
   return createPostgresStore(sql);
 }

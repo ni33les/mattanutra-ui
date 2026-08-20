@@ -5,7 +5,7 @@ import { handleQaJsonRpc } from "@/lib/agentic/mcp/qa-dispatcher";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import { isPaymentScenario, simulatePayment } from "@/lib/agentic/qa/simulate";
 import { nowIso } from "@/lib/agentic/runtime";
-import { resolveCapability } from "@/lib/agentic/capabilities";
+import { isOpaqueCapabilityHandle, resolveCapability } from "@/lib/agentic/capabilities";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 
 export const runtime = "nodejs";
@@ -47,6 +47,15 @@ export async function POST(request: Request) {
     );
   }
 
+  if (body && typeof body === "object" && !Array.isArray(body) && !("method" in body)) {
+    if ("orderId" in body && !("orderHandle" in body)) {
+      return NextResponse.json(
+        { message: "Use orderHandle only. Never send raw order IDs." },
+        { status: 400 }
+      );
+    }
+  }
+
   if (
     body &&
     typeof body === "object" &&
@@ -58,7 +67,7 @@ export async function POST(request: Request) {
     const scenario = (body as { scenario?: unknown }).scenario;
     const now = nowIso();
 
-    if (orderHandle.length < 32) {
+    if (!isOpaqueCapabilityHandle(orderHandle)) {
       return NextResponse.json({ message: "Not found." }, { status: 404 });
     }
 
@@ -67,7 +76,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: "Unknown scenario." }, { status: 400 });
       }
 
-      const simulated = await simulatePayment({
+      await simulatePayment({
         config: runtime.config,
         now,
         orderHandle,
@@ -84,11 +93,14 @@ export async function POST(request: Request) {
         scope: runtime.scope,
         store: runtime.store
       });
-      const counts = capability
-        ? await redactedOrderCounts({ orderId: capability.resourceId, runtime })
-        : null;
+
+      if (!capability) {
+        return NextResponse.json({ message: "Not found." }, { status: 404 });
+      }
+
+      const counts = await redactedOrderCounts({ orderId: capability.resourceId, runtime });
       return NextResponse.json(
-        { counts, ok: true, simulated },
+        { ok: true, scenario, ...counts },
         { headers: { "Cache-Control": "no-store" } }
       );
     }

@@ -5,6 +5,7 @@ export type RedactedOrderCounts = Readonly<{
   fulfilmentStatus: string | null;
   omsChildOrderCount: number;
   omsSubmitCount: number;
+  orderStatus: string | null;
   outboxPendingCount: number;
   paymentAttemptCount: number;
   paymentConfirmedCount: number;
@@ -33,6 +34,7 @@ export async function redactedOrderCounts(input: Readonly<{
     fulfilmentStatus: order?.fulfilmentStatus ?? null,
     omsChildOrderCount: retail ? 1 : 0,
     omsSubmitCount: retail ? 1 : 0,
+    orderStatus: order?.orderStatus ?? null,
     outboxPendingCount,
     paymentAttemptCount: attempts.length,
     paymentConfirmedCount: audits.filter((item) => item.type === "payment_confirmed").length,

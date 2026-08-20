@@ -22,6 +22,7 @@ import { AGENTIC_PUBLIC_TOOLS } from "../lib/agentic/contract/index.ts";
 import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
 import { infoTool } from "../lib/agentic/info.ts";
 import { recordMcpTiming } from "../lib/agentic/metrics.ts";
+import { isOpaqueCapabilityHandle } from "../lib/agentic/capabilities.ts";
 
 function runtimeFor(): AgenticRuntime {
   return createAgenticRuntime({
@@ -234,26 +235,53 @@ describe("DEV internal QA harness", () => {
       paymentAttemptCount?: number;
       paymentConfirmedCount?: number;
       omsSubmitCount?: number;
+      omsChildOrderCount?: number;
+      orderStatus?: string;
       providerEventCount?: number;
       alertP0Count?: number;
       outboxPendingCount?: number;
     };
     assert.equal(counts.paymentConfirmedCount, 1);
     assert.equal(counts.omsSubmitCount, 1);
+    assert.equal(counts.omsChildOrderCount, 1);
     assert.ok((counts.paymentAttemptCount ?? 0) >= 1);
     assert.ok((counts.providerEventCount ?? 0) >= 1);
     assert.equal(counts.alertP0Count, 0);
+    assert.equal(counts.orderStatus, "completed");
     assert.equal(JSON.stringify(counts).includes(executed.orderHandle), false);
+    assert.equal(/[0-9a-f]{8}-[0-9a-f]{4}-/.test(JSON.stringify(counts)), false);
 
     recordMcpTiming("info", 12);
     recordMcpTiming("execute", 40);
     recordMcpTiming("order", 18);
     const info = infoTool({ config: runtime.config, locale: "en" });
+    const infoAgain = infoTool({ config: runtime.config, locale: "en" });
     if (runtime.config.environment === "dev") {
       assert.equal(
         typeof (info as { latency?: { info?: { p95Ms?: number } } }).latency?.info?.p95Ms,
         "number"
       );
+      assert.equal(
+        typeof (infoAgain as { latency?: { execute?: { p95Ms?: number; p99Ms?: number } } })
+          .latency?.execute?.p95Ms,
+        "number"
+      );
+      assert.equal(
+        typeof (infoAgain as { latency?: { execute?: { p99Ms?: number } } }).latency?.execute
+          ?.p99Ms,
+        "number"
+      );
+      assert.equal(
+        (infoAgain as { latency?: { buildId?: string } }).latency?.buildId,
+        runtime.config.buildId
+      );
     }
+  });
+
+  it("accepts only opaque capability handles, never raw order IDs", () => {
+    assert.equal(isOpaqueCapabilityHandle("cap_" + "a".repeat(40)), true);
+    assert.equal(isOpaqueCapabilityHandle("6b3a1c2e-4d5f-6789-abcd-ef0123456789"), false);
+    assert.equal(isOpaqueCapabilityHandle("ord_abc"), false);
+    assert.equal(isOpaqueCapabilityHandle(""), false);
   });
 });

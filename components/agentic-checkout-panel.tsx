@@ -35,6 +35,7 @@ type AgenticCheckoutPanelProps = Readonly<{
   locale: Locale;
   orderReference: string;
   paid: boolean;
+  refundable?: boolean;
   shippingMinor: number;
   subtotalMinor: number;
   taxMinor: number;
@@ -71,8 +72,8 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
   const shippingMinor = asMinor(props.shippingMinor);
   const taxMinor = asMinor(props.taxMinor);
   const totalPriceMinor = asMinor(props.totalPriceMinor);
-  const unpaidOpen = !props.paid && !props.expired;
-  const refundable = props.paid;
+  const refundable = props.paid || Boolean(props.refundable);
+  const unpaidOpen = !props.paid && !props.expired && !refundable;
   const scenarios = unpaidOpen
     ? CHECKOUT_TEST_SCENARIOS
     : (["refund", "partial_refund"] as const);

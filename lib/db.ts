@@ -170,3 +170,28 @@ export async function checkDatabaseConnection() {
     return false;
   }
 }
+
+const DB_KEEP_ALIVE_MS = 20_000;
+
+export async function keepDatabaseWarm() {
+  const sql = getSql();
+
+  if (!sql) {
+    return false;
+  }
+
+  const ok = await checkDatabaseConnection();
+  const globalKeep = globalThis as typeof globalThis & {
+    mattanutraDbKeepAlive?: ReturnType<typeof setInterval>;
+  };
+
+  if (!globalKeep.mattanutraDbKeepAlive) {
+    const timer = setInterval(() => {
+      void sql`select 1`.catch(() => null);
+    }, DB_KEEP_ALIVE_MS);
+    timer.unref?.();
+    globalKeep.mattanutraDbKeepAlive = timer;
+  }
+
+  return ok;
+}

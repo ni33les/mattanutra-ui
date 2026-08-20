@@ -64,13 +64,14 @@ export function infoTool(input: Readonly<{
   locale?: string;
 }>) {
   const key = `${input.config.buildId}:${input.config.environment}`;
+  const value =
+    infoCache?.key === key
+      ? infoCache.value
+      : buildInfo(input);
 
-  if (infoCache?.key === key) {
-    return infoCache.value;
+  if (infoCache?.key !== key) {
+    infoCache = { key, value };
   }
-
-  const value = buildInfo(input);
-  infoCache = { key, value };
 
   if (input.config.environment !== "dev") {
     return value;

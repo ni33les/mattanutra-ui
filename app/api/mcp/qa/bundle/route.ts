@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import { packProof } from "@/lib/agentic/qa/pack-proof";
-import { resolveCapability } from "@/lib/agentic/capabilities";
+import { isOpaqueCapabilityHandle, resolveCapability } from "@/lib/agentic/capabilities";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 import { nowIso } from "@/lib/agentic/runtime";
 
@@ -25,9 +25,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const orderHandle = new URL(request.url).searchParams.get("orderHandle") ?? "";
+  const url = new URL(request.url);
 
-  if (orderHandle.length >= 32) {
+  if (url.searchParams.has("orderId")) {
+    return NextResponse.json(
+      { message: "Use orderHandle only. Never send raw order IDs." },
+      { status: 400 }
+    );
+  }
+
+  const orderHandle = url.searchParams.get("orderHandle") ?? "";
+
+  if (orderHandle && !isOpaqueCapabilityHandle(orderHandle)) {
+    return NextResponse.json({ message: "Not found." }, { status: 404 });
+  }
+
+  if (isOpaqueCapabilityHandle(orderHandle)) {
     const capability = await resolveCapability({
       action: "order.read",
       config: runtime.config,

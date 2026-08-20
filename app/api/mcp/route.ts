@@ -163,6 +163,10 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  void import("@/lib/db")
+    .then((mod) => mod.keepDatabaseWarm())
+    .catch(() => null);
+
   return NextResponse.json(
     {
       contractVersion: "3.0.0",

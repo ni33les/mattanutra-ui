@@ -715,6 +715,13 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /partial_refund/);
     assert.match(panel, /refundable/);
     assert.match(panel, /paid page keeps an authorized refund form/);
+    assert.match(panel, /props\.paid \|\| Boolean\(props\.refundable\)/);
+    const page = readFileSync(
+      new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/page.tsx", import.meta.url),
+      "utf8"
+    );
+    assert.match(page, /paymentStatus === "refunded"/);
+    assert.match(page, /partially_refunded/);
   });
 
   it("accepts Creatine by official name and does not call it a legacy ID", async () => {
