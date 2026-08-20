@@ -1,0 +1,294 @@
+import assert from "node:assert/strict";
+import { afterEach, describe, it } from "node:test";
+import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
+import { parseCheckoutAddress } from "../lib/agentic/checkout-address.ts";
+import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
+import {
+  createAgenticRuntime,
+  setAgenticRuntimeForTests,
+  type AgenticRuntime
+} from "../lib/agentic/runtime.ts";
+import { createMemoryStore } from "../lib/agentic/store/memory.ts";
+
+function supplementId(name: string) {
+  const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
+  assert.ok(found, name);
+  return found.supplementId;
+}
+
+function runtimeFor(): AgenticRuntime {
+  return createAgenticRuntime({
+    config: loadAgenticConfig(),
+    scope: {
+      environment: "dev",
+      principalScope: "tester",
+      tenantScope: "mattanutra"
+    },
+    store: createMemoryStore()
+  });
+}
+
+async function call(runtime: AgenticRuntime, name: string, args: unknown) {
+  const response = await handleJsonRpc(runtime, {
+    id: 1,
+    method: "tools/call",
+    params: { arguments: args, name }
+  });
+  assert.ok(response?.result);
+  return response.result.structuredContent as Record<string, unknown>;
+}
+
+afterEach(() => {
+  setAgenticRuntimeForTests(null);
+});
+
+describe("agentic P1 pack fixes", () => {
+  it("labels converted Vitamin D3 coverage in IU not mcg", async () => {
+    const runtime = runtimeFor();
+    const result = await call(runtime, "plan", {
+      idempotencyKey: "p1-d3-units-0000001",
+      request: {
+        currency: "THB",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" }
+        ]
+      }
+    });
+
+    const row = (result.coverage as Array<Record<string, unknown>>)[0];
+    assert.equal(row.unit, "IU");
+    assert.equal(row.requestedAmount, 2000);
+    assert.equal(row.deliveredAmount, 2000);
+    assert.equal(JSON.stringify(result).includes("retailerSku"), false);
+    assert.equal(JSON.stringify(result).includes("sellerId"), false);
+    assert.equal(JSON.stringify(result).includes("stockStatus"), false);
+  });
+
+  it("does not mark a 50% retained zinc target ready", async () => {
+    const runtime = runtimeFor();
+    const result = await call(runtime, "plan", {
+      idempotencyKey: "p1-retain-zinc-00001",
+      request: {
+        currency: "THB",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {
+          retainSupplementIds: [supplementId("Zinc")]
+        },
+        targets: [
+          { amount: 50, name: "Zinc", supplementId: supplementId("Zinc"), unit: "mg" }
+        ]
+      }
+    });
+
+    assert.equal(result.ok, true);
+    assert.notEqual(result.status, "ready");
+    const row = (result.coverage as Array<Record<string, unknown>>)[0];
+    assert.equal(row.unit, "mg");
+    assert.equal(row.requestedAmount, 50);
+    assert.equal(row.deliveredAmount, 25);
+    assert.ok((row.coveragePercent as number) < 90);
+  });
+
+  it("invalidates safety acknowledgement after exposure changes", async () => {
+    const runtime = runtimeFor();
+    const first = await call(runtime, "plan", {
+      idempotencyKey: "p1-ack-first-0000001",
+      request: {
+        currency: "THB",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        medicationCodes: ["apixaban"],
+        targets: [
+          { amount: 1000, name: "Omega-3", supplementId: supplementId("Omega-3"), unit: "mg" }
+        ]
+      }
+    });
+
+    assert.equal(first.status, "needs_input");
+    const guidanceIds = (first.safetyGuidance as Array<{ guidanceId: string }>).map(
+      (item) => item.guidanceId
+    );
+    assert.ok(guidanceIds.length > 0);
+
+    const acked = await call(runtime, "plan", {
+      expectedRevision: first.revision,
+      idempotencyKey: "p1-ack-second-000001",
+      planHandle: first.planHandle,
+      request: {
+        currency: "THB",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        medicationCodes: ["apixaban"],
+        safetyAcknowledgement: {
+          confirmed: true,
+          guidanceIds,
+          revision: first.revision
+        },
+        targets: [
+          { amount: 1000, name: "Omega-3", supplementId: supplementId("Omega-3"), unit: "mg" }
+        ]
+      }
+    });
+    assert.equal(acked.status, "ready");
+
+    const changed = await call(runtime, "plan", {
+      expectedRevision: acked.revision,
+      idempotencyKey: "p1-ack-third-0000001",
+      planHandle: first.planHandle,
+      request: {
+        currency: "THB",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        medicationCodes: ["apixaban"],
+        safetyAcknowledgement: {
+          confirmed: true,
+          guidanceIds,
+          revision: acked.revision
+        },
+        targets: [
+          { amount: 2000, name: "Omega-3", supplementId: supplementId("Omega-3"), unit: "mg" }
+        ]
+      }
+    });
+    assert.equal(changed.status, "needs_input");
+  });
+
+  it("rejects feedback for a stale plan revision", async () => {
+    const runtime = runtimeFor();
+    const first = await call(runtime, "plan", {
+      idempotencyKey: "p1-fb-first-00000001",
+      request: {
+        currency: "THB",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" }
+        ]
+      }
+    });
+    const second = await call(runtime, "plan", {
+      expectedRevision: first.revision,
+      idempotencyKey: "p1-fb-second-0000001",
+      planHandle: first.planHandle,
+      request: {
+        currency: "THB",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "lowest_cost",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" }
+        ]
+      }
+    });
+    assert.ok((second.revision as number) > (first.revision as number));
+
+    const stale = await call(runtime, "feedback", {
+      consentConfirmed: true,
+      expectedRevision: first.revision,
+      idempotencyKey: "p1-fb-stale-00000001",
+      planHandle: first.planHandle,
+      summary: "Great coverage."
+    });
+    assert.equal(stale.ok, false);
+    assert.equal((stale.error as { reasonCode: string }).reasonCode, "not_found");
+
+    const current = await call(runtime, "feedback", {
+      consentConfirmed: true,
+      expectedRevision: second.revision,
+      idempotencyKey: "p1-fb-current-0000001",
+      planHandle: first.planHandle,
+      summary: "Great coverage."
+    });
+    assert.deepEqual(current, { accepted: true, ok: true });
+  });
+
+  it("requires a Thailand address for checkout parsing", () => {
+    const missing = parseCheckoutAddress({ country: "TH" }, "TH");
+    assert.ok("error" in missing);
+
+    const mismatch = parseCheckoutAddress(
+      {
+        addressLine1: "12 Sukhumvit",
+        city: "Watthana",
+        country: "SG",
+        customerEmail: "a@b.com",
+        customerName: "Ada",
+        phone: "0812345678",
+        postalCode: "10110",
+        province: "Bangkok"
+      },
+      "TH"
+    );
+    assert.ok("error" in mismatch);
+
+    const ok = parseCheckoutAddress(
+      {
+        addressLine1: "12 Sukhumvit",
+        city: "Watthana",
+        country: "TH",
+        customerEmail: "ada@example.com",
+        customerName: "Ada Lovelace",
+        phone: "0812345678",
+        postalCode: "10110",
+        province: "Bangkok"
+      },
+      "TH"
+    );
+    assert.ok("address" in ok);
+  });
+
+  it("keeps QA tools off the public connector and isolation proof passing", async () => {
+    const runtime = runtimeFor();
+    const listed = await handleJsonRpc(runtime, { id: 1, method: "tools/list" });
+    const names = (
+      listed?.result?.tools as Array<{ name: string }>
+    ).map((item) => item.name);
+    assert.deepEqual(names, ["info", "plan", "execute", "order", "support", "feedback"]);
+
+    const proof = await handleQaJsonRpc(runtime, {
+      id: 2,
+      method: "tools/call",
+      params: { arguments: {}, name: "isolationProof" }
+    });
+    const body = proof?.result?.structuredContent as { passed: boolean; checks: unknown[] };
+    assert.equal(body.passed, true);
+    assert.ok(body.checks.length > 0);
+
+    const continuity = await handleQaJsonRpc(runtime, {
+      id: 3,
+      method: "tools/call",
+      params: { arguments: {}, name: "checkoutContinuityProof" }
+    });
+    const cont = continuity?.result?.structuredContent as {
+      passed: boolean;
+      evidence: { paymentConfirmedCount: number; omsSubmitCount: number };
+    };
+    assert.equal(cont.passed, true);
+    assert.equal(cont.evidence.paymentConfirmedCount, 1);
+    assert.equal(cont.evidence.omsSubmitCount, 1);
+  });
+});

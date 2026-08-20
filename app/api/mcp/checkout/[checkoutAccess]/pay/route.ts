@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { getAgenticRuntime, nowIso } from "@/lib/agentic/runtime";
+import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
+import { nowIso } from "@/lib/agentic/runtime";
 import { hashCapability } from "@/lib/agentic/capabilities";
+import { parseCheckoutAddress } from "@/lib/agentic/checkout-address";
 import { mockEventForScenario } from "@/lib/agentic/commerce/payment";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
@@ -25,10 +27,18 @@ export async function POST(request: Request, { params }: RouteProps) {
   }
 
   const { checkoutAccess } = await params;
-  const runtime = getAgenticRuntime(request);
+  const runtime = getLiveAgenticRuntime(request);
 
   if (runtime.config.paymentProvider !== "mock") {
     return NextResponse.json({ message: "Mock pay is DEV only." }, { status: 404 });
+  }
+
+  let body: Record<string, unknown> = {};
+
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    body = {};
   }
 
   const checkout = await runtime.store.getCheckoutByAccessHash(
@@ -49,7 +59,28 @@ export async function POST(request: Request, { params }: RouteProps) {
     return NextResponse.json({ message: "Checkout expired." }, { status: 409 });
   }
 
+  if (body.agentAuthorized !== true) {
+    return NextResponse.json(
+      { message: "AI-agent authorization is required." },
+      { status: 400 }
+    );
+  }
+
+  const parsed = parseCheckoutAddress(body.address, order.destinationCountry);
+
+  if ("error" in parsed) {
+    return NextResponse.json({ message: parsed.error }, { status: 400 });
+  }
+
   const now = nowIso();
+  await runtime.store.updateCheckout({
+    ...checkout,
+    encryptedAddress: JSON.stringify({
+      address: parsed.address,
+      agentAuthorized: true
+    })
+  });
+
   await applyVerifiedPaymentEvent({
     event: mockEventForScenario({
       amountMinor: order.totalPriceMinor,

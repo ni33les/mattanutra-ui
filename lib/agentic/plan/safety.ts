@@ -16,15 +16,27 @@ function guidance(input: Readonly<{
   severity: SafetyGuidance["severity"];
   supplementIds: readonly string[];
   exposure?: number | null;
+  requested?: number | null;
   threshold?: number | null;
 }>): SafetyGuidance {
   const messageKey = `guidance.${input.code}`;
+  const exposureKey = [
+    input.exposure == null ? "na" : String(Math.round(input.exposure * 1000) / 1000),
+    input.requested == null ? "na" : String(Math.round(input.requested * 1000) / 1000)
+  ].join("@");
+  const guidanceId = [
+    "gdn",
+    input.code,
+    [...input.supplementIds].sort().join("+") || "none",
+    [...input.productIds].sort().join("+") || "none",
+    exposureKey
+  ].join(":");
 
   return {
     action: input.action,
     code: input.code,
     exposure: input.exposure ?? null,
-    guidanceId: `gdn_${input.code}`,
+    guidanceId,
     message: agenticMessage(input.locale, messageKey),
     messageKey,
     productIds: input.productIds,
@@ -51,6 +63,8 @@ export function evaluateSafety(input: Readonly<{
   const zincCoverage = input.selected?.coverage.find((row) => /zinc/i.test(row.name));
   const ironCoverage = input.selected?.coverage.find((row) => /iron/i.test(row.name));
 
+  const omegaCoverage = input.selected?.coverage.find((row) => /omega/i.test(row.name));
+
   if (
     input.state.medicationCodes.includes("apixaban") &&
     omegaIds.length > 0
@@ -58,8 +72,10 @@ export function evaluateSafety(input: Readonly<{
     items.push(guidance({
       action: "acknowledge",
       code: "medication_interaction",
+      exposure: omegaCoverage?.totalExposureAmount ?? null,
       locale: input.locale,
       productIds,
+      requested: omegaCoverage?.requestedAmount ?? null,
       severity: "high",
       supplementIds: omegaIds
     }));
@@ -76,16 +92,25 @@ export function evaluateSafety(input: Readonly<{
     }));
   }
 
-  if (zincCoverage && zincCoverage.totalExposureAmount > 40_000) {
+  const zincLimit = zincCoverage
+    ? zincCoverage.unit === "mg"
+      ? 40
+      : zincCoverage.unit === "mcg"
+        ? 40_000
+        : 40
+    : null;
+
+  if (zincCoverage && zincLimit != null && zincCoverage.totalExposureAmount > zincLimit) {
     items.push(guidance({
       action: "acknowledge",
       code: "dose_review_required",
       exposure: zincCoverage.totalExposureAmount,
       locale: input.locale,
       productIds,
+      requested: zincCoverage.requestedAmount,
       severity: "high",
       supplementIds: [zincCoverage.supplementId],
-      threshold: 40_000
+      threshold: zincLimit
     }));
   }
 
@@ -112,6 +137,7 @@ export function safetyQuestions(input: Readonly<{
   guidance: readonly SafetyGuidance[];
   locale: Locale;
   selected: StackOption | null;
+  shownRevision: number;
   state: CanonicalPlanState;
 }>): PlanQuestion[] {
   const questions: PlanQuestion[] = [];
@@ -143,7 +169,8 @@ export function safetyQuestions(input: Readonly<{
 
   for (const row of input.selected?.coverage ?? []) {
     if (
-      row.status === "uncovered" &&
+      row.status !== "covered" &&
+      row.status !== "over_target" &&
       !input.state.acceptedGaps.some((gap) => gap.supplementId === row.supplementId)
     ) {
       questions.push({
@@ -172,6 +199,7 @@ export function safetyQuestions(input: Readonly<{
     const bound = input.state.safetyAcknowledgement;
     const same =
       bound &&
+      bound.revision === input.shownRevision &&
       bound.guidanceIds.slice().sort().join() ===
         ackable.map((item) => item.guidanceId).sort().join();
 
@@ -201,7 +229,11 @@ export function planStatus(input: Readonly<{
   state: CanonicalPlanState;
   unmetRequirements: readonly string[];
 }>): "blocked" | "needs_input" | "ready" {
-  if (!input.selected || input.selected.coveragePercent === 0) {
+  if (
+    !input.selected ||
+    input.selected.basket.length === 0 ||
+    input.selected.coverage.every((row) => row.status === "uncovered")
+  ) {
     return "blocked";
   }
 
@@ -217,10 +249,12 @@ export function planStatus(input: Readonly<{
     return "needs_input";
   }
 
-  const uncovered = input.selected.coverage.filter((row) => row.status === "uncovered");
+  const gaps = input.selected.coverage.filter(
+    (row) => row.status !== "covered" && row.status !== "over_target"
+  );
 
   if (
-    uncovered.some(
+    gaps.some(
       (row) => !input.state.acceptedGaps.some((gap) => gap.supplementId === row.supplementId)
     )
   ) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
-import { getAgenticRuntime } from "@/lib/agentic/runtime";
+import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const runtime = getAgenticRuntime(request);
+  const runtime = getLiveAgenticRuntime(request);
 
   try {
     if (Array.isArray(body)) {

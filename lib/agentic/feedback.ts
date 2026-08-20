@@ -87,12 +87,17 @@ export async function feedbackTool(input: Readonly<{
   }
 
   const plan = await input.store.getPlan(capability.resourceId);
+
+  if (!plan || plan.currentRevision !== input.expectedRevision) {
+    return businessError({ message: "Not found.", reasonCode: "not_found" });
+  }
+
   const revision = await input.store.getPlanRevision(
     capability.resourceId,
     input.expectedRevision
   );
 
-  if (!plan || !revision) {
+  if (!revision) {
     return businessError({ message: "Not found.", reasonCode: "not_found" });
   }
 

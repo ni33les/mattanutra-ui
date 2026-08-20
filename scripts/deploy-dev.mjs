@@ -76,6 +76,10 @@ async function applyOrVerifyRuntimeSchema() {
       "[deploy:dev] DB_SCHEMA_URL/DB_OWNER_URL not set; verifying existing runtime schema..."
     );
     await npmRun("dev-runtime-schema:verify");
+    if (process.env.DB_URL) {
+      console.log("[deploy:dev] Applying agentic schema via DB_URL...");
+      await run(npmCommand, ["run", "agentic:schema:apply"]);
+    }
     return;
   }
 

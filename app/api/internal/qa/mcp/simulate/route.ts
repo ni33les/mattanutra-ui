@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAgenticRuntime, nowIso } from "@/lib/agentic/runtime";
+import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
+import { nowIso } from "@/lib/agentic/runtime";
 import { isPaymentScenario, simulatePayment } from "@/lib/agentic/qa/simulate";
 import { isAgenticErrorResult } from "@/lib/agentic/contract";
 
@@ -16,7 +17,7 @@ function authorized(request: Request, expected: string | undefined) {
 }
 
 export async function POST(request: Request) {
-  const runtime = getAgenticRuntime(request);
+  const runtime = getLiveAgenticRuntime(request);
 
   if (!runtime.config.internalQaHarness || runtime.config.environment !== "dev") {
     return NextResponse.json({ message: "Not found." }, { status: 404 });

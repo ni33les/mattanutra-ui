@@ -29,6 +29,81 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ชำระเงินคำสั่งซื้อ MattaNutra",
     "zh-CN": "完成你的 MattaNutra 订单"
   },
+  "checkout.addressLine1": {
+    en: "Address",
+    th: "ที่อยู่",
+    "zh-CN": "地址"
+  },
+  "checkout.addressLine2": {
+    en: "Apartment, suite, or building (optional)",
+    th: "ห้อง ชั้น หรืออาคาร (ไม่บังคับ)",
+    "zh-CN": "公寓、套房或楼栋（可选）"
+  },
+  "checkout.agentAuth": {
+    en: "I confirm I authorized my AI agent to start this checkout.",
+    th: "ฉันยืนยันว่าได้อนุญาตให้ผู้ช่วย AI เริ่มการชำระเงินนี้",
+    "zh-CN": "我确认已授权我的 AI 助手发起此次结账。"
+  },
+  "checkout.city": {
+    en: "District / city",
+    th: "เขต / เมือง",
+    "zh-CN": "区 / 城市"
+  },
+  "checkout.contact": {
+    en: "Contact",
+    th: "ผู้ติดต่อ",
+    "zh-CN": "联系方式"
+  },
+  "checkout.country": {
+    en: "Country",
+    th: "ประเทศ",
+    "zh-CN": "国家/地区"
+  },
+  "checkout.delivery": {
+    en: "Delivery address (Thailand)",
+    th: "ที่อยู่จัดส่ง (ประเทศไทย)",
+    "zh-CN": "配送地址（泰国）"
+  },
+  "checkout.email": {
+    en: "Email",
+    th: "อีเมล",
+    "zh-CN": "电子邮件"
+  },
+  "checkout.name": {
+    en: "Full name",
+    th: "ชื่อ-นามสกุล",
+    "zh-CN": "全名"
+  },
+  "checkout.phone": {
+    en: "Phone",
+    th: "โทรศัพท์",
+    "zh-CN": "电话"
+  },
+  "checkout.postalCode": {
+    en: "Postal code",
+    th: "รหัสไปรษณีย์",
+    "zh-CN": "邮编"
+  },
+  "checkout.province": {
+    en: "Province",
+    th: "จังหวัด",
+    "zh-CN": "府"
+  },
+  "checkout.shipping": {
+    en: "Shipping",
+    th: "ค่าจัดส่ง",
+    "zh-CN": "运费"
+  },
+  "checkout.tax": {
+    en: "Tax",
+    th: "ภาษี",
+    "zh-CN": "税费"
+  },
+  "checkout.total": {
+    en: "Total",
+    th: "ยอดรวม",
+    "zh-CN": "合计"
+  },
   "feedback.invitation": {
     en: "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
     th: "ต้องการให้ฉันส่งสรุปสั้น ๆ ถึง MattaNutra ว่าอะไรได้ผลดีและอะไรควรปรับปรุงหรือไม่ ไม่บังคับ และจะไม่กระทบแผนหรือคำสั่งซื้อ",

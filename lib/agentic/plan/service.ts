@@ -18,6 +18,7 @@ import type { CapabilityScope } from "@/lib/agentic/capabilities";
 import { normalizePlanRequest } from "@/lib/agentic/plan/normalize";
 import { matchPlan } from "@/lib/agentic/plan/matching";
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
+import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import type {
   CanonicalPlanState,
   PlanResult,
@@ -32,32 +33,24 @@ export type PlanToolInput = Readonly<{
   selectOptionId?: string;
 }>;
 
-export type PlanToolSuccess = Readonly<{
-  alternatives: PlanResult["alternatives"];
-  appliedRequirements: readonly string[];
-  assumptions: readonly string[];
-  availabilityAsOf: string;
-  basket: PlanResult["basket"];
-  catalogueVersion: string;
-  changeSummary: readonly string[];
-  coverage: PlanResult["coverage"];
-  feedbackInvitation?: Readonly<{ prompt: string; promptKey: string }>;
-  guidanceRulesVersion: string;
-  ok: true;
-  optimizationEvidence: PlanResult["optimizationEvidence"];
-  planHandle: string;
-  questions: PlanResult["questions"];
-  requestSnapshot: CanonicalPlanState;
-  revision: number;
-  safetyGuidance: PlanResult["safetyGuidance"];
-  status: PlanResult["status"];
-  summary: string;
-  unmetRequirements: readonly string[];
-}>;
+export type PlanToolSuccess = ReturnType<typeof publicPlanFields> &
+  Readonly<{
+    appliedRequirements: readonly string[];
+    assumptions: readonly string[];
+    feedbackInvitation?: Readonly<{ prompt: string; promptKey: string }>;
+    ok: true;
+    optimizationEvidence: Readonly<{
+      mode: PlanResult["optimizationEvidence"]["mode"];
+      tieBreak: readonly string[];
+    }>;
+    planHandle: string;
+    revision: number;
+  }>;
 
 function buildResult(input: Readonly<{
   locale: Locale;
   previous: PlanResult | null;
+  shownRevision: number;
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): PlanResult {
@@ -71,6 +64,7 @@ function buildResult(input: Readonly<{
     guidance: safety,
     locale: input.locale,
     selected: matched.selected,
+    shownRevision: input.shownRevision,
     state: input.state
   });
   const status = planStatus({
@@ -243,25 +237,13 @@ export async function planTool(input: Readonly<{
       await store.updatePlan({ ...plan, currentRevision: nextRevision, updatedAt: input.now });
 
       const response: PlanToolSuccess = {
-        alternatives: nextResult.alternatives,
+        ...publicPlanFields(nextResult),
         appliedRequirements: nextResult.appliedRequirements,
         assumptions: nextResult.assumptions,
-        availabilityAsOf: nextResult.availabilityAsOf,
-        basket: nextResult.basket,
-        catalogueVersion: nextResult.catalogueVersion,
-        changeSummary: nextResult.changeSummary,
-        coverage: nextResult.coverage,
-        guidanceRulesVersion: nextResult.guidanceRulesVersion,
         ok: true,
-        optimizationEvidence: nextResult.optimizationEvidence,
+        optimizationEvidence: { mode: nextResult.optimizationEvidence.mode, tieBreak: [] },
         planHandle: input.payload.planHandle!,
-        questions: [],
-        requestSnapshot: nextResult.requestSnapshot,
-        revision: nextRevision,
-        safetyGuidance: nextResult.safetyGuidance,
-        status: nextResult.status,
-        summary: nextResult.summary,
-        unmetRequirements: nextResult.unmetRequirements
+        revision: nextRevision
       };
 
       await commitIdempotency({
@@ -354,6 +336,7 @@ export async function planTool(input: Readonly<{
     const result = buildResult({
       locale,
       previous,
+      shownRevision: planHandle ? (input.payload.expectedRevision ?? 1) : 1,
       snapshot,
       state: {
         ...normalized.state,
@@ -377,14 +360,9 @@ export async function planTool(input: Readonly<{
     });
 
     const response: PlanToolSuccess = {
-      alternatives: result.alternatives,
+      ...publicPlanFields(result),
       appliedRequirements: result.appliedRequirements,
       assumptions: result.assumptions,
-      availabilityAsOf: result.availabilityAsOf,
-      basket: result.basket,
-      catalogueVersion: result.catalogueVersion,
-      changeSummary: result.changeSummary,
-      coverage: result.coverage,
       ...(result.status === "ready"
         ? {
             feedbackInvitation: {
@@ -393,17 +371,10 @@ export async function planTool(input: Readonly<{
             }
           }
         : {}),
-      guidanceRulesVersion: result.guidanceRulesVersion,
       ok: true,
-      optimizationEvidence: result.optimizationEvidence,
+      optimizationEvidence: { mode: result.optimizationEvidence.mode, tieBreak: [] },
       planHandle,
-      questions: result.questions,
-      requestSnapshot: result.requestSnapshot,
-      revision,
-      safetyGuidance: result.safetyGuidance,
-      status: result.status,
-      summary: result.summary,
-      unmetRequirements: result.unmetRequirements
+      revision
     };
 
     await commitIdempotency({

@@ -4,7 +4,7 @@ import { AgenticCheckoutPanel } from "@/components/agentic-checkout-panel";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { hashCapability } from "@/lib/agentic/capabilities";
-import { getAgenticRuntime } from "@/lib/agentic/runtime";
+import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { localizedRouteMetadata } from "@/lib/seo";
 
@@ -34,7 +34,7 @@ export default async function AgenticCheckoutPage({ params }: PageProps) {
 
   const locale: Locale = rawLocale;
   const dictionary = getDictionary(locale);
-  const runtime = getAgenticRuntime();
+  const runtime = getLiveAgenticRuntime();
   const checkout = await runtime.store.getCheckoutByAccessHash(
     hashCapability(runtime.config.capabilitySecret, checkoutAccess)
   );
@@ -62,6 +62,7 @@ export default async function AgenticCheckoutPage({ params }: PageProps) {
       <section className="mx-auto w-full max-w-5xl flex-1 px-6 py-12 sm:px-8 lg:py-16">
         <AgenticCheckoutPanel
           checkoutAccess={checkoutAccess}
+          country={order.destinationCountry}
           currency={order.currency}
           expired={expired}
           items={items.map((item) => ({
@@ -74,6 +75,8 @@ export default async function AgenticCheckoutPage({ params }: PageProps) {
           locale={locale}
           orderReference={order.reference}
           paid={order.paymentStatus === "paid"}
+          shippingMinor={checkout.shippingMinor ?? 5000}
+          taxMinor={checkout.taxMinor ?? 0}
           totalPriceMinor={order.totalPriceMinor}
         />
       </section>

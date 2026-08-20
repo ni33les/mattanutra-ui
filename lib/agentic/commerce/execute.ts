@@ -12,6 +12,7 @@ import {
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import type { AgenticStore } from "@/lib/agentic/store/types";
+import { publicFrozenItems } from "@/lib/agentic/public-mapper";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 
 export type ExecuteSuccess = Readonly<{
@@ -131,12 +132,10 @@ export async function executeTool(input: Readonly<{
       environment: input.scope.environment,
       expiredAt: null,
       frozenPlan: {
-        availabilityAsOf: result.availabilityAsOf,
-        catalogueVersion: result.catalogueVersion,
         coveragePercent: selected.coveragePercent,
         currency: "THB",
         dailyPills: selected.dailyPills,
-        items: selected.basket,
+        items: publicFrozenItems(selected.basket),
         planRevision: plan.currentRevision,
         safetyGuidanceIds: result.safetyGuidance.map((item) => item.guidanceId),
         totalPriceMinor: selected.totalPriceMinor

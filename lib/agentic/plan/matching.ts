@@ -1,24 +1,19 @@
 import { createHash } from "node:crypto";
-import { comparableDoseAmount, parseDose } from "@/lib/dose-conversion";
+import { parseDose } from "@/lib/dose-conversion";
 import { recommendProductStackFullBeam } from "@/lib/product-recommendations";
 import type { ProductRecommendationNeed } from "@/lib/product-recommendation-types";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
+import {
+  doseComparable,
+  fromComparable,
+  roundDose
+} from "@/lib/agentic/plan/units";
 import type {
   BasketItem,
   CanonicalPlanState,
   CoverageRow,
   StackOption
 } from "@/lib/agentic/plan/types";
-
-function doseComparable(amount: number, unit: string, name: string) {
-  const parsed = parseDose(`${amount} ${unit}`, name.toLowerCase().replace(/\s+/g, "_"));
-
-  if (!parsed) {
-    return amount;
-  }
-
-  return comparableDoseAmount(parsed, name.toLowerCase().replace(/\s+/g, "_")) ?? amount;
-}
 
 function productEligible(product: CatalogueProduct, state: CanonicalPlanState) {
   if (!product.orderable || product.incompleteCommercialFacts) {
@@ -86,21 +81,26 @@ function coverageFor(
   products: readonly CatalogueProduct[]
 ): CoverageRow[] {
   return state.targets.map((target) => {
-    const requested = doseComparable(target.amount, target.unit, target.name);
-    const current = state.currentSupplements
+    const requestedComparable = doseComparable(
+      target.amount,
+      target.unit,
+      target.name
+    );
+    const currentComparable = state.currentSupplements
       .filter((item) => item.supplementId === target.supplementId)
       .reduce(
-        (sum, item) => sum + doseComparable(item.dailyAmount, item.unit, item.name),
+        (sum, item) =>
+          sum + doseComparable(item.dailyAmount, item.unit, item.name),
         0
       );
-    const delivered = products
+    const deliveredComparable = products
       .filter((item) => item.contributionSupplementIds.includes(target.supplementId))
       .reduce((sum, item) => {
         const fact = item.candidate.facts[0];
         return sum + (fact?.comparableAmount ?? 0);
       }, 0);
-    const coveragePercent = requested > 0
-      ? Math.min(200, Math.round((delivered / requested) * 100))
+    const coveragePercent = requestedComparable > 0
+      ? Math.min(200, Math.round((deliveredComparable / requestedComparable) * 100))
       : 0;
     let status: CoverageRow["status"] = "uncovered";
 
@@ -112,16 +112,24 @@ function coverageFor(
       status = "partial";
     }
 
+    const requestedAmount = roundDose(target.amount);
+    const currentAmount = roundDose(
+      fromComparable(currentComparable, target.unit, target.name)
+    );
+    const deliveredAmount = roundDose(
+      fromComparable(deliveredComparable, target.unit, target.name)
+    );
+
     return {
       coveragePercent,
-      currentAmount: current,
-      deliveredAmount: delivered,
+      currentAmount,
+      deliveredAmount,
       name: target.name,
       percentOfUpperLimit: null,
-      requestedAmount: requested,
+      requestedAmount,
       status,
       supplementId: target.supplementId,
-      totalExposureAmount: delivered + current,
+      totalExposureAmount: roundDose(currentAmount + deliveredAmount),
       unit: target.unit,
       upperLimitAmount: null
     };
@@ -320,6 +328,35 @@ export function matchPlan(input: Readonly<{
 
   const limited = alternatives.slice(0, 2);
   const unmet: string[] = [];
+  const retainProducts = input.state.requirements.retainProductIds ?? [];
+  const selectedIds = new Set(selected.basket.map((item) => item.productId));
+
+  for (const productId of retainProducts) {
+    const product = eligible.find((item) => item.productId === productId);
+
+    if (!product) {
+      unmet.push(`retainProductIds:${productId}`);
+      continue;
+    }
+
+    if (!selectedIds.has(productId)) {
+      unmet.push(`retainProductIds:${productId}`);
+    }
+  }
+
+  for (const supplementId of input.state.requirements.retainSupplementIds ?? []) {
+    const row = selected.coverage.find((item) => item.supplementId === supplementId);
+    const accepted = input.state.acceptedGaps.some(
+      (gap) => gap.supplementId === supplementId
+    );
+
+    if (
+      !accepted &&
+      (!row || (row.status !== "covered" && row.status !== "over_target"))
+    ) {
+      unmet.push(`retainSupplementIds:${supplementId}`);
+    }
+  }
 
   if (
     input.state.requirements.maxPriceMinor != null &&
