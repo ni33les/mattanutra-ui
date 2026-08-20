@@ -118,7 +118,7 @@ async function ensureCatalogueProduct(input: Readonly<{
       products.created_at asc
     limit 1
   `;
-  let productId = matched[0]?.id ?? wanted;
+  const productId = matched[0]?.id ?? wanted;
 
   if (!productId) {
     return null;
