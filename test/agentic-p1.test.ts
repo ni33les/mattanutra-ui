@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { afterEach, describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
 import { parseCheckoutAddress } from "../lib/agentic/checkout-address.ts";
@@ -672,6 +673,34 @@ describe("agentic P1 pack fixes", () => {
     const text = (polled?.result?.content as Array<{ text: string }>)[0]?.text ?? "";
     assert.equal(text.includes("Checkout ready"), false);
     assert.match(text, /paid|completed|confirmed/i);
+  });
+
+  it("omits null placeholders and empty collections from blocked plan payloads", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "p1-d410-blocked-00001",
+      request: {
+        conditionCodes: ["ckd"],
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
+      }
+    });
+    assert.equal(plan.status, "blocked");
+    const encoded = JSON.stringify(plan);
+    assert.equal(encoded.includes(":null"), false);
+    assert.equal(/:\s*\[\]/.test(encoded), false);
+    assert.equal(encoded.includes("rulesVersion"), false);
+  });
+
+  it("exposes a DEV checkout test scenario selector", () => {
+    const panel = readFileSync(new URL("../components/agentic-checkout-panel.tsx", import.meta.url), "utf8");
+    assert.match(panel, /name="scenario"/);
+    assert.match(panel, /decline_insufficient_funds/);
+    assert.match(panel, /<select/);
   });
 
   it("accepts Creatine by official name and does not call it a legacy ID", async () => {

@@ -6,6 +6,7 @@ import { parseCheckoutAddress } from "@/lib/agentic/checkout-address";
 import { mockEventForScenario } from "@/lib/agentic/commerce/payment";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
+import { isPaymentScenario, scenarioSubmitsOms } from "@/lib/agentic/qa/simulate";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { asMinor } from "@/lib/agentic/money";
 
@@ -82,24 +83,36 @@ export async function POST(request: Request, { params }: RouteProps) {
     })
   });
 
+  const requestedScenario = body.scenario ?? "success";
+  if (!isPaymentScenario(requestedScenario)) {
+    return NextResponse.json({ message: "Unknown test scenario." }, { status: 400 });
+  }
+
   await applyVerifiedPaymentEvent({
     event: mockEventForScenario({
       amountMinor: asMinor(order.totalPriceMinor),
       currency: order.currency,
       orderId: order.id,
       providerSessionId: order.providerSessionId,
-      scenario: "success"
+      scenario: requestedScenario
     }),
     now,
     store: runtime.store
   });
-  await processOmsOutbox({ now, store: runtime.store });
+
+  if (scenarioSubmitsOms(requestedScenario)) {
+    await processOmsOutbox({ now, store: runtime.store });
+  }
 
   const paid = await runtime.store.getOrder(order.id);
 
   return NextResponse.json({
+    latestPaymentAttempt: paid?.latestPaymentAttempt ?? null,
+    latestPaymentReason: paid?.latestPaymentReason ?? null,
     ok: true,
     orderReference: paid?.reference,
-    paymentStatus: paid?.paymentStatus
+    orderStatus: paid?.orderStatus,
+    paymentStatus: paid?.paymentStatus,
+    stateVersion: paid?.stateVersion
   });
 }

@@ -50,11 +50,28 @@ const emptyAddress: AddressState = {
   province: ""
 };
 
+const TEST_SCENARIOS = [
+  "decline_insufficient_funds",
+  "success",
+  "processing_then_success",
+  "provider_unavailable",
+  "amount_mismatch",
+  "three_ds_required",
+  "three_ds_succeeded",
+  "three_ds_failed",
+  "three_ds_cancelled",
+  "expire",
+  "refund",
+  "partial_refund"
+] as const;
+
 export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
   const [status, setStatus] = useState<"idle" | "paying" | "paid" | "error">(
     props.paid ? "paid" : "idle"
   );
   const [error, setError] = useState<string | null>(null);
+  const [scenario, setScenario] = useState<string>("decline_insufficient_funds");
+  const [lastResult, setLastResult] = useState<string | null>(null);
   const [agentAuthorized, setAgentAuthorized] = useState(false);
   const [address, setAddress] = useState<AddressState>(emptyAddress);
   const subtotalMinor = asMinor(props.subtotalMinor);
@@ -112,21 +129,38 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
               ...address,
               country: props.country
             },
-            agentAuthorized: true
+            agentAuthorized: true,
+            scenario
           }),
           headers: { "content-type": "application/json" },
           method: "POST"
         }
       );
-      const body = (await response.json()) as { message?: string; paymentStatus?: string };
+      const body = (await response.json()) as {
+        latestPaymentAttempt?: string | null;
+        latestPaymentReason?: string | null;
+        message?: string;
+        orderStatus?: string;
+        paymentStatus?: string;
+        stateVersion?: number;
+      };
 
-      if (!response.ok || body.paymentStatus !== "paid") {
+      if (!response.ok) {
         setStatus("error");
         setError(body.message ?? "Payment could not be simulated.");
         return;
       }
 
-      setStatus("paid");
+      setLastResult(
+        `paymentStatus=${body.paymentStatus ?? "?"} attempt=${body.latestPaymentAttempt ?? "none"} reason=${body.latestPaymentReason ?? "none"} v${body.stateVersion ?? "?"}`
+      );
+
+      if (body.paymentStatus === "paid") {
+        setStatus("paid");
+        return;
+      }
+
+      setStatus("idle");
     } catch {
       setStatus("error");
       setError("Payment could not be simulated.");
@@ -224,17 +258,36 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
           )}
         </p>
       ) : (
-        <button
-          className="w-full rounded-full bg-[var(--brand-green)] px-6 py-3 font-semibold text-white disabled:opacity-60"
-          disabled={status === "paying" || !formComplete}
-          onClick={() => void pay()}
-          type="button"
-        >
-          {status === "paying"
-            ? "…"
-            : agenticMessage(props.locale, "checkout.pay_mock")}
-        </button>
+        <div className="space-y-3">
+          <label className="block space-y-1 text-sm">
+            <span className="font-medium text-ink">Test scenario</span>
+            <select
+              className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-white px-3 py-2 text-ink"
+              disabled={status === "paying"}
+              name="scenario"
+              onChange={(event) => setScenario(event.target.value)}
+              value={scenario}
+            >
+              {TEST_SCENARIOS.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="w-full rounded-full bg-[var(--brand-green)] px-6 py-3 font-semibold text-white disabled:opacity-60"
+            disabled={status === "paying" || !formComplete}
+            onClick={() => void pay()}
+            type="button"
+          >
+            {status === "paying"
+              ? "…"
+              : agenticMessage(props.locale, "checkout.pay_mock")}
+          </button>
+        </div>
       )}
+      {lastResult ? <p className="text-sm text-muted-foreground">{lastResult}</p> : null}
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
     </div>
   );

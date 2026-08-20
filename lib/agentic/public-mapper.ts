@@ -2,6 +2,7 @@ import type {
   BasketItem,
   CoverageRow,
   PlanResult,
+  SafetyGuidance,
   StackOption
 } from "@/lib/agentic/plan/types";
 
@@ -134,6 +135,21 @@ export function publicOption(option: StackOption, selected: StackOption | null) 
   };
 }
 
+export function publicSafetyGuidance(row: SafetyGuidance) {
+  return {
+    action: row.action,
+    code: row.code,
+    guidanceId: row.guidanceId,
+    message: row.message,
+    messageKey: row.messageKey,
+    severity: row.severity,
+    ...(row.exposure != null ? { exposure: row.exposure } : {}),
+    ...(row.threshold != null ? { threshold: row.threshold } : {}),
+    ...(row.productIds.length > 0 ? { productIds: row.productIds } : {}),
+    ...(row.supplementIds.length > 0 ? { supplementIds: row.supplementIds } : {})
+  };
+}
+
 export function publicQuestions(
   questions: PlanResult["questions"]
 ) {
@@ -184,8 +200,12 @@ export function publicPlanFields(result: Pick<
   });
 
   return {
-    basket: result.basket.map(publicBasketItem),
-    coverage: result.coverage.map(publicCoverage),
+    ...(result.basket.length > 0
+      ? { basket: result.basket.map(publicBasketItem) }
+      : {}),
+    ...(result.coverage.length > 0
+      ? { coverage: result.coverage.map(publicCoverage) }
+      : {}),
     productCount: result.basket.length,
     status: result.status,
     summary: result.summary,
@@ -202,7 +222,7 @@ export function publicPlanFields(result: Pick<
       ? { questions: publicQuestions(result.questions) }
       : {}),
     ...(result.safetyGuidance.length > 0
-      ? { safetyGuidance: result.safetyGuidance }
+      ? { safetyGuidance: result.safetyGuidance.map(publicSafetyGuidance) }
       : {}),
     ...(result.unmetRequirements.length > 0
       ? { unmetRequirements: result.unmetRequirements }
