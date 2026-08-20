@@ -8,8 +8,8 @@ const globalDb = globalThis as typeof globalThis & {
 
 const BENIGN_SCHEMA_NOTICE_CODES = new Set(["42P07", "42701", "42710"]);
 const DEFAULT_DB_CONNECT_TIMEOUT_SECONDS = 5;
-const DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 10;
-const DEFAULT_DB_POOL_MAX = 1;
+const DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 60;
+const DEFAULT_DB_POOL_MAX = 4;
 const MAX_DB_POOL_MAX = 10;
 
 function assertManagedDatabaseEndpoint(connection: string) {

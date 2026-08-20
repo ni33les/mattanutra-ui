@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
-import { canonicalPublicToolName, handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
+import { loadAgenticConfig } from "@/lib/agentic/config";
 import { AGENTIC_PUBLIC_TOOLS } from "@/lib/agentic/contract";
-import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
+import {
+  handleLightweightJsonRpc,
+  mcpCallNeedsStore,
+  type JsonRpcRequest
+} from "@/lib/agentic/mcp/rpc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const log = createLogger("api.mcp");
+const MCP_HEADERS = {
+  "Cache-Control": "no-store",
+  Connection: "keep-alive"
+};
 
 function mcpNeedsRateLimit(body: unknown) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -27,11 +35,19 @@ function mcpNeedsRateLimit(body: unknown) {
 
   if (method === "tools/call") {
     const name = (body as { params?: { name?: unknown } }).params?.name;
-    const canonical = typeof name === "string" ? canonicalPublicToolName(name) : null;
-    return canonical !== "info" && canonical !== "order";
+    if (typeof name !== "string") {
+      return true;
+    }
+
+    const suffix = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : name;
+    return suffix !== "info" && suffix !== "order";
   }
 
   return true;
+}
+
+function jsonRpc(body: unknown, status = 200) {
+  return NextResponse.json(body, { headers: MCP_HEADERS, status });
 }
 
 export async function POST(request: Request) {
@@ -40,12 +56,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
+    return jsonRpc(
       {
         error: { code: -32700, message: "Parse error" },
         jsonrpc: "2.0"
       },
-      { status: 400 }
+      400
     );
   }
 
@@ -57,9 +73,28 @@ export async function POST(request: Request) {
     }
   }
 
-  const runtime = getLiveAgenticRuntime(request);
-
   try {
+    if (!Array.isArray(body) && !mcpCallNeedsStore(body)) {
+      const light = handleLightweightJsonRpc(
+        loadAgenticConfig(request),
+        body as JsonRpcRequest
+      );
+
+      if (light === null) {
+        return new NextResponse(null, { status: 202 });
+      }
+
+      if (light) {
+        return jsonRpc(light);
+      }
+    }
+
+    const [{ getLiveAgenticRuntime }, { handleJsonRpc }] = await Promise.all([
+      import("@/lib/agentic/live-runtime"),
+      import("@/lib/agentic/mcp/dispatcher")
+    ]);
+    const runtime = getLiveAgenticRuntime(request);
+
     if (Array.isArray(body)) {
       const responses = [];
 
@@ -70,31 +105,27 @@ export async function POST(request: Request) {
         }
       }
 
-      return NextResponse.json(responses, {
-        headers: { "Cache-Control": "no-store" }
-      });
+      return jsonRpc(responses);
     }
 
-    const result = await handleJsonRpc(runtime, body as { method?: string });
+    const result = await handleJsonRpc(runtime, body as JsonRpcRequest);
 
     if (!result) {
       return new NextResponse(null, { status: 202 });
     }
 
-    return NextResponse.json(result, {
-      headers: { "Cache-Control": "no-store" }
-    });
+    return jsonRpc(result);
   } catch (error) {
     log.error("mcp.dispatch_failed", {
       message: error instanceof Error ? error.message : "unknown"
     });
 
-    return NextResponse.json(
+    return jsonRpc(
       {
         error: { code: -32603, message: "Internal error" },
         jsonrpc: "2.0"
       },
-      { status: 500 }
+      500
     );
   }
 }

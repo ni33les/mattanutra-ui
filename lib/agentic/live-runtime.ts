@@ -6,19 +6,21 @@ import {
 } from "@/lib/agentic/runtime";
 import { createRuntimeStore } from "@/lib/agentic/store/postgres";
 
-let liveRuntime: AgenticRuntime | null = null;
+const globalLive = globalThis as typeof globalThis & {
+  mattanutraLiveAgenticRuntime?: AgenticRuntime;
+};
 
 export function getLiveAgenticRuntime(request?: Request): AgenticRuntime {
-  if (liveRuntime) {
-    return liveRuntime;
+  if (globalLive.mattanutraLiveAgenticRuntime) {
+    return globalLive.mattanutraLiveAgenticRuntime;
   }
 
   try {
-    liveRuntime = createAgenticRuntime({
+    globalLive.mattanutraLiveAgenticRuntime = createAgenticRuntime({
       config: loadAgenticConfig(request),
       store: createRuntimeStore()
     });
-    return liveRuntime;
+    return globalLive.mattanutraLiveAgenticRuntime;
   } catch {
     return getAgenticRuntime(request);
   }

@@ -86,16 +86,14 @@ export async function feedbackTool(input: Readonly<{
     return businessError({ message: "Not found.", reasonCode: "not_found" });
   }
 
-  const plan = await input.store.getPlan(capability.resourceId);
+  const [plan, revision] = await Promise.all([
+    input.store.getPlan(capability.resourceId),
+    input.store.getPlanRevision(capability.resourceId, input.expectedRevision)
+  ]);
 
   if (!plan || plan.currentRevision !== input.expectedRevision) {
     return businessError({ message: "Not found.", reasonCode: "not_found" });
   }
-
-  const revision = await input.store.getPlanRevision(
-    capability.resourceId,
-    input.expectedRevision
-  );
 
   if (!revision) {
     return businessError({ message: "Not found.", reasonCode: "not_found" });

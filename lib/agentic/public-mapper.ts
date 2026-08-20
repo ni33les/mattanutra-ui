@@ -49,6 +49,33 @@ export function publicCoverage(row: CoverageRow) {
   };
 }
 
+const INTERNAL_TRADEOFF =
+  /\b(beam|snapshot|tie[-\s]?break|catalogueVersion|guidanceRulesVersion|optimizationEvidence)\b/i;
+
+function clientTradeOffSummary(
+  option: StackOption,
+  selected: StackOption | null,
+  parts: readonly string[]
+) {
+  if (parts.length > 0) {
+    return parts.join("; ");
+  }
+
+  if (!selected || option.optionId === selected.optionId) {
+    return "Selected stack";
+  }
+
+  return "No material difference versus the selected stack";
+}
+
+function clientReason(reason: string) {
+  if (!reason.trim() || INTERNAL_TRADEOFF.test(reason)) {
+    return "Selected stack";
+  }
+
+  return reason;
+}
+
 export function publicTradeOffs(
   option: StackOption,
   selected: StackOption | null
@@ -61,7 +88,7 @@ export function publicTradeOffs(
       pillDelta: 0,
       priceDeltaMinor: 0,
       productCountDelta: 0,
-      summary: option.reason
+      summary: clientTradeOffSummary(option, null, [])
     };
   }
 
@@ -89,7 +116,7 @@ export function publicTradeOffs(
     pillDelta,
     priceDeltaMinor,
     productCountDelta,
-    summary: parts.join("; ") || option.reason
+    summary: clientTradeOffSummary(option, selected, parts)
   };
 }
 
@@ -101,7 +128,7 @@ export function publicOption(option: StackOption, selected: StackOption | null) 
     dailyPills: option.dailyPills,
     optionId: option.optionId,
     productCount: option.basket.length,
-    reason: option.reason,
+    reason: clientReason(option.reason),
     totalPriceMinor: option.totalPriceMinor,
     tradeOffs: publicTradeOffs(option, selected)
   };

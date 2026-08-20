@@ -270,7 +270,7 @@ export function matchPlan(input: Readonly<{
     input.state,
     eligible,
     input.snapshot.availabilityAsOf,
-    "Deterministic coverage-first stack"
+    "Coverage-first stack"
   );
 
   if (needs.length > 0 && eligible.length > 0) {
@@ -294,7 +294,7 @@ export function matchPlan(input: Readonly<{
         input.state,
         mapped,
         input.snapshot.availabilityAsOf,
-        "Selected by deterministic beam search"
+        "Selected for coverage, price and daily pills"
       );
     }
   }

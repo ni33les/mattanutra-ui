@@ -1,17 +1,8 @@
 import {
-  AGENTIC_CONTRACT_VERSION,
-  AGENTIC_SERVICE_NAME,
-  AGENTIC_SERVICE_VERSION
-} from "@/lib/agentic/config";
-import {
-  AGENTIC_PUBLIC_TOOLS,
-  AGENTIC_SERVER_INSTRUCTIONS,
-  AGENTIC_TOOL_DESCRIPTIONS,
   AGENTIC_TOOL_SCHEMAS,
   isAgenticErrorResult,
   schemaIssueToError,
-  validateToolInput,
-  type AgenticPublicToolName
+  validateToolInput
 } from "@/lib/agentic/contract";
 import { infoTool } from "@/lib/agentic/info";
 import { planTool } from "@/lib/agentic/plan/service";
@@ -20,148 +11,24 @@ import { orderTool } from "@/lib/agentic/commerce/order";
 import { supportTool } from "@/lib/agentic/support";
 import { feedbackTool } from "@/lib/agentic/feedback";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
+import {
+  canonicalPublicToolName,
+  handleLightweightJsonRpc,
+  record,
+  toolResult,
+  type JsonRpcRequest,
+  type JsonRpcResponse
+} from "@/lib/agentic/mcp/rpc";
 
-export type JsonRpcRequest = Readonly<{
-  id?: number | string | null;
-  jsonrpc?: string;
-  method?: string;
-  params?: unknown;
-}>;
-
-function record(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-export function canonicalPublicToolName(raw: string): AgenticPublicToolName | null {
-  const trimmed = raw.trim();
-
-  if (AGENTIC_PUBLIC_TOOLS.includes(trimmed as AgenticPublicToolName)) {
-    return trimmed as AgenticPublicToolName;
-  }
-
-  const separator = trimmed.lastIndexOf(".");
-  if (separator <= 0) {
-    return null;
-  }
-
-  const suffix = trimmed.slice(separator + 1);
-  if (AGENTIC_PUBLIC_TOOLS.includes(suffix as AgenticPublicToolName)) {
-    return suffix as AgenticPublicToolName;
-  }
-
-  return null;
-}
-
-export function mcpServerInfoName(environment: AgenticRuntime["config"]["environment"]) {
-  if (environment === "dev") {
-    return "mattanutra_dev";
-  }
-
-  if (environment === "uat") {
-    return "mattanutra_uat";
-  }
-
-  return AGENTIC_SERVICE_NAME;
-}
-
-export function advertisedPublicToolName(
-  environment: AgenticRuntime["config"]["environment"],
-  name: AgenticPublicToolName
-) {
-  return `${mcpServerInfoName(environment)}.${name}`;
-}
-
-export function advertisedPublicToolNames(
-  environment: AgenticRuntime["config"]["environment"]
-) {
-  return AGENTIC_PUBLIC_TOOLS.map((name) => advertisedPublicToolName(environment, name));
-}
-
-function toolList() {
-  return AGENTIC_PUBLIC_TOOLS.map((name) => ({
-    description: AGENTIC_TOOL_DESCRIPTIONS[name],
-    inputSchema: AGENTIC_TOOL_SCHEMAS[name],
-    name
-  }));
-}
-
-function toolText(value: unknown) {
-  if (!value || typeof value !== "object") {
-    return String(value);
-  }
-
-  const recordValue = value as Record<string, unknown>;
-  const error = recordValue.error;
-
-  if (recordValue.ok === false && error && typeof error === "object") {
-    const message = (error as { message?: unknown }).message;
-    return typeof message === "string" ? message : "Request failed.";
-  }
-
-  if (typeof recordValue.summary === "string" && recordValue.summary.trim()) {
-    const questions = recordValue.questions;
-    const first =
-      Array.isArray(questions) && questions[0] && typeof questions[0] === "object"
-        ? (questions[0] as { prompt?: unknown }).prompt
-        : null;
-    return typeof first === "string" && first.trim()
-      ? `${recordValue.summary}\n${first}`
-      : recordValue.summary;
-  }
-
-  if (
-    recordValue.lookupStatus === "found" &&
-    typeof recordValue.message === "string" &&
-    recordValue.message.trim()
-  ) {
-    return recordValue.message;
-  }
-
-  const paid =
-    recordValue.paymentStatus === "paid" ||
-    recordValue.orderStatus === "completed";
-
-  if (paid && typeof recordValue.orderReference === "string") {
-    return `Order ${recordValue.orderReference} is completed and paid.`;
-  }
-
-  if (
-    typeof recordValue.orderReference === "string" &&
-    recordValue.checkoutUrl &&
-    recordValue.paymentStatus !== "paid"
-  ) {
-    return `Checkout ready for ${recordValue.orderReference}. Poll the order; the browser is not payment truth.`;
-  }
-
-  if (typeof recordValue.paymentStatus === "string") {
-    return `Order paymentStatus=${recordValue.paymentStatus} stateVersion=${recordValue.stateVersion ?? "?"}.`;
-  }
-
-  if (typeof recordValue.serviceName === "string") {
-    return `${recordValue.serviceName} ${recordValue.environment ?? ""} contract ${recordValue.contractVersion ?? ""}`.trim();
-  }
-
-  if (typeof recordValue.message === "string") {
-    return recordValue.message;
-  }
-
-  return "ok";
-}
-
-function toolResult(value: unknown, isError = false) {
-  return {
-    content: [
-      {
-        text: toolText(value),
-        type: "text"
-      }
-    ],
-    isError,
-    structuredContent: value
-  };
-}
+export {
+  advertisedPublicToolName,
+  advertisedPublicToolNames,
+  canonicalPublicToolName,
+  mcpServerInfoName,
+  type JsonRpcRequest,
+  type JsonRpcResponse
+} from "@/lib/agentic/mcp/rpc";
+export { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 
 async function callTool(
   runtime: AgenticRuntime,
@@ -282,54 +149,19 @@ async function callTool(
   };
 }
 
-export type JsonRpcResponse = Readonly<{
-  error?: Readonly<{ code: number; message: string }>;
-  id: number | string | null;
-  jsonrpc: "2.0";
-  result?: Record<string, unknown>;
-}>;
-
 export async function handleJsonRpc(
   runtime: AgenticRuntime,
   body: JsonRpcRequest
 ): Promise<JsonRpcResponse | null> {
+  const light = handleLightweightJsonRpc(runtime.config, body);
+
+  if (light !== undefined) {
+    return light;
+  }
+
   const id = body.id ?? null;
   const method = body.method ?? "";
   const params = record(body.params);
-
-  if (method === "initialize") {
-    return {
-      id,
-      jsonrpc: "2.0",
-      result: {
-        capabilities: {
-          tools: { listChanged: false }
-        },
-        instructions: AGENTIC_SERVER_INSTRUCTIONS,
-        protocolVersion: "2025-03-26",
-        serverInfo: {
-          name: mcpServerInfoName(runtime.config.environment),
-          version: AGENTIC_SERVICE_VERSION
-        }
-      }
-    };
-  }
-
-  if (method === "notifications/initialized") {
-    return null;
-  }
-
-  if (method === "ping") {
-    return { id, jsonrpc: "2.0", result: {} };
-  }
-
-  if (method === "tools/list") {
-    return {
-      id,
-      jsonrpc: "2.0",
-      result: { tools: toolList() }
-    };
-  }
 
   if (method === "tools/call") {
     const name = typeof params.name === "string" ? params.name : "";
@@ -350,5 +182,3 @@ export async function handleJsonRpc(
     jsonrpc: "2.0"
   };
 }
-
-export { AGENTIC_CONTRACT_VERSION };

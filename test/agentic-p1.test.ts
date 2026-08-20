@@ -612,6 +612,29 @@ describe("agentic P1 pack fixes", () => {
     }
   });
 
+  it("keeps client-visible trade-offs free of matcher internals", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "p1-tradeoffs-public-01",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const encoded = JSON.stringify(plan).toLowerCase();
+    assert.equal(encoded.includes("beam"), false);
+    assert.equal(encoded.includes("snapshot"), false);
+    assert.equal(encoded.includes("tie-break"), false);
+    assert.equal(encoded.includes("tie break"), false);
+    const tradeOffs = plan.tradeOffs as { summary?: string };
+    assert.equal(typeof tradeOffs?.summary, "string");
+    assert.equal(/beam|snapshot|tie-?break|version/i.test(tradeOffs.summary ?? ""), false);
+  });
+
   it("describes a paid order as completed, not checkout-ready", async () => {
     const runtime = runtimeFor();
     const created = await call(runtime, "plan", {
