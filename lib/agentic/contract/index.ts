@@ -12,6 +12,10 @@ export {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_DESCRIPTIONS,
+  AGENTIC_UAT_SERVER_INSTRUCTIONS,
+  AGENTIC_UAT_TOOL_DESCRIPTIONS,
+  agenticServerInstructions,
+  agenticToolDescriptions,
   type AgenticPublicToolName
 } from "@/lib/agentic/contract/instructions";
 export {

@@ -5,6 +5,7 @@ import {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_DESCRIPTIONS,
+  AGENTIC_UAT_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_SCHEMAS,
   validateToolInput
 } from "../lib/agentic/contract/index.ts";
@@ -116,6 +117,37 @@ describe("agentic MCP contract 3.0.0", () => {
       "3.0.0"
     );
     assert.equal((result.serverInfo as { name: string }).name, "mattanutra_dev");
+  });
+
+  it("uses polling-only UAT instructions without the DEV harness", async () => {
+    const runtime = createAgenticRuntime({
+      config: {
+        ...createAgenticRuntime().config,
+        environment: "uat",
+        internalQaHarness: false,
+        paymentProvider: "stripe_test",
+        thailandRetailerAdapter: "thailand_uat",
+        capabilitySecret: "uat-test-capability-key-not-for-dev"
+      }
+    });
+    const response = await handleJsonRpc(runtime, {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "initialize"
+    });
+    const result = rpcResult(response);
+    assert.equal(result.instructions, AGENTIC_UAT_SERVER_INSTRUCTIONS);
+    assert.match(String(result.instructions), /Polling is the only continuation method/);
+    assert.match(String(result.instructions), /order\(orderHandle\)/);
+    assert.match(String(result.instructions), /Stripe Test Mode/);
+    assert.equal(String(result.instructions).includes("dev-mcp-qa-token"), false);
+    assert.equal(String(result.instructions).includes("scenario=decline_insufficient_funds"), false);
+    const listed = await handleJsonRpc(runtime, { id: 2, method: "tools/list" });
+    const names = ((listed?.result?.tools as Array<{ name: string }>) ?? []).map(
+      (item) => item.name
+    );
+    assert.deepEqual(names, [...AGENTIC_PUBLIC_TOOLS]);
+    assert.equal((result.serverInfo as { name: string }).name, "mattanutra_uat");
   });
 
   it("accepts bare, single-prefixed and double-prefixed tools/call names", async () => {

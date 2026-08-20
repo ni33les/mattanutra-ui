@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { loadAgenticConfig } from "@/lib/agentic/config";
-import { AGENTIC_PUBLIC_TOOLS, AGENTIC_SERVER_INSTRUCTIONS } from "@/lib/agentic/contract";
+import {
+  AGENTIC_PUBLIC_TOOLS,
+  agenticServerInstructions
+} from "@/lib/agentic/contract";
 import {
   canonicalPublicToolName,
   handleLightweightJsonRpc,
@@ -162,15 +165,16 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   void import("@/lib/db")
     .then((mod) => mod.keepDatabaseWarm())
     .catch(() => null);
 
+  const config = loadAgenticConfig(request);
   return NextResponse.json(
     {
       contractVersion: "3.0.0",
-      instructions: AGENTIC_SERVER_INSTRUCTIONS,
+      instructions: agenticServerInstructions(config.environment),
       tools: [...AGENTIC_PUBLIC_TOOLS],
       transport: "streamable-http"
     },

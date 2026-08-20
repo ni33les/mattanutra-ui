@@ -5,9 +5,9 @@ import {
 } from "@/lib/agentic/config";
 import {
   AGENTIC_PUBLIC_TOOLS,
-  AGENTIC_SERVER_INSTRUCTIONS,
-  AGENTIC_TOOL_DESCRIPTIONS,
   AGENTIC_TOOL_SCHEMAS,
+  agenticServerInstructions,
+  agenticToolDescriptions,
   isAgenticErrorResult,
   schemaIssueToError,
   validateToolInput,
@@ -96,9 +96,10 @@ export function advertisedPublicToolNames(environment: AgenticEnvironment) {
   return AGENTIC_PUBLIC_TOOLS.map((name) => advertisedPublicToolName(environment, name));
 }
 
-export function toolList() {
+export function toolList(environment: AgenticEnvironment = "dev") {
+  const descriptions = agenticToolDescriptions(environment);
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
-    description: AGENTIC_TOOL_DESCRIPTIONS[name],
+    description: descriptions[name],
     inputSchema: AGENTIC_TOOL_SCHEMAS[name],
     name
   }));
@@ -220,7 +221,7 @@ export function handleLightweightJsonRpc(
         capabilities: {
           tools: { listChanged: false }
         },
-        instructions: AGENTIC_SERVER_INSTRUCTIONS,
+        instructions: agenticServerInstructions(config.environment),
         protocolVersion: "2025-03-26",
         serverInfo: {
           name: mcpServerInfoName(config.environment),
@@ -242,7 +243,7 @@ export function handleLightweightJsonRpc(
     return {
       id,
       jsonrpc: "2.0",
-      result: { tools: toolList() }
+      result: { tools: toolList(config.environment) }
     };
   }
 

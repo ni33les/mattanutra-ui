@@ -5,6 +5,7 @@ import {
   createMockPaymentAdapter,
   type PaymentPort
 } from "@/lib/agentic/commerce/payment";
+import { createStripePaymentAdapter } from "@/lib/agentic/commerce/stripe-adapter";
 import type { CapabilityScope } from "@/lib/agentic/capabilities";
 
 export type AgenticRuntime = Readonly<{
@@ -26,7 +27,11 @@ export function createAgenticRuntime(overrides?: Partial<AgenticRuntime>): Agent
 
   return {
     config,
-    payment: overrides?.payment ?? createMockPaymentAdapter(),
+    payment:
+      overrides?.payment ??
+      (config.paymentProvider === "mock"
+        ? createMockPaymentAdapter()
+        : createStripePaymentAdapter()),
     scope: overrides?.scope ?? {
       environment: config.environment,
       principalScope: null,

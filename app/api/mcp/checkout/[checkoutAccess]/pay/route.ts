@@ -8,6 +8,7 @@ import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
 import { isPaymentScenario, scenarioSubmitsOms } from "@/lib/agentic/qa/simulate";
 import { joinMcpPaidOrderToRetail } from "@/lib/agentic/commerce/retail-join";
+import { createAgenticStripeCheckoutSession } from "@/lib/agentic/commerce/stripe-adapter";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { asMinor } from "@/lib/agentic/money";
 
@@ -32,8 +33,11 @@ export async function POST(request: Request, { params }: RouteProps) {
   const { checkoutAccess } = await params;
   const runtime = getLiveAgenticRuntime(request);
 
-  if (runtime.config.paymentProvider !== "mock") {
-    return NextResponse.json({ message: "Mock pay is DEV only." }, { status: 404 });
+  if (
+    runtime.config.paymentProvider !== "mock" &&
+    runtime.config.paymentProvider !== "stripe_test"
+  ) {
+    return NextResponse.json({ message: "Checkout pay is unavailable." }, { status: 404 });
   }
 
   const contentType = request.headers.get("content-type") ?? "";
@@ -128,6 +132,31 @@ export async function POST(request: Request, { params }: RouteProps) {
       agentAuthorized: true
     })
   });
+
+  if (runtime.config.paymentProvider === "stripe_test") {
+    if (typeof body.scenario === "string" && body.scenario.length > 0) {
+      return NextResponse.json(
+        { message: "Stripe Test Mode does not accept mock payment scenarios." },
+        { status: 400 }
+      );
+    }
+
+    const session = await createAgenticStripeCheckoutSession({
+      checkoutAccess,
+      customerEmail: parsed.address.customerEmail,
+      customerName: parsed.address.customerName,
+      locale: "en",
+      orderId: order.id,
+      runtime,
+      totalPriceMinor: asMinor(order.totalPriceMinor)
+    });
+
+    if (formPosted) {
+      return NextResponse.redirect(session.url, 303);
+    }
+
+    return NextResponse.json({ ok: true, checkoutUrl: session.url });
+  }
 
   const requestedScenario = body.scenario ?? "success";
   if (!isPaymentScenario(requestedScenario)) {

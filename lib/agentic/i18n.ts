@@ -19,6 +19,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "จำลองการชำระเงินสำเร็จ",
     "zh-CN": "模拟付款成功"
   },
+  "checkout.pay_stripe": {
+    en: "Continue to Stripe Test Mode",
+    th: "ไปที่ Stripe โหมดทดสอบ",
+    "zh-CN": "继续前往 Stripe 测试模式"
+  },
   "checkout.test_mode": {
     en: "Test mode. No real payment is collected.",
     th: "โหมดทดสอบ ไม่มีการเรียกเก็บเงินจริง",

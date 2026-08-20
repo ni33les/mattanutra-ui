@@ -2424,6 +2424,28 @@ export async function handleStripeWebhookPayload(input: Readonly<{
     return { duplicate: true, ok: true };
   }
 
+  try {
+    const { getLiveAgenticRuntime } = await import("@/lib/agentic/live-runtime");
+    const { tryApplyAgenticStripeEvent } = await import(
+      "@/lib/agentic/commerce/stripe-adapter"
+    );
+    const agentic = await tryApplyAgenticStripeEvent({
+      event,
+      runtime: getLiveAgenticRuntime(input.request)
+    });
+
+    if (agentic) {
+      await markWebhookEventStatus(sql, {
+        sessionId: session?.id ?? null,
+        status: "processed",
+        stripeEventId: event.id
+      });
+      return { ...agentic, duplicate: false };
+    }
+  } catch {
+    // Fall through to the existing nutrition/retail Stripe path.
+  }
+
   await writePaymentBpmEvent({
     actorType: "system",
     eventName: "payment_webhook_received",

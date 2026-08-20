@@ -49,7 +49,14 @@ export async function simulatePayment(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>) {
-  if (!input.config.internalQaHarness || input.config.environment !== "dev") {
+  const uatFixture =
+    input.config.environment === "uat" &&
+    input.config.paymentProvider === "stripe_test" &&
+    !input.config.internalQaHarness;
+  const devHarness =
+    input.config.internalQaHarness && input.config.environment === "dev";
+
+  if (!devHarness && !uatFixture) {
     return businessError({
       message: "Not found.",
       reasonCode: "not_found"

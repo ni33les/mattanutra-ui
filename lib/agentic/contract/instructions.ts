@@ -14,6 +14,30 @@ export const AGENTIC_TOOL_DESCRIPTIONS = {
     "Create or reply to support for an existing order using its orderHandle. Omit supportHandle to create a case; include it to reply to that case. Do not use this tool for planning, payment polling or general health advice."
 } as const;
 
+export const AGENTIC_UAT_SERVER_INSTRUCTIONS =
+  "The purchasing flow is plan, then execute, then external MattaNutra checkout, then order polling. Polling is the only continuation method. Never represent payment as confirmed until order returns completed. After execute, the customer opens checkoutUrl on MattaNutra, enters Thailand delivery details, ticks AI-agent authorization, and pays in Stripe Test Mode. Use Stripe test card 4000000000009995 once for insufficient_funds, poll order until unpaid/declined/insufficient_funds/stateVersion=1, then pay the same checkout with 4242424242424242 and poll until paid/stateVersion=2. For 3DS use a separate unpaid checkout and card 4000000000003220. Do not use live cards. Do not use DEV mock payment scenarios or the DEV internal evidence harness. Do not use any callback, webhook-to-agent, or return-to-agent path. The calling agent learns payment and fulfilment ONLY by polling order(orderHandle). Call tools only by the short names info, plan, execute, order, support, feedback. Never prefix mattanutra_uat. When the user asks to run the UAT pack, open with Official MattaNutra UAT QA Pack and PASS or FAIL for U1 through U10 plus a /10 score. MattaNutra supplies product and safety facts; it does not diagnose or replace qualified clinical advice.";
+
+export const AGENTIC_UAT_TOOL_DESCRIPTIONS = {
+  execute:
+    "Freeze exactly one ready plan revision and create one external MattaNutra checkout. Send only planHandle, expectedRevision and a stable idempotencyKey. After checkoutUrl returns, the customer pays in Stripe Test Mode on the merchant checkout. Unpaid after execute is not a UAT pass. Do not call for needs_input or blocked plans.",
+  feedback:
+    "Submit optional consented improvement feedback for one exact plan revision and selected stack. This never changes a plan, checkout or order. Require consentConfirmed=true.",
+  info: "Check MattaNutra availability, supported destinations, currencies, locales and the purchasing flow before planning. continuation is polling_only. This tool does not list a catalogue dump.",
+  order:
+    "Read authoritative payment and fulfilment state using only the opaque orderHandle returned by execute. Poll no faster than pollAfterSeconds until the order is completed, cancelled, or expired. Do not infer payment success from the browser, and do not use callbacks or any other continuation method.",
+  plan: "Create or refine a purchasable supplement stack from the person’s agreed targets, profile, medications, conditions and constraints. Omit planHandle to create; include planHandle and expectedRevision to revise. This tool never purchases.",
+  support:
+    "Create or reply to support for an existing order using its orderHandle. Omit supportHandle to create a case; include it to reply."
+} as const;
+
+export function agenticServerInstructions(environment: "dev" | "prd" | "uat") {
+  return environment === "dev" ? AGENTIC_SERVER_INSTRUCTIONS : AGENTIC_UAT_SERVER_INSTRUCTIONS;
+}
+
+export function agenticToolDescriptions(environment: "dev" | "prd" | "uat") {
+  return environment === "dev" ? AGENTIC_TOOL_DESCRIPTIONS : AGENTIC_UAT_TOOL_DESCRIPTIONS;
+}
+
 export const AGENTIC_PUBLIC_TOOLS = [
   "info",
   "plan",

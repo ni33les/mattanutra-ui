@@ -724,6 +724,9 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /partial_refund/);
     assert.match(panel, /refundable/);
     assert.match(panel, /paid page keeps an authorized refund form/);
+    assert.match(panel, /Stripe Test Mode/);
+    assert.match(panel, /4000000000009995/);
+    assert.match(panel, /4242424242424242/);
     assert.match(panel, /props\.paid \|\| Boolean\(props\.refundable\)/);
     const page = readFileSync(
       new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/page.tsx", import.meta.url),
