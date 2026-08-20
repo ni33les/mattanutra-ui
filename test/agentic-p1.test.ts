@@ -701,6 +701,10 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /name="scenario"/);
     assert.match(panel, /decline_insufficient_funds/);
     assert.match(panel, /<select/);
+    assert.match(panel, /method="post"/);
+    assert.match(panel, /type="submit"/);
+    assert.match(panel, /name="customerName"/);
+    assert.match(panel, /name="agentAuthorized"/);
   });
 
   it("accepts Creatine by official name and does not call it a legacy ID", async () => {

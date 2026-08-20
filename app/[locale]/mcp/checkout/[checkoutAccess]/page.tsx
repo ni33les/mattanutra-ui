@@ -17,6 +17,7 @@ import {
 
 type PageProps = Readonly<{
   params: Promise<{ checkoutAccess: string; locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>;
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 }
 
-export default async function AgenticCheckoutPage({ params }: PageProps) {
+export default async function AgenticCheckoutPage({ params, searchParams }: PageProps) {
   const { checkoutAccess, locale: rawLocale } = await params;
+  const query = await searchParams;
 
   if (!isLocale(rawLocale) || checkoutAccess.length < 32) {
     notFound();
@@ -98,6 +100,11 @@ export default async function AgenticCheckoutPage({ params }: PageProps) {
           }))}
           locale={locale}
           orderReference={order.reference}
+          lastResult={
+            typeof query.paymentStatus === "string"
+              ? `paymentStatus=${query.paymentStatus} attempt=${query.attempt ?? "none"} reason=${query.reason ?? "none"} v${query.stateVersion ?? "?"}`
+              : null
+          }
           paid={order.paymentStatus === "paid"}
           shippingMinor={shippingMinor}
           subtotalMinor={subtotalMinor}

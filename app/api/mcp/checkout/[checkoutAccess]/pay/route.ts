@@ -35,12 +35,37 @@ export async function POST(request: Request, { params }: RouteProps) {
     return NextResponse.json({ message: "Mock pay is DEV only." }, { status: 404 });
   }
 
+  const contentType = request.headers.get("content-type") ?? "";
+  const formPosted = contentType.includes("application/x-www-form-urlencoded") ||
+    contentType.includes("multipart/form-data");
   let body: Record<string, unknown> = {};
+  let returnTo = "";
 
-  try {
-    body = (await request.json()) as Record<string, unknown>;
-  } catch {
-    body = {};
+  if (formPosted) {
+    const form = await request.formData();
+    returnTo = String(form.get("returnTo") ?? "");
+    body = {
+      address: {
+        addressLine1: String(form.get("addressLine1") ?? ""),
+        addressLine2: String(form.get("addressLine2") ?? ""),
+        city: String(form.get("city") ?? ""),
+        country: String(form.get("country") ?? ""),
+        customerEmail: String(form.get("customerEmail") ?? ""),
+        customerName: String(form.get("customerName") ?? ""),
+        phone: String(form.get("phone") ?? ""),
+        postalCode: String(form.get("postalCode") ?? ""),
+        province: String(form.get("province") ?? "")
+      },
+      agentAuthorized:
+        form.get("agentAuthorized") === "true" || form.get("agentAuthorized") === "on",
+      scenario: String(form.get("scenario") ?? "success")
+    };
+  } else {
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      body = {};
+    }
   }
 
   const checkout = await runtime.store.getCheckoutByAccessHash(
@@ -105,14 +130,27 @@ export async function POST(request: Request, { params }: RouteProps) {
   }
 
   const paid = await runtime.store.getOrder(order.id);
-
-  return NextResponse.json({
+  const result = {
     latestPaymentAttempt: paid?.latestPaymentAttempt ?? null,
     latestPaymentReason: paid?.latestPaymentReason ?? null,
-    ok: true,
+    ok: true as const,
     orderReference: paid?.reference,
     orderStatus: paid?.orderStatus,
     paymentStatus: paid?.paymentStatus,
     stateVersion: paid?.stateVersion
-  });
+  };
+
+  if (formPosted) {
+    const target = new URL(
+      returnTo.startsWith("/") ? returnTo : `/en/mcp/checkout/${checkoutAccess}`,
+      runtime.config.siteUrl
+    );
+    target.searchParams.set("paymentStatus", String(result.paymentStatus ?? ""));
+    target.searchParams.set("attempt", String(result.latestPaymentAttempt ?? ""));
+    target.searchParams.set("reason", String(result.latestPaymentReason ?? ""));
+    target.searchParams.set("stateVersion", String(result.stateVersion ?? ""));
+    return NextResponse.redirect(target, 303);
+  }
+
+  return NextResponse.json(result);
 }

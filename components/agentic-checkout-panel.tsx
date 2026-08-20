@@ -1,6 +1,3 @@
-"use client";
-
-import { useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import { asMinor, formatMinor } from "@/lib/agentic/money";
@@ -13,44 +10,7 @@ export type AgenticCheckoutItem = Readonly<{
   quantity: number;
 }>;
 
-type AgenticCheckoutPanelProps = Readonly<{
-  checkoutAccess: string;
-  country: string;
-  currency: string;
-  expired: boolean;
-  items: readonly AgenticCheckoutItem[];
-  locale: Locale;
-  orderReference: string;
-  paid: boolean;
-  shippingMinor: number;
-  subtotalMinor: number;
-  taxMinor: number;
-  totalPriceMinor: number;
-}>;
-
-type AddressState = {
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  customerEmail: string;
-  customerName: string;
-  phone: string;
-  postalCode: string;
-  province: string;
-};
-
-const emptyAddress: AddressState = {
-  addressLine1: "",
-  addressLine2: "",
-  city: "",
-  customerEmail: "",
-  customerName: "",
-  phone: "",
-  postalCode: "",
-  province: ""
-};
-
-const TEST_SCENARIOS = [
+export const CHECKOUT_TEST_SCENARIOS = [
   "decline_insufficient_funds",
   "success",
   "processing_then_success",
@@ -65,107 +25,53 @@ const TEST_SCENARIOS = [
   "partial_refund"
 ] as const;
 
-export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
-  const [status, setStatus] = useState<"idle" | "paying" | "paid" | "error">(
-    props.paid ? "paid" : "idle"
+type AgenticCheckoutPanelProps = Readonly<{
+  checkoutAccess: string;
+  country: string;
+  currency: string;
+  expired: boolean;
+  items: readonly AgenticCheckoutItem[];
+  lastResult?: string | null;
+  locale: Locale;
+  orderReference: string;
+  paid: boolean;
+  shippingMinor: number;
+  subtotalMinor: number;
+  taxMinor: number;
+  totalPriceMinor: number;
+}>;
+
+function Field(input: Readonly<{
+  autoComplete?: string;
+  disabled?: boolean;
+  id: string;
+  label: string;
+  name: string;
+  required?: boolean;
+  type?: string;
+}>) {
+  return (
+    <label className="block space-y-1 text-sm" htmlFor={input.id}>
+      <span className="font-medium text-ink">{input.label}</span>
+      <input
+        autoComplete={input.autoComplete}
+        className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-white px-3 py-2 text-ink"
+        disabled={input.disabled}
+        id={input.id}
+        name={input.name}
+        required={input.required}
+        type={input.type ?? "text"}
+      />
+    </label>
   );
-  const [error, setError] = useState<string | null>(null);
-  const [scenario, setScenario] = useState<string>("decline_insufficient_funds");
-  const [lastResult, setLastResult] = useState<string | null>(null);
-  const [agentAuthorized, setAgentAuthorized] = useState(false);
-  const [address, setAddress] = useState<AddressState>(emptyAddress);
+}
+
+export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
   const subtotalMinor = asMinor(props.subtotalMinor);
   const shippingMinor = asMinor(props.shippingMinor);
   const taxMinor = asMinor(props.taxMinor);
   const totalPriceMinor = asMinor(props.totalPriceMinor);
-
-  const formComplete = useMemo(() => {
-    return Boolean(
-      address.customerName &&
-        address.phone &&
-        address.customerEmail &&
-        address.addressLine1 &&
-        address.city &&
-        address.province &&
-        address.postalCode &&
-        agentAuthorized
-    );
-  }, [address, agentAuthorized]);
-
-  function field(
-    key: keyof AddressState,
-    labelKey: string,
-    options: { autoComplete?: string; type?: string } = {}
-  ) {
-    return (
-      <label className="block space-y-1 text-sm">
-        <span className="font-medium text-ink">
-          {agenticMessage(props.locale, labelKey)}
-        </span>
-        <input
-          autoComplete={options.autoComplete}
-          className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-white px-3 py-2 text-ink"
-          disabled={status === "paid" || props.expired}
-          onChange={(event) =>
-            setAddress((current) => ({ ...current, [key]: event.target.value }))
-          }
-          type={options.type ?? "text"}
-          value={address[key]}
-        />
-      </label>
-    );
-  }
-
-  async function pay() {
-    setStatus("paying");
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `/api/mcp/checkout/${encodeURIComponent(props.checkoutAccess)}/pay`,
-        {
-          body: JSON.stringify({
-            address: {
-              ...address,
-              country: props.country
-            },
-            agentAuthorized: true,
-            scenario
-          }),
-          headers: { "content-type": "application/json" },
-          method: "POST"
-        }
-      );
-      const body = (await response.json()) as {
-        latestPaymentAttempt?: string | null;
-        latestPaymentReason?: string | null;
-        message?: string;
-        orderStatus?: string;
-        paymentStatus?: string;
-        stateVersion?: number;
-      };
-
-      if (!response.ok) {
-        setStatus("error");
-        setError(body.message ?? "Payment could not be simulated.");
-        return;
-      }
-
-      setLastResult(
-        `paymentStatus=${body.paymentStatus ?? "?"} attempt=${body.latestPaymentAttempt ?? "none"} reason=${body.latestPaymentReason ?? "none"} v${body.stateVersion ?? "?"}`
-      );
-
-      if (body.paymentStatus === "paid") {
-        setStatus("paid");
-        return;
-      }
-
-      setStatus("idle");
-    } catch {
-      setStatus("error");
-      setError("Payment could not be simulated.");
-    }
-  }
+  const locked = props.paid || props.expired;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
@@ -211,64 +117,120 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
           <dd>{formatMinor(totalPriceMinor, props.currency, props.locale)}</dd>
         </div>
       </dl>
-      <fieldset className="space-y-3 rounded-2xl border border-[var(--color-forest-glow)] bg-white p-5">
-        <legend className="px-1 font-semibold text-ink">
-          {agenticMessage(props.locale, "checkout.contact")}
-        </legend>
-        {field("customerName", "checkout.name", { autoComplete: "name" })}
-        {field("phone", "checkout.phone", { autoComplete: "tel", type: "tel" })}
-        {field("customerEmail", "checkout.email", { autoComplete: "email", type: "email" })}
-      </fieldset>
-      <fieldset className="space-y-3 rounded-2xl border border-[var(--color-forest-glow)] bg-white p-5">
-        <legend className="px-1 font-semibold text-ink">
-          {agenticMessage(props.locale, "checkout.delivery")}
-        </legend>
-        {field("addressLine1", "checkout.addressLine1", { autoComplete: "address-line1" })}
-        {field("addressLine2", "checkout.addressLine2", { autoComplete: "address-line2" })}
-        {field("city", "checkout.city", { autoComplete: "address-level2" })}
-        {field("province", "checkout.province", { autoComplete: "address-level1" })}
-        {field("postalCode", "checkout.postalCode", { autoComplete: "postal-code" })}
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium text-ink">
-            {agenticMessage(props.locale, "checkout.country")}
-          </span>
-          <input
-            className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-[var(--brand-soft-green)] px-3 py-2 text-ink"
-            disabled
-            readOnly
-            value={props.country}
-          />
-        </label>
-      </fieldset>
-      <label className="flex items-start gap-3 text-sm text-ink">
-        <input
-          checked={agentAuthorized}
-          className="mt-1 size-4"
-          disabled={status === "paid" || props.expired}
-          onChange={(event) => setAgentAuthorized(event.target.checked)}
-          type="checkbox"
-        />
-        <span>{agenticMessage(props.locale, "checkout.agentAuth")}</span>
-      </label>
-      {props.expired || status === "paid" ? (
+      {locked ? (
         <p className="rounded-lg bg-[var(--brand-soft-green)] px-4 py-3">
           {agenticMessage(
             props.locale,
-            status === "paid" ? "checkout.paid" : "checkout.expired"
+            props.paid ? "checkout.paid" : "checkout.expired"
           )}
         </p>
       ) : (
-        <div className="space-y-3">
-          <label className="block space-y-1 text-sm">
+        <form
+          action={`/api/mcp/checkout/${encodeURIComponent(props.checkoutAccess)}/pay`}
+          className="space-y-6"
+          method="post"
+        >
+          <input name="country" type="hidden" value={props.country} />
+          <input name="returnTo" type="hidden" value={`/${props.locale}/mcp/checkout/${props.checkoutAccess}`} />
+          <fieldset className="space-y-3 rounded-2xl border border-[var(--color-forest-glow)] bg-white p-5">
+            <legend className="px-1 font-semibold text-ink">
+              {agenticMessage(props.locale, "checkout.contact")}
+            </legend>
+            <Field
+              autoComplete="name"
+              id="customerName"
+              label={agenticMessage(props.locale, "checkout.name")}
+              name="customerName"
+              required
+            />
+            <Field
+              autoComplete="tel"
+              id="phone"
+              label={agenticMessage(props.locale, "checkout.phone")}
+              name="phone"
+              required
+              type="tel"
+            />
+            <Field
+              autoComplete="email"
+              id="customerEmail"
+              label={agenticMessage(props.locale, "checkout.email")}
+              name="customerEmail"
+              required
+              type="email"
+            />
+          </fieldset>
+          <fieldset className="space-y-3 rounded-2xl border border-[var(--color-forest-glow)] bg-white p-5">
+            <legend className="px-1 font-semibold text-ink">
+              {agenticMessage(props.locale, "checkout.delivery")}
+            </legend>
+            <Field
+              autoComplete="address-line1"
+              id="addressLine1"
+              label={agenticMessage(props.locale, "checkout.addressLine1")}
+              name="addressLine1"
+              required
+            />
+            <Field
+              autoComplete="address-line2"
+              id="addressLine2"
+              label={agenticMessage(props.locale, "checkout.addressLine2")}
+              name="addressLine2"
+            />
+            <Field
+              autoComplete="address-level2"
+              id="city"
+              label={agenticMessage(props.locale, "checkout.city")}
+              name="city"
+              required
+            />
+            <Field
+              autoComplete="address-level1"
+              id="province"
+              label={agenticMessage(props.locale, "checkout.province")}
+              name="province"
+              required
+            />
+            <Field
+              autoComplete="postal-code"
+              id="postalCode"
+              label={agenticMessage(props.locale, "checkout.postalCode")}
+              name="postalCode"
+              required
+            />
+            <label className="block space-y-1 text-sm" htmlFor="countryDisplay">
+              <span className="font-medium text-ink">
+                {agenticMessage(props.locale, "checkout.country")}
+              </span>
+              <input
+                className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-[var(--brand-soft-green)] px-3 py-2 text-ink"
+                disabled
+                id="countryDisplay"
+                readOnly
+                value={props.country}
+              />
+            </label>
+          </fieldset>
+          <label className="flex items-start gap-3 text-sm text-ink">
+            <input
+              className="mt-1 size-4"
+              name="agentAuthorized"
+              required
+              type="checkbox"
+              value="true"
+            />
+            <span>{agenticMessage(props.locale, "checkout.agentAuth")}</span>
+          </label>
+          <label className="block space-y-1 text-sm" htmlFor="scenario">
             <span className="font-medium text-ink">Test scenario</span>
             <select
               className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-white px-3 py-2 text-ink"
-              disabled={status === "paying"}
+              defaultValue="decline_insufficient_funds"
+              id="scenario"
               name="scenario"
-              onChange={(event) => setScenario(event.target.value)}
-              value={scenario}
+              required
             >
-              {TEST_SCENARIOS.map((item) => (
+              {CHECKOUT_TEST_SCENARIOS.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
@@ -276,19 +238,16 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
             </select>
           </label>
           <button
-            className="w-full rounded-full bg-[var(--brand-green)] px-6 py-3 font-semibold text-white disabled:opacity-60"
-            disabled={status === "paying" || !formComplete}
-            onClick={() => void pay()}
-            type="button"
+            className="w-full rounded-full bg-[var(--brand-green)] px-6 py-3 font-semibold text-white"
+            type="submit"
           >
-            {status === "paying"
-              ? "…"
-              : agenticMessage(props.locale, "checkout.pay_mock")}
+            {agenticMessage(props.locale, "checkout.pay_mock")}
           </button>
-        </div>
+        </form>
       )}
-      {lastResult ? <p className="text-sm text-muted-foreground">{lastResult}</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {props.lastResult ? (
+        <p className="text-sm text-muted-foreground">{props.lastResult}</p>
+      ) : null}
     </div>
   );
 }
