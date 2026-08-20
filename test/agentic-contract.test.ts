@@ -75,11 +75,14 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.equal(result.instructions, AGENTIC_SERVER_INSTRUCTIONS);
     assert.match(
       String(result.instructions),
-      /HARD RULE: Call tools only by the short names info, plan, execute, order, support, feedback/
+      /HARD RULE 1 — OFFICIAL PACK SCORING/
     );
+    assert.match(String(result.instructions), /D1-01 through D10-10/);
+    assert.match(String(result.instructions), /12-row happy-path/);
+    assert.match(String(result.instructions), /HARD RULE 2 — DEV CHECKOUT FORM POST/);
+    assert.match(String(result.instructions), /unpaid order is not complete/);
     assert.match(String(result.instructions), /Never prefix mattanutra_dev/);
     assert.match(String(result.instructions), /mattanutra_dev\.mattanutra_dev\.\*/);
-    assert.match(String(result.instructions), /NATIVE HTML FORM/);
     assert.match(String(result.instructions), /application\/x-www-form-urlencoded/);
     assert.match(String(result.instructions), /customerName, phone, customerEmail, addressLine1/);
     assert.match(String(result.instructions), /scenario=decline_insufficient_funds/);
