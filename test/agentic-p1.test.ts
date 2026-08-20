@@ -1306,6 +1306,9 @@ describe("agentic P1 pack fixes", () => {
 
     assert.match(pay, /joinMcpPaidOrderToRetail/);
     assert.match(simulate, /joinMcpPaidOrderToRetail/);
+    assert.match(pay, /postedScenario/);
+    assert.equal(pay.includes('form.get("scenario") ?? "success"'), false);
+    assert.match(pay, /Stripe Test Mode does not accept mock payment scenarios/);
     assert.match(join, /fulfillAgenticRetailCheckout/);
     assert.match(join, /persistMcpPlanFeedback/);
     assert.match(join, /persistAssessmentSubmission/);

@@ -49,6 +49,7 @@ export async function POST(request: Request, { params }: RouteProps) {
   if (formPosted) {
     const form = await request.formData();
     returnTo = String(form.get("returnTo") ?? "");
+    const postedScenario = form.get("scenario");
     body = {
       address: {
         addressLine1: String(form.get("addressLine1") ?? ""),
@@ -63,7 +64,9 @@ export async function POST(request: Request, { params }: RouteProps) {
       },
       agentAuthorized:
         form.get("agentAuthorized") === "true" || form.get("agentAuthorized") === "on",
-      scenario: String(form.get("scenario") ?? "success")
+      ...(typeof postedScenario === "string" && postedScenario.trim() !== ""
+        ? { scenario: postedScenario.trim() }
+        : {})
     };
   } else {
     try {
@@ -87,9 +90,11 @@ export async function POST(request: Request, { params }: RouteProps) {
     return NextResponse.json({ message: "Order not found." }, { status: 404 });
   }
 
-  const requestedScenarioEarly = String(
-    (body as { scenario?: unknown }).scenario ?? "success"
-  );
+  const postedScenarioValue =
+    typeof (body as { scenario?: unknown }).scenario === "string"
+      ? String((body as { scenario?: unknown }).scenario).trim()
+      : "";
+  const requestedScenarioEarly = postedScenarioValue || "success";
   const refundScenario =
     requestedScenarioEarly === "refund" || requestedScenarioEarly === "partial_refund";
 
@@ -134,7 +139,7 @@ export async function POST(request: Request, { params }: RouteProps) {
   });
 
   if (runtime.config.paymentProvider === "stripe_test") {
-    if (typeof body.scenario === "string" && body.scenario.length > 0) {
+    if (postedScenarioValue) {
       return NextResponse.json(
         { message: "Stripe Test Mode does not accept mock payment scenarios." },
         { status: 400 }
