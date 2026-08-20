@@ -38,9 +38,11 @@ describe("agentic MCP contract 3.0.0", () => {
     const snapshot = JSON.parse(
       readFileSync(new URL("../contract/mcp/3.0.0/tools.json", import.meta.url), "utf8")
     ) as {
+      instructions?: string;
       tools: Array<{ description: string; inputSchema: unknown; name: string }>;
     };
 
+    assert.equal(snapshot.instructions, AGENTIC_SERVER_INSTRUCTIONS);
     assert.deepEqual(
       snapshot.tools.map((tool) => tool.name),
       [...AGENTIC_PUBLIC_TOOLS]
@@ -71,11 +73,46 @@ describe("agentic MCP contract 3.0.0", () => {
 
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_SERVER_INSTRUCTIONS);
+    assert.match(
+      String(result.instructions),
+      /HARD RULE: Call tools only by the short names info, plan, execute, order, support, feedback/
+    );
+    assert.match(String(result.instructions), /Never prefix mattanutra_dev/);
+    assert.match(String(result.instructions), /mattanutra_dev\.mattanutra_dev\.\*/);
     assert.equal(
       (result.serverInfo as { version: string }).version,
       "3.0.0"
     );
     assert.equal((result.serverInfo as { name: string }).name, "mattanutra_dev");
+  });
+
+  it("accepts bare, single-prefixed and double-prefixed tools/call names", async () => {
+    const runtime = createAgenticRuntime();
+
+    for (const name of AGENTIC_PUBLIC_TOOLS) {
+      for (const called of [
+        name,
+        `mattanutra_dev.${name}`,
+        `mattanutra_dev.mattanutra_dev.${name}`
+      ]) {
+        const response = await handleJsonRpc(runtime, {
+          id: 1,
+          method: "tools/call",
+          params: { arguments: {}, name: called }
+        });
+        assert.notEqual(
+          response?.error?.code,
+          -32601,
+          `${called} must not be Unknown tool`
+        );
+        assert.notEqual(
+          response?.error?.code,
+          -32001,
+          `${called} must not be client-catalog -32001`
+        );
+        assert.ok(response?.result, `${called} must dispatch`);
+      }
+    }
   });
 
   it("tools/list returns the six schemas with additionalProperties false", async () => {

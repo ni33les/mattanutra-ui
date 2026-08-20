@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { loadAgenticConfig } from "@/lib/agentic/config";
-import { AGENTIC_PUBLIC_TOOLS } from "@/lib/agentic/contract";
+import { AGENTIC_PUBLIC_TOOLS, AGENTIC_SERVER_INSTRUCTIONS } from "@/lib/agentic/contract";
 import {
   handleLightweightJsonRpc,
   mcpCallNeedsStore,
@@ -134,8 +134,9 @@ export async function GET() {
   return NextResponse.json(
     {
       contractVersion: "3.0.0",
-      transport: "streamable-http",
-      tools: [...AGENTIC_PUBLIC_TOOLS]
+      instructions: AGENTIC_SERVER_INSTRUCTIONS,
+      tools: [...AGENTIC_PUBLIC_TOOLS],
+      transport: "streamable-http"
     },
     { headers: { "Cache-Control": "no-store" } }
   );

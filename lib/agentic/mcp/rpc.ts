@@ -35,19 +35,37 @@ export function record(value: unknown) {
     : {};
 }
 
-export function canonicalPublicToolName(raw: string): AgenticPublicToolName | null {
-  const trimmed = raw.trim();
+const MCP_SERVER_NAME_PREFIXES = [
+  "mattanutra_dev.",
+  "mattanutra_uat."
+] as const;
 
-  if (AGENTIC_PUBLIC_TOOLS.includes(trimmed as AgenticPublicToolName)) {
-    return trimmed as AgenticPublicToolName;
+export function canonicalPublicToolName(raw: string): AgenticPublicToolName | null {
+  let name = raw.trim();
+
+  let stripped = true;
+  while (stripped && name) {
+    stripped = false;
+    const lower = name.toLowerCase();
+    for (const prefix of MCP_SERVER_NAME_PREFIXES) {
+      if (lower.startsWith(prefix)) {
+        name = name.slice(prefix.length);
+        stripped = true;
+        break;
+      }
+    }
   }
 
-  const separator = trimmed.lastIndexOf(".");
+  if (AGENTIC_PUBLIC_TOOLS.includes(name as AgenticPublicToolName)) {
+    return name as AgenticPublicToolName;
+  }
+
+  const separator = name.lastIndexOf(".");
   if (separator <= 0) {
     return null;
   }
 
-  const suffix = trimmed.slice(separator + 1);
+  const suffix = name.slice(separator + 1);
   if (AGENTIC_PUBLIC_TOOLS.includes(suffix as AgenticPublicToolName)) {
     return suffix as AgenticPublicToolName;
   }

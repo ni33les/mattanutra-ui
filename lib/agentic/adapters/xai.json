@@ -1,6 +1,6 @@
 {
   "name": "MattaNutra",
-  "description": "Deterministic supplement stacks with external checkout and order polling.",
+  "description": "Deterministic supplement stacks with external checkout and order polling. Call tools only as info, plan, execute, order, support, feedback. Never prefix mattanutra_dev. Never call mattanutra_dev.* or mattanutra_dev.mattanutra_dev.*."
   "server_url": "/api/mcp",
   "contractVersion": "3.0.0",
   "tools": ["info", "plan", "execute", "order", "support", "feedback"]
