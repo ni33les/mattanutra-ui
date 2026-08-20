@@ -172,10 +172,17 @@ async function callTool(
   };
 }
 
+export type JsonRpcResponse = Readonly<{
+  error?: Readonly<{ code: number; message: string }>;
+  id: number | string | null;
+  jsonrpc: "2.0";
+  result?: Record<string, unknown>;
+}>;
+
 export async function handleJsonRpc(
   runtime: AgenticRuntime,
   body: JsonRpcRequest
-) {
+): Promise<JsonRpcResponse | null> {
   const id = body.id ?? null;
   const method = body.method ?? "";
   const params = record(body.params);

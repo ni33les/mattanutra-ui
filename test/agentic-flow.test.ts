@@ -58,6 +58,7 @@ async function call(runtime: AgenticRuntime, name: string, args: unknown, id = 1
     method: "tools/call",
     params: { arguments: args, name }
   });
+  assert.ok(response?.result);
   return response.result.structuredContent as Record<string, unknown>;
 }
 

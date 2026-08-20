@@ -45,7 +45,7 @@ function asRequest(value: unknown): PlanRequest | AgenticErrorResult {
 }
 
 function uniqueTargets(
-  targets: readonly PlanTarget[],
+  targets: readonly Readonly<{ supplementId: string }>[],
   field: "targets" | "currentSupplements"
 ): AgenticErrorResult | null {
   const seen = new Set<string>();
@@ -81,15 +81,6 @@ function resolveSupplement(
   }
 
   return found;
-}
-
-function convertAmount(
-  amount: number,
-  unit: string,
-  name: string
-) {
-  const parsed = parseDose(`${amount} ${unit}`, name.toLowerCase().replace(/\s+/g, "_"));
-  return parsed ? comparableDoseAmount(parsed, name.toLowerCase().replace(/\s+/g, "_")) : amount;
 }
 
 function applyAnswers(

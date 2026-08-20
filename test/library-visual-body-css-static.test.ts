@@ -238,14 +238,6 @@ describe("library article body visual CSS", () => {
         const blob = JSON.stringify(nodes);
 
         for (const mod of want) {
-          if (mod === "stance") {
-            const ok =
-              blob.includes("stance") ||
-              blob.includes('"tag":"article"') ||
-              blob.includes('"tag": "article"');
-            assert.ok(ok, `${slug} ${loc} missing stance/article for zip stance`);
-            continue;
-          }
           assert.ok(
             blob.includes(mod),
             `${slug} ${loc} missing zip body module .${mod}`

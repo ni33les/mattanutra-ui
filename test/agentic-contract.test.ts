@@ -8,8 +8,17 @@ import {
   AGENTIC_TOOL_SCHEMAS,
   validateToolInput
 } from "../lib/agentic/contract/index.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import {
+  handleJsonRpc,
+  type JsonRpcResponse
+} from "../lib/agentic/mcp/dispatcher.ts";
 import { createAgenticRuntime } from "../lib/agentic/runtime.ts";
+
+function rpcResult(response: JsonRpcResponse | null) {
+  assert.ok(response);
+  assert.ok(response.result && typeof response.result === "object");
+  return response.result;
+}
 
 describe("agentic MCP contract 3.0.0", () => {
   it("exposes exactly six public tools", () => {
@@ -60,9 +69,12 @@ describe("agentic MCP contract 3.0.0", () => {
       }
     });
 
-    assert.ok(response);
-    assert.equal(response.result.instructions, AGENTIC_SERVER_INSTRUCTIONS);
-    assert.equal(response.result.serverInfo.version, "3.0.0");
+    const result = rpcResult(response);
+    assert.equal(result.instructions, AGENTIC_SERVER_INSTRUCTIONS);
+    assert.equal(
+      (result.serverInfo as { version: string }).version,
+      "3.0.0"
+    );
   });
 
   it("tools/list returns the six schemas with additionalProperties false", async () => {
@@ -71,11 +83,13 @@ describe("agentic MCP contract 3.0.0", () => {
       id: 2,
       method: "tools/list"
     });
-    const names = response.result.tools.map((tool: { name: string }) => tool.name);
+    const result = rpcResult(response);
+    const tools = result.tools as Array<{ inputSchema: unknown; name: string }>;
+    const names = tools.map((tool) => tool.name);
 
     assert.deepEqual(names, [...AGENTIC_PUBLIC_TOOLS]);
 
-    for (const tool of response.result.tools) {
+    for (const tool of tools) {
       const schema = JSON.stringify(tool.inputSchema);
       assert.match(schema, /"additionalProperties":false/);
     }
@@ -113,11 +127,12 @@ describe("agentic MCP contract 3.0.0", () => {
       method: "tools/call",
       params: { arguments: {}, name: "info" }
     });
-    const payload = JSON.stringify(response.result.structuredContent);
+    const content = rpcResult(response).structuredContent as Record<string, unknown>;
+    const payload = JSON.stringify(content);
 
-    assert.equal(response.result.structuredContent.ok, true);
+    assert.equal(content.ok, true);
     assert.doesNotMatch(payload, /sandbox/i);
     assert.doesNotMatch(payload, /simulate/i);
-    assert.equal(response.result.structuredContent.continuation, "polling_only");
+    assert.equal(content.continuation, "polling_only");
   });
 });
