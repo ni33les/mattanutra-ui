@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
+import { businessError } from "@/lib/agentic/contract/errors";
 import type { AgenticStore, OrderRecord } from "@/lib/agentic/store/types";
 import type { VerifiedPaymentEvent } from "@/lib/agentic/commerce/payment";
 import { publicFrozenOrder } from "@/lib/agentic/public-mapper";
@@ -153,13 +154,12 @@ export function orderPollView(input: Readonly<{
   order: OrderRecord | null;
 }>) {
   if (!input.found || !input.order) {
-    return {
-      lookupStatus: "not_found",
+    return businessError({
+      fieldPath: "orderHandle",
       message: input.localeMessage("order.not_found"),
       messageKey: "order.not_found",
-      nextAction: "none",
-      ok: true as const
-    };
+      reasonCode: "not_found"
+    });
   }
 
   const order = input.order;

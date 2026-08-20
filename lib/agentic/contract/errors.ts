@@ -14,6 +14,7 @@ export const AGENTIC_REASON_CODES = [
   "duplicate_supplement",
   "unsupported_unit",
   "legacy_id",
+  "unknown_supplement",
   "required",
   "unsupported_country",
   "unsupported_currency",
@@ -34,6 +35,7 @@ export type AgenticReasonCode = (typeof AGENTIC_REASON_CODES)[number];
 
 export type AgenticBusinessError = Readonly<{
   category: AgenticErrorCategory;
+  error_code: AgenticErrorCategory;
   fieldPath: string | null;
   message: string;
   messageKey: string;
@@ -54,6 +56,7 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
   idempotency_conflict: "ABORTED",
   legacy_id: "INVALID_ARGUMENT",
   not_found: "NOT_FOUND",
+  unknown_supplement: "INVALID_ARGUMENT",
   plan_not_ready: "FAILED_PRECONDITION",
   positive_number_required: "INVALID_ARGUMENT",
   rate_limited: "RESOURCE_EXHAUSTED",
@@ -78,9 +81,12 @@ export function businessError(input: Readonly<{
   messageKey?: string;
   reasonCode: AgenticReasonCode;
 }>): AgenticErrorResult {
+  const category = CATEGORY_BY_REASON[input.reasonCode];
+
   return {
     error: {
-      category: CATEGORY_BY_REASON[input.reasonCode],
+      category,
+      error_code: category,
       fieldPath: input.fieldPath ?? null,
       message: input.message,
       messageKey: input.messageKey ?? `mcp.errors.${input.reasonCode}`,

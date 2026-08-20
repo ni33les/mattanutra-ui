@@ -243,13 +243,28 @@ function greedyStack(
   return stackFromProducts(state, selected, availabilityAsOf, reason);
 }
 
-function materialDifference(left: StackOption, right: StackOption) {
+function basketKey(option: StackOption) {
+  return option.basket
+    .map((item) => item.productId)
+    .slice()
+    .sort()
+    .join("|");
+}
+
+function materialDifference(left: StackOption | null, right: StackOption | null) {
+  if (!left || !right) {
+    return false;
+  }
+
+  if (left.optionId === right.optionId || basketKey(left) === basketKey(right)) {
+    return false;
+  }
+
   return (
     Math.abs(left.totalPriceMinor - right.totalPriceMinor) >= 1000 ||
     Math.abs(left.coveragePercent - right.coveragePercent) >= 5 ||
     Math.abs(left.dailyPills - right.dailyPills) >= 1 ||
-    left.basket.map((item) => item.productId).join() !==
-      right.basket.map((item) => item.productId).join()
+    left.basket.length !== right.basket.length
   );
 }
 

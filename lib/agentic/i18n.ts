@@ -170,9 +170,14 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "该幂等键已用于不同的请求内容。"
   },
   "mcp.errors.legacy_id": {
-    en: "Use a current canonical ID from info. Legacy IDs are not accepted.",
-    th: "ใช้รหัสมาตรฐานจาก info รหัสเก่าใช้ไม่ได้",
-    "zh-CN": "请使用 info 返回的当前规范 ID。不接受旧 ID。"
+    en: "That identifier is not a current supplement ID. Send a recognised supplement name instead.",
+    th: "รหัสนี้ไม่ใช่รหัสสารอาหารปัจจุบัน ส่งชื่อสารอาหารที่ระบบรู้จักแทน",
+    "zh-CN": "该标识不是当前补充剂 ID。请改用已识别的补充剂名称。"
+  },
+  "mcp.errors.unknown_supplement": {
+    en: "Unknown supplement name. Use a recognised name such as Vitamin D3 or Creatine.",
+    th: "ไม่รู้จักชื่อสารอาหารนี้ ใช้ชื่อที่ระบบรู้จัก ห้ามใส่รหัสเก่าในชื่อ",
+    "zh-CN": "未知补充剂名称。请使用已识别的名称，不要在 name 中发送旧 ID。"
   },
   "mcp.errors.not_found": {
     en: "Not found.",

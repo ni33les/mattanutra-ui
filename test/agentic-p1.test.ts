@@ -674,6 +674,146 @@ describe("agentic P1 pack fixes", () => {
     assert.match(text, /paid|completed|confirmed/i);
   });
 
+  it("accepts Creatine by official name and does not call it a legacy ID", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "p1-creatine-name-00001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 2000, name: "Vitamin D3", unit: "IU" },
+          { amount: 1000, name: "Omega-3", unit: "mg" },
+          { amount: 300, name: "Magnesium", unit: "mg" },
+          { amount: 5, name: "Creatine", unit: "g" }
+        ]
+      }
+    });
+    assert.equal(plan.ok, true);
+    assert.notEqual(plan.status, undefined);
+    const encoded = JSON.stringify(plan).toLowerCase();
+    assert.equal(encoded.includes("legacy id"), false);
+    assert.ok((plan.coverage as Array<{ name?: string }>).some((row) =>
+      String(row.name).toLowerCase().includes("creatine")
+    ));
+
+    const unknown = await call(runtime, "plan", {
+      idempotencyKey: "p1-unknown-name-00001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 1, name: "Unobtainium", unit: "mg" }]
+      }
+    });
+    assert.equal(unknown.ok, false);
+    assert.equal((unknown.error as { reasonCode: string }).reasonCode, "unknown_supplement");
+    assert.equal(
+      String((unknown.error as { message: string }).message)
+        .toLowerCase()
+        .includes("legacy ids are not accepted"),
+      false
+    );
+  });
+
+  it("omits alternatives that duplicate the selected stack", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "p1-no-twin-alt-00001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 2000, name: "Vitamin D3", unit: "IU" },
+          { amount: 1000, name: "Omega-3", unit: "mg" },
+          { amount: 300, name: "Magnesium", unit: "mg" }
+        ]
+      }
+    });
+    const selectedIds = ((plan.basket as Array<{ productId: string }>) ?? [])
+      .map((item) => item.productId)
+      .slice()
+      .sort()
+      .join("|");
+    const alternatives = (plan.alternatives as Array<{
+      basket?: Array<{ productId: string }>;
+      optionId?: string;
+      tradeOffs?: { summary?: string };
+    }>) ?? [];
+    for (const option of alternatives) {
+      const ids = (option.basket ?? [])
+        .map((item) => item.productId)
+        .slice()
+        .sort()
+        .join("|");
+      assert.notEqual(ids, selectedIds);
+      assert.notEqual(option.optionId, plan.optionId);
+    }
+  });
+
+  it("agrees error category with error_code and treats missing order as an error", async () => {
+    const runtime = runtimeFor();
+    const created = await call(runtime, "plan", {
+      idempotencyKey: "p1-err-shape-plan-001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const stale = await call(runtime, "plan", {
+      expectedRevision: 99,
+      idempotencyKey: "p1-err-shape-stale-01",
+      planHandle: created.planHandle,
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const staleError = stale.error as {
+      category: string;
+      error_code: string;
+      reasonCode: string;
+    };
+    assert.equal(stale.ok, false);
+    assert.equal(staleError.reasonCode, "revision_conflict");
+    assert.equal(staleError.category, "ABORTED");
+    assert.equal(staleError.error_code, "ABORTED");
+
+    const missing = await handleJsonRpc(runtime, {
+      id: 11,
+      method: "tools/call",
+      params: {
+        arguments: { orderHandle: "missing-order-handle-not-found-0001" },
+        name: "order"
+      }
+    });
+    assert.equal(missing?.result?.isError, true);
+    const missingBody = missing?.result?.structuredContent as {
+      error?: { category: string; error_code: string; reasonCode: string };
+      ok?: boolean;
+    };
+    assert.equal(missingBody.ok, false);
+    assert.equal(missingBody.error?.reasonCode, "not_found");
+    assert.equal(missingBody.error?.category, "NOT_FOUND");
+    assert.equal(missingBody.error?.error_code, "NOT_FOUND");
+  });
+
   it("returns every untested pack ID from packProof", async () => {
     const runtime = runtimeFor();
     const proof = await handleQaJsonRpc(runtime, {

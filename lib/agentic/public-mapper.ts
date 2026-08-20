@@ -162,6 +162,26 @@ export function publicPlanFields(result: Pick<
   | "unmetRequirements"
 >) {
   const selected = result.selected;
+  const alternatives = result.alternatives.filter((item) => {
+    if (!selected) {
+      return true;
+    }
+
+    const sameProducts =
+      item.optionId === selected.optionId ||
+      item.basket
+        .map((row) => row.productId)
+        .slice()
+        .sort()
+        .join("|") ===
+        selected.basket
+          .map((row) => row.productId)
+          .slice()
+          .sort()
+          .join("|");
+
+    return !sameProducts;
+  });
 
   return {
     basket: result.basket.map(publicBasketItem),
@@ -187,11 +207,9 @@ export function publicPlanFields(result: Pick<
     ...(result.unmetRequirements.length > 0
       ? { unmetRequirements: result.unmetRequirements }
       : {}),
-    ...(result.alternatives.length > 0
+    ...(alternatives.length > 0
       ? {
-          alternatives: result.alternatives.map((item) =>
-            publicOption(item, selected)
-          )
+          alternatives: alternatives.map((item) => publicOption(item, selected))
         }
       : {})
   };

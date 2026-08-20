@@ -12,6 +12,7 @@ const SUPPLEMENT_UUIDS = {
   c: "55555555-5555-5555-5555-555555555555",
   collagen: "99999999-9999-9999-9999-999999999999",
   coq10: "88888888-8888-8888-8888-888888888888",
+  creatine: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
   d3: "11111111-1111-1111-1111-111111111111",
   iron: "77777777-7777-7777-7777-777777777777",
   magnesium: "33333333-3333-3333-3333-333333333333",
@@ -47,7 +48,8 @@ export const FIXTURE_SUPPLEMENTS: readonly CatalogueSupplement[] = [
   supplement("iron", "Iron", ["Ferrous"], ["mg"]),
   supplement("coq10", "CoQ10", ["Ubiquinone", "Ubiquinol"], ["mg"]),
   supplement("collagen", "Collagen", ["Collagen peptides"], ["g", "mg"]),
-  supplement("sterols", "Plant sterols", ["Phytosterols"], ["mg", "g"])
+  supplement("sterols", "Plant sterols", ["Phytosterols"], ["mg", "g"]),
+  supplement("creatine", "Creatine", ["Creatine monohydrate", "Creapure"], ["g", "mg"])
 ];
 
 function candidate(input: Readonly<{
@@ -344,6 +346,22 @@ export const FIXTURE_PRODUCTS: readonly CatalogueProduct[] = [
     supplementKey: "d3",
     title: "Singapore-only D3",
     unit: "IU"
+  }),
+  product({
+    amount: 5,
+    comparableAmount: 5_000_000,
+    dailyPills: 1,
+    dietarySource: "any",
+    form: "powder",
+    id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    name: "Creatine",
+    normalizedName: "creatine",
+    omegaSource: "none",
+    priceMinor: 59000,
+    sku: "TH-CRE-5",
+    supplementKey: "creatine",
+    title: "Creatine Monohydrate 5 g",
+    unit: "g"
   })
 ];
 

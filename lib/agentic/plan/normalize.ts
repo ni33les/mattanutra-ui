@@ -73,6 +73,27 @@ function namesOf(item: CatalogueSupplement) {
   return [item.name, ...item.aliases].map(normalizeName);
 }
 
+function isIdShaped(value: string) {
+  const trimmed = value.trim();
+  return (
+    /^(sup_|prd_|cap_|ord_|tkt_)/i.test(trimmed) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed) ||
+    /^[0-9a-f]{32}$/i.test(trimmed.replace(/-/g, ""))
+  );
+}
+
+function matchByName(snapshot: CatalogueSnapshot, wanted: string) {
+  const exact = snapshot.supplements.filter((item) => namesOf(item).includes(wanted));
+
+  if (exact.length > 0) {
+    return exact;
+  }
+
+  return snapshot.supplements.filter((item) =>
+    namesOf(item).some((name) => name === wanted || name.startsWith(`${wanted} `))
+  );
+}
+
 function resolveSupplement(
   snapshot: CatalogueSnapshot,
   input: Readonly<{ name?: string; supplementId?: string }>,
@@ -86,7 +107,7 @@ function resolveSupplement(
     if (!found) {
       return businessError({
         fieldPath,
-        message: "Use a current canonical ID from info. Legacy IDs are not accepted.",
+        message: "That identifier is not a current supplement ID. Send a recognised supplement name instead.",
         reasonCode: "legacy_id"
       });
     }
@@ -94,10 +115,10 @@ function resolveSupplement(
     if (input.name) {
       const wanted = normalizeName(input.name);
 
-      if (!namesOf(found).includes(wanted)) {
+      if (!namesOf(found).includes(wanted) && !namesOf(found).some((name) => name.startsWith(`${wanted} `))) {
         return businessError({
           fieldPath,
-          message: "Use a current canonical ID from info. Legacy IDs are not accepted.",
+          message: "That identifier is not a current supplement ID. Send a recognised supplement name instead.",
           reasonCode: "legacy_id"
         });
       }
@@ -106,7 +127,8 @@ function resolveSupplement(
     return found;
   }
 
-  const wanted = normalizeName(input.name ?? "");
+  const rawName = (input.name ?? "").trim();
+  const wanted = normalizeName(rawName);
 
   if (!wanted) {
     return businessError({
@@ -116,7 +138,15 @@ function resolveSupplement(
     });
   }
 
-  const matches = snapshot.supplements.filter((item) => namesOf(item).includes(wanted));
+  if (isIdShaped(rawName)) {
+    return businessError({
+      fieldPath,
+      message: "That identifier is not a current supplement ID. Send a recognised supplement name instead.",
+      reasonCode: "legacy_id"
+    });
+  }
+
+  const matches = matchByName(snapshot, wanted);
 
   if (matches.length === 1 && matches[0]) {
     return matches[0];
@@ -132,8 +162,8 @@ function resolveSupplement(
 
   return businessError({
     fieldPath,
-    message: "Use a current canonical ID from info. Legacy IDs are not accepted.",
-    reasonCode: "legacy_id"
+    message: "Unknown supplement name. Use a recognised name such as Vitamin D3 or Creatine.",
+    reasonCode: "unknown_supplement"
   });
 }
 
