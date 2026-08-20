@@ -14,7 +14,7 @@ export type LogFields = Readonly<Record<string, unknown>>;
 
 // Match secrets even when embedded in camelCase (e.g. stripeSecret, accessToken).
 const SENSITIVE_KEY =
-  /password|passwd|secret|token|authorization|cookie|api[_-]?key|access[_-]?key|refresh|private[_-]?key|credit[_-]?card|card[_-]?number|cvv|\bssn\b|session/i;
+  /password|passwd|secret|token|authorization|cookie|api[_-]?key|access[_-]?key|refresh|private[_-]?key|credit[_-]?card|card[_-]?number|cvv|\bssn\b|session|planHandle|orderHandle|supportHandle|checkoutAccess|capability/i;
 
 const EMAIL_KEY = /email|e-mail/i;
 

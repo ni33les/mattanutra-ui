@@ -6,11 +6,13 @@ const schemaScripts = [
   "products:soft-delete:schema:apply",
   "products:v9:schema:apply",
   "product-coverage:demand-cache:schema:apply",
-  "payments:schema:apply"
+  "payments:schema:apply",
+  "agentic:schema:apply"
 ];
 const smokeUrls = [
   "http://127.0.0.1:3000/en/admin/login",
-  "https://dev.mattanutra.com/en/admin/login"
+  "https://dev.mattanutra.com/en/admin/login",
+  "https://dev.mattanutra.com/api/mcp"
 ];
 
 function allowNonDevBranch() {
