@@ -11,6 +11,8 @@ import { addMinor, asMinor, asMinorOr, formatMinor, TH_MOCK_TAX_MINOR } from "@/
 import { infoTool } from "@/lib/agentic/info";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { feedbackTool } from "@/lib/agentic/feedback";
+import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
+import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 
 function supplementId(name: string) {
   const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
@@ -49,19 +51,7 @@ export async function orderEvidence(input: Readonly<{
   orderId: string;
   runtime: AgenticRuntime;
 }>) {
-  const order = await input.runtime.store.getOrder(input.orderId);
-  const audits = await input.runtime.store.listPaymentAudits(input.orderId);
-  const attempts = await input.runtime.store.listPaymentAttempts(input.orderId);
-  const retail = await input.runtime.store.getRetailLink(input.orderId);
-
-  return {
-    fulfilmentStatus: order?.fulfilmentStatus ?? null,
-    omsSubmitCount: retail ? 1 : 0,
-    paymentAttemptCount: attempts.length,
-    paymentConfirmedCount: audits.filter((item) => item.type === "payment_confirmed").length,
-    paymentStatus: order?.paymentStatus ?? null,
-    stateVersion: order?.stateVersion ?? null
-  };
+  return redactedOrderCounts(input);
 }
 
 export async function isolationProof(runtime: AgenticRuntime) {
@@ -355,6 +345,7 @@ export async function latencyProof(runtime: AgenticRuntime) {
 
   const infoSamples: number[] = [];
   const orderSamples: number[] = [];
+  const executeSamples: number[] = [];
   const feedbackSamples: number[] = [];
 
   for (let index = 0; index < 20; index += 1) {
@@ -373,6 +364,19 @@ export async function latencyProof(runtime: AgenticRuntime) {
     orderSamples.push(performance.now() - start);
 
     start = performance.now();
+    await executeTool({
+      config: runtime.config,
+      expectedRevision: created.revision,
+      idempotencyKey: `qa-lat-exec-${stamp}xxxxx`,
+      now,
+      payment: runtime.payment,
+      planHandle: created.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    executeSamples.push(performance.now() - start);
+
+    start = performance.now();
     await feedbackTool({
       config: runtime.config,
       consentConfirmed: true,
@@ -389,9 +393,12 @@ export async function latencyProof(runtime: AgenticRuntime) {
 
   const infoP95 = percentile(infoSamples, 95);
   const orderP95 = percentile(orderSamples, 95);
+  const executeP95 = percentile(executeSamples, 95);
   const feedbackP95 = percentile(feedbackSamples, 95);
+  const http = mcpLatencySnapshot(runtime.config.buildId);
   const checks = [
     { budgetMs: 300, name: "info_p95", passed: infoP95 <= 300, p95Ms: Math.round(infoP95) },
+    { budgetMs: 1500, name: "execute_p95", passed: executeP95 <= 1500, p95Ms: Math.round(executeP95) },
     { budgetMs: 500, name: "order_p95", passed: orderP95 <= 500, p95Ms: Math.round(orderP95) },
     { budgetMs: 1000, name: "feedback_p95", passed: feedbackP95 <= 1000, p95Ms: Math.round(feedbackP95) }
   ];
@@ -399,6 +406,7 @@ export async function latencyProof(runtime: AgenticRuntime) {
   return {
     buildId: runtime.config.buildId,
     checks,
+    http,
     ok: true as const,
     passed: checks.every((item) => item.passed)
   };

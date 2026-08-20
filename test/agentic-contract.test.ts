@@ -86,6 +86,9 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.match(String(result.instructions), /info\.schemaChecksum/);
     assert.match(String(result.instructions), /scenario=refund/);
     assert.match(String(result.instructions), /two different idempotencyKeys/);
+    assert.match(String(result.instructions), /HARD RULE 5 — DEV INTERNAL EVIDENCE/);
+    assert.match(String(result.instructions), /\/api\/mcp\/qa/);
+    assert.match(String(result.instructions), /never raw order IDs/);
     assert.match(String(result.instructions), /HARD RULE 2 — DEV CHECKOUT FORM POST/);
     assert.match(String(result.instructions), /unpaid order is not complete/);
     assert.match(String(result.instructions), /Never prefix mattanutra_dev/);

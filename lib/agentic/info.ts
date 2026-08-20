@@ -14,6 +14,7 @@ import {
   ACTIVE_MARKET_NAME
 } from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
+import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
 
 export const AGENTIC_SCHEMA_CHECKSUM = createHash("sha256")
   .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
@@ -70,5 +71,13 @@ export function infoTool(input: Readonly<{
 
   const value = buildInfo(input);
   infoCache = { key, value };
-  return value;
+
+  if (input.config.environment !== "dev") {
+    return value;
+  }
+
+  return {
+    ...value,
+    latency: mcpLatencySnapshot(input.config.buildId)
+  };
 }

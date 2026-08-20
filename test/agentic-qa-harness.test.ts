@@ -19,6 +19,9 @@ import {
 } from "../lib/agentic/qa/control-plane.ts";
 import { isQaErrorResult } from "../lib/agentic/qa/errors.ts";
 import { AGENTIC_PUBLIC_TOOLS } from "../lib/agentic/contract/index.ts";
+import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
+import { infoTool } from "../lib/agentic/info.ts";
+import { recordMcpTiming } from "../lib/agentic/metrics.ts";
 
 function runtimeFor(): AgenticRuntime {
   return createAgenticRuntime({
@@ -183,6 +186,74 @@ describe("DEV internal QA harness", () => {
     assert.equal(isQaErrorResult(result), true);
     if (isQaErrorResult(result)) {
       assert.equal(result.error.reasonCode, "not_found");
+    }
+  });
+
+  it("returns redacted D7/D8 counts from opaque orderHandle only", async () => {
+    const runtime = runtimeFor();
+    const now = nowIso();
+    const created = await planTool({
+      config: runtime.config,
+      now,
+      payload: {
+        idempotencyKey: "qa-harness-ev-plan-0001",
+        request: goldenPlanRequest()
+      },
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.ok("planHandle" in created);
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: created.revision,
+      idempotencyKey: "qa-harness-ev-exec-0001",
+      now,
+      payment: runtime.payment,
+      planHandle: created.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.ok("orderHandle" in executed);
+
+    await startScenarioRun({
+      idempotencyKey: "qa-harness-ev-pay-00001",
+      resource: { handle: executed.orderHandle, type: "order" },
+      runtime,
+      scenario: "payment.success"
+    });
+
+    const evidence = await handleQaJsonRpc(runtime, {
+      id: 3,
+      method: "tools/call",
+      params: {
+        arguments: { orderHandle: executed.orderHandle },
+        name: "evidence"
+      }
+    });
+    const counts = evidence?.result?.structuredContent as {
+      paymentAttemptCount?: number;
+      paymentConfirmedCount?: number;
+      omsSubmitCount?: number;
+      providerEventCount?: number;
+      alertP0Count?: number;
+      outboxPendingCount?: number;
+    };
+    assert.equal(counts.paymentConfirmedCount, 1);
+    assert.equal(counts.omsSubmitCount, 1);
+    assert.ok((counts.paymentAttemptCount ?? 0) >= 1);
+    assert.ok((counts.providerEventCount ?? 0) >= 1);
+    assert.equal(counts.alertP0Count, 0);
+    assert.equal(JSON.stringify(counts).includes(executed.orderHandle), false);
+
+    recordMcpTiming("info", 12);
+    recordMcpTiming("execute", 40);
+    recordMcpTiming("order", 18);
+    const info = infoTool({ config: runtime.config, locale: "en" });
+    if (runtime.config.environment === "dev") {
+      assert.equal(
+        typeof (info as { latency?: { info?: { p95Ms?: number } } }).latency?.info?.p95Ms,
+        "number"
+      );
     }
   });
 });

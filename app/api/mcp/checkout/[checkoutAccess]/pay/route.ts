@@ -83,13 +83,26 @@ export async function POST(request: Request, { params }: RouteProps) {
     return NextResponse.json({ message: "Order not found." }, { status: 404 });
   }
 
+  const requestedScenarioEarly = String(
+    (body as { scenario?: unknown }).scenario ?? "success"
+  );
+  const refundScenario =
+    requestedScenarioEarly === "refund" || requestedScenarioEarly === "partial_refund";
+
+  if (order.orderStatus === "cancelled") {
+    return NextResponse.json({ message: "Checkout cancelled." }, { status: 409 });
+  }
+
   if (
-    checkout.expiresAt <= nowIso() ||
-    order.orderStatus === "expired" ||
-    order.orderStatus === "cancelled"
+    !refundScenario &&
+    (checkout.expiresAt <= nowIso() || order.orderStatus === "expired")
   ) {
+    return NextResponse.json({ message: "Checkout expired." }, { status: 409 });
+  }
+
+  if (refundScenario && order.paymentStatus !== "paid" && order.paymentStatus !== "refunded") {
     return NextResponse.json(
-      { message: order.orderStatus === "cancelled" ? "Checkout cancelled." : "Checkout expired." },
+      { message: "Refund fixtures require a paid checkout." },
       { status: 409 }
     );
   }

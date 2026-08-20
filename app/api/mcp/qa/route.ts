@@ -3,6 +3,10 @@ import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { handleQaJsonRpc } from "@/lib/agentic/mcp/qa-dispatcher";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
+import { isPaymentScenario, simulatePayment } from "@/lib/agentic/qa/simulate";
+import { nowIso } from "@/lib/agentic/runtime";
+import { resolveCapability } from "@/lib/agentic/capabilities";
+import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +44,75 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: { code: -32700, message: "Parse error" }, jsonrpc: "2.0" },
       { status: 400 }
+    );
+  }
+
+  if (
+    body &&
+    typeof body === "object" &&
+    !Array.isArray(body) &&
+    !("method" in body) &&
+    "orderHandle" in body
+  ) {
+    const orderHandle = String((body as { orderHandle?: unknown }).orderHandle ?? "");
+    const scenario = (body as { scenario?: unknown }).scenario;
+    const now = nowIso();
+
+    if (orderHandle.length < 32) {
+      return NextResponse.json({ message: "Not found." }, { status: 404 });
+    }
+
+    if (typeof scenario === "string") {
+      if (!isPaymentScenario(scenario)) {
+        return NextResponse.json({ message: "Unknown scenario." }, { status: 400 });
+      }
+
+      const simulated = await simulatePayment({
+        config: runtime.config,
+        now,
+        orderHandle,
+        scenario,
+        scope: runtime.scope,
+        store: runtime.store
+      });
+      const capability = await resolveCapability({
+        action: "order.read",
+        config: runtime.config,
+        handle: orderHandle,
+        now,
+        resourceType: "order",
+        scope: runtime.scope,
+        store: runtime.store
+      });
+      const counts = capability
+        ? await redactedOrderCounts({ orderId: capability.resourceId, runtime })
+        : null;
+      return NextResponse.json(
+        { counts, ok: true, simulated },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const capability = await resolveCapability({
+      action: "order.read",
+      config: runtime.config,
+      handle: orderHandle,
+      now,
+      resourceType: "order",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+
+    if (!capability) {
+      return NextResponse.json({ message: "Not found." }, { status: 404 });
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        ...(await redactedOrderCounts({ orderId: capability.resourceId, runtime }))
+      },
+      { headers: { "Cache-Control": "no-store" } }
     );
   }
 

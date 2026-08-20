@@ -554,5 +554,6 @@ export function createRuntimeStore() {
     return createMemoryStore();
   }
 
+  void sql`select 1`.catch(() => null);
   return createPostgresStore(sql);
 }

@@ -712,6 +712,9 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /scenario=expire/);
     assert.match(panel, /three_ds_cancelled/);
     assert.match(panel, /scenario=refund/);
+    assert.match(panel, /partial_refund/);
+    assert.match(panel, /refundable/);
+    assert.match(panel, /paid page keeps an authorized refund form/);
   });
 
   it("accepts Creatine by official name and does not call it a legacy ID", async () => {
@@ -1231,7 +1234,7 @@ describe("agentic P1 pack fixes", () => {
     assert.match(checkout, /recordRetailCheckoutFinance/);
     assert.match(checkout, /createRetailCustomerOrderFromPayment/);
     assert.match(feedback, /persistMcpPlanFeedback/);
-    assert.match(order, /lookupRetailOrderForAgentic/);
+    assert.match(order, /getRetailLink/);
     assert.match(support, /lookupRetailOrderForAgentic/);
   });
 

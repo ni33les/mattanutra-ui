@@ -71,7 +71,12 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
   const shippingMinor = asMinor(props.shippingMinor);
   const taxMinor = asMinor(props.taxMinor);
   const totalPriceMinor = asMinor(props.totalPriceMinor);
-  const locked = props.paid || props.expired;
+  const unpaidOpen = !props.paid && !props.expired;
+  const refundable = props.paid;
+  const scenarios = unpaidOpen
+    ? CHECKOUT_TEST_SCENARIOS
+    : (["refund", "partial_refund"] as const);
+  const defaultScenario = unpaidOpen ? "decline_insufficient_funds" : "refund";
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
@@ -96,8 +101,13 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
           until orderStatus=cancelled.
         </li>
         <li>
-          D7-09 uses a different paid checkout: POST scenario=success, then POST scenario=refund
-          and poll paymentStatus=refunded. Do not refund the D8 paid order.
+          D7-10 after this checkout is paid: POST the same named fields with scenario=refund or
+          partial_refund. The paid page keeps an authorized refund form. Poll order for
+          paymentStatus=refunded.
+        </li>
+        <li>
+          D9 expire and three_ds_cancelled MUST use SEPARATE unpaid checkout URLs, never this
+          paid D8 order.
         </li>
       </ol>
       <header className="space-y-1">
@@ -139,14 +149,17 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
           <dd>{formatMinor(totalPriceMinor, props.currency, props.locale)}</dd>
         </div>
       </dl>
-      {locked ? (
+      {props.paid ? (
         <p className="rounded-lg bg-[var(--brand-soft-green)] px-4 py-3">
-          {agenticMessage(
-            props.locale,
-            props.paid ? "checkout.paid" : "checkout.expired"
-          )}
+          {agenticMessage(props.locale, "checkout.paid")}
         </p>
-      ) : (
+      ) : null}
+      {props.expired && !props.paid ? (
+        <p className="rounded-lg bg-[var(--brand-soft-green)] px-4 py-3">
+          {agenticMessage(props.locale, "checkout.expired")}
+        </p>
+      ) : null}
+      {unpaidOpen || refundable ? (
         <form
           action={`/api/mcp/checkout/${encodeURIComponent(props.checkoutAccess)}/pay`}
           className="space-y-6"
@@ -247,12 +260,12 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
             <span className="font-medium text-ink">Test scenario</span>
             <select
               className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-white px-3 py-2 text-ink"
-              defaultValue="decline_insufficient_funds"
+              defaultValue={defaultScenario}
               id="scenario"
               name="scenario"
               required
             >
-              {CHECKOUT_TEST_SCENARIOS.map((item) => (
+              {scenarios.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>

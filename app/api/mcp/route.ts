@@ -4,10 +4,12 @@ import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { loadAgenticConfig } from "@/lib/agentic/config";
 import { AGENTIC_PUBLIC_TOOLS, AGENTIC_SERVER_INSTRUCTIONS } from "@/lib/agentic/contract";
 import {
+  canonicalPublicToolName,
   handleLightweightJsonRpc,
   mcpCallNeedsStore,
   type JsonRpcRequest
 } from "@/lib/agentic/mcp/rpc";
+import { recordMcpTiming } from "@/lib/agentic/metrics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +52,24 @@ function jsonRpc(body: unknown, status = 200) {
   return NextResponse.json(body, { headers: MCP_HEADERS, status });
 }
 
+function timedToolName(body: unknown) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return null;
+  }
+
+  const method = (body as { method?: unknown }).method;
+  if (method === "initialize" || method === "tools/list" || method === "ping") {
+    return "info";
+  }
+
+  if (method !== "tools/call") {
+    return null;
+  }
+
+  const name = (body as { params?: { name?: unknown } }).params?.name;
+  return typeof name === "string" ? canonicalPublicToolName(name) : null;
+}
+
 export async function POST(request: Request) {
   let body: unknown;
 
@@ -73,6 +93,9 @@ export async function POST(request: Request) {
     }
   }
 
+  const started = performance.now();
+  const timed = timedToolName(body);
+
   try {
     if (!Array.isArray(body) && !mcpCallNeedsStore(body)) {
       const light = handleLightweightJsonRpc(
@@ -85,6 +108,9 @@ export async function POST(request: Request) {
       }
 
       if (light) {
+        if (timed) {
+          recordMcpTiming(timed, performance.now() - started);
+        }
         return jsonRpc(light);
       }
     }
@@ -105,6 +131,9 @@ export async function POST(request: Request) {
         }
       }
 
+      if (timed) {
+        recordMcpTiming(timed, performance.now() - started);
+      }
       return jsonRpc(responses);
     }
 
@@ -114,6 +143,9 @@ export async function POST(request: Request) {
       return new NextResponse(null, { status: 202 });
     }
 
+    if (timed) {
+      recordMcpTiming(timed, performance.now() - started);
+    }
     return jsonRpc(result);
   } catch (error) {
     log.error("mcp.dispatch_failed", {

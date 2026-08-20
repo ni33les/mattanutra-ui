@@ -14,6 +14,7 @@ import {
   asMinor,
   asMinorOr
 } from "@/lib/agentic/money";
+import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 
 type PageProps = Readonly<{
   params: Promise<{ checkoutAccess: string; locale: string }>;
@@ -77,6 +78,17 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
     frozen.totalPriceMinor == null
       ? addMinor(subtotalMinor, shippingMinor, taxMinor)
       : asMinor(frozen.totalPriceMinor);
+  const queryResult =
+    typeof query.paymentStatus === "string"
+      ? `paymentStatus=${query.paymentStatus} attempt=${query.attempt ?? "none"} reason=${query.reason ?? "none"} v${query.stateVersion ?? "?"}`
+      : null;
+  const counts =
+    runtime.config.environment === "dev"
+      ? await redactedOrderCounts({ orderId: order.id, runtime })
+      : null;
+  const lastResult = [queryResult, counts ? `TEST-DRIVER EVIDENCE (not payment truth) ${JSON.stringify(counts)}` : null]
+    .filter(Boolean)
+    .join("\n");
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -100,11 +112,7 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
           }))}
           locale={locale}
           orderReference={order.reference}
-          lastResult={
-            typeof query.paymentStatus === "string"
-              ? `paymentStatus=${query.paymentStatus} attempt=${query.attempt ?? "none"} reason=${query.reason ?? "none"} v${query.stateVersion ?? "?"}`
-              : null
-          }
+          lastResult={lastResult || null}
           paid={order.paymentStatus === "paid"}
           shippingMinor={shippingMinor}
           subtotalMinor={subtotalMinor}

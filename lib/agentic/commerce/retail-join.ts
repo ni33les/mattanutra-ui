@@ -381,6 +381,41 @@ export async function joinMcpPaidOrderToRetail(input: Readonly<{
   }
 }
 
+export async function persistMcpAssessment(input: Readonly<{
+  locale?: string;
+  planId: string;
+}>) {
+  const sql = await loadSql();
+
+  if (!sql || !isUuid(input.planId)) {
+    return;
+  }
+
+  const locale = asLocale(input.locale);
+
+  await sql`
+    insert into public.assessments (
+      plan_id,
+      locale,
+      status,
+      answers,
+      answer_summary,
+      health_score,
+      updated_at
+    )
+    values (
+      ${input.planId}::uuid,
+      ${locale},
+      'captured',
+      '{}'::jsonb,
+      '{}'::jsonb,
+      '{}'::jsonb,
+      now()
+    )
+    on conflict (plan_id) do nothing
+  `;
+}
+
 export async function persistMcpPlanFeedback(input: Readonly<{
   optionId: string | null;
   planId: string;
@@ -396,28 +431,7 @@ export async function persistMcpPlanFeedback(input: Readonly<{
 
   try {
     const { savePlanFeedback } = await import("@/lib/plan-feedback");
-
-    await sql`
-      insert into public.assessments (
-        plan_id,
-        locale,
-        status,
-        answers,
-        answer_summary,
-        health_score,
-        updated_at
-      )
-      values (
-        ${input.planId}::uuid,
-        'en',
-        'captured',
-        '{}'::jsonb,
-        '{}'::jsonb,
-        '{}'::jsonb,
-        now()
-      )
-      on conflict (plan_id) do nothing
-    `;
+    await persistMcpAssessment({ locale: "en", planId: input.planId });
 
     const retail = await sql<Array<{ order_id: string }>>`
       select retail_customer_orders.id::text as order_id

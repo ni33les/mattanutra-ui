@@ -465,6 +465,12 @@ export async function planTool(input: Readonly<{
       store
     });
 
+    void import("@/lib/agentic/commerce/retail-join")
+      .then(({ persistMcpAssessment }) =>
+        persistMcpAssessment({ locale, planId })
+      )
+      .catch(() => null);
+
     return response;
   });
 }
