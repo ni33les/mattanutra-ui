@@ -226,7 +226,6 @@ export function normalizePlanRequest(input: Readonly<{
 
   const market = resolveMarket({
     countryCode: request.destinationCountry,
-    currency: request.currency,
     retailerAdapter: input.config.thailandRetailerAdapter
   });
 
