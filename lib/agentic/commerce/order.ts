@@ -47,13 +47,13 @@ export async function orderTool(input: Readonly<{
     found: Boolean(order),
     localeMessage: (key) => agenticMessage(locale, key),
     order,
-    retail: orderNumber
+    retail: order && orderNumber
       ? {
           orderId: order.id,
           orderNumber,
           orderStatus: order.fulfilmentStatus,
           trackingUrl: `/${locale}/order/track/${encodeURIComponent(orderNumber)}`
         }
-      : null
+      : null}
   });
 }
