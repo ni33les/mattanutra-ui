@@ -1,16 +1,19 @@
-import type postgres from "postgres";
 import { getSql } from "@/lib/db";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { createMemoryStore } from "@/lib/agentic/store/memory";
 
 type Sql = NonNullable<ReturnType<typeof getSql>>;
+type AnySql = ((strings: TemplateStringsArray, ...params: unknown[]) => Promise<Array<Record<string, unknown>>>) & {
+  begin: (fn: (tx: AnySql) => Promise<unknown>) => Promise<unknown>;
+};
 
 function asJson(value: unknown) {
-  return value as postgres.JSONValue;
+  return JSON.parse(JSON.stringify(value ?? null)) as unknown;
 }
 
-export function createPostgresStore(sql: Sql): AgenticStore {
-  const store: AgenticStore = {
+export function createPostgresStore(inputSql: Sql): AgenticStore {
+  const sql = inputSql as unknown as AnySql;
+  const store = {
     async deleteAll() {
       await sql`truncate table
         public.agentic_feedback,
@@ -39,15 +42,15 @@ export function createPostgresStore(sql: Sql): AgenticStore {
       return {
         allowedActions: row.allowed_actions,
         environment: row.environment,
-        expiresAt: row.expires_at?.toISOString?.() ?? row.expires_at,
+        expiresAt: toIsoOrNull(row.expires_at),
         hash: row.capability_hash,
         id: row.id,
-        issuedAt: row.issued_at?.toISOString?.() ?? row.issued_at,
+        issuedAt: toIso(row.issued_at),
         keyVersion: row.key_version,
         principalScope: row.principal_scope,
         resourceId: row.resource_id,
         resourceType: row.resource_type,
-        revokedAt: row.revoked_at?.toISOString?.() ?? row.revoked_at,
+        revokedAt: toIsoOrNull(row.revoked_at),
         tenantScope: row.tenant_scope
       };
     },
@@ -404,8 +407,8 @@ export function createPostgresStore(sql: Sql): AgenticStore {
         update public.agentic_outbox_events set processed_at = ${processedAt}::timestamptz where id = ${id}::uuid
       `;
     },
-    async transaction(work) {
-      return sql.begin((tx) => work(createPostgresStore(tx as unknown as Sql))) as Promise<ReturnType<typeof work>>;
+    async transaction<T>(work: (store: AgenticStore) => Promise<T>) {
+      return sql.begin((tx) => work(createPostgresStore(tx as unknown as Sql))) as Promise<T>;
     },
     async updateCheckout(record) {
       await sql`
@@ -455,21 +458,31 @@ export function createPostgresStore(sql: Sql): AgenticStore {
     }
   };
 
-  return store;
+  return store as AgenticStore;
 }
 
 function toIso(value: unknown) {
   if (value instanceof Date) {
     return value.toISOString();
   }
-  return value == null ? value : String(value);
+  if (typeof value === "string" && value) {
+    return value;
+  }
+  return new Date(0).toISOString();
+}
+
+function toIsoOrNull(value: unknown) {
+  if (value == null || value === "") {
+    return null;
+  }
+  return toIso(value);
 }
 
 function mapCheckout(row: Record<string, any>) {
   return {
-    accessHash: row.access_hash,
+    accessHash: String(row.access_hash),
     createdAt: toIso(row.created_at),
-    encryptedAddress: row.encrypted_address,
+    encryptedAddress: row.encrypted_address == null ? null : String(row.encrypted_address),
     expiresAt: toIso(row.expires_at),
     id: row.id,
     orderId: row.order_id,
@@ -481,16 +494,16 @@ function mapCheckout(row: Record<string, any>) {
 
 function mapOrder(row: Record<string, any>) {
   return {
-    cancelledAt: toIso(row.cancelled_at),
-    checkoutAccessHash: row.checkout_access_hash,
-    checkoutExpiresAt: toIso(row.checkout_expires_at),
-    checkoutUrl: row.checkout_url,
-    completedAt: toIso(row.completed_at),
+    cancelledAt: toIsoOrNull(row.cancelled_at),
+    checkoutAccessHash: row.checkout_access_hash ?? null,
+    checkoutExpiresAt: toIsoOrNull(row.checkout_expires_at),
+    checkoutUrl: row.checkout_url ?? null,
+    completedAt: toIsoOrNull(row.completed_at),
     createdAt: toIso(row.created_at),
     currency: row.currency,
     destinationCountry: row.destination_country,
     environment: row.environment,
-    expiredAt: toIso(row.expired_at),
+    expiredAt: toIsoOrNull(row.expired_at),
     frozenPlan: row.frozen_plan,
     fulfilmentStatus: row.fulfilment_status,
     id: row.id,
@@ -516,7 +529,7 @@ function mapOutbox(row: Record<string, any>) {
     id: row.id,
     orderId: row.order_id,
     payload: row.payload,
-    processedAt: toIso(row.processed_at),
+    processedAt: toIsoOrNull(row.processed_at),
     type: row.type
   };
 }
