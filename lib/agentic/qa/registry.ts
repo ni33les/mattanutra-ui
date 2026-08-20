@@ -7,7 +7,7 @@ import {
   getCatalogueSnapshot,
   replaceCatalogueSnapshot
 } from "@/lib/agentic/catalogue/snapshot";
-import { qaError, type QaErrorResult } from "@/lib/agentic/qa/errors";
+import { isQaErrorResult, qaError, type QaErrorResult } from "@/lib/agentic/qa/errors";
 import type { OrderRecord } from "@/lib/agentic/store/types";
 
 export const PAYMENT_SCENARIOS = [
@@ -184,7 +184,7 @@ export async function driveScenario(input: Readonly<{
 
     const order = await resolveOrderFromHandle({ handle: input.orderHandle, now, runtime });
 
-    if ("ok" in order && order.ok === false) {
+    if (isQaErrorResult(order)) {
       return order;
     }
 
@@ -198,7 +198,7 @@ export async function driveScenario(input: Readonly<{
 
     const resolved = await resolveOrderFromHandle({ handle: input.orderHandle, now, runtime });
 
-    if ("ok" in resolved && resolved.ok === false) {
+    if (isQaErrorResult(resolved)) {
       return resolved;
     }
 
@@ -239,11 +239,11 @@ export async function driveScenario(input: Readonly<{
       mapped === "duplicate_success";
     const next = await drivePaymentEvent({ now, order, runtime, scenario: mapped, submitOms });
 
-    if ("ok" in next && next.ok === false) {
+    if (isQaErrorResult(next)) {
       return next;
     }
 
-    return { order: next as OrderRecord };
+    return { order: next };
   }
 
   if (input.scenario.startsWith("oms.")) {
@@ -253,7 +253,7 @@ export async function driveScenario(input: Readonly<{
 
     const resolved = await resolveOrderFromHandle({ handle: input.orderHandle, now, runtime });
 
-    if ("ok" in resolved && resolved.ok === false) {
+    if (isQaErrorResult(resolved)) {
       return resolved;
     }
 
