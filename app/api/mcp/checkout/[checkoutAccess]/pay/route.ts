@@ -82,8 +82,15 @@ export async function POST(request: Request, { params }: RouteProps) {
     return NextResponse.json({ message: "Order not found." }, { status: 404 });
   }
 
-  if (checkout.expiresAt <= nowIso() || order.orderStatus === "expired") {
-    return NextResponse.json({ message: "Checkout expired." }, { status: 409 });
+  if (
+    checkout.expiresAt <= nowIso() ||
+    order.orderStatus === "expired" ||
+    order.orderStatus === "cancelled"
+  ) {
+    return NextResponse.json(
+      { message: order.orderStatus === "cancelled" ? "Checkout cancelled." : "Checkout expired." },
+      { status: 409 }
+    );
   }
 
   if (body.agentAuthorized !== true) {

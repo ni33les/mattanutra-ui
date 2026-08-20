@@ -6,6 +6,7 @@ export const AGENTIC_SERVICE_VERSION = "3.0.0";
 export const AGENTIC_MIGRATION_VERSION = "agentic-3.0.0";
 export const AGENTIC_POLL_AFTER_SECONDS = 3;
 export const AGENTIC_CHECKOUT_TTL_MS = 15 * 60 * 1000;
+export const AGENTIC_PLAN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const AGENTIC_IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const GUIDANCE_RULES_VERSION = "3.0.0";
 
@@ -19,6 +20,7 @@ export type AgenticConfig = Readonly<{
   capabilitySecret: string;
   checkoutTtlMs: number;
   continuation: "polling_only";
+  planTtlMs: number;
   environment: AgenticEnvironment;
   internalQaHarness: boolean;
   paymentProvider: PaymentProviderMode;
@@ -173,6 +175,7 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
     capabilitySecret,
     checkoutTtlMs: AGENTIC_CHECKOUT_TTL_MS,
     continuation: "polling_only",
+    planTtlMs: AGENTIC_PLAN_TTL_MS,
     environment,
     internalQaHarness,
     paymentProvider,

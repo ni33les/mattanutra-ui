@@ -62,6 +62,27 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     return { applied: false, order: next };
   }
 
+  if (input.event.status === "declined" && input.event.reason === "three_ds_cancelled") {
+    const next: OrderRecord = {
+      ...order,
+      cancelledAt: input.now,
+      checkoutUrl: null,
+      latestPaymentAttempt: "cancelled",
+      latestPaymentReason: "three_ds_cancelled",
+      orderStatus: "cancelled",
+      paymentStatus: "unpaid",
+      updatedAt: input.now
+    };
+    await input.store.updateOrder(next);
+    await input.store.insertPaymentAudit({
+      createdAt: input.now,
+      id: randomUUID(),
+      orderId: order.id,
+      type: "payment_cancelled"
+    });
+    return { applied: true, order: next };
+  }
+
   if (input.event.status === "declined" || input.event.status === "unavailable") {
     const next: OrderRecord = {
       ...order,
@@ -173,20 +194,23 @@ export function orderPollView(input: Readonly<{
   const declined = order.latestPaymentAttempt === "declined";
   const processing = order.paymentStatus === "processing";
   const expired = order.orderStatus === "expired";
+  const cancelled = order.orderStatus === "cancelled";
   const refunded =
     order.paymentStatus === "refunded" || order.paymentStatus === "partially_refunded";
-  const terminal = paid || expired || refunded || order.orderStatus === "cancelled";
-  const messageKey = declined
-    ? "order.payment_declined_retry"
-    : paid
-      ? "order.paid"
-      : processing
-        ? "order.processing"
-        : expired
-          ? "order.expired"
-          : refunded
-            ? "order.refunded"
-            : "order.open_unpaid";
+  const terminal = paid || expired || refunded || cancelled;
+  const messageKey = cancelled
+    ? "order.cancelled"
+    : expired
+      ? "order.expired"
+      : declined
+        ? "order.payment_declined_retry"
+        : paid
+          ? "order.paid"
+          : processing
+            ? "order.processing"
+            : refunded
+              ? "order.refunded"
+              : "order.open_unpaid";
 
   return {
     checkoutExpiresAt: order.checkoutExpiresAt,

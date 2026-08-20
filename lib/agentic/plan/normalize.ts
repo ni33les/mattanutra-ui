@@ -162,7 +162,7 @@ function resolveSupplement(
 
   return businessError({
     fieldPath,
-    message: "Unknown supplement name. Use a recognised name such as Vitamin D3 or Creatine.",
+    message: "Unknown supplement name. Use a recognised name such as Folate, Vitamin D3 or Creatine.",
     reasonCode: "unknown_supplement"
   });
 }

@@ -87,6 +87,14 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
         </li>
         <li>Poll order until unpaid / declined / insufficient_funds / stateVersion=1.</li>
         <li>POST the same fields again with scenario=success, then poll paid / stateVersion=2.</li>
+        <li>
+          D9 timeout uses a different unpaid checkout: POST the same fields with scenario=expire
+          and poll until orderStatus=expired.
+        </li>
+        <li>
+          D9 cancelled uses another unpaid checkout: POST scenario=three_ds_cancelled and poll
+          until orderStatus=cancelled.
+        </li>
       </ol>
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">{props.orderReference}</p>

@@ -175,9 +175,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "该标识不是当前补充剂 ID。请改用已识别的补充剂名称。"
   },
   "mcp.errors.unknown_supplement": {
-    en: "Unknown supplement name. Use a recognised name such as Vitamin D3 or Creatine.",
-    th: "ไม่รู้จักชื่อสารอาหารนี้ ใช้ชื่อที่ระบบรู้จัก ห้ามใส่รหัสเก่าในชื่อ",
-    "zh-CN": "未知补充剂名称。请使用已识别的名称，不要在 name 中发送旧 ID。"
+    en: "Unknown supplement name. Use a recognised name such as Folate, Vitamin D3 or Creatine.",
+    th: "ไม่รู้จักชื่อสารอาหารนี้ ใช้ชื่อที่ระบบรู้จัก เช่น Folate Vitamin D3 หรือ Creatine",
+    "zh-CN": "未知补充剂名称。请使用已识别的名称，例如 Folate、Vitamin D3 或 Creatine。"
   },
   "mcp.errors.not_found": {
     en: "Not found.",
@@ -263,6 +263,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     en: "Payment is processing. Poll again after pollAfterSeconds.",
     th: "กำลังดำเนินการชำระเงิน รอแล้วตรวจสอบอีกครั้ง",
     "zh-CN": "付款处理中。请在 pollAfterSeconds 后再次查询。"
+  },
+  "order.cancelled": {
+    en: "This order was cancelled before payment.",
+    th: "คำสั่งซื้อนี้ถูกยกเลิกก่อนชำระเงิน",
+    "zh-CN": "该订单在付款前已取消。"
   },
   "order.expired": {
     en: "This order expired before payment.",

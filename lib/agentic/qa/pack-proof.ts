@@ -674,7 +674,9 @@ export async function packProof(runtime: AgenticRuntime) {
       "D9-07",
       panel.includes("checkout.agentAuth") &&
         panel.includes("checkout.test_mode") &&
-        panel.includes("subtotalMinor")
+        panel.includes("subtotalMinor") &&
+        panel.includes("scenario=expire") &&
+        panel.includes("three_ds_cancelled")
     )
   );
   checks.push(
@@ -710,11 +712,61 @@ export async function packProof(runtime: AgenticRuntime) {
   );
   checks.push(check("D10-08", typeof sanitizeLogFields === "function"));
   checks.push(check("D10-09", true, { mutationRateLimit: "mcp 60/min on plan/execute/feedback" }));
+
+  const concurrentPlan = await readyPlan(runtime, `qa-pack-cc-${stamp}`);
+  let concurrentOk = false;
+  let cancelledOk = false;
+  if (!isAgenticErrorResult(concurrentPlan) && concurrentPlan.status === "ready") {
+    const [first, second] = await Promise.all([
+      executeTool({
+        config: runtime.config,
+        expectedRevision: concurrentPlan.revision,
+        idempotencyKey: `qa-pack-cc-a-${stamp}`,
+        now,
+        payment: runtime.payment,
+        planHandle: concurrentPlan.planHandle,
+        scope: runtime.scope,
+        store: runtime.store
+      }),
+      executeTool({
+        config: runtime.config,
+        expectedRevision: concurrentPlan.revision,
+        idempotencyKey: `qa-pack-cc-b-${stamp}`,
+        now,
+        payment: runtime.payment,
+        planHandle: concurrentPlan.planHandle,
+        scope: runtime.scope,
+        store: runtime.store
+      })
+    ]);
+    concurrentOk = !isAgenticErrorResult(first) || !isAgenticErrorResult(second);
+    const cancelHandle = !isAgenticErrorResult(first)
+      ? first.orderHandle
+      : !isAgenticErrorResult(second)
+        ? second.orderHandle
+        : null;
+    if (cancelHandle) {
+      const cancelled = await simulatePayment({
+        config: runtime.config,
+        now,
+        orderHandle: cancelHandle,
+        scenario: "three_ds_cancelled",
+        scope: runtime.scope,
+        store: runtime.store
+      });
+      cancelledOk =
+        !isAgenticErrorResult(cancelled) &&
+        (cancelled as { orderStatus?: string }).orderStatus === "cancelled";
+    }
+  }
   checks.push(
     check(
       "D10-10",
       checks.some((item) => item.id === "D2-04" && item.passed) &&
-        checks.some((item) => item.id === "D2-10" && item.passed)
+        checks.some((item) => item.id === "D2-10" && item.passed) &&
+        concurrentOk &&
+        cancelledOk,
+      { cancelledOk, concurrentOk }
     )
   );
 

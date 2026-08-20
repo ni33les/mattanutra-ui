@@ -9,14 +9,19 @@ import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogu
 
 const SUPPLEMENT_UUIDS = {
   b12: "44444444-4444-4444-4444-444444444444",
+  b6: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
   c: "55555555-5555-5555-5555-555555555555",
+  calcium: "dddddddd-dddd-dddd-dddd-dddddddddddd",
   collagen: "99999999-9999-9999-9999-999999999999",
   coq10: "88888888-8888-8888-8888-888888888888",
   creatine: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
   d3: "11111111-1111-1111-1111-111111111111",
+  folate: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  iodine: "a1a1a1a1-a1a1-41a1-a1a1-a1a1a1a1a1a1",
   iron: "77777777-7777-7777-7777-777777777777",
   magnesium: "33333333-3333-3333-3333-333333333333",
   omega3: "22222222-2222-2222-2222-222222222222",
+  selenium: "a2a2a2a2-a2a2-42a2-a2a2-a2a2a2a2a2a2",
   sterols: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   zinc: "66666666-6666-6666-6666-666666666666"
 } as const;
@@ -39,17 +44,22 @@ function supplement(
 }
 
 export const FIXTURE_SUPPLEMENTS: readonly CatalogueSupplement[] = [
-  supplement("d3", "Vitamin D3", ["Vitamin D", "D3", "Cholecalciferol"], ["IU", "mcg", "mg"]),
-  supplement("omega3", "Omega-3", ["Fish oil", "EPA", "DHA", "Algae oil"], ["mg", "g"]),
-  supplement("magnesium", "Magnesium", ["Mg", "Magnesium glycinate"], ["mg", "g"]),
-  supplement("b12", "Vitamin B12", ["B12", "Cobalamin", "Methylcobalamin"], ["mcg", "mg"]),
-  supplement("c", "Vitamin C", ["Ascorbic acid"], ["mg", "g"]),
-  supplement("zinc", "Zinc", ["Zinc picolinate"], ["mg"]),
-  supplement("iron", "Iron", ["Ferrous"], ["mg"]),
-  supplement("coq10", "CoQ10", ["Ubiquinone", "Ubiquinol"], ["mg"]),
-  supplement("collagen", "Collagen", ["Collagen peptides"], ["g", "mg"]),
-  supplement("sterols", "Plant sterols", ["Phytosterols"], ["mg", "g"]),
-  supplement("creatine", "Creatine", ["Creatine monohydrate", "Creapure"], ["g", "mg"])
+  supplement("d3", "Vitamin D3", ["Vitamin D", "D3", "Cholecalciferol", "Vit D3", "Colecalciferol"], ["IU", "mcg", "mg"]),
+  supplement("omega3", "Omega-3", ["Fish oil", "EPA", "DHA", "Algae oil", "Omega 3", "n-3"], ["mg", "g"]),
+  supplement("magnesium", "Magnesium", ["Mg", "Magnesium glycinate", "Magnesium citrate"], ["mg", "g"]),
+  supplement("b12", "Vitamin B12", ["B12", "Cobalamin", "Methylcobalamin", "Cyanocobalamin"], ["mcg", "mg"]),
+  supplement("c", "Vitamin C", ["Ascorbic acid", "Ascorbate"], ["mg", "g"]),
+  supplement("zinc", "Zinc", ["Zinc picolinate", "Zinc citrate"], ["mg"]),
+  supplement("iron", "Iron", ["Ferrous", "Ferrous sulfate", "Ferrous sulphate"], ["mg"]),
+  supplement("coq10", "CoQ10", ["Ubiquinone", "Ubiquinol", "Coenzyme Q10"], ["mg"]),
+  supplement("collagen", "Collagen", ["Collagen peptides", "Hydrolyzed collagen"], ["g", "mg"]),
+  supplement("sterols", "Plant sterols", ["Phytosterols", "Plant sterol"], ["mg", "g"]),
+  supplement("creatine", "Creatine", ["Creatine monohydrate", "Creapure"], ["g", "mg"]),
+  supplement("folate", "Folate", ["Folic acid", "Vitamin B9", "Folacin", "Methylfolate"], ["mcg", "mg"]),
+  supplement("calcium", "Calcium", ["Calcium citrate", "Calcium carbonate"], ["mg", "g"]),
+  supplement("b6", "Vitamin B6", ["B6", "Pyridoxine"], ["mg", "mcg"]),
+  supplement("iodine", "Iodine", ["Potassium iodide", "Iodide"], ["mcg"]),
+  supplement("selenium", "Selenium", ["Selenomethionine"], ["mcg"])
 ];
 
 function candidate(input: Readonly<{
@@ -362,6 +372,86 @@ export const FIXTURE_PRODUCTS: readonly CatalogueProduct[] = [
     supplementKey: "creatine",
     title: "Creatine Monohydrate 5 g",
     unit: "g"
+  }),
+  product({
+    amount: 400,
+    comparableAmount: 400,
+    dailyPills: 1,
+    dietarySource: "any",
+    form: "tablet",
+    id: "cccccccc-cccc-4ccc-cccc-cccccccccccc",
+    name: "Folate",
+    normalizedName: "folate",
+    omegaSource: "none",
+    priceMinor: 19000,
+    sku: "TH-FOL-400",
+    supplementKey: "folate",
+    title: "Folate 400 mcg",
+    unit: "mcg"
+  }),
+  product({
+    amount: 600,
+    comparableAmount: 600_000,
+    dailyPills: 1,
+    dietarySource: "any",
+    form: "tablet",
+    id: "dddddddd-dddd-4ddd-dddd-dddddddddddd",
+    name: "Calcium",
+    normalizedName: "calcium",
+    omegaSource: "none",
+    priceMinor: 27000,
+    sku: "TH-CA-600",
+    supplementKey: "calcium",
+    title: "Calcium Citrate 600 mg",
+    unit: "mg"
+  }),
+  product({
+    amount: 10,
+    comparableAmount: 10_000,
+    dailyPills: 1,
+    dietarySource: "any",
+    form: "tablet",
+    id: "eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee",
+    name: "Vitamin B6",
+    normalizedName: "vitamin_b6",
+    omegaSource: "none",
+    priceMinor: 18000,
+    sku: "TH-B6-10",
+    supplementKey: "b6",
+    title: "Vitamin B6 10 mg",
+    unit: "mg"
+  }),
+  product({
+    amount: 150,
+    comparableAmount: 150,
+    dailyPills: 1,
+    dietarySource: "any",
+    form: "tablet",
+    id: "a1a1a1a1-a1a1-41a1-a1a1-a1a1a1a1a1a1",
+    name: "Iodine",
+    normalizedName: "iodine",
+    omegaSource: "none",
+    priceMinor: 16000,
+    sku: "TH-IOD-150",
+    supplementKey: "iodine",
+    title: "Iodine 150 mcg",
+    unit: "mcg"
+  }),
+  product({
+    amount: 55,
+    comparableAmount: 55,
+    dailyPills: 1,
+    dietarySource: "any",
+    form: "capsule",
+    id: "a2a2a2a2-a2a2-42a2-a2a2-a2a2a2a2a2a2",
+    name: "Selenium",
+    normalizedName: "selenium",
+    omegaSource: "none",
+    priceMinor: 17000,
+    sku: "TH-SE-55",
+    supplementKey: "selenium",
+    title: "Selenium 55 mcg",
+    unit: "mcg"
   })
 ];
 

@@ -5,6 +5,8 @@ import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
 import { parseCheckoutAddress } from "../lib/agentic/checkout-address.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { planTool } from "../lib/agentic/plan/service.ts";
+import { executeTool } from "../lib/agentic/commerce/execute.ts";
 import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
 import {
   createAgenticRuntime,
@@ -707,6 +709,8 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /application\/x-www-form-urlencoded/);
     assert.match(panel, /name="customerName"/);
     assert.match(panel, /name="agentAuthorized"/);
+    assert.match(panel, /scenario=expire/);
+    assert.match(panel, /three_ds_cancelled/);
   });
 
   it("accepts Creatine by official name and does not call it a legacy ID", async () => {
@@ -869,5 +873,237 @@ describe("agentic P1 pack fixes", () => {
     assert.deepEqual(missing, []);
     const failed = body.checks.filter((item) => !item.passed).map((item) => item.id);
     assert.deepEqual(failed, [], failed.join(","));
+  });
+
+  it("accepts pregnant lifeStage with Folate and Folic acid aliases", async () => {
+    const runtime = runtimeFor();
+    const folate = await call(runtime, "plan", {
+      idempotencyKey: "p1-pregnant-folate-001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 32, lifeStage: "pregnant", sexAtBirth: "female" },
+        requirements: {},
+        targets: [{ amount: 400, name: "Folate", unit: "mcg" }]
+      }
+    });
+    assert.equal(folate.ok, true);
+    assert.notEqual(folate.status, undefined);
+    assert.ok((folate.coverage as Array<{ name?: string }>).some((row) =>
+      String(row.name).toLowerCase().includes("folate")
+    ));
+
+    const alias = await call(runtime, "plan", {
+      idempotencyKey: "p1-pregnant-folic-001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 32, lifeStage: "pregnant", sexAtBirth: "female" },
+        requirements: {},
+        targets: [{ amount: 400, name: "Folic acid", unit: "mcg" }]
+      }
+    });
+    assert.equal(alias.ok, true);
+    assert.equal((alias.error as { reasonCode?: string } | undefined)?.reasonCode, undefined);
+  });
+
+  it("recognises Calcium, Vitamin B6, Iodine and Selenium by name", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "p1-extra-names-000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "female" },
+        requirements: {},
+        targets: [
+          { amount: 600, name: "Calcium", unit: "mg" },
+          { amount: 10, name: "Vitamin B6", unit: "mg" },
+          { amount: 150, name: "Iodine", unit: "mcg" },
+          { amount: 55, name: "Selenium", unit: "mcg" }
+        ]
+      }
+    });
+    assert.equal(plan.ok, true);
+    const names = ((plan.coverage as Array<{ name?: string }>) ?? []).map((row) =>
+      String(row.name).toLowerCase()
+    );
+    assert.ok(names.some((name) => name.includes("calcium")));
+    assert.ok(names.some((name) => name.includes("b6") || name.includes("vitamin b6")));
+    assert.ok(names.some((name) => name.includes("iodine")));
+    assert.ok(names.some((name) => name.includes("selenium")));
+  });
+
+  it("reuses a planHandle hours later and expires it after the 7-day TTL", async () => {
+    const runtime = runtimeFor();
+    const created = await call(runtime, "plan", {
+      idempotencyKey: "p1-plan-ttl-create-01",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    assert.equal(created.ok, true);
+    const later = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString();
+    const reused = await planTool({
+      config: runtime.config,
+      now: later,
+      payload: {
+        expectedRevision: created.revision as number,
+        idempotencyKey: "p1-plan-ttl-reuse-001",
+        planHandle: String(created.planHandle),
+        request: {
+          destinationCountry: "TH",
+          locale: "en",
+          optimization: "balanced",
+          profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+          requirements: {},
+          targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+        }
+      },
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.equal("ok" in reused && reused.ok, true);
+
+    const expired = await planTool({
+      config: runtime.config,
+      now: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+      payload: {
+        expectedRevision: created.revision as number,
+        idempotencyKey: "p1-plan-ttl-expire-01",
+        planHandle: String(created.planHandle),
+        request: {
+          destinationCountry: "TH",
+          locale: "en",
+          optimization: "balanced",
+          profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+          requirements: {},
+          targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+        }
+      },
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.equal("ok" in expired && expired.ok, false);
+    assert.equal(
+      (expired as { error?: { reasonCode?: string } }).error?.reasonCode,
+      "not_found"
+    );
+  });
+
+  it("advances unpaid checkouts to expired and cancelled via named scenarios", async () => {
+    const runtime = runtimeFor();
+    const expirePlan = await call(runtime, "plan", {
+      idempotencyKey: "p1-expire-plan-000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const expireExec = await call(runtime, "execute", {
+      expectedRevision: expirePlan.revision,
+      idempotencyKey: "p1-expire-exec-000001",
+      planHandle: expirePlan.planHandle
+    });
+    const expired = await simulatePayment({
+      config: runtime.config,
+      now: new Date().toISOString(),
+      orderHandle: String(expireExec.orderHandle),
+      scenario: "expire",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.equal((expired as { orderStatus?: string }).orderStatus, "expired");
+
+    const cancelPlan = await call(runtime, "plan", {
+      idempotencyKey: "p1-cancel-plan-000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    const cancelExec = await call(runtime, "execute", {
+      expectedRevision: cancelPlan.revision,
+      idempotencyKey: "p1-cancel-exec-000001",
+      planHandle: cancelPlan.planHandle
+    });
+    const cancelled = await simulatePayment({
+      config: runtime.config,
+      now: new Date().toISOString(),
+      orderHandle: String(cancelExec.orderHandle),
+      scenario: "three_ds_cancelled",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.equal((cancelled as { orderStatus?: string }).orderStatus, "cancelled");
+    assert.equal((cancelled as { messageKey?: string }).messageKey, "order.cancelled");
+  });
+
+  it("binds acknowledge_safety answers and returns revision_conflict on stale execute", async () => {
+    const runtime = runtimeFor();
+    const first = await call(runtime, "plan", {
+      idempotencyKey: "p1-ack-answer-first-01",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        medicationCodes: ["apixaban"],
+        targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
+      }
+    });
+    assert.equal(first.status, "needs_input");
+    const questions = (first.questions as Array<{ questionId?: string }>) ?? [];
+    assert.ok(questions.some((item) => item.questionId === "q_safety_ack"));
+
+    const acked = await call(runtime, "plan", {
+      expectedRevision: first.revision,
+      idempotencyKey: "p1-ack-answer-second01",
+      planHandle: first.planHandle,
+      request: {
+        answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        medicationCodes: ["apixaban"],
+        targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
+      }
+    });
+    assert.equal(acked.status, "ready");
+
+    const stale = await executeTool({
+      config: runtime.config,
+      expectedRevision: first.revision as number,
+      idempotencyKey: "p1-stale-exec-0000001",
+      now: new Date().toISOString(),
+      payment: runtime.payment,
+      planHandle: String(acked.planHandle),
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.equal("ok" in stale && stale.ok, false);
+    assert.equal(
+      (stale as { error?: { reasonCode?: string } }).error?.reasonCode,
+      "revision_conflict"
+    );
   });
 });

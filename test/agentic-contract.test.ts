@@ -87,6 +87,14 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.match(String(result.instructions), /customerName, phone, customerEmail, addressLine1/);
     assert.match(String(result.instructions), /scenario=decline_insufficient_funds/);
     assert.match(String(result.instructions), /scenario=success/);
+    assert.match(String(result.instructions), /HARD RULE 4 — REMAINING PACK CASES/);
+    assert.match(String(result.instructions), /lifeStage=pregnant/);
+    assert.match(String(result.instructions), /Folate/);
+    assert.match(String(result.instructions), /planHandle stays valid 7 days/);
+    assert.match(String(result.instructions), /scenario=expire/);
+    assert.match(String(result.instructions), /scenario=three_ds_cancelled/);
+    assert.match(String(result.instructions), /acknowledge_safety/);
+    assert.match(String(result.instructions), /revision_conflict/);
     assert.equal(
       (result.serverInfo as { version: string }).version,
       "3.0.0"

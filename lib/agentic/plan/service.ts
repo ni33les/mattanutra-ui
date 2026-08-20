@@ -123,6 +123,46 @@ function previousResult(record: unknown): PlanResult | null {
   return record && typeof record === "object" ? (record as PlanResult) : null;
 }
 
+function bindSafetyAcknowledgement(input: Readonly<{
+  previous: PlanResult | null;
+  request: unknown;
+  shownRevision: number;
+  state: CanonicalPlanState;
+}>): CanonicalPlanState {
+  if (input.state.safetyAcknowledgement) {
+    return input.state;
+  }
+
+  const answers =
+    input.request &&
+    typeof input.request === "object" &&
+    Array.isArray((input.request as { answers?: unknown }).answers)
+      ? (input.request as { answers: Array<{ choice?: string }> }).answers
+      : [];
+  const wantsAck = answers.some((item) => item.choice === "acknowledge_safety");
+
+  if (!wantsAck || !input.previous) {
+    return input.state;
+  }
+
+  const guidanceIds = input.previous.safetyGuidance
+    .filter((item) => item.action === "acknowledge")
+    .map((item) => item.guidanceId);
+
+  if (guidanceIds.length === 0) {
+    return input.state;
+  }
+
+  return {
+    ...input.state,
+    safetyAcknowledgement: {
+      confirmed: true,
+      guidanceIds,
+      revision: input.shownRevision
+    }
+  };
+}
+
 export async function planTool(input: Readonly<{
   config: AgenticConfig;
   now: string;
@@ -356,6 +396,7 @@ export async function planTool(input: Readonly<{
       const issued = await issueCapability({
         allowedActions: ["plan.read", "plan.revise", "plan.execute", "feedback.write"],
         config: input.config,
+        expiresAt: new Date(Date.parse(input.now) + input.config.planTtlMs).toISOString(),
         now: input.now,
         resourceId: planId,
         resourceType: "plan",
@@ -366,13 +407,19 @@ export async function planTool(input: Readonly<{
     }
 
     const locale = negotiateLocale(normalized.state.locale);
+    const shownRevision = planHandle ? (input.payload.expectedRevision ?? 1) : 1;
     const result = buildResult({
       locale,
       previous,
-      shownRevision: planHandle ? (input.payload.expectedRevision ?? 1) : 1,
+      shownRevision,
       snapshot,
       state: {
-        ...normalized.state,
+        ...bindSafetyAcknowledgement({
+          previous,
+          request: input.payload.request,
+          shownRevision,
+          state: normalized.state
+        }),
         acceptedGaps: normalized.state.acceptedGaps.map((gap) => ({
           ...gap,
           revision
