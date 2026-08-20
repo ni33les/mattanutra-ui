@@ -206,6 +206,10 @@ export async function tryApplyAgenticStripeEvent(input: Readonly<{
     store: input.runtime.store
   });
 
+  if (!applied) {
+    return { ignored: true, ok: true, reason: "order_not_found" };
+  }
+
   if (applied.order.paymentStatus === "paid") {
     await joinMcpPaidOrderToRetail({
       now,
