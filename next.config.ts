@@ -1,7 +1,27 @@
+import { execSync } from "node:child_process";
 import type { NextConfig } from "next";
 import { localeRoutePattern } from "./lib/i18n";
 import { firstPartyImageHosts } from "./lib/first-party-image-rules";
 import { noStoreLocaleRootSegments } from "./lib/public-cache-policy";
+
+function gitBuildId() {
+  const fromEnv =
+    process.env.AGENTIC_BUILD_ID?.trim() ||
+    process.env.COMMIT_SHA?.trim() ||
+    process.env.COMMIT_HASH?.trim();
+
+  if (fromEnv) {
+    return fromEnv;
+  }
+
+  try {
+    return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return "";
+  }
+}
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 const skipBuildTypecheck = process.env.NEXT_BUILD_SKIP_TYPECHECK === "1";
@@ -109,6 +129,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["localhost", "127.0.0.1", "dev.mattanutra.com"],
   devIndicators: false,
+  env: {
+    AGENTIC_BUILD_ID: gitBuildId()
+  },
   images: {
     localPatterns: [
       {

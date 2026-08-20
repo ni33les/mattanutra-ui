@@ -134,6 +134,7 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
     (environment === "dev" && process.env.INTERNAL_QA_HARNESS !== "false");
   const capabilitySecret =
     process.env.AGENTIC_CAPABILITY_KEY?.trim() ||
+    process.env.MCP_V2_ORDER_HANDLE_SECRET?.trim() ||
     (environment === "dev" ? "dev-agentic-capability-key-not-for-uat" : "");
 
   if (!capabilitySecret) {
@@ -171,6 +172,7 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
     buildId:
       process.env.AGENTIC_BUILD_ID?.trim() ||
       process.env.COMMIT_SHA?.trim() ||
+      process.env.COMMIT_HASH?.trim() ||
       `local-${AGENTIC_SERVICE_VERSION}`,
     capabilitySecret,
     checkoutTtlMs: AGENTIC_CHECKOUT_TTL_MS,
