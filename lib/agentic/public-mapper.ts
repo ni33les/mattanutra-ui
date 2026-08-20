@@ -142,6 +142,7 @@ export function publicSafetyGuidance(row: SafetyGuidance) {
     guidanceId: row.guidanceId,
     message: row.message,
     messageKey: row.messageKey,
+    requiresSafetyAcknowledgement: row.action === "acknowledge" || row.action === "block",
     severity: row.severity,
     ...(row.exposure != null ? { exposure: row.exposure } : {}),
     ...(row.threshold != null ? { threshold: row.threshold } : {}),
@@ -178,6 +179,16 @@ export function publicPlanFields(result: Pick<
   | "unmetRequirements"
 >) {
   const selected = result.selected;
+  const guidanceIds = result.safetyGuidance.map((item) => item.guidanceId);
+  const snapshot =
+    "requestSnapshot" in result
+      ? (result as PlanResult).requestSnapshot
+      : null;
+  const medicationCodes = snapshot?.medicationCodes ?? [];
+  const conditionCodes = snapshot?.conditionCodes ?? [];
+  const requiresSafetyAcknowledgement = result.safetyGuidance.some(
+    (item) => item.action === "acknowledge" || item.action === "block"
+  );
   const alternatives = result.alternatives.filter((item) => {
     if (!selected) {
       return true;
@@ -224,6 +235,10 @@ export function publicPlanFields(result: Pick<
     ...(result.safetyGuidance.length > 0
       ? { safetyGuidance: result.safetyGuidance.map(publicSafetyGuidance) }
       : {}),
+    ...(guidanceIds.length > 0 ? { guidanceIds } : {}),
+    ...(requiresSafetyAcknowledgement ? { requiresSafetyAcknowledgement: true } : {}),
+    ...(medicationCodes.length > 0 ? { medicationCodes } : {}),
+    ...(conditionCodes.length > 0 ? { conditionCodes } : {}),
     ...(result.unmetRequirements.length > 0
       ? { unmetRequirements: result.unmetRequirements }
       : {}),

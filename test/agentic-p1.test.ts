@@ -125,10 +125,14 @@ describe("agentic P1 pack fixes", () => {
     });
 
     assert.equal(first.status, "needs_input");
-    const guidanceIds = (first.safetyGuidance as Array<{ guidanceId: string }>).map(
+    const guidanceIds = first.guidanceIds as string[];
+    assert.ok(Array.isArray(guidanceIds) && guidanceIds.length > 0);
+    assert.equal(first.requiresSafetyAcknowledgement, true);
+    assert.deepEqual(first.medicationCodes, ["apixaban"]);
+    const fromGuidance = (first.safetyGuidance as Array<{ guidanceId: string }>).map(
       (item) => item.guidanceId
     );
-    assert.ok(guidanceIds.length > 0);
+    assert.deepEqual(guidanceIds, fromGuidance);
 
     const acked = await call(runtime, "plan", {
       expectedRevision: first.revision,
@@ -152,6 +156,7 @@ describe("agentic P1 pack fixes", () => {
       }
     });
     assert.equal(acked.status, "ready");
+    assert.deepEqual(acked.medicationCodes, ["apixaban"]);
 
     const changed = await call(runtime, "plan", {
       expectedRevision: acked.revision,
@@ -692,6 +697,10 @@ describe("agentic P1 pack fixes", () => {
       }
     });
     assert.equal(plan.status, "blocked");
+    const guidanceIds = plan.guidanceIds as string[] | undefined;
+    assert.ok(Array.isArray(guidanceIds) && guidanceIds.length > 0);
+    assert.equal(plan.requiresSafetyAcknowledgement, true);
+    assert.deepEqual(plan.conditionCodes, ["ckd"]);
     const encoded = JSON.stringify(plan);
     assert.equal(encoded.includes(":null"), false);
     assert.equal(/:\s*\[\]/.test(encoded), false);
@@ -1127,7 +1136,68 @@ describe("agentic P1 pack fixes", () => {
     assert.equal("supplements" in info, false);
   });
 
-  it("reuses one planHandle twice for D5-08 and D5-09", async () => {
+  it("returns D5-07 medicationCodes plus safetyAcknowledgement and D5-09 blocked guidanceIds", async () => {
+    const runtime = runtimeFor();
+    const first = await call(runtime, "plan", {
+      idempotencyKey: "p1-d507-plan-0000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        medicationCodes: ["apixaban"],
+        targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
+      }
+    });
+    assert.equal(first.status, "needs_input");
+    assert.equal(first.requiresSafetyAcknowledgement, true);
+    assert.ok(Array.isArray(first.guidanceIds) && (first.guidanceIds as string[]).length > 0);
+    assert.ok(
+      ((first.questions as Array<{ questionId?: string }>) ?? []).some(
+        (item) => item.questionId === "q_safety_ack"
+      )
+    );
+    const acked = await call(runtime, "plan", {
+      expectedRevision: first.revision,
+      idempotencyKey: "p1-d507-ack-0000001",
+      planHandle: first.planHandle,
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        medicationCodes: ["apixaban"],
+        safetyAcknowledgement: {
+          confirmed: true,
+          guidanceIds: first.guidanceIds as string[],
+          revision: first.revision as number
+        },
+        targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
+      }
+    });
+    assert.equal(acked.status, "ready");
+
+    const blocked = await call(runtime, "plan", {
+      idempotencyKey: "p1-d509-block-000001",
+      request: {
+        conditionCodes: ["ckd"],
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 60, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
+      }
+    });
+    assert.equal(blocked.status, "blocked");
+    assert.ok(Array.isArray(blocked.guidanceIds) && (blocked.guidanceIds as string[]).length > 0);
+    assert.equal(blocked.requiresSafetyAcknowledgement, true);
+    assert.deepEqual(blocked.conditionCodes, ["ckd"]);
+  });
+
+  it("reuses one planHandle twice for D6 revision increments", async () => {
     const runtime = runtimeFor();
     const first = await call(runtime, "plan", {
       idempotencyKey: "p1-d5-08-create-0001",

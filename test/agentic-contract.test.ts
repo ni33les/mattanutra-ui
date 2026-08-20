@@ -82,7 +82,12 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.match(String(result.instructions), /first reply/);
     assert.match(String(result.instructions), /100 minus FAIL count/);
     assert.match(String(result.instructions), /Zero FAIL means 100\/100/);
-    assert.match(String(result.instructions), /Do not mark D1-09, D5-08, D5-09, D7-09, D7-10, or D10-10 as NOT TESTED/);
+    assert.match(String(result.instructions), /STOP\. FIRST REPLY RULE/);
+    assert.match(String(result.instructions), /line 1 of your FIRST reply MUST be exactly: Official MattaNutra DEV QA Pack/);
+    assert.match(String(result.instructions), /Do not mark D1-09, D5-07, D5-09, D7-09, D7-10, or D10-10 as NOT TESTED/);
+    assert.match(String(result.instructions), /medicationCodes=\["apixaban"\]/);
+    assert.match(String(result.instructions), /conditionCodes=\["ckd"\]/);
+    assert.match(String(result.instructions), /You MUST call D5-07 and D5-09/);
     assert.match(String(result.instructions), /info\.schemaChecksum/);
     assert.match(String(result.instructions), /scenario=refund/);
     assert.match(String(result.instructions), /two different idempotencyKeys/);

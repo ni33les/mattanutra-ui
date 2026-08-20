@@ -225,6 +225,7 @@ describe("agentic DEV flow", () => {
     });
 
     assert.equal(created.status, "blocked");
+    assert.ok(Array.isArray(created.guidanceIds) && created.guidanceIds.length > 0);
 
     const executed = await call(runtime, "execute", {
       expectedRevision: created.revision,
