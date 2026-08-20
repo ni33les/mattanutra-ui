@@ -159,7 +159,7 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
           {agenticMessage(props.locale, "checkout.expired")}
         </p>
       ) : null}
-      {unpaidOpen || refundable ? (
+      {(unpaidOpen || refundable) ? (
         <form
           action={`/api/mcp/checkout/${encodeURIComponent(props.checkoutAccess)}/pay`}
           className="space-y-6"
