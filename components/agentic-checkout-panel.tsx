@@ -279,7 +279,7 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
             {agenticMessage(props.locale, "checkout.pay_mock")}
           </button>
         </form>
-      )}
+      ) : null}
       {props.lastResult ? (
         <p className="text-sm text-muted-foreground">{props.lastResult}</p>
       ) : null}
