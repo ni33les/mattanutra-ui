@@ -54,6 +54,6 @@ export async function orderTool(input: Readonly<{
           orderStatus: order.fulfilmentStatus,
           trackingUrl: `/${locale}/order/track/${encodeURIComponent(orderNumber)}`
         }
-      : null}
+      : null
   });
 }
