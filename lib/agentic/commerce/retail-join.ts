@@ -4,6 +4,7 @@ import { TH_MOCK_SHIPPING_MINOR } from "@/lib/agentic/money";
 import { parseCheckoutAddress, type CheckoutAddress } from "@/lib/agentic/checkout-address";
 import type { OrderRecord } from "@/lib/agentic/store/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
+import type { CoverageRow, PlanResult } from "@/lib/agentic/plan/types";
 
 const DELIGHT_ORGANISATION_NAME = "Delight Pharmacy";
 
@@ -381,9 +382,104 @@ export async function joinMcpPaidOrderToRetail(input: Readonly<{
   }
 }
 
+function coverageStatus(status: CoverageRow["status"]) {
+  if (status === "covered" || status === "over_target") {
+    return "covered" as const;
+  }
+
+  if (status === "partial") {
+    return "add" as const;
+  }
+
+  return "review" as const;
+}
+
+function mcpFormulation(result: PlanResult) {
+  const coverage = result.coverage.length > 0
+    ? result.coverage
+    : result.selected?.coverage ?? [];
+
+  return {
+    channel: "mcp",
+    coveragePercent: result.selected?.coveragePercent ?? 0,
+    dailyPills: result.selected?.dailyPills ?? 0,
+    productStack: result.basket.map((item) => ({
+      dailyPills: item.dailyPills,
+      lineTotalMinor: item.lineTotalMinor,
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity
+    })),
+    source: "mcp_plan",
+    status: result.status,
+    supplementBreakdown: coverage.map((row, index) => ({
+      category: "Supplement",
+      dailyDose: `${row.deliveredAmount} ${row.unit}/day`,
+      effectivenessRank: index + 1,
+      id: row.supplementId,
+      rationale: `${row.status} ${row.coveragePercent}%`,
+      status: coverageStatus(row.status),
+      supplement: row.name
+    })),
+    totalPriceMinor: result.selected?.totalPriceMinor ?? 0
+  };
+}
+
+function mcpAnswers(result: PlanResult) {
+  const state = result.requestSnapshot;
+
+  return {
+    ageYears: state.profile.ageYears,
+    channel: "mcp",
+    conditions: [...state.conditionCodes],
+    country: state.destinationCountry,
+    currentSupplements: state.currentSupplements.map((item) => ({
+      dailyAmount: item.dailyAmount,
+      name: item.name,
+      unit: item.unit
+    })),
+    firstName: "",
+    lifeStage: state.profile.lifeStage,
+    meds: state.medicationCodes.join(", "),
+    optimization: state.optimization,
+    sex: state.profile.sexAtBirth,
+    source: "mcp",
+    targets: state.targets.map((item) => ({
+      amount: item.amount,
+      name: item.name,
+      unit: item.unit
+    }))
+  };
+}
+
+function mcpHealthScore(result: PlanResult) {
+  return {
+    band: "mcp",
+    domains: [],
+    headline: result.summary,
+    movers: [],
+    score: Math.round(result.selected?.coveragePercent ?? 0),
+    summary: result.summary,
+    version: "mcp:plan"
+  };
+}
+
+function mcpAssessmentStatus(result: PlanResult) {
+  if (result.status === "ready") {
+    return "ready" as const;
+  }
+
+  if (result.status === "blocked") {
+    return "failed" as const;
+  }
+
+  return "captured" as const;
+}
+
 export async function persistMcpAssessment(input: Readonly<{
   locale?: string;
   planId: string;
+  result?: PlanResult;
 }>) {
   const sql = await loadSql();
 
@@ -391,29 +487,71 @@ export async function persistMcpAssessment(input: Readonly<{
     return;
   }
 
-  const locale = asLocale(input.locale);
+  const locale = asLocale(input.locale ?? input.result?.requestSnapshot.locale);
 
-  await sql`
-    insert into public.assessments (
-      plan_id,
+  // planHandle stays an opaque cap_* capability. assessments.plan_id is the same
+  // UUID as agentic_plans.id so admin/reporting see MCP plans on the web path.
+  if (!input.result) {
+    await sql`
+      insert into public.assessments (
+        plan_id,
+        locale,
+        status,
+        answers,
+        answer_summary,
+        health_score,
+        updated_at
+      )
+      values (
+        ${input.planId}::uuid,
+        ${locale},
+        'captured',
+        '{"source":"mcp"}'::jsonb,
+        '{}'::jsonb,
+        '{}'::jsonb,
+        now()
+      )
+      on conflict (plan_id) do nothing
+    `;
+    return;
+  }
+
+  try {
+    const { persistAssessmentSubmission } = await import("@/lib/assessment-store");
+    const { insertFormulationVersion } = await import("@/lib/plan-version-writes");
+    const status = mcpAssessmentStatus(input.result);
+
+    await persistAssessmentSubmission({
+      answers: mcpAnswers(input.result),
       locale,
-      status,
-      answers,
-      answer_summary,
-      health_score,
-      updated_at
-    )
-    values (
-      ${input.planId}::uuid,
-      ${locale},
-      'captured',
-      '{}'::jsonb,
-      '{}'::jsonb,
-      '{}'::jsonb,
-      now()
-    )
-    on conflict (plan_id) do nothing
-  `;
+      selectedPlan: "precision",
+      snapshot: {
+        healthScore: mcpHealthScore(input.result),
+        plan: "precision",
+        planId: input.planId,
+        queuePosition: 0,
+        status: status === "captured" ? "queued" : status,
+        steps: [
+          { id: "assessment", state: "complete" },
+          { id: "score", state: status === "ready" ? "complete" : "pending" },
+          { id: "results", state: status === "ready" ? "complete" : "pending" }
+        ]
+      },
+      status
+    });
+
+    await insertFormulationVersion(sql, {
+      formulation: mcpFormulation(input.result),
+      includeEmptyRecommendations: true,
+      modelVersion: "mcp-plan:v1",
+      planId: input.planId
+    });
+  } catch (error) {
+    console.warn("Unable to persist MCP plan to web assessments", {
+      error,
+      planId: input.planId
+    });
+  }
 }
 
 export async function persistMcpPlanFeedback(input: Readonly<{

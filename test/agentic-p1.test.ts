@@ -1235,12 +1235,23 @@ describe("agentic P1 pack fixes", () => {
     assert.match(simulate, /joinMcpPaidOrderToRetail/);
     assert.match(join, /fulfillAgenticRetailCheckout/);
     assert.match(join, /persistMcpPlanFeedback/);
+    assert.match(join, /persistAssessmentSubmission/);
+    assert.match(join, /insertFormulationVersion/);
+    assert.match(join, /source: "mcp_plan"/);
+    assert.match(join, /assessments\.plan_id is the same/);
+    const planService = readFileSync(
+      new URL("../lib/agentic/plan/service.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(planService, /persistCanonicalWebPlan/);
+    assert.match(planService, /persistMcpAssessment/);
     assert.match(checkout, /async function fulfillRetailCheckoutPayment/);
     assert.match(checkout, /export async function completeMockRetailCheckout/);
     assert.match(checkout, /export async function fulfillAgenticRetailCheckout/);
     assert.match(checkout, /recordRetailCheckoutFinance/);
     assert.match(checkout, /createRetailCustomerOrderFromPayment/);
     assert.match(feedback, /persistMcpPlanFeedback/);
+    assert.match(feedback, /savePlanFeedback|persistMcpPlanFeedback/);
     assert.match(order, /getRetailLink/);
     assert.match(support, /lookupRetailOrderForAgentic/);
   });

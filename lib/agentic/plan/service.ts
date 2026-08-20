@@ -330,6 +330,12 @@ export async function planTool(input: Readonly<{
         store
       });
 
+      await persistCanonicalWebPlan({
+        locale,
+        planId: plan.id,
+        result: nextResult
+      });
+
       return response;
     }
 
@@ -465,12 +471,21 @@ export async function planTool(input: Readonly<{
       store
     });
 
-    void import("@/lib/agentic/commerce/retail-join")
-      .then(({ persistMcpAssessment }) =>
-        persistMcpAssessment({ locale, planId })
-      )
-      .catch(() => null);
+    await persistCanonicalWebPlan({ locale, planId, result });
 
     return response;
   });
+}
+
+async function persistCanonicalWebPlan(input: Readonly<{
+  locale: Locale;
+  planId: string;
+  result: PlanResult;
+}>) {
+  try {
+    const { persistMcpAssessment } = await import("@/lib/agentic/commerce/retail-join");
+    await persistMcpAssessment(input);
+  } catch {
+    return;
+  }
 }
