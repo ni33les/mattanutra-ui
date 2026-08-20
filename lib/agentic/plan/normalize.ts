@@ -44,14 +44,14 @@ function asRequest(value: unknown): PlanRequest | AgenticErrorResult {
   return value as PlanRequest;
 }
 
-function uniqueTargets(
-  targets: readonly Readonly<{ supplementId: string }>[],
+function uniqueIds(
+  ids: readonly string[],
   field: "targets" | "currentSupplements"
 ): AgenticErrorResult | null {
   const seen = new Set<string>();
 
-  for (const [index, target] of targets.entries()) {
-    if (seen.has(target.supplementId)) {
+  for (const [index, id] of ids.entries()) {
+    if (seen.has(id)) {
       return businessError({
         fieldPath: `request.${field}[${index}].supplementId`,
         message: "The same supplement concept appears more than once.",
@@ -59,28 +59,82 @@ function uniqueTargets(
       });
     }
 
-    seen.add(target.supplementId);
+    seen.add(id);
   }
 
   return null;
 }
 
+function normalizeName(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function namesOf(item: CatalogueSupplement) {
+  return [item.name, ...item.aliases].map(normalizeName);
+}
+
 function resolveSupplement(
   snapshot: CatalogueSnapshot,
-  supplementId: string,
+  input: Readonly<{ name?: string; supplementId?: string }>,
   fieldPath: string
 ): CatalogueSupplement | AgenticErrorResult {
-  const found = snapshot.supplements.find((item) => item.supplementId === supplementId);
+  if (input.supplementId) {
+    const found = snapshot.supplements.find(
+      (item) => item.supplementId === input.supplementId
+    );
 
-  if (!found) {
+    if (!found) {
+      return businessError({
+        fieldPath,
+        message: "Use a current canonical ID from info. Legacy IDs are not accepted.",
+        reasonCode: "legacy_id"
+      });
+    }
+
+    if (input.name) {
+      const wanted = normalizeName(input.name);
+
+      if (!namesOf(found).includes(wanted)) {
+        return businessError({
+          fieldPath,
+          message: "Use a current canonical ID from info. Legacy IDs are not accepted.",
+          reasonCode: "legacy_id"
+        });
+      }
+    }
+
+    return found;
+  }
+
+  const wanted = normalizeName(input.name ?? "");
+
+  if (!wanted) {
     return businessError({
       fieldPath,
-      message: "Use a current canonical ID from info. Legacy IDs are not accepted.",
-      reasonCode: "legacy_id"
+      message: "A required field is missing or invalid.",
+      reasonCode: "required"
     });
   }
 
-  return found;
+  const matches = snapshot.supplements.filter((item) => namesOf(item).includes(wanted));
+
+  if (matches.length === 1 && matches[0]) {
+    return matches[0];
+  }
+
+  if (matches.length > 1) {
+    return businessError({
+      fieldPath,
+      message: "A required field is missing or invalid.",
+      reasonCode: "required"
+    });
+  }
+
+  return businessError({
+    fieldPath,
+    message: "Use a current canonical ID from info. Legacy IDs are not accepted.",
+    reasonCode: "legacy_id"
+  });
 }
 
 function applyAnswers(
@@ -126,6 +180,29 @@ function applyAnswers(
         targets: next.targets.filter((item) => item.supplementId !== supplementId)
       };
     }
+
+    if (answer.choice === "relax_max_price") {
+      const { maxPriceMinor: _removed, ...requirements } = next.requirements;
+      next = { ...next, requirements };
+    }
+
+    if (answer.choice === "relax_max_pills") {
+      const { maxDailyPills: _removed, ...requirements } = next.requirements;
+      next = { ...next, requirements };
+    }
+
+    if (answer.choice.startsWith("drop_retain:")) {
+      const productId = answer.choice.slice("drop_retain:".length);
+      next = {
+        ...next,
+        requirements: {
+          ...next.requirements,
+          retainProductIds: (next.requirements.retainProductIds ?? []).filter(
+            (item) => item !== productId
+          )
+        }
+      };
+    }
   }
 
   return { ...next, acceptedGaps };
@@ -157,27 +234,16 @@ export function normalizePlanRequest(input: Readonly<{
     return market;
   }
 
-  const duplicate = uniqueTargets(request.targets, "targets");
-
-  if (duplicate) {
-    return duplicate;
-  }
-
-  if (request.currentSupplements) {
-    const currentDup = uniqueTargets(request.currentSupplements, "currentSupplements");
-
-    if (currentDup) {
-      return currentDup;
-    }
-  }
-
   const targets: PlanTarget[] = [];
 
   for (const [index, target] of request.targets.entries()) {
+    const fieldPath = target.supplementId
+      ? `request.targets[${index}].supplementId`
+      : `request.targets[${index}].name`;
     const supplement = resolveSupplement(
       input.snapshot,
-      target.supplementId,
-      `request.targets[${index}].supplementId`
+      { name: target.name, supplementId: target.supplementId },
+      fieldPath
     );
 
     if (isAgenticErrorResult(supplement)) {
@@ -200,13 +266,25 @@ export function normalizePlanRequest(input: Readonly<{
     });
   }
 
+  const targetDup = uniqueIds(
+    targets.map((item) => item.supplementId),
+    "targets"
+  );
+
+  if (targetDup) {
+    return targetDup;
+  }
+
   const currentSupplements: CurrentSupplement[] = [];
 
   for (const [index, item] of (request.currentSupplements ?? []).entries()) {
+    const fieldPath = item.supplementId
+      ? `request.currentSupplements[${index}].supplementId`
+      : `request.currentSupplements[${index}].name`;
     const supplement = resolveSupplement(
       input.snapshot,
-      item.supplementId,
-      `request.currentSupplements[${index}].supplementId`
+      { name: item.name, supplementId: item.supplementId },
+      fieldPath
     );
 
     if (isAgenticErrorResult(supplement)) {
@@ -219,6 +297,15 @@ export function normalizePlanRequest(input: Readonly<{
       supplementId: supplement.supplementId,
       unit: item.unit
     });
+  }
+
+  const currentDup = uniqueIds(
+    currentSupplements.map((item) => item.supplementId),
+    "currentSupplements"
+  );
+
+  if (currentDup) {
+    return currentDup;
   }
 
   const exclude = request.requirements.excludeSupplementIds ?? [];

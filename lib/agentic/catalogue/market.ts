@@ -17,7 +17,7 @@ export type MarketBinding = Readonly<{
 
 export function resolveMarket(input: Readonly<{
   countryCode: string;
-  currency: string;
+  currency?: string;
   retailerAdapter: MarketBinding["retailerAdapter"];
 }>): MarketBinding | AgenticErrorResult {
   if (input.countryCode !== ACTIVE_MARKET_COUNTRY) {
@@ -28,7 +28,9 @@ export function resolveMarket(input: Readonly<{
     });
   }
 
-  if (input.currency !== ACTIVE_MARKET_CURRENCY) {
+  const currency = input.currency?.trim() || ACTIVE_MARKET_CURRENCY;
+
+  if (currency !== ACTIVE_MARKET_CURRENCY) {
     return businessError({
       fieldPath: "request.currency",
       message: "Currency must match the destination market.",

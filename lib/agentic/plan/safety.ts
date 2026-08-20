@@ -196,11 +196,13 @@ export function evaluateSafety(input: Readonly<{
 }
 
 export function safetyQuestions(input: Readonly<{
+  alternatives?: readonly StackOption[];
   guidance: readonly SafetyGuidance[];
   locale: Locale;
   selected: StackOption | null;
   shownRevision: number;
   state: CanonicalPlanState;
+  unmetRequirements?: readonly string[];
 }>): PlanQuestion[] {
   const questions: PlanQuestion[] = [];
   const omegaTarget = input.state.targets.find((item) => /omega/i.test(item.name));
@@ -279,6 +281,85 @@ export function safetyQuestions(input: Readonly<{
         questionId: "q_safety_ack"
       });
     }
+  }
+
+  const unmet = input.unmetRequirements ?? [];
+  const alternatives = input.alternatives ?? [];
+
+  if (unmet.includes("maxPriceMinor")) {
+    const cap = input.state.requirements.maxPriceMinor ?? 0;
+    const choices: PlanQuestion["choices"][number][] = [
+      {
+        choice: "relax_max_price",
+        effect: "requirements.maxPriceMinor=",
+        label: agenticMessage(input.locale, "plan.question.relax_max_price")
+      }
+    ];
+
+    for (const option of alternatives) {
+      if (option.totalPriceMinor <= cap) {
+        choices.push({
+          choice: `select_option:${option.optionId}`,
+          effect: `selectOptionId=${option.optionId}`,
+          label: agenticMessage(input.locale, "plan.question.select_option")
+        });
+      }
+    }
+
+    questions.push({
+      choices,
+      prompt: agenticMessage(input.locale, "plan.question.relax_max_price"),
+      promptKey: "plan.question.relax_max_price",
+      questionId: "q_max_price"
+    });
+  }
+
+  if (unmet.includes("maxDailyPills")) {
+    const cap = input.state.requirements.maxDailyPills ?? 0;
+    const choices: PlanQuestion["choices"][number][] = [
+      {
+        choice: "relax_max_pills",
+        effect: "requirements.maxDailyPills=",
+        label: agenticMessage(input.locale, "plan.question.relax_max_pills")
+      }
+    ];
+
+    for (const option of alternatives) {
+      if (option.dailyPills <= cap) {
+        choices.push({
+          choice: `select_option:${option.optionId}`,
+          effect: `selectOptionId=${option.optionId}`,
+          label: agenticMessage(input.locale, "plan.question.select_option")
+        });
+      }
+    }
+
+    questions.push({
+      choices,
+      prompt: agenticMessage(input.locale, "plan.question.relax_max_pills"),
+      promptKey: "plan.question.relax_max_pills",
+      questionId: "q_max_pills"
+    });
+  }
+
+  for (const item of unmet) {
+    if (!item.startsWith("retainProductIds:")) {
+      continue;
+    }
+
+    const productId = item.slice("retainProductIds:".length);
+    questions.push({
+      choices: [
+        {
+          choice: `drop_retain:${productId}`,
+          effect: `requirements.retainProductIds-=${productId}`,
+          label: agenticMessage(input.locale, "plan.question.drop_retain")
+        }
+      ],
+      prompt: agenticMessage(input.locale, "plan.question.drop_retain"),
+      promptKey: "plan.question.drop_retain",
+      questionId: `q_retain_${productId}`
+    });
   }
 
   return questions;

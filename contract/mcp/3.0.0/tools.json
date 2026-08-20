@@ -85,7 +85,6 @@
                   },
                   "required": [
                     "name",
-                    "supplementId",
                     "dailyAmount",
                     "unit"
                   ],
@@ -292,7 +291,6 @@
                   },
                   "required": [
                     "name",
-                    "supplementId",
                     "amount",
                     "unit"
                   ],
@@ -305,7 +303,6 @@
             },
             "required": [
               "locale",
-              "currency",
               "destinationCountry",
               "optimization",
               "profile",

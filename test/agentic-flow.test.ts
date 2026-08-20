@@ -105,7 +105,7 @@ describe("agentic DEV flow", () => {
     assert.equal(created.status, "ready");
     assert.ok(Array.isArray(created.basket));
     assert.ok((created.basket as unknown[]).length >= 4);
-    assert.ok((created.alternatives as unknown[]).length <= 2);
+    assert.ok(((created.alternatives as unknown[] | undefined) ?? []).length <= 2);
     assert.equal(typeof created.planHandle, "string");
     assert.ok(String(created.planHandle).length >= 32);
 

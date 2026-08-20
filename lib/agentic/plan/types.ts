@@ -57,11 +57,25 @@ export type PlanAnswer = Readonly<{
   questionId: string;
 }>;
 
+export type PlanRequestTarget = Readonly<{
+  amount: number;
+  name: string;
+  supplementId?: string;
+  unit: CatalogueUnit;
+}>;
+
+export type PlanRequestCurrent = Readonly<{
+  dailyAmount: number;
+  name: string;
+  supplementId?: string;
+  unit: CatalogueUnit;
+}>;
+
 export type PlanRequest = Readonly<{
   answers?: readonly PlanAnswer[];
   conditionCodes?: readonly string[];
-  currency: string;
-  currentSupplements?: readonly CurrentSupplement[];
+  currency?: string;
+  currentSupplements?: readonly PlanRequestCurrent[];
   destinationCountry: string;
   locale: string;
   medicationCodes?: readonly string[];
@@ -69,7 +83,7 @@ export type PlanRequest = Readonly<{
   profile: PlanProfile;
   requirements: PlanRequirements;
   safetyAcknowledgement?: SafetyAcknowledgement;
-  targets: readonly PlanTarget[];
+  targets: readonly PlanRequestTarget[];
 }>;
 
 export type AcceptedGap = Readonly<{

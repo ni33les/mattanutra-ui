@@ -431,4 +431,132 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(frozen.totalPriceMinor, 236000);
     assert.match(formatMinor(frozen.totalPriceMinor, "THB", "en-US"), /2,360\.00/);
   });
+
+  it("plans J1 from names without currency or supplement IDs", async () => {
+    const runtime = runtimeFor();
+    const result = await call(runtime, "plan", {
+      idempotencyKey: "p1-names-only-0000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 2000, name: "Vitamin D", unit: "IU" },
+          { amount: 1000, name: "Omega-3", unit: "mg" },
+          { amount: 300, name: "Magnesium", unit: "mg" },
+          { amount: 1000, name: "B12", unit: "mcg" },
+          { amount: 1000, name: "Vitamin C", unit: "mg" }
+        ]
+      }
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.status, "ready");
+    assert.equal(
+      (result.requestSnapshot as { currency?: string }).currency,
+      "THB"
+    );
+  });
+
+  it("rejects a currency that does not match TH", async () => {
+    const runtime = runtimeFor();
+    const result = await call(runtime, "plan", {
+      idempotencyKey: "p1-usd-currency-000001",
+      request: {
+        currency: "USD",
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+      }
+    });
+    assert.equal(result.ok, false);
+    assert.equal((result.error as { reasonCode: string }).reasonCode, "unsupported_currency");
+  });
+
+  it("asks one budget question when a covered stack is over maxPriceMinor", async () => {
+    const runtime = runtimeFor();
+    const result = await call(runtime, "plan", {
+      idempotencyKey: "p1-over-budget-0000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: { maxPriceMinor: 100000 },
+        targets: [
+          { amount: 2000, name: "Vitamin D3", unit: "IU" },
+          { amount: 1000, name: "Omega-3", unit: "mg" },
+          { amount: 300, name: "Magnesium", unit: "mg" },
+          { amount: 1000, name: "Vitamin B12", unit: "mcg" },
+          { amount: 1000, name: "Vitamin C", unit: "mg" }
+        ]
+      }
+    });
+    assert.equal(result.status, "needs_input");
+    const questions = (result.questions as Array<{ questionId: string }>) ?? [];
+    assert.ok(questions.length > 0);
+    assert.ok(questions.some((item) => item.questionId === "q_max_price"));
+
+    const relaxed = await call(runtime, "plan", {
+      expectedRevision: result.revision,
+      idempotencyKey: "p1-over-budget-relax-01",
+      planHandle: result.planHandle,
+      request: {
+        answers: [{ choice: "relax_max_price", questionId: "q_max_price" }],
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: { maxPriceMinor: 100000 },
+        targets: [
+          { amount: 2000, name: "Vitamin D3", unit: "IU" },
+          { amount: 1000, name: "Omega-3", unit: "mg" },
+          { amount: 300, name: "Magnesium", unit: "mg" },
+          { amount: 1000, name: "Vitamin B12", unit: "mcg" },
+          { amount: 1000, name: "Vitamin C", unit: "mg" }
+        ]
+      }
+    });
+    assert.equal(relaxed.status, "ready");
+  });
+
+  it("drops leftover gap questions when selecting a fully covered option", async () => {
+    const runtime = runtimeFor();
+    const created = await call(runtime, "plan", {
+      idempotencyKey: "p1-select-option-000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        requirements: {},
+        targets: [
+          { amount: 2000, name: "Vitamin D3", unit: "IU" },
+          { amount: 1000, name: "Omega-3", unit: "mg" },
+          { amount: 300, name: "Magnesium", unit: "mg" },
+          { amount: 1000, name: "Vitamin B12", unit: "mcg" },
+          { amount: 1000, name: "Vitamin C", unit: "mg" }
+        ]
+      }
+    });
+    assert.equal(created.status, "ready");
+    assert.equal(typeof created.optionId, "string");
+
+    const selected = await call(runtime, "plan", {
+      expectedRevision: created.revision,
+      idempotencyKey: "p1-select-option-pick-01",
+      planHandle: created.planHandle,
+      selectOptionId: created.optionId
+    });
+    assert.equal(selected.ok, true);
+    assert.equal(selected.status, "ready");
+    const leftover = ((selected.questions as Array<{ questionId: string }>) ?? []).filter(
+      (item) => item.questionId.startsWith("q_gap_")
+    );
+    assert.equal(leftover.length, 0);
+  });
 });

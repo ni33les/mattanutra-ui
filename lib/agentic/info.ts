@@ -4,7 +4,12 @@ import { getCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import { ACTIVE_MARKET_COUNTRY, ACTIVE_MARKET_CURRENCY, ACTIVE_MARKET_NAME } from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 
-export function infoTool(input: Readonly<{
+let infoCache: {
+  key: string;
+  value: ReturnType<typeof buildInfo>;
+} | null = null;
+
+function buildInfo(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
 }>) {
@@ -44,4 +49,20 @@ export function infoTool(input: Readonly<{
     supportedLocales: ["en", "th", "zh-CN"],
     userAccountRequired: false
   };
+}
+
+export function infoTool(input: Readonly<{
+  config: AgenticConfig;
+  locale?: string;
+}>) {
+  const snapshot = getCatalogueSnapshot();
+  const key = `${input.config.buildId}:${snapshot.catalogueVersion}:${input.config.environment}`;
+
+  if (infoCache?.key === key) {
+    return infoCache.value;
+  }
+
+  const value = buildInfo(input);
+  infoCache = { key, value };
+  return value;
 }

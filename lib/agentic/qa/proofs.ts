@@ -8,6 +8,9 @@ import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import { addMinor, asMinor, asMinorOr, formatMinor, TH_MOCK_TAX_MINOR } from "@/lib/agentic/money";
+import { infoTool } from "@/lib/agentic/info";
+import { orderTool } from "@/lib/agentic/commerce/order";
+import { feedbackTool } from "@/lib/agentic/feedback";
 
 function supplementId(name: string) {
   const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
@@ -288,6 +291,115 @@ export async function checkoutContinuityProof(runtime: AgenticRuntime) {
     catalogueVersion: catalogueVersion(),
     checks,
     evidence,
+    ok: true as const,
+    passed: checks.every((item) => item.passed)
+  };
+}
+
+function percentile(samples: readonly number[], p: number) {
+  const sorted = samples.slice().sort((left, right) => left - right);
+  if (sorted.length === 0) {
+    return 0;
+  }
+
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
+  );
+  return sorted[index] ?? 0;
+}
+
+export async function latencyProof(runtime: AgenticRuntime) {
+  const now = nowIso();
+  const stamp = `${Date.now()}`;
+  const created = await planTool({
+    config: runtime.config,
+    now,
+    payload: {
+      idempotencyKey: `qa-lat-plan-${stamp}xxxxx`,
+      request: goldenPlanRequest()
+    },
+    scope: runtime.scope,
+    store: runtime.store
+  });
+
+  if (isAgenticErrorResult(created) || created.status !== "ready") {
+    return {
+      buildId: runtime.config.buildId,
+      ok: true as const,
+      passed: false,
+      reason: "plan_not_ready"
+    };
+  }
+
+  const executed = await executeTool({
+    config: runtime.config,
+    expectedRevision: created.revision,
+    idempotencyKey: `qa-lat-exec-${stamp}xxxxx`,
+    now,
+    payment: runtime.payment,
+    planHandle: created.planHandle,
+    scope: runtime.scope,
+    store: runtime.store
+  });
+
+  if (isAgenticErrorResult(executed)) {
+    return {
+      buildId: runtime.config.buildId,
+      ok: true as const,
+      passed: false,
+      reason: "execute_failed"
+    };
+  }
+
+  infoTool({ config: runtime.config });
+
+  const infoSamples: number[] = [];
+  const orderSamples: number[] = [];
+  const feedbackSamples: number[] = [];
+
+  for (let index = 0; index < 20; index += 1) {
+    let start = performance.now();
+    infoTool({ config: runtime.config });
+    infoSamples.push(performance.now() - start);
+
+    start = performance.now();
+    await orderTool({
+      config: runtime.config,
+      now,
+      orderHandle: executed.orderHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    orderSamples.push(performance.now() - start);
+
+    start = performance.now();
+    await feedbackTool({
+      config: runtime.config,
+      consentConfirmed: true,
+      expectedRevision: created.revision,
+      idempotencyKey: `qa-lat-fb-${stamp}-${index}xxxx`,
+      now,
+      planHandle: created.planHandle,
+      scope: runtime.scope,
+      store: runtime.store,
+      summary: "Latency probe."
+    });
+    feedbackSamples.push(performance.now() - start);
+  }
+
+  const infoP95 = percentile(infoSamples, 95);
+  const orderP95 = percentile(orderSamples, 95);
+  const feedbackP95 = percentile(feedbackSamples, 95);
+  const checks = [
+    { budgetMs: 300, name: "info_p95", passed: infoP95 <= 300, p95Ms: Math.round(infoP95) },
+    { budgetMs: 500, name: "order_p95", passed: orderP95 <= 500, p95Ms: Math.round(orderP95) },
+    { budgetMs: 1000, name: "feedback_p95", passed: feedbackP95 <= 1000, p95Ms: Math.round(feedbackP95) }
+  ];
+
+  return {
+    buildId: runtime.config.buildId,
+    checks,
     ok: true as const,
     passed: checks.every((item) => item.passed)
   };

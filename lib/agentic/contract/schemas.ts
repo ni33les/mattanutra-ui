@@ -37,7 +37,7 @@ const PLAN_REQUEST: JsonSchema = {
             type: "string"
           }
         },
-        required: ["name", "supplementId", "dailyAmount", "unit"],
+        required: ["name", "dailyAmount", "unit"],
         type: "object"
       },
       maxItems: 50,
@@ -154,7 +154,7 @@ const PLAN_REQUEST: JsonSchema = {
             type: "string"
           }
         },
-        required: ["name", "supplementId", "amount", "unit"],
+        required: ["name", "amount", "unit"],
         type: "object"
       },
       maxItems: 30,
@@ -164,7 +164,6 @@ const PLAN_REQUEST: JsonSchema = {
   },
   required: [
     "locale",
-    "currency",
     "destinationCountry",
     "optimization",
     "profile",

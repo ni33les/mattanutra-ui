@@ -6,11 +6,18 @@ import { isPaymentScenario, simulatePayment } from "@/lib/agentic/qa/simulate";
 import {
   checkoutContinuityProof,
   isolationProof,
+  latencyProof,
   orderEvidence
 } from "@/lib/agentic/qa/proofs";
 import type { JsonRpcRequest, JsonRpcResponse } from "@/lib/agentic/mcp/dispatcher";
 
-const QA_TOOLS = ["simulate", "evidence", "isolationProof", "checkoutContinuityProof"] as const;
+const QA_TOOLS = [
+  "simulate",
+  "evidence",
+  "isolationProof",
+  "checkoutContinuityProof",
+  "latencyProof"
+] as const;
 
 function record(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -80,6 +87,11 @@ function toolList() {
       description: "Run decline-then-success continuity proof and return audit/OMS counts.",
       inputSchema: { additionalProperties: false, properties: {}, type: "object" },
       name: "checkoutContinuityProof"
+    },
+    {
+      description: "Measure in-process info, order and feedback p95 against spec budgets.",
+      inputSchema: { additionalProperties: false, properties: {}, type: "object" },
+      name: "latencyProof"
     }
   ];
 }
@@ -142,7 +154,15 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
     return { result: toolResult(await isolationProof(runtime)) };
   }
 
-  return { result: toolResult(await checkoutContinuityProof(runtime)) };
+  if (name === "checkoutContinuityProof") {
+    return { result: toolResult(await checkoutContinuityProof(runtime)) };
+  }
+
+  if (name === "latencyProof") {
+    return { result: toolResult(await latencyProof(runtime)) };
+  }
+
+  return { error: { code: -32601, message: `Unknown tool: ${name}` } };
 }
 
 export async function handleQaJsonRpc(
@@ -160,7 +180,7 @@ export async function handleQaJsonRpc(
       result: {
         capabilities: { tools: { listChanged: false } },
         instructions:
-          "DEV-only MattaNutra QA harness. Public customer tools live on /api/mcp. Use simulate, evidence, isolationProof and checkoutContinuityProof here.",
+          "DEV-only MattaNutra QA harness. Public customer tools live on /api/mcp. Use simulate, evidence, isolationProof, checkoutContinuityProof and latencyProof here.",
         protocolVersion: "2025-03-26",
         serverInfo: {
           name: `${AGENTIC_SERVICE_NAME} QA`,

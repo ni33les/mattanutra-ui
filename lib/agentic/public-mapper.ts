@@ -1,4 +1,10 @@
-import type { BasketItem, CoverageRow, PlanResult, StackOption } from "@/lib/agentic/plan/types";
+import type {
+  BasketItem,
+  CanonicalPlanState,
+  CoverageRow,
+  PlanResult,
+  StackOption
+} from "@/lib/agentic/plan/types";
 
 export type PublicBasketItem = Readonly<{
   currency: "THB";
@@ -70,6 +76,36 @@ export function publicQuestions(
   }));
 }
 
+export function publicRequestSnapshot(state: CanonicalPlanState) {
+  return {
+    currency: state.currency,
+    destinationCountry: state.destinationCountry,
+    locale: state.locale,
+    optimization: state.optimization,
+    profile: state.profile,
+    requirements: state.requirements,
+    targets: state.targets.map((item) => ({
+      amount: item.amount,
+      name: item.name,
+      supplementId: item.supplementId,
+      unit: item.unit
+    })),
+    ...(state.currentSupplements.length > 0
+      ? { currentSupplements: state.currentSupplements }
+      : {}),
+    ...(state.medicationCodes.length > 0
+      ? { medicationCodes: state.medicationCodes }
+      : {}),
+    ...(state.conditionCodes.length > 0
+      ? { conditionCodes: state.conditionCodes }
+      : {}),
+    ...(state.acceptedGaps.length > 0 ? { acceptedGaps: state.acceptedGaps } : {}),
+    ...(state.safetyAcknowledgement
+      ? { safetyAcknowledgement: state.safetyAcknowledgement }
+      : {})
+  };
+}
+
 export function publicPlanFields(result: Pick<
   PlanResult,
   | "alternatives"
@@ -82,6 +118,7 @@ export function publicPlanFields(result: Pick<
   | "questions"
   | "requestSnapshot"
   | "safetyGuidance"
+  | "selected"
   | "status"
   | "summary"
   | "unmetRequirements"
@@ -90,16 +127,27 @@ export function publicPlanFields(result: Pick<
     availabilityAsOf: result.availabilityAsOf,
     basket: result.basket.map(publicBasketItem),
     catalogueVersion: result.catalogueVersion,
-    changeSummary: result.changeSummary,
     coverage: result.coverage.map(publicCoverage),
     guidanceRulesVersion: result.guidanceRulesVersion,
-    questions: publicQuestions(result.questions),
-    requestSnapshot: result.requestSnapshot,
-    safetyGuidance: result.safetyGuidance,
+    requestSnapshot: publicRequestSnapshot(result.requestSnapshot),
     status: result.status,
     summary: result.summary,
-    unmetRequirements: result.unmetRequirements,
-    alternatives: result.alternatives.map(publicOption)
+    ...(result.selected ? { optionId: result.selected.optionId } : {}),
+    ...(result.changeSummary.length > 0
+      ? { changeSummary: result.changeSummary }
+      : {}),
+    ...(result.questions.length > 0
+      ? { questions: publicQuestions(result.questions) }
+      : {}),
+    ...(result.safetyGuidance.length > 0
+      ? { safetyGuidance: result.safetyGuidance }
+      : {}),
+    ...(result.unmetRequirements.length > 0
+      ? { unmetRequirements: result.unmetRequirements }
+      : {}),
+    ...(result.alternatives.length > 0
+      ? { alternatives: result.alternatives.map(publicOption) }
+      : {})
   };
 }
 

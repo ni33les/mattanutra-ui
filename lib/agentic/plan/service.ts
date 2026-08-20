@@ -16,7 +16,7 @@ import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { CapabilityScope } from "@/lib/agentic/capabilities";
 import { normalizePlanRequest } from "@/lib/agentic/plan/normalize";
-import { matchPlan } from "@/lib/agentic/plan/matching";
+import { matchPlan, unmetRequirementsFor } from "@/lib/agentic/plan/matching";
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import type {
@@ -35,8 +35,8 @@ export type PlanToolInput = Readonly<{
 
 export type PlanToolSuccess = ReturnType<typeof publicPlanFields> &
   Readonly<{
-    appliedRequirements: readonly string[];
-    assumptions: readonly string[];
+    appliedRequirements?: readonly string[];
+    assumptions?: readonly string[];
     feedbackInvitation?: Readonly<{ prompt: string; promptKey: string }>;
     ok: true;
     optimizationEvidence: Readonly<{
@@ -60,11 +60,13 @@ function buildResult(input: Readonly<{
     state: input.state
   });
   const questions = safetyQuestions({
+    alternatives: matched.alternatives,
     guidance: safety,
     locale: input.locale,
     selected: matched.selected,
     shownRevision: input.shownRevision,
-    state: input.state
+    state: input.state,
+    unmetRequirements: matched.unmetRequirements
   });
   const status = planStatus({
     guidance: safety,
@@ -153,7 +155,23 @@ export async function planTool(input: Readonly<{
   }
 
   return input.store.transaction(async (store) => {
-    if (input.payload.selectOptionId) {
+    const selectFromAnswers =
+      input.payload.request &&
+      typeof input.payload.request === "object" &&
+      Array.isArray((input.payload.request as { answers?: unknown }).answers)
+        ? (
+            (input.payload.request as { answers: Array<{ choice?: string }> }).answers.find(
+              (item) =>
+                typeof item.choice === "string" &&
+                item.choice.startsWith("select_option:")
+            )?.choice ?? null
+          )
+        : null;
+    const selectOptionId =
+      input.payload.selectOptionId ??
+      (selectFromAnswers ? selectFromAnswers.slice("select_option:".length) : undefined);
+
+    if (selectOptionId) {
       const capability = await resolveCapability({
         action: "plan.revise",
         config: input.config,
@@ -194,9 +212,9 @@ export async function planTool(input: Readonly<{
       }
 
       const option: StackOption | null =
-        result.selected?.optionId === input.payload.selectOptionId
+        result.selected?.optionId === selectOptionId
           ? result.selected
-          : result.alternatives.find((item) => item.optionId === input.payload.selectOptionId) ??
+          : result.alternatives.find((item) => item.optionId === selectOptionId) ??
             null;
 
       if (!option) {
@@ -208,18 +226,42 @@ export async function planTool(input: Readonly<{
       }
 
       const nextRevision = plan.currentRevision + 1;
+      const state = result.requestSnapshot;
+      const locale = negotiateLocale(state.locale);
+      const unmet = unmetRequirementsFor({ option, state });
+      const safety = evaluateSafety({
+        locale,
+        selected: option,
+        state
+      });
+      const questions = safetyQuestions({
+        alternatives: [],
+        guidance: safety,
+        locale,
+        selected: option,
+        shownRevision: nextRevision,
+        state,
+        unmetRequirements: unmet
+      });
+      const status = planStatus({
+        guidance: safety,
+        questions,
+        selected: option,
+        state,
+        unmetRequirements: unmet
+      });
       const nextResult: PlanResult = {
         ...result,
         alternatives: [],
         basket: option.basket,
         changeSummary: [`selected_option:${option.optionId}`],
         coverage: option.coverage,
+        questions,
+        safetyGuidance: [...safety],
         selected: option,
-        status: result.status === "blocked" ? "blocked" : "ready",
-        summary: agenticMessage(
-          negotiateLocale(result.requestSnapshot.locale),
-          "plan.summary.ready"
-        )
+        status,
+        summary: agenticMessage(locale, `plan.summary.${status}`),
+        unmetRequirements: unmet
       };
 
       await store.insertPlanRevision({
@@ -237,8 +279,9 @@ export async function planTool(input: Readonly<{
 
       const response: PlanToolSuccess = {
         ...publicPlanFields(nextResult),
-        appliedRequirements: nextResult.appliedRequirements,
-        assumptions: nextResult.assumptions,
+        ...(nextResult.appliedRequirements.length > 0
+          ? { appliedRequirements: nextResult.appliedRequirements }
+          : {}),
         ok: true,
         optimizationEvidence: { mode: nextResult.optimizationEvidence.mode },
         planHandle: input.payload.planHandle!,
@@ -360,8 +403,9 @@ export async function planTool(input: Readonly<{
 
     const response: PlanToolSuccess = {
       ...publicPlanFields(result),
-      appliedRequirements: result.appliedRequirements,
-      assumptions: result.assumptions,
+      ...(result.appliedRequirements.length > 0
+        ? { appliedRequirements: result.appliedRequirements }
+        : {}),
       ...(result.status === "ready"
         ? {
             feedbackInvitation: {

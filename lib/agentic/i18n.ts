@@ -294,6 +294,26 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ตรวจทานข้อมูลความปลอดภัยแล้วยืนยันก่อนสร้างการชำระเงิน",
     "zh-CN": "请先查看安全说明并确认，然后我们才会冻结结账。"
   },
+  "plan.question.relax_max_price": {
+    en: "This stack is over the price cap. Raise the budget, or pick a cheaper complete option?",
+    th: "สูตรนี้เกินงบ ต้องการเพิ่มงบหรือเลือกสูตรที่ถูกกว่าหรือไม่",
+    "zh-CN": "该组合超出价格上限。要提高预算，还是选择更便宜的完整方案？"
+  },
+  "plan.question.relax_max_pills": {
+    en: "This stack is over the daily pill cap. Raise the limit, or pick a lower-pill option?",
+    th: "สูตรนี้เกินจำนวนเม็ดต่อวัน ต้องการเพิ่มขีดจำกัดหรือเลือกสูตรที่เม็ดน้อยกว่าหรือไม่",
+    "zh-CN": "该组合超出每日粒数上限。要提高限制，还是选择粒数更少的方案？"
+  },
+  "plan.question.select_option": {
+    en: "Use this complete option instead.",
+    th: "ใช้สูตรสำเร็จรูปนี้แทน",
+    "zh-CN": "改用这个完整方案。"
+  },
+  "plan.question.drop_retain": {
+    en: "Drop this retained product so matching can continue?",
+    th: "ลบสินค้าที่ต้องการคงไว้นี้ออกเพื่อให้จับคู่ต่อได้หรือไม่",
+    "zh-CN": "是否取消保留该产品以便继续匹配？"
+  },
   "plan.summary.blocked": {
     en: "This stack is blocked until the client changes a hard constraint or safety choice.",
     th: "สูตรนี้ถูกบล็อกจนกว่าจะเปลี่ยนข้อจำกัดหรือตัวเลือกความปลอดภัย",

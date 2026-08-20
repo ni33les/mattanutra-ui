@@ -338,18 +338,32 @@ export function matchPlan(input: Readonly<{
   }
 
   const limited = alternatives.slice(0, 2);
+
+  return {
+    alternatives: limited,
+    selected,
+    unmetRequirements: unmetRequirementsFor({
+      option: selected,
+      state: input.state
+    })
+  };
+}
+
+export function unmetRequirementsFor(input: Readonly<{
+  option: StackOption | null;
+  state: CanonicalPlanState;
+}>): string[] {
   const unmet: string[] = [];
+  const selected = input.option;
+
+  if (!selected) {
+    return unmet;
+  }
+
   const retainProducts = input.state.requirements.retainProductIds ?? [];
   const selectedIds = new Set(selected.basket.map((item) => item.productId));
 
   for (const productId of retainProducts) {
-    const product = eligible.find((item) => item.productId === productId);
-
-    if (!product) {
-      unmet.push(`retainProductIds:${productId}`);
-      continue;
-    }
-
     if (!selectedIds.has(productId)) {
       unmet.push(`retainProductIds:${productId}`);
     }
@@ -383,9 +397,5 @@ export function matchPlan(input: Readonly<{
     unmet.push("maxDailyPills");
   }
 
-  return {
-    alternatives: limited,
-    selected,
-    unmetRequirements: unmet
-  };
+  return unmet;
 }
