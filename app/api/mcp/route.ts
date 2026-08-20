@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
-import {
-  advertisedPublicToolNames,
-  canonicalPublicToolName,
-  handleJsonRpc
-} from "@/lib/agentic/mcp/dispatcher";
+import { canonicalPublicToolName, handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
+import { AGENTIC_PUBLIC_TOOLS } from "@/lib/agentic/contract";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 
 export const runtime = "nodejs";
@@ -102,14 +99,12 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  const runtime = getLiveAgenticRuntime(request);
-
+export async function GET() {
   return NextResponse.json(
     {
       contractVersion: "3.0.0",
       transport: "streamable-http",
-      tools: advertisedPublicToolNames(runtime.config.environment)
+      tools: [...AGENTIC_PUBLIC_TOOLS]
     },
     { headers: { "Cache-Control": "no-store" } }
   );

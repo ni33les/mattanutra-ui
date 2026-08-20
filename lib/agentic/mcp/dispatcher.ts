@@ -79,11 +79,11 @@ export function advertisedPublicToolNames(
   return AGENTIC_PUBLIC_TOOLS.map((name) => advertisedPublicToolName(environment, name));
 }
 
-function toolList(runtime: AgenticRuntime) {
+function toolList() {
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: AGENTIC_TOOL_DESCRIPTIONS[name],
     inputSchema: AGENTIC_TOOL_SCHEMAS[name],
-    name: advertisedPublicToolName(runtime.config.environment, name)
+    name
   }));
 }
 
@@ -327,7 +327,7 @@ export async function handleJsonRpc(
     return {
       id,
       jsonrpc: "2.0",
-      result: { tools: toolList(runtime) }
+      result: { tools: toolList() }
     };
   }
 
