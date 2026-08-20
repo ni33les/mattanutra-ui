@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
-import { canonicalPublicToolName, handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
+import {
+  advertisedPublicToolNames,
+  canonicalPublicToolName,
+  handleJsonRpc
+} from "@/lib/agentic/mcp/dispatcher";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 
 export const runtime = "nodejs";
@@ -98,12 +102,14 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const runtime = getLiveAgenticRuntime(request);
+
   return NextResponse.json(
     {
       contractVersion: "3.0.0",
       transport: "streamable-http",
-      tools: ["info", "plan", "execute", "order", "support", "feedback"]
+      tools: advertisedPublicToolNames(runtime.config.environment)
     },
     { headers: { "Cache-Control": "no-store" } }
   );

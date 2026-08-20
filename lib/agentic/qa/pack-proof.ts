@@ -285,6 +285,7 @@ export async function packProof(runtime: AgenticRuntime) {
     check(
       "D4-01",
       toolNames.length === 6 &&
+        toolNames[0] === "mattanutra_dev.info" &&
         !("supplements" in info) &&
         info.continuation === "polling_only"
     )
@@ -686,7 +687,8 @@ export async function packProof(runtime: AgenticRuntime) {
   checks.push(
     check(
       "D9-10",
-      toolNames.join(",") === "info,plan,execute,order,support,feedback"
+      toolNames.join(",") ===
+        "mattanutra_dev.info,mattanutra_dev.plan,mattanutra_dev.execute,mattanutra_dev.order,mattanutra_dev.support,mattanutra_dev.feedback"
     )
   );
 

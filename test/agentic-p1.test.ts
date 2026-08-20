@@ -267,7 +267,14 @@ describe("agentic P1 pack fixes", () => {
     const names = (
       listed?.result?.tools as Array<{ name: string }>
     ).map((item) => item.name);
-    assert.deepEqual(names, ["info", "plan", "execute", "order", "support", "feedback"]);
+    assert.deepEqual(names, [
+      "mattanutra_dev.info",
+      "mattanutra_dev.plan",
+      "mattanutra_dev.execute",
+      "mattanutra_dev.order",
+      "mattanutra_dev.support",
+      "mattanutra_dev.feedback"
+    ]);
 
     const proof = await handleQaJsonRpc(runtime, {
       id: 2,

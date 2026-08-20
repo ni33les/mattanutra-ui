@@ -88,7 +88,7 @@ describe("agentic MCP contract 3.0.0", () => {
     const tools = result.tools as Array<{ inputSchema: unknown; name: string }>;
     const names = tools.map((tool) => tool.name);
 
-    assert.deepEqual(names, [...AGENTIC_PUBLIC_TOOLS]);
+    assert.deepEqual(names, AGENTIC_PUBLIC_TOOLS.map((name) => `mattanutra_dev.${name}`));
 
     for (const tool of tools) {
       const schema = JSON.stringify(tool.inputSchema);

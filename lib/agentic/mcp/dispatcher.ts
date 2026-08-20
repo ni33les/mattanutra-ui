@@ -54,7 +54,7 @@ export function canonicalPublicToolName(raw: string): AgenticPublicToolName | nu
   return null;
 }
 
-function mcpServerInfoName(environment: AgenticRuntime["config"]["environment"]) {
+export function mcpServerInfoName(environment: AgenticRuntime["config"]["environment"]) {
   if (environment === "dev") {
     return "mattanutra_dev";
   }
@@ -66,11 +66,24 @@ function mcpServerInfoName(environment: AgenticRuntime["config"]["environment"])
   return AGENTIC_SERVICE_NAME;
 }
 
-function toolList() {
+export function advertisedPublicToolName(
+  environment: AgenticRuntime["config"]["environment"],
+  name: AgenticPublicToolName
+) {
+  return `${mcpServerInfoName(environment)}.${name}`;
+}
+
+export function advertisedPublicToolNames(
+  environment: AgenticRuntime["config"]["environment"]
+) {
+  return AGENTIC_PUBLIC_TOOLS.map((name) => advertisedPublicToolName(environment, name));
+}
+
+function toolList(runtime: AgenticRuntime) {
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: AGENTIC_TOOL_DESCRIPTIONS[name],
     inputSchema: AGENTIC_TOOL_SCHEMAS[name],
-    name
+    name: advertisedPublicToolName(runtime.config.environment, name)
   }));
 }
 
@@ -314,7 +327,7 @@ export async function handleJsonRpc(
     return {
       id,
       jsonrpc: "2.0",
-      result: { tools: toolList() }
+      result: { tools: toolList(runtime) }
     };
   }
 
