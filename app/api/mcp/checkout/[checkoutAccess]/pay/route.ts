@@ -7,6 +7,7 @@ import { mockEventForScenario } from "@/lib/agentic/commerce/payment";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
 import { isPaymentScenario, scenarioSubmitsOms } from "@/lib/agentic/qa/simulate";
+import { joinMcpPaidOrderToRetail } from "@/lib/agentic/commerce/retail-join";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { asMinor } from "@/lib/agentic/money";
 
@@ -131,6 +132,17 @@ export async function POST(request: Request, { params }: RouteProps) {
     now,
     store: runtime.store
   });
+
+  const paidForRetail = await runtime.store.getOrder(order.id);
+
+  if (paidForRetail?.paymentStatus === "paid") {
+    await joinMcpPaidOrderToRetail({
+      now,
+      order: paidForRetail,
+      request,
+      store: runtime.store
+    });
+  }
 
   if (scenarioSubmitsOms(requestedScenario)) {
     await processOmsOutbox({ now, store: runtime.store });

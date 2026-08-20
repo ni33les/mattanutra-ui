@@ -9,6 +9,7 @@ import {
   type CapabilityScope
 } from "@/lib/agentic/capabilities";
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
+import { lookupRetailOrderForAgentic } from "@/lib/agentic/commerce/retail-join";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
 export type SupportSuccess = Readonly<{
@@ -19,6 +20,12 @@ export type SupportSuccess = Readonly<{
   ok: true;
   responseExpectation: string;
   responseExpectationKey: "support.acknowledgement";
+  retailCustomerOrder?: Readonly<{
+    orderId: string;
+    orderNumber: string;
+    orderStatus: string;
+    trackingUrl: string;
+  }>;
   status: "open";
   supportHandle: string;
 }>;
@@ -138,6 +145,7 @@ export async function supportTool(input: Readonly<{
   });
 
   const supportCase = await input.store.getSupportCase(caseId);
+  const retail = await lookupRetailOrderForAgentic(orderCapability.resourceId);
 
   const response: SupportSuccess = {
     caseReference: supportCase?.caseReference ?? humanCaseReference(caseId),
@@ -150,6 +158,16 @@ export async function supportTool(input: Readonly<{
     ok: true,
     responseExpectation: agenticMessage(locale, "support.acknowledgement"),
     responseExpectationKey: "support.acknowledgement",
+    ...(retail
+      ? {
+          retailCustomerOrder: {
+            orderId: retail.orderId,
+            orderNumber: retail.orderNumber,
+            orderStatus: retail.orderStatus,
+            trackingUrl: `/${locale}/order/track/${encodeURIComponent(retail.orderNumber)}`
+          }
+        }
+      : {}),
     status: "open",
     supportHandle: supportHandle!
   };

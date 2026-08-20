@@ -1200,6 +1200,41 @@ describe("agentic P1 pack fixes", () => {
     assert.equal((refunded as { paymentStatus?: string }).paymentStatus, "refunded");
   });
 
+  it("joins MCP pay to the same retail checkout fulfill path", () => {
+    const pay = readFileSync(
+      new URL("../app/api/mcp/checkout/[checkoutAccess]/pay/route.ts", import.meta.url),
+      "utf8"
+    );
+    const simulate = readFileSync(new URL("../lib/agentic/qa/simulate.ts", import.meta.url), "utf8");
+    const join = readFileSync(
+      new URL("../lib/agentic/commerce/retail-join.ts", import.meta.url),
+      "utf8"
+    );
+    const checkout = readFileSync(
+      new URL("../lib/retail-product-checkout.ts", import.meta.url),
+      "utf8"
+    );
+    const feedback = readFileSync(new URL("../lib/agentic/feedback.ts", import.meta.url), "utf8");
+    const order = readFileSync(
+      new URL("../lib/agentic/commerce/order.ts", import.meta.url),
+      "utf8"
+    );
+    const support = readFileSync(new URL("../lib/agentic/support.ts", import.meta.url), "utf8");
+
+    assert.match(pay, /joinMcpPaidOrderToRetail/);
+    assert.match(simulate, /joinMcpPaidOrderToRetail/);
+    assert.match(join, /fulfillAgenticRetailCheckout/);
+    assert.match(join, /persistMcpPlanFeedback/);
+    assert.match(checkout, /async function fulfillRetailCheckoutPayment/);
+    assert.match(checkout, /export async function completeMockRetailCheckout/);
+    assert.match(checkout, /export async function fulfillAgenticRetailCheckout/);
+    assert.match(checkout, /recordRetailCheckoutFinance/);
+    assert.match(checkout, /createRetailCustomerOrderFromPayment/);
+    assert.match(feedback, /persistMcpPlanFeedback/);
+    assert.match(order, /lookupRetailOrderForAgentic/);
+    assert.match(support, /lookupRetailOrderForAgentic/);
+  });
+
   it("executes the same ready revision twice with different idempotency keys", async () => {
     const runtime = runtimeFor();
     const plan = await call(runtime, "plan", {

@@ -855,9 +855,11 @@ async function createRetailCustomerOrderFromPayment(
       now(),
       ${cleanText(objectValue(payment.shipping_address).notes) || null},
       ${sql.json(toJsonValue({
-        checkoutPaymentId: payment.id,
+        agenticOrderId: paymentMetadata.agenticOrderId ?? null,
         billingAddress: paymentMetadata.billingAddress ?? null,
         billingSameAsShipping: paymentMetadata.billingSameAsShipping !== false,
+        channel: paymentMetadata.channel ?? "web",
+        checkoutPaymentId: payment.id,
         freeShipping: shippingAmount <= 0,
         removedItemIds: payment.removed_item_ids,
         shippingAddress: payment.shipping_address,
@@ -1012,6 +1014,7 @@ async function recordRetailCheckoutFinance(
     entryType: "nominal",
     from: `customer:${payment.customer_email ?? payment.id}`,
     metadata: {
+      channel: objectValue(payment.metadata).channel ?? "web",
       checkoutPaymentId: payment.id,
       orderId,
       planId: payment.plan_id,
@@ -1105,6 +1108,7 @@ async function fulfillRetailCheckoutPayment(
     locale: updated.locale,
     planId: updated.plan_id,
     properties: {
+      channel: objectValue(updated.metadata).channel ?? "web",
       checkoutPaymentId: updated.id,
       orderId,
       selectedRetailerOrganisationId: updated.selected_retailer_organisation_id
@@ -1208,6 +1212,7 @@ export async function completeMockRetailCheckout(input: Readonly<{
     locale: payment.locale,
     planId: payment.plan_id,
     properties: {
+      channel: objectValue(payment.metadata).channel ?? "web",
       checkoutPaymentId: payment.id,
       stripeMode: payment.stripe_mode
     },
@@ -1485,4 +1490,292 @@ export function retailCheckoutAddressFromUnknown(value: unknown): RetailCheckout
 
 export function isRetailCheckoutLocale(value: unknown): value is Locale {
   return isLocale(value);
+}
+
+export type AgenticRetailCheckoutItem = Readonly<{
+  productId: string;
+  productName: string;
+  quantity: number;
+  retailerSku?: string | null;
+  unitPriceAmount: number;
+}>;
+
+export type AgenticRetailCheckoutResult = Readonly<{
+  orderId: string;
+  orderNumber: string;
+  paymentId: string;
+  trackingUrl: string;
+}>;
+
+export async function fulfillAgenticRetailCheckout(input: Readonly<{
+  address: RetailCheckoutAddress;
+  agenticOrderId: string;
+  agenticOrderReference: string;
+  currency: string;
+  items: readonly AgenticRetailCheckoutItem[];
+  locale: Locale;
+  organisationId: string;
+  planId: string;
+  request?: Request;
+  shippingAmount: number;
+  totalAmount: number;
+}>): Promise<AgenticRetailCheckoutResult | null> {
+  const sql = getSql() as Db | null;
+
+  if (!sql) {
+    return null;
+  }
+
+  await ensureRetailCheckoutSchema(sql);
+
+  const address = normalizeAddress(input.address);
+  assertAddress(address);
+
+  if (!isUuid(input.planId) || !isUuid(input.organisationId) || input.items.length < 1) {
+    throw new Error("MCP retail checkout is missing plan, retailer or items");
+  }
+
+  await sql`
+    insert into public.assessments (
+      plan_id,
+      locale,
+      status,
+      answers,
+      answer_summary,
+      first_name,
+      contact_email,
+      contact_email_captured_at,
+      health_score,
+      updated_at
+    )
+    values (
+      ${input.planId}::uuid,
+      ${input.locale},
+      'captured',
+      '{}'::jsonb,
+      '{}'::jsonb,
+      ${address.customerName},
+      ${address.customerEmail},
+      now(),
+      '{}'::jsonb,
+      now()
+    )
+    on conflict (plan_id) do update set
+      contact_email = coalesce(public.assessments.contact_email, excluded.contact_email),
+      first_name = coalesce(public.assessments.first_name, excluded.first_name),
+      updated_at = now()
+  `;
+
+  const existing = await sql<CheckoutPaymentRow[]>`
+    select *
+    from public.retail_checkout_payments
+    where metadata->>'agenticOrderId' = ${input.agenticOrderId}
+    order by created_at desc
+    limit 1
+  `;
+  let payment = existing[0] ?? null;
+
+  if (!payment) {
+    const quoteLines: QuoteLine[] = input.items.map((item) => ({
+      currency: input.currency,
+      etaDate: null,
+      imageUrl: null,
+      platformMarginPercent: null,
+      productId: item.productId,
+      productTitle: item.productName,
+      quantity: item.quantity,
+      retailerPayableAmount: item.unitPriceAmount,
+      retailerPayableNeedsReviewReason: null,
+      retailerPayableSource: "rrp",
+      retailSellableProductId: null,
+      rrpPriceAmount: item.unitPriceAmount,
+      unitPriceAmount: item.unitPriceAmount
+    }));
+    const subtotalAmount = quoteSubtotalAmount(quoteLines);
+    const shippingAmount = Math.max(0, input.shippingAmount);
+    const totalAmount = input.totalAmount || subtotalAmount + shippingAmount;
+    const config = stripePaymentConfig(input.request);
+    const rows = await sql<CheckoutPaymentRow[]>`
+      insert into public.retail_checkout_payments (
+        id,
+        plan_id,
+        recommendation_run_id,
+        selected_retailer_organisation_id,
+        locale,
+        status,
+        amount,
+        amount_unit,
+        currency,
+        stripe_mode,
+        customer_email,
+        customer_name,
+        customer_phone,
+        shipping_address,
+        selected_item_ids,
+        removed_item_ids,
+        quote_lines,
+        routing_snapshot,
+        metadata,
+        idempotency_key,
+        created_at,
+        updated_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${input.planId}::uuid,
+        ${null}::uuid,
+        ${input.organisationId}::uuid,
+        ${input.locale},
+        'created',
+        ${amountMicros(totalAmount)},
+        'micros',
+        ${input.currency},
+        ${config.mode === "live" ? "live" : config.mode === "test" ? "test" : "mock"},
+        ${address.customerEmail},
+        ${address.customerName},
+        ${address.phone},
+        ${sql.json(toJsonValue(address))}::jsonb,
+        ${quoteLines.map((item) => item.productId)}::text[],
+        '{}'::text[],
+        ${sql.json(toJsonValue(quoteLines))}::jsonb,
+        ${sql.json(toJsonValue({
+          channel: "mcp",
+          source: "retail_product_checkout"
+        }))}::jsonb,
+        ${sql.json(toJsonValue({
+          agenticOrderId: input.agenticOrderId,
+          agenticOrderReference: input.agenticOrderReference,
+          billingSameAsShipping: true,
+          channel: "mcp",
+          freeShipping: shippingAmount <= 0,
+          shippingAmount,
+          shippingSource: "mcp",
+          source: "retail_product_checkout",
+          subtotalAmount,
+          taxAmount: 0,
+          taxDisplay: "included",
+          totalAmount
+        }))}::jsonb,
+        ${`mcp:${input.agenticOrderId}`},
+        now(),
+        now()
+      )
+      returning *
+    `;
+    payment = rows[0] ?? null;
+  }
+
+  if (!payment) {
+    throw new Error("MCP retail checkout payment could not be created");
+  }
+
+  const config = stripePaymentConfig(input.request);
+
+  if (config.mode === "mock") {
+    const completed = await completeMockRetailCheckout({
+      paymentId: payment.id,
+      request: input.request
+    });
+    const refreshed = await sql<CheckoutPaymentRow[]>`
+      select *
+      from public.retail_checkout_payments
+      where id = ${payment.id}::uuid
+      limit 1
+    `;
+    const fulfilled = refreshed[0] ?? payment;
+    const orderId = fulfilled.retail_customer_order_id;
+
+    if (!orderId) {
+      throw new Error("MCP retail checkout did not create a customer order");
+    }
+
+    const orderRows = await sql<Array<{ order_number: string }>>`
+      select order_number
+      from public.retail_customer_orders
+      where id = ${orderId}::uuid
+      limit 1
+    `;
+    const orderNumber = orderRows[0]?.order_number ?? orderId;
+    const trackingUrl =
+      completed?.destination ??
+      `/${input.locale}/order/track/${encodeURIComponent(orderNumber)}`;
+
+    return {
+      orderId,
+      orderNumber,
+      paymentId: payment.id,
+      trackingUrl
+    };
+  }
+
+  const fulfilled = await fulfillRetailCheckoutPayment(sql, {
+    ...payment,
+    status: "paid"
+  });
+  const orderId = fulfilled.retail_customer_order_id;
+
+  if (!orderId) {
+    throw new Error("MCP retail checkout did not create a customer order");
+  }
+
+  const orderRows = await sql<Array<{ order_number: string }>>`
+    select order_number
+    from public.retail_customer_orders
+    where id = ${orderId}::uuid
+    limit 1
+  `;
+  const orderNumber = orderRows[0]?.order_number ?? orderId;
+
+  return {
+    orderId,
+    orderNumber,
+    paymentId: payment.id,
+    trackingUrl: `/${input.locale}/order/track/${encodeURIComponent(orderNumber)}`
+  };
+}
+
+export async function getRetailOrderByAgenticOrderId(agenticOrderId: string) {
+  if (!agenticOrderId) {
+    return null;
+  }
+
+  const sql = getSql() as Db | null;
+
+  if (!sql) {
+    return null;
+  }
+
+  const rows = await sql<Array<{
+    order_id: string;
+    order_number: string;
+    order_status: string;
+    payment_id: string;
+    tracking_url: string | null;
+  }>>`
+    select
+      retail_customer_orders.id::text as order_id,
+      retail_customer_orders.order_number,
+      retail_customer_orders.status as order_status,
+      retail_checkout_payments.id::text as payment_id,
+      ${null}::text as tracking_url
+    from public.retail_checkout_payments
+    join public.retail_customer_orders
+      on retail_customer_orders.id = retail_checkout_payments.retail_customer_order_id
+    where retail_checkout_payments.metadata->>'agenticOrderId' = ${agenticOrderId}
+    order by retail_checkout_payments.created_at desc
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    orderId: row.order_id,
+    orderNumber: row.order_number,
+    orderStatus: row.order_status,
+    paymentId: row.payment_id,
+    trackingUrl: `/${"en"}/order/track/${encodeURIComponent(row.order_number)}`
+  };
 }

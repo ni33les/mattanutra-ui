@@ -179,6 +179,12 @@ export function orderPollView(input: Readonly<{
   found: boolean;
   localeMessage: (key: string) => string;
   order: OrderRecord | null;
+  retail?: Readonly<{
+    orderId: string;
+    orderNumber: string;
+    orderStatus: string;
+    trackingUrl: string;
+  }> | null;
 }>) {
   if (!input.found || !input.order) {
     return businessError({
@@ -219,7 +225,14 @@ export function orderPollView(input: Readonly<{
     fulfilment: {
       deliveryWindow: null,
       status: order.fulfilmentStatus,
-      tracking: []
+      tracking: input.retail
+        ? [
+            {
+              number: input.retail.orderNumber,
+              url: input.retail.trackingUrl
+            }
+          ]
+        : []
     },
     latestPaymentAttempt: order.latestPaymentAttempt,
     latestPaymentReason: order.latestPaymentReason,
@@ -231,6 +244,16 @@ export function orderPollView(input: Readonly<{
       : "poll",
     ok: true as const,
     orderReference: order.reference,
+    ...(input.retail
+      ? {
+          retailCustomerOrder: {
+            orderId: input.retail.orderId,
+            orderNumber: input.retail.orderNumber,
+            orderStatus: input.retail.orderStatus,
+            trackingUrl: input.retail.trackingUrl
+          }
+        }
+      : {}),
     orderStatus: order.orderStatus,
     paymentStatus: order.paymentStatus,
     pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,

@@ -3,6 +3,7 @@ import type { AgenticConfig } from "@/lib/agentic/config";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
+import { persistMcpPlanFeedback } from "@/lib/agentic/commerce/retail-join";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 
@@ -117,6 +118,14 @@ export async function feedbackTool(input: Readonly<{
     optionId,
     planId: plan.id,
     points: input.points ?? [],
+    rating: input.rating ?? null,
+    revision: input.expectedRevision,
+    summary: input.summary ?? null
+  });
+
+  await persistMcpPlanFeedback({
+    optionId,
+    planId: plan.id,
     rating: input.rating ?? null,
     revision: input.expectedRevision,
     summary: input.summary ?? null
