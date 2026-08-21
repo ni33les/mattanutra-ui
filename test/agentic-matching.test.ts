@@ -60,6 +60,21 @@ describe("agentic live-catalogue matching constraints", () => {
       isNonAlgaeOmegaStandin({ title: "Super Omega 3-6-9", facts: [] }),
       true
     );
+    assert.equal(
+      inferOmegaSource({
+        automatedSafetyPassed: true,
+        availabilityStatus: "in_stock",
+        currency: "THB",
+        facts: [],
+        id: "dha",
+        labelStatus: "parsed",
+        platform: "manual",
+        productUrl: "https://example.test/dha",
+        region: "TH",
+        title: "Blackmores Omega DHA"
+      }),
+      "fish"
+    );
     assert.equal(inferOmegaSource({
       automatedSafetyPassed: true,
       availabilityStatus: "in_stock",
@@ -120,10 +135,15 @@ describe("agentic live-catalogue matching constraints", () => {
       omegaSource: "none" as const,
       unitPriceMinor: 200
     };
+    const fishDha = {
+      ...withTitle(algae, "Blackmores Omega DHA"),
+      omegaSource: "none" as const,
+      unitPriceMinor: 150
+    };
     const matched = matchPlan({
       snapshot: {
         ...snapshot,
-        products: [...snapshot.products, mixed, lecithin]
+        products: [...snapshot.products, mixed, lecithin, fishDha]
       },
       state: {
         ...stateFor(algae, {
@@ -141,6 +161,6 @@ describe("agentic live-catalogue matching constraints", () => {
     });
     const names = (matched.selected?.basket ?? []).map((item) => item.productName);
     assert.ok(names.some((name) => /algae/i.test(name)));
-    assert.equal(names.some((name) => /3-6-9|lecithin|fish oil/i.test(name)), false);
+    assert.equal(names.some((name) => /3-6-9|lecithin|fish oil|omega dha/i.test(name)), false);
   });
 });

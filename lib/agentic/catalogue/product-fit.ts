@@ -39,6 +39,21 @@ export function isNonAlgaeOmegaStandin(
   );
 }
 
+export function isNonAlgaeOmegaLine(
+  candidate: Pick<ProductCandidate, "brandName" | "facts" | "title">
+) {
+  const hay = catalogueHaystack(candidate);
+
+  if (/\balgae\b|\balgal\b/.test(hay)) {
+    return false;
+  }
+
+  return (
+    isNonAlgaeOmegaStandin(candidate) ||
+    /\bomega\b|\bepa\b|\bdha\b/.test(hay)
+  );
+}
+
 export function inferOmegaSource(candidate: ProductCandidate): CatalogueProduct["omegaSource"] {
   const haystack = catalogueHaystack(candidate);
 
@@ -46,11 +61,7 @@ export function inferOmegaSource(candidate: ProductCandidate): CatalogueProduct[
     return "algae";
   }
 
-  if (isNonAlgaeOmegaStandin(candidate)) {
-    return "fish";
-  }
-
-  if (/\bfish\b|\bepa\b|\bdha\b|\bomega/.test(haystack) && /\boil\b/.test(haystack)) {
+  if (isNonAlgaeOmegaLine(candidate) || (/\bfish\b/.test(haystack) && /\boil\b/.test(haystack))) {
     return "fish";
   }
 

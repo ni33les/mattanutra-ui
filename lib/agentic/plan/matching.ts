@@ -3,7 +3,7 @@ import { parseDose } from "@/lib/dose-conversion";
 import { recommendProductStackFullBeam } from "@/lib/product-recommendations";
 import type { ProductRecommendationNeed } from "@/lib/product-recommendation-types";
 import {
-  isNonAlgaeOmegaStandin,
+  isNonAlgaeOmegaLine,
   isPrenatalOrFertilitySku
 } from "@/lib/agentic/catalogue/product-fit";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
@@ -49,7 +49,7 @@ function productEligible(product: CatalogueProduct, state: CanonicalPlanState) {
 
   if (
     state.requirements.omega3SourcePreference === "algae_only" &&
-    (product.omegaSource === "fish" || isNonAlgaeOmegaStandin(product.candidate))
+    (product.omegaSource === "fish" || isNonAlgaeOmegaLine(product.candidate))
   ) {
     return false;
   }
