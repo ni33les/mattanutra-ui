@@ -71,6 +71,7 @@ describe("agentic live-catalogue matching constraints", () => {
         platform: "manual",
         productUrl: "https://example.test/dha",
         region: "TH",
+        status: "approved",
         title: "Blackmores Omega DHA"
       }),
       "fish"
@@ -85,6 +86,7 @@ describe("agentic live-catalogue matching constraints", () => {
       platform: "manual",
       productUrl: "https://example.test/x",
       region: "TH",
+      status: "approved",
       title: "Super Omega 3-6-9"
     }), "fish");
     assert.equal(
@@ -98,6 +100,7 @@ describe("agentic live-catalogue matching constraints", () => {
         platform: "manual",
         productUrl: "https://example.test/x",
         region: "TH",
+        status: "approved",
         title: "Super Omega 3-6-9"
       }),
       false
