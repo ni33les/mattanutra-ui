@@ -1,5 +1,24 @@
-export const TH_MOCK_SHIPPING_MINOR = 5000;
-export const TH_MOCK_TAX_MINOR = 0;
+function envMinor(name: string, fallback: number) {
+  const raw = process.env[name]?.trim() ?? "";
+
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+export const DEFAULT_SHIPPING_MINOR = envMinor(
+  "AGENTIC_DEFAULT_SHIPPING_MINOR",
+  5000
+);
+export const DEFAULT_TAX_MINOR = envMinor("AGENTIC_DEFAULT_TAX_MINOR", 0);
 
 export function asMinor(value: unknown): number {
   if (typeof value === "bigint") {
@@ -59,8 +78,8 @@ export function payableSnapshot(input: Readonly<{
   taxMinor?: unknown;
 }>) {
   const subtotalMinor = asMinor(input.subtotalMinor);
-  const shippingMinor = asMinorOr(input.shippingMinor, TH_MOCK_SHIPPING_MINOR);
-  const taxMinor = asMinorOr(input.taxMinor, TH_MOCK_TAX_MINOR);
+  const shippingMinor = asMinorOr(input.shippingMinor, DEFAULT_SHIPPING_MINOR);
+  const taxMinor = asMinorOr(input.taxMinor, DEFAULT_TAX_MINOR);
 
   return {
     shippingMinor,

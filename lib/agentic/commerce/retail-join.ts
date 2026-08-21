@@ -1,6 +1,6 @@
 import { isUuid, parsePublicId } from "@/lib/agentic/contract/ids";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { TH_MOCK_SHIPPING_MINOR } from "@/lib/agentic/money";
+import { DEFAULT_SHIPPING_MINOR } from "@/lib/agentic/money";
 import { parseCheckoutAddress, type CheckoutAddress } from "@/lib/agentic/checkout-address";
 import type { OrderRecord } from "@/lib/agentic/store/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
@@ -258,7 +258,7 @@ export async function joinMcpPaidOrderToRetail(input: Readonly<{
       ? (input.order.frozenPlan as Record<string, unknown>)
       : {};
     const shippingAmount = majorFromMinor(
-      typeof frozen.shippingMinor === "number" ? frozen.shippingMinor : TH_MOCK_SHIPPING_MINOR
+      typeof frozen.shippingMinor === "number" ? frozen.shippingMinor : DEFAULT_SHIPPING_MINOR
     );
     const totalAmount = majorFromMinor(input.order.totalPriceMinor);
     const { fulfillAgenticRetailCheckout } = await import("@/lib/retail-product-checkout");

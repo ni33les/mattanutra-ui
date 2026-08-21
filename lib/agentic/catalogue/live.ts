@@ -1,5 +1,6 @@
 import { getRetailerAwareProductRecommendationCandidateSets } from "@/lib/admin-product-search";
 import { publicProductId } from "@/lib/agentic/contract/ids";
+import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogue/market";
 import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
 import {
   inferOmegaSource,
@@ -159,8 +160,8 @@ function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | nul
     orderable: true,
     productId: publicProductId(candidate.id),
     retailerSku: candidate.retailSellableProductId ?? candidate.id,
-    sellerId: candidate.selectedRetailerOrganisationId ?? "retailer_th",
-    sellerName: candidate.selectedRetailerName ?? "Retailer",
+    sellerId: candidate.selectedRetailerOrganisationId ?? ACTIVE_RETAILER_ID,
+    sellerName: candidate.selectedRetailerName ?? ACTIVE_RETAILER_NAME,
     source: "retail",
     stockStatus,
     unitPriceMinor: Math.round(price * 100)

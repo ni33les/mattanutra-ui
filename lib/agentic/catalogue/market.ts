@@ -1,4 +1,5 @@
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
+import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { displayCountryName } from "@/lib/product-countries";
 
 export { displayCountryName };
@@ -41,9 +42,12 @@ export function cannotDeliverMessage(
   markets: readonly DeliverableMarket[],
   locale = "en"
 ) {
-  const destination = displayCountryName(countryCode, locale);
-  const served = markets.map((item) => item.countryName).join(", ");
-  return `We cannot deliver to ${destination} yet. MattaNutra currently delivers to ${served}.`;
+  const negotiated = negotiateLocale(locale);
+  const destination = displayCountryName(countryCode, negotiated);
+  const served = markets
+    .map((item) => displayCountryName(item.countryCode, negotiated))
+    .join(", ");
+  return agenticMessage(negotiated, "mcp.cannot_deliver", { destination, served });
 }
 
 async function loadDeliverableMarkets(): Promise<DeliverableMarket[]> {
@@ -129,9 +133,13 @@ export async function resolveMarket(input: Readonly<{
   const currency = input.currency?.trim().toUpperCase();
 
   if (currency && currency !== market.currency) {
+    const negotiated = negotiateLocale(input.locale);
     return businessError({
       fieldPath: "request.currency",
-      message: `Currency must be ${market.currency} for ${market.countryName}.`,
+      message: agenticMessage(negotiated, "mcp.unsupported_currency_detail", {
+        currency: market.currency,
+        market: displayCountryName(market.countryCode, negotiated)
+      }),
       reasonCode: "unsupported_currency"
     });
   }

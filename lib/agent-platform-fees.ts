@@ -123,8 +123,6 @@ export async function recordPlatformFeeReceivable(
     fxRateId: fx.fxRateId,
     usdRate: fx.usdRate,
   });
-
-  // TODO: Also create a row in an agent_platform_fee_settlements table for tracking
 }
 
 /**

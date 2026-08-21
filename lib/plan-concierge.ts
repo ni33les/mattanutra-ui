@@ -10,6 +10,7 @@ import type {
   PlanFeedbackItem
 } from "@/lib/formulation-types";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { displayCountryName } from "@/lib/product-countries";
 import {
   inferPlanFeedbackFromMessage,
   loadActivePlanFeedback,
@@ -20,33 +21,44 @@ import {
 type Db = postgres.Sql | postgres.TransactionSql;
 const PLAN_CHAT_WELCOME_KIND = "plan_chat_welcome";
 export const PLAN_CHAT_MAX_USER_ROUNDS = 8;
-export const PLAN_CHAT_LIMIT_ERROR_MESSAGE =
-  "Plan chat interaction limit reached";
-
 const planConciergeCopy = {
   en: {
+    limitReached: "Plan chat interaction limit reached",
     pendingProfile: "Profile pending",
-    pendingRegion: "Thailand",
+    pendingRegion: displayCountryName("TH", "en"),
     welcome:
       "Hi, I’m MattaNutra AI. I’ll help tailor your food and supplement guidance.\n\nTell me what you’d like to remove, swap, simplify, or adjust.\n\nWhen you’re happy, press Deliver Nutrition Plan or tell me to go ahead."
   },
   th: {
+    limitReached: "ถึงขีดจำกัดการสนทนาของแผนแล้ว",
     pendingProfile: "กำลังเตรียมข้อมูล",
-    pendingRegion: "ไทย",
+    pendingRegion: displayCountryName("TH", "th"),
     welcome:
-      "สวัสดีครับ ผมคือ MattaNutra AI ผมจะช่วยปรับคำแนะนำอาหารและอาหารเสริมให้เข้ากับคุณ\n\nบอกผมได้เลยว่าอยากเอาอะไรออก เปลี่ยนอะไร หรือทำให้ง่ายขึ้น\n\nเมื่อพร้อมแล้ว ให้กด Deliver Nutrition Plan หรือบอกผมว่าไปต่อได้เลย"
+      "สวัสดีครับ ผมคือ MattaNutra AI ผมจะช่วยปรับคำแนะนำอาหารและอาหารเสริมให้เข้ากับคุณ\n\nบอกผมได้เลยว่าอยากเอาอะไรออก เปลี่ยนอะไร หรือทำให้ง่ายขึ้น\n\nเมื่อพร้อมแล้ว ให้กด ส่งมอบแผนโภชนาการ หรือบอกผมว่าไปต่อได้เลย"
   },
   "zh-CN": {
+    limitReached: "已达到方案对话次数上限",
     pendingProfile: "资料待完善",
-    pendingRegion: "中国",
+    pendingRegion: displayCountryName("TH", "zh-CN"),
     welcome:
-      "你好，我是 MattaNutra AI。我会帮你调整食物和补充剂建议，让它更贴合你。\n\n告诉我你想删除、替换、简化或调整什么。\n\n满意后，请点击 Deliver Nutrition Plan，或直接告诉我可以继续。"
+      "你好，我是 MattaNutra AI。我会帮你调整食物和补充剂建议，让它更贴合你。\n\n告诉我你想删除、替换、简化或调整什么。\n\n满意后，请点击 交付营养计划，或直接告诉我可以继续。"
   }
 } satisfies Record<Locale, {
+  limitReached: string;
   pendingProfile: string;
   pendingRegion: string;
   welcome: string;
 }>;
+
+export const PLAN_CHAT_LIMIT_ERROR_MESSAGE = planConciergeCopy.en.limitReached;
+
+export function planChatFallbackRegion(locale: Locale) {
+  return planConciergeCopy[locale].pendingRegion;
+}
+
+export function planChatLimitErrorMessage(locale: Locale) {
+  return planConciergeCopy[locale].limitReached;
+}
 
 export type PlanChatChannel =
   | "email"
@@ -344,7 +356,8 @@ export async function appendPlanChatMessage(
       (await planChatUserMessageCount(sql, input.planId)) >=
       PLAN_CHAT_MAX_USER_ROUNDS
     ) {
-      throw new Error(PLAN_CHAT_LIMIT_ERROR_MESSAGE);
+      const state = await planChatWelcomeState(sql, input.planId);
+      throw new Error(planChatLimitErrorMessage(state?.locale ?? "en"));
     }
   }
 

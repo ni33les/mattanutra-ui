@@ -7,6 +7,7 @@ import {
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 
 const cachedByCountry = new Map<string, CatalogueSnapshot>();
+let lastSnapshot: CatalogueSnapshot | null = null;
 
 function usesLiveCatalogue(environment?: AgenticEnvironment) {
   return environment === "uat" || environment === "prd";
@@ -17,8 +18,18 @@ function countryKey(countryCode?: string) {
   return /^[A-Z]{2}$/.test(code ?? "") ? code! : "TH";
 }
 
-export function getCatalogueSnapshot(): CatalogueSnapshot {
-  return cachedByCountry.get("TH") ?? fixtureSnapshot();
+function countryFromSnapshot(snapshot: CatalogueSnapshot) {
+  const match = snapshot.catalogueVersion.match(/^retail-([A-Z]{2})-/);
+  return match?.[1] ?? "TH";
+}
+
+export function getCatalogueSnapshot(countryCode?: string): CatalogueSnapshot {
+  if (countryCode) {
+    const code = countryKey(countryCode);
+    return cachedByCountry.get(code) ?? lastSnapshot ?? fixtureSnapshot();
+  }
+
+  return lastSnapshot ?? cachedByCountry.get("TH") ?? fixtureSnapshot();
 }
 
 export async function ensureCatalogueSnapshot(
@@ -93,9 +104,10 @@ export async function warmCatalogueSnapshot(
 
 export function replaceCatalogueSnapshot(snapshot: CatalogueSnapshot | null) {
   cachedByCountry.clear();
+  lastSnapshot = snapshot;
 
   if (snapshot) {
-    cachedByCountry.set("TH", snapshot);
+    cachedByCountry.set(countryFromSnapshot(snapshot), snapshot);
   }
 }
 

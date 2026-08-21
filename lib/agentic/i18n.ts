@@ -239,10 +239,20 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "เรายังจัดส่งไปประเทศนั้นไม่ได้",
     "zh-CN": "我们暂时无法配送到该国家/地区。"
   },
+  "mcp.cannot_deliver": {
+    en: "We cannot deliver to {destination} yet. MattaNutra currently delivers to {served}.",
+    th: "เรายังจัดส่งไป{destination}ไม่ได้ ขณะนี้ MattaNutra จัดส่งไปที่ {served}",
+    "zh-CN": "我们暂时无法配送到{destination}。MattaNutra 目前配送到 {served}。"
+  },
   "mcp.errors.unsupported_currency": {
     en: "Currency must match the destination market.",
     th: "สกุลเงินต้องตรงกับตลาดปลายทาง",
     "zh-CN": "货币必须与目的地市场一致。"
+  },
+  "mcp.unsupported_currency_detail": {
+    en: "Currency must be {currency} for {market}.",
+    th: "สกุลเงินสำหรับ {market} ต้องเป็น {currency}",
+    "zh-CN": "{market} 必须使用 {currency}。"
   },
   "mcp.errors.unsupported_unit": {
     en: "This supplement does not accept that unit.",
@@ -376,14 +386,26 @@ export function negotiateLocale(value: unknown): Locale {
   return "en";
 }
 
-export function agenticMessage(locale: Locale, key: string) {
+export function agenticMessage(
+  locale: Locale,
+  key: string,
+  vars?: Readonly<Record<string, string | number>>
+) {
   const entry = MESSAGES[key];
 
   if (!entry) {
     return key;
   }
 
-  return entry[locale] ?? entry.en;
+  let text = entry[locale] ?? entry.en;
+
+  if (vars) {
+    for (const [name, value] of Object.entries(vars)) {
+      text = text.replaceAll(`{${name}}`, String(value));
+    }
+  }
+
+  return text;
 }
 
 export function hasAgenticMessage(key: string) {

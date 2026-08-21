@@ -75,11 +75,15 @@ export async function supportTool(input: Readonly<{
     store: input.store
   });
 
+  const locale = negotiateLocale(input.locale);
+
   if (!orderCapability) {
-    return businessError({ message: "Not found.", reasonCode: "not_found" });
+    return businessError({
+      message: agenticMessage(locale, "mcp.errors.not_found"),
+      reasonCode: "not_found"
+    });
   }
 
-  const locale = negotiateLocale(input.locale);
   let supportHandle = input.supportHandle;
   let caseId: string;
 
@@ -95,13 +99,19 @@ export async function supportTool(input: Readonly<{
     });
 
     if (!supportCapability || supportCapability.resourceId !== orderCapability.resourceId) {
-      return businessError({ message: "Not found.", reasonCode: "not_found" });
+      return businessError({
+        message: agenticMessage(locale, "mcp.errors.not_found"),
+        reasonCode: "not_found"
+      });
     }
 
     const existing = await input.store.getSupportCaseByOrderId(orderCapability.resourceId);
 
     if (!existing) {
-      return businessError({ message: "Not found.", reasonCode: "not_found" });
+      return businessError({
+        message: agenticMessage(locale, "mcp.errors.not_found"),
+        reasonCode: "not_found"
+      });
     }
 
     caseId = existing.id;

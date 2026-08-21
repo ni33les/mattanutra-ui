@@ -12,15 +12,32 @@ import {
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import type { AgenticStore } from "@/lib/agentic/store/types";
-import { agenticMessage } from "@/lib/agentic/i18n";
+import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
+import type { Locale } from "@/lib/i18n";
 import { publicFrozenItems } from "@/lib/agentic/public-mapper";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
-  TH_MOCK_SHIPPING_MINOR,
-  TH_MOCK_TAX_MINOR,
+  DEFAULT_SHIPPING_MINOR,
+  DEFAULT_TAX_MINOR,
   payableSnapshot
 } from "@/lib/agentic/money";
+
+function executeError(
+  locale: Locale,
+  reasonCode:
+    | "availability_changed"
+    | "not_found"
+    | "plan_not_ready"
+    | "revision_conflict",
+  fieldPath?: string
+) {
+  return businessError({
+    fieldPath,
+    message: agenticMessage(locale, `mcp.errors.${reasonCode}`),
+    reasonCode
+  });
+}
 
 export type ExecuteSuccess = Readonly<{
   checkoutExpiresAt: string;
@@ -81,33 +98,27 @@ export async function executeTool(input: Readonly<{
     });
 
     if (!capability) {
-      return businessError({ message: "Not found.", reasonCode: "not_found" });
+      return executeError("en", "not_found");
     }
 
     const plan = await store.getPlan(capability.resourceId);
 
     if (!plan) {
-      return businessError({ message: "Not found.", reasonCode: "not_found" });
+      return executeError("en", "not_found");
     }
 
     if (plan.currentRevision !== input.expectedRevision) {
-      return businessError({
-        fieldPath: "expectedRevision",
-        message: "The plan revision is stale. Reload the latest revision.",
-        reasonCode: "revision_conflict"
-      });
+      return executeError("en", "revision_conflict", "expectedRevision");
     }
 
     const revision = await store.getPlanRevision(plan.id, plan.currentRevision);
 
     if (!revision || revision.status !== "ready") {
-      return businessError({
-        message: "This plan is not ready to execute.",
-        reasonCode: "plan_not_ready"
-      });
+      return executeError("en", "plan_not_ready");
     }
 
     const result = revision.result as PlanResult;
+    const locale = negotiateLocale(result.requestSnapshot.locale);
     const selected = result.selected;
     const snapshot = await ensureCatalogueSnapshot(
       input.config.environment,
@@ -126,16 +137,13 @@ export async function executeTool(input: Readonly<{
     );
 
     if (!selected || unavailable) {
-      return businessError({
-        message: "Availability changed. Create a new plan revision before checkout.",
-        reasonCode: "availability_changed"
-      });
+      return executeError(locale, "availability_changed");
     }
 
     const payable = payableSnapshot({
-      shippingMinor: TH_MOCK_SHIPPING_MINOR,
+      shippingMinor: DEFAULT_SHIPPING_MINOR,
       subtotalMinor: selected.totalPriceMinor,
-      taxMinor: TH_MOCK_TAX_MINOR
+      taxMinor: DEFAULT_TAX_MINOR
     });
     const orderId = randomUUID();
     const reference = humanOrderReference(orderId);
@@ -248,7 +256,7 @@ export async function executeTool(input: Readonly<{
       checkoutExpiresAt: session.expiresAt,
       checkoutUrl,
       feedbackInvitation: {
-        prompt: agenticMessage("en", "feedback.invitation"),
+        prompt: agenticMessage(locale, "feedback.invitation"),
         promptKey: "feedback.invitation"
       },
       frozenPlan: order.frozenPlan,

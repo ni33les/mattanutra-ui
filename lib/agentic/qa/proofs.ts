@@ -7,7 +7,7 @@ import { simulatePayment } from "@/lib/agentic/qa/simulate";
 import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
-import { addMinor, asMinor, asMinorOr, formatMinor, TH_MOCK_TAX_MINOR } from "@/lib/agentic/money";
+import { addMinor, asMinor, asMinorOr, formatMinor, DEFAULT_TAX_MINOR } from "@/lib/agentic/money";
 import { infoTool } from "@/lib/agentic/info";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { feedbackTool } from "@/lib/agentic/feedback";
@@ -179,7 +179,7 @@ export async function checkoutContinuityProof(runtime: AgenticRuntime) {
       : {};
   const subtotalMinor = asMinor(frozen.subtotalMinor ?? 0);
   const shippingMinor = asMinorOr(payableCheckout?.shippingMinor, 0);
-  const taxMinor = asMinorOr(payableCheckout?.taxMinor, TH_MOCK_TAX_MINOR);
+  const taxMinor = asMinorOr(payableCheckout?.taxMinor, DEFAULT_TAX_MINOR);
   const payableMinor = asMinor(payableOrder?.totalPriceMinor ?? 0);
   const formatted = formatMinor(payableMinor, payableOrder?.currency ?? "THB", "en-US");
 

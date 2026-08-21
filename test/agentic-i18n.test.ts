@@ -8,6 +8,8 @@ describe("agentic i18n", () => {
     assert.ok(keys.includes("feedback.invitation"));
     assert.ok(keys.includes("mcp.errors.unsupported_unit"));
     assert.ok(keys.includes("support.acknowledgement"));
+    assert.ok(keys.includes("mcp.cannot_deliver"));
+    assert.ok(keys.includes("mcp.unsupported_currency_detail"));
 
     for (const key of keys) {
       const en = agenticMessage("en", key);
@@ -17,5 +19,14 @@ describe("agentic i18n", () => {
       assert.notEqual(th, en, key);
       assert.notEqual(zh, en, key);
     }
+  });
+
+  it("fills cannot-deliver placeholders", () => {
+    const message = agenticMessage("en", "mcp.cannot_deliver", {
+      destination: "Singapore",
+      served: "Thailand"
+    });
+    assert.match(message, /cannot deliver to Singapore/i);
+    assert.match(message, /Thailand/);
   });
 });

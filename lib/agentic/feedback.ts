@@ -5,6 +5,7 @@ import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilit
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import { persistMcpPlanFeedback } from "@/lib/agentic/commerce/retail-join";
 import type { AgenticStore } from "@/lib/agentic/store/types";
+import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 
 const SECRETISH =
@@ -32,7 +33,7 @@ export async function feedbackTool(input: Readonly<{
   if (input.consentConfirmed !== true) {
     return businessError({
       fieldPath: "consentConfirmed",
-      message: "Feedback requires consentConfirmed=true.",
+      message: agenticMessage("en", "mcp.errors.consent_required"),
       reasonCode: "consent_required"
     });
   }
@@ -42,7 +43,7 @@ export async function feedbackTool(input: Readonly<{
   if (SECRETISH.test(text)) {
     return businessError({
       fieldPath: "summary",
-      message: "Feedback cannot include secrets, contact details or a conversation transcript.",
+      message: agenticMessage("en", "mcp.errors.unsafe_content"),
       reasonCode: "unsafe_content"
     });
   }
@@ -84,7 +85,10 @@ export async function feedbackTool(input: Readonly<{
   });
 
   if (!capability) {
-    return businessError({ message: "Not found.", reasonCode: "not_found" });
+    return businessError({
+      message: agenticMessage("en", "mcp.errors.not_found"),
+      reasonCode: "not_found"
+    });
   }
 
   const [plan, revision] = await Promise.all([
@@ -93,14 +97,21 @@ export async function feedbackTool(input: Readonly<{
   ]);
 
   if (!plan || plan.currentRevision !== input.expectedRevision) {
-    return businessError({ message: "Not found.", reasonCode: "not_found" });
+    return businessError({
+      message: agenticMessage("en", "mcp.errors.not_found"),
+      reasonCode: "not_found"
+    });
   }
 
   if (!revision) {
-    return businessError({ message: "Not found.", reasonCode: "not_found" });
+    return businessError({
+      message: agenticMessage("en", "mcp.errors.not_found"),
+      reasonCode: "not_found"
+    });
   }
 
   const result = revision.result as PlanResult;
+  const locale = negotiateLocale(result.requestSnapshot.locale);
   const optionId = input.optionId ?? result.selected?.optionId ?? null;
 
   if (
@@ -108,7 +119,10 @@ export async function feedbackTool(input: Readonly<{
     result.selected?.optionId !== input.optionId &&
     result.alternatives.every((item) => item.optionId !== input.optionId)
   ) {
-    return businessError({ message: "Not found.", reasonCode: "not_found" });
+    return businessError({
+      message: agenticMessage(locale, "mcp.errors.not_found"),
+      reasonCode: "not_found"
+    });
   }
 
   await input.store.insertFeedback({

@@ -9,8 +9,8 @@ import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { localizedRouteMetadata } from "@/lib/seo";
 import {
-  TH_MOCK_SHIPPING_MINOR,
-  TH_MOCK_TAX_MINOR,
+  DEFAULT_SHIPPING_MINOR,
+  DEFAULT_TAX_MINOR,
   addMinor,
   asMinor,
   asMinorOr
@@ -86,9 +86,9 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
       : {};
   const shippingMinor = asMinorOr(
     checkout.shippingMinor ?? frozen.shippingMinor,
-    TH_MOCK_SHIPPING_MINOR
+    DEFAULT_SHIPPING_MINOR
   );
-  const taxMinor = asMinorOr(checkout.taxMinor ?? frozen.taxMinor, TH_MOCK_TAX_MINOR);
+  const taxMinor = asMinorOr(checkout.taxMinor ?? frozen.taxMinor, DEFAULT_TAX_MINOR);
   const subtotalMinor =
     frozen.subtotalMinor == null
       ? asMinor(order.totalPriceMinor)
