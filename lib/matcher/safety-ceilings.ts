@@ -73,22 +73,54 @@ function normalizeName(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+type CeilingIndex = {
+  byId: Map<string, SafetyCeiling>;
+  byName: Map<string, SafetyCeiling>;
+};
+
+const ceilingIndexCache = new WeakMap<object, CeilingIndex>();
+
+function indexCeilings(ceilings: readonly SafetyCeiling[]): CeilingIndex {
+  const cachedIndex = ceilingIndexCache.get(ceilings as object);
+
+  if (cachedIndex) {
+    return cachedIndex;
+  }
+
+  const byId = new Map<string, SafetyCeiling>();
+  const byName = new Map<string, SafetyCeiling>();
+
+  for (const item of ceilings) {
+    const id = item.subjectId.trim().toLowerCase();
+    byId.set(id, item);
+    byId.set(id.replace(/^supplement:/, ""), item);
+    byId.set(id.replace(/^sup_/, ""), item);
+    const name = normalizeName(item.name);
+
+    if (name && !byName.has(name)) {
+      byName.set(name, item);
+    }
+  }
+
+  const index = { byId, byName };
+  ceilingIndexCache.set(ceilings as object, index);
+  return index;
+}
+
 export function safetyCeilingFor(
   ceilings: readonly SafetyCeiling[],
   input: Readonly<{ name?: string; subjectId: string }>
 ) {
+  if (ceilings.length === 0) {
+    return null;
+  }
+
+  const index = indexCeilings(ceilings);
   const raw = input.subjectId.trim().toLowerCase();
-  const ids = new Set(
-    [
-      raw,
-      raw.replace(/^supplement:/, ""),
-      raw.replace(/^sup_/, "")
-    ].filter(Boolean)
-  );
-  const byId = ceilings.find((item) => {
-    const id = item.subjectId.trim().toLowerCase();
-    return ids.has(id) || ids.has(id.replace(/^sup_/, ""));
-  });
+  const byId =
+    index.byId.get(raw) ??
+    index.byId.get(raw.replace(/^supplement:/, "")) ??
+    index.byId.get(raw.replace(/^sup_/, ""));
 
   if (byId) {
     return byId;
@@ -100,7 +132,5 @@ export function safetyCeilingFor(
     return null;
   }
 
-  return (
-    ceilings.find((item) => normalizeName(item.name) === name) ?? null
-  );
+  return index.byName.get(name) ?? null;
 }

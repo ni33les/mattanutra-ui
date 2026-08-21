@@ -55,13 +55,30 @@ function subjectIdsMatching(
   return [...ids].sort();
 }
 
+const thresholdCache = new WeakMap<
+  CanonicalRequest,
+  Map<string, ReturnType<typeof scaleAmount> | null>
+>();
+
 function ceilingThreshold(request: CanonicalRequest, subjectId: string) {
+  let cached = thresholdCache.get(request);
+
+  if (!cached) {
+    cached = new Map();
+    thresholdCache.set(request, cached);
+  }
+
+  if (cached.has(subjectId)) {
+    return cached.get(subjectId) ?? null;
+  }
+
   const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
     name: nameOf(request, subjectId),
     subjectId
   });
 
   if (!ceiling) {
+    cached.set(subjectId, null);
     return null;
   }
 
@@ -72,11 +89,9 @@ function ceilingThreshold(request: CanonicalRequest, subjectId: string) {
     unit: ceiling.maxUnit
   });
 
-  if ("reason" in scaled) {
-    return null;
-  }
-
-  return scaled;
+  const resolved = "reason" in scaled ? null : scaled;
+  cached.set(subjectId, resolved);
+  return resolved;
 }
 
 export function evaluateSafety(input: Readonly<{
