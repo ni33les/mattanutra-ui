@@ -93,7 +93,14 @@ function assertConnectionMatchesEnv(connection: string | null, environment: stri
     return;
   }
 
-  throw new Error("--target-env=dev or --target-env=prd is required.");
+  if (environment === "uat") {
+    if (!/(uat|mn-uat|mattanutra-uat)/i.test(label) || /(prd|prod|production)/i.test(label)) {
+      throw new Error(`Refusing UAT retail catalogue alignment against unexpected database "${label}".`);
+    }
+    return;
+  }
+
+  throw new Error("--target-env=dev, --target-env=uat, or --target-env=prd is required.");
 }
 
 function assertApplyConfirmation(environment: string) {
@@ -110,6 +117,15 @@ function assertApplyConfirmation(environment: string) {
   if (environment === "dev" && process.env.MATTANUTRA_CONFIRM_DEV_RETAIL_CATALOGUE_ALIGN !== "mirror") {
     throw new Error(
       "Refusing DEV retail catalogue alignment without MATTANUTRA_CONFIRM_DEV_RETAIL_CATALOGUE_ALIGN=mirror."
+    );
+  }
+
+  if (
+    environment === "uat" &&
+    process.env.MATTANUTRA_CONFIRM_UAT_RETAIL_CATALOGUE_ALIGN !== "prd-to-uat"
+  ) {
+    throw new Error(
+      "Refusing UAT retail catalogue alignment without MATTANUTRA_CONFIRM_UAT_RETAIL_CATALOGUE_ALIGN=prd-to-uat."
     );
   }
 }
@@ -462,13 +478,23 @@ async function main() {
     throw new Error("Database is not configured.");
   }
 
-  const targetOrgBySlug = await targetOrganisations(sql, RETAIL_CATALOGUE_ORG_SLUGS);
+  const snapshot = JSON.parse(await readFile(inputPath, "utf8")) as RetailSnapshot;
+  const requestedSlugs = hasArg("snapshot-orgs-only")
+    ? RETAIL_CATALOGUE_ORG_SLUGS.filter((slug) =>
+        normalizeRows(snapshot.tables?.organisations).some((row) => row.slug === slug)
+      )
+    : [...RETAIL_CATALOGUE_ORG_SLUGS];
+
+  if (requestedSlugs.length < 1) {
+    throw new Error("Retail snapshot has no known tenant organisation slugs to align.");
+  }
+
+  const targetOrgBySlug = await targetOrganisations(sql, requestedSlugs);
   const targetSlugs = [...targetOrgBySlug.keys()];
   const targetSlugSet = new Set(targetSlugs);
   const missingTargetOrganisationSlugs = RETAIL_CATALOGUE_ORG_SLUGS.filter(
     (slug) => !targetOrgBySlug.has(slug)
   );
-  const snapshot = JSON.parse(await readFile(inputPath, "utf8")) as RetailSnapshot;
   const sourceOrgById = sourceOrganisationMap(
     normalizeRows(snapshot.tables?.organisations),
     targetSlugs
@@ -603,6 +629,8 @@ async function main() {
     missingTargetOrganisationSlugs,
     protectedIssues,
     report: dryRunReport,
+    requestedOrganisationSlugs: requestedSlugs,
+    snapshotOrgsOnly: hasArg("snapshot-orgs-only"),
     targetEnv: environment
   };
   const outputPath = await writeSummary(outputDir, summary);

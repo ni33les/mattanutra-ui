@@ -104,7 +104,14 @@ function assertConnectionMatchesEnv(connection: string | null, environment: stri
     return;
   }
 
-  throw new Error("--target-env=dev or --target-env=prd is required.");
+  if (environment === "uat") {
+    if (!/(uat|mn-uat|mattanutra-uat)/i.test(label) || /(prd|prod|production)/i.test(label)) {
+      throw new Error(`Refusing UAT catalogue alignment against unexpected database "${label}".`);
+    }
+    return;
+  }
+
+  throw new Error("--target-env=dev, --target-env=uat, or --target-env=prd is required.");
 }
 
 function assertApplyConfirmation(environment: string) {
@@ -121,6 +128,12 @@ function assertApplyConfirmation(environment: string) {
   if (environment === "dev" && process.env.MATTANUTRA_CONFIRM_DEV_CATALOGUE_ALIGN !== "align") {
     throw new Error(
       "Refusing DEV catalogue alignment without MATTANUTRA_CONFIRM_DEV_CATALOGUE_ALIGN=align."
+    );
+  }
+
+  if (environment === "uat" && process.env.MATTANUTRA_CONFIRM_UAT_CATALOGUE_ALIGN !== "prd-to-uat") {
+    throw new Error(
+      "Refusing UAT catalogue alignment without MATTANUTRA_CONFIRM_UAT_CATALOGUE_ALIGN=prd-to-uat."
     );
   }
 }
@@ -292,9 +305,25 @@ async function setCatalogueTriggers(sql: Db, enabled: boolean) {
   await setTriggerEnabled(sql, "product_recommendation_items", "product_recommendation_items_no_update_delete", enabled);
 }
 
-async function deleteTableRows(sql: Db, tableName: string) {
+async function deleteTableRows(
+  sql: Db,
+  tableName: string,
+  retainBy?: Readonly<{ column: string; ids: readonly string[] }>
+) {
   if (!(await tableExists(sql, tableName))) {
     return 0;
+  }
+
+  if (retainBy && retainBy.ids.length > 0) {
+    const result = await sql.unsafe(
+      `
+        delete from public.${quoteCatalogueAlignmentIdentifier(tableName)}
+        where not (${quoteCatalogueAlignmentIdentifier(retainBy.column)}::text = any($1::text[]))
+      `,
+      [retainBy.ids]
+    );
+
+    return result.count;
   }
 
   const result = await sql.unsafe(
@@ -537,7 +566,12 @@ function protectedDataIssues(
   return issues;
 }
 
-async function applyAlignment(sql: Db, tables: SnapshotTables, staleProductIds: readonly string[]) {
+async function applyAlignment(
+  sql: Db,
+  tables: SnapshotTables,
+  staleProductIds: readonly string[],
+  retainProductIds: readonly string[] = []
+) {
   const deletedChildren: Record<string, number> = {};
   const deletedRoots: Record<string, number> = {};
   const upserted: Record<string, number> = {};
@@ -554,7 +588,12 @@ async function applyAlignment(sql: Db, tables: SnapshotTables, staleProductIds: 
         continue;
       }
 
-      deletedChildren[tableName] = await deleteTableRows(sql, tableName);
+      const spec = tableSpec(tableName);
+      const retainChildren =
+        retainProductIds.length > 0 && spec.idColumn === "product_id"
+          ? { column: "product_id", ids: retainProductIds }
+          : undefined;
+      deletedChildren[tableName] = await deleteTableRows(sql, tableName, retainChildren);
     }
 
     for (const tableName of PLATFORM_CATALOGUE_DELETE_ORDER) {
@@ -563,9 +602,13 @@ async function applyAlignment(sql: Db, tables: SnapshotTables, staleProductIds: 
       }
 
       const spec = tableSpec(tableName);
+      const keepIds =
+        tableName === "products"
+          ? [...sourceIds(tables[tableName] ?? [], spec.idColumn), ...retainProductIds]
+          : sourceIds(tables[tableName] ?? [], spec.idColumn);
       deletedRoots[tableName] = await deleteTargetOnlyRootRows(sql, {
         idColumn: spec.idColumn,
-        sourceIds: sourceIds(tables[tableName] ?? [], spec.idColumn),
+        sourceIds: keepIds,
         tableName
       });
     }
@@ -656,11 +699,16 @@ async function main() {
   let applyReport: unknown = null;
   let protectedIssues: ProtectedIssue[] = [];
 
-  if (apply && blocked) {
+  const retainBlockedStaleProducts = hasArg("retain-blocked-stale-products");
+
+  if (apply && blocked && !retainBlockedStaleProducts) {
     throw new Error(
       `Catalogue alignment is blocked by protected stale product references: ${JSON.stringify(dependencyReport.blockers)}`
     );
   }
+
+  const retainProductIds = retainBlockedStaleProducts ? staleProductIds : [];
+  const staleProductIdsToDelete = retainBlockedStaleProducts ? [] : staleProductIds;
 
   if (apply) {
     applyReport = await sql.begin(async (transaction) => {
@@ -673,7 +721,12 @@ async function main() {
       const protectedBefore = environment.startsWith("prd")
         ? await captureProtectedDataSnapshot(tx)
         : null;
-      const result = await applyAlignment(tx, tables, staleProductIds);
+      const result = await applyAlignment(
+        tx,
+        tables,
+        staleProductIdsToDelete,
+        retainProductIds
+      );
       const protectedAfter = protectedBefore
         ? await captureProtectedDataSnapshot(tx)
         : null;
@@ -694,6 +747,7 @@ async function main() {
     });
   }
 
+  const tablesAfter = await summarize(sql, tables);
   const summary = {
     applied: apply,
     applyReport,
@@ -703,6 +757,9 @@ async function main() {
     generatedAt: new Date().toISOString(),
     inputPath,
     protectedIssues,
+    retainBlockedStaleProducts,
+    retainedProductIds: retainProductIds,
+    tablesAfter,
     tablesBefore,
     targetEnv: environment
   };

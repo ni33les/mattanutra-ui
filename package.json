@@ -19,6 +19,7 @@
     "catalogue:align": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-align-from-snapshot.ts",
     "catalogue:parity": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-parity-report.ts",
     "catalogue:sync-prd": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-sync-prd.ts",
+    "catalogue:t10-prd-to-uat": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/t10-prd-to-uat-catalogues.ts",
     "retail:snapshot": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/retail-snapshot.ts",
     "retail:catalogue-align": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/retail-catalogue-align-from-snapshot.ts",
     "retail:approved-only-cleanup": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/retail-approved-only-cleanup.ts",
