@@ -4,9 +4,27 @@ import type { AgenticRuntime } from "@/lib/agentic/runtime";
 const KEEP_WARM_MS = 20_000;
 
 const globalWarm = globalThis as typeof globalThis & {
+  mattanutraLivePlanCount?: number;
   mattanutraPlanKeepWarm?: ReturnType<typeof setInterval>;
   mattanutraPlanWarming?: boolean;
 };
+
+export async function withLivePlanRequest<T>(work: () => Promise<T>) {
+  globalWarm.mattanutraLivePlanCount = (globalWarm.mattanutraLivePlanCount ?? 0) + 1;
+
+  try {
+    return await work();
+  } finally {
+    globalWarm.mattanutraLivePlanCount = Math.max(
+      0,
+      (globalWarm.mattanutraLivePlanCount ?? 1) - 1
+    );
+  }
+}
+
+function livePlanInFlight() {
+  return (globalWarm.mattanutraLivePlanCount ?? 0) > 0;
+}
 
 function eightTargetRequest() {
   return {
@@ -59,7 +77,7 @@ function structuredPlan(value: unknown) {
 }
 
 async function pingPlanHotPath(runtime: AgenticRuntime) {
-  if (globalWarm.mattanutraPlanWarming) {
+  if (globalWarm.mattanutraPlanWarming || livePlanInFlight()) {
     return;
   }
 
@@ -140,10 +158,7 @@ export async function keepPlanPathWarm(environment: AgenticEnvironment) {
   }
 
   const timer = setInterval(() => {
-    void (async () => {
-      await warmAgenticCatalogue(environment);
-      await pingPlanHotPath(getLiveAgenticRuntime());
-    })().catch((error) => {
+    void warmAgenticCatalogue(environment).catch((error) => {
       console.warn("Unable to keep plan path warm", error);
     });
   }, KEEP_WARM_MS);

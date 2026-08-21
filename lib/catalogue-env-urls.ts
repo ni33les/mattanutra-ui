@@ -115,6 +115,15 @@ export function assertPrdCatalogueDatabase(
   }
 }
 
+export const T10_PRD_RETAIL_SOURCE = {
+  identity: "organisation_id + product_id",
+  organisationSlugs: ["delight-pharmacy"] as const,
+  productStatus: "approved",
+  query:
+    "retail_sellable_products JOIN organisations (slug = 'delight-pharmacy') JOIN products (status = 'approved') WHERE sellable.status <> 'deleted'",
+  sellableStatus: "not deleted"
+} as const;
+
 export const T10_CATALOGUE_GROUPS = {
   food: [
     "foods",

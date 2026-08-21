@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 import {
   T10_CATALOGUE_GROUPS,
+  T10_PRD_RETAIL_SOURCE,
   derivePrdCatalogueSourceUrl,
   deriveUatCatalogueTargetUrl,
   isPrdCatalogueDatabase,
@@ -25,6 +26,10 @@ describe("T10 PRD to UAT catalogue sync", () => {
       "retail_sellable_products",
       "retail_product_stock"
     ]);
+    assert.deepEqual([...T10_PRD_RETAIL_SOURCE.organisationSlugs], ["delight-pharmacy"]);
+    assert.equal(T10_PRD_RETAIL_SOURCE.productStatus, "approved");
+    assert.match(T10_PRD_RETAIL_SOURCE.query, /status = 'approved'/);
+    assert.doesNotMatch(T10_PRD_RETAIL_SOURCE.query, /enchanted-pharmacy/);
   });
 
   it("derives the existing PRD pool and UAT target from mn-dev", () => {
@@ -59,7 +64,10 @@ describe("T10 PRD to UAT catalogue sync", () => {
     assert.match(job, /--retain-blocked-stale-products/);
     assert.match(job, /--snapshot-orgs-only/);
     assert.match(job, /written: sumForTables/);
-    assert.match(job, /skipped: retainedProductIds.length/);
+    assert.match(job, /retained: retainedProductIds.length/);
+    assert.match(job, /cannotBeSoldOnDelight/);
+    assert.match(job, /T10_PRD_RETAIL_SOURCE/);
+    assert.match(job, /enchanted-pharmacy is a UAT-only tenant/);
     assert.doesNotMatch(job, /from "@\/lib\/matcher/);
     assert.doesNotMatch(job, /create table/);
     assert.match(platformAlign, /MATTANUTRA_CONFIRM_UAT_CATALOGUE_ALIGN/);

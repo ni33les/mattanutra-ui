@@ -4,12 +4,14 @@ import path from "node:path";
 
 import {
   T10_CATALOGUE_GROUPS,
+  T10_PRD_RETAIL_SOURCE,
   assertPrdCatalogueDatabase,
   assertUatCatalogueDatabase,
   databaseNameFromUrl,
   derivePrdCatalogueSourceUrl,
   deriveUatCatalogueTargetUrl
 } from "@/lib/catalogue-env-urls";
+import { closeSqlPool, getSql } from "@/lib/db";
 
 function argValue(name: string, fallback: string | null = null) {
   const prefix = `--${name}=`;
@@ -136,6 +138,7 @@ function sumForTables(counts: Record<string, number>, tables: readonly string[])
 
 function catalogOpLog(input: {
   failed: number;
+  retained?: number;
   skipped: number;
   tables: readonly string[];
   insertedChildren: Record<string, number>;
@@ -143,10 +146,61 @@ function catalogOpLog(input: {
 }) {
   return {
     failed: input.failed,
+    retained: input.retained ?? 0,
     skipped: input.skipped,
     updated: sumForTables(input.upserted, input.tables),
     written: sumForTables(input.insertedChildren, input.tables)
   };
+}
+
+async function withDatabase<T>(connection: string, work: (sql: NonNullable<ReturnType<typeof getSql>>) => Promise<T>) {
+  process.env.DB_URL = connection;
+  await closeSqlPool();
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured.");
+  }
+
+  try {
+    return await work(sql);
+  } finally {
+    await closeSqlPool();
+  }
+}
+
+async function delightApprovedLiveCount(sql: NonNullable<ReturnType<typeof getSql>>) {
+  const rows = await sql<Array<{ n: number }>>`
+    select count(*)::int as n
+    from public.retail_sellable_products sellable
+    join public.organisations organisation on organisation.id = sellable.organisation_id
+    join public.products products on products.id = sellable.product_id
+    where organisation.slug = 'delight-pharmacy'
+      and products.status = 'approved'
+      and coalesce(sellable.status, '') <> 'deleted'
+  `;
+
+  return Number(rows[0]?.n ?? 0);
+}
+
+async function retainedDelightLiveProductIds(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  productIds: readonly string[]
+) {
+  if (productIds.length < 1) {
+    return [] as string[];
+  }
+
+  const rows = await sql<Array<{ product_id: string }>>`
+    select sellable.product_id::text as product_id
+    from public.retail_sellable_products sellable
+    join public.organisations organisation on organisation.id = sellable.organisation_id
+    where organisation.slug = 'delight-pharmacy'
+      and sellable.product_id::text = any(${productIds as string[]})
+      and coalesce(sellable.status, '') <> 'deleted'
+  `;
+
+  return rows.map((row) => row.product_id);
 }
 
 async function main() {
@@ -311,29 +365,47 @@ async function main() {
     "platform-product": catalogOpLog({
       failed: 0,
       insertedChildren,
-      skipped: retainedProductIds.length,
+      retained: retainedProductIds.length,
+      skipped: 0,
       tables: T10_CATALOGUE_GROUPS["platform-product"],
       upserted
     }),
     "retail-product": {
       failed: 0,
+      retained: 0,
       skipped: skippedRetailOrgs.length,
       updated: sumForTables(retailUpserted, T10_CATALOGUE_GROUPS["retail-product"]),
       written: 0
     }
   };
+  const prdApprovedLive = await withDatabase(prdUrl!, delightApprovedLiveCount);
+  const uatApprovedLive = await withDatabase(uatUrl!, delightApprovedLiveCount);
+  const retainedStillSellableOnDelight = await withDatabase(uatUrl!, (sql) =>
+    retainedDelightLiveProductIds(sql, retainedProductIds)
+  );
   const leftovers = {
     platform: {
       blockers: platformAlignSummary.dependencyReport,
+      cannotBeSoldOnDelight: retainedStillSellableOnDelight.length === 0,
+      liveDelightSellableProductIds: retainedStillSellableOnDelight,
       reason:
-        "UAT-only product roots referenced by retail_customer_order_lines are retained; child rows for those product_ids are kept",
+        "UAT-only product roots referenced by retail_customer_order_lines are retained so order history is not deleted",
       retainedBlockedProductCount: retainedProductIds.length,
       retainedBlockedProductIds: retainedProductIds
     },
     retail: {
+      delightApprovedLiveSellable: {
+        prd: prdApprovedLive,
+        query: T10_PRD_RETAIL_SOURCE.query,
+        uat: uatApprovedLive
+      },
       delightTargetOnlyMarkedDeleted: retailMarkedDeleted,
-      reason:
-        "PRD retail snapshot has delight-pharmacy only; enchanted-pharmacy is UAT-only and is left untouched",
+      enchantedPharmacy: {
+        inPrdSnapshot: false,
+        reason:
+          "PRD organisations snapshot has delight-pharmacy only; enchanted-pharmacy is a UAT-only tenant and is not part of the existing PRD retail source. Unapproved Enchanted leftovers are T01, not a second retail catalog.",
+        skipped: skippedRetailOrgs.includes("enchanted-pharmacy")
+      },
       requestedOrganisationSlugs: requestedRetailOrgs,
       skippedOrganisationSlugs: skippedRetailOrgs
     }
@@ -353,6 +425,7 @@ async function main() {
     source: {
       database: databaseNameFromUrl(prdUrl),
       pool: "mn-pool-prd",
+      retail: T10_PRD_RETAIL_SOURCE,
       script: "catalogue:snapshot + retail:snapshot"
     },
     target: {

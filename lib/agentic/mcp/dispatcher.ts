@@ -5,6 +5,7 @@ import {
   validateToolInput
 } from "@/lib/agentic/contract";
 import { infoTool } from "@/lib/agentic/info";
+import { withLivePlanRequest } from "@/lib/agentic/plan/warm-dev";
 import { planTool } from "@/lib/agentic/plan/service";
 import { executeTool } from "@/lib/agentic/commerce/execute";
 import { orderTool } from "@/lib/agentic/commerce/order";
@@ -67,28 +68,30 @@ async function callTool(
       });
       break;
     case "plan":
-      value = await planTool({
-        config: runtime.config,
-        now,
-        payload: {
-          answers: params.answers,
-          expectedRevision:
-            typeof params.expectedRevision === "number"
-              ? params.expectedRevision
-              : undefined,
-          idempotencyKey: String(params.idempotencyKey),
-          planHandle:
-            typeof params.planHandle === "string" ? params.planHandle : undefined,
-          request: params.request,
-          safetyAcknowledgement: params.safetyAcknowledgement,
-          selectOptionId:
-            typeof params.selectOptionId === "string"
-              ? params.selectOptionId
-              : undefined
-        },
-        scope: runtime.scope,
-        store: runtime.store
-      });
+      value = await withLivePlanRequest(() =>
+        planTool({
+          config: runtime.config,
+          now,
+          payload: {
+            answers: params.answers,
+            expectedRevision:
+              typeof params.expectedRevision === "number"
+                ? params.expectedRevision
+                : undefined,
+            idempotencyKey: String(params.idempotencyKey),
+            planHandle:
+              typeof params.planHandle === "string" ? params.planHandle : undefined,
+            request: params.request,
+            safetyAcknowledgement: params.safetyAcknowledgement,
+            selectOptionId:
+              typeof params.selectOptionId === "string"
+                ? params.selectOptionId
+                : undefined
+          },
+          scope: runtime.scope,
+          store: runtime.store
+        })
+      );
       break;
     case "execute":
       value = await executeTool({

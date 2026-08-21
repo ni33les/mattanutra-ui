@@ -416,8 +416,13 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /RESERVE_EXPIRED_SWEEP_BATCH_LIMIT = 3[\s\S]*releaseExpiredReservations\(\{[\s\S]*batchLimit: RESERVE_EXPIRED_SWEEP_BATCH_LIMIT/,
+      /RESERVE_EXPIRED_SWEEP_BATCH_LIMIT = 3[\s\S]*maybeReleaseExpiredReservations/,
       "worker reserve polling must not block behind a full expired-reservation sweep",
+    );
+    assert.match(
+      source,
+      /RESERVE_EXPIRED_SWEEP_MIN_INTERVAL_MS = 15_000/,
+      "expired reservation sweeps must not run on every worker poll"
     );
     assert.match(
       source,

@@ -25,6 +25,39 @@ export const runtime = "nodejs";
 const DEFAULT_RESERVE_POLL_INTERVAL_MS = 5_000;
 const INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000;
 const RESERVE_EXPIRED_SWEEP_BATCH_LIMIT = 3;
+const RESERVE_EXPIRED_SWEEP_MIN_INTERVAL_MS = 15_000;
+
+const globalReserve = globalThis as typeof globalThis & {
+  mattanutraExpiredSweepAt?: number;
+  mattanutraExpiredSweeping?: boolean;
+};
+
+async function maybeReleaseExpiredReservations() {
+  const now = Date.now();
+
+  if (globalReserve.mattanutraExpiredSweeping) {
+    return 0;
+  }
+
+  if (
+    typeof globalReserve.mattanutraExpiredSweepAt === "number" &&
+    now - globalReserve.mattanutraExpiredSweepAt < RESERVE_EXPIRED_SWEEP_MIN_INTERVAL_MS
+  ) {
+    return 0;
+  }
+
+  globalReserve.mattanutraExpiredSweeping = true;
+
+  try {
+    const released = await releaseExpiredReservations({
+      batchLimit: RESERVE_EXPIRED_SWEEP_BATCH_LIMIT
+    });
+    globalReserve.mattanutraExpiredSweepAt = Date.now();
+    return released;
+  } finally {
+    globalReserve.mattanutraExpiredSweeping = false;
+  }
+}
 const INTERACTIVE_TASK_TYPES = new Set([
   "analyze_healthscore",
   "generate_food_gap_guidance",
@@ -99,9 +132,7 @@ export async function POST(request: Request) {
     const heartbeatDurationMs = Date.now() - heartbeatStartedAt;
 
     const sweepStartedAt = Date.now();
-    const releasedExpiredReservations = await releaseExpiredReservations({
-      batchLimit: RESERVE_EXPIRED_SWEEP_BATCH_LIMIT
-    });
+    const releasedExpiredReservations = await maybeReleaseExpiredReservations();
     const sweepDurationMs = Date.now() - sweepStartedAt;
 
     if (sweepDurationMs > 1_000 || releasedExpiredReservations > 0) {
