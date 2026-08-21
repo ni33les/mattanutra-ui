@@ -18,10 +18,9 @@ import {
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 import { loadAgenticCheckoutProducts } from "@/lib/agentic/commerce/checkout-products";
 import {
-  joinMcpPaidOrderToRetail,
-  lookupRetailOrderForAgentic
-} from "@/lib/agentic/commerce/retail-join";
-import { nowIso } from "@/lib/agentic/runtime";
+  mcpOrderTrackSuccessPath,
+  resolveAgenticPaidTrackingPath
+} from "@/lib/agentic/commerce/checkout-return";
 import { stripePublishableKey } from "@/lib/stripe-payments";
 
 type PageProps = Readonly<{
@@ -68,21 +67,16 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
     notFound();
   }
 
-  if (order.paymentStatus === "paid" && runtime.config.paymentProvider === "stripe_test") {
-    const existing = await lookupRetailOrderForAgentic(order.id);
-    const joined = existing
-      ? null
-      : await joinMcpPaidOrderToRetail({
-          now: nowIso(),
-          order,
-          store: runtime.store
-        });
-    const trackingUrl = existing?.trackingUrl ?? joined?.trackingUrl;
+  const sessionId = typeof query.session_id === "string" ? query.session_id : "";
+  const paidTracking = await resolveAgenticPaidTrackingPath({
+    checkoutAccess,
+    locale,
+    runtime,
+    sessionId: sessionId || undefined
+  });
 
-    if (trackingUrl) {
-      const path = trackingUrl.replace(/^\/en(?=\/)/, `/${locale}`);
-      redirect(`${path}${path.includes("?") ? "&" : "?"}from=mcp`);
-    }
+  if (paidTracking) {
+    redirect(paidTracking);
   }
 
   const expired = checkout.expiresAt <= new Date().toISOString();
@@ -117,6 +111,7 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
   const websiteCheckout = runtime.config.paymentProvider === "stripe_test";
   const products = websiteCheckout ? await loadAgenticCheckoutProducts(items) : [];
   const major = (minor: number) => asMinor(minor) / 100;
+  const successUrl = mcpOrderTrackSuccessPath(locale);
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -133,6 +128,7 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
             expired={expired}
             locale={locale}
             paid={order.paymentStatus === "paid"}
+            successUrl={successUrl}
             products={products.map((item) => ({
               id: item.id,
               imageUrl: item.imageUrl,
@@ -154,6 +150,7 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
             country={order.destinationCountry}
             currency={order.currency}
             expired={expired}
+            successUrl={successUrl}
             items={items.map((item) => ({
               dailyPills: item.dailyPills,
               form: item.form,

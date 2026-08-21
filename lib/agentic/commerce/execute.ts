@@ -34,6 +34,7 @@ export type ExecuteSuccess = Readonly<{
   paymentStatus: "unpaid";
   pollAfterSeconds: number;
   stateVersion: 1;
+  successUrl: string;
 }>;
 
 export async function executeTool(input: Readonly<{
@@ -210,6 +211,7 @@ export async function executeTool(input: Readonly<{
       order: draftOrder
     });
     const checkoutUrl = `${input.config.siteUrl}/en/mcp/checkout/${checkoutIssued.handle}`;
+    const successUrl = `${input.config.siteUrl}/en/order/track`;
     const order = {
       ...draftOrder,
       checkoutUrl,
@@ -253,7 +255,8 @@ export async function executeTool(input: Readonly<{
       orderStatus: "open",
       paymentStatus: "unpaid",
       pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
-      stateVersion: 1
+      stateVersion: 1,
+      successUrl
     };
 
     await commitIdempotency({

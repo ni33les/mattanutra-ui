@@ -7,6 +7,7 @@ import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import { asMinor } from "@/lib/agentic/money";
 import { isLocale, type Locale } from "@/lib/i18n";
+import type { OrderRecord } from "@/lib/agentic/store/types";
 
 const AGENTIC_STRIPE_SOURCE = "agentic_mcp";
 
@@ -57,7 +58,7 @@ export async function createAgenticStripeCheckoutSession(input: Readonly<{
   }
 
   const returnUrl =
-    `${input.runtime.config.siteUrl}/${locale}/mcp/checkout/${encodeURIComponent(input.checkoutAccess)}` +
+    `${input.runtime.config.siteUrl}/${locale}/mcp/checkout/${encodeURIComponent(input.checkoutAccess)}/return` +
     "?session_id={CHECKOUT_SESSION_ID}";
   const session = await stripe.checkout.sessions.create({
     customer_email: input.customerEmail,
@@ -113,6 +114,53 @@ export async function createAgenticStripeCheckoutSession(input: Readonly<{
     clientSecret: session.client_secret,
     sessionId: session.id
   };
+}
+
+export async function applyPaidAgenticStripeSession(input: Readonly<{
+  order: OrderRecord;
+  runtime: AgenticRuntime;
+  sessionId: string;
+}>): Promise<OrderRecord | null> {
+  const stripe = testModeStripe();
+  const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+  const paid =
+    session.payment_status === "paid" ||
+    session.status === "complete";
+
+  if (!paid) {
+    return input.order;
+  }
+
+  if (input.order.paymentStatus === "paid") {
+    return input.order;
+  }
+
+  let order = input.order;
+
+  if (order.providerSessionId !== session.id) {
+    order = {
+      ...order,
+      providerSessionId: session.id,
+      updatedAt: nowIso()
+    };
+    await input.runtime.store.updateOrder(order);
+  }
+
+  const applied = await applyVerifiedPaymentEvent({
+    event: {
+      amountMinor: asMinor(session.amount_total ?? order.totalPriceMinor),
+      currency: (session.currency ?? order.currency).toUpperCase(),
+      providerEventId: `return:${session.id}`,
+      providerSessionId: session.id,
+      reason: null,
+      scenario: "success",
+      status: "succeeded"
+    },
+    now: nowIso(),
+    store: input.runtime.store
+  });
+
+  return applied?.order ?? order;
 }
 
 function metadataRecord(value: unknown): Record<string, string> {

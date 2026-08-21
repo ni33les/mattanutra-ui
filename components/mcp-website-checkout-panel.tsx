@@ -35,6 +35,7 @@ type McpWebsiteCheckoutPanelProps = Readonly<{
   products: readonly ProductBasketProduct[];
   publishableKey: string;
   sellerName: string | null;
+  successUrl: string;
   shippingAmount: number;
   subtotalAmount: number;
   totalAmount: number;
@@ -266,6 +267,7 @@ export function McpWebsiteCheckoutPanel(props: McpWebsiteCheckoutPanelProps) {
 
   return (
     <div className="pb-32 lg:pb-0">
+      <input name="success_url" readOnly type="hidden" value={props.successUrl} />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="space-y-5">
           <section className="mn-commerce-card">

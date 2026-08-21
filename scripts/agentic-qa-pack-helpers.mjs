@@ -92,6 +92,10 @@ export function unpaidA9EnvGate(env) {
   };
 }
 
+export function hasOrderTrackDestination(...values) {
+  return values.some((value) => /\/order\/track/i.test(String(value ?? "")));
+}
+
 export function collectTrackPointer(order, execute, html) {
   const retail = order?.retailCustomerOrder?.trackingUrl;
   if (typeof retail === "string" && retail.includes("/order/track")) {
@@ -103,9 +107,15 @@ export function collectTrackPointer(order, execute, html) {
     return tracking;
   }
 
-  for (const action of [execute?.nextAction, order?.nextAction]) {
+  for (const action of [
+    execute?.successUrl,
+    execute?.returnUrl,
+    execute?.nextAction,
+    order?.nextAction,
+    order?.successUrl
+  ]) {
     if (typeof action === "string" && action.includes("/order/track")) {
-      return action;
+      return action.includes("/order/track/") ? action : null;
     }
   }
 

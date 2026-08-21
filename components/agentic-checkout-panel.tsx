@@ -36,6 +36,7 @@ type AgenticCheckoutPanelProps = Readonly<{
   orderReference: string;
   paid: boolean;
   refundable?: boolean;
+  successUrl: string;
   shippingMinor: number;
   subtotalMinor: number;
   taxMinor: number;
@@ -168,6 +169,7 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
         >
           <input name="country" type="hidden" value={props.country} />
           <input name="returnTo" type="hidden" value={`/${props.locale}/mcp/checkout/${props.checkoutAccess}`} />
+          <input name="success_url" readOnly type="hidden" value={props.successUrl} />
           <fieldset className="space-y-3 rounded-2xl border border-[var(--color-forest-glow)] bg-white p-5">
             <legend className="px-1 font-semibold text-ink">
               {agenticMessage(props.locale, "checkout.contact")}

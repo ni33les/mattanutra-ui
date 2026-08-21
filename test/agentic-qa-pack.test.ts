@@ -17,7 +17,8 @@ import {
   isFixtureShapedId,
   isHttpUrl,
   optionLines,
-  unpaidA9EnvGate
+  unpaidA9EnvGate,
+  hasOrderTrackDestination
 } from "../scripts/agentic-qa-pack-helpers.mjs";
 
 function runtimeFor(): AgenticRuntime {
@@ -296,6 +297,8 @@ describe("Official MattaNutra Agentic QA Pack", () => {
   });
 
   it("A9 unpaid execute is env-gated on uat and dev", () => {
+    assert.equal(hasOrderTrackDestination("https://uat.mattanutra.com/en/order/track"), true);
+    assert.equal(hasOrderTrackDestination("https://example.test/mcp/checkout/x"), false);
     const uat = unpaidA9EnvGate("uat");
     assert.equal(uat.pass, true);
     assert.match(uat.detail, /UAT env-gated: unpaid execute never hits \/order\/track/);

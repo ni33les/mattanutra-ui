@@ -6,6 +6,7 @@ import {
   absolutize,
   collectTrackPointer,
   everyLineHasHttpImage,
+  hasOrderTrackDestination,
   exactToolNames,
   isFixtureLine,
   isFixtureShapedId,
@@ -389,13 +390,24 @@ async function main() {
       ? await call("order", { orderHandle: executed.orderHandle })
       : {};
     let track = collectTrackPointer(ordered, executed, html);
+    const destVisible = hasOrderTrackDestination(
+      executed.successUrl,
+      executed.returnUrl,
+      executed.nextAction,
+      ordered.successUrl,
+      ordered.nextAction,
+      html
+    );
 
     if (!checkoutOk || page.status !== 200) {
       a9Pass = false;
       a9Detail = "execute.checkoutUrl GET failed";
+    } else if (!destVisible) {
+      a9Pass = false;
+      a9Detail = "success destination /order/track not host-visible";
     } else if (env === "dev" && (!paySecurely || harness)) {
       a9Pass = true;
-      a9Detail = "A9 PASS DEV env-gated: mocked pay never hits /order/track";
+      a9Detail = "DEV env-gated: mocked pay never hits /order/track";
     } else if (!paySecurely || harness) {
       a9Pass = false;
       a9Detail = "parallel rail: missing Pay securely or DEV scenario form present";

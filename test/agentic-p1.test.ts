@@ -742,6 +742,19 @@ describe("agentic P1 pack fixes", () => {
       "utf8"
     );
     assert.match(adapter, /ui_mode: "embedded_page"/);
+    assert.match(adapter, /\/mcp\/checkout\/\$\{encodeURIComponent\(input\.checkoutAccess\)\}\/return/);
+    const executeSource = readFileSync(
+      new URL("../lib/agentic/commerce/execute.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(executeSource, /successUrl/);
+    assert.match(executeSource, /\/en\/order\/track/);
+    const returnPage = readFileSync(
+      new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/return/page.tsx", import.meta.url),
+      "utf8"
+    );
+    assert.match(returnPage, /resolveAgenticPaidTrackingPath/);
+    assert.match(website, /name="success_url"/);
     assert.match(panel, /props\.paid \|\| Boolean\(props\.refundable\)/);
     assert.match(page, /paymentStatus === "refunded"/);
     assert.match(page, /partially_refunded/);
@@ -1359,8 +1372,13 @@ describe("agentic P1 pack fixes", () => {
       "utf8"
     );
     assert.match(mapper, /imageUrl/);
-    assert.match(checkoutPage, /redirect\(`/);
-    assert.match(checkoutPage, /from=mcp/);
+    assert.match(checkoutPage, /redirect\(paidTracking\)/);
+    assert.match(checkoutPage, /resolveAgenticPaidTrackingPath/);
+    const checkoutReturn = readFileSync(
+      new URL("../lib/agentic/commerce/checkout-return.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(checkoutReturn, /from=mcp/);
     assert.match(tracking, /returnToAgent/);
     assert.match(tracking, /Please return to your AI Agent Chat/);
     assert.match(workflow, /Payment was received/);
