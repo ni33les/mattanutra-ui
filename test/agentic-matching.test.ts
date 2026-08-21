@@ -124,6 +124,38 @@ describe("agentic live-catalogue matching constraints", () => {
     assert.equal(names.some((name) => /conceive|prenatal|fertility/i.test(name)), false);
   });
 
+  it("algae_only leftover is uncovered when the catalogue has no algae omega SKU", () => {
+    const snapshot = fixtureSnapshot();
+    const omega =
+      snapshot.products.find((item) => item.omegaSource === "algae") ??
+      snapshot.products[0]!;
+    const fishOnly = snapshot.products.filter((item) => item.omegaSource !== "algae");
+    const matched = matchPlan({
+      snapshot: { ...snapshot, products: fishOnly },
+      state: stateFor(omega, {
+        requirements: { omega3SourcePreference: "algae_only" },
+        targets: [
+          {
+            amount: 1000,
+            name: "Omega-3",
+            supplementId: omega.contributionSupplementIds[0]!,
+            unit: "mg"
+          }
+        ]
+      })
+    });
+    const names = (matched.selected?.basket ?? []).map((item) => item.productName);
+    assert.equal(
+      names.some((name) => /omega|fish oil|krill|3-6-9|lecithin/i.test(name) && !/algae/i.test(name)),
+      false
+    );
+    assert.ok(
+      matched.leftovers.some(
+        (item) => /omega/i.test(item.name) && item.reason === "uncovered"
+      )
+    );
+  });
+
   it("does not select Super Omega 3-6-9 or lecithin under algae_only", () => {
     const snapshot = fixtureSnapshot();
     const algae = snapshot.products.find((item) => item.omegaSource === "algae");

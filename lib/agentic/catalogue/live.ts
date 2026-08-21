@@ -224,6 +224,28 @@ function loadingSnapshot(countryCode: string): CatalogueSnapshot {
   };
 }
 
+function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
+  const existing = liveInflight.get(code);
+
+  if (existing) {
+    return existing;
+  }
+
+  const inflight = loadLiveRetailSnapshot(code)
+    .then((snapshot) => {
+      if (snapshot.products.length > 0) {
+        liveCache.set(code, { at: Date.now(), snapshot });
+      }
+
+      return snapshot;
+    })
+    .finally(() => {
+      liveInflight.delete(code);
+    });
+  liveInflight.set(code, inflight);
+  return inflight;
+}
+
 export async function cachedLiveRetailSnapshot(
   countryCode: string
 ): Promise<CatalogueSnapshot> {
@@ -234,22 +256,7 @@ export async function cachedLiveRetailSnapshot(
     return hit.snapshot;
   }
 
-  let inflight = liveInflight.get(code);
-
-  if (!inflight) {
-    inflight = loadLiveRetailSnapshot(code)
-      .then((snapshot) => {
-        if (snapshot.products.length > 0) {
-          liveCache.set(code, { at: Date.now(), snapshot });
-        }
-
-        return snapshot;
-      })
-      .finally(() => {
-        liveInflight.delete(code);
-      });
-    liveInflight.set(code, inflight);
-  }
+  const inflight = startLiveLoad(code);
 
   if (hit) {
     return hit.snapshot;
@@ -261,6 +268,19 @@ export async function cachedLiveRetailSnapshot(
       setTimeout(() => resolve(loadingSnapshot(code)), LIVE_LOAD_WAIT_MS);
     })
   ]);
+}
+
+export async function warmLiveRetailSnapshot(
+  countryCode: string
+): Promise<CatalogueSnapshot> {
+  const code = countryCode.trim().toUpperCase() || "TH";
+  const hit = liveCache.get(code);
+
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS && hit.snapshot.products.length > 0) {
+    return hit.snapshot;
+  }
+
+  return startLiveLoad(code);
 }
 
 export function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {

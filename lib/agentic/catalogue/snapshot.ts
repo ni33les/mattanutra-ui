@@ -1,6 +1,9 @@
 import type { AgenticEnvironment } from "@/lib/agentic/config";
 import { fixtureSnapshot } from "@/lib/agentic/catalogue/fixtures";
-import { cachedLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
+import {
+  cachedLiveRetailSnapshot,
+  warmLiveRetailSnapshot
+} from "@/lib/agentic/catalogue/live";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 
 const cachedByCountry = new Map<string, CatalogueSnapshot>();
@@ -44,7 +47,14 @@ export async function ensureCatalogueSnapshot(
 
   try {
     const live = await cachedLiveRetailSnapshot(code);
-    cachedByCountry.set(code, live);
+
+    if (
+      live.products.length > 0 &&
+      !live.catalogueVersion.endsWith("-loading")
+    ) {
+      cachedByCountry.set(code, live);
+    }
+
     return live;
   } catch (error) {
     console.warn("Unable to load live retail catalogue for MCP", { countryCode: code, error });
@@ -54,6 +64,30 @@ export async function ensureCatalogueSnapshot(
       products: [],
       supplements: fixtureSnapshot().supplements
     };
+  }
+}
+
+export async function warmCatalogueSnapshot(
+  environment?: AgenticEnvironment,
+  countryCode?: string
+): Promise<CatalogueSnapshot> {
+  const code = countryKey(countryCode);
+
+  if (!usesLiveCatalogue(environment)) {
+    return ensureCatalogueSnapshot(environment, code);
+  }
+
+  try {
+    const live = await warmLiveRetailSnapshot(code);
+
+    if (live.products.length > 0) {
+      cachedByCountry.set(code, live);
+    }
+
+    return live;
+  } catch (error) {
+    console.warn("Unable to warm live retail catalogue for MCP", { countryCode: code, error });
+    return ensureCatalogueSnapshot(environment, code);
   }
 }
 

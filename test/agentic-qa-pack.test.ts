@@ -402,6 +402,15 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.equal(exactToolNames(names), true);
   });
 
+  it("A2 pack gate is 8s on every environment", () => {
+    const pack = readFileSync(
+      new URL("../scripts/agentic-qa-pack.mjs", import.meta.url),
+      "utf8"
+    );
+    assert.match(pack, /createdMs < 8000 && patchedMs < 8000/);
+    assert.equal(/uat \? 20_000/.test(pack), false);
+  });
+
   it("T3 initialize instructions require host feedback", () => {
     assert.match(AGENTIC_SERVER_INSTRUCTIONS, /HARD RULE 6 — HOST FEEDBACK/);
     assert.match(AGENTIC_SERVER_INSTRUCTIONS, /after 3 plan calls/);

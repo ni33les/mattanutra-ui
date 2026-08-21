@@ -142,13 +142,14 @@ function pruneComplete(states: SearchState[], request: CanonicalRequest) {
 function exactSearch(
   groups: readonly ProductGroup[],
   request: CanonicalRequest,
-  budget: Budget
+  budget: Budget,
+  deadlineAt: number
 ): SearchRun {
   const complete: SearchState[] = [];
   const seed = seedState(request);
 
   const dfs = (state: SearchState) => {
-    if (budget.remaining < 0) {
+    if (budget.remaining < 0 || Date.now() >= deadlineAt) {
       return;
     }
 
@@ -178,7 +179,7 @@ function exactSearch(
   return {
     complete: pruneComplete(complete, request),
     mode: "exact",
-    trimmed: budget.remaining < 0
+    trimmed: budget.remaining < 0 || Date.now() >= deadlineAt
   };
 }
 
@@ -222,13 +223,14 @@ function beamSearch(
   groups: readonly ProductGroup[],
   request: CanonicalRequest,
   config: MatcherConfig,
-  budget: Budget
+  budget: Budget,
+  deadlineAt: number
 ): SearchRun {
   let width = config.initialBeamWidth;
   let best: SearchState[] = [];
   let trimmed = false;
 
-  while (width <= config.maxBeamWidth && budget.remaining > 0) {
+  while (width <= config.maxBeamWidth && budget.remaining > 0 && Date.now() < deadlineAt) {
     let beam: SearchState[] = [seedState(request)];
     const complete: SearchState[] = [];
     let runTrimmed = false;
@@ -240,7 +242,8 @@ function beamSearch(
       for (const state of beam) {
         budget.remaining -= 1;
 
-        if (budget.remaining < 0) {
+        if (budget.remaining < 0 || Date.now() >= deadlineAt) {
+          runTrimmed = true;
           break;
         }
 
@@ -288,7 +291,11 @@ function beamSearch(
     width = Math.min(width * 2, config.maxBeamWidth);
   }
 
-  return { complete: best, mode: "bounded", trimmed };
+  return {
+    complete: best,
+    mode: "bounded",
+    trimmed: trimmed || Date.now() >= deadlineAt
+  };
 }
 
 export function searchGroups(
@@ -298,13 +305,14 @@ export function searchGroups(
 ): SearchRun {
   const variantCount = groups.reduce((sum, group) => sum + group.variants.length, 0);
   const budget: Budget = { remaining: config.expansionBudget };
+  const deadlineAt = Date.now() + config.searchDeadlineMs;
   const exact =
     groups.length <= config.exactGroupLimit &&
     variantCount <= config.exactVariantLimit;
 
   return exact
-    ? exactSearch(groups, request, budget)
-    : beamSearch(groups, request, config, budget);
+    ? exactSearch(groups, request, budget, deadlineAt)
+    : beamSearch(groups, request, config, budget, deadlineAt);
 }
 
 export function reconstructVariants(

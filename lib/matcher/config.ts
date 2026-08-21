@@ -8,6 +8,7 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   expansionBudget: 8_000,
   initialBeamWidth: 24,
   maxBeamWidth: 48,
+  searchDeadlineMs: 2_500,
   usefulCoverageFloor: 90,
   version: MATCHER_VERSION
 };

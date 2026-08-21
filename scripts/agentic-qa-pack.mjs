@@ -227,8 +227,7 @@ async function main() {
     ((created.basket ?? []).length === 8 &&
       namesInBasket(created).some((name) => /zinc/i.test(name)) &&
       namesInBasket(created).some((name) => /b12/i.test(name)));
-  const a2BudgetMs = env === "uat" ? 20_000 : 8_000;
-  const a2Latency = createdMs < a2BudgetMs && patchedMs < a2BudgetMs;
+  const a2Latency = createdMs < 8000 && patchedMs < 8000;
   record(
     "A2",
     a2Core && a2DevExtra && a2Latency,

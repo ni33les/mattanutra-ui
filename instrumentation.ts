@@ -5,4 +5,12 @@ export async function register() {
 
   const { keepDatabaseWarm } = await import("./lib/db");
   await keepDatabaseWarm();
+
+  try {
+    const { resolveAgenticEnvironment } = await import("./lib/agentic/config");
+    const { warmAgenticCatalogue } = await import("./lib/agentic/catalogue/warm");
+    await warmAgenticCatalogue(resolveAgenticEnvironment());
+  } catch (error) {
+    console.warn("Unable to warm agentic catalogue", error);
+  }
 }

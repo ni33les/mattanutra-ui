@@ -214,6 +214,7 @@ export type MatcherConfig = Readonly<{
   expansionBudget: number;
   initialBeamWidth: number;
   maxBeamWidth: number;
+  searchDeadlineMs: number;
   usefulCoverageFloor: number;
   version: string;
 }>;

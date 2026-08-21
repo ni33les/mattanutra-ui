@@ -245,7 +245,22 @@ export function leftoversFor(
     leftovers.push(item);
   }
 
-  for (const row of selected?.coverage ?? []) {
+  if (!selected) {
+    for (const target of state.targets) {
+      push({
+        amount: target.amount,
+        name: target.name,
+        reason: "uncovered",
+        severity: "high",
+        supplementId: target.supplementId,
+        unit: target.unit
+      });
+    }
+
+    return leftovers;
+  }
+
+  for (const row of selected.coverage) {
     if (row.status === "uncovered") {
       push({
         amount: row.requestedAmount,
