@@ -709,8 +709,36 @@ export async function planTool(input: Readonly<{
     return txResult as AgenticErrorResult;
   }
 
-  void persistPlanSideEffects(txResult.persist);
+  schedulePersistPlanSideEffects(txResult.persist);
   return txResult.response;
+}
+
+function schedulePersistPlanSideEffects(
+  input: Readonly<{
+    locale: Locale;
+    planId: string;
+    result: PlanResult;
+    revision: number;
+  }>
+) {
+  const startedAt = Date.now();
+  const wait = async () => {
+    const { isLivePlanInFlight } = await import("@/lib/agentic/plan/warm-dev");
+    const elapsed = Date.now() - startedAt;
+
+    if (elapsed < 750 || (isLivePlanInFlight() && elapsed < 8_000)) {
+      setTimeout(() => {
+        void wait();
+      }, 25);
+      return;
+    }
+
+    void persistPlanSideEffects(input);
+  };
+
+  setTimeout(() => {
+    void wait();
+  }, 25);
 }
 
 async function persistPlanSideEffects(input: Readonly<{

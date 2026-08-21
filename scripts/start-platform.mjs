@@ -133,10 +133,19 @@ async function mcpRpc(method, params) {
       params,
     }),
   });
+  const body = await response.json();
 
   if (!response.ok) {
     throw new Error(`MCP ${method} HTTP ${response.status}`);
   }
+
+  return body;
+}
+
+function structuredPlan(value) {
+  const result = value?.result ?? value;
+  const nested = result?.structuredContent ?? result;
+  return nested && typeof nested === "object" ? nested : null;
 }
 
 async function warmDevPlanHotPath() {
@@ -145,31 +154,66 @@ async function warmDevPlanHotPath() {
       arguments: { locale: "en" },
       name: "info",
     });
-    await mcpRpc("tools/call", {
-      arguments: {
-        idempotencyKey: `platform-hot-${Date.now()}`,
-        request: {
-          destinationCountry: "TH",
-          locale: "en",
-          medicationCodes: ["apixaban"],
-          optimization: "balanced",
-          profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
-          requirements: {},
-          targets: [
-            { amount: 2000, name: "Vitamin D3", unit: "IU" },
-            { amount: 1000, name: "Algae omega-3", unit: "mg" },
-            { amount: 300, name: "Magnesium", unit: "mg" },
-            { amount: 1000, name: "Vitamin B12", unit: "mcg" },
-            { amount: 1000, name: "Vitamin C", unit: "mg" },
-            { amount: 25, name: "Zinc", unit: "mg" },
-            { amount: 10, name: "Iron", unit: "mg" },
-            { amount: 100, name: "CoQ10", unit: "mg" },
-          ],
+    const created = structuredPlan(
+      await mcpRpc("tools/call", {
+        arguments: {
+          idempotencyKey: `platform-hot-${Date.now()}`,
+          request: {
+            destinationCountry: "TH",
+            locale: "en",
+            medicationCodes: ["apixaban"],
+            optimization: "balanced",
+            profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
+            requirements: {},
+            targets: [
+              { amount: 2000, name: "Vitamin D3", unit: "IU" },
+              { amount: 1000, name: "Algae omega-3", unit: "mg" },
+              { amount: 300, name: "Magnesium", unit: "mg" },
+              { amount: 1000, name: "Vitamin B12", unit: "mcg" },
+              { amount: 1000, name: "Vitamin C", unit: "mg" },
+              { amount: 25, name: "Zinc", unit: "mg" },
+              { amount: 10, name: "Iron", unit: "mg" },
+              { amount: 100, name: "CoQ10", unit: "mg" },
+            ],
+          },
         },
-      },
-      name: "plan",
-    });
-    console.log("[platform] DEV plan hot path warmed");
+        name: "plan",
+      }),
+    );
+
+    if (created?.planHandle && created.revision != null) {
+      const answers = (created.questions ?? []).flatMap((question) => {
+        const choice = question.choices?.[0]?.choice;
+        const questionId = question.questionId;
+        if (
+          choice &&
+          (questionId === "q_safety_ack" || String(questionId).startsWith("q_gap_"))
+        ) {
+          return [{ choice, questionId }];
+        }
+        return [];
+      });
+      await mcpRpc("tools/call", {
+        arguments: {
+          answers,
+          expectedRevision: created.revision,
+          idempotencyKey: `platform-hot-${Date.now()}-patch`,
+          planHandle: created.planHandle,
+          ...(created.guidanceIds
+            ? {
+                safetyAcknowledgement: {
+                  confirmed: true,
+                  guidanceIds: created.guidanceIds,
+                  revision: created.revision,
+                },
+              }
+            : {}),
+        },
+        name: "plan",
+      });
+    }
+
+    console.log("[platform] plan hot path warmed (create+patch)");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[platform] DEV plan hot path warm failed: ${message}`);

@@ -8,7 +8,7 @@ const globalDb = globalThis as typeof globalThis & {
 
 const BENIGN_SCHEMA_NOTICE_CODES = new Set(["42P07", "42701", "42710"]);
 const DEFAULT_DB_CONNECT_TIMEOUT_SECONDS = 5;
-const DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 60;
+const DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 120;
 const DEFAULT_DB_POOL_MAX = 4;
 const MAX_DB_POOL_MAX = 10;
 
@@ -172,6 +172,12 @@ export async function checkDatabaseConnection() {
 }
 
 const DB_KEEP_ALIVE_MS = 20_000;
+const DB_KEEP_ALIVE_CONNECTIONS = 3;
+
+async function pingWarmConnections(sql: NonNullable<ReturnType<typeof getSql>>) {
+  const n = Math.min(DB_KEEP_ALIVE_CONNECTIONS, dbPoolMax());
+  await Promise.all(Array.from({ length: n }, () => sql`select 1`));
+}
 
 export async function keepDatabaseWarm() {
   const sql = getSql();
@@ -180,14 +186,26 @@ export async function keepDatabaseWarm() {
     return false;
   }
 
-  const ok = await checkDatabaseConnection();
+  let ok = false;
+
+  try {
+    await pingWarmConnections(sql);
+    globalDb.mattanutraDbUnavailableLogged = false;
+    ok = true;
+  } catch (error) {
+    if (!globalDb.mattanutraDbUnavailableLogged) {
+      console.error("Database unavailable", error);
+      globalDb.mattanutraDbUnavailableLogged = true;
+    }
+  }
+
   const globalKeep = globalThis as typeof globalThis & {
     mattanutraDbKeepAlive?: ReturnType<typeof setInterval>;
   };
 
   if (!globalKeep.mattanutraDbKeepAlive) {
     const timer = setInterval(() => {
-      void sql`select 1`.catch(() => null);
+      void pingWarmConnections(sql).catch(() => null);
     }, DB_KEEP_ALIVE_MS);
     timer.unref?.();
     globalKeep.mattanutraDbKeepAlive = timer;

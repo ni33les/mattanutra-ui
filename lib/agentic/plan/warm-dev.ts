@@ -22,8 +22,12 @@ export async function withLivePlanRequest<T>(work: () => Promise<T>) {
   }
 }
 
-function livePlanInFlight() {
+export function isLivePlanInFlight() {
   return (globalWarm.mattanutraLivePlanCount ?? 0) > 0;
+}
+
+function livePlanInFlight() {
+  return isLivePlanInFlight();
 }
 
 function eightTargetRequest() {
