@@ -21,8 +21,8 @@ import {
 } from "@/lib/example-email";
 import { isLocale, publicLocales, type Locale } from "@/lib/i18n";
 import {
+  getLiveSaleEligibleRetailerCandidateSets,
   getProductRecommendationCandidates,
-  getRetailerAwareProductRecommendationCandidateSets,
   type ProductRecommendationRetailerCandidateSet
 } from "@/lib/admin-products";
 import {
@@ -1823,16 +1823,10 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   );
   const candidateLoadStartedAt = Date.now();
   const retailerCandidateSets =
-    await getRetailerAwareProductRecommendationCandidateSets({
-      countryCode,
-      includeIneligible: true
+    await getLiveSaleEligibleRetailerCandidateSets({
+      countryCode
     });
-  const candidates = retailerCandidateSets.length > 0
-    ? retailerCandidateSets.flatMap((set) => set.candidates)
-    : await getProductRecommendationCandidates({
-    countryCode,
-    includeIneligible: true
-      });
+  const candidates = retailerCandidateSets.flatMap((set) => set.candidates);
 
   return {
     candidates,

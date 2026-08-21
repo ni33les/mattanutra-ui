@@ -18,6 +18,7 @@ import {
   customerPriceFromRpp,
   getCustomerPriceMarginPercent
 } from "@/lib/customer-pricing";
+import { assessRetailSellability } from "@/lib/retail-sellability";
 import { organisationDispatchCity } from "@/lib/organisation-dispatch";
 import type { ProductCandidate } from "@/lib/product-recommendations";
 
@@ -380,25 +381,22 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
     const stockQuantity = integerOrDefault(retailRow.stock_quantity, 0);
     const allocatedQuantity = integerOrDefault(retailRow.allocated_quantity, 0);
     const availableNow = Math.max(0, stockQuantity - allocatedQuantity);
-    const backorderAllowed = retailRow.backorder_policy !== "deny";
-    const rrpPriceAmount = moneyOrNull(retailRow.rrp_price_amount);
-    // Full-beam / sale eligibility: RRP set + (in stock or backorder).
-    // Customer price = RRP + platform % from admin (never bake margin into RRP).
-    const priceAmount =
-      rrpPriceAmount !== null && rrpPriceAmount > 0
-        ? customerPriceFromRpp(rrpPriceAmount, customerPriceMarginPercent)
-        : null;
+    const sellability = assessRetailSellability({
+      availableNow,
+      backorderPolicy: retailRow.backorder_policy,
+      marginPercent: customerPriceMarginPercent,
+      productStatus: retailRow.product_status,
+      requireMasterApproved: true,
+      rrpPriceAmount: retailRow.rrp_price_amount,
+      sellableStatus: "active"
+    });
+    const priceAmount = sellability.customerUnitPrice;
 
     if (
-      priceAmount === null ||
-      (availableNow <= 0 && !backorderAllowed) ||
-      String(retailRow.product_status ?? "").toLowerCase() === "deleted"
-    ) {
-      continue;
-    }
-
-    if (
-      String(retailRow.product_status ?? "approved").toLowerCase() !== "approved"
+      sellability.hardReasons.includes("missing_retail_price") ||
+      sellability.hardReasons.includes("out_of_stock_no_backorder") ||
+      sellability.hardReasons.includes("sellable_inactive") ||
+      sellability.hardReasons.includes("master_not_approved")
     ) {
       continue;
     }
@@ -418,7 +416,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
           retailRow.organisation_currency?.trim().toUpperCase() ||
           "THB",
         etaDate,
-        priceAmount,
+        priceAmount: priceAmount ?? 0,
         priceSource: "master_list_country_rrp_margin",
         retailSellableProductId: retailRow.retail_sellable_product_id,
         selectedRetailerName: retailRow.organisation_name,
@@ -467,7 +465,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
 
     retailer.candidates.push(candidate);
     retailer.etaDates.push(etaDate);
-    retailer.subtotalAmount += priceAmount;
+    retailer.subtotalAmount += priceAmount ?? 0;
     byRetailer.set(retailRow.organisation_id, retailer);
   }
 
@@ -485,4 +483,17 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
   }));
 
   return candidateSets.filter((set) => set.candidates.length > 0);
+}
+
+export async function getLiveSaleEligibleRetailerCandidateSets(input: Readonly<{
+  countryCode?: string | null;
+  limit?: number;
+  productId?: string | null;
+  sql?: ProductSearchDb;
+}>) {
+  return getRetailerAwareProductRecommendationCandidateSets({
+    ...input,
+    includeIneligible: false,
+    saleEligibleOnly: true
+  });
 }

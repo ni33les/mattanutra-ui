@@ -1381,9 +1381,8 @@ describe("agentic P1 pack fixes", () => {
       "utf8"
     );
     assert.match(snapshot, /cachedLiveRetailSnapshot/);
-    assert.match(live, /getRetailerAwareProductRecommendationCandidateSets/);
-    assert.match(live, /includeIneligible: false/);
-    assert.match(live, /saleEligibleOnly: true/);
+    assert.match(live, /getLiveSaleEligibleRetailerCandidateSets/);
+    assert.match(live, /assessRetailSellability/);
     assert.match(live, /isSaleEligible/);
     assert.match(live, /sellerId\}:\$\{mapped\.productId\}/);
     const mapper = readFileSync(

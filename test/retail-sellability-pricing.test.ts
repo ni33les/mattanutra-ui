@@ -50,8 +50,10 @@ describe("retail sellability and platform margin pricing", () => {
     assert.doesNotMatch(search, /rrp_price_amount as retail_override_price_amount/);
     assert.match(cart, /Missing retail price \(RRP\)/);
     assert.match(cart, /customerPriceFromRpp\(/);
-    assert.match(search, /customerPriceFromRpp\(rrpPriceAmount/);
-    assert.match(search, /availableNow <= 0 && !backorderAllowed/);
+    assert.match(search, /assessRetailSellability/);
+    assert.match(search, /missing_retail_price/);
+    assert.match(search, /master_not_approved/);
+    assert.match(search, /getLiveSaleEligibleRetailerCandidateSets/);
   });
 
   it("checkout pays pharmacy RRP and records platform margin", () => {

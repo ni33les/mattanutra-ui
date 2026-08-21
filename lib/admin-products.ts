@@ -117,6 +117,7 @@ export {
   loadProductRows
 } from "./admin-product-read-model.ts";
 export {
+  getLiveSaleEligibleRetailerCandidateSets,
   getProductRecommendationCandidates,
   getRetailerAwareProductRecommendationCandidateSets,
   type ProductRecommendationRetailerCandidateSet,

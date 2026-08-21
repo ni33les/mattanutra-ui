@@ -1,4 +1,5 @@
-import { getRetailerAwareProductRecommendationCandidateSets } from "@/lib/admin-product-search";
+import { getLiveSaleEligibleRetailerCandidateSets } from "@/lib/admin-product-search";
+import { assessRetailSellability } from "@/lib/retail-sellability";
 import { publicProductId } from "@/lib/agentic/contract/ids";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogue/market";
 import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
@@ -109,13 +110,19 @@ function inferDailyPills(candidate: ProductCandidate) {
 }
 
 function isSaleEligible(candidate: ProductCandidate) {
+  const price = candidate.unitPriceAmount ?? candidate.priceAmount ?? 0;
   return (
-    candidate.status === "approved" &&
+    assessRetailSellability({
+      availableNow: 1,
+      productStatus: candidate.status,
+      rrpPriceAmount: price,
+      sellableStatus: "active"
+    }).eligible &&
     (candidate.brandStatus == null || candidate.brandStatus === "approved") &&
     candidate.validation?.status === "pass" &&
     candidate.automatedSafetyPassed === true &&
     Boolean(candidate.imageUrl?.trim()) &&
-    (candidate.unitPriceAmount ?? candidate.priceAmount ?? 0) > 0
+    price > 0
   );
 }
 
@@ -172,10 +179,8 @@ function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | nul
 export async function loadLiveRetailSnapshot(
   countryCode: string
 ): Promise<CatalogueSnapshot> {
-  const sets = await getRetailerAwareProductRecommendationCandidateSets({
-    countryCode: countryCode.trim().toUpperCase(),
-    includeIneligible: false,
-    saleEligibleOnly: true
+  const sets = await getLiveSaleEligibleRetailerCandidateSets({
+    countryCode: countryCode.trim().toUpperCase()
   });
   const byListing = new Map<string, CatalogueProduct>();
 

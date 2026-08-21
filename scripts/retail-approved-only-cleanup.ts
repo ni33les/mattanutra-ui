@@ -287,6 +287,8 @@ async function dependencyCounts(sql: Db, organisationIds: readonly string[]) {
   `;
 }
 
+const HISTORICAL_CLEANUP_DEPENDENCIES = new Set(["retail_customer_order_lines"]);
+
 function blockers(input: Readonly<{
   counts: Awaited<ReturnType<typeof activeUnapprovedCounts>>;
   dependencies: Array<{ rows: number; table_name: string }>;
@@ -298,7 +300,10 @@ function blockers(input: Readonly<{
   }
 
   for (const dependency of input.dependencies) {
-    if (Number(dependency.rows) > 0) {
+    if (
+      Number(dependency.rows) > 0 &&
+      !HISTORICAL_CLEANUP_DEPENDENCIES.has(dependency.table_name)
+    ) {
       issues.push(`${dependency.table_name}=${dependency.rows}`);
     }
   }

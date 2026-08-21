@@ -9,8 +9,7 @@ import {
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import {
-  getProductRecommendationCandidates,
-  getRetailerAwareProductRecommendationCandidateSets
+  getLiveSaleEligibleRetailerCandidateSets
 } from "@/lib/admin-products";
 import {
   defaultProductCountryCode,
@@ -2260,17 +2259,11 @@ async function applyProductRecommendationsResult(
 
   if (variants.length < 1) {
     const retailerCandidateSets =
-      await getRetailerAwareProductRecommendationCandidateSets({
+      await getLiveSaleEligibleRetailerCandidateSets({
         countryCode,
-        includeIneligible: true,
         sql
       });
-    const candidates = retailerCandidateSets.length > 0
-      ? retailerCandidateSets.flatMap((set) => set.candidates)
-      : await getProductRecommendationCandidates({
-      countryCode,
-      includeIneligible: true
-        });
+    const candidates = retailerCandidateSets.flatMap((set) => set.candidates);
 
     variants = PRODUCT_STACK_VARIANT_CONFIGS.map((config) => ({
       maxProducts: config.maxProducts,
