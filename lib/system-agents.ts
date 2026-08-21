@@ -252,7 +252,7 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
       usesModel: true
     },
     model: "grok:panya",
-    name: "Panya",
+    name: "Nong Mata",
     type: "ai"
   },
   productMatcher: {

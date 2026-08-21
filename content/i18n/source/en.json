@@ -6640,7 +6640,7 @@
     "translatable": true
   },
   "customer.revealCopy.foodSupportNoGapsBody": {
-    "defaultMessage": "The managed food catalogue does not yet have a strong match for this formula. Keep meals steady and use Panya if you want a food-first guide.",
+    "defaultMessage": "The managed food catalogue does not yet have a strong match for this formula. Keep meals steady and use Nong Mata if you want a food-first guide.",
     "description": "Reveal page copy field foodSupportNoGapsBody.",
     "namespace": "customer.revealCopy",
     "audience": "customer",
@@ -7467,7 +7467,7 @@
     "translatable": true
   },
   "customer.revealFinalCopy.foodEmptyBody": {
-    "defaultMessage": "The managed food catalogue does not yet have a strong match for this formula. Keep meals steady and use Panya if you want a food-first guide.",
+    "defaultMessage": "The managed food catalogue does not yet have a strong match for this formula. Keep meals steady and use Nong Mata if you want a food-first guide.",
     "description": "Final reveal copy field foodEmptyBody.",
     "namespace": "customer.revealFinalCopy",
     "audience": "customer",
@@ -7656,7 +7656,7 @@
     "translatable": true
   },
   "customer.revealFinalCopy.panyaButtonLead": {
-    "defaultMessage": "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Panya will recognise this plan.",
+    "defaultMessage": "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Nong Mata will recognise this plan.",
     "description": "Final reveal copy field panyaButtonLead.",
     "namespace": "customer.revealFinalCopy",
     "audience": "customer",
@@ -7701,7 +7701,7 @@
     "translatable": true
   },
   "customer.revealFinalCopy.panyaLivingBody": {
-    "defaultMessage": "Use LINE to ask Panya about your formula, and to check in throughout your protocol as your plan adapts.",
+    "defaultMessage": "Use LINE to ask Nong Mata about your formula, and to check in throughout your protocol as your plan adapts.",
     "description": "Final reveal copy field panyaLivingBody.",
     "namespace": "customer.revealFinalCopy",
     "audience": "customer",
@@ -7737,7 +7737,7 @@
     "translatable": true
   },
   "customer.revealFinalCopy.panyaPlanBody": {
-    "defaultMessage": "Use LINE to ask Panya about your formula, why each nutrient was selected, and to revisit this plan anytime.",
+    "defaultMessage": "Use LINE to ask Nong Mata about your formula, why each nutrient was selected, and to revisit this plan anytime.",
     "description": "Final reveal copy field panyaPlanBody.",
     "namespace": "customer.revealFinalCopy",
     "audience": "customer",
@@ -7746,7 +7746,7 @@
     "translatable": true
   },
   "customer.revealFinalCopy.panyaPlanHeading": {
-    "defaultMessage": "Talk through your nutrition plan with Panya.",
+    "defaultMessage": "Talk through your nutrition plan with Nong Mata.",
     "description": "Final reveal copy field panyaPlanHeading.",
     "namespace": "customer.revealFinalCopy",
     "audience": "customer",
@@ -7773,7 +7773,7 @@
     "translatable": true
   },
   "customer.revealFinalCopy.panyaSection": {
-    "defaultMessage": "Panya support",
+    "defaultMessage": "Nong Mata support",
     "description": "Final reveal copy field panyaSection.",
     "namespace": "customer.revealFinalCopy",
     "audience": "customer",
@@ -7782,7 +7782,7 @@
     "translatable": true
   },
   "customer.revealFinalCopy.panyaWisdomBody": {
-    "defaultMessage": "The name comes from the Pali/Sanskrit Buddhist word paññā / prajñā — a deeper kind of wisdom. Not just being smart, but seeing things clearly and understanding truth. It is a fitting name for the guide behind your plan: designed by MattaNutra's team, including physicians, and supported by AI, with a person responding directly when your question needs one.",
+    "defaultMessage": "Nong Mata is the guide behind your plan: designed by MattaNutra's team, including physicians, and supported by AI, with a person responding directly when your question needs one.",
     "description": "Final reveal copy field panyaWisdomBody.",
     "namespace": "customer.revealFinalCopy",
     "audience": "customer",
@@ -8878,8 +8878,8 @@
   },
   "outbound.panya.quota.livingProtocol": {
     "audience": "customer",
-    "defaultMessage": "You have used today's {limit, number} Panya messages. You can continue tomorrow, and the MattaNutra team can still review anything urgent.",
-    "description": "LINE reply when a Living Protocol customer reaches the daily Panya message limit.",
+    "defaultMessage": "You have used today's {limit, number} Nong Mata messages. You can continue tomorrow, and the MattaNutra team can still review anything urgent.",
+    "description": "LINE reply when a Living Protocol customer reaches the daily Nong Mata message limit.",
     "namespace": "outbound.panya",
     "surface": "line",
     "translatable": true,
@@ -8889,8 +8889,8 @@
   },
   "outbound.panya.quota.standard": {
     "audience": "customer",
-    "defaultMessage": "You have used today's {limit, number} Panya messages. You can still view your plan and orders. Living Protocol unlocks deeper ongoing support and plan refinement.",
-    "description": "LINE reply when a non-subscription customer reaches the daily Panya message limit.",
+    "defaultMessage": "You have used today's {limit, number} Nong Mata messages. You can still view your plan and orders. Living Protocol unlocks deeper ongoing support and plan refinement.",
+    "description": "LINE reply when a non-subscription customer reaches the daily Nong Mata message limit.",
     "namespace": "outbound.panya",
     "surface": "line",
     "translatable": true,
@@ -8900,7 +8900,7 @@
   },
   "outbound.panya.reorderNudge": {
     "audience": "customer",
-    "defaultMessage": "It has been about three weeks since your MattaNutra order.\nIf your current formula is still working for you, this is a good time to reorder so you do not run out around day 30.\nIf sleep, stress, medication, travel, diet, or goals have changed, take the assessment again before reordering: {reassessmentUrl}\nReply here if you want Panya to help with the next step.",
+    "defaultMessage": "It has been about three weeks since your MattaNutra order.\nIf your current formula is still working for you, this is a good time to reorder so you do not run out around day 30.\nIf sleep, stress, medication, travel, diet, or goals have changed, take the assessment again before reordering: {reassessmentUrl}\nReply here if you want Nong Mata to help with the next step.",
     "description": "LINE reorder nudge sent around three weeks after an order.",
     "namespace": "outbound.panya",
     "surface": "line",
@@ -8911,8 +8911,8 @@
   },
   "outbound.panya.welcome.livingProtocol": {
     "audience": "customer",
-    "defaultMessage": "You are connected to Panya{name}. You can ask about your Living Protocol, plan, products, orders, or changes in your routine here. Your plan is here: {planUrl}",
-    "description": "Fallback Panya welcome message for Living Protocol customers.",
+    "defaultMessage": "You are connected to Nong Mata{name}. You can ask about your Living Protocol, plan, products, orders, or changes in your routine here. Your plan is here: {planUrl}",
+    "description": "Fallback Nong Mata welcome message for Living Protocol customers.",
     "namespace": "outbound.panya",
     "surface": "line",
     "translatable": true,
@@ -8923,8 +8923,8 @@
   },
   "outbound.panya.welcome.rightAmountFormula": {
     "audience": "customer",
-    "defaultMessage": "You are connected to Panya{name}. I can help explain your Right Amount Formula, products, order, and next steps. Your plan is here: {planUrl}",
-    "description": "Fallback Panya welcome message for Right Amount Formula customers.",
+    "defaultMessage": "You are connected to Nong Mata{name}. I can help explain your Right Amount Formula, products, order, and next steps. Your plan is here: {planUrl}",
+    "description": "Fallback Nong Mata welcome message for Right Amount Formula customers.",
     "namespace": "outbound.panya",
     "surface": "line",
     "translatable": true,
@@ -8935,8 +8935,8 @@
   },
   "outbound.panya.welcome.unpaid": {
     "audience": "customer",
-    "defaultMessage": "You are connected to Panya{name}. You can ask about MattaNutra, your assessment, orders, and next steps here.",
-    "description": "Fallback Panya welcome message for unpaid or unentitled customers.",
+    "defaultMessage": "You are connected to Nong Mata{name}. You can ask about MattaNutra, your assessment, orders, and next steps here.",
+    "description": "Fallback Nong Mata welcome message for unpaid or unentitled customers.",
     "namespace": "outbound.panya",
     "surface": "line",
     "translatable": true,

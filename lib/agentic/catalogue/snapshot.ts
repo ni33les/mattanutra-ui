@@ -5,6 +5,7 @@ import {
   warmLiveRetailSnapshot
 } from "@/lib/agentic/catalogue/live";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
+import { refreshAdminSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 
 const cachedByCountry = new Map<string, CatalogueSnapshot>();
 let lastSnapshot: CatalogueSnapshot | null = null;
@@ -47,6 +48,7 @@ export async function ensureCatalogueSnapshot(
 
     const fixtures = fixtureSnapshot();
     cachedByCountry.set(code, fixtures);
+    await refreshAdminSafetyCeilings();
     return fixtures;
   }
 

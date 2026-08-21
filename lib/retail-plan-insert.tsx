@@ -1046,12 +1046,12 @@ function BackCover({ data }: { data: RetailPlanInsertData }) {
         <View style={styles.qrCard}>
           <View style={styles.qrTile}>
             <PdfImageWithAlt
-              alt="Panya LINE QR code"
+              alt="Nong Mata LINE QR code"
               src={data.panyaQrDataUri}
               style={styles.qrImage}
             />
           </View>
-          <InsertText style={styles.qrTitle}>Ask Panya on LINE</InsertText>
+          <InsertText style={styles.qrTitle}>Ask Nong Mata on LINE</InsertText>
           <InsertText style={styles.qrSub}>
             Your plan, explained anytime. Code {data.panyaCode}
           </InsertText>
@@ -1125,7 +1125,7 @@ function FoodPanel({ data }: { data: RetailPlanInsertData }) {
       )) : (
         <InsertText style={styles.emptyState}>
           Your full plan remains available online. Food support can be reviewed
-          with Panya whenever you need a practical meal idea.
+          with Nong Mata whenever you need a practical meal idea.
         </InsertText>
       )}
       <InsertText style={[styles.foodRationale, { marginTop: "auto" }]}>
@@ -1178,7 +1178,7 @@ function ProductPanel({ data }: { data: RetailPlanInsertData }) {
           </View>
         )) : (
           <InsertText style={styles.emptyState}>
-            Product dosing is available in your online reveal page. Ask Panya if
+            Product dosing is available in your online reveal page. Ask Nong Mata if
             you want help reading the product labels.
           </InsertText>
         )}

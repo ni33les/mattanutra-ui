@@ -52,6 +52,13 @@ export type CanonicalCurrent = Readonly<{
   unit: MatcherUnit;
 }>;
 
+export type SafetyCeiling = Readonly<{
+  maxAmount: number;
+  maxUnit: MatcherUnit;
+  name: string;
+  subjectId: string;
+}>;
+
 export type CanonicalRequest = Readonly<{
   acceptedGapSubjectIds: readonly string[];
   allowedForms: readonly string[] | null;
@@ -75,6 +82,7 @@ export type CanonicalRequest = Readonly<{
   }>;
   retainProductIds: readonly string[];
   retainSubjectIds: readonly string[];
+  safetyCeilings?: readonly SafetyCeiling[];
   selectorMode: SelectorMode;
   targets: readonly CanonicalTarget[];
 }>;

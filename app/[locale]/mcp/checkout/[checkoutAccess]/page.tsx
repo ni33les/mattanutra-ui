@@ -109,7 +109,7 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
     .filter(Boolean)
     .join("\n");
   const websiteCheckout = runtime.config.paymentProvider === "stripe_test";
-  const products = websiteCheckout ? await loadAgenticCheckoutProducts(items) : [];
+  const products = websiteCheckout ? await loadAgenticCheckoutProducts(items, locale) : [];
   const major = (minor: number) => asMinor(minor) / 100;
   const successUrl = mcpOrderTrackSuccessPath(locale);
 
@@ -131,9 +131,11 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
             paid={order.paymentStatus === "paid"}
             successUrl={successUrl}
             products={products.map((item) => ({
+              currency: order.currency,
               id: item.id,
               imageUrl: item.imageUrl,
-              name: item.name
+              name: item.name,
+              unitPriceAmount: major(item.unitPriceMinor)
             }))}
             publishableKey={stripePublishableKey()}
             quantities={Object.fromEntries(products.map((item) => [item.id, item.quantity]))}

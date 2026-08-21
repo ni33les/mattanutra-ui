@@ -1498,7 +1498,7 @@ CREATE TABLE public.panya_config_versions (
 -- Name: TABLE panya_config_versions; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.panya_config_versions IS 'Versioned platform-governed Panya persona, guardrails, quota, and check-in configuration.';
+COMMENT ON TABLE public.panya_config_versions IS 'Versioned platform-governed Nong Mata persona, guardrails, quota, and check-in configuration.';
 
 
 --
@@ -1529,7 +1529,7 @@ CREATE TABLE public.panya_daily_usage (
 -- Name: TABLE panya_daily_usage; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.panya_daily_usage IS 'Atomic per-conversation, per-customer-local-day Panya usage counter for customer chat quotas.';
+COMMENT ON TABLE public.panya_daily_usage IS 'Atomic per-conversation, per-customer-local-day Nong Mata usage counter for customer chat quotas.';
 
 
 --

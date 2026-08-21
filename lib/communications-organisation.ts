@@ -893,7 +893,7 @@ export async function queueCustomerChatCommunicationDispatchTask(input: Readonly
       messageId: input.messageId
     },
     planId: input.planId ?? null,
-    priorityReason: "Panya reply is queued for the chat dispatcher.",
+    priorityReason: "Nong Mata reply is queued for the chat dispatcher.",
     priorityScore: ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY,
     reasoningEffort: "none",
     requiredCapabilities: [
@@ -903,7 +903,7 @@ export async function queueCustomerChatCommunicationDispatchTask(input: Readonly
     sourceEntityId: input.messageId,
     sourceEntityType: "communication_message",
     taskType: "dispatch_chat_communication_message",
-    title: "Dispatch Panya LINE reply"
+    title: "Dispatch Nong Mata LINE reply"
   });
 }
 

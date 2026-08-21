@@ -268,7 +268,7 @@ describe("communications channel selection", () => {
     assert.match(execution, /executeCommunicationDispatchTask/);
     assert.match(agents, /route_admin_communication:[\s\S]*agentKey: "communicationsCoordinator"/);
     assert.match(agents, /customer_chat_reply:[\s\S]*agentKey: "panya"/);
-    assert.match(agents, /name: "Panya"/);
+    assert.match(agents, /name: "Nong Mata"/);
     assert.match(agents, /dispatch_email_communication_message:[\s\S]*agentKey: "emailDispatcher"/);
     assert.match(agents, /dispatch_chat_communication_message:[\s\S]*agentKey: "chatDispatcher"/);
     assert.match(runner, /runtimeWorkerProfileForMode\(mode\)/);

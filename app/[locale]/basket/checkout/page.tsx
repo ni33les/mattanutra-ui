@@ -44,7 +44,8 @@ function parseIds(value: unknown) {
 
 async function selectedProductsForCheckout(
   planId: string,
-  selectedItemIds: readonly string[]
+  selectedItemIds: readonly string[],
+  locale: Locale
 ) {
   const sql = getSql();
 
@@ -53,23 +54,34 @@ async function selectedProductsForCheckout(
   }
 
   const rows = await sql<Array<{
+    currency: string | null;
     image_url: string | null;
     product_id: string;
     title: string;
+    unit_price_amount: string | number | null;
   }>>`
     select distinct on (product_recommendation_items.product_id)
       product_recommendation_items.product_id::text,
       coalesce(
+        nullif(product_translation_locale.title, ''),
         nullif(product_translation_en.title, ''),
-        nullif(products.title, ''),
-        'Product'
+        nullif(products.title, '')
       ) as title,
-      coalesce(products.image_url, product_recommendation_items.image_url) as image_url
+      coalesce(products.image_url, product_recommendation_items.image_url) as image_url,
+      coalesce(
+        product_recommendation_items.unit_price_amount,
+        product_recommendation_items.price_amount
+      ) as unit_price_amount,
+      product_recommendation_items.currency
     from public.product_recommendation_items
     join public.product_recommendation_runs
       on product_recommendation_runs.id = product_recommendation_items.run_id
     join public.products
       on products.id = product_recommendation_items.product_id
+    left join public.product_translations product_translation_locale
+      on product_translation_locale.product_id = products.id
+      and product_translation_locale.locale = ${locale}
+      and product_translation_locale.status <> 'missing'
     left join public.product_translations product_translation_en
       on product_translation_en.product_id = products.id
       and product_translation_en.locale = 'en'
@@ -82,11 +94,19 @@ async function selectedProductsForCheckout(
   `;
   const byId = new Map(rows.map((row) => [row.product_id, row]));
 
-  return selectedItemIds.map((id) => ({
-    id,
-    imageUrl: byId.get(id)?.image_url ?? null,
-    name: byId.get(id)?.title ?? "Product"
-  }));
+  return selectedItemIds.map((id) => {
+    const row = byId.get(id);
+    const amount = row?.unit_price_amount == null ? null : Number(row.unit_price_amount);
+
+    return {
+      currency: row?.currency ?? null,
+      id,
+      imageUrl: row?.image_url ?? null,
+      name: row?.title?.trim() || "",
+      unitPriceAmount:
+        amount != null && Number.isFinite(amount) && amount > 0 ? amount : null
+    };
+  });
 }
 
 export function generateStaticParams() {
@@ -138,7 +158,8 @@ export default async function BasketCheckoutPage({
   const currentPath = `/${locale}/basket/checkout`;
   const selectedProducts = await selectedProductsForCheckout(
     planId,
-    selectedItemIds
+    selectedItemIds,
+    locale
   );
 
   return (

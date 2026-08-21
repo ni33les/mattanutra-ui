@@ -3,6 +3,7 @@ import { MATCHER_VERSION } from "@/lib/matcher/config";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import { match } from "@/lib/matcher";
+import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { productEligible } from "@/lib/matcher/eligibility";
 import { publicCoveragePercent } from "@/lib/matcher/explainer";
 import type { MatcherProduct, MatcherUnit } from "@/lib/matcher/types";
@@ -183,6 +184,7 @@ export function recommendWithMatcher(
       },
       retainProductIds: [],
       retainSubjectIds: [],
+      safetyCeilings: matcherSafetyCeilings(),
       selectorMode: "web_single",
       targets: targets.targets
     },

@@ -3,7 +3,7 @@ import { closeSqlPool, getSql } from "@/lib/db";
 const sql = getSql();
 
 if (!sql) {
-  throw new Error("DB_URL is required to apply Panya schema");
+  throw new Error("DB_URL is required to apply Nong Mata schema");
 }
 
 try {
@@ -168,4 +168,4 @@ try {
   await closeSqlPool();
 }
 
-console.log("Panya schema applied.");
+console.log("Nong Mata schema applied.");

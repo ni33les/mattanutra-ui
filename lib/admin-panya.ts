@@ -13,7 +13,7 @@ import {
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import {
-  DEFAULT_PANYA_CONFIG,
+  DEFAULT_NONG MATA_CONFIG,
   getActivePanyaConfig,
   panyaEntitlementLabel,
   resolvePanyaEntitlement,
@@ -113,7 +113,7 @@ type MessageRow = Readonly<{
 
 export function emptyAdminPanyaData(): AdminPanyaData {
   return {
-    activeConfig: DEFAULT_PANYA_CONFIG,
+    activeConfig: DEFAULT_NONG MATA_CONFIG,
     activeConfigVersion: null,
     conversations: [],
     databaseAvailable: false,
@@ -327,7 +327,7 @@ export async function getAdminPanyaData(
       summary: buildSummary(conversations)
     };
   } catch (error) {
-    console.error("Unable to load admin Panya data", error);
+    console.error("Unable to load admin Nong Mata data", error);
     return emptyAdminPanyaData();
   }
 }
@@ -398,7 +398,7 @@ export async function sendAdminPanyaConversationReply(input: Readonly<{
   }
 
   if (input.context.effectiveOrganisation.type !== "platform") {
-    throw new Error("Panya replies are platform-only");
+    throw new Error("Nong Mata replies are platform-only");
   }
 
   if (!isUuid(planId)) {
@@ -545,7 +545,7 @@ export async function resolveAdminPanyaConversationEscalation(input: Readonly<{
   }
 
   if (input.context.effectiveOrganisation.type !== "platform") {
-    throw new Error("Panya escalation resolution is platform-only");
+    throw new Error("Nong Mata escalation resolution is platform-only");
   }
 
   if (!threadKey) {
@@ -635,7 +635,7 @@ export async function resolveAdminPanyaConversationEscalation(input: Readonly<{
         ${input.context.actorPerson.displayName || "admin_dashboard"},
         'admin',
         'decision',
-        ${note ?? "Panya escalation resolved from the conversation page."},
+        ${note ?? "Nong Mata escalation resolved from the conversation page."},
         ${sql.json(resultPayload)}::jsonb,
         now()
       )

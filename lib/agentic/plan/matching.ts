@@ -10,6 +10,7 @@ import type {
   ScoredBasket
 } from "@/lib/matcher/types";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
+import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import type {
   BasketItem,
   CanonicalPlanState,
@@ -115,6 +116,7 @@ function toCanonicalRequest(
     profile: state.profile,
     retainProductIds: state.requirements.retainProductIds ?? [],
     retainSubjectIds: state.requirements.retainSupplementIds ?? [],
+    safetyCeilings: matcherSafetyCeilings(),
     selectorMode: "agentic",
     targets: targets.targets
   };
@@ -138,7 +140,10 @@ function coverageFor(
       : 0;
     const deliveredAmount = Math.max(0, (deliveredTotal ?? 0) - currentAmount);
     const totalExposureAmount = currentAmount + deliveredAmount;
-    const limit = upperLimitAmount(target.name, target.unit);
+    const limit = upperLimitAmount(target.name, target.unit, {
+      ceilings: matcherSafetyCeilings(),
+      subjectId: target.supplementId
+    });
     let status: CoverageRow["status"] = "uncovered";
 
     if (coveragePercent >= 90 && coveragePercent <= 125) {

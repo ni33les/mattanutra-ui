@@ -967,7 +967,7 @@ export async function enqueuePanyaCustomerChatReplyTask({
   const taskId = await createWorkTask({
     actorType: "ai",
     businessValue: TASK_BUSINESS_VALUES.customerChatReply,
-    groupLabel: "Panya customer chat",
+    groupLabel: "Nong Mata customer chat",
     id: deterministicUuid(`mattanutra:task:panya-chat:${messageId}`),
     idempotencyKey: `panya-chat:${messageId}`,
     idempotencyScope: "active",
@@ -983,7 +983,7 @@ export async function enqueuePanyaCustomerChatReplyTask({
     reasoningEffort: "low",
     source: "line_customer_chat",
     taskGroupId,
-    taskTitle: "Panya reply to customer chat",
+    taskTitle: "Nong Mata reply to customer chat",
     taskType: "customer_chat_reply"
   });
 

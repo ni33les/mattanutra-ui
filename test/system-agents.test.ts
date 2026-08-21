@@ -33,7 +33,7 @@ describe("system agents", () => {
         "Human Reviewer",
         "Nutrition Plan Advisor",
         "Nutrition Plan Formulator",
-        "Panya",
+        "Nong Mata",
         "Product Matcher",
         "Retail Stock Planner",
         "Safety Scanner",
@@ -163,7 +163,7 @@ describe("system agents", () => {
       "WORKER_FORMULATION_AGENT_API_KEY",
       "WORKER_HEALTHSCORE_AGENT_API_KEY",
       "WORKER_HOSTING_AGENT_API_KEY",
-      "WORKER_PANYA_AGENT_API_KEY",
+      "WORKER_NONG MATA_AGENT_API_KEY",
       "WORKER_PRODUCTS_AGENT_API_KEY",
       "WORKER_STOCK_AGENT_API_KEY"
     ].sort());

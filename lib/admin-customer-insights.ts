@@ -515,14 +515,14 @@ function fallbackNextMessage(label: string) {
 
 const segmentRules: SegmentRule[] = [
   {
-    description: "Paid customers who are already talking to Panya.",
+    description: "Paid customers who are already talking to Nong Mata.",
     id: "panya-engaged-paid",
-    label: "Panya-engaged paid customers",
+    label: "Nong Mata-engaged paid customers",
     matches: (customer) => Boolean(customer.selectedPlan && customer.panya.inboundCount > 0),
-    reason: () => "Paid plan with inbound Panya activity",
+    reason: () => "Paid plan with inbound Nong Mata activity",
     signalMix: (customer) => [
       customer.entitlementLabel,
-      `${customer.panya.inboundCount} inbound Panya message${customer.panya.inboundCount === 1 ? "" : "s"}`,
+      `${customer.panya.inboundCount} inbound Nong Mata message${customer.panya.inboundCount === 1 ? "" : "s"}`,
       customer.orderStatus ? `order ${customer.orderStatus}` : "no linked order"
     ]
   },
@@ -535,7 +535,7 @@ const segmentRules: SegmentRule[] = [
     signalMix: (customer) => [
       customer.entitlementLabel,
       ...customer.goals.slice(0, 2),
-      customer.panya.messageCount > 0 ? "Panya connected" : "No Panya thread"
+      customer.panya.messageCount > 0 ? "Nong Mata connected" : "No Nong Mata thread"
     ]
   },
   {
@@ -551,13 +551,13 @@ const segmentRules: SegmentRule[] = [
     ]
   },
   {
-    description: "LINE/Panya reachable customers without a linked retail order.",
+    description: "LINE/Nong Mata reachable customers without a linked retail order.",
     id: "line-connected-no-order",
     label: "Connected but not ordered",
     matches: (customer) =>
       Boolean(customer.panya.channelAddress || customer.panya.messageCount > 0) &&
       !customer.orderNumber,
-    reason: () => "Reachable through Panya but no linked order",
+    reason: () => "Reachable through Nong Mata but no linked order",
     signalMix: (customer) => [
       customer.panya.channelType ?? "connected channel",
       customer.funnelStage,
@@ -575,7 +575,7 @@ const segmentRules: SegmentRule[] = [
     signalMix: (customer) => [
       customer.orderStatus ?? "order active",
       customer.orderNumber ?? "linked order",
-      customer.panya.messageCount > 0 ? "Panya context available" : "no chat yet"
+      customer.panya.messageCount > 0 ? "Nong Mata context available" : "no chat yet"
     ]
   },
   {
@@ -609,7 +609,7 @@ const segmentRules: SegmentRule[] = [
         ],
         ["sleep", "stress", "energy", "focus", "routine", "นอน", "เครียด", "พลังงาน"]
       ),
-    reason: () => "Goals or Panya context mention daily routine themes",
+    reason: () => "Goals or Nong Mata context mention daily routine themes",
     signalMix: (customer) => [
       ...customer.goals.slice(0, 3),
       ...(customer.healthScore?.focusAreas ?? [])

@@ -34,7 +34,7 @@ describe("central ICU i18n catalog", () => {
     );
     assert.equal(
       t("zh-CN", "outbound.panya.quota.standard", { limit: 12 }),
-      "你今天已用完 12 条 Panya 消息。你仍可查看方案和订单；如果需要持续跟进和调整，动态健康方案会解锁更深入的支持。"
+      "你今天已用完 12 条 Nong Mata 消息。你仍可查看方案和订单；如果需要持续跟进和调整，动态健康方案会解锁更深入的支持。"
     );
 
     const status = tStatus("zh-CN", "customer.nutritionPublicShell.reveal.primary");

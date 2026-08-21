@@ -226,7 +226,35 @@ function scoreScalePercent(score: number) {
 }
 
 function optionScore(value: string, scores: Record<string, number>, fallback: number) {
-  return scores[value] ?? fallback;
+  if (Object.prototype.hasOwnProperty.call(scores, value)) {
+    return scores[value];
+  }
+
+  const compact = value.trim().toLowerCase().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+  const aliases: Record<string, string> = {
+    "under 5": "u5",
+    "under 5 h": "u5",
+    "under 5 hours": "u5",
+    "5-6 h": "5-6",
+    "6-7 h": "6-7",
+    "7-8 h": "7-8",
+    "8-9 h": "8-9",
+    "over 9": "9+",
+    "9+ h": "9+",
+    "mostly sitting": "sitting",
+    sedentary: "sitting",
+    "very active": "active",
+    "trains daily": "active",
+    "train daily": "active",
+    daily: "active",
+    athlete: "athlete",
+    "very low": "verylow",
+    "well rested": "8-9",
+    "great sleep": "7-8"
+  };
+  const mapped = aliases[compact] ?? compact;
+
+  return scores[mapped] ?? fallback;
 }
 
 function fmt(template: string, context: Record<string, string | number>) {
@@ -943,17 +971,39 @@ function gapPillarCard(
   };
 }
 
+function gapOrStrengthCard(
+  pillar: HealthScorePillarContent & { name: PillarName },
+  number: string,
+  locale: Locale
+): HealthScoreGapCard {
+  if (pillar.value >= 70) {
+    return {
+      body: localizedPillarStrength(pillar.name, locale, { value: pillar.value }),
+      headline: healthScorePageText(locale, "strengthHeadline", {
+        pillar: pillar.label
+      }),
+      tag: healthScorePageText(locale, "gap.tag", {
+        number,
+        pillarLabel: locale === "en" ? pillar.label.toUpperCase() : pillar.label
+      }),
+      value: `${pillar.value}%`
+    };
+  }
+
+  return gapPillarCard(pillar, number, locale);
+}
+
 function buildGapTrio(
   pillars: Array<HealthScorePillarContent & { name: PillarName }>,
   answers: NormalizedAnswers,
   locale: Locale
 ) {
   const weak = pillars.slice().sort((first, second) => first.value - second.value);
-  const cards: HealthScoreGapCard[] = [gapPillarCard(weak[0], "01", locale)];
-  const linkedLow = weak.filter((pillar) => pillar.goalLinked);
+  const cards: HealthScoreGapCard[] = [gapOrStrengthCard(weak[0], "01", locale)];
+  const linkedLow = weak.filter((pillar) => pillar.goalLinked && pillar.value < 70);
   const second =
     linkedLow.find((pillar) => pillar.name !== weak[0].name) ?? weak[1];
-  cards.push(gapPillarCard(second, "02", locale));
+  cards.push(gapOrStrengthCard(second, "02", locale));
 
   const symptoms = answers.symptoms.filter((symptom) => symptom !== "great");
 
@@ -973,7 +1023,7 @@ function buildGapTrio(
     });
   } else {
     const used = new Set([weak[0].name, second.name]);
-    cards.push(gapPillarCard(
+    cards.push(gapOrStrengthCard(
       weak.find((pillar) => !used.has(pillar.name)) ?? weak[weak.length - 1],
       "03",
       locale

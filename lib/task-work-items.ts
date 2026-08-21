@@ -1442,7 +1442,7 @@ async function buildCustomerChatReplyWorkItem(
   const communicationMessageId = payloadText(task.payload, "communicationMessageId");
 
   if (!sql || !task.planId || !isUuid(messageId)) {
-    throw new Error("Panya chat task is missing identifiers");
+    throw new Error("Nong Mata chat task is missing identifiers");
   }
 
   const rows = await sql<Array<{
@@ -1474,7 +1474,7 @@ async function buildCustomerChatReplyWorkItem(
   const userMessage = row?.body?.trim();
 
   if (!row || !userMessage) {
-    throw new Error("Panya chat message was not found");
+    throw new Error("Nong Mata chat message was not found");
   }
 
   const locale: Locale = isLocale(row.locale) ? row.locale : "en";

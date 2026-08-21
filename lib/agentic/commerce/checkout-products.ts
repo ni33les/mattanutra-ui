@@ -15,7 +15,8 @@ function productUuid(productId: string) {
 }
 
 export async function loadAgenticCheckoutProducts(
-  items: readonly OrderItemRecord[]
+  items: readonly OrderItemRecord[],
+  locale = "en"
 ): Promise<readonly AgenticCheckoutProduct[]> {
   const ids = items
     .map((item) => productUuid(item.productId))
@@ -34,11 +35,15 @@ export async function loadAgenticCheckoutProducts(
           products.id::text as id,
           products.image_url,
           coalesce(
+            nullif(product_translation_locale.title, ''),
             nullif(product_translation_en.title, ''),
-            nullif(products.title, ''),
-            'Product'
+            nullif(products.title, '')
           ) as title
         from public.products
+        left join public.product_translations product_translation_locale
+          on product_translation_locale.product_id = products.id
+          and product_translation_locale.locale = ${locale}
+          and product_translation_locale.status <> 'missing'
         left join public.product_translations product_translation_en
           on product_translation_en.product_id = products.id
           and product_translation_en.locale = 'en'

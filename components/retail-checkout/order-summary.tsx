@@ -15,6 +15,7 @@ type OrderSummaryLabels = Readonly<{
   subtotal: string;
   tax: string;
   total: string;
+  unitPrice?: string;
 }>;
 
 export function OrderSummary({
@@ -58,17 +59,23 @@ export function OrderSummary({
       </div>
       <div className="mt-4 divide-y divide-[var(--mn-line)]">
         {(lines.length > 0 ? lines : selectedProducts.map((product) => ({
-          currency,
+          currency: product.currency ?? currency,
           etaDate: null,
-          payable: true,
+          payable: product.unitPriceAmount != null,
           productId: product.id,
           quantityRequested: 1,
           reason: "",
           selectedRetailerName: null,
-          unitPriceAmount: null
+          unitPriceAmount: product.unitPriceAmount
         }))).map((line) => {
           const product = productsById.get(line.productId);
-          const amount = (line.unitPriceAmount ?? 0) * line.quantityRequested;
+          const unitPrice =
+            line.unitPriceAmount ?? product?.unitPriceAmount ?? null;
+          const quantity = line.quantityRequested || 1;
+          const lineTotal =
+            unitPrice != null ? unitPrice * quantity : null;
+          const lineCurrency = line.currency ?? product?.currency ?? currency;
+          const displayName = product?.name?.trim() || "";
 
           return (
             <div
@@ -89,18 +96,21 @@ export function OrderSummary({
               />
               <div className="min-w-0">
                 <p className="line-clamp-2 text-sm font-semibold text-[var(--mn-ink)]">
-                  {product?.name ?? "Product"}
+                  {displayName}
                 </p>
                 <p className="mt-1 text-xs text-[var(--mn-ink-soft)]">
-                  {labels.quantity}: {line.quantityRequested}
+                  {labels.quantity}: {quantity}
+                  {unitPrice != null
+                    ? ` · ${formatCurrencyAmount(locale, unitPrice, lineCurrency)}`
+                    : ""}
                   {line.etaDate ? ` · ETA ${line.etaDate}` : ""}
                   {!line.payable ? ` · ${line.reason}` : ""}
                 </p>
               </div>
               <div className="text-right text-sm font-bold text-[var(--mn-ink)]">
-                {line.unitPriceAmount !== null
-                  ? formatCurrencyAmount(locale, amount, line.currency ?? currency)
-                  : "-"}
+                {lineTotal != null
+                  ? formatCurrencyAmount(locale, lineTotal, lineCurrency)
+                  : ""}
               </div>
             </div>
           );

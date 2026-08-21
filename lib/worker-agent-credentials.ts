@@ -82,7 +82,7 @@ export const RUNTIME_WORKER_PROFILES: readonly RuntimeWorkerCredentialProfile[] 
   profile("hosting", "scheduler", "WORKER_HOSTING_AGENT_API_KEY", "platform_agent", [
     "sync_digitalocean_billing"
   ]),
-  profile("panya", "panya", "WORKER_PANYA_AGENT_API_KEY", "platform_agent", [
+  profile("panya", "panya", "WORKER_NONG MATA_AGENT_API_KEY", "platform_agent", [
     "customer_chat_reply"
   ]),
   profile("products", "productMatcher", "WORKER_PRODUCTS_AGENT_API_KEY", "platform_agent", [

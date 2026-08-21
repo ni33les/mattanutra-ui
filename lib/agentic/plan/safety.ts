@@ -2,6 +2,7 @@ import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
+import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { doseComparable, fromComparable, roundDose } from "@/lib/agentic/plan/units";
 import type {
   CanonicalPlanState,
@@ -144,7 +145,10 @@ export function evaluateSafety(input: Readonly<{
   }
 
   const zincLimit = zincCoverage
-    ? upperLimitAmount(zincCoverage.name, zincCoverage.unit)
+    ? upperLimitAmount(zincCoverage.name, zincCoverage.unit, {
+        ceilings: matcherSafetyCeilings(),
+        subjectId: zincCoverage.supplementId
+      })
     : null;
 
   if (zincCoverage && zincLimit != null && zincCoverage.totalExposureAmount >= zincLimit) {

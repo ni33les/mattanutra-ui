@@ -61,7 +61,7 @@ const applyScript = readFileSync(
   "utf8"
 );
 
-describe("Panya customer agent architecture", () => {
+describe("Nong Mata customer agent architecture", () => {
   it("stores governed config and atomic daily usage in first-class schema", () => {
     assert.match(schema, /CREATE TABLE public\.panya_config_versions/);
     assert.match(schema, /CREATE TABLE public\.panya_daily_usage/);
@@ -73,15 +73,15 @@ describe("Panya customer agent architecture", () => {
     assert.match(packageJson.scripts?.["panya:schema:apply"] ?? "", /apply-panya-schema\.ts/);
     assert.match(panya, /protocolAdvice: Record<PanyaEntitlement, string>/);
     assert.match(panya, /welcomeBriefs: Record<PanyaEntitlement, string>/);
-    assert.match(panya, /DEFAULT_PANYA_CONFIG[\s\S]*protocolAdvice/);
-    assert.match(panya, /DEFAULT_PANYA_CONFIG[\s\S]*welcomeBriefs[\s\S]*living_protocol[\s\S]*right_amount_formula[\s\S]*unpaid/);
+    assert.match(panya, /DEFAULT_NONG MATA_CONFIG[\s\S]*protocolAdvice/);
+    assert.match(panya, /DEFAULT_NONG MATA_CONFIG[\s\S]*welcomeBriefs[\s\S]*living_protocol[\s\S]*right_amount_formula[\s\S]*unpaid/);
     assert.match(panya, /const welcomeBriefs = objectValue\(input\.welcomeBriefs\)/);
     assert.match(panya, /with next_version as \(/);
     assert.match(panya, /archived as \([\s\S]*update public\.panya_config_versions[\s\S]*where status = 'active'[\s\S]*returning id[\s\S]*\)/);
     assert.match(panya, /insert into public\.panya_config_versions[\s\S]*from next_version/);
   });
 
-  it("keeps the Panya admin page platform-only and dashboard-backed", () => {
+  it("keeps the Nong Mata admin page platform-only and dashboard-backed", () => {
     const agentRoleBlock = /export const agentRolePermissions = \{([\s\S]*?)\n\} as const/.exec(rbac)?.[1] ?? "";
 
     assert.match(rbac, /"panya\.read"/);
@@ -93,25 +93,25 @@ describe("Panya customer agent architecture", () => {
     assert.match(dashboardPage, /getAdminPanyaData/);
     assert.doesNotMatch(
       dashboardContent,
-      /marketing: \[[^\]]*name: "Panya", view: "panya"[^\]]*\]/
+      /marketing: \[[^\]]*name: "Nong Mata", view: "panya"[^\]]*\]/
     );
-    assert.match(dashboardContent, /panyaTitle: "Panya"/);
+    assert.match(dashboardContent, /panyaTitle: "Nong Mata"/);
     assert.match(dashboardContent, /panyaNavigation: \[/);
     assert.match(dashboardContent, /name: "Configuration"[\s\S]*panyaSection: "configuration"[\s\S]*view: "panya"/);
     assert.match(dashboardContent, /name: "Conversations"[\s\S]*panyaSection: "conversations"[\s\S]*view: "panya"/);
     assert.doesNotMatch(
       dashboardContent,
-      /administration: \[[^\]]*name: "Panya", view: "panya"[^\]]*\]/
+      /administration: \[[^\]]*name: "Nong Mata", view: "panya"[^\]]*\]/
     );
     assert.doesNotMatch(
       dashboardContentZh,
-      /"marketing": \[[^\]]*"name": "Panya",\s*"view": "panya"[^\]]*\]/
+      /"marketing": \[[^\]]*"name": "Nong Mata",\s*"view": "panya"[^\]]*\]/
     );
-    assert.match(dashboardContentZh, /"panyaTitle": "Panya"/);
+    assert.match(dashboardContentZh, /"panyaTitle": "Nong Mata"/);
     assert.match(dashboardContentZh, /"panyaNavigation": \[/);
     assert.match(adminPanya, /context\.effectiveOrganisation\.type !== "platform"/);
-    assert.match(panyaView, /Panya Configuration/);
-    assert.match(panyaView, /Panya Conversations/);
+    assert.match(panyaView, /Nong Mata Configuration/);
+    assert.match(panyaView, /Nong Mata Conversations/);
     assert.match(adminPanya, /from public\.retail_checkout_payments/);
     assert.doesNotMatch(adminPanya, /retail_customer_orders\.plan_id/);
     assert.match(adminPanya, /sendAdminPanyaConversationReply/);
@@ -154,10 +154,10 @@ describe("Panya customer agent architecture", () => {
     assert.match(panyaView, /Configuration status/);
     assert.match(panyaView, /\{busy \? "Saving\.\.\." : "Save"\}/);
     assert.doesNotMatch(panyaView, /Activate config/);
-    assert.match(panyaRoute, /catch \(error\)[\s\S]*Could not save Panya config/);
+    assert.match(panyaRoute, /catch \(error\)[\s\S]*Could not save Nong Mata config/);
   });
 
-  it("enforces quota before queuing a Panya reply task from LINE", () => {
+  it("enforces quota before queuing a Nong Mata reply task from LINE", () => {
     assert.match(webhook, /checkAndRecordPanyaUserMessage/);
     assert.match(webhook, /queuePanyaQuotaLimitReply/);
     assert.match(webhook, /panyaQuotaBlocked/);
@@ -216,7 +216,7 @@ describe("Panya customer agent architecture", () => {
     assert.match(panya, /eventName: "panya_reorder_callback_queued"/);
   });
 
-  it("creates visible human escalation tasks from Panya decisions", () => {
+  it("creates visible human escalation tasks from Nong Mata decisions", () => {
     assert.match(taskResultApplier, /taskType: "customer_chat_escalation"/);
     assert.match(taskResultApplier, /actorType: "human"/);
     assert.match(taskResultApplier, /requiredCapabilities: \[AGENT_CAPABILITIES\.humanReview\]/);

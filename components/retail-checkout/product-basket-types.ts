@@ -1,7 +1,9 @@
 export type ProductBasketProduct = Readonly<{
+  currency: string | null;
   id: string;
   imageUrl: string | null;
   name: string;
+  unitPriceAmount: number | null;
 }>;
 
 export type ProductBasketQuoteLine = Readonly<{

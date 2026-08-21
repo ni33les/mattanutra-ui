@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
-describe("reveal Panya LINE CTA", () => {
-  it("places Panya as a top-level reveal section instead of a checkout widget", async () => {
+describe("reveal Nong Mata LINE CTA", () => {
+  it("places Nong Mata as a top-level reveal section instead of a checkout widget", async () => {
     const [reveal, cta, route, chatLinks, communicationsFacade, communicationsShared] =
       await Promise.all([
       readFile("components/reveal-final-results.tsx", "utf8"),
@@ -47,8 +47,8 @@ describe("reveal Panya LINE CTA", () => {
     assert.doesNotMatch(reveal, /MN PLAN/);
     assert.doesNotMatch(reveal, /source="reveal_products"/);
     assert.doesNotMatch(reveal, /source="reveal_products_checkout"/);
-    assert.match(cta, /Connect with Panya for ongoing nutrition support/);
-    assert.match(cta, /Connect with Panya to discuss your nutrition plan/);
+    assert.match(cta, /Connect with Nong Mata for ongoing nutrition support/);
+    assert.match(cta, /Connect with Nong Mata to discuss your nutrition plan/);
     assert.match(cta, /presentation\?: "button" \| "inline_qr" \| "section"/);
     assert.match(cta, /presentation !== "inline_qr"/);
     assert.match(cta, /showBody\?: boolean/);

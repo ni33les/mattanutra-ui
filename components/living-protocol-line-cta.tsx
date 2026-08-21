@@ -39,33 +39,33 @@ const copy = {
     error: "Could not create a LINE code at this time.",
     expires: "Code expires soon",
     instructions:
-      "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Panya will recognise this plan.",
+      "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Nong Mata will recognise this plan.",
     lineNote: "Opens LINE. The code expires shortly.",
     loading: "Creating code...",
     modes: {
       general: {
         body:
-          "Ask about your order, your plan, or what to do next. Panya can help you navigate MattaNutra and bring in a human when needed.",
-        button: "Connect with Panya",
-        dialogTitle: "Connect with Panya on LINE",
+          "Ask about your order, your plan, or what to do next. Nong Mata can help you navigate MattaNutra and bring in a human when needed.",
+        button: "Connect with Nong Mata",
+        dialogTitle: "Connect with Nong Mata on LINE",
         eyebrow: "LINE support",
-        heading: "Connect with Panya"
+        heading: "Connect with Nong Mata"
       },
       living_protocol: {
         body:
-          "Use LINE to keep the conversation going as sleep, stress, travel, food, or symptoms change. Panya keeps support connected to your MattaNutra plan.",
-        button: "Connect with Panya",
-        dialogTitle: "Connect with Panya on LINE",
+          "Use LINE to keep the conversation going as sleep, stress, travel, food, or symptoms change. Nong Mata keeps support connected to your MattaNutra plan.",
+        button: "Connect with Nong Mata",
+        dialogTitle: "Connect with Nong Mata on LINE",
         eyebrow: "Living Protocol",
-        heading: "Connect with Panya for ongoing nutrition support"
+        heading: "Connect with Nong Mata for ongoing nutrition support"
       },
       nutrition_plan: {
         body:
           "Ask why nutrients were selected, how to read your plan, and what to do next. Ongoing refinement is available with Living Protocol.",
-        button: "Connect with Panya",
-        dialogTitle: "Connect with Panya on LINE",
+        button: "Connect with Nong Mata",
+        dialogTitle: "Connect with Nong Mata on LINE",
         eyebrow: "Plan support",
-        heading: "Connect with Panya to discuss your nutrition plan"
+        heading: "Connect with Nong Mata to discuss your nutrition plan"
       }
     },
     openLine: "Open LINE",
@@ -75,33 +75,33 @@ const copy = {
     error: "ไม่สามารถสร้างรหัส LINE ได้ในขณะนี้",
     expires: "รหัสจะหมดอายุเร็ว ๆ นี้",
     instructions:
-      "สแกน QR หรือเปิด LINE ข้อความเชื่อมต่อจะถูกใส่ไว้ให้แล้ว กดส่งใน LINE แล้ว Panya จะรู้ว่าเป็นแผนนี้",
+      "สแกน QR หรือเปิด LINE ข้อความเชื่อมต่อจะถูกใส่ไว้ให้แล้ว กดส่งใน LINE แล้ว Nong Mata จะรู้ว่าเป็นแผนนี้",
     lineNote: "เปิด LINE รหัสจะหมดอายุในไม่ช้า",
     loading: "กำลังสร้างรหัส...",
     modes: {
       general: {
         body:
-          "ถามเรื่องคำสั่งซื้อ แผนโภชนาการ หรือขั้นตอนถัดไปได้ Panya จะช่วยพาคุณใช้งาน MattaNutra และส่งต่อให้ทีมงานเมื่อจำเป็น",
-        button: "เชื่อมต่อกับ Panya",
-        dialogTitle: "เชื่อมต่อกับ Panya บน LINE",
+          "ถามเรื่องคำสั่งซื้อ แผนโภชนาการ หรือขั้นตอนถัดไปได้ Nong Mata จะช่วยพาคุณใช้งาน MattaNutra และส่งต่อให้ทีมงานเมื่อจำเป็น",
+        button: "เชื่อมต่อกับ Nong Mata",
+        dialogTitle: "เชื่อมต่อกับ Nong Mata บน LINE",
         eyebrow: "ช่วยเหลือผ่าน LINE",
-        heading: "เชื่อมต่อกับ Panya"
+        heading: "เชื่อมต่อกับ Nong Mata"
       },
       living_protocol: {
         body:
-          "ใช้ LINE เพื่อคุยต่อเมื่อการนอน ความเครียด การเดินทาง อาหาร หรืออาการเปลี่ยนไป Panya จะอ้างอิงการช่วยเหลือกับแผน MattaNutra ของคุณ",
-        button: "เชื่อมต่อกับ Panya",
-        dialogTitle: "เชื่อมต่อกับ Panya บน LINE",
+          "ใช้ LINE เพื่อคุยต่อเมื่อการนอน ความเครียด การเดินทาง อาหาร หรืออาการเปลี่ยนไป Nong Mata จะอ้างอิงการช่วยเหลือกับแผน MattaNutra ของคุณ",
+        button: "เชื่อมต่อกับ Nong Mata",
+        dialogTitle: "เชื่อมต่อกับ Nong Mata บน LINE",
         eyebrow: "Living Protocol",
-        heading: "เชื่อมต่อกับ Panya เพื่อดูแลโภชนาการอย่างต่อเนื่อง"
+        heading: "เชื่อมต่อกับ Nong Mata เพื่อดูแลโภชนาการอย่างต่อเนื่อง"
       },
       nutrition_plan: {
         body:
           "ถามได้ว่าทำไมจึงเลือกสารอาหารเหล่านี้ ควรอ่านแผนอย่างไร และควรทำอะไรต่อ การปรับแผนต่อเนื่องจะอยู่ในบริการ Living Protocol",
-        button: "เชื่อมต่อกับ Panya",
-        dialogTitle: "เชื่อมต่อกับ Panya บน LINE",
+        button: "เชื่อมต่อกับ Nong Mata",
+        dialogTitle: "เชื่อมต่อกับ Nong Mata บน LINE",
         eyebrow: "ช่วยเหลือเรื่องแผน",
-        heading: "เชื่อมต่อกับ Panya เพื่อคุยเรื่องแผนโภชนาการของคุณ"
+        heading: "เชื่อมต่อกับ Nong Mata เพื่อคุยเรื่องแผนโภชนาการของคุณ"
       }
     },
     openLine: "เปิด LINE",
@@ -111,33 +111,33 @@ const copy = {
     error: "目前无法创建 LINE 代码。",
     expires: "代码即将过期",
     instructions:
-      "扫描二维码或打开 LINE。连接消息会自动填好；在 LINE 中点发送后，Panya 会识别这份方案。",
+      "扫描二维码或打开 LINE。连接消息会自动填好；在 LINE 中点发送后，Nong Mata 会识别这份方案。",
     lineNote: "打开 LINE。代码会在短时间后过期。",
     loading: "正在创建代码...",
     modes: {
       general: {
         body:
-          "你可以询问订单、方案或下一步怎么做。Panya 会帮助你使用 MattaNutra，并在需要时转给人工团队。",
-        button: "连接 Panya",
-        dialogTitle: "在 LINE 上连接 Panya",
+          "你可以询问订单、方案或下一步怎么做。Nong Mata 会帮助你使用 MattaNutra，并在需要时转给人工团队。",
+        button: "连接 Nong Mata",
+        dialogTitle: "在 LINE 上连接 Nong Mata",
         eyebrow: "LINE 支持",
-        heading: "连接 Panya"
+        heading: "连接 Nong Mata"
       },
       living_protocol: {
         body:
-          "当睡眠、压力、旅行、饮食或症状发生变化时，可通过 LINE 持续沟通。Panya 会把支持与你的 MattaNutra 方案保持关联。",
-        button: "连接 Panya",
-        dialogTitle: "在 LINE 上连接 Panya",
+          "当睡眠、压力、旅行、饮食或症状发生变化时，可通过 LINE 持续沟通。Nong Mata 会把支持与你的 MattaNutra 方案保持关联。",
+        button: "连接 Nong Mata",
+        dialogTitle: "在 LINE 上连接 Nong Mata",
         eyebrow: "Living Protocol",
-        heading: "连接 Panya，获得持续营养支持"
+        heading: "连接 Nong Mata，获得持续营养支持"
       },
       nutrition_plan: {
         body:
           "你可以询问为什么选择这些营养素、如何理解方案以及下一步怎么做。持续调整服务包含在 Living Protocol 中。",
-        button: "连接 Panya",
-        dialogTitle: "在 LINE 上连接 Panya",
+        button: "连接 Nong Mata",
+        dialogTitle: "在 LINE 上连接 Nong Mata",
         eyebrow: "方案支持",
-        heading: "连接 Panya，讨论你的营养方案"
+        heading: "连接 Nong Mata，讨论你的营养方案"
       }
     },
     openLine: "打开 LINE",

@@ -78,7 +78,16 @@ describe("matcher safety engine", () => {
     const safety = evaluateSafety({
       exposure,
       products: [],
-      request: request(),
+      request: request({
+        safetyCeilings: [
+          {
+            maxAmount: 40,
+            maxUnit: "mg",
+            name: "Zinc",
+            subjectId: "sup_zinc"
+          }
+        ]
+      }),
       variants: [variant]
     });
     assert.equal(safety.hardBlocked, false);
@@ -156,7 +165,16 @@ describe("matcher safety engine", () => {
     const safety = evaluateSafety({
       exposure,
       products: [],
-      request: request(),
+      request: request({
+        safetyCeilings: [
+          {
+            maxAmount: 40,
+            maxUnit: "mg",
+            name: "Zinc",
+            subjectId: "sup_zinc"
+          }
+        ]
+      }),
       variants: [variant]
     });
     assert.equal(

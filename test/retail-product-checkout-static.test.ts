@@ -63,7 +63,7 @@ describe("retail product checkout static contracts", () => {
     assert.match(trackingPage, /getTrackingOrderByReference\(token, locale\)/);
   });
 
-  it("shows Panya connection on tracking only until LINE is connected", () => {
+  it("shows Nong Mata connection on tracking only until LINE is connected", () => {
     assert.match(checkoutService, /has_active_line_channel/);
     assert.match(checkoutService, /plan_communication_identities/);
     assert.match(checkoutService, /communication_channels\.channel_type = 'line'/);

@@ -139,23 +139,37 @@ export function localizedSupplementName(
   id: string,
   locale: Locale
 ) {
-  const localized = getLocalizedText(value, locale);
+  const record =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  const localeText =
+    record && typeof record[locale] === "string" ? record[locale].trim() : "";
+  const english =
+    record && typeof record.en === "string"
+      ? record.en.trim()
+      : typeof value === "string"
+        ? value.trim()
+        : "";
 
-  if (locale === "en") {
-    return localized;
+  if (localeText) {
+    return localeText;
   }
 
-  const english = getLocalizedText(value, "en");
-  const hasLocaleSpecificText = localized && localized !== english;
-
-  if (hasLocaleSpecificText) {
-    return localized;
+  if (english) {
+    return english;
   }
 
-  const fallback =
-    supplementNameFallbacks[supplementFallbackKey(id, english || localized)];
+  if (record) {
+    for (const item of Object.values(record)) {
+      if (typeof item === "string" && item.trim()) {
+        return item.trim();
+      }
+    }
+  }
 
-  return fallback?.[locale] ?? fallback?.en ?? localized;
+  void id;
+  return "";
 }
 
 export function localizedDoseText(value: LocalizedText, locale: Locale) {
@@ -444,7 +458,7 @@ export function foodSupportRequirements(
         bestRejectedProductId: null,
         bestRejectedReason: null,
         coveragePercent: 100,
-        displayName: getLocalizedText(ingredient.supplement, "en") || ingredient.id,
+        displayName: localizedSupplementName(ingredient.supplement, ingredient.id, "en"),
         id: ingredient.id,
         itemType: "supplement"
       }

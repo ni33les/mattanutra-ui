@@ -296,15 +296,15 @@ export function AdminPanyaView({
       const json = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(configText(json.error) || "Could not save Panya config");
+        throw new Error(configText(json.error) || "Could not save Nong Mata config");
       }
 
-      setMessage("Panya configuration saved.");
+      setMessage("Nong Mata configuration saved.");
     } catch (saveError) {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "Could not save Panya config"
+          : "Could not save Nong Mata config"
       );
     } finally {
       setBusy(false);
@@ -405,8 +405,8 @@ export function AdminPanyaView({
         <div>
           <h2 className="mt-1 text-2xl font-bold text-gray-900">
             {activeSection === "configuration"
-              ? "Panya Configuration"
-              : "Panya Conversations"}
+              ? "Nong Mata Configuration"
+              : "Nong Mata Conversations"}
           </h2>
           {activeSection === "conversations" ? (
             <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
@@ -465,7 +465,7 @@ export function AdminPanyaView({
                   {data.activeConfigVersion
                     ? `v${data.activeConfigVersion.version}`
                     : "uses defaults"}
-                  . Saving activates a new platform-wide Panya config.
+                  . Saving activates a new platform-wide Nong Mata config.
                 </p>
               </div>
               <button
@@ -495,9 +495,9 @@ export function AdminPanyaView({
                 Modality controls
               </h3>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
-                Welcome briefs tell Panya what kind of first message to generate
+                Welcome briefs tell Nong Mata what kind of first message to generate
                 when a customer connects LINE. AI advice is used later inside
-                ongoing Panya replies.
+                ongoing Nong Mata replies.
               </p>
             </div>
             <div className="grid gap-4 xl:grid-cols-3">
@@ -576,7 +576,7 @@ export function AdminPanyaView({
               Global behaviour
             </h3>
             <p className="mt-1 text-sm leading-6 text-gray-600">
-              These controls shape Panya across all modalities.
+              These controls shape Nong Mata across all modalities.
             </p>
             <div className="mt-5 grid gap-4 lg:grid-cols-3">
               <label className="block">
@@ -632,7 +632,7 @@ export function AdminPanyaView({
                   Proactive check-ins
                 </h3>
                 <p className="mt-1 text-sm leading-6 text-gray-600">
-                  Panya can send scheduled follow-ups after a LINE connection.
+                  Nong Mata can send scheduled follow-ups after a LINE connection.
                 </p>
               </div>
               <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
@@ -828,7 +828,7 @@ export function AdminPanyaView({
                 : "Conversation is escalated"}
             </div>
             <p className="mt-1">
-              Panya escalated this conversation. Review the task flow item or
+              Nong Mata escalated this conversation. Review the task flow item or
               reply directly below. Resolve it when the human follow-up is done.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -880,7 +880,7 @@ export function AdminPanyaView({
                 key={message.id}
               >
                 <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500">
-                  <span>{outbound ? "Panya / MattaNutra" : "Customer"}</span>
+                  <span>{outbound ? "Nong Mata / MattaNutra" : "Customer"}</span>
                   <span>·</span>
                   <span>{readableToken(message.messageType)}</span>
                   <span>·</span>

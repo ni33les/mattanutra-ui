@@ -295,6 +295,33 @@ describe("HealthScore v4 deterministic scoring", () => {
     ]);
   });
 
+  it("does not describe strong sleep or activity pillars as gaps", () => {
+    const rested = computeHealthScore(
+      {
+        ...excellentProfile(),
+        activity: "athlete",
+        energy: "excellent",
+        sleepHrs: "7-8",
+        stress: "verylow"
+      },
+      "en"
+    );
+    const sleep = domainScore(rested, "sleep");
+    const activity = domainScore(rested, "activity");
+    assert.ok(sleep >= 70, `sleep ${sleep}`);
+    assert.ok(activity >= 70, `activity ${activity}`);
+    const gapText = JSON.stringify(rested.pageContent?.copySeeds.gapTrio ?? []);
+    assert.equal(/didn.t have time to recover|recovery is too short/i.test(gapText), false);
+    assert.equal(/sedentary|sits low/i.test(gapText), false);
+  });
+
+  it("moves sleep and activity scores when answers move", () => {
+    const well = computeHealthScore({ ...excellentProfile(), sleepHrs: "7-8", activity: "athlete" }, "en");
+    const poor = computeHealthScore({ ...excellentProfile(), sleepHrs: "u5", activity: "sitting" }, "en");
+    assert.ok(domainScore(well, "sleep") > domainScore(poor, "sleep"));
+    assert.ok(domainScore(well, "activity") > domainScore(poor, "activity"));
+  });
+
   it("derives the HealthScore selected nutrient count from assessment complexity", () => {
     const simple = computeHealthScore(
       {

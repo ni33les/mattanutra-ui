@@ -21,6 +21,7 @@ import {
   formatMinor,
   payableSnapshot
 } from "../lib/agentic/money.ts";
+import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 
 function supplementId(name: string) {
   const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
@@ -52,6 +53,7 @@ async function call(runtime: AgenticRuntime, name: string, args: unknown) {
 
 afterEach(() => {
   setAgenticRuntimeForTests(null);
+  setMatcherSafetyCeilings([]);
 });
 
 describe("agentic P1 pack fixes", () => {
@@ -351,6 +353,16 @@ describe("agentic P1 pack fixes", () => {
   });
 
   it("emits J4 cumulative zinc upper-limit guidance at 40 mg", async () => {
+    const zinc = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Zinc");
+    assert.ok(zinc);
+    setMatcherSafetyCeilings([
+      {
+        maxAmount: 40,
+        maxUnit: "mg",
+        name: "Zinc",
+        subjectId: zinc.supplementId
+      }
+    ]);
     const runtime = runtimeFor();
     const result = await call(runtime, "plan", {
       idempotencyKey: "p1-j4-zinc-00000001",

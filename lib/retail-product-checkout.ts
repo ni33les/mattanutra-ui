@@ -1148,7 +1148,7 @@ async function fulfillRetailCheckoutPayment(
       source: "retail_checkout_fulfilled"
     });
   } catch (error) {
-    console.warn("Unable to schedule Panya reorder callback", error);
+    console.warn("Unable to schedule Nong Mata reorder callback", error);
   }
 
   return {

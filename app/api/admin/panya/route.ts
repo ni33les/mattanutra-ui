@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (action !== "save_config") {
-    return NextResponse.json({ error: "Unsupported Panya action" }, { status: 400 });
+    return NextResponse.json({ error: "Unsupported Nong Mata action" }, { status: 400 });
   }
 
   try {
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         error:
           error instanceof Error
             ? error.message
-            : "Could not save Panya config"
+            : "Could not save Nong Mata config"
       },
       { status: 400 }
     );

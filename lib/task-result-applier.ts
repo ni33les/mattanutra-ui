@@ -1528,7 +1528,7 @@ async function applyCustomerChatReplyResult(
   const escalationReason = textValue(analysis.escalationReason);
 
   if (!sql || !task.planId || !isUuid(messageId) || !reply) {
-    throw new Error("Panya chat result is missing identifiers or reply");
+    throw new Error("Nong Mata chat result is missing identifiers or reply");
   }
 
   const refinementRequested =
@@ -1621,7 +1621,7 @@ async function applyCustomerChatReplyResult(
       source: "panya_customer_chat_reply"
     },
     planId: task.planId,
-    subject: "Panya reply",
+    subject: "Nong Mata reply",
     taskId: task.id
   });
 
@@ -1647,7 +1647,7 @@ async function applyCustomerChatReplyResult(
         },
         createdByTaskId: task.id,
         description:
-          "Review a customer LINE conversation that Panya marked for human follow-up.",
+          "Review a customer LINE conversation that Nong Mata marked for human follow-up.",
         groupLabel: "Customer chat escalation",
         dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         idempotencyKey: `panya-escalation:${messageId}`,
@@ -1665,8 +1665,8 @@ async function applyCustomerChatReplyResult(
         initialComment: {
           authorType: "system",
           body: escalationReason
-            ? `Panya escalated this conversation: ${escalationReason}`
-            : "Panya escalated this customer conversation for human review.",
+            ? `Nong Mata escalated this conversation: ${escalationReason}`
+            : "Nong Mata escalated this customer conversation for human review.",
           commentType: "note",
           metadata: {
             assistantMessageId: assistantRows[0]?.id ?? null,
@@ -1677,14 +1677,14 @@ async function applyCustomerChatReplyResult(
           visibility: "admin"
         },
         planId: task.planId,
-        priorityReason: "Panya marked this customer message for human review.",
+        priorityReason: "Nong Mata marked this customer message for human review.",
         priorityScore: 420,
         reasoningEffort: "none",
         requiredCapabilities: [AGENT_CAPABILITIES.humanReview],
         sourceEntityId: messageId,
         sourceEntityType: "plan_chat_message",
         taskType: "customer_chat_escalation",
-        title: "Review Panya customer chat escalation"
+        title: "Review Nong Mata customer chat escalation"
       })
     : null;
 

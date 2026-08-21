@@ -238,7 +238,7 @@ describe("final reveal UX", () => {
     assert.match(reveal, /className="ink-section mn-reveal-closing/);
   });
 
-  it("keeps Panya as a top-level reveal section with existing LINE behavior", () => {
+  it("keeps Nong Mata as a top-level reveal section with existing LINE behavior", () => {
     assert.match(reveal, /id="panya-support"/);
     assert.match(reveal, /className="mn-reveal-panya border-t/);
     assert.match(reveal, /className="mn-reveal-panya-card/);

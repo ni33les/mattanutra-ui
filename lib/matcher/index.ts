@@ -78,7 +78,7 @@ export function match(
       variants: []
     });
 
-    if (baseline.hardBlocked && request.selectorMode === "agentic") {
+    if (baseline.hardBlocked) {
       return {
         alternatives: [],
         leftovers: leftoversFor(request, null),

@@ -1496,7 +1496,7 @@ const baseContent = {
         view: "panya"
       }
     ],
-    panyaTitle: "Panya",
+    panyaTitle: "Nong Mata",
     administration: [
       { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" },
       { icon: UserGroupIcon, name: "Memberships", view: "memberships" },
@@ -1570,7 +1570,7 @@ const baseContent = {
       memberships: "Memberships",
       organisations: "Organisations",
       people: "People",
-      panya: "Panya",
+      panya: "Nong Mata",
       "plan-coverage-simulator": "Plan Coverage Simulator",
       "product-optimisation": "Product Optimisation",
       "product-coverage": "Supplement Coverage",
@@ -2406,7 +2406,7 @@ const baseContent = {
         view: "panya"
       }
     ],
-    panyaTitle: "Panya",
+    panyaTitle: "Nong Mata",
     administration: [
       { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" },
       { icon: UserGroupIcon, name: "สมาชิก", view: "memberships" },
@@ -2480,7 +2480,7 @@ const baseContent = {
       memberships: "สมาชิก",
       organisations: "องค์กร",
       people: "ผู้ใช้",
-      panya: "Panya",
+      panya: "Nong Mata",
       "plan-coverage-simulator": "จำลองความครอบคลุมแผน",
       "product-optimisation": "ปรับตะกร้าสินค้า",
       "product-coverage": "ความครอบคลุมอาหารเสริม",

@@ -114,7 +114,7 @@ describe("customer intelligence insights", () => {
     assert.ok(archetype.signalMix.includes("Energy"));
   });
 
-  it("assigns deterministic segments from plan, Panya, order and HealthScore signals", () => {
+  it("assigns deterministic segments from plan, Nong Mata, order and HealthScore signals", () => {
     const { customers, segments } = buildCustomerInsightSegments([
       customer()
     ] as never);

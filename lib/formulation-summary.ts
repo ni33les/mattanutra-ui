@@ -1,3 +1,4 @@
+import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
 import type { AssessmentSummary } from "@/lib/formulation-types";
@@ -239,10 +240,11 @@ export function buildAssessmentSummary({
   const record = toRecord(answers);
   const country = toText(record.country) || "TH";
   const region = countryLabels[locale][country] ?? valueLabel(country) ?? "Thailand";
+  const firstName = firstNameFromAssessmentAnswers(record);
   const sex = localizedValueLabel(record.sex, locale);
   const height = formatHeight(record.heightCm);
   const weight = formatWeight(record.weightKg);
-  const profileParts = [sex, height, weight].filter(Boolean);
+  const profileParts = [firstName, sex, height, weight].filter(Boolean);
   const goals = toTextArray(record.goals).map((value) =>
     localizedValueLabel(value, locale)
   );

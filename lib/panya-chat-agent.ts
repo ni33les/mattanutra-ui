@@ -33,13 +33,13 @@ function booleanValue(value: unknown) {
 
 function parseJsonObject(content: string | null | undefined) {
   if (!content) {
-    throw new Error("Panya response was empty");
+    throw new Error("Nong Mata response was empty");
   }
 
   const parsed = JSON.parse(content.trim()) as unknown;
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Panya response was not a JSON object");
+    throw new Error("Nong Mata response was not a JSON object");
   }
 
   return parsed as Record<string, unknown>;
@@ -48,13 +48,13 @@ function parseJsonObject(content: string | null | undefined) {
 function panyaConfig() {
   return {
     apiKey: getRequiredXaiApiKey(),
-    model: configuredGrokModel(process.env.PANYA_MODEL, process.env.GROK_MODEL),
+    model: configuredGrokModel(process.env.NONG MATA_MODEL, process.env.GROK_MODEL),
     promptVersion:
-      configuredGrokValue(process.env.PANYA_PROMPT_VERSION) ||
+      configuredGrokValue(process.env.NONG MATA_PROMPT_VERSION) ||
       configuredGrokValue(process.env.NUTRITION_ADVISOR_PROMPT_VERSION) ||
       DEFAULT_PROMPT_VERSION,
     reasoningEffort:
-      configuredGrokValue(process.env.PANYA_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.NONG MATA_REASONING_EFFORT) ||
       grokTaskReasoningDefault("panyaChat")
   };
 }
@@ -79,7 +79,7 @@ function systemPrompt(
   entitlement: PanyaEntitlement
 ) {
   return [
-    `You are Panya, MattaNutra's customer LINE chat agent ${promptVersion}.`,
+    `You are Nong Mata, MattaNutra's customer LINE chat agent ${promptVersion}.`,
     "Admin-configured soul/persona:",
     governedConfig.soul,
     "Admin-configured safety guardrails:",
@@ -185,7 +185,7 @@ export async function analyzePanyaCustomerChatWithGrok(
   const reply = text(parsed.reply);
 
   if (!reply) {
-    throw new Error("Panya reply was missing");
+    throw new Error("Nong Mata reply was missing");
   }
 
   return {

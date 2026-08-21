@@ -1,5 +1,6 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
+import { safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
 import type {
   CanonicalRequest,
   DoseVariant,
@@ -51,14 +52,21 @@ function subjectIdsMatching(
   return [...ids].sort();
 }
 
-function zincThreshold(request: CanonicalRequest) {
-  const subjectId = subjectIdsMatching(request, ZINC)[0];
-  const name = nameOf(request, subjectId) || "Zinc";
+function ceilingThreshold(request: CanonicalRequest, subjectId: string) {
+  const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
+    name: nameOf(request, subjectId),
+    subjectId
+  });
+
+  if (!ceiling) {
+    return null;
+  }
+
   const scaled = scaleAmount({
-    amount: 40,
-    subjectId: subjectId || "zinc",
-    subjectName: name,
-    unit: "mg"
+    amount: ceiling.maxAmount,
+    subjectId,
+    subjectName: ceiling.name || nameOf(request, subjectId) || subjectId,
+    unit: ceiling.maxUnit
   });
 
   if ("reason" in scaled) {
@@ -89,7 +97,11 @@ export function evaluateSafety(input: Readonly<{
     .filter((item) => ZINC.test(item.name) || zincIds.includes(item.subjectId))
     .reduce((sum, item) => sum + item.daily.units, BigInt(0));
   const zincSelected = zincTotal - zincCurrent;
-  const threshold = zincThreshold(input.request);
+  const ceilingSubjects = new Set<string>([
+    ...input.request.targets.map((item) => item.subjectId),
+    ...input.request.currentSupplements.map((item) => item.subjectId),
+    ...input.exposure.totals.keys()
+  ]);
 
   if (
     input.request.medicationCodes.includes("apixaban") &&
@@ -126,18 +138,40 @@ export function evaluateSafety(input: Readonly<{
     });
   }
 
-  if (zincSubject && threshold && zincTotal >= threshold.units) {
-    findings.push({
-      action: "acknowledge",
-      code: "dose_review_required",
-      contributors: productIds,
-      exposureUnits: zincTotal,
-      family: "dose",
-      guidanceId: guidanceId("dose_review_required", "dose"),
-      ruleId: "zinc-ul",
-      subjectId: zincSubject,
-      thresholdUnits: threshold.units
-    });
+  for (const subjectId of ceilingSubjects) {
+    const threshold = ceilingThreshold(input.request, subjectId);
+
+    if (!threshold) {
+      continue;
+    }
+
+    const total = unitsOrZero(input.exposure.totals, subjectId);
+
+    if (total > threshold.units) {
+      findings.push({
+        action: "block",
+        code: "dose_review_required",
+        contributors: productIds,
+        exposureUnits: total,
+        family: "dose",
+        guidanceId: guidanceId("dose_review_required", "dose"),
+        ruleId: `ul:${subjectId}`,
+        subjectId,
+        thresholdUnits: threshold.units
+      });
+    } else if (total === threshold.units) {
+      findings.push({
+        action: "acknowledge",
+        code: "dose_review_required",
+        contributors: productIds,
+        exposureUnits: total,
+        family: "dose",
+        guidanceId: guidanceId("dose_review_required", "dose"),
+        ruleId: `ul:${subjectId}`,
+        subjectId,
+        thresholdUnits: threshold.units
+      });
+    }
   }
 
   if (zincSubject && zincCurrent > BigInt(0) && zincSelected > BigInt(0)) {

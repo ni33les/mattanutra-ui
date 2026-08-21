@@ -48,7 +48,7 @@ export const GROK_TASK_REASONING_DEFAULTS = {
   healthScoreCopy: "medium",
   /** Plan refinement / advisor replies. */
   nutritionAdvisor: "medium",
-  /** Ongoing customer chat (Panya). */
+  /** Ongoing customer chat (Nong Mata). */
   panyaChat: "medium",
   /** One-shot welcome message. */
   panyaWelcome: "none",

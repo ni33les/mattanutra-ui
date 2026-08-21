@@ -23,7 +23,7 @@ Coordinator: `QuestionnaireAgentCoordinator` in `lib/questionnaire/agents/index.
 
 ## AI chat integration (later)
 
-1. Register tools from `questionnaireToolsForLlm()` on the chat tool router (Panya / OpenClaw).
+1. Register tools from `questionnaireToolsForLlm()` on the chat tool router (Nong Mata / OpenClaw).
 2. For each tool call, `await coordinator.invoke({ name, args })`.
 3. Render `get_next_prompt` options as buttons / quick replies — **do not let the LLM invent field keys or option values**.
 4. On `complete`, call `finalize_assessment` then deep-link to Health Score.

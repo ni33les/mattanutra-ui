@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  DEFAULT_PANYA_CONFIG,
+  DEFAULT_NONG MATA_CONFIG,
   panyaWelcomeFallbackReply,
   panyaWelcomeGenerationInput,
   panyaWelcomeReplyFromAiContent,
@@ -57,7 +57,7 @@ function welcomeContext(
   };
 }
 
-describe("Panya welcome helpers", () => {
+describe("Nong Mata welcome helpers", () => {
   it("maps selected plans to the matching welcome brief", () => {
     assert.equal(resolvePanyaEntitlement("pro"), "living_protocol");
     assert.equal(resolvePanyaEntitlement("precision"), "right_amount_formula");
@@ -65,16 +65,16 @@ describe("Panya welcome helpers", () => {
 
     assert.equal(
       panyaWelcomeGenerationInput(
-        DEFAULT_PANYA_CONFIG,
+        DEFAULT_NONG MATA_CONFIG,
         welcomeContext("precision")
       ).welcomeBrief,
-      DEFAULT_PANYA_CONFIG.welcomeBriefs.right_amount_formula
+      DEFAULT_NONG MATA_CONFIG.welcomeBriefs.right_amount_formula
     );
   });
 
   it("passes rich but compact customer context to the AI payload", () => {
     const payload = panyaWelcomeGenerationInput(
-      DEFAULT_PANYA_CONFIG,
+      DEFAULT_NONG MATA_CONFIG,
       welcomeContext("precision")
     );
 
