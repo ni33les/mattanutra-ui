@@ -192,6 +192,8 @@ const copy = {
   }
 };
 
+export const retailCheckoutCopy = copy;
+
 const countries = [
   { code: "TH", name: "Thailand" },
   { code: "US", name: "United States" },

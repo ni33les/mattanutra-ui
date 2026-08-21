@@ -156,11 +156,10 @@ export async function POST(request: Request, { params }: RouteProps) {
       totalPriceMinor: asMinor(order.totalPriceMinor)
     });
 
-    if (formPosted) {
-      return NextResponse.redirect(session.url, 303);
-    }
-
-    return NextResponse.json({ ok: true, checkoutUrl: session.url });
+    return NextResponse.json(
+      { clientSecret: session.clientSecret, ok: true, sessionId: session.sessionId },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   }
 
   const requestedScenario = body.scenario ?? "success";

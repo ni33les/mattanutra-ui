@@ -724,14 +724,25 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /partial_refund/);
     assert.match(panel, /refundable/);
     assert.match(panel, /paid page keeps an authorized refund form/);
-    assert.match(panel, /Stripe Test Mode/);
-    assert.match(panel, /4000000000009995/);
-    assert.match(panel, /4242424242424242/);
-    assert.match(panel, /props\.paid \|\| Boolean\(props\.refundable\)/);
+    const website = readFileSync(
+      new URL("../components/mcp-website-checkout-panel.tsx", import.meta.url),
+      "utf8"
+    );
     const page = readFileSync(
       new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/page.tsx", import.meta.url),
       "utf8"
     );
+    assert.match(website, /Pay securely and place order|labels\.continue/);
+    assert.match(website, /EmbeddedCheckout/);
+    assert.equal(website.includes("Continue to Stripe Test Mode"), false);
+    assert.match(page, /McpWebsiteCheckoutPanel/);
+    assert.match(page, /loadAgenticCheckoutProducts/);
+    const adapter = readFileSync(
+      new URL("../lib/agentic/commerce/stripe-adapter.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(adapter, /ui_mode: "embedded_page"/);
+    assert.match(panel, /props\.paid \|\| Boolean\(props\.refundable\)/);
     assert.match(page, /paymentStatus === "refunded"/);
     assert.match(page, /partially_refunded/);
   });

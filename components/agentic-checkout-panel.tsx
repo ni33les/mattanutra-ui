@@ -35,7 +35,6 @@ type AgenticCheckoutPanelProps = Readonly<{
   locale: Locale;
   orderReference: string;
   paid: boolean;
-  paymentProvider?: "mock" | "stripe_test" | "stripe_live";
   refundable?: boolean;
   shippingMinor: number;
   subtotalMinor: number;
@@ -73,8 +72,7 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
   const shippingMinor = asMinor(props.shippingMinor);
   const taxMinor = asMinor(props.taxMinor);
   const totalPriceMinor = asMinor(props.totalPriceMinor);
-  const stripeCheckout = props.paymentProvider === "stripe_test";
-  const refundable = !stripeCheckout && (props.paid || Boolean(props.refundable));
+  const refundable = props.paid || Boolean(props.refundable);
   const unpaidOpen = !props.paid && !props.expired && !refundable;
   const scenarios = unpaidOpen
     ? CHECKOUT_TEST_SCENARIOS
@@ -87,53 +85,31 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
         {agenticMessage(props.locale, "checkout.test_mode")}
       </p>
       <ol className="list-decimal space-y-1 px-4 text-sm text-ink">
-        {stripeCheckout ? (
-          <>
-            <li>UAT / Stripe Test Mode. No live cards. Card details stay in Stripe-hosted Checkout.</li>
-            <li>
-              POST application/x-www-form-urlencoded to /api/mcp/checkout/{props.checkoutAccess}/pay
-              with customerName, phone, customerEmail, addressLine1, city, province, postalCode,
-              country=TH, agentAuthorized=true. Do not send a mock scenario.
-            </li>
-            <li>
-              Pay with Stripe test card 4000000000009995 (insufficient funds), then poll order.
-              Retry the same checkout with 4242424242424242. For 3DS use 4000000000003220 on a
-              separate unpaid checkout.
-            </li>
-            <li>
-              The calling agent learns payment state only by polling order(orderHandle). Browser
-              success is not payment proof.
-            </li>
-          </>
-        ) : (
-          <>
-            <li>This page is a native HTML form, not a React SPA. Do not wait for hydration.</li>
-            <li>
-              POST application/x-www-form-urlencoded to /api/mcp/checkout/{props.checkoutAccess}/pay
-              with customerName, phone, customerEmail, addressLine1, city, province, postalCode,
-              country=TH, agentAuthorized=true, scenario=decline_insufficient_funds.
-            </li>
-            <li>Poll order until unpaid / declined / insufficient_funds / stateVersion=1.</li>
-            <li>POST the same fields again with scenario=success, then poll paid / stateVersion=2.</li>
-            <li>
-              D9 timeout uses a different unpaid checkout: POST the same fields with scenario=expire
-              and poll until orderStatus=expired.
-            </li>
-            <li>
-              D9 cancelled uses another unpaid checkout: POST scenario=three_ds_cancelled and poll
-              until orderStatus=cancelled.
-            </li>
-            <li>
-              D7-10 after this checkout is paid: POST the same named fields with scenario=refund or
-              partial_refund. The paid page keeps an authorized refund form. Poll order for
-              paymentStatus=refunded.
-            </li>
-            <li>
-              D9 expire and three_ds_cancelled MUST use SEPARATE unpaid checkout URLs, never this
-              paid D8 order.
-            </li>
-          </>
-        )}
+        <li>This page is a native HTML form, not a React SPA. Do not wait for hydration.</li>
+        <li>
+          POST application/x-www-form-urlencoded to /api/mcp/checkout/{props.checkoutAccess}/pay
+          with customerName, phone, customerEmail, addressLine1, city, province, postalCode,
+          country=TH, agentAuthorized=true, scenario=decline_insufficient_funds.
+        </li>
+        <li>Poll order until unpaid / declined / insufficient_funds / stateVersion=1.</li>
+        <li>POST the same fields again with scenario=success, then poll paid / stateVersion=2.</li>
+        <li>
+          D9 timeout uses a different unpaid checkout: POST the same fields with scenario=expire
+          and poll until orderStatus=expired.
+        </li>
+        <li>
+          D9 cancelled uses another unpaid checkout: POST scenario=three_ds_cancelled and poll
+          until orderStatus=cancelled.
+        </li>
+        <li>
+          D7-10 after this checkout is paid: POST the same named fields with scenario=refund or
+          partial_refund. The paid page keeps an authorized refund form. Poll order for
+          paymentStatus=refunded.
+        </li>
+        <li>
+          D9 expire and three_ds_cancelled MUST use SEPARATE unpaid checkout URLs, never this
+          paid D8 order.
+        </li>
       </ol>
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">{props.orderReference}</p>
@@ -281,32 +257,27 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
             />
             <span>{agenticMessage(props.locale, "checkout.agentAuth")}</span>
           </label>
-          {stripeCheckout ? null : (
-            <label className="block space-y-1 text-sm" htmlFor="scenario">
-              <span className="font-medium text-ink">Test scenario</span>
-              <select
-                className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-white px-3 py-2 text-ink"
-                defaultValue={defaultScenario}
-                id="scenario"
-                name="scenario"
-                required
-              >
-                {scenarios.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <label className="block space-y-1 text-sm" htmlFor="scenario">
+            <span className="font-medium text-ink">Test scenario</span>
+            <select
+              className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-white px-3 py-2 text-ink"
+              defaultValue={defaultScenario}
+              id="scenario"
+              name="scenario"
+              required
+            >
+              {scenarios.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             className="w-full rounded-full bg-[var(--brand-green)] px-6 py-3 font-semibold text-white"
             type="submit"
           >
-            {agenticMessage(
-              props.locale,
-              stripeCheckout ? "checkout.pay_stripe" : "checkout.pay_mock"
-            )}
+            {agenticMessage(props.locale, "checkout.pay_mock")}
           </button>
         </form>
       ) : null}

@@ -1,11 +1,12 @@
 import Stripe from "stripe";
-import { stripePaymentConfig } from "@/lib/stripe-payment-config";
+import { stripeLocale, stripePaymentConfig } from "@/lib/stripe-payment-config";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
 import { joinMcpPaidOrderToRetail } from "@/lib/agentic/commerce/retail-join";
 import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import { asMinor } from "@/lib/agentic/money";
+import { isLocale, type Locale } from "@/lib/i18n";
 
 const AGENTIC_STRIPE_SOURCE = "agentic_mcp";
 
@@ -49,16 +50,16 @@ export async function createAgenticStripeCheckoutSession(input: Readonly<{
   const stripe = testModeStripe();
   const order = await input.runtime.store.getOrder(input.orderId);
   const items = await input.runtime.store.getOrderItems(input.orderId);
+  const locale: Locale = isLocale(input.locale) ? input.locale : "en";
 
   if (!order) {
     throw new Error("Order not found.");
   }
 
-  const successUrl =
-    `${input.runtime.config.siteUrl}/${input.locale}/mcp/checkout/${encodeURIComponent(input.checkoutAccess)}` +
-    "?stripe=return";
+  const returnUrl =
+    `${input.runtime.config.siteUrl}/${locale}/mcp/checkout/${encodeURIComponent(input.checkoutAccess)}` +
+    "?session_id={CHECKOUT_SESSION_ID}";
   const session = await stripe.checkout.sessions.create({
-    cancel_url: successUrl,
     customer_email: input.customerEmail,
     expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
     line_items: [
@@ -67,16 +68,18 @@ export async function createAgenticStripeCheckoutSession(input: Readonly<{
           currency: "thb",
           product_data: {
             name: items[0]?.productName
-              ? `MattaNutra stack (${items.length} products)`
-              : "MattaNutra supplement stack"
+              ? `MattaNutra (${items.length} products)`
+              : "MattaNutra order"
           },
           unit_amount: asMinor(input.totalPriceMinor)
         },
         quantity: 1
       }
     ],
+    locale: stripeLocale(locale),
     metadata: {
       agenticOrderId: order.id,
+      customerName: input.customerName.slice(0, 40),
       mattanutraEnv: input.runtime.config.environment,
       source: AGENTIC_STRIPE_SOURCE
     },
@@ -88,15 +91,16 @@ export async function createAgenticStripeCheckoutSession(input: Readonly<{
         source: AGENTIC_STRIPE_SOURCE
       }
     },
-    success_url: successUrl
+    return_url: returnUrl,
+    ui_mode: "embedded_page"
   });
 
   if (session.livemode) {
     throw new Error("Refusing live Stripe session in UAT.");
   }
 
-  if (!session.url) {
-    throw new Error("Stripe did not return a hosted Checkout URL.");
+  if (!session.client_secret) {
+    throw new Error("Stripe did not return an embedded Checkout client secret");
   }
 
   await input.runtime.store.updateOrder({
@@ -105,7 +109,10 @@ export async function createAgenticStripeCheckoutSession(input: Readonly<{
     updatedAt: nowIso()
   });
 
-  return { sessionId: session.id, url: session.url };
+  return {
+    clientSecret: session.client_secret,
+    sessionId: session.id
+  };
 }
 
 function metadataRecord(value: unknown): Record<string, string> {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AgenticCheckoutPanel } from "@/components/agentic-checkout-panel";
+import { McpWebsiteCheckoutPanel } from "@/components/mcp-website-checkout-panel";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { hashCapability } from "@/lib/agentic/capabilities";
@@ -15,6 +16,8 @@ import {
   asMinorOr
 } from "@/lib/agentic/money";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
+import { loadAgenticCheckoutProducts } from "@/lib/agentic/commerce/checkout-products";
+import { stripePublishableKey } from "@/lib/stripe-payments";
 
 type PageProps = Readonly<{
   params: Promise<{ checkoutAccess: string; locale: string }>;
@@ -89,42 +92,68 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
   const lastResult = [queryResult, counts ? `TEST-DRIVER EVIDENCE (not payment truth) ${JSON.stringify(counts)}` : null]
     .filter(Boolean)
     .join("\n");
+  const websiteCheckout = runtime.config.paymentProvider === "stripe_test";
+  const products = websiteCheckout ? await loadAgenticCheckoutProducts(items) : [];
+  const major = (minor: number) => asMinor(minor) / 100;
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
         currentLocale={locale}
         currentPath={`/${locale}/mcp/checkout/${checkoutAccess}`}
-        title="MattaNutra"
+        title={dictionary.hero.eyebrow}
       />
       <section className="mx-auto w-full max-w-5xl flex-1 px-6 py-12 sm:px-8 lg:py-16">
-        <AgenticCheckoutPanel
-          checkoutAccess={checkoutAccess}
-          country={order.destinationCountry}
-          currency={order.currency}
-          expired={expired}
-          items={items.map((item) => ({
-            dailyPills: item.dailyPills,
-            form: item.form,
-            lineTotalMinor: item.lineTotalMinor,
-            productName: item.productName,
-            quantity: item.quantity
-          }))}
-          locale={locale}
-          orderReference={order.reference}
-          lastResult={lastResult || null}
-          paid={order.paymentStatus === "paid"}
-          paymentProvider={runtime.config.paymentProvider}
-          refundable={
-            order.paymentStatus === "paid" ||
-            order.paymentStatus === "refunded" ||
-            order.paymentStatus === "partially_refunded"
-          }
-          shippingMinor={shippingMinor}
-          subtotalMinor={subtotalMinor}
-          taxMinor={taxMinor}
-          totalPriceMinor={totalPriceMinor}
-        />
+        {websiteCheckout ? (
+          <McpWebsiteCheckoutPanel
+            checkoutAccess={checkoutAccess}
+            currency={order.currency}
+            expired={expired}
+            locale={locale}
+            paid={order.paymentStatus === "paid"}
+            products={products.map((item) => ({
+              id: item.id,
+              imageUrl: item.imageUrl,
+              name: item.name
+            }))}
+            publishableKey={stripePublishableKey()}
+            quantities={Object.fromEntries(products.map((item) => [item.id, item.quantity]))}
+            sellerName={items[0]?.sellerName ?? null}
+            shippingAmount={major(shippingMinor)}
+            subtotalAmount={major(subtotalMinor)}
+            totalAmount={major(totalPriceMinor)}
+            unitPrices={Object.fromEntries(
+              products.map((item) => [item.id, major(item.unitPriceMinor)])
+            )}
+          />
+        ) : (
+          <AgenticCheckoutPanel
+            checkoutAccess={checkoutAccess}
+            country={order.destinationCountry}
+            currency={order.currency}
+            expired={expired}
+            items={items.map((item) => ({
+              dailyPills: item.dailyPills,
+              form: item.form,
+              lineTotalMinor: item.lineTotalMinor,
+              productName: item.productName,
+              quantity: item.quantity
+            }))}
+            locale={locale}
+            orderReference={order.reference}
+            lastResult={lastResult || null}
+            paid={order.paymentStatus === "paid"}
+            refundable={
+              order.paymentStatus === "paid" ||
+              order.paymentStatus === "refunded" ||
+              order.paymentStatus === "partially_refunded"
+            }
+            shippingMinor={shippingMinor}
+            subtotalMinor={subtotalMinor}
+            taxMinor={taxMinor}
+            totalPriceMinor={totalPriceMinor}
+          />
+        )}
       </section>
       <SiteFooter content={dictionary.footer} locale={locale} />
     </main>
