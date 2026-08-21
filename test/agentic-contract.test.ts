@@ -117,6 +117,8 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.match(String(result.instructions), /HARD RULE 6 — HOST FEEDBACK/);
     assert.match(String(result.instructions), /plan_feedback/);
     assert.match(String(result.instructions), /Official MattaNutra Agentic QA Pack/);
+    assert.match(String(result.instructions), /A1–A13 = 13\/13/);
+    assert.match(String(result.instructions), /A9 is GET-only/);
     assert.match(String(result.instructions), /leftover not_in_catalogue/);
     assert.equal(
       (result.serverInfo as { version: string }).version,

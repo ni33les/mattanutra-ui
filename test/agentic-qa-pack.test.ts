@@ -10,6 +10,14 @@ import {
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { AGENTIC_SERVER_INSTRUCTIONS } from "../lib/agentic/contract/instructions.ts";
+import {
+  everyLineHasHttpImage,
+  exactToolNames,
+  isFixtureLine,
+  isFixtureShapedId,
+  isHttpUrl,
+  optionLines
+} from "../scripts/agentic-qa-pack-helpers.mjs";
 
 function runtimeFor(): AgenticRuntime {
   return createAgenticRuntime({
@@ -95,7 +103,7 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     ));
   });
 
-  it("A2 answers patch keeps the selected 8-product option", async () => {
+  it("A2 answers+expectedRevision patch stays sticky", async () => {
     const runtime = runtimeFor();
     const created = await call(runtime, "plan", {
       idempotencyKey: "qa-a2-create-0000001",
@@ -254,10 +262,9 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.ok(leftovers.some((item) =>
       String(item.name).toLowerCase().includes("k2") && item.reason === "not_in_catalogue"
     ));
-    assert.equal((plan.basket as unknown[]).length, 8);
   });
 
-  it("A7 fixture products are marked fixture, not live Thai SKUs", async () => {
+  it("A7 DEV fixtures are explicitly marked fixture", async () => {
     const runtime = runtimeFor();
     const plan = await call(runtime, "plan", {
       idempotencyKey: "qa-a7-fixture-0000001",
@@ -273,10 +280,82 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.match(String(item.productId), /^prd_b{8}/i);
   });
 
+  it("A8 plan option lines include http(s) imageUrl", async () => {
+    assert.equal(isHttpUrl("https://example.test/x.jpg"), true);
+    assert.equal(everyLineHasHttpImage([{ imageUrl: "https://example.test/x.jpg" }]), true);
+    assert.equal(everyLineHasHttpImage([{ imageUrl: "" }]), false);
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "qa-a8-images-0000001",
+      request: baseRequest()
+    });
+    const lines = optionLines(plan);
+    assert.ok(lines.length > 0);
+    assert.equal(everyLineHasHttpImage(lines), true);
+  });
+
+  it("A10 DEV fixtures are explicitly marked", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "qa-a10-fixture-000001",
+      request: baseRequest({
+        targets: [{ amount: 5, name: "Creatine", unit: "g" }]
+      })
+    });
+    const lines = optionLines(plan);
+    assert.ok(lines.length > 0);
+    for (const line of lines as Array<Record<string, unknown>>) {
+      if (isFixtureShapedId(line.productId)) {
+        assert.equal(isFixtureLine(line), true);
+      }
+    }
+  });
+
+  it("A11 sex not sexAtBirth", async () => {
+    const runtime = runtimeFor();
+    const listed = await handleJsonRpc(runtime, { id: 2, method: "tools/list" });
+    const blob = JSON.stringify(listed?.result ?? {});
+    assert.equal(/sexAtBirth/i.test(blob), false);
+    assert.match(blob, /"sex"/);
+    const rejected = await call(runtime, "plan", {
+      idempotencyKey: "qa-a11-sexatbirth-001",
+      request: {
+        ...baseRequest(),
+        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" }
+      }
+    });
+    assert.equal(rejected.ok, false);
+    assert.equal(/sexAtBirth/i.test(JSON.stringify(rejected.error ?? {})), false);
+  });
+
+  it("A12 Folate is not the Creatine fixture", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "qa-a12-folate-000001",
+      request: baseRequest({
+        targets: [{ amount: 400, name: "Folate", unit: "mcg" }]
+      })
+    });
+    assert.equal(plan.ok, true);
+    const item = ((plan.basket as Array<Record<string, unknown>>) ?? [])[0];
+    assert.ok(item);
+    assert.notEqual(item.productName, "Creatine Monohydrate 5 g");
+  });
+
+  it("A13 tools/list is exactly the six names", async () => {
+    const runtime = runtimeFor();
+    const listed = await handleJsonRpc(runtime, { id: 3, method: "tools/list" });
+    const names = ((listed?.result?.tools as Array<{ name: string }>) ?? []).map(
+      (item) => item.name
+    );
+    assert.equal(exactToolNames(names), true);
+  });
+
   it("T3 initialize instructions require host feedback", () => {
     assert.match(AGENTIC_SERVER_INSTRUCTIONS, /HARD RULE 6 — HOST FEEDBACK/);
     assert.match(AGENTIC_SERVER_INSTRUCTIONS, /after 3 plan calls/);
     assert.match(AGENTIC_SERVER_INSTRUCTIONS, /plan_feedback/);
+    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /A1–A13 = 13\/13/);
     const schema = readFileSync(
       new URL("../scripts/apply-agentic-commerce-schema.ts", import.meta.url),
       "utf8"

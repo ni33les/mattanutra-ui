@@ -95,6 +95,7 @@ function candidate(input: Readonly<{
       }
     ],
     id: input.id,
+    imageUrl: `https://catalogue.local/${input.id}.jpg`,
     labelStatus: "parsed",
     platform: "wholesale_pharmacy_import",
     priceAmount: input.priceAmount,
