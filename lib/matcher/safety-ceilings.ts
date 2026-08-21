@@ -1,9 +1,19 @@
 import type { SafetyCeiling } from "@/lib/matcher/types";
 
 let cached: { at: number; ceilings: SafetyCeiling[] } | null = null;
+let unavailable = false;
 
 export function setMatcherSafetyCeilings(ceilings: readonly SafetyCeiling[]) {
   cached = { at: Date.now(), ceilings: [...ceilings] };
+  unavailable = false;
+}
+
+export function setMatcherSafetyCeilingsUnavailable() {
+  unavailable = true;
+}
+
+export function matcherSafetyCeilingsUnavailable() {
+  return unavailable && (cached?.ceilings.length ?? 0) < 1;
 }
 
 export function matcherSafetyCeilings() {

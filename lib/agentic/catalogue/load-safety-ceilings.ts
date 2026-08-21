@@ -1,9 +1,11 @@
+import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
 import { publicSupplementId } from "@/lib/agentic/contract/ids";
 import { getSql } from "@/lib/db";
 import {
   matcherSafetyCeilings,
   matcherSafetyCeilingsCachedAt,
-  setMatcherSafetyCeilings
+  setMatcherSafetyCeilings,
+  setMatcherSafetyCeilingsUnavailable
 } from "@/lib/matcher/safety-ceilings";
 import type { MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
@@ -60,6 +62,17 @@ export async function refreshAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
   return inflight;
 }
 
+function fixtureIdsForName(name: string) {
+  const needle = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  return FIXTURE_SUPPLEMENTS.filter((item) => {
+    const names = [item.name, ...item.aliases].map((value) =>
+      value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+    );
+    return names.includes(needle);
+  }).flatMap((item) => [item.supplementId, item.uuid]);
+}
+
 async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
   try {
     const sql = getSql();
@@ -110,10 +123,23 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
         ...ceiling,
         subjectId: publicSupplementId(row.supplement_id)
       });
+      for (const fixtureId of fixtureIdsForName(row.name)) {
+        ceilings.push({
+          ...ceiling,
+          subjectId: fixtureId
+        });
+      }
     }
 
     return ceilings;
   } catch {
-    return matcherSafetyCeilings();
+    const previous = matcherSafetyCeilings();
+
+    if (previous.length > 0) {
+      return previous;
+    }
+
+    setMatcherSafetyCeilingsUnavailable();
+    return previous;
   }
 }

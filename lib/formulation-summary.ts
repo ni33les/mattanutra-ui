@@ -283,6 +283,7 @@ export function buildAssessmentSummary({
       constraints.length > 0
         ? constraints
         : [summaryCopy[locale].reviewLabels],
+    firstName,
     goals:
       goals.length > 0
         ? goals

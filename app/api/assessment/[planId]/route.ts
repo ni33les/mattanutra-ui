@@ -7,6 +7,7 @@ import {
   isUuid,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
+import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import {
   enqueueAssessmentPregenerationTasks,
@@ -146,6 +147,7 @@ export async function GET(
       return NextResponse.json(
         {
           ...snapshot,
+          firstName: firstNameFromAssessmentAnswers(prefill.answers),
           healthScore: refreshedHealthScore(
             prefill.answers,
             await getEvaluatedIngredientCatalogueCount(),

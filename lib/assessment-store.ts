@@ -2318,7 +2318,7 @@ export async function getStoredFormulationResult(
       Number(row.active_supplement_count) || 0
     ),
     generatedAt,
-    ...(firstName ? { firstName } : {}),
+    firstName,
     planId,
     nutritionReport,
     ...(productRecommendationStatus

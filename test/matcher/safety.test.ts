@@ -97,6 +97,54 @@ describe("matcher safety engine", () => {
     );
   });
 
+  it("blocks a stack that exceeds the admin ceiling", () => {
+    const amount = scaleAmount({
+      amount: 41,
+      subjectId: "sup_zinc",
+      subjectName: "Zinc",
+      unit: "mg"
+    });
+    assert.equal("reason" in amount, false);
+    if ("reason" in amount) {
+      return;
+    }
+    const variant: DoseVariant = {
+      contributions: new Map([["sup_zinc", amount]]),
+      dailyPills: 1,
+      dailyUnits: 1,
+      productId: "prd_zinc",
+      unknownSafetyAmount: false,
+      variantId: "prd_zinc:x1"
+    };
+    const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
+    assert.equal("reason" in exposure, false);
+    if ("reason" in exposure) {
+      return;
+    }
+    const safety = evaluateSafety({
+      exposure,
+      products: [],
+      request: request({
+        safetyCeilings: [
+          {
+            maxAmount: 40,
+            maxUnit: "mg",
+            name: "Zinc",
+            subjectId: "sup_zinc"
+          }
+        ]
+      }),
+      variants: [variant]
+    });
+    assert.equal(safety.hardBlocked, true);
+    assert.equal(
+      safety.findings.some(
+        (item) => item.code === "dose_review_required" && item.action === "block"
+      ),
+      true
+    );
+  });
+
   it("SAFE-04 blocks CKD plus magnesium at request level", () => {
     const mag = scaleAmount({
       amount: 300,

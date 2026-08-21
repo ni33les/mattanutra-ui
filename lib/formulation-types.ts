@@ -302,6 +302,7 @@ export type ProductRecommendationOption = {
 
 export type AssessmentSummary = {
   constraints: string[];
+  firstName?: string | null;
   goals: string[];
   plan: string;
   profile: string;

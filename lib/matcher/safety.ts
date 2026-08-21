@@ -1,6 +1,9 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
-import { safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
+import {
+  matcherSafetyCeilingsUnavailable,
+  safetyCeilingFor
+} from "@/lib/matcher/safety-ceilings";
 import type {
   CanonicalRequest,
   DoseVariant,
@@ -85,6 +88,20 @@ export function evaluateSafety(input: Readonly<{
 }>): SafetyResult {
   const findings: SafetyFinding[] = [];
   const productIds = [...new Set(input.variants.map((item) => item.productId))].sort();
+
+  if (matcherSafetyCeilingsUnavailable()) {
+    findings.push({
+      action: "block",
+      code: "dose_review_required",
+      contributors: productIds,
+      exposureUnits: null,
+      family: "dose",
+      guidanceId: guidanceId("dose_review_required", "dose"),
+      ruleId: "ul:unavailable",
+      subjectId: null,
+      thresholdUnits: null
+    });
+  }
   const omegaIds = subjectIdsMatching(input.request, OMEGA);
   const magnesiumIds = subjectIdsMatching(input.request, MAGNESIUM);
   const zincIds = subjectIdsMatching(input.request, ZINC);

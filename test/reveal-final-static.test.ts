@@ -186,6 +186,9 @@ describe("final reveal UX", () => {
     assert.match(reveal, /mn-reveal-font-display/);
     assert.match(reveal, /mn-reveal-font-mono/);
     assert.match(reveal, /mn-reveal-track-hero-title/);
+    assert.match(reveal, /export function revealHeroFirstName/);
+    assert.match(reveal, /data-testid="reveal-hero-name"/);
+    assert.match(reveal, /result\.assessmentSummary\.firstName/);
     assert.match(reveal, /mn-reveal-track-hero-copy/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-track-hero-title\s*\{[\s\S]*letter-spacing:\s*-0\.03em/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-track-hero-copy\s*\{[\s\S]*letter-spacing:\s*-0\.015em/);

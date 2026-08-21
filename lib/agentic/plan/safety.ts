@@ -114,6 +114,7 @@ export function evaluateSafety(input: Readonly<{
     .map((item) => item.supplementId);
   const zincCoverage = zincExposure(input.selected, input.state);
   const ironCoverage = input.selected?.coverage.find((row) => /iron/i.test(row.name));
+  const coverageRows = input.selected?.coverage ?? (zincCoverage ? [zincCoverage] : []);
 
   const omegaCoverage = input.selected?.coverage.find((row) => /omega/i.test(row.name));
 
@@ -144,42 +145,38 @@ export function evaluateSafety(input: Readonly<{
     }));
   }
 
-  const zincLimit = zincCoverage
-    ? upperLimitAmount(zincCoverage.name, zincCoverage.unit, {
-        ceilings: matcherSafetyCeilings(),
-        subjectId: zincCoverage.supplementId
-      })
-    : null;
+  for (const row of coverageRows) {
+    const limit = upperLimitAmount(row.name, row.unit, {
+      ceilings: matcherSafetyCeilings(),
+      subjectId: row.supplementId
+    });
 
-  if (zincCoverage && zincLimit != null && zincCoverage.totalExposureAmount >= zincLimit) {
-    items.push(guidance({
-      action: "acknowledge",
-      code: "dose_review_required",
-      exposure: zincCoverage.totalExposureAmount,
-      locale: input.locale,
-      productIds,
-      requested: zincCoverage.requestedAmount,
-      severity: "high",
-      supplementIds: [zincCoverage.supplementId],
-      threshold: zincLimit
-    }));
-  }
+    if (limit != null && row.totalExposureAmount >= limit) {
+      items.push(guidance({
+        action: "acknowledge",
+        code: "dose_review_required",
+        exposure: row.totalExposureAmount,
+        locale: input.locale,
+        productIds,
+        requested: row.requestedAmount,
+        severity: "high",
+        supplementIds: [row.supplementId],
+        threshold: limit
+      }));
+    }
 
-  if (
-    zincCoverage &&
-    zincCoverage.currentAmount > 0 &&
-    zincCoverage.deliveredAmount > 0
-  ) {
-    items.push(guidance({
-      action: "acknowledge",
-      code: "duplicate_or_overlap",
-      exposure: zincCoverage.totalExposureAmount,
-      locale: input.locale,
-      productIds,
-      requested: zincCoverage.requestedAmount,
-      severity: "high",
-      supplementIds: [zincCoverage.supplementId]
-    }));
+    if (row.currentAmount > 0 && row.deliveredAmount > 0) {
+      items.push(guidance({
+        action: "acknowledge",
+        code: "duplicate_or_overlap",
+        exposure: row.totalExposureAmount,
+        locale: input.locale,
+        productIds,
+        requested: row.requestedAmount,
+        severity: "high",
+        supplementIds: [row.supplementId]
+      }));
+    }
   }
 
   if (input.state.profile.lifeStage === "child") {

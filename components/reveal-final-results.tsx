@@ -33,6 +33,7 @@ import {
   visibleFormulaIngredients,
   visibleSupplementRecommendationCount,
 } from "@/components/formulation-support-helpers";
+import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import {
   formatTemplate,
   getLocalizedText,
@@ -402,6 +403,28 @@ function fallbackForYouCopy(
   return t(locale, "customer.revealFallbacks.forYou", { supplement });
 }
 
+export function revealHeroFirstName(result: FormulationResult) {
+  const fromResult =
+    typeof result.firstName === "string" ? result.firstName.trim() : "";
+
+  if (fromResult) {
+    return fromResult;
+  }
+
+  const fromSummary =
+    typeof result.assessmentSummary.firstName === "string"
+      ? result.assessmentSummary.firstName.trim()
+      : "";
+
+  if (fromSummary) {
+    return fromSummary;
+  }
+
+  return firstNameFromAssessmentAnswers({
+    firstName: result.assessmentSummary.profile.split(" / ")[0]
+  }) ?? "";
+}
+
 function fallbackDecisionCopy(
   locale: Locale,
   dailyDose: string,
@@ -453,10 +476,7 @@ export function RevealFinalResultsPage({
     { supplementSelectedText },
   );
   const heroMeta = revealHeroMetaItems(result, locale);
-  const firstName =
-    typeof result.firstName === "string" && result.firstName.trim()
-      ? result.firstName.trim()
-      : "";
+  const firstName = revealHeroFirstName(result);
   const groups = assessmentGroups(result, locale);
   const productOptions = productStackPreferenceOrder.flatMap((preference) => {
     const option = productRecommendationOptions.find(
@@ -556,7 +576,10 @@ export function RevealFinalResultsPage({
               {copy.heroFor}
             </div>
           ) : null}
-          <h1 className="hero-rise hero-rise-d3 mb-8 mn-reveal-font-display mn-reveal-track-hero-title text-[clamp(64px,10vw,132px)] font-normal italic leading-[0.98] text-[var(--mn-teal-deep)]">
+          <h1
+            className="hero-rise hero-rise-d3 mb-8 mn-reveal-font-display mn-reveal-track-hero-title text-[clamp(64px,10vw,132px)] font-normal italic leading-[0.98] text-[var(--mn-teal-deep)]"
+            data-testid="reveal-hero-name"
+          >
             {firstName || copy.heroTitle}
             <span className="text-[var(--mn-gold)]">.</span>
           </h1>

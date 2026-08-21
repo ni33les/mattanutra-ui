@@ -168,8 +168,11 @@ export function localizedSupplementName(
     }
   }
 
-  void id;
-  return "";
+  const fallbackId = typeof id === "string" ? id.trim() : "";
+  if (fallbackId && !/^(sup_|prd_)?[0-9a-f-]{8,}$/i.test(fallbackId)) {
+    return fallbackId;
+  }
+  return english || localeText;
 }
 
 export function localizedDoseText(value: LocalizedText, locale: Locale) {
@@ -560,13 +563,10 @@ export function managedSeedForFoodSupportItem(item: FoodGapSupportItem) {
 }
 
 function foodSupportNeedLabel(need: ProductNeedCoverage, locale: Locale) {
-  const text = foodSupportNeedText(need);
-  const key = Object.keys(foodSupportNeedLabels).find((candidate) =>
-    text.includes(candidate.replace(/_/g, " "))
-  );
+  const catalogName = need.displayName?.trim();
 
-  if (key) {
-    return foodSupportNeedLabels[key][locale] ?? foodSupportNeedLabels[key].en;
+  if (catalogName && !/^(sup_|prd_)?[0-9a-f-]{8,}$/i.test(catalogName)) {
+    return catalogName;
   }
 
   return localizeKnownInlineTerms(need.displayName, locale);
