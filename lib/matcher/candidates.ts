@@ -145,13 +145,18 @@ function pruneVariants(variants: DoseVariant[]) {
 
 export function compileGroups(
   request: CanonicalRequest,
-  catalog: CatalogSnapshot
+  catalog: CatalogSnapshot,
+  deadlineAt?: number
 ): ProductGroup[] {
   const groups: ProductGroup[] = [];
 
   for (const product of [...catalog.products].sort((left, right) =>
     left.productId.localeCompare(right.productId)
   )) {
+    if (deadlineAt != null && Date.now() >= deadlineAt) {
+      break;
+    }
+
     if (!productEligible(product, request)) {
       continue;
     }

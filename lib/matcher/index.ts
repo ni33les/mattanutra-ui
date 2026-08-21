@@ -89,14 +89,23 @@ export function match(
     }
   }
 
-  const groups = compileGroups(request, catalog);
+  const deadlineAt = Date.now() + config.searchDeadlineMs;
+  const groups = compileGroups(
+    request,
+    catalog,
+    Math.max(Date.now(), deadlineAt - 400)
+  );
   const sellers = groupsBySeller(groups, request);
   const scored: ScoredBasket[] = [];
   let mode: "bounded" | "exact" = "exact";
   let trimmed = false;
 
   for (const seller of sellers) {
-    const run = searchGroups(seller.groups, request, config);
+    const remaining = Math.max(0, deadlineAt - Date.now());
+    const run = searchGroups(seller.groups, request, {
+      ...config,
+      searchDeadlineMs: remaining
+    });
     mode = run.mode === "bounded" ? "bounded" : mode;
     trimmed = trimmed || run.trimmed;
 
