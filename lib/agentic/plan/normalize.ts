@@ -2,27 +2,17 @@ import { isAgenticErrorResult, businessError, type AgenticErrorResult } from "@/
 import { canonicalRequestHash } from "@/lib/agentic/idempotency";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 import type { CatalogueSnapshot, CatalogueSupplement } from "@/lib/agentic/catalogue/types";
+import { CONDITION_ALIASES, MEDICATION_ALIASES } from "@/lib/agentic/catalogue/names";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import type {
   AcceptedGap,
   CanonicalPlanState,
   CurrentSupplement,
+  PlanLeftover,
   PlanRequest,
   PlanTarget
 } from "@/lib/agentic/plan/types";
-
-const MEDICATION_ALIASES: Record<string, string> = {
-  apixaban: "apixaban",
-  eliquis: "apixaban"
-};
-
-const CONDITION_ALIASES: Record<string, string> = {
-  af: "atrial_fibrillation",
-  atrial_fibrillation: "atrial_fibrillation",
-  ckd: "ckd",
-  chronic_kidney_disease: "ckd"
-};
 
 function normalizeCode(
   value: string,
@@ -82,16 +72,58 @@ function isIdShaped(value: string) {
   );
 }
 
+function tokensOf(value: string) {
+  return normalizeName(value).split(" ").filter((part) => part.length > 0);
+}
+
+function tokenSubsetMatch(left: string, right: string) {
+  const leftTokens = tokensOf(left);
+  const rightTokens = tokensOf(right);
+
+  if (leftTokens.length === 0 || rightTokens.length === 0) {
+    return false;
+  }
+
+  const [shorter, longer] =
+    leftTokens.length <= rightTokens.length
+      ? [leftTokens, rightTokens]
+      : [rightTokens, leftTokens];
+
+  if (shorter.length === 1 && (shorter[0]?.length ?? 0) < 2) {
+    return false;
+  }
+
+  return shorter.every((part) => longer.includes(part));
+}
+
 function matchByName(snapshot: CatalogueSnapshot, wanted: string) {
   const exact = snapshot.supplements.filter((item) => namesOf(item).includes(wanted));
 
-  if (exact.length > 0) {
+  if (exact.length === 1) {
     return exact;
   }
 
-  return snapshot.supplements.filter((item) =>
+  if (exact.length > 1) {
+    return exact;
+  }
+
+  const prefix = snapshot.supplements.filter((item) =>
     namesOf(item).some((name) => name === wanted || name.startsWith(`${wanted} `))
   );
+
+  if (prefix.length === 1) {
+    return prefix;
+  }
+
+  const token = snapshot.supplements.filter((item) =>
+    namesOf(item).some((name) => tokenSubsetMatch(name, wanted))
+  );
+
+  if (token.length === 1) {
+    return token;
+  }
+
+  return [];
 }
 
 function resolveSupplement(
@@ -152,14 +184,6 @@ function resolveSupplement(
     return matches[0];
   }
 
-  if (matches.length > 1) {
-    return businessError({
-      fieldPath,
-      message: "A required field is missing or invalid.",
-      reasonCode: "required"
-    });
-  }
-
   return businessError({
     fieldPath,
     message: "Unknown supplement name. Use a recognised name such as Folate, Vitamin D3 or Creatine.",
@@ -167,9 +191,24 @@ function resolveSupplement(
   });
 }
 
-function applyAnswers(
+function leftoverForUnknown(input: Readonly<{
+  amount?: number;
+  name: string;
+  unit?: PlanTarget["unit"];
+}>): PlanLeftover {
+  return {
+    ...(input.amount != null ? { amount: input.amount } : {}),
+    name: input.name,
+    note: "not_in_catalogue",
+    reason: "not_in_catalogue",
+    severity: "high",
+    ...(input.unit ? { unit: input.unit } : {})
+  };
+}
+
+export function applyPlanAnswers(
   state: CanonicalPlanState,
-  request: PlanRequest
+  request: Pick<PlanRequest, "answers">
 ): CanonicalPlanState {
   const answers = request.answers ?? [];
   let next = state;
@@ -235,7 +274,28 @@ function applyAnswers(
     }
   }
 
-  return { ...next, acceptedGaps };
+  return {
+    ...next,
+    acceptedGaps,
+    leftovers: state.leftovers,
+    pinnedOptionId: state.pinnedOptionId
+  };
+}
+
+export function planRematchFingerprint(state: CanonicalPlanState) {
+  return JSON.stringify({
+    currentSupplements: state.currentSupplements,
+    excludeSupplementIds: state.requirements.excludeSupplementIds ?? [],
+    dietaryPreference: state.requirements.dietaryPreference ?? null,
+    forms: state.requirements.allowedForms ?? [],
+    lifeStage: state.profile.lifeStage,
+    maxDailyPills: state.requirements.maxDailyPills ?? null,
+    maxPriceMinor: state.requirements.maxPriceMinor ?? null,
+    maxProductCount: state.requirements.maxProductCount ?? null,
+    omega3SourcePreference: state.requirements.omega3SourcePreference ?? null,
+    optimization: state.optimization,
+    targets: state.targets
+  });
 }
 
 export type NormalizedPlan = Readonly<{
@@ -264,6 +324,7 @@ export function normalizePlanRequest(input: Readonly<{
   }
 
   const targets: PlanTarget[] = [];
+  const leftovers: PlanLeftover[] = [];
 
   for (const [index, target] of request.targets.entries()) {
     const fieldPath = target.supplementId
@@ -276,6 +337,15 @@ export function normalizePlanRequest(input: Readonly<{
     );
 
     if (isAgenticErrorResult(supplement)) {
+      if (supplement.error.reasonCode === "unknown_supplement") {
+        leftovers.push(leftoverForUnknown({
+          amount: target.amount,
+          name: target.name,
+          unit: target.unit
+        }));
+        continue;
+      }
+
       return supplement;
     }
 
@@ -317,6 +387,15 @@ export function normalizePlanRequest(input: Readonly<{
     );
 
     if (isAgenticErrorResult(supplement)) {
+      if (supplement.error.reasonCode === "unknown_supplement") {
+        leftovers.push(leftoverForUnknown({
+          amount: item.dailyAmount,
+          name: item.name,
+          unit: item.unit
+        }));
+        continue;
+      }
+
       return supplement;
     }
 
@@ -357,18 +436,20 @@ export function normalizePlanRequest(input: Readonly<{
     currency: "THB",
     currentSupplements,
     destinationCountry: "TH",
+    leftovers,
     locale: negotiateLocale(request.locale),
     medicationCodes: [...new Set((request.medicationCodes ?? []).map((item) =>
       normalizeCode(item, MEDICATION_ALIASES)
     ))],
     optimization: request.optimization,
+    pinnedOptionId: null,
     profile: request.profile,
     requirements: { ...request.requirements },
     safetyAcknowledgement: request.safetyAcknowledgement ?? null,
     targets
   };
 
-  state = applyAnswers(state, request);
+  state = applyPlanAnswers(state, request);
 
   return {
     hash: canonicalRequestHash(state),

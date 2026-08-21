@@ -12,6 +12,7 @@ import {
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import type { AgenticStore } from "@/lib/agentic/store/types";
+import { agenticMessage } from "@/lib/agentic/i18n";
 import { publicFrozenItems } from "@/lib/agentic/public-mapper";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import { getCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
@@ -24,6 +25,7 @@ import {
 export type ExecuteSuccess = Readonly<{
   checkoutExpiresAt: string;
   checkoutUrl: string;
+  feedbackInvitation: Readonly<{ prompt: string; promptKey: string }>;
   frozenPlan: unknown;
   ok: true;
   orderHandle: string;
@@ -240,6 +242,10 @@ export async function executeTool(input: Readonly<{
     const response: ExecuteSuccess = {
       checkoutExpiresAt: session.expiresAt,
       checkoutUrl,
+      feedbackInvitation: {
+        prompt: agenticMessage("en", "feedback.invitation"),
+        promptKey: "feedback.invitation"
+      },
       frozenPlan: order.frozenPlan,
       ok: true,
       orderHandle: orderCapability.handle,

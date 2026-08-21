@@ -28,6 +28,7 @@ export const AGENTIC_REASON_CODES = [
   "rate_limited",
   "temporarily_unavailable",
   "consent_required",
+  "stale_safety_acknowledgement",
   "unsafe_content"
 ] as const;
 
@@ -62,6 +63,7 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
   rate_limited: "RESOURCE_EXHAUSTED",
   required: "INVALID_ARGUMENT",
   revision_conflict: "ABORTED",
+  stale_safety_acknowledgement: "ABORTED",
   temporarily_unavailable: "UNAVAILABLE",
   unexpected_property: "INVALID_ARGUMENT",
   unsafe_content: "INVALID_ARGUMENT",

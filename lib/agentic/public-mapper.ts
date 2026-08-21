@@ -9,11 +9,13 @@ import type {
 export type PublicBasketItem = Readonly<{
   currency: "THB";
   dailyPills: number;
+  fixture?: true;
   form: string;
   lineTotalMinor: number;
   productId: string;
   productName: string;
   quantity: number;
+  source?: "fixture" | "retail";
   unitPriceMinor: number;
 }>;
 
@@ -26,7 +28,10 @@ export function publicBasketItem(item: BasketItem): PublicBasketItem {
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
-    unitPriceMinor: item.unitPriceMinor
+    unitPriceMinor: item.unitPriceMinor,
+    ...(item.fixture || item.source === "fixture"
+      ? { fixture: true as const, source: "fixture" as const }
+      : {})
   };
 }
 
@@ -177,7 +182,8 @@ export function publicPlanFields(result: Pick<
   | "status"
   | "summary"
   | "unmetRequirements"
->) {
+> &
+  Partial<Pick<PlanResult, "leftovers" | "matcherTelemetry">>) {
   const selected = result.selected;
   const guidanceIds = result.safetyGuidance.map((item) => item.guidanceId);
   const snapshot =
@@ -246,8 +252,40 @@ export function publicPlanFields(result: Pick<
       ? {
           alternatives: alternatives.map((item) => publicOption(item, selected))
         }
-      : {})
+      : {}),
+    ...(result.leftovers && result.leftovers.length > 0
+      ? { leftovers: result.leftovers }
+      : {}),
+    ...publicMatcherTelemetry(result.matcherTelemetry)
   };
+}
+
+function publicMatcherTelemetry(
+  telemetry: PlanResult["matcherTelemetry"] | undefined
+) {
+  if (!telemetry) {
+    return {};
+  }
+
+  const payload: Record<string, unknown> = {};
+
+  if (telemetry.coveragePercent != null) {
+    payload.coveragePercent = telemetry.coveragePercent;
+  }
+  if (telemetry.leftovers.length > 0) {
+    payload.leftovers = telemetry.leftovers;
+  }
+  if (telemetry.productIds.length > 0) {
+    payload.productIds = telemetry.productIds;
+  }
+  if (telemetry.requestedNames.length > 0) {
+    payload.requestedNames = telemetry.requestedNames;
+  }
+  if (telemetry.selectedOptionId) {
+    payload.selectedOptionId = telemetry.selectedOptionId;
+  }
+
+  return Object.keys(payload).length > 0 ? { matcherTelemetry: payload } : {};
 }
 
 export function publicFrozenItems(items: readonly BasketItem[]) {
@@ -277,6 +315,7 @@ export function publicFrozenOrder(frozen: unknown) {
         currency: "THB",
         dailyPills: Number(row.dailyPills) || 0,
         deliveryWindow: null,
+        fixture: Boolean(row.fixture) || row.source === "fixture",
         form: String(row.form ?? ""),
         incompleteCommercialFacts: false,
         lineTotalMinor: Number(row.lineTotalMinor) || 0,
@@ -286,6 +325,7 @@ export function publicFrozenOrder(frozen: unknown) {
         retailerSku: "",
         sellerId: "",
         sellerName: "",
+        source: row.source === "fixture" || Boolean(row.fixture) ? "fixture" : "retail",
         stockStatus: "in_stock",
         unitPriceMinor: Number(row.unitPriceMinor) || 0
       });

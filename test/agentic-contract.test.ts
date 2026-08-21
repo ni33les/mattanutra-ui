@@ -112,6 +112,10 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.match(String(result.instructions), /scenario=three_ds_cancelled/);
     assert.match(String(result.instructions), /acknowledge_safety/);
     assert.match(String(result.instructions), /revision_conflict/);
+    assert.match(String(result.instructions), /HARD RULE 6 — HOST FEEDBACK/);
+    assert.match(String(result.instructions), /plan_feedback/);
+    assert.match(String(result.instructions), /Official MattaNutra Agentic QA Pack/);
+    assert.match(String(result.instructions), /leftover not_in_catalogue/);
     assert.equal(
       (result.serverInfo as { version: string }).version,
       "3.0.0"

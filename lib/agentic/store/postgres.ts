@@ -18,6 +18,7 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
   const store = {
     async deleteAll() {
       await sql`truncate table
+        public.agentic_matcher_events,
         public.agentic_feedback,
         public.agentic_support_messages,
         public.agentic_support_cases,

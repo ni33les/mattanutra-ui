@@ -45,7 +45,7 @@ function supplement(
 
 export const FIXTURE_SUPPLEMENTS: readonly CatalogueSupplement[] = [
   supplement("d3", "Vitamin D3", ["Vitamin D", "D3", "Cholecalciferol", "Vit D3", "Colecalciferol"], ["IU", "mcg", "mg"]),
-  supplement("omega3", "Omega-3", ["Fish oil", "EPA", "DHA", "Algae oil", "Omega 3", "n-3"], ["mg", "g"]),
+  supplement("omega3", "Omega-3", ["Fish oil", "EPA", "DHA", "Algae oil", "Algae omega-3", "Algal omega-3", "Algae Omega-3", "Omega 3", "n-3"], ["mg", "g"]),
   supplement("magnesium", "Magnesium", ["Mg", "Magnesium glycinate", "Magnesium citrate"], ["mg", "g"]),
   supplement("b12", "Vitamin B12", ["B12", "Cobalamin", "Methylcobalamin", "Cyanocobalamin"], ["mcg", "mg"]),
   supplement("c", "Vitamin C", ["Ascorbic acid", "Ascorbate"], ["mg", "g"]),
@@ -157,9 +157,23 @@ function product(input: Readonly<{
     retailerSku: input.sku,
     sellerId: ACTIVE_RETAILER_ID,
     sellerName: ACTIVE_RETAILER_NAME,
+    source: "fixture",
     stockStatus: input.stockStatus ?? "in_stock",
     unitPriceMinor: input.priceMinor
   };
+}
+
+export function recognisedSupplementNames() {
+  const names = new Set<string>();
+
+  for (const item of FIXTURE_SUPPLEMENTS) {
+    names.add(item.name);
+    for (const alias of item.aliases) {
+      names.add(alias);
+    }
+  }
+
+  return [...names].sort((left, right) => left.localeCompare(right));
 }
 
 export const FIXTURE_PRODUCTS: readonly CatalogueProduct[] = [

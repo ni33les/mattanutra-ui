@@ -90,19 +90,56 @@ export type AcceptedGap = Readonly<{
   supplementId: string;
 }>;
 
+export type PlanLeftoverReason =
+  | "dose_gap"
+  | "not_in_catalogue"
+  | "uncovered"
+  | "weaker_sku";
+
+export type PlanLeftover = Readonly<{
+  amount?: number;
+  name: string;
+  note?: string;
+  reason: PlanLeftoverReason;
+  severity: "high" | "low" | "medium";
+  supplementId?: string;
+  unit?: CatalogueUnit;
+}>;
+
 export type CanonicalPlanState = Readonly<{
   acceptedGaps: readonly AcceptedGap[];
   conditionCodes: readonly string[];
   currency: "THB";
   currentSupplements: readonly CurrentSupplement[];
   destinationCountry: "TH";
+  leftovers: readonly PlanLeftover[];
   locale: string;
   medicationCodes: readonly string[];
   optimization: OptimizationMode;
+  pinnedOptionId: string | null;
   profile: PlanProfile;
   requirements: PlanRequirements;
   safetyAcknowledgement: SafetyAcknowledgement | null;
   targets: readonly PlanTarget[];
+}>;
+
+export type MatcherTelemetry = Readonly<{
+  constraints: PlanRequirements &
+    Readonly<{
+      conditionCodes: readonly string[];
+      medicationCodes: readonly string[];
+    }>;
+  coveragePercent: number | null;
+  leftovers: readonly PlanLeftover[];
+  productIds: readonly string[];
+  productSkus: readonly string[];
+  requestedDoses: readonly Readonly<{
+    amount: number;
+    name: string;
+    unit: CatalogueUnit;
+  }>[];
+  requestedNames: readonly string[];
+  selectedOptionId: string | null;
 }>;
 
 export type BasketItem = Readonly<{
@@ -111,6 +148,7 @@ export type BasketItem = Readonly<{
   currency: "THB";
   dailyPills: number;
   deliveryWindow: string | null;
+  fixture: boolean;
   form: string;
   incompleteCommercialFacts: boolean;
   lineTotalMinor: number;
@@ -120,6 +158,7 @@ export type BasketItem = Readonly<{
   retailerSku: string;
   sellerId: string;
   sellerName: string;
+  source: "fixture" | "retail";
   stockStatus: "backorder" | "in_stock";
   unitPriceMinor: number;
 }>;
@@ -189,6 +228,8 @@ export type PlanResult = Readonly<{
   changeSummary: readonly string[];
   coverage: readonly CoverageRow[];
   guidanceRulesVersion: string;
+  leftovers: readonly PlanLeftover[];
+  matcherTelemetry: MatcherTelemetry;
   optimizationEvidence: Readonly<{
     mode: OptimizationMode;
     tieBreak: readonly string[];

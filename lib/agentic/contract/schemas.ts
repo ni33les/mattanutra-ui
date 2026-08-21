@@ -222,6 +222,18 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
         "selectOptionId"
       ],
       type: "object"
+    },
+    {
+      additionalProperties: false,
+      properties: {
+        answers: PLAN_REQUEST.properties.answers,
+        expectedRevision: { minimum: 1, type: "integer" },
+        idempotencyKey: IDEMPOTENCY_KEY,
+        planHandle: HANDLE,
+        safetyAcknowledgement: PLAN_REQUEST.properties.safetyAcknowledgement
+      },
+      required: ["idempotencyKey", "planHandle", "expectedRevision"],
+      type: "object"
     }
   ]
 };

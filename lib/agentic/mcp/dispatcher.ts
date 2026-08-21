@@ -71,6 +71,7 @@ async function callTool(
         config: runtime.config,
         now,
         payload: {
+          answers: params.answers,
           expectedRevision:
             typeof params.expectedRevision === "number"
               ? params.expectedRevision
@@ -79,6 +80,7 @@ async function callTool(
           planHandle:
             typeof params.planHandle === "string" ? params.planHandle : undefined,
           request: params.request,
+          safetyAcknowledgement: params.safetyAcknowledgement,
           selectOptionId:
             typeof params.selectOptionId === "string"
               ? params.selectOptionId

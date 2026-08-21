@@ -192,6 +192,45 @@ create table if not exists public.agentic_feedback (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.agentic_matcher_events (
+  id uuid primary key,
+  plan_id uuid not null references public.agentic_plans(id) on delete restrict,
+  revision integer not null,
+  requested_names jsonb not null default '[]'::jsonb,
+  requested_doses jsonb not null default '[]'::jsonb,
+  constraints jsonb not null default '{}'::jsonb,
+  selected_option_id text,
+  coverage_percent integer,
+  product_ids jsonb not null default '[]'::jsonb,
+  product_skus jsonb not null default '[]'::jsonb,
+  leftovers jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists agentic_matcher_events_plan_idx
+  on public.agentic_matcher_events (plan_id, revision);
+
+create index if not exists agentic_matcher_events_created_idx
+  on public.agentic_matcher_events (created_at desc);
+
+create or replace view public.agentic_catalogue_gaps as
+select
+  leftover->>'name' as requested_name,
+  leftover->>'reason' as miss_reason,
+  leftover->>'severity' as miss_severity,
+  count(*)::int as frequency,
+  max(events.created_at) as last_seen_at,
+  (
+    case leftover->>'severity'
+      when 'high' then 30
+      when 'medium' then 20
+      else 10
+    end * count(*)
+  )::int as add_priority
+from public.agentic_matcher_events as events
+cross join lateral jsonb_array_elements(events.leftovers) as leftover
+group by 1, 2, 3;
+
 create table if not exists public.agentic_qa_scenario_runs (
   id uuid primary key,
   handle_hash text not null unique,

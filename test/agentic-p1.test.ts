@@ -781,17 +781,18 @@ describe("agentic P1 pack fixes", () => {
         optimization: "balanced",
         profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
         requirements: {},
-        targets: [{ amount: 1, name: "Unobtainium", unit: "mg" }]
+        targets: [
+          { amount: 2000, name: "Vitamin D3", unit: "IU" },
+          { amount: 1, name: "Unobtainium", unit: "mg" }
+        ]
       }
     });
-    assert.equal(unknown.ok, false);
-    assert.equal((unknown.error as { reasonCode: string }).reasonCode, "unknown_supplement");
-    assert.equal(
-      String((unknown.error as { message: string }).message)
-        .toLowerCase()
-        .includes("legacy ids are not accepted"),
-      false
-    );
+    assert.equal(unknown.ok, true);
+    const leftovers = (unknown.leftovers as Array<{ name?: string; reason?: string }>) ?? [];
+    assert.ok(leftovers.some((item) =>
+      String(item.name).toLowerCase() === "unobtainium" && item.reason === "not_in_catalogue"
+    ));
+    assert.equal(JSON.stringify(unknown).toLowerCase().includes("legacy ids are not accepted"), false);
   });
 
   it("omits alternatives that duplicate the selected stack", async () => {

@@ -24,6 +24,7 @@ export type CatalogueProduct = Readonly<{
   retailerSku: string;
   sellerId: string;
   sellerName: string;
+  source: "fixture" | "retail";
   stockStatus: "backorder" | "in_stock" | "unavailable";
   unitPriceMinor: number;
 }>;

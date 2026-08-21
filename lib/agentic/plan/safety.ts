@@ -23,17 +23,19 @@ function guidance(input: Readonly<{
   threshold?: number | null;
 }>): SafetyGuidance {
   const messageKey = `guidance.${input.code}`;
-  const exposureKey = [
-    input.exposure == null ? "na" : String(Math.round(input.exposure * 1000) / 1000),
-    input.requested == null ? "na" : String(Math.round(input.requested * 1000) / 1000)
-  ].join("@");
-  const guidanceId = [
-    "gdn",
-    input.code,
-    [...input.supplementIds].sort().join("+") || "none",
-    [...input.productIds].sort().join("+") || "none",
-    exposureKey
-  ].join(":");
+  const family =
+    input.code === "medication_interaction"
+      ? "omega3+anticoagulant"
+      : input.code === "condition_review_required"
+        ? "magnesium+ckd"
+        : input.code === "dose_review_required"
+          ? "dose"
+          : input.code === "duplicate_or_overlap"
+            ? "overlap"
+            : input.code === "pediatric_review_required"
+              ? "pediatric"
+              : input.code;
+  const guidanceId = ["gdn", input.code, family].join(":");
 
   return {
     action: input.action,
@@ -261,13 +263,11 @@ export function safetyQuestions(input: Readonly<{
 
   if (ackable.length > 0) {
     const bound = input.state.safetyAcknowledgement;
-    const same =
-      bound &&
-      bound.revision === input.shownRevision &&
-      bound.guidanceIds.slice().sort().join() ===
-        ackable.map((item) => item.guidanceId).sort().join();
+    const covered =
+      bound?.confirmed === true &&
+      ackable.every((item) => bound.guidanceIds.includes(item.guidanceId));
 
-    if (!same) {
+    if (!covered) {
       questions.push({
         choices: [
           {

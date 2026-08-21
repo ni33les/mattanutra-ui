@@ -13,6 +13,8 @@ import type {
   BasketItem,
   CanonicalPlanState,
   CoverageRow,
+  MatcherTelemetry,
+  PlanLeftover,
   StackOption
 } from "@/lib/agentic/plan/types";
 
@@ -157,6 +159,7 @@ function basketFromProducts(
     currency: "THB",
     dailyPills: product.dailyPills,
     deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
+    fixture: product.source === "fixture",
     form: product.form,
     incompleteCommercialFacts: product.incompleteCommercialFacts,
     lineTotalMinor: product.unitPriceMinor,
@@ -166,6 +169,7 @@ function basketFromProducts(
     retailerSku: product.retailerSku,
     sellerId: product.sellerId,
     sellerName: product.sellerName,
+    source: product.source,
     stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
     unitPriceMinor: product.unitPriceMinor
   }));
@@ -195,22 +199,85 @@ function stackFromProducts(
   };
 }
 
+function maxProductCount(state: CanonicalPlanState) {
+  return state.requirements.maxProductCount ?? 8;
+}
+
+function coverageRatio(product: CatalogueProduct, target: CanonicalPlanState["targets"][number]) {
+  const requested = doseComparable(target.amount, target.unit, target.name);
+  const delivered = product.candidate.facts[0]?.comparableAmount ?? 0;
+
+  if (requested <= 0) {
+    return 0;
+  }
+
+  return delivered / requested;
+}
+
+function pickForTarget(
+  target: CanonicalPlanState["targets"][number],
+  eligible: readonly CatalogueProduct[],
+  mode: "cheapest" | "coverage"
+) {
+  const candidates = eligible
+    .filter((item) => item.contributionSupplementIds.includes(target.supplementId))
+    .slice()
+    .sort((left, right) => {
+      if (mode === "coverage") {
+        const leftRatio = coverageRatio(left, target);
+        const rightRatio = coverageRatio(right, target);
+        const leftComplete = leftRatio >= 0.9 ? 1 : 0;
+        const rightComplete = rightRatio >= 0.9 ? 1 : 0;
+
+        if (leftComplete !== rightComplete) {
+          return rightComplete - leftComplete;
+        }
+
+        if (leftComplete === 1) {
+          if (left.unitPriceMinor !== right.unitPriceMinor) {
+            return left.unitPriceMinor - right.unitPriceMinor;
+          }
+        } else if (leftRatio !== rightRatio) {
+          return rightRatio - leftRatio;
+        }
+      }
+
+      if (left.unitPriceMinor !== right.unitPriceMinor) {
+        return left.unitPriceMinor - right.unitPriceMinor;
+      }
+
+      if (left.dailyPills !== right.dailyPills) {
+        return left.dailyPills - right.dailyPills;
+      }
+
+      return left.productId.localeCompare(right.productId);
+    });
+
+  return candidates[0] ?? null;
+}
+
 function greedyStack(
   state: CanonicalPlanState,
   eligible: readonly CatalogueProduct[],
   availabilityAsOf: string,
-  reason: string
+  reason: string,
+  mode: "cheapest" | "coverage" = "cheapest"
 ) {
   const selected: CatalogueProduct[] = [];
   const retain = new Set(state.requirements.retainProductIds ?? []);
+  const cap = maxProductCount(state);
 
   for (const product of eligible) {
-    if (retain.has(product.productId)) {
+    if (retain.has(product.productId) && selected.length < cap) {
       selected.push(product);
     }
   }
 
   for (const target of state.targets) {
+    if (selected.length >= cap) {
+      break;
+    }
+
     if (state.requirements.excludeSupplementIds?.includes(target.supplementId)) {
       continue;
     }
@@ -219,28 +286,35 @@ function greedyStack(
       continue;
     }
 
-    const candidates = eligible
-      .filter((item) => item.contributionSupplementIds.includes(target.supplementId))
-      .slice()
-      .sort((left, right) => {
-        if (left.unitPriceMinor !== right.unitPriceMinor) {
-          return left.unitPriceMinor - right.unitPriceMinor;
-        }
+    const picked = pickForTarget(target, eligible, mode);
 
-        if (left.dailyPills !== right.dailyPills) {
-          return left.dailyPills - right.dailyPills;
-        }
-
-        return left.productId.localeCompare(right.productId);
-      });
-
-    if (candidates[0]) {
-      selected.push(candidates[0]);
+    if (picked) {
+      selected.push(picked);
     }
   }
 
   selected.sort((left, right) => left.productId.localeCompare(right.productId));
   return stackFromProducts(state, selected, availabilityAsOf, reason);
+}
+
+function optionIsComplete(option: StackOption) {
+  if (option.coverage.length === 0) {
+    return false;
+  }
+
+  return option.coverage.every(
+    (row) => row.status === "covered" || row.status === "over_target"
+  );
+}
+
+function cheaperReason(selected: StackOption, cheaper: StackOption) {
+  if (cheaper.totalPriceMinor >= selected.totalPriceMinor) {
+    return "Alternative stack";
+  }
+
+  return optionIsComplete(cheaper)
+    ? "Lower-cost complete stack"
+    : "Lower-cost incomplete stack";
 }
 
 function basketKey(option: StackOption) {
@@ -268,11 +342,118 @@ function materialDifference(left: StackOption | null, right: StackOption | null)
   );
 }
 
+export function leftoversFor(
+  state: CanonicalPlanState,
+  selected: StackOption | null,
+  cheaper: StackOption | null
+): PlanLeftover[] {
+  const leftovers: PlanLeftover[] = [...state.leftovers];
+  const seen = new Set(leftovers.map((item) => `${item.reason}:${item.name}`));
+
+  function push(item: PlanLeftover) {
+    const key = `${item.reason}:${item.name}`;
+
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    leftovers.push(item);
+  }
+
+  for (const row of selected?.coverage ?? []) {
+    if (row.status === "uncovered") {
+      push({
+        amount: row.requestedAmount,
+        name: row.name,
+        reason: "uncovered",
+        severity: "high",
+        supplementId: row.supplementId,
+        unit: row.unit
+      });
+    } else if (row.status === "partial") {
+      push({
+        amount: row.requestedAmount,
+        name: row.name,
+        note: `covered ${row.coveragePercent}%`,
+        reason: "dose_gap",
+        severity: "medium",
+        supplementId: row.supplementId,
+        unit: row.unit
+      });
+    }
+  }
+
+  if (cheaper && selected && cheaper.totalPriceMinor < selected.totalPriceMinor) {
+    for (const row of cheaper.coverage) {
+      const selectedRow = selected.coverage.find(
+        (item) => item.supplementId === row.supplementId
+      );
+
+      if (
+        selectedRow &&
+        row.coveragePercent + 10 < selectedRow.coveragePercent
+      ) {
+        push({
+          name: row.name,
+          note: "cheaper SKU covers less",
+          reason: "weaker_sku",
+          severity: "low",
+          supplementId: row.supplementId,
+          unit: row.unit
+        });
+      }
+    }
+  }
+
+  return leftovers;
+}
+
+export function matcherTelemetryFor(input: Readonly<{
+  leftovers: readonly PlanLeftover[];
+  selected: StackOption | null;
+  state: CanonicalPlanState;
+}>): MatcherTelemetry {
+  return {
+    constraints: {
+      ...input.state.requirements,
+      conditionCodes: input.state.conditionCodes,
+      medicationCodes: input.state.medicationCodes
+    },
+    coveragePercent: input.selected?.coveragePercent ?? null,
+    leftovers: input.leftovers,
+    productIds: input.selected?.basket.map((item) => item.productId) ?? [],
+    productSkus: input.selected?.basket.map((item) => item.retailerSku) ?? [],
+    requestedDoses: [
+      ...input.state.targets.map((item) => ({
+        amount: item.amount,
+        name: item.name,
+        unit: item.unit
+      })),
+      ...input.state.leftovers
+        .filter((item) => item.reason === "not_in_catalogue" && item.amount != null && item.unit)
+        .map((item) => ({
+          amount: item.amount as number,
+          name: item.name,
+          unit: item.unit as CanonicalPlanState["targets"][number]["unit"]
+        }))
+    ],
+    requestedNames: [
+      ...input.state.targets.map((item) => item.name),
+      ...input.state.leftovers
+        .filter((item) => item.reason === "not_in_catalogue")
+        .map((item) => item.name)
+    ],
+    selectedOptionId: input.selected?.optionId ?? null
+  };
+}
+
 export function matchPlan(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): {
   alternatives: StackOption[];
+  leftovers: PlanLeftover[];
   selected: StackOption | null;
   unmetRequirements: string[];
 } {
@@ -280,13 +461,26 @@ export function matchPlan(input: Readonly<{
     productEligible(product, input.state)
   );
   const needs = toNeed(input.state);
-  const maxProducts = input.state.requirements.maxProductCount ?? 8;
-  let selected = greedyStack(
+  const maxProducts = maxProductCount(input.state);
+  const coverageFirst = greedyStack(
     input.state,
     eligible,
     input.snapshot.availabilityAsOf,
-    "Coverage-first stack"
+    "Highest-coverage feasible stack",
+    "coverage"
   );
+  const cheapest = greedyStack(
+    { ...input.state, optimization: "lowest_cost" },
+    eligible,
+    input.snapshot.availabilityAsOf,
+    "Lower-cost incomplete stack",
+    "cheapest"
+  );
+  let selected = coverageFirst;
+
+  if (input.state.optimization === "lowest_cost") {
+    selected = cheapest;
+  }
 
   if (needs.length > 0 && eligible.length > 0) {
     const beam = recommendProductStackFullBeam({
@@ -305,28 +499,41 @@ export function matchPlan(input: Readonly<{
       .filter((item): item is CatalogueProduct => Boolean(item));
 
     if (mapped.length > 0) {
-      selected = stackFromProducts(
+      const beamed = stackFromProducts(
         input.state,
         mapped,
         input.snapshot.availabilityAsOf,
         "Selected for coverage, price and daily pills"
       );
+
+      if (
+        input.state.optimization === "lowest_cost"
+          ? beamed.totalPriceMinor < selected.totalPriceMinor
+          : beamed.coveragePercent > selected.coveragePercent ||
+            (beamed.coveragePercent === selected.coveragePercent &&
+              beamed.totalPriceMinor < selected.totalPriceMinor)
+      ) {
+        selected = beamed;
+      }
     }
+  }
+
+  if (
+    input.state.optimization !== "lowest_cost" &&
+    (coverageFirst.coveragePercent > selected.coveragePercent ||
+      (coverageFirst.coveragePercent === selected.coveragePercent &&
+        coverageFirst.totalPriceMinor < selected.totalPriceMinor))
+  ) {
+    selected = coverageFirst;
   }
 
   const alternatives: StackOption[] = [];
 
-  if (input.state.optimization !== "lowest_cost") {
-    const cheaper = greedyStack(
-      { ...input.state, optimization: "lowest_cost" },
-      eligible,
-      input.snapshot.availabilityAsOf,
-      "Lower-cost complete stack"
-    );
-
-    if (materialDifference(selected, cheaper)) {
-      alternatives.push(cheaper);
-    }
+  if (input.state.optimization !== "lowest_cost" && materialDifference(selected, cheapest)) {
+    alternatives.push({
+      ...cheapest,
+      reason: cheaperReason(selected, cheapest)
+    });
   }
 
   if (input.state.optimization !== "fewest_pills") {
@@ -341,7 +548,8 @@ export function matchPlan(input: Readonly<{
       { ...input.state, optimization: "fewest_pills" },
       compactEligible,
       input.snapshot.availabilityAsOf,
-      "Fewer daily pills"
+      "Fewer daily pills",
+      "coverage"
     );
 
     if (
@@ -353,9 +561,11 @@ export function matchPlan(input: Readonly<{
   }
 
   const limited = alternatives.slice(0, 2);
+  const leftovers = leftoversFor(input.state, selected, cheapest);
 
   return {
     alternatives: limited,
+    leftovers,
     selected,
     unmetRequirements: unmetRequirementsFor({
       option: selected,

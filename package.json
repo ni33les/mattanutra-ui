@@ -83,6 +83,7 @@
     "communications:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-communications-schema.ts",
     "panya:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-panya-schema.ts",
     "agentic:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-agentic-commerce-schema.ts",
+    "agentic:qa:pack": "node scripts/agentic-qa-pack.mjs",
     "retail-checkout:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-retail-checkout-schema.ts",
     "retail-financials:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-retail-financials-schema.ts",
     "retail-financials:backfill": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/backfill-retail-order-settlements.ts",

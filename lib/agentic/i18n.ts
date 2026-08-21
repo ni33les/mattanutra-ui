@@ -214,6 +214,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "แผนนี้ไม่ใช่ฉบับล่าสุด โหลดฉบับปัจจุบันอีกครั้ง",
     "zh-CN": "方案版本已过期。请重新加载最新版本。"
   },
+  "mcp.errors.stale_safety_acknowledgement": {
+    en: "safetyAcknowledgement.revision does not match the current plan revision. Reload the latest revision and resubmit the acknowledgement.",
+    th: "safetyAcknowledgement.revision ไม่ตรงกับแผนฉบับปัจจุบัน โหลดฉบับล่าสุดแล้วส่งการยืนยันใหม่",
+    "zh-CN": "safetyAcknowledgement.revision 与当前方案版本不一致。请重新加载最新版本并再次提交确认。"
+  },
   "mcp.errors.temporarily_unavailable": {
     en: "The service is temporarily unavailable.",
     th: "บริการไม่พร้อมชั่วคราว",

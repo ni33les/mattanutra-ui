@@ -15,6 +15,11 @@ import {
 } from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
+import { recognisedSupplementNames } from "@/lib/agentic/catalogue/fixtures";
+import {
+  RECOGNISED_CONDITION_CODES,
+  RECOGNISED_MEDICATION_CODES
+} from "@/lib/agentic/catalogue/names";
 
 export const AGENTIC_SCHEMA_CHECKSUM = createHash("sha256")
   .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
@@ -42,7 +47,10 @@ function buildInfo(input: Readonly<{
     environment: input.config.environment,
     migrationVersion: AGENTIC_MIGRATION_VERSION,
     ok: true as const,
+    conditionCodes: [...RECOGNISED_CONDITION_CODES],
+    medicationCodes: [...RECOGNISED_MEDICATION_CODES],
     pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
+    recognisedNames: recognisedSupplementNames(),
     schemaChecksum: AGENTIC_SCHEMA_CHECKSUM,
     serviceName: AGENTIC_SERVICE_NAME,
     serviceVersion: AGENTIC_SERVICE_VERSION,

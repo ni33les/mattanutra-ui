@@ -15,21 +15,37 @@ import { getCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { CapabilityScope } from "@/lib/agentic/capabilities";
-import { normalizePlanRequest } from "@/lib/agentic/plan/normalize";
-import { matchPlan, unmetRequirementsFor } from "@/lib/agentic/plan/matching";
+import {
+  applyPlanAnswers,
+  normalizePlanRequest,
+  planRematchFingerprint
+} from "@/lib/agentic/plan/normalize";
+import {
+  leftoversFor,
+  matcherTelemetryFor,
+  matchPlan,
+  unmetRequirementsFor
+} from "@/lib/agentic/plan/matching";
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
+import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import type {
   CanonicalPlanState,
+  PlanAnswer,
   PlanResult,
+  SafetyAcknowledgement,
   StackOption
 } from "@/lib/agentic/plan/types";
 
+export const PLAN_FEEDBACK_AFTER_REVISIONS = 3;
+
 export type PlanToolInput = Readonly<{
+  answers?: unknown;
   expectedRevision?: number;
   idempotencyKey: string;
   planHandle?: string;
   request?: unknown;
+  safetyAcknowledgement?: unknown;
   selectOptionId?: string;
 }>;
 
@@ -41,64 +57,143 @@ export type PlanToolSuccess = ReturnType<typeof publicPlanFields> &
     revision: number;
   }>;
 
-function buildResult(input: Readonly<{
+function asAnswers(value: unknown): PlanAnswer[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (item): item is PlanAnswer =>
+      Boolean(item) &&
+      typeof item === "object" &&
+      typeof (item as { choice?: unknown }).choice === "string" &&
+      typeof (item as { questionId?: unknown }).questionId === "string"
+  );
+}
+
+function asAck(value: unknown): SafetyAcknowledgement | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (
+    record.confirmed !== true ||
+    !Array.isArray(record.guidanceIds) ||
+    typeof record.revision !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    confirmed: true,
+    guidanceIds: record.guidanceIds.filter((item): item is string => typeof item === "string"),
+    revision: record.revision
+  };
+}
+
+function requestRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function incomingAnswers(payload: PlanToolInput) {
+  const nested = requestRecord(payload.request);
+  return [
+    ...asAnswers(payload.answers),
+    ...asAnswers(nested?.answers)
+  ];
+}
+
+function incomingAck(payload: PlanToolInput) {
+  return asAck(payload.safetyAcknowledgement) ?? asAck(requestRecord(payload.request)?.safetyAcknowledgement);
+}
+
+function hasFullRequest(payload: PlanToolInput) {
+  const nested = requestRecord(payload.request);
+  return Array.isArray(nested?.targets) && nested.targets.length > 0;
+}
+
+function composeResult(input: Readonly<{
+  alternatives: readonly StackOption[];
   locale: Locale;
+  leftovers: PlanResult["leftovers"];
   previous: PlanResult | null;
+  selected: StackOption | null;
   shownRevision: number;
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
+  unmetRequirements: readonly string[];
 }>): PlanResult {
-  const matched = matchPlan({ snapshot: input.snapshot, state: input.state });
   const safety = evaluateSafety({
     locale: input.locale,
-    selected: matched.selected,
+    selected: input.selected,
     state: input.state
   });
   const questions = safetyQuestions({
-    alternatives: matched.alternatives,
+    alternatives: input.alternatives,
     guidance: safety,
     locale: input.locale,
-    selected: matched.selected,
+    selected: input.selected,
     shownRevision: input.shownRevision,
     state: input.state,
-    unmetRequirements: matched.unmetRequirements
+    unmetRequirements: [...input.unmetRequirements]
   });
   const status = planStatus({
     guidance: safety,
     questions,
-    selected: matched.selected,
+    selected: input.selected,
     state: input.state,
-    unmetRequirements: matched.unmetRequirements
+    unmetRequirements: [...input.unmetRequirements]
   });
   const summary = agenticMessage(input.locale, `plan.summary.${status}`);
   const changeSummary: string[] = [];
+  const pinnedState = {
+    ...input.state,
+    leftovers: input.leftovers,
+    pinnedOptionId: input.selected?.optionId ?? input.state.pinnedOptionId
+  };
 
   if (input.previous) {
     if (input.previous.status !== status) {
       changeSummary.push(`status:${input.previous.status}->${status}`);
     }
 
+    if (input.previous.selected?.optionId !== input.selected?.optionId) {
+      changeSummary.push(
+        input.selected ? `selected_option:${input.selected.optionId}` : "selected_cleared"
+      );
+    }
+
     if (
-      input.previous.selected?.totalPriceMinor !== matched.selected?.totalPriceMinor
+      input.previous.selected?.totalPriceMinor !== input.selected?.totalPriceMinor
     ) {
       changeSummary.push("price_changed");
     }
   }
 
   return {
-    alternatives: matched.alternatives,
-    appliedRequirements: Object.entries(input.state.requirements)
+    alternatives: [...input.alternatives],
+    appliedRequirements: Object.entries(pinnedState.requirements)
       .filter(([, value]) => value !== undefined)
       .map(([key]) => key),
     assumptions: [],
     availabilityAsOf: input.snapshot.availabilityAsOf,
-    basket: matched.selected?.basket ?? [],
+    basket: input.selected?.basket ?? [],
     catalogueVersion: input.snapshot.catalogueVersion,
     changeSummary,
-    coverage: matched.selected?.coverage ?? [],
+    coverage: input.selected?.coverage ?? [],
     guidanceRulesVersion: input.snapshot.catalogueVersion,
+    leftovers: input.leftovers,
+    matcherTelemetry: matcherTelemetryFor({
+      leftovers: input.leftovers,
+      selected: input.selected,
+      state: pinnedState
+    }),
     optimizationEvidence: {
-      mode: input.state.optimization,
+      mode: pinnedState.optimization,
       tieBreak: [
         "objective",
         "unmet_targets",
@@ -110,13 +205,62 @@ function buildResult(input: Readonly<{
       ]
     },
     questions,
-    requestSnapshot: input.state,
+    requestSnapshot: pinnedState,
     safetyGuidance: [...safety],
-    selected: matched.selected,
+    selected: input.selected,
     status,
     summary,
-    unmetRequirements: matched.unmetRequirements
+    unmetRequirements: [...input.unmetRequirements]
   };
+}
+
+function buildResult(input: Readonly<{
+  locale: Locale;
+  previous: PlanResult | null;
+  shownRevision: number;
+  snapshot: CatalogueSnapshot;
+  state: CanonicalPlanState;
+}>): PlanResult {
+  const matched = matchPlan({ snapshot: input.snapshot, state: input.state });
+  return composeResult({
+    alternatives: matched.alternatives,
+    locale: input.locale,
+    leftovers: matched.leftovers,
+    previous: input.previous,
+    selected: matched.selected,
+    shownRevision: input.shownRevision,
+    snapshot: input.snapshot,
+    state: input.state,
+    unmetRequirements: matched.unmetRequirements
+  });
+}
+
+function buildPinnedResult(input: Readonly<{
+  locale: Locale;
+  previous: PlanResult;
+  selected: StackOption;
+  shownRevision: number;
+  snapshot: CatalogueSnapshot;
+  state: CanonicalPlanState;
+}>): PlanResult {
+  const unmet = unmetRequirementsFor({ option: input.selected, state: input.state });
+  const leftovers = leftoversFor(
+    input.state,
+    input.selected,
+    input.previous.alternatives[0] ?? null
+  );
+
+  return composeResult({
+    alternatives: input.previous.alternatives,
+    locale: input.locale,
+    leftovers,
+    previous: input.previous,
+    selected: input.selected,
+    shownRevision: input.shownRevision,
+    snapshot: input.snapshot,
+    state: input.state,
+    unmetRequirements: unmet
+  });
 }
 
 function previousResult(record: unknown): PlanResult | null {
@@ -124,22 +268,24 @@ function previousResult(record: unknown): PlanResult | null {
 }
 
 function bindSafetyAcknowledgement(input: Readonly<{
+  incomingAck: SafetyAcknowledgement | null;
   previous: PlanResult | null;
-  request: unknown;
+  answers: readonly PlanAnswer[];
   shownRevision: number;
   state: CanonicalPlanState;
 }>): CanonicalPlanState {
+  if (input.incomingAck) {
+    return {
+      ...input.state,
+      safetyAcknowledgement: input.incomingAck
+    };
+  }
+
   if (input.state.safetyAcknowledgement) {
     return input.state;
   }
 
-  const answers =
-    input.request &&
-    typeof input.request === "object" &&
-    Array.isArray((input.request as { answers?: unknown }).answers)
-      ? (input.request as { answers: Array<{ choice?: string }> }).answers
-      : [];
-  const wantsAck = answers.some((item) => item.choice === "acknowledge_safety");
+  const wantsAck = input.answers.some((item) => item.choice === "acknowledge_safety");
 
   if (!wantsAck || !input.previous) {
     return input.state;
@@ -161,6 +307,31 @@ function bindSafetyAcknowledgement(input: Readonly<{
       revision: input.shownRevision
     }
   };
+}
+
+function feedbackFields(input: Readonly<{
+  locale: Locale;
+  revision: number;
+  status: PlanResult["status"];
+}>) {
+  if (
+    input.status !== "ready" &&
+    input.revision < PLAN_FEEDBACK_AFTER_REVISIONS
+  ) {
+    return {};
+  }
+
+  return {
+    feedbackInvitation: {
+      prompt: agenticMessage(input.locale, "feedback.invitation"),
+      promptKey: "feedback.invitation"
+    }
+  };
+}
+
+function selectFromAnswers(answers: readonly PlanAnswer[]) {
+  const found = answers.find((item) => item.choice.startsWith("select_option:"));
+  return found ? found.choice.slice("select_option:".length) : undefined;
 }
 
 export async function planTool(input: Readonly<{
@@ -190,27 +361,22 @@ export async function planTool(input: Readonly<{
   }
 
   return input.store.transaction(async (store) => {
-    const selectFromAnswers =
-      input.payload.request &&
-      typeof input.payload.request === "object" &&
-      Array.isArray((input.payload.request as { answers?: unknown }).answers)
-        ? (
-            (input.payload.request as { answers: Array<{ choice?: string }> }).answers.find(
-              (item) =>
-                typeof item.choice === "string" &&
-                item.choice.startsWith("select_option:")
-            )?.choice ?? null
-          )
-        : null;
+    const answers = incomingAnswers(input.payload);
+    const ack = incomingAck(input.payload);
     const selectOptionId =
-      input.payload.selectOptionId ??
-      (selectFromAnswers ? selectFromAnswers.slice("select_option:".length) : undefined);
+      input.payload.selectOptionId ?? selectFromAnswers(answers);
 
-    if (selectOptionId) {
+    let planHandle = input.payload.planHandle;
+    let planId: string;
+    let revision = 1;
+    let previous: PlanResult | null = null;
+    let existingPlan = null;
+
+    if (planHandle) {
       const capability = await resolveCapability({
         action: "plan.revise",
         config: input.config,
-        handle: input.payload.planHandle ?? "",
+        handle: planHandle,
         now: input.now,
         resourceType: "plan",
         scope: input.scope,
@@ -240,16 +406,38 @@ export async function planTool(input: Readonly<{
         return businessError({ message: "Not found.", reasonCode: "not_found" });
       }
 
-      const result = previousResult(current.result);
+      previous = previousResult(current.result);
+      existingPlan = plan;
+      planId = plan.id;
+      revision = plan.currentRevision + 1;
+    } else {
+      planId = crypto.randomUUID();
+    }
 
-      if (!result) {
-        return businessError({ message: "Not found.", reasonCode: "not_found" });
+    const shownRevision = planHandle ? (input.payload.expectedRevision ?? 1) : 1;
+
+    if (ack && previous && ack.revision !== shownRevision) {
+      return businessError({
+        fieldPath: "safetyAcknowledgement.revision",
+        message:
+          "safetyAcknowledgement.revision does not match the current plan revision. Reload the latest revision and resubmit the acknowledgement.",
+        reasonCode: "stale_safety_acknowledgement"
+      });
+    }
+
+    if (selectOptionId) {
+      if (!previous || !existingPlan || !planHandle) {
+        return businessError({
+          fieldPath: "selectOptionId",
+          message: "Not found.",
+          reasonCode: "not_found"
+        });
       }
 
       const option: StackOption | null =
-        result.selected?.optionId === selectOptionId
-          ? result.selected
-          : result.alternatives.find((item) => item.optionId === selectOptionId) ??
+        previous.selected?.optionId === selectOptionId
+          ? previous.selected
+          : previous.alternatives.find((item) => item.optionId === selectOptionId) ??
             null;
 
       if (!option) {
@@ -260,63 +448,54 @@ export async function planTool(input: Readonly<{
         });
       }
 
-      const nextRevision = plan.currentRevision + 1;
-      const state = result.requestSnapshot;
-      const locale = negotiateLocale(state.locale);
-      const unmet = unmetRequirementsFor({ option, state });
-      const safety = evaluateSafety({
+      const locale = negotiateLocale(previous.requestSnapshot.locale);
+      const state = bindSafetyAcknowledgement({
+        answers,
+        incomingAck: ack,
+        previous,
+        shownRevision,
+        state: applyPlanAnswers(previous.requestSnapshot, { answers })
+      });
+      const nextResult = buildPinnedResult({
         locale,
+        previous,
         selected: option,
-        state
+        shownRevision: revision,
+        snapshot,
+        state: {
+          ...state,
+          acceptedGaps: state.acceptedGaps.map((gap) => ({ ...gap, revision })),
+          pinnedOptionId: option.optionId
+        }
       });
-      const questions = safetyQuestions({
-        alternatives: [],
-        guidance: safety,
-        locale,
-        selected: option,
-        shownRevision: nextRevision,
-        state,
-        unmetRequirements: unmet
-      });
-      const status = planStatus({
-        guidance: safety,
-        questions,
-        selected: option,
-        state,
-        unmetRequirements: unmet
-      });
-      const nextResult: PlanResult = {
-        ...result,
-        alternatives: [],
-        basket: option.basket,
-        changeSummary: [`selected_option:${option.optionId}`],
-        coverage: option.coverage,
-        questions,
-        safetyGuidance: [...safety],
-        selected: option,
-        status,
-        summary: agenticMessage(locale, `plan.summary.${status}`),
-        unmetRequirements: unmet
-      };
 
+      await store.updatePlan({
+        ...existingPlan,
+        currentRevision: revision,
+        updatedAt: input.now
+      });
       await store.insertPlanRevision({
-        availabilityAsOf: current.availabilityAsOf,
-        catalogueVersion: current.catalogueVersion,
+        availabilityAsOf: nextResult.availabilityAsOf,
+        catalogueVersion: nextResult.catalogueVersion,
         createdAt: input.now,
-        guidanceRulesVersion: current.guidanceRulesVersion,
-        planId: plan.id,
-        requestSnapshot: current.requestSnapshot,
+        guidanceRulesVersion: nextResult.guidanceRulesVersion,
+        planId,
+        requestSnapshot: nextResult.requestSnapshot,
         result: nextResult,
-        revision: nextRevision,
+        revision,
         status: nextResult.status
       });
-      await store.updatePlan({ ...plan, currentRevision: nextRevision, updatedAt: input.now });
 
       const response: PlanToolSuccess = {
         ...publicPlanFields(nextResult),
+        ...feedbackFields({
+          locale,
+          revision,
+          status: nextResult.status
+        }),
         ok: true,
-        planHandle: input.payload.planHandle!,
-        revision: nextRevision
+        planHandle,
+        revision
       };
 
       await commitIdempotency({
@@ -325,71 +504,106 @@ export async function planTool(input: Readonly<{
         operation: "plan",
         ownerScope,
         payload: input.payload,
-        resourceIds: { planId: plan.id },
+        resourceIds: { planId },
         response,
         store
       });
-
-      await persistCanonicalWebPlan({
-        locale,
-        planId: plan.id,
-        result: nextResult
+      await persistCanonicalWebPlan({ locale, planId, result: nextResult });
+      await persistMatcherTelemetry({
+        planId,
+        result: nextResult,
+        revision
       });
-
       return response;
     }
 
-    const normalized = normalizePlanRequest({
-      config: input.config,
-      request: input.payload.request,
-      snapshot
-    });
+    let state: CanonicalPlanState;
+    let pinPrevious = false;
 
-    if (isAgenticErrorResult(normalized)) {
-      return normalized;
-    }
-
-    let planHandle = input.payload.planHandle;
-    let planId: string;
-    let revision = 1;
-    let previous: PlanResult | null = null;
-
-    if (planHandle) {
-      const capability = await resolveCapability({
-        action: "plan.revise",
+    if (hasFullRequest(input.payload)) {
+      const normalized = normalizePlanRequest({
         config: input.config,
-        handle: planHandle,
-        now: input.now,
-        resourceType: "plan",
-        scope: input.scope,
-        store
+        request: input.payload.request,
+        snapshot
       });
 
-      if (!capability) {
-        return businessError({ message: "Not found.", reasonCode: "not_found" });
+      if (isAgenticErrorResult(normalized)) {
+        return normalized;
       }
 
-      const plan = await store.getPlan(capability.resourceId);
-
-      if (!plan) {
-        return businessError({ message: "Not found.", reasonCode: "not_found" });
-      }
-
-      if (plan.currentRevision !== input.payload.expectedRevision) {
-        return businessError({
-          fieldPath: "expectedRevision",
-          message: "The plan revision is stale. Reload the latest revision.",
-          reasonCode: "revision_conflict"
-        });
-      }
-
-      const current = await store.getPlanRevision(plan.id, plan.currentRevision);
-      previous = previousResult(current?.result);
-      planId = plan.id;
-      revision = plan.currentRevision + 1;
-      await store.updatePlan({ ...plan, currentRevision: revision, updatedAt: input.now });
+      const merged = applyPlanAnswers(normalized.state, { answers });
+      pinPrevious = Boolean(
+        previous &&
+          planRematchFingerprint(previous.requestSnapshot) ===
+            planRematchFingerprint(merged)
+      );
+      state = pinPrevious
+        ? {
+            ...merged,
+            leftovers: [
+              ...previous!.requestSnapshot.leftovers.filter(
+                (item) => item.reason === "not_in_catalogue"
+              ),
+              ...merged.leftovers.filter((item) => item.reason === "not_in_catalogue")
+            ].filter(
+              (item, index, list) =>
+                list.findIndex(
+                  (row) => row.reason === item.reason && row.name === item.name
+                ) === index
+            ),
+            pinnedOptionId: previous!.selected?.optionId ?? null
+          }
+        : merged;
+    } else if (previous) {
+      pinPrevious = true;
+      state = applyPlanAnswers(previous.requestSnapshot, { answers });
     } else {
-      planId = crypto.randomUUID();
+      return businessError({
+        fieldPath: "request",
+        message: "request is required.",
+        reasonCode: "required"
+      });
+    }
+
+    state = bindSafetyAcknowledgement({
+      answers,
+      incomingAck: ack,
+      previous,
+      shownRevision,
+      state
+    });
+    state = {
+      ...state,
+      acceptedGaps: state.acceptedGaps.map((gap) => ({ ...gap, revision }))
+    };
+
+    const locale = negotiateLocale(state.locale);
+    const pinnedOption =
+      pinPrevious && previous
+        ? previous.selected?.optionId === state.pinnedOptionId || !state.pinnedOptionId
+          ? previous.selected
+          : previous.alternatives.find((item) => item.optionId === state.pinnedOptionId) ??
+            previous.selected
+        : null;
+    const result =
+      pinPrevious && previous && pinnedOption
+        ? buildPinnedResult({
+            locale,
+            previous,
+            selected: pinnedOption,
+            shownRevision: revision,
+            snapshot,
+            state
+          })
+        : buildResult({
+            locale,
+            previous,
+            shownRevision,
+            snapshot,
+            state
+          });
+
+    if (!existingPlan) {
       await store.insertPlan({
         createdAt: input.now,
         currentRevision: 1,
@@ -410,28 +624,13 @@ export async function planTool(input: Readonly<{
         store
       });
       planHandle = issued.handle;
+    } else {
+      await store.updatePlan({
+        ...existingPlan,
+        currentRevision: revision,
+        updatedAt: input.now
+      });
     }
-
-    const locale = negotiateLocale(normalized.state.locale);
-    const shownRevision = planHandle ? (input.payload.expectedRevision ?? 1) : 1;
-    const result = buildResult({
-      locale,
-      previous,
-      shownRevision,
-      snapshot,
-      state: {
-        ...bindSafetyAcknowledgement({
-          previous,
-          request: input.payload.request,
-          shownRevision,
-          state: normalized.state
-        }),
-        acceptedGaps: normalized.state.acceptedGaps.map((gap) => ({
-          ...gap,
-          revision
-        }))
-      }
-    });
 
     await store.insertPlanRevision({
       availabilityAsOf: result.availabilityAsOf,
@@ -447,16 +646,13 @@ export async function planTool(input: Readonly<{
 
     const response: PlanToolSuccess = {
       ...publicPlanFields(result),
-      ...(result.status === "ready"
-        ? {
-            feedbackInvitation: {
-              prompt: agenticMessage(locale, "feedback.invitation"),
-              promptKey: "feedback.invitation"
-            }
-          }
-        : {}),
+      ...feedbackFields({
+        locale,
+        revision,
+        status: result.status
+      }),
       ok: true,
-      planHandle,
+      planHandle: planHandle!,
       revision
     };
 
@@ -472,6 +668,7 @@ export async function planTool(input: Readonly<{
     });
 
     await persistCanonicalWebPlan({ locale, planId, result });
+    await persistMatcherTelemetry({ planId, result, revision });
 
     return response;
   });
