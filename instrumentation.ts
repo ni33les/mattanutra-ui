@@ -9,7 +9,10 @@ export async function register() {
   try {
     const { resolveAgenticEnvironment } = await import("./lib/agentic/config");
     const { warmAgenticCatalogue } = await import("./lib/agentic/catalogue/warm");
-    await warmAgenticCatalogue(resolveAgenticEnvironment());
+    const { keepPlanPathWarm } = await import("./lib/agentic/plan/warm-dev");
+    const environment = resolveAgenticEnvironment();
+    await warmAgenticCatalogue(environment);
+    void keepPlanPathWarm(environment);
   } catch (error) {
     console.warn("Unable to warm agentic catalogue", error);
   }

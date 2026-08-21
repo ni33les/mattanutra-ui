@@ -73,12 +73,6 @@ export async function infoTool(input: Readonly<{
       warmCatalogueSnapshot(input.config.environment, market.countryCode)
     )
   );
-  if (input.config.environment === "dev") {
-    void import("@/lib/agentic/live-runtime").then(async ({ getLiveAgenticRuntime }) => {
-      const { ensureDevPlanHotPath } = await import("@/lib/agentic/plan/warm-dev");
-      await ensureDevPlanHotPath(getLiveAgenticRuntime());
-    }).catch(() => undefined);
-  }
   const supportedCountries = markets.map((market) => ({
     countryCode: market.countryCode,
     countryName: market.countryName,

@@ -1,8 +1,11 @@
+import type { AgenticEnvironment } from "@/lib/agentic/config";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
 
+const KEEP_WARM_MS = 20_000;
+
 const globalWarm = globalThis as typeof globalThis & {
-  mattanutraDevPlanHotPath?: Promise<void>;
-  mattanutraDevPlanWarming?: boolean;
+  mattanutraPlanKeepWarm?: ReturnType<typeof setInterval>;
+  mattanutraPlanWarming?: boolean;
 };
 
 function eightTargetRequest() {
@@ -55,80 +58,95 @@ function structuredPlan(value: unknown) {
   };
 }
 
-async function runDevPlanHotPath(runtime: AgenticRuntime) {
-  const { handleJsonRpc } = await import("@/lib/agentic/mcp/dispatcher");
-  const created = await handleJsonRpc(runtime, {
-    id: "dev-hot-create",
-    jsonrpc: "2.0",
-    method: "tools/call",
-    params: {
-      arguments: {
-        idempotencyKey: `dev-hot-${Date.now()}-create`,
-        request: eightTargetRequest()
-      },
-      name: "plan"
-    }
-  });
-  const plan = structuredPlan(created);
-
-  if (!plan?.planHandle || plan.revision == null) {
+async function pingPlanHotPath(runtime: AgenticRuntime) {
+  if (globalWarm.mattanutraPlanWarming) {
     return;
   }
 
-  const answers = (plan.questions ?? []).flatMap((question) => {
-    const choice = question.choices?.[0]?.choice;
-    const questionId = question.questionId;
-    if (
-      choice &&
-      (questionId === "q_safety_ack" || String(questionId).startsWith("q_gap_"))
-    ) {
-      return [{ choice, questionId }];
-    }
-    return [];
-  });
+  globalWarm.mattanutraPlanWarming = true;
+  try {
+    const { handleJsonRpc } = await import("@/lib/agentic/mcp/dispatcher");
+    const created = await handleJsonRpc(runtime, {
+      id: "hot-create",
+      jsonrpc: "2.0",
+      method: "tools/call",
+      params: {
+        arguments: {
+          idempotencyKey: `hot-${Date.now()}-create`,
+          request: eightTargetRequest()
+        },
+        name: "plan"
+      }
+    });
+    const plan = structuredPlan(created);
 
-  await handleJsonRpc(runtime, {
-    id: "dev-hot-patch",
-    jsonrpc: "2.0",
-    method: "tools/call",
-    params: {
-      arguments: {
-        answers,
-        expectedRevision: plan.revision,
-        idempotencyKey: `dev-hot-${Date.now()}-patch`,
-        planHandle: plan.planHandle,
-        ...(plan.guidanceIds
-          ? {
-              safetyAcknowledgement: {
-                confirmed: true,
-                guidanceIds: plan.guidanceIds,
-                revision: plan.revision
-              }
-            }
-          : {})
-      },
-      name: "plan"
+    if (!plan?.planHandle || plan.revision == null) {
+      return;
     }
-  });
+
+    const answers = (plan.questions ?? []).flatMap((question) => {
+      const choice = question.choices?.[0]?.choice;
+      const questionId = question.questionId;
+      if (
+        choice &&
+        (questionId === "q_safety_ack" || String(questionId).startsWith("q_gap_"))
+      ) {
+        return [{ choice, questionId }];
+      }
+      return [];
+    });
+
+    await handleJsonRpc(runtime, {
+      id: "hot-patch",
+      jsonrpc: "2.0",
+      method: "tools/call",
+      params: {
+        arguments: {
+          answers,
+          expectedRevision: plan.revision,
+          idempotencyKey: `hot-${Date.now()}-patch`,
+          planHandle: plan.planHandle,
+          ...(plan.guidanceIds
+            ? {
+                safetyAcknowledgement: {
+                  confirmed: true,
+                  guidanceIds: plan.guidanceIds,
+                  revision: plan.revision
+                }
+              }
+            : {})
+        },
+        name: "plan"
+      }
+    });
+  } finally {
+    globalWarm.mattanutraPlanWarming = false;
+  }
 }
 
 export async function ensureDevPlanHotPath(runtime: AgenticRuntime) {
-  if (runtime.config.environment !== "dev" || globalWarm.mattanutraDevPlanWarming) {
+  await pingPlanHotPath(runtime);
+}
+
+export async function keepPlanPathWarm(environment: AgenticEnvironment) {
+  const { getLiveAgenticRuntime } = await import("@/lib/agentic/live-runtime");
+  const { warmAgenticCatalogue } = await import("@/lib/agentic/catalogue/warm");
+  const runtime = getLiveAgenticRuntime();
+
+  await pingPlanHotPath(runtime);
+
+  if (globalWarm.mattanutraPlanKeepWarm) {
     return;
   }
 
-  if (!globalWarm.mattanutraDevPlanHotPath) {
-    globalWarm.mattanutraDevPlanHotPath = (async () => {
-      globalWarm.mattanutraDevPlanWarming = true;
-      try {
-        await runDevPlanHotPath(runtime);
-      } catch (error) {
-        console.warn("Unable to warm DEV plan hot path", error);
-      } finally {
-        globalWarm.mattanutraDevPlanWarming = false;
-      }
-    })();
-  }
-
-  await globalWarm.mattanutraDevPlanHotPath;
+  const timer = setInterval(() => {
+    void (async () => {
+      await warmAgenticCatalogue(environment);
+      await pingPlanHotPath(getLiveAgenticRuntime());
+    })().catch((error) => {
+      console.warn("Unable to keep plan path warm", error);
+    });
+  }, KEEP_WARM_MS);
+  timer.unref?.();
+  globalWarm.mattanutraPlanKeepWarm = timer;
 }
