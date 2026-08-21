@@ -726,6 +726,7 @@ function HealthScoreHero({
             "goalmirror",
             locale === "en" ? "text-balance" : "break-words",
           )}
+          data-testid="reveal-hero-name"
         >
           {firstName ? `${firstName}, ` : null}
           {renderInlineMarkup(headline)}

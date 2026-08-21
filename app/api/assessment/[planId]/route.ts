@@ -119,7 +119,7 @@ export async function GET(
   const displayLocale = isLocale(requestedLocale) ? requestedLocale : null;
 
   if (healthScoreView) {
-    await enqueueHealthScoreAnalysisTask({ planId });
+    void enqueueHealthScoreAnalysisTask({ planId });
   }
 
   const snapshot = healthScoreView

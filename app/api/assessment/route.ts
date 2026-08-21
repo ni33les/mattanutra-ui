@@ -3,11 +3,8 @@ import {
   createAssessmentSnapshot,
   DEFAULT_ASSESSMENT_PLAN
 } from "@/lib/assessment-snapshot";
-import {
-  getStoredAssessmentSnapshot,
-  getStoredHealthScoreAnalysisSnapshot,
-  persistAssessmentSubmission
-} from "@/lib/assessment-store";
+import { persistAssessmentSubmission } from "@/lib/assessment-store";
+import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueAssessmentPregenerationTasks,
@@ -133,67 +130,6 @@ export async function POST(request: Request) {
       status: "captured"
     });
 
-    const finalizedResumeEmail =
-      await finalizeAssessmentResumeDraft({
-        planId: snapshot.planId,
-        token: body.resumeToken
-      }) ??
-      await finalizeAssessmentResumeDraftForContact({
-        contactEmail: body.contactEmail,
-        planId: snapshot.planId
-      });
-
-    if (finalizedResumeEmail) {
-      await writeBpmEvent({
-        actorType: "visitor",
-        attribution: bpm.attribution,
-        email: finalizedResumeEmail,
-        eventName: "assessment_resume_finalized",
-        eventType: "funnel",
-        locale: body.locale,
-        planId: snapshot.planId,
-        ray: typeof bpm.ray === "string" ? bpm.ray : null
-      });
-    }
-
-    await writeBpmEvent({
-      actorType: "visitor",
-      attribution: bpm.attribution,
-      eventName: intent === "capture" ? "assessment_captured" : "assessment_process_requested",
-      eventType: "funnel",
-      locale: body.locale,
-      planId: snapshot.planId,
-      ray: typeof bpm.ray === "string" ? bpm.ray : null,
-      ...healthScoreBpmFields(snapshot)
-    });
-
-    await enqueueAssessmentPregenerationTasks({
-      answers: body.answers,
-      locale: body.locale,
-      planId: snapshot.planId
-    });
-
-    const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
-
-    if (reassessmentEmail) {
-      await scheduleReassessmentAction({
-        email: reassessmentEmail,
-        locale: body.locale,
-        planId: snapshot.planId
-      });
-      void enqueueDueScheduledActions();
-      await writeBpmEvent({
-        actorType: "visitor",
-        attribution: bpm.attribution,
-        email: reassessmentEmail,
-        eventName: "reassessment_opted_in",
-        eventType: "reassessment",
-        locale: body.locale,
-        planId: snapshot.planId,
-        ray: typeof bpm.ray === "string" ? bpm.ray : null
-      });
-    }
-
     if (intent === "capture" && typeof body.paymentId === "string") {
       const boundPayment = await bindPaidReservationToAssessment({
         locale: isLocale(body.locale) ? body.locale : "en",
@@ -213,10 +149,9 @@ export async function POST(request: Request) {
         );
       }
     }
-
   } catch (error) {
     log.error("Unable to persist assessment submission", { error });
-    await writeBpmEvent({
+    void writeBpmEvent({
       actorType: "system",
       attribution: bpm.attribution,
       errorCode: "assessment_persist_failed",
@@ -240,13 +175,85 @@ export async function POST(request: Request) {
     );
   }
 
-  const storedSnapshot =
-    await getStoredHealthScoreAnalysisSnapshot(snapshot.planId) ??
-    await getStoredAssessmentSnapshot(snapshot.planId);
+  void (async () => {
+    try {
+      const finalizedResumeEmail =
+        (await finalizeAssessmentResumeDraft({
+          planId: snapshot.planId,
+          token: body.resumeToken
+        })) ??
+        (await finalizeAssessmentResumeDraftForContact({
+          contactEmail: body.contactEmail,
+          planId: snapshot.planId
+        }));
 
-  return NextResponse.json(storedSnapshot ?? snapshot, {
-    headers: {
-      "Cache-Control": "no-store"
+      if (finalizedResumeEmail) {
+        await writeBpmEvent({
+          actorType: "visitor",
+          attribution: bpm.attribution,
+          email: finalizedResumeEmail,
+          eventName: "assessment_resume_finalized",
+          eventType: "funnel",
+          locale: body.locale,
+          planId: snapshot.planId,
+          ray: typeof bpm.ray === "string" ? bpm.ray : null
+        });
+      }
+
+      await writeBpmEvent({
+        actorType: "visitor",
+        attribution: bpm.attribution,
+        eventName:
+          intent === "capture"
+            ? "assessment_captured"
+            : "assessment_process_requested",
+        eventType: "funnel",
+        locale: body.locale,
+        planId: snapshot.planId,
+        ray: typeof bpm.ray === "string" ? bpm.ray : null,
+        ...healthScoreBpmFields(snapshot)
+      });
+
+      await enqueueAssessmentPregenerationTasks({
+        answers: body.answers,
+        locale: body.locale,
+        planId: snapshot.planId
+      });
+
+      const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
+
+      if (reassessmentEmail) {
+        await scheduleReassessmentAction({
+          email: reassessmentEmail,
+          locale: body.locale,
+          planId: snapshot.planId
+        });
+        void enqueueDueScheduledActions();
+        await writeBpmEvent({
+          actorType: "visitor",
+          attribution: bpm.attribution,
+          email: reassessmentEmail,
+          eventName: "reassessment_opted_in",
+          eventType: "reassessment",
+          locale: body.locale,
+          planId: snapshot.planId,
+          ray: typeof bpm.ray === "string" ? bpm.ray : null
+        });
+      }
+    } catch (error) {
+      log.error("Unable to finish assessment capture side effects", { error });
     }
-  });
+  })();
+
+  return NextResponse.json(
+    {
+      ...snapshot,
+      firstName: firstNameFromAssessmentAnswers(body.answers)
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    }
+  );
 }

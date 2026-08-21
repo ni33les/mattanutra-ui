@@ -170,6 +170,7 @@ describe("HealthScore panel static guardrails", () => {
     assert.match(engineSource, /const highlightedGoals = answers\.goals\.map/);
     assert.match(engineSource, /`<em>\$\{localizedGoalPhrase\(goal, locale\)\}<\/em>`/);
     assert.match(panelSource, /renderInlineMarkup\(headline\)/);
+    assert.match(panelSource, /data-testid="reveal-hero-name"/);
     assert.match(
       cssSource,
       /\.mn-healthscore-v7 \.goalmirror em[\s\S]*?color: var\(--hs-teal-deep\)/
