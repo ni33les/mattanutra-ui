@@ -144,6 +144,9 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.match(String(result.instructions), /Polling is the only continuation method/);
     assert.match(String(result.instructions), /order\(orderHandle\)/);
     assert.match(String(result.instructions), /Stripe Test Mode/);
+    assert.match(String(result.instructions), /HARD RULE 6 — HOST FEEDBACK/);
+    assert.match(String(result.instructions), /after 3 plan calls/);
+    assert.match(String(result.instructions), /plan_feedback/);
     assert.equal(String(result.instructions).includes("dev-mcp-qa-token"), false);
     assert.equal(String(result.instructions).includes("scenario=decline_insufficient_funds"), false);
     const listed = await handleJsonRpc(runtime, { id: 2, method: "tools/list" });
