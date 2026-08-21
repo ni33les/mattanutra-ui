@@ -69,18 +69,18 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
   }
 
   if (order.paymentStatus === "paid" && runtime.config.paymentProvider === "stripe_test") {
-    let retail = await lookupRetailOrderForAgentic(order.id);
+    const existing = await lookupRetailOrderForAgentic(order.id);
+    const joined = existing
+      ? null
+      : await joinMcpPaidOrderToRetail({
+          now: nowIso(),
+          order,
+          store: runtime.store
+        });
+    const trackingUrl = existing?.trackingUrl ?? joined?.trackingUrl;
 
-    if (!retail) {
-      retail = await joinMcpPaidOrderToRetail({
-        now: nowIso(),
-        order,
-        store: runtime.store
-      });
-    }
-
-    if (retail?.trackingUrl) {
-      const path = retail.trackingUrl.replace(/^\/en(?=\/)/, `/${locale}`);
+    if (trackingUrl) {
+      const path = trackingUrl.replace(/^\/en(?=\/)/, `/${locale}`);
       redirect(`${path}${path.includes("?") ? "&" : "?"}from=mcp`);
     }
   }
