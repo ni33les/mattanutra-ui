@@ -54,6 +54,25 @@ export function isNonAlgaeOmegaLine(
   );
 }
 
+export function isAnimalDerivedSku(
+  candidate: Pick<ProductCandidate, "brandName" | "facts" | "title">
+) {
+  const hay = catalogueHaystack(candidate);
+
+  if (/\balgae\b|\balgal\b|\bvegan\b|\bplant[- ]based\b/.test(hay) && !/\bcollagen\b|\bgelatin\b|\bkrill\b|\bfish\s+oil\b/.test(hay)) {
+    return false;
+  }
+
+  return (
+    /\bcollagen\b/.test(hay) ||
+    /\bgelatin\b/.test(hay) ||
+    /\bkrill\b/.test(hay) ||
+    /\bfish\s+oil\b/.test(hay) ||
+    /\bwhey\b/.test(hay) ||
+    isNonAlgaeOmegaLine(candidate)
+  );
+}
+
 export function inferOmegaSource(candidate: ProductCandidate): CatalogueProduct["omegaSource"] {
   const haystack = catalogueHaystack(candidate);
 

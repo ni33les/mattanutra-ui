@@ -167,6 +167,38 @@ describe("agentic live-catalogue matching constraints", () => {
     assert.equal(names.some((name) => /3-6-9|lecithin|fish oil|omega dha/i.test(name)), false);
   });
 
+  it("vegan implies algae omega and excludes collagen", () => {
+    const snapshot = fixtureSnapshot();
+    const omega =
+      snapshot.products.find((item) => /omega/i.test(item.candidate.title)) ??
+      snapshot.products[0]!;
+    const collagen =
+      snapshot.products.find((item) => /collagen/i.test(item.candidate.title)) ??
+      snapshot.products[1]!;
+    const matched = matchPlan({
+      snapshot: { ...snapshot, products: [omega, collagen] },
+      state: stateFor(omega, {
+        requirements: { dietaryPreference: "vegan" },
+        targets: [
+          {
+            amount: 1000,
+            name: "Omega-3",
+            supplementId: omega.contributionSupplementIds[0]!,
+            unit: "mg"
+          },
+          {
+            amount: 10,
+            name: "Collagen",
+            supplementId: collagen.contributionSupplementIds[0]!,
+            unit: "g"
+          }
+        ]
+      })
+    });
+    const names = (matched.selected?.basket ?? []).map((item) => item.productName);
+    assert.equal(names.some((name) => /collagen/i.test(name)), false);
+  });
+
   it("matches each retailer separately and keeps one seller in the basket", () => {
     const snapshot = fixtureSnapshot();
     const folate =

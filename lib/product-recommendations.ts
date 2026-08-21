@@ -1,3 +1,4 @@
+import { recommendWithMatcher } from "@/lib/matcher/adapters/web";
 import {
   comparableDoseAmount,
   normalizeDoseUnit,
@@ -2952,10 +2953,7 @@ export function recommendProductStackV2(input: ProductRecommendationInput) {
 }
 
 export function recommendProductStackFullBeam(input: ProductRecommendationInput) {
-  return recommendProductStackExact(input, {
-    algorithmVersion: V2_FULL_BEAM_ALGORITHM_VERSION,
-    searchMode: "full-beam"
-  });
+  return recommendWithMatcher(input);
 }
 
 export function recommendProductStack(input: ProductRecommendationInput) {

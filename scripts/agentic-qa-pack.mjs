@@ -566,6 +566,98 @@ async function main() {
     "male age 52 is not mapped to prenatal/conceive/fertility SKUs"
   );
 
+  const defAlts = created.alternatives ?? [];
+  record(
+    "P-DEF",
+    created.ok === true &&
+      typeof created.coveragePercent === "number" &&
+      defAlts.every(
+        (item) =>
+          typeof item?.coveragePercent !== "number" ||
+          item.coveragePercent <= created.coveragePercent
+      ),
+    "default is highest-coverage feasible, not a cheaper incomplete"
+  );
+  record(
+    "P-DIV",
+    defAlts.every(
+      (item) =>
+        item?.optionId !== created.optionId &&
+        JSON.stringify(item?.basket ?? []) !== JSON.stringify(created.basket ?? [])
+    ),
+    "alternatives are materially different or omitted"
+  );
+  record("P-STICK", created.ok === true && typeof created.optionId === "string", "optionId present for sticky select");
+  const blocked = await call("plan", {
+    idempotencyKey: `qa-psafe-${Date.now()}`,
+    request: baseRequest({
+      conditionCodes: ["ckd"],
+      targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
+    })
+  });
+  record(
+    "P-SAFE",
+    blocked.ok === true && blocked.status === "blocked",
+    "BLOCK never returns ready"
+  );
+  record("P-ALG", results.find((item) => item.id === "A15")?.pass === true, "algae_only never fish/krill/3-6-9");
+  const veganPlan = await call("plan", {
+    idempotencyKey: `qa-pveg-${Date.now()}`,
+    request: baseRequest({
+      requirements: { dietaryPreference: "vegan" },
+      targets: [
+        { amount: 1000, name: "Omega-3", unit: "mg" },
+        { amount: 10, name: "Collagen", unit: "g" }
+      ]
+    })
+  });
+  const veganNames = namesInBasket(veganPlan);
+  record(
+    "P-VEG",
+    veganPlan.ok === true &&
+      veganNames.every((name) => !/collagen|fish oil|krill|gelatin|3-6-9/i.test(name) || /algae/i.test(name)),
+    "vegan implies algae omega and no animal SKUs"
+  );
+  record("P-MALE", results.find((item) => item.id === "A16")?.pass === true, "male 52 no prenatal");
+  record(
+    "P-LEFT",
+    leftoverPlan.ok === true &&
+      (leftoverPlan.leftovers ?? []).some(
+        (item) => String(item.name).toLowerCase().includes("k2") && item.reason === "not_in_catalogue"
+      ),
+    "unknown name is leftover not_in_catalogue"
+  );
+  const intPlan = await call("plan", {
+    idempotencyKey: `qa-pint-${Date.now()}`,
+    request: baseRequest({
+      currentSupplements: [{ dailyAmount: 1000, name: "Zinc", unit: "mcg" }],
+      targets: [{ amount: 1, name: "Zinc", unit: "mg" }]
+    })
+  });
+  const zincRow = (intPlan.coverage ?? []).find((row) => /zinc/i.test(String(row.name ?? "")));
+  record(
+    "P-INT",
+    intPlan.ok === true &&
+      (zincRow == null ||
+        Number(zincRow.currentAmount) + Number(zincRow.deliveredAmount) > 0),
+    "1000 mcg + 1 mg zinc is exact integer dose"
+  );
+  record(
+    "P-PACK",
+    (created.basket ?? []).every((item) => Number(item.quantity ?? 1) === 1),
+    "two packs do not appear as doubled daily quantity"
+  );
+  await call("plan", {
+    idempotencyKey: `qa-plat-warm-${Date.now()}`,
+    request: baseRequest()
+  });
+  const latPlan = Date.now();
+  await call("plan", {
+    idempotencyKey: `qa-plat-${Date.now()}`,
+    request: baseRequest()
+  });
+  record("P-LAT", Date.now() - latPlan < 8000, "create/patch under 8s after warmup");
+
   record(
     "T1",
     Array.isArray(leftoverPlan.leftovers) &&
@@ -600,13 +692,28 @@ async function main() {
 
   const scoredA = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13"];
   const extraA = ["A15", "A16"];
+  const scoredP = [
+    "P-DEF",
+    "P-DIV",
+    "P-STICK",
+    "P-SAFE",
+    "P-ALG",
+    "P-VEG",
+    "P-MALE",
+    "P-LEFT",
+    "P-INT",
+    "P-PACK",
+    "P-LAT"
+  ];
   const scoredT = ["T1", "T2", "T3"];
   const aItems = scoredA.map((id) => results.find((item) => item.id === id)).filter(Boolean);
   const extraItems = extraA.map((id) => results.find((item) => item.id === id)).filter(Boolean);
+  const pItems = scoredP.map((id) => results.find((item) => item.id === id)).filter(Boolean);
   const tItems = scoredT.map((id) => results.find((item) => item.id === id)).filter(Boolean);
   const aPassed = aItems.filter((item) => item.pass).length;
-  console.log(`Official MattaNutra Agentic QA Pack, ${aPassed}/13`);
-  for (const item of [...aItems, ...extraItems, ...tItems]) {
+  const pPassed = pItems.filter((item) => item.pass).length;
+  console.log(`Official MattaNutra Agentic QA Pack, ${aPassed + pPassed}/${scoredA.length + scoredP.length}`);
+  for (const item of [...aItems, ...extraItems, ...pItems, ...tItems]) {
     console.log(`${item.id} ${item.pass ? "PASS" : "FAIL"} ${item.detail}`);
   }
   console.log("A14 NOT TESTED not host-visible");
@@ -615,6 +722,8 @@ async function main() {
     aItems.every((item) => item.pass) &&
     extraItems.length === 2 &&
     extraItems.every((item) => item.pass) &&
+    pItems.length === scoredP.length &&
+    pItems.every((item) => item.pass) &&
     tItems.length === 3 &&
     tItems.every((item) => item.pass);
   process.exitCode = allGreen ? 0 : 1;

@@ -29,7 +29,7 @@ export type CurrentSupplement = Readonly<{
 
 export type PlanRequirements = Readonly<{
   allowedForms?: readonly string[];
-  dietaryPreference?: "any" | "plant_based";
+  dietaryPreference?: "any" | "plant_based" | "vegan";
   excludeSupplementIds?: readonly string[];
   maxDailyPills?: number;
   maxPriceMinor?: number;

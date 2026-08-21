@@ -1,18 +1,15 @@
-import { createHash } from "node:crypto";
-import { parseDose } from "@/lib/dose-conversion";
-import { recommendProductStackFullBeam } from "@/lib/product-recommendations";
-import type { ProductRecommendationNeed } from "@/lib/product-recommendation-types";
-import {
-  isNonAlgaeOmegaLine,
-  isPrenatalOrFertilitySku
-} from "@/lib/agentic/catalogue/product-fit";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
+import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
+import { impliedOmegaPreference, match, optionIdFor, publicCoveragePercent } from "@/lib/matcher";
+import { amountFromScaled } from "@/lib/matcher/dose";
+import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
+import type {
+  CanonicalRequest,
+  MatcherProduct,
+  MatcherUnit,
+  ScoredBasket
+} from "@/lib/matcher/types";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
-import {
-  doseComparable,
-  fromComparable,
-  roundDose
-} from "@/lib/agentic/plan/units";
 import type {
   BasketItem,
   CanonicalPlanState,
@@ -22,128 +19,126 @@ import type {
   StackOption
 } from "@/lib/agentic/plan/types";
 
-const AGENTIC_MATCH_DEADLINE_MS = 2500;
-const AGENTIC_CANDIDATES_PER_TARGET = 8;
-
-function productEligible(product: CatalogueProduct, state: CanonicalPlanState) {
-  if (!product.orderable || product.incompleteCommercialFacts) {
-    return false;
-  }
-
-  const availableCountries = product.candidate.availableCountryCodes;
-
-  if (
-    availableCountries &&
-    availableCountries.length > 0 &&
-    !availableCountries.includes(state.destinationCountry)
-  ) {
-    return false;
-  }
-
-  const excluded = state.requirements.excludeSupplementIds ?? [];
-
-  if (product.contributionSupplementIds.some((id) => excluded.includes(id))) {
-    return false;
-  }
-
-  if (
-    state.requirements.dietaryPreference === "plant_based" &&
-    (product.dietarySource === "fish" || product.omegaSource === "fish")
-  ) {
-    return false;
-  }
-
-  if (
-    state.requirements.omega3SourcePreference === "algae_only" &&
-    (product.omegaSource === "fish" || isNonAlgaeOmegaLine(product.candidate))
-  ) {
-    return false;
-  }
-
-  const sex = state.profile.sex;
-  const audience = product.candidate.productAudience ?? "both";
-
-  if (sex === "male" && audience === "female") {
-    return false;
-  }
-
-  if (sex === "female" && audience === "male") {
-    return false;
-  }
-
-  if (
-    isPrenatalOrFertilitySku(product.candidate) &&
-    (sex === "male" || (state.profile.ageYears >= 40 && sex !== "female"))
-  ) {
-    return false;
-  }
-
-  const allowedForms = state.requirements.allowedForms;
-
-  if (allowedForms && allowedForms.length > 0 && !allowedForms.includes(product.form)) {
-    return false;
-  }
-
-  if (state.profile.lifeStage === "child" && product.audience === "adult") {
-    return false;
-  }
-
-  return true;
+function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
+  return {
+    availableCountryCodes: product.candidate.availableCountryCodes ?? null,
+    contributionSubjectIds: product.contributionSupplementIds,
+    currency: product.candidate.currency,
+    dailyPillsPerServing: product.dailyPills,
+    dietarySource: product.dietarySource,
+    form: product.form,
+    imageUrl: product.candidate.imageUrl?.trim() || null,
+    incompleteCommercialFacts: product.incompleteCommercialFacts,
+    labelledContributions: product.candidate.facts.map((fact) => ({
+      amount: fact.amount ?? fact.comparableAmount ?? 0,
+      name: fact.name,
+      subjectId: null,
+      unit: fact.unit
+    })),
+    omegaSource: product.omegaSource,
+    orderable: product.orderable,
+    prenatalOrFertility: isPrenatalOrFertilitySku(product.candidate),
+    productAudience: product.candidate.productAudience ?? "both",
+    productId: product.productId,
+    retailerSku: product.retailerSku,
+    sellerId: product.sellerId,
+    sellerName: product.sellerName,
+    source: product.source,
+    status: product.candidate.status ?? "approved",
+    stockStatus: product.stockStatus === "backorder" ? "backorder" : product.stockStatus === "unavailable" ? "unavailable" : "in_stock",
+    title: product.candidate.title,
+    unknownSafetyAmount: false,
+    unitPriceMinor: product.unitPriceMinor
+  };
 }
 
-function toNeed(state: CanonicalPlanState): ProductRecommendationNeed[] {
-  return state.targets.map((target, index) => ({
-    category: "Supplement",
-    displayName: target.name,
-    id: `supplement:${target.supplementId}`,
-    itemType: "supplement",
-    normalizedName: target.name.toLowerCase().replace(/\s+/g, "_"),
-    sourceId: target.supplementId,
-    targetComparableAmount: doseComparable(target.amount, target.unit, target.name),
-    targetDose: parseDose(`${target.amount} ${target.unit}`, target.name),
-    targetText: `${target.amount} ${target.unit}`,
-    weight: Math.max(1, 8 - index)
-  }));
-}
+function toCanonicalRequest(
+  state: CanonicalPlanState
+): CanonicalRequest | { error: string; reason: "unsupported_unit" } {
+  const targets = canonicalizeTargets({
+    leftovers: state.leftovers.map((item) => ({
+      amount: item.amount,
+      name: item.name,
+      note: item.note,
+      reason: item.reason,
+      severity: item.severity,
+      subjectId: item.supplementId,
+      unit: item.unit as MatcherUnit | undefined
+    })),
+    targets: state.targets.map((item) => ({
+      amount: item.amount,
+      name: item.name,
+      subjectId: item.supplementId,
+      unit: item.unit
+    }))
+  });
 
-function optionIdFor(productIds: readonly string[]) {
-  return `opt_${createHash("sha256").update(productIds.slice().sort().join("|")).digest("hex").slice(0, 16)}`;
+  if ("error" in targets) {
+    return targets;
+  }
+
+  const currents = canonicalizeCurrents(
+    state.currentSupplements.map((item, index) => ({
+      dailyAmount: item.dailyAmount,
+      name: item.name,
+      sourceId: `${item.supplementId}:${index}`,
+      subjectId: item.supplementId,
+      unit: item.unit
+    }))
+  );
+
+  if ("error" in currents) {
+    return currents;
+  }
+
+  const dietary = state.requirements.dietaryPreference ?? "any";
+
+  return {
+    acceptedGapSubjectIds: state.acceptedGaps.map((item) => item.supplementId),
+    allowedForms: state.requirements.allowedForms ?? null,
+    conditionCodes: state.conditionCodes,
+    currency: state.currency,
+    currentSupplements: currents,
+    destinationCountry: state.destinationCountry,
+    dietaryPreference: dietary,
+    excludeSubjectIds: state.requirements.excludeSupplementIds ?? [],
+    leftovers: targets.leftovers,
+    maxDailyPills: state.requirements.maxDailyPills ?? null,
+    maxPriceMinor: state.requirements.maxPriceMinor ?? null,
+    maxProductCount: state.requirements.maxProductCount ?? 8,
+    medicationCodes: state.medicationCodes,
+    omega3SourcePreference: impliedOmegaPreference(
+      dietary,
+      state.requirements.omega3SourcePreference
+    ),
+    optimization: state.optimization,
+    profile: state.profile,
+    retainProductIds: state.requirements.retainProductIds ?? [],
+    retainSubjectIds: state.requirements.retainSupplementIds ?? [],
+    selectorMode: "agentic",
+    targets: targets.targets
+  };
 }
 
 function coverageFor(
   state: CanonicalPlanState,
+  basket: ScoredBasket | null,
   products: readonly CatalogueProduct[]
 ): CoverageRow[] {
   return state.targets.map((target) => {
-    const requestedComparable = doseComparable(
-      target.amount,
-      target.unit,
-      target.name
+    const coverageUnits = basket?.coverageBySubject.get(target.supplementId) ?? 0;
+    const coveragePercent = Math.round(coverageUnits / 100);
+    const current = state.currentSupplements.filter(
+      (item) => item.supplementId === target.supplementId
     );
-    const currentComparable = state.currentSupplements
-      .filter((item) => item.supplementId === target.supplementId)
-      .reduce(
-        (sum, item) =>
-          sum + doseComparable(item.dailyAmount, item.unit, item.name),
-        0
-      );
-    const deliveredComparable = products
-      .filter((item) => item.contributionSupplementIds.includes(target.supplementId))
-      .reduce((sum, item) => {
-        const wanted = target.name.trim().toLowerCase();
-        const fact =
-          item.candidate.facts.find((row) => {
-            const name = (row.name ?? row.normalizedName ?? "")
-              .replace(/_/g, " ")
-              .trim()
-              .toLowerCase();
-            return name === wanted || name.includes(wanted) || wanted.includes(name);
-          }) ?? item.candidate.facts[0];
-        return sum + (fact?.comparableAmount ?? 0);
-      }, 0);
-    const coveragePercent = requestedComparable > 0
-      ? Math.min(200, Math.round((deliveredComparable / requestedComparable) * 100))
+    const currentAmount = current.reduce((sum, item) => sum + item.dailyAmount, 0);
+    const deliveredScaled = basket?.exposure.totals.get(target.supplementId);
+    const deliveredTotal = deliveredScaled
+      ? amountFromScaled(deliveredScaled, target.unit, target.name)
       : 0;
+    const deliveredAmount = Math.max(0, (deliveredTotal ?? 0) - currentAmount);
+    const totalExposureAmount = currentAmount + deliveredAmount;
+    const limit = upperLimitAmount(target.name, target.unit);
     let status: CoverageRow["status"] = "uncovered";
 
     if (coveragePercent >= 90 && coveragePercent <= 125) {
@@ -154,20 +149,6 @@ function coverageFor(
       status = "partial";
     }
 
-    const requestedAmount = roundDose(target.amount);
-    const currentAmount = roundDose(
-      fromComparable(currentComparable, target.unit, target.name)
-    );
-    const deliveredAmount = roundDose(
-      fromComparable(deliveredComparable, target.unit, target.name)
-    );
-    const totalExposureAmount = roundDose(currentAmount + deliveredAmount);
-    const limit = upperLimitAmount(target.name, target.unit);
-    const percentOfUpperLimit =
-      limit != null && limit > 0
-        ? Math.round((totalExposureAmount / limit) * 100)
-        : null;
-
     if (limit != null && totalExposureAmount >= limit) {
       status = "upper_limit_risk";
     }
@@ -177,8 +158,11 @@ function coverageFor(
       currentAmount,
       deliveredAmount,
       name: target.name,
-      percentOfUpperLimit,
-      requestedAmount,
+      percentOfUpperLimit:
+        limit != null && limit > 0
+          ? Math.round((totalExposureAmount / limit) * 100)
+          : null,
+      requestedAmount: target.amount,
       status,
       supplementId: target.supplementId,
       totalExposureAmount,
@@ -188,243 +172,58 @@ function coverageFor(
   });
 }
 
-function basketFromProducts(
-  products: readonly CatalogueProduct[],
-  availabilityAsOf: string,
-  currency: string
+function basketFromIds(
+  state: CanonicalPlanState,
+  snapshot: CatalogueSnapshot,
+  basket: ScoredBasket
 ): BasketItem[] {
-  return products.map((product) => ({
-    availabilityAsOf,
-    contributionSupplementIds: product.contributionSupplementIds,
-    currency: product.candidate.currency || currency,
-    dailyPills: product.dailyPills,
-    deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
-    fixture: product.source === "fixture",
-    form: product.form,
-    imageUrl: product.candidate.imageUrl?.trim() || null,
-    incompleteCommercialFacts: product.incompleteCommercialFacts,
-    lineTotalMinor: product.unitPriceMinor,
-    productId: product.productId,
-    productName: product.candidate.title,
-    quantity: 1,
-    retailerSku: product.retailerSku,
-    sellerId: product.sellerId,
-    sellerName: product.sellerName,
-    source: product.source,
-    stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
-    unitPriceMinor: product.unitPriceMinor
-  }));
+  return basket.productIds
+    .map((productId) =>
+      snapshot.products.find(
+        (item) =>
+          item.productId === productId &&
+          (item.sellerId === basket.sellerId || !basket.sellerId)
+      )
+    )
+    .filter((item): item is CatalogueProduct => Boolean(item))
+    .map((product) => ({
+      availabilityAsOf: snapshot.availabilityAsOf,
+      contributionSupplementIds: product.contributionSupplementIds,
+      currency: product.candidate.currency || state.currency,
+      dailyPills: product.dailyPills,
+      deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
+      fixture: product.source === "fixture",
+      form: product.form,
+      imageUrl: product.candidate.imageUrl?.trim() || null,
+      incompleteCommercialFacts: product.incompleteCommercialFacts,
+      lineTotalMinor: product.unitPriceMinor,
+      productId: product.productId,
+      productName: product.candidate.title,
+      quantity: 1,
+      retailerSku: product.retailerSku,
+      sellerId: product.sellerId,
+      sellerName: product.sellerName,
+      source: product.source,
+      stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
+      unitPriceMinor: product.unitPriceMinor
+    }));
 }
 
-function stackFromProducts(
+function toStackOption(
   state: CanonicalPlanState,
-  products: readonly CatalogueProduct[],
-  availabilityAsOf: string,
-  reason: string
+  snapshot: CatalogueSnapshot,
+  basket: ScoredBasket
 ): StackOption {
-  const basket = basketFromProducts(products, availabilityAsOf, state.currency);
-  const coverage = coverageFor(state, products);
-  const covered = coverage.filter((row) => row.status === "covered" || row.status === "over_target").length;
-  const coveragePercent = coverage.length > 0
-    ? Math.round((covered / coverage.length) * 100)
-    : 0;
-
+  const items = basketFromIds(state, snapshot, basket);
   return {
-    basket,
-    coverage,
-    coveragePercent,
-    dailyPills: basket.reduce((sum, item) => sum + item.dailyPills, 0),
-    optionId: optionIdFor(basket.map((item) => item.productId)),
-    reason,
-    totalPriceMinor: basket.reduce((sum, item) => sum + item.lineTotalMinor, 0)
+    basket: items,
+    coverage: coverageFor(state, basket, snapshot.products),
+    coveragePercent: publicCoveragePercent(basket),
+    dailyPills: basket.dailyPills,
+    optionId: optionIdFor(basket.productIds),
+    reason: basket.reason,
+    totalPriceMinor: basket.priceMinor
   };
-}
-
-function maxProductCount(state: CanonicalPlanState) {
-  return state.requirements.maxProductCount ?? 8;
-}
-
-function coverageRatio(product: CatalogueProduct, target: CanonicalPlanState["targets"][number]) {
-  const requested = doseComparable(target.amount, target.unit, target.name);
-  const delivered = product.candidate.facts[0]?.comparableAmount ?? 0;
-
-  if (requested <= 0) {
-    return 0;
-  }
-
-  return delivered / requested;
-}
-
-function pickForTarget(
-  target: CanonicalPlanState["targets"][number],
-  eligible: readonly CatalogueProduct[],
-  mode: "cheapest" | "coverage"
-) {
-  const candidates = eligible
-    .filter((item) => item.contributionSupplementIds.includes(target.supplementId))
-    .slice()
-    .sort((left, right) => {
-      if (mode === "coverage") {
-        const leftRatio = coverageRatio(left, target);
-        const rightRatio = coverageRatio(right, target);
-        const leftComplete = leftRatio >= 0.9 ? 1 : 0;
-        const rightComplete = rightRatio >= 0.9 ? 1 : 0;
-
-        if (leftComplete !== rightComplete) {
-          return rightComplete - leftComplete;
-        }
-
-        if (leftComplete === 1) {
-          if (left.unitPriceMinor !== right.unitPriceMinor) {
-            return left.unitPriceMinor - right.unitPriceMinor;
-          }
-        } else if (leftRatio !== rightRatio) {
-          return rightRatio - leftRatio;
-        }
-      }
-
-      if (left.unitPriceMinor !== right.unitPriceMinor) {
-        return left.unitPriceMinor - right.unitPriceMinor;
-      }
-
-      if (left.dailyPills !== right.dailyPills) {
-        return left.dailyPills - right.dailyPills;
-      }
-
-      return left.productId.localeCompare(right.productId);
-    });
-
-  return candidates[0] ?? null;
-}
-
-function shortlistForBeam(
-  eligible: readonly CatalogueProduct[],
-  state: CanonicalPlanState
-) {
-  const chosen = new Map<string, CatalogueProduct>();
-
-  for (const target of state.targets) {
-    const ranked = eligible
-      .filter((item) => item.contributionSupplementIds.includes(target.supplementId))
-      .slice()
-      .sort((left, right) => {
-        const leftRatio = coverageRatio(left, target);
-        const rightRatio = coverageRatio(right, target);
-
-        if (leftRatio !== rightRatio) {
-          return rightRatio - leftRatio;
-        }
-
-        return left.unitPriceMinor - right.unitPriceMinor;
-      })
-      .slice(0, AGENTIC_CANDIDATES_PER_TARGET);
-
-    for (const item of ranked) {
-      chosen.set(item.productId, item);
-    }
-  }
-
-  for (const productId of state.requirements.retainProductIds ?? []) {
-    const retained = eligible.find((item) => item.productId === productId);
-
-    if (retained) {
-      chosen.set(retained.productId, retained);
-    }
-  }
-
-  return [...chosen.values()];
-}
-
-function clientSexFor(state: CanonicalPlanState) {
-  return state.profile.sex === "female" || state.profile.sex === "male"
-    ? state.profile.sex
-    : null;
-}
-
-function greedyStack(
-  state: CanonicalPlanState,
-  eligible: readonly CatalogueProduct[],
-  availabilityAsOf: string,
-  reason: string,
-  mode: "cheapest" | "coverage" = "cheapest"
-) {
-  const selected: CatalogueProduct[] = [];
-  const retain = new Set(state.requirements.retainProductIds ?? []);
-  const cap = maxProductCount(state);
-
-  for (const product of eligible) {
-    if (retain.has(product.productId) && selected.length < cap) {
-      selected.push(product);
-    }
-  }
-
-  for (const target of state.targets) {
-    if (selected.length >= cap) {
-      break;
-    }
-
-    if (state.requirements.excludeSupplementIds?.includes(target.supplementId)) {
-      continue;
-    }
-
-    if (selected.some((item) => item.contributionSupplementIds.includes(target.supplementId))) {
-      continue;
-    }
-
-    const picked = pickForTarget(target, eligible, mode);
-
-    if (picked) {
-      selected.push(picked);
-    }
-  }
-
-  selected.sort((left, right) => left.productId.localeCompare(right.productId));
-  return stackFromProducts(state, selected, availabilityAsOf, reason);
-}
-
-function optionIsComplete(option: StackOption) {
-  if (option.coverage.length === 0) {
-    return false;
-  }
-
-  return option.coverage.every(
-    (row) => row.status === "covered" || row.status === "over_target"
-  );
-}
-
-function cheaperReason(selected: StackOption, cheaper: StackOption) {
-  if (cheaper.totalPriceMinor >= selected.totalPriceMinor) {
-    return "Alternative stack";
-  }
-
-  return optionIsComplete(cheaper)
-    ? "Lower-cost complete stack"
-    : "Lower-cost incomplete stack";
-}
-
-function basketKey(option: StackOption) {
-  return option.basket
-    .map((item) => item.productId)
-    .slice()
-    .sort()
-    .join("|");
-}
-
-function materialDifference(left: StackOption | null, right: StackOption | null) {
-  if (!left || !right) {
-    return false;
-  }
-
-  if (left.optionId === right.optionId || basketKey(left) === basketKey(right)) {
-    return false;
-  }
-
-  return (
-    Math.abs(left.totalPriceMinor - right.totalPriceMinor) >= 1000 ||
-    Math.abs(left.coveragePercent - right.coveragePercent) >= 5 ||
-    Math.abs(left.dailyPills - right.dailyPills) >= 1 ||
-    left.basket.length !== right.basket.length
-  );
 }
 
 export function leftoversFor(
@@ -475,10 +274,7 @@ export function leftoversFor(
         (item) => item.supplementId === row.supplementId
       );
 
-      if (
-        selectedRow &&
-        row.coveragePercent + 10 < selectedRow.coveragePercent
-      ) {
+      if (selectedRow && row.coveragePercent + 10 < selectedRow.coveragePercent) {
         push({
           name: row.name,
           note: "cheaper SKU covers less",
@@ -533,130 +329,6 @@ export function matcherTelemetryFor(input: Readonly<{
   };
 }
 
-function groupBySeller(products: readonly CatalogueProduct[]) {
-  const groups = new Map<string, CatalogueProduct[]>();
-
-  for (const product of products) {
-    const key = product.sellerId || "unknown";
-    const list = groups.get(key) ?? [];
-    list.push(product);
-    groups.set(key, list);
-  }
-
-  return [...groups.values()];
-}
-
-function preferStack(
-  current: StackOption,
-  next: StackOption,
-  optimization: CanonicalPlanState["optimization"]
-) {
-  if (optimization === "lowest_cost") {
-    if (next.totalPriceMinor !== current.totalPriceMinor) {
-      return next.totalPriceMinor < current.totalPriceMinor;
-    }
-
-    return next.coveragePercent > current.coveragePercent;
-  }
-
-  if (next.coveragePercent !== current.coveragePercent) {
-    return next.coveragePercent > current.coveragePercent;
-  }
-
-  return next.totalPriceMinor < current.totalPriceMinor;
-}
-
-function matchRetailerStack(input: Readonly<{
-  deadlineAt: number;
-  eligible: readonly CatalogueProduct[];
-  snapshot: CatalogueSnapshot;
-  state: CanonicalPlanState;
-}>) {
-  const needs = toNeed(input.state);
-  const maxProducts = maxProductCount(input.state);
-  const coverageFirst = greedyStack(
-    input.state,
-    input.eligible,
-    input.snapshot.availabilityAsOf,
-    "Highest-coverage feasible stack",
-    "coverage"
-  );
-  const cheapest = greedyStack(
-    { ...input.state, optimization: "lowest_cost" },
-    input.eligible,
-    input.snapshot.availabilityAsOf,
-    "Lower-cost incomplete stack",
-    "cheapest"
-  );
-  let selected = input.state.optimization === "lowest_cost" ? cheapest : coverageFirst;
-
-  if (needs.length > 0 && input.eligible.length > 0 && Date.now() < input.deadlineAt) {
-    const beamCandidates = shortlistForBeam(input.eligible, input.state);
-
-    try {
-      if (beamCandidates.length > 0) {
-        const beam = recommendProductStackFullBeam({
-          budgetAmount: input.state.requirements.maxPriceMinor
-            ? input.state.requirements.maxPriceMinor / 100
-            : null,
-          candidates: beamCandidates.map((item) => item.candidate),
-          clientSex: clientSexFor(input.state),
-          countryCode: input.state.destinationCountry,
-          deadlineAt: input.deadlineAt,
-          maxProducts,
-          needs,
-          stackPreference:
-            input.state.optimization === "fewest_pills" ? "compact" : "balanced"
-        });
-        const mapped = beam.recommendations
-          .map((row) =>
-            input.eligible.find((item) => item.candidate.id === row.product.id)
-          )
-          .filter((item): item is CatalogueProduct => Boolean(item));
-
-        if (mapped.length > 0) {
-          const beamed = stackFromProducts(
-            input.state,
-            mapped,
-            input.snapshot.availabilityAsOf,
-            "Selected for coverage, price and daily pills"
-          );
-
-          if (preferStack(selected, beamed, input.state.optimization)) {
-            selected = beamed;
-          }
-        }
-      }
-    } catch {
-      // Keep the greedy stack when a live catalogue beam overruns.
-    }
-  }
-
-  if (
-    input.state.optimization !== "lowest_cost" &&
-    preferStack(selected, coverageFirst, input.state.optimization)
-  ) {
-    selected = coverageFirst;
-  }
-
-  const compactEligible = input.eligible.slice().sort((left, right) => {
-    if (left.dailyPills !== right.dailyPills) {
-      return left.dailyPills - right.dailyPills;
-    }
-
-    return left.productId.localeCompare(right.productId);
-  });
-  const compact = greedyStack(
-    { ...input.state, optimization: "fewest_pills" },
-    compactEligible,
-    input.snapshot.availabilityAsOf,
-    "Fewer daily pills",
-    "coverage"
-  );
-
-  return { cheapest, compact, selected };
-}
-
 export function matchPlan(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
@@ -666,79 +338,32 @@ export function matchPlan(input: Readonly<{
   selected: StackOption | null;
   unmetRequirements: string[];
 } {
-  const eligible = input.snapshot.products.filter((product) =>
-    productEligible(product, input.state)
+  const request = toCanonicalRequest(input.state);
+
+  if ("error" in request) {
+    return {
+      alternatives: [],
+      leftovers: [...input.state.leftovers],
+      selected: null,
+      unmetRequirements: []
+    };
+  }
+
+  const result = match(request, {
+    availabilityAsOf: input.snapshot.availabilityAsOf,
+    catalogueVersion: input.snapshot.catalogueVersion,
+    products: input.snapshot.products.map(toMatcherProduct)
+  });
+  const selected = result.selected
+    ? toStackOption(input.state, input.snapshot, result.selected)
+    : null;
+  const alternatives = result.alternatives.map((item) =>
+    toStackOption(input.state, input.snapshot, item)
   );
-  const deadlineAt = Date.now() + AGENTIC_MATCH_DEADLINE_MS;
-  const retailers = groupBySeller(eligible)
-    .map((products) => ({
-      greedy: greedyStack(
-        input.state,
-        products,
-        input.snapshot.availabilityAsOf,
-        "Highest-coverage feasible stack",
-        "coverage"
-      ),
-      products
-    }))
-    .sort(
-      (left, right) =>
-        right.greedy.coveragePercent - left.greedy.coveragePercent ||
-        left.greedy.totalPriceMinor - right.greedy.totalPriceMinor ||
-        left.products[0]!.sellerId.localeCompare(right.products[0]!.sellerId)
-    );
-
-  let selected: StackOption | null = null;
-  let cheapest: StackOption | null = null;
-  let compact: StackOption | null = null;
-
-  for (const retailer of retailers) {
-    const matched = matchRetailerStack({
-      deadlineAt,
-      eligible: retailer.products,
-      snapshot: input.snapshot,
-      state: input.state
-    });
-
-    if (!matched.selected) {
-      continue;
-    }
-
-    if (!selected || preferStack(selected, matched.selected, input.state.optimization)) {
-      selected = matched.selected;
-      cheapest = matched.cheapest;
-      compact = matched.compact;
-    }
-  }
-
-  const alternatives: StackOption[] = [];
-
-  if (
-    selected &&
-    cheapest &&
-    input.state.optimization !== "lowest_cost" &&
-    materialDifference(selected, cheapest)
-  ) {
-    alternatives.push({
-      ...cheapest,
-      reason: cheaperReason(selected, cheapest)
-    });
-  }
-
-  if (
-    selected &&
-    compact &&
-    input.state.optimization !== "fewest_pills" &&
-    materialDifference(selected, compact) &&
-    alternatives.every((item) => materialDifference(item, compact))
-  ) {
-    alternatives.push(compact);
-  }
-
-  const leftovers = leftoversFor(input.state, selected, cheapest);
+  const leftovers = leftoversFor(input.state, selected, alternatives[0] ?? null);
 
   return {
-    alternatives: alternatives.slice(0, 2),
+    alternatives,
     leftovers,
     selected,
     unmetRequirements: unmetRequirementsFor({

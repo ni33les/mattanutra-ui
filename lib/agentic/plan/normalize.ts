@@ -284,16 +284,22 @@ export function applyPlanAnswers(
 
 export function planRematchFingerprint(state: CanonicalPlanState) {
   return JSON.stringify({
+    ageYears: state.profile.ageYears,
+    conditionCodes: state.conditionCodes,
+    currency: state.currency,
     currentSupplements: state.currentSupplements,
-    excludeSupplementIds: state.requirements.excludeSupplementIds ?? [],
+    destinationCountry: state.destinationCountry,
     dietaryPreference: state.requirements.dietaryPreference ?? null,
+    excludeSupplementIds: state.requirements.excludeSupplementIds ?? [],
     forms: state.requirements.allowedForms ?? [],
     lifeStage: state.profile.lifeStage,
     maxDailyPills: state.requirements.maxDailyPills ?? null,
     maxPriceMinor: state.requirements.maxPriceMinor ?? null,
     maxProductCount: state.requirements.maxProductCount ?? null,
+    medicationCodes: state.medicationCodes,
     omega3SourcePreference: state.requirements.omega3SourcePreference ?? null,
     optimization: state.optimization,
+    sex: state.profile.sex,
     targets: state.targets
   });
 }

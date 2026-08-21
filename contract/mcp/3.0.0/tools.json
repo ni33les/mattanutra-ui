@@ -17,7 +17,7 @@
       "name": "info"
     },
     {
-      "description": "Create or refine a purchasable supplement stack from the person’s agreed targets, profile (including lifeStage pregnant and profile.sex as female, male, intersex, or unspecified), current supplements, medicationCodes, conditionCodes, dietary requirements, budget, pill/form limits and optimization priority. destinationCountry must be a country from info.supportedCountries; otherwise plan returns unsupported_country and a polite cannot-deliver message instead of substituting another country. Recognised names include Folate, Folic acid, Calcium, Vitamin B6, Iodine, Selenium, Vitamin D3, Omega-3, Algae omega-3, Magnesium, Vitamin B12, Vitamin C, Zinc, Iron, CoQ10, Collagen, Plant sterols and Creatine. Unrecognised names such as Vitamin K2 become leftover not_in_catalogue lines; do not 400 the whole plan. Omit planHandle to create; include planHandle and expectedRevision to submit the complete desired state for a revision. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching. optionId stays sticky until the host selects another option or changes targets. planHandle stays valid 7 days. D5-07 PASSES when medicationCodes=[\"apixaban\"] plus Omega-3 returns needs_input, q_safety_ack and guidanceIds, and a follow-up with those medicationCodes plus safetyAcknowledgement.confirmed=true (or answers acknowledge_safety) is ready. D5-09 PASSES when conditionCodes=[\"ckd\"] plus Magnesium returns status=blocked with a non-empty guidanceIds array. D6 PASSES when a second plan on the same handle with expectedRevision increments revision. Stale expectedRevision returns revision_conflict. Wrong safetyAcknowledgement.revision returns stale_safety_acknowledgement, not a silent no-op. Use selectOptionId with planHandle and expectedRevision to choose one returned complete-stack option without rematching. For medication_interaction, submit answers choice acknowledge_safety or safetyAcknowledgement.confirmed=true with the returned guidanceIds. This tool never purchases.",
+      "description": "Create or refine a purchasable supplement stack from the person’s agreed targets, profile (including lifeStage pregnant and profile.sex as female, male, intersex, or unspecified), current supplements, medicationCodes, conditionCodes, dietary requirements, budget, pill/form limits and optimization priority. requirements.dietaryPreference=vegan implies algae omega-3 and excludes animal SKUs; algae_only remains its own flag. destinationCountry must be a country from info.supportedCountries; otherwise plan returns unsupported_country and a polite cannot-deliver message instead of substituting another country. Recognised names include Folate, Folic acid, Calcium, Vitamin B6, Iodine, Selenium, Vitamin D3, Omega-3, Algae omega-3, Magnesium, Vitamin B12, Vitamin C, Zinc, Iron, CoQ10, Collagen, Plant sterols and Creatine. Unrecognised names such as Vitamin K2 become leftover not_in_catalogue lines; do not 400 the whole plan. Omit planHandle to create; include planHandle and expectedRevision to submit the complete desired state for a revision. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching. optionId stays sticky until the host selects another option or changes targets. planHandle stays valid 7 days. D5-07 PASSES when medicationCodes=[\"apixaban\"] plus Omega-3 returns needs_input, q_safety_ack and guidanceIds, and a follow-up with those medicationCodes plus safetyAcknowledgement.confirmed=true (or answers acknowledge_safety) is ready. D5-09 PASSES when conditionCodes=[\"ckd\"] plus Magnesium returns status=blocked with a non-empty guidanceIds array. D6 PASSES when a second plan on the same handle with expectedRevision increments revision. Stale expectedRevision returns revision_conflict. Wrong safetyAcknowledgement.revision returns stale_safety_acknowledgement, not a silent no-op. Use selectOptionId with planHandle and expectedRevision to choose one returned complete-stack option without rematching. For medication_interaction, submit answers choice acknowledge_safety or safetyAcknowledgement.confirmed=true with the returned guidanceIds. This tool never purchases.",
       "inputSchema": {
         "$defs": {
           "PlanRequest": {
@@ -179,7 +179,8 @@
                   "dietaryPreference": {
                     "enum": [
                       "any",
-                      "plant_based"
+                      "plant_based",
+                      "vegan"
                     ],
                     "type": "string"
                   },
@@ -485,7 +486,8 @@
                       "dietaryPreference": {
                         "enum": [
                           "any",
-                          "plant_based"
+                          "plant_based",
+                          "vegan"
                         ],
                         "type": "string"
                       },

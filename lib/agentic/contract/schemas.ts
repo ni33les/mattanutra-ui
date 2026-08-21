@@ -116,7 +116,7 @@ const PLAN_REQUEST: JsonSchema = {
           uniqueItems: true
         },
         dietaryPreference: {
-          enum: ["any", "plant_based"],
+          enum: ["any", "plant_based", "vegan"],
           type: "string"
         },
         excludeSupplementIds: {

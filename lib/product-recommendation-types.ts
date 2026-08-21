@@ -106,6 +106,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 }>;
 
 export type ProductRecommendationAlgorithmVersion =
+  | "pareto-hybrid-1"
   | "v2-exact-shortlist"
   | "v2-full-beam";
 export type ProductStackPreference = "balanced" | "compact";

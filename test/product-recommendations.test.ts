@@ -598,7 +598,7 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       needs: [need("magnesium", "Magnesium", 5)]
     });
 
-    assert.equal(result.diagnostics.algorithmVersion, "v2-full-beam");
+    assert.equal(result.diagnostics.algorithmVersion, "pareto-hybrid-1");
     assert.equal(result.recommendations[0]?.product.id, "magnesium");
   });
 
@@ -1515,7 +1515,7 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       needs
     });
 
-    assert.equal(fullBeam.diagnostics.algorithmVersion, "v2-full-beam");
+    assert.equal(fullBeam.diagnostics.algorithmVersion, "pareto-hybrid-1");
     assert.equal(fullBeam.diagnostics.trace?.searchMode, "full-beam");
     assert.equal(fullBeam.diagnostics.trace?.candidatePoolSize, 36);
     assert.equal(fullBeam.diagnostics.trace?.shortlistSize, 36);
