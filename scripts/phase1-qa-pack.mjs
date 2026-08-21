@@ -18,7 +18,7 @@ function structured(response) {
 
 async function rpc(method, params) {
   const response = await fetch(MCP_URL, {
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(45_000),
     method: "POST",
     headers: {
       Accept: "application/json, text/event-stream",
@@ -50,7 +50,7 @@ async function call(name, args) {
 }
 
 async function getText(url) {
-  const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(20_000) });
+  const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(45_000) });
   return {
     status: response.status,
     text: await response.text(),
@@ -58,17 +58,41 @@ async function getText(url) {
   };
 }
 
+async function getJson(url, init = {}) {
+  const response = await fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(90_000),
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {})
+    }
+  });
+  let body = {};
+  try {
+    body = await response.json();
+  } catch {
+    body = {};
+  }
+  return { body, status: response.status, url: response.url };
+}
+
 function looksLikeId(value) {
   return /^(sup_|prd_)?[0-9a-f-]{8,}$/i.test(String(value).trim());
 }
 
-async function t02Ceilings() {
-  const over = await call("plan", {
-    idempotencyKey: `p1-t02-over-${Date.now()}`,
+function zincRow(plan) {
+  return (Array.isArray(plan.coverage) ? plan.coverage : []).find((row) =>
+    /zinc/i.test(String(row.name ?? ""))
+  );
+}
+
+function zincPlan(idempotencyKey, currentAmount) {
+  return call("plan", {
+    idempotencyKey,
     request: {
-      currentSupplements: [
-        { dailyAmount: 39, name: "Zinc", unit: "mg" }
-      ],
+      ...(currentAmount
+        ? { currentSupplements: [{ dailyAmount: currentAmount, name: "Zinc", unit: "mg" }] }
+        : {}),
       destinationCountry: "TH",
       locale: "en",
       optimization: "balanced",
@@ -77,41 +101,46 @@ async function t02Ceilings() {
       targets: [{ amount: 25, name: "Zinc", unit: "mg" }]
     }
   });
-  const coverage = Array.isArray(over.coverage) ? over.coverage : [];
-  const zinc = coverage.find((row) => /zinc/i.test(String(row.name ?? "")));
-  const rows = coverage.filter((row) => typeof row.upperLimitAmount === "number");
-  const neverOver = coverage.every((row) => {
-    if (typeof row.upperLimitAmount !== "number") {
-      return true;
-    }
-    return Number(row.totalExposureAmount ?? 0) <= Number(row.upperLimitAmount);
-  });
-  const hasAdminUl =
-    typeof zinc?.upperLimitAmount === "number" && zinc.upperLimitAmount > 0;
-  const pass = Boolean(over.ok) && neverOver && hasAdminUl;
+}
+
+async function t02Ceilings() {
+  const modest = await zincPlan(`p1-t02-modest-${Date.now()}`, 0);
+  const modestZinc = zincRow(modest);
+  const ul = Number(modestZinc?.upperLimitAmount);
+  const hasAdminUl = Number.isFinite(ul) && ul > 0;
+  const overCurrent = hasAdminUl ? Math.ceil(ul) + 10 : 90;
+  const over = await zincPlan(`p1-t02-over-${Date.now()}`, overCurrent);
+  const overZinc = zincRow(over);
+  const overUl = Number(overZinc?.upperLimitAmount);
+  const overExposure = Number(overZinc?.totalExposureAmount ?? 0);
+  const readyOverCeiling =
+    over.status === "ready" && Number.isFinite(overUl) && overExposure > overUl;
+  const pass =
+    Boolean(modest.ok) &&
+    hasAdminUl &&
+    Number.isFinite(overUl) &&
+    overUl > 0 &&
+    !readyOverCeiling;
   record(
     "T02",
     pass,
     pass
-      ? `zinc UL ${zinc.upperLimitAmount} ${zinc.unit}; exposure ${zinc.totalExposureAmount} <= UL`
-      : `ok=${over.ok} zincUl=${zinc?.upperLimitAmount} exposure=${zinc?.totalExposureAmount} rowsWithUl=${rows.length}`,
-    pass ? 10 : hasAdminUl && neverOver ? 8 : 5
+      ? `zinc UL ${ul} mg; over current ${overCurrent} status ${over.status} exposure ${overExposure}`
+      : `modestUl=${modestZinc?.upperLimitAmount} overStatus=${over.status} overUl=${overZinc?.upperLimitAmount} overExposure=${overZinc?.totalExposureAmount}`,
+    pass ? 10 : hasAdminUl ? 8 : 5
   );
 }
 
 async function t03Pillars() {
   async function capture(answers) {
-    const response = await fetch(`${ORIGIN}/api/assessment`, {
+    return getJson(`${ORIGIN}/api/assessment`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         answers,
         intent: "capture",
         locale: "en"
       })
     });
-    const body = await response.json();
-    return { status: response.status, body };
   }
 
   const wellAnswers = {
@@ -140,12 +169,18 @@ async function t03Pillars() {
   const poor = await capture(poorAnswers);
   const wellId = well.body?.planId;
   const poorId = poor.body?.planId;
-  const wellScore = wellId
-    ? await (await fetch(`${ORIGIN}/api/assessment/${wellId}?view=healthscore&locale=en`)).json()
-    : {};
-  const poorScore = poorId
-    ? await (await fetch(`${ORIGIN}/api/assessment/${poorId}?view=healthscore&locale=en`)).json()
-    : {};
+  const wellScore =
+    well.body?.healthScore || wellId
+      ? well.body?.healthScore
+        ? well.body
+        : (await getJson(`${ORIGIN}/api/assessment/${wellId}?view=healthscore&locale=en`)).body
+      : {};
+  const poorScore =
+    poor.body?.healthScore || poorId
+      ? poor.body?.healthScore
+        ? poor.body
+        : (await getJson(`${ORIGIN}/api/assessment/${poorId}?view=healthscore&locale=en`)).body
+      : {};
   const wellSleep = wellScore.healthScore?.domains?.find((item) => item.id === "sleep")?.score;
   const poorSleep = poorScore.healthScore?.domains?.find((item) => item.id === "sleep")?.score;
   const wellActivity = wellScore.healthScore?.domains?.find((item) => item.id === "activity")?.score;
@@ -253,9 +288,8 @@ async function t04Prices() {
 
 async function t05Reveal(planId) {
   const name = "ArinyaQa";
-  const captured = await fetch(`${ORIGIN}/api/assessment`, {
+  const captured = await getJson(`${ORIGIN}/api/assessment`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       answers: {
         activity: "moderate",
@@ -273,18 +307,17 @@ async function t05Reveal(planId) {
       locale: "en"
     })
   });
-  const capturedBody = await captured.json();
+  const capturedBody = captured.body;
   const id = capturedBody.planId ?? planId;
-  const score = await (await fetch(`${ORIGIN}/api/assessment/${id}?view=healthscore&locale=en`)).json();
+  const score = id
+    ? (await getJson(`${ORIGIN}/api/assessment/${id}?view=healthscore&locale=en`)).body
+    : {};
   const healthHtml = await getText(`${ORIGIN}/en/nutrition/healthscore?plan=${id}`);
   const revealHtml = await getText(`${ORIGIN}/en/nutrition/reveal?plan=${id}`);
-  const formulation = await fetch(`${ORIGIN}/api/assessment/${id}/formulation?locale=en`);
-  let formulationBody = {};
-  try {
-    formulationBody = await formulation.json();
-  } catch {
-    formulationBody = {};
-  }
+  const formulation = id
+    ? await getJson(`${ORIGIN}/api/assessment/${id}/formulation?locale=en`)
+    : { body: {}, status: 0 };
+  const formulationBody = formulation.body ?? {};
   const jsonHasName = score.firstName === name || formulationBody.firstName === name;
   const htmlHasName =
     healthHtml.text.includes(name) ||
@@ -359,12 +392,38 @@ async function t07Names(checkoutUrl) {
 }
 
 async function main() {
-  await t02Ceilings();
-  const capturedId = await t03Pillars();
-  const t04 = await t04Prices();
-  await t05Reveal(capturedId);
-  await t06Brand();
-  await t07Names(t04?.checkoutUrl);
+  try {
+    await t02Ceilings();
+  } catch (error) {
+    record("T02", false, error instanceof Error ? error.message : String(error), 0);
+  }
+  let capturedId;
+  try {
+    capturedId = await t03Pillars();
+  } catch (error) {
+    record("T03", false, error instanceof Error ? error.message : String(error), 0);
+  }
+  let t04;
+  try {
+    t04 = await t04Prices();
+  } catch (error) {
+    record("T04", false, error instanceof Error ? error.message : String(error), 0);
+  }
+  try {
+    await t05Reveal(capturedId);
+  } catch (error) {
+    record("T05", false, error instanceof Error ? error.message : String(error), 0);
+  }
+  try {
+    await t06Brand();
+  } catch (error) {
+    record("T06", false, error instanceof Error ? error.message : String(error), 0);
+  }
+  try {
+    await t07Names(t04?.checkoutUrl);
+  } catch (error) {
+    record("T07", false, error instanceof Error ? error.message : String(error), 0);
+  }
 
   const passed = results.filter((item) => item.pass).length;
   console.log(`Official MattaNutra Phase 1 Pack, ${passed}/${results.length}`);

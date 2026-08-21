@@ -4,38 +4,17 @@ import { getSql } from "@/lib/db";
 import {
   matcherSafetyCeilings,
   matcherSafetyCeilingsCachedAt,
+  parseAdminLimitUnit,
   setMatcherSafetyCeilings,
   setMatcherSafetyCeilingsUnavailable
 } from "@/lib/matcher/safety-ceilings";
-import type { MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
+import type { SafetyCeiling } from "@/lib/matcher/types";
 
 const LIMITS_TTL_MS = 10 * 60_000;
 let inflight: Promise<SafetyCeiling[]> | null = null;
 
-function asMatcherUnit(value: string): MatcherUnit | null {
-  const unit = value.trim();
-
-  if (
-    unit === "mg" ||
-    unit === "mcg" ||
-    unit === "g" ||
-    unit === "IU" ||
-    unit === "CFU" ||
-    unit === "ml" ||
-    unit === "serving"
-  ) {
-    return unit;
-  }
-
-  if (unit.toLowerCase() === "iu") {
-    return "IU";
-  }
-
-  if (unit.toLowerCase() === "ug" || unit.toLowerCase() === "µg") {
-    return "mcg";
-  }
-
-  return null;
+function asMatcherUnit(value: string) {
+  return parseAdminLimitUnit(value);
 }
 
 export async function refreshAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
@@ -129,6 +108,17 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
           subjectId: fixtureId
         });
       }
+    }
+
+    if (ceilings.length === 0 && rows.length > 0) {
+      const previous = matcherSafetyCeilings();
+
+      if (previous.length > 0) {
+        return previous;
+      }
+
+      setMatcherSafetyCeilingsUnavailable();
+      return previous;
     }
 
     return ceilings;
