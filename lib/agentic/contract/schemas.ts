@@ -1,21 +1,39 @@
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
-const PLAN_REQUEST: JsonSchema = {
+const PLAN_ANSWERS: JsonSchema = {
+  items: {
+    additionalProperties: false,
+    properties: {
+      choice: { type: "string" },
+      questionId: { type: "string" }
+    },
+    required: ["questionId", "choice"],
+    type: "object"
+  },
+  type: "array",
+  uniqueItems: true
+};
+
+const PLAN_SAFETY_ACK: JsonSchema = {
   additionalProperties: false,
   properties: {
-    answers: {
-      items: {
-        additionalProperties: false,
-        properties: {
-          choice: { type: "string" },
-          questionId: { type: "string" }
-        },
-        required: ["questionId", "choice"],
-        type: "object"
-      },
+    confirmed: { const: true },
+    guidanceIds: {
+      items: { type: "string" },
+      minItems: 1,
       type: "array",
       uniqueItems: true
     },
+    revision: { minimum: 1, type: "integer" }
+  },
+  required: ["revision", "guidanceIds", "confirmed"],
+  type: "object"
+};
+
+const PLAN_REQUEST: JsonSchema = {
+  additionalProperties: false,
+  properties: {
+    answers: PLAN_ANSWERS,
     conditionCodes: {
       items: { type: "string" },
       type: "array",
@@ -123,21 +141,7 @@ const PLAN_REQUEST: JsonSchema = {
       },
       type: "object"
     },
-    safetyAcknowledgement: {
-      additionalProperties: false,
-      properties: {
-        confirmed: { const: true },
-        guidanceIds: {
-          items: { type: "string" },
-          minItems: 1,
-          type: "array",
-          uniqueItems: true
-        },
-        revision: { minimum: 1, type: "integer" }
-      },
-      required: ["revision", "guidanceIds", "confirmed"],
-      type: "object"
-    },
+    safetyAcknowledgement: PLAN_SAFETY_ACK,
     targets: {
       items: {
         additionalProperties: false,
@@ -226,11 +230,11 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
     {
       additionalProperties: false,
       properties: {
-        answers: PLAN_REQUEST.properties.answers,
+        answers: PLAN_ANSWERS,
         expectedRevision: { minimum: 1, type: "integer" },
         idempotencyKey: IDEMPOTENCY_KEY,
         planHandle: HANDLE,
-        safetyAcknowledgement: PLAN_REQUEST.properties.safetyAcknowledgement
+        safetyAcknowledgement: PLAN_SAFETY_ACK
       },
       required: ["idempotencyKey", "planHandle", "expectedRevision"],
       type: "object"
