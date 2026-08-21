@@ -208,6 +208,6 @@ describe("worker auth doctor", () => {
     assert.match(gitignore, /^\.env\.prd-smoke$/m);
     assert.match(prdSmokeExample, /^PRD_DB_URL=$/m);
     assert.match(prdSmokeExample, /^LINE_CHANNEL_ACCESS_TOKEN=$/m);
-    assert.match(prdSmokeExample, /^WORKER_NONG MATA_AGENT_API_KEY=$/m);
+    assert.match(prdSmokeExample, /^WORKER_PANYA_AGENT_API_KEY=$/m);
   });
 });

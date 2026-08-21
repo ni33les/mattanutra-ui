@@ -61,7 +61,7 @@ export type PanyaConfigVersion = Readonly<{
   version: number;
 }>;
 
-export const DEFAULT_NONG MATA_CONFIG: PanyaConfig = {
+export const DEFAULT_PANYA_CONFIG: PanyaConfig = {
   checkIns: {
     enabled: true,
     minimumDaysBetweenMessages: 7,
@@ -160,69 +160,69 @@ function panyaConfigFromUnknown(value: unknown): PanyaConfig {
       enabled: checkIns.enabled !== false,
       minimumDaysBetweenMessages: numberValue(
         checkIns.minimumDaysBetweenMessages,
-        DEFAULT_NONG MATA_CONFIG.checkIns.minimumDaysBetweenMessages,
+        DEFAULT_PANYA_CONFIG.checkIns.minimumDaysBetweenMessages,
         1,
         90
       ),
       quietDaysAfterInbound: numberValue(
         checkIns.quietDaysAfterInbound,
-        DEFAULT_NONG MATA_CONFIG.checkIns.quietDaysAfterInbound,
+        DEFAULT_PANYA_CONFIG.checkIns.quietDaysAfterInbound,
         0,
         30
       ),
       questions: {
-        en: stringArray(questions.en, DEFAULT_NONG MATA_CONFIG.checkIns.questions.en),
-        th: stringArray(questions.th, DEFAULT_NONG MATA_CONFIG.checkIns.questions.th),
+        en: stringArray(questions.en, DEFAULT_PANYA_CONFIG.checkIns.questions.en),
+        th: stringArray(questions.th, DEFAULT_PANYA_CONFIG.checkIns.questions.th),
         "zh-CN": stringArray(
           questions["zh-CN"],
-          DEFAULT_NONG MATA_CONFIG.checkIns.questions["zh-CN"]
+          DEFAULT_PANYA_CONFIG.checkIns.questions["zh-CN"]
         )
       }
     },
-    guardrails: text(input.guardrails, DEFAULT_NONG MATA_CONFIG.guardrails).slice(0, 6000),
+    guardrails: text(input.guardrails, DEFAULT_PANYA_CONFIG.guardrails).slice(0, 6000),
     protocolAdvice: {
       living_protocol: text(
         protocolAdvice.living_protocol,
-        DEFAULT_NONG MATA_CONFIG.protocolAdvice.living_protocol
+        DEFAULT_PANYA_CONFIG.protocolAdvice.living_protocol
       ).slice(0, 5000),
       right_amount_formula: text(
         protocolAdvice.right_amount_formula,
-        DEFAULT_NONG MATA_CONFIG.protocolAdvice.right_amount_formula
+        DEFAULT_PANYA_CONFIG.protocolAdvice.right_amount_formula
       ).slice(0, 5000),
       unpaid: text(
         protocolAdvice.unpaid,
-        DEFAULT_NONG MATA_CONFIG.protocolAdvice.unpaid
+        DEFAULT_PANYA_CONFIG.protocolAdvice.unpaid
       ).slice(0, 5000)
     },
     quotas: {
       living_protocol: numberValue(
         quotas.living_protocol,
-        DEFAULT_NONG MATA_CONFIG.quotas.living_protocol,
+        DEFAULT_PANYA_CONFIG.quotas.living_protocol,
         1,
         500
       ),
       right_amount_formula: numberValue(
         quotas.right_amount_formula,
-        DEFAULT_NONG MATA_CONFIG.quotas.right_amount_formula,
+        DEFAULT_PANYA_CONFIG.quotas.right_amount_formula,
         1,
         500
       ),
-      unpaid: numberValue(quotas.unpaid, DEFAULT_NONG MATA_CONFIG.quotas.unpaid, 1, 500)
+      unpaid: numberValue(quotas.unpaid, DEFAULT_PANYA_CONFIG.quotas.unpaid, 1, 500)
     },
-    soul: text(input.soul, DEFAULT_NONG MATA_CONFIG.soul).slice(0, 6000),
-    upsellTone: text(input.upsellTone, DEFAULT_NONG MATA_CONFIG.upsellTone).slice(0, 3000),
+    soul: text(input.soul, DEFAULT_PANYA_CONFIG.soul).slice(0, 6000),
+    upsellTone: text(input.upsellTone, DEFAULT_PANYA_CONFIG.upsellTone).slice(0, 3000),
     welcomeBriefs: {
       living_protocol: text(
         welcomeBriefs.living_protocol,
-        DEFAULT_NONG MATA_CONFIG.welcomeBriefs.living_protocol
+        DEFAULT_PANYA_CONFIG.welcomeBriefs.living_protocol
       ).slice(0, 3000),
       right_amount_formula: text(
         welcomeBriefs.right_amount_formula,
-        DEFAULT_NONG MATA_CONFIG.welcomeBriefs.right_amount_formula
+        DEFAULT_PANYA_CONFIG.welcomeBriefs.right_amount_formula
       ).slice(0, 3000),
       unpaid: text(
         welcomeBriefs.unpaid,
-        DEFAULT_NONG MATA_CONFIG.welcomeBriefs.unpaid
+        DEFAULT_PANYA_CONFIG.welcomeBriefs.unpaid
       ).slice(0, 3000)
     }
   };
@@ -717,8 +717,8 @@ async function generatePanyaWelcome(input: Readonly<{
   context: PanyaWelcomeContext;
 }>) {
   const model = configuredGrokModel(
-    process.env.NONG MATA_WELCOME_MODEL,
-    process.env.NONG MATA_MODEL,
+    process.env.PANYA_WELCOME_MODEL,
+    process.env.PANYA_MODEL,
     process.env.GROK_MODEL
   );
   const completion = await callGovernedGrokChatCompletion({
@@ -750,7 +750,7 @@ async function generatePanyaWelcome(input: Readonly<{
     model,
     purpose: "panya welcome greeting",
     reasoningEffort:
-      configuredGrokValue(process.env.NONG MATA_WELCOME_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.PANYA_WELCOME_REASONING_EFFORT) ||
       grokTaskReasoningDefault("panyaWelcome"),
     temperature: 0.55,
     timeoutMs: 8_000
@@ -909,7 +909,7 @@ export async function archivePanyaWelcomeMessage(input: Readonly<{
 export async function getActivePanyaConfig(sql: Db | null = getSql()) {
   if (!sql) {
     return {
-      config: DEFAULT_NONG MATA_CONFIG,
+      config: DEFAULT_PANYA_CONFIG,
       version: null
     };
   }
@@ -934,7 +934,7 @@ export async function getActivePanyaConfig(sql: Db | null = getSql()) {
 
     if (!row) {
       return {
-        config: DEFAULT_NONG MATA_CONFIG,
+        config: DEFAULT_PANYA_CONFIG,
         version: null
       };
     }
@@ -947,7 +947,7 @@ export async function getActivePanyaConfig(sql: Db | null = getSql()) {
     };
   } catch {
     return {
-      config: DEFAULT_NONG MATA_CONFIG,
+      config: DEFAULT_PANYA_CONFIG,
       version: null
     };
   }
@@ -1307,7 +1307,7 @@ function panyaCheckInQuestion(
   const daySeed = Number(usageDay.replaceAll("-", "")) || 0;
 
   return questions[daySeed % Math.max(questions.length, 1)] ??
-    DEFAULT_NONG MATA_CONFIG.checkIns.questions.en[0];
+    DEFAULT_PANYA_CONFIG.checkIns.questions.en[0];
 }
 
 function panyaReorderCallbackBody(input: Readonly<{

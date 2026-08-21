@@ -3,7 +3,7 @@
 import postgres from "postgres";
 import { hashAdminToken } from "@/lib/admin-session-cookie";
 import { toJsonValue } from "@/lib/assessment-store";
-import { DEFAULT_NONG MATA_CONFIG } from "@/lib/panya";
+import { DEFAULT_PANYA_CONFIG } from "@/lib/panya";
 import { FLAT_RATE_SHIPPING_METADATA_KEY } from "@/lib/shipping-fees";
 import { SYSTEM_AGENTS, type SystemAgentKey } from "@/lib/system-agents";
 import { RUNTIME_WORKER_CREDENTIAL_PROFILES } from "@/lib/worker-agent-credentials";
@@ -673,7 +673,7 @@ async function seedPanyaConfig(source: Db, target: Db) {
     limit 1
   `.catch(() => []);
   const sourceRow = rows[0];
-  const config = sourceRow?.config ?? DEFAULT_NONG MATA_CONFIG;
+  const config = sourceRow?.config ?? DEFAULT_PANYA_CONFIG;
   const metadata = {
     ...objectValue(sourceRow?.metadata),
     source: sourceRow ? "uat-panya-config" : "default-panya-config",

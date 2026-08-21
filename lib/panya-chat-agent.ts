@@ -48,13 +48,13 @@ function parseJsonObject(content: string | null | undefined) {
 function panyaConfig() {
   return {
     apiKey: getRequiredXaiApiKey(),
-    model: configuredGrokModel(process.env.NONG MATA_MODEL, process.env.GROK_MODEL),
+    model: configuredGrokModel(process.env.PANYA_MODEL, process.env.GROK_MODEL),
     promptVersion:
-      configuredGrokValue(process.env.NONG MATA_PROMPT_VERSION) ||
+      configuredGrokValue(process.env.PANYA_PROMPT_VERSION) ||
       configuredGrokValue(process.env.NUTRITION_ADVISOR_PROMPT_VERSION) ||
       DEFAULT_PROMPT_VERSION,
     reasoningEffort:
-      configuredGrokValue(process.env.NONG MATA_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.PANYA_REASONING_EFFORT) ||
       grokTaskReasoningDefault("panyaChat")
   };
 }

@@ -10,7 +10,7 @@ const runtimeWorkerProfiles = [
   { envKey: "WORKER_FORMULATION_AGENT_API_KEY", mode: "formulation" },
   { envKey: "WORKER_HEALTHSCORE_AGENT_API_KEY", mode: "healthscore" },
   { envKey: "WORKER_HOSTING_AGENT_API_KEY", mode: "hosting" },
-  { envKey: "WORKER_NONG MATA_AGENT_API_KEY", mode: "panya" },
+  { envKey: "WORKER_PANYA_AGENT_API_KEY", mode: "panya" },
   { envKey: "WORKER_PRODUCTS_AGENT_API_KEY", mode: "products" },
   { envKey: "WORKER_STOCK_AGENT_API_KEY", mode: "stock" }
 ];

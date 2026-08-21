@@ -2,7 +2,7 @@ import { getRetailerAwareProductRecommendationCandidateSets } from "@/lib/admin-
 import { publicProductId } from "@/lib/agentic/contract/ids";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogue/market";
 import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
-import { refreshAdminSafetyCeilings } from "@/lib/matcher/safety-ceilings";
+import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import {
   inferOmegaSource,
   supplementNameMatchesFact

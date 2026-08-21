@@ -13,7 +13,7 @@ import {
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import {
-  DEFAULT_NONG MATA_CONFIG,
+  DEFAULT_PANYA_CONFIG,
   getActivePanyaConfig,
   panyaEntitlementLabel,
   resolvePanyaEntitlement,
@@ -113,7 +113,7 @@ type MessageRow = Readonly<{
 
 export function emptyAdminPanyaData(): AdminPanyaData {
   return {
-    activeConfig: DEFAULT_NONG MATA_CONFIG,
+    activeConfig: DEFAULT_PANYA_CONFIG,
     activeConfigVersion: null,
     conversations: [],
     databaseAvailable: false,

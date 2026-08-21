@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  DEFAULT_NONG MATA_CONFIG,
+  DEFAULT_PANYA_CONFIG,
   panyaWelcomeFallbackReply,
   panyaWelcomeGenerationInput,
   panyaWelcomeReplyFromAiContent,
@@ -65,16 +65,16 @@ describe("Nong Mata welcome helpers", () => {
 
     assert.equal(
       panyaWelcomeGenerationInput(
-        DEFAULT_NONG MATA_CONFIG,
+        DEFAULT_PANYA_CONFIG,
         welcomeContext("precision")
       ).welcomeBrief,
-      DEFAULT_NONG MATA_CONFIG.welcomeBriefs.right_amount_formula
+      DEFAULT_PANYA_CONFIG.welcomeBriefs.right_amount_formula
     );
   });
 
   it("passes rich but compact customer context to the AI payload", () => {
     const payload = panyaWelcomeGenerationInput(
-      DEFAULT_NONG MATA_CONFIG,
+      DEFAULT_PANYA_CONFIG,
       welcomeContext("precision")
     );
 

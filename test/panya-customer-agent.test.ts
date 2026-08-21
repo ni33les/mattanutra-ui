@@ -73,8 +73,8 @@ describe("Nong Mata customer agent architecture", () => {
     assert.match(packageJson.scripts?.["panya:schema:apply"] ?? "", /apply-panya-schema\.ts/);
     assert.match(panya, /protocolAdvice: Record<PanyaEntitlement, string>/);
     assert.match(panya, /welcomeBriefs: Record<PanyaEntitlement, string>/);
-    assert.match(panya, /DEFAULT_NONG MATA_CONFIG[\s\S]*protocolAdvice/);
-    assert.match(panya, /DEFAULT_NONG MATA_CONFIG[\s\S]*welcomeBriefs[\s\S]*living_protocol[\s\S]*right_amount_formula[\s\S]*unpaid/);
+    assert.match(panya, /DEFAULT_PANYA_CONFIG[\s\S]*protocolAdvice/);
+    assert.match(panya, /DEFAULT_PANYA_CONFIG[\s\S]*welcomeBriefs[\s\S]*living_protocol[\s\S]*right_amount_formula[\s\S]*unpaid/);
     assert.match(panya, /const welcomeBriefs = objectValue\(input\.welcomeBriefs\)/);
     assert.match(panya, /with next_version as \(/);
     assert.match(panya, /archived as \([\s\S]*update public\.panya_config_versions[\s\S]*where status = 'active'[\s\S]*returning id[\s\S]*\)/);

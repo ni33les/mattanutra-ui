@@ -18,7 +18,7 @@ function read(rel) {
 
 const limits = read("lib/agentic/plan/limits.ts");
 const safety = read("lib/matcher/safety.ts");
-const ceilings = read("lib/matcher/safety-ceilings.ts");
+const ceilings = `${read("lib/matcher/safety-ceilings.ts")}\n${read("lib/agentic/catalogue/load-safety-ceilings.ts")}`;
 record(
   "T02",
   /supplement_safety_limits/.test(ceilings) &&
