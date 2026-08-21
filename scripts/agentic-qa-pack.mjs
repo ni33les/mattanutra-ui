@@ -567,14 +567,16 @@ async function main() {
   );
 
   const defAlts = created.alternatives ?? [];
+  const defCoverage =
+    created.matcherTelemetry?.coveragePercent ?? created.coveragePercent;
   record(
     "P-DEF",
     created.ok === true &&
-      typeof created.coveragePercent === "number" &&
+      typeof defCoverage === "number" &&
       defAlts.every(
         (item) =>
           typeof item?.coveragePercent !== "number" ||
-          item.coveragePercent <= created.coveragePercent
+          item.coveragePercent <= defCoverage
       ),
     "default is highest-coverage feasible, not a cheaper incomplete"
   );
