@@ -11,7 +11,8 @@ import type {
 } from "@/lib/agentic/catalogue/types";
 import type { ProductCandidate } from "@/lib/product-recommendation-types";
 
-const LIVE_TTL_MS = 60_000;
+const LIVE_TTL_MS = 10 * 60_000;
+const LIVE_LOAD_WAIT_MS = 8_000;
 
 let liveCache: { at: number; snapshot: CatalogueSnapshot } | null = null;
 let liveInflight: Promise<CatalogueSnapshot> | null = null;
@@ -209,6 +210,15 @@ export async function loadLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
   };
 }
 
+function loadingSnapshot(): CatalogueSnapshot {
+  return {
+    availabilityAsOf: new Date().toISOString(),
+    catalogueVersion: liveCache?.snapshot.catalogueVersion ?? "retail-th-loading",
+    products: liveCache?.snapshot.products ?? [],
+    supplements: FIXTURE_SUPPLEMENTS
+  };
+}
+
 export async function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
   if (liveCache && Date.now() - liveCache.at < LIVE_TTL_MS) {
     return liveCache.snapshot;
@@ -217,7 +227,10 @@ export async function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
   if (!liveInflight) {
     liveInflight = loadLiveThailandSnapshot()
       .then((snapshot) => {
-        liveCache = { at: Date.now(), snapshot };
+        if (snapshot.products.length > 0) {
+          liveCache = { at: Date.now(), snapshot };
+        }
+
         return snapshot;
       })
       .finally(() => {
@@ -225,7 +238,16 @@ export async function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
       });
   }
 
-  return liveInflight;
+  if (liveCache) {
+    return liveCache.snapshot;
+  }
+
+  return Promise.race([
+    liveInflight,
+    new Promise<CatalogueSnapshot>((resolve) => {
+      setTimeout(() => resolve(loadingSnapshot()), LIVE_LOAD_WAIT_MS);
+    })
+  ]);
 }
 
 export function resetLiveCatalogueCache() {

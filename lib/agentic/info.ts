@@ -16,6 +16,7 @@ import {
 import { negotiateLocale } from "@/lib/agentic/i18n";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
 import { recognisedSupplementNames } from "@/lib/agentic/catalogue/fixtures";
+import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
   RECOGNISED_CONDITION_CODES,
   RECOGNISED_MEDICATION_CODES
@@ -71,6 +72,7 @@ export function infoTool(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
 }>) {
+  void ensureCatalogueSnapshot(input.config.environment);
   const key = `${input.config.buildId}:${input.config.environment}`;
   const value =
     infoCache?.key === key

@@ -564,6 +564,7 @@ export function matchPlan(input: Readonly<{
     const beamCandidates = shortlistForBeam(eligible, input.state);
 
     try {
+      if (beamCandidates.length > 0) {
       const beam = recommendProductStackFullBeam({
         budgetAmount: input.state.requirements.maxPriceMinor
           ? input.state.requirements.maxPriceMinor / 100
@@ -598,6 +599,7 @@ export function matchPlan(input: Readonly<{
         ) {
           selected = beamed;
         }
+      }
       }
     } catch {
       // Keep the greedy stack when a live catalogue beam overruns.
