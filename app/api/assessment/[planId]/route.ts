@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createAssessmentSnapshot } from "@/lib/assessment-snapshot";
+import {
+  createAssessmentSnapshot,
+  DEFAULT_ASSESSMENT_PLAN
+} from "@/lib/assessment-snapshot";
 import {
   getStoredAssessmentPrefill,
   getStoredAssessmentSnapshot,
@@ -28,6 +31,10 @@ import {
   publicRateLimits
 } from "@/lib/rate-limit";
 import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
+import {
+  mergeInStorePharmacyAnswers,
+  resolveCapturePharmacy
+} from "@/lib/pharmacy-in-store";
 
 export const runtime = "nodejs";
 
@@ -192,6 +199,7 @@ export async function PATCH(
     intent?: "capture" | "process";
     locale?: unknown;
     paymentId?: unknown;
+    pharmacyId?: unknown;
     plan?: unknown;
     resumeToken?: unknown;
   } = {};
@@ -203,6 +211,7 @@ export async function PATCH(
       intent?: "capture" | "process";
       locale?: unknown;
       paymentId?: unknown;
+      pharmacyId?: unknown;
       plan?: unknown;
       resumeToken?: unknown;
     };
@@ -240,10 +249,38 @@ export async function PATCH(
   try {
     const existingSnapshot = await getStoredAssessmentSnapshot(planId);
     const existingPrefill = await getStoredAssessmentPrefill(planId);
-    const effectiveAnswers =
-      body.answers === undefined ? existingPrefill?.answers : body.answers;
-    const selectedPlan = existingPrefill?.plan ?? null;
-    const healthScore = await buildHealthScore(effectiveAnswers, body.locale);
+    const { invalidRequested, pharmacy } = await resolveCapturePharmacy(
+      body.pharmacyId,
+      existingPrefill?.answers
+    );
+
+    if (invalidRequested) {
+      return NextResponse.json(
+        { message: "Pharmacy not found" },
+        {
+          headers: {
+            "Cache-Control": "no-store"
+          },
+          status: 404
+        }
+      );
+    }
+
+    const skipHealthScore = Boolean(pharmacy);
+    const effectiveAnswers = pharmacy
+      ? mergeInStorePharmacyAnswers(
+          body.answers === undefined ? existingPrefill?.answers : body.answers,
+          pharmacy
+        )
+      : body.answers === undefined
+        ? existingPrefill?.answers
+        : body.answers;
+    const selectedPlan =
+      existingPrefill?.plan ??
+      (skipHealthScore ? DEFAULT_ASSESSMENT_PLAN : null);
+    const healthScore = skipHealthScore
+      ? existingPrefill?.healthScore ?? undefined
+      : await buildHealthScore(effectiveAnswers, body.locale);
     const snapshot = createAssessmentSnapshot({
       healthScore,
       plan: selectedPlan ?? existingSnapshot?.plan,
@@ -257,6 +294,7 @@ export async function PATCH(
       contactEmail: body.contactEmail,
       locale: body.locale,
       selectedPlan,
+      skipHealthScore,
       snapshot,
       status: "captured"
     });

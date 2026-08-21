@@ -12,8 +12,10 @@ import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import {
   nutritionHealthScorePath,
-  nutritionQuizPath
+  nutritionQuizPath,
+  nutritionRevealPath
 } from "@/lib/nutrition-paths";
+import { assessmentSkipsHealthScore } from "@/lib/pharmacy-in-store";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
@@ -126,6 +128,10 @@ export default async function NutritionHealthScorePage({
   }
 
   const prefill = await getStoredAssessmentPrefill(planId);
+
+  if (assessmentSkipsHealthScore(prefill?.answers)) {
+    redirect(nutritionRevealPath(locale, planId));
+  }
 
   if (!prefill?.healthScore) {
     redirect(nutritionQuizPath(locale, planId));

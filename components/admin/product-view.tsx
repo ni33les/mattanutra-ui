@@ -286,6 +286,9 @@ export function AdminProductListView({
   const [addProductSaving, setAddProductSaving] = useState(false);
   const [addProductError, setAddProductError] = useState<string | null>(null);
   const viewLabels = productViewLabels[locale];
+  const exportHref = `/api/admin/products/catalogue/export?scope=approved${
+    accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : ""
+  }`;
   const metrics = productMetricCardsFromSummary({
     locale,
     summary: data.summary,
@@ -384,7 +387,14 @@ export function AdminProductListView({
 
   return (
     <section className="mt-8 space-y-6">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <a
+          className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
+          data-testid="approved-products-export"
+          href={exportHref}
+        >
+          {viewLabels.exportCsv}
+        </a>
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
           onClick={() => {

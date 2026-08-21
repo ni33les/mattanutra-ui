@@ -23,6 +23,7 @@ export type CaptureFinalizeInput = Readonly<{
   state: QuestionnaireState;
   contactEmail?: string | null;
   paymentId?: string | null;
+  pharmacyId?: string | null;
   planId?: string | null;
   resumeToken?: string | null;
   /** Absolute or relative assessment API base; default same-origin. */
@@ -78,6 +79,7 @@ export async function finalizeAssessmentCapture(
     intent: "capture" as const,
     locale: input.state.locale === "zh-CN" ? "zh-CN" : input.state.locale,
     paymentId: input.paymentId || undefined,
+    pharmacyId: input.pharmacyId || undefined,
     resumeToken: input.resumeToken || undefined,
     bpm: {
       ...(input.bpm || {}),

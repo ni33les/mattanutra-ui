@@ -4,6 +4,7 @@ import { canAccessRetailOrganisation } from "@/lib/admin-retail-stock-access";
 import { requireAdminRouteAccess } from "@/lib/admin-route-auth";
 import { isUuidValue } from "@/lib/admin-product-helpers";
 import {
+  buildApprovedProductCatalogueCsv,
   buildPlatformProductCatalogueJson,
   buildRetailProductCatalogueJson,
   type ProductCatalogueCsvScope
@@ -22,7 +23,15 @@ function textOrNull(value: unknown, max = 2000) {
 }
 
 function csvScope(value: unknown): ProductCatalogueCsvScope {
-  return value === "retail" ? "retail" : "platform";
+  if (value === "retail") {
+    return "retail";
+  }
+
+  if (value === "approved") {
+    return "approved";
+  }
+
+  return "platform";
 }
 
 async function resolveRetailExport(request: NextRequest, organisationId: string | null) {
@@ -87,6 +96,30 @@ export async function GET(request: NextRequest) {
   try {
     const scope = csvScope(url.searchParams.get("scope"));
     const organisationId = textOrNull(url.searchParams.get("organisationId"), 80);
+
+    if (scope === "approved") {
+      if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
+        return NextResponse.json(
+          { message: "Not found" },
+          {
+            headers: {
+              "Cache-Control": "no-store"
+            },
+            status: 404
+          }
+        );
+      }
+
+      const payload = await buildApprovedProductCatalogueCsv();
+
+      return new Response(payload.csv, {
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Disposition": 'attachment; filename="approved-products.csv"',
+          "Content-Type": "text/csv; charset=utf-8"
+        }
+      });
+    }
 
     if (scope === "platform") {
       if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {

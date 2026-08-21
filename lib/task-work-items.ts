@@ -32,6 +32,7 @@ import {
 import {
   ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE
 } from "@/lib/admin-catalogue-optimization-jobs";
+import { inStorePharmacyFromAnswers } from "@/lib/pharmacy-in-store";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCode
@@ -1824,7 +1825,8 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   const candidateLoadStartedAt = Date.now();
   const retailerCandidateSets =
     await getLiveSaleEligibleRetailerCandidateSets({
-      countryCode
+      countryCode,
+      organisationId: inStorePharmacyFromAnswers(context.answers)?.id ?? null
     });
   const candidates = retailerCandidateSets.flatMap((set) => set.candidates);
 

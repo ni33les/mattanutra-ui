@@ -38,6 +38,7 @@ import {
   formatTemplate,
   getLocalizedText,
   localizedBenefitTagLabel,
+  localizedCategoryExplanation,
   localizedCategoryLabel,
   localizedContextChip,
   localizedCountText,
@@ -961,10 +962,20 @@ function RevealFormulaFinalSection({
 
           {groupedFormulaIngredients(ingredients).map(([category, group]) => (
             <div key={category}>
-              <div className="mt-8 flex items-center gap-3 border-b border-dashed border-[var(--mn-line)] pb-3 mn-reveal-font-display text-sm italic text-[var(--mn-gold)]">
-                <span className="size-1.5 rounded-full bg-[var(--mn-gold)]" />
-                {localizedCategoryLabel(category, locale)}
-                <span className="ml-auto mn-reveal-font-mono text-[11px] not-italic uppercase tracking-[0.2em] text-[var(--mn-ash)]">
+              <div className="mt-8 flex items-start gap-3 border-b border-dashed border-[var(--mn-line)] pb-3 mn-reveal-font-display text-sm italic text-[var(--mn-gold)]">
+                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[var(--mn-gold)]" />
+                <div className="min-w-0 flex-1">
+                  <div>{localizedCategoryLabel(category, locale)}</div>
+                  {localizedCategoryExplanation(category, locale) ? (
+                    <p
+                      className="mt-1 max-w-[46rem] mn-reveal-font-body text-sm not-italic leading-[1.55] tracking-normal text-[var(--mn-ink-soft)]"
+                      data-testid="formula-category-explain"
+                    >
+                      {localizedCategoryExplanation(category, locale)}
+                    </p>
+                  ) : null}
+                </div>
+                <span className="ml-auto shrink-0 pt-1 mn-reveal-font-mono text-[11px] not-italic uppercase tracking-[0.2em] text-[var(--mn-ash)]">
                   {group.length} {copy.selectedSuffix}
                 </span>
               </div>

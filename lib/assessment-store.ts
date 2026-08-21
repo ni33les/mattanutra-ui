@@ -56,6 +56,7 @@ type PersistAssessmentInput = Readonly<{
   contactEmail?: unknown;
   locale?: unknown;
   selectedPlan?: AssessmentPlan | null;
+  skipHealthScore?: boolean;
   snapshot: AssessmentSnapshot;
   status: StoredAssessmentStatus;
 }>;
@@ -1126,6 +1127,7 @@ export async function persistAssessmentSubmission({
   contactEmail,
   locale,
   selectedPlan,
+  skipHealthScore = false,
   snapshot,
   status
 }: PersistAssessmentInput) {
@@ -1139,7 +1141,7 @@ export async function persistAssessmentSubmission({
     throw new Error("Assessment plan ID must be a UUID");
   }
 
-  if (!snapshot.healthScore) {
+  if (!snapshot.healthScore && !skipHealthScore) {
     throw new Error("Assessment snapshot must include backend HealthScore");
   }
 

@@ -11,6 +11,7 @@ import { appendAssessmentVersion } from "@/lib/domain-versions";
 import {
   getLiveSaleEligibleRetailerCandidateSets
 } from "@/lib/admin-products";
+import { loadInStorePharmacyOrganisationId } from "@/lib/pharmacy-in-store";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCode
@@ -2261,6 +2262,7 @@ async function applyProductRecommendationsResult(
     const retailerCandidateSets =
       await getLiveSaleEligibleRetailerCandidateSets({
         countryCode,
+        organisationId: await loadInStorePharmacyOrganisationId(sql, task.planId),
         sql
       });
     const candidates = retailerCandidateSets.flatMap((set) => set.candidates);

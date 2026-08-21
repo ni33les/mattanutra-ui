@@ -85,9 +85,11 @@ function runLeafBurst(count = 8) {
 type ChatQuestionnaireProps = Readonly<{
   locale: Locale;
   paymentId?: string;
+  pharmacyId?: string;
   returningPlanId?: string;
   resumeToken?: string;
   showDevShortcut?: boolean;
+  skipHealthScore?: boolean;
 }>;
 
 type UiScreen = "welcome" | "chat" | "calculating";
@@ -178,9 +180,10 @@ function hasUsableHealthScore(payload: {
 function resultsPath(
   locale: Locale,
   planId: string,
-  paymentId?: string
+  paymentId?: string,
+  skipHealthScore?: boolean
 ) {
-  return paymentId
+  return paymentId || skipHealthScore
     ? nutritionRevealPath(locale, planId)
     : nutritionHealthScorePath(locale, planId);
 }
@@ -188,10 +191,13 @@ function resultsPath(
 export function ChatQuestionnaire({
   locale,
   paymentId,
+  pharmacyId,
   returningPlanId,
   resumeToken,
-  showDevShortcut
+  showDevShortcut,
+  skipHealthScore = false
 }: ChatQuestionnaireProps) {
+  const skipHealthScoreStep = skipHealthScore || Boolean(pharmacyId);
   const router = useRouter();
   const logEndRef = useRef<HTMLDivElement | null>(null);
   const logScrollRef = useRef<HTMLDivElement | null>(null);
@@ -643,6 +649,7 @@ export function ChatQuestionnaire({
           state: { ...completed, phase: "completing" },
           planId: returningPlanId || completed.planId,
           paymentId,
+          pharmacyId,
           resumeToken,
           contactEmail: queuedEmail,
           bpm: getBpmPayload(),
@@ -662,13 +669,15 @@ export function ChatQuestionnaire({
         // Capture often returns status "captured"/"preparing" while a base score
         // already exists — treat that as ready so the UI does not hang waiting
         // for optional analysis enrichment tasks.
-        let ready = hasUsableHealthScore({
-          status: captured.status,
-          healthScore: captured.healthScore,
-          planId: captured.planId
-        });
+        let ready = skipHealthScoreStep
+          ? Boolean(captured.planId)
+          : hasUsableHealthScore({
+              status: captured.status,
+              healthScore: captured.healthScore,
+              planId: captured.planId
+            });
 
-        if (!ready) {
+        if (!ready && !skipHealthScoreStep) {
           ready = await pollHealthScore(captured.planId);
         }
 
@@ -683,7 +692,9 @@ export function ChatQuestionnaire({
         }
 
         clearLocalState(locale);
-        trackBpmEvent("healthscore_ready", {
+        trackBpmEvent(
+          skipHealthScoreStep ? "assessment_captured" : "healthscore_ready",
+          {
           email: queuedEmail || undefined,
           eventType: "funnel",
           locale,
@@ -691,7 +702,8 @@ export function ChatQuestionnaire({
           properties: {
             channel: "web",
             questionnaireVersion: "v6-conversational",
-            uxVersion: UX_VERSION
+            uxVersion: UX_VERSION,
+            skipHealthScore: skipHealthScoreStep
           }
         });
         setCalcStatus("ready");
@@ -706,9 +718,11 @@ export function ChatQuestionnaire({
       armCalcFallback,
       locale,
       paymentId,
+      pharmacyId,
       pollHealthScore,
       resumeToken,
       returningPlanId,
+      skipHealthScoreStep,
       ui.processingError
     ]
   );
@@ -1631,7 +1645,9 @@ export function ChatQuestionnaire({
             return;
           }
 
-          router.replace(resultsPath(locale, planId, paymentId));
+          router.replace(
+            resultsPath(locale, planId, paymentId, skipHealthScoreStep)
+          );
         }}
         onEmailSubmit={onFallbackEmail}
       />

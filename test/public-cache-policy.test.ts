@@ -40,7 +40,8 @@ describe("public cache and crawl policy", () => {
       "assessment",
       "basket",
       "nutrition",
-      "order"
+      "order",
+      "p"
     ]);
 
     assert.equal(localePathRequiresNoStore("/en"), false);
@@ -57,6 +58,7 @@ describe("public cache and crawl policy", () => {
     assert.equal(localePathRequiresNoStore("/en/nutrition/quiz"), true);
     assert.equal(localePathRequiresNoStore("/en/nutrition/reveal"), true);
     assert.equal(localePathRequiresNoStore("/en/order/track/abc"), true);
+    assert.equal(localePathRequiresNoStore("/en/p/delight-pharmacy"), true);
   });
 
   it("disallows admin, api, and private funnels in robots.txt rules", () => {
@@ -70,6 +72,8 @@ describe("public cache and crawl policy", () => {
     assert.ok(disallow.includes("/*/nutrition/payment/"));
     assert.ok(disallow.includes("/*/nutrition/refine/"));
     assert.ok(disallow.includes("/*/order/"));
+    assert.ok(disallow.includes("/p/"));
+    assert.ok(disallow.includes("/*/p/"));
 
     // Indexable marketing shells under nutrition remain crawlable.
     assert.equal(

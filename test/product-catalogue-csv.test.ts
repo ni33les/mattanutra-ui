@@ -351,7 +351,9 @@ describe("product catalogue CSV", () => {
     assert.match(exportRoute, /retail-product-catalogue-\$\{organisationId\}\.json/);
     assert.match(exportRoute, /application\/json/);
     assert.doesNotMatch(exportRoute, /buildProductCatalogueCsv/);
-    assert.doesNotMatch(exportRoute, /text\/csv/);
+    assert.match(exportRoute, /buildApprovedProductCatalogueCsv/);
+    assert.match(exportRoute, /text\/csv; charset=utf-8/);
+    assert.match(exportRoute, /approved-products\.csv/);
     assert.match(importRoute, /applyProductCatalogueCsvImport/);
     assert.match(service, /createAdminProduct/);
     assert.match(service, /updateAdminProduct/);

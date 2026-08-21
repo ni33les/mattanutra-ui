@@ -227,6 +227,10 @@ export function localizedCategoryLabel(value: string, locale: Locale) {
   return labelFromCatalog(locale, "formulaCategory", value, value);
 }
 
+export function localizedCategoryExplanation(value: string, locale: Locale) {
+  return labelFromCatalog(locale, "formulaCategoryExplain", value, "");
+}
+
 export function localizedContextChip(value: string, locale: Locale) {
   return value
     .split(" / ")

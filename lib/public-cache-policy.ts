@@ -18,7 +18,8 @@ export const noStoreLocaleRootSegments = [
   "assessment",
   "basket",
   "nutrition",
-  "order"
+  "order",
+  "p"
 ] as const;
 
 export type NoStoreLocaleRootSegment =
@@ -57,6 +58,8 @@ export function robotsDisallowPaths(): string[] {
     "/admin",
     "/admin/",
     "/api/",
+    "/p",
+    "/p/",
     "/*/admin",
     "/*/admin/",
     "/*/assessment",
@@ -65,6 +68,8 @@ export function robotsDisallowPaths(): string[] {
     "/*/nutrition/payment/",
     "/*/nutrition/refine",
     "/*/nutrition/refine/",
-    "/*/order/"
+    "/*/order/",
+    "/*/p",
+    "/*/p/"
   ];
 }

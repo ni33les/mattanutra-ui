@@ -35,7 +35,22 @@ import {
   v9MasterListProductFromSourceSnapshot,
 } from "@/lib/v9-product-master";
 
-export type ProductCatalogueCsvScope = "platform" | "retail";
+export type ProductCatalogueCsvScope = "approved" | "platform" | "retail";
+
+export const APPROVED_PRODUCT_EXPORT_HEADERS = [
+  "Product ID",
+  "Manufacturer SKU",
+  "EAN-13",
+  "Brand",
+  "Name",
+  "Thai Name",
+  "Status",
+  "Country",
+  "FDA Approval",
+  "Product URL",
+  "Image URL",
+  "Updated At"
+] as const;
 
 export type PlatformProductCatalogueJson = Readonly<{
   generatedAt: string;
@@ -1026,6 +1041,119 @@ export function platformProductCatalogueJsonProductFromRow(
     },
     translations: row.translations,
     updatedAt: row.updatedAt,
+  };
+}
+
+function csvCell(value: unknown) {
+  const text = value == null ? "" : String(value);
+
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  return text;
+}
+
+export async function buildApprovedProductCatalogueCsv() {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const rows = await sql<
+    Array<{
+      barcode: string | null;
+      brand_name: string | null;
+      country_codes: string[] | null;
+      fda_approval: string | null;
+      image_url: string | null;
+      manufacturer_sku: string | null;
+      product_id: string;
+      product_url: string | null;
+      status: string;
+      thai_name: string | null;
+      title: string;
+      updated_at: Date | string;
+    }>
+  >`
+    select
+      products.id::text as product_id,
+      products.title,
+      products.brand_name,
+      products.status,
+      products.product_url,
+      products.image_url,
+      products.updated_at,
+      sku.identifier_value as manufacturer_sku,
+      barcode.identifier_value as barcode,
+      fda.approval_number as fda_approval,
+      th.title as thai_name,
+      country_rows.country_codes
+    from public.products
+    left join lateral (
+      select identifier_value
+      from public.product_identifiers
+      where product_id = products.id
+        and status = 'active'
+        and identifier_type = 'manufacturer_sku'
+      order by updated_at desc
+      limit 1
+    ) sku on true
+    left join lateral (
+      select identifier_value
+      from public.product_identifiers
+      where product_id = products.id
+        and status = 'active'
+        and identifier_type in ('ean13', 'upc')
+      order by case identifier_type when 'ean13' then 0 else 1 end, updated_at desc
+      limit 1
+    ) barcode on true
+    left join lateral (
+      select approval_number
+      from public.product_regulatory_approvals
+      where product_id = products.id
+        and status in ('verified', 'sourced')
+      order by updated_at desc
+      limit 1
+    ) fda on true
+    left join public.product_translations th
+      on th.product_id = products.id
+     and th.locale = 'th'
+    left join lateral (
+      select array_agg(product_countries.country_code order by product_countries.country_code) as country_codes
+      from public.product_countries
+      where product_countries.product_id = products.id
+    ) country_rows on true
+    where products.status = 'approved'
+    order by lower(coalesce(products.brand_name, '')), lower(products.title), products.id
+  `;
+
+  const lines = [
+    APPROVED_PRODUCT_EXPORT_HEADERS.join(","),
+    ...rows.map((row) =>
+      [
+        row.product_id,
+        row.manufacturer_sku,
+        row.barcode,
+        row.brand_name,
+        row.title,
+        row.thai_name,
+        row.status,
+        (row.country_codes ?? []).join(" "),
+        row.fda_approval,
+        row.product_url,
+        row.image_url,
+        isoDateTime(row.updated_at)
+      ]
+        .map(csvCell)
+        .join(",")
+    )
+  ];
+
+  return {
+    csv: `${lines.join("\n")}\n`,
+    productCount: rows.length
   };
 }
 

@@ -7,6 +7,10 @@ import { persistAssessmentSubmission } from "@/lib/assessment-store";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import { computeHealthScore } from "@/lib/health-score";
 import {
+  mergeInStorePharmacyAnswers,
+  resolveCapturePharmacy
+} from "@/lib/pharmacy-in-store";
+import {
   enqueueAssessmentPregenerationTasks,
   enqueueDueScheduledActions,
   scheduleReassessmentAction
@@ -81,6 +85,7 @@ export async function POST(request: Request) {
     intent?: "capture" | "process";
     locale?: unknown;
     paymentId?: unknown;
+    pharmacyId?: unknown;
     plan?: unknown;
     resumeToken?: unknown;
   } = {};
@@ -92,6 +97,7 @@ export async function POST(request: Request) {
       intent?: "capture" | "process";
       locale?: unknown;
       paymentId?: unknown;
+      pharmacyId?: unknown;
       plan?: unknown;
       resumeToken?: unknown;
     };
@@ -114,18 +120,41 @@ export async function POST(request: Request) {
     );
   }
 
+  const { invalidRequested, pharmacy } = await resolveCapturePharmacy(
+    body.pharmacyId
+  );
+
+  if (invalidRequested) {
+    return NextResponse.json(
+      { message: "Pharmacy not found" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 404
+      }
+    );
+  }
+
+  const skipHealthScore = Boolean(pharmacy);
+  const answers = pharmacy
+    ? mergeInStorePharmacyAnswers(body.answers, pharmacy)
+    : body.answers;
   const snapshot = createAssessmentSnapshot({
-    healthScore: await buildHealthScore(body.answers, body.locale),
+    healthScore: skipHealthScore
+      ? undefined
+      : await buildHealthScore(answers, body.locale),
     plan: DEFAULT_ASSESSMENT_PLAN,
     status: "ready"
   });
 
   try {
     await persistAssessmentSubmission({
-      answers: body.answers,
+      answers,
       contactEmail: body.contactEmail,
       locale: body.locale,
-      selectedPlan: null,
+      selectedPlan: skipHealthScore ? DEFAULT_ASSESSMENT_PLAN : null,
+      skipHealthScore,
       snapshot,
       status: "captured"
     });
@@ -215,7 +244,7 @@ export async function POST(request: Request) {
       });
 
       await enqueueAssessmentPregenerationTasks({
-        answers: body.answers,
+        answers,
         locale: body.locale,
         planId: snapshot.planId
       });

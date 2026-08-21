@@ -6390,6 +6390,33 @@
     "translatable": true,
     "variables": []
   },
+  "customer.pharmacyInStore.homeCta": {
+    "audience": "customer",
+    "defaultMessage": "Go to MattaNutra home",
+    "description": "Home link on the invalid in-store pharmacy page.",
+    "namespace": "customer.pharmacyInStore",
+    "surface": "quiz",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.pharmacyInStore.invalidBody": {
+    "audience": "customer",
+    "defaultMessage": "This in-store link is not valid. Ask the pharmacy for a current QR code, or start a plan on the MattaNutra website.",
+    "description": "Body copy when /p/{pharmacyId} does not match an active tenant pharmacy.",
+    "namespace": "customer.pharmacyInStore",
+    "surface": "quiz",
+    "translatable": true,
+    "variables": []
+  },
+  "customer.pharmacyInStore.invalidTitle": {
+    "audience": "customer",
+    "defaultMessage": "Pharmacy not found",
+    "description": "Title when /p/{pharmacyId} is not an active tenant pharmacy.",
+    "namespace": "customer.pharmacyInStore",
+    "surface": "quiz",
+    "translatable": true,
+    "variables": []
+  },
   "customer.revealCopy.begin": {
     "defaultMessage": "Begin",
     "description": "Reveal page copy field begin.",
@@ -8240,9 +8267,117 @@
     "variables": [],
     "translatable": true
   },
+  "customer.revealLabels.formulaCategory.addSeparately": {
+    "defaultMessage": "Add separately",
+    "description": "Reveal formulaCategory label for Add separately.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategory.core": {
+    "defaultMessage": "Foundation",
+    "description": "Reveal formulaCategory label for Core (shown as Foundation).",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategory.foundation": {
+    "defaultMessage": "Foundation",
+    "description": "Reveal formulaCategory label for Foundation.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategory.foundationAddOn": {
+    "defaultMessage": "Foundation add-on",
+    "description": "Reveal formulaCategory label for Foundation add-on.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategory.review": {
+    "defaultMessage": "Review",
+    "description": "Reveal formulaCategory label for Review.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategory.targeted": {
+    "defaultMessage": "Targeted",
+    "description": "Reveal formulaCategory label for Targeted.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
   "customer.revealLabels.formulaCategory.vitamins": {
     "defaultMessage": "Vitamins",
     "description": "Reveal formulaCategory label for Vitamins.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategoryExplain.addSeparately": {
+    "defaultMessage": "Useful for you, but better taken as its own product rather than in the main mix.",
+    "description": "Plain-language explanation for the Add separately formula group.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategoryExplain.core": {
+    "defaultMessage": "Daily basics that most people benefit from keeping topped up.",
+    "description": "Plain-language explanation for the Core/Foundation formula group.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategoryExplain.foundation": {
+    "defaultMessage": "Daily basics that most people benefit from keeping topped up.",
+    "description": "Plain-language explanation for the Foundation formula group.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategoryExplain.foundationAddOn": {
+    "defaultMessage": "Extra daily support on top of the basics, chosen from your answers.",
+    "description": "Plain-language explanation for the Foundation add-on formula group.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategoryExplain.review": {
+    "defaultMessage": "Worth checking with a pharmacist or clinician before you start.",
+    "description": "Plain-language explanation for the Review formula group.",
+    "namespace": "customer.revealLabels",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealLabels.formulaCategoryExplain.targeted": {
+    "defaultMessage": "Chosen specifically for your goals and current answers.",
+    "description": "Plain-language explanation for the Targeted formula group.",
     "namespace": "customer.revealLabels",
     "audience": "customer",
     "surface": "reveal",

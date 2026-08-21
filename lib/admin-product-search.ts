@@ -287,6 +287,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
   countryCode?: string | null;
   includeIneligible?: boolean;
   limit?: number;
+  organisationId?: string | null;
   productId?: string | null;
   saleEligibleOnly?: boolean;
   sql?: ProductSearchDb;
@@ -299,6 +300,13 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
 
   const countryCode =
     normalizeProductCountryCode(input.countryCode) ?? defaultProductCountryCode;
+  const organisationId =
+    typeof input.organisationId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      input.organisationId
+    )
+      ? input.organisationId
+      : null;
   const rows = await loadProductRows(input.productId ?? null);
 
   if (!rows || rows.length < 1) {
@@ -352,6 +360,11 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       and organisations.status = 'active'
       and organisations.country_code = ${countryCode}
       and sellable.product_id = any(${productIds}::uuid[])
+      and ${
+        organisationId
+          ? sql`organisations.id = ${organisationId}::uuid`
+          : sql`true`
+      }
       and ${
         input.saleEligibleOnly
           ? sql`products.status = 'approved'
@@ -488,6 +501,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
 export async function getLiveSaleEligibleRetailerCandidateSets(input: Readonly<{
   countryCode?: string | null;
   limit?: number;
+  organisationId?: string | null;
   productId?: string | null;
   sql?: ProductSearchDb;
 }>) {

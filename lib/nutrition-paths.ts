@@ -34,3 +34,11 @@ export function nutritionHealthScorePath(locale: Locale, planId?: string) {
 export function nutritionRevealPath(locale: Locale, planId?: string) {
   return withQuery(`/${locale}/nutrition/reveal`, { plan: planId });
 }
+
+export function pharmacyEntryPath(pharmacyId: string) {
+  return `/p/${encodeURIComponent(pharmacyId)}`;
+}
+
+export function nutritionPharmacyPath(locale: Locale, pharmacyId: string) {
+  return `/${locale}/p/${encodeURIComponent(pharmacyId)}`;
+}

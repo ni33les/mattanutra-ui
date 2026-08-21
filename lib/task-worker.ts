@@ -8,6 +8,7 @@ import {
   isUuid,
   toJsonValue
 } from "@/lib/assessment-store";
+import { assessmentSkipsHealthScore } from "@/lib/pharmacy-in-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
@@ -295,13 +296,17 @@ export async function enqueueHealthScoreAnalysisTask({
   }
 
   const rows = await sql`
-    select health_score
+    select answers, health_score
     from public.assessments
     where plan_id = ${planId}::uuid
     limit 1
   `;
 
   if (!rows[0]) {
+    return null;
+  }
+
+  if (assessmentSkipsHealthScore(rows[0].answers)) {
     return null;
   }
 
@@ -489,10 +494,12 @@ export async function enqueueAssessmentPregenerationTasks({
     plan,
     pregeneration: true
   };
-  const healthScoreTaskId = await enqueueHealthScoreAnalysisTask({
-    planId,
-    taskGroupId
-  });
+  const healthScoreTaskId = assessmentSkipsHealthScore(answers)
+    ? null
+    : await enqueueHealthScoreAnalysisTask({
+        planId,
+        taskGroupId
+      });
   const formulationTaskId = await createWorkTask({
     actorType: "deterministic",
     businessValue: TASK_BUSINESS_VALUES.precision,

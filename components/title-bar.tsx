@@ -53,7 +53,9 @@ function isAssessmentStartedPath(currentPath: string, locale: Locale) {
     pathname === `/${locale}/assessment/results` ||
     pathname === `/${locale}/nutrition/quiz` ||
     pathname === `/${locale}/nutrition/healthscore` ||
-    pathname === `/${locale}/nutrition/reveal`;
+    pathname === `/${locale}/nutrition/reveal` ||
+    pathname === `/${locale}/p` ||
+    pathname.startsWith(`/${locale}/p/`);
 }
 
 export function TitleBar({

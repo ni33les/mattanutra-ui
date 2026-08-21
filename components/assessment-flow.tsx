@@ -70,12 +70,14 @@ type AssessmentFlowProps = Readonly<{
   initialSectionIndex?: number;
   locale: Locale;
   paymentId?: string;
+  pharmacyId?: string;
   prefillAnswers?: unknown;
   prefillContactEmail?: string | null;
   returningHealthScore?: HealthScoreResult | null;
   returningPlanId?: string;
   resumeToken?: string;
   showDevShortcut?: boolean;
+  skipHealthScore?: boolean;
 }>;
 
 type AssessmentQuestion = Readonly<{
@@ -165,13 +167,16 @@ export function AssessmentFlow({
   initialSectionIndex,
   locale,
   paymentId,
+  pharmacyId,
   prefillAnswers,
   prefillContactEmail,
   returningHealthScore,
   returningPlanId,
   resumeToken,
-  showDevShortcut = false
+  showDevShortcut = false,
+  skipHealthScore = false
 }: AssessmentFlowProps) {
+  const skipHealthScoreStep = skipHealthScore || Boolean(pharmacyId);
   const copy = copies[locale];
   const router = useRouter();
   const returningScoreStatus = returningPlanId && returningHealthScore
@@ -1164,21 +1169,23 @@ export function AssessmentFlow({
 
       let readyStatus = captured;
 
-      if (readyStatus.status !== "ready") {
+      if (!skipHealthScoreStep && readyStatus.status !== "ready") {
         setProcessingStatus(readyStatus);
         readyStatus = await waitForHealthScoreAnalysis(readyStatus.planId);
       }
 
-      if (!readyStatus.healthScore) {
+      if (!skipHealthScoreStep && !readyStatus.healthScore) {
         throw new Error("Assessment capture did not return a HealthScore");
       }
 
-      setHealthScore(readyStatus.healthScore);
+      if (readyStatus.healthScore) {
+        setHealthScore(readyStatus.healthScore);
+      }
       setCapturedStatus(readyStatus);
       setProcessingStatus(null);
-      setShowHealthScore(true);
+      setShowHealthScore(!skipHealthScoreStep);
       router.replace(
-        paymentId
+        paymentId || skipHealthScoreStep
           ? nutritionRevealPath(locale, readyStatus.planId)
           : nutritionHealthScorePath(locale, readyStatus.planId)
       );
@@ -1240,6 +1247,7 @@ export function AssessmentFlow({
                   intent: "capture",
                   locale,
                   paymentId,
+                  pharmacyId,
                   resumeToken
                 }),
                 cache: "no-store",
@@ -1257,6 +1265,7 @@ export function AssessmentFlow({
                 intent: "capture",
                 locale,
                 paymentId,
+                pharmacyId,
                 resumeToken
               }),
               cache: "no-store",
