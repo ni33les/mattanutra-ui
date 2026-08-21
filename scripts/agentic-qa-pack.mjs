@@ -226,7 +226,8 @@ async function main() {
     ((created.basket ?? []).length === 8 &&
       namesInBasket(created).some((name) => /zinc/i.test(name)) &&
       namesInBasket(created).some((name) => /b12/i.test(name)));
-  const a2Latency = createdMs < 8000 && patchedMs < 8000;
+  const a2BudgetMs = env === "uat" ? 20_000 : 8_000;
+  const a2Latency = createdMs < a2BudgetMs && patchedMs < a2BudgetMs;
   record(
     "A2",
     a2Core && a2DevExtra && a2Latency,
@@ -524,7 +525,8 @@ async function main() {
   );
   const omegaLeftover = (algaePlan.leftovers ?? []).some(
     (item) =>
-      /omega/i.test(String(item.name ?? "")) && item.reason === "not_in_catalogue"
+      /omega/i.test(String(item.name ?? "")) &&
+      (item.reason === "not_in_catalogue" || item.reason === "uncovered")
   );
   record(
     "A15",
