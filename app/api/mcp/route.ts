@@ -101,7 +101,7 @@ export async function POST(request: Request) {
 
   try {
     if (!Array.isArray(body) && !mcpCallNeedsStore(body)) {
-      const light = handleLightweightJsonRpc(
+      const light = await handleLightweightJsonRpc(
         loadAgenticConfig(request),
         body as JsonRpcRequest
       );

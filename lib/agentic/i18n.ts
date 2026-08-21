@@ -65,9 +65,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "国家/地区"
   },
   "checkout.delivery": {
-    en: "Delivery address (Thailand)",
-    th: "ที่อยู่จัดส่ง (ประเทศไทย)",
-    "zh-CN": "配送地址（泰国）"
+    en: "Delivery address",
+    th: "ที่อยู่จัดส่ง",
+    "zh-CN": "配送地址"
   },
   "checkout.email": {
     en: "Email",
@@ -90,9 +90,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "邮编"
   },
   "checkout.province": {
-    en: "Province",
-    th: "จังหวัด",
-    "zh-CN": "府"
+    en: "Province / state",
+    th: "จังหวัด / รัฐ",
+    "zh-CN": "省 / 州"
   },
   "checkout.subtotal": {
     en: "Subtotal",
@@ -235,9 +235,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "反馈不得包含密钥、联系方式或对话记录。"
   },
   "mcp.errors.unsupported_country": {
-    en: "This destination country is not supported yet.",
-    th: "ยังไม่รองรับประเทศปลายทางนี้",
-    "zh-CN": "暂不支持该目的地国家/地区。"
+    en: "We cannot deliver to that country yet.",
+    th: "เรายังจัดส่งไปประเทศนั้นไม่ได้",
+    "zh-CN": "我们暂时无法配送到该国家/地区。"
   },
   "mcp.errors.unsupported_currency": {
     en: "Currency must match the destination market.",

@@ -150,9 +150,51 @@ describe("retail cart availability", () => {
     });
 
     assert.equal(availability.canCheckout, true);
+    assert.equal(availability.cannotDeliver, false);
     assert.equal(availability.shippingCountry, "TH");
     assert.equal(availability.selectedRetailer?.organisationId, "thai-retailer");
     assert.equal(availability.lines[0]?.reason, "Stock is available now.");
+  });
+
+  it("politely refuses undeliverable countries instead of remapping to Thailand", () => {
+    const singapore = resolveRegionalBasketAvailabilityFromRows({
+      lines: [{ productId: "product-1", quantity: 1 }],
+      now,
+      preference: "cheapest_price",
+      rows: [
+        regionalRow({
+          organisation_country_code: "TH",
+          organisation_id: "thai-retailer",
+          organisation_name: "Thai Retailer"
+        })
+      ],
+      shippingCountry: "SG"
+    });
+
+    assert.equal(singapore.shippingCountry, "SG");
+    assert.equal(singapore.canCheckout, false);
+    assert.equal(singapore.cannotDeliver, true);
+    assert.match(String(singapore.cannotDeliverMessage), /cannot deliver to Singapore/i);
+    assert.equal(singapore.selectedRetailer, null);
+
+    const zealand = resolveRegionalBasketAvailabilityFromRows({
+      lines: [{ productId: "product-1", quantity: 1 }],
+      now,
+      preference: "cheapest_price",
+      rows: [
+        regionalRow({
+          organisation_country_code: "TH",
+          organisation_id: "thai-retailer",
+          organisation_name: "Thai Retailer"
+        })
+      ],
+      shippingCountry: "NZ"
+    });
+
+    assert.equal(zealand.shippingCountry, "NZ");
+    assert.equal(zealand.canCheckout, false);
+    assert.equal(zealand.cannotDeliver, true);
+    assert.equal(zealand.selectedRetailer, null);
   });
 
   it("selects the cheapest full-basket retailer and uses ETA only as a tie-breaker", () => {

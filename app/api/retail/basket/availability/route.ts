@@ -7,7 +7,7 @@ import {
 import { writeBpmEvent } from "@/lib/bpm";
 import { isUuid } from "@/lib/assessment-store";
 import { isLocale } from "@/lib/i18n";
-import { normalizeProductCountryCode } from "@/lib/product-countries";
+import { parseShippingCountryCode } from "@/lib/product-countries";
 import {
   enforceRateLimit,
   publicRateLimits
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const shippingCountry = normalizeProductCountryCode(body.shippingCountry);
+  const shippingCountry = parseShippingCountryCode(body.shippingCountry);
   const lines = linesValue(body.lines);
   const locale = isLocale(body.locale) ? body.locale : undefined;
   const planId = typeof body.planId === "string" && isUuid(body.planId)
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 
   if (!shippingCountry || lines.length === 0) {
     return NextResponse.json(
-      { error: "Shipping country and basket lines are required" },
+      { error: "A valid shipping country and basket lines are required" },
       { status: 400 }
     );
   }

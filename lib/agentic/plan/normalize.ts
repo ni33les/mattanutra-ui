@@ -303,19 +303,20 @@ export type NormalizedPlan = Readonly<{
   state: CanonicalPlanState;
 }>;
 
-export function normalizePlanRequest(input: Readonly<{
+export async function normalizePlanRequest(input: Readonly<{
   config: AgenticConfig;
   request: unknown;
   snapshot: CatalogueSnapshot;
-}>): NormalizedPlan | AgenticErrorResult {
+}>): Promise<NormalizedPlan | AgenticErrorResult> {
   const request = asRequest(input.request);
 
   if (isAgenticErrorResult(request)) {
     return request;
   }
 
-  const market = resolveMarket({
+  const market = await resolveMarket({
     countryCode: request.destinationCountry,
+    locale: request.locale,
     retailerAdapter: input.config.thailandRetailerAdapter
   });
 
@@ -433,9 +434,9 @@ export function normalizePlanRequest(input: Readonly<{
     conditionCodes: [...new Set((request.conditionCodes ?? []).map((item) =>
       normalizeCode(item, CONDITION_ALIASES)
     ))],
-    currency: "THB",
+    currency: market.currency,
     currentSupplements,
-    destinationCountry: "TH",
+    destinationCountry: market.countryCode,
     leftovers,
     locale: negotiateLocale(request.locale),
     medicationCodes: [...new Set((request.medicationCodes ?? []).map((item) =>

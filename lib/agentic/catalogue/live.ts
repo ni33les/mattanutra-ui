@@ -14,8 +14,8 @@ import type { ProductCandidate } from "@/lib/product-recommendation-types";
 const LIVE_TTL_MS = 10 * 60_000;
 const LIVE_LOAD_WAIT_MS = 8_000;
 
-let liveCache: { at: number; snapshot: CatalogueSnapshot } | null = null;
-let liveInflight: Promise<CatalogueSnapshot> | null = null;
+const liveCache = new Map<string, { at: number; snapshot: CatalogueSnapshot }>();
+const liveInflight = new Map<string, Promise<CatalogueSnapshot>>();
 
 function normalizeName(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -160,16 +160,18 @@ function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | nul
     productId: publicProductId(candidate.id),
     retailerSku: candidate.retailSellableProductId ?? candidate.id,
     sellerId: candidate.selectedRetailerOrganisationId ?? "retailer_th",
-    sellerName: candidate.selectedRetailerName ?? "Thailand retailer",
+    sellerName: candidate.selectedRetailerName ?? "Retailer",
     source: "retail",
     stockStatus,
     unitPriceMinor: Math.round(price * 100)
   };
 }
 
-export async function loadLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
+export async function loadLiveRetailSnapshot(
+  countryCode: string
+): Promise<CatalogueSnapshot> {
   const sets = await getRetailerAwareProductRecommendationCandidateSets({
-    countryCode: "TH",
+    countryCode: countryCode.trim().toUpperCase(),
     includeIneligible: false,
     saleEligibleOnly: true
   });
@@ -205,53 +207,67 @@ export async function loadLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
 
   return {
     availabilityAsOf: new Date().toISOString(),
-    catalogueVersion: `retail-th-${byListing.size}`,
+    catalogueVersion: `retail-${countryCode.trim().toUpperCase()}-${byListing.size}`,
     products: [...byListing.values()],
     supplements: FIXTURE_SUPPLEMENTS
   };
 }
 
-function loadingSnapshot(): CatalogueSnapshot {
+function loadingSnapshot(countryCode: string): CatalogueSnapshot {
+  const hit = liveCache.get(countryCode);
+
   return {
     availabilityAsOf: new Date().toISOString(),
-    catalogueVersion: liveCache?.snapshot.catalogueVersion ?? "retail-th-loading",
-    products: liveCache?.snapshot.products ?? [],
+    catalogueVersion: hit?.snapshot.catalogueVersion ?? `retail-${countryCode}-loading`,
+    products: hit?.snapshot.products ?? [],
     supplements: FIXTURE_SUPPLEMENTS
   };
 }
 
-export async function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
-  if (liveCache && Date.now() - liveCache.at < LIVE_TTL_MS) {
-    return liveCache.snapshot;
+export async function cachedLiveRetailSnapshot(
+  countryCode: string
+): Promise<CatalogueSnapshot> {
+  const code = countryCode.trim().toUpperCase() || "TH";
+  const hit = liveCache.get(code);
+
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS) {
+    return hit.snapshot;
   }
 
-  if (!liveInflight) {
-    liveInflight = loadLiveThailandSnapshot()
+  let inflight = liveInflight.get(code);
+
+  if (!inflight) {
+    inflight = loadLiveRetailSnapshot(code)
       .then((snapshot) => {
         if (snapshot.products.length > 0) {
-          liveCache = { at: Date.now(), snapshot };
+          liveCache.set(code, { at: Date.now(), snapshot });
         }
 
         return snapshot;
       })
       .finally(() => {
-        liveInflight = null;
+        liveInflight.delete(code);
       });
+    liveInflight.set(code, inflight);
   }
 
-  if (liveCache) {
-    return liveCache.snapshot;
+  if (hit) {
+    return hit.snapshot;
   }
 
   return Promise.race([
-    liveInflight,
+    inflight,
     new Promise<CatalogueSnapshot>((resolve) => {
-      setTimeout(() => resolve(loadingSnapshot()), LIVE_LOAD_WAIT_MS);
+      setTimeout(() => resolve(loadingSnapshot(code)), LIVE_LOAD_WAIT_MS);
     })
   ]);
 }
 
+export function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
+  return cachedLiveRetailSnapshot("TH");
+}
+
 export function resetLiveCatalogueCache() {
-  liveCache = null;
-  liveInflight = null;
+  liveCache.clear();
+  liveInflight.clear();
 }

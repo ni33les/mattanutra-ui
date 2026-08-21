@@ -1183,7 +1183,7 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(route, /async reconcile_customer_order_lifecycle\(context, body\)/);
 	    assert.match(basketRoute, /resolveRegionalBasketAvailability/);
 	    assert.match(basketRoute, /retail_basket_routing_preview/);
-    assert.match(basketRoute, /normalizeProductCountryCode/);
+    assert.match(basketRoute, /parseShippingCountryCode/);
     assert.match(basketRoute, /Cache-Control/);
     assert.match(cartService, /export type RetailRoutingPreference = "cheapest_price" \| "fastest_delivery"/);
     assert.match(cartService, /export type RegionalBasketAvailability/);

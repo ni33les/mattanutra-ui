@@ -13,6 +13,7 @@ import type {
 import type { Locale } from "@/lib/i18n";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import { formatCurrencyAmount } from "@/lib/currencies";
+import { displayCountryName } from "@/lib/product-countries";
 
 type AddressState = {
   addressLine1: string;
@@ -29,6 +30,7 @@ type AddressState = {
 type McpWebsiteCheckoutPanelProps = Readonly<{
   checkoutAccess: string;
   currency: string;
+  destinationCountry: string;
   expired: boolean;
   locale: Locale;
   paid: boolean;
@@ -51,12 +53,12 @@ function inputClass(hasError: boolean) {
   ].join(" ");
 }
 
-function emptyAddress(): AddressState {
+function emptyAddress(country: string): AddressState {
   return {
     addressLine1: "",
     addressLine2: "",
     city: "",
-    country: "TH",
+    country: country.trim().toUpperCase(),
     customerEmail: "",
     customerName: "",
     phone: "",
@@ -67,7 +69,9 @@ function emptyAddress(): AddressState {
 
 export function McpWebsiteCheckoutPanel(props: McpWebsiteCheckoutPanelProps) {
   const labels = retailCheckoutCopy[props.locale] ?? retailCheckoutCopy.en;
-  const [address, setAddress] = useState<AddressState>(emptyAddress);
+  const [address, setAddress] = useState<AddressState>(() =>
+    emptyAddress(props.destinationCountry)
+  );
   const [addressLine2Visible, setAddressLine2Visible] = useState(false);
   const [agentAuthorized, setAgentAuthorized] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -315,7 +319,7 @@ export function McpWebsiteCheckoutPanel(props: McpWebsiteCheckoutPanelProps) {
                 <input
                   className={`${inputClass(false)} bg-[var(--mn-cream)]`}
                   readOnly
-                  value="Thailand"
+                  value={displayCountryName(address.country, props.locale)}
                 />
               </label>
               {field("customerName", labels.name, {
@@ -352,7 +356,7 @@ export function McpWebsiteCheckoutPanel(props: McpWebsiteCheckoutPanelProps) {
                 </button>
               )}
               {field("city", labels.city, { autoComplete: "shipping address-level2" })}
-              {field("province", "Province", { autoComplete: "shipping address-level1" })}
+              {field("province", labels.province, { autoComplete: "shipping address-level1" })}
               {field("postalCode", labels.postalCode, {
                 autoComplete: "shipping postal-code",
                 inputMode: "numeric"

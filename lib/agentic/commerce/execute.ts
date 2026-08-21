@@ -109,7 +109,10 @@ export async function executeTool(input: Readonly<{
 
     const result = revision.result as PlanResult;
     const selected = result.selected;
-    const snapshot = await ensureCatalogueSnapshot(input.config.environment);
+    const snapshot = await ensureCatalogueSnapshot(
+      input.config.environment,
+      result.requestSnapshot.destinationCountry
+    );
     const unavailable = Boolean(
       selected?.basket.some((item) => {
         const product = snapshot.products.find((row) => row.productId === item.productId);
@@ -153,13 +156,13 @@ export async function executeTool(input: Readonly<{
       checkoutUrl: null,
       completedAt: null,
       createdAt: input.now,
-      currency: "THB",
-      destinationCountry: "TH",
+      currency: result.requestSnapshot.currency,
+      destinationCountry: result.requestSnapshot.destinationCountry,
       environment: input.scope.environment,
       expiredAt: null,
       frozenPlan: {
         coveragePercent: selected.coveragePercent,
-        currency: "THB",
+        currency: result.requestSnapshot.currency,
         dailyPills: selected.dailyPills,
         items: publicFrozenItems(selected.basket),
         planRevision: plan.currentRevision,
@@ -189,7 +192,7 @@ export async function executeTool(input: Readonly<{
     await store.insertOrder(draftOrder);
     await store.insertOrderItems(
       selected.basket.map((item) => ({
-        currency: "THB",
+        currency: item.currency || result.requestSnapshot.currency,
         dailyPills: item.dailyPills,
         form: item.form,
         id: randomUUID(),

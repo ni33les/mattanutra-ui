@@ -49,7 +49,7 @@ export function parseCheckoutAddress(
   }
 
   if (!address.addressLine1 || !address.city || !address.province || !address.postalCode) {
-    return { error: "A complete Thailand delivery address is required." };
+    return { error: "A complete delivery address is required." };
   }
 
   return { address };

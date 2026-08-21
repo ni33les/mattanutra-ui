@@ -15,16 +15,18 @@ export type AgenticRetailJoinResult = Readonly<{
   trackingUrl: string;
 }>;
 
-const FALLBACK_ADDRESS: CheckoutAddress = {
-  addressLine1: "1 Test Road",
-  city: "Bangkok",
-  country: "TH",
-  customerEmail: "mcp-orders@mattanutra.com",
-  customerName: "MattaNutra MCP",
-  phone: "+66812345678",
-  postalCode: "10110",
-  province: "Bangkok"
-};
+function fallbackAddress(country: string): CheckoutAddress {
+  return {
+    addressLine1: "Address on file",
+    city: "City",
+    country: country.trim().toUpperCase() || "TH",
+    customerEmail: "mcp-orders@mattanutra.com",
+    customerName: "MattaNutra MCP",
+    phone: "+66812345678",
+    postalCode: "00000",
+    province: "Province"
+  };
+}
 
 function asLocale(value: unknown): Locale {
   return isLocale(value) ? value : "en";
@@ -122,17 +124,19 @@ async function ensureCatalogueProduct(input: Readonly<{
   return matched[0]?.id ?? null;
 }
 
-function addressFromCheckout(value: string | null): CheckoutAddress {
+function addressFromCheckout(value: string | null, country: string): CheckoutAddress {
+  const plannedCountry = country.trim().toUpperCase() || "TH";
+
   if (!value) {
-    return FALLBACK_ADDRESS;
+    return fallbackAddress(plannedCountry);
   }
 
   try {
     const parsedJson = JSON.parse(value) as { address?: unknown };
-    const parsed = parseCheckoutAddress(parsedJson.address ?? parsedJson, "TH");
-    return "address" in parsed ? parsed.address : FALLBACK_ADDRESS;
+    const parsed = parseCheckoutAddress(parsedJson.address ?? parsedJson, plannedCountry);
+    return "address" in parsed ? parsed.address : fallbackAddress(plannedCountry);
   } catch {
-    return FALLBACK_ADDRESS;
+    return fallbackAddress(plannedCountry);
   }
 }
 
@@ -259,7 +263,10 @@ export async function joinMcpPaidOrderToRetail(input: Readonly<{
     const totalAmount = majorFromMinor(input.order.totalPriceMinor);
     const { fulfillAgenticRetailCheckout } = await import("@/lib/retail-product-checkout");
     const result = await fulfillAgenticRetailCheckout({
-      address: addressFromCheckout(checkout?.encryptedAddress ?? null),
+      address: addressFromCheckout(
+        checkout?.encryptedAddress ?? null,
+        input.order.destinationCountry
+      ),
       agenticOrderId: input.order.id,
       agenticOrderReference: input.order.reference,
       currency: input.order.currency,

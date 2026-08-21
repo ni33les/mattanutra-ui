@@ -125,6 +125,7 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
           <McpWebsiteCheckoutPanel
             checkoutAccess={checkoutAccess}
             currency={order.currency}
+            destinationCountry={order.destinationCountry}
             expired={expired}
             locale={locale}
             paid={order.paymentStatus === "paid"}

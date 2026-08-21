@@ -1,6 +1,7 @@
 import type { Locale } from "@/lib/i18n";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import { asMinor, formatMinor } from "@/lib/agentic/money";
+import { displayCountryName } from "@/lib/product-countries";
 
 export type AgenticCheckoutItem = Readonly<{
   dailyPills: number;
@@ -90,7 +91,7 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
         <li>
           POST application/x-www-form-urlencoded to /api/mcp/checkout/{props.checkoutAccess}/pay
           with customerName, phone, customerEmail, addressLine1, city, province, postalCode,
-          country=TH, agentAuthorized=true, scenario=decline_insufficient_funds.
+          country={props.country}, agentAuthorized=true, scenario=decline_insufficient_funds.
         </li>
         <li>Poll order until unpaid / declined / insufficient_funds / stateVersion=1.</li>
         <li>POST the same fields again with scenario=success, then poll paid / stateVersion=2.</li>
@@ -245,7 +246,7 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
                 disabled
                 id="countryDisplay"
                 readOnly
-                value={props.country}
+                value={displayCountryName(props.country, props.locale)}
               />
             </label>
           </fieldset>

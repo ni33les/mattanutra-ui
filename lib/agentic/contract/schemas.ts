@@ -58,6 +58,8 @@ const PLAN_REQUEST: JsonSchema = {
       type: "array"
     },
     destinationCountry: {
+      description:
+        "ISO 3166-1 alpha-2 destination. Call info for supportedCountries. If MattaNutra does not deliver there yet, plan returns unsupported_country with a polite cannot-deliver message.",
       pattern: "^[A-Z]{2}$",
       type: "string"
     },

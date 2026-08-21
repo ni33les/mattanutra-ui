@@ -109,9 +109,9 @@ export type PlanLeftover = Readonly<{
 export type CanonicalPlanState = Readonly<{
   acceptedGaps: readonly AcceptedGap[];
   conditionCodes: readonly string[];
-  currency: "THB";
+  currency: string;
   currentSupplements: readonly CurrentSupplement[];
-  destinationCountry: "TH";
+  destinationCountry: string;
   leftovers: readonly PlanLeftover[];
   locale: string;
   medicationCodes: readonly string[];
@@ -145,7 +145,7 @@ export type MatcherTelemetry = Readonly<{
 export type BasketItem = Readonly<{
   availabilityAsOf: string;
   contributionSupplementIds: readonly string[];
-  currency: "THB";
+  currency: string;
   dailyPills: number;
   deliveryWindow: string | null;
   fixture: boolean;

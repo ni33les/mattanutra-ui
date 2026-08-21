@@ -254,8 +254,8 @@ describe("DEV internal QA harness", () => {
     recordMcpTiming("info", 12);
     recordMcpTiming("execute", 40);
     recordMcpTiming("order", 18);
-    const info = infoTool({ config: runtime.config, locale: "en" });
-    const infoAgain = infoTool({ config: runtime.config, locale: "en" });
+    const info = await infoTool({ config: runtime.config, locale: "en" });
+    const infoAgain = await infoTool({ config: runtime.config, locale: "en" });
     if (runtime.config.environment === "dev") {
       assert.equal(
         typeof (info as { latency?: { info?: { p95Ms?: number } } }).latency?.info?.p95Ms,

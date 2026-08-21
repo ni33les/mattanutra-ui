@@ -15,7 +15,7 @@ export type PaymentProviderMode = "mock" | "stripe_test" | "stripe_live";
 export type RetailerAdapterId = "mock_thailand" | "thailand_uat" | "thailand_live";
 
 export type AgenticConfig = Readonly<{
-  activeMarkets: readonly ["TH"];
+  activeMarkets: readonly string[];
   buildId: string;
   capabilitySecret: string;
   checkoutTtlMs: number;

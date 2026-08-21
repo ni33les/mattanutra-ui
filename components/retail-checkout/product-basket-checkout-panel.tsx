@@ -12,6 +12,7 @@ import type {
 import { trackBpmEvent } from "@/lib/bpm-client";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import type { Locale } from "@/lib/i18n";
+import { displayCountryName, productCountryOptions } from "@/lib/product-countries";
 
 const CHECKOUT_SESSION_TIMEOUT_MS = 15_000;
 
@@ -99,7 +100,8 @@ const copy = {
     total: "Total",
     unavailable: "Unavailable",
     unavailableBody:
-      "This basket is not currently checkoutable with one pharmacy. Please adjust your basket before payment."
+      "This basket is not currently checkoutable with one pharmacy. Please adjust your basket before payment.",
+    cannotDeliver: "We cannot deliver to {country} yet."
   },
   th: {
     addAddressLine2: "+ เพิ่มอพาร์ตเมนต์ ห้อง หรืออาคาร",
@@ -144,7 +146,8 @@ const copy = {
     total: "ยอดชำระ",
     unavailable: "ไม่พร้อมชำระเงิน",
     unavailableBody:
-      "ตะกร้านี้ยังไม่สามารถชำระเงินกับร้านขายยาเดียวได้ โปรดปรับตะกร้าก่อนชำระเงิน"
+      "ตะกร้านี้ยังไม่สามารถชำระเงินกับร้านขายยาเดียวได้ โปรดปรับตะกร้าก่อนชำระเงิน",
+    cannotDeliver: "เรายังจัดส่งไป{country}ไม่ได้"
   },
   "zh-CN": {
     addAddressLine2: "+ 添加公寓、套房或楼栋",
@@ -188,18 +191,17 @@ const copy = {
     title: "结账",
     total: "总计",
     unavailable: "暂不能结账",
-    unavailableBody: "此购物篮目前无法由单一药房完整履约。请先调整购物篮。"
+    unavailableBody: "此购物篮目前无法由单一药房完整履约。请先调整购物篮。",
+    cannotDeliver: "我们暂时无法配送到{country}。"
   }
 };
 
 export const retailCheckoutCopy = copy;
 
-const countries = [
-  { code: "TH", name: "Thailand" },
-  { code: "US", name: "United States" },
-  { code: "GB", name: "United Kingdom" },
-  { code: "AU", name: "Australia" }
-];
+const countries = productCountryOptions.map((item) => ({
+  code: item.code,
+  name: item.label
+}));
 
 function countryFieldLabels(country: string, labels: (typeof copy)["en"]) {
   if (country === "US") {
@@ -599,7 +601,14 @@ export function ProductBasketCheckoutPanel({
     const activeQuotePreview = quotePreview ?? (await previewQuote());
 
     if (!activeQuotePreview?.canCheckout) {
-      setError(labels.unavailableBody);
+      setError(
+        activeQuotePreview?.cannotDeliver
+          ? labels.cannotDeliver.replace(
+              "{country}",
+              displayCountryName(checkout.address.country, locale)
+            )
+          : labels.unavailableBody
+      );
       return;
     }
 
@@ -663,6 +672,7 @@ export function ProductBasketCheckoutPanel({
     checkout.address,
     checkout.billingAddress,
     checkout.billingSameAsShipping,
+    labels.cannotDeliver,
     labels.error,
     labels.unavailableBody,
     formIsValid,
@@ -920,7 +930,14 @@ export function ProductBasketCheckoutPanel({
               {!quotePreview?.canCheckout && quotePreview ? (
                 <div className="mt-4 rounded-lg bg-[var(--mn-error-soft)] p-3 text-sm text-[var(--mn-error)]">
                   <p className="font-bold">{labels.unavailable}</p>
-                  <p className="mt-1">{labels.unavailableBody}</p>
+                  <p className="mt-1">
+                    {quotePreview.cannotDeliver
+                      ? labels.cannotDeliver.replace(
+                          "{country}",
+                          displayCountryName(checkout.address.country, locale)
+                        )
+                      : labels.unavailableBody}
+                  </p>
                 </div>
               ) : null}
             </div>

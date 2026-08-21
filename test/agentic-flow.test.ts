@@ -91,6 +91,12 @@ describe("agentic DEV flow", () => {
 
     assert.equal(result.ok, false);
     assert.equal((result.error as { reasonCode: string }).reasonCode, "unsupported_country");
+    assert.match(
+      (result.error as { message: string }).message,
+      /cannot deliver to Singapore/i
+    );
+    assert.match((result.error as { message: string }).message, /Thailand/);
+    assert.equal((result.error as { message: string }).message.includes("locked"), false);
   });
 
   it("creates a deterministic J1 stack, freezes checkout, mocks payment, then supports and feedback", async () => {

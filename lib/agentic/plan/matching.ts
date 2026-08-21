@@ -30,7 +30,13 @@ function productEligible(product: CatalogueProduct, state: CanonicalPlanState) {
     return false;
   }
 
-  if (product.candidate.availableCountryCodes?.includes("TH") === false) {
+  const availableCountries = product.candidate.availableCountryCodes;
+
+  if (
+    availableCountries &&
+    availableCountries.length > 0 &&
+    !availableCountries.includes(state.destinationCountry)
+  ) {
     return false;
   }
 
@@ -184,12 +190,13 @@ function coverageFor(
 
 function basketFromProducts(
   products: readonly CatalogueProduct[],
-  availabilityAsOf: string
+  availabilityAsOf: string,
+  currency: string
 ): BasketItem[] {
   return products.map((product) => ({
     availabilityAsOf,
     contributionSupplementIds: product.contributionSupplementIds,
-    currency: "THB",
+    currency: product.candidate.currency || currency,
     dailyPills: product.dailyPills,
     deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
     fixture: product.source === "fixture",
@@ -215,7 +222,7 @@ function stackFromProducts(
   availabilityAsOf: string,
   reason: string
 ): StackOption {
-  const basket = basketFromProducts(products, availabilityAsOf);
+  const basket = basketFromProducts(products, availabilityAsOf, state.currency);
   const coverage = coverageFor(state, products);
   const covered = coverage.filter((row) => row.status === "covered" || row.status === "over_target").length;
   const coveragePercent = coverage.length > 0
@@ -594,7 +601,7 @@ function matchRetailerStack(input: Readonly<{
             : null,
           candidates: beamCandidates.map((item) => item.candidate),
           clientSex: clientSexFor(input.state),
-          countryCode: "TH",
+          countryCode: input.state.destinationCountry,
           deadlineAt: input.deadlineAt,
           maxProducts,
           needs,

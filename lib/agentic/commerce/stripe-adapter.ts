@@ -66,7 +66,7 @@ export async function createAgenticStripeCheckoutSession(input: Readonly<{
     line_items: [
       {
         price_data: {
-          currency: "thb",
+          currency: order.currency.toLowerCase(),
           product_data: {
             name: items[0]?.productName
               ? `MattaNutra (${items.length} products)`

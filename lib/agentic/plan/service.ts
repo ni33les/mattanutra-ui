@@ -341,7 +341,11 @@ export async function planTool(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
-  const snapshot = await ensureCatalogueSnapshot(input.config.environment);
+  const requestedDestination = requestRecord(input.payload.request)?.destinationCountry;
+  let snapshot = await ensureCatalogueSnapshot(
+    input.config.environment,
+    typeof requestedDestination === "string" ? requestedDestination : undefined
+  );
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const replay = await beginIdempotency<PlanToolSuccess>({
     key: input.payload.idempotencyKey,
@@ -410,6 +414,13 @@ export async function planTool(input: Readonly<{
       existingPlan = plan;
       planId = plan.id;
       revision = plan.currentRevision + 1;
+
+      if (previous?.requestSnapshot.destinationCountry) {
+        snapshot = await ensureCatalogueSnapshot(
+          input.config.environment,
+          previous.requestSnapshot.destinationCountry
+        );
+      }
     } else {
       planId = crypto.randomUUID();
     }
@@ -521,7 +532,7 @@ export async function planTool(input: Readonly<{
     let pinPrevious = false;
 
     if (hasFullRequest(input.payload)) {
-      const normalized = normalizePlanRequest({
+      const normalized = await normalizePlanRequest({
         config: input.config,
         request: input.payload.request,
         snapshot

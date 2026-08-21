@@ -8,11 +8,7 @@ import {
   AGENTIC_SERVICE_VERSION
 } from "@/lib/agentic/config";
 import { AGENTIC_TOOL_SCHEMAS } from "@/lib/agentic/contract";
-import {
-  ACTIVE_MARKET_COUNTRY,
-  ACTIVE_MARKET_CURRENCY,
-  ACTIVE_MARKET_NAME
-} from "@/lib/agentic/catalogue/market";
+import { listDeliverableMarkets } from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
 import { recognisedSupplementNames } from "@/lib/agentic/catalogue/fixtures";
@@ -34,6 +30,11 @@ let infoCache: {
 function buildInfo(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
+  supportedCountries: ReadonlyArray<{
+    countryCode: string;
+    countryName: string;
+    currency: string;
+  }>;
 }>) {
   void negotiateLocale(input.locale);
 
@@ -56,28 +57,30 @@ function buildInfo(input: Readonly<{
     serviceName: AGENTIC_SERVICE_NAME,
     serviceVersion: AGENTIC_SERVICE_VERSION,
     supportAvailable: true,
-    supportedCountries: [
-      {
-        countryCode: ACTIVE_MARKET_COUNTRY,
-        countryName: ACTIVE_MARKET_NAME,
-        currency: ACTIVE_MARKET_CURRENCY
-      }
-    ],
+    supportedCountries: [...input.supportedCountries],
     supportedLocales: ["en", "th", "zh-CN"],
     userAccountRequired: false
   };
 }
 
-export function infoTool(input: Readonly<{
+export async function infoTool(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
 }>) {
   void ensureCatalogueSnapshot(input.config.environment);
-  const key = `${input.config.buildId}:${input.config.environment}`;
+  const markets = await listDeliverableMarkets();
+  const supportedCountries = markets.map((market) => ({
+    countryCode: market.countryCode,
+    countryName: market.countryName,
+    currency: market.currency
+  }));
+  const key = `${input.config.buildId}:${input.config.environment}:${supportedCountries
+    .map((item) => item.countryCode)
+    .join(",")}`;
   const value =
     infoCache?.key === key
       ? infoCache.value
-      : buildInfo(input);
+      : buildInfo({ ...input, supportedCountries });
 
   if (infoCache?.key !== key) {
     infoCache = { key, value };

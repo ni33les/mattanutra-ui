@@ -64,7 +64,7 @@ export async function packProof(runtime: AgenticRuntime) {
   const toolNames = ((listed?.result?.tools as Array<{ name: string }> | undefined) ?? []).map(
     (item) => item.name
   );
-  const info = infoTool({ config: runtime.config });
+  const info = await infoTool({ config: runtime.config });
 
   checks.push(
     check(

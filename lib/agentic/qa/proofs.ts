@@ -341,7 +341,7 @@ export async function latencyProof(runtime: AgenticRuntime) {
     };
   }
 
-  infoTool({ config: runtime.config });
+  await infoTool({ config: runtime.config });
 
   const infoSamples: number[] = [];
   const orderSamples: number[] = [];
@@ -350,7 +350,7 @@ export async function latencyProof(runtime: AgenticRuntime) {
 
   for (let index = 0; index < 20; index += 1) {
     let start = performance.now();
-    infoTool({ config: runtime.config });
+    await infoTool({ config: runtime.config });
     infoSamples.push(performance.now() - start);
 
     start = performance.now();

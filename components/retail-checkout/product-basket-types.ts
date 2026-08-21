@@ -18,6 +18,8 @@ export type ProductBasketQuoteLine = Readonly<{
 
 export type ProductBasketQuotePreview = Readonly<{
   canCheckout: boolean;
+  cannotDeliver?: boolean;
+  cannotDeliverMessage?: string;
   currency: string | null;
   etaDate: string | null;
   lines: ProductBasketQuoteLine[];

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   defaultProductCountryCode,
+  displayCountryName,
   normalizeProductCountryCode,
   normalizeProductCountryCodes,
+  parseShippingCountryCode,
   productCountryLabel
 } from "../lib/product-countries.ts";
 
@@ -31,5 +33,15 @@ describe("product countries", () => {
     assert.deepEqual(normalizeProductCountryCodes(["th", "TH", "US"]), ["TH", "US"]);
     assert.equal(productCountryLabel("TH"), "Thailand");
     assert.equal(productCountryLabel("ZZ"), "ZZ");
+  });
+
+  it("parses shipping countries without remapping unknown ISO codes to Thailand", () => {
+    assert.equal(parseShippingCountryCode("Thailand"), "TH");
+    assert.equal(parseShippingCountryCode("SG"), "SG");
+    assert.equal(parseShippingCountryCode("nz"), "NZ");
+    assert.equal(parseShippingCountryCode("ZZ"), "ZZ");
+    assert.equal(parseShippingCountryCode("OTHER"), null);
+    assert.equal(parseShippingCountryCode(""), null);
+    assert.equal(displayCountryName("SG"), "Singapore");
   });
 });

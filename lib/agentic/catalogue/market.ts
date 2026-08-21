@@ -1,4 +1,7 @@
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
+import { displayCountryName } from "@/lib/product-countries";
+
+export { displayCountryName };
 
 export const ACTIVE_MARKET_COUNTRY = "TH";
 export const ACTIVE_MARKET_CURRENCY = "THB";
@@ -6,45 +9,140 @@ export const ACTIVE_MARKET_NAME = "Thailand";
 export const ACTIVE_RETAILER_ID = "retailer_th_delight";
 export const ACTIVE_RETAILER_NAME = "Thailand retailer";
 
-export type MarketBinding = Readonly<{
-  countryCode: "TH";
-  countryName: typeof ACTIVE_MARKET_NAME;
-  currency: "THB";
-  retailerAdapter: "mock_thailand" | "thailand_uat" | "thailand_live";
-  retailerId: typeof ACTIVE_RETAILER_ID;
-  retailerName: typeof ACTIVE_RETAILER_NAME;
+export type DeliverableMarket = Readonly<{
+  countryCode: string;
+  countryName: string;
+  currency: string;
 }>;
 
-export function resolveMarket(input: Readonly<{
+export type MarketBinding = Readonly<{
+  countryCode: string;
+  countryName: string;
+  currency: string;
+  retailerAdapter: "mock_thailand" | "thailand_uat" | "thailand_live";
+  retailerId: string;
+  retailerName: string;
+}>;
+
+const FALLBACK_MARKETS: readonly DeliverableMarket[] = [
+  {
+    countryCode: ACTIVE_MARKET_COUNTRY,
+    countryName: ACTIVE_MARKET_NAME,
+    currency: ACTIVE_MARKET_CURRENCY
+  }
+];
+
+const MARKETS_TTL_MS = 60_000;
+let marketsCache: { at: number; markets: DeliverableMarket[] } | null = null;
+let marketsInflight: Promise<DeliverableMarket[]> | null = null;
+
+export function cannotDeliverMessage(
+  countryCode: string,
+  markets: readonly DeliverableMarket[],
+  locale = "en"
+) {
+  const destination = displayCountryName(countryCode, locale);
+  const served = markets.map((item) => item.countryName).join(", ");
+  return `We cannot deliver to ${destination} yet. MattaNutra currently delivers to ${served}.`;
+}
+
+async function loadDeliverableMarkets(): Promise<DeliverableMarket[]> {
+  try {
+    const { getSql } = await import("@/lib/db");
+    const sql = getSql();
+
+    if (!sql) {
+      return [...FALLBACK_MARKETS];
+    }
+
+    const rows = await sql<Array<{ country_code: string; currency: string }>>`
+      select distinct
+        upper(organisations.country_code) as country_code,
+        upper(coalesce(nullif(organisations.currency, ''), ${ACTIVE_MARKET_CURRENCY})) as currency
+      from public.organisations
+      where organisations.organisation_type = 'tenant'
+        and organisations.status = 'active'
+        and organisations.country_code ~ '^[A-Z]{2}$'
+      order by 1
+    `;
+
+    if (rows.length < 1) {
+      return [...FALLBACK_MARKETS];
+    }
+
+    return rows.map((row) => ({
+      countryCode: row.country_code,
+      countryName: displayCountryName(row.country_code),
+      currency: row.currency
+    }));
+  } catch {
+    return [...FALLBACK_MARKETS];
+  }
+}
+
+export async function listDeliverableMarkets(): Promise<DeliverableMarket[]> {
+  if (marketsCache && Date.now() - marketsCache.at < MARKETS_TTL_MS) {
+    return marketsCache.markets;
+  }
+
+  if (!marketsInflight) {
+    marketsInflight = loadDeliverableMarkets()
+      .then((markets) => {
+        marketsCache = { at: Date.now(), markets };
+        return markets;
+      })
+      .finally(() => {
+        marketsInflight = null;
+      });
+  }
+
+  if (marketsCache) {
+    return marketsCache.markets;
+  }
+
+  return marketsInflight;
+}
+
+export function cachedDeliverableMarkets(): DeliverableMarket[] {
+  void listDeliverableMarkets();
+  return marketsCache?.markets ?? [...FALLBACK_MARKETS];
+}
+
+export async function resolveMarket(input: Readonly<{
   countryCode: string;
   currency?: string;
+  locale?: string;
   retailerAdapter: MarketBinding["retailerAdapter"];
-}>): MarketBinding | AgenticErrorResult {
-  if (input.countryCode !== ACTIVE_MARKET_COUNTRY) {
+}>): Promise<MarketBinding | AgenticErrorResult> {
+  const countryCode = input.countryCode.trim().toUpperCase();
+  const markets = await listDeliverableMarkets();
+  const market = markets.find((item) => item.countryCode === countryCode);
+
+  if (!market) {
     return businessError({
       fieldPath: "request.destinationCountry",
-      message: "This destination country is not supported yet.",
+      message: cannotDeliverMessage(countryCode, markets, input.locale),
       reasonCode: "unsupported_country"
     });
   }
 
-  const currency = input.currency?.trim() || ACTIVE_MARKET_CURRENCY;
+  const currency = input.currency?.trim().toUpperCase();
 
-  if (currency !== ACTIVE_MARKET_CURRENCY) {
+  if (currency && currency !== market.currency) {
     return businessError({
       fieldPath: "request.currency",
-      message: "Currency must match the destination market.",
+      message: `Currency must be ${market.currency} for ${market.countryName}.`,
       reasonCode: "unsupported_currency"
     });
   }
 
   return {
-    countryCode: "TH",
-    countryName: ACTIVE_MARKET_NAME,
-    currency: "THB",
+    countryCode: market.countryCode,
+    countryName: market.countryName,
+    currency: market.currency,
     retailerAdapter: input.retailerAdapter,
     retailerId: ACTIVE_RETAILER_ID,
-    retailerName: ACTIVE_RETAILER_NAME
+    retailerName: market.countryName
   };
 }
 

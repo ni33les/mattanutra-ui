@@ -205,10 +205,10 @@ export function mcpCallNeedsStore(body: unknown) {
   return true;
 }
 
-export function handleLightweightJsonRpc(
+export async function handleLightweightJsonRpc(
   config: AgenticConfig,
   body: JsonRpcRequest
-): JsonRpcResponse | null | undefined {
+): Promise<JsonRpcResponse | null | undefined> {
   const id = body.id ?? null;
   const method = body.method ?? "";
   const params = record(body.params);
@@ -282,7 +282,7 @@ export function handleLightweightJsonRpc(
         ? (args as { locale?: unknown }).locale
         : undefined;
 
-    const value = infoTool({
+    const value = await infoTool({
       config,
       locale: typeof locale === "string" ? locale : undefined
     });

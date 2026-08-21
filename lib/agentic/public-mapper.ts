@@ -7,7 +7,7 @@ import type {
 } from "@/lib/agentic/plan/types";
 
 export type PublicBasketItem = Readonly<{
-  currency: "THB";
+  currency: string;
   dailyPills: number;
   fixture?: true;
   form: string;
@@ -24,7 +24,7 @@ export function publicBasketItem(item: BasketItem): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
 
   return {
-    currency: "THB",
+    currency: item.currency,
     dailyPills: item.dailyPills,
     form: item.form,
     lineTotalMinor: item.lineTotalMinor,
@@ -316,7 +316,7 @@ export function publicFrozenOrder(frozen: unknown) {
       return publicBasketItem({
         availabilityAsOf: "",
         contributionSupplementIds: [],
-        currency: "THB",
+        currency: typeof row.currency === "string" && row.currency ? row.currency : "THB",
         dailyPills: Number(row.dailyPills) || 0,
         deliveryWindow: null,
         fixture: Boolean(row.fixture) || row.source === "fixture",

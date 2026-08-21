@@ -61,7 +61,7 @@ async function callTool(
 
   switch (canonical) {
     case "info":
-      value = infoTool({
+      value = await infoTool({
         config: runtime.config,
         locale: typeof params.locale === "string" ? params.locale : undefined
       });
@@ -155,7 +155,7 @@ export async function handleJsonRpc(
   runtime: AgenticRuntime,
   body: JsonRpcRequest
 ): Promise<JsonRpcResponse | null> {
-  const light = handleLightweightJsonRpc(runtime.config, body);
+  const light = await handleLightweightJsonRpc(runtime.config, body);
 
   if (light !== undefined) {
     return light;

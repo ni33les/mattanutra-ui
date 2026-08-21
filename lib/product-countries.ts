@@ -78,6 +78,31 @@ export function normalizeProductCountryCode(value: unknown): ProductCountryCode 
   );
 }
 
+export function parseShippingCountryCode(value: unknown): string | null {
+  const aliased = normalizeProductCountryCode(value);
+
+  if (aliased) {
+    return aliased;
+  }
+
+  const code = typeof value === "string" ? value.trim().toUpperCase() : "";
+  return /^[A-Z]{2}$/.test(code) ? code : null;
+}
+
+export function displayCountryName(countryCode: string, locale = "en"): string {
+  const code = countryCode.trim().toUpperCase();
+
+  if (!/^[A-Z]{2}$/.test(code)) {
+    return countryCode.trim() || "that country";
+  }
+
+  try {
+    return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? productCountryLabel(code);
+  } catch {
+    return productCountryLabel(code);
+  }
+}
+
 export function normalizeProductCountryCodes(
   value: unknown,
   fallback: readonly string[] = [defaultProductCountryCode]

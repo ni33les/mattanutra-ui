@@ -1,8 +1,8 @@
 import type postgres from "postgres";
 import { getSql } from "@/lib/db";
 import {
-  defaultProductCountryCode,
-  normalizeProductCountryCode
+  displayCountryName,
+  parseShippingCountryCode
 } from "@/lib/product-countries";
 import {
   customerPriceFromRpp,
@@ -88,6 +88,8 @@ export type RegionalBasketLineAvailability = Readonly<
 
 export type RegionalBasketAvailability = Readonly<{
   canCheckout: boolean;
+  cannotDeliver: boolean;
+  cannotDeliverMessage: string | null;
   currency: string | null;
   etaDate: string | null;
   lines: RegionalBasketLineAvailability[];
@@ -403,7 +405,10 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
   shippingCountry: string;
 }>): RegionalBasketAvailability {
   const shippingCountry =
-    normalizeProductCountryCode(input.shippingCountry) ?? defaultProductCountryCode;
+    parseShippingCountryCode(input.shippingCountry) ??
+    (typeof input.shippingCountry === "string"
+      ? input.shippingCountry.trim().toUpperCase()
+      : "");
   const preference = normalizeRetailRoutingPreference(input.preference);
   const lines = input.lines
     .filter((line) => line.productId.trim())
@@ -423,11 +428,9 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
   >();
 
   for (const row of input.rows) {
-    const countryCode =
-      normalizeProductCountryCode(row.organisation_country_code) ??
-      shippingCountry;
+    const countryCode = parseShippingCountryCode(row.organisation_country_code);
 
-    if (countryCode !== shippingCountry) {
+    if (!countryCode || countryCode !== shippingCountry) {
       continue;
     }
 
@@ -585,9 +588,15 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
   });
   const payableLines = regionalLines.filter((line) => line.payable);
   const unavailableLines = regionalLines.filter((line) => !line.payable);
+  const cannotDeliver = Boolean(shippingCountry) && rowsByOrganisation.size === 0;
+  const cannotDeliverMessage = cannotDeliver
+    ? `We cannot deliver to ${displayCountryName(shippingCountry)} yet.`
+    : null;
 
   return {
     canCheckout: Boolean(selectedRetailer?.fullBasket),
+    cannotDeliver,
+    cannotDeliverMessage,
     currency: selectedRetailer?.currency ?? null,
     etaDate: selectedRetailer?.etaDate ?? null,
     lines: regionalLines,
@@ -622,7 +631,10 @@ export async function resolveRegionalBasketAvailability(input: Readonly<{
   }
 
   const shippingCountry =
-    normalizeProductCountryCode(input.shippingCountry) ?? defaultProductCountryCode;
+    parseShippingCountryCode(input.shippingCountry) ??
+    (typeof input.shippingCountry === "string"
+      ? input.shippingCountry.trim().toUpperCase()
+      : "");
   const productIds = [
     ...new Set(input.lines.map((line) => line.productId.trim()).filter(Boolean))
   ];

@@ -234,7 +234,7 @@ describe("agentic P1 pack fixes", () => {
     assert.deepEqual(current, { accepted: true, ok: true });
   });
 
-  it("requires a Thailand address for checkout parsing", () => {
+  it("requires a matching destination country for checkout parsing", () => {
     const missing = parseCheckoutAddress({ country: "TH" }, "TH");
     assert.ok("error" in missing);
 
@@ -596,6 +596,12 @@ describe("agentic P1 pack fixes", () => {
     assert.equal("catalogueVersion" in info, false);
     assert.equal(typeof info.schemaChecksum, "string");
     assert.equal(info.migrationVersion, "agentic-3.0.0");
+    assert.ok(Array.isArray(info.supportedCountries));
+    assert.ok(
+      (info.supportedCountries as Array<{ countryCode: string }>).every(
+        (item) => /^[A-Z]{2}$/.test(item.countryCode)
+      )
+    );
 
     const plan = await call(runtime, "plan", {
       idempotencyKey: "p1-public-slim-0000001",
@@ -1362,7 +1368,7 @@ describe("agentic P1 pack fixes", () => {
       new URL("../lib/agentic/contract/schemas.ts", import.meta.url),
       "utf8"
     );
-    assert.match(snapshot, /cachedLiveThailandSnapshot/);
+    assert.match(snapshot, /cachedLiveRetailSnapshot/);
     assert.match(live, /getRetailerAwareProductRecommendationCandidateSets/);
     assert.match(live, /includeIneligible: false/);
     assert.match(live, /saleEligibleOnly: true/);
@@ -1375,6 +1381,20 @@ describe("agentic P1 pack fixes", () => {
     assert.match(mapper, /imageUrl/);
     assert.match(checkoutPage, /redirect\(paidTracking\)/);
     assert.match(checkoutPage, /resolveAgenticPaidTrackingPath/);
+    assert.match(checkoutPage, /destinationCountry=\{order\.destinationCountry\}/);
+    const mcpPanel = readFileSync(
+      new URL("../components/mcp-website-checkout-panel.tsx", import.meta.url),
+      "utf8"
+    );
+    assert.equal(mcpPanel.includes('value="Thailand"'), false);
+    assert.match(mcpPanel, /displayCountryName/);
+    const market = readFileSync(
+      new URL("../lib/agentic/catalogue/market.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(market, /cannotDeliverMessage/);
+    assert.match(market, /unsupported_country/);
+    assert.match(market, /listDeliverableMarkets/);
     const checkoutReturn = readFileSync(
       new URL("../lib/agentic/commerce/checkout-return.ts", import.meta.url),
       "utf8"
