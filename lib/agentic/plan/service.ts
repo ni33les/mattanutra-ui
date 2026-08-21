@@ -377,7 +377,7 @@ export async function planTool(input: Readonly<{
     return replay.response;
   }
 
-  return input.store.transaction(async (store) => {
+  const txResult = await input.store.transaction(async (store) => {
     const answers = incomingAnswers(input.payload);
     const ack = incomingAck(input.payload);
     const selectOptionId =
@@ -543,13 +543,10 @@ export async function planTool(input: Readonly<{
         response,
         store
       });
-      await persistCanonicalWebPlan({ locale, planId, result: nextResult });
-      await persistMatcherTelemetry({
-        planId,
-        result: nextResult,
-        revision
-      });
-      return response;
+      return {
+        persist: { locale, planId, result: nextResult, revision },
+        response
+      };
     }
 
     let state: CanonicalPlanState;
@@ -702,10 +699,35 @@ export async function planTool(input: Readonly<{
       store
     });
 
-    await persistCanonicalWebPlan({ locale, planId, result });
-    await persistMatcherTelemetry({ planId, result, revision });
+    return {
+      persist: { locale, planId, result, revision },
+      response
+    };
+  });
 
-    return response;
+  if (!txResult || typeof txResult !== "object" || !("response" in txResult)) {
+    return txResult as AgenticErrorResult;
+  }
+
+  void persistPlanSideEffects(txResult.persist);
+  return txResult.response;
+}
+
+async function persistPlanSideEffects(input: Readonly<{
+  locale: Locale;
+  planId: string;
+  result: PlanResult;
+  revision: number;
+}>) {
+  await persistCanonicalWebPlan({
+    locale: input.locale,
+    planId: input.planId,
+    result: input.result
+  });
+  await persistMatcherTelemetry({
+    planId: input.planId,
+    result: input.result,
+    revision: input.revision
   });
 }
 

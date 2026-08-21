@@ -66,9 +66,7 @@ async function callTool(
         locale: typeof params.locale === "string" ? params.locale : undefined
       });
       break;
-    case "plan": {
-      const { ensureDevPlanHotPath } = await import("@/lib/agentic/plan/warm-dev");
-      await ensureDevPlanHotPath(runtime);
+    case "plan":
       value = await planTool({
         config: runtime.config,
         now,
@@ -92,7 +90,6 @@ async function callTool(
         store: runtime.store
       });
       break;
-    }
     case "execute":
       value = await executeTool({
         config: runtime.config,

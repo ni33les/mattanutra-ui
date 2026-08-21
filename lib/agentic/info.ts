@@ -74,9 +74,10 @@ export async function infoTool(input: Readonly<{
     )
   );
   if (input.config.environment === "dev") {
-    const { getLiveAgenticRuntime } = await import("@/lib/agentic/live-runtime");
-    const { ensureDevPlanHotPath } = await import("@/lib/agentic/plan/warm-dev");
-    await ensureDevPlanHotPath(getLiveAgenticRuntime());
+    void import("@/lib/agentic/live-runtime").then(async ({ getLiveAgenticRuntime }) => {
+      const { ensureDevPlanHotPath } = await import("@/lib/agentic/plan/warm-dev");
+      await ensureDevPlanHotPath(getLiveAgenticRuntime());
+    }).catch(() => undefined);
   }
   const supportedCountries = markets.map((market) => ({
     countryCode: market.countryCode,
