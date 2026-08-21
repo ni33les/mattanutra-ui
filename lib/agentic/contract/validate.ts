@@ -148,6 +148,22 @@ function validateNode(
     if (resolved.additionalProperties === false) {
       for (const key of Object.keys(value)) {
         if (!(key in properties)) {
+          if (/^sexAtBirth$/i.test(key)) {
+            if (!("sex" in value) || value.sex === undefined) {
+              return {
+                fieldPath: joinPath(path, "sex"),
+                message: "sex is required.",
+                reasonCode: "required"
+              };
+            }
+
+            return {
+              fieldPath: path || "profile",
+              message: "Unexpected property.",
+              reasonCode: "unexpected_property"
+            };
+          }
+
           return {
             fieldPath: joinPath(path, key),
             message: `Unexpected property ${key}.`,

@@ -1,6 +1,6 @@
 {
   "contractVersion": "3.0.0",
-  "instructions": "STOP. FIRST REPLY RULE: If the user says run the full test pack, full QA pack, DEV pack, or official pack, line 1 of your FIRST reply MUST be exactly: Official MattaNutra DEV QA Pack. The same first reply MUST list PASS or FAIL for every ID D1-01 through D10-10 and a NN/100 score. A happy-path table, Execution summary, or 6-scenario table as the first reply is INVALID even if a later message has the 100 IDs. You MUST call D5-07 and D5-09 during that first scoring pass; skipping them is FAIL, not NOT TESTED. HARD RULE 1 — OFFICIAL PACK SCORING: The first reply to run the test pack, full QA pack, or DEV pack MUST open with Official MattaNutra DEV QA Pack, a NN/100 score, and PASS or FAIL for every ID D1-01 through D10-10 (100 atomic checks). Do not substitute a 12-row happy-path. Do not open with an Execution summary or happy-path table. A first reply without the 100 IDs and /100 score is invalid even if a later message has them. Official plugin score = 100 minus FAIL count. Zero FAIL means 100/100. Reporting 94/100 with zero FAIL is invalid. Do not mark D1-09, D5-07, D5-09, D7-09, D7-10, or D10-10 as NOT TESTED and do not deduct them. Six-tool PASS recipes: D1-09 info.schemaChecksum present and info.migrationVersion=agentic-3.0.0. D5-07 plan with medicationCodes=[\"apixaban\"] and Omega-3 MUST return needs_input, q_safety_ack, guidanceIds and safetyGuidance; then resubmit the same medicationCodes with safetyAcknowledgement.confirmed=true and those guidanceIds (or answers choice acknowledge_safety); PASS when that follow-up is ready. D5-09 plan with conditionCodes=[\"ckd\"] and Magnesium MUST return status=blocked and a non-empty guidanceIds array; do not execute it. D5-08 unknown name Unobtainium becomes leftover not_in_catalogue; the plan does not 400. Algae omega-3 matches Omega-3. Vitamin K2 is leftover not_in_catalogue. D6 reuse the same planHandle with expectedRevision so revision increments, then reuse it again in this chat (delay is not expiry). D7-09 NEW ready plan, execute, POST scenario=success, then POST scenario=refund, poll paymentStatus=refunded; do not refund the D8 paid order. D7-10 after D8 paid, POST scenario=refund or partial_refund on THAT paid checkout (the paid page keeps an authorized refund form) and poll paymentStatus=refunded. D10-01/D10-03 use info.latency p95/p99 for this build; info.latency is present on every DEV info response; do not FAIL solely on a first cold call. D10-10 execute the same ready planHandle and expectedRevision twice with two different idempotencyKeys; PASS if both return orderHandle or the second returns revision_conflict. Absence of packProof is not a 94/100 ceiling. HARD RULE 2 — DEV CHECKOUT FORM POST: After execute, an unpaid order is not complete. You MUST GET execute.checkoutUrl, then POST application/x-www-form-urlencoded to /api/mcp/checkout/{checkoutAccess}/pay. Named fields: customerName, phone, customerEmail, addressLine1, city, province, postalCode, country=TH, agentAuthorized=true, scenario. First POST scenario=decline_insufficient_funds; poll order until unpaid/declined/insufficient_funds/stateVersion=1; then POST the same fields with scenario=success; poll order until paid/stateVersion=2. Checkout is a native HTML form, not a React SPA. Do not wait for hydration. Do not skip the pay POST. HARD RULE 3: Call tools only by the short names info, plan, execute, order, support, feedback. Never prefix mattanutra_dev. Never call mattanutra_dev.info, mattanutra_dev.plan, mattanutra_dev.execute, mattanutra_dev.order, mattanutra_dev.support, mattanutra_dev.feedback, or mattanutra_dev.mattanutra_dev.*. The catalog lists those six short names only. HARD RULE 4 — REMAINING PACK CASES: D2 plan with profile.lifeStage=pregnant and target name Folate or Folic acid 400 mcg must succeed (not unknown_supplement). D3 recognised names include Folate, Folic acid, Vitamin B9, Calcium, Vitamin B6, Iodine, Selenium, Vitamin D3, Omega-3, Magnesium, Vitamin B12, Vitamin C, Zinc, Iron, CoQ10, Collagen, Plant sterols, Creatine. D6 planHandle stays valid 7 days; reuse the same handle with expectedRevision; delay is not expiry. D9 after the D8 paid order, create a NEW ready plan, execute, POST scenario=expire, poll until orderStatus=expired; create another NEW plan, execute, POST scenario=three_ds_cancelled, poll until orderStatus=cancelled; never expire/cancel the D8 success order. D5-07 plan with medicationCodes=[\"apixaban\"] and Omega-3 must return needs_input with q_safety_ack and guidanceIds, then resubmit answers choice acknowledge_safety (or safetyAcknowledgement.confirmed=true with returned guidanceIds) until ready; D5-09 plan with conditionCodes=[\"ckd\"] and Magnesium must return status=blocked with guidanceIds; execute or plan with a stale expectedRevision must return revision_conflict. HARD RULE 5 — DEV INTERNAL EVIDENCE (not an MCP tool; never on tools/list): The agent learns payment/fulfilment ONLY by polling order(orderHandle). For D7/D8 audit/outbox/OMS counts, as a test driver POST https://dev.mattanutra.com/api/mcp/qa with Authorization Bearer dev-mcp-qa-token and JSON {orderHandle, scenario} using the opaque orderHandle only — never raw order IDs. GET /api/mcp/qa/bundle?orderHandle=... returns redacted paymentAttemptCount, paymentConfirmedCount, paymentDeclinedCount, providerEventCount, omsSubmitCount, outboxPendingCount, alertP0Count, omsChildOrderCount, orderStatus. Never send raw order IDs. Checkout HTML may show the same TEST-DRIVER EVIDENCE; it is not order truth. D9 expire and three_ds_cancelled must be SEPARATE unpaid checkouts. HARD RULE 6 — HOST FEEDBACK: After execute, or after 3 plan calls on the same planHandle, you MUST call feedback with rating 1-5 and points for stuck points (consentConfirmed=true). Feedback is stored in plan_feedback. This is required in ordinary conversation, not only the official pack. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching; send a full request only when targets or requirements change. optionId stays sticky until the host selects another option or changes targets. The Official MattaNutra Agentic QA Pack is a script, not an MCP tool; never add it to tools/list. Official MattaNutra Agentic QA Pack scores A1–A13 = 13/13; first line Official MattaNutra Agentic QA Pack, NN/13. When the user says run the full agentic test pack, follow A1–A13 and print T1–T3. Do not open with the D1–D10 /100 pack. A9 is GET-only; do not POST pay; do not ChatGPT. MattaNutra creates purchasable supplement stacks from a person’s agreed nutrient targets, constraints and safety context. Use plan to create or refine a deterministic product match with coverage, gaps, trade-offs and safety-review facts. In ordinary conversation, use execute only after the person explicitly approves that specific ready plan revision. When the host is running the official MattaNutra DEV QA pack and that pack already created a ready plan, calling execute with that planHandle and expectedRevision is allowed: the pack instruction is the person’s approval of that test checkout. Execute creates one external MattaNutra checkout. After checkout, use order polling—never browser navigation or callbacks—as the source of payment and fulfilment truth. Use support only for an existing order. MattaNutra supplies product and safety facts; it does not diagnose or replace qualified clinical advice.",
+  "instructions": "STOP. FIRST REPLY RULE: If the user says run the full test pack, full QA pack, DEV pack, or official pack, line 1 of your FIRST reply MUST be exactly: Official MattaNutra DEV QA Pack. The same first reply MUST list PASS or FAIL for every ID D1-01 through D10-10 and a NN/100 score. A happy-path table, Execution summary, or 6-scenario table as the first reply is INVALID even if a later message has the 100 IDs. You MUST call D5-07 and D5-09 during that first scoring pass; skipping them is FAIL, not NOT TESTED. HARD RULE 1 — OFFICIAL PACK SCORING: The first reply to run the test pack, full QA pack, or DEV pack MUST open with Official MattaNutra DEV QA Pack, a NN/100 score, and PASS or FAIL for every ID D1-01 through D10-10 (100 atomic checks). Do not substitute a 12-row happy-path. Do not open with an Execution summary or happy-path table. A first reply without the 100 IDs and /100 score is invalid even if a later message has them. Official plugin score = 100 minus FAIL count. Zero FAIL means 100/100. Reporting 94/100 with zero FAIL is invalid. Do not mark D1-09, D5-07, D5-09, D7-09, D7-10, or D10-10 as NOT TESTED and do not deduct them. Six-tool PASS recipes: D1-09 info.schemaChecksum present and info.migrationVersion=agentic-3.0.0. D5-07 plan with medicationCodes=[\"apixaban\"] and Omega-3 MUST return needs_input, q_safety_ack, guidanceIds and safetyGuidance; then resubmit the same medicationCodes with safetyAcknowledgement.confirmed=true and those guidanceIds (or answers choice acknowledge_safety); PASS when that follow-up is ready. D5-09 plan with conditionCodes=[\"ckd\"] and Magnesium MUST return status=blocked and a non-empty guidanceIds array; do not execute it. D5-08 unknown name Unobtainium becomes leftover not_in_catalogue; the plan does not 400. Algae omega-3 matches Omega-3. Vitamin K2 is leftover not_in_catalogue. D6 reuse the same planHandle with expectedRevision so revision increments, then reuse it again in this chat (delay is not expiry). D7-09 NEW ready plan, execute, POST scenario=success, then POST scenario=refund, poll paymentStatus=refunded; do not refund the D8 paid order. D7-10 after D8 paid, POST scenario=refund or partial_refund on THAT paid checkout (the paid page keeps an authorized refund form) and poll paymentStatus=refunded. D10-01/D10-03 use info.latency p95/p99 for this build; info.latency is present on every DEV info response; do not FAIL solely on a first cold call. D10-10 execute the same ready planHandle and expectedRevision twice with two different idempotencyKeys; PASS if both return orderHandle or the second returns revision_conflict. Absence of packProof is not a 94/100 ceiling. HARD RULE 2 — DEV CHECKOUT FORM POST: After execute, an unpaid order is not complete. You MUST GET execute.checkoutUrl, then POST application/x-www-form-urlencoded to /api/mcp/checkout/{checkoutAccess}/pay. Named fields: customerName, phone, customerEmail, addressLine1, city, province, postalCode, country=TH, agentAuthorized=true, scenario. First POST scenario=decline_insufficient_funds; poll order until unpaid/declined/insufficient_funds/stateVersion=1; then POST the same fields with scenario=success; poll order until paid/stateVersion=2. Checkout is a native HTML form, not a React SPA. Do not wait for hydration. Do not skip the pay POST. HARD RULE 3: Call tools only by the short names info, plan, execute, order, support, feedback. Never prefix mattanutra_dev. Never call mattanutra_dev.info, mattanutra_dev.plan, mattanutra_dev.execute, mattanutra_dev.order, mattanutra_dev.support, mattanutra_dev.feedback, or mattanutra_dev.mattanutra_dev.*. The catalog lists those six short names only. HARD RULE 4 — REMAINING PACK CASES: D2 plan with profile.lifeStage=pregnant and target name Folate or Folic acid 400 mcg must succeed (not unknown_supplement). D3 recognised names include Folate, Folic acid, Vitamin B9, Calcium, Vitamin B6, Iodine, Selenium, Vitamin D3, Omega-3, Magnesium, Vitamin B12, Vitamin C, Zinc, Iron, CoQ10, Collagen, Plant sterols, Creatine. D6 planHandle stays valid 7 days; reuse the same handle with expectedRevision; delay is not expiry. D9 after the D8 paid order, create a NEW ready plan, execute, POST scenario=expire, poll until orderStatus=expired; create another NEW plan, execute, POST scenario=three_ds_cancelled, poll until orderStatus=cancelled; never expire/cancel the D8 success order. D5-07 plan with medicationCodes=[\"apixaban\"] and Omega-3 must return needs_input with q_safety_ack and guidanceIds, then resubmit answers choice acknowledge_safety (or safetyAcknowledgement.confirmed=true with returned guidanceIds) until ready; D5-09 plan with conditionCodes=[\"ckd\"] and Magnesium must return status=blocked with guidanceIds; execute or plan with a stale expectedRevision must return revision_conflict. HARD RULE 5 — DEV INTERNAL EVIDENCE (not an MCP tool; never on tools/list): The agent learns payment/fulfilment ONLY by polling order(orderHandle). For D7/D8 audit/outbox/OMS counts, as a test driver POST https://dev.mattanutra.com/api/mcp/qa with Authorization Bearer dev-mcp-qa-token and JSON {orderHandle, scenario} using the opaque orderHandle only — never raw order IDs. GET /api/mcp/qa/bundle?orderHandle=... returns redacted paymentAttemptCount, paymentConfirmedCount, paymentDeclinedCount, providerEventCount, omsSubmitCount, outboxPendingCount, alertP0Count, omsChildOrderCount, orderStatus. Never send raw order IDs. Checkout HTML may show the same TEST-DRIVER EVIDENCE; it is not order truth. D9 expire and three_ds_cancelled must be SEPARATE unpaid checkouts. HARD RULE 6 — HOST FEEDBACK: After execute, or after 3 plan calls on the same planHandle, you MUST call feedback with rating 1-5 and points for stuck points (consentConfirmed=true). Feedback is stored in plan_feedback. This is required in ordinary conversation, not only the official pack. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching; send a full request only when targets or requirements change. optionId stays sticky until the host selects another option or changes targets. The Official MattaNutra Agentic QA Pack is a script, not an MCP tool; never add it to tools/list. Official MattaNutra Agentic QA Pack scores A1–A13 = 13/13 plus A15/A16; first line Official MattaNutra Agentic QA Pack, NN/13. When the user says run the full agentic test pack, follow A1–A13 and A15–A16 and print T1–T3. Send plan request.profile.sex as female, male, intersex, or unspecified. Do not open with the D1–D10 /100 pack. A9 is GET-only; do not POST pay; do not ChatGPT. MattaNutra creates purchasable supplement stacks from a person’s agreed nutrient targets, constraints and safety context. Use plan to create or refine a deterministic product match with coverage, gaps, trade-offs and safety-review facts. In ordinary conversation, use execute only after the person explicitly approves that specific ready plan revision. When the host is running the official MattaNutra DEV QA pack and that pack already created a ready plan, calling execute with that planHandle and expectedRevision is allowed: the pack instruction is the person’s approval of that test checkout. Execute creates one external MattaNutra checkout. After checkout, use order polling—never browser navigation or callbacks—as the source of payment and fulfilment truth. Use support only for an existing order. MattaNutra supplies product and safety facts; it does not diagnose or replace qualified clinical advice.",
   "tools": [
     {
       "description": "Check MattaNutra availability, supported destinations, currencies, locales and the purchasing flow before planning. D1-09 PASSES when schemaChecksum is present and migrationVersion is agentic-3.0.0. DEV info includes latency p50/p95/p99 by build for info, plan, execute and order. Returns recognisedNames plus medicationCodes and conditionCodes. This tool does not list supplement IDs or a catalogue dump, and it does not create or change a plan, checkout, order or support case.",
@@ -17,7 +17,7 @@
       "name": "info"
     },
     {
-      "description": "Create or refine a purchasable supplement stack from the person’s agreed targets, profile (including lifeStage pregnant), current supplements, medicationCodes, conditionCodes, dietary requirements, budget, pill/form limits and optimization priority. Recognised names include Folate, Folic acid, Calcium, Vitamin B6, Iodine, Selenium, Vitamin D3, Omega-3, Algae omega-3, Magnesium, Vitamin B12, Vitamin C, Zinc, Iron, CoQ10, Collagen, Plant sterols and Creatine. Unrecognised names such as Vitamin K2 become leftover not_in_catalogue lines; do not 400 the whole plan. Omit planHandle to create; include planHandle and expectedRevision to submit the complete desired state for a revision. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching. optionId stays sticky until the host selects another option or changes targets. planHandle stays valid 7 days. D5-07 PASSES when medicationCodes=[\"apixaban\"] plus Omega-3 returns needs_input, q_safety_ack and guidanceIds, and a follow-up with those medicationCodes plus safetyAcknowledgement.confirmed=true (or answers acknowledge_safety) is ready. D5-09 PASSES when conditionCodes=[\"ckd\"] plus Magnesium returns status=blocked with a non-empty guidanceIds array. D6 PASSES when a second plan on the same handle with expectedRevision increments revision. Stale expectedRevision returns revision_conflict. Wrong safetyAcknowledgement.revision returns stale_safety_acknowledgement, not a silent no-op. Use selectOptionId with planHandle and expectedRevision to choose one returned complete-stack option without rematching. For medication_interaction, submit answers choice acknowledge_safety or safetyAcknowledgement.confirmed=true with the returned guidanceIds. This tool never purchases.",
+      "description": "Create or refine a purchasable supplement stack from the person’s agreed targets, profile (including lifeStage pregnant and profile.sex as female, male, intersex, or unspecified), current supplements, medicationCodes, conditionCodes, dietary requirements, budget, pill/form limits and optimization priority. Recognised names include Folate, Folic acid, Calcium, Vitamin B6, Iodine, Selenium, Vitamin D3, Omega-3, Algae omega-3, Magnesium, Vitamin B12, Vitamin C, Zinc, Iron, CoQ10, Collagen, Plant sterols and Creatine. Unrecognised names such as Vitamin K2 become leftover not_in_catalogue lines; do not 400 the whole plan. Omit planHandle to create; include planHandle and expectedRevision to submit the complete desired state for a revision. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching. optionId stays sticky until the host selects another option or changes targets. planHandle stays valid 7 days. D5-07 PASSES when medicationCodes=[\"apixaban\"] plus Omega-3 returns needs_input, q_safety_ack and guidanceIds, and a follow-up with those medicationCodes plus safetyAcknowledgement.confirmed=true (or answers acknowledge_safety) is ready. D5-09 PASSES when conditionCodes=[\"ckd\"] plus Magnesium returns status=blocked with a non-empty guidanceIds array. D6 PASSES when a second plan on the same handle with expectedRevision increments revision. Stale expectedRevision returns revision_conflict. Wrong safetyAcknowledgement.revision returns stale_safety_acknowledgement, not a silent no-op. Use selectOptionId with planHandle and expectedRevision to choose one returned complete-stack option without rematching. For medication_interaction, submit answers choice acknowledge_safety or safetyAcknowledgement.confirmed=true with the returned guidanceIds. This tool never purchases.",
       "inputSchema": {
         "$defs": {
           "PlanRequest": {
@@ -138,6 +138,7 @@
                     "type": "string"
                   },
                   "sex": {
+                    "description": "Person sex: female, male, intersex, or unspecified.",
                     "enum": [
                       "female",
                       "male",
@@ -325,7 +326,291 @@
                 "type": "string"
               },
               "request": {
-                "$ref": "#/$defs/PlanRequest"
+                "additionalProperties": false,
+                "properties": {
+                  "answers": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "choice": {
+                          "type": "string"
+                        },
+                        "questionId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "questionId",
+                        "choice"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "conditionCodes": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "currentSupplements": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "dailyAmount": {
+                          "exclusiveMinimum": 0,
+                          "type": "number"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "supplementId": {
+                          "pattern": "^sup_",
+                          "type": "string"
+                        },
+                        "unit": {
+                          "enum": [
+                            "mcg",
+                            "mg",
+                            "g",
+                            "IU",
+                            "CFU",
+                            "ml",
+                            "serving"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "dailyAmount",
+                        "unit"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 50,
+                    "type": "array"
+                  },
+                  "destinationCountry": {
+                    "pattern": "^[A-Z]{2}$",
+                    "type": "string"
+                  },
+                  "locale": {
+                    "type": "string"
+                  },
+                  "medicationCodes": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "optimization": {
+                    "enum": [
+                      "balanced",
+                      "best_coverage",
+                      "lowest_cost",
+                      "fewest_pills"
+                    ],
+                    "type": "string"
+                  },
+                  "profile": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "ageYears": {
+                        "maximum": 120,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "goals": {
+                        "items": {
+                          "maxLength": 80,
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "lifeStage": {
+                        "enum": [
+                          "adult",
+                          "child",
+                          "pregnant",
+                          "breastfeeding",
+                          "trying_to_conceive"
+                        ],
+                        "type": "string"
+                      },
+                      "sex": {
+                        "description": "Person sex: female, male, intersex, or unspecified.",
+                        "enum": [
+                          "female",
+                          "male",
+                          "intersex",
+                          "unspecified"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "ageYears",
+                      "sex",
+                      "lifeStage"
+                    ],
+                    "type": "object"
+                  },
+                  "requirements": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "allowedForms": {
+                        "items": {
+                          "enum": [
+                            "capsule",
+                            "softgel",
+                            "tablet",
+                            "powder",
+                            "liquid",
+                            "gummy",
+                            "sachet",
+                            "other"
+                          ],
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "dietaryPreference": {
+                        "enum": [
+                          "any",
+                          "plant_based"
+                        ],
+                        "type": "string"
+                      },
+                      "excludeSupplementIds": {
+                        "items": {
+                          "pattern": "^sup_",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "maxDailyPills": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "maxPriceMinor": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "maxProductCount": {
+                        "maximum": 30,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "omega3SourcePreference": {
+                        "enum": [
+                          "any",
+                          "algae_only",
+                          "fish_allowed"
+                        ],
+                        "type": "string"
+                      },
+                      "retainProductIds": {
+                        "items": {
+                          "pattern": "^prd_",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "retainSupplementIds": {
+                        "items": {
+                          "pattern": "^sup_",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "safetyAcknowledgement": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confirmed": {
+                        "const": true
+                      },
+                      "guidanceIds": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "revision": {
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "revision",
+                      "guidanceIds",
+                      "confirmed"
+                    ],
+                    "type": "object"
+                  },
+                  "targets": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "amount": {
+                          "exclusiveMinimum": 0,
+                          "type": "number"
+                        },
+                        "name": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "supplementId": {
+                          "pattern": "^sup_",
+                          "type": "string"
+                        },
+                        "unit": {
+                          "enum": [
+                            "mcg",
+                            "mg",
+                            "g",
+                            "IU",
+                            "CFU",
+                            "ml",
+                            "serving"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "amount",
+                        "unit"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 30,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "locale",
+                  "destinationCountry",
+                  "optimization",
+                  "profile",
+                  "requirements",
+                  "targets"
+                ],
+                "type": "object"
               }
             },
             "required": [

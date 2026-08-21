@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { parseDose } from "@/lib/dose-conversion";
 import { recommendProductStackFullBeam } from "@/lib/product-recommendations";
 import type { ProductRecommendationNeed } from "@/lib/product-recommendation-types";
+import {
+  isNonAlgaeOmegaStandin,
+  isPrenatalOrFertilitySku
+} from "@/lib/agentic/catalogue/product-fit";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
 import {
@@ -17,6 +21,9 @@ import type {
   PlanLeftover,
   StackOption
 } from "@/lib/agentic/plan/types";
+
+const AGENTIC_MATCH_DEADLINE_MS = 2500;
+const AGENTIC_CANDIDATES_PER_TARGET = 8;
 
 function productEligible(product: CatalogueProduct, state: CanonicalPlanState) {
   if (!product.orderable || product.incompleteCommercialFacts) {
@@ -42,7 +49,25 @@ function productEligible(product: CatalogueProduct, state: CanonicalPlanState) {
 
   if (
     state.requirements.omega3SourcePreference === "algae_only" &&
-    product.omegaSource === "fish"
+    (product.omegaSource === "fish" || isNonAlgaeOmegaStandin(product.candidate))
+  ) {
+    return false;
+  }
+
+  const sex = state.profile.sex;
+  const audience = product.candidate.productAudience ?? "both";
+
+  if (sex === "male" && audience === "female") {
+    return false;
+  }
+
+  if (sex === "female" && audience === "male") {
+    return false;
+  }
+
+  if (
+    isPrenatalOrFertilitySku(product.candidate) &&
+    (sex === "male" || (state.profile.ageYears >= 40 && sex !== "female"))
   ) {
     return false;
   }
@@ -263,6 +288,50 @@ function pickForTarget(
     });
 
   return candidates[0] ?? null;
+}
+
+function shortlistForBeam(
+  eligible: readonly CatalogueProduct[],
+  state: CanonicalPlanState
+) {
+  const chosen = new Map<string, CatalogueProduct>();
+
+  for (const target of state.targets) {
+    const ranked = eligible
+      .filter((item) => item.contributionSupplementIds.includes(target.supplementId))
+      .slice()
+      .sort((left, right) => {
+        const leftRatio = coverageRatio(left, target);
+        const rightRatio = coverageRatio(right, target);
+
+        if (leftRatio !== rightRatio) {
+          return rightRatio - leftRatio;
+        }
+
+        return left.unitPriceMinor - right.unitPriceMinor;
+      })
+      .slice(0, AGENTIC_CANDIDATES_PER_TARGET);
+
+    for (const item of ranked) {
+      chosen.set(item.productId, item);
+    }
+  }
+
+  for (const productId of state.requirements.retainProductIds ?? []) {
+    const retained = eligible.find((item) => item.productId === productId);
+
+    if (retained) {
+      chosen.set(retained.productId, retained);
+    }
+  }
+
+  return [...chosen.values()];
+}
+
+function clientSexFor(state: CanonicalPlanState) {
+  return state.profile.sex === "female" || state.profile.sex === "male"
+    ? state.profile.sex
+    : null;
 }
 
 function greedyStack(
@@ -492,38 +561,46 @@ export function matchPlan(input: Readonly<{
   }
 
   if (needs.length > 0 && eligible.length > 0) {
-    const beam = recommendProductStackFullBeam({
-      budgetAmount: input.state.requirements.maxPriceMinor
-        ? input.state.requirements.maxPriceMinor / 100
-        : null,
-      candidates: eligible.map((item) => item.candidate),
-      countryCode: "TH",
-      maxProducts,
-      needs,
-      stackPreference:
-        input.state.optimization === "fewest_pills" ? "compact" : "balanced"
-    });
-    const mapped = beam.recommendations
-      .map((row) => eligible.find((item) => item.candidate.id === row.product.id))
-      .filter((item): item is CatalogueProduct => Boolean(item));
+    const beamCandidates = shortlistForBeam(eligible, input.state);
 
-    if (mapped.length > 0) {
-      const beamed = stackFromProducts(
-        input.state,
-        mapped,
-        input.snapshot.availabilityAsOf,
-        "Selected for coverage, price and daily pills"
-      );
+    try {
+      const beam = recommendProductStackFullBeam({
+        budgetAmount: input.state.requirements.maxPriceMinor
+          ? input.state.requirements.maxPriceMinor / 100
+          : null,
+        candidates: beamCandidates.map((item) => item.candidate),
+        clientSex: clientSexFor(input.state),
+        countryCode: "TH",
+        deadlineAt: Date.now() + AGENTIC_MATCH_DEADLINE_MS,
+        maxProducts,
+        needs,
+        stackPreference:
+          input.state.optimization === "fewest_pills" ? "compact" : "balanced"
+      });
+      const mapped = beam.recommendations
+        .map((row) => eligible.find((item) => item.candidate.id === row.product.id))
+        .filter((item): item is CatalogueProduct => Boolean(item));
 
-      if (
-        input.state.optimization === "lowest_cost"
-          ? beamed.totalPriceMinor < selected.totalPriceMinor
-          : beamed.coveragePercent > selected.coveragePercent ||
-            (beamed.coveragePercent === selected.coveragePercent &&
-              beamed.totalPriceMinor < selected.totalPriceMinor)
-      ) {
-        selected = beamed;
+      if (mapped.length > 0) {
+        const beamed = stackFromProducts(
+          input.state,
+          mapped,
+          input.snapshot.availabilityAsOf,
+          "Selected for coverage, price and daily pills"
+        );
+
+        if (
+          input.state.optimization === "lowest_cost"
+            ? beamed.totalPriceMinor < selected.totalPriceMinor
+            : beamed.coveragePercent > selected.coveragePercent ||
+              (beamed.coveragePercent === selected.coveragePercent &&
+                beamed.totalPriceMinor < selected.totalPriceMinor)
+        ) {
+          selected = beamed;
+        }
       }
+    } catch {
+      // Keep the greedy stack when a live catalogue beam overruns.
     }
   }
 

@@ -1,0 +1,146 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
+import type { CatalogueProduct } from "../lib/agentic/catalogue/types.ts";
+import {
+  inferOmegaSource,
+  isNonAlgaeOmegaStandin,
+  isPrenatalOrFertilitySku,
+  supplementNameMatchesFact
+} from "../lib/agentic/catalogue/product-fit.ts";
+import { matchPlan } from "../lib/agentic/plan/matching.ts";
+import type { CanonicalPlanState } from "../lib/agentic/plan/types.ts";
+
+function withTitle(product: CatalogueProduct, title: string, audience?: "both" | "female" | "male") {
+  return {
+    ...product,
+    candidate: {
+      ...product.candidate,
+      productAudience: audience ?? product.candidate.productAudience,
+      title
+    },
+    productId: `prd_${title.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 24)}`
+  };
+}
+
+function stateFor(product: CatalogueProduct, overrides: Partial<CanonicalPlanState> = {}): CanonicalPlanState {
+  return {
+    acceptedGaps: [],
+    conditionCodes: [],
+    currency: "THB",
+    currentSupplements: [],
+    destinationCountry: "TH",
+    leftovers: [],
+    locale: "en",
+    medicationCodes: [],
+    optimization: "balanced",
+    pinnedOptionId: null,
+    profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
+    requirements: {},
+    safetyAcknowledgement: null,
+    targets: [
+      {
+        amount: 400,
+        name: "Folate",
+        supplementId: product.contributionSupplementIds[0]!,
+        unit: "mcg"
+      }
+    ],
+    ...overrides
+  };
+}
+
+describe("agentic live-catalogue matching constraints", () => {
+  it("classifies Conceive Well as prenatal and Super Omega 3-6-9 as a non-algae omega stand-in", () => {
+    assert.equal(
+      isPrenatalOrFertilitySku({ title: "Blackmores Conceive Well Gold", facts: [] }),
+      true
+    );
+    assert.equal(
+      isNonAlgaeOmegaStandin({ title: "Super Omega 3-6-9", facts: [] }),
+      true
+    );
+    assert.equal(inferOmegaSource({
+      automatedSafetyPassed: true,
+      availabilityStatus: "in_stock",
+      currency: "THB",
+      facts: [{ amount: 80, comparableAmount: 80, confidence: "high", itemType: "supplement", name: "Omega 3-6-9", normalizedName: "omega_3_6_9", unit: "mg" }],
+      id: "x",
+      labelStatus: "parsed",
+      platform: "manual",
+      productUrl: "https://example.test/x",
+      region: "TH",
+      title: "Super Omega 3-6-9"
+    }), "fish");
+    assert.equal(
+      supplementNameMatchesFact("omega 3", "omega 3 6 9", {
+        automatedSafetyPassed: true,
+        availabilityStatus: "in_stock",
+        currency: "THB",
+        facts: [],
+        id: "x",
+        labelStatus: "parsed",
+        platform: "manual",
+        productUrl: "https://example.test/x",
+        region: "TH",
+        title: "Super Omega 3-6-9"
+      }),
+      false
+    );
+  });
+
+  it("does not select a prenatal SKU for a 52-year-old man", () => {
+    const snapshot = fixtureSnapshot();
+    const donor =
+      snapshot.products.find((item) => /folate|folic/i.test(item.candidate.title)) ??
+      snapshot.products[0]!;
+    const prenatal = withTitle(donor, "Blackmores Conceive Well Gold", "female");
+    const matched = matchPlan({
+      snapshot: {
+        ...snapshot,
+        products: [...snapshot.products, prenatal]
+      },
+      state: stateFor(prenatal)
+    });
+    const names = (matched.selected?.basket ?? []).map((item) => item.productName);
+    assert.equal(names.some((name) => /conceive|prenatal|fertility/i.test(name)), false);
+  });
+
+  it("does not select Super Omega 3-6-9 or lecithin under algae_only", () => {
+    const snapshot = fixtureSnapshot();
+    const algae = snapshot.products.find((item) => item.omegaSource === "algae");
+    assert.ok(algae);
+    const mixed = {
+      ...withTitle(algae, "Super Omega 3-6-9"),
+      omegaSource: "none" as const,
+      unitPriceMinor: 100
+    };
+    const lecithin = {
+      ...withTitle(algae, "Soy Lecithin 1200 mg"),
+      omegaSource: "none" as const,
+      unitPriceMinor: 200
+    };
+    const matched = matchPlan({
+      snapshot: {
+        ...snapshot,
+        products: [...snapshot.products, mixed, lecithin]
+      },
+      state: {
+        ...stateFor(algae, {
+          requirements: { omega3SourcePreference: "algae_only" },
+          targets: [
+            {
+              amount: 1000,
+              name: "Omega-3",
+              supplementId: algae.contributionSupplementIds[0]!,
+              unit: "mg"
+            }
+          ]
+        })
+      }
+    });
+    const names = (matched.selected?.basket ?? []).map((item) => item.productName);
+    assert.ok(names.some((name) => /algae/i.test(name)));
+    assert.equal(names.some((name) => /3-6-9|lecithin|fish oil/i.test(name)), false);
+  });
+});

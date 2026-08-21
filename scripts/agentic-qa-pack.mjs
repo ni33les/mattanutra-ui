@@ -189,11 +189,14 @@ async function main() {
     "info names/codes and Algae omega-3 / Vitamin K2 leftovers"
   );
 
+  const createdStarted = Date.now();
   const created = await call("plan", {
     idempotencyKey: `qa-a2-${Date.now()}-create`,
     request: baseRequest({ medicationCodes: ["apixaban"] })
   });
+  const createdMs = Date.now() - createdStarted;
   const answers = answersFromQuestions(created);
+  const patchedStarted = Date.now();
   const patched = await call("plan", {
     answers,
     expectedRevision: created.revision,
@@ -209,6 +212,7 @@ async function main() {
         }
       : {})
   });
+  const patchedMs = Date.now() - patchedStarted;
   const retainAsked = (patched.questions ?? []).some((item) =>
     String(item.questionId).startsWith("q_retain_")
   );
@@ -222,10 +226,11 @@ async function main() {
     ((created.basket ?? []).length === 8 &&
       namesInBasket(created).some((name) => /zinc/i.test(name)) &&
       namesInBasket(created).some((name) => /b12/i.test(name)));
+  const a2Latency = createdMs < 8000 && patchedMs < 8000;
   record(
     "A2",
-    a2Core && a2DevExtra,
-    "answers+expectedRevision patch stays sticky"
+    a2Core && a2DevExtra && a2Latency,
+    `answers+expectedRevision patch stays sticky (${createdMs}ms create, ${patchedMs}ms patch)`
   );
 
   const sticky = await call("plan", {
@@ -502,6 +507,51 @@ async function main() {
     "tools/list is exactly info,plan,execute,order,support,feedback"
   );
 
+  const algaePlan = await call("plan", {
+    idempotencyKey: `qa-a15-${Date.now()}-algae`,
+    request: baseRequest({
+      requirements: { omega3SourcePreference: "algae_only" },
+      targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
+    })
+  });
+  const algaeNames = namesInBasket(algaePlan);
+  const omegaLooking = algaeNames.filter((name) =>
+    /omega|algae|fish|lecithin|krill/i.test(name)
+  );
+  const forbiddenOmega = algaeNames.some(
+    (name) =>
+      /super omega|3-6-9|fish oil|lecithin|krill/i.test(name) && !/algae/i.test(name)
+  );
+  const omegaLeftover = (algaePlan.leftovers ?? []).some(
+    (item) =>
+      /omega/i.test(String(item.name ?? "")) && item.reason === "not_in_catalogue"
+  );
+  record(
+    "A15",
+    algaePlan.ok === true &&
+      forbiddenOmega === false &&
+      (omegaLooking.length > 0
+        ? omegaLooking.every((name) => /algae/i.test(name))
+        : omegaLeftover),
+    "algae_only omega line is algae, not fish/3-6-9/lecithin"
+  );
+
+  const malePlan = await call("plan", {
+    idempotencyKey: `qa-a16-${Date.now()}-male`,
+    request: baseRequest({
+      profile: { ageYears: 52, lifeStage: "adult", sex: "male" }
+    })
+  });
+  const maleNames = namesInBasket(malePlan);
+  const prenatal = maleNames.some((name) =>
+    /conceive|prenatal|pregnancy|fertility/i.test(name)
+  );
+  record(
+    "A16",
+    malePlan.ok === true && prenatal === false,
+    "male age 52 is not mapped to prenatal/conceive/fertility SKUs"
+  );
+
   record(
     "T1",
     Array.isArray(leftoverPlan.leftovers) &&
@@ -535,18 +585,22 @@ async function main() {
   );
 
   const scoredA = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13"];
+  const extraA = ["A15", "A16"];
   const scoredT = ["T1", "T2", "T3"];
   const aItems = scoredA.map((id) => results.find((item) => item.id === id)).filter(Boolean);
+  const extraItems = extraA.map((id) => results.find((item) => item.id === id)).filter(Boolean);
   const tItems = scoredT.map((id) => results.find((item) => item.id === id)).filter(Boolean);
   const aPassed = aItems.filter((item) => item.pass).length;
   console.log(`Official MattaNutra Agentic QA Pack, ${aPassed}/13`);
-  for (const item of [...aItems, ...tItems]) {
+  for (const item of [...aItems, ...extraItems, ...tItems]) {
     console.log(`${item.id} ${item.pass ? "PASS" : "FAIL"} ${item.detail}`);
   }
   console.log("A14 NOT TESTED not host-visible");
   const allGreen =
     aItems.length === 13 &&
     aItems.every((item) => item.pass) &&
+    extraItems.length === 2 &&
+    extraItems.every((item) => item.pass) &&
     tItems.length === 3 &&
     tItems.every((item) => item.pass);
   process.exitCode = allGreen ? 0 : 1;

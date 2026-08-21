@@ -85,6 +85,7 @@ const PLAN_REQUEST: JsonSchema = {
           type: "string"
         },
         sex: {
+          description: "Person sex: female, male, intersex, or unspecified.",
           enum: ["female", "male", "intersex", "unspecified"],
           type: "string"
         }
@@ -206,7 +207,7 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
         expectedRevision: { minimum: 1, type: "integer" },
         idempotencyKey: IDEMPOTENCY_KEY,
         planHandle: HANDLE,
-        request: { $ref: "#/$defs/PlanRequest" }
+        request: PLAN_REQUEST
       },
       required: ["idempotencyKey", "request"],
       type: "object"

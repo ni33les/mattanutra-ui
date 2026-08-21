@@ -184,6 +184,7 @@ export type ProductRecommendationInput = Readonly<{
   clientContext?: ProductRecommendationClientContext | null;
   clientSex?: ProductClientSex | null;
   countryCode?: string | null;
+  deadlineAt?: number | null;
   maxProducts?: number;
   needs: ProductRecommendationNeed[];
   stackPreference?: ProductStackPreference | null;

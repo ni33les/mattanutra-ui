@@ -354,6 +354,39 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.notEqual(item.productName, "Creatine Monohydrate 5 g");
   });
 
+  it("A15 algae_only omega line is algae not fish", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "qa-a15-algae-0000001",
+      request: baseRequest({
+        requirements: { omega3SourcePreference: "algae_only" },
+        targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
+      })
+    });
+    const names = namesInBasket(plan);
+    assert.equal(plan.ok, true);
+    assert.ok(names.some((name) => /algae/i.test(name)));
+    assert.equal(
+      names.some((name) => /fish oil|3-6-9|lecithin|krill/i.test(name) && !/algae/i.test(name)),
+      false
+    );
+  });
+
+  it("A16 male age 52 is not mapped to prenatal SKUs", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "qa-a16-male52-000001",
+      request: baseRequest({
+        profile: { ageYears: 52, lifeStage: "adult", sex: "male" }
+      })
+    });
+    assert.equal(plan.ok, true);
+    assert.equal(
+      namesInBasket(plan).some((name) => /conceive|prenatal|pregnancy|fertility/i.test(name)),
+      false
+    );
+  });
+
   it("A13 tools/list is exactly the six names", async () => {
     const runtime = runtimeFor();
     const listed = await handleJsonRpc(runtime, { id: 3, method: "tools/list" });

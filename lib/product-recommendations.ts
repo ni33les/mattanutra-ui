@@ -1804,13 +1804,25 @@ function beamSearchStackScores(
     keepState(state);
   }
 
-  for (let depth = 2; depth <= maxProducts && beam.length > 0; depth += 1) {
+  search: for (let depth = 2; depth <= maxProducts && beam.length > 0; depth += 1) {
+    if (input.deadlineAt != null && Date.now() >= input.deadlineAt) {
+      break;
+    }
+
     const nextBeam: V2BeamState[] = [];
 
     for (const state of beam) {
+      if (input.deadlineAt != null && Date.now() >= input.deadlineAt) {
+        break search;
+      }
+
       const selectedIndices = new Set(state.indices);
 
       for (let entryIndex = 0; entryIndex < orderedEntries.length; entryIndex += 1) {
+        if (input.deadlineAt != null && Date.now() >= input.deadlineAt) {
+          break search;
+        }
+
         if (selectedIndices.has(entryIndex)) {
           continue;
         }

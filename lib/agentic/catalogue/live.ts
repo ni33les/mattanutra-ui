@@ -1,6 +1,10 @@
 import { getRetailerAwareProductRecommendationCandidateSets } from "@/lib/admin-product-search";
 import { publicProductId } from "@/lib/agentic/contract/ids";
 import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
+import {
+  inferOmegaSource,
+  supplementNameMatchesFact
+} from "@/lib/agentic/catalogue/product-fit";
 import type {
   CatalogueProduct,
   CatalogueSnapshot
@@ -33,11 +37,8 @@ function contributionSupplementIds(candidate: ProductCandidate) {
     for (const key of keys) {
       const wanted = normalizeName(key);
       const match = FIXTURE_SUPPLEMENTS.find((item) =>
-        namesOfSupplement(item).some(
-          (name) =>
-            name === wanted ||
-            (wanted.length >= 4 && name.startsWith(`${wanted} `)) ||
-            (name.length >= 4 && wanted.startsWith(`${name} `))
+        namesOfSupplement(item).some((name) =>
+          supplementNameMatchesFact(name, wanted, candidate)
         )
       );
 
@@ -48,22 +49,6 @@ function contributionSupplementIds(candidate: ProductCandidate) {
   }
 
   return [...ids];
-}
-
-function inferOmegaSource(candidate: ProductCandidate): CatalogueProduct["omegaSource"] {
-  const haystack = [candidate.title, ...candidate.facts.map((item) => item.name)]
-    .join(" ")
-    .toLowerCase();
-
-  if (/\balgae\b|\balgal\b/.test(haystack)) {
-    return "algae";
-  }
-
-  if (/\bfish\b|\bepa\b|\bdha\b|\bomega/.test(haystack) && /\boil\b/.test(haystack)) {
-    return "fish";
-  }
-
-  return "none";
 }
 
 function inferDietarySource(
