@@ -10,7 +10,8 @@ import type {
   Exposure,
   MatcherProduct,
   SafetyFinding,
-  SafetyResult
+  SafetyResult,
+  ScaledAmount
 } from "@/lib/matcher/types";
 
 const ZINC = /zinc/i;
@@ -57,10 +58,13 @@ function subjectIdsMatching(
 
 const thresholdCache = new WeakMap<
   CanonicalRequest,
-  Map<string, ReturnType<typeof scaleAmount> | null>
+  Map<string, ScaledAmount | null>
 >();
 
-function ceilingThreshold(request: CanonicalRequest, subjectId: string) {
+function ceilingThreshold(
+  request: CanonicalRequest,
+  subjectId: string
+): ScaledAmount | null {
   let cached = thresholdCache.get(request);
 
   if (!cached) {
