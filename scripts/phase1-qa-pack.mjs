@@ -113,19 +113,16 @@ async function t02Ceilings() {
   const overZinc = zincRow(over);
   const overUl = Number(overZinc?.upperLimitAmount);
   const overExposure = Number(overZinc?.totalExposureAmount ?? 0);
+  const blockedOver = over.status === "blocked" || over.ok === false;
   const readyOverCeiling =
-    over.status === "ready" && Number.isFinite(overUl) && overExposure > overUl;
-  const pass =
-    Boolean(modest.ok) &&
-    hasAdminUl &&
-    Number.isFinite(overUl) &&
-    overUl > 0 &&
-    !readyOverCeiling;
+    over.status === "ready" &&
+    ((Number.isFinite(overUl) && overExposure > overUl) || overExposure > ul);
+  const pass = Boolean(modest.ok) && hasAdminUl && blockedOver && !readyOverCeiling;
   record(
     "T02",
     pass,
     pass
-      ? `zinc UL ${ul} mg; over current ${overCurrent} status ${over.status} exposure ${overExposure}`
+      ? `zinc UL ${ul} mg; over current ${overCurrent} status ${over.status}`
       : `modestUl=${modestZinc?.upperLimitAmount} overStatus=${over.status} overUl=${overZinc?.upperLimitAmount} overExposure=${overZinc?.totalExposureAmount}`,
     pass ? 10 : hasAdminUl ? 8 : 5
   );
