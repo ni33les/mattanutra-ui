@@ -526,6 +526,130 @@ export function matcherTelemetryFor(input: Readonly<{
   };
 }
 
+function groupBySeller(products: readonly CatalogueProduct[]) {
+  const groups = new Map<string, CatalogueProduct[]>();
+
+  for (const product of products) {
+    const key = product.sellerId || "unknown";
+    const list = groups.get(key) ?? [];
+    list.push(product);
+    groups.set(key, list);
+  }
+
+  return [...groups.values()];
+}
+
+function preferStack(
+  current: StackOption,
+  next: StackOption,
+  optimization: CanonicalPlanState["optimization"]
+) {
+  if (optimization === "lowest_cost") {
+    if (next.totalPriceMinor !== current.totalPriceMinor) {
+      return next.totalPriceMinor < current.totalPriceMinor;
+    }
+
+    return next.coveragePercent > current.coveragePercent;
+  }
+
+  if (next.coveragePercent !== current.coveragePercent) {
+    return next.coveragePercent > current.coveragePercent;
+  }
+
+  return next.totalPriceMinor < current.totalPriceMinor;
+}
+
+function matchRetailerStack(input: Readonly<{
+  deadlineAt: number;
+  eligible: readonly CatalogueProduct[];
+  snapshot: CatalogueSnapshot;
+  state: CanonicalPlanState;
+}>) {
+  const needs = toNeed(input.state);
+  const maxProducts = maxProductCount(input.state);
+  const coverageFirst = greedyStack(
+    input.state,
+    input.eligible,
+    input.snapshot.availabilityAsOf,
+    "Highest-coverage feasible stack",
+    "coverage"
+  );
+  const cheapest = greedyStack(
+    { ...input.state, optimization: "lowest_cost" },
+    input.eligible,
+    input.snapshot.availabilityAsOf,
+    "Lower-cost incomplete stack",
+    "cheapest"
+  );
+  let selected = input.state.optimization === "lowest_cost" ? cheapest : coverageFirst;
+
+  if (needs.length > 0 && input.eligible.length > 0 && Date.now() < input.deadlineAt) {
+    const beamCandidates = shortlistForBeam(input.eligible, input.state);
+
+    try {
+      if (beamCandidates.length > 0) {
+        const beam = recommendProductStackFullBeam({
+          budgetAmount: input.state.requirements.maxPriceMinor
+            ? input.state.requirements.maxPriceMinor / 100
+            : null,
+          candidates: beamCandidates.map((item) => item.candidate),
+          clientSex: clientSexFor(input.state),
+          countryCode: "TH",
+          deadlineAt: input.deadlineAt,
+          maxProducts,
+          needs,
+          stackPreference:
+            input.state.optimization === "fewest_pills" ? "compact" : "balanced"
+        });
+        const mapped = beam.recommendations
+          .map((row) =>
+            input.eligible.find((item) => item.candidate.id === row.product.id)
+          )
+          .filter((item): item is CatalogueProduct => Boolean(item));
+
+        if (mapped.length > 0) {
+          const beamed = stackFromProducts(
+            input.state,
+            mapped,
+            input.snapshot.availabilityAsOf,
+            "Selected for coverage, price and daily pills"
+          );
+
+          if (preferStack(selected, beamed, input.state.optimization)) {
+            selected = beamed;
+          }
+        }
+      }
+    } catch {
+      // Keep the greedy stack when a live catalogue beam overruns.
+    }
+  }
+
+  if (
+    input.state.optimization !== "lowest_cost" &&
+    preferStack(selected, coverageFirst, input.state.optimization)
+  ) {
+    selected = coverageFirst;
+  }
+
+  const compactEligible = input.eligible.slice().sort((left, right) => {
+    if (left.dailyPills !== right.dailyPills) {
+      return left.dailyPills - right.dailyPills;
+    }
+
+    return left.productId.localeCompare(right.productId);
+  });
+  const compact = greedyStack(
+    { ...input.state, optimization: "fewest_pills" },
+    compactEligible,
+    input.snapshot.availabilityAsOf,
+    "Fewer daily pills",
+    "coverage"
+  );
+
+  return { cheapest, compact, selected };
+}
+
 export function matchPlan(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
@@ -538,121 +662,76 @@ export function matchPlan(input: Readonly<{
   const eligible = input.snapshot.products.filter((product) =>
     productEligible(product, input.state)
   );
-  const needs = toNeed(input.state);
-  const maxProducts = maxProductCount(input.state);
-  const coverageFirst = greedyStack(
-    input.state,
-    eligible,
-    input.snapshot.availabilityAsOf,
-    "Highest-coverage feasible stack",
-    "coverage"
-  );
-  const cheapest = greedyStack(
-    { ...input.state, optimization: "lowest_cost" },
-    eligible,
-    input.snapshot.availabilityAsOf,
-    "Lower-cost incomplete stack",
-    "cheapest"
-  );
-  let selected = coverageFirst;
+  const deadlineAt = Date.now() + AGENTIC_MATCH_DEADLINE_MS;
+  const retailers = groupBySeller(eligible)
+    .map((products) => ({
+      greedy: greedyStack(
+        input.state,
+        products,
+        input.snapshot.availabilityAsOf,
+        "Highest-coverage feasible stack",
+        "coverage"
+      ),
+      products
+    }))
+    .sort(
+      (left, right) =>
+        right.greedy.coveragePercent - left.greedy.coveragePercent ||
+        left.greedy.totalPriceMinor - right.greedy.totalPriceMinor ||
+        left.products[0]!.sellerId.localeCompare(right.products[0]!.sellerId)
+    );
 
-  if (input.state.optimization === "lowest_cost") {
-    selected = cheapest;
-  }
+  let selected: StackOption | null = null;
+  let cheapest: StackOption | null = null;
+  let compact: StackOption | null = null;
 
-  if (needs.length > 0 && eligible.length > 0) {
-    const beamCandidates = shortlistForBeam(eligible, input.state);
+  for (const retailer of retailers) {
+    const matched = matchRetailerStack({
+      deadlineAt,
+      eligible: retailer.products,
+      snapshot: input.snapshot,
+      state: input.state
+    });
 
-    try {
-      if (beamCandidates.length > 0) {
-      const beam = recommendProductStackFullBeam({
-        budgetAmount: input.state.requirements.maxPriceMinor
-          ? input.state.requirements.maxPriceMinor / 100
-          : null,
-        candidates: beamCandidates.map((item) => item.candidate),
-        clientSex: clientSexFor(input.state),
-        countryCode: "TH",
-        deadlineAt: Date.now() + AGENTIC_MATCH_DEADLINE_MS,
-        maxProducts,
-        needs,
-        stackPreference:
-          input.state.optimization === "fewest_pills" ? "compact" : "balanced"
-      });
-      const mapped = beam.recommendations
-        .map((row) => eligible.find((item) => item.candidate.id === row.product.id))
-        .filter((item): item is CatalogueProduct => Boolean(item));
-
-      if (mapped.length > 0) {
-        const beamed = stackFromProducts(
-          input.state,
-          mapped,
-          input.snapshot.availabilityAsOf,
-          "Selected for coverage, price and daily pills"
-        );
-
-        if (
-          input.state.optimization === "lowest_cost"
-            ? beamed.totalPriceMinor < selected.totalPriceMinor
-            : beamed.coveragePercent > selected.coveragePercent ||
-              (beamed.coveragePercent === selected.coveragePercent &&
-                beamed.totalPriceMinor < selected.totalPriceMinor)
-        ) {
-          selected = beamed;
-        }
-      }
-      }
-    } catch {
-      // Keep the greedy stack when a live catalogue beam overruns.
+    if (!matched.selected) {
+      continue;
     }
-  }
 
-  if (
-    input.state.optimization !== "lowest_cost" &&
-    (coverageFirst.coveragePercent > selected.coveragePercent ||
-      (coverageFirst.coveragePercent === selected.coveragePercent &&
-        coverageFirst.totalPriceMinor < selected.totalPriceMinor))
-  ) {
-    selected = coverageFirst;
+    if (!selected || preferStack(selected, matched.selected, input.state.optimization)) {
+      selected = matched.selected;
+      cheapest = matched.cheapest;
+      compact = matched.compact;
+    }
   }
 
   const alternatives: StackOption[] = [];
 
-  if (input.state.optimization !== "lowest_cost" && materialDifference(selected, cheapest)) {
+  if (
+    selected &&
+    cheapest &&
+    input.state.optimization !== "lowest_cost" &&
+    materialDifference(selected, cheapest)
+  ) {
     alternatives.push({
       ...cheapest,
       reason: cheaperReason(selected, cheapest)
     });
   }
 
-  if (input.state.optimization !== "fewest_pills") {
-    const compactEligible = eligible.slice().sort((left, right) => {
-      if (left.dailyPills !== right.dailyPills) {
-        return left.dailyPills - right.dailyPills;
-      }
-
-      return left.productId.localeCompare(right.productId);
-    });
-    const compact = greedyStack(
-      { ...input.state, optimization: "fewest_pills" },
-      compactEligible,
-      input.snapshot.availabilityAsOf,
-      "Fewer daily pills",
-      "coverage"
-    );
-
-    if (
-      materialDifference(selected, compact) &&
-      alternatives.every((item) => materialDifference(item, compact))
-    ) {
-      alternatives.push(compact);
-    }
+  if (
+    selected &&
+    compact &&
+    input.state.optimization !== "fewest_pills" &&
+    materialDifference(selected, compact) &&
+    alternatives.every((item) => materialDifference(item, compact))
+  ) {
+    alternatives.push(compact);
   }
 
-  const limited = alternatives.slice(0, 2);
   const leftovers = leftoversFor(input.state, selected, cheapest);
 
   return {
-    alternatives: limited,
+    alternatives: alternatives.slice(0, 2),
     leftovers,
     selected,
     unmetRequirements: unmetRequirementsFor({

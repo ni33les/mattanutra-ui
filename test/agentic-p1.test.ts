@@ -1367,6 +1367,7 @@ describe("agentic P1 pack fixes", () => {
     assert.match(live, /includeIneligible: false/);
     assert.match(live, /saleEligibleOnly: true/);
     assert.match(live, /isSaleEligible/);
+    assert.match(live, /sellerId\}:\$\{mapped\.productId\}/);
     const mapper = readFileSync(
       new URL("../lib/agentic/public-mapper.ts", import.meta.url),
       "utf8"

@@ -163,4 +163,82 @@ describe("agentic live-catalogue matching constraints", () => {
     assert.ok(names.some((name) => /algae/i.test(name)));
     assert.equal(names.some((name) => /3-6-9|lecithin|fish oil|omega dha/i.test(name)), false);
   });
+
+  it("matches each retailer separately and keeps one seller in the basket", () => {
+    const snapshot = fixtureSnapshot();
+    const folate =
+      snapshot.products.find((item) => /folate|folic/i.test(item.candidate.title)) ??
+      snapshot.products[0]!;
+    const zinc =
+      snapshot.products.find((item) => /zinc/i.test(item.candidate.title)) ??
+      snapshot.products[1]!;
+    const retailerA = "org_a";
+    const retailerB = "org_b";
+    const aFolate = {
+      ...folate,
+      sellerId: retailerA,
+      sellerName: "Retailer A",
+      unitPriceMinor: 90000,
+      candidate: {
+        ...folate.candidate,
+        selectedRetailerOrganisationId: retailerA,
+        selectedRetailerName: "Retailer A"
+      }
+    };
+    const aZinc = {
+      ...zinc,
+      sellerId: retailerA,
+      sellerName: "Retailer A",
+      candidate: {
+        ...zinc.candidate,
+        selectedRetailerOrganisationId: retailerA,
+        selectedRetailerName: "Retailer A"
+      }
+    };
+    const bFolate = {
+      ...folate,
+      sellerId: retailerB,
+      sellerName: "Retailer B",
+      unitPriceMinor: 20000,
+      candidate: {
+        ...folate.candidate,
+        id: `${folate.candidate.id}-b`,
+        selectedRetailerOrganisationId: retailerB,
+        selectedRetailerName: "Retailer B",
+        unitPriceAmount: 200
+      }
+    };
+    const folateOnly = matchPlan({
+      snapshot: { ...snapshot, products: [aFolate, aZinc, bFolate] },
+      state: stateFor(folate)
+    });
+    const folateSellers = new Set(
+      (folateOnly.selected?.basket ?? []).map((item) => item.sellerId)
+    );
+    assert.equal(folateSellers.size, 1);
+    assert.equal([...folateSellers][0], retailerB);
+
+    const both = matchPlan({
+      snapshot: { ...snapshot, products: [aFolate, aZinc, bFolate] },
+      state: stateFor(folate, {
+        targets: [
+          {
+            amount: 400,
+            name: "Folate",
+            supplementId: folate.contributionSupplementIds[0]!,
+            unit: "mcg"
+          },
+          {
+            amount: 25,
+            name: "Zinc",
+            supplementId: zinc.contributionSupplementIds[0]!,
+            unit: "mg"
+          }
+        ]
+      })
+    });
+    const bothSellers = new Set((both.selected?.basket ?? []).map((item) => item.sellerId));
+    assert.equal(bothSellers.size, 1);
+    assert.equal([...bothSellers][0], retailerA);
+  });
 });

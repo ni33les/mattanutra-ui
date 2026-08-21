@@ -173,7 +173,7 @@ export async function loadLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
     includeIneligible: false,
     saleEligibleOnly: true
   });
-  const byProduct = new Map<string, CatalogueProduct>();
+  const byListing = new Map<string, CatalogueProduct>();
 
   for (const set of sets) {
     for (const candidate of set.candidates) {
@@ -183,10 +183,11 @@ export async function loadLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
         continue;
       }
 
-      const existing = byProduct.get(mapped.productId);
+      const listingKey = `${mapped.sellerId}:${mapped.productId}`;
+      const existing = byListing.get(listingKey);
 
       if (!existing) {
-        byProduct.set(mapped.productId, mapped);
+        byListing.set(listingKey, mapped);
         continue;
       }
 
@@ -197,15 +198,15 @@ export async function loadLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
         nextRank < existingRank ||
         (nextRank === existingRank && mapped.unitPriceMinor < existing.unitPriceMinor)
       ) {
-        byProduct.set(mapped.productId, mapped);
+        byListing.set(listingKey, mapped);
       }
     }
   }
 
   return {
     availabilityAsOf: new Date().toISOString(),
-    catalogueVersion: `retail-th-${byProduct.size}`,
-    products: [...byProduct.values()],
+    catalogueVersion: `retail-th-${byListing.size}`,
+    products: [...byListing.values()],
     supplements: FIXTURE_SUPPLEMENTS
   };
 }
