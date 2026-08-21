@@ -116,6 +116,15 @@ function hasFullRequest(payload: PlanToolInput) {
   return Array.isArray(nested?.targets) && nested.targets.length > 0;
 }
 
+function snapshotForPin(previous: PlanResult): CatalogueSnapshot {
+  return {
+    availabilityAsOf: previous.availabilityAsOf,
+    catalogueVersion: previous.catalogueVersion,
+    products: [],
+    supplements: []
+  };
+}
+
 function composeResult(input: Readonly<{
   alternatives: readonly StackOption[];
   locale: Locale;
@@ -342,10 +351,14 @@ export async function planTool(input: Readonly<{
   store: AgenticStore;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
   const requestedDestination = requestRecord(input.payload.request)?.destinationCountry;
-  let snapshot = await ensureCatalogueSnapshot(
-    input.config.environment,
-    typeof requestedDestination === "string" ? requestedDestination : undefined
-  );
+  const loadLiveCatalogue =
+    hasFullRequest(input.payload) || !input.payload.planHandle;
+  let snapshot: CatalogueSnapshot | null = loadLiveCatalogue
+    ? await ensureCatalogueSnapshot(
+        input.config.environment,
+        typeof requestedDestination === "string" ? requestedDestination : undefined
+      )
+    : null;
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const replay = await beginIdempotency<PlanToolSuccess>({
     key: input.payload.idempotencyKey,
@@ -415,14 +428,25 @@ export async function planTool(input: Readonly<{
       planId = plan.id;
       revision = plan.currentRevision + 1;
 
-      if (previous?.requestSnapshot.destinationCountry) {
+      if (previous?.requestSnapshot.destinationCountry && loadLiveCatalogue) {
         snapshot = await ensureCatalogueSnapshot(
           input.config.environment,
           previous.requestSnapshot.destinationCountry
         );
       }
+
+      if (!snapshot && previous) {
+        snapshot = snapshotForPin(previous);
+      }
     } else {
       planId = crypto.randomUUID();
+    }
+
+    if (!snapshot) {
+      snapshot = await ensureCatalogueSnapshot(
+        input.config.environment,
+        typeof requestedDestination === "string" ? requestedDestination : undefined
+      );
     }
 
     const shownRevision = planHandle ? (input.payload.expectedRevision ?? 1) : 1;
