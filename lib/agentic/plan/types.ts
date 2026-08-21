@@ -150,6 +150,7 @@ export type BasketItem = Readonly<{
   deliveryWindow: string | null;
   fixture: boolean;
   form: string;
+  imageUrl: string | null;
   incompleteCommercialFacts: boolean;
   lineTotalMinor: number;
   productId: string;

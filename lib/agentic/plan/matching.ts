@@ -169,6 +169,7 @@ function basketFromProducts(
     deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
     fixture: product.source === "fixture",
     form: product.form,
+    imageUrl: product.candidate.imageUrl?.trim() || null,
     incompleteCommercialFacts: product.incompleteCommercialFacts,
     lineTotalMinor: product.unitPriceMinor,
     productId: product.productId,

@@ -36,8 +36,8 @@ function contributionSupplementIds(candidate: ProductCandidate) {
         namesOfSupplement(item).some(
           (name) =>
             name === wanted ||
-            name.startsWith(`${wanted} `) ||
-            wanted.startsWith(`${name} `)
+            (wanted.length >= 4 && name.startsWith(`${wanted} `)) ||
+            (name.length >= 4 && wanted.startsWith(`${name} `))
         )
       );
 
@@ -120,8 +120,19 @@ function inferDailyPills(candidate: ProductCandidate) {
   return 1;
 }
 
+function isSaleEligible(candidate: ProductCandidate) {
+  return (
+    candidate.status === "approved" &&
+    (candidate.brandStatus == null || candidate.brandStatus === "approved") &&
+    candidate.validation?.status === "pass" &&
+    candidate.automatedSafetyPassed === true &&
+    Boolean(candidate.imageUrl?.trim()) &&
+    (candidate.unitPriceAmount ?? candidate.priceAmount ?? 0) > 0
+  );
+}
+
 function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | null {
-  if (!candidate.imageUrl?.trim()) {
+  if (!isSaleEligible(candidate)) {
     return null;
   }
 
@@ -173,7 +184,8 @@ function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | nul
 export async function loadLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
   const sets = await getRetailerAwareProductRecommendationCandidateSets({
     countryCode: "TH",
-    includeIneligible: false
+    includeIneligible: false,
+    saleEligibleOnly: true
   });
   const byProduct = new Map<string, CatalogueProduct>();
 

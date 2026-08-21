@@ -287,6 +287,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
   includeIneligible?: boolean;
   limit?: number;
   productId?: string | null;
+  saleEligibleOnly?: boolean;
   sql?: ProductSearchDb;
 }>): Promise<ProductRecommendationRetailerCandidateSet[]> {
   const sql = input.sql ?? getSql();
@@ -333,6 +334,8 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       and sellable.status = 'active'
     join public.products
       on products.id = sellable.product_id
+    left join public.product_brands
+      on product_brands.id = products.brand_id
     left join public.retail_product_stock stock
       on stock.organisation_id = sellable.organisation_id
       and stock.product_id = sellable.product_id
@@ -348,7 +351,13 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       and organisations.status = 'active'
       and organisations.country_code = ${countryCode}
       and sellable.product_id = any(${productIds}::uuid[])
-      and products.status <> 'deleted'
+      and ${
+        input.saleEligibleOnly
+          ? sql`products.status = 'approved'
+            and (products.brand_id is null or product_brands.status = 'approved')
+            and coalesce(products.validation_status, 'pass') = 'pass'`
+          : sql`products.status <> 'deleted'`
+      }
     order by lower(organisations.name), sellable.updated_at desc
   `;
   const customerPriceMarginPercent = await getCustomerPriceMarginPercent({ sql });

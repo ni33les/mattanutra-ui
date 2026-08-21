@@ -11,6 +11,7 @@ export type PublicBasketItem = Readonly<{
   dailyPills: number;
   fixture?: true;
   form: string;
+  imageUrl?: string;
   lineTotalMinor: number;
   productId: string;
   productName: string;
@@ -20,6 +21,8 @@ export type PublicBasketItem = Readonly<{
 }>;
 
 export function publicBasketItem(item: BasketItem): PublicBasketItem {
+  const imageUrl = item.imageUrl?.trim() || null;
+
   return {
     currency: "THB",
     dailyPills: item.dailyPills,
@@ -29,6 +32,7 @@ export function publicBasketItem(item: BasketItem): PublicBasketItem {
     productName: item.productName,
     quantity: item.quantity,
     unitPriceMinor: item.unitPriceMinor,
+    ...(imageUrl ? { imageUrl } : {}),
     ...(item.fixture || item.source === "fixture"
       ? { fixture: true as const, source: "fixture" as const }
       : {})
@@ -317,6 +321,7 @@ export function publicFrozenOrder(frozen: unknown) {
         deliveryWindow: null,
         fixture: Boolean(row.fixture) || row.source === "fixture",
         form: String(row.form ?? ""),
+        imageUrl: typeof row.imageUrl === "string" && row.imageUrl.trim() ? row.imageUrl : null,
         incompleteCommercialFacts: false,
         lineTotalMinor: Number(row.lineTotalMinor) || 0,
         productId: String(row.productId ?? ""),

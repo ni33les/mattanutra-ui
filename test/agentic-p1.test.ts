@@ -1352,6 +1352,13 @@ describe("agentic P1 pack fixes", () => {
     assert.match(snapshot, /cachedLiveThailandSnapshot/);
     assert.match(live, /getRetailerAwareProductRecommendationCandidateSets/);
     assert.match(live, /includeIneligible: false/);
+    assert.match(live, /saleEligibleOnly: true/);
+    assert.match(live, /isSaleEligible/);
+    const mapper = readFileSync(
+      new URL("../lib/agentic/public-mapper.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(mapper, /imageUrl/);
     assert.match(checkoutPage, /redirect\(`/);
     assert.match(checkoutPage, /from=mcp/);
     assert.match(tracking, /returnToAgent/);
