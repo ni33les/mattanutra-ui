@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AgenticCheckoutPanel } from "@/components/agentic-checkout-panel";
 import { McpWebsiteCheckoutPanel } from "@/components/mcp-website-checkout-panel";
 import { SiteFooter } from "@/components/site-footer";
@@ -17,6 +17,11 @@ import {
 } from "@/lib/agentic/money";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 import { loadAgenticCheckoutProducts } from "@/lib/agentic/commerce/checkout-products";
+import {
+  joinMcpPaidOrderToRetail,
+  lookupRetailOrderForAgentic
+} from "@/lib/agentic/commerce/retail-join";
+import { nowIso } from "@/lib/agentic/runtime";
 import { stripePublishableKey } from "@/lib/stripe-payments";
 
 type PageProps = Readonly<{
@@ -61,6 +66,23 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
 
   if (!order) {
     notFound();
+  }
+
+  if (order.paymentStatus === "paid" && runtime.config.paymentProvider === "stripe_test") {
+    let retail = await lookupRetailOrderForAgentic(order.id);
+
+    if (!retail) {
+      retail = await joinMcpPaidOrderToRetail({
+        now: nowIso(),
+        order,
+        store: runtime.store
+      });
+    }
+
+    if (retail?.trackingUrl) {
+      const path = retail.trackingUrl.replace(/^\/en(?=\/)/, `/${locale}`);
+      redirect(`${path}${path.includes("?") ? "&" : "?"}from=mcp`);
+    }
   }
 
   const expired = checkout.expiresAt <= new Date().toISOString();

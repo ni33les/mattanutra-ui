@@ -63,7 +63,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" }
@@ -88,7 +88,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {
           retainSupplementIds: [supplementId("Zinc")]
         },
@@ -115,7 +115,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         medicationCodes: ["apixaban"],
         targets: [
@@ -142,7 +142,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         medicationCodes: ["apixaban"],
         safetyAcknowledgement: {
@@ -166,7 +166,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         medicationCodes: ["apixaban"],
         safetyAcknowledgement: {
@@ -190,7 +190,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" }
@@ -205,7 +205,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "lowest_cost",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" }
@@ -366,7 +366,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 50, name: "Zinc", supplementId: supplementId("Zinc"), unit: "mg" }
@@ -402,7 +402,7 @@ describe("agentic P1 pack fixes", () => {
             destinationCountry: "TH",
             locale: "en",
             optimization: "balanced",
-            profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+            profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
             requirements: {},
             targets: [
               {
@@ -432,7 +432,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" },
@@ -470,7 +470,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D", unit: "IU" },
@@ -497,7 +497,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -514,7 +514,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: { maxPriceMinor: 100000 },
         targets: [
           { amount: 2000, name: "Vitamin D3", unit: "IU" },
@@ -539,7 +539,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: { maxPriceMinor: 100000 },
         targets: [
           { amount: 2000, name: "Vitamin D3", unit: "IU" },
@@ -561,7 +561,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D3", unit: "IU" },
@@ -603,7 +603,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -628,7 +628,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -651,7 +651,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -691,7 +691,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       }
@@ -755,7 +755,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D3", unit: "IU" },
@@ -779,7 +779,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D3", unit: "IU" },
@@ -803,7 +803,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [
           { amount: 2000, name: "Vitamin D3", unit: "IU" },
@@ -841,7 +841,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -854,7 +854,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -918,7 +918,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 32, lifeStage: "pregnant", sexAtBirth: "female" },
+        profile: { ageYears: 32, lifeStage: "pregnant", sex: "female" },
         requirements: {},
         targets: [{ amount: 400, name: "Folate", unit: "mcg" }]
       }
@@ -935,7 +935,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 32, lifeStage: "pregnant", sexAtBirth: "female" },
+        profile: { ageYears: 32, lifeStage: "pregnant", sex: "female" },
         requirements: {},
         targets: [{ amount: 400, name: "Folic acid", unit: "mcg" }]
       }
@@ -952,7 +952,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "female" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "female" },
         requirements: {},
         targets: [
           { amount: 600, name: "Calcium", unit: "mg" },
@@ -980,7 +980,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -998,7 +998,7 @@ describe("agentic P1 pack fixes", () => {
           destinationCountry: "TH",
           locale: "en",
           optimization: "balanced",
-          profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+          profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
           requirements: {},
           targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
         }
@@ -1019,7 +1019,7 @@ describe("agentic P1 pack fixes", () => {
           destinationCountry: "TH",
           locale: "en",
           optimization: "balanced",
-          profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+          profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
           requirements: {},
           targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
         }
@@ -1042,7 +1042,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -1068,7 +1068,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -1098,7 +1098,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         medicationCodes: ["apixaban"],
         targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
@@ -1117,7 +1117,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         medicationCodes: ["apixaban"],
         targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
@@ -1159,7 +1159,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         medicationCodes: ["apixaban"],
         targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
@@ -1181,7 +1181,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         medicationCodes: ["apixaban"],
         safetyAcknowledgement: {
@@ -1201,7 +1201,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 60, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 60, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       }
@@ -1220,7 +1220,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -1233,7 +1233,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "lowest_cost",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -1248,7 +1248,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "fewest_pills",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -1266,7 +1266,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
@@ -1322,6 +1322,44 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(pay.includes('form.get("scenario") ?? "success"'), false);
     assert.match(pay, /Stripe Test Mode does not accept mock payment scenarios/);
     assert.match(join, /fulfillAgenticRetailCheckout/);
+    assert.match(join, /products.status = 'approved'/);
+    assert.equal(join.includes("insert into public.products"), false);
+    assert.equal(join.includes("insert into public.retail_sellable_products"), false);
+    const snapshot = readFileSync(
+      new URL("../lib/agentic/catalogue/snapshot.ts", import.meta.url),
+      "utf8"
+    );
+    const live = readFileSync(
+      new URL("../lib/agentic/catalogue/live.ts", import.meta.url),
+      "utf8"
+    );
+    const tracking = readFileSync(
+      new URL("../app/[locale]/order/track/[token]/page.tsx", import.meta.url),
+      "utf8"
+    );
+    const checkoutPage = readFileSync(
+      new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/page.tsx", import.meta.url),
+      "utf8"
+    );
+    const workflow = readFileSync(
+      new URL("../lib/retail-order-workflow.ts", import.meta.url),
+      "utf8"
+    );
+    const schema = readFileSync(
+      new URL("../lib/agentic/contract/schemas.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(snapshot, /cachedLiveThailandSnapshot/);
+    assert.match(live, /getRetailerAwareProductRecommendationCandidateSets/);
+    assert.match(live, /includeIneligible: false/);
+    assert.match(checkoutPage, /redirect\(`/);
+    assert.match(checkoutPage, /from=mcp/);
+    assert.match(tracking, /returnToAgent/);
+    assert.match(tracking, /Please return to your AI Agent Chat/);
+    assert.match(workflow, /Payment was received/);
+    assert.equal(workflow.includes("Thank you for trusting MattaNutra"), false);
+    assert.match(schema, /required: \["ageYears", "sex", "lifeStage"\]/);
+    assert.equal(schema.includes("sexAtBirth"), false);
     assert.match(join, /persistMcpPlanFeedback/);
     assert.match(join, /persistAssessmentSubmission/);
     assert.match(join, /insertFormulationVersion/);
@@ -1352,7 +1390,7 @@ describe("agentic P1 pack fixes", () => {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }

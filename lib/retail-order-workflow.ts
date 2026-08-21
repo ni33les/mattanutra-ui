@@ -151,10 +151,10 @@ const emailCopy = {
   },
   confirmed: {
     eyebrow: "Order confirmed",
-    headline: "Your retail partner order is confirmed",
+    headline: "Your order is confirmed",
     intro:
-      "Thank you for trusting MattaNutra. Your selected products have been sent to one pharmacy, and we will keep this tracking page updated as the order moves forward.",
-    subject: "Your retail partner order is confirmed"
+      "Payment was received. Your pharmacy is preparing this order. Use the tracking page below for status updates, item details and delivery progress.",
+    subject: "Your MattaNutra order is confirmed"
   },
   delivered: {
     eyebrow: "Delivered",

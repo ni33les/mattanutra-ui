@@ -102,11 +102,11 @@ async function ensureCatalogueProduct(input: Readonly<{
   const matched = await sql<Array<{ id: string }>>`
     select products.id::text
     from public.products
-    left join public.retail_sellable_products
+    join public.retail_sellable_products
       on retail_sellable_products.product_id = products.id
       and retail_sellable_products.organisation_id = ${input.organisationId}::uuid
       and retail_sellable_products.status = 'active'
-    where products.status <> 'deleted'
+    where products.status = 'approved'
       and (
         ${wanted}::uuid is not null and products.id = ${wanted}::uuid
         or products.normalized_title = ${normalized}
@@ -115,96 +115,11 @@ async function ensureCatalogueProduct(input: Readonly<{
       )
     order by
       case when ${wanted}::uuid is not null and products.id = ${wanted}::uuid then 0 else 1 end,
-      case when retail_sellable_products.id is not null then 0 else 1 end,
       products.created_at asc
     limit 1
   `;
-  const productId = matched[0]?.id ?? wanted;
 
-  if (!productId) {
-    return null;
-  }
-
-  if (!matched[0]) {
-    const url = `https://mattanutra.local/mcp/product/${productId}`;
-    await sql`
-      insert into public.products (
-        id,
-        platform,
-        region,
-        external_product_id,
-        title,
-        normalized_title,
-        product_url,
-        normalized_url,
-        product_kind,
-        product_audience,
-        status,
-        label_status,
-        availability_status,
-        price_amount,
-        currency,
-        source,
-        created_at,
-        updated_at
-      )
-      values (
-        ${productId}::uuid,
-        'manual',
-        'TH',
-        ${input.retailerSku || null},
-        ${title},
-        ${normalized},
-        ${url},
-        ${url.toLowerCase()},
-        'supplement',
-        'both',
-        'approved',
-        'parsed',
-        'in_stock',
-        ${input.unitPriceAmount},
-        'THB',
-        'admin',
-        now(),
-        now()
-      )
-      on conflict (id) do nothing
-    `;
-  }
-
-  await sql`
-    insert into public.retail_sellable_products (
-      organisation_id,
-      product_id,
-      status,
-      rrp_price_amount,
-      wholesale_price_amount,
-      currency,
-      lead_time_days,
-      backorder_policy,
-      metadata,
-      created_at,
-      updated_at
-    )
-    values (
-      ${input.organisationId}::uuid,
-      ${productId}::uuid,
-      'active',
-      ${input.unitPriceAmount},
-      ${input.unitPriceAmount},
-      'THB',
-      0,
-      'allow',
-      ${JSON.stringify({ channel: "mcp", source: "retail_product_checkout" })}::jsonb,
-      now(),
-      now()
-    )
-    on conflict (organisation_id, product_id) do update set
-      status = 'active',
-      updated_at = now()
-  `;
-
-  return productId;
+  return matched[0]?.id ?? null;
 }
 
 function addressFromCheckout(value: string | null): CheckoutAddress {
@@ -374,7 +289,7 @@ export async function joinMcpPaidOrderToRetail(input: Readonly<{
 
     return result;
   } catch (error) {
-    console.warn("Unable to join MCP pay to retail checkout", {
+    console.error("Unable to join MCP pay to retail checkout", {
       error,
       orderId: input.order.id
     });
@@ -442,7 +357,7 @@ function mcpAnswers(result: PlanResult) {
     lifeStage: state.profile.lifeStage,
     meds: state.medicationCodes.join(", "),
     optimization: state.optimization,
-    sex: state.profile.sexAtBirth,
+    sex: state.profile.sex,
     source: "mcp",
     targets: state.targets.map((item) => ({
       amount: item.amount,

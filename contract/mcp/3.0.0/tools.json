@@ -137,7 +137,7 @@
                     ],
                     "type": "string"
                   },
-                  "sexAtBirth": {
+                  "sex": {
                     "enum": [
                       "female",
                       "male",
@@ -149,7 +149,7 @@
                 },
                 "required": [
                   "ageYears",
-                  "sexAtBirth",
+                  "sex",
                   "lifeStage"
                 ],
                 "type": "object"

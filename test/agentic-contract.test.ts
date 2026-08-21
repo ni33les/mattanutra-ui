@@ -32,6 +32,8 @@ describe("agentic MCP contract 3.0.0", () => {
       "feedback"
     ]);
     assert.equal(Object.keys(AGENTIC_TOOL_SCHEMAS).length, 6);
+    assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("sexAtBirth"), false);
+    assert.match(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan), /"sex"/);
     assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 6);
   });
 

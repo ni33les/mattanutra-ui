@@ -25,7 +25,7 @@ function j1Request(overrides: Record<string, unknown> = {}) {
     profile: {
       ageYears: 38,
       lifeStage: "adult",
-      sexAtBirth: "male"
+      sex: "male"
     },
     requirements: {},
     targets: [

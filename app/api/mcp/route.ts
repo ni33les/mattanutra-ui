@@ -169,6 +169,9 @@ export async function GET(request: Request) {
   void import("@/lib/db")
     .then((mod) => mod.keepDatabaseWarm())
     .catch(() => null);
+  void import("@/lib/agentic/catalogue/snapshot")
+    .then((mod) => mod.ensureCatalogueSnapshot(loadAgenticConfig(request).environment))
+    .catch(() => null);
 
   const config = loadAgenticConfig(request);
   return NextResponse.json(

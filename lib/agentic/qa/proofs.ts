@@ -30,7 +30,7 @@ export function goldenPlanRequest() {
     profile: {
       ageYears: 38,
       lifeStage: "adult" as const,
-      sexAtBirth: "male" as const
+      sex: "male" as const
     },
     requirements: {},
     targets: [

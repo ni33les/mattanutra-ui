@@ -10,6 +10,7 @@ import { localizedRouteMetadata } from "@/lib/seo";
 
 type Props = {
   params: Promise<{ locale: string; token: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 const orderTrackingCopy = {
@@ -44,6 +45,7 @@ const orderTrackingCopy = {
     title: "Your Order",
     trackShipment: "Track shipment",
     trackingNumber: "Tracking number",
+    returnToAgent: "Please return to your AI Agent Chat.",
     yourItems: "Your Items",
     metadataTitle: "Track Your Order | MattaNutra"
   },
@@ -78,6 +80,7 @@ const orderTrackingCopy = {
     title: "คำสั่งซื้อของคุณ",
     trackShipment: "ติดตามพัสดุ",
     trackingNumber: "หมายเลขติดตาม",
+    returnToAgent: "กรุณากลับไปที่แชทผู้ช่วย AI ของคุณ",
     yourItems: "รายการของคุณ",
     metadataTitle: "ติดตามคำสั่งซื้อ | MattaNutra"
   },
@@ -109,6 +112,7 @@ const orderTrackingCopy = {
     title: "你的订单",
     trackShipment: "追踪配送",
     trackingNumber: "追踪号",
+    returnToAgent: "请返回你的 AI 助手对话。",
     yourItems: "你的商品",
     metadataTitle: "追踪你的订单 | MattaNutra"
   }
@@ -269,13 +273,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function CustomerOrderTrackingPage({ params }: Props) {
+export default async function CustomerOrderTrackingPage({ params, searchParams }: Props) {
   const { locale: rawLocale, token } = await params;
+  const query = searchParams ? await searchParams : {};
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
   const copy = orderTrackingCopy[locale];
   const dictionary = getDictionary(locale);
   const order = await getTrackingOrderByReference(token, locale);
   const currentPath = `/${locale}/order/track/${encodeURIComponent(token)}`;
+  const fromAgent = query.from === "mcp" || query.from === "agent";
 
   if (!order) {
     return (
@@ -319,6 +325,11 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
       />
       <section className="mx-auto w-full max-w-6xl flex-1 px-6 py-12 sm:px-8 lg:py-16">
         <div className="mb-8 max-w-3xl">
+          {fromAgent ? (
+            <p className="mb-6 rounded-2xl bg-[var(--mn-mint)] px-5 py-4 text-[var(--mn-ink)]">
+              {copy.returnToAgent}
+            </p>
+          ) : null}
           <p className={labelClass(locale)}>{copy.status}</p>
           <h1 className="mt-3 font-serif text-5xl font-medium leading-tight text-[var(--mn-ink)]">
             {copy.title}

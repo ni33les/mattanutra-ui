@@ -99,7 +99,15 @@ function coverageFor(
     const deliveredComparable = products
       .filter((item) => item.contributionSupplementIds.includes(target.supplementId))
       .reduce((sum, item) => {
-        const fact = item.candidate.facts[0];
+        const wanted = target.name.trim().toLowerCase();
+        const fact =
+          item.candidate.facts.find((row) => {
+            const name = (row.name ?? row.normalizedName ?? "")
+              .replace(/_/g, " ")
+              .trim()
+              .toLowerCase();
+            return name === wanted || name.includes(wanted) || wanted.includes(name);
+          }) ?? item.candidate.facts[0];
         return sum + (fact?.comparableAmount ?? 0);
       }, 0);
     const coveragePercent = requestedComparable > 0

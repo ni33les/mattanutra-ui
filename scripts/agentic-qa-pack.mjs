@@ -27,7 +27,7 @@ function baseRequest(overrides = {}) {
     destinationCountry: "TH",
     locale: "en",
     optimization: "balanced",
-    profile: { ageYears: 38, lifeStage: "adult", sexAtBirth: "male" },
+    profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
     requirements: {},
     targets: eightTargets(),
     ...overrides

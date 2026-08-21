@@ -11,7 +11,7 @@ import {
   beginIdempotency,
   commitIdempotency
 } from "@/lib/agentic/idempotency";
-import { getCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
+import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { CapabilityScope } from "@/lib/agentic/capabilities";
@@ -341,7 +341,7 @@ export async function planTool(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
-  const snapshot = getCatalogueSnapshot();
+  const snapshot = await ensureCatalogueSnapshot(input.config.environment);
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const replay = await beginIdempotency<PlanToolSuccess>({
     key: input.payload.idempotencyKey,

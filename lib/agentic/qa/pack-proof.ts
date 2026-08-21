@@ -301,7 +301,7 @@ export async function packProof(runtime: AgenticRuntime) {
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
-        profile: { ageYears: 60, lifeStage: "adult", sexAtBirth: "male" },
+        profile: { ageYears: 60, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       }

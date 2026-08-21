@@ -84,12 +84,12 @@ const PLAN_REQUEST: JsonSchema = {
           enum: ["adult", "child", "pregnant", "breastfeeding", "trying_to_conceive"],
           type: "string"
         },
-        sexAtBirth: {
+        sex: {
           enum: ["female", "male", "intersex", "unspecified"],
           type: "string"
         }
       },
-      required: ["ageYears", "sexAtBirth", "lifeStage"],
+      required: ["ageYears", "sex", "lifeStage"],
       type: "object"
     },
     requirements: {
