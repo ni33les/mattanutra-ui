@@ -40,24 +40,32 @@ function warmupState(countryCode: string): CanonicalPlanState {
   };
 }
 
+const globalWarm = globalThis as typeof globalThis & {
+  mattanutraMatcherWarmed?: boolean;
+};
+
 export async function warmAgenticCatalogue(environment: AgenticEnvironment) {
   const markets = await listDeliverableMarkets();
-
-  await Promise.all(
-    markets.map(async (market) => {
-      const snapshot = await warmCatalogueSnapshot(
-        environment,
-        market.countryCode
-      );
-
-      if (snapshot.products.length < 1) {
-        return;
-      }
-
-      matchPlan({
-        snapshot,
-        state: warmupState(market.countryCode)
-      });
-    })
+  const snapshots = await Promise.all(
+    markets.map((market) =>
+      warmCatalogueSnapshot(environment, market.countryCode)
+    )
   );
+
+  if (globalWarm.mattanutraMatcherWarmed) {
+    return;
+  }
+
+  for (const [index, snapshot] of snapshots.entries()) {
+    if (snapshot.products.length < 1) {
+      continue;
+    }
+
+    matchPlan({
+      snapshot,
+      state: warmupState(markets[index]?.countryCode ?? "TH")
+    });
+  }
+
+  globalWarm.mattanutraMatcherWarmed = true;
 }

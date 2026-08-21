@@ -264,7 +264,19 @@ function beamSearch(
         unique.set(fingerprintState(state), state);
       }
 
+      if (Date.now() >= deadlineAt) {
+        runTrimmed = true;
+        beam = compactBeam([...unique.values()], width, request);
+        break;
+      }
+
       let layer = paretoPrune([...unique.values()], request);
+
+      if (Date.now() >= deadlineAt) {
+        runTrimmed = true;
+        beam = layer.length > width ? compactBeam(layer, width, request) : layer;
+        break;
+      }
 
       if (layer.length > width) {
         layer = compactBeam(layer, width, request);

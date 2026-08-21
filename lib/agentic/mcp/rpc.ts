@@ -205,6 +205,12 @@ export function mcpCallNeedsStore(body: unknown) {
   return true;
 }
 
+function kickCatalogueWarm(environment: AgenticConfig["environment"]) {
+  void import("@/lib/agentic/catalogue/warm")
+    .then(({ warmAgenticCatalogue }) => warmAgenticCatalogue(environment))
+    .catch(() => undefined);
+}
+
 export async function handleLightweightJsonRpc(
   config: AgenticConfig,
   body: JsonRpcRequest
@@ -212,6 +218,10 @@ export async function handleLightweightJsonRpc(
   const id = body.id ?? null;
   const method = body.method ?? "";
   const params = record(body.params);
+
+  if (method === "initialize" || method === "tools/list" || method === "ping") {
+    kickCatalogueWarm(config.environment);
+  }
 
   if (method === "initialize") {
     return {

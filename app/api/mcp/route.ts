@@ -17,6 +17,13 @@ import { recordMcpTiming } from "@/lib/agentic/metrics";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+void import("@/lib/agentic/catalogue/warm")
+  .then(async ({ warmAgenticCatalogue }) => {
+    const { resolveAgenticEnvironment } = await import("@/lib/agentic/config");
+    await warmAgenticCatalogue(resolveAgenticEnvironment());
+  })
+  .catch(() => undefined);
+
 const log = createLogger("api.mcp");
 const MCP_HEADERS = {
   "Cache-Control": "no-store",

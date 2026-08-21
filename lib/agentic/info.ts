@@ -12,7 +12,7 @@ import { listDeliverableMarkets } from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
 import { recognisedSupplementNames } from "@/lib/agentic/catalogue/fixtures";
-import { warmCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
+import { warmAgenticCatalogue } from "@/lib/agentic/catalogue/warm";
 import {
   RECOGNISED_CONDITION_CODES,
   RECOGNISED_MEDICATION_CODES
@@ -68,11 +68,7 @@ export async function infoTool(input: Readonly<{
   locale?: string;
 }>) {
   const markets = await listDeliverableMarkets();
-  await Promise.all(
-    markets.map((market) =>
-      warmCatalogueSnapshot(input.config.environment, market.countryCode)
-    )
-  );
+  await warmAgenticCatalogue(input.config.environment);
   const supportedCountries = markets.map((market) => ({
     countryCode: market.countryCode,
     countryName: market.countryName,
