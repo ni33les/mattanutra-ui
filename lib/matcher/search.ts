@@ -6,7 +6,7 @@ import {
   paretoPrune
 } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError, unitsOrZero } from "@/lib/matcher/dose";
-import { evaluateSafety } from "@/lib/matcher/safety";
+import { evaluateSafety, exposureExceedsCeiling } from "@/lib/matcher/safety";
 import type {
   CanonicalRequest,
   DoseVariant,
@@ -94,8 +94,15 @@ export function tryAddVariant(
   const exposure = cloneMap(state.exposure);
 
   for (const [subjectId, amount] of variant.contributions) {
+    const nextExposure =
+      (exposure.get(subjectId) ?? BigInt(0)) + amount.units;
+
+    if (exposureExceedsCeiling(request, subjectId, nextExposure)) {
+      return null;
+    }
+
     delivered.set(subjectId, (delivered.get(subjectId) ?? BigInt(0)) + amount.units);
-    exposure.set(subjectId, (exposure.get(subjectId) ?? BigInt(0)) + amount.units);
+    exposure.set(subjectId, nextExposure);
   }
 
   return {

@@ -98,6 +98,15 @@ function ceilingThreshold(
   return resolved;
 }
 
+export function exposureExceedsCeiling(
+  request: CanonicalRequest,
+  subjectId: string,
+  exposureUnits: bigint
+) {
+  const threshold = ceilingThreshold(request, subjectId);
+  return threshold != null && exposureUnits > threshold.units;
+}
+
 export function evaluateSafety(input: Readonly<{
   exposure: Exposure;
   products: readonly MatcherProduct[];
