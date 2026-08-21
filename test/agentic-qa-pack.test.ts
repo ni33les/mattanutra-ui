@@ -16,7 +16,8 @@ import {
   isFixtureLine,
   isFixtureShapedId,
   isHttpUrl,
-  optionLines
+  optionLines,
+  unpaidA9EnvGate
 } from "../scripts/agentic-qa-pack-helpers.mjs";
 
 function runtimeFor(): AgenticRuntime {
@@ -292,6 +293,17 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     const lines = optionLines(plan);
     assert.ok(lines.length > 0);
     assert.equal(everyLineHasHttpImage(lines), true);
+  });
+
+  it("A9 unpaid execute is env-gated on uat and dev", () => {
+    const uat = unpaidA9EnvGate("uat");
+    assert.equal(uat.pass, true);
+    assert.match(uat.detail, /UAT env-gated: unpaid execute never hits \/order\/track/);
+    assert.match(uat.detail, /POST pay forbidden/);
+    const dev = unpaidA9EnvGate("dev");
+    assert.equal(dev.pass, true);
+    assert.match(dev.detail, /DEV env-gated/);
+    assert.equal(unpaidA9EnvGate("prd").pass, false);
   });
 
   it("A10 DEV fixtures are explicitly marked", async () => {

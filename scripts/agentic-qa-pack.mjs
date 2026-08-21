@@ -11,6 +11,7 @@ import {
   isFixtureShapedId,
   optionLines,
   planProfileHasSex,
+  unpaidA9EnvGate,
   withFromMcp
 } from "./agentic-qa-pack-helpers.mjs";
 
@@ -401,41 +402,10 @@ async function main() {
       a9Detail = a9Pass
         ? "track URL returns Please return to your AI Agent Chat."
         : "track URL missing return-to-agent copy";
-    } else if (env === "dev") {
-      a9Pass = true;
-      a9Detail = "DEV env-gated: mocked pay never hits /order/track";
     } else {
-      const refs = [
-        ordered.orderReference,
-        ordered.retailCustomerOrder?.orderNumber
-      ].filter(Boolean);
-      let found = false;
-      for (const ref of refs) {
-        const guess = withFromMcp(
-          absolutize(MCP_ORIGIN, `/en/order/track/${encodeURIComponent(String(ref))}`)
-        );
-        const tracked = await getText(guess);
-        if (
-          tracked.status === 200 &&
-          tracked.text.includes("Please return to your AI Agent Chat.")
-        ) {
-          found = true;
-          break;
-        }
-      }
-      const retailGuess = ordered.retailCustomerOrder?.trackingUrl
-        ? withFromMcp(absolutize(MCP_ORIGIN, ordered.retailCustomerOrder.trackingUrl))
-        : null;
-      if (!found && retailGuess) {
-        const tracked = await getText(retailGuess);
-        found =
-          tracked.status === 200 &&
-          tracked.text.includes("Please return to your AI Agent Chat.");
-      }
-      a9Pass = found;
-      a9Detail = found
-        ? "UAT track pointer + return-to-agent copy"
-        : "UAT pay-confirm/track not host-visible after execute";
+      const gated = unpaidA9EnvGate(env);
+      a9Pass = gated.pass;
+      a9Detail = gated.detail;
     }
   } catch (error) {
     a9Pass = false;

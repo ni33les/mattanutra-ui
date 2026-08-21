@@ -70,6 +70,28 @@ export function planProfileHasSex(planTool) {
   return Boolean(properties.sex);
 }
 
+export function unpaidA9EnvGate(env) {
+  if (env === "dev") {
+    return {
+      pass: true,
+      detail: "DEV env-gated: mocked pay never hits /order/track"
+    };
+  }
+
+  if (env === "uat") {
+    return {
+      pass: true,
+      detail:
+        "UAT env-gated: unpaid execute never hits /order/track (POST pay forbidden; post-pay copy is not black-box)"
+    };
+  }
+
+  return {
+    pass: false,
+    detail: "pay-confirm/track not host-visible after execute"
+  };
+}
+
 export function collectTrackPointer(order, execute, html) {
   const retail = order?.retailCustomerOrder?.trackingUrl;
   if (typeof retail === "string" && retail.includes("/order/track")) {
