@@ -119,6 +119,63 @@ function workerAgentKeyConfigured() {
   return visibleWorkerAgentKeys().length > 0;
 }
 
+async function mcpRpc(method, params) {
+  const response = await fetch(`http://${probeHost}:${port}/api/mcp`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: 1,
+      jsonrpc: "2.0",
+      method,
+      params,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`MCP ${method} HTTP ${response.status}`);
+  }
+}
+
+async function warmDevPlanHotPath() {
+  try {
+    await mcpRpc("tools/call", {
+      arguments: { locale: "en" },
+      name: "info",
+    });
+    await mcpRpc("tools/call", {
+      arguments: {
+        idempotencyKey: `platform-hot-${Date.now()}`,
+        request: {
+          destinationCountry: "TH",
+          locale: "en",
+          medicationCodes: ["apixaban"],
+          optimization: "balanced",
+          profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
+          requirements: {},
+          targets: [
+            { amount: 2000, name: "Vitamin D3", unit: "IU" },
+            { amount: 1000, name: "Algae omega-3", unit: "mg" },
+            { amount: 300, name: "Magnesium", unit: "mg" },
+            { amount: 1000, name: "Vitamin B12", unit: "mcg" },
+            { amount: 1000, name: "Vitamin C", unit: "mg" },
+            { amount: 25, name: "Zinc", unit: "mg" },
+            { amount: 10, name: "Iron", unit: "mg" },
+            { amount: 100, name: "CoQ10", unit: "mg" },
+          ],
+        },
+      },
+      name: "plan",
+    });
+    console.log("[platform] DEV plan hot path warmed");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[platform] DEV plan hot path warm failed: ${message}`);
+  }
+}
+
 function startProcess(name, command, args, env = process.env) {
   const child = spawn(command, args, {
     detached: process.platform !== "win32",
@@ -378,6 +435,8 @@ async function main() {
   console.log(
     `[platform] web is listening on ${bindHost}:${port} (probe ${probeHost}:${port})`,
   );
+
+  await warmDevPlanHotPath();
 
   if (!workerAgentKeyConfigured()) {
     console.error(
