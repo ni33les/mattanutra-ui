@@ -312,31 +312,6 @@ export function StripeCheckoutPanel({
   ]);
 
   if (!hasStripePublishableKey) {
-    if (isMockCheckout && paymentId) {
-      return (
-        <div className="mn-commerce-card">
-          <p className="mb-5 text-sm leading-6 text-[var(--mn-ink-soft)]">
-            {labels.mockIntro}
-          </p>
-          {error ? (
-            <p className="mb-4 rounded-lg bg-[var(--mn-error-soft)] p-3 text-sm font-semibold text-[var(--mn-error)]">
-              {error}
-            </p>
-          ) : null}
-          <button
-            className="mn-primary-button w-fit"
-            disabled={isCompletingMock}
-            type="button"
-            onClick={async () => {
-              scheduleMockCheckoutCompletion(paymentId);
-            }}
-          >
-            {isCompletingMock ? labels.loading : labels.mockCta}
-          </button>
-        </div>
-      );
-    }
-
     return (
       <div className="mn-commerce-card">
         <p className="mb-5 text-sm leading-6 text-[var(--mn-ink-soft)]">
@@ -347,24 +322,15 @@ export function StripeCheckoutPanel({
             {error}
           </p>
         ) : null}
-        <button
-          className="mn-primary-button w-fit"
-          type="button"
-          disabled={isCompletingMock}
-          onClick={async () => {
-            try {
-              const session = await requestCheckoutSession();
-
-              if (session.mock && session.paymentId) {
-                scheduleMockCheckoutCompletion(session.paymentId);
-              }
-            } catch (caught) {
-              setError(caught instanceof Error ? caught.message : labels.configError);
-            }
-          }}
-        >
-          {isCompletingMock ? labels.loading : labels.mockCta}
-        </button>
+        <form action="/api/payments/mock-pay" method="post">
+          <input name="locale" type="hidden" value={locale} />
+          <input name="plan" type="hidden" value={plan} />
+          <input name="sourceSurface" type="hidden" value={sourceSurface} />
+          {planId ? <input name="planId" type="hidden" value={planId} /> : null}
+          <button className="mn-primary-button w-fit" type="submit">
+            {labels.mockCta}
+          </button>
+        </form>
       </div>
     );
   }

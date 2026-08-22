@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { MockPaymentForm } from "@/components/nutrition-flow/mock-payment-form";
 import { StripeCheckoutPanel } from "@/components/nutrition-flow/stripe-checkout-panel";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
@@ -23,6 +24,7 @@ type CheckoutPageProps = Readonly<{
     locale: string;
   }>;
   searchParams: Promise<{
+    error?: string;
     plan?: string;
     planId?: string;
     source?: string;
@@ -84,6 +86,8 @@ export default async function PaymentCheckoutPage({
       ? query.planId
       : null;
   const sourceSurface = normalizePaymentSourceSurface(query.source);
+  const mockError = typeof query.error === "string" ? query.error.trim() : "";
+  const publishableKey = stripePublishableKey();
 
   if (!selectedPlan) {
     redirect(nutritionQuizPath(locale));
@@ -130,13 +134,23 @@ export default async function PaymentCheckoutPage({
             </p>
           </div>
         </div>
-        <StripeCheckoutPanel
-          locale={locale}
-          plan={selectedPlan}
-          planId={planId}
-          publishableKey={stripePublishableKey()}
-          sourceSurface={sourceSurface}
-        />
+        {publishableKey ? (
+          <StripeCheckoutPanel
+            locale={locale}
+            plan={selectedPlan}
+            planId={planId}
+            publishableKey={publishableKey}
+            sourceSurface={sourceSurface}
+          />
+        ) : (
+          <MockPaymentForm
+            error={mockError}
+            locale={locale}
+            plan={selectedPlan as AssessmentPlan}
+            planId={planId}
+            sourceSurface={sourceSurface}
+          />
+        )}
       </section>
       <SiteFooter content={dictionary.footer} locale={locale} />
     </main>

@@ -156,6 +156,7 @@ describe("rate limit", () => {
       "../app/api/assessment/[planId]/communication-channel/route.ts",
       "../app/api/assessment/[planId]/product-recommendations/route.ts",
       "../app/api/payments/checkout-session/route.ts",
+      "../app/api/payments/mock-pay/route.ts",
       "../app/api/payments/[paymentId]/mock-complete/route.ts",
       "../app/api/retail/checkout/session/route.ts",
       "../app/api/retail/checkout/[paymentId]/mock-complete/route.ts",

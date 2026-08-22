@@ -30,6 +30,24 @@ describe("DEV mock payment completion", () => {
       panel,
       /if \(body\.mock\) \{\s*setIsMockCheckout\(true\);\s*return body;/
     );
+    assert.match(panel, /action="\/api\/payments\/mock-pay"/);
     assert.doesNotMatch(panel, /MOCK_PAYMENT_COMPLETION_DELAY_MS/);
+
+    const form = await readFile(
+      "components/nutrition-flow/mock-payment-form.tsx",
+      "utf8"
+    );
+    const page = await readFile(
+      "app/[locale]/nutrition/payment/checkout/page.tsx",
+      "utf8"
+    );
+    const route = await readFile("app/api/payments/mock-pay/route.ts", "utf8");
+
+    assert.match(form, /action="\/api\/payments\/mock-pay"/);
+    assert.match(form, /type="submit"/);
+    assert.match(page, /MockPaymentForm/);
+    assert.match(route, /createStripeCheckoutSession/);
+    assert.match(route, /completeMockPayment/);
+    assert.match(route, /NextResponse\.redirect/);
   });
 });
