@@ -11,6 +11,7 @@ import {
 import { assessmentSkipsHealthScore } from "@/lib/pharmacy-in-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getSql } from "@/lib/db";
+import { textArray } from "@/lib/sql-arrays";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import { validateLeadEmail } from "@/lib/email-validation";
 import { digitalOceanBillingSyncConfiguration } from "@/lib/finance-ledger";
@@ -397,8 +398,8 @@ async function activePlanTaskId(
       and status not in ('completed', 'failed', 'cancelled', 'skipped')
       and (
         ${inputHashes.length < 1}
-        or payload ->> 'inputHash' = any(${inputHashes}::text[])
-        or idempotency_key like any(${inputHashPatterns}::text[])
+        or payload ->> 'inputHash' = any(${textArray(sql, inputHashes)}::text[])
+        or idempotency_key like any(${textArray(sql, inputHashPatterns)}::text[])
       )
     order by business_value desc, scheduled_for asc, created_at asc
     limit 1
@@ -441,8 +442,8 @@ async function nutritionOutputReadiness(
                 and tasks.task_type = 'generate_supplement_guidance'
                 and tasks.status in ('completed', 'skipped')
                 and (
-                  tasks.payload ->> 'inputHash' = any(${inputHashes}::text[])
-                  or tasks.idempotency_key like any(${inputHashPatterns}::text[])
+                  tasks.payload ->> 'inputHash' = any(${textArray(sql, inputHashes)}::text[])
+                  or tasks.idempotency_key like any(${textArray(sql, inputHashPatterns)}::text[])
                 )
             )
           )

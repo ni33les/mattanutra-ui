@@ -42,6 +42,7 @@ import {
   enqueuePaymentCheckoutPregenerationTasks,
   PAYMENT_CHECKOUT_PREGENERATION_SOURCE
 } from "@/lib/task-worker";
+import { textArray } from "@/lib/sql-arrays";
 import { validateLeadEmail } from "@/lib/email-validation";
 
 export {
@@ -306,7 +307,7 @@ async function updatePaymentState(
           where id = ${input.paymentId}::uuid
             and (
               ${input.expectedStatuses ? input.expectedStatuses.length : 0}::int = 0
-              or status = any(${input.expectedStatuses ? [...input.expectedStatuses] : []}::text[])
+              or status = any(${textArray(sql, input.expectedStatuses ?? [])}::text[])
             )
           returning *
         ),
@@ -1363,11 +1364,6 @@ export async function completeMockPayment(input: Readonly<{
     return null;
   }
 
-  const mockWebhook = await recordMockStripeWebhookLifecycle(sql, {
-    config,
-    payment,
-    request: input.request
-  });
   const paid =
     payment.status === "paid" || payment.status === "bound"
       ? payment
@@ -1385,27 +1381,59 @@ export async function completeMockPayment(input: Readonly<{
           stripePaymentIntentId: `mock_pi_${input.paymentId}`
         });
   const currentPayment = paid ?? payment;
+  const destination = paymentReturnPath(
+    currentPayment.locale,
+    currentPayment.stripe_checkout_session_id ?? `mock_cs_${currentPayment.id}`
+  );
 
-  await recordStripePaymentAccounting(sql, currentPayment, null);
+  void finishMockPaymentSideEffects({
+    config,
+    payment: currentPayment,
+    request: input.request,
+    sql
+  }).catch((error) => {
+    console.warn("Mock payment follow-up failed", error);
+  });
+
+  return {
+    destination,
+    payment: mapPayment(currentPayment)
+  };
+}
+
+async function finishMockPaymentSideEffects(input: Readonly<{
+  config: StripePaymentConfig;
+  payment: PaymentRow;
+  request?: Request;
+  sql: Db;
+}>) {
+  const { config, payment, request, sql } = input;
+  const mockWebhook = await recordMockStripeWebhookLifecycle(sql, {
+    config,
+    payment,
+    request
+  });
+
+  await recordStripePaymentAccounting(sql, payment, null);
 
   await writePaymentBpmEvent({
     actorType: "system",
     eventName: "payment_succeeded",
     eventStatus: "paid",
-    locale: currentPayment.locale,
-    paymentId: currentPayment.id,
-    planId: currentPayment.plan_id,
+    locale: payment.locale,
+    paymentId: payment.id,
+    planId: payment.plan_id,
     properties: {
       mock: true,
       source: "local_dev",
-      sourceSurface: currentPayment.source_surface
+      sourceSurface: payment.source_surface
     },
-    request: input.request,
-    selectedPlan: currentPayment.selected_plan,
+    request,
+    selectedPlan: payment.selected_plan,
     sql,
-    stripeSessionId: currentPayment.stripe_checkout_session_id,
-    valueAmount: currentPayment.amount / AMOUNT_MICROS_PER_UNIT,
-    valueCurrency: currentPayment.currency
+    stripeSessionId: payment.stripe_checkout_session_id,
+    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: payment.currency
   });
 
   await queuePlatformPaymentNotification({
@@ -1414,15 +1442,15 @@ export async function completeMockPayment(input: Readonly<{
       mock: true,
       source: "mock_payment_completion"
     },
-    payment: currentPayment
+    payment
   });
 
-  if (currentPayment.plan_id) {
+  if (payment.plan_id) {
     await startPaidAssessmentPlan({
-      locale: currentPayment.locale,
-      paymentId: currentPayment.id,
-      planId: currentPayment.plan_id,
-      selectedPlan: currentPayment.selected_plan,
+      locale: payment.locale,
+      paymentId: payment.id,
+      planId: payment.plan_id,
+      selectedPlan: payment.selected_plan,
       sql
     });
   }
@@ -1431,40 +1459,32 @@ export async function completeMockPayment(input: Readonly<{
     actorType: "system",
     eventName: "payment_fulfillment_succeeded",
     eventStatus: "paid",
-    locale: currentPayment.locale,
-    paymentId: currentPayment.id,
-    planId: currentPayment.plan_id,
+    locale: payment.locale,
+    paymentId: payment.id,
+    planId: payment.plan_id,
     properties: {
       mock: true,
       source: "local_dev",
-      sourceSurface: currentPayment.source_surface
+      sourceSurface: payment.source_surface
     },
-    selectedPlan: currentPayment.selected_plan,
+    selectedPlan: payment.selected_plan,
     sql,
-    stripeSessionId: currentPayment.stripe_checkout_session_id,
-    valueAmount: currentPayment.amount / AMOUNT_MICROS_PER_UNIT,
-    valueCurrency: currentPayment.currency
+    stripeSessionId: payment.stripe_checkout_session_id,
+    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: payment.currency
   });
 
   await markWebhookEventStatus(sql, {
-    paymentId: currentPayment.id,
+    paymentId: payment.id,
     sessionId: mockWebhook.sessionId,
     status: "processed",
     stripeEventId: mockWebhook.fatEventId
   });
   await recordMockStripePayoutLifecycle(sql, {
     config,
-    payment: currentPayment,
-    request: input.request
+    payment,
+    request
   });
-
-  return {
-    destination: paymentReturnPath(
-      currentPayment.locale,
-      currentPayment.stripe_checkout_session_id ?? `mock_cs_${currentPayment.id}`
-    ),
-    payment: mapPayment(currentPayment)
-  };
 }
 
 async function recordMockStripeWebhookLifecycle(

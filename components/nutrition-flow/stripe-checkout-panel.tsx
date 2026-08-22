@@ -7,7 +7,6 @@ import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
 import type { PaymentSourceSurface } from "@/lib/payment-paths";
 
-const MOCK_PAYMENT_COMPLETION_DELAY_MS = 1200;
 const CHECKOUT_SESSION_TIMEOUT_MS = 15_000;
 const STRIPE_LOAD_TIMEOUT_MS = 15_000;
 
@@ -161,13 +160,21 @@ export function StripeCheckoutPanel({
     setError("");
 
     try {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(
+        () => controller.abort(),
+        CHECKOUT_SESSION_TIMEOUT_MS
+      );
       const response = await fetch(
         `/api/payments/${encodeURIComponent(id)}/mock-complete`,
         {
           cache: "no-store",
-          method: "POST"
+          method: "POST",
+          signal: controller.signal
         }
-      );
+      ).finally(() => {
+        window.clearTimeout(timeout);
+      });
       const body = (await response.json().catch(() => ({}))) as {
         destination?: string;
         message?: string;
@@ -184,11 +191,7 @@ export function StripeCheckoutPanel({
     }
   }, [labels.unable]);
   const scheduleMockCheckoutCompletion = useCallback((id: string) => {
-    setIsCompletingMock(true);
-    setError("");
-    window.setTimeout(() => {
-      void completeMockCheckout(id);
-    }, MOCK_PAYMENT_COMPLETION_DELAY_MS);
+    void completeMockCheckout(id);
   }, [completeMockCheckout]);
   const retryCheckout = useCallback(() => {
     const stalePaymentId = paymentId;
