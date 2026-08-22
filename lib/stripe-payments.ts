@@ -224,32 +224,39 @@ async function fulfillMockCheckoutSession(
     throw new Error("Payment record not found for mock checkout session");
   }
 
-  if (
-    input.source === "return_page" &&
-    !(await paymentBpmEventExists(sql, {
-      eventName: "payment_checkout_returned",
-      paymentId: payment.id,
-      stripeSessionId: sessionId
-    }))
-  ) {
-    await writePaymentBpmEvent({
-      actorType: "visitor",
-      eventName: "payment_checkout_returned",
-      eventStatus: "received",
-      locale: payment.locale,
-      paymentId: payment.id,
-      planId: payment.plan_id,
-      properties: {
-        mock: true,
-        sourceSurface: payment.source_surface
-      },
-      request: input.request,
-      selectedPlan: payment.selected_plan,
-      sql,
-      stripeEventId: input.stripeEventId,
-      stripeSessionId: sessionId,
-      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-      valueCurrency: payment.currency
+  if (input.source === "return_page") {
+    void (async () => {
+      if (
+        await paymentBpmEventExists(sql, {
+          eventName: "payment_checkout_returned",
+          paymentId: payment.id,
+          stripeSessionId: sessionId
+        })
+      ) {
+        return;
+      }
+
+      await writePaymentBpmEvent({
+        actorType: "visitor",
+        eventName: "payment_checkout_returned",
+        eventStatus: "received",
+        locale: payment.locale,
+        paymentId: payment.id,
+        planId: payment.plan_id,
+        properties: {
+          mock: true,
+          sourceSurface: payment.source_surface
+        },
+        request: input.request,
+        selectedPlan: payment.selected_plan,
+        sql,
+        stripeEventId: input.stripeEventId,
+        stripeSessionId: sessionId,
+        valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+        valueCurrency: payment.currency
+      });
+    })().catch((error) => {
+      console.warn("Mock payment return follow-up failed", error);
     });
   }
 
@@ -1028,11 +1035,10 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     selectedPlan: input.selectedPlan,
     sourceSurface: input.sourceSurface
   });
-
-  await writePaymentBpmEvent({
-    actorType: "visitor",
-    eventName: "payment_checkout_requested",
-    eventStatus: "requested",
+  const checkoutRequestedEvent = {
+    actorType: "visitor" as const,
+    eventName: "payment_checkout_requested" as const,
+    eventStatus: "requested" as const,
     locale: input.locale,
     paymentId,
     planId: input.planId,
@@ -1045,7 +1051,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     sql,
     valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
     valueCurrency: payment.currency
-  });
+  };
 
   if (config.mode === "mock") {
     const mockSessionId = `mock_cs_${paymentId}`;
@@ -1064,23 +1070,28 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
       stripePriceId: config.priceIds[input.selectedPlan]
     });
 
-    await writePaymentBpmEvent({
-      actorType: "system",
-      eventName: "payment_checkout_session_created",
-      eventStatus: "checkout_session_created",
-      locale: input.locale,
-      paymentId,
-      planId: input.planId,
-      properties: {
-        mattanutraEnv: config.env,
-        mock: true,
-        sourceSurface: input.sourceSurface
-      },
-      selectedPlan: input.selectedPlan,
-      sql,
-      stripeSessionId: mockSessionId,
-      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-      valueCurrency: payment.currency
+    void Promise.all([
+      writePaymentBpmEvent(checkoutRequestedEvent),
+      writePaymentBpmEvent({
+        actorType: "system",
+        eventName: "payment_checkout_session_created",
+        eventStatus: "checkout_session_created",
+        locale: input.locale,
+        paymentId,
+        planId: input.planId,
+        properties: {
+          mattanutraEnv: config.env,
+          mock: true,
+          sourceSurface: input.sourceSurface
+        },
+        selectedPlan: input.selectedPlan,
+        sql,
+        stripeSessionId: mockSessionId,
+        valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+        valueCurrency: payment.currency
+      })
+    ]).catch((error) => {
+      console.warn("Mock checkout session follow-up failed", error);
     });
 
     return {
@@ -1091,6 +1102,8 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
       returnUrl: paymentReturnPath(input.locale, mockSessionId)
     };
   }
+
+  await writePaymentBpmEvent(checkoutRequestedEvent);
 
   const stripe = stripeClientForConfig(config);
   const plan = paymentPlan(input.selectedPlan);
@@ -1227,6 +1240,7 @@ export async function markPaymentCheckoutOpened(input: Readonly<{
   if (
     checkoutOpenedByThisRequest &&
     currentPayment.plan_id &&
+    currentPayment.stripe_mode !== "mock" &&
     !["paid", "bound", "cancelled", "expired", "failed", "fulfillment_failed"].includes(
       currentPayment.status
     )
@@ -1358,42 +1372,67 @@ export async function completeMockPayment(input: Readonly<{
     throw new Error("Mock payment completion is only available in dev mock mode");
   }
 
-  const payment = await getPaymentRowById(sql, input.paymentId);
+  let currentPayment = await getPaymentRowById(sql, input.paymentId);
 
-  if (!payment || payment.stripe_mode !== "mock") {
+  if (!currentPayment || currentPayment.stripe_mode !== "mock") {
     return null;
   }
 
-  const paid =
-    payment.status === "paid" || payment.status === "bound"
-      ? payment
-      : await updatePaymentState(sql, {
-          action: "mock_payment_paid",
-          actor: "system",
-          metadata: {
-            mock: true,
-            source: "local_dev"
-          },
-          paymentId: input.paymentId,
-          reason: "local_mock_payment_confirmed",
-          status: "paid",
-          stripeCustomerId: "mock_customer",
-          stripePaymentIntentId: `mock_pi_${input.paymentId}`
-        });
-  const currentPayment = paid ?? payment;
+  if (currentPayment.status !== "paid" && currentPayment.status !== "bound") {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const paid = await updatePaymentState(sql, {
+        action: "mock_payment_paid",
+        actor: "system",
+        metadata: {
+          mock: true,
+          source: "local_dev"
+        },
+        paymentId: input.paymentId,
+        reason: "local_mock_payment_confirmed",
+        status: "paid",
+        stripeCustomerId: "mock_customer",
+        stripePaymentIntentId: `mock_pi_${input.paymentId}`
+      });
+
+      if (paid) {
+        currentPayment = paid;
+        break;
+      }
+
+      currentPayment =
+        (await getPaymentRowById(sql, input.paymentId)) ?? currentPayment;
+
+      if (
+        currentPayment.status === "paid" ||
+        currentPayment.status === "bound"
+      ) {
+        break;
+      }
+    }
+  }
+
+  if (
+    currentPayment.status !== "paid" &&
+    currentPayment.status !== "bound"
+  ) {
+    throw new Error("Unable to complete mock payment");
+  }
+
   const destination = paymentReturnPath(
     currentPayment.locale,
     currentPayment.stripe_checkout_session_id ?? `mock_cs_${currentPayment.id}`
   );
+  const followUpPayment = currentPayment;
 
-  void finishMockPaymentSideEffects({
-    config,
-    payment: currentPayment,
-    request: input.request,
-    sql
-  }).catch((error) => {
-    console.warn("Mock payment follow-up failed", error);
-  });
+  setTimeout(() => {
+    void finishMockPaymentSideEffects({
+      config,
+      payment: followUpPayment,
+      sql
+    }).catch((error) => {
+      console.warn("Mock payment follow-up failed", error);
+    });
+  }, 2_000);
 
   return {
     destination,

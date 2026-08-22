@@ -29,7 +29,6 @@ import {
   paymentReturnDestination
 } from "@/lib/stripe-payments";
 import { localizedRouteMetadata } from "@/lib/seo";
-import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 type PaymentReturnPageProps = Readonly<{
   params: Promise<{
@@ -485,9 +484,7 @@ async function loadHealthScoreContext(
       return null;
     }
 
-    const healthScore = computeHealthScore(prefill.answers ?? null, locale, {
-      evaluatedIngredientCount: await getEvaluatedIngredientCatalogueCount()
-    });
+    const healthScore = computeHealthScore(prefill.answers ?? null, locale);
     const counts = healthScoreIngredientCounts(healthScore);
 
     return counts;
@@ -754,9 +751,16 @@ export default async function PaymentReturnPage({
 
   const payment = result?.payment ?? null;
   const status = result?.status ?? "error";
-  const [formula, healthScore] = await Promise.all([
-    loadFormulaResult(payment, locale),
-    loadHealthScoreContext(payment, locale)
+  const [formula, healthScore] = await Promise.race([
+    Promise.all([
+      loadFormulaResult(payment, locale),
+      loadHealthScoreContext(payment, locale)
+    ]),
+    new Promise<
+      [Awaited<ReturnType<typeof loadFormulaResult>>, Awaited<ReturnType<typeof loadHealthScoreContext>>]
+    >((resolve) => {
+      setTimeout(() => resolve([null, null]), 1_500);
+    })
   ]);
   const view = buildConfirmationView({
     failureMessage,

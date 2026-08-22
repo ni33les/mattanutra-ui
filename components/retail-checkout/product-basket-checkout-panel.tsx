@@ -651,15 +651,15 @@ export function ProductBasketCheckoutPanel({
 
       setPaymentId(body.paymentId);
 
-      void fetch(`/api/retail/checkout/${encodeURIComponent(body.paymentId)}`, {
-        cache: "no-store",
-        method: "POST"
-      });
-
       if (body.mock) {
         setMockReady(true);
         return;
       }
+
+      void fetch(`/api/retail/checkout/${encodeURIComponent(body.paymentId)}`, {
+        cache: "no-store",
+        method: "POST"
+      });
 
       setClientSecret(body.clientSecret ?? null);
     } catch (caught) {

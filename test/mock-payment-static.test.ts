@@ -19,7 +19,17 @@ describe("DEV mock payment completion", () => {
       source,
       /finishMockPaymentSideEffects[\s\S]*recordMockStripePayoutLifecycle/
     );
+    assert.match(source, /currentPayment\.stripe_mode !== "mock"/);
+    assert.match(source, /Unable to complete mock payment/);
+    assert.match(
+      source,
+      /setTimeout\(\(\) => \{[\s\S]*finishMockPaymentSideEffects/
+    );
     assert.match(panel, /signal: controller.signal/);
+    assert.match(
+      panel,
+      /if \(body\.mock\) \{\s*setIsMockCheckout\(true\);\s*return body;/
+    );
     assert.doesNotMatch(panel, /MOCK_PAYMENT_COMPLETION_DELAY_MS/);
   });
 });
