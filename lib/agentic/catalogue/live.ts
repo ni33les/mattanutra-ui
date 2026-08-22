@@ -179,9 +179,12 @@ function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | nul
 export async function loadLiveRetailSnapshot(
   countryCode: string
 ): Promise<CatalogueSnapshot> {
-  const sets = await getLiveSaleEligibleRetailerCandidateSets({
-    countryCode: countryCode.trim().toUpperCase()
-  });
+  const [sets] = await Promise.all([
+    getLiveSaleEligibleRetailerCandidateSets({
+      countryCode: countryCode.trim().toUpperCase()
+    }),
+    refreshAdminSafetyCeilings()
+  ]);
   const byListing = new Map<string, CatalogueProduct>();
 
   for (const set of sets) {
@@ -211,8 +214,6 @@ export async function loadLiveRetailSnapshot(
       }
     }
   }
-
-  await refreshAdminSafetyCeilings();
 
   return {
     availabilityAsOf: new Date().toISOString(),

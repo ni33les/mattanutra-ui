@@ -14,6 +14,14 @@ describe("Phase 3 T01/T08 shared eligibility", () => {
 
     assert.match(search, /assessRetailSellability/);
     assert.match(search, /saleEligibleOnly: true/);
+    assert.match(search, /loadProductRows\(null, \{ productIds: retailProductIds \}\)/);
+    assert.doesNotMatch(
+      search.slice(
+        search.indexOf("export async function getRetailerAwareProductRecommendationCandidateSets"),
+        search.indexOf("export async function getLiveSaleEligibleRetailerCandidateSets")
+      ),
+      /loadProductRows\(input\.productId \?\? null\)/
+    );
     assert.match(workItems, /getLiveSaleEligibleRetailerCandidateSets/);
     assert.match(applier, /getLiveSaleEligibleRetailerCandidateSets/);
     assert.doesNotMatch(

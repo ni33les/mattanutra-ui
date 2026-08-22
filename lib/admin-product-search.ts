@@ -307,20 +307,13 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
     )
       ? input.organisationId
       : null;
-  const rows = await loadProductRows(input.productId ?? null);
-
-  if (!rows || rows.length < 1) {
-    return [];
-  }
-
-  const productRowsById = new Map(
-    rows.map((sourceRow) => [rowFromDb(sourceRow).id, sourceRow])
-  );
-  const supplementAvailability = await getSupplementEffectiveAvailability(
-    sql,
-    countryCode
-  );
-  const productIds = [...productRowsById.keys()];
+  const scopedProductId =
+    typeof input.productId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      input.productId
+    )
+      ? input.productId
+      : null;
   const retailRows = await sql<RetailProductCandidateRow[]>`
     select
       organisations.id::text as organisation_id,
@@ -359,7 +352,11 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
     where organisations.organisation_type = 'tenant'
       and organisations.status = 'active'
       and organisations.country_code = ${countryCode}
-      and sellable.product_id = any(${productIds}::uuid[])
+      and ${
+        scopedProductId
+          ? sql`sellable.product_id = ${scopedProductId}::uuid`
+          : sql`true`
+      }
       and ${
         organisationId
           ? sql`organisations.id = ${organisationId}::uuid`
@@ -374,7 +371,21 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       }
     order by lower(organisations.name), sellable.updated_at desc
   `;
-  const customerPriceMarginPercent = await getCustomerPriceMarginPercent({ sql });
+  const retailProductIds = [...new Set(retailRows.map((row) => row.product_id))];
+  const [rows, supplementAvailability, customerPriceMarginPercent] =
+    await Promise.all([
+      loadProductRows(null, { productIds: retailProductIds }),
+      getSupplementEffectiveAvailability(sql, countryCode),
+      getCustomerPriceMarginPercent({ sql })
+    ]);
+
+  if (!rows || rows.length < 1) {
+    return [];
+  }
+
+  const productRowsById = new Map(
+    rows.map((sourceRow) => [rowFromDb(sourceRow).id, sourceRow])
+  );
   const byRetailer = new Map<string, {
     candidates: ProductCandidate[];
     currency: string;

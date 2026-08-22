@@ -37,5 +37,10 @@ describe("plan keep-warm does not starve first-create A2", () => {
     assert.match(db, /DB_KEEP_ALIVE_CONNECTIONS = 3/);
     assert.match(db, /DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 120/);
     assert.match(startPlatform, /platform-hot-\$\{Date\.now\(\)\}-patch/);
+    assert.match(
+      dispatcher,
+      /case "info":\s*await import\("@\/lib\/agentic\/catalogue\/warm"\)/,
+      "info must finish catalogue warm so the next first-create A2 is a cache hit"
+    );
   });
 });

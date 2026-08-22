@@ -35,6 +35,7 @@ import {
 
 type LoadProductRowsOptions = Readonly<{
   brandId?: string | null;
+  productIds?: readonly string[] | null;
 }>;
 
 export async function loadProductRows(
@@ -48,6 +49,14 @@ export async function loadProductRows(
   }
 
   const brandId = isUuidValue(options.brandId) ? options.brandId : null;
+  const productIds = (options.productIds ?? [])
+    .map((id) => id.trim())
+    .filter((id) => isUuidValue(id));
+  const restrictToIds = options.productIds != null;
+
+  if (restrictToIds && productIds.length < 1) {
+    return [];
+  }
 
   return sql<ProductDbRow[]>`
     select
@@ -362,6 +371,11 @@ export async function loadProductRows(
     ) history on true
     where products.status <> 'deleted'
       and (${productId ?? null}::uuid is null or products.id = ${productId ?? null}::uuid)
+      and (${
+        restrictToIds
+          ? sql`products.id = any(${productIds}::uuid[])`
+          : sql`true`
+      })
       and (${brandId}::uuid is null or products.brand_id = ${brandId}::uuid)
     order by products.updated_at desc, products.title asc
   `;
