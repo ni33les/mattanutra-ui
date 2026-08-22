@@ -14,19 +14,18 @@ export async function insertFormulationVersion(
 ) {
   const rows = input.includeEmptyRecommendations
     ? await db<{ version: number | string }[]>`
-        with next_version as (
-          select greatest(
-            (
-              select coalesce(max(version), 0)
-              from public.formulations
-              where plan_id = ${input.planId}::uuid
-            ),
-            (
-              select coalesce(max(version), 0)
-              from public.recommendations
-              where plan_id = ${input.planId}::uuid
-            )
-          ) + 1 as version
+        with bumped as (
+          insert into public.assessment_version_counters as counters (
+            plan_id,
+            current_formulation_version
+          )
+          values (
+            ${input.planId}::uuid,
+            1
+          )
+          on conflict (plan_id) do update set
+            current_formulation_version = counters.current_formulation_version + 1
+          returning counters.plan_id, counters.current_formulation_version as version
         ),
         inserted_formulation as (
           insert into public.formulations (
@@ -38,13 +37,13 @@ export async function insertFormulationVersion(
             updated_at
           )
           select
-            ${input.planId}::uuid,
-            next_version.version,
+            bumped.plan_id,
+            bumped.version,
             ${db.json(toJsonValue(input.formulation))},
             ${input.modelVersion},
             now(),
             now()
-          from next_version
+          from bumped
           returning version
         ),
         inserted_recommendations as (
@@ -56,12 +55,12 @@ export async function insertFormulationVersion(
             updated_at
           )
           select
-            ${input.planId}::uuid,
-            inserted_formulation.version,
+            bumped.plan_id,
+            bumped.version,
             ${db.json(toJsonValue([]))},
             now(),
             now()
-          from inserted_formulation
+          from bumped
           returning version
         )
         select inserted_formulation.version
@@ -69,6 +68,19 @@ export async function insertFormulationVersion(
         left join inserted_recommendations using (version)
       `
     : await db<{ version: number | string }[]>`
+        with bumped as (
+          insert into public.assessment_version_counters as counters (
+            plan_id,
+            current_formulation_version
+          )
+          values (
+            ${input.planId}::uuid,
+            1
+          )
+          on conflict (plan_id) do update set
+            current_formulation_version = counters.current_formulation_version + 1
+          returning counters.plan_id, counters.current_formulation_version as version
+        )
         insert into public.formulations (
           plan_id,
           version,
@@ -78,14 +90,13 @@ export async function insertFormulationVersion(
           updated_at
         )
         select
-          ${input.planId}::uuid,
-          coalesce(max(version), 0) + 1,
+          bumped.plan_id,
+          bumped.version,
           ${db.json(toJsonValue(input.formulation))},
           ${input.modelVersion},
           now(),
           now()
-        from public.formulations
-        where plan_id = ${input.planId}::uuid
+        from bumped
         returning version
       `;
 
@@ -101,6 +112,19 @@ export async function insertFoodGuidanceVersion(
   }>
 ) {
   const rows = await db<{ version: number | string }[]>`
+    with bumped as (
+      insert into public.assessment_version_counters as counters (
+        plan_id,
+        current_food_guidance_version
+      )
+      values (
+        ${input.planId}::uuid,
+        1
+      )
+      on conflict (plan_id) do update set
+        current_food_guidance_version = counters.current_food_guidance_version + 1
+      returning counters.plan_id, counters.current_food_guidance_version as version
+    )
     insert into public.food_guidance (
       plan_id,
       version,
@@ -110,14 +134,13 @@ export async function insertFoodGuidanceVersion(
       updated_at
     )
     select
-      ${input.planId}::uuid,
-      coalesce(max(version), 0) + 1,
+      bumped.plan_id,
+      bumped.version,
       ${db.json(toJsonValue(input.foodGuidance))},
       ${input.modelVersion},
       now(),
       now()
-    from public.food_guidance
-    where plan_id = ${input.planId}::uuid
+    from bumped
     returning version
   `;
 

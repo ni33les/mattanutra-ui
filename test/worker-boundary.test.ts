@@ -251,7 +251,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /tasks\.required_capabilities <@ \$\{reserveCapabilities\}::text\[\]/,
+      /tasks\.required_capabilities <@ \$\{textArray\(sql, input\.reserveCapabilities\)\}::text\[\]/,
       "task reservation must match tasks against session-scoped capabilities",
     );
     assert.match(
@@ -261,12 +261,12 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /\$\{accessScope\.role\}::text = 'platform_agent'[\s\S]*task_organisations\.organisation_type = 'platform'/,
+      /\$\{input\.accessScope\.role\}::text = 'platform_agent'[\s\S]*task_organisations\.organisation_type = 'platform'/,
       "platform agents must only reserve platform organisation tasks",
     );
     assert.match(
       source,
-      /\$\{accessScope\.role\}::text = 'retail_agent'[\s\S]*task_organisations\.organisation_type = 'tenant'[\s\S]*tasks\.organisation_id = \$\{accessScope\.organisationId\}::uuid/,
+      /\$\{input\.accessScope\.role\}::text = 'retail_agent'[\s\S]*task_organisations\.organisation_type = 'tenant'[\s\S]*tasks\.organisation_id = \$\{input\.accessScope\.organisationId\}::uuid/,
       "retail agents must only reserve tasks for their own retail organisation",
     );
     assert.match(
@@ -409,20 +409,51 @@ describe("external worker boundaries", () => {
       /task_(?:lease_renewed|progress_reported)|ensureWorkerSessionSchema\(sql\)/,
       "renew/progress are heartbeat hot paths and must not do schema checks or per-call task event inserts",
     );
-    assert.match(
+    const workItemRouteSource = await readFile(
+      "app/api/tasks/[id]/work-item/route.ts",
+      "utf8",
+    );
+    const sweepLoopSource = await readFile("lib/task-sweep-loop.ts", "utf8");
+
+    assert.doesNotMatch(
       source,
-      /buildTaskWorkItem[\s\S]*failTask[\s\S]*continue;/,
-      "a malformed reserved task should be failed and skipped without turning reserve into a worker-visible 500",
+      /buildTaskWorkItem/,
+      "reserve must return the claim immediately without hydrating a work item",
+    );
+    assert.doesNotMatch(
+      source,
+      /releaseExpiredReservations|maybeReleaseExpiredReservations|enqueueMissingProductRecommendations/,
+      "reserve must not sweep expired leases or enqueue missing recommendations",
     );
     assert.match(
-      source,
-      /RESERVE_EXPIRED_SWEEP_BATCH_LIMIT = 3[\s\S]*maybeReleaseExpiredReservations/,
-      "worker reserve polling must not block behind a full expired-reservation sweep",
+      workItemRouteSource,
+      /buildTaskWorkItem[\s\S]*failTask/,
+      "work-item hydrate is a post-claim side effect and must fail-close the reserved task",
     );
     assert.match(
-      source,
-      /RESERVE_EXPIRED_SWEEP_MIN_INTERVAL_MS = 15_000/,
-      "expired reservation sweeps must not run on every worker poll"
+      runnerSource,
+      /client\.workItem\([\s\S]*continue;/,
+      "workers must hydrate the work item after reserve and skip a failed hydrate without crashing the loop",
+    );
+    assert.match(
+      runnerSource,
+      /startTaskMaintenanceLoop/,
+      "expired-lease sweep and missing-recommendation enqueue belong on the worker maintenance timer",
+    );
+    assert.match(
+      sweepLoopSource,
+      /EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT = 3/,
+      "maintenance sweep must stay bounded",
+    );
+    assert.match(
+      sweepLoopSource,
+      /TASK_MAINTENANCE_INTERVAL_MS = 15_000/,
+      "maintenance ticks must not run on every worker poll",
+    );
+    assert.match(
+      sweepLoopSource,
+      /mattanutraTaskMaintenanceInflight/,
+      "overlapping maintenance ticks must coalesce instead of taking a request-path mutex",
     );
     assert.match(
       source,

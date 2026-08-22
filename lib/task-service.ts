@@ -39,6 +39,7 @@ import {
   uuidOrNew,
   uuidOrNull
 } from "@/lib/task-service-mappers";
+import { textArray, uuidArray } from "@/lib/sql-arrays";
 import { notifyTaskQueueChanged } from "@/lib/task-wakeup";
 import type {
   AddTaskCommentInput,
@@ -124,6 +125,7 @@ const TASK_FINALIZATION_LEASE_SECONDS = 300;
 const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT = 50;
 const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT_MAX = 100;
 const DEPENDENCY_BOOTSTRAP_DELAY_MS = 60_000;
+const RESERVE_CLAIM_ATTEMPTS = 3;
 
 type Db = TaskServiceDb;
 type ActiveReservationRow = {
@@ -1226,7 +1228,7 @@ async function claimExpiredReservationsBatch(
 	        )
 	      order by task_reservations.lease_until asc
 	      limit ${batchLimit}
-	      for update skip locked
+	      for update of task_reservations skip locked
 	    ),
     released as (
       update public.task_reservations set
@@ -1625,6 +1627,197 @@ async function runTaskAfterCommitEffects(
   }
 }
 
+async function claimQueuedTaskRow(
+  sql: Db,
+  input: Readonly<{
+    accessScope: TaskAgentAccessScope;
+    leaseSeconds: number;
+    mustRequireCapability: string | null;
+    reserveCapabilities: readonly string[];
+    skipTaskIds: readonly string[];
+    taskTypes: readonly string[];
+  }>
+) {
+  const rows = await sql<TaskRow[]>`
+    with candidate as (
+      select tasks.id
+      from public.tasks
+      join public.organisations task_organisations
+        on task_organisations.id = tasks.organisation_id
+      where tasks.status = 'queued'
+        and coalesce(tasks.actor_type, 'system') <> 'human'
+        and tasks.scheduled_for <= now()
+        and tasks.attempts < tasks.max_attempts
+        and not (tasks.id = any(${uuidArray(sql, input.skipTaskIds)}::uuid[]))
+        and (
+          coalesce(cardinality(tasks.required_capabilities), 0) = 0
+          or tasks.required_capabilities <@ ${textArray(sql, input.reserveCapabilities)}::text[]
+        )
+        and (
+          ${input.mustRequireCapability}::text is null
+          or ${input.mustRequireCapability} = any(tasks.required_capabilities)
+        )
+        and (
+          ${input.taskTypes.length < 1}
+          or tasks.task_type = any(${textArray(sql, input.taskTypes)}::text[])
+        )
+        and (
+          (
+            ${input.accessScope.role}::text = 'platform_agent'
+            and task_organisations.organisation_type = 'platform'
+          )
+          or (
+            ${input.accessScope.role}::text = 'retail_agent'
+            and task_organisations.organisation_type = 'tenant'
+            and tasks.organisation_id = ${input.accessScope.organisationId}::uuid
+          )
+        )
+      order by
+        coalesce(tasks.priority_score, tasks.business_value) desc,
+        tasks.scheduled_for asc,
+        tasks.created_at asc
+      limit 1
+      for update of tasks skip locked
+    )
+    update public.tasks set
+      status = 'reserved',
+      reserved_by_agent_id = ${input.accessScope.agentId}::uuid,
+      lease_until = now() + make_interval(secs => ${input.leaseSeconds}),
+      started_at = coalesce(public.tasks.started_at, now()),
+      updated_at = now()
+    from candidate
+    where public.tasks.id = candidate.id
+      and public.tasks.status = 'queued'
+    returning public.tasks.*
+  `;
+
+  return rows[0] ? mapTask(rows[0]) : null;
+}
+
+async function claimedTaskIsBlocked(sql: Db, taskId: string) {
+  const [dependencyRows, reservationRows] = await Promise.all([
+    sql<Array<{ blocked: boolean }>>`
+      select exists (
+        select 1
+        from public.task_dependencies
+        join public.tasks as dependency
+          on dependency.id = task_dependencies.depends_on_task_id
+        where task_dependencies.task_id = ${taskId}::uuid
+          and (
+            (
+              task_dependencies.dependency_type = 'complete'
+              and dependency.status not in ('completed', 'skipped')
+            )
+            or (
+              task_dependencies.dependency_type = 'successful'
+              and dependency.status <> 'completed'
+            )
+            or (
+              task_dependencies.dependency_type = 'approved'
+              and not exists (
+                select 1
+                from public.task_approvals
+                where task_approvals.task_id = dependency.id
+                  and task_approvals.status = 'approved'
+              )
+            )
+          )
+      ) as blocked
+    `,
+    sql<Array<{ id: string }>>`
+      select id::text
+      from public.task_reservations
+      where task_id = ${taskId}::uuid
+        and status = 'active'
+      limit 1
+    `
+  ]);
+
+  return Boolean(dependencyRows[0]?.blocked || reservationRows[0]);
+}
+
+async function releaseUncommittedClaim(sql: Db, taskId: string) {
+  await sql`
+    update public.tasks set
+      status = 'queued',
+      reserved_by_agent_id = null,
+      lease_until = null,
+      updated_at = now()
+    where id = ${taskId}::uuid
+      and status = 'reserved'
+  `;
+}
+
+async function confirmTaskReservation(
+  sql: Db,
+  input: Readonly<{
+    accessScope: TaskAgentAccessScope;
+    leaseSeconds: number;
+    registeredTaskTypes: readonly string[];
+    requestedTaskTypes: readonly string[];
+    reserveCapabilities: readonly string[];
+    reservationId: string;
+    task: TaskRecord;
+    workerSessionId: string | null;
+  }>
+) {
+  await sql`
+    update public.tasks set
+      attempts = public.tasks.attempts + 1,
+      updated_at = now()
+    where id = ${input.task.id}::uuid
+      and status = 'reserved'
+  `;
+
+  await sql`
+    insert into public.task_reservations (
+      id,
+      task_id,
+      agent_id,
+      membership_id,
+      worker_session_id,
+      status,
+      reserved_at,
+      lease_until,
+      metadata
+    )
+    values (
+      ${input.reservationId}::uuid,
+      ${input.task.id}::uuid,
+      ${input.accessScope.agentId}::uuid,
+      ${input.accessScope.membershipId}::uuid,
+      ${input.workerSessionId}::uuid,
+      'active',
+      now(),
+      now() + make_interval(secs => ${input.leaseSeconds}),
+      ${sql.json(
+        toJsonValue({
+          capabilities: input.reserveCapabilities,
+          membershipId: input.accessScope.membershipId,
+          organisationId: input.accessScope.organisationId,
+          registeredTaskTypes: input.registeredTaskTypes,
+          requestedTaskTypes: input.requestedTaskTypes,
+          role: input.accessScope.role,
+          workerSessionId: input.workerSessionId
+        })
+      )}::jsonb
+    )
+  `;
+
+  await insertTaskEvent(sql, {
+    agentId: input.accessScope.agentId,
+    eventPayload: {
+      leaseSeconds: input.leaseSeconds,
+      reservationId: input.reservationId,
+      workerSessionId: input.workerSessionId
+    },
+    eventStatus: "accepted",
+    eventType: "task_reserved",
+    severity: "low",
+    taskId: input.task.id
+  });
+}
+
 export async function reserveNextTask(
   input: ReserveNextTaskInput
 ): Promise<ReservedTask | null> {
@@ -1761,174 +1954,58 @@ export async function reserveNextTask(
     return null;
   }
 
-  const reservationId = randomUUID();
-  const rows = await sql<Array<TaskRow & { reservation_id: string }>>`
-    with candidate as (
-      select tasks.*
-      from public.tasks
-      join public.organisations task_organisations
-        on task_organisations.id = tasks.organisation_id
-      where tasks.status = 'queued'
-        and coalesce(tasks.actor_type, 'system') <> 'human'
-        and tasks.scheduled_for <= now()
-        and tasks.attempts < tasks.max_attempts
-        and not exists (
-          select 1
-          from public.task_reservations
-          where task_reservations.task_id = tasks.id
-            and task_reservations.status = 'active'
-        )
-        and (
-          coalesce(cardinality(tasks.required_capabilities), 0) = 0
-          or tasks.required_capabilities <@ ${reserveCapabilities}::text[]
-        )
-        and (
-          ${mustRequireCapability}::text is null
-          or ${mustRequireCapability} = any(tasks.required_capabilities)
-        )
-        and (
-          ${taskTypes.length < 1}
-          or tasks.task_type = any(${taskTypes}::text[])
-        )
-        and (
-          (
-            ${accessScope.role}::text = 'platform_agent'
-            and task_organisations.organisation_type = 'platform'
-          )
-          or (
-            ${accessScope.role}::text = 'retail_agent'
-            and task_organisations.organisation_type = 'tenant'
-            and tasks.organisation_id = ${accessScope.organisationId}::uuid
-          )
-        )
-        and not exists (
-          select 1
-          from public.task_dependencies
-          join public.tasks as dependency
-            on dependency.id = task_dependencies.depends_on_task_id
-          where task_dependencies.task_id = tasks.id
-            and (
-              (
-                task_dependencies.dependency_type = 'complete'
-                and dependency.status not in ('completed', 'skipped')
-              )
-              or (
-                task_dependencies.dependency_type = 'successful'
-                and dependency.status <> 'completed'
-              )
-              or (
-                task_dependencies.dependency_type = 'approved'
-                and not exists (
-                  select 1
-                  from public.task_approvals
-                  where task_approvals.task_id = dependency.id
-                    and task_approvals.status = 'approved'
-                )
-              )
-            )
-        )
-      order by
-        (
-          coalesce(tasks.priority_score, tasks.business_value)
-          + least(
-            200,
-            floor(greatest(0, extract(epoch from now() - tasks.scheduled_for) - 300) / 900) * 10
-          )
-        ) desc,
-        tasks.scheduled_for asc,
-        tasks.created_at asc
-      limit 1
-      for update skip locked
-    ),
-    claimed_task as (
-      update public.tasks set
-        status = 'reserved',
-        reserved_by_agent_id = ${accessScope.agentId}::uuid,
-        lease_until = now() + make_interval(secs => ${leaseSeconds}),
-        started_at = coalesce(public.tasks.started_at, now()),
-        attempts = public.tasks.attempts + 1,
-        updated_at = now()
-      from candidate
-      where public.tasks.id = candidate.id
-      returning public.tasks.*
-    ),
-    reservation as (
-      insert into public.task_reservations (
-        id,
-        task_id,
-        agent_id,
-        membership_id,
-        worker_session_id,
-        status,
-        reserved_at,
-        lease_until,
-        metadata
-      )
-      select
-        ${reservationId}::uuid,
-        claimed_task.id,
-        ${accessScope.agentId}::uuid,
-        ${accessScope.membershipId}::uuid,
-        ${workerSessionId}::uuid,
-        'active',
-        now(),
-        coalesce(claimed_task.lease_until, now()),
-        ${sql.json(
-          toJsonValue({
-            capabilities: reserveCapabilities,
-            membershipId: accessScope.membershipId,
-            organisationId: accessScope.organisationId,
-            registeredTaskTypes,
-            requestedTaskTypes,
-            role: accessScope.role,
-            workerSessionId
-          })
-        )}::jsonb
-      from claimed_task
-      returning id::text
-    ),
-    task_event as (
-      insert into public.task_events (
-        id,
-        task_id,
-        agent_id,
-        event_type,
-        event_status,
-        severity,
-        event_payload,
-        occurred_at,
-        created_at
-      )
-      select
-        gen_random_uuid(),
-        claimed_task.id,
-        ${accessScope.agentId}::uuid,
-        'task_reserved',
-        'accepted',
-        'low',
-        jsonb_build_object(
-          'leaseSeconds', ${leaseSeconds}::integer,
-          'reservationId', reservation.id,
-          'workerSessionId', ${workerSessionId}::text
-        ),
-        now(),
-        now()
-      from claimed_task
-      join reservation on true
-      returning id
-    )
-    select claimed_task.*, reservation.id as reservation_id
-    from claimed_task
-    join reservation on true
-  `;
+  const skipTaskIds: string[] = [];
+  let reserved: { reservationId: string; task: TaskRecord } | null = null;
 
-  const reserved = rows[0]
-    ? {
-        agent,
-        reservationId: rows[0].reservation_id,
-        task: mapTask(rows[0])
+  for (let attempt = 0; attempt < RESERVE_CLAIM_ATTEMPTS; attempt += 1) {
+    const claimed = await claimQueuedTaskRow(sql, {
+      accessScope,
+      leaseSeconds,
+      mustRequireCapability,
+      reserveCapabilities,
+      skipTaskIds,
+      taskTypes
+    });
+
+    if (!claimed) {
+      break;
+    }
+
+    if (await claimedTaskIsBlocked(sql, claimed.id)) {
+      await releaseUncommittedClaim(sql, claimed.id);
+      skipTaskIds.push(claimed.id);
+      continue;
+    }
+
+    const reservationId = randomUUID();
+
+    try {
+      await confirmTaskReservation(sql, {
+        accessScope,
+        leaseSeconds,
+        registeredTaskTypes,
+        requestedTaskTypes,
+        reserveCapabilities,
+        reservationId,
+        task: claimed,
+        workerSessionId
+      });
+      reserved = { reservationId, task: claimed };
+      break;
+    } catch (error) {
+      await releaseUncommittedClaim(sql, claimed.id);
+      skipTaskIds.push(claimed.id);
+
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? String(error.code)
+          : "";
+
+      if (code !== "23505") {
+        throw error;
       }
-    : null;
+    }
+  }
 
   if (!reserved) {
     return null;
@@ -1957,8 +2034,10 @@ export async function reserveNextTask(
   `;
 
   return {
-    ...reserved,
-    comments: commentRows.map(mapComment)
+    agent,
+    comments: commentRows.map(mapComment),
+    reservationId: reserved.reservationId,
+    task: reserved.task
   };
 }
 

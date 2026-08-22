@@ -99,6 +99,75 @@ for (const row of rows) {
   backfilled += 1;
 }
 
+await sql`
+  create table if not exists public.assessment_version_counters (
+    plan_id uuid primary key,
+    current_version integer not null default 0,
+    current_formulation_version integer not null default 0,
+    current_food_guidance_version integer not null default 0
+  )
+`;
+
+await sql`
+  do $$
+  begin
+    if exists (select 1 from pg_roles where rolname = 'mn') then
+      grant select, insert, update, delete on public.assessment_version_counters to mn;
+    end if;
+  end
+  $$;
+`;
+
+const assessmentCounters = await sql`
+  insert into public.assessment_version_counters as counters (plan_id, current_version)
+  select plan_id, max(version)::int
+  from public.assessment_versions
+  group by plan_id
+  on conflict (plan_id) do update set
+    current_version = greatest(counters.current_version, excluded.current_version)
+`;
+
+const formulationCounters = await sql`
+  insert into public.assessment_version_counters as counters (plan_id, current_formulation_version)
+  select plan_id, max(version)::int
+  from public.formulations
+  group by plan_id
+  on conflict (plan_id) do update set
+    current_formulation_version = greatest(
+      counters.current_formulation_version,
+      excluded.current_formulation_version
+    )
+`;
+
+const foodCounters = await sql`
+  insert into public.assessment_version_counters as counters (plan_id, current_food_guidance_version)
+  select plan_id, max(version)::int
+  from public.food_guidance
+  group by plan_id
+  on conflict (plan_id) do update set
+    current_food_guidance_version = greatest(
+      counters.current_food_guidance_version,
+      excluded.current_food_guidance_version
+    )
+`;
+
+let claimIndex = "skipped";
+
+try {
+  await sql.unsafe(`
+    create index if not exists tasks_claim_queued_idx
+      on public.tasks using btree (task_type, scheduled_for, created_at)
+      where status = 'queued' and attempts < max_attempts
+  `);
+  claimIndex = "applied";
+} catch (error) {
+  claimIndex =
+    error instanceof Error ? `not applied (${error.message})` : "not applied";
+}
+
 console.log(
   `[assessment-schema] first_name/contact_email columns and resume drafts ready; backfilled ${backfilled} assessment${backfilled === 1 ? "" : "s"}.`
+);
+console.log(
+  `[assessment-schema] version counters ready; assessment=${assessmentCounters.count} formulation=${formulationCounters.count} food=${foodCounters.count}; claim index ${claimIndex}.`
 );

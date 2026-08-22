@@ -22,6 +22,21 @@ export async function appendAssessmentVersion(
   }>
 ) {
   await db`
+    with bumped as (
+      insert into public.assessment_version_counters as counters (
+        plan_id,
+        current_version
+      )
+      values (
+        ${input.planId}::uuid,
+        1
+      )
+      on conflict (plan_id) do update set
+        current_version = counters.current_version + 1
+      returning
+        counters.plan_id,
+        counters.current_version
+    )
     insert into public.assessment_versions (
       plan_id,
       version,
@@ -35,13 +50,9 @@ export async function appendAssessmentVersion(
       metadata,
       created_at
     )
-    values (
-      ${input.planId}::uuid,
-      coalesce((
-        select max(version)
-        from public.assessment_versions
-        where plan_id = ${input.planId}::uuid
-      ), 0) + 1,
+    select
+      bumped.plan_id,
+      bumped.current_version,
       ${input.eventType},
       ${input.actor ?? "system"},
       ${input.changeReason},
@@ -52,14 +63,14 @@ export async function appendAssessmentVersion(
         'projectionBefore', coalesce((
           select to_jsonb(assessments.*)
           from public.assessments
-          where assessments.plan_id = ${input.planId}::uuid
+          where assessments.plan_id = bumped.plan_id
           limit 1
         ), '{}'::jsonb),
         'projectionPatch', ${db.json(jsonPayload(input.afterPayload))}::jsonb
       ),
       ${db.json(jsonPayload(input.eventPayload))}::jsonb,
       now()
-    )
+    from bumped
   `;
 }
 

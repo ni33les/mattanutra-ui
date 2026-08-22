@@ -2594,7 +2594,7 @@ async function claimDueCronActions(sql: postgres.Sql) {
           )
         )
       order by scheduled_for asc
-      for update skip locked
+      for update of cron skip locked
       limit 25
     )
     returning id::text, action_type, plan_id::text, recipient, payload

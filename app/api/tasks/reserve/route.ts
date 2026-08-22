@@ -5,15 +5,9 @@ import {
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
-import { buildTaskWorkItem } from "@/lib/task-work-items";
-import { enqueueMissingProductRecommendationsForReadyPlans } from "@/lib/task-worker";
-import { applyTaskFailureResult } from "@/lib/task-result-applier";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
-  failTask,
-  getTaskBundle,
   heartbeatWorkerSession,
-  releaseExpiredReservations,
   reserveNextTask
 } from "@/lib/task-service";
 import type { AgentType } from "@/lib/task-service";
@@ -24,40 +18,7 @@ export const runtime = "nodejs";
 
 const DEFAULT_RESERVE_POLL_INTERVAL_MS = 5_000;
 const INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000;
-const RESERVE_EXPIRED_SWEEP_BATCH_LIMIT = 3;
-const RESERVE_EXPIRED_SWEEP_MIN_INTERVAL_MS = 15_000;
 
-const globalReserve = globalThis as typeof globalThis & {
-  mattanutraExpiredSweepAt?: number;
-  mattanutraExpiredSweeping?: boolean;
-};
-
-async function maybeReleaseExpiredReservations() {
-  const now = Date.now();
-
-  if (globalReserve.mattanutraExpiredSweeping) {
-    return 0;
-  }
-
-  if (
-    typeof globalReserve.mattanutraExpiredSweepAt === "number" &&
-    now - globalReserve.mattanutraExpiredSweepAt < RESERVE_EXPIRED_SWEEP_MIN_INTERVAL_MS
-  ) {
-    return 0;
-  }
-
-  globalReserve.mattanutraExpiredSweeping = true;
-
-  try {
-    const released = await releaseExpiredReservations({
-      batchLimit: RESERVE_EXPIRED_SWEEP_BATCH_LIMIT
-    });
-    globalReserve.mattanutraExpiredSweepAt = Date.now();
-    return released;
-  } finally {
-    globalReserve.mattanutraExpiredSweeping = false;
-  }
-}
 const INTERACTIVE_TASK_TYPES = new Set([
   "analyze_healthscore",
   "generate_food_gap_guidance",
@@ -131,23 +92,6 @@ export async function POST(request: Request) {
     });
     const heartbeatDurationMs = Date.now() - heartbeatStartedAt;
 
-    const sweepStartedAt = Date.now();
-    const releasedExpiredReservations = await maybeReleaseExpiredReservations();
-    const sweepDurationMs = Date.now() - sweepStartedAt;
-
-    if (sweepDurationMs > 1_000 || releasedExpiredReservations > 0) {
-      console.info("[tasks:reserve] expired reservation sweep", {
-        durationMs: sweepDurationMs,
-        releasedExpiredReservations,
-        taskTypes,
-        workerSessionId
-      });
-    }
-
-    if (taskTypes.includes("generate_product_recommendations")) {
-      await enqueueMissingProductRecommendationsForReadyPlans();
-    }
-
     while (true) {
       const reserved = await reserveNextTask({
         accessScope: access.scope,
@@ -189,7 +133,6 @@ export async function POST(request: Request) {
           console.info("[tasks:reserve]", {
             heartbeatDurationMs,
             reserved: false,
-            sweepDurationMs,
             taskTypes,
             totalDurationMs: Date.now() - startedAt,
             workerSessionId
@@ -201,46 +144,6 @@ export async function POST(request: Request) {
         await waitForTaskQueueChange(
           Math.min(pollIntervalMs, Math.max(0, deadline - Date.now()))
         );
-        continue;
-      }
-
-      const bundle = await getTaskBundle({
-        accessScope: access.scope,
-        taskId: reserved.task.id
-      });
-      let workItem;
-
-      try {
-        workItem = await buildTaskWorkItem(bundle.task);
-      } catch (error) {
-        await failTask({
-          accessScope: access.scope,
-          agentId: reserved.agent.id,
-          applyFailure: (context) =>
-            applyTaskFailureResult({
-              afterCommit: context.afterCommit,
-              errorMessage:
-                error instanceof Error
-                  ? error.message
-                  : "Unable to build task work item",
-              resultPayload: context.resultPayload,
-              retryWillBeScheduled: context.retryWillBeScheduled,
-              sql: context.sql,
-              task: context.task,
-              taskId: bundle.task.id
-            }),
-          errorMessage:
-            error instanceof Error
-              ? error.message
-              : "Unable to build task work item",
-          workerSessionId,
-          reservationId: reserved.reservationId,
-          resultPayload: {
-            stage: "work_item_build",
-            taskType: bundle.task.taskType
-          },
-          taskId: bundle.task.id
-        });
         continue;
       }
 
@@ -264,7 +167,6 @@ export async function POST(request: Request) {
       console.info("[tasks:reserve]", {
         heartbeatDurationMs,
         reserved: true,
-        sweepDurationMs,
         taskId: reserved.task.id,
         taskType: reserved.task.taskType,
         totalDurationMs: Date.now() - startedAt,
@@ -273,11 +175,9 @@ export async function POST(request: Request) {
 
       return openClawJson({
         agent: reserved.agent,
-        comments: bundle.comments,
-        dependencies: bundle.dependencies,
+        comments: reserved.comments,
         reservationId: reserved.reservationId,
-        task: bundle.task,
-        workItem
+        task: reserved.task
       });
     }
   } catch (error) {

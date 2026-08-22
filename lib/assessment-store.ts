@@ -1161,30 +1161,6 @@ export async function persistAssessmentSubmission({
     limit 1
   `;
 
-  await appendAssessmentVersion(sql, {
-    actor: "assessment_api",
-    afterPayload: {
-      answers: storedAnswers,
-      answerSummary: storedAnswerSummary,
-      firstName,
-      contactEmail: normalizedContactEmail,
-      healthScore: storedHealthScore,
-      locale: normalizedLocale,
-      queuePosition: snapshot.queuePosition,
-      selectedPlan,
-      status
-    },
-    changeReason: "assessment_submission",
-    eventPayload: {
-      beforePayload: beforeRows[0]?.before_payload ?? {},
-      selectedPlan: storedPlan,
-      status
-    },
-    eventType: "assessment_submission_persisted",
-    planId: snapshot.planId,
-    source: "assessment_store"
-  });
-
   await sql`
     insert into assessments (
       plan_id,
@@ -1256,6 +1232,30 @@ export async function persistAssessmentSubmission({
       ),
       updated_at = now()
   `;
+
+  await appendAssessmentVersion(sql, {
+    actor: "assessment_api",
+    afterPayload: {
+      answers: storedAnswers,
+      answerSummary: storedAnswerSummary,
+      firstName,
+      contactEmail: normalizedContactEmail,
+      healthScore: storedHealthScore,
+      locale: normalizedLocale,
+      queuePosition: snapshot.queuePosition,
+      selectedPlan,
+      status
+    },
+    changeReason: "assessment_submission",
+    eventPayload: {
+      beforePayload: beforeRows[0]?.before_payload ?? {},
+      selectedPlan: storedPlan,
+      status
+    },
+    eventType: "assessment_submission_persisted",
+    planId: snapshot.planId,
+    source: "assessment_store"
+  });
 
   if (normalizedContactEmail) {
     await upsertAssessmentEmailChannel({

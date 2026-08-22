@@ -63,6 +63,9 @@ function functionBody(source: string, functionName: string) {
 
 describe("database transaction boundaries", () => {
   it("keeps runtime code free of explicit app-level transactions", async () => {
+    const allowedBegins = new Map<string, readonly string[]>([
+      ["lib/agentic/store/postgres.ts", ["createPostgresStore"]]
+    ]);
     const files = [
       ...(await filesUnder("app")),
       ...(await filesUnder("lib")),
@@ -77,7 +80,7 @@ describe("database transaction boundaries", () => {
 
       assert.deepEqual(
         actual.sort(),
-        [],
+        [...(allowedBegins.get(file) ?? [])].sort(),
         `${file} has unexpected explicit sql.begin call sites`
       );
     }
@@ -137,8 +140,8 @@ describe("database transaction boundaries", () => {
 
     assert.match(
       claimBody,
-      /limit\s+\$\{batchLimit\}[\s\S]*for\s+update\s+skip\s+locked/i,
-      "expired reservation release must claim a bounded batch while holding row locks"
+      /limit\s+\$\{batchLimit\}[\s\S]*for\s+update\s+of\s+task_reservations\s+skip\s+locked/i,
+      "expired reservation release must claim a bounded batch while holding row locks only on reservations"
     );
     assert.match(
       claimBody,
@@ -204,7 +207,7 @@ describe("database transaction boundaries", () => {
         "lib/task-service.ts",
         [
           "claimExpiredReservationsBatch",
-          "reserveNextTask"
+          "claimQueuedTaskRow"
         ]
       ],
       ["lib/task-worker.ts", ["claimDueCronActions"]]
@@ -327,13 +330,63 @@ describe("database transaction boundaries", () => {
     );
     assert.match(
       helper,
-      /insert\s+into\s+public\.formulations[\s\S]*coalesce\(max\(version\),\s*0\)\s+\+\s+1/i,
-      "formulation versions should be allocated by the insert statement"
+      /current_formulation_version = counters\.current_formulation_version \+ 1[\s\S]*insert\s+into\s+public\.formulations/i,
+      "formulation versions should bump the plan counter then insert in one statement"
     );
     assert.match(
       helper,
-      /insert\s+into\s+public\.food_guidance[\s\S]*coalesce\(max\(version\),\s*0\)\s+\+\s+1/i,
-      "food guidance versions should be allocated by the insert statement"
+      /current_food_guidance_version = counters\.current_food_guidance_version \+ 1[\s\S]*insert\s+into\s+public\.food_guidance/i,
+      "food guidance versions should bump the plan counter then insert in one statement"
+    );
+  });
+
+  it("keeps assessment version allocation on a single projection row", async () => {
+    const helper = functionBody(
+      await readFile("lib/domain-versions.ts", "utf8"),
+      "appendAssessmentVersion"
+    );
+
+    assert.equal(
+      helper.includes("sql.begin"),
+      false,
+      "assessment version writes must not open an explicit app transaction"
+    );
+    assert.equal(
+      /select\s+max\(\s*version\s*\)/i.test(helper),
+      false,
+      "assessment versions must not allocate by scanning max(version)"
+    );
+    assert.match(
+      helper,
+      /current_version = counters\.current_version \+ 1[\s\S]*insert\s+into\s+public\.assessment_versions/i,
+      "assessment versions should bump assessment_version_counters then insert in one statement"
+    );
+  });
+
+  it("keeps reserve claims free of work-item hydrate and nested existence locks", async () => {
+    const source = await readFile("lib/task-service.ts", "utf8");
+    const reserveBody = functionBody(source, "reserveNextTask");
+    const claimBody = functionBody(source, "claimQueuedTaskRow");
+
+    assert.equal(
+      reserveBody.includes("buildTaskWorkItem"),
+      false,
+      "reserveNextTask must not hydrate work items"
+    );
+    assert.equal(
+      reserveBody.includes("enqueueMissingProductRecommendations"),
+      false,
+      "reserveNextTask must not enqueue missing recommendations"
+    );
+    assert.match(
+      claimBody,
+      /for\s+update\s+of\s+tasks\s+skip\s+locked/i,
+      "queued task claim must lock only the tasks row"
+    );
+    assert.equal(
+      /not exists \([\s\S]*task_dependencies/i.test(claimBody),
+      false,
+      "dependency checks must run after the short claim statement"
     );
   });
 

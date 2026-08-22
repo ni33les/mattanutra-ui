@@ -89,6 +89,55 @@ export class WorkerApiClient {
     this.token = input.token;
   }
 
+  async get<T>(path: string) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const url = `${this.baseUrl}${path}`;
+
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          Accept: "application/json"
+        },
+        method: "GET",
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+
+        throw new WorkerApiError({
+          bodyText: text,
+          path,
+          status: response.status,
+          url
+        });
+      }
+
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof WorkerApiError) {
+        throw error;
+      }
+
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const cause =
+        error instanceof Error &&
+        error.cause &&
+        typeof error.cause === "object" &&
+        "message" in error.cause
+          ? String(error.cause.message)
+          : "";
+      const suffix = cause && cause !== message ? `: ${cause}` : "";
+
+      throw new Error(`${path} fetch failed for ${url}: ${message}${suffix}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async post<T>(path: string, body: JsonRecord) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -184,8 +233,22 @@ export class WorkerApiClient {
       agent?: WorkerRegistration["agent"];
       reservationId?: string;
       task?: Readonly<{ id: string; taskType: string }> | null;
-      workItem?: JsonRecord;
     }>("/api/tasks/reserve", input);
+  }
+
+  workItem(input: Readonly<{
+    reservationId: string;
+    taskId: string;
+    workerSessionId: string;
+  }>) {
+    const params = new URLSearchParams({
+      reservationId: input.reservationId,
+      workerSessionId: input.workerSessionId
+    });
+
+    return this.get<{
+      workItem?: JsonRecord;
+    }>(`/api/tasks/${input.taskId}/work-item?${params.toString()}`);
   }
 
   renew(input: Readonly<{

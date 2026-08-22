@@ -689,6 +689,13 @@ CREATE TABLE public.assessments (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+CREATE TABLE public.assessment_version_counters (
+    plan_id uuid PRIMARY KEY,
+    current_version integer DEFAULT 0 NOT NULL,
+    current_formulation_version integer DEFAULT 0 NOT NULL,
+    current_food_guidance_version integer DEFAULT 0 NOT NULL
+);
+
 
 --
 -- Name: assessment_resume_drafts; Type: TABLE; Schema: public; Owner: -
@@ -5691,6 +5698,13 @@ CREATE INDEX tasks_queue_idx ON public.tasks USING btree (status, business_value
 --
 
 CREATE INDEX tasks_priority_queue_idx ON public.tasks USING btree (status, priority_score DESC, due_at, scheduled_for, created_at);
+
+
+--
+-- Name: tasks_claim_queued_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tasks_claim_queued_idx ON public.tasks USING btree (task_type, scheduled_for, created_at) WHERE ((status = 'queued'::text) AND (attempts < max_attempts));
 
 
 --

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { toJsonValue } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
+import { textArray } from "@/lib/sql-arrays";
 import {
   normalizeCapabilities
 } from "@/lib/task-service-utils";
@@ -75,7 +76,7 @@ export async function ensureWorkerSessionSchema(sql?: postgres.Sql) {
       select table_name, column_name
       from information_schema.columns
       where table_schema = 'public'
-        and table_name = any(${Object.keys(requiredColumns)}::text[])
+        and table_name = any(${textArray(configured, Object.keys(requiredColumns))}::text[])
     `;
     const available = new Map<string, Set<string>>();
 

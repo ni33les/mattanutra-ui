@@ -8,6 +8,7 @@ import {
   runtimeWorkerProfileForMode,
   type WorkerProfileMode,
 } from "../lib/worker-agent-credentials.ts";
+import { startTaskMaintenanceLoop } from "../lib/task-sweep-loop.ts";
 import {
   isWorkerAuthConfigurationError,
   WorkerApiClient,
@@ -434,7 +435,7 @@ async function runAgentLoop(
         continue;
       }
 
-      if (!reserved.task || !reserved.reservationId || !reserved.workItem) {
+      if (!reserved.task || !reserved.reservationId) {
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
         continue;
@@ -444,7 +445,30 @@ async function runAgentLoop(
       const task = reserved.task;
       const taskId = task.id;
       const taskType = task.taskType;
-      const workItem = reserved.workItem;
+      let workItem: Record<string, unknown>;
+
+      try {
+        const hydrated = await client.workItem({
+          reservationId,
+          taskId,
+          workerSessionId,
+        });
+
+        if (!hydrated.workItem) {
+          heartbeatStatus = "idle";
+          heartbeatTaskId = null;
+          continue;
+        }
+
+        workItem = hydrated.workItem;
+      } catch (error) {
+        console.error(
+          `[agent] ${agent.name} could not load work item for ${taskId}: ${errorMessage(error)}`,
+        );
+        heartbeatStatus = "idle";
+        heartbeatTaskId = null;
+        continue;
+      }
       heartbeatStatus = "working";
       heartbeatTaskId = taskId;
       const taskAbortController = new AbortController();
@@ -649,6 +673,7 @@ async function shutdown() {
 }
 
 async function runWorker(mode: WorkerMode) {
+  startTaskMaintenanceLoop();
   const modes = workerProfileModesForRun(mode);
   const loops = modes.flatMap((profileMode, profileIndex) => {
     const configs = requireConfigs(profileMode);
