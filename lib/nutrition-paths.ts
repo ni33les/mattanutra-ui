@@ -35,6 +35,10 @@ export function nutritionRevealPath(locale: Locale, planId?: string) {
   return withQuery(`/${locale}/nutrition/reveal`, { plan: planId });
 }
 
+export function nutritionProgressPath(locale: Locale, planId?: string) {
+  return withQuery(`/${locale}/nutrition/progress`, { plan: planId });
+}
+
 export function pharmacyEntryPath(pharmacyId: string) {
   return `/p/${encodeURIComponent(pharmacyId)}`;
 }

@@ -93,3 +93,160 @@ export function nutritionJourneyStatus({
 
   return productCount > 0 ? "checkout_ready" : "formulation_ready";
 }
+
+export type JourneyWorkStageId =
+  | "healthscore"
+  | "formulation"
+  | "products";
+
+export type JourneyWorkStageState = "complete" | "active" | "pending";
+
+export type JourneyWorkTimeline = Readonly<{
+  failed: boolean;
+  readyForReveal: boolean;
+  stages: Readonly<{
+    formulation: JourneyWorkStageState;
+    healthscore: JourneyWorkStageState;
+    products: JourneyWorkStageState;
+  }>;
+  status: NutritionJourneyStatus;
+}>;
+
+export function isNutritionJourneyRevealReady(
+  status: NutritionJourneyStatus
+) {
+  return status === "checkout_ready" || status === "formulation_ready";
+}
+
+export function nutritionJourneyWorkTimeline({
+  hasHealthScore,
+  status
+}: Readonly<{
+  hasHealthScore: boolean;
+  status: NutritionJourneyStatus;
+}>): JourneyWorkTimeline {
+  const failed = status === "failed" || status === "stale";
+  const readyForReveal = isNutritionJourneyRevealReady(status);
+
+  if (readyForReveal) {
+    return {
+      failed: false,
+      readyForReveal: true,
+      stages: {
+        formulation: "complete",
+        healthscore: "complete",
+        products: "complete"
+      },
+      status
+    };
+  }
+
+  if (status === "product_matching_pending") {
+    return {
+      failed,
+      readyForReveal: false,
+      stages: {
+        formulation: "complete",
+        healthscore: "complete",
+        products: failed ? "pending" : "active"
+      },
+      status
+    };
+  }
+
+  if (status === "formulation_pending") {
+    return {
+      failed,
+      readyForReveal: false,
+      stages: {
+        formulation: failed ? "pending" : "active",
+        healthscore: hasHealthScore ? "complete" : "active",
+        products: "pending"
+      },
+      status
+    };
+  }
+
+  return {
+    failed,
+    readyForReveal: false,
+    stages: {
+      formulation: "pending",
+      healthscore: hasHealthScore ? "complete" : failed ? "pending" : "active",
+      products: "pending"
+    },
+    status
+  };
+}
+
+export function nutritionJourneyStatusFromCounts({
+  assessmentStatus,
+  hasPaidPlan,
+  hasStaleSnapshot,
+  productCount,
+  productSectionStatus,
+  stackCoveragePercent,
+  taskStatuses,
+  visibleSupplementCount
+}: Readonly<{
+  assessmentStatus?: string | null;
+  hasPaidPlan?: boolean;
+  hasStaleSnapshot?: boolean;
+  productCount?: number;
+  productSectionStatus?: string | null;
+  stackCoveragePercent?: number | null;
+  taskStatuses?: readonly string[];
+  visibleSupplementCount?: number;
+}>): NutritionJourneyStatus {
+  const formula =
+    (visibleSupplementCount ?? 0) > 0
+      ? {
+          productRecommendations:
+            stackCoveragePercent === null || stackCoveragePercent === undefined
+              ? undefined
+              : {
+                  matchedCount: productCount ?? 0,
+                  needsCount: 1,
+                  stackCoveragePercent,
+                  status: "partial" as const
+                },
+          recommendations: Array.from({ length: productCount ?? 0 }, (_, index) => ({
+            covers: [],
+            description: "",
+            id: `product-${index}`,
+            marketplace: "Imported product" as const,
+            name: "",
+            priority: index + 1,
+            tag: "",
+            url: ""
+          })),
+          sectionStatuses: {
+            foods: "pending" as const,
+            supplements:
+              (productCount ?? 0) > 0 || productSectionStatus === "ready"
+                ? ("ready" as const)
+                : ("pending" as const)
+          },
+          supplementBreakdown: Array.from(
+            { length: visibleSupplementCount ?? 0 },
+            (_, index) => ({
+              category: "Core" as const,
+              dailyDose: "",
+              effectivenessRank: index + 1,
+              id: `supplement-${index}`,
+              rationale: "",
+              status: "add" as const,
+              supplement: `supplement-${index}`
+            })
+          )
+        }
+      : null;
+
+  return nutritionJourneyStatus({
+    assessmentStatus,
+    formula,
+    hasPaidPlan,
+    hasStaleSnapshot,
+    taskStatuses
+  });
+}

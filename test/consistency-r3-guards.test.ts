@@ -142,7 +142,9 @@ describe("consistency r3 regression guards", () => {
       "app/api/mcp/route.ts",
       "app/[locale]/nutrition/reveal/page.tsx",
       "app/api/assessment/[planId]/formulation/route.ts",
+      "app/api/assessment/[planId]/journey/route.ts",
       "app/api/assessment/[planId]/line-connect/route.ts",
+      "lib/nutrition-journey-read.ts",
       "lib/agentic/catalogue/live.ts",
       "lib/agentic/catalogue/market.ts"
     ];

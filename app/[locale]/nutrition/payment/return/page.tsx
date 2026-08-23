@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
@@ -19,6 +19,7 @@ import type { FormulationResult } from "@/lib/formulation-types";
 import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import { isLocale, locales, type Locale, type LocaleCode } from "@/lib/i18n";
 import { visibleSupplementRecommendationCount } from "@/lib/nutrition-journey-status";
+import { nutritionProgressPath } from "@/lib/nutrition-paths";
 import {
   paymentCheckoutPath,
   paymentReturnPath
@@ -751,6 +752,11 @@ export default async function PaymentReturnPage({
 
   const payment = result?.payment ?? null;
   const status = result?.status ?? "error";
+
+  if (status === "paid_with_plan" && payment?.planId) {
+    redirect(nutritionProgressPath(locale, payment.planId));
+  }
+
   const [formula, healthScore] = await Promise.race([
     Promise.all([
       loadFormulaResult(payment, locale),

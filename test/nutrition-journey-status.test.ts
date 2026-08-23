@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   hiddenSafetyIngredientCount,
+  isNutritionJourneyRevealReady,
   nutritionJourneyStatus,
+  nutritionJourneyStatusFromCounts,
+  nutritionJourneyWorkTimeline,
   visibleSupplementRecommendationCount
 } from "../lib/nutrition-journey-status.ts";
 import type { FormulationIngredient, FormulationResult } from "../lib/formulation-types.ts";
@@ -105,5 +108,50 @@ describe("nutrition journey status", () => {
       "failed"
     );
     assert.equal(nutritionJourneyStatus({ hasStaleSnapshot: true }), "stale");
+  });
+
+  it("maps count snapshots onto the three work stages without fake timers", () => {
+    assert.equal(
+      nutritionJourneyStatusFromCounts({ hasPaidPlan: true, taskStatuses: ["queued"] }),
+      "formulation_pending"
+    );
+    assert.equal(
+      nutritionJourneyWorkTimeline({
+        hasHealthScore: true,
+        status: "formulation_pending"
+      }).stages.healthscore,
+      "complete"
+    );
+    assert.equal(
+      nutritionJourneyWorkTimeline({
+        hasHealthScore: true,
+        status: "formulation_pending"
+      }).stages.formulation,
+      "active"
+    );
+    assert.equal(
+      nutritionJourneyWorkTimeline({
+        hasHealthScore: true,
+        status: "product_matching_pending"
+      }).stages.products,
+      "active"
+    );
+    assert.equal(
+      isNutritionJourneyRevealReady("checkout_ready"),
+      true
+    );
+    assert.equal(
+      isNutritionJourneyRevealReady("formulation_pending"),
+      false
+    );
+    assert.equal(
+      nutritionJourneyStatusFromCounts({
+        hasPaidPlan: true,
+        visibleSupplementCount: 2,
+        productCount: 1,
+        stackCoveragePercent: 40
+      }),
+      "checkout_ready"
+    );
   });
 });
