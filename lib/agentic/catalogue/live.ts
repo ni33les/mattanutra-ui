@@ -56,8 +56,25 @@ async function catalogueSql() {
   return getWorkerSql() ?? getSql();
 }
 
-const liveCache = new Map<string, { at: number; snapshot: CatalogueSnapshot }>();
-const liveInflight = new Map<string, Promise<CatalogueSnapshot>>();
+const globalLive = globalThis as typeof globalThis & {
+  mattanutraLiveCatalogueCache?: Map<
+    string,
+    { at: number; snapshot: CatalogueSnapshot }
+  >;
+  mattanutraLiveCatalogueInflight?: Map<string, Promise<CatalogueSnapshot>>;
+};
+
+function liveCache() {
+  globalLive.mattanutraLiveCatalogueCache ??= new Map();
+
+  return globalLive.mattanutraLiveCatalogueCache;
+}
+
+function liveInflight() {
+  globalLive.mattanutraLiveCatalogueInflight ??= new Map();
+
+  return globalLive.mattanutraLiveCatalogueInflight;
+}
 
 function normalizeName(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -501,7 +518,7 @@ export async function loadLiveRetailSnapshot(
 }
 
 function loadingSnapshot(countryCode: string): CatalogueSnapshot {
-  const hit = liveCache.get(countryCode);
+  const hit = liveCache().get(countryCode);
 
   return {
     availabilityAsOf: new Date().toISOString(),
@@ -512,7 +529,7 @@ function loadingSnapshot(countryCode: string): CatalogueSnapshot {
 }
 
 function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
-  const existing = liveInflight.get(code);
+  const existing = liveInflight().get(code);
 
   if (existing) {
     return existing;
@@ -524,12 +541,12 @@ function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
     resolveInflight = resolve;
     rejectInflight = reject;
   });
-  liveInflight.set(code, inflight);
+  liveInflight().set(code, inflight);
 
   void loadLiveRetailSnapshot(code)
     .then((snapshot) => {
       if (snapshot.products.length > 0) {
-        liveCache.set(code, { at: Date.now(), snapshot });
+        liveCache().set(code, { at: Date.now(), snapshot });
       }
 
       resolveInflight(snapshot);
@@ -539,8 +556,8 @@ function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
       rejectInflight(error);
     })
     .finally(() => {
-      if (liveInflight.get(code) === inflight) {
-        liveInflight.delete(code);
+      if (liveInflight().get(code) === inflight) {
+        liveInflight().delete(code);
       }
     });
 
@@ -561,7 +578,7 @@ export async function cachedLiveRetailSnapshot(
     };
   }
 
-  const hit = liveCache.get(code);
+  const hit = liveCache().get(code);
 
   if (hit && Date.now() - hit.at < LIVE_TTL_MS) {
     return hit.snapshot;
@@ -589,7 +606,7 @@ export async function warmLiveRetailSnapshot(
   }
 
   const code = countryCode.trim().toUpperCase() || "TH";
-  const hit = liveCache.get(code);
+  const hit = liveCache().get(code);
 
   if (hit && Date.now() - hit.at < LIVE_TTL_MS && hit.snapshot.products.length > 0) {
     return hit.snapshot;
@@ -612,6 +629,6 @@ export function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
 }
 
 export function resetLiveCatalogueCache() {
-  liveCache.clear();
-  liveInflight.clear();
+  liveCache().clear();
+  liveInflight().clear();
 }
