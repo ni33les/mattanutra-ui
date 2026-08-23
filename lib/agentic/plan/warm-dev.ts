@@ -1,7 +1,8 @@
 import type { AgenticEnvironment } from "@/lib/agentic/config";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
 
-const KEEP_WARM_MS = 20_000;
+const KEEP_WARM_FIRST_DELAY_MS = 60_000;
+const KEEP_WARM_MS = 10 * 60_000;
 
 const globalWarm = globalThis as typeof globalThis & {
   mattanutraLivePlanCount?: number;
@@ -152,13 +153,13 @@ export async function ensureDevPlanHotPath(runtime: AgenticRuntime) {
 }
 
 export async function keepPlanPathWarm(environment: AgenticEnvironment) {
-  const { warmAgenticCatalogue } = await import("@/lib/agentic/catalogue/warm");
-
   if (globalWarm.mattanutraPlanKeepWarm) {
     return;
   }
 
-  const timer = setInterval(() => {
+  const { warmAgenticCatalogue } = await import("@/lib/agentic/catalogue/warm");
+
+  const warmOnce = () => {
     if (globalWarm.mattanutraCatalogueWarmInflight) {
       return;
     }
@@ -172,7 +173,14 @@ export async function keepPlanPathWarm(environment: AgenticEnvironment) {
       .finally(() => {
         globalWarm.mattanutraCatalogueWarmInflight = null;
       });
-  }, KEEP_WARM_MS);
-  timer.unref?.();
-  globalWarm.mattanutraPlanKeepWarm = timer;
+  };
+
+  const start = setTimeout(() => {
+    warmOnce();
+    const timer = setInterval(warmOnce, KEEP_WARM_MS);
+    timer.unref?.();
+    globalWarm.mattanutraPlanKeepWarm = timer;
+  }, KEEP_WARM_FIRST_DELAY_MS);
+  start.unref?.();
+  globalWarm.mattanutraPlanKeepWarm = start;
 }

@@ -142,4 +142,31 @@ describe("consistency r5 regression guards", () => {
     assert.match(readModel, /sql\?: postgres\.Sql/);
     assert.match(readModel, /options\.sql \?\? getSql\(\)/);
   });
+
+  it("does not open a worker pool or warm the catalogue at first-hit", async () => {
+    const [db, mcpRoute, rpc, info, lineToken] = await Promise.all([
+      readFile("lib/db.ts", "utf8"),
+      readFile("app/api/mcp/route.ts", "utf8"),
+      readFile("lib/agentic/mcp/rpc.ts", "utf8"),
+      readFile("lib/agentic/info.ts", "utf8"),
+      readFile("lib/communications-organisation.ts", "utf8")
+    ]);
+    const listenStart = db.indexOf("export async function prepareListenConnection");
+    const listen = db.slice(listenStart, listenStart + 800);
+    const tokenStart = lineToken.indexOf(
+      "export async function createCustomerLineConnectToken"
+    );
+    const token = lineToken.slice(tokenStart, tokenStart + 1800);
+
+    assert.match(listen, /const sql = getSql\(\)/);
+    assert.doesNotMatch(listen, /getWorkerSql/);
+    assert.doesNotMatch(mcpRoute, /warmAgenticCatalogue/);
+    assert.doesNotMatch(mcpRoute, /ensureCatalogueSnapshot/);
+    assert.doesNotMatch(rpc, /kickCatalogueWarm|warmAgenticCatalogue/);
+    assert.doesNotMatch(info, /warmCatalogueSnapshot/);
+    assert.doesNotMatch(
+      token.slice(0, token.indexOf("from public.assessments")),
+      /ensureCommunicationSchema/
+    );
+  });
 });

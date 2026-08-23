@@ -38,6 +38,7 @@ export async function POST(
   request: Request,
   { params }: LineConnectRouteProps
 ) {
+  const startedAt = Date.now();
   const limited = enforceRateLimit(
     request,
     publicRateLimits.assessmentPlanMutation
@@ -63,6 +64,11 @@ export async function POST(
     });
     const command = `MN ${token.code}`;
 
+    console.info("[line-connect:post]", {
+      planId,
+      totalMs: Date.now() - startedAt
+    });
+
     return noStoreJson({
       code: token.code,
       command,
@@ -71,6 +77,12 @@ export async function POST(
       retailCustomerOrderId: token.retailCustomerOrderId
     });
   } catch (error) {
+    console.warn("[line-connect:post] failed", {
+      planId,
+      totalMs: Date.now() - startedAt,
+      message: error instanceof Error ? error.message : "unknown"
+    });
+
     return noStoreJson(
       {
         message:

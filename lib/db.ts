@@ -167,7 +167,7 @@ export async function prepareListenConnection() {
     return;
   }
 
-  const sql = getWorkerSql() ?? getSql();
+  const sql = getSql();
 
   if (!sql) {
     return;

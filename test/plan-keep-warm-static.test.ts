@@ -17,6 +17,8 @@ describe("plan keep-warm does not starve first-create A2", () => {
     assert.match(warm, /withLivePlanRequest/);
     assert.match(warm, /isLivePlanInFlight/);
     assert.match(dispatcher, /withLivePlanRequest\(\(\) =>/);
+    assert.match(warm, /KEEP_WARM_FIRST_DELAY_MS = 60_000/);
+    assert.match(warm, /KEEP_WARM_MS = 10 \* 60_000/);
     assert.match(
       warm,
       /mattanutraCatalogueWarmInflight/,
@@ -28,16 +30,11 @@ describe("plan keep-warm does not starve first-create A2", () => {
       "interval keep-warm must not run a second 8-target plan against the live pool"
     );
     assert.doesNotMatch(
-      warm.slice(
-        warm.indexOf("export async function keepPlanPathWarm"),
-        warm.indexOf("const timer = setInterval")
-      ),
+      warm.slice(warm.indexOf("export async function keepPlanPathWarm")),
       /pingPlanHotPath/
     );
-    assert.doesNotMatch(
-      warm.slice(warm.indexOf("const timer = setInterval")),
-      /pingPlanHotPath\(getLiveAgenticRuntime\(\)\)/
-    );
+    assert.match(warm, /setTimeout\(\(\) => \{/);
+    assert.match(warm, /setInterval\(warmOnce, KEEP_WARM_MS\)/);
     assert.doesNotMatch(reserve, /maybeReleaseExpiredReservations|releaseExpiredReservations/);
     assert.match(sweep, /TASK_MAINTENANCE_INTERVAL_MS = 15_000/);
     assert.match(sweep, /releaseExpiredReservations/);
@@ -52,10 +49,10 @@ describe("plan keep-warm does not starve first-create A2", () => {
     assert.match(db, /DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 120/);
     assert.match(startPlatform, /platform-hot-\$\{Date\.now\(\)\}-patch/);
     assert.match(startPlatform, /DB_POOL_ROLE: "worker"/);
-    assert.match(
+    assert.doesNotMatch(
       dispatcher,
-      /case "info":\s*await import\("@\/lib\/agentic\/catalogue\/warm"\)/,
-      "info must finish catalogue warm so the next first-create A2 is a cache hit"
+      /case "info":[\s\S]{0,400}warmAgenticCatalogue/,
+      "info must not wait on catalogue warm; plan/execute load the snapshot on demand"
     );
   });
 });

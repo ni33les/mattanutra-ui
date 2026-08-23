@@ -18,13 +18,6 @@ import { recordMcpTiming } from "@/lib/agentic/metrics";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-void import("@/lib/agentic/catalogue/warm")
-  .then(async ({ warmAgenticCatalogue }) => {
-    const { resolveAgenticEnvironment } = await import("@/lib/agentic/config");
-    await warmAgenticCatalogue(resolveAgenticEnvironment());
-  })
-  .catch(() => undefined);
-
 const log = createLogger("api.mcp");
 const MCP_HEADERS = {
   "Cache-Control": "no-store",
@@ -198,9 +191,6 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   void import("@/lib/db")
     .then((mod) => mod.keepDatabaseWarm())
-    .catch(() => null);
-  void import("@/lib/agentic/catalogue/snapshot")
-    .then((mod) => mod.ensureCatalogueSnapshot(loadAgenticConfig(request).environment))
     .catch(() => null);
 
   const config = loadAgenticConfig(request);

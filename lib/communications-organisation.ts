@@ -523,8 +523,6 @@ export async function createCustomerLineConnectToken(input: Readonly<{
     Math.max(1, Math.round(Number(input.expiresInMinutes) || 15))
   );
 
-  await ensureCommunicationSchema(sql);
-
   const assessmentRows = await sql<Array<{ plan_id: string }>>`
     select plan_id::text
     from public.assessments

@@ -62,11 +62,6 @@ async function callTool(
 
   switch (canonical) {
     case "info":
-      await import("@/lib/agentic/catalogue/warm")
-        .then(({ warmAgenticCatalogue }) =>
-          warmAgenticCatalogue(runtime.config.environment)
-        )
-        .catch(() => undefined);
       value = await infoTool({
         config: runtime.config,
         locale: typeof params.locale === "string" ? params.locale : undefined
