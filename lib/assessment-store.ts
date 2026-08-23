@@ -37,6 +37,7 @@ import {
   type ProductRecommendationNeed
 } from "@/lib/product-recommendations";
 import { getSql } from "@/lib/db";
+import { uuidArray } from "@/lib/sql-arrays";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import {
   firstNameFromAssessmentAnswers,
@@ -71,6 +72,228 @@ export function isUuid(value: string) {
 
 function normalizeLocale(locale: unknown): Locale {
   return isLocale(locale) ? locale : defaultLocale;
+}
+
+function marketplaceFromPlatform(
+  platform: unknown
+): RecommendedProduct["marketplace"] {
+  if (platform === "lazada") {
+    return "Lazada Thailand";
+  }
+
+  if (platform === "shopee") {
+    return "Shopee Thailand";
+  }
+
+  return "Imported product";
+}
+
+function coversFromNeeds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (item && typeof item === "object" && "sourceId" in item) {
+        const sourceId = (item as { sourceId?: unknown }).sourceId;
+        return typeof sourceId === "string" ? sourceId : "";
+      }
+
+      return typeof item === "string" ? item : "";
+    })
+    .filter((item) => item.length > 0);
+}
+
+function servingMultiplierFrom(row: Readonly<{
+  serving_multiplier?: unknown;
+  why?: unknown;
+}>) {
+  const fromColumn = Number(row.serving_multiplier);
+  const fromWhy = Number(
+    String(row.why ?? "").match(/^Use ([0-9]+) servings/)?.[1]
+  );
+
+  return Math.max(
+    1,
+    Number.isFinite(fromColumn) && fromColumn > 0 ? fromColumn : 1,
+    Number.isFinite(fromWhy) && fromWhy > 0 ? fromWhy : 1
+  );
+}
+
+function mapStoredRecommendationItem(
+  item: Record<string, unknown>,
+  stackCoveragePercent: number
+): RecommendedProduct {
+  const priceAmount = Number(item.price_amount);
+  const productId = String(item.product_id);
+  const localeTitle =
+    typeof item.locale_title === "string" ? item.locale_title.trim() : "";
+  const defaultTitle =
+    typeof item.default_title === "string" ? item.default_title.trim() : "";
+  const productTitle =
+    typeof item.product_title === "string" ? item.product_title : "";
+  const productImage =
+    typeof item.product_image_url === "string" && item.product_image_url
+      ? item.product_image_url
+      : typeof item.image_url === "string"
+        ? item.image_url
+        : null;
+
+  return {
+    affiliate: false,
+    covers: coversFromNeeds(item.covered_needs),
+    description: typeof item.why === "string" ? item.why : "",
+    id: productId,
+    imageUrl: productImage,
+    marketplace: marketplaceFromPlatform(item.platform),
+    name: localeTitle || defaultTitle || productTitle,
+    price:
+      Number.isFinite(priceAmount) && priceAmount > 0
+        ? {
+            amount: priceAmount,
+            currency: typeof item.currency === "string" ? item.currency : "THB"
+          }
+        : null,
+    retailer: null,
+    priority: Number(item.rank) || 0,
+    productCoveragePercent: Number(item.product_coverage_percent) || 0,
+    productId,
+    rank: Number(item.rank) || 0,
+    recommendationRunId: String(item.run_id),
+    servingMultiplier: servingMultiplierFrom(item),
+    stackContributionPercent: Number(item.stack_contribution_percent) || 0,
+    stackCoveragePercent,
+    tag: "Best match",
+    url: typeof item.url_used === "string" ? item.url_used : ""
+  };
+}
+
+async function loadStoredRecommendationProductPayloads(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  planId: string,
+  locale: string
+): Promise<{
+  items: RecommendedProduct[];
+  options: Array<Record<string, unknown>>;
+}> {
+  // Matcher write already keeps in-country, sale-eligible SKUs on the run.
+  // Availability flips are a stack refresh, not a GET-time product_facts /
+  // jsonb country scan. This path is a bounded lookup by run_id.
+  const runs = await sql<
+    Array<{
+      client_needs_count: number | null;
+      diagnostics: unknown;
+      generated_at: Date | string | null;
+      id: string;
+      notes: string | null;
+      stack_coverage_percent: number | null;
+      stack_preference: string;
+      status: string;
+    }>
+  >`
+    select distinct on (coalesce(diagnostics ->> 'stackPreference', 'balanced'))
+      id,
+      status,
+      stack_coverage_percent,
+      jsonb_array_length(client_needs) as client_needs_count,
+      diagnostics,
+      coalesce(diagnostics ->> 'stackPreference', 'balanced') as stack_preference,
+      notes,
+      generated_at
+    from product_recommendation_runs
+    where plan_id = ${planId}::uuid
+      and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
+    order by
+      coalesce(diagnostics ->> 'stackPreference', 'balanced'),
+      generated_at desc
+  `;
+
+  if (runs.length < 1) {
+    return { items: [], options: [] };
+  }
+
+  const itemRows = await sql<Array<Record<string, unknown>>>`
+    select
+      i.run_id,
+      i.rank,
+      i.why,
+      i.image_url,
+      i.price_amount,
+      i.currency,
+      i.product_coverage_percent,
+      i.serving_multiplier,
+      i.stack_contribution_percent,
+      i.url_used,
+      i.covered_needs,
+      i.product_id,
+      p.image_url as product_image_url,
+      p.platform,
+      p.title as product_title,
+      loc.title as locale_title,
+      def.title as default_title
+    from product_recommendation_items i
+    join products p
+      on p.id = i.product_id
+    left join product_translations loc
+      on loc.product_id = p.id
+      and loc.locale = ${locale}
+    left join product_translations def
+      on def.product_id = p.id
+      and def.locale = ${defaultLocale}
+    where i.run_id = any(${uuidArray(
+      sql,
+      runs.map((run) => String(run.id))
+    )}::uuid[])
+    order by i.rank
+  `;
+
+  const itemsByRun = new Map<string, RecommendedProduct[]>();
+  const coverageByRun = new Map(
+    runs.map((run) => [String(run.id), Number(run.stack_coverage_percent) || 0])
+  );
+
+  for (const item of itemRows) {
+    const runId = String(item.run_id);
+    const list = itemsByRun.get(runId) ?? [];
+    list.push(
+      mapStoredRecommendationItem(item, coverageByRun.get(runId) ?? 0)
+    );
+    itemsByRun.set(runId, list);
+  }
+
+  const primary =
+    runs.find((run) => run.stack_preference === "balanced") ?? runs[0]!;
+  const preferenceRank = (preference: string) =>
+    preference === "balanced" ? 1 : preference === "compact" ? 2 : 4;
+
+  return {
+    items: itemsByRun.get(String(primary.id)) ?? [],
+    options: [...runs]
+      .sort(
+        (left, right) =>
+          preferenceRank(left.stack_preference) -
+          preferenceRank(right.stack_preference)
+      )
+      .map((run) => {
+        const diagnostics = asRecord(run.diagnostics);
+        const trace = asRecord(diagnostics.trace);
+
+        return {
+          generatedAt: run.generated_at,
+          maxProducts:
+            trace.maxProducts ?? diagnostics.maxProducts ?? null,
+          needsCount: run.client_needs_count,
+          notes: run.notes,
+          recommendations: itemsByRun.get(String(run.id)) ?? [],
+          runId: String(run.id),
+          stackCoveragePercent: Number(run.stack_coverage_percent) || 0,
+          stackPreference: run.stack_preference,
+          status: run.status,
+          diagnostics: run.diagnostics
+        };
+      })
+  };
 }
 
 function toJsonRecord(value: unknown) {
@@ -1604,337 +1827,12 @@ export async function getStoredFormulationResult(
         generated_at desc
       limit 1
     ) product_recommendation_run on true
-    ${includeProductPayloads ? sql`
-    left join lateral (
-      select coalesce(
-        jsonb_agg(
-          jsonb_build_object(
-            'affiliate',
-              false,
-            'covers',
-              coalesce(
-                (
-                  select jsonb_agg(covered_need.value ->> 'sourceId')
-                  from jsonb_array_elements(product_recommendation_items.covered_needs) as covered_need(value)
-                ),
-                '[]'::jsonb
-              ),
-            'description',
-              coalesce(product_recommendation_items.why, ''),
-            'id',
-              products.id::text,
-            'imageUrl',
-              coalesce(
-                products.image_url,
-                product_recommendation_items.image_url
-              ),
-            'marketplace',
-              case products.platform
-                when 'lazada' then 'Lazada Thailand'
-                when 'shopee' then 'Shopee Thailand'
-                else 'Imported product'
-              end,
-            'name',
-              coalesce(
-                nullif(btrim(product_translation_locale.title), ''),
-                nullif(btrim(product_translation_default.title), ''),
-                products.title
-              ),
-            'price',
-              case
-                when product_recommendation_items.price_amount is not null
-                  and product_recommendation_items.price_amount > 0
-                  then jsonb_build_object(
-                    'amount',
-                      product_recommendation_items.price_amount,
-                    'currency',
-                      product_recommendation_items.currency
-                  )
-                else null
-              end,
-            'retailer',
-              null,
-            'priority',
-              product_recommendation_items.rank,
-            'productCoveragePercent',
-              product_recommendation_items.product_coverage_percent,
-            'productId',
-              products.id::text,
-            'rank',
-              product_recommendation_items.rank,
-            'recommendationRunId',
-              product_recommendation_items.run_id::text,
-            'servingMultiplier',
-              greatest(
-                1,
-                coalesce(product_recommendation_items.serving_multiplier, 1),
-                coalesce(
-                  nullif(
-                    substring(
-                      coalesce(product_recommendation_items.why, '')
-                      from '^Use ([0-9]+) servings'
-                    ),
-                    ''
-                  )::integer,
-                  1
-                )
-              ),
-            'stackContributionPercent',
-              product_recommendation_items.stack_contribution_percent,
-            'stackCoveragePercent',
-              product_recommendation_run.stack_coverage_percent,
-            'tag',
-              'Best match',
-            'url',
-              product_recommendation_items.url_used
-          )
-          order by product_recommendation_items.rank
-        ),
-        '[]'::jsonb
-      ) as recommendations
-      from product_recommendation_items
-      join products
-        on products.id = product_recommendation_items.product_id
-      left join product_translations product_translation_locale
-        on product_translation_locale.product_id = products.id
-        and product_translation_locale.locale = ${resultLocale}
-      left join product_translations product_translation_default
-        on product_translation_default.product_id = products.id
-        and product_translation_default.locale = ${defaultLocale}
-      where product_recommendation_run.id is not null
-        and product_recommendation_items.run_id = product_recommendation_run.id
-        and not exists (
-          select 1
-          from public.product_facts blocked_product_facts
-          join public.supplements blocked_supplements
-            on blocked_supplements.id = blocked_product_facts.supplement_id
-          left join lateral (
-            select rule.status
-            from jsonb_to_recordset(
-              case
-                when jsonb_typeof(blocked_supplements.source_payload -> 'countryAvailability') = 'array'
-                  then blocked_supplements.source_payload -> 'countryAvailability'
-                else '[]'::jsonb
-              end
-            ) as rule("countryCode" text, country_code text, status text)
-            where coalesce(rule."countryCode", rule.country_code) = case
-                when upper(btrim(coalesce(assessments.answers ->> 'country', 'TH'))) in ('GB', 'UK', 'GREAT BRITAIN', 'UNITED KINGDOM') then 'GB'
-                when upper(btrim(coalesce(assessments.answers ->> 'country', 'TH'))) ~ '^[A-Z]{2}$' then upper(btrim(coalesce(assessments.answers ->> 'country', 'TH')))
-                else 'TH'
-              end
-              and rule.status in ('allowed', 'blocked')
-            limit 1
-          ) blocked_country on true
-          where blocked_product_facts.product_id = products.id
-            and blocked_product_facts.item_type = 'supplement'
-            and (
-              blocked_country.status = 'blocked'
-              or (
-                blocked_country.status is null
-                and (
-                  blocked_supplements.is_active = false
-                  or blocked_supplements.list_status = 'blocked'
-                )
-              )
-            )
-        )
-    ) product_recommendation_items_payload on true
-    left join lateral (
-      with latest_runs as (
-        select distinct on (coalesce(diagnostics ->> 'stackPreference', 'balanced'))
-          id,
-          status,
-          stack_coverage_percent,
-          jsonb_array_length(client_needs) as client_needs_count,
-          diagnostics,
-          coalesce(diagnostics ->> 'stackPreference', 'balanced') as stack_preference,
-          notes,
-          generated_at
-        from product_recommendation_runs
-        where product_recommendation_runs.plan_id = assessments.plan_id
-          and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
-        order by
-          coalesce(diagnostics ->> 'stackPreference', 'balanced'),
-          generated_at desc
-      )
-      select coalesce(
-        jsonb_agg(
-          jsonb_build_object(
-            'generatedAt',
-              latest_runs.generated_at,
-            'maxProducts',
-              coalesce(
-                latest_runs.diagnostics #>> '{trace,maxProducts}',
-                latest_runs.diagnostics ->> 'maxProducts'
-              ),
-            'needsCount',
-              latest_runs.client_needs_count,
-            'notes',
-              latest_runs.notes,
-            'recommendations',
-              coalesce(option_items.recommendations, '[]'::jsonb),
-            'runId',
-              latest_runs.id::text,
-            'stackCoveragePercent',
-              latest_runs.stack_coverage_percent,
-            'stackPreference',
-              latest_runs.stack_preference,
-            'status',
-              latest_runs.status,
-            'diagnostics',
-              latest_runs.diagnostics
-          )
-          order by case latest_runs.stack_preference
-            when 'balanced' then 1
-            when 'compact' then 2
-            else 4
-          end
-        ),
-        '[]'::jsonb
-      ) as options
-      from latest_runs
-      left join lateral (
-        select coalesce(
-          jsonb_agg(
-            jsonb_build_object(
-              'affiliate',
-                false,
-              'covers',
-                coalesce(
-                  (
-                    select jsonb_agg(covered_need.value ->> 'sourceId')
-                    from jsonb_array_elements(product_recommendation_items.covered_needs) as covered_need(value)
-                  ),
-                  '[]'::jsonb
-                ),
-              'description',
-                coalesce(product_recommendation_items.why, ''),
-              'id',
-                products.id::text,
-              'imageUrl',
-                coalesce(
-                  products.image_url,
-                  product_recommendation_items.image_url
-                ),
-              'marketplace',
-                case products.platform
-                  when 'lazada' then 'Lazada Thailand'
-                  when 'shopee' then 'Shopee Thailand'
-                  else 'Imported product'
-                end,
-              'name',
-                coalesce(
-                  nullif(btrim(product_translation_locale.title), ''),
-                  nullif(btrim(product_translation_default.title), ''),
-                  products.title
-                ),
-              'price',
-                case
-                  when product_recommendation_items.price_amount is not null
-                    and product_recommendation_items.price_amount > 0
-                    then jsonb_build_object(
-                      'amount',
-                        product_recommendation_items.price_amount,
-                      'currency',
-                        product_recommendation_items.currency
-                    )
-                  else null
-                end,
-              'retailer',
-                null,
-              'priority',
-                product_recommendation_items.rank,
-              'productCoveragePercent',
-                product_recommendation_items.product_coverage_percent,
-              'productId',
-                products.id::text,
-              'rank',
-                product_recommendation_items.rank,
-              'recommendationRunId',
-                product_recommendation_items.run_id::text,
-              'servingMultiplier',
-                greatest(
-                  1,
-                  coalesce(product_recommendation_items.serving_multiplier, 1),
-                  coalesce(
-                    nullif(
-                      substring(
-                        coalesce(product_recommendation_items.why, '')
-                        from '^Use ([0-9]+) servings'
-                      ),
-                      ''
-                    )::integer,
-                    1
-                  )
-                ),
-              'stackContributionPercent',
-                product_recommendation_items.stack_contribution_percent,
-              'stackCoveragePercent',
-                latest_runs.stack_coverage_percent,
-              'tag',
-                'Best match',
-              'url',
-                product_recommendation_items.url_used
-            )
-            order by product_recommendation_items.rank
-          ),
-          '[]'::jsonb
-        ) as recommendations
-        from product_recommendation_items
-        join products
-          on products.id = product_recommendation_items.product_id
-        left join product_translations product_translation_locale
-          on product_translation_locale.product_id = products.id
-          and product_translation_locale.locale = ${resultLocale}
-        left join product_translations product_translation_default
-          on product_translation_default.product_id = products.id
-          and product_translation_default.locale = ${defaultLocale}
-        where product_recommendation_items.run_id = latest_runs.id
-          and not exists (
-            select 1
-            from public.product_facts blocked_product_facts
-            join public.supplements blocked_supplements
-              on blocked_supplements.id = blocked_product_facts.supplement_id
-            left join lateral (
-              select rule.status
-              from jsonb_to_recordset(
-                case
-                  when jsonb_typeof(blocked_supplements.source_payload -> 'countryAvailability') = 'array'
-                    then blocked_supplements.source_payload -> 'countryAvailability'
-                  else '[]'::jsonb
-                end
-              ) as rule("countryCode" text, country_code text, status text)
-              where coalesce(rule."countryCode", rule.country_code) = case
-                  when upper(btrim(coalesce(assessments.answers ->> 'country', 'TH'))) in ('GB', 'UK', 'GREAT BRITAIN', 'UNITED KINGDOM') then 'GB'
-                  when upper(btrim(coalesce(assessments.answers ->> 'country', 'TH'))) ~ '^[A-Z]{2}$' then upper(btrim(coalesce(assessments.answers ->> 'country', 'TH')))
-                  else 'TH'
-                end
-                and rule.status in ('allowed', 'blocked')
-              limit 1
-            ) blocked_country on true
-            where blocked_product_facts.product_id = products.id
-              and blocked_product_facts.item_type = 'supplement'
-              and (
-                blocked_country.status = 'blocked'
-                or (
-                  blocked_country.status is null
-                  and (
-                    blocked_supplements.is_active = false
-                    or blocked_supplements.list_status = 'blocked'
-                  )
-                )
-              )
-          )
-      ) option_items on true
-    ) product_recommendation_options_payload on true
-    ` : sql`
     left join lateral (
       select '[]'::jsonb as recommendations
     ) product_recommendation_items_payload on true
     left join lateral (
       select '[]'::jsonb as options
     ) product_recommendation_options_payload on true
-    `}
     left join lateral (
       select created_at, payload, status
       from tasks
@@ -1957,24 +1855,12 @@ export async function getStoredFormulationResult(
       order by created_at desc
       limit 1
     ) food_gap_support_task on true
-    ${includeProductPayloads ? sql`
-    left join lateral (
-      select count(*)::int as active_supplement_count
-      from public.supplements
-    ) supplement_catalogue on true
-    left join lateral (
-      select count(*)::int as approved_product_count
-      from public.products
-      where status = 'approved'
-    ) product_catalogue on true
-    ` : sql`
     left join lateral (
       select 0::int as active_supplement_count
     ) supplement_catalogue on true
     left join lateral (
       select 0::int as approved_product_count
     ) product_catalogue on true
-    `}
     where assessments.plan_id = ${planId}::uuid
       ${assessmentAccessFilter}
     limit 1
@@ -1984,6 +1870,10 @@ export async function getStoredFormulationResult(
   if (!row) {
     return null;
   }
+
+  const productPayloads = includeProductPayloads
+    ? await loadStoredRecommendationProductPayloads(sql, planId, resultLocale)
+    : { items: [], options: [] };
 
   if (mode === "preview" && (!row.formulation || !row.food_guidance)) {
     return null;
@@ -2009,18 +1899,18 @@ export async function getStoredFormulationResult(
   const storedFoodGapSupport = asFoodGapSupport(
     storedFoodGuidanceRecord.foodGapSupport
   );
-  const reconciledSafety = await reconcileResolvedSafetyReviewFlags(
-    sql,
-    planId,
-    {
-      foodGuidance: storedFoodGuidance,
-      foodSafetySummary: safetySummaryFromRecord(
-        storedFoodGuidanceRecord.foodSafetySummary
-      ),
-      safetySummary: safetySummaryFromRecord(storedFormulation.safetySummary),
-      supplementBreakdown: storedSupplementBreakdown
-    }
-  );
+  const storedSafety = {
+    foodGuidance: storedFoodGuidance,
+    foodSafetySummary: safetySummaryFromRecord(
+      storedFoodGuidanceRecord.foodSafetySummary
+    ),
+    safetySummary: safetySummaryFromRecord(storedFormulation.safetySummary),
+    supplementBreakdown: storedSupplementBreakdown
+  };
+  const reconciledSafety =
+    options.detail === "page"
+      ? storedSafety
+      : await reconcileResolvedSafetyReviewFlags(sql, planId, storedSafety);
   const supplementBreakdown = reconciledSafety.supplementBreakdown;
   const foodGuidance = reconciledSafety.foodGuidance;
   const safetySummary = reconciledSafety.safetySummary;
@@ -2029,9 +1919,9 @@ export async function getStoredFormulationResult(
   const legacyRecommendations = asArray<RecommendedProduct>(
     row.recommendations
   );
-  const productRecommendationItems = asArray<RecommendedProduct>(
-    row.product_recommendation_items_payload
-  );
+  const productRecommendationItems = includeProductPayloads
+    ? productPayloads.items
+    : asArray<RecommendedProduct>(row.product_recommendation_items_payload);
   const hasStructuredProductRecommendationRun =
     typeof row.product_recommendation_run_status === "string" &&
     row.product_recommendation_run_status.length > 0;
@@ -2146,8 +2036,10 @@ export async function getStoredFormulationResult(
           productRecommendationGeneratedAt
         )
       : false;
-  const productRecommendationOptions = asArray<Record<string, unknown>>(
-    row.product_recommendation_options_payload
+  const productRecommendationOptions = (
+    includeProductPayloads
+      ? productPayloads.options
+      : asArray<Record<string, unknown>>(row.product_recommendation_options_payload)
   )
     .flatMap((option): ProductRecommendationOption[] => {
       const stackPreference = asProductStackPreference(option.stackPreference);

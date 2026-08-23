@@ -110,21 +110,24 @@ export default async function NutritionRevealPage({
     redirect(nutritionHealthScorePath(locale, planId));
   }
 
-  void ensureFreshProductRecommendationsForReveal(
-    planId,
-    initialStackPreference
-  ).catch((error) => {
-    console.warn("Unable to ensure fresh reveal product recommendations", {
-      error: error instanceof Error ? error.message : String(error),
-      planId
-    });
-  });
-
-  const initialResult = await getStoredFormulationResult(planId, {
+  const initialResultPromise = getStoredFormulationResult(planId, {
     detail: "page",
     locale,
     mode: "full"
   });
+  setTimeout(() => {
+    void ensureFreshProductRecommendationsForReveal(
+      planId,
+      initialStackPreference
+    ).catch((error) => {
+      console.warn("Unable to ensure fresh reveal product recommendations", {
+        error: error instanceof Error ? error.message : String(error),
+        planId
+      });
+    });
+  }, 0);
+
+  const initialResult = await initialResultPromise;
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
