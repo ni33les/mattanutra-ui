@@ -164,6 +164,11 @@ describe("consistency r5 regression guards", () => {
     assert.doesNotMatch(mcpRoute, /ensureCatalogueSnapshot/);
     assert.doesNotMatch(rpc, /kickCatalogueWarm|warmAgenticCatalogue/);
     assert.doesNotMatch(info, /warmCatalogueSnapshot/);
+    const startPlatform = await readFile("scripts/start-platform.mjs", "utf8");
+    assert.doesNotMatch(
+      startPlatform.slice(startPlatform.indexOf("async function main")),
+      /warmDevPlanHotPath/
+    );
     assert.doesNotMatch(
       token.slice(0, token.indexOf("from public.assessments")),
       /ensureCommunicationSchema/
