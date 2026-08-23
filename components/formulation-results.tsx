@@ -4,7 +4,6 @@ import {
   startTransition,
   useCallback,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
@@ -16,7 +15,6 @@ import {
   productRecommendationOptionsForResult,
   resultHasPendingProductRecommendations,
   resultHasProductStackRows,
-  resultHasPendingSections,
   selectProductRecommendationOption,
   supplementProductCoverageById,
 } from "@/components/formulation-results-helpers";
@@ -37,9 +35,12 @@ type FormulationResultsProps = Readonly<{
 
 type LoadState = "loading" | "ready" | "error";
 
-const MAX_PRODUCT_MATCHING_POLLS = 240;
-const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
-const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 1_000;
+const MAX_MISSING_FORMULA_POLLS = 30;
+const MISSING_FORMULA_POLL_INTERVAL_MS = 3_000;
+
+function hasRenderableFormula(result: FormulationResult | null) {
+  return Boolean(result && result.supplementBreakdown.length > 0);
+}
 
 export function FormulationResults({
   initialStackPreference = null,
@@ -61,8 +62,7 @@ export function FormulationResults({
         : "balanced"),
     );
   const [productPollingPreference, setProductPollingPreference] =
-    useState<ProductStackPreference | null>(() => initialStackPreference);
-  const productPollAttemptsRef = useRef(0);
+    useState<ProductStackPreference | null>(null);
 
   const refreshFormulationResult = useCallback(async () => {
     const response = await fetch(
@@ -84,7 +84,6 @@ export function FormulationResults({
 
   const startProductStackPolling = useCallback(
     (preference: ProductStackPreference) => {
-      productPollAttemptsRef.current = 0;
       setProductPollingPreference(preference);
     },
     [],
@@ -93,63 +92,79 @@ export function FormulationResults({
   useEffect(() => {
     let cancelled = false;
     let retryTimer: number | undefined;
-    productPollAttemptsRef.current = 0;
+    let inFlight = false;
+    let missingAttempts = 0;
 
-    async function fetchFormulation() {
+    async function fetchFormulation(mode: "until-formula" | "once") {
+      if (cancelled || inFlight) {
+        return;
+      }
+
+      inFlight = true;
+
       try {
         const response = await fetch(
           `/api/assessment/${encodeURIComponent(effectivePlanId)}/formulation?locale=${locale}`,
           { cache: "no-store" },
         );
 
+        if (cancelled) {
+          return;
+        }
+
         if (response.status === 202) {
-          retryTimer = window.setTimeout(fetchFormulation, 1000);
+          if (
+            mode === "until-formula" &&
+            missingAttempts < MAX_MISSING_FORMULA_POLLS
+          ) {
+            missingAttempts += 1;
+            retryTimer = window.setTimeout(() => {
+              void fetchFormulation(mode);
+            }, MISSING_FORMULA_POLL_INTERVAL_MS);
+          }
           return;
         }
 
         if (!response.ok) {
-          throw new Error("Unable to load formulation");
+          if (!hasRenderableFormula(initialResult)) {
+            setLoadState("error");
+          }
+          return;
         }
 
         const payload = (await response.json()) as FormulationResult;
 
-        if (!cancelled) {
-          setResult(payload);
-          setLoadState("ready");
+        setResult(payload);
+        setLoadState("ready");
 
-          const productMatchingPending =
-            resultHasPendingProductRecommendations(payload) ||
-            Boolean(
-              productPollingPreference &&
-                !resultHasProductStackRows(payload, productPollingPreference),
-            );
-          const shouldPollProductMatching =
-            productMatchingPending &&
-            productPollAttemptsRef.current < MAX_PRODUCT_MATCHING_POLLS;
-
-          if (productMatchingPending) {
-            productPollAttemptsRef.current += 1;
-          }
-
-          if (resultHasPendingSections(payload) || shouldPollProductMatching) {
-            retryTimer = window.setTimeout(
-              fetchFormulation,
-              shouldPollProductMatching
-                ? PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS
-                : PENDING_SECTION_POLL_INTERVAL_MS,
-            );
-          } else if (productPollingPreference) {
-            setProductPollingPreference(null);
-          }
+        if (
+          mode === "until-formula" &&
+          !hasRenderableFormula(payload) &&
+          missingAttempts < MAX_MISSING_FORMULA_POLLS
+        ) {
+          missingAttempts += 1;
+          retryTimer = window.setTimeout(() => {
+            void fetchFormulation(mode);
+          }, MISSING_FORMULA_POLL_INTERVAL_MS);
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && !hasRenderableFormula(initialResult)) {
           setLoadState("error");
+        }
+      } finally {
+        inFlight = false;
+
+        if (productPollingPreference) {
+          setProductPollingPreference(null);
         }
       }
     }
 
-    void fetchFormulation();
+    if (!hasRenderableFormula(initialResult)) {
+      void fetchFormulation("until-formula");
+    } else if (productPollingPreference) {
+      void fetchFormulation("once");
+    }
 
     return () => {
       cancelled = true;
@@ -158,7 +173,7 @@ export function FormulationResults({
         window.clearTimeout(retryTimer);
       }
     };
-  }, [effectivePlanId, locale, productPollingPreference]);
+  }, [effectivePlanId, initialResult, locale, productPollingPreference]);
 
   useEffect(() => {
     if (!result) {
@@ -209,11 +224,7 @@ export function FormulationResults({
   }).format(new Date(result.generatedAt));
   const effectiveResultPlanId = result.planId || effectivePlanId;
   const isPreview = result.access === "preview";
-  const sectionStatuses = result.sectionStatuses ?? {
-    foods: (result.foodGuidance ?? []).length > 0 ? "ready" : "pending",
-    supplements: orderedIngredients.length > 0 ? "ready" : "pending",
-  };
-  const nutritionPending = sectionStatuses.supplements !== "ready";
+  const nutritionPending = orderedIngredients.length === 0;
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
   const productRecommendationOptions =
     productRecommendationOptionsForResult(result);
