@@ -28,6 +28,7 @@ export function getWelcomeCopy(locale: Locale): WelcomeCopy {
 type QuestionnaireWelcomeProps = Readonly<{
   locale: Locale;
   onStart: () => void;
+  onDevFastForward?: () => void;
 }>;
 
 /**
@@ -36,7 +37,8 @@ type QuestionnaireWelcomeProps = Readonly<{
  */
 export function QuestionnaireWelcome({
   locale,
-  onStart
+  onStart,
+  onDevFastForward
 }: QuestionnaireWelcomeProps) {
   const activeLang = welcomeKeyForLocale(locale);
   const copy = useMemo(() => getWelcomeCopy(locale), [locale]);
@@ -165,6 +167,16 @@ export function QuestionnaireWelcome({
               →
             </span>
           </button>
+          {onDevFastForward ? (
+            <button
+              type="button"
+              className="mn-quiz-welcome__dev"
+              data-testid="dev-fill-questionnaire"
+              onClick={onDevFastForward}
+            >
+              Fill questionnaire (DEV)
+            </button>
+          ) : null}
           <p className="mn-quiz-welcome__meta">{copy.meta}</p>
           <p className="mn-quiz-welcome__private">{copy.private}</p>
           {showZhNotice ? (

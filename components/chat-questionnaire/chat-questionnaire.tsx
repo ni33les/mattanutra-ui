@@ -7,6 +7,7 @@ import {
   computePrecision,
   createInitialState,
   deserializeState,
+  fastForwardQuestionnaire,
   getDefinition,
   getNextPrompt,
   isVisibleTurn,
@@ -767,6 +768,32 @@ export function ChatQuestionnaire({
       track
     ]
   );
+
+  async function fillAndFinish() {
+    if (finalizing.current || uiScreen === "calculating") {
+      return;
+    }
+
+    const initial =
+      state && (state.phase === "active" || state.phase === "intro")
+        ? state
+        : createInitialState({
+            locale,
+            channel: "web",
+            planId: returningPlanId ?? null
+          });
+    const filled = fastForwardQuestionnaire(initial);
+
+    if (!filled.ok) {
+      setProcessingError(filled.error || "Unable to fill questionnaire");
+      return;
+    }
+
+    finalizing.current = true;
+    setState(filled.state);
+    saveLocalState(locale, filled.state);
+    await finalize(filled.state);
+  }
 
   function beginFromWelcome() {
     trackBpmEvent("welcome_cta", {
@@ -1629,7 +1656,11 @@ export function ChatQuestionnaire({
 
   if (uiScreen === "welcome") {
     return (
-      <QuestionnaireWelcome locale={locale} onStart={beginFromWelcome} />
+      <QuestionnaireWelcome
+        locale={locale}
+        onStart={beginFromWelcome}
+        onDevFastForward={showDevShortcut ? fillAndFinish : undefined}
+      />
     );
   }
 
@@ -1787,10 +1818,15 @@ export function ChatQuestionnaire({
         </div>
       ) : null}
 
-      {showDevShortcut && process.env.NODE_ENV !== "production" ? (
-        <div style={{ padding: 8, fontSize: 12, opacity: 0.5 }}>
-          chat-q v14 · {state?.phase} · t{state?.turnIndex} · {uiScreen}
-        </div>
+      {showDevShortcut ? (
+        <button
+          type="button"
+          className="mn-chat-q__dev"
+          data-testid="dev-fill-questionnaire"
+          onClick={() => void fillAndFinish()}
+        >
+          Fill questionnaire (DEV)
+        </button>
       ) : null}
     </div>
   );

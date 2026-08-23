@@ -1075,6 +1075,104 @@ export function completeQuestionnaire(
   };
 }
 
+export function defaultAnswerForTurn(
+  definition: QuestionnaireDefinition,
+  turn: TurnDef
+): unknown {
+  if (turn.kind === "confirm") {
+    return true;
+  }
+
+  if (turn.kind === "gate") {
+    return "skip";
+  }
+
+  if (turn.kind === "sliders") {
+    const height = definition.meta.height.default;
+    const weight = definition.meta.weight.default;
+
+    return {
+      h: String(height),
+      height,
+      w: String(weight),
+      weight
+    };
+  }
+
+  if (turn.kind === "swatch") {
+    return definition.meta.skinValues[0] ?? "III";
+  }
+
+  if (turn.kind === "text") {
+    return turn.k === "firstName" ? "Alex" : "ok";
+  }
+
+  if (turn.kind === "fitness") {
+    return { hrv: "55", vo2: "42" };
+  }
+
+  if (turn.kind === "labs") {
+    return { vitd: "42" };
+  }
+
+  if (turn.kind === "multi") {
+    const excluded = new Set(turn.excl ?? []);
+    const first = turn.opts?.find((option) => !excluded.has(option.v));
+
+    return first ? [first.v] : ["none"];
+  }
+
+  return turn.opts?.[0]?.v ?? "";
+}
+
+export function fastForwardQuestionnaire(
+  state: QuestionnaireState
+): ApplyAnswerResult {
+  const started =
+    state.phase === "active"
+      ? { state: cloneState(state), events: [] as QuestionnaireEvent[] }
+      : startQuestionnaire(state);
+  let next = started.state;
+  const events: QuestionnaireEvent[] = [...started.events];
+  const definition = getDefinition(next);
+  const limit = definition.turns.length + 8;
+
+  for (let step = 0; step < limit && next.phase === "active"; step += 1) {
+    const turn = getTurn(definition, next.turnIndex);
+
+    if (!turn) {
+      const completed = completeQuestionnaire(next, events);
+
+      return { ok: true, events: completed.events, state: completed.state };
+    }
+
+    const applied = applyAnswer(next, turn.k, defaultAnswerForTurn(definition, turn));
+
+    if (!applied.ok) {
+      const skipped = skipTurn(next, turn.k);
+
+      if (!skipped.ok) {
+        return skipped;
+      }
+
+      next = skipped.state;
+      events.push(...skipped.events);
+      continue;
+    }
+
+    next = applied.state;
+    events.push(...applied.events);
+  }
+
+  if (next.phase !== "complete") {
+    const completed = completeQuestionnaire(next, events);
+
+    return { ok: true, events: completed.events, state: completed.state };
+  }
+
+  return { ok: true, events, state: next };
+}
+
 export function getNextPrompt(state: QuestionnaireState): NextPrompt {
   const definition = getDefinition(state);
   const precision = computePrecision(definition, state);

@@ -27,7 +27,7 @@ import {
   enforceRateLimit,
   publicRateLimits
 } from "@/lib/rate-limit";
-import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
+import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 export const runtime = "nodejs";
 
@@ -47,7 +47,7 @@ async function buildHealthScore(answers: unknown, locale: unknown) {
   const normalizedLocale = isLocale(locale) ? locale : "en";
 
   return computeHealthScore(answers, normalizedLocale, {
-    evaluatedIngredientCount: await getEvaluatedIngredientCatalogueCount()
+    evaluatedIngredientCount: cachedEvaluatedIngredientCatalogueCount()
   });
 }
 

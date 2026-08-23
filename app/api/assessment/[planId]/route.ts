@@ -30,7 +30,7 @@ import {
   enforceRateLimit,
   publicRateLimits
 } from "@/lib/rate-limit";
-import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
+import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 import {
   mergeInStorePharmacyAnswers,
   resolveCapturePharmacy
@@ -54,7 +54,7 @@ async function buildHealthScore(answers: unknown, locale: unknown) {
   const normalizedLocale = isLocale(locale) ? locale : "en";
 
   return computeHealthScore(answers, normalizedLocale, {
-    evaluatedIngredientCount: await getEvaluatedIngredientCatalogueCount()
+    evaluatedIngredientCount: cachedEvaluatedIngredientCatalogueCount()
   });
 }
 
@@ -145,7 +145,9 @@ export async function GET(
     );
   }
 
-  void enqueueDueScheduledActions();
+  if (!healthScoreView) {
+    void enqueueDueScheduledActions();
+  }
 
   if (healthScoreView && displayLocale) {
     const prefill = await getStoredAssessmentPrefill(planId);
@@ -157,7 +159,7 @@ export async function GET(
           firstName: firstNameFromAssessmentAnswers(prefill.answers),
           healthScore: refreshedHealthScore(
             prefill.answers,
-            await getEvaluatedIngredientCatalogueCount(),
+            cachedEvaluatedIngredientCatalogueCount(),
             displayLocale,
             prefill.healthScore,
             prefill.locale

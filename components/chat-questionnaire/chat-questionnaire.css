@@ -1365,6 +1365,25 @@
   transform: translateX(7px);
 }
 
+.mn-quiz-welcome__dev,
+.mn-chat-q__dev {
+  display: block;
+  margin: 12px auto 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cq-ink-soft, #5b6883);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.mn-chat-q__dev {
+  margin: 8px 0 0;
+  text-align: left;
+}
+
 @keyframes mn-quiz-cta-sheen {
   0%,
   15% {

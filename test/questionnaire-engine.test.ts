@@ -4,6 +4,7 @@ import {
   applyAnswer,
   computePrecision,
   createInitialState,
+  fastForwardQuestionnaire,
   getDefinition,
   getNextPrompt,
   halfwayPreviewCopy,
@@ -47,6 +48,22 @@ describe("questionnaire v6 definition", () => {
 });
 
 describe("questionnaire engine v6", () => {
+  it("fast-forwards a blank session to a completed HealthScore-ready state", () => {
+    const filled = fastForwardQuestionnaire(
+      createInitialState({ locale: "en", channel: "web" })
+    );
+
+    assert.equal(filled.ok, true);
+    if (!filled.ok) {
+      return;
+    }
+
+    assert.equal(filled.state.phase, "complete");
+    assert.equal(filled.state.answers.firstName, "Alex");
+    assert.equal(isQuestionnaireComplete(filled.state), true);
+    assert.ok(computePrecision(getDefinition(filled.state), filled.state) >= 8);
+  });
+
   it("starts on firstName after intro (no section intro yet)", () => {
     const started = startQuestionnaire(
       createInitialState({ locale: "en", channel: "web" })

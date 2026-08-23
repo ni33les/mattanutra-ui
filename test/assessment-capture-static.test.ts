@@ -50,6 +50,8 @@ describe("assessment capture stays off the pregeneration wait path", () => {
       /await enqueueHealthScoreAnalysisTask\(\{ planId \}\)/
     );
     assert.match(planRoute, /firstName: firstNameFromAssessmentAnswers\(prefill\.answers\)/);
+    assert.match(planRoute, /cachedEvaluatedIngredientCatalogueCount\(\)/);
+    assert.match(planRoute, /if \(!healthScoreView\) \{\s*void enqueueDueScheduledActions\(\)/);
   });
 
   it("puts the submitted first name on the existing healthscore and reveal heroes", () => {

@@ -1078,7 +1078,8 @@ export function AssessmentFlow({
 
 
   function fillRandomDefaultsAndFinalStep() {
-    setAnswers(buildRandomDevAnswers());
+    const filled = buildRandomDevAnswers();
+    setAnswers(filled);
     setProcessingError("");
     setShowHealthScore(false);
     clearProcessingStatus();
@@ -1086,6 +1087,7 @@ export function AssessmentFlow({
     captureInFlight.current = null;
     setSectionIndex(sections.length - 1);
     window.scrollTo({ behavior: "smooth", top: 0 });
+    void prepareHealthScoreGate(filled);
   }
 
   const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];

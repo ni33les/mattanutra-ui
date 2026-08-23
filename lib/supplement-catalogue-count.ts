@@ -5,6 +5,12 @@ const COUNT_TTL_MS = 10 * 60_000;
 let cached: { at: number; count: number } | null = null;
 let inflight: Promise<number> | null = null;
 
+export function cachedEvaluatedIngredientCatalogueCount() {
+  void getEvaluatedIngredientCatalogueCount();
+
+  return cached?.count ?? DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT;
+}
+
 export async function getEvaluatedIngredientCatalogueCount() {
   if (cached && Date.now() - cached.at < COUNT_TTL_MS) {
     return cached.count;

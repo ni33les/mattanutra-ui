@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { PublicNutritionShell } from "@/components/nutrition-flow/public-nutrition-shell";
 import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";
-import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
-import { checkDatabaseConnection } from "@/lib/db";
 import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import {
@@ -17,7 +15,7 @@ import {
 } from "@/lib/nutrition-paths";
 import { assessmentSkipsHealthScore } from "@/lib/pharmacy-in-store";
 import { localizedRouteMetadata } from "@/lib/seo";
-import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
+import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 type NutritionHealthScorePageProps = Readonly<{
   params: Promise<{
@@ -111,22 +109,6 @@ export default async function NutritionHealthScorePage({
   }
 
   const currentPath = nutritionHealthScorePath(locale, planId);
-  const databaseReady = await checkDatabaseConnection();
-
-  if (!databaseReady) {
-    return (
-      <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
-        <TitleBar
-          currentLocale={locale}
-          currentPath={currentPath}
-          title={dictionary.hero.eyebrow}
-        />
-        <ServiceIssue href={currentPath} locale={locale} />
-        <SiteFooter content={dictionary.footer} locale={locale} />
-      </main>
-    );
-  }
-
   const prefill = await getStoredAssessmentPrefill(planId);
 
   if (assessmentSkipsHealthScore(prefill?.answers)) {
@@ -139,7 +121,7 @@ export default async function NutritionHealthScorePage({
 
   const healthScore = refreshedHealthScore(
     prefill.answers ?? null,
-    await getEvaluatedIngredientCatalogueCount(),
+    cachedEvaluatedIngredientCatalogueCount(),
     locale,
     prefill.healthScore,
     prefill.locale
