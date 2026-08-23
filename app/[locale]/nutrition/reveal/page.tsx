@@ -84,25 +84,25 @@ export default async function NutritionRevealPage({
   }
 
   const currentPath = nutritionRevealPath(locale, planId);
-  const databaseReady = await checkDatabaseConnection();
-
-  if (!databaseReady) {
-    return (
-      <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
-        <TitleBar
-          currentLocale={locale}
-          currentPath={currentPath}
-          title={dictionary.hero.eyebrow}
-        />
-        <ServiceIssue href={currentPath} locale={locale} />
-        <SiteFooter content={dictionary.footer} locale={locale} />
-      </main>
-    );
-  }
-
   const assessment = await getStoredAssessmentPrefill(planId);
 
   if (!assessment) {
+    const databaseReady = await checkDatabaseConnection();
+
+    if (!databaseReady) {
+      return (
+        <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+          <TitleBar
+            currentLocale={locale}
+            currentPath={currentPath}
+            title={dictionary.hero.eyebrow}
+          />
+          <ServiceIssue href={currentPath} locale={locale} />
+          <SiteFooter content={dictionary.footer} locale={locale} />
+        </main>
+      );
+    }
+
     notFound();
   }
 
@@ -110,7 +110,7 @@ export default async function NutritionRevealPage({
     redirect(nutritionHealthScorePath(locale, planId));
   }
 
-  await ensureFreshProductRecommendationsForReveal(
+  void ensureFreshProductRecommendationsForReveal(
     planId,
     initialStackPreference
   ).catch((error) => {
@@ -121,6 +121,7 @@ export default async function NutritionRevealPage({
   });
 
   const initialResult = await getStoredFormulationResult(planId, {
+    detail: "page",
     locale,
     mode: "full"
   });

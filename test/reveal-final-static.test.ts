@@ -96,7 +96,7 @@ describe("final reveal UX", () => {
       "const assessment = await getStoredAssessmentPrefill(planId);",
     );
     const refreshStart = route.indexOf(
-      "await ensureFreshProductRecommendationsForReveal",
+      "void ensureFreshProductRecommendationsForReveal",
     );
     const gate = route.slice(gateStart, refreshStart);
 

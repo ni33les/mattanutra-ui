@@ -119,8 +119,9 @@ describe("product recommendation freshness", () => {
     assert.match(revealPage, /export const revalidate = 0/);
     assert.match(
       revealPage,
-      /ensureFreshProductRecommendationsForReveal\([\s\S]*planId,[\s\S]*initialStackPreference/,
+      /void ensureFreshProductRecommendationsForReveal\([\s\S]*planId,[\s\S]*initialStackPreference/,
     );
+    assert.match(revealPage, /detail:\s*"page"/);
     assert.ok(
       revealPage.indexOf("ensureFreshProductRecommendationsForReveal") <
         revealPage.indexOf("getStoredFormulationResult(planId"),

@@ -1459,6 +1459,7 @@ export async function getStoredAssessmentPrefill(planId: string) {
 export async function getStoredFormulationResult(
   planId: string,
   options: Readonly<{
+    detail?: "full" | "page";
     locale?: string | null;
     mode?: "full" | "preview";
   }> = {}
@@ -1470,6 +1471,7 @@ export async function getStoredFormulationResult(
   }
 
   const mode = options.mode ?? "full";
+  const includeProductPayloads = options.detail !== "page";
   const resultLocale = normalizeLocale(options.locale);
   const exampleModelPattern = "%:example";
   const formulationModeFilter =
@@ -1602,6 +1604,7 @@ export async function getStoredFormulationResult(
         generated_at desc
       limit 1
     ) product_recommendation_run on true
+    ${includeProductPayloads ? sql`
     left join lateral (
       select coalesce(
         jsonb_agg(
@@ -1924,6 +1927,14 @@ export async function getStoredFormulationResult(
           )
       ) option_items on true
     ) product_recommendation_options_payload on true
+    ` : sql`
+    left join lateral (
+      select '[]'::jsonb as recommendations
+    ) product_recommendation_items_payload on true
+    left join lateral (
+      select '[]'::jsonb as options
+    ) product_recommendation_options_payload on true
+    `}
     left join lateral (
       select created_at, payload, status
       from tasks
@@ -1946,6 +1957,7 @@ export async function getStoredFormulationResult(
       order by created_at desc
       limit 1
     ) food_gap_support_task on true
+    ${includeProductPayloads ? sql`
     left join lateral (
       select count(*)::int as active_supplement_count
       from public.supplements
@@ -1955,6 +1967,14 @@ export async function getStoredFormulationResult(
       from public.products
       where status = 'approved'
     ) product_catalogue on true
+    ` : sql`
+    left join lateral (
+      select 0::int as active_supplement_count
+    ) supplement_catalogue on true
+    left join lateral (
+      select 0::int as approved_product_count
+    ) product_catalogue on true
+    `}
     where assessments.plan_id = ${planId}::uuid
       ${assessmentAccessFilter}
     limit 1
