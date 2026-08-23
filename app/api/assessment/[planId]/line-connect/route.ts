@@ -57,15 +57,18 @@ export async function POST(
   const body = objectValue(await request.json().catch(() => ({})));
 
   try {
+    const sqlStartedAt = Date.now();
     const token = await createCustomerLineConnectToken({
       planId,
       retailCustomerOrderId: text(body.retailCustomerOrderId),
       source: text(body.source) || "customer_line_cta"
     });
+    const sqlMs = Date.now() - sqlStartedAt;
     const command = `MN ${token.code}`;
 
     console.info("[line-connect:post]", {
       planId,
+      sqlMs,
       totalMs: Date.now() - startedAt
     });
 

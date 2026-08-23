@@ -168,7 +168,14 @@ describe("consistency r5 regression guards", () => {
     const tokenStart = lineToken.indexOf(
       "export async function createCustomerLineConnectToken"
     );
-    const token = lineToken.slice(tokenStart, tokenStart + 1800);
+    const tokenEnd = lineToken.indexOf(
+      "export async function consumeCustomerLineConnectCode",
+      tokenStart
+    );
+    const token = lineToken.slice(
+      tokenStart,
+      tokenEnd > tokenStart ? tokenEnd : tokenStart + 4000
+    );
 
     assert.match(listen, /const sql = getSql\(\)/);
     assert.doesNotMatch(listen, /getWorkerSql/);
@@ -182,9 +189,11 @@ describe("consistency r5 regression guards", () => {
       /warmDevPlanHotPath/
     );
     assert.match(startPlatform, /PLATFORM_WORKER_START_DELAY_MS \|\| 30_000/);
-    assert.doesNotMatch(
-      token.slice(0, token.indexOf("from public.assessments")),
-      /ensureCommunicationSchema/
-    );
+    assert.doesNotMatch(token, /ensureCommunicationSchema/);
+    assert.doesNotMatch(token, /ensurePlanIdentity/);
+    assert.match(token, /insert into public\.customer_line_connect_tokens/);
+    assert.match(token, /from public\.assessments/);
+    assert.match(token, /void writeBpmEvent\(/);
+    assert.doesNotMatch(token, /await writeBpmEvent\(/);
   });
 });

@@ -522,36 +522,15 @@ export async function createCustomerLineConnectToken(input: Readonly<{
     90 * 24 * 60,
     Math.max(1, Math.round(Number(input.expiresInMinutes) || 15))
   );
-
-  const assessmentRows = await sql<Array<{ plan_id: string }>>`
-    select plan_id::text
-    from public.assessments
-    where plan_id = ${input.planId}::uuid
-    limit 1
-  `;
-
-  if (!assessmentRows[0]) {
-    throw new Error("Plan not found");
-  }
-
-  const orderRows = orderId
-    ? await sql<Array<{ id: string }>>`
-        select id::text
-        from public.retail_customer_orders
-        where id = ${orderId}::uuid
-        limit 1
-      `
-    : [];
-  const retailCustomerOrderId = orderRows[0]?.id ?? null;
   const code = newLineConnectCode();
   const tokenHash = hashLineConnectCode(code);
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
-
-  await ensurePlanIdentity(sql, input.planId);
+  const tokenId = randomUUID();
 
   const rows = await sql<Array<{
-    id: string;
     expires_at: Date | string;
+    id: string;
+    retail_customer_order_id: string | null;
   }>>`
     insert into public.customer_line_connect_tokens (
       id,
@@ -564,25 +543,39 @@ export async function createCustomerLineConnectToken(input: Readonly<{
       created_at,
       updated_at
     )
-    values (
-      ${randomUUID()}::uuid,
-      ${input.planId}::uuid,
-      ${retailCustomerOrderId}::uuid,
+    select
+      ${tokenId}::uuid,
+      assessments.plan_id,
+      (
+        select orders.id
+        from public.retail_customer_orders orders
+        where orders.id = ${orderId}::uuid
+        limit 1
+      ),
       ${tokenHash},
       'active',
       ${expiresAt},
-      ${sql.json(toJsonValue({
-        expiresInMinutes,
-        retailCustomerOrderId,
-        source
-      }))},
+      ${sql.json(
+        toJsonValue({
+          expiresInMinutes,
+          retailCustomerOrderId: orderId,
+          source
+        })
+      )},
       now(),
       now()
-    )
-    returning id::text, expires_at
+    from public.assessments
+    where assessments.plan_id = ${input.planId}::uuid
+    limit 1
+    returning id::text, expires_at, retail_customer_order_id::text
   `;
+  const created = rows[0];
 
-  await writeBpmEvent({
+  if (!created) {
+    throw new Error("Plan not found");
+  }
+
+  void writeBpmEvent({
     actorType: "visitor",
     emittedBy: "customer_line_connect",
     eventName: "customer_line_connect_code_created",
@@ -590,19 +583,19 @@ export async function createCustomerLineConnectToken(input: Readonly<{
     eventType: "chat",
     planId: input.planId,
     properties: {
-      retailCustomerOrderId,
+      retailCustomerOrderId: created.retail_customer_order_id,
       source,
-      tokenId: rows[0]?.id ?? null
+      tokenId: created.id
     },
-    severity: "low",
-    sql
+    severity: "low"
   });
 
   return {
     code,
-    expiresAt: isoDate(rows[0]?.expires_at ?? expiresAt) ?? expiresAt.toISOString(),
-    id: rows[0]?.id ?? null,
-    retailCustomerOrderId
+    expiresAt:
+      isoDate(created.expires_at) ?? expiresAt.toISOString(),
+    id: created.id,
+    retailCustomerOrderId: created.retail_customer_order_id
   };
 }
 
