@@ -387,14 +387,21 @@ async function main() {
     return;
   }
 
-  console.log(`[platform] worker API base URL: ${workerApiBaseUrl}`);
-  const credentialsOk = await checkWorkerCredentials();
+  const workerStartDelayMs = Number(
+    process.env.PLATFORM_WORKER_START_DELAY_MS || 30_000,
+  );
 
-  if (!credentialsOk) {
-    return;
-  }
+  console.log(
+    `[platform] worker API base URL: ${workerApiBaseUrl}; starting workers in ${workerStartDelayMs}ms`,
+  );
 
-  startWorker();
+  setTimeout(() => {
+    void checkWorkerCredentials().then((credentialsOk) => {
+      if (credentialsOk && !shuttingDown) {
+        startWorker();
+      }
+    });
+  }, Number.isFinite(workerStartDelayMs) ? Math.max(0, workerStartDelayMs) : 30_000);
 }
 
 process.on("SIGTERM", () => {

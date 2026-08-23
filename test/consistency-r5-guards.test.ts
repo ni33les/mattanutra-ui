@@ -169,6 +169,7 @@ describe("consistency r5 regression guards", () => {
       startPlatform.slice(startPlatform.indexOf("async function main")),
       /warmDevPlanHotPath/
     );
+    assert.match(startPlatform, /PLATFORM_WORKER_START_DELAY_MS \|\| 30_000/);
     assert.doesNotMatch(
       token.slice(0, token.indexOf("from public.assessments")),
       /ensureCommunicationSchema/
