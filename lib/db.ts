@@ -123,6 +123,10 @@ function dbListenApplicationName() {
   return process.env.DB_LISTEN_APPLICATION_NAME?.trim() || "mattanutra-listen";
 }
 
+const globalListenDb = globalThis as typeof globalThis & {
+  mattanutraListenDatabaseName?: string;
+};
+
 function listenConnectionUrl() {
   const explicit = process.env.DB_LISTEN_URL?.trim();
 
@@ -144,6 +148,11 @@ function listenConnectionUrl() {
       url.port === "25061"
     ) {
       url.port = "25060";
+
+      if (globalListenDb.mattanutraListenDatabaseName) {
+        url.pathname = `/${globalListenDb.mattanutraListenDatabaseName}`;
+      }
+
       return url.toString();
     }
   } catch {
@@ -151,6 +160,29 @@ function listenConnectionUrl() {
   }
 
   return connection;
+}
+
+export async function prepareListenConnection() {
+  if (process.env.DB_LISTEN_URL?.trim() || globalListenDb.mattanutraListenDatabaseName) {
+    return;
+  }
+
+  const sql = getWorkerSql() ?? getSql();
+
+  if (!sql) {
+    return;
+  }
+
+  try {
+    const rows = await sql<Array<{ db: string }>>`select current_database() as db`;
+    const databaseName = rows[0]?.db?.trim();
+
+    if (databaseName) {
+      globalListenDb.mattanutraListenDatabaseName = databaseName;
+    }
+  } catch {
+    return;
+  }
 }
 
 function dbTimeoutMs(envName: string, fallback: number) {

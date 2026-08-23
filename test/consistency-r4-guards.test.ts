@@ -42,6 +42,8 @@ describe("consistency r4 regression guards", () => {
     assert.match(db, /max: 1/);
     assert.match(db, /idle_timeout: 0/);
     assert.match(db, /url\.port = "25060"/);
+    assert.match(db, /current_database\(\) as db/);
+    assert.match(wakeup, /prepareListenConnection\(\)/);
     assert.doesNotMatch(
       wakeup,
       /getListenSql[\s\S]{0,200}reserveNextTask|getStoredFormulationResult/

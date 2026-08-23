@@ -1,6 +1,12 @@
 import type postgres from "postgres";
 import { createLogger } from "@/lib/logger";
-import { getListenSql, getSql, getWorkerSql, onListenSqlClose } from "@/lib/db";
+import {
+  getListenSql,
+  getSql,
+  getWorkerSql,
+  onListenSqlClose,
+  prepareListenConnection
+} from "@/lib/db";
 
 export const TASK_QUEUE_CHANNEL = "mattanutra_tasks";
 
@@ -75,6 +81,7 @@ export function waitForTaskQueueChange(
 }
 
 export async function subscribeTaskQueue() {
+  await prepareListenConnection();
   const sql = getListenSql();
 
   if (!sql) {
