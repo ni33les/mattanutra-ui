@@ -1738,7 +1738,7 @@ async function claimQueuedTaskById(
 export async function listQueuedTaskHeads() {
   const sql = getRequiredSql();
   const rows = await sql<Array<{ task_id: string; task_type: string }>>`
-    select distinct on (task_type)
+    select
       id::text as task_id,
       task_type
     from public.tasks
@@ -1747,10 +1747,10 @@ export async function listQueuedTaskHeads() {
       and scheduled_for <= now()
       and attempts < max_attempts
     order by
-      task_type,
       coalesce(priority_score, business_value) desc,
       scheduled_for asc,
       created_at asc
+    limit 50
   `;
 
   return rows.map((row) => ({

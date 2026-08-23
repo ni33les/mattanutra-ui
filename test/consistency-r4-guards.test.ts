@@ -62,10 +62,11 @@ describe("consistency r4 regression guards", () => {
     assert.match(runner, /waitForTaskQueueWork/);
     assert.match(runner, /client\.queued\(\)/);
     assert.match(runner, /startQueuedPeekLoop/);
-    assert.match(runner, /taskId: work\.taskId/);
+    assert.match(runner, /claimNext/);
+    assert.match(runner, /client\.queued\(\)/);
     assert.match(
       runner,
-      /if \(!work\?\.taskId\) \{[\s\S]*continue/
+      /if \(!work\) \{\s*continue/
     );
   });
 

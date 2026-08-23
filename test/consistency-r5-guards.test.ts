@@ -32,8 +32,9 @@ describe("consistency r5 regression guards", () => {
     const start = service.indexOf("export async function listQueuedTaskHeads");
     const peek = service.slice(start, start + 900);
 
-    assert.match(peek, /select distinct on \(task_type\)/);
+    assert.match(peek, /limit 50/);
     assert.doesNotMatch(peek, /for update/i);
+    assert.doesNotMatch(peek, /distinct on/i);
     assert.match(route, /requireWorkerAccess/);
     assert.match(route, /listQueuedTaskHeads\(\)/);
   });
@@ -58,6 +59,7 @@ describe("consistency r5 regression guards", () => {
   it("fans out from a shared HTTP peek so remote runners do not need Postgres", async () => {
     const runner = await readFile("workers/runner.ts", "utf8");
 
+    assert.match(runner, /drainQueue/);
     assert.match(runner, /startQueuedPeekLoop/);
     assert.match(runner, /client\.queued\(\)/);
     assert.match(runner, /signalTaskQueue/);

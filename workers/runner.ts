@@ -405,6 +405,49 @@ async function runAgentLoop(
 
     let pollingBackoffMs = 1_000;
 
+    const claimNext = async (preferredTaskId?: string) => {
+      const ids: string[] = [];
+
+      if (preferredTaskId) {
+        ids.push(preferredTaskId);
+      }
+
+      try {
+        const queued = await client.queued();
+        for (const task of queued.tasks ?? []) {
+          if (
+            task.taskId &&
+            agentConfig.taskTypes.includes(task.taskType) &&
+            !ids.includes(task.taskId)
+          ) {
+            ids.push(task.taskId);
+          }
+        }
+      } catch (error) {
+        if (!preferredTaskId) {
+          throw error;
+        }
+      }
+
+      for (const taskId of ids) {
+        const reserved = await client.reserve({
+          agent,
+          leaseSeconds,
+          taskId,
+          taskTypes: agentConfig.taskTypes,
+          workerSessionId,
+        });
+
+        if (reserved.task && reserved.reservationId) {
+          return reserved;
+        }
+      }
+
+      return { task: null, reservationId: undefined };
+    };
+
+    let drainQueue = false;
+
     while (!shuttingDown) {
       if (staleHeartbeatError) {
         throw staleHeartbeatError;
@@ -415,24 +458,22 @@ async function runAgentLoop(
       try {
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
-        const work = await waitForTaskQueueWork(
-          waitSeconds * 1_000 + Math.floor(Math.random() * 8_000),
-          agentConfig.taskTypes,
-        );
 
-        if (!work?.taskId) {
-          heartbeatStatus = "idle";
-          heartbeatTaskId = null;
-          continue;
+        if (!drainQueue) {
+          const work = await waitForTaskQueueWork(
+            waitSeconds * 1_000 + Math.floor(Math.random() * 8_000),
+            agentConfig.taskTypes,
+          );
+
+          if (!work) {
+            continue;
+          }
+
+          reserved = await claimNext(work.taskId);
+        } else {
+          reserved = await claimNext();
         }
 
-        reserved = await client.reserve({
-          agent,
-          leaseSeconds,
-          taskId: work.taskId,
-          taskTypes: agentConfig.taskTypes,
-          workerSessionId,
-        });
         pollingBackoffMs = 1_000;
       } catch (error) {
         heartbeatStatus = "idle";
@@ -458,8 +499,11 @@ async function runAgentLoop(
       if (!reserved.task || !reserved.reservationId) {
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
+        drainQueue = false;
         continue;
       }
+
+      drainQueue = true;
 
       const reservationId = reserved.reservationId;
       const task = reserved.task;
