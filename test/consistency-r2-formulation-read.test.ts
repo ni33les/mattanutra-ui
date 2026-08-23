@@ -37,7 +37,8 @@ describe("consistency r2 formulation read", () => {
       "utf8"
     );
 
-    assert.match(reveal, /detail:\s*"page"/);
+    assert.doesNotMatch(reveal, /getStoredFormulationResult/);
+    assert.doesNotMatch(reveal, /detail:\s*"page"/);
     assert.doesNotMatch(reveal, /await ensureFreshProductRecommendationsForReveal/);
     assert.match(
       reveal,

@@ -16,6 +16,36 @@ import type { ProductCandidate } from "@/lib/product-recommendation-types";
 
 const LIVE_TTL_MS = 10 * 60_000;
 const LIVE_LOAD_WAIT_MS = 8_000;
+const WARM_FAILURE_BACKOFF_MS = 5 * 60_000;
+
+let lastWarmFailureAt = 0;
+
+function isStatementTimeout(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return /statement timeout/i.test(String(error));
+  }
+
+  const code = "code" in error ? String(error.code) : "";
+  const message = error instanceof Error ? error.message : String(error);
+
+  return code === "57014" || /statement timeout|57014/i.test(message);
+}
+
+function noteWarmFailure(error: unknown) {
+  if (isStatementTimeout(error)) {
+    lastWarmFailureAt = Date.now();
+  }
+}
+
+function warmFailureIsCoolingDown() {
+  return Date.now() - lastWarmFailureAt < WARM_FAILURE_BACKOFF_MS;
+}
+
+async function catalogueSql() {
+  const { getSql, getWorkerSql } = await import("@/lib/db");
+
+  return getWorkerSql() ?? getSql();
+}
 
 const liveCache = new Map<string, { at: number; snapshot: CatalogueSnapshot }>();
 const liveInflight = new Map<string, Promise<CatalogueSnapshot>>();
@@ -179,9 +209,11 @@ function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | nul
 export async function loadLiveRetailSnapshot(
   countryCode: string
 ): Promise<CatalogueSnapshot> {
+  const sql = await catalogueSql();
   const [sets] = await Promise.all([
     getLiveSaleEligibleRetailerCandidateSets({
-      countryCode: countryCode.trim().toUpperCase()
+      countryCode: countryCode.trim().toUpperCase(),
+      sql: sql ?? undefined
     }),
     refreshAdminSafetyCeilings()
   ]);
@@ -249,6 +281,10 @@ function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
 
       return snapshot;
     })
+    .catch((error) => {
+      noteWarmFailure(error);
+      throw error;
+    })
     .finally(() => {
       liveInflight.delete(code);
     });
@@ -304,7 +340,16 @@ export async function warmLiveRetailSnapshot(
     return hit.snapshot;
   }
 
-  return startLiveLoad(code);
+  if (warmFailureIsCoolingDown()) {
+    return hit?.snapshot ?? loadingSnapshot(code);
+  }
+
+  try {
+    return await startLiveLoad(code);
+  } catch (error) {
+    noteWarmFailure(error);
+    throw error;
+  }
 }
 
 export function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {

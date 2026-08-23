@@ -374,7 +374,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
   const retailProductIds = [...new Set(retailRows.map((row) => row.product_id))];
   const [rows, supplementAvailability, customerPriceMarginPercent] =
     await Promise.all([
-      loadProductRows(null, { productIds: retailProductIds }),
+      loadProductRows(null, { productIds: retailProductIds, sql }),
       getSupplementEffectiveAvailability(sql, countryCode),
       getCustomerPriceMarginPercent({ sql })
     ]);

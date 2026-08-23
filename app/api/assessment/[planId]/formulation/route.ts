@@ -20,13 +20,23 @@ function jsonNoStore(body: unknown, init: ResponseInit = {}) {
 }
 
 export async function GET(request: Request, { params }: FormulationRouteProps) {
+  const startedAt = Date.now();
   const { planId } = await params;
   const url = new URL(request.url);
   const locale = url.searchParams.get("locale");
   const includeProducts = url.searchParams.get("products") === "1";
+  const sqlStartedAt = Date.now();
   const stored = await getStoredFormulationRead(planId, {
     includeProducts,
     locale
+  });
+  const sqlMs = Date.now() - sqlStartedAt;
+  console.info("[formulation:get]", {
+    includeProducts,
+    planId,
+    sqlMs,
+    status: stored?.status ?? "missing",
+    totalMs: Date.now() - startedAt
   });
 
   if (!stored) {

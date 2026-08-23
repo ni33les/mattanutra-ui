@@ -19,7 +19,12 @@ describe("plan keep-warm does not starve first-create A2", () => {
     assert.match(dispatcher, /withLivePlanRequest\(\(\) =>/);
     assert.match(
       warm,
-      /setInterval\(\(\) => \{\s*void warmAgenticCatalogue\(environment\)/,
+      /mattanutraCatalogueWarmInflight/,
+      "interval keep-warm must skip while a catalogue warm is already in flight"
+    );
+    assert.match(
+      warm,
+      /warmAgenticCatalogue\(\s*environment/,
       "interval keep-warm must not run a second 8-target plan against the live pool"
     );
     assert.doesNotMatch(

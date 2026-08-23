@@ -52,8 +52,8 @@ export function cannotDeliverMessage(
 
 async function loadDeliverableMarkets(): Promise<DeliverableMarket[]> {
   try {
-    const { getSql } = await import("@/lib/db");
-    const sql = getSql();
+    const { getSql, getWorkerSql } = await import("@/lib/db");
+    const sql = getWorkerSql() ?? getSql();
 
     if (!sql) {
       return [...FALLBACK_MARKETS];

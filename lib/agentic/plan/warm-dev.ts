@@ -7,6 +7,7 @@ const globalWarm = globalThis as typeof globalThis & {
   mattanutraLivePlanCount?: number;
   mattanutraPlanKeepWarm?: ReturnType<typeof setInterval>;
   mattanutraPlanWarming?: boolean;
+  mattanutraCatalogueWarmInflight?: Promise<unknown> | null;
 };
 
 export async function withLivePlanRequest<T>(work: () => Promise<T>) {
@@ -162,9 +163,19 @@ export async function keepPlanPathWarm(environment: AgenticEnvironment) {
   }
 
   const timer = setInterval(() => {
-    void warmAgenticCatalogue(environment).catch((error) => {
-      console.warn("Unable to keep plan path warm", error);
-    });
+    if (globalWarm.mattanutraCatalogueWarmInflight) {
+      return;
+    }
+
+    globalWarm.mattanutraCatalogueWarmInflight = warmAgenticCatalogue(
+      environment
+    )
+      .catch((error) => {
+        console.warn("Unable to keep plan path warm", error);
+      })
+      .finally(() => {
+        globalWarm.mattanutraCatalogueWarmInflight = null;
+      });
   }, KEEP_WARM_MS);
   timer.unref?.();
   globalWarm.mattanutraPlanKeepWarm = timer;

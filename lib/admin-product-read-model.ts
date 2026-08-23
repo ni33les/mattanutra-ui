@@ -19,6 +19,7 @@ import {
   productCountryCodesFromDb
 } from "./admin-product-helpers.ts";
 import { getSql } from "@/lib/db";
+import type postgres from "postgres";
 import type { ProductDbRow } from "./admin-product-types.ts";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import {
@@ -36,13 +37,14 @@ import {
 type LoadProductRowsOptions = Readonly<{
   brandId?: string | null;
   productIds?: readonly string[] | null;
+  sql?: postgres.Sql | postgres.TransactionSql | null;
 }>;
 
 export async function loadProductRows(
   productId?: string | null,
   options: LoadProductRowsOptions = {}
 ) {
-  const sql = getSql();
+  const sql = options.sql ?? getSql();
 
   if (!sql) {
     return null;

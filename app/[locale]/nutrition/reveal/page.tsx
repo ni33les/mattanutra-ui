@@ -7,7 +7,6 @@ import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import {
   getStoredAssessmentPrefill,
-  getStoredFormulationResult,
   isUuid
 } from "@/lib/assessment-store";
 import { checkDatabaseConnection } from "@/lib/db";
@@ -110,11 +109,6 @@ export default async function NutritionRevealPage({
     redirect(nutritionHealthScorePath(locale, planId));
   }
 
-  const initialResultPromise = getStoredFormulationResult(planId, {
-    detail: "page",
-    locale,
-    mode: "full"
-  });
   setTimeout(() => {
     void ensureFreshProductRecommendationsForReveal(
       planId,
@@ -127,8 +121,6 @@ export default async function NutritionRevealPage({
     });
   }, 0);
 
-  const initialResult = await initialResultPromise;
-
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
@@ -138,7 +130,6 @@ export default async function NutritionRevealPage({
       />
       <FormulationResults
         initialStackPreference={initialStackPreference}
-        initialResult={initialResult}
         locale={locale}
         planId={planId}
       />

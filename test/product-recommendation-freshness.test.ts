@@ -121,12 +121,12 @@ describe("product recommendation freshness", () => {
       revealPage,
       /setTimeout\(\(\) => \{[\s\S]*ensureFreshProductRecommendationsForReveal\([\s\S]*planId,[\s\S]*initialStackPreference/,
     );
-    assert.match(revealPage, /detail:\s*"page"/);
+    assert.doesNotMatch(revealPage, /getStoredFormulationResult/);
+    assert.doesNotMatch(revealPage, /detail:\s*"page"/);
     assert.doesNotMatch(revealPage, /await ensureFreshProductRecommendationsForReveal/);
-    assert.ok(
-      revealPage.indexOf("const initialResultPromise = getStoredFormulationResult") <
-        revealPage.indexOf("setTimeout(() => {"),
-      "reveal HTML must start the formula read before scheduling catalogue freshness",
+    assert.match(
+      revealPage,
+      /setTimeout\(\(\) => \{[\s\S]*ensureFreshProductRecommendationsForReveal/,
     );
     assert.match(formulationRoute, /Cache-Control", "no-store, max-age=0"/);
     assert.match(formulationRoute, /jsonNoStore\(storedResult\)/);

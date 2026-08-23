@@ -1644,8 +1644,6 @@ export async function getStoredAssessmentPrefill(planId: string) {
     return null;
   }
 
-  await ensureAssessmentSchema();
-
   const rows = await sql`
     select
       answers,
