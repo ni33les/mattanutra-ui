@@ -5,6 +5,14 @@ export async function register() {
 
   const { keepDatabaseWarm } = await import("./lib/db");
   await keepDatabaseWarm();
+  void import("./lib/task-wakeup")
+    .then((mod) => mod.subscribeTaskQueue())
+    .catch((error) => {
+      console.warn(
+        "Unable to LISTEN for task queue notifies",
+        error instanceof Error ? error.message : error
+      );
+    });
 
   try {
     const { resolveAgenticEnvironment } = await import("./lib/agentic/config");

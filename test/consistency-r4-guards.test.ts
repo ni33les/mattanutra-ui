@@ -34,8 +34,9 @@ describe("consistency r4 regression guards", () => {
 
     assert.match(wakeup, /TASK_QUEUE_CHANNEL = "mattanutra_tasks"/);
     assert.match(wakeup, /pg_notify\(\$\{TASK_QUEUE_CHANNEL\}/);
-    assert.doesNotMatch(wakeup, /sql\.listen\(/);
-    assert.doesNotMatch(wakeup, /getListenSql\(/);
+    assert.match(wakeup, /subscribeTaskQueue/);
+    assert.match(wakeup, /pingRegisteredWorkerWakes/);
+    assert.match(wakeup, /sql\.listen\(/);
     assert.match(db, /export function getListenSql\(/);
   });
 

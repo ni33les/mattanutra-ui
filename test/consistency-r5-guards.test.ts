@@ -63,7 +63,22 @@ describe("consistency r5 regression guards", () => {
     assert.match(runner, /signalTaskQueue/);
     assert.match(runner, /WORKER_API_BASE_URL/);
     assert.match(runner, /from "\.\.\/lib\/task-queue-signal\.ts"/);
+    assert.match(runner, /startWorkerWakeServer/);
+    assert.match(runner, /wakeUrl/);
     assert.doesNotMatch(runner, /from "\.\.\/lib\/db/);
-    assert.doesNotMatch(runner, /task-wakeup|subscribeTaskQueue|getListenSql/);
+    assert.doesNotMatch(runner, /subscribeTaskQueue|getListenSql/);
+  });
+
+  it("listens on the platform and HTTP-pings registered worker wake URLs", async () => {
+    const [instrumentation, wake, wakeup] = await Promise.all([
+      readFile("instrumentation.ts", "utf8"),
+      readFile("lib/worker-wake.ts", "utf8"),
+      readFile("lib/task-wakeup.ts", "utf8")
+    ]);
+
+    assert.match(instrumentation, /subscribeTaskQueue\(\)/);
+    assert.match(wake, /metadata ->> 'wakeUrl'/);
+    assert.match(wake, /method: "POST"/);
+    assert.match(wakeup, /pingRegisteredWorkerWakes/);
   });
 });

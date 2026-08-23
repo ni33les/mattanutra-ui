@@ -13,6 +13,7 @@ import {
   signalTaskQueue,
   waitForTaskQueueWork
 } from "../lib/task-queue-signal.ts";
+import { startWorkerWakeServer } from "./wake-server.ts";
 import {
   isWorkerAuthConfigurationError,
   WorkerApiClient,
@@ -52,6 +53,8 @@ const TASK_LEASE_ABORT_SAFETY_MS = 120_000;
 const WORKER_RUN_ID = randomUUID();
 const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES;
 let stopQueuedPeek: (() => void) | null = null;
+let stopWakeServer: (() => void) | null = null;
+let workerWakeUrl: string | null = null;
 
 type ActiveSession = Readonly<{
   agentId: string;
@@ -328,6 +331,7 @@ async function runAgentLoop(
           runId: WORKER_RUN_ID,
           slotCount,
           slotIndex,
+          ...(workerWakeUrl ? { wakeUrl: workerWakeUrl } : {}),
         },
         workerVersion: workerVersion(),
       }),
@@ -731,12 +735,24 @@ async function shutdown() {
 
   shuttingDown = true;
   stopQueuedPeek?.();
+  stopWakeServer?.();
   await markSessionsOffline();
   process.exit(0);
 }
 
 async function runWorker(mode: WorkerMode) {
   startTaskMaintenanceLoop();
+
+  try {
+    const wake = await startWorkerWakeServer();
+    workerWakeUrl = wake.url;
+    stopWakeServer = wake.close;
+  } catch (error) {
+    console.warn(
+      "[worker] wake server failed; 24s HTTP peek still runs",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   const modes = workerProfileModesForRun(mode);
   const peekConfig = modes
