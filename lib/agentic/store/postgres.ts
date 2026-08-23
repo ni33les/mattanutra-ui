@@ -423,6 +423,18 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
         where id = ${record.id}::uuid
       `;
     },
+    async updateIdempotency(record) {
+      await sql`
+        update public.agentic_idempotency_records set
+          request_hash = ${record.requestHash},
+          resource_ids = ${asJson(record.resourceIds)},
+          response_json = ${asJson(JSON.parse(record.responseJson))},
+          expires_at = ${record.expiresAt}::timestamptz
+        where operation = ${record.operation}
+          and owner_scope = ${record.ownerScope}
+          and idempotency_key = ${record.key}
+      `;
+    },
     async updateOrder(record) {
       await sql`
         update public.agentic_orders set
@@ -449,6 +461,18 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
           current_revision = ${record.currentRevision},
           updated_at = ${record.updatedAt}::timestamptz
         where id = ${record.id}::uuid
+      `;
+    },
+    async updatePlanRevision(record) {
+      await sql`
+        update public.agentic_plan_revisions set
+          status = ${record.status},
+          request_snapshot = ${asJson(record.requestSnapshot)},
+          result = ${asJson(record.result)},
+          catalogue_version = ${record.catalogueVersion},
+          guidance_rules_version = ${record.guidanceRulesVersion},
+          availability_as_of = ${record.availabilityAsOf}::timestamptz
+        where plan_id = ${record.planId}::uuid and revision = ${record.revision}
       `;
     },
     async updateSupportCase(record) {

@@ -86,6 +86,45 @@ export async function executeTool(input: Readonly<{
     return replay.response;
   }
 
+  const peeked = await resolveCapability({
+    action: "plan.execute",
+    config: input.config,
+    handle: input.planHandle,
+    now: input.now,
+    resourceType: "plan",
+    scope: input.scope,
+    store: input.store
+  });
+
+  if (!peeked) {
+    return executeError("en", "not_found");
+  }
+
+  const peekedPlan = await input.store.getPlan(peeked.resourceId);
+
+  if (!peekedPlan) {
+    return executeError("en", "not_found");
+  }
+
+  if (peekedPlan.currentRevision !== input.expectedRevision) {
+    return executeError("en", "revision_conflict", "expectedRevision");
+  }
+
+  const peekedRevision = await input.store.getPlanRevision(
+    peekedPlan.id,
+    peekedPlan.currentRevision
+  );
+
+  if (!peekedRevision || peekedRevision.status !== "ready") {
+    return executeError("en", "plan_not_ready");
+  }
+
+  const peekedResult = peekedRevision.result as PlanResult;
+  const snapshot = await ensureCatalogueSnapshot(
+    input.config.environment,
+    peekedResult.requestSnapshot.destinationCountry
+  );
+
   return input.store.transaction(async (store) => {
     const capability = await resolveCapability({
       action: "plan.execute",
@@ -120,10 +159,6 @@ export async function executeTool(input: Readonly<{
     const result = revision.result as PlanResult;
     const locale = negotiateLocale(result.requestSnapshot.locale);
     const selected = result.selected;
-    const snapshot = await ensureCatalogueSnapshot(
-      input.config.environment,
-      result.requestSnapshot.destinationCountry
-    );
     const unavailable = Boolean(
       selected?.basket.some((item) => {
         const product = snapshot.products.find((row) => row.productId === item.productId);

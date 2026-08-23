@@ -354,6 +354,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ต้องเลือกอีกหนึ่งข้อก่อนสูตรนี้พร้อมซื้อ",
     "zh-CN": "购买前还需要客户做一个选择。"
   },
+  "plan.summary.processing": {
+    en: "Matching is still running. Poll this plan until status is ready, needs_input, or blocked.",
+    th: "กำลังจับคู่อยู่ ตรวจสอบแผนนี้จนกว่าสถานะจะเป็น ready, needs_input หรือ blocked",
+    "zh-CN": "仍在匹配中。请轮询此方案，直到状态为 ready、needs_input 或 blocked。"
+  },
   "plan.summary.ready": {
     en: "A purchasable stack is ready. Confirm with the person before execute.",
     th: "สูตรพร้อมซื้อแล้ว ยืนยันกับลูกค้าก่อน execute",

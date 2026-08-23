@@ -260,6 +260,16 @@ export async function cachedLiveRetailSnapshot(
   countryCode: string
 ): Promise<CatalogueSnapshot> {
   const code = countryCode.trim().toUpperCase() || "TH";
+
+  if (process.env.NODE_TEST_CONTEXT) {
+    return {
+      availabilityAsOf: new Date().toISOString(),
+      catalogueVersion: `retail-${code}-test`,
+      products: [],
+      supplements: FIXTURE_SUPPLEMENTS
+    };
+  }
+
   const hit = liveCache.get(code);
 
   if (hit && Date.now() - hit.at < LIVE_TTL_MS) {
@@ -283,6 +293,10 @@ export async function cachedLiveRetailSnapshot(
 export async function warmLiveRetailSnapshot(
   countryCode: string
 ): Promise<CatalogueSnapshot> {
+  if (process.env.NODE_TEST_CONTEXT) {
+    return cachedLiveRetailSnapshot(countryCode);
+  }
+
   const code = countryCode.trim().toUpperCase() || "TH";
   const hit = liveCache.get(code);
 

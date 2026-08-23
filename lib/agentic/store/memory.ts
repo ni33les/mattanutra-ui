@@ -235,11 +235,29 @@ export function createMemoryStore(): AgenticStore {
     async updateCheckout(record) {
       checkouts.set(record.id, clone(record));
     },
+    async updateIdempotency(record) {
+      const key = idempotencyKey(record.operation, record.ownerScope, record.key);
+
+      if (!idempotency.has(key)) {
+        throw new Error("idempotency_missing");
+      }
+
+      idempotency.set(key, clone(record));
+    },
     async updateOrder(record) {
       orders.set(record.id, clone(record));
     },
     async updatePlan(record) {
       plans.set(record.id, clone(record));
+    },
+    async updatePlanRevision(record) {
+      const key = revisionKey(record.planId, record.revision);
+
+      if (!revisions.has(key)) {
+        throw new Error("plan_revision_missing");
+      }
+
+      revisions.set(key, clone(record));
     },
     async updateSupportCase(record) {
       supportCases.set(record.id, clone(record));

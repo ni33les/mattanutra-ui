@@ -9,9 +9,10 @@ import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-
 
 const cachedByCountry = new Map<string, CatalogueSnapshot>();
 let lastSnapshot: CatalogueSnapshot | null = null;
+let installedSnapshot: CatalogueSnapshot | null = null;
 
 function usesLiveCatalogue(environment?: AgenticEnvironment) {
-  return environment === "uat" || environment === "prd";
+  return environment === "dev" || environment === "uat" || environment === "prd";
 }
 
 function countryKey(countryCode?: string) {
@@ -39,45 +40,59 @@ export async function ensureCatalogueSnapshot(
 ): Promise<CatalogueSnapshot> {
   const code = countryKey(countryCode);
 
-  if (!usesLiveCatalogue(environment)) {
+  if (installedSnapshot) {
+    return cachedByCountry.get(code) ?? installedSnapshot;
+  }
+
+  if (usesLiveCatalogue(environment)) {
     const hit = cachedByCountry.get(code);
 
-    if (hit) {
+    if (
+      hit &&
+      hit.catalogueVersion.startsWith(`retail-${code}-`) &&
+      !hit.catalogueVersion.endsWith("-loading")
+    ) {
       return hit;
     }
 
-    const fixtures = fixtureSnapshot();
-    cachedByCountry.set(code, fixtures);
-    await refreshAdminSafetyCeilings();
-    return fixtures;
-  }
+    try {
+      const live = await cachedLiveRetailSnapshot(code);
 
-  const hit = cachedByCountry.get(code);
-
-  if (hit && hit.catalogueVersion.startsWith(`retail-${code}-`) && !hit.catalogueVersion.endsWith("-loading")) {
-    return hit;
-  }
-
-  try {
-    const live = await cachedLiveRetailSnapshot(code);
-
-    if (
-      live.products.length > 0 &&
-      !live.catalogueVersion.endsWith("-loading")
-    ) {
-      cachedByCountry.set(code, live);
+      if (
+        live.products.length > 0 &&
+        !live.catalogueVersion.endsWith("-loading")
+      ) {
+        cachedByCountry.set(code, live);
+        lastSnapshot = live;
+        return live;
+      }
+    } catch (error) {
+      console.warn("Unable to load live retail catalogue for MCP", {
+        countryCode: code,
+        error
+      });
     }
 
-    return live;
-  } catch (error) {
-    console.warn("Unable to load live retail catalogue for MCP", { countryCode: code, error });
-    return {
-      availabilityAsOf: new Date().toISOString(),
-      catalogueVersion: `retail-${code}-unavailable`,
-      products: [],
-      supplements: fixtureSnapshot().supplements
-    };
+    if (environment === "uat" || environment === "prd") {
+      return {
+        availabilityAsOf: new Date().toISOString(),
+        catalogueVersion: `retail-${code}-unavailable`,
+        products: [],
+        supplements: fixtureSnapshot().supplements
+      };
+    }
   }
+
+  const cached = cachedByCountry.get(code);
+
+  if (cached) {
+    return cached;
+  }
+
+  const fixtures = fixtureSnapshot();
+  cachedByCountry.set(code, fixtures);
+  await refreshAdminSafetyCeilings();
+  return fixtures;
 }
 
 export async function warmCatalogueSnapshot(
@@ -107,6 +122,7 @@ export async function warmCatalogueSnapshot(
 export function replaceCatalogueSnapshot(snapshot: CatalogueSnapshot | null) {
   cachedByCountry.clear();
   lastSnapshot = snapshot;
+  installedSnapshot = snapshot;
 
   if (snapshot) {
     cachedByCountry.set(countryFromSnapshot(snapshot), snapshot);

@@ -92,3 +92,30 @@ export async function commitIdempotency(input: Readonly<{
   await input.store.insertIdempotency(record);
   return record;
 }
+
+export async function overwriteIdempotency(input: Readonly<{
+  key: string;
+  now: string;
+  operation: string;
+  ownerScope: string;
+  payload: unknown;
+  resourceIds: Readonly<Record<string, string>>;
+  response: unknown;
+  store: AgenticStore;
+}>): Promise<IdempotencyRecord> {
+  const record: IdempotencyRecord = {
+    createdAt: input.now,
+    expiresAt: new Date(
+      Date.parse(input.now) + AGENTIC_IDEMPOTENCY_TTL_MS
+    ).toISOString(),
+    key: input.key,
+    operation: input.operation,
+    ownerScope: input.ownerScope,
+    requestHash: canonicalRequestHash(input.payload),
+    resourceIds: input.resourceIds,
+    responseJson: JSON.stringify(input.response)
+  };
+
+  await input.store.updateIdempotency(record);
+  return record;
+}

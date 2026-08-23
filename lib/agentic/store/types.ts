@@ -47,7 +47,7 @@ export type PlanRevisionRecord = Readonly<{
   requestSnapshot: unknown;
   result: unknown;
   revision: number;
-  status: "blocked" | "needs_input" | "ready";
+  status: "blocked" | "needs_input" | "processing" | "ready";
 }>;
 
 export type OrderRecord = Readonly<{
@@ -244,7 +244,9 @@ export type AgenticStore = {
   markOutboxProcessed(id: string, processedAt: string): Promise<void>;
   transaction<T>(work: (store: AgenticStore) => Promise<T>): Promise<T>;
   updateCheckout(record: CheckoutSessionRecord): Promise<void>;
+  updateIdempotency(record: IdempotencyRecord): Promise<void>;
   updateOrder(record: OrderRecord): Promise<void>;
   updatePlan(record: PlanRecord): Promise<void>;
+  updatePlanRevision(record: PlanRevisionRecord): Promise<void>;
   updateSupportCase(record: SupportCaseRecord): Promise<void>;
 };

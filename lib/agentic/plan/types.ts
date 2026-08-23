@@ -239,7 +239,7 @@ export type PlanResult = Readonly<{
   requestSnapshot: CanonicalPlanState;
   safetyGuidance: readonly SafetyGuidance[];
   selected: StackOption | null;
-  status: "blocked" | "needs_input" | "ready";
+  status: "blocked" | "needs_input" | "processing" | "ready";
   summary: string;
   unmetRequirements: readonly string[];
 }>;

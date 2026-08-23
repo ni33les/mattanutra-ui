@@ -9,8 +9,10 @@ import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { issueCapability, resolveCapability } from "@/lib/agentic/capabilities";
 import {
   beginIdempotency,
-  commitIdempotency
+  commitIdempotency,
+  overwriteIdempotency
 } from "@/lib/agentic/idempotency";
+import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
@@ -32,12 +34,19 @@ import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import type {
   CanonicalPlanState,
   PlanAnswer,
+  PlanRequest,
   PlanResult,
   SafetyAcknowledgement,
   StackOption
 } from "@/lib/agentic/plan/types";
 
 export const PLAN_FEEDBACK_AFTER_REVISIONS = 3;
+export const PLAN_MATCH_RETURN_BUDGET_MS = 1_500;
+
+const inflightPlanMatches = new Map<
+  string,
+  Promise<PlanToolSuccess | AgenticErrorResult>
+>();
 
 export type PlanToolInput = Readonly<{
   answers?: unknown;
@@ -343,6 +352,238 @@ function selectFromAnswers(answers: readonly PlanAnswer[]) {
   return found ? found.choice.slice("select_option:".length) : undefined;
 }
 
+function matchInflightKey(planId: string, revision: number) {
+  return `${planId}:${revision}`;
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isTerminalPlanStatus(
+  status: PlanResult["status"]
+): status is "blocked" | "needs_input" | "ready" {
+  return status === "blocked" || status === "needs_input" || status === "ready";
+}
+
+function successFromResult(input: Readonly<{
+  locale: Locale;
+  planHandle: string;
+  result: PlanResult;
+  revision: number;
+}>): PlanToolSuccess {
+  return {
+    ...publicPlanFields(input.result),
+    ...feedbackFields({
+      locale: input.locale,
+      revision: input.revision,
+      status: input.result.status
+    }),
+    ok: true,
+    planHandle: input.planHandle,
+    revision: input.revision
+  };
+}
+
+function requestFromState(state: CanonicalPlanState): PlanRequest {
+  return {
+    ...(state.conditionCodes.length > 0 ? { conditionCodes: state.conditionCodes } : {}),
+    ...(state.currentSupplements.length > 0
+      ? { currentSupplements: state.currentSupplements }
+      : {}),
+    destinationCountry: state.destinationCountry,
+    locale: state.locale,
+    ...(state.medicationCodes.length > 0 ? { medicationCodes: state.medicationCodes } : {}),
+    optimization: state.optimization,
+    profile: state.profile,
+    requirements: state.requirements,
+    ...(state.safetyAcknowledgement
+      ? { safetyAcknowledgement: state.safetyAcknowledgement }
+      : {}),
+    targets: state.targets
+  };
+}
+
+function draftStateFromPayload(input: Readonly<{
+  answers: readonly PlanAnswer[];
+  payload: PlanToolInput;
+  previous: PlanResult | null;
+}>): CanonicalPlanState | null {
+  if (hasFullRequest(input.payload)) {
+    const request = input.payload.request as PlanRequest;
+    return applyPlanAnswers(
+      {
+        acceptedGaps: [],
+        conditionCodes: [...new Set(request.conditionCodes ?? [])],
+        currency: "THB",
+        currentSupplements: (request.currentSupplements ?? []).map((item) => ({
+          dailyAmount: item.dailyAmount,
+          name: item.name,
+          supplementId: item.supplementId ?? item.name,
+          unit: item.unit
+        })),
+        destinationCountry: request.destinationCountry,
+        leftovers: [],
+        locale: request.locale,
+        medicationCodes: [...new Set(request.medicationCodes ?? [])],
+        optimization: request.optimization,
+        pinnedOptionId: input.previous?.selected?.optionId ?? null,
+        profile: request.profile,
+        requirements: { ...request.requirements },
+        safetyAcknowledgement: request.safetyAcknowledgement ?? null,
+        targets: request.targets.map((item) => ({
+          amount: item.amount,
+          name: item.name,
+          supplementId: item.supplementId ?? item.name,
+          unit: item.unit
+        }))
+      },
+      { answers: input.answers }
+    );
+  }
+
+  if (input.previous) {
+    return applyPlanAnswers(input.previous.requestSnapshot, {
+      answers: input.answers
+    });
+  }
+
+  return null;
+}
+
+function processingResult(input: Readonly<{
+  locale: Locale;
+  previous: PlanResult | null;
+  state: CanonicalPlanState;
+}>): PlanResult {
+  const selected = input.previous?.selected ?? null;
+  const leftovers = input.previous?.leftovers ?? input.state.leftovers;
+  const pinnedState = {
+    ...input.state,
+    leftovers,
+    pinnedOptionId: selected?.optionId ?? input.state.pinnedOptionId
+  };
+
+  return {
+    alternatives: input.previous?.alternatives ?? [],
+    appliedRequirements: Object.entries(pinnedState.requirements)
+      .filter(([, value]) => value !== undefined)
+      .map(([key]) => key),
+    assumptions: [],
+    availabilityAsOf: input.previous?.availabilityAsOf ?? new Date().toISOString(),
+    basket: selected?.basket ?? [],
+    catalogueVersion: input.previous?.catalogueVersion ?? "processing",
+    changeSummary: [],
+    coverage: selected?.coverage ?? [],
+    guidanceRulesVersion: input.previous?.guidanceRulesVersion ?? "processing",
+    leftovers,
+    matcherTelemetry: matcherTelemetryFor({
+      leftovers,
+      selected,
+      state: pinnedState
+    }),
+    optimizationEvidence: {
+      mode: pinnedState.optimization,
+      tieBreak: [
+        "objective",
+        "unmet_targets",
+        "safety",
+        "price",
+        "pills",
+        "product_count",
+        "productId"
+      ]
+    },
+    questions: input.previous?.questions ?? [],
+    requestSnapshot: pinnedState,
+    safetyGuidance: input.previous?.safetyGuidance ?? [],
+    selected,
+    status: "processing",
+    summary: agenticMessage(input.locale, "plan.summary.processing"),
+    unmetRequirements: input.previous?.unmetRequirements ?? []
+  };
+}
+
+function revisionRecord(
+  planId: string,
+  revision: number,
+  result: PlanResult,
+  createdAt: string
+) {
+  return {
+    availabilityAsOf: result.availabilityAsOf,
+    catalogueVersion: result.catalogueVersion,
+    createdAt,
+    guidanceRulesVersion: result.guidanceRulesVersion,
+    planId,
+    requestSnapshot: result.requestSnapshot,
+    result,
+    revision,
+    status: result.status
+  };
+}
+
+async function commitTerminalIdempotency(input: Readonly<{
+  key: string;
+  now: string;
+  ownerScope: string;
+  payload: unknown;
+  planId: string;
+  response: unknown;
+  store: AgenticStore;
+}>) {
+  const existing = await input.store.getIdempotency(
+    "plan",
+    input.ownerScope,
+    input.key
+  );
+
+  if (existing) {
+    await overwriteIdempotency({
+      key: input.key,
+      now: input.now,
+      operation: "plan",
+      ownerScope: input.ownerScope,
+      payload: input.payload,
+      resourceIds: { planId: input.planId },
+      response: input.response,
+      store: input.store
+    });
+    return;
+  }
+
+  await commitIdempotency({
+    key: input.key,
+    now: input.now,
+    operation: "plan",
+    ownerScope: input.ownerScope,
+    payload: input.payload,
+    resourceIds: { planId: input.planId },
+    response: input.response,
+    store: input.store
+  });
+}
+
+type PreparedPlanCommand = Readonly<{
+  answers: readonly PlanAnswer[];
+  ack: SafetyAcknowledgement | null;
+  existingPlan: Awaited<ReturnType<AgenticStore["getPlan"]>>;
+  locale: Locale;
+  ownerScope: string;
+  persistProcessing: boolean;
+  planHandle: string;
+  planId: string;
+  previous: PlanResult | null;
+  processing: PlanResult;
+  resume: boolean;
+  revision: number;
+  selectOptionId?: string;
+  shownRevision: number;
+  state: CanonicalPlanState;
+}>;
+
 export async function planTool(input: Readonly<{
   config: AgenticConfig;
   now: string;
@@ -353,12 +594,6 @@ export async function planTool(input: Readonly<{
   const requestedDestination = requestRecord(input.payload.request)?.destinationCountry;
   const loadLiveCatalogue =
     hasFullRequest(input.payload) || !input.payload.planHandle;
-  let snapshot: CatalogueSnapshot | null = loadLiveCatalogue
-    ? await ensureCatalogueSnapshot(
-        input.config.environment,
-        typeof requestedDestination === "string" ? requestedDestination : undefined
-      )
-    : null;
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const replay = await beginIdempotency<PlanToolSuccess>({
     key: input.payload.idempotencyKey,
@@ -373,21 +608,48 @@ export async function planTool(input: Readonly<{
     return replay.error;
   }
 
+  let payload = input.payload;
+
   if (replay.kind === "replay") {
-    return replay.response;
+    if (replay.response.status !== "processing") {
+      return replay.response;
+    }
+
+    payload = {
+      ...input.payload,
+      expectedRevision: replay.response.revision,
+      planHandle: replay.response.planHandle
+    };
   }
 
-  const txResult = await input.store.transaction(async (store) => {
-    const answers = incomingAnswers(input.payload);
-    const ack = incomingAck(input.payload);
-    const selectOptionId =
-      input.payload.selectOptionId ?? selectFromAnswers(answers);
+  if (hasFullRequest(payload) && typeof requestedDestination === "string") {
+    const market = await resolveMarket({
+      countryCode: requestedDestination,
+      locale:
+        typeof requestRecord(input.payload.request)?.locale === "string"
+          ? String(requestRecord(input.payload.request)?.locale)
+          : undefined,
+      retailerAdapter: input.config.thailandRetailerAdapter
+    });
 
-    let planHandle = input.payload.planHandle;
+    if (isAgenticErrorResult(market)) {
+      return market;
+    }
+  }
+
+  const prepared = await input.store.transaction(async (store) => {
+    const answers = incomingAnswers(payload);
+    const ack = incomingAck(payload);
+    const selectOptionId =
+      payload.selectOptionId ?? selectFromAnswers(answers);
+
+    let planHandle = payload.planHandle;
     let planId: string;
     let revision = 1;
     let previous: PlanResult | null = null;
     let existingPlan = null;
+    let resume = false;
+    let shownRevision = 1;
 
     if (planHandle) {
       const capability = await resolveCapability({
@@ -409,7 +671,7 @@ export async function planTool(input: Readonly<{
 
       const plan = await store.getPlan(capability.resourceId);
 
-      if (!plan || plan.currentRevision !== input.payload.expectedRevision) {
+      if (!plan || plan.currentRevision !== payload.expectedRevision) {
         return businessError({
           fieldPath: "expectedRevision",
           message: "The plan revision is stale. Reload the latest revision.",
@@ -426,30 +688,22 @@ export async function planTool(input: Readonly<{
       previous = previousResult(current.result);
       existingPlan = plan;
       planId = plan.id;
-      revision = plan.currentRevision + 1;
+      shownRevision = payload.expectedRevision ?? 1;
+      const isPoll =
+        !hasFullRequest(payload) &&
+        !selectOptionId &&
+        answers.length === 0 &&
+        !ack;
 
-      if (previous?.requestSnapshot.destinationCountry && loadLiveCatalogue) {
-        snapshot = await ensureCatalogueSnapshot(
-          input.config.environment,
-          previous.requestSnapshot.destinationCountry
-        );
-      }
-
-      if (!snapshot && previous) {
-        snapshot = snapshotForPin(previous);
+      if (current.status === "processing" || isPoll) {
+        resume = current.status === "processing";
+        revision = plan.currentRevision;
+      } else {
+        revision = plan.currentRevision + 1;
       }
     } else {
       planId = crypto.randomUUID();
     }
-
-    if (!snapshot) {
-      snapshot = await ensureCatalogueSnapshot(
-        input.config.environment,
-        typeof requestedDestination === "string" ? requestedDestination : undefined
-      );
-    }
-
-    const shownRevision = planHandle ? (input.payload.expectedRevision ?? 1) : 1;
 
     if (ack && previous && ack.revision !== shownRevision) {
       return businessError({
@@ -460,16 +714,16 @@ export async function planTool(input: Readonly<{
       });
     }
 
-    if (selectOptionId) {
-      if (!previous || !existingPlan || !planHandle) {
-        return businessError({
-          fieldPath: "selectOptionId",
-          message: "Not found.",
-          reasonCode: "not_found"
-        });
-      }
+    if (selectOptionId && (!previous || !existingPlan || !planHandle)) {
+      return businessError({
+        fieldPath: "selectOptionId",
+        message: "Not found.",
+        reasonCode: "not_found"
+      });
+    }
 
-      const option: StackOption | null =
+    if (selectOptionId && previous) {
+      const option =
         previous.selected?.optionId === selectOptionId
           ? previous.selected
           : previous.alternatives.find((item) => item.optionId === selectOptionId) ??
@@ -482,114 +736,15 @@ export async function planTool(input: Readonly<{
           reasonCode: "not_found"
         });
       }
-
-      const locale = negotiateLocale(previous.requestSnapshot.locale);
-      const state = bindSafetyAcknowledgement({
-        answers,
-        incomingAck: ack,
-        previous,
-        shownRevision,
-        state: applyPlanAnswers(previous.requestSnapshot, { answers })
-      });
-      const nextResult = buildPinnedResult({
-        locale,
-        previous,
-        selected: option,
-        shownRevision: revision,
-        snapshot,
-        state: {
-          ...state,
-          acceptedGaps: state.acceptedGaps.map((gap) => ({ ...gap, revision })),
-          pinnedOptionId: option.optionId
-        }
-      });
-
-      await store.updatePlan({
-        ...existingPlan,
-        currentRevision: revision,
-        updatedAt: input.now
-      });
-      await store.insertPlanRevision({
-        availabilityAsOf: nextResult.availabilityAsOf,
-        catalogueVersion: nextResult.catalogueVersion,
-        createdAt: input.now,
-        guidanceRulesVersion: nextResult.guidanceRulesVersion,
-        planId,
-        requestSnapshot: nextResult.requestSnapshot,
-        result: nextResult,
-        revision,
-        status: nextResult.status
-      });
-
-      const response: PlanToolSuccess = {
-        ...publicPlanFields(nextResult),
-        ...feedbackFields({
-          locale,
-          revision,
-          status: nextResult.status
-        }),
-        ok: true,
-        planHandle,
-        revision
-      };
-
-      await commitIdempotency({
-        key: input.payload.idempotencyKey,
-        now: input.now,
-        operation: "plan",
-        ownerScope,
-        payload: input.payload,
-        resourceIds: { planId },
-        response,
-        store
-      });
-      return {
-        persist: { locale, planId, result: nextResult, revision },
-        response
-      };
     }
 
-    let state: CanonicalPlanState;
-    let pinPrevious = false;
+    const draft = draftStateFromPayload({
+      answers,
+      payload,
+      previous
+    });
 
-    if (hasFullRequest(input.payload)) {
-      const normalized = await normalizePlanRequest({
-        config: input.config,
-        request: input.payload.request,
-        snapshot
-      });
-
-      if (isAgenticErrorResult(normalized)) {
-        return normalized;
-      }
-
-      const merged = applyPlanAnswers(normalized.state, { answers });
-      pinPrevious = Boolean(
-        previous &&
-          planRematchFingerprint(previous.requestSnapshot) ===
-            planRematchFingerprint(merged)
-      );
-      state = pinPrevious
-        ? {
-            ...merged,
-            leftovers: [
-              ...previous!.requestSnapshot.leftovers.filter(
-                (item) => item.reason === "not_in_catalogue"
-              ),
-              ...merged.leftovers.filter((item) => item.reason === "not_in_catalogue")
-            ].filter(
-              (item, index, list) =>
-                list.findIndex(
-                  (row) => row.reason === item.reason && row.name === item.name
-                ) === index
-            ),
-            pinnedOptionId: previous!.selected?.optionId ?? null
-          }
-        : merged;
-    } else if (previous) {
-      pinPrevious = true;
-      state = applyPlanAnswers(previous.requestSnapshot, { answers });
-    } else {
+    if (!draft) {
       return businessError({
         fieldPath: "request",
         message: "request is required.",
@@ -597,43 +752,48 @@ export async function planTool(input: Readonly<{
       });
     }
 
-    state = bindSafetyAcknowledgement({
+    const locale = negotiateLocale(draft.locale);
+    const state = bindSafetyAcknowledgement({
       answers,
       incomingAck: ack,
       previous,
       shownRevision,
-      state
+      state: {
+        ...draft,
+        acceptedGaps: draft.acceptedGaps.map((gap) => ({ ...gap, revision })),
+        ...(selectOptionId ? { pinnedOptionId: selectOptionId } : {})
+      }
     });
-    state = {
-      ...state,
-      acceptedGaps: state.acceptedGaps.map((gap) => ({ ...gap, revision }))
-    };
+    const processing = processingResult({ locale, previous, state });
 
-    const locale = negotiateLocale(state.locale);
-    const pinnedOption =
-      pinPrevious && previous
-        ? previous.selected?.optionId === state.pinnedOptionId || !state.pinnedOptionId
-          ? previous.selected
-          : previous.alternatives.find((item) => item.optionId === state.pinnedOptionId) ??
-            previous.selected
-        : null;
-    const result =
-      pinPrevious && previous && pinnedOption
-        ? buildPinnedResult({
-            locale,
-            previous,
-            selected: pinnedOption,
-            shownRevision: revision,
-            snapshot,
-            state
-          })
-        : buildResult({
-            locale,
-            previous,
-            shownRevision,
-            snapshot,
-            state
-          });
+    const persistProcessing = !resume && !(
+      !hasFullRequest(payload) &&
+      !selectOptionId &&
+      answers.length === 0 &&
+      !ack &&
+      previous &&
+      isTerminalPlanStatus(previous.status)
+    );
+
+    if (!persistProcessing) {
+      return {
+        answers,
+        ack,
+        existingPlan,
+        locale,
+        ownerScope,
+        persistProcessing: false,
+        planHandle: planHandle!,
+        planId,
+        previous,
+        processing,
+        resume,
+        revision,
+        selectOptionId,
+        shownRevision,
+        state
+      } satisfies PreparedPlanCommand;
+    }
 
     if (!existingPlan) {
       await store.insertPlan({
@@ -664,29 +824,16 @@ export async function planTool(input: Readonly<{
       });
     }
 
-    await store.insertPlanRevision({
-      availabilityAsOf: result.availabilityAsOf,
-      catalogueVersion: result.catalogueVersion,
-      createdAt: input.now,
-      guidanceRulesVersion: result.guidanceRulesVersion,
-      planId,
-      requestSnapshot: result.requestSnapshot,
-      result,
-      revision,
-      status: result.status
-    });
+    await store.insertPlanRevision(
+      revisionRecord(planId, revision, processing, input.now)
+    );
 
-    const response: PlanToolSuccess = {
-      ...publicPlanFields(result),
-      ...feedbackFields({
-        locale,
-        revision,
-        status: result.status
-      }),
-      ok: true,
+    const processingResponse = successFromResult({
+      locale,
       planHandle: planHandle!,
+      result: processing,
       revision
-    };
+    });
 
     await commitIdempotency({
       key: input.payload.idempotencyKey,
@@ -695,22 +842,349 @@ export async function planTool(input: Readonly<{
       ownerScope,
       payload: input.payload,
       resourceIds: { planId },
-      response,
+      response: processingResponse,
       store
     });
 
     return {
-      persist: { locale, planId, result, revision },
-      response
-    };
+      answers,
+      ack,
+      existingPlan,
+      locale,
+      ownerScope,
+      persistProcessing: true,
+      planHandle: planHandle!,
+      planId,
+      previous,
+      processing,
+      resume: false,
+      revision,
+      selectOptionId,
+      shownRevision,
+      state
+    } satisfies PreparedPlanCommand;
   });
 
-  if (!txResult || typeof txResult !== "object" || !("response" in txResult)) {
-    return txResult as AgenticErrorResult;
+  if (!prepared || typeof prepared !== "object" || !("planId" in prepared)) {
+    return prepared as AgenticErrorResult;
   }
 
-  schedulePersistPlanSideEffects(txResult.persist);
-  return txResult.response;
+  if (!prepared.resume && prepared.previous && isTerminalPlanStatus(prepared.previous.status)) {
+    const isPoll =
+      !hasFullRequest(payload) &&
+      !prepared.selectOptionId &&
+      prepared.answers.length === 0 &&
+      !prepared.ack;
+
+    if (isPoll) {
+      const response = successFromResult({
+        locale: prepared.locale,
+        planHandle: prepared.planHandle,
+        result: prepared.previous,
+        revision: prepared.revision
+      });
+      await commitTerminalIdempotency({
+        key: input.payload.idempotencyKey,
+        now: input.now,
+        ownerScope,
+        payload: input.payload,
+        planId: prepared.planId,
+        response,
+        store: input.store
+      });
+      return response;
+    }
+  }
+
+  const work = runPlanMatch(prepared, input, loadLiveCatalogue);
+  const raced = await Promise.race([
+    work.then((result) => ({ done: true as const, result })),
+    sleep(PLAN_MATCH_RETURN_BUDGET_MS).then(() => ({ done: false as const }))
+  ]);
+
+  if (raced.done) {
+    return raced.result;
+  }
+
+  return successFromResult({
+    locale: prepared.locale,
+    planHandle: prepared.planHandle,
+    result: prepared.processing,
+    revision: prepared.revision
+  });
+}
+
+function runPlanMatch(
+  prepared: PreparedPlanCommand,
+  input: Readonly<{
+    config: AgenticConfig;
+    now: string;
+    payload: PlanToolInput;
+    scope: CapabilityScope;
+    store: AgenticStore;
+  }>,
+  loadLiveCatalogue: boolean
+) {
+  const key = matchInflightKey(prepared.planId, prepared.revision);
+  const existing = inflightPlanMatches.get(key);
+
+  if (existing) {
+    return existing;
+  }
+
+  const work = completePreparedPlan(prepared, input, loadLiveCatalogue).finally(() => {
+    inflightPlanMatches.delete(key);
+  });
+  inflightPlanMatches.set(key, work);
+  return work;
+}
+
+async function completePreparedPlan(
+  prepared: PreparedPlanCommand,
+  input: Readonly<{
+    config: AgenticConfig;
+    now: string;
+    payload: PlanToolInput;
+    scope: CapabilityScope;
+    store: AgenticStore;
+  }>,
+  loadLiveCatalogue: boolean
+): Promise<PlanToolSuccess | AgenticErrorResult> {
+  const country =
+    prepared.state.destinationCountry ||
+    prepared.previous?.requestSnapshot.destinationCountry;
+  const snapshot =
+    loadLiveCatalogue || prepared.resume
+      ? await ensureCatalogueSnapshot(input.config.environment, country)
+      : prepared.previous
+        ? snapshotForPin(prepared.previous)
+        : await ensureCatalogueSnapshot(input.config.environment, country);
+
+  const answers = prepared.answers;
+  const ack = prepared.ack;
+  const selectOptionId = prepared.selectOptionId;
+  const previous = prepared.previous;
+  const revision = prepared.revision;
+  const shownRevision = prepared.shownRevision;
+
+  if (selectOptionId) {
+    if (!previous) {
+      return businessError({
+        fieldPath: "selectOptionId",
+        message: "Not found.",
+        reasonCode: "not_found"
+      });
+    }
+
+    const option: StackOption | null =
+      previous.selected?.optionId === selectOptionId
+        ? previous.selected
+        : previous.alternatives.find((item) => item.optionId === selectOptionId) ??
+          null;
+
+    if (!option) {
+      return businessError({
+        fieldPath: "selectOptionId",
+        message: "Not found.",
+        reasonCode: "not_found"
+      });
+    }
+
+    const nextResult = buildPinnedResult({
+      locale: prepared.locale,
+      previous,
+      selected: option,
+      shownRevision: revision,
+      snapshot,
+      state: {
+        ...prepared.state,
+        pinnedOptionId: option.optionId
+      }
+    });
+    return persistTerminalPlan({
+      input,
+      locale: prepared.locale,
+      ownerScope: prepared.ownerScope,
+      planHandle: prepared.planHandle,
+      planId: prepared.planId,
+      result: nextResult,
+      revision
+    });
+  }
+
+  let state: CanonicalPlanState;
+  let pinPrevious = false;
+
+  if (hasFullRequest(input.payload) && !prepared.resume) {
+    const normalized = await normalizePlanRequest({
+      config: input.config,
+      request: input.payload.request,
+      snapshot
+    });
+
+    if (isAgenticErrorResult(normalized)) {
+      return normalized;
+    }
+
+    const merged = applyPlanAnswers(normalized.state, { answers });
+    pinPrevious = Boolean(
+      previous &&
+        planRematchFingerprint(previous.requestSnapshot) ===
+          planRematchFingerprint(merged)
+    );
+    state = pinPrevious
+      ? {
+          ...merged,
+          leftovers: [
+            ...previous!.requestSnapshot.leftovers.filter(
+              (item) => item.reason === "not_in_catalogue"
+            ),
+            ...merged.leftovers.filter((item) => item.reason === "not_in_catalogue")
+          ].filter(
+            (item, index, list) =>
+              list.findIndex(
+                (row) => row.reason === item.reason && row.name === item.name
+              ) === index
+          ),
+          pinnedOptionId: previous!.selected?.optionId ?? null
+        }
+      : merged;
+  } else if (prepared.resume || hasFullRequest(input.payload)) {
+    const normalized = await normalizePlanRequest({
+      config: input.config,
+      request: requestFromState(prepared.state),
+      snapshot
+    });
+
+    if (isAgenticErrorResult(normalized)) {
+      return normalized;
+    }
+
+    state = applyPlanAnswers(normalized.state, { answers });
+  } else if (previous) {
+    pinPrevious = true;
+    state = applyPlanAnswers(previous.requestSnapshot, { answers });
+  } else {
+    return businessError({
+      fieldPath: "request",
+      message: "request is required.",
+      reasonCode: "required"
+    });
+  }
+
+  state = bindSafetyAcknowledgement({
+    answers,
+    incomingAck: ack,
+    previous,
+    shownRevision,
+    state
+  });
+  state = {
+    ...state,
+    acceptedGaps: state.acceptedGaps.map((gap) => ({ ...gap, revision }))
+  };
+
+  const locale = negotiateLocale(state.locale);
+  const pinnedOption =
+    pinPrevious && previous
+      ? previous.selected?.optionId === state.pinnedOptionId || !state.pinnedOptionId
+        ? previous.selected
+        : previous.alternatives.find((item) => item.optionId === state.pinnedOptionId) ??
+          previous.selected
+      : null;
+  const result =
+    pinPrevious && previous && pinnedOption
+      ? buildPinnedResult({
+          locale,
+          previous,
+          selected: pinnedOption,
+          shownRevision: revision,
+          snapshot,
+          state
+        })
+      : buildResult({
+          locale,
+          previous,
+          shownRevision,
+          snapshot,
+          state
+        });
+
+  return persistTerminalPlan({
+    input,
+    locale,
+    ownerScope: prepared.ownerScope,
+    planHandle: prepared.planHandle,
+    planId: prepared.planId,
+    result,
+    revision
+  });
+}
+
+async function persistTerminalPlan(input: Readonly<{
+  input: Readonly<{
+    config: AgenticConfig;
+    now: string;
+    payload: PlanToolInput;
+    store: AgenticStore;
+  }>;
+  locale: Locale;
+  ownerScope: string;
+  planHandle: string;
+  planId: string;
+  result: PlanResult;
+  revision: number;
+}>): Promise<PlanToolSuccess> {
+  const response = successFromResult({
+    locale: input.locale,
+    planHandle: input.planHandle,
+    result: input.result,
+    revision: input.revision
+  });
+
+  await input.input.store.transaction(async (store) => {
+    const plan = await store.getPlan(input.planId);
+
+    if (plan) {
+      await store.updatePlan({
+        ...plan,
+        currentRevision: input.revision,
+        updatedAt: input.input.now
+      });
+    }
+
+    const current = await store.getPlanRevision(input.planId, input.revision);
+    const record = revisionRecord(
+      input.planId,
+      input.revision,
+      input.result,
+      current?.createdAt ?? input.input.now
+    );
+
+    if (current) {
+      await store.updatePlanRevision(record);
+    } else {
+      await store.insertPlanRevision(record);
+    }
+
+    await commitTerminalIdempotency({
+      key: input.input.payload.idempotencyKey,
+      now: input.input.now,
+      ownerScope: input.ownerScope,
+      payload: input.input.payload,
+      planId: input.planId,
+      response,
+      store
+    });
+  });
+
+  schedulePersistPlanSideEffects({
+    locale: input.locale,
+    planId: input.planId,
+    result: input.result,
+    revision: input.revision
+  });
+  return response;
 }
 
 function schedulePersistPlanSideEffects(

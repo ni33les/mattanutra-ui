@@ -169,6 +169,15 @@ describe("consistency r1 regression guards", () => {
     assert.doesNotMatch(planService, /FIXTURE_SUPPLEMENTS/);
     assert.match(live, /getLiveSaleEligibleRetailerCandidateSets/);
     assert.doesNotMatch(snapshot, /fixture-skip/);
+    assert.match(
+      snapshot,
+      /environment === "dev" \|\| environment === "uat" \|\| environment === "prd"/
+    );
+    assert.match(snapshot, /cachedLiveRetailSnapshot\(code\)/);
+    assert.doesNotMatch(
+      snapshot,
+      /if \(!usesLiveCatalogue\(environment\)\) \{[\s\S]{0,240}return fixtures/
+    );
   });
 
   it("keeps explicit QA fixture keys off the unscoped first-create path", async () => {
