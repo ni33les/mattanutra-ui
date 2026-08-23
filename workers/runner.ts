@@ -11,9 +11,8 @@ import {
 import { startTaskMaintenanceLoop } from "../lib/task-sweep-loop.ts";
 import {
   signalTaskQueue,
-  subscribeTaskQueue,
   waitForTaskQueueWork
-} from "../lib/task-wakeup.ts";
+} from "../lib/task-queue-signal.ts";
 import {
   isWorkerAuthConfigurationError,
   WorkerApiClient,
@@ -52,7 +51,6 @@ const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
 const TASK_LEASE_ABORT_SAFETY_MS = 120_000;
 const WORKER_RUN_ID = randomUUID();
 const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES;
-let stopTaskQueueListen: (() => Promise<void>) | null = null;
 let stopQueuedPeek: (() => void) | null = null;
 
 type ActiveSession = Readonly<{
@@ -733,7 +731,6 @@ async function shutdown() {
 
   shuttingDown = true;
   stopQueuedPeek?.();
-  await stopTaskQueueListen?.().catch(() => null);
   await markSessionsOffline();
   process.exit(0);
 }
@@ -741,14 +738,6 @@ async function shutdown() {
 async function runWorker(mode: WorkerMode) {
   startTaskMaintenanceLoop();
 
-  try {
-    stopTaskQueueListen = await subscribeTaskQueue();
-  } catch (error) {
-    console.warn(
-      "[worker] task queue LISTEN unavailable; using HTTP queued peek every 24s (remote-safe)",
-      error instanceof Error ? error.message : error,
-    );
-  }
   const modes = workerProfileModesForRun(mode);
   const peekConfig = modes
     .flatMap((profileMode) => {

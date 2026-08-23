@@ -484,7 +484,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(runnerSource, /waitForTaskQueueWork/);
     assert.match(runnerSource, /client\.queued\(\)/);
-    assert.match(runnerSource, /subscribeTaskQueue/);
+    assert.doesNotMatch(runnerSource, /subscribeTaskQueue|task-wakeup/);
     assert.doesNotMatch(
       runnerSource,
       /waitSeconds,\s*workerSessionId/,

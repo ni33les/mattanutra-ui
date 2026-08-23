@@ -34,20 +34,9 @@ describe("consistency r4 regression guards", () => {
 
     assert.match(wakeup, /TASK_QUEUE_CHANNEL = "mattanutra_tasks"/);
     assert.match(wakeup, /pg_notify\(\$\{TASK_QUEUE_CHANNEL\}/);
-    assert.match(wakeup, /sql\.listen\(TASK_QUEUE_CHANNEL/);
-    assert.match(wakeup, /getListenSql\(\)/);
+    assert.doesNotMatch(wakeup, /sql\.listen\(/);
+    assert.doesNotMatch(wakeup, /getListenSql\(/);
     assert.match(db, /export function getListenSql\(/);
-    assert.match(db, /application_name: applicationName/);
-    assert.match(db, /mattanutra-listen/);
-    assert.match(db, /max: 1/);
-    assert.match(db, /idle_timeout: 0/);
-    assert.match(db, /url\.port = "25060"/);
-    assert.match(db, /current_database\(\) as db/);
-    assert.match(wakeup, /prepareListenConnection\(\)/);
-    assert.doesNotMatch(
-      wakeup,
-      /getListenSql[\s\S]{0,200}reserveNextTask|getStoredFormulationResult/
-    );
   });
 
   it("keeps reserve as a single check-and-return claim", async () => {
@@ -66,7 +55,9 @@ describe("consistency r4 regression guards", () => {
     const runner = await readFile("workers/runner.ts", "utf8");
 
     assert.match(runner, /DEFAULT_POLL_WAIT_SECONDS = 24/);
-    assert.match(runner, /subscribeTaskQueue\(\)/);
+    assert.doesNotMatch(runner, /subscribeTaskQueue/);
+    assert.doesNotMatch(runner, /task-wakeup/);
+    assert.match(runner, /from "\.\.\/lib\/task-queue-signal\.ts"/);
     assert.match(runner, /waitForTaskQueueWork/);
     assert.match(runner, /client\.queued\(\)/);
     assert.match(runner, /startQueuedPeekLoop/);
@@ -74,10 +65,6 @@ describe("consistency r4 regression guards", () => {
     assert.match(
       runner,
       /if \(!work\?\.taskId\) \{[\s\S]*continue/
-    );
-    assert.match(
-      runner,
-      /LISTEN unavailable; using HTTP queued peek/
     );
   });
 

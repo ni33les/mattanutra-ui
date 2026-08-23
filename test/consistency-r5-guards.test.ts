@@ -62,10 +62,8 @@ describe("consistency r5 regression guards", () => {
     assert.match(runner, /client\.queued\(\)/);
     assert.match(runner, /signalTaskQueue/);
     assert.match(runner, /WORKER_API_BASE_URL/);
+    assert.match(runner, /from "\.\.\/lib\/task-queue-signal\.ts"/);
     assert.doesNotMatch(runner, /from "\.\.\/lib\/db/);
-    assert.match(
-      runner,
-      /LISTEN unavailable; using HTTP queued peek every 24s \(remote-safe\)/
-    );
+    assert.doesNotMatch(runner, /task-wakeup|subscribeTaskQueue|getListenSql/);
   });
 });
