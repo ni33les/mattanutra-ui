@@ -118,21 +118,24 @@ describe("consistency r5 regression guards", () => {
 
     assert.match(instrumentation, /subscribeTaskQueue\(\)/);
     assert.match(instrumentation, /startTaskMaintenanceLoop/);
-    assert.match(instrumentation, /void warmAgenticCatalogue/);
-    assert.doesNotMatch(instrumentation, /await warmAgenticCatalogue/);
+    assert.match(instrumentation, /keepPlanPathWarm/);
+    assert.doesNotMatch(instrumentation, /warmAgenticCatalogue/);
     assert.match(wake, /metadata ->> 'wakeUrl'/);
     assert.match(wake, /method: "POST"/);
     assert.match(wakeup, /pingRegisteredWorkerWakes/);
   });
 
-  it("keeps catalogue warm off the interactive pool and backs off statement timeouts", async () => {
-    const [live, search, readModel] = await Promise.all([
+  it("loads MCP catalogue on the interactive pool, not a second worker pool", async () => {
+    const [live, search, readModel, market] = await Promise.all([
       readFile("lib/agentic/catalogue/live.ts", "utf8"),
       readFile("lib/admin-product-search.ts", "utf8"),
-      readFile("lib/admin-product-read-model.ts", "utf8")
+      readFile("lib/admin-product-read-model.ts", "utf8"),
+      readFile("lib/agentic/catalogue/market.ts", "utf8")
     ]);
 
-    assert.match(live, /getWorkerSql\(\) \?\? getSql\(\)/);
+    assert.doesNotMatch(live, /getWorkerSql/);
+    assert.doesNotMatch(market, /getWorkerSql/);
+    assert.match(live, /return getSql\(\)/);
     assert.match(live, /WARM_FAILURE_BACKOFF_MS = 5 \* 60_000/);
     assert.match(live, /code === "57014"/);
     assert.match(search, /loadProductRows\(null, \{ productIds: retailProductIds, sql \}\)/);

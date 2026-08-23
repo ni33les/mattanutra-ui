@@ -51,9 +51,9 @@ function warmFailureIsCoolingDown() {
 }
 
 async function catalogueSql() {
-  const { getSql, getWorkerSql } = await import("@/lib/db");
+  const { getSql } = await import("@/lib/db");
 
-  return getWorkerSql() ?? getSql();
+  return getSql();
 }
 
 const globalLive = globalThis as typeof globalThis & {
