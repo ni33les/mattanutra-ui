@@ -5,18 +5,26 @@ const globalDb = globalThis as typeof globalThis & {
   mattanutraDbUnavailableLogged?: boolean;
   mattanutraSql?: postgres.Sql;
   mattanutraSqlConnectionKey?: string;
+  mattanutraWorkerSql?: postgres.Sql;
+  mattanutraWorkerSqlConnectionKey?: string;
 };
 
 const BENIGN_SCHEMA_NOTICE_CODES = new Set(["42P07", "42701", "42710"]);
 const DEFAULT_DB_CONNECT_TIMEOUT_SECONDS = 5;
 const DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 120;
 const DEFAULT_DB_POOL_MAX = 4;
-const MAX_DB_POOL_MAX = 10;
+const DEFAULT_DB_WORKER_POOL_MAX = 4;
+const MAX_DB_POOL_MAX = 8;
 const DEFAULT_DB_STATEMENT_TIMEOUT_MS = 15_000;
 const DEFAULT_DB_LOCK_TIMEOUT_MS = 2_000;
 const DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS = 10_000;
 const dbLog = createLogger("db.pool");
-let poolInitLogged = false;
+const poolInitLogged = {
+  interactive: false,
+  worker: false
+};
+
+type PoolKind = "interactive" | "worker";
 
 function assertManagedDatabaseEndpoint(connection: string) {
   try {
@@ -58,12 +66,24 @@ function dbSslNegotiation() {
   return process.env.DB_SSL_NEGOTIATION === "direct" ? "direct" : null;
 }
 
-function dbPoolMax() {
-  const parsed = Number(process.env.DB_POOL_MAX ?? DEFAULT_DB_POOL_MAX);
-
+function clampPoolMax(parsed: number, fallback: number) {
   return Number.isFinite(parsed)
     ? Math.min(MAX_DB_POOL_MAX, Math.max(1, Math.round(parsed)))
-    : DEFAULT_DB_POOL_MAX;
+    : fallback;
+}
+
+function dbPoolMax() {
+  return clampPoolMax(
+    Number(process.env.DB_POOL_MAX ?? DEFAULT_DB_POOL_MAX),
+    DEFAULT_DB_POOL_MAX
+  );
+}
+
+function dbWorkerPoolMax() {
+  return clampPoolMax(
+    Number(process.env.DB_WORKER_POOL_MAX ?? DEFAULT_DB_WORKER_POOL_MAX),
+    DEFAULT_DB_WORKER_POOL_MAX
+  );
 }
 
 function dbPoolIdleTimeout() {
@@ -90,6 +110,10 @@ function dbConnectTimeout() {
 
 function dbApplicationName() {
   return process.env.DB_APPLICATION_NAME?.trim() || "mattanutra-web";
+}
+
+function dbWorkerApplicationName() {
+  return process.env.DB_WORKER_APPLICATION_NAME?.trim() || "mattanutra-worker";
 }
 
 function dbTimeoutMs(envName: string, fallback: number) {
@@ -121,11 +145,11 @@ function dbIdleInTxnTimeoutMs() {
   );
 }
 
-function postgresConnectionSettings() {
+function postgresConnectionSettings(applicationName: string) {
   return {
-    applicationName: dbApplicationName(),
+    applicationName,
     connection: {
-      application_name: dbApplicationName()
+      application_name: applicationName
     },
     idleInTxnTimeoutMs: dbIdleInTxnTimeoutMs(),
     lockTimeoutMs: dbLockTimeoutMs(),
@@ -139,16 +163,13 @@ async function applyInteractiveTimeouts(
   const statementTimeoutMs = dbStatementTimeoutMs();
   const lockTimeoutMs = dbLockTimeoutMs();
   const idleInTxnTimeoutMs = dbIdleInTxnTimeoutMs();
-  const n = Math.min(dbPoolMax(), 4);
 
-  await Promise.all(
-    Array.from({ length: n }, () => sql`
-      select
-        set_config('statement_timeout', ${String(statementTimeoutMs)}, false),
-        set_config('lock_timeout', ${String(lockTimeoutMs)}, false),
-        set_config('idle_in_transaction_session_timeout', ${String(idleInTxnTimeoutMs)}, false)
-    `)
-  );
+  await sql`
+    select
+      set_config('statement_timeout', ${String(statementTimeoutMs)}, false),
+      set_config('lock_timeout', ${String(lockTimeoutMs)}, false),
+      set_config('idle_in_transaction_session_timeout', ${String(idleInTxnTimeoutMs)}, false)
+  `;
 }
 
 function handleDatabaseNotice(notice: { code?: string }) {
@@ -159,7 +180,7 @@ function handleDatabaseNotice(notice: { code?: string }) {
   console.info("Database notice", notice);
 }
 
-export function getSql() {
+function getOrCreateSqlPool(kind: PoolKind) {
   const connection = process.env.DB_URL;
 
   if (!connection) {
@@ -170,17 +191,27 @@ export function getSql() {
 
   const useSsl = shouldUseSsl(connection);
   const sslNegotiation = dbSslNegotiation();
-  const poolMax = dbPoolMax();
+  const poolMax = kind === "worker" ? dbWorkerPoolMax() : dbPoolMax();
   const connectTimeout = dbConnectTimeout();
   const idleTimeout = dbPoolIdleTimeout();
-  const timeouts = postgresConnectionSettings();
-  const connectionKey = `${connection}|ssl:${String(
+  const applicationName =
+    kind === "worker" ? dbWorkerApplicationName() : dbApplicationName();
+  const timeouts = postgresConnectionSettings(applicationName);
+  const connectionKey = `${connection}|kind:${kind}|ssl:${String(
     useSsl
   )}|sslNegotiation:${
     sslNegotiation ?? "standard"
   }|poolMax:${poolMax}|connectTimeout:${connectTimeout}|idleTimeout:${idleTimeout}|applicationName:${timeouts.applicationName}|statementTimeoutMs:${timeouts.statementTimeoutMs}|lockTimeoutMs:${timeouts.lockTimeoutMs}|idleInTxnTimeoutMs:${timeouts.idleInTxnTimeoutMs}`;
 
-  if (
+  if (kind === "worker") {
+    if (
+      globalDb.mattanutraWorkerSql &&
+      globalDb.mattanutraWorkerSqlConnectionKey !== connectionKey
+    ) {
+      void globalDb.mattanutraWorkerSql.end();
+      globalDb.mattanutraWorkerSql = undefined;
+    }
+  } else if (
     globalDb.mattanutraSql &&
     globalDb.mattanutraSqlConnectionKey !== connectionKey
   ) {
@@ -188,46 +219,73 @@ export function getSql() {
     globalDb.mattanutraSql = undefined;
   }
 
-  globalDb.mattanutraSql ??= postgres(connection, {
-    connect_timeout: connectTimeout,
-    connection: timeouts.connection,
-    idle_timeout: idleTimeout,
-    max: poolMax,
-    onnotice: handleDatabaseNotice,
-    prepare: false,
-    ...(useSsl ? { ssl: "require" } : {}),
-    ...(sslNegotiation ? { sslnegotiation: sslNegotiation } : {})
-  });
-  globalDb.mattanutraSqlConnectionKey = connectionKey;
-
-  if (!poolInitLogged) {
-    poolInitLogged = true;
-    dbLog.info("pool_initialized", {
-      idleInTxnTimeoutMs: timeouts.idleInTxnTimeoutMs,
-      lockTimeoutMs: timeouts.lockTimeoutMs,
-      poolMax,
-      statementTimeoutMs: timeouts.statementTimeoutMs
+  const existing =
+    kind === "worker" ? globalDb.mattanutraWorkerSql : globalDb.mattanutraSql;
+  const sql =
+    existing ??
+    postgres(connection, {
+      connect_timeout: connectTimeout,
+      connection: timeouts.connection,
+      idle_timeout: idleTimeout,
+      max: poolMax,
+      onnotice: handleDatabaseNotice,
+      prepare: false,
+      ...(useSsl ? { ssl: "require" } : {}),
+      ...(sslNegotiation ? { sslnegotiation: sslNegotiation } : {})
     });
-    void applyInteractiveTimeouts(globalDb.mattanutraSql).catch((error) => {
+
+  if (kind === "worker") {
+    globalDb.mattanutraWorkerSql = sql;
+    globalDb.mattanutraWorkerSqlConnectionKey = connectionKey;
+  } else {
+    globalDb.mattanutraSql = sql;
+    globalDb.mattanutraSqlConnectionKey = connectionKey;
+  }
+
+  if (!poolInitLogged[kind]) {
+    poolInitLogged[kind] = true;
+    dbLog.info(
+      kind === "worker" ? "worker_pool_initialized" : "pool_initialized",
+      {
+        applicationName: timeouts.applicationName,
+        idleInTxnTimeoutMs: timeouts.idleInTxnTimeoutMs,
+        lockTimeoutMs: timeouts.lockTimeoutMs,
+        poolMax,
+        statementTimeoutMs: timeouts.statementTimeoutMs
+      }
+    );
+    void applyInteractiveTimeouts(sql).catch((error) => {
       dbLog.warn("unable_to_apply_interactive_timeouts", {
+        kind,
         message: error instanceof Error ? error.message : "unknown"
       });
     });
   }
 
-  return globalDb.mattanutraSql;
+  return sql;
+}
+
+export function getSql() {
+  return getOrCreateSqlPool("interactive");
+}
+
+export function getWorkerSql() {
+  return getOrCreateSqlPool("worker");
 }
 
 export async function closeSqlPool() {
   const sql = globalDb.mattanutraSql;
-
-  if (!sql) {
-    return;
-  }
+  const workerSql = globalDb.mattanutraWorkerSql;
 
   globalDb.mattanutraSql = undefined;
   globalDb.mattanutraSqlConnectionKey = undefined;
-  await sql.end();
+  globalDb.mattanutraWorkerSql = undefined;
+  globalDb.mattanutraWorkerSqlConnectionKey = undefined;
+
+  await Promise.all([
+    sql ? sql.end() : Promise.resolve(),
+    workerSql ? workerSql.end() : Promise.resolve()
+  ]);
 }
 
 export async function checkDatabaseConnection() {
@@ -252,10 +310,12 @@ export async function checkDatabaseConnection() {
 }
 
 const DB_KEEP_ALIVE_MS = 20_000;
-const DB_KEEP_ALIVE_CONNECTIONS = 3;
+const DB_KEEP_ALIVE_CONNECTIONS = 1;
 
 async function pingWarmConnections(sql: NonNullable<ReturnType<typeof getSql>>) {
-  await applyInteractiveTimeouts(sql);
+  await Promise.all(
+    Array.from({ length: DB_KEEP_ALIVE_CONNECTIONS }, () => sql`select 1`)
+  );
 }
 
 export async function keepDatabaseWarm() {

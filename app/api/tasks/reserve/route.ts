@@ -6,6 +6,7 @@ import {
   textValue
 } from "@/lib/openclaw-api";
 import { writeBpmEvent } from "@/lib/bpm";
+import { getWorkerSql } from "@/lib/db";
 import {
   heartbeatWorkerSession,
   reserveNextTask
@@ -161,7 +162,8 @@ export async function POST(request: Request) {
           taskType: reserved.task.taskType,
           workerSessionId
         },
-        severity: "low"
+        severity: "low",
+        sql: getWorkerSql() ?? undefined
       });
 
       console.info("[tasks:reserve]", {

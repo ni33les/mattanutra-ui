@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { toJsonValue } from "@/lib/assessment-store";
-import { getSql } from "@/lib/db";
+import { getSql, getWorkerSql } from "@/lib/db";
 import { textArray } from "@/lib/sql-arrays";
 import {
   normalizeCapabilities
@@ -37,7 +37,7 @@ const globalTaskServiceAgents = globalThis as typeof globalThis & {
 };
 
 function getRequiredSql(sql?: postgres.Sql) {
-  const configured = sql ?? getSql();
+  const configured = sql ?? getWorkerSql() ?? getSql();
 
   if (!configured) {
     throw new Error("Database connection is not configured");

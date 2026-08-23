@@ -36,7 +36,7 @@ describe("plan keep-warm does not starve first-create A2", () => {
       planService,
       /void persistPlanSideEffects\(txResult\.persist\)/
     );
-    assert.match(db, /DB_KEEP_ALIVE_CONNECTIONS = 3/);
+    assert.match(db, /DB_KEEP_ALIVE_CONNECTIONS = 1/);
     assert.match(db, /DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 120/);
     assert.match(startPlatform, /platform-hot-\$\{Date\.now\(\)\}-patch/);
     assert.match(

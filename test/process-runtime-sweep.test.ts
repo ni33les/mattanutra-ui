@@ -367,13 +367,15 @@ describe("process runtime technical debt sweep", () => {
 
   it("uses DB_URL as the only runtime database connection variable", async () => {
     const db = await readFile("lib/db.ts", "utf8");
-    const getSqlBody = functionBody(db, "getSql");
+    const poolBody = functionBody(db, "getOrCreateSqlPool");
 
-    assert.match(getSqlBody, /process\.env\.DB_URL/);
+    assert.match(poolBody, /process\.env\.DB_URL/);
     assert.doesNotMatch(
-      getSqlBody,
+      poolBody,
       new RegExp(String.raw`process\.env\.DB_` + String.raw`CONNECTION`)
     );
+    assert.match(functionBody(db, "getSql"), /getOrCreateSqlPool\("interactive"\)/);
+    assert.match(functionBody(db, "getWorkerSql"), /getOrCreateSqlPool\("worker"\)/);
   });
 
   it("keeps retired database connection env names out of committed runtime and operator code", async () => {

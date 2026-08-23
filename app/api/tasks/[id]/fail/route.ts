@@ -7,6 +7,7 @@ import {
 } from "@/lib/openclaw-api";
 import { applyTaskFailureResult } from "@/lib/task-result-applier";
 import { writeBpmEvent } from "@/lib/bpm";
+import { getWorkerSql } from "@/lib/db";
 import { failTask } from "@/lib/task-service";
 import { requireWorkerAccess } from "@/lib/worker-auth";
 
@@ -89,7 +90,8 @@ export async function POST(request: Request, { params }: FailTaskRouteProps) {
         taskType: task.taskType,
         workerSessionId
       },
-      severity: "high"
+      severity: "high",
+      sql: getWorkerSql() ?? undefined
     });
 
     return openClawJson({ task });
