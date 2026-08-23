@@ -167,7 +167,10 @@ describe("consistency r1 regression guards", () => {
     assert.match(planService, /ensureCatalogueSnapshot\(/);
     assert.doesNotMatch(planService, /fixtureSnapshot\(/);
     assert.doesNotMatch(planService, /FIXTURE_SUPPLEMENTS/);
-    assert.match(live, /getLiveSaleEligibleRetailerCandidateSets/);
+    assert.doesNotMatch(live, /getLiveSaleEligibleRetailerCandidateSets/);
+    assert.doesNotMatch(live, /loadProductRows/);
+    assert.match(live, /from public.product_facts/);
+    assert.match(live, /supplement_id is not null/);
     assert.doesNotMatch(snapshot, /fixture-skip/);
     assert.match(
       snapshot,

@@ -1381,7 +1381,8 @@ describe("agentic P1 pack fixes", () => {
       "utf8"
     );
     assert.match(snapshot, /cachedLiveRetailSnapshot/);
-    assert.match(live, /getLiveSaleEligibleRetailerCandidateSets/);
+    assert.doesNotMatch(live, /getLiveSaleEligibleRetailerCandidateSets/);
+    assert.doesNotMatch(live, /loadProductRows/);
     assert.match(live, /assessRetailSellability/);
     assert.match(live, /isSaleEligible/);
     assert.match(live, /sellerId\}:\$\{mapped\.productId\}/);

@@ -156,7 +156,12 @@ export async function keepPlanPathWarm(environment: AgenticEnvironment) {
   const { warmAgenticCatalogue } = await import("@/lib/agentic/catalogue/warm");
   const runtime = getLiveAgenticRuntime();
 
-  await pingPlanHotPath(runtime);
+  void pingPlanHotPath(runtime).catch((error) => {
+    console.warn(
+      "Unable to ping plan hot path",
+      error instanceof Error ? error.message : error
+    );
+  });
 
   if (globalWarm.mattanutraPlanKeepWarm) {
     return;

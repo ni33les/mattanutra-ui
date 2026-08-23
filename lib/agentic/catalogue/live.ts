@@ -1,4 +1,3 @@
-import { getLiveSaleEligibleRetailerCandidateSets } from "@/lib/admin-product-search";
 import { assessRetailSellability } from "@/lib/retail-sellability";
 import { publicProductId } from "@/lib/agentic/contract/ids";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogue/market";
@@ -8,11 +7,21 @@ import {
   inferOmegaSource,
   supplementNameMatchesFact
 } from "@/lib/agentic/catalogue/product-fit";
+import {
+  customerPriceFromRpp,
+  getCustomerPriceMarginPercent
+} from "@/lib/customer-pricing";
+import { uuidArray } from "@/lib/sql-arrays";
 import type {
   CatalogueProduct,
   CatalogueSnapshot
 } from "@/lib/agentic/catalogue/types";
-import type { ProductCandidate } from "@/lib/product-recommendation-types";
+import type {
+  ProductCandidate,
+  ProductCandidateFact,
+  ProductPlatform,
+  ProductStatus
+} from "@/lib/product-recommendation-types";
 
 const LIVE_TTL_MS = 10 * 60_000;
 const LIVE_LOAD_WAIT_MS = 8_000;
@@ -206,50 +215,286 @@ function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | nul
   };
 }
 
+type SnapshotSkuRow = Readonly<{
+  backorder_policy: string | null;
+  brand_status: string | null;
+  currency: string | null;
+  image_url: string | null;
+  lead_time_days: number | string | null;
+  organisation_currency: string | null;
+  organisation_id: string;
+  organisation_metadata: unknown;
+  organisation_name: string;
+  platform: string | null;
+  product_audience: string | null;
+  product_form: string | null;
+  product_id: string;
+  product_kind: string | null;
+  product_status: string;
+  product_url: string | null;
+  region: string | null;
+  retail_sellable_product_id: string;
+  rrp_price_amount: number | string | null;
+  stock_quantity: number | string | null;
+  title: string;
+  validation_status: string | null;
+}>;
+
+function numberOrZero(value: unknown) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function snapshotFacts(value: unknown): ProductCandidateFact[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+
+    const row = item as Record<string, unknown>;
+    const name = typeof row.name === "string" ? row.name : "";
+    const unit = typeof row.unit === "string" ? row.unit : null;
+    const amount = Number(row.amount);
+
+    if (!name) {
+      return [];
+    }
+
+    return [
+      {
+        amount: Number.isFinite(amount) ? amount : null,
+        comparableAmount: Number.isFinite(amount) ? amount : null,
+        confidence: "high",
+        itemType: "supplement",
+        name,
+        normalizedName:
+          typeof row.normalizedName === "string"
+            ? row.normalizedName
+            : name.toLowerCase(),
+        servingLabel:
+          typeof row.servingLabel === "string" ? row.servingLabel : null,
+        supplementId:
+          typeof row.supplementId === "string" ? row.supplementId : null,
+        unit
+      } satisfies ProductCandidateFact
+    ];
+  });
+}
+
+function snapshotPlatform(value: unknown): ProductPlatform {
+  return value === "lazada" ||
+    value === "manual" ||
+    value === "shopee" ||
+    value === "wholesale_pharmacy_import"
+    ? value
+    : "wholesale_pharmacy_import";
+}
+
+function candidateFromSnapshotRow(
+  row: SnapshotSkuRow,
+  facts: ProductCandidateFact[],
+  countryCode: string,
+  marginPercent: number
+): ProductCandidate {
+  const stockQuantity = Math.max(0, Math.round(numberOrZero(row.stock_quantity)));
+  const rrp = numberOrZero(row.rrp_price_amount);
+  const currency = row.currency || row.organisation_currency || "THB";
+  const customerPrice = customerPriceFromRpp(rrp, marginPercent) ?? rrp;
+  const backorderAllowed =
+    String(row.backorder_policy ?? "allow").trim().toLowerCase() !== "deny";
+  const retailAvailabilityStatus =
+    stockQuantity > 0
+      ? "available_now"
+      : backorderAllowed
+        ? "backorder"
+        : "unavailable";
+
+  return {
+    automatedSafetyPassed: (row.validation_status ?? "pass") === "pass",
+    availabilityStatus: stockQuantity > 0 ? "in_stock" : "out_of_stock",
+    availableCountryCodes: [countryCode],
+    brandStatus: (row.brand_status as ProductStatus | null) ?? null,
+    currency,
+    facts,
+    id: row.product_id,
+    imageUrl: row.image_url,
+    labelStatus: facts.length > 0 ? "parsed" : "missing",
+    platform: snapshotPlatform(row.platform),
+    priceAmount: customerPrice,
+    priceSource: "retail_override",
+    productAudience:
+      row.product_audience === "female" || row.product_audience === "male"
+        ? row.product_audience
+        : "both",
+    productKind:
+      row.product_kind === "food" ||
+      row.product_kind === "multi" ||
+      row.product_kind === "supplement"
+        ? row.product_kind
+        : "supplement",
+    productUrl: row.product_url || "",
+    region: row.region || countryCode,
+    retailAvailabilityStatus,
+    retailSellableProductId: row.retail_sellable_product_id,
+    selectedRetailerName: row.organisation_name,
+    selectedRetailerOrganisationId: row.organisation_id,
+    status: row.product_status === "approved" ? "approved" : "pending_review",
+    title: row.title,
+    unitPriceAmount: customerPrice,
+    validation: {
+      checkedAt: new Date(0).toISOString(),
+      matchableFactCount: facts.length,
+      reasons: [],
+      status: (row.validation_status ?? "pass") === "pass" ? "pass" : "failed",
+      summary: ""
+    }
+  };
+}
+
 export async function loadLiveRetailSnapshot(
   countryCode: string
 ): Promise<CatalogueSnapshot> {
   const sql = await catalogueSql();
-  const [sets] = await Promise.all([
-    getLiveSaleEligibleRetailerCandidateSets({
-      countryCode: countryCode.trim().toUpperCase(),
-      sql: sql ?? undefined
-    }),
+  const code = countryCode.trim().toUpperCase();
+  const startedAt = Date.now();
+
+  if (!sql) {
+    return {
+      availabilityAsOf: new Date().toISOString(),
+      catalogueVersion: `retail-${code}-unavailable`,
+      products: [],
+      supplements: FIXTURE_SUPPLEMENTS
+    };
+  }
+
+  const [skuRows, marginPercent] = await Promise.all([
+    sql<SnapshotSkuRow[]>`
+      select
+        organisations.id::text as organisation_id,
+        organisations.name as organisation_name,
+        organisations.currency as organisation_currency,
+        organisations.metadata as organisation_metadata,
+        sellable.id::text as retail_sellable_product_id,
+        sellable.product_id::text,
+        sellable.rrp_price_amount,
+        sellable.currency,
+        sellable.lead_time_days,
+        sellable.backorder_policy,
+        products.title,
+        products.image_url,
+        products.product_url,
+        products.platform,
+        products.region,
+        products.status as product_status,
+        products.validation_status,
+        products.product_kind,
+        coalesce(to_jsonb(products) ->> 'product_audience', 'both') as product_audience,
+        coalesce(
+          to_jsonb(products) ->> 'product_form',
+          products.source_snapshot ->> 'productForm',
+          products.source_snapshot ->> 'product_form'
+        ) as product_form,
+        product_brands.status as brand_status,
+        coalesce(stock.stock_quantity, 0)::int as stock_quantity
+      from public.organisations
+      join public.retail_sellable_products sellable
+        on sellable.organisation_id = organisations.id
+        and sellable.status = 'active'
+      join public.products
+        on products.id = sellable.product_id
+      left join public.product_brands
+        on product_brands.id = products.brand_id
+      left join public.retail_product_stock stock
+        on stock.organisation_id = sellable.organisation_id
+        and stock.product_id = sellable.product_id
+        and stock.status <> 'deleted'
+      where organisations.organisation_type = 'tenant'
+        and organisations.status = 'active'
+        and organisations.country_code = ${code}
+        and products.status = 'approved'
+        and coalesce(products.validation_status, 'pass') = 'pass'
+        and (products.brand_id is null or product_brands.status = 'approved')
+    `,
+    getCustomerPriceMarginPercent({ sql }),
     refreshAdminSafetyCeilings()
   ]);
+  const productIds = [...new Set(skuRows.map((row) => row.product_id))];
+  const factRows =
+    productIds.length > 0
+      ? await sql<Array<{ facts: unknown; product_id: string }>>`
+          select
+            product_id::text,
+            coalesce(
+              jsonb_agg(
+                jsonb_build_object(
+                  'name', name,
+                  'normalizedName', normalized_name,
+                  'amount', amount,
+                  'unit', unit,
+                  'servingLabel', serving_label,
+                  'supplementId', supplement_id::text,
+                  'itemType', item_type
+                )
+              ) filter (where supplement_id is not null),
+              '[]'::jsonb
+            ) as facts
+          from public.product_facts
+          where product_id = any(${uuidArray(sql, productIds)}::uuid[])
+          group by product_id
+        `
+      : [];
+  const factsByProduct = new Map(
+    factRows.map((row) => [row.product_id, snapshotFacts(row.facts)])
+  );
   const byListing = new Map<string, CatalogueProduct>();
 
-  for (const set of sets) {
-    for (const candidate of set.candidates) {
-      const mapped = toCatalogueProduct(candidate);
+  for (const row of skuRows) {
+    const candidate = candidateFromSnapshotRow(
+      row,
+      factsByProduct.get(row.product_id) ?? [],
+      code,
+      marginPercent
+    );
+    const mapped = toCatalogueProduct(candidate);
 
-      if (!mapped) {
-        continue;
-      }
+    if (!mapped) {
+      continue;
+    }
 
-      const listingKey = `${mapped.sellerId}:${mapped.productId}`;
-      const existing = byListing.get(listingKey);
+    const listingKey = `${mapped.sellerId}:${mapped.productId}`;
+    const existing = byListing.get(listingKey);
 
-      if (!existing) {
-        byListing.set(listingKey, mapped);
-        continue;
-      }
+    if (!existing) {
+      byListing.set(listingKey, mapped);
+      continue;
+    }
 
-      const existingRank = existing.stockStatus === "in_stock" ? 0 : 1;
-      const nextRank = mapped.stockStatus === "in_stock" ? 0 : 1;
+    const existingRank = existing.stockStatus === "in_stock" ? 0 : 1;
+    const nextRank = mapped.stockStatus === "in_stock" ? 0 : 1;
 
-      if (
-        nextRank < existingRank ||
-        (nextRank === existingRank && mapped.unitPriceMinor < existing.unitPriceMinor)
-      ) {
-        byListing.set(listingKey, mapped);
-      }
+    if (
+      nextRank < existingRank ||
+      (nextRank === existingRank && mapped.unitPriceMinor < existing.unitPriceMinor)
+    ) {
+      byListing.set(listingKey, mapped);
     }
   }
 
+  console.info("[catalogue:snapshot]", {
+    countryCode: code,
+    ms: Date.now() - startedAt,
+    products: byListing.size,
+    skus: skuRows.length
+  });
+
   return {
     availabilityAsOf: new Date().toISOString(),
-    catalogueVersion: `retail-${countryCode.trim().toUpperCase()}-${byListing.size}`,
+    catalogueVersion: `retail-${code}-${byListing.size}`,
     products: [...byListing.values()],
     supplements: FIXTURE_SUPPLEMENTS
   };
