@@ -27,13 +27,12 @@ describe("plan keep-warm does not starve first-create A2", () => {
       /warmAgenticCatalogue\(\s*environment/,
       "interval keep-warm must not run a second 8-target plan against the live pool"
     );
-    assert.match(warm, /void pingPlanHotPath\(runtime\)/);
     assert.doesNotMatch(
       warm.slice(
         warm.indexOf("export async function keepPlanPathWarm"),
         warm.indexOf("const timer = setInterval")
       ),
-      /await pingPlanHotPath/
+      /pingPlanHotPath/
     );
     assert.doesNotMatch(
       warm.slice(warm.indexOf("const timer = setInterval")),
