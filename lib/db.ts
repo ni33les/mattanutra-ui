@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import { createLogger } from "@/lib/logger";
 
 const globalDb = globalThis as typeof globalThis & {
   mattanutraDbUnavailableLogged?: boolean;
@@ -11,6 +12,11 @@ const DEFAULT_DB_CONNECT_TIMEOUT_SECONDS = 5;
 const DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 120;
 const DEFAULT_DB_POOL_MAX = 4;
 const MAX_DB_POOL_MAX = 10;
+const DEFAULT_DB_STATEMENT_TIMEOUT_MS = 15_000;
+const DEFAULT_DB_LOCK_TIMEOUT_MS = 2_000;
+const DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS = 10_000;
+const dbLog = createLogger("db.pool");
+let poolInitLogged = false;
 
 function assertManagedDatabaseEndpoint(connection: string) {
   try {
@@ -86,6 +92,65 @@ function dbApplicationName() {
   return process.env.DB_APPLICATION_NAME?.trim() || "mattanutra-web";
 }
 
+function dbTimeoutMs(envName: string, fallback: number) {
+  const raw = process.env[envName];
+
+  if (raw === "0") {
+    return 0;
+  }
+
+  const parsed = Number(raw ?? fallback);
+
+  return Number.isFinite(parsed) && parsed >= 0
+    ? Math.min(120_000, Math.round(parsed))
+    : fallback;
+}
+
+function dbStatementTimeoutMs() {
+  return dbTimeoutMs("DB_STATEMENT_TIMEOUT_MS", DEFAULT_DB_STATEMENT_TIMEOUT_MS);
+}
+
+function dbLockTimeoutMs() {
+  return dbTimeoutMs("DB_LOCK_TIMEOUT_MS", DEFAULT_DB_LOCK_TIMEOUT_MS);
+}
+
+function dbIdleInTxnTimeoutMs() {
+  return dbTimeoutMs(
+    "DB_IDLE_IN_TXN_TIMEOUT_MS",
+    DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS
+  );
+}
+
+function postgresConnectionSettings() {
+  const applicationName = dbApplicationName();
+  const statementTimeoutMs = dbStatementTimeoutMs();
+  const lockTimeoutMs = dbLockTimeoutMs();
+  const idleInTxnTimeoutMs = dbIdleInTxnTimeoutMs();
+  const connection: Record<string, string> = {
+    application_name: applicationName
+  };
+
+  if (statementTimeoutMs > 0) {
+    connection.statement_timeout = String(statementTimeoutMs);
+  }
+
+  if (lockTimeoutMs > 0) {
+    connection.lock_timeout = String(lockTimeoutMs);
+  }
+
+  if (idleInTxnTimeoutMs > 0) {
+    connection.idle_in_transaction_session_timeout = String(idleInTxnTimeoutMs);
+  }
+
+  return {
+    applicationName,
+    connection,
+    idleInTxnTimeoutMs,
+    lockTimeoutMs,
+    statementTimeoutMs
+  };
+}
+
 function handleDatabaseNotice(notice: { code?: string }) {
   if (notice.code && BENIGN_SCHEMA_NOTICE_CODES.has(notice.code)) {
     return;
@@ -108,12 +173,12 @@ export function getSql() {
   const poolMax = dbPoolMax();
   const connectTimeout = dbConnectTimeout();
   const idleTimeout = dbPoolIdleTimeout();
-  const applicationName = dbApplicationName();
+  const timeouts = postgresConnectionSettings();
   const connectionKey = `${connection}|ssl:${String(
     useSsl
   )}|sslNegotiation:${
     sslNegotiation ?? "standard"
-  }|poolMax:${poolMax}|connectTimeout:${connectTimeout}|idleTimeout:${idleTimeout}|applicationName:${applicationName}`;
+  }|poolMax:${poolMax}|connectTimeout:${connectTimeout}|idleTimeout:${idleTimeout}|applicationName:${timeouts.applicationName}|statementTimeoutMs:${timeouts.statementTimeoutMs}|lockTimeoutMs:${timeouts.lockTimeoutMs}|idleInTxnTimeoutMs:${timeouts.idleInTxnTimeoutMs}`;
 
   if (
     globalDb.mattanutraSql &&
@@ -125,7 +190,7 @@ export function getSql() {
 
   globalDb.mattanutraSql ??= postgres(connection, {
     connect_timeout: connectTimeout,
-    connection: { application_name: applicationName },
+    connection: timeouts.connection,
     idle_timeout: idleTimeout,
     max: poolMax,
     onnotice: handleDatabaseNotice,
@@ -134,6 +199,16 @@ export function getSql() {
     ...(sslNegotiation ? { sslnegotiation: sslNegotiation } : {})
   });
   globalDb.mattanutraSqlConnectionKey = connectionKey;
+
+  if (!poolInitLogged) {
+    poolInitLogged = true;
+    dbLog.info("pool_initialized", {
+      idleInTxnTimeoutMs: timeouts.idleInTxnTimeoutMs,
+      lockTimeoutMs: timeouts.lockTimeoutMs,
+      poolMax,
+      statementTimeoutMs: timeouts.statementTimeoutMs
+    });
+  }
 
   return globalDb.mattanutraSql;
 }

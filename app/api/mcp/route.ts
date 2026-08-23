@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
+import { requestCorrelationId } from "@/lib/request-correlation";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { loadAgenticConfig } from "@/lib/agentic/config";
 import {
@@ -105,6 +106,7 @@ export async function POST(request: Request) {
 
   const started = performance.now();
   const timed = timedToolName(body);
+  const correlationId = requestCorrelationId(request);
 
   try {
     if (!Array.isArray(body) && !mcpCallNeedsStore(body)) {
@@ -118,9 +120,15 @@ export async function POST(request: Request) {
       }
 
       if (light) {
+        const durationMs = Math.round(performance.now() - started);
         if (timed) {
-          recordMcpTiming(timed, performance.now() - started);
+          recordMcpTiming(timed, durationMs);
         }
+        log.info("mcp.tool_completed", {
+          correlationId,
+          durationMs,
+          tool: timed ?? "other"
+        });
         return jsonRpc(light);
       }
     }
@@ -141,9 +149,15 @@ export async function POST(request: Request) {
         }
       }
 
+      const durationMs = Math.round(performance.now() - started);
       if (timed) {
-        recordMcpTiming(timed, performance.now() - started);
+        recordMcpTiming(timed, durationMs);
       }
+      log.info("mcp.tool_completed", {
+        correlationId,
+        durationMs,
+        tool: timed ?? "batch"
+      });
       return jsonRpc(responses);
     }
 
@@ -153,13 +167,22 @@ export async function POST(request: Request) {
       return new NextResponse(null, { status: 202 });
     }
 
+    const durationMs = Math.round(performance.now() - started);
     if (timed) {
-      recordMcpTiming(timed, performance.now() - started);
+      recordMcpTiming(timed, durationMs);
     }
+    log.info("mcp.tool_completed", {
+      correlationId,
+      durationMs,
+      tool: timed ?? "other"
+    });
     return jsonRpc(result);
   } catch (error) {
     log.error("mcp.dispatch_failed", {
-      message: error instanceof Error ? error.message : "unknown"
+      correlationId,
+      durationMs: Math.round(performance.now() - started),
+      message: error instanceof Error ? error.message : "unknown",
+      tool: timed ?? "unknown"
     });
 
     return jsonRpc(
