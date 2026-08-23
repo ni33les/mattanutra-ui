@@ -120,8 +120,13 @@ describe("consistency r5 regression guards", () => {
     assert.match(instrumentation, /startTaskMaintenanceLoop/);
     const sweep = await readFile("lib/task-sweep-loop.ts", "utf8");
     const startFn = sweep.slice(sweep.indexOf("export function startTaskMaintenanceLoop"));
+    assert.match(sweep, /TASK_MAINTENANCE_FIRST_DELAY_MS = 60_000/);
+    assert.match(startFn, /setTimeout\(\(\) => \{/);
     assert.doesNotMatch(
-      startFn.slice(startFn.indexOf("timer.unref")),
+      startFn.slice(
+        startFn.indexOf("export function startTaskMaintenanceLoop"),
+        startFn.indexOf("setTimeout")
+      ),
       /runTaskMaintenanceTick/,
       "reservation sweep must not open the worker pool at register"
     );

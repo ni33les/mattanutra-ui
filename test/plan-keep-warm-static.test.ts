@@ -36,6 +36,7 @@ describe("plan keep-warm does not starve first-create A2", () => {
     assert.match(warm, /setTimeout\(\(\) => \{/);
     assert.match(warm, /setInterval\(warmOnce, KEEP_WARM_MS\)/);
     assert.doesNotMatch(reserve, /maybeReleaseExpiredReservations|releaseExpiredReservations/);
+    assert.match(sweep, /TASK_MAINTENANCE_FIRST_DELAY_MS = 60_000/);
     assert.match(sweep, /TASK_MAINTENANCE_INTERVAL_MS = 15_000/);
     assert.match(sweep, /releaseExpiredReservations/);
     assert.match(planService, /schedulePersistPlanSideEffects/);
