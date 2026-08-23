@@ -815,7 +815,7 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
     });
   }
 
-  notifyTaskQueueChanged();
+  notifyTaskQueueChanged(task.taskType, sql);
 
   return { created: true, task };
 }

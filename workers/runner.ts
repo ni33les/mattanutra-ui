@@ -10,6 +10,10 @@ import {
 } from "../lib/worker-agent-credentials.ts";
 import { startTaskMaintenanceLoop } from "../lib/task-sweep-loop.ts";
 import {
+  subscribeTaskQueue,
+  waitForTaskQueueChange
+} from "../lib/task-wakeup.ts";
+import {
   isWorkerAuthConfigurationError,
   WorkerApiClient,
   type WorkerAgentConfig,
@@ -35,7 +39,7 @@ type WorkerMode =
   | "stock"
   | "supplement";
 
-const DEFAULT_POLL_WAIT_SECONDS = 20;
+const DEFAULT_POLL_WAIT_SECONDS = 24;
 const DEFAULT_LEASE_SECONDS = 900;
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000;
 const INITIAL_AGENT_RESTART_BACKOFF_MS = 1_000;
@@ -47,6 +51,7 @@ const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
 const TASK_LEASE_ABORT_SAFETY_MS = 120_000;
 const WORKER_RUN_ID = randomUUID();
 const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES;
+let stopTaskQueueListen: (() => Promise<void>) | null = null;
 
 type ActiveSession = Readonly<{
   agentId: string;
@@ -339,7 +344,7 @@ async function runAgentLoop(
   const waitSeconds =
     positiveInteger(
       process.env.WORKER_POLL_WAIT_SECONDS,
-      registration.polling.waitSeconds,
+      DEFAULT_POLL_WAIT_SECONDS,
     ) || DEFAULT_POLL_WAIT_SECONDS;
   const heartbeatIntervalMs = positiveInteger(
     process.env.WORKER_HEARTBEAT_INTERVAL_MS,
@@ -410,7 +415,6 @@ async function runAgentLoop(
           agent,
           leaseSeconds,
           taskTypes: agentConfig.taskTypes,
-          waitSeconds,
           workerSessionId,
         });
         pollingBackoffMs = 1_000;
@@ -438,6 +442,10 @@ async function runAgentLoop(
       if (!reserved.task || !reserved.reservationId) {
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
+        await waitForTaskQueueChange(
+          waitSeconds * 1_000,
+          agentConfig.taskTypes,
+        );
         continue;
       }
 
@@ -668,12 +676,22 @@ async function shutdown() {
   }
 
   shuttingDown = true;
+  await stopTaskQueueListen?.().catch(() => null);
   await markSessionsOffline();
   process.exit(0);
 }
 
 async function runWorker(mode: WorkerMode) {
   startTaskMaintenanceLoop();
+
+  try {
+    stopTaskQueueListen = await subscribeTaskQueue();
+  } catch (error) {
+    console.error(
+      "[worker] task queue LISTEN failed; falling back to 24s poll",
+      error instanceof Error ? error.message : error,
+    );
+  }
   const modes = workerProfileModesForRun(mode);
   const loops = modes.flatMap((profileMode, profileIndex) => {
     const configs = requireConfigs(profileMode);

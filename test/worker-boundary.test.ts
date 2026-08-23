@@ -374,25 +374,10 @@ describe("external worker boundaries", () => {
       "utf8",
     );
 
-    assert.match(
+    assert.doesNotMatch(
       source,
-      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_gap_guidance[\s\S]*generate_supplement_guidance/,
-      "blocking UI task types must be on the interactive reserve path",
-    );
-    assert.equal(
-      /INTERACTIVE_TASK_TYPES[\s\S]*generate_food_guidance/.test(source),
-      false,
-      "legacy food guidance must stay off the interactive reserve path",
-    );
-    assert.match(
-      source,
-      /INTERACTIVE_TASK_TYPES[\s\S]*generate_product_recommendations/,
-      "product matching must be on the interactive reserve path because the reveal page waits for it",
-    );
-    assert.match(
-      source,
-      /waitForTaskQueueChange/,
-      "long-polling workers should wake immediately when the task queue changes",
+      /waitForTaskQueueChange|INTERACTIVE_RESERVE_POLL_INTERVAL_MS|while\s*\(\s*true\s*\)/,
+      "reserve is check-and-return; workers wait locally on LISTEN or 24s",
     );
     assert.match(source, /eventName: "task_reserved"/);
     assert.match(completeRouteSource, /eventName: "task_completed"/);
@@ -493,9 +478,19 @@ describe("external worker boundaries", () => {
       "workers should not send a redundant polling heartbeat before every reserve call",
     );
     assert.match(
-      source,
-      /INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000/,
-      "interactive fallback polling should keep user-visible tasks responsive",
+      runnerSource,
+      /DEFAULT_POLL_WAIT_SECONDS = 24/,
+      "empty reserve must wait locally for LISTEN or 24s, not tight-loop",
+    );
+    assert.match(
+      runnerSource,
+      /await waitForTaskQueueChange\(\s*waitSeconds \* 1_000,\s*agentConfig\.taskTypes/,
+    );
+    assert.match(runnerSource, /subscribeTaskQueue/);
+    assert.doesNotMatch(
+      runnerSource,
+      /waitSeconds,\s*workerSessionId/,
+      "workers must not HTTP long-poll reserve",
     );
     assert.match(
       profilesSource,

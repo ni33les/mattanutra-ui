@@ -376,6 +376,8 @@ describe("process runtime technical debt sweep", () => {
     );
     assert.match(functionBody(db, "getSql"), /getOrCreateSqlPool\("interactive"\)/);
     assert.match(functionBody(db, "getWorkerSql"), /getOrCreateSqlPool\("worker"\)/);
+    assert.match(functionBody(db, "getListenSql"), /listenConnectionUrl\(\)/);
+    assert.match(db, /process\.env\.DB_LISTEN_URL/);
   });
 
   it("keeps retired database connection env names out of committed runtime and operator code", async () => {

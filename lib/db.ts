@@ -7,6 +7,8 @@ const globalDb = globalThis as typeof globalThis & {
   mattanutraSqlConnectionKey?: string;
   mattanutraWorkerSql?: postgres.Sql;
   mattanutraWorkerSqlConnectionKey?: string;
+  mattanutraListenSql?: postgres.Sql;
+  mattanutraListenSqlConnectionKey?: string;
 };
 
 const BENIGN_SCHEMA_NOTICE_CODES = new Set(["42P07", "42701", "42710"]);
@@ -21,6 +23,7 @@ const DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS = 10_000;
 const dbLog = createLogger("db.pool");
 const poolInitLogged = {
   interactive: false,
+  listen: false,
   worker: false
 };
 
@@ -114,6 +117,40 @@ function dbApplicationName() {
 
 function dbWorkerApplicationName() {
   return process.env.DB_WORKER_APPLICATION_NAME?.trim() || "mattanutra-worker";
+}
+
+function dbListenApplicationName() {
+  return process.env.DB_LISTEN_APPLICATION_NAME?.trim() || "mattanutra-listen";
+}
+
+function listenConnectionUrl() {
+  const explicit = process.env.DB_LISTEN_URL?.trim();
+
+  if (explicit) {
+    return explicit;
+  }
+
+  const connection = process.env.DB_URL?.trim();
+
+  if (!connection) {
+    return null;
+  }
+
+  try {
+    const url = new URL(connection);
+
+    if (
+      url.hostname.endsWith(".db.ondigitalocean.com") &&
+      url.port === "25061"
+    ) {
+      url.port = "25060";
+      return url.toString();
+    }
+  } catch {
+    return connection;
+  }
+
+  return connection;
 }
 
 function dbTimeoutMs(envName: string, fallback: number) {
@@ -277,18 +314,104 @@ export function getWorkerSql() {
   return getOrCreateSqlPool("worker");
 }
 
+export function getListenSql() {
+  const connection = listenConnectionUrl();
+
+  if (!connection) {
+    return null;
+  }
+
+  const useSsl = shouldUseSsl(connection);
+  const sslNegotiation = dbSslNegotiation();
+  const connectTimeout = dbConnectTimeout();
+  const applicationName = dbListenApplicationName();
+  const connectionKey = `${connection}|kind:listen|ssl:${String(
+    useSsl
+  )}|sslNegotiation:${
+    sslNegotiation ?? "standard"
+  }|connectTimeout:${connectTimeout}|applicationName:${applicationName}`;
+
+  if (
+    globalDb.mattanutraListenSql &&
+    globalDb.mattanutraListenSqlConnectionKey !== connectionKey
+  ) {
+    void globalDb.mattanutraListenSql.end();
+    globalDb.mattanutraListenSql = undefined;
+  }
+
+  globalDb.mattanutraListenSql ??= postgres(connection, {
+    connect_timeout: connectTimeout,
+    connection: {
+      application_name: applicationName
+    },
+    idle_timeout: 0,
+    keep_alive: 30,
+    max: 1,
+    max_lifetime: null,
+    onclose: () => {
+      const listeners = (
+        globalThis as typeof globalThis & {
+          mattanutraListenSqlOnClose?: Set<() => void>;
+        }
+      ).mattanutraListenSqlOnClose;
+
+      if (!listeners) {
+        return;
+      }
+
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    onnotice: handleDatabaseNotice,
+    prepare: false,
+    ...(useSsl ? { ssl: "require" } : {}),
+    ...(sslNegotiation ? { sslnegotiation: sslNegotiation } : {})
+  });
+  globalDb.mattanutraListenSqlConnectionKey = connectionKey;
+
+  if (!poolInitLogged.listen) {
+    poolInitLogged.listen = true;
+    dbLog.info("listen_initialized", {
+      applicationName,
+      derivedDirect:
+        Boolean(process.env.DB_URL?.includes(":25061")) &&
+        !process.env.DB_LISTEN_URL?.trim()
+    });
+  }
+
+  return globalDb.mattanutraListenSql;
+}
+
+export function onListenSqlClose(listener: () => void) {
+  const globalListen = globalThis as typeof globalThis & {
+    mattanutraListenSqlOnClose?: Set<() => void>;
+  };
+
+  globalListen.mattanutraListenSqlOnClose ??= new Set();
+  globalListen.mattanutraListenSqlOnClose.add(listener);
+
+  return () => {
+    globalListen.mattanutraListenSqlOnClose?.delete(listener);
+  };
+}
+
 export async function closeSqlPool() {
   const sql = globalDb.mattanutraSql;
   const workerSql = globalDb.mattanutraWorkerSql;
+  const listenSql = globalDb.mattanutraListenSql;
 
   globalDb.mattanutraSql = undefined;
   globalDb.mattanutraSqlConnectionKey = undefined;
   globalDb.mattanutraWorkerSql = undefined;
   globalDb.mattanutraWorkerSqlConnectionKey = undefined;
+  globalDb.mattanutraListenSql = undefined;
+  globalDb.mattanutraListenSqlConnectionKey = undefined;
 
   await Promise.all([
     sql ? sql.end() : Promise.resolve(),
-    workerSql ? workerSql.end() : Promise.resolve()
+    workerSql ? workerSql.end() : Promise.resolve(),
+    listenSql ? listenSql.end() : Promise.resolve()
   ]);
 }
 

@@ -144,21 +144,13 @@ describe("consistency r3 regression guards", () => {
     }
   });
 
-  it("waits for the task queue without holding a SQL transaction", async () => {
-    const [reserve, wakeup] = await Promise.all([
-      readFile("app/api/tasks/reserve/route.ts", "utf8"),
-      readFile("lib/task-wakeup.ts", "utf8")
-    ]);
+  it("does not wait or open a SQL transaction on reserve", async () => {
+    const reserve = await readFile("app/api/tasks/reserve/route.ts", "utf8");
     const beginBodies = extractBalancedCalls(reserve, /\bsql\.begin\s*\(/g);
 
     assert.equal(beginBodies.length, 0, "reserve must not open sql.begin");
-    assert.match(reserve, /waitForTaskQueueChange/);
-    assert.match(wakeup, /setTimeout\(\(\) => complete\(false\), timeoutMs\)/);
-    assert.doesNotMatch(wakeup, /sql\.begin|getSql|getWorkerSql/);
-
-    assert.match(
-      reserve,
-      /if \(!reserved\) \{[\s\S]*await waitForTaskQueueChange\(/
-    );
+    assert.doesNotMatch(reserve, /waitForTaskQueueChange/);
+    assert.doesNotMatch(reserve, /INTERACTIVE_RESERVE_POLL_INTERVAL_MS/);
+    assert.doesNotMatch(reserve, /while\s*\(\s*true\s*\)/);
   });
 });

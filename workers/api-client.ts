@@ -226,7 +226,6 @@ export class WorkerApiClient {
     agent: WorkerRegistration["agent"];
     leaseSeconds: number;
     taskTypes: readonly string[];
-    waitSeconds: number;
     workerSessionId: string;
   }>) {
     return this.post<{
