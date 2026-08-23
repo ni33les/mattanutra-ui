@@ -3,6 +3,10 @@ export async function register() {
     return;
   }
 
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+
   const { keepDatabaseWarm } = await import("./lib/db");
   await keepDatabaseWarm();
   void import("./lib/task-sweep-loop")
@@ -23,12 +27,4 @@ export async function register() {
         error instanceof Error ? error.message : error
       );
     });
-
-  try {
-    const { resolveAgenticEnvironment } = await import("./lib/agentic/config");
-    const { keepPlanPathWarm } = await import("./lib/agentic/plan/warm-dev");
-    void keepPlanPathWarm(resolveAgenticEnvironment());
-  } catch (error) {
-    console.warn("Unable to start plan keep-warm", error);
-  }
 }

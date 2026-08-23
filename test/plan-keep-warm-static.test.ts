@@ -3,38 +3,28 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 describe("plan keep-warm does not starve first-create A2", () => {
-  it("warms catalogue on the interval and skips competing 8-target plan pings", async () => {
-    const [warm, dispatcher, reserve, sweep, planService, db, startPlatform] = await Promise.all([
+  it("does not rebuild the MCP catalogue on a timer", async () => {
+    const [warm, dispatcher, reserve, sweep, planService, db, startPlatform, instrumentation] =
+      await Promise.all([
       readFile("lib/agentic/plan/warm-dev.ts", "utf8"),
       readFile("lib/agentic/mcp/dispatcher.ts", "utf8"),
       readFile("app/api/tasks/reserve/route.ts", "utf8"),
       readFile("lib/task-sweep-loop.ts", "utf8"),
       readFile("lib/agentic/plan/service.ts", "utf8"),
       readFile("lib/db.ts", "utf8"),
-      readFile("scripts/start-platform.mjs", "utf8")
+      readFile("scripts/start-platform.mjs", "utf8"),
+      readFile("instrumentation.ts", "utf8")
     ]);
 
     assert.match(warm, /withLivePlanRequest/);
     assert.match(warm, /isLivePlanInFlight/);
     assert.match(dispatcher, /withLivePlanRequest\(\(\) =>/);
-    assert.match(warm, /KEEP_WARM_FIRST_DELAY_MS = 60_000/);
-    assert.match(warm, /KEEP_WARM_MS = 10 \* 60_000/);
-    assert.match(
-      warm,
-      /mattanutraCatalogueWarmInflight/,
-      "interval keep-warm must skip while a catalogue warm is already in flight"
-    );
-    assert.match(
-      warm,
-      /warmAgenticCatalogue\(\s*environment/,
-      "interval keep-warm must not run a second 8-target plan against the live pool"
-    );
     assert.doesNotMatch(
       warm.slice(warm.indexOf("export async function keepPlanPathWarm")),
-      /pingPlanHotPath/
+      /warmAgenticCatalogue/
     );
-    assert.match(warm, /setTimeout\(\(\) => \{/);
-    assert.match(warm, /setInterval\(warmOnce, KEEP_WARM_MS\)/);
+    assert.doesNotMatch(instrumentation, /keepPlanPathWarm/);
+    assert.match(instrumentation, /NEXT_PHASE === "phase-production-build"/);
     assert.doesNotMatch(reserve, /maybeReleaseExpiredReservations|releaseExpiredReservations/);
     assert.match(sweep, /TASK_MAINTENANCE_FIRST_DELAY_MS = 60_000/);
     assert.match(sweep, /TASK_MAINTENANCE_INTERVAL_MS = 15_000/);

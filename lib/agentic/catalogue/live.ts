@@ -2,16 +2,15 @@ import { assessRetailSellability } from "@/lib/retail-sellability";
 import { publicProductId } from "@/lib/agentic/contract/ids";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogue/market";
 import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
-import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import {
   inferOmegaSource,
+  shouldSkipOmegaContribution,
   supplementNameMatchesFact
 } from "@/lib/agentic/catalogue/product-fit";
 import {
   customerPriceFromRpp,
-  getCustomerPriceMarginPercent
+  DEFAULT_CUSTOMER_PRICE_MARGIN_PERCENT
 } from "@/lib/customer-pricing";
-import { uuidArray } from "@/lib/sql-arrays";
 import type {
   CatalogueProduct,
   CatalogueSnapshot
@@ -84,10 +83,36 @@ function namesOfSupplement(item: (typeof FIXTURE_SUPPLEMENTS)[number]) {
   return [item.name, ...item.aliases].map(normalizeName);
 }
 
+const fixtureIdByKey = (() => {
+  const keys = new Map<string, string>();
+
+  for (const item of FIXTURE_SUPPLEMENTS) {
+    keys.set(item.uuid, item.supplementId);
+    keys.set(item.supplementId, item.supplementId);
+
+    for (const name of namesOfSupplement(item)) {
+      if (name) {
+        keys.set(name, item.supplementId);
+      }
+    }
+  }
+
+  return keys;
+})();
+
 function contributionSupplementIds(candidate: ProductCandidate) {
   const ids = new Set<string>();
 
   for (const fact of candidate.facts ?? []) {
+    if (fact.supplementId) {
+      const mapped = fixtureIdByKey.get(fact.supplementId);
+
+      if (mapped && !shouldSkipOmegaContribution(mapped, candidate)) {
+        ids.add(mapped);
+        continue;
+      }
+    }
+
     const keys = [
       fact.name,
       fact.normalizedName?.replace(/_/g, " "),
@@ -96,6 +121,19 @@ function contributionSupplementIds(candidate: ProductCandidate) {
 
     for (const key of keys) {
       const wanted = normalizeName(key);
+      const exact = fixtureIdByKey.get(wanted);
+
+      if (exact) {
+        if (!shouldSkipOmegaContribution(wanted, candidate)) {
+          ids.add(exact);
+        }
+        continue;
+      }
+
+      if (fact.supplementId) {
+        continue;
+      }
+
       const match = FIXTURE_SUPPLEMENTS.find((item) =>
         namesOfSupplement(item).some((name) =>
           supplementNameMatchesFact(name, wanted, candidate)
@@ -236,15 +274,13 @@ type SnapshotSkuRow = Readonly<{
   backorder_policy: string | null;
   brand_status: string | null;
   currency: string | null;
+  facts: unknown;
   image_url: string | null;
-  lead_time_days: number | string | null;
   organisation_currency: string | null;
   organisation_id: string;
-  organisation_metadata: unknown;
   organisation_name: string;
   platform: string | null;
   product_audience: string | null;
-  product_form: string | null;
   product_id: string;
   product_kind: string | null;
   product_status: string;
@@ -252,6 +288,7 @@ type SnapshotSkuRow = Readonly<{
   region: string | null;
   retail_sellable_product_id: string;
   rrp_price_amount: number | string | null;
+  margin_percent: number | string | null;
   stock_quantity: number | string | null;
   title: string;
   validation_status: string | null;
@@ -389,93 +426,92 @@ export async function loadLiveRetailSnapshot(
     };
   }
 
-  const [skuRows, marginPercent] = await Promise.all([
-    sql<SnapshotSkuRow[]>`
-      select
-        organisations.id::text as organisation_id,
-        organisations.name as organisation_name,
-        organisations.currency as organisation_currency,
-        organisations.metadata as organisation_metadata,
-        sellable.id::text as retail_sellable_product_id,
-        sellable.product_id::text,
-        sellable.rrp_price_amount,
-        sellable.currency,
-        sellable.lead_time_days,
-        sellable.backorder_policy,
-        products.title,
-        products.image_url,
-        products.product_url,
-        products.platform,
-        products.region,
-        products.status as product_status,
-        products.validation_status,
-        products.product_kind,
-        coalesce(to_jsonb(products) ->> 'product_audience', 'both') as product_audience,
-        coalesce(
-          to_jsonb(products) ->> 'product_form',
-          products.source_snapshot ->> 'productForm',
-          products.source_snapshot ->> 'product_form'
-        ) as product_form,
-        product_brands.status as brand_status,
-        coalesce(stock.stock_quantity, 0)::int as stock_quantity
+  const skuRows = await sql<SnapshotSkuRow[]>`
+    with tenants as materialized (
+      select organisations.id, organisations.name, organisations.currency
       from public.organisations
-      join public.retail_sellable_products sellable
-        on sellable.organisation_id = organisations.id
-        and sellable.status = 'active'
-      join public.products
-        on products.id = sellable.product_id
-      left join public.product_brands
-        on product_brands.id = products.brand_id
-      left join public.retail_product_stock stock
-        on stock.organisation_id = sellable.organisation_id
-        and stock.product_id = sellable.product_id
-        and stock.status <> 'deleted'
       where organisations.organisation_type = 'tenant'
         and organisations.status = 'active'
         and organisations.country_code = ${code}
-        and products.status = 'approved'
-        and coalesce(products.validation_status, 'pass') = 'pass'
-        and (products.brand_id is null or product_brands.status = 'approved')
-    `,
-    getCustomerPriceMarginPercent({ sql }),
-    refreshAdminSafetyCeilings()
-  ]);
-  const productIds = [...new Set(skuRows.map((row) => row.product_id))];
-  const factRows =
-    productIds.length > 0
-      ? await sql<Array<{ facts: unknown; product_id: string }>>`
-          select
-            product_id::text,
-            coalesce(
-              jsonb_agg(
-                jsonb_build_object(
-                  'name', name,
-                  'normalizedName', normalized_name,
-                  'amount', amount,
-                  'unit', unit,
-                  'servingLabel', serving_label,
-                  'supplementId', supplement_id::text,
-                  'itemType', item_type
-                )
-              ) filter (where supplement_id is not null),
-              '[]'::jsonb
-            ) as facts
-          from public.product_facts
-          where product_id = any(${uuidArray(sql, productIds)}::uuid[])
-          group by product_id
-        `
-      : [];
-  const factsByProduct = new Map(
-    factRows.map((row) => [row.product_id, snapshotFacts(row.facts)])
-  );
+    ),
+    platform_margin as materialized (
+      select coalesce(
+        nullif(platform.metadata ->> 'customerPriceMarginPercent', '')::numeric,
+        ${DEFAULT_CUSTOMER_PRICE_MARGIN_PERCENT}
+      ) as percent
+      from public.organisations platform
+      where lower(platform.slug) = 'mattanutra'
+        and platform.organisation_type = 'platform'
+      limit 1
+    )
+    select
+      tenants.id::text as organisation_id,
+      tenants.name as organisation_name,
+      tenants.currency as organisation_currency,
+      sellable.id::text as retail_sellable_product_id,
+      sellable.product_id::text,
+      sellable.rrp_price_amount,
+      sellable.currency,
+      sellable.backorder_policy,
+      products.title,
+      products.image_url,
+      products.product_url,
+      products.platform,
+      products.region,
+      products.status as product_status,
+      products.validation_status,
+      products.product_kind,
+      products.product_audience,
+      product_brands.status as brand_status,
+      coalesce(stock.stock_quantity, 0)::int as stock_quantity,
+      coalesce(fact_rows.facts, '[]'::jsonb) as facts,
+      coalesce(
+        (select percent from platform_margin),
+        ${DEFAULT_CUSTOMER_PRICE_MARGIN_PERCENT}
+      ) as margin_percent
+    from tenants
+    join public.retail_sellable_products sellable
+      on sellable.organisation_id = tenants.id
+      and sellable.status = 'active'
+    join public.products
+      on products.id = sellable.product_id
+    left join public.product_brands
+      on product_brands.id = products.brand_id
+    left join public.retail_product_stock stock
+      on stock.organisation_id = sellable.organisation_id
+      and stock.product_id = sellable.product_id
+      and stock.status <> 'deleted'
+    left join lateral (
+      select
+        coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'name', name,
+              'normalizedName', normalized_name,
+              'amount', amount,
+              'unit', unit,
+              'servingLabel', serving_label,
+              'supplementId', supplement_id::text,
+              'itemType', item_type
+            )
+          ) filter (where supplement_id is not null),
+          '[]'::jsonb
+        ) as facts
+      from public.product_facts
+      where product_facts.product_id = products.id
+    ) fact_rows on true
+    where products.status = 'approved'
+      and coalesce(products.validation_status, 'pass') = 'pass'
+      and (products.brand_id is null or product_brands.status = 'approved')
+  `;
   const byListing = new Map<string, CatalogueProduct>();
 
   for (const row of skuRows) {
     const candidate = candidateFromSnapshotRow(
       row,
-      factsByProduct.get(row.product_id) ?? [],
+      snapshotFacts(row.facts),
       code,
-      marginPercent
+      numberOrZero(row.margin_percent) || DEFAULT_CUSTOMER_PRICE_MARGIN_PERCENT
     );
     const mapped = toCatalogueProduct(candidate);
 
