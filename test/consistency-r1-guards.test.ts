@@ -86,12 +86,13 @@ describe("consistency r1 regression guards", () => {
     assert.match(db, /DEFAULT_DB_STATEMENT_TIMEOUT_MS = 15_000/);
     assert.match(db, /DEFAULT_DB_LOCK_TIMEOUT_MS = 2_000/);
     assert.match(db, /DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS = 10_000/);
-    assert.match(db, /connection\.statement_timeout = String\(statementTimeoutMs\)/);
-    assert.match(db, /connection\.lock_timeout = String\(lockTimeoutMs\)/);
+    assert.match(db, /-c statement_timeout=\$\{statementTimeoutMs\}/);
+    assert.match(db, /-c lock_timeout=\$\{lockTimeoutMs\}/);
     assert.match(
       db,
-      /connection\.idle_in_transaction_session_timeout = String\(idleInTxnTimeoutMs\)/
+      /-c idle_in_transaction_session_timeout=\$\{idleInTxnTimeoutMs\}/
     );
+    assert.match(db, /connection\.options = optionFlags\.join\(" "\)/);
     assert.match(db, /pool_initialized/);
   });
 

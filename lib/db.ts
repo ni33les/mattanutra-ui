@@ -129,17 +129,16 @@ function postgresConnectionSettings() {
   const connection: Record<string, string> = {
     application_name: applicationName
   };
+  const optionFlags = [
+    statementTimeoutMs > 0 ? `-c statement_timeout=${statementTimeoutMs}` : "",
+    lockTimeoutMs > 0 ? `-c lock_timeout=${lockTimeoutMs}` : "",
+    idleInTxnTimeoutMs > 0
+      ? `-c idle_in_transaction_session_timeout=${idleInTxnTimeoutMs}`
+      : ""
+  ].filter(Boolean);
 
-  if (statementTimeoutMs > 0) {
-    connection.statement_timeout = String(statementTimeoutMs);
-  }
-
-  if (lockTimeoutMs > 0) {
-    connection.lock_timeout = String(lockTimeoutMs);
-  }
-
-  if (idleInTxnTimeoutMs > 0) {
-    connection.idle_in_transaction_session_timeout = String(idleInTxnTimeoutMs);
+  if (optionFlags.length > 0) {
+    connection.options = optionFlags.join(" ");
   }
 
   return {
