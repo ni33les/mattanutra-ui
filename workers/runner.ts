@@ -405,6 +405,7 @@ async function runAgentLoop(
     let pollingBackoffMs = 1_000;
 
     let leftoverIds: string[] = [];
+    const maxClaimAttempts = 3;
 
     const loadQueuedIds = async () => {
       const queued = await client.queued();
@@ -444,8 +445,10 @@ async function runAgentLoop(
       }
 
       leftoverIds = [];
+      const attempts = ids.slice(0, maxClaimAttempts);
 
-      for (const taskId of ids) {
+      for (let index = 0; index < attempts.length; index += 1) {
+        const taskId = attempts[index]!;
         const reserved = await client.reserve({
           agent,
           leaseSeconds,
@@ -455,11 +458,12 @@ async function runAgentLoop(
         });
 
         if (reserved.task && reserved.reservationId) {
-          leftoverIds = ids.filter((id) => id !== taskId);
+          leftoverIds = ids.slice(index + 1);
           return reserved;
         }
       }
 
+      leftoverIds = [];
       return { task: null, reservationId: undefined };
     };
 
@@ -747,14 +751,17 @@ async function peekQueuedWork(client: WorkerApiClient) {
   try {
     const result = await client.queued();
     const tasks = Array.isArray(result.tasks) ? result.tasks : [];
+    const signaledTypes = new Set<string>();
 
     for (const task of tasks) {
-      if (task.taskId && task.taskType) {
-        signalTaskQueue({
-          taskId: task.taskId,
-          taskType: task.taskType
-        });
+      if (!task.taskType || signaledTypes.has(task.taskType)) {
+        continue;
       }
+
+      signaledTypes.add(task.taskType);
+      signalTaskQueue({
+        taskType: task.taskType
+      });
     }
 
     if (tasks.length > 0) {

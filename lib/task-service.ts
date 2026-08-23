@@ -1735,22 +1735,58 @@ async function claimQueuedTaskById(
   return rows[0] ? mapTask(rows[0]) : null;
 }
 
+const QUEUED_HEADS_PER_TYPE = 8;
+
 export async function listQueuedTaskHeads() {
   const sql = getRequiredSql();
   const rows = await sql<Array<{ task_id: string; task_type: string }>>`
-    select
-      id::text as task_id,
-      task_type
-    from public.tasks
-    where status = 'queued'
-      and coalesce(actor_type, 'system') <> 'human'
-      and scheduled_for <= now()
-      and attempts < max_attempts
-    order by
-      coalesce(priority_score, business_value) desc,
-      scheduled_for asc,
-      created_at asc
-    limit 50
+    with ranked as (
+      select
+        id::text as task_id,
+        task_type,
+        row_number() over (
+          partition by task_type
+          order by
+            coalesce(priority_score, business_value) desc,
+            scheduled_for asc,
+            created_at asc
+        ) as type_rank
+      from public.tasks
+      where status = 'queued'
+        and coalesce(actor_type, 'system') <> 'human'
+        and scheduled_for <= now()
+        and attempts < max_attempts
+        and not exists (
+          select 1
+          from public.task_dependencies
+          join public.tasks as dependency
+            on dependency.id = task_dependencies.depends_on_task_id
+          where task_dependencies.task_id = tasks.id
+            and (
+              (
+                task_dependencies.dependency_type = 'complete'
+                and dependency.status not in ('completed', 'skipped')
+              )
+              or (
+                task_dependencies.dependency_type = 'successful'
+                and dependency.status <> 'completed'
+              )
+              or (
+                task_dependencies.dependency_type = 'approved'
+                and not exists (
+                  select 1
+                  from public.task_approvals
+                  where task_approvals.task_id = dependency.id
+                    and task_approvals.status = 'approved'
+                )
+              )
+            )
+        )
+    )
+    select task_id, task_type
+    from ranked
+    where type_rank <= ${QUEUED_HEADS_PER_TYPE}
+    order by task_type, type_rank
   `;
 
   return rows.map((row) => ({

@@ -29,12 +29,15 @@ describe("consistency r5 regression guards", () => {
       readFile("lib/task-service.ts", "utf8"),
       readFile("app/api/tasks/queued/route.ts", "utf8")
     ]);
-    const start = service.indexOf("export async function listQueuedTaskHeads");
-    const peek = service.slice(start, start + 900);
+    const start = service.indexOf("const QUEUED_HEADS_PER_TYPE");
+    const peek = service.slice(start, start + 2400);
 
-    assert.match(peek, /limit 50/);
+    assert.match(service, /QUEUED_HEADS_PER_TYPE = 8/);
+    assert.match(peek, /partition by task_type/);
+    assert.match(peek, /type_rank <= \$\{QUEUED_HEADS_PER_TYPE\}/);
+    assert.match(peek, /task_dependencies/);
+    assert.match(peek, /dependency_type = 'successful'/);
     assert.doesNotMatch(peek, /for update/i);
-    assert.doesNotMatch(peek, /distinct on/i);
     assert.match(route, /requireWorkerAccess/);
     assert.match(route, /listQueuedTaskHeads\(\)/);
   });
@@ -69,6 +72,17 @@ describe("consistency r5 regression guards", () => {
     assert.match(runner, /wakeUrl/);
     assert.doesNotMatch(runner, /from "\.\.\/lib\/db/);
     assert.doesNotMatch(runner, /subscribeTaskQueue|getListenSql/);
+    assert.match(runner, /maxClaimAttempts = 3/);
+    assert.match(runner, /ids\.slice\(0, maxClaimAttempts\)/);
+    assert.match(runner, /signaledTypes/);
+    assert.match(
+      runner,
+      /signalTaskQueue\(\{\s*taskType: task\.taskType\s*\}\)/
+    );
+    assert.doesNotMatch(
+      runner.slice(runner.indexOf("async function peekQueuedWork")),
+      /signalTaskQueue\(\{[\s\S]*taskId: task\.taskId/
+    );
   });
 
   it("does not wake all workers after a reserve or typeless ping", async () => {
