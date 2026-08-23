@@ -44,5 +44,4 @@ export function startTaskMaintenanceLoop() {
   }, TASK_MAINTENANCE_INTERVAL_MS);
   timer.unref?.();
   globalSweep.mattanutraTaskMaintenanceTimer = timer;
-  void runTaskMaintenanceTick();
 }

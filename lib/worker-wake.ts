@@ -6,15 +6,15 @@ const wakeLog = createLogger("worker.wake");
 const WAKE_TIMEOUT_MS = 1_500;
 
 export async function pingRegisteredWorkerWakes(signal: TaskQueueSignal) {
-  const sql = getWorkerSql() ?? getSql();
-
-  if (!sql) {
-    return;
-  }
-
   const taskType = signal.taskType.trim();
 
   if (!taskType) {
+    return;
+  }
+
+  const sql = getWorkerSql() ?? getSql();
+
+  if (!sql) {
     return;
   }
 
