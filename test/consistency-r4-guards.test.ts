@@ -70,6 +70,10 @@ describe("consistency r4 regression guards", () => {
     assert.match(runner, /waitForTaskQueueChange/);
     assert.match(
       runner,
+      /waitSeconds \* 1_000 \+ Math\.floor\(Math\.random\(\) \* 8_000\)/
+    );
+    assert.match(
+      runner,
       /if \(!reserved\.task \|\| !reserved\.reservationId\) \{[\s\S]*await waitForTaskQueueChange/
     );
     assert.doesNotMatch(

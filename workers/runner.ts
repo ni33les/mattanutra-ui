@@ -443,7 +443,7 @@ async function runAgentLoop(
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
         await waitForTaskQueueChange(
-          waitSeconds * 1_000,
+          waitSeconds * 1_000 + Math.floor(Math.random() * 8_000),
           agentConfig.taskTypes,
         );
         continue;

@@ -484,7 +484,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       runnerSource,
-      /await waitForTaskQueueChange\(\s*waitSeconds \* 1_000,\s*agentConfig\.taskTypes/,
+      /await waitForTaskQueueChange\(\s*waitSeconds \* 1_000 \+ Math\.floor\(Math\.random\(\) \* 8_000\),\s*agentConfig\.taskTypes/,
     );
     assert.match(runnerSource, /subscribeTaskQueue/);
     assert.doesNotMatch(
