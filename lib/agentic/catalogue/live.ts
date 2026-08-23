@@ -518,22 +518,32 @@ function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
     return existing;
   }
 
-  const inflight = loadLiveRetailSnapshot(code)
+  let resolveInflight!: (snapshot: CatalogueSnapshot) => void;
+  let rejectInflight!: (error: unknown) => void;
+  const inflight = new Promise<CatalogueSnapshot>((resolve, reject) => {
+    resolveInflight = resolve;
+    rejectInflight = reject;
+  });
+  liveInflight.set(code, inflight);
+
+  void loadLiveRetailSnapshot(code)
     .then((snapshot) => {
       if (snapshot.products.length > 0) {
         liveCache.set(code, { at: Date.now(), snapshot });
       }
 
-      return snapshot;
+      resolveInflight(snapshot);
     })
     .catch((error) => {
       noteWarmFailure(error);
-      throw error;
+      rejectInflight(error);
     })
     .finally(() => {
-      liveInflight.delete(code);
+      if (liveInflight.get(code) === inflight) {
+        liveInflight.delete(code);
+      }
     });
-  liveInflight.set(code, inflight);
+
   return inflight;
 }
 
