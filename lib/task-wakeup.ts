@@ -10,10 +10,16 @@ import {
 
 export const TASK_QUEUE_CHANNEL = "mattanutra_tasks";
 
+export type TaskQueueSignal = Readonly<{
+  taskId?: string;
+  taskType: string;
+}>;
+
 const wakeupLog = createLogger("task.wakeup");
 
 const globalTaskWakeup = globalThis as typeof globalThis & {
-  mattanutraTaskWakeupWaiters?: Set<(taskType: string) => void>;
+  mattanutraTaskQueuePending?: TaskQueueSignal[];
+  mattanutraTaskWakeupWaiters?: Set<(signal: TaskQueueSignal) => void>;
 };
 
 function taskWakeupWaiters() {
@@ -22,26 +28,76 @@ function taskWakeupWaiters() {
   return globalTaskWakeup.mattanutraTaskWakeupWaiters;
 }
 
-function wakeTaskQueueWaiters(taskType = "") {
+function parseTaskQueuePayload(payload: string): TaskQueueSignal {
+  const text = payload.trim();
+
+  if (text.startsWith("{")) {
+    try {
+      const json = JSON.parse(text) as {
+        taskId?: unknown;
+        taskType?: unknown;
+      };
+      const taskType =
+        typeof json.taskType === "string" ? json.taskType.trim() : "";
+      const taskId = typeof json.taskId === "string" ? json.taskId.trim() : "";
+
+      return {
+        taskType,
+        ...(taskId ? { taskId } : {})
+      };
+    } catch {
+      return { taskType: text };
+    }
+  }
+
+  return { taskType: text };
+}
+
+function pendingTaskQueueSignals() {
+  globalTaskWakeup.mattanutraTaskQueuePending ??= [];
+
+  return globalTaskWakeup.mattanutraTaskQueuePending;
+}
+
+export function signalTaskQueue(signal: TaskQueueSignal) {
   const waiters = taskWakeupWaiters();
 
+  if (waiters.size === 0) {
+    if (signal.taskType) {
+      pendingTaskQueueSignals().push(signal);
+    }
+
+    return;
+  }
+
   for (const waiter of waiters) {
-    waiter(taskType);
+    waiter(signal);
   }
 }
 
 export function notifyTaskQueueChanged(
   taskType?: string,
-  sql?: postgres.Sql | postgres.TransactionSql
+  sql?: postgres.Sql | postgres.TransactionSql,
+  taskId?: string
 ) {
-  const payload = typeof taskType === "string" ? taskType.trim() : "";
-  wakeTaskQueueWaiters(payload);
+  const payloadType = typeof taskType === "string" ? taskType.trim() : "";
+  const payloadId = typeof taskId === "string" ? taskId.trim() : "";
+  const signal: TaskQueueSignal = {
+    taskType: payloadType,
+    ...(payloadId ? { taskId: payloadId } : {})
+  };
+  signalTaskQueue(signal);
 
   const db = sql ?? getWorkerSql() ?? getSql();
 
   if (!db) {
     return;
   }
+
+  const payload = JSON.stringify({
+    taskId: payloadId || null,
+    taskType: payloadType
+  });
 
   void db`select pg_notify(${TASK_QUEUE_CHANNEL}, ${payload})`.catch((error) => {
     wakeupLog.warn("task_queue_notify_failed", {
@@ -69,12 +125,52 @@ export function waitForTaskQueueChange(
       waiters.delete(onWakeup);
       resolve(changed);
     };
-    const onWakeup = (taskType: string) => {
-      if (accepted.size === 0 || !taskType || accepted.has(taskType)) {
+    const onWakeup = (signal: TaskQueueSignal) => {
+      if (
+        accepted.size === 0 ||
+        !signal.taskType ||
+        accepted.has(signal.taskType)
+      ) {
         complete(true);
       }
     };
     const timeout = setTimeout(() => complete(false), timeoutMs);
+
+    waiters.add(onWakeup);
+  });
+}
+
+export function waitForTaskQueueWork(
+  timeoutMs: number,
+  taskTypes: readonly string[]
+) {
+  const accepted = new Set(
+    taskTypes.filter((taskType) => taskType.trim().length > 0)
+  );
+  const pending = pendingTaskQueueSignals();
+  const pendingIndex = pending.findIndex((signal) =>
+    Boolean(signal.taskType && accepted.has(signal.taskType))
+  );
+
+  if (pendingIndex >= 0) {
+    const [signal] = pending.splice(pendingIndex, 1);
+
+    return Promise.resolve(signal ?? null);
+  }
+
+  return new Promise<TaskQueueSignal | null>((resolve) => {
+    const waiters = taskWakeupWaiters();
+    const complete = (signal: TaskQueueSignal | null) => {
+      clearTimeout(timeout);
+      waiters.delete(onWakeup);
+      resolve(signal);
+    };
+    const onWakeup = (signal: TaskQueueSignal) => {
+      if (signal.taskType && accepted.has(signal.taskType)) {
+        complete(signal);
+      }
+    };
+    const timeout = setTimeout(() => complete(null), timeoutMs);
 
     waiters.add(onWakeup);
   });
@@ -99,7 +195,9 @@ export async function subscribeTaskQueue() {
 
     try {
       handle = await sql.listen(TASK_QUEUE_CHANNEL, (payload) => {
-        wakeTaskQueueWaiters(typeof payload === "string" ? payload : "");
+        signalTaskQueue(
+          parseTaskQueuePayload(typeof payload === "string" ? payload : "")
+        );
       });
       wakeupLog.info("task_queue_listening", { channel: TASK_QUEUE_CHANNEL });
     } catch (error) {

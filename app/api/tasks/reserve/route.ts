@@ -66,6 +66,7 @@ export async function POST(request: Request) {
       },
       leaseSeconds: body.leaseSeconds,
       mustRequireCapability: textValue(body.mustRequireCapability),
+      taskId: textValue(body.taskId) || null,
       taskTypes,
       workerSessionId
     });

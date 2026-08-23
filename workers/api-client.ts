@@ -222,9 +222,17 @@ export class WorkerApiClient {
     return this.post("/api/workers/heartbeat", input);
   }
 
+  queued() {
+    return this.get<{
+      taskTypes?: string[];
+      tasks?: ReadonlyArray<{ taskId: string; taskType: string }>;
+    }>("/api/tasks/queued");
+  }
+
   reserve(input: Readonly<{
     agent: WorkerRegistration["agent"];
     leaseSeconds: number;
+    taskId?: string;
     taskTypes: readonly string[];
     workerSessionId: string;
   }>) {

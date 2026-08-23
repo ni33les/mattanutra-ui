@@ -10,8 +10,9 @@ import {
 } from "../lib/worker-agent-credentials.ts";
 import { startTaskMaintenanceLoop } from "../lib/task-sweep-loop.ts";
 import {
+  signalTaskQueue,
   subscribeTaskQueue,
-  waitForTaskQueueChange
+  waitForTaskQueueWork
 } from "../lib/task-wakeup.ts";
 import {
   isWorkerAuthConfigurationError,
@@ -52,6 +53,7 @@ const TASK_LEASE_ABORT_SAFETY_MS = 120_000;
 const WORKER_RUN_ID = randomUUID();
 const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES;
 let stopTaskQueueListen: (() => Promise<void>) | null = null;
+let stopQueuedPeek: (() => void) | null = null;
 
 type ActiveSession = Readonly<{
   agentId: string;
@@ -411,9 +413,21 @@ async function runAgentLoop(
       try {
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
+        const work = await waitForTaskQueueWork(
+          waitSeconds * 1_000 + Math.floor(Math.random() * 8_000),
+          agentConfig.taskTypes,
+        );
+
+        if (!work?.taskId) {
+          heartbeatStatus = "idle";
+          heartbeatTaskId = null;
+          continue;
+        }
+
         reserved = await client.reserve({
           agent,
           leaseSeconds,
+          taskId: work.taskId,
           taskTypes: agentConfig.taskTypes,
           workerSessionId,
         });
@@ -442,10 +456,6 @@ async function runAgentLoop(
       if (!reserved.task || !reserved.reservationId) {
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
-        await waitForTaskQueueChange(
-          waitSeconds * 1_000 + Math.floor(Math.random() * 8_000),
-          agentConfig.taskTypes,
-        );
         continue;
       }
 
@@ -670,12 +680,59 @@ async function runSupervisedAgentLoop(
   }
 }
 
+async function peekQueuedWork(client: WorkerApiClient) {
+  try {
+    const result = await client.queued();
+    const tasks = Array.isArray(result.tasks) ? result.tasks : [];
+
+    for (const task of tasks) {
+      if (task.taskId && task.taskType) {
+        signalTaskQueue({
+          taskId: task.taskId,
+          taskType: task.taskType
+        });
+      }
+    }
+
+    if (tasks.length > 0) {
+      console.info("[worker] queued peek", {
+        taskTypes: [...new Set(tasks.map((task) => task.taskType))],
+        tasks: tasks.length
+      });
+    }
+  } catch (error) {
+    console.warn(
+      "[worker] queued peek failed",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+function startQueuedPeekLoop(client: WorkerApiClient, waitSeconds: number) {
+  const intervalMs = Math.max(1, waitSeconds) * 1_000;
+  const timer = setInterval(() => {
+    if (!shuttingDown) {
+      void peekQueuedWork(client);
+    }
+  }, intervalMs);
+  (
+    timer as ReturnType<typeof setInterval> & { unref?: () => void }
+  ).unref?.();
+
+  void peekQueuedWork(client);
+
+  return () => {
+    clearInterval(timer);
+  };
+}
+
 async function shutdown() {
   if (shuttingDown) {
     return;
   }
 
   shuttingDown = true;
+  stopQueuedPeek?.();
   await stopTaskQueueListen?.().catch(() => null);
   await markSessionsOffline();
   process.exit(0);
@@ -687,12 +744,28 @@ async function runWorker(mode: WorkerMode) {
   try {
     stopTaskQueueListen = await subscribeTaskQueue();
   } catch (error) {
-    console.error(
-      "[worker] task queue LISTEN failed; falling back to 24s poll",
+    console.warn(
+      "[worker] task queue LISTEN unavailable; using HTTP queued peek every 24s (remote-safe)",
       error instanceof Error ? error.message : error,
     );
   }
   const modes = workerProfileModesForRun(mode);
+  const peekConfig = modes
+    .flatMap((profileMode) => {
+      try {
+        return requireConfigs(profileMode);
+      } catch {
+        return [];
+      }
+    })
+    .at(0);
+
+  if (peekConfig) {
+    stopQueuedPeek = startQueuedPeekLoop(
+      new WorkerApiClient(peekConfig),
+      DEFAULT_POLL_WAIT_SECONDS,
+    );
+  }
   const loops = modes.flatMap((profileMode, profileIndex) => {
     const configs = requireConfigs(profileMode);
     const concurrency = workerConcurrency(profileMode);

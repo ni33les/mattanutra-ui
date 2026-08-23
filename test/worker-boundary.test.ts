@@ -482,10 +482,8 @@ describe("external worker boundaries", () => {
       /DEFAULT_POLL_WAIT_SECONDS = 24/,
       "empty reserve must wait locally for LISTEN or 24s, not tight-loop",
     );
-    assert.match(
-      runnerSource,
-      /await waitForTaskQueueChange\(\s*waitSeconds \* 1_000 \+ Math\.floor\(Math\.random\(\) \* 8_000\),\s*agentConfig\.taskTypes/,
-    );
+    assert.match(runnerSource, /waitForTaskQueueWork/);
+    assert.match(runnerSource, /client\.queued\(\)/);
     assert.match(runnerSource, /subscribeTaskQueue/);
     assert.doesNotMatch(
       runnerSource,

@@ -391,6 +391,7 @@ export type ReserveNextTaskInput = Readonly<{
   }>;
   leaseSeconds?: unknown;
   mustRequireCapability?: string | null;
+  taskId?: string | null;
   taskTypes?: unknown;
   workerSessionId?: string | null;
 }>;

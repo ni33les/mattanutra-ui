@@ -62,23 +62,22 @@ describe("consistency r4 regression guards", () => {
     assert.match(reserve, /return openClawJson\(\{\s*task: null\s*\}\)/);
   });
 
-  it("waits in the worker process on LISTEN or 24s, not a tight empty loop", async () => {
+  it("waits in the worker process on LISTEN or 24s peek, not a tight empty loop", async () => {
     const runner = await readFile("workers/runner.ts", "utf8");
 
     assert.match(runner, /DEFAULT_POLL_WAIT_SECONDS = 24/);
     assert.match(runner, /subscribeTaskQueue\(\)/);
-    assert.match(runner, /waitForTaskQueueChange/);
+    assert.match(runner, /waitForTaskQueueWork/);
+    assert.match(runner, /client\.queued\(\)/);
+    assert.match(runner, /startQueuedPeekLoop/);
+    assert.match(runner, /taskId: work\.taskId/);
     assert.match(
       runner,
-      /waitSeconds \* 1_000 \+ Math\.floor\(Math\.random\(\) \* 8_000\)/
+      /if \(!work\?\.taskId\) \{[\s\S]*continue/
     );
     assert.match(
       runner,
-      /if \(!reserved\.task \|\| !reserved\.reservationId\) \{[\s\S]*await waitForTaskQueueChange/
-    );
-    assert.doesNotMatch(
-      runner,
-      /if \(!reserved\.task \|\| !reserved\.reservationId\) \{[\s\S]{0,80}continue/
+      /LISTEN unavailable; using HTTP queued peek/
     );
   });
 

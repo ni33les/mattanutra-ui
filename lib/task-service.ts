@@ -815,7 +815,7 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
     });
   }
 
-  notifyTaskQueueChanged(task.taskType, sql);
+  notifyTaskQueueChanged(task.taskType, sql, task.id);
 
   return { created: true, task };
 }
@@ -1704,6 +1704,61 @@ async function claimQueuedTaskRow(
   return rows[0] ? mapTask(rows[0]) : null;
 }
 
+async function claimQueuedTaskById(
+  sql: Db,
+  input: Readonly<{
+    accessScope: TaskAgentAccessScope;
+    leaseSeconds: number;
+    taskId: string;
+    taskTypes: readonly string[];
+  }>
+) {
+  const rows = await sql<TaskRow[]>`
+    update public.tasks set
+      status = 'reserved',
+      reserved_by_agent_id = ${input.accessScope.agentId}::uuid,
+      lease_until = now() + make_interval(secs => ${input.leaseSeconds}),
+      started_at = coalesce(public.tasks.started_at, now()),
+      updated_at = now()
+    where id = ${input.taskId}::uuid
+      and status = 'queued'
+      and coalesce(actor_type, 'system') <> 'human'
+      and scheduled_for <= now()
+      and attempts < max_attempts
+      and (
+        ${input.taskTypes.length < 1}
+        or task_type = any(${textArray(sql, input.taskTypes)}::text[])
+      )
+    returning public.tasks.*
+  `;
+
+  return rows[0] ? mapTask(rows[0]) : null;
+}
+
+export async function listQueuedTaskHeads() {
+  const sql = getRequiredSql();
+  const rows = await sql<Array<{ task_id: string; task_type: string }>>`
+    select distinct on (task_type)
+      id::text as task_id,
+      task_type
+    from public.tasks
+    where status = 'queued'
+      and coalesce(actor_type, 'system') <> 'human'
+      and scheduled_for <= now()
+      and attempts < max_attempts
+    order by
+      task_type,
+      coalesce(priority_score, business_value) desc,
+      scheduled_for asc,
+      created_at asc
+  `;
+
+  return rows.map((row) => ({
+    taskId: row.task_id,
+    taskType: row.task_type
+  }));
+}
+
 async function claimedTaskIsBlocked(sql: Db, taskId: string) {
   const [dependencyRows, reservationRows] = await Promise.all([
     sql<Array<{ blocked: boolean }>>`
@@ -1966,18 +2021,26 @@ export async function reserveNextTask(
 
   const skipTaskIds: string[] = [];
   let reserved: { reservationId: string; task: TaskRecord } | null = null;
+  const requestedTaskId = uuidOrNull(input.taskId);
 
   for (let attempt = 0; attempt < RESERVE_CLAIM_ATTEMPTS; attempt += 1) {
-    const claimed = await withSingleQueuedTaskClaim(() =>
-      claimQueuedTaskRow(sql, {
-        accessScope,
-        leaseSeconds,
-        mustRequireCapability,
-        reserveCapabilities,
-        skipTaskIds,
-        taskTypes
-      })
-    );
+    const claimed = requestedTaskId
+      ? await claimQueuedTaskById(sql, {
+          accessScope,
+          leaseSeconds,
+          taskId: requestedTaskId,
+          taskTypes
+        })
+      : await withSingleQueuedTaskClaim(() =>
+          claimQueuedTaskRow(sql, {
+            accessScope,
+            leaseSeconds,
+            mustRequireCapability,
+            reserveCapabilities,
+            skipTaskIds,
+            taskTypes
+          })
+        );
 
     if (!claimed) {
       break;
@@ -1985,6 +2048,11 @@ export async function reserveNextTask(
 
     if (await claimedTaskIsBlocked(sql, claimed.id)) {
       await releaseUncommittedClaim(sql, claimed.id);
+
+      if (requestedTaskId) {
+        break;
+      }
+
       skipTaskIds.push(claimed.id);
       continue;
     }
