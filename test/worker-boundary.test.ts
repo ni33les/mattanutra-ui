@@ -556,6 +556,11 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       assessmentPregenerationSource,
+      /getWorkerSql\(\) \?\? getSql\(\)/,
+      "assessment pregeneration enqueue must stay off the interactive pool",
+    );
+    assert.match(
+      assessmentPregenerationSource,
       /enqueueHealthScoreAnalysisTask[\s\S]*generate_supplement_guidance[\s\S]*enqueueProductRecommendationsTask[\s\S]*enqueueFoodGapSupportTask/,
       "assessment capture should prequeue the single HealthScore, supplement, product, and food-gap graph",
     );

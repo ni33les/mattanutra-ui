@@ -45,8 +45,6 @@ import "./chat-questionnaire.css";
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 /** Surface the slow-path UI sooner so calc never looks infinitely hung. */
 const CALC_FALLBACK_MS = 12_000;
-const POLL_ATTEMPTS = 20;
-const POLL_INTERVAL_MS = 1_200;
 
 /**
  * Section / finish stage overlay timing.
@@ -136,10 +134,6 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   } finally {
     window.clearTimeout(timeout);
   }
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 /** True when the API payload has a usable score (analysis may still be enriching). */
@@ -503,40 +497,6 @@ export function ChatQuestionnaire({
     }, CALC_FALLBACK_MS);
   }, []);
 
-  const pollHealthScore = useCallback(
-    async (planId: string) => {
-      for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
-        const response = await fetchWithTimeout(
-          `/api/assessment/${encodeURIComponent(planId)}?view=healthscore&locale=${encodeURIComponent(locale)}`,
-          { cache: "no-store" }
-        );
-
-        if (!response.ok) {
-          throw new Error("Unable to load HealthScore");
-        }
-
-        const payload = (await response.json()) as {
-          status?: string;
-          healthScore?: unknown;
-          planId?: string;
-        };
-
-        if (hasUsableHealthScore({ ...payload, planId })) {
-          return true;
-        }
-
-        if (payload.status === "failed") {
-          throw new Error("HealthScore analysis failed");
-        }
-
-        await sleep(POLL_INTERVAL_MS);
-      }
-
-      return false;
-    },
-    [locale]
-  );
-
   const clearStageTimers = useCallback(() => {
     for (const id of stageTimers.current) {
       window.clearTimeout(id);
@@ -670,7 +630,7 @@ export function ChatQuestionnaire({
         // Capture often returns status "captured"/"preparing" while a base score
         // already exists — treat that as ready so the UI does not hang waiting
         // for optional analysis enrichment tasks.
-        let ready = skipHealthScoreStep
+        const ready = skipHealthScoreStep
           ? Boolean(captured.planId)
           : hasUsableHealthScore({
               status: captured.status,
@@ -678,12 +638,7 @@ export function ChatQuestionnaire({
               planId: captured.planId
             });
 
-        if (!ready && !skipHealthScoreStep) {
-          ready = await pollHealthScore(captured.planId);
-        }
-
         if (!ready) {
-          // Still have a plan — keep planId so user can open results; show slow UI
           setCalcStatus("slow");
           return;
         }
@@ -708,6 +663,9 @@ export function ChatQuestionnaire({
           }
         });
         setCalcStatus("ready");
+        router.replace(
+          resultsPath(locale, captured.planId, paymentId, skipHealthScoreStep)
+        );
       } catch {
         finalizing.current = false;
         setCalcStatus("error");
@@ -720,7 +678,6 @@ export function ChatQuestionnaire({
       locale,
       paymentId,
       pharmacyId,
-      pollHealthScore,
       resumeToken,
       returningPlanId,
       skipHealthScoreStep,

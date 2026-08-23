@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
-import { healthScoreAnalysisStatusFromTaskStatuses } from "@/lib/assessment-status";
 import {
   buildAssessmentSteps,
   createHealthScoreAnalysisSnapshot,
@@ -1368,7 +1367,6 @@ export async function persistAssessmentSubmission({
     throw new Error("Assessment snapshot must include backend HealthScore");
   }
 
-  await ensureAssessmentSchema();
   const normalizedLocale = normalizeLocale(locale);
   const storedPlan = toStoredPlan(selectedPlan);
   const storedAnswersRecord = buildStoredAssessmentAnswers(answers);
@@ -1377,12 +1375,6 @@ export async function persistAssessmentSubmission({
   const storedAnswers = toJsonValue(storedAnswersRecord);
   const storedAnswerSummary = toJsonValue(buildAnswerSummary(storedAnswersRecord));
   const storedHealthScore = toJsonValue(snapshot.healthScore);
-  const beforeRows = await sql<Array<{ before_payload: unknown }>>`
-    select to_jsonb(assessments.*) as before_payload
-    from public.assessments assessments
-    where assessments.plan_id = ${snapshot.planId}::uuid
-    limit 1
-  `;
 
   await sql`
     insert into assessments (
@@ -1456,7 +1448,7 @@ export async function persistAssessmentSubmission({
       updated_at = now()
   `;
 
-  await appendAssessmentVersion(sql, {
+  void appendAssessmentVersion(sql, {
     actor: "assessment_api",
     afterPayload: {
       answers: storedAnswers,
@@ -1471,21 +1463,21 @@ export async function persistAssessmentSubmission({
     },
     changeReason: "assessment_submission",
     eventPayload: {
-      beforePayload: beforeRows[0]?.before_payload ?? {},
+      beforePayload: {},
       selectedPlan: storedPlan,
       status
     },
     eventType: "assessment_submission_persisted",
     planId: snapshot.planId,
     source: "assessment_store"
-  });
+  }).catch(() => undefined);
 
   if (normalizedContactEmail) {
-    await upsertAssessmentEmailChannel({
+    void upsertAssessmentEmailChannel({
       contactEmail: normalizedContactEmail,
       displayName: firstName,
       planId: snapshot.planId
-    });
+    }).catch(() => undefined);
   }
 }
 
@@ -1590,8 +1582,6 @@ export async function getStoredHealthScoreAnalysisSnapshot(planId: string) {
     return null;
   }
 
-  await ensureAssessmentSchema();
-
   const rows = await sql`
     select
       plan_id::text,
@@ -1613,27 +1603,11 @@ export async function getStoredHealthScoreAnalysisSnapshot(planId: string) {
     return null;
   }
 
-  const hasAdvice = hasHealthScoreAdvice(healthScore);
-  const taskRows = hasAdvice
-    ? []
-    : await sql<{ status: string }[]>`
-        select status::text
-        from public.tasks
-        where plan_id = ${planId}::uuid
-          and task_type = 'analyze_healthscore'
-        order by created_at desc
-        limit 20
-      `;
-  const analysisStatus = healthScoreAnalysisStatusFromTaskStatuses(
-    hasAdvice,
-    taskRows.map((task) => task.status)
-  );
-
   return createHealthScoreAnalysisSnapshot({
     healthScore: healthScore as NonNullable<AssessmentSnapshot["healthScore"]>,
     plan: row.selected_plan,
     planId: row.plan_id,
-    status: analysisStatus
+    status: "ready"
   });
 }
 

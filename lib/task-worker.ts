@@ -126,7 +126,7 @@ async function createWorkTask(input: Readonly<{
   taskTitle: string;
   taskType: WorkTaskType;
 }>) {
-  const sql = getSql();
+  const sql = getWorkerSql() ?? getSql();
 
   if (!sql) {
     return null;
@@ -290,7 +290,7 @@ export async function enqueueHealthScoreAnalysisTask({
   taskGroupId?: string | null;
   planId: string;
 }>) {
-  const sql = getSql();
+  const sql = getWorkerSql() ?? getSql();
 
   if (!sql || !isUuid(planId)) {
     return null;
@@ -466,7 +466,7 @@ export async function enqueueAssessmentPregenerationTasks({
   locale?: unknown;
   planId: string;
 }>) {
-  const sql = getSql();
+  const sql = getWorkerSql() ?? getSql();
 
   if (!sql || !isUuid(planId)) {
     return null;

@@ -11,15 +11,14 @@ import {
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
-import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
+import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueAssessmentPregenerationTasks,
   enqueueDueScheduledActions,
-  enqueueHealthScoreAnalysisTask,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
-import { isLocale, type Locale } from "@/lib/i18n";
+import { isLocale } from "@/lib/i18n";
 import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
 import {
   finalizeAssessmentResumeDraft,
@@ -58,36 +57,6 @@ async function buildHealthScore(answers: unknown, locale: unknown) {
   });
 }
 
-function refreshedHealthScore(
-  answers: unknown,
-  evaluatedIngredientCount: number,
-  locale: Locale,
-  storedHealthScore: HealthScoreResult | null | undefined,
-  storedLocale: unknown
-): HealthScoreResult {
-  const refreshed = computeHealthScore(answers ?? null, locale, {
-    evaluatedIngredientCount
-  });
-  const refreshedPageContent = refreshed.pageContent;
-
-  if (!refreshedPageContent || !storedHealthScore || storedLocale !== locale) {
-    return refreshed;
-  }
-
-  return {
-    ...refreshed,
-    advice: storedHealthScore.advice ?? refreshed.advice,
-    pageContent: {
-      ...refreshedPageContent,
-      ...(storedHealthScore.pageContent?.aiCopy
-        ? {
-            aiCopy: storedHealthScore.pageContent.aiCopy
-          }
-        : {})
-    }
-  } satisfies HealthScoreResult;
-}
-
 function healthScoreBpmFields(snapshot: { healthScore?: ReturnType<typeof computeHealthScore> }) {
   const lowestDomain = snapshot.healthScore?.domains
     .slice()
@@ -122,12 +91,6 @@ export async function GET(
   const { planId } = await params;
   const url = new URL(request.url);
   const healthScoreView = url.searchParams.get("view") === "healthscore";
-  const requestedLocale = url.searchParams.get("locale");
-  const displayLocale = isLocale(requestedLocale) ? requestedLocale : null;
-
-  if (healthScoreView) {
-    void enqueueHealthScoreAnalysisTask({ planId });
-  }
 
   const snapshot = healthScoreView
     ? await getStoredHealthScoreAnalysisSnapshot(planId)
@@ -147,31 +110,6 @@ export async function GET(
 
   if (!healthScoreView) {
     void enqueueDueScheduledActions();
-  }
-
-  if (healthScoreView && displayLocale) {
-    const prefill = await getStoredAssessmentPrefill(planId);
-
-    if (prefill?.healthScore) {
-      return NextResponse.json(
-        {
-          ...snapshot,
-          firstName: firstNameFromAssessmentAnswers(prefill.answers),
-          healthScore: refreshedHealthScore(
-            prefill.answers,
-            cachedEvaluatedIngredientCatalogueCount(),
-            displayLocale,
-            prefill.healthScore,
-            prefill.locale
-          )
-        },
-        {
-          headers: {
-            "Cache-Control": "no-store"
-          }
-        }
-      );
-    }
   }
 
   return NextResponse.json(snapshot, {
@@ -301,71 +239,6 @@ export async function PATCH(
       status: "captured"
     });
 
-    const finalizedResumeEmail =
-      await finalizeAssessmentResumeDraft({
-        planId: snapshot.planId,
-        token: body.resumeToken
-      }) ??
-      await finalizeAssessmentResumeDraftForContact({
-        contactEmail: body.contactEmail,
-        planId: snapshot.planId
-      });
-
-    if (finalizedResumeEmail) {
-      await writeBpmEvent({
-        actorType: "visitor",
-        attribution: bpm.attribution,
-        email: finalizedResumeEmail,
-        eventName: "assessment_resume_finalized",
-        eventType: "funnel",
-        locale: body.locale,
-        planId: snapshot.planId,
-        ray: typeof bpm.ray === "string" ? bpm.ray : null
-      });
-    }
-
-    await writeBpmEvent({
-      actorType: "visitor",
-      attribution: bpm.attribution,
-      eventName:
-        intent === "capture"
-          ? "assessment_recaptured"
-          : "assessment_process_requested",
-      eventType: "funnel",
-      locale: body.locale,
-      planId: snapshot.planId,
-      ray: typeof bpm.ray === "string" ? bpm.ray : null,
-      selectedPlan,
-      ...healthScoreBpmFields(snapshot)
-    });
-
-    await enqueueAssessmentPregenerationTasks({
-      answers: effectiveAnswers,
-      locale: body.locale,
-      planId: snapshot.planId
-    });
-
-    const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
-
-    if (reassessmentEmail) {
-      await scheduleReassessmentAction({
-        email: reassessmentEmail,
-        locale: body.locale,
-        planId: snapshot.planId
-      });
-      void enqueueDueScheduledActions();
-      await writeBpmEvent({
-        actorType: "visitor",
-        attribution: bpm.attribution,
-        email: reassessmentEmail,
-        eventName: "reassessment_opted_in",
-        eventType: "reassessment",
-        locale: body.locale,
-        planId: snapshot.planId,
-        ray: typeof bpm.ray === "string" ? bpm.ray : null
-      });
-    }
-
     if (typeof body.paymentId === "string") {
       const boundPayment = await bindPaidReservationToAssessment({
         locale: isLocale(body.locale) ? body.locale : "en",
@@ -386,23 +259,91 @@ export async function PATCH(
       }
     }
 
-    if (intent === "capture") {
-      const healthScoreSnapshot =
-        await getStoredHealthScoreAnalysisSnapshot(snapshot.planId) ??
-        snapshot;
+    void (async () => {
+      try {
+        const finalizedResumeEmail =
+          (await finalizeAssessmentResumeDraft({
+            planId: snapshot.planId,
+            token: body.resumeToken
+          })) ??
+          (await finalizeAssessmentResumeDraftForContact({
+            contactEmail: body.contactEmail,
+            planId: snapshot.planId
+          }));
 
-      return NextResponse.json(healthScoreSnapshot, {
+        if (finalizedResumeEmail) {
+          await writeBpmEvent({
+            actorType: "visitor",
+            attribution: bpm.attribution,
+            email: finalizedResumeEmail,
+            eventName: "assessment_resume_finalized",
+            eventType: "funnel",
+            locale: body.locale,
+            planId: snapshot.planId,
+            ray: typeof bpm.ray === "string" ? bpm.ray : null
+          });
+        }
+
+        await writeBpmEvent({
+          actorType: "visitor",
+          attribution: bpm.attribution,
+          eventName:
+            intent === "capture"
+              ? "assessment_recaptured"
+              : "assessment_process_requested",
+          eventType: "funnel",
+          locale: body.locale,
+          planId: snapshot.planId,
+          ray: typeof bpm.ray === "string" ? bpm.ray : null,
+          selectedPlan,
+          ...healthScoreBpmFields(snapshot)
+        });
+
+        await enqueueAssessmentPregenerationTasks({
+          answers: effectiveAnswers,
+          locale: body.locale,
+          planId: snapshot.planId
+        });
+
+        const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
+
+        if (reassessmentEmail) {
+          await scheduleReassessmentAction({
+            email: reassessmentEmail,
+            locale: body.locale,
+            planId: snapshot.planId
+          });
+          void enqueueDueScheduledActions();
+          await writeBpmEvent({
+            actorType: "visitor",
+            attribution: bpm.attribution,
+            email: reassessmentEmail,
+            eventName: "reassessment_opted_in",
+            eventType: "reassessment",
+            locale: body.locale,
+            planId: snapshot.planId,
+            ray: typeof bpm.ray === "string" ? bpm.ray : null
+          });
+        }
+      } catch (error) {
+        log.error("Unable to finish assessment capture side effects", {
+          error,
+          planId: snapshot.planId
+        });
+      }
+    })();
+
+    return NextResponse.json(
+      {
+        ...snapshot,
+        firstName: firstNameFromAssessmentAnswers(effectiveAnswers)
+      },
+      {
         headers: {
           "Cache-Control": "no-store"
         }
-      });
-    }
-
-    return NextResponse.json(snapshot, {
-      headers: {
-        "Cache-Control": "no-store"
       }
-    });
+    );
   } catch (error) {
     log.error("Unable to persist assessment plan selection", { error, planId });
     await writeBpmEvent({

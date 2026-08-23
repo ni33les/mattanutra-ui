@@ -1171,7 +1171,11 @@ export function AssessmentFlow({
 
       let readyStatus = captured;
 
-      if (!skipHealthScoreStep && readyStatus.status !== "ready") {
+      if (
+        !skipHealthScoreStep &&
+        readyStatus.status !== "ready" &&
+        typeof readyStatus.healthScore?.score !== "number"
+      ) {
         setProcessingStatus(readyStatus);
         readyStatus = await waitForHealthScoreAnalysis(readyStatus.planId);
       }

@@ -18,6 +18,10 @@ const reveal = readFileSync(
   new URL("../components/reveal-final-results.tsx", import.meta.url),
   "utf8"
 );
+const chat = readFileSync(
+  new URL("../components/chat-questionnaire/chat-questionnaire.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("assessment capture stays off the pregeneration wait path", () => {
   it("returns the captured plan before waiting on pregeneration or analysis", () => {
@@ -44,14 +48,74 @@ describe("assessment capture stays off the pregeneration wait path", () => {
   });
 
   it("does not block healthscore GET on analysis enqueue", () => {
-    assert.match(planRoute, /void enqueueHealthScoreAnalysisTask\(\{ planId \}\)/);
+    assert.doesNotMatch(planRoute, /enqueueHealthScoreAnalysisTask/);
+    assert.match(planRoute, /getStoredHealthScoreAnalysisSnapshot\(planId\)/);
     assert.doesNotMatch(
       planRoute,
-      /await enqueueHealthScoreAnalysisTask\(\{ planId \}\)/
+      /await getStoredHealthScoreAnalysisSnapshot\(snapshot\.planId\)/
     );
-    assert.match(planRoute, /firstName: firstNameFromAssessmentAnswers\(prefill\.answers\)/);
     assert.match(planRoute, /cachedEvaluatedIngredientCatalogueCount\(\)/);
     assert.match(planRoute, /if \(!healthScoreView\) \{\s*void enqueueDueScheduledActions\(\)/);
+    assert.match(
+      planRoute,
+      /void \(async \(\) => \{[\s\S]*enqueueAssessmentPregenerationTasks/
+    );
+    assert.ok(
+      planRoute.indexOf("await persistAssessmentSubmission") <
+        planRoute.indexOf("void (async () => {")
+    );
+    assert.ok(
+      planRoute.lastIndexOf("return NextResponse.json") >
+        planRoute.indexOf("void (async () => {")
+    );
+  });
+
+  it("persists capture as one upsert and does not inspect schema first", () => {
+    const store = readFileSync(
+      new URL("../lib/assessment-store.ts", import.meta.url),
+      "utf8"
+    );
+    const persistStart = store.indexOf(
+      "export async function persistAssessmentSubmission"
+    );
+    const persistEnd = store.indexOf(
+      "export async function getStoredAssessmentSnapshot"
+    );
+    const persist = store.slice(persistStart, persistEnd);
+
+    assert.match(persist, /insert into assessments \(/);
+    assert.doesNotMatch(persist, /ensureAssessmentSchema/);
+    assert.doesNotMatch(persist, /to_jsonb\(assessments\.\*\)/);
+    assert.match(persist, /void appendAssessmentVersion/);
+    assert.match(persist, /void upsertAssessmentEmailChannel/);
+  });
+
+  it("treats a stored HealthScore number as ready without scanning tasks", () => {
+    const store = readFileSync(
+      new URL("../lib/assessment-store.ts", import.meta.url),
+      "utf8"
+    );
+    const snapshotStart = store.indexOf(
+      "export async function getStoredHealthScoreAnalysisSnapshot"
+    );
+    const snapshotEnd = store.indexOf(
+      "export async function getStoredAssessmentPrefill"
+    );
+    const snapshot = store.slice(snapshotStart, snapshotEnd);
+
+    assert.doesNotMatch(snapshot, /from public\.tasks/);
+    assert.doesNotMatch(snapshot, /healthScoreAnalysisStatusFromTaskStatuses/);
+    assert.match(snapshot, /status: "ready"/);
+  });
+
+  it("navigates to HealthScore as soon as capture returns a score", () => {
+    assert.doesNotMatch(chat, /pollHealthScore/);
+    assert.doesNotMatch(chat, /POLL_ATTEMPTS|POLL_INTERVAL_MS/);
+    assert.match(chat, /hasUsableHealthScore/);
+    assert.match(
+      chat,
+      /setCalcStatus\("ready"\);\s*router\.replace\(\s*resultsPath\(/
+    );
   });
 
   it("puts the submitted first name on the existing healthscore and reveal heroes", () => {
