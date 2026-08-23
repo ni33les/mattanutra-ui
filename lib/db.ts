@@ -122,32 +122,33 @@ function dbIdleInTxnTimeoutMs() {
 }
 
 function postgresConnectionSettings() {
-  const applicationName = dbApplicationName();
+  return {
+    applicationName: dbApplicationName(),
+    connection: {
+      application_name: dbApplicationName()
+    },
+    idleInTxnTimeoutMs: dbIdleInTxnTimeoutMs(),
+    lockTimeoutMs: dbLockTimeoutMs(),
+    statementTimeoutMs: dbStatementTimeoutMs()
+  };
+}
+
+async function applyInteractiveTimeouts(
+  sql: NonNullable<ReturnType<typeof getSql>>
+) {
   const statementTimeoutMs = dbStatementTimeoutMs();
   const lockTimeoutMs = dbLockTimeoutMs();
   const idleInTxnTimeoutMs = dbIdleInTxnTimeoutMs();
-  const connection: Record<string, string> = {
-    application_name: applicationName
-  };
-  const optionFlags = [
-    statementTimeoutMs > 0 ? `-c statement_timeout=${statementTimeoutMs}` : "",
-    lockTimeoutMs > 0 ? `-c lock_timeout=${lockTimeoutMs}` : "",
-    idleInTxnTimeoutMs > 0
-      ? `-c idle_in_transaction_session_timeout=${idleInTxnTimeoutMs}`
-      : ""
-  ].filter(Boolean);
+  const n = Math.min(dbPoolMax(), 4);
 
-  if (optionFlags.length > 0) {
-    connection.options = optionFlags.join(" ");
-  }
-
-  return {
-    applicationName,
-    connection,
-    idleInTxnTimeoutMs,
-    lockTimeoutMs,
-    statementTimeoutMs
-  };
+  await Promise.all(
+    Array.from({ length: n }, () => sql`
+      select
+        set_config('statement_timeout', ${String(statementTimeoutMs)}, false),
+        set_config('lock_timeout', ${String(lockTimeoutMs)}, false),
+        set_config('idle_in_transaction_session_timeout', ${String(idleInTxnTimeoutMs)}, false)
+    `)
+  );
 }
 
 function handleDatabaseNotice(notice: { code?: string }) {
@@ -207,6 +208,11 @@ export function getSql() {
       poolMax,
       statementTimeoutMs: timeouts.statementTimeoutMs
     });
+    void applyInteractiveTimeouts(globalDb.mattanutraSql).catch((error) => {
+      dbLog.warn("unable_to_apply_interactive_timeouts", {
+        message: error instanceof Error ? error.message : "unknown"
+      });
+    });
   }
 
   return globalDb.mattanutraSql;
@@ -249,8 +255,7 @@ const DB_KEEP_ALIVE_MS = 20_000;
 const DB_KEEP_ALIVE_CONNECTIONS = 3;
 
 async function pingWarmConnections(sql: NonNullable<ReturnType<typeof getSql>>) {
-  const n = Math.min(DB_KEEP_ALIVE_CONNECTIONS, dbPoolMax());
-  await Promise.all(Array.from({ length: n }, () => sql`select 1`));
+  await applyInteractiveTimeouts(sql);
 }
 
 export async function keepDatabaseWarm() {

@@ -86,14 +86,22 @@ describe("consistency r1 regression guards", () => {
     assert.match(db, /DEFAULT_DB_STATEMENT_TIMEOUT_MS = 15_000/);
     assert.match(db, /DEFAULT_DB_LOCK_TIMEOUT_MS = 2_000/);
     assert.match(db, /DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS = 10_000/);
-    assert.match(db, /-c statement_timeout=\$\{statementTimeoutMs\}/);
-    assert.match(db, /-c lock_timeout=\$\{lockTimeoutMs\}/);
     assert.match(
       db,
-      /-c idle_in_transaction_session_timeout=\$\{idleInTxnTimeoutMs\}/
+      /set_config\('statement_timeout', \$\{String\(statementTimeoutMs\)\}, false\)/
     );
-    assert.match(db, /connection\.options = optionFlags\.join\(" "\)/);
+    assert.match(
+      db,
+      /set_config\('lock_timeout', \$\{String\(lockTimeoutMs\)\}, false\)/
+    );
+    assert.match(
+      db,
+      /set_config\('idle_in_transaction_session_timeout', \$\{String\(idleInTxnTimeoutMs\)\}, false\)/
+    );
+    assert.match(db, /applyInteractiveTimeouts/);
     assert.match(db, /pool_initialized/);
+    assert.doesNotMatch(db, /connection\.statement_timeout/);
+    assert.doesNotMatch(db, /connection\.options/);
   });
 
   it("logs MCP tool duration with a correlation id", async () => {
