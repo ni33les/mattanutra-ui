@@ -45,6 +45,35 @@ describe("consistency r2 formulation read", () => {
     );
     assert.doesNotMatch(formulation, /jsonb_to_recordset/);
     assert.doesNotMatch(formulation, /blocked_product_facts/);
-    assert.match(formulation, /getStoredFormulationResult\(planId,/);
+    assert.doesNotMatch(formulation, /getStoredAssessmentSnapshot/);
+    assert.match(formulation, /getStoredFormulationRead\(planId,/);
+  });
+
+  it("keeps the default formulation GET as one formula read", async () => {
+    const store = await readFile("lib/assessment-store.ts", "utf8");
+    const formulation = await readFile(
+      "app/api/assessment/[planId]/formulation/route.ts",
+      "utf8"
+    );
+    const start = store.indexOf(
+      "async function loadStoredFormulationFormulaRead"
+    );
+    const end = store.indexOf(
+      "export async function getStoredFormulationRead"
+    );
+    const slim = store.slice(start, end > start ? end : store.length);
+
+    assert.match(slim, /from assessments/);
+    assert.match(slim, /left join lateral/);
+    assert.doesNotMatch(slim, /information_schema/);
+    assert.doesNotMatch(slim, /from tasks/);
+    assert.doesNotMatch(slim, /product_recommendation_items/);
+    assert.doesNotMatch(slim, /jsonb_to_recordset/);
+    assert.doesNotMatch(slim, /blocked_product_facts/);
+    assert.doesNotMatch(slim, /loadStoredRecommendationProductPayloads/);
+    assert.doesNotMatch(slim, /reconcileResolvedSafetyReviewFlags/);
+    assert.doesNotMatch(formulation, /getStoredFormulationResult\(/);
+    assert.match(formulation, /includeProducts/);
+    assert.match(formulation, /products"\) === "1"/);
   });
 });

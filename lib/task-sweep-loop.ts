@@ -1,5 +1,4 @@
 import { releaseExpiredReservations } from "@/lib/task-service";
-import { enqueueMissingProductRecommendationsForReadyPlans } from "@/lib/task-worker";
 
 const TASK_MAINTENANCE_INTERVAL_MS = 15_000;
 const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT = 3;
@@ -24,14 +23,6 @@ async function runTaskMaintenanceTick() {
         console.info("[tasks:maintenance] expired reservation sweep", {
           released
         });
-      }
-
-      const enqueued = await enqueueMissingProductRecommendationsForReadyPlans({
-        limit: 10
-      });
-
-      if (enqueued.queued > 0) {
-        console.info("[tasks:maintenance] missing product recommendations", enqueued);
       }
     } catch (error) {
       console.warn("[tasks:maintenance] tick failed", error);

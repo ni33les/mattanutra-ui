@@ -8,7 +8,6 @@ import {
   runtimeWorkerProfileForMode,
   type WorkerProfileMode,
 } from "../lib/worker-agent-credentials.ts";
-import { startTaskMaintenanceLoop } from "../lib/task-sweep-loop.ts";
 import {
   signalTaskQueue,
   waitForTaskQueueWork
@@ -803,8 +802,6 @@ async function shutdown() {
 }
 
 async function runWorker(mode: WorkerMode) {
-  startTaskMaintenanceLoop();
-
   try {
     const wake = await startWorkerWakeServer();
     workerWakeUrl = wake.url;

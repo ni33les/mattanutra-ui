@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  getStoredAssessmentSnapshot,
-  getStoredFormulationResult
-} from "@/lib/assessment-store";
+import { getStoredFormulationRead } from "@/lib/assessment-store";
+import { buildAssessmentSteps } from "@/lib/assessment-snapshot";
 
 type FormulationRouteProps = Readonly<{
   params: Promise<{
@@ -23,48 +21,43 @@ function jsonNoStore(body: unknown, init: ResponseInit = {}) {
 
 export async function GET(request: Request, { params }: FormulationRouteProps) {
   const { planId } = await params;
-  const locale = new URL(request.url).searchParams.get("locale");
-  const snapshot = await getStoredAssessmentSnapshot(planId);
+  const url = new URL(request.url);
+  const locale = url.searchParams.get("locale");
+  const includeProducts = url.searchParams.get("products") === "1";
+  const stored = await getStoredFormulationRead(planId, {
+    includeProducts,
+    locale
+  });
 
-  if (!snapshot) {
+  if (!stored) {
     return jsonNoStore({ message: "Plan not found" }, { status: 404 });
   }
 
-  const storedResult = await getStoredFormulationResult(planId, {
-    locale,
-    mode: "full"
-  });
+  const storedResult = stored.result;
 
-  if (storedResult) {
+  if (storedResult.supplementBreakdown.length > 0) {
     return jsonNoStore(storedResult);
   }
 
-  if (snapshot.status === "ready") {
+  const steps = buildAssessmentSteps(stored.status);
+
+  if (stored.status === "ready") {
     return jsonNoStore(
       {
         message: "Formulation result is missing or invalid",
-        status: snapshot.status,
-        steps: snapshot.steps
+        status: stored.status,
+        steps
       },
       { status: 409 }
     );
   }
 
-  const previewResult = await getStoredFormulationResult(planId, {
-    locale,
-    mode: "preview"
-  });
-
-  if (previewResult) {
-    return jsonNoStore(previewResult);
-  }
-
-  if (snapshot.status === "failed") {
+  if (stored.status === "failed") {
     return jsonNoStore(
       {
         message: "Formulation processing failed",
-        status: snapshot.status,
-        steps: snapshot.steps
+        status: stored.status,
+        steps
       },
       { status: 500 }
     );
@@ -73,8 +66,8 @@ export async function GET(request: Request, { params }: FormulationRouteProps) {
   return jsonNoStore(
     {
       message: "Formulation is still being prepared",
-      status: snapshot.status,
-      steps: snapshot.steps
+      status: stored.status,
+      steps
     },
     { status: 202 }
   );

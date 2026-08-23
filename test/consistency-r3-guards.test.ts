@@ -114,6 +114,11 @@ describe("consistency r3 regression guards", () => {
     assert.match(service, /withSingleQueuedTaskClaim/);
 
     const taskWorker = await readFile("lib/task-worker.ts", "utf8");
+    const sweepLoop = await readFile("lib/task-sweep-loop.ts", "utf8");
+    assert.doesNotMatch(
+      sweepLoop,
+      /enqueueMissingProductRecommendationsForReadyPlans/
+    );
     assert.match(
       taskWorker,
       /enqueueMissingProductRecommendationsForReadyPlans[\s\S]{0,200}getWorkerSql\(\) \?\? getSql\(\)/
@@ -121,6 +126,13 @@ describe("consistency r3 regression guards", () => {
     assert.match(reserve, /sql: getWorkerSql\(\) \?\? undefined/);
     assert.match(complete, /sql: getWorkerSql\(\) \?\? undefined/);
     assert.match(fail, /sql: getWorkerSql\(\) \?\? undefined/);
+
+    const accessPrincipal = await readFile("lib/access-principal.ts", "utf8");
+    assert.match(
+      accessPrincipal,
+      /allowLegacy === "worker"[\s\S]*getWorkerSql\(\) \?\? getSql\(\)/
+    );
+    assert.match(accessPrincipal, /CREDENTIAL_USE_TOUCH_MS = 60_000/);
   });
 
   it("does not import the worker pool from interactive request paths", async () => {

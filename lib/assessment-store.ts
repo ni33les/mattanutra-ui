@@ -1679,6 +1679,200 @@ export async function getStoredAssessmentPrefill(planId: string) {
   };
 }
 
+type StoredFormulationRead = Readonly<{
+  result: FormulationResult;
+  status: AssessmentSnapshot["status"];
+}>;
+
+function mapSlimFormulationResult(
+  planId: string,
+  locale: Locale,
+  row: Readonly<Record<string, unknown>>
+): FormulationResult {
+  const firstName =
+    normalizeAssessmentFirstName(row.first_name) ??
+    firstNameFromAssessmentAnswers(row.answers);
+  const plan = fromStoredPlan(row.selected_plan);
+  const storedFormulation = asRecord(row.formulation);
+  const storedFoodGuidanceRecord = asRecord(row.food_guidance);
+  const supplementBreakdown = asArray<FormulationIngredient>(
+    storedFormulation.supplementBreakdown ?? storedFormulation.formula
+  );
+  const marketingPoints = asArray<MarketingPoint>(
+    storedFormulation.marketingPoints
+  );
+  const cautions = asArray<FormulationCaution>(storedFormulation.cautions);
+  const foodGuidance = asArray<FoodGuidanceItem>(
+    storedFoodGuidanceRecord.foodGuidance
+  );
+  const storedFoodGapSupport = asFoodGapSupport(
+    storedFoodGuidanceRecord.foodGapSupport
+  );
+  const safetySummary = safetySummaryFromRecord(
+    storedFormulation.safetySummary
+  );
+  const foodSafetySummary = safetySummaryFromRecord(
+    storedFoodGuidanceRecord.foodSafetySummary
+  );
+  const generatedDates = [row.generated_at, row.food_guidance_generated_at]
+    .filter(Boolean)
+    .map((value) => (value instanceof Date ? value : new Date(String(value))))
+    .filter((date) => Number.isFinite(date.getTime()));
+  const generatedAt = (
+    generatedDates.length > 0
+      ? new Date(Math.max(...generatedDates.map((date) => date.getTime())))
+      : row.assessment_updated_at instanceof Date
+        ? row.assessment_updated_at
+        : new Date(String(row.assessment_updated_at))
+  ).toISOString();
+  const supplementsReady = Boolean(row.formulation);
+  const foodsReady = Boolean(row.food_guidance);
+  const result = {
+    access:
+      !row.selected_plan ||
+      isExampleFormulationModelVersion(row.model_version)
+        ? "preview"
+        : "full",
+    assessmentSummary: buildAssessmentSummary({
+      answers: row.answers,
+      locale,
+      plan
+    }),
+    catalogueProductCount: 0,
+    catalogueSupplementCount: 0,
+    generatedAt,
+    firstName,
+    planId,
+    nutritionReport: null,
+    recommendations: [],
+    schemaVersion: 1 as const,
+    sectionStatuses: {
+      foods: foodsReady ? "ready" : "pending",
+      supplements: supplementsReady ? "ready" : "pending"
+    },
+    ...(safetySummary ? { safetySummary } : {}),
+    ...(foodSafetySummary ? { foodSafetySummary } : {}),
+    ...(cautions.length > 0 ? { cautions } : {}),
+    ...(marketingPoints.length > 0 ? { marketingPoints } : {}),
+    ...(storedFoodGapSupport ? { foodGapSupport: storedFoodGapSupport } : {}),
+    foodGuidance,
+    supplementBreakdown
+  } satisfies FormulationResult;
+
+  return result.access === "preview"
+    ? toFreePreviewFormulationResult(result)
+    : result;
+}
+
+async function loadStoredFormulationFormulaRead(
+  planId: string,
+  localeOption?: string | null
+): Promise<StoredFormulationRead | null> {
+  const sql = getSql();
+
+  if (!sql || !isUuid(planId)) {
+    return null;
+  }
+
+  const resultLocale = normalizeLocale(localeOption);
+  const exampleModelPattern = "%:example";
+  const rows = await sql<Array<Record<string, unknown>>>`
+    select
+      assessments.status::text,
+      assessments.answers,
+      assessments.first_name,
+      assessments.locale,
+      assessments.selected_plan::text,
+      assessments.updated_at as assessment_updated_at,
+      formulations.formulation,
+      formulations.generated_at,
+      formulations.model_version,
+      food_guidance.guidance as food_guidance,
+      food_guidance.generated_at as food_guidance_generated_at,
+      food_guidance.model_version as food_guidance_model_version
+    from assessments
+    left join lateral (
+      select formulation, generated_at, model_version
+      from formulations
+      where formulations.plan_id = assessments.plan_id
+        and (
+          case
+            when assessments.selected_plan is not null then
+              (
+                formulations.model_version is null
+                or formulations.model_version not like ${exampleModelPattern}
+              )
+            else
+              formulations.model_version like ${exampleModelPattern}
+          end
+        )
+      order by version desc, generated_at desc
+      limit 1
+    ) formulations on true
+    left join lateral (
+      select guidance, generated_at, model_version
+      from food_guidance
+      where food_guidance.plan_id = assessments.plan_id
+        and (
+          case
+            when assessments.selected_plan is not null then
+              (
+                food_guidance.model_version is null
+                or food_guidance.model_version not like ${exampleModelPattern}
+              )
+            else
+              food_guidance.model_version like ${exampleModelPattern}
+          end
+        )
+      order by version desc, generated_at desc
+      limit 1
+    ) food_guidance on true
+    where assessments.plan_id = ${planId}::uuid
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    result: mapSlimFormulationResult(planId, resultLocale, row),
+    status: toSnapshotStatus(row.status)
+  };
+}
+
+export async function getStoredFormulationRead(
+  planId: string,
+  options: Readonly<{
+    includeProducts?: boolean;
+    locale?: string | null;
+  }> = {}
+): Promise<StoredFormulationRead | null> {
+  if (options.includeProducts) {
+    const result =
+      (await getStoredFormulationResult(planId, {
+        locale: options.locale,
+        mode: "full"
+      })) ??
+      (await getStoredFormulationResult(planId, {
+        locale: options.locale,
+        mode: "preview"
+      }));
+
+    if (!result) {
+      return null;
+    }
+
+    return {
+      result,
+      status: "ready"
+    };
+  }
+
+  return loadStoredFormulationFormulaRead(planId, options.locale);
+}
+
 export async function getStoredFormulationResult(
   planId: string,
   options: Readonly<{

@@ -420,10 +420,24 @@ describe("external worker boundaries", () => {
       /client\.workItem\([\s\S]*continue;/,
       "workers must hydrate the work item after reserve and skip a failed hydrate without crashing the loop",
     );
-    assert.match(
+    assert.doesNotMatch(
       runnerSource,
+      /startTaskMaintenanceLoop|task-sweep-loop/,
+      "remote runners must not open a database connection for maintenance",
+    );
+    const instrumentationSource = await readFile(
+      "instrumentation.ts",
+      "utf8",
+    );
+    assert.match(
+      instrumentationSource,
       /startTaskMaintenanceLoop/,
-      "expired-lease sweep and missing-recommendation enqueue belong on the worker maintenance timer",
+      "expired-lease sweep belongs on the platform, not the agent process",
+    );
+    assert.doesNotMatch(
+      sweepLoopSource,
+      /enqueueMissingProductRecommendations/,
+      "the 15s tick must not run the matcher backfill scan",
     );
     assert.match(
       sweepLoopSource,

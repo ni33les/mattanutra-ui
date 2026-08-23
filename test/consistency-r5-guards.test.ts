@@ -103,6 +103,7 @@ describe("consistency r5 regression guards", () => {
     ]);
 
     assert.match(instrumentation, /subscribeTaskQueue\(\)/);
+    assert.match(instrumentation, /startTaskMaintenanceLoop/);
     assert.match(wake, /metadata ->> 'wakeUrl'/);
     assert.match(wake, /method: "POST"/);
     assert.match(wakeup, /pingRegisteredWorkerWakes/);

@@ -42,6 +42,20 @@ function hasRenderableFormula(result: FormulationResult | null) {
   return Boolean(result && result.supplementBreakdown.length > 0);
 }
 
+function formulationUrl(
+  planId: string,
+  locale: Locale,
+  includeProducts = false,
+) {
+  const params = new URLSearchParams({ locale });
+
+  if (includeProducts) {
+    params.set("products", "1");
+  }
+
+  return `/api/assessment/${encodeURIComponent(planId)}/formulation?${params}`;
+}
+
 export function FormulationResults({
   initialStackPreference = null,
   initialResult = null,
@@ -66,7 +80,7 @@ export function FormulationResults({
 
   const refreshFormulationResult = useCallback(async () => {
     const response = await fetch(
-      `/api/assessment/${encodeURIComponent(effectivePlanId)}/formulation?locale=${locale}`,
+      formulationUrl(effectivePlanId, locale, true),
       { cache: "no-store" },
     );
 
@@ -104,7 +118,7 @@ export function FormulationResults({
 
       try {
         const response = await fetch(
-          `/api/assessment/${encodeURIComponent(effectivePlanId)}/formulation?locale=${locale}`,
+          formulationUrl(effectivePlanId, locale, mode === "once"),
           { cache: "no-store" },
         );
 

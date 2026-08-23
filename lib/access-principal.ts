@@ -1,4 +1,4 @@
-import { getSql } from "@/lib/db";
+import { getSql, getWorkerSql } from "@/lib/db";
 import {
   hashAdminToken,
   signedAdminSessionFromRequest
@@ -260,10 +260,28 @@ function agentPrincipalFromRow(
     : null;
 }
 
+const CREDENTIAL_USE_TOUCH_MS = 60_000;
+const credentialUseTouchedAt = new Map<string, number>();
+
+function agentAuthSql(options: ResolveOptions) {
+  if (options.allowLegacy === "worker") {
+    return getWorkerSql() ?? getSql();
+  }
+
+  return getSql();
+}
+
 async function markAgentCredentialUsed(
   sql: NonNullable<ReturnType<typeof getSql>>,
   credentialId: string
 ) {
+  const lastTouchedAt = credentialUseTouchedAt.get(credentialId) ?? 0;
+
+  if (Date.now() - lastTouchedAt < CREDENTIAL_USE_TOUCH_MS) {
+    return;
+  }
+
+  credentialUseTouchedAt.set(credentialId, Date.now());
   await sql`
     update public.agent_credentials
     set last_used_at = now(), updated_at = now()
@@ -375,7 +393,7 @@ async function agentPrincipalFromToken(
     return null;
   }
 
-  const sql = getSql();
+  const sql = agentAuthSql(options);
 
   if (!sql) {
     return null;
