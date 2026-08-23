@@ -405,6 +405,22 @@ async function runAgentLoop(
 
     let pollingBackoffMs = 1_000;
 
+    let leftoverIds: string[] = [];
+
+    const loadQueuedIds = async () => {
+      const queued = await client.queued();
+      leftoverIds = [];
+
+      for (const task of queued.tasks ?? []) {
+        if (
+          task.taskId &&
+          agentConfig.taskTypes.includes(task.taskType)
+        ) {
+          leftoverIds.push(task.taskId);
+        }
+      }
+    };
+
     const claimNext = async (preferredTaskId?: string) => {
       const ids: string[] = [];
 
@@ -412,22 +428,23 @@ async function runAgentLoop(
         ids.push(preferredTaskId);
       }
 
-      try {
-        const queued = await client.queued();
-        for (const task of queued.tasks ?? []) {
-          if (
-            task.taskId &&
-            agentConfig.taskTypes.includes(task.taskType) &&
-            !ids.includes(task.taskId)
-          ) {
-            ids.push(task.taskId);
+      if (leftoverIds.length < 1) {
+        try {
+          await loadQueuedIds();
+        } catch (error) {
+          if (!preferredTaskId) {
+            throw error;
           }
         }
-      } catch (error) {
-        if (!preferredTaskId) {
-          throw error;
+      }
+
+      for (const taskId of leftoverIds) {
+        if (!ids.includes(taskId)) {
+          ids.push(taskId);
         }
       }
+
+      leftoverIds = [];
 
       for (const taskId of ids) {
         const reserved = await client.reserve({
@@ -439,6 +456,7 @@ async function runAgentLoop(
         });
 
         if (reserved.task && reserved.reservationId) {
+          leftoverIds = ids.filter((id) => id !== taskId);
           return reserved;
         }
       }

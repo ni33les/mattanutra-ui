@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { textArray } from "@/lib/sql-arrays";
 import { allLocales } from "@/lib/i18n";
 
 type StripePaymentDb = NonNullable<ReturnType<typeof getSql>>;
@@ -61,7 +62,7 @@ export async function assertPaymentSchema(sql: StripePaymentDb) {
       select table_name, column_name
       from information_schema.columns
       where table_schema = 'public'
-        and table_name = any(${Object.keys(requiredColumns)}::text[])
+        and table_name = any(${textArray(sql, Object.keys(requiredColumns))}::text[])
     `;
     const available = new Map<string, Set<string>>();
 

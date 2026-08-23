@@ -2104,8 +2104,6 @@ export async function reserveNextTask(
     `;
   }
 
-  notifyTaskQueueChanged();
-
   const commentRows = await sql<CommentRow[]>`
     select *
     from public.task_comments
@@ -2599,8 +2597,6 @@ export async function reportTaskProgress(input: ProgressTaskInput) {
   if (!row) {
     throw new Error(`Task ${taskId} is not currently progress-reportable`);
   }
-
-  notifyTaskQueueChanged();
 
   return {
     reservationId: row.reservation_id ?? "",

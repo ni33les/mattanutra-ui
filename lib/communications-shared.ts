@@ -11,6 +11,7 @@ import {
 } from "@/lib/communication-channel-utils";
 import { formatOutboundLineMessage } from "@/lib/line-message-format";
 import { getSql } from "@/lib/db";
+import { textArray } from "@/lib/sql-arrays";
 import { validateLeadEmail } from "@/lib/email-validation";
 import {
   sendTransactionalEmail,
@@ -834,7 +835,7 @@ export async function ensureCommunicationSchema(sql: Db = sqlOrThrow()) {
       select table_name, column_name
       from information_schema.columns
       where table_schema = 'public'
-        and table_name = any(${Object.keys(requiredColumns)}::text[])
+        and table_name = any(${textArray(sql, Object.keys(requiredColumns))}::text[])
     `;
     const available = new Map<string, Set<string>>();
 

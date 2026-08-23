@@ -13,16 +13,18 @@ export async function pingRegisteredWorkerWakes(signal: TaskQueueSignal) {
   }
 
   const taskType = signal.taskType.trim();
+
+  if (!taskType) {
+    return;
+  }
+
   const rows = await sql<Array<{ wake_url: string }>>`
     select distinct trim(both from metadata ->> 'wakeUrl') as wake_url
     from public.worker_sessions
     where status in ('idle', 'polling', 'working')
       and last_seen_at > now() - interval '5 minutes'
       and coalesce(metadata ->> 'wakeUrl', '') <> ''
-      and (
-        ${taskType} = ''
-        or ${taskType} = any(task_types)
-      )
+      and ${taskType} = any(task_types)
   `;
   const urls = [
     ...new Set(rows.map((row) => row.wake_url).filter((url) => url.length > 0))

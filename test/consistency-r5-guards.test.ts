@@ -71,6 +71,30 @@ describe("consistency r5 regression guards", () => {
     assert.doesNotMatch(runner, /subscribeTaskQueue|getListenSql/);
   });
 
+  it("does not wake all workers after a reserve or typeless ping", async () => {
+    const service = await readFile("lib/task-service.ts", "utf8");
+    const wake = await readFile("lib/worker-wake.ts", "utf8");
+    const start = service.indexOf("export async function reserveNextTask");
+    const end = service.indexOf("async function claimTaskCompletionApplication");
+    const reserve = service.slice(start, end > start ? end : start + 4000);
+
+    assert.doesNotMatch(reserve, /notifyTaskQueueChanged/);
+    assert.match(wake, /if \(!taskType\) \{\s*return/);
+  });
+
+  it("binds communication schema table names with sql.array", async () => {
+    const source = await readFile("lib/communications-shared.ts", "utf8");
+
+    assert.match(
+      source,
+      /table_name = any\(\$\{textArray\(sql, Object\.keys\(requiredColumns\)\)\}::text\[\]\)/
+    );
+    assert.doesNotMatch(
+      source,
+      /table_name = any\(\$\{Object\.keys\(requiredColumns\)\}::text\[\]\)/
+    );
+  });
+
   it("listens on the platform and HTTP-pings registered worker wake URLs", async () => {
     const [instrumentation, wake, wakeup] = await Promise.all([
       readFile("instrumentation.ts", "utf8"),
