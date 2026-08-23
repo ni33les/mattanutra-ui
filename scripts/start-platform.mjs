@@ -399,6 +399,7 @@ function startWorker() {
     ],
     {
       ...process.env,
+      DB_POOL_ROLE: "worker",
       WORKER_API_BASE_URL: workerApiBaseUrl,
     },
   );

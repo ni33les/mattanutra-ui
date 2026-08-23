@@ -10,7 +10,7 @@ import {
 } from "@/lib/assessment-store";
 import { assessmentSkipsHealthScore } from "@/lib/pharmacy-in-store";
 import { writeBpmEvent } from "@/lib/bpm";
-import { getSql } from "@/lib/db";
+import { getSql, getWorkerSql } from "@/lib/db";
 import { textArray } from "@/lib/sql-arrays";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import { validateLeadEmail } from "@/lib/email-validation";
@@ -1681,7 +1681,7 @@ export async function enqueueFoodGapSupportTask({
 export async function enqueueMissingProductRecommendationsForReadyPlans({
   limit = 10
 }: Readonly<{ limit?: number }> = {}) {
-  const sql = getSql();
+  const sql = getWorkerSql() ?? getSql();
 
   if (!sql) {
     return { checked: 0, queued: 0 };

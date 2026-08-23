@@ -72,6 +72,7 @@ describe("consistency r3 regression guards", () => {
     assert.match(db, /DB_WORKER_POOL_MAX/);
     assert.match(db, /getOrCreateSqlPool\("interactive"\)/);
     assert.match(db, /getOrCreateSqlPool\("worker"\)/);
+    assert.match(db, /process\.env\.DB_POOL_ROLE === "worker"/);
     assert.doesNotMatch(db, /Math\.min\(dbPoolMax\(\),\s*4\)/);
     assert.doesNotMatch(
       db,
@@ -110,6 +111,13 @@ describe("consistency r3 regression guards", () => {
       assert.match(source, /getWorkerSql\(\)\s*\?\?\s*getSql\(\)/);
     }
 
+    assert.match(service, /withSingleQueuedTaskClaim/);
+
+    const taskWorker = await readFile("lib/task-worker.ts", "utf8");
+    assert.match(
+      taskWorker,
+      /enqueueMissingProductRecommendationsForReadyPlans[\s\S]{0,200}getWorkerSql\(\) \?\? getSql\(\)/
+    );
     assert.match(reserve, /sql: getWorkerSql\(\) \?\? undefined/);
     assert.match(complete, /sql: getWorkerSql\(\) \?\? undefined/);
     assert.match(fail, /sql: getWorkerSql\(\) \?\? undefined/);

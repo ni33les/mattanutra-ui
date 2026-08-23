@@ -39,6 +39,7 @@ describe("plan keep-warm does not starve first-create A2", () => {
     assert.match(db, /DB_KEEP_ALIVE_CONNECTIONS = 1/);
     assert.match(db, /DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 120/);
     assert.match(startPlatform, /platform-hot-\$\{Date\.now\(\)\}-patch/);
+    assert.match(startPlatform, /DB_POOL_ROLE: "worker"/);
     assert.match(
       dispatcher,
       /case "info":\s*await import\("@\/lib\/agentic\/catalogue\/warm"\)/,

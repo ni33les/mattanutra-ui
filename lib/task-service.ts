@@ -126,6 +126,16 @@ const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT = 50;
 const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT_MAX = 100;
 const DEPENDENCY_BOOTSTRAP_DELAY_MS = 60_000;
 const RESERVE_CLAIM_ATTEMPTS = 3;
+let claimQueuedTaskTail: Promise<unknown> = Promise.resolve();
+
+function withSingleQueuedTaskClaim<T>(work: () => Promise<T>) {
+  const run = claimQueuedTaskTail.then(work, work);
+  claimQueuedTaskTail = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
 
 type Db = TaskServiceDb;
 type ActiveReservationRow = {
@@ -1958,14 +1968,16 @@ export async function reserveNextTask(
   let reserved: { reservationId: string; task: TaskRecord } | null = null;
 
   for (let attempt = 0; attempt < RESERVE_CLAIM_ATTEMPTS; attempt += 1) {
-    const claimed = await claimQueuedTaskRow(sql, {
-      accessScope,
-      leaseSeconds,
-      mustRequireCapability,
-      reserveCapabilities,
-      skipTaskIds,
-      taskTypes
-    });
+    const claimed = await withSingleQueuedTaskClaim(() =>
+      claimQueuedTaskRow(sql, {
+        accessScope,
+        leaseSeconds,
+        mustRequireCapability,
+        reserveCapabilities,
+        skipTaskIds,
+        taskTypes
+      })
+    );
 
     if (!claimed) {
       break;

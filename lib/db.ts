@@ -266,6 +266,10 @@ function getOrCreateSqlPool(kind: PoolKind) {
 }
 
 export function getSql() {
+  if (process.env.DB_POOL_ROLE === "worker") {
+    return getOrCreateSqlPool("worker");
+  }
+
   return getOrCreateSqlPool("interactive");
 }
 
