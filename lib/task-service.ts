@@ -1693,7 +1693,6 @@ async function claimQueuedTaskRow(
       status = 'reserved',
       reserved_by_agent_id = ${input.accessScope.agentId}::uuid,
       lease_until = now() + make_interval(secs => ${input.leaseSeconds}),
-      started_at = coalesce(public.tasks.started_at, now()),
       updated_at = now()
     from candidate
     where public.tasks.id = candidate.id
@@ -1718,7 +1717,6 @@ async function claimQueuedTaskById(
       status = 'reserved',
       reserved_by_agent_id = ${input.accessScope.agentId}::uuid,
       lease_until = now() + make_interval(secs => ${input.leaseSeconds}),
-      started_at = coalesce(public.tasks.started_at, now()),
       updated_at = now()
     where id = ${input.taskId}::uuid
       and status = 'queued'
@@ -1843,6 +1841,7 @@ async function releaseUncommittedClaim(sql: Db, taskId: string) {
       status = 'queued',
       reserved_by_agent_id = null,
       lease_until = null,
+      started_at = null,
       updated_at = now()
     where id = ${taskId}::uuid
       and status = 'reserved'
@@ -1865,6 +1864,7 @@ async function confirmTaskReservation(
   await sql`
     update public.tasks set
       attempts = public.tasks.attempts + 1,
+      started_at = coalesce(public.tasks.started_at, now()),
       updated_at = now()
     where id = ${input.task.id}::uuid
       and status = 'reserved'

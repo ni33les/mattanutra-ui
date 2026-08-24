@@ -77,4 +77,27 @@ describe("consistency r2 formulation read", () => {
     assert.match(formulation, /includeProducts/);
     assert.match(formulation, /products"\) === "1"/);
   });
+
+  it("loads stored products on the first reveal formulation fetch", async () => {
+    const source = await readFile(
+      "components/formulation-results.tsx",
+      "utf8"
+    );
+
+    assert.match(source, /formulationUrl\(effectivePlanId, locale, true\)/);
+    assert.match(source, /waitingForProducts/);
+    assert.doesNotMatch(
+      source,
+      /formulationUrl\(effectivePlanId, locale, mode === "once"\)/
+    );
+  });
+
+  it("does not insert an empty recommendations row with the formula", async () => {
+    const applier = await readFile("lib/task-result-applier.ts", "utf8");
+    const start = applier.indexOf("includeEmptyRecommendations:");
+    assert.match(
+      applier.slice(start, start + 80),
+      /includeEmptyRecommendations:\s*false/
+    );
+  });
 });

@@ -118,7 +118,7 @@ export function FormulationResults({
 
       try {
         const response = await fetch(
-          formulationUrl(effectivePlanId, locale, mode === "once"),
+          formulationUrl(effectivePlanId, locale, true),
           { cache: "no-store" },
         );
 
@@ -151,9 +151,15 @@ export function FormulationResults({
         setResult(payload);
         setLoadState("ready");
 
+        const waitingForProducts =
+          hasRenderableFormula(payload) &&
+          !resultHasProductStackRows(payload, "balanced") &&
+          resultHasPendingProductRecommendations(payload);
+        const waitingForFormula = !hasRenderableFormula(payload);
+
         if (
           mode === "until-formula" &&
-          !hasRenderableFormula(payload) &&
+          (waitingForFormula || waitingForProducts) &&
           missingAttempts < MAX_MISSING_FORMULA_POLLS
         ) {
           missingAttempts += 1;

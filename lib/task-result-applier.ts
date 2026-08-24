@@ -501,7 +501,7 @@ async function applyPaidFormulationResult(
 
   const version = await insertFormulationVersion(sql, {
     formulation: safeFormulation,
-    includeEmptyRecommendations: true,
+    includeEmptyRecommendations: false,
     modelVersion: modelVersion(analysis),
     planId
   });

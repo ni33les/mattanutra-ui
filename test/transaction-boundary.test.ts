@@ -19,7 +19,9 @@ async function filesUnder(dir: string): Promise<string[]> {
 function enclosingFunctionName(source: string, index: number) {
   const prefix = source.slice(0, index);
   const matches = [
-    ...prefix.matchAll(/(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g)
+    ...prefix.matchAll(
+      /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*(?:<[^>]*>)?\s*\(/g
+    )
   ];
 
   return matches.at(-1)?.[1] ?? "(unknown)";
@@ -64,7 +66,8 @@ function functionBody(source: string, functionName: string) {
 describe("database transaction boundaries", () => {
   it("keeps runtime code free of explicit app-level transactions", async () => {
     const allowedBegins = new Map<string, readonly string[]>([
-      ["lib/agentic/store/postgres.ts", ["createPostgresStore"]]
+      ["lib/agentic/store/postgres.ts", ["createPostgresStore"]],
+      ["lib/db.ts", ["withLocalStatementTimeout"]]
     ]);
     const files = [
       ...(await filesUnder("app")),
@@ -387,6 +390,23 @@ describe("database transaction boundaries", () => {
       /not exists \([\s\S]*task_dependencies/i.test(claimBody),
       false,
       "dependency checks must run after the short claim statement"
+    );
+    assert.doesNotMatch(
+      claimBody,
+      /started_at = coalesce/,
+      "claim must not stamp started_at before dependencies are checked"
+    );
+    const confirmBody = functionBody(source, "confirmTaskReservation");
+    const releaseBody = functionBody(source, "releaseUncommittedClaim");
+    assert.match(
+      confirmBody,
+      /started_at = coalesce\(public\.tasks\.started_at, now\(\)\)/,
+      "started_at should be set only after a reservation is confirmed"
+    );
+    assert.match(
+      releaseBody,
+      /started_at = null/,
+      "blocked claims must clear started_at so matching does not look reserved before formula"
     );
   });
 
