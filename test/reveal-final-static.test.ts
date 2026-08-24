@@ -73,11 +73,10 @@ describe("final reveal UX", () => {
   });
 
   it("uses the standard site header for the successful paid reveal route", () => {
-    const successReturnStart = route.indexOf(
-      "  return (",
-      route.indexOf("const initialResult"),
-    );
-    const successReturnEnd = route.indexOf("</main>", successReturnStart);
+    const resultsIndex = route.indexOf("<FormulationResults");
+    assert.ok(resultsIndex > -1, "paid reveal should render FormulationResults");
+    const successReturnStart = route.lastIndexOf("return (", resultsIndex);
+    const successReturnEnd = route.indexOf("</main>", resultsIndex);
     const successReturn = route.slice(successReturnStart, successReturnEnd);
 
     assert.match(successReturn, /<FormulationResults/);

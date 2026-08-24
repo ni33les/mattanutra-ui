@@ -361,6 +361,13 @@ function isTaggedTemplate(strings: unknown): strings is TemplateStringsArray {
   return Array.isArray(strings) && Array.isArray((strings as { raw?: unknown }).raw);
 }
 
+const EXECUTABLE_SQL_PREFIX =
+  /^(select|insert|update|delete|with|values|table|create|alter|drop|do|call|explain|begin|commit|rollback|savepoint|release|set|listen|notify|unlisten|copy|truncate|refresh|vacuum|analyze|grant|revoke|lock|comment|prepare|execute|deallocate|discard|show|reset|declare|fetch|move|close|checkpoint)\b/i;
+
+function isExecutableTaggedQuery(strings: TemplateStringsArray) {
+  return EXECUTABLE_SQL_PREFIX.test(String(strings[0] ?? "").trimStart());
+}
+
 function instrumentSql(
   sql: postgres.Sql,
   kind: PoolKind
@@ -376,6 +383,7 @@ function instrumentSql(
 
     if (
       isTaggedTemplate(args[0]) &&
+      isExecutableTaggedQuery(args[0]) &&
       result &&
       typeof (result as Promise<unknown>).then === "function"
     ) {
