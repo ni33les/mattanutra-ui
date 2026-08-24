@@ -6,6 +6,7 @@ import {
   defaultLocale,
   indexableLocales,
   isLocale,
+  localeHtmlLang,
   publicLocales,
   resolveLocalizedText,
   siteLocaleRegistry
@@ -116,9 +117,18 @@ describe("locale registry and SEO helpers", () => {
   it("builds localized canonical and alternates only for indexable pages", () => {
     const alternates = localizedAlternates({ path: "/terms" });
 
-    assert.equal(alternates.languages["en"], expectedAbsoluteUrl("/en/terms"));
-    assert.equal(alternates.languages["th"], expectedAbsoluteUrl("/th/terms"));
-    assert.equal(alternates.languages["zh-CN"], expectedAbsoluteUrl("/zh-CN/terms"));
+    assert.equal(
+      alternates.languages[localeHtmlLang("en")],
+      expectedAbsoluteUrl("/en/terms")
+    );
+    assert.equal(
+      alternates.languages[localeHtmlLang("th")],
+      expectedAbsoluteUrl("/th/terms")
+    );
+    assert.equal(
+      alternates.languages[localeHtmlLang("zh-CN")],
+      expectedAbsoluteUrl("/zh-CN/terms")
+    );
     assert.equal(alternates.languages["x-default"], expectedAbsoluteUrl("/en/terms"));
     assert.equal(localizedPath("th", "/nutrition/quiz"), "/th/nutrition/quiz");
     assert.equal(localizedPath("zh-CN", "/nutrition/quiz"), "/zh-CN/nutrition/quiz");

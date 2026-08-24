@@ -244,7 +244,11 @@ describe("Stripe payment schema and lifecycle", () => {
     assert.match(paymentService, /paymentCustomerLedgerAccount/);
     assert.match(paymentService, /plan:\$\{payment\.plan_id\}:customer/);
     assert.match(paymentService, /entryType:\s*"actual"/);
-    assert.match(paymentService, /stripe:payout:\$\{payout\.id\}:net/);
+    assert.match(paymentService, /eventName:\s*"payment_payout_recorded"/);
+    assert.doesNotMatch(
+      paymentService,
+      /async function recordStripePayoutAccounting[\s\S]*?recordFinanceTransaction/
+    );
   });
 
   it("keeps required payment BPM lifecycle events in one service", () => {
