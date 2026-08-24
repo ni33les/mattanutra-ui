@@ -292,6 +292,10 @@ describe("communications channel selection", () => {
     assert.match(webhook, /formatOutboundLineMessage/);
     assert.match(service, /commandExecution: "disabled_v1"/);
     assert.match(service, /contactName/);
+    assert.match(service, /listOrganisationPendingLineConnections/);
+    assert.match(adminSettings, /pendingLineConnections/);
+    assert.match(view, /pending-line-channel/);
+    assert.match(view, /Waiting for LINE/);
     assert.match(service, /deleteDisabledOrganisationCommunicationChannel/);
     assert.match(service, /Only disabled communication channels can be deleted/);
     assert.match(service, /const broadcastChannels =/);

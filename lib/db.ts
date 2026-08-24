@@ -388,16 +388,24 @@ function instrumentSql(
       result &&
       typeof (result as Promise<unknown>).then === "function"
     ) {
-      return (result as Promise<unknown>).then(
-        (value) => {
-          noteQuery(kind, startedAt, args[0]);
-          return value;
-        },
-        (error: unknown) => {
-          noteQuery(kind, startedAt, args[0]);
-          throw error;
-        }
-      );
+      const pending = result as Promise<unknown> & {
+        then: Promise<unknown>["then"];
+      };
+      const originalThen = pending.then.bind(pending);
+      pending.then = ((onFulfilled, onRejected) =>
+        originalThen(
+          (value) => {
+            noteQuery(kind, startedAt, args[0]);
+            return typeof onFulfilled === "function" ? onFulfilled(value) : value;
+          },
+          (error) => {
+            noteQuery(kind, startedAt, args[0]);
+            if (typeof onRejected === "function") {
+              return onRejected(error);
+            }
+            throw error;
+          }
+        )) as Promise<unknown>["then"];
     }
 
     return result;

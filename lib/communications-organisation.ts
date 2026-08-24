@@ -87,6 +87,48 @@ export async function listOrganisationCommunicationChannels(input: Readonly<{
   return rows.map(mapChannel);
 }
 
+export type PendingOrganisationLineConnection = Readonly<{
+  displayName: string | null;
+  expiresAt: string;
+  id: string;
+}>;
+
+export async function listOrganisationPendingLineConnections(input: Readonly<{
+  organisationId: string;
+  sql?: Db;
+}>) {
+  if (!isUuid(input.organisationId)) {
+    return [] as PendingOrganisationLineConnection[];
+  }
+
+  const sql = input.sql ? sqlOrThrow(input.sql) : sqlOrThrow();
+  const rows = await sql<Array<{
+    expires_at: Date | string;
+    id: string;
+    metadata: unknown;
+  }>>`
+    select id::text, expires_at, metadata
+    from public.line_connect_tokens
+    where organisation_id = ${input.organisationId}::uuid
+      and status = 'active'
+      and consumed_at is null
+      and expires_at > now()
+    order by created_at desc
+  `;
+
+  return rows.map((row) => {
+    const metadata = objectValue(row.metadata);
+
+    return {
+      displayName:
+        optionalText(metadata.contactName) ??
+        optionalText(metadata.displayName),
+      expiresAt: isoDate(row.expires_at) ?? new Date().toISOString(),
+      id: row.id
+    } satisfies PendingOrganisationLineConnection;
+  });
+}
+
 export async function listOrganisationNotificationPreferences(input: Readonly<{
   organisationId: string;
   sql?: Db;

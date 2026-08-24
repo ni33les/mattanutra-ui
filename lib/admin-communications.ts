@@ -6,11 +6,13 @@ import type { AdminSessionContext } from "@/lib/admin-access-types";
 import {
   adminCommunicationEventKeysForScope,
   listOrganisationCommunicationChannels,
+  listOrganisationPendingLineConnections,
   listOrganisationNotificationPreferences,
   type AdminCommunicationScope,
   type AdminCommunicationEventKey,
   type CommunicationChannel,
-  type OrganisationNotificationPreference
+  type OrganisationNotificationPreference,
+  type PendingOrganisationLineConnection
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 
@@ -69,6 +71,7 @@ export type AdminOrganisationCommunicationSettings = Readonly<{
   channels: CommunicationChannel[];
   eventKeys: AdminCommunicationEventKey[];
   organisations: AdminCommunicationOrganisation[];
+  pendingLineConnections: PendingOrganisationLineConnection[];
   preferences: OrganisationNotificationPreference[];
   selectedOrganisationId: string;
   selectedOrganisationName: string;
@@ -212,8 +215,12 @@ export async function getAdminOrganisationCommunicationSettings(
   };
   const organisationRows = [selected];
 
-  const [channels, preferences] = await Promise.all([
+  const [channels, pendingLineConnections, preferences] = await Promise.all([
     listOrganisationCommunicationChannels({
+      organisationId: selected.id,
+      sql
+    }),
+    listOrganisationPendingLineConnections({
       organisationId: selected.id,
       sql
     }),
@@ -235,6 +242,7 @@ export async function getAdminOrganisationCommunicationSettings(
     channels,
     eventKeys: adminCommunicationEventKeysForScope(scope),
     organisations: organisationRows,
+    pendingLineConnections,
     preferences,
     selectedOrganisationId: selected.id,
     selectedOrganisationName: selected.name,

@@ -225,6 +225,16 @@ export function AdminCommunicationsView({
         expiresAt: json.token.expiresAt,
         lineUrl: json.token.lineUrl
       });
+
+      const settingsResponse = await fetch(
+        `/api/admin/communications/organisation?organisationId=${encodeURIComponent(settings.selectedOrganisationId)}`,
+        { credentials: "same-origin" }
+      );
+      const settingsJson = await settingsResponse.json();
+
+      if (settingsResponse.ok && settingsJson.settings) {
+        setSettings(settingsJson.settings);
+      }
     } catch {
       setSettingsError("Could not create LINE connection code.");
     } finally {
@@ -469,6 +479,25 @@ export function AdminCommunicationsView({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
+                    {(settings.pendingLineConnections ?? []).map((pending) => (
+                      <tr key={`pending-line-${pending.id}`} data-testid="pending-line-channel">
+                        <td className="py-3 pr-4 font-medium text-gray-900">
+                          Line
+                          <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                            Waiting for LINE
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-gray-700">
+                          {pending.displayName || "—"}
+                        </td>
+                        <td className="py-3 pr-4 text-gray-600">
+                          Send MN code in LINE before {formatGeneratedAt(pending.expiresAt, locale)}
+                        </td>
+                        <td className="py-3 pr-4 text-xs text-gray-500">
+                          Pending
+                        </td>
+                      </tr>
+                    ))}
                     {settings.channels.map((channel) => (
                       <tr key={channel.id}>
                         <td className="py-3 pr-4 font-medium text-gray-900">

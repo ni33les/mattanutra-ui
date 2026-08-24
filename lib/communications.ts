@@ -114,6 +114,7 @@ export {
   deleteDisabledOrganisationCommunicationChannel,
   ensureOrganisationCommunicationIdentity,
   listOrganisationCommunicationChannels,
+  listOrganisationPendingLineConnections,
   listOrganisationNotificationPreferences,
   queueCustomerChatCommunicationDispatchTask,
   recordInboundLineCommunication,
@@ -121,6 +122,7 @@ export {
   updateOrganisationNotificationPreference,
   upsertOrganisationCommunicationChannel
 } from "@/lib/communications-organisation";
+export type { PendingOrganisationLineConnection } from "@/lib/communications-organisation";
 
 function orderEventCopy(input: Readonly<{
   customerName: string | null;

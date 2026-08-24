@@ -185,6 +185,15 @@ describe("product admin card layout", () => {
     assert.doesNotMatch(listQuery, /product_list_base/);
     assert.doesNotMatch(listQuery, /product_recommendation_items/);
     assert.doesNotMatch(listQuery, /jsonb_agg\([\s\S]*product_regulatory_approvals/);
+    assert.match(listQuery, /Math\.max\(INTERACTIVE_STATEMENT_TIMEOUT_MS, 8_000\)/);
+  });
+
+  it("shows an unavailable state when the product list cannot load", async () => {
+    const detailView = await readFile("components/admin/product-view.tsx", "utf8");
+    const helpers = await readFile("components/admin/product-view-helpers.ts", "utf8");
+    assert.match(detailView, /product-list-unavailable/);
+    assert.match(detailView, /data\.databaseAvailable/);
+    assert.match(helpers, /listUnavailable/);
   });
 
   it("keeps recommendation telemetry out of product admin surfaces", async () => {

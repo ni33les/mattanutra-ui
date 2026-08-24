@@ -469,6 +469,15 @@ export function AdminProductListView({
         </div>
       </form>
 
+      {data.databaseAvailable ? null : (
+        <p
+          className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 ring-1 ring-red-100"
+          data-testid="product-list-unavailable"
+        >
+          {viewLabels.listUnavailable}
+        </p>
+      )}
+
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {data.rows.map((row) => (
           <ProductCard

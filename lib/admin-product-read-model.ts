@@ -578,7 +578,7 @@ export async function getAdminProductListData(
   try {
     return await withLocalStatementTimeout(
       pool,
-      INTERACTIVE_STATEMENT_TIMEOUT_MS,
+      Math.max(INTERACTIVE_STATEMENT_TIMEOUT_MS, 8_000),
       async (sql) => {
         const searchFilter = hasSearch
           ? sql`

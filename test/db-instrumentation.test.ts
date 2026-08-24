@@ -14,6 +14,9 @@ describe("db query instrumentation", () => {
       body,
       /isTaggedTemplate\(args\[0\]\) &&\s*isExecutableTaggedQuery\(args\[0\]\)/
     );
+    assert.match(body, /pending\.then = \(\(onFulfilled, onRejected\) =>/);
+    assert.doesNotMatch(body, /return \(result as Promise<unknown>\)\.then\(/);
+    assert.doesNotMatch(body, /void \(result as Promise<unknown>\)\.then\(/);
     assert.match(
       source,
       /EXECUTABLE_SQL_PREFIX[\s\S]*\^\\?\(select\|insert\|update\|delete/
