@@ -15,6 +15,7 @@ import type {
   CatalogueProduct,
   CatalogueSnapshot
 } from "@/lib/agentic/catalogue/types";
+import { factComparableAmount } from "@/lib/product-recommendation-metrics";
 import type {
   ProductCandidate,
   ProductCandidateFact,
@@ -319,22 +320,27 @@ function snapshotFacts(value: unknown): ProductCandidateFact[] {
       return [];
     }
 
+    const fact = {
+      amount: Number.isFinite(amount) ? amount : null,
+      comparableAmount: null,
+      confidence: "high" as const,
+      itemType: "supplement" as const,
+      name,
+      normalizedName:
+        typeof row.normalizedName === "string"
+          ? row.normalizedName
+          : name.toLowerCase(),
+      servingLabel:
+        typeof row.servingLabel === "string" ? row.servingLabel : null,
+      supplementId:
+        typeof row.supplementId === "string" ? row.supplementId : null,
+      unit
+    } satisfies ProductCandidateFact;
+
     return [
       {
-        amount: Number.isFinite(amount) ? amount : null,
-        comparableAmount: Number.isFinite(amount) ? amount : null,
-        confidence: "high",
-        itemType: "supplement",
-        name,
-        normalizedName:
-          typeof row.normalizedName === "string"
-            ? row.normalizedName
-            : name.toLowerCase(),
-        servingLabel:
-          typeof row.servingLabel === "string" ? row.servingLabel : null,
-        supplementId:
-          typeof row.supplementId === "string" ? row.supplementId : null,
-        unit
+        ...fact,
+        comparableAmount: factComparableAmount(fact)
       } satisfies ProductCandidateFact
     ];
   });

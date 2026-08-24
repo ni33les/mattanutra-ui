@@ -51,6 +51,22 @@ function unitFromNeed(unit: string | null | undefined): MatcherUnit {
 
 const matcherProductByCandidate = new WeakMap<ProductCandidate, MatcherProduct>();
 
+function labelledSubjectId(fact: ProductCandidate["facts"][number]) {
+  const fromName = fact.normalizedName?.trim();
+
+  if (fromName && !/^[0-9a-f-]{36}$/i.test(fromName)) {
+    return fromName;
+  }
+
+  const fromId = fact.supplementId?.trim();
+
+  if (fromId && !/^[0-9a-f-]{36}$/i.test(fromId)) {
+    return fromId;
+  }
+
+  return fromName || null;
+}
+
 function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
   const cached = matcherProductByCandidate.get(candidate);
 
@@ -59,23 +75,28 @@ function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
   }
 
   const price = candidate.unitPriceAmount ?? candidate.priceAmount ?? 0;
+  const labelledContributions = candidate.facts.map((fact) => ({
+    amount: fact.amount ?? 0,
+    name: fact.name,
+    subjectId: labelledSubjectId(fact),
+    unit: fact.unit
+  }));
   const mapped: MatcherProduct = {
     availableCountryCodes: candidate.availableCountryCodes ?? null,
-    contributionSubjectIds: candidate.facts
-      .map((fact) => fact.supplementId)
-      .filter((item): item is string => Boolean(item)),
+    contributionSubjectIds: [
+      ...new Set(
+        labelledContributions
+          .map((item) => item.subjectId)
+          .filter((item): item is string => Boolean(item))
+      )
+    ],
     currency: candidate.currency,
     dailyPillsPerServing: 1,
     dietarySource: "any",
     form: "capsule",
     imageUrl: candidate.imageUrl?.trim() || null,
     incompleteCommercialFacts: false,
-    labelledContributions: candidate.facts.map((fact) => ({
-      amount: fact.comparableAmount ?? fact.amount ?? 0,
-      name: fact.name,
-      subjectId: fact.supplementId ?? null,
-      unit: fact.comparableAmount != null ? "mcg" : fact.unit
-    })),
+    labelledContributions,
     omegaSource: "none",
     orderable:
       candidate.status === "approved" &&
@@ -117,8 +138,19 @@ function needSubjectIds(need: ProductRecommendationNeed) {
   const fromPrefixed = id?.includes(":")
     ? id.slice(id.indexOf(":") + 1)
     : null;
+  const raw = [need.normalizedName?.trim(), sourceId, id, fromPrefixed].filter(
+    Boolean
+  ) as string[];
 
-  return [...new Set([sourceId, id, fromPrefixed].filter(Boolean))] as string[];
+  return [
+    ...new Set(
+      raw.flatMap((value) => [
+        value,
+        value.replace(/-/g, "_"),
+        value.replace(/_/g, "-")
+      ])
+    )
+  ];
 }
 
 export function matcherNeedCoveragePercent(
@@ -202,7 +234,7 @@ export function recommendWithMatcher(
         need.targetComparableAmount ??
         0,
       name: need.displayName,
-      subjectId: need.sourceId || need.id,
+      subjectId: need.normalizedName || need.sourceId || need.id,
       unit: need.targetDose
         ? unitFromNeed(need.targetDose.unit)
         : "mcg"
