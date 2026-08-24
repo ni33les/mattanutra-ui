@@ -115,4 +115,61 @@ describe("assessment store product coverage reconciliation", () => {
       100
     );
   });
+
+  it("does not invent 100% need coverage from a covers list when matcher diagnostics are empty", () => {
+    const result = reconcileProductRecommendationCoverage({
+      foodGuidance: [],
+      rawNeedCoverage: [],
+      storedStackCoveragePercent: 20,
+      recommendations: [
+        recommendation({
+          covers: [
+            "vitamin-d3",
+            "omega-3",
+            "magnesium",
+            "creatine"
+          ],
+          productCoveragePercent: 20,
+          stackContributionPercent: 20
+        })
+      ],
+      supplementBreakdown: [
+        {
+          category: "Vitamin",
+          dailyDose: { en: "50 mcg/day", th: "50 mcg/day" },
+          effectivenessRank: 1,
+          id: "vitamin-d3",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Vitamin D3", th: "Vitamin D3" }
+        },
+        {
+          category: "Mineral",
+          dailyDose: { en: "300 mg/day", th: "300 mg/day" },
+          effectivenessRank: 2,
+          id: "magnesium",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Magnesium", th: "Magnesium" }
+        },
+        {
+          category: "Amino acid",
+          dailyDose: { en: "3000 mg/day", th: "3000 mg/day" },
+          effectivenessRank: 3,
+          id: "creatine",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Creatine", th: "Creatine" }
+        }
+      ]
+    });
+
+    assert.equal(result.stackCoveragePercent, 20);
+    assert.equal(
+      result.needCoverage.every((item) => item.coveragePercent === 0),
+      true
+    );
+    assert.equal(result.recommendations[0]?.stackCoveragePercent, 20);
+    assert.equal(result.recommendations[0]?.productCoveragePercent, 20);
+  });
 });

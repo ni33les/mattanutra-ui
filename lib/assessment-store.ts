@@ -484,21 +484,6 @@ function productCoverageReasonLookup(items: readonly ProductNeedCoverage[]) {
   return lookup;
 }
 
-function addRecommendationCoverageFallback(
-  lookup: Map<string, number>,
-  recommendations: readonly RecommendedProduct[]
-) {
-  for (const recommendation of recommendations) {
-    for (const covered of recommendation.covers ?? []) {
-      const keys = [covered, sourceIdFromNeedId(covered), normalizeReviewName(covered)];
-
-      for (const key of keys) {
-        lookup.set(key, Math.max(lookup.get(key) ?? 0, 100));
-      }
-    }
-  }
-}
-
 function currentNeedCoverage(
   needs: readonly ProductRecommendationNeed[],
   coverageLookup: ReadonlyMap<string, number>,
@@ -611,6 +596,7 @@ export function reconcileProductRecommendationCoverage(input: Readonly<{
   foodGuidance: readonly FoodGuidanceItem[];
   rawNeedCoverage: readonly ProductNeedCoverage[];
   recommendations: readonly RecommendedProduct[];
+  storedStackCoveragePercent?: number;
   supplementBreakdown: readonly FormulationIngredient[];
 }>) {
   const currentNeeds = buildProductNeeds({
@@ -619,13 +605,16 @@ export function reconcileProductRecommendationCoverage(input: Readonly<{
   });
   const coverageLookup = productCoverageLookup(input.rawNeedCoverage);
   const reasonLookup = productCoverageReasonLookup(input.rawNeedCoverage);
-
-  if (input.rawNeedCoverage.length < 1) {
-    addRecommendationCoverageFallback(coverageLookup, input.recommendations);
-  }
   const needCoverage = currentNeedCoverage(currentNeeds, coverageLookup, reasonLookup);
   const productNeeds = currentNeeds.filter((need) => need.itemType === "supplement");
-  const stackCoveragePercent = weightedCoveragePercent(productNeeds, coverageLookup);
+  const fromNeeds = weightedCoveragePercent(productNeeds, coverageLookup);
+  const storedStackCoveragePercent = boundedPercentOrNull(
+    input.storedStackCoveragePercent
+  );
+  const stackCoveragePercent =
+    input.rawNeedCoverage.length > 0
+      ? fromNeeds
+      : storedStackCoveragePercent ?? fromNeeds;
 
   return {
     needCoverage,
@@ -2110,6 +2099,8 @@ export async function getStoredFormulationResult(
       row.product_recommendation_diagnostics
     ),
     recommendations,
+    storedStackCoveragePercent:
+      Number(row.product_recommendation_stack_coverage_percent) || 0,
     supplementBreakdown
   });
   const productNeedCoverage = productRecommendationCoverage.needCoverage;
@@ -2244,6 +2235,7 @@ export async function getStoredFormulationResult(
         foodGuidance,
         rawNeedCoverage: productNeedCoverageFromDiagnostics(diagnostics),
         recommendations: optionRecommendations,
+        storedStackCoveragePercent: Number(option.stackCoveragePercent) || 0,
         supplementBreakdown
       });
       const generatedAt =

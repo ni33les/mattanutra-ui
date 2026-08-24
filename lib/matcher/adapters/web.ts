@@ -1,15 +1,20 @@
 import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
-import { MATCHER_VERSION } from "@/lib/matcher/config";
+import { COVERAGE_SCALE, MATCHER_VERSION } from "@/lib/matcher/config";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import { match } from "@/lib/matcher";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
-import { productEligible } from "@/lib/matcher/eligibility";
 import { publicCoveragePercent } from "@/lib/matcher/explainer";
-import type { MatcherProduct, MatcherUnit } from "@/lib/matcher/types";
+import {
+  normalizeProductFactKey,
+  productKeysMatch
+} from "@/lib/product-key-matching";
+import type { MatcherProduct, MatcherUnit, ScoredBasket } from "@/lib/matcher/types";
 import type {
   ProductCandidate,
   ProductRecommendationInput,
+  ProductRecommendationNeed,
+  ProductRecommendationNeedDiagnostic,
   ProductRecommendationResult,
   ProductRecommendationSelection
 } from "@/lib/product-recommendation-types";
@@ -104,6 +109,84 @@ function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
   matcherProductByCandidate.set(candidate, mapped);
 
   return mapped;
+}
+
+function needSubjectIds(need: ProductRecommendationNeed) {
+  const sourceId = need.sourceId?.trim();
+  const id = need.id?.trim();
+  const fromPrefixed = id?.includes(":")
+    ? id.slice(id.indexOf(":") + 1)
+    : null;
+
+  return [...new Set([sourceId, id, fromPrefixed].filter(Boolean))] as string[];
+}
+
+export function matcherNeedCoveragePercent(
+  coverageBySubject: ReadonlyMap<string, number> | undefined,
+  need: ProductRecommendationNeed
+) {
+  if (!coverageBySubject) {
+    return 0;
+  }
+
+  let units = 0;
+
+  for (const subjectId of needSubjectIds(need)) {
+    units = Math.max(units, coverageBySubject.get(subjectId) ?? 0);
+  }
+
+  return Math.max(0, Math.min(100, Math.round(units / (COVERAGE_SCALE / 100))));
+}
+
+export function matcherProductCoversNeed(
+  product: MatcherProduct,
+  need: ProductRecommendationNeed
+) {
+  const subjectIds = new Set(needSubjectIds(need));
+
+  if (product.contributionSubjectIds.some((id) => subjectIds.has(id))) {
+    return true;
+  }
+
+  for (const contribution of product.labelledContributions) {
+    if (!contribution.amount || contribution.amount <= 0) {
+      continue;
+    }
+
+    if (contribution.subjectId && subjectIds.has(contribution.subjectId)) {
+      return true;
+    }
+
+    const factKey = normalizeProductFactKey(contribution.name);
+    const aliases = need.aliasKeys ?? [];
+
+    if (
+      factKey === need.normalizedName ||
+      aliases.includes(factKey) ||
+      productKeysMatch(need.normalizedName, factKey, aliases)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function needDiagnosticsFromBasket(
+  needs: readonly ProductRecommendationNeed[],
+  selected: ScoredBasket | null
+): ProductRecommendationNeedDiagnostic[] {
+  return needs.map((need) => ({
+    bestRejectedProductId: null,
+    bestRejectedReason: null,
+    coveragePercent: matcherNeedCoveragePercent(
+      selected?.coverageBySubject,
+      need
+    ),
+    displayName: need.displayName,
+    id: need.id,
+    itemType: need.itemType === "food" ? "food" : "supplement"
+  }));
 }
 
 export function recommendWithMatcher(
@@ -207,6 +290,10 @@ export function recommendWithMatcher(
     }
   );
   const coverage = publicCoveragePercent(result.selected);
+  const needDiagnostics = needDiagnosticsFromBasket(
+    supplementNeeds,
+    result.selected
+  );
   const byId = new Map(input.candidates.map((item) => [item.id, item]));
   const recommendations: ProductRecommendationSelection[] = [];
   for (const [index, productId] of (result.selected?.productIds ?? []).entries()) {
@@ -214,8 +301,11 @@ export function recommendWithMatcher(
     if (!product) {
       continue;
     }
+    const matcherProduct = toMatcherProduct(product);
     recommendations.push({
-      coveredNeeds: supplementNeeds,
+      coveredNeeds: supplementNeeds.filter((need) =>
+        matcherProductCoversNeed(matcherProduct, need)
+      ),
       availabilityStatus:
         product.retailAvailabilityStatus ??
         (product.availabilityStatus === "in_stock" ? "available_now" : "available_now"),
@@ -249,10 +339,10 @@ export function recommendWithMatcher(
         totalPlanCoveragePercent: coverage
       },
       factIssues: [],
-      matchedNeeds: [],
+      matchedNeeds: needDiagnostics.filter((item) => item.coveragePercent > 0),
       nearMisses: [],
       productsConsidered: input.candidates.length,
-      unmatchedNeeds: [],
+      unmatchedNeeds: needDiagnostics.filter((item) => item.coveragePercent <= 0),
       trace: {
         alternativeStacks: [],
         componentScores: {},
