@@ -20,9 +20,9 @@ export const WEB_MATCHER_CONFIG: MatcherConfig = {
 
 export const WEB_COMPACT_MATCHER_CONFIG: MatcherConfig = {
   ...WEB_MATCHER_CONFIG,
-  initialBeamWidth: 48,
-  maxBeamWidth: 64,
-  sellerGroupLimit: 48
+  initialBeamWidth: 96,
+  maxBeamWidth: 192,
+  sellerGroupLimit: 64
 };
 
 export const MATERIAL_COVERAGE_POINTS = 5;
