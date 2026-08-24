@@ -18,6 +18,13 @@ export const WEB_MATCHER_CONFIG: MatcherConfig = {
   searchDeadlineMs: 400
 };
 
+export const WEB_COMPACT_MATCHER_CONFIG: MatcherConfig = {
+  ...WEB_MATCHER_CONFIG,
+  initialBeamWidth: 48,
+  maxBeamWidth: 64,
+  sellerGroupLimit: 48
+};
+
 export const MATERIAL_COVERAGE_POINTS = 5;
 export const MATERIAL_PRICE_MINOR = 1000;
 export const MATERIAL_PILL_DELTA = 1;

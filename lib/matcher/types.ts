@@ -223,6 +223,7 @@ export type MatcherConfig = Readonly<{
   initialBeamWidth: number;
   maxBeamWidth: number;
   searchDeadlineMs: number;
+  sellerGroupLimit?: number;
   usefulCoverageFloor: number;
   version: string;
 }>;

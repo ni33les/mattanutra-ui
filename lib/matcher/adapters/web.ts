@@ -3,7 +3,10 @@ import { COVERAGE_SCALE, MATCHER_VERSION } from "@/lib/matcher/config";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import { compileGroups, contributionFor } from "@/lib/matcher/candidates";
-import { WEB_MATCHER_CONFIG } from "@/lib/matcher/config";
+import {
+  WEB_COMPACT_MATCHER_CONFIG,
+  WEB_MATCHER_CONFIG
+} from "@/lib/matcher/config";
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { match } from "@/lib/matcher";
@@ -444,7 +447,9 @@ export function recommendWithMatcher(
   const result = match(
     request,
     compiled.catalog,
-    WEB_MATCHER_CONFIG,
+    input.stackPreference === "compact"
+      ? WEB_COMPACT_MATCHER_CONFIG
+      : WEB_MATCHER_CONFIG,
     compiled.groups
   );
   const variantCount = compiled.groups.reduce(
@@ -458,6 +463,10 @@ export function recommendWithMatcher(
     mode: result.searchMode,
     searchMs: Date.now() - searchStartedAt,
     stackPreference: input.stackPreference ?? "balanced",
+    beamWidth:
+      input.stackPreference === "compact"
+        ? WEB_COMPACT_MATCHER_CONFIG.initialBeamWidth
+        : WEB_MATCHER_CONFIG.initialBeamWidth,
     trimmed: result.trimmed,
     variants: variantCount
   });

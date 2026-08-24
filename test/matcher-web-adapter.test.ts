@@ -158,7 +158,11 @@ describe("matcher web adapter coverage mapping", () => {
     assert.match(candidates, /variantLeavesTargetShortfall/);
     const config = await readFile("lib/matcher/config.ts", "utf8");
     assert.match(config, /WEB_MATCHER_CONFIG/);
+    assert.match(config, /WEB_COMPACT_MATCHER_CONFIG/);
     assert.match(config, /searchDeadlineMs: 400/);
+    assert.match(config, /initialBeamWidth: 48/);
+    const adapter = await readFile("lib/matcher/adapters/web.ts", "utf8");
+    assert.match(adapter, /WEB_COMPACT_MATCHER_CONFIG/);
     const search = await readFile("lib/matcher/search.ts", "utf8");
     assert.match(search, /hasUsefulBasket/);
     assert.match(

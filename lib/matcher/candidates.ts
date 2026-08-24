@@ -262,7 +262,8 @@ function orderByScarcity(groups: ProductGroup[], request: CanonicalRequest) {
 
 export function groupsBySeller(
   groups: readonly ProductGroup[],
-  request: CanonicalRequest
+  request: CanonicalRequest,
+  sellerGroupLimit = 32
 ) {
   const bySeller = new Map<string, ProductGroup[]>();
 
@@ -275,7 +276,7 @@ export function groupsBySeller(
   return [...bySeller.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([sellerId, sellerGroups]) => ({
-      groups: orderByScarcity(sellerGroups, request).slice(0, 32),
+      groups: orderByScarcity(sellerGroups, request).slice(0, sellerGroupLimit),
       sellerId
     }));
 }

@@ -99,7 +99,11 @@ export function match(
         catalog,
         Math.max(Date.now(), deadlineAt - 400)
       );
-  const sellers = groupsBySeller(groups, request);
+  const sellers = groupsBySeller(
+    groups,
+    request,
+    config.sellerGroupLimit ?? 32
+  );
   const scored: ScoredBasket[] = [];
   let mode: "bounded" | "exact" = "exact";
   let trimmed = false;
