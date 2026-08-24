@@ -227,9 +227,14 @@ describe("questionnaire v14 UX on v6 schema", () => {
       join(root, "components/chat-questionnaire/questionnaire-calculating.tsx"),
       "utf8"
     );
+    const wait = readFileSync(
+      join(root, "components/chat-questionnaire/calculating-wait.tsx"),
+      "utf8"
+    );
     assert.match(calc, /showEmailEscape/);
     assert.match(calc, /calc-emailbox|email-stack/);
-    assert.match(calc, /nongPoseSrc\(\"wai\"\)/);
+    assert.match(wait, /nongPoseSrc\(\"wai\"\)/);
+    assert.match(calc, /CalculatingWait/);
     // No retry button in fallback UI
     assert.doesNotMatch(calc, /calcRetry/);
     assert.doesNotMatch(calc, /onClick=\{onRetry\}/);

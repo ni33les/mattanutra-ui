@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { Locale } from "@/lib/i18n";
-import { nongPoseSrc } from "@/lib/questionnaire/poses";
+import { CalculatingWait } from "@/components/chat-questionnaire/calculating-wait";
 import { getWelcomeCopy } from "@/components/chat-questionnaire/questionnaire-welcome";
-
-const LINE_SUPPORT_URL = "https://line.me/R/ti/p/%40344enooi";
+import type { Locale } from "@/lib/i18n";
 
 export type CalculatingStatus = "building" | "ready" | "error" | "sent";
 
@@ -39,6 +37,20 @@ export function QuestionnaireCalculating({
   const isReady = status === "ready";
   const isBuilding = status === "building";
   const showResultsBtn = isReady && canOpenResults;
+  const statusLabel = isSent
+    ? copy.calcEmailThanks
+    : isReady
+      ? copy.calcReady
+      : isBuilding
+        ? copy.calcBuilding
+        : copy.calcSavedNote;
+  const note = isSent
+    ? null
+    : isBuilding
+      ? copy.calcKeepOpen
+      : isReady
+        ? copy.calcReadyNote
+        : null;
 
   async function submitEmail() {
     const trimmed = email.trim();
@@ -62,51 +74,20 @@ export function QuestionnaireCalculating({
   }
 
   return (
-    <div
-      className="mn-quiz-calc"
-      data-testid="questionnaire-calculating"
-      aria-live="polite"
+    <CalculatingWait
+      copy={{
+        body: isSent ? copy.calcSavedNote : copy.calcCopy,
+        disclaimer: copy.calcDisclaimer,
+        kicker: copy.calcKicker,
+        line: copy.calcLine,
+        note,
+        status: statusLabel,
+        title: isSent ? copy.calcEmailThanks : copy.calcTitle
+      }}
+      showSupport={!isSent}
+      spinning={isBuilding && !isSent}
+      testId="questionnaire-calculating"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        className="mn-quiz-calc__nong"
-        src={nongPoseSrc("wai")}
-        alt=""
-      />
-      <div className="mn-quiz-calc__kicker">{copy.calcKicker}</div>
-      <h1 className="mn-quiz-calc__title">
-        {isSent ? copy.calcEmailThanks : copy.calcTitle}
-      </h1>
-      {isSent ? (
-        <p className="mn-quiz-calc__copy">{copy.calcSavedNote}</p>
-      ) : (
-        <p className="mn-quiz-calc__copy">{copy.calcCopy}</p>
-      )}
-
-      <div className="mn-quiz-calc__status">
-        {isSent ? (
-          <>
-            <span aria-hidden>✓</span>
-            <span>{copy.calcEmailThanks}</span>
-          </>
-        ) : isReady ? (
-          <>
-            <span aria-hidden>✓</span>
-            <span>{copy.calcReady}</span>
-          </>
-        ) : isBuilding ? (
-          <>
-            <span className="mn-quiz-calc__spinner" aria-hidden />
-            <span>{copy.calcBuilding}</span>
-          </>
-        ) : (
-          <>
-            <span aria-hidden>✓</span>
-            <span>{copy.calcSavedNote}</span>
-          </>
-        )}
-      </div>
-
       {showResultsBtn ? (
         <button
           type="button"
@@ -117,23 +98,6 @@ export function QuestionnaireCalculating({
           {copy.calcSee}
         </button>
       ) : null}
-
-      {isSent ? null : isBuilding ? (
-        <p className="mn-quiz-calc__note">{copy.calcKeepOpen}</p>
-      ) : isReady ? (
-        <p className="mn-quiz-calc__note">{copy.calcReadyNote}</p>
-      ) : null}
-
-      {isSent ? null : (
-        <>
-          <div className="mn-quiz-calc__support">
-            <a href={LINE_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
-              {copy.calcLine}
-            </a>
-          </div>
-          <p className="mn-quiz-calc__disclaimer">{copy.calcDisclaimer}</p>
-        </>
-      )}
 
       {showEmailEscape ? (
         <div className="mn-quiz-calc__fallback" data-testid="calc-fallback">
@@ -170,6 +134,6 @@ export function QuestionnaireCalculating({
           ) : null}
         </div>
       ) : null}
-    </div>
+    </CalculatingWait>
   );
 }

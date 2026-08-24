@@ -18,7 +18,6 @@ import {
   selectProductRecommendationOption,
   supplementProductCoverageById,
 } from "@/components/formulation-results-helpers";
-import { NutritionProgress } from "@/components/nutrition-progress";
 import { RevealFinalResultsPage } from "@/components/reveal-final-results";
 import type {
   FormulationResult,
@@ -221,7 +220,6 @@ export function FormulationResults({
   if (loadState === "error" || !result) {
     return (
       <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
-        <NutritionProgress className="mb-8" current="reveal" locale={locale} />
         <div className="rounded-lg bg-white p-6 text-center ring-1 ring-foreground/10 sm:p-8">
           <ExclamationTriangleIcon
             aria-hidden={true}

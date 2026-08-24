@@ -2,61 +2,56 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowPathIcon } from "@heroicons/react/24/outline";
-import { CheckIcon } from "@heroicons/react/24/solid";
+import { CalculatingWait } from "@/components/chat-questionnaire/calculating-wait";
+import { getWelcomeCopy } from "@/components/chat-questionnaire/questionnaire-welcome";
+import "@/components/chat-questionnaire/chat-questionnaire.css";
 import type { Locale } from "@/lib/i18n";
 import { nutritionRevealPath } from "@/lib/nutrition-paths";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
-import type {
-  JourneyWorkStageId,
-  JourneyWorkStageState,
-  JourneyWorkTimeline
-} from "@/lib/nutrition-journey-status";
+import type { JourneyWorkTimeline } from "@/lib/nutrition-journey-status";
 
 const POLL_INTERVAL_MS = 1_500;
 const MAX_POLL_ATTEMPTS = 80;
-const STAGE_ORDER: readonly JourneyWorkStageId[] = [
-  "healthscore",
-  "formulation",
-  "products"
-];
 
-const copy = {
+const formulaCopy = {
   en: {
-    aria: "Plan preparation",
+    kicker: "Thank you",
+    title: "Your formula is being prepared",
+    body: "MattaNutra is building your personalised formula and matching the right products. This normally takes several seconds.",
+    building: "Preparing your formula…",
+    note: "Please keep this page open.",
     error: "We could not finish this step. Your completed work is saved.",
-    retry: "Try again",
-    title: "Preparing your plan",
-    healthscore: "Calculating your Healthscore",
-    formulation: "Creating your formulation",
-    products: "Matching your products"
+    retry: "Try again"
   },
   th: {
-    aria: "ความคืบหน้าของแผน",
+    kicker: "ขอบคุณค่ะ",
+    title: "กำลังจัดสูตรของคุณ",
+    body: "MattaNutra กำลังจัดทำสูตรเฉพาะบุคคลและจับคู่สินค้าที่เหมาะกับคุณ โดยปกติใช้เวลาเพียงไม่กี่วินาทีค่ะ",
+    building: "กำลังจัดสูตรของคุณ…",
+    note: "กรุณาเปิดหน้านี้ไว้นะคะ",
     error: "ขั้นตอนนี้ยังทำไม่สำเร็จ งานที่เสร็จแล้วถูกบันทึกไว้",
-    retry: "ลองอีกครั้ง",
-    title: "กำลังจัดแผนของคุณ",
-    healthscore: "กำลังคำนวณ Healthscore",
-    formulation: "กำลังสร้างสูตร",
-    products: "กำลังจับคู่สินค้า"
+    retry: "ลองอีกครั้ง"
   },
   "zh-CN": {
-    aria: "方案准备进度",
+    kicker: "谢谢",
+    title: "正在准备你的配方",
+    body: "MattaNutra 正在为你制定个性化配方并匹配产品，通常只需几秒钟。",
+    building: "正在准备你的配方…",
+    note: "请保持此页面打开。",
     error: "这一步没能完成。已完成的部分已保存。",
-    retry: "再试一次",
-    title: "正在准备你的方案",
-    healthscore: "正在计算 Healthscore",
-    formulation: "正在创建配方",
-    products: "正在匹配产品"
+    retry: "再试一次"
   }
 } satisfies Record<
   Locale,
   {
-    aria: string;
+    body: string;
+    building: string;
     error: string;
+    kicker: string;
+    note: string;
     retry: string;
     title: string;
-  } & Record<JourneyWorkStageId, string>
+  }
 >;
 
 type JourneyProgressProps = Readonly<{
@@ -65,17 +60,14 @@ type JourneyProgressProps = Readonly<{
   planId: string;
 }>;
 
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
-
 export function JourneyProgress({
   initial,
   locale,
   planId
 }: JourneyProgressProps) {
   const router = useRouter();
-  const labels = copy[locale];
+  const labels = formulaCopy[locale];
+  const support = getWelcomeCopy(locale === "zh-CN" ? "en" : locale);
   const [timeline, setTimeline] = useState<JourneyWorkTimeline>(initial);
   const [attempts, setAttempts] = useState(0);
   const [fetchFailed, setFetchFailed] = useState(false);
@@ -148,88 +140,31 @@ export function JourneyProgress({
   const failed = timeline.failed || fetchFailed;
 
   return (
-    <section
-      className="mx-auto w-full max-w-xl px-6 py-12 sm:px-8"
-      data-testid="journey-progress"
+    <CalculatingWait
+      copy={{
+        body: labels.body,
+        disclaimer: support.calcDisclaimer,
+        kicker: labels.kicker,
+        line: support.calcLine,
+        note: failed ? null : labels.note,
+        status: failed ? labels.error : labels.building,
+        title: labels.title
+      }}
+      spinning={!failed}
+      testId="journey-progress"
     >
-      <h1 className="font-serif text-2xl font-semibold tracking-normal text-[var(--mn-ink)] sm:text-3xl">
-        {labels.title}
-      </h1>
-      <nav aria-label={labels.aria} className="mt-8">
-        <ol className="space-y-0">
-          {STAGE_ORDER.map((stage, index) => {
-            const state: JourneyWorkStageState = timeline.stages[stage];
-            const complete = state === "complete";
-            const active = state === "active" && !failed;
-
-            return (
-              <li className="grid grid-cols-[40px_1fr] gap-4" key={stage}>
-                <div className="flex flex-col items-center">
-                  <span
-                    className={cx(
-                      "flex size-10 items-center justify-center rounded-full border-2",
-                      complete
-                        ? "border-[var(--mn-gold)] bg-[var(--mn-gold)]"
-                        : active
-                          ? "border-[var(--mn-gold)] bg-white"
-                          : "border-gray-300 bg-white"
-                    )}
-                    aria-current={active ? "step" : undefined}
-                  >
-                    {complete ? (
-                      <CheckIcon aria-hidden className="size-5 text-white" />
-                    ) : active ? (
-                      <ArrowPathIcon
-                        aria-hidden
-                        className="size-6 animate-spin text-[var(--mn-gold)]"
-                        strokeWidth={2.4}
-                      />
-                    ) : (
-                      <span className="text-sm font-semibold text-gray-400">
-                        {index + 1}
-                      </span>
-                    )}
-                  </span>
-                  {index < STAGE_ORDER.length - 1 ? (
-                    <span
-                      aria-hidden
-                      className={cx(
-                        "mt-1 w-[2px] flex-1 min-h-[28px]",
-                        complete ? "bg-[var(--mn-gold)]" : "bg-gray-200"
-                      )}
-                    />
-                  ) : null}
-                </div>
-                <p
-                  className={cx(
-                    "pt-2 text-base font-medium",
-                    complete || active
-                      ? "text-[var(--mn-ink)]"
-                      : "text-gray-400"
-                  )}
-                >
-                  {labels[stage]}
-                </p>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
       {failed ? (
-        <div className="mt-8 rounded-lg bg-white p-5 ring-1 ring-foreground/10">
-          <p className="text-sm leading-6 text-muted-foreground">{labels.error}</p>
-          <button
-            type="button"
-            className="mt-4 rounded-full bg-[var(--mn-ink)] px-4 py-2 text-sm font-medium text-white"
-            data-testid="journey-progress-retry"
-            onClick={() => {
-              void retry();
-            }}
-          >
-            {labels.retry}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="mn-quiz-calc__ready-btn"
+          data-testid="journey-progress-retry"
+          onClick={() => {
+            void retry();
+          }}
+        >
+          {labels.retry}
+        </button>
       ) : null}
-    </section>
+    </CalculatingWait>
   );
 }

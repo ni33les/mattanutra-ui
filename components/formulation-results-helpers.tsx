@@ -6,7 +6,6 @@ import {
   CountUpNumber,
   useInViewOnce,
 } from "@/components/formulation-results-motion";
-import { NutritionProgress } from "@/components/nutrition-progress";
 import type {
   FormulationResult,
   ProductStackPreference,
@@ -106,19 +105,12 @@ export type PanelLabels = (typeof formulationResultsCopy)["en"];
 
 export function NutritionGuidancePreparingPanel({
   labels,
-  locale,
 }: Readonly<{
   labels: PanelLabels;
   locale: Locale;
 }>) {
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
-      <NutritionProgress
-        className="mb-8"
-        current="reveal"
-        locale={locale}
-        pending={true}
-      />
       <div
         aria-live="polite"
         className="rounded-lg bg-white p-6 ring-1 ring-foreground/10 transition-colors sm:p-8"

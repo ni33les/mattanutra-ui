@@ -10,6 +10,10 @@ const progressUi = readFileSync(
   new URL("../components/nutrition-flow/journey-progress.tsx", import.meta.url),
   "utf8"
 );
+const calculatingWait = readFileSync(
+  new URL("../components/chat-questionnaire/calculating-wait.tsx", import.meta.url),
+  "utf8"
+);
 const journeyRoute = readFileSync(
   new URL("../app/api/assessment/[planId]/journey/route.ts", import.meta.url),
   "utf8"
@@ -24,6 +28,14 @@ const returnPage = readFileSync(
 );
 const chat = readFileSync(
   new URL("../components/chat-questionnaire/chat-questionnaire.tsx", import.meta.url),
+  "utf8"
+);
+const formulationResults = readFileSync(
+  new URL("../components/formulation-results.tsx", import.meta.url),
+  "utf8"
+);
+const formulationHelpers = readFileSync(
+  new URL("../components/formulation-results-helpers.tsx", import.meta.url),
   "utf8"
 );
 
@@ -56,10 +68,33 @@ describe("after-pay journey progress stays truthful", () => {
     assert.doesNotMatch(journeyRead, /sql\.begin/);
   });
 
-  it("advances the three work stages from backend state, not timers", () => {
-    assert.match(progressUi, /Calculating your Healthscore/);
-    assert.match(progressUi, /Creating your formulation/);
-    assert.match(progressUi, /Matching your products/);
+  it("uses the HealthScore wait chrome with formula copy, not a stepper", () => {
+    assert.match(progressUi, /CalculatingWait/);
+    assert.match(progressUi, /mn-quiz-calc__ready-btn/);
+    assert.match(calculatingWait, /mn-quiz-calc__spinner/);
+    assert.match(progressUi, /Your formula is being prepared/);
+    assert.match(
+      progressUi,
+      /MattaNutra is building your personalised formula and matching the right products/
+    );
+    assert.match(progressUi, /Preparing your formula…/);
+    assert.match(progressUi, /กำลังจัดสูตรของคุณ/);
+    assert.match(
+      progressUi,
+      /MattaNutra กำลังจัดทำสูตรเฉพาะบุคคลและจับคู่สินค้าที่เหมาะกับคุณ/
+    );
+    assert.match(progressUi, /正在准备你的配方/);
+    assert.match(
+      progressUi,
+      /MattaNutra 正在为你制定个性化配方并匹配产品，通常只需几秒钟。/
+    );
+    assert.doesNotMatch(progressUi, /Thai pharmac/i);
+    assert.doesNotMatch(progressUi, /Thailand/i);
+    assert.doesNotMatch(progressUi, /ร้านขายยาไทย/);
+    assert.doesNotMatch(progressUi, /Calculating your Healthscore/);
+    assert.doesNotMatch(progressUi, /Creating your formulation/);
+    assert.doesNotMatch(progressUi, /Matching your products/);
+    assert.doesNotMatch(progressUi, /STAGE_ORDER/);
     assert.match(progressUi, /POLL_INTERVAL_MS/);
     assert.doesNotMatch(progressUi, /setTimeline\([\s\S]*setTimeout/);
     assert.match(progressUi, /router\.replace\(\s*nutritionRevealPath/);
@@ -70,5 +105,12 @@ describe("after-pay journey progress stays truthful", () => {
       /snapshot\.status === "healthscore_only"[\s\S]*nutritionHealthScorePath/
     );
     assert.doesNotMatch(progressUi, /NutritionProgress/);
+  });
+
+  it("does not render the Discover / Reveal / Deliver meter on reveal", () => {
+    assert.doesNotMatch(formulationResults, /NutritionProgress/);
+    assert.doesNotMatch(formulationHelpers, /NutritionProgress/);
+    assert.doesNotMatch(formulationResults, /components\/nutrition-progress/);
+    assert.doesNotMatch(formulationHelpers, /components\/nutrition-progress/);
   });
 });
