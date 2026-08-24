@@ -42,13 +42,12 @@ import {
 } from "@/components/chat-questionnaire/questionnaire-calculating";
 import {
   fetchHealthScoreCopyStatus,
-  HEALTHSCORE_COPY_POLL_INTERVAL_MS
+  HEALTHSCORE_COPY_POLL_INTERVAL_MS,
+  HEALTHSCORE_COPY_WAIT_MS
 } from "@/lib/healthscore-copy-client";
 import "./chat-questionnaire.css";
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
-/** Surface the slow-path UI sooner so calc never looks infinitely hung. */
-const CALC_FALLBACK_MS = 12_000;
 
 /**
  * Section / finish stage overlay timing.
@@ -221,7 +220,6 @@ export function ChatQuestionnaire({
   const [labUnits, setLabUnits] = useState<Record<string, string>>({});
   const [processingError, setProcessingError] = useState("");
   const [calcStatus, setCalcStatus] = useState<CalculatingStatus>("building");
-  const [copyBarPct, setCopyBarPct] = useState(12);
   const [reviewOpen, setReviewOpen] = useState(false);
 
   const [stageFlash, setStageFlash] = useState<null | {
@@ -499,9 +497,9 @@ export function ChatQuestionnaire({
 
     fallbackTimer.current = window.setTimeout(() => {
       setCalcStatus((prev) =>
-        prev === "ready" || prev === "sent" ? prev : "slow"
+        prev === "ready" || prev === "sent" ? prev : "error"
       );
-    }, CALC_FALLBACK_MS);
+    }, HEALTHSCORE_COPY_WAIT_MS);
   }, []);
 
   const clearStageTimers = useCallback(() => {
@@ -643,7 +641,7 @@ export function ChatQuestionnaire({
             });
 
         if (!capturedOk) {
-          setCalcStatus("slow");
+          setCalcStatus("error");
           return;
         }
 
@@ -671,17 +669,14 @@ export function ChatQuestionnaire({
           return;
         }
 
-        const copyDeadline = Date.now() + CALC_FALLBACK_MS;
+        const copyDeadline = Date.now() + HEALTHSCORE_COPY_WAIT_MS;
         let copyReady = false;
         let copyFailed = false;
-        let attempt = 0;
 
         while (Date.now() < copyDeadline) {
           await new Promise((resolve) => {
             window.setTimeout(resolve, HEALTHSCORE_COPY_POLL_INTERVAL_MS);
           });
-          attempt += 1;
-          setCopyBarPct(Math.min(90, 12 + attempt * 10));
 
           try {
             const copyStatus = await fetchHealthScoreCopyStatus(
@@ -700,7 +695,7 @@ export function ChatQuestionnaire({
         }
 
         if (!copyReady) {
-          setCalcStatus(copyFailed ? "error" : "slow");
+          setCalcStatus("error");
           return;
         }
 
@@ -721,7 +716,6 @@ export function ChatQuestionnaire({
             skipHealthScore: false
           }
         });
-        setCopyBarPct(100);
         setCalcStatus("ready");
         router.replace(
           resultsPath(locale, captured.planId, paymentId, skipHealthScoreStep)
@@ -1686,7 +1680,6 @@ export function ChatQuestionnaire({
       <QuestionnaireCalculating
         locale={locale}
         status={calcStatus}
-        barPct={copyBarPct}
         canOpenResults={calcStatus === "ready"}
         onSeeResults={() => {
           const planId = readyPlanId.current || resultPlanId;

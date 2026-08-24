@@ -47,6 +47,8 @@ describe("HealthScore page waits for real AI copy", () => {
     assert.match(page, /HealthScoreCopyGate/);
     assert.match(calculating, /"sent"/);
     assert.match(calculating, /onEmailComplete/);
-    assert.match(calculating, /mn-quiz-calc__vial/);
+    assert.doesNotMatch(calculating, /mn-quiz-calc__vial|barPct/);
+    assert.doesNotMatch(calculating, /calcLonger/);
+    assert.match(calculating, /showEmailEscape/);
   });
 });

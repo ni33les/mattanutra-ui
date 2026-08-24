@@ -1,4 +1,5 @@
 export const HEALTHSCORE_COPY_POLL_INTERVAL_MS = 1_500;
+export const HEALTHSCORE_COPY_WAIT_MS = 90_000;
 
 export type HealthScoreCopyStatus = Readonly<{
   copyFailed: boolean;

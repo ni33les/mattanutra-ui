@@ -227,17 +227,17 @@ describe("questionnaire v14 UX on v6 schema", () => {
       join(root, "components/chat-questionnaire/questionnaire-calculating.tsx"),
       "utf8"
     );
-    assert.match(calc, /showFallback/);
+    assert.match(calc, /showEmailEscape/);
     assert.match(calc, /calc-emailbox|email-stack/);
     assert.match(calc, /nongPoseSrc\(\"wai\"\)/);
     // No retry button in fallback UI
     assert.doesNotMatch(calc, /calcRetry/);
     assert.doesNotMatch(calc, /onClick=\{onRetry\}/);
     assert.match(calc, /email-stack|email-submit/);
-    // Email only inside fallback branch (not always-on)
+    // Email only inside the failure branch (not always-on)
     assert.match(
       calc,
-      /showFallback \? \([\s\S]*email/
+      /showEmailEscape \? \([\s\S]*email/
     );
     const css = readFileSync(
       join(root, "components/chat-questionnaire/chat-questionnaire.css"),

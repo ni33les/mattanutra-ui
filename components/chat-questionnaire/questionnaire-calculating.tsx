@@ -7,12 +7,11 @@ import { getWelcomeCopy } from "@/components/chat-questionnaire/questionnaire-we
 
 const LINE_SUPPORT_URL = "https://line.me/R/ti/p/%40344enooi";
 
-export type CalculatingStatus = "building" | "ready" | "slow" | "error" | "sent";
+export type CalculatingStatus = "building" | "ready" | "error" | "sent";
 
 type QuestionnaireCalculatingProps = Readonly<{
   locale: Locale;
   status: CalculatingStatus;
-  barPct?: number;
   onSeeResults: () => void;
   /** When true, slow path can still open results (plan already created). */
   canOpenResults?: boolean;
@@ -25,7 +24,6 @@ type QuestionnaireCalculatingProps = Readonly<{
 export function QuestionnaireCalculating({
   locale,
   status,
-  barPct = 12,
   onSeeResults,
   canOpenResults = false,
   onEmailSubmit,
@@ -37,7 +35,7 @@ export function QuestionnaireCalculating({
   const [emailBusy, setEmailBusy] = useState(false);
 
   const isSent = status === "sent" || emailSent;
-  const showFallback = !isSent && (status === "slow" || status === "error");
+  const showEmailEscape = !isSent && status === "error";
   const isReady = status === "ready";
   const isBuilding = status === "building";
   const showResultsBtn = isReady && canOpenResults;
@@ -85,17 +83,6 @@ export function QuestionnaireCalculating({
         <p className="mn-quiz-calc__copy">{copy.calcCopy}</p>
       )}
 
-      {isBuilding ? (
-        <div className="mn-chat-q__vial mn-quiz-calc__vial" aria-hidden>
-          <div className="mn-chat-q__vial-track">
-            <div
-              className="mn-chat-q__vial-fill"
-              style={{ width: `${Math.max(6, Math.min(96, barPct))}%` }}
-            />
-          </div>
-        </div>
-      ) : null}
-
       <div className="mn-quiz-calc__status">
         {isSent ? (
           <>
@@ -114,8 +101,8 @@ export function QuestionnaireCalculating({
           </>
         ) : (
           <>
-            <span aria-hidden>…</span>
-            <span>{copy.calcLonger}</span>
+            <span aria-hidden>✓</span>
+            <span>{copy.calcSavedNote}</span>
           </>
         )}
       </div>
@@ -148,13 +135,8 @@ export function QuestionnaireCalculating({
         </>
       )}
 
-      {/* Slow/error: message + stacked email + submit (no retry). */}
-      {showFallback ? (
+      {showEmailEscape ? (
         <div className="mn-quiz-calc__fallback" data-testid="calc-fallback">
-          <p className="mn-quiz-calc__fallback-msg">
-            {status === "error" ? copy.calcError : copy.calcLonger}
-          </p>
-          <p className="mn-quiz-calc__fallback-saved">{copy.calcSavedNote}</p>
           <div className="mn-quiz-calc__email-stack" data-testid="calc-emailbox">
             <input
               type="email"

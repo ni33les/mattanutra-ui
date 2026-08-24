@@ -9,11 +9,10 @@ import {
 import "@/components/chat-questionnaire/chat-questionnaire.css";
 import {
   fetchHealthScoreCopyStatus,
-  HEALTHSCORE_COPY_POLL_INTERVAL_MS
+  HEALTHSCORE_COPY_POLL_INTERVAL_MS,
+  HEALTHSCORE_COPY_WAIT_MS
 } from "@/lib/healthscore-copy-client";
 import type { Locale } from "@/lib/i18n";
-
-const COPY_WAIT_MS = 12_000;
 
 type HealthScoreCopyGateProps = Readonly<{
   locale: Locale;
@@ -26,22 +25,17 @@ export function HealthScoreCopyGate({
 }: HealthScoreCopyGateProps) {
   const router = useRouter();
   const [status, setStatus] = useState<CalculatingStatus>("building");
-  const [barPct, setBarPct] = useState(12);
   const cancelled = useRef(false);
 
   useEffect(() => {
     cancelled.current = false;
     const startedAt = Date.now();
-    let attempt = 0;
     let timer = 0;
 
     async function tick() {
       if (cancelled.current) {
         return;
       }
-
-      attempt += 1;
-      setBarPct(Math.min(90, 12 + attempt * 10));
 
       try {
         const copyStatus = await fetchHealthScoreCopyStatus(planId);
@@ -51,14 +45,13 @@ export function HealthScoreCopyGate({
         }
 
         if (copyStatus.copyReady) {
-          setBarPct(100);
           setStatus("ready");
           router.refresh();
           return;
         }
 
-        if (copyStatus.copyFailed || Date.now() - startedAt >= COPY_WAIT_MS) {
-          setStatus(copyStatus.copyFailed ? "error" : "slow");
+        if (copyStatus.copyFailed || Date.now() - startedAt >= HEALTHSCORE_COPY_WAIT_MS) {
+          setStatus("error");
           return;
         }
       } catch {
@@ -99,7 +92,6 @@ export function HealthScoreCopyGate({
     <QuestionnaireCalculating
       locale={locale}
       status={status}
-      barPct={barPct}
       canOpenResults={false}
       onSeeResults={() => undefined}
       onEmailSubmit={persistEmail}

@@ -1512,11 +1512,6 @@
   font-weight: 700;
 }
 
-.mn-quiz-calc__vial {
-  width: min(330px, 90vw);
-  margin: 18px auto 0;
-}
-
 .mn-quiz-calc__spinner {
   width: 22px;
   height: 22px;

@@ -115,10 +115,7 @@ describe("assessment capture stays off the pregeneration wait path", () => {
     assert.match(chat, /hasUsableHealthScore/);
     assert.match(chat, /copyReady/);
     assert.match(chat, /setCalcStatus\("sent"\)/);
-    assert.match(
-      chat,
-      /if \(!copyReady\) \{\s*setCalcStatus\(copyFailed \? "error" : "slow"\)/
-    );
+    assert.match(chat, /if \(!copyReady\) \{\s*setCalcStatus\("error"\)/);
   });
 
   it("puts the submitted first name on the existing healthscore and reveal heroes", () => {
