@@ -565,6 +565,11 @@ describe("external worker boundaries", () => {
       "assessment capture should prequeue HealthScore, supplement, product, and food-gap; matching depends on formula",
     );
     assert.match(
+      assessmentPregenerationSource,
+      /void warmLiveRetailSnapshot\(catalogueCountry\)/,
+      "assessment capture should warm the live catalogue in parallel so matching does not reload it",
+    );
+    assert.match(
       taskWorkerSource,
       /activeTaskRows[\s\S]*task_type = 'analyze_healthscore'[\s\S]*status in \([\s\S]*'queued'[\s\S]*'reserved'[\s\S]*'waiting_approval'[\s\S]*if \(activeTaskRows\[0\]\) \{[\s\S]*return null;/,
       "HealthScore status polling must not enqueue a second HealthScore while the first AI copy task is still active",

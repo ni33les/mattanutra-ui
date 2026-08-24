@@ -25,13 +25,13 @@ describe("Phase 3 T01/T08 shared eligibility", () => {
       ),
       /loadProductRows\(input\.productId \?\? null\)/
     );
-    assert.match(workItems, /loadLiveRetailSnapshot/);
+    assert.match(workItems, /warmLiveRetailSnapshot/);
     assert.doesNotMatch(
       workItems.slice(
-        workItems.indexOf("async function buildProductRecommendationsWorkItem"),
+        workItems.indexOf("async function retailerCandidateSetsFromLiveSnapshot"),
         workItems.indexOf("async function buildAdminCatalogueOptimizationWorkItem")
       ),
-      /getLiveSaleEligibleRetailerCandidateSets|loadProductRows/
+      /getLiveSaleEligibleRetailerCandidateSets|loadProductRows|loadLiveRetailSnapshot\(/
     );
     assert.match(applier, /getLiveSaleEligibleRetailerCandidateSets/);
     assert.doesNotMatch(

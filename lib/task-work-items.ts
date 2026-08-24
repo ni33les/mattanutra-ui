@@ -24,7 +24,7 @@ import {
   getProductRecommendationCandidates,
   type ProductRecommendationRetailerCandidateSet
 } from "@/lib/admin-products";
-import { loadLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
+import { warmLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
 import {
   type AdminPlanCoverageSimulationData,
   type AdminPlanCoverageSimulationSampleTrace
@@ -1803,7 +1803,12 @@ async function retailerCandidateSetsFromLiveSnapshot(
   countryCode: string,
   organisationId: string | null
 ): Promise<ProductRecommendationRetailerCandidateSet[]> {
-  const snapshot = await loadLiveRetailSnapshot(countryCode);
+  const snapshot = await warmLiveRetailSnapshot(countryCode);
+
+  if (snapshot.products.length < 1 && !process.env.NODE_TEST_CONTEXT) {
+    throw new Error("Product matching catalogue is not ready");
+  }
+
   const byRetailer = new Map<
     string,
     {

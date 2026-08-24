@@ -22,6 +22,11 @@ import {
   normalizeProductStackPreference,
   type ProductStackPreference
 } from "@/lib/product-recommendations";
+import { warmLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode
+} from "@/lib/product-countries";
 import {
   loadProductRecommendationFreshnessSnapshot
 } from "@/lib/product-recommendation-freshness";
@@ -482,6 +487,19 @@ export async function enqueueAssessmentPregenerationTasks({
   if (!assessmentRows[0]) {
     return null;
   }
+
+  const answerRecord =
+    answers && typeof answers === "object" && !Array.isArray(answers)
+      ? (answers as Record<string, unknown>)
+      : {};
+  const catalogueCountry =
+    normalizeProductCountryCode(
+      typeof answerRecord.country === "string" ? answerRecord.country : null
+    ) ?? defaultProductCountryCode;
+
+  void warmLiveRetailSnapshot(catalogueCountry).catch(() => {
+    /* matching work-item retries if the cache is still empty */
+  });
 
   const plan = DEFAULT_ASSESSMENT_PLAN;
   const inputHash = stableHash({ answers, locale });
