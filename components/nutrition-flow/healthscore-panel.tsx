@@ -259,17 +259,16 @@ function localizedLegacyText(
 function localize(
   value: LocalizedHealthScoreText | undefined,
   locale: Locale,
-  fallback = "",
 ) {
   if (!value) {
-    return fallback;
+    return "";
   }
 
   if (typeof value === "string") {
-    return localizedLegacyText(value, locale, fallback);
+    return localizedLegacyText(value, locale);
   }
 
-  return value[locale] || fallback;
+  return value[locale] || "";
 }
 
 export function localizeHealthScoreText(
@@ -282,9 +281,15 @@ export function localizeHealthScoreText(
 function aiCardBody(
   card: HealthScorePageAiCard | undefined,
   locale: Locale,
-  fallback: string,
 ) {
-  return localize(card?.body, locale, fallback);
+  return localize(card?.body, locale);
+}
+
+function aiCardHeadline(
+  card: HealthScorePageAiCard | undefined,
+  locale: Locale,
+) {
+  return localize(card?.headline ?? card?.title, locale);
 }
 
 function displayBand(band: string, locale: Locale) {
@@ -479,11 +484,7 @@ function buildHealthScoreViewModel({
   const medianMarker = relativity?.spectrumMedianPct ?? scorePosition(median);
 
   return {
-    bandLine: localizedLegacyText(
-      page?.copySeeds.bandLine,
-      locale,
-      copy.defaultBandLine,
-    ),
+    bandLine: localize(ai?.bandLine, locale),
     bandPill: localizedLegacyText(
       page?.copySeeds.bandPill,
       locale,
@@ -495,67 +496,27 @@ function buildHealthScoreViewModel({
       page?.copySeeds.findingsMode === "strengths"
         ? copy.pillarsEyebrow
         : copy.whatCaught,
-    findingsHeadline: localizedLegacyText(
-      page?.copySeeds.findingsHeadline,
-      locale,
-      copy.gapTitle,
-    ),
-    findingsSub: localizedLegacyText(
-      page?.copySeeds.findingsSub,
-      locale,
-      copy.whatCaughtSub,
-    ),
+    findingsHeadline: localize(ai?.findingsHeadline, locale),
+    findingsSub: localize(ai?.findingsSub, locale),
     firstName,
     gapCards: gapCards(result, locale),
-    heroBody: localize(
-      ai?.heroBody,
-      locale,
-      localizedLegacyText(
-        page?.copySeeds.heroBody ?? result.summary,
-        locale,
-        copy.defaultHeroBody,
-      ),
-    ),
-    heroTitle: localizedLegacyText(
-      page?.copySeeds.goalMirror,
-      locale,
-      copy.heroTitle(score),
-    ),
-    highestLeverageBody: localizedLegacyText(
-      page?.copySeeds.highestLeverage?.text,
-      locale,
-      "",
-    ),
+    heroBody: localize(ai?.heroBody, locale),
+    heroTitle: localize(ai?.heroTitle, locale),
+    highestLeverageBody: localize(ai?.highestLeverageBody, locale),
     locale,
     median,
     methodCards: methodCards(result, locale),
-    methodHeadline: localizedLegacyText(
-      page?.copySeeds.methodHeadline,
-      locale,
-      copy.methodTitle,
-    ),
+    methodHeadline: localize(ai?.methodHeadline, locale),
     opportunityPill: localizedLegacyText(
       page?.copySeeds.opportunityPill,
       locale,
       percentile >= 80 ? copy.topTier : copy.pillOpportunity,
     ),
-    pillarHeadline: localizedLegacyText(
-      page?.copySeeds.pillarHeadline,
-      locale,
-      copy.pillarsTitle,
-    ),
+    pillarHeadline: localize(ai?.pillarHeadline, locale),
     pillars: normalizedPillars(result),
     percentile,
-    relativityHeadline: localizedLegacyText(
-      relativity?.headline,
-      locale,
-      copy.fallbackScoreMeaning(score, percentile),
-    ),
-    relativitySub: localize(
-      ai?.relativitySub,
-      locale,
-      localizedLegacyText(relativity?.sub, locale, copy.fallbackScoreMeaningSub),
-    ),
+    relativityHeadline: localize(ai?.relativityHeadline, locale),
+    relativitySub: localize(ai?.relativitySub, locale),
     result,
     score,
     spectrum: {
@@ -570,17 +531,9 @@ function buildHealthScoreViewModel({
       medianMarker,
       scoreMarker,
     },
-    strengthNote: localizedLegacyText(
-      page?.copySeeds.strengthNote,
-      locale,
-      "",
-    ),
+    strengthNote: localize(ai?.strengthNote, locale),
     subtraction: {
-      body: localizedLegacyText(
-        subtractionSeed?.body,
-        locale,
-        copy.subtractionTitle,
-      ),
+      body: localize(ai?.subtractionBody, locale),
       labels: [
         localizedLegacyText(
           subtractionSeed?.labelEvaluated,
@@ -806,8 +759,7 @@ function GapCards({
       <div className="gaprow">
         {cards.map((card, index) => {
           const aiCard = ai?.gapTrio?.[index];
-          const fallbackCard = copy.fallbackGaps[index] ?? card;
-          const tag = localizedLegacyText(card.tag, locale, fallbackCard.tag);
+          const tag = localizedLegacyText(card.tag, locale);
 
           return (
             <RevealBlock
@@ -822,18 +774,10 @@ function GapCards({
                   {card.value}
                 </div>
                 <h3>
-                  {renderInlineMarkup(localizedLegacyText(
-                    card.headline,
-                    locale,
-                    fallbackCard.headline,
-                  ))}
+                  {renderInlineMarkup(aiCardHeadline(aiCard, locale))}
                 </h3>
                 <p className={copy.bodyClass}>
-                  {renderInlineMarkup(aiCardBody(
-                    aiCard,
-                    locale,
-                    localizedLegacyText(card.body, locale, fallbackCard.body),
-                  ))}
+                  {renderInlineMarkup(aiCardBody(aiCard, locale))}
                 </p>
               </article>
             </RevealBlock>
@@ -966,10 +910,6 @@ function FindingsSection({
         {items.map((item, index) => {
           const aiCard = ai?.findings?.[index];
           const isSingle = items.length === 1;
-          const fallbackCard = copy.fallbackGaps[index] ?? {
-            body: copy.fallbackFindingBody,
-            headline: copy.fallbackFindingTitle,
-          };
 
           return (
             <RevealBlock
@@ -987,18 +927,10 @@ function FindingsSection({
                   {item.icon === "sun" ? "☼" : item.icon === "◎" ? "◎" : "✦"}
                 </div>
                 <h3>
-                  {renderInlineMarkup(localizedLegacyText(
-                    item.headline,
-                    locale,
-                    fallbackCard.headline,
-                  ))}
+                  {renderInlineMarkup(aiCardHeadline(aiCard, locale))}
                 </h3>
                 <p className={copy.bodyClass}>
-                  {renderInlineMarkup(aiCardBody(
-                    aiCard,
-                    locale,
-                    localizedLegacyText(item.body, locale, fallbackCard.body),
-                  ))}
+                  {renderInlineMarkup(aiCardBody(aiCard, locale))}
                 </p>
               </article>
             </RevealBlock>
@@ -1093,7 +1025,6 @@ function MethodCards({
       <div className="method">
         {cards.map((card, index) => {
           const aiCard = ai?.methodCards?.[index];
-          const fallbackCard = copy.fallbackMethodCards[index] ?? card;
 
           return (
             <RevealBlock
@@ -1105,18 +1036,10 @@ function MethodCards({
                   {card.number ?? index + 1}
                 </div>
                 <h3>
-                  {renderInlineMarkup(localizedLegacyText(
-                    card.title,
-                    locale,
-                    fallbackCard.title,
-                  ))}
+                  {renderInlineMarkup(aiCardHeadline(aiCard, locale))}
                 </h3>
                 <p className={copy.bodyClass}>
-                  {renderInlineMarkup(aiCardBody(
-                    aiCard,
-                    locale,
-                    localizedLegacyText(card.body, locale, fallbackCard.body),
-                  ))}
+                  {renderInlineMarkup(aiCardBody(aiCard, locale))}
                 </p>
               </article>
             </RevealBlock>

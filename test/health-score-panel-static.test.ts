@@ -51,6 +51,23 @@ describe("HealthScore panel static guardrails", () => {
     assert.match(panelSource, /reducedMotion \|\| !active \? value : display/);
   });
 
+  it("renders HealthScore prose from aiCopy only", () => {
+    assert.match(panelSource, /localize\(ai\?\.heroTitle, locale\)/);
+    assert.match(panelSource, /localize\(ai\?\.heroBody, locale\)/);
+    assert.match(panelSource, /localize\(ai\?\.bandLine, locale\)/);
+    assert.match(panelSource, /localize\(ai\?\.strengthNote, locale\)/);
+    assert.match(panelSource, /localize\(ai\?\.pillarHeadline, locale\)/);
+    assert.match(panelSource, /localize\(ai\?\.subtractionBody, locale\)/);
+    assert.match(panelSource, /aiCardHeadline\(aiCard, locale\)/);
+    assert.doesNotMatch(panelSource, /copySeeds\.heroBody/);
+    assert.doesNotMatch(panelSource, /copySeeds\.bandLine/);
+    assert.doesNotMatch(panelSource, /copySeeds\.goalMirror/);
+    assert.doesNotMatch(panelSource, /copySeeds\.strengthNote/);
+    assert.doesNotMatch(panelSource, /copySeeds\.pillarHeadline/);
+    assert.doesNotMatch(panelSource, /fallbackCard\.headline/);
+    assert.doesNotMatch(panelSource, /fallbackCard\.body/);
+  });
+
   it("keeps V3 pricing labels and Thai static fallbacks in the panel", () => {
     assert.match(copySource, /Right Amount Formula/);
     assert.match(copySource, /Living Protocol/);
@@ -148,13 +165,13 @@ describe("HealthScore panel static guardrails", () => {
   });
 
   it("does not let AI copy override locked numeric HealthScore fields", () => {
-    assert.doesNotMatch(panelSource, /ai\?\.heroTitle/);
-    assert.doesNotMatch(panelSource, /ai\?\.bandLine/);
-    assert.doesNotMatch(panelSource, /ai\?\.subtractionBody/);
-    assert.doesNotMatch(panelSource, /ai\?\.methodHeadline/);
-    assert.doesNotMatch(panelSource, /ai\?\.findingsHeadline/);
-    assert.doesNotMatch(panelSource, /ai\?\.pillarHeadline/);
+    assert.match(panelSource, /page\?\.locked\.score\s*\?\?\s*result\.score/);
+    assert.match(panelSource, /page\?\.locked\.subtraction/);
+    assert.match(panelSource, /normalizedPillars\(result\)/);
+    assert.doesNotMatch(panelSource, /ai\?\.score/);
+    assert.doesNotMatch(panelSource, /locked\.score\s*=/);
     assert.match(panelSource, /ai\?\.heroBody/);
+    assert.match(panelSource, /ai\?\.heroTitle/);
   });
 
   it("does not label HealthScore subtraction as a final selected formula count", () => {

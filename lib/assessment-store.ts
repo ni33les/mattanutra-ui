@@ -324,23 +324,68 @@ export function hasHealthScoreAdvice(value: unknown) {
   return hasHealthScoreAiCopy(value);
 }
 
-export function hasHealthScoreAiCopy(value: unknown) {
-  const healthScore = asRecord(value);
-  const pageContent = asRecord(healthScore.pageContent);
-  const aiCopy = asRecord(pageContent.aiCopy);
-  const heroBody = aiCopy.heroBody;
+const HEALTHSCORE_AI_TEXT_KEYS = [
+  "bandLine",
+  "findingsHeadline",
+  "findingsSub",
+  "heroBody",
+  "heroTitle",
+  "highestLeverageBody",
+  "methodHeadline",
+  "pillarHeadline",
+  "relativityHeadline",
+  "relativitySub",
+  "strengthNote",
+  "subtractionBody"
+] as const;
 
-  if (typeof heroBody === "string") {
-    return heroBody.trim().length > 0;
+function localizedHealthScoreTextPresent(value: unknown) {
+  if (typeof value === "string") {
+    return value.trim().length > 0;
   }
 
-  if (heroBody && typeof heroBody === "object" && !Array.isArray(heroBody)) {
-    return Object.values(heroBody as Record<string, unknown>).some(
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return Object.values(value as Record<string, unknown>).some(
       (item) => typeof item === "string" && item.trim().length > 0
     );
   }
 
   return false;
+}
+
+function healthScoreAiCardPresent(value: unknown) {
+  const card = asRecord(value);
+
+  return (
+    localizedHealthScoreTextPresent(card.body) &&
+    (localizedHealthScoreTextPresent(card.headline) ||
+      localizedHealthScoreTextPresent(card.title))
+  );
+}
+
+export function hasHealthScoreAiCopy(value: unknown) {
+  const aiCopy = asRecord(asRecord(asRecord(value).pageContent).aiCopy);
+
+  if (
+    !HEALTHSCORE_AI_TEXT_KEYS.every((key) =>
+      localizedHealthScoreTextPresent(aiCopy[key])
+    )
+  ) {
+    return false;
+  }
+
+  const gaps = asArray(aiCopy.gapTrio);
+  const findings = asArray(aiCopy.findings);
+  const methodCards = asArray(aiCopy.methodCards);
+
+  return (
+    gaps.length > 0 &&
+    gaps.every(healthScoreAiCardPresent) &&
+    findings.length > 0 &&
+    findings.every(healthScoreAiCardPresent) &&
+    methodCards.length === 3 &&
+    methodCards.every(healthScoreAiCardPresent)
+  );
 }
 
 function asArray<T>(value: unknown): T[] {

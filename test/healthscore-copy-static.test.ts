@@ -39,8 +39,11 @@ describe("HealthScore page waits for real AI copy", () => {
     assert.match(applier, /if \(!fallbackUsed\) \{[\s\S]*health_score = \$\{sql\.json\(toJsonValue\(healthScore\)\)\}/);
   });
 
-  it("treats AI copy as ready only when a hero body exists", () => {
+  it("treats AI copy as ready only when the full overlay exists", () => {
     assert.match(store, /export function hasHealthScoreAiCopy/);
+    assert.match(store, /HEALTHSCORE_AI_TEXT_KEYS/);
+    assert.match(store, /heroTitle/);
+    assert.match(store, /methodCards\.length === 3/);
     assert.match(store, /export function hasHealthScoreAdvice\(value: unknown\) \{\s*return hasHealthScoreAiCopy\(value\);/);
     assert.match(journeyRead, /copyReady/);
     assert.match(journeyRead, /analyze_healthscore/);
