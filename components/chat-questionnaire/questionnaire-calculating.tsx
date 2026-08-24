@@ -7,35 +7,40 @@ import { getWelcomeCopy } from "@/components/chat-questionnaire/questionnaire-we
 
 const LINE_SUPPORT_URL = "https://line.me/R/ti/p/%40344enooi";
 
-export type CalculatingStatus = "building" | "ready" | "slow" | "error";
+export type CalculatingStatus = "building" | "ready" | "slow" | "error" | "sent";
 
 type QuestionnaireCalculatingProps = Readonly<{
   locale: Locale;
   status: CalculatingStatus;
+  barPct?: number;
   onSeeResults: () => void;
   /** When true, slow path can still open results (plan already created). */
   canOpenResults?: boolean;
   /** @deprecated Retry control removed from UI; kept optional for call-site compatibility. */
   onRetry?: () => void;
   onEmailSubmit: (email: string) => Promise<void> | void;
+  onEmailComplete?: () => void;
 }>;
 
 export function QuestionnaireCalculating({
   locale,
   status,
+  barPct = 12,
   onSeeResults,
   canOpenResults = false,
-  onEmailSubmit
+  onEmailSubmit,
+  onEmailComplete
 }: QuestionnaireCalculatingProps) {
   const copy = getWelcomeCopy(locale === "zh-CN" ? "en" : locale);
   const [email, setEmail] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
+  const [emailSent, setEmailSent] = useState(status === "sent");
   const [emailBusy, setEmailBusy] = useState(false);
 
-  const showFallback = status === "slow" || status === "error";
+  const isSent = status === "sent" || emailSent;
+  const showFallback = !isSent && (status === "slow" || status === "error");
   const isReady = status === "ready";
   const isBuilding = status === "building";
-  const showResultsBtn = isReady || (status === "slow" && canOpenResults);
+  const showResultsBtn = isReady && canOpenResults;
 
   async function submitEmail() {
     const trimmed = email.trim();
@@ -52,6 +57,7 @@ export function QuestionnaireCalculating({
       } catch {
         /* ignore */
       }
+      onEmailComplete?.();
     } finally {
       setEmailBusy(false);
     }
@@ -70,11 +76,33 @@ export function QuestionnaireCalculating({
         alt=""
       />
       <div className="mn-quiz-calc__kicker">{copy.calcKicker}</div>
-      <h1 className="mn-quiz-calc__title">{copy.calcTitle}</h1>
-      <p className="mn-quiz-calc__copy">{copy.calcCopy}</p>
+      <h1 className="mn-quiz-calc__title">
+        {isSent ? copy.calcEmailThanks : copy.calcTitle}
+      </h1>
+      {isSent ? (
+        <p className="mn-quiz-calc__copy">{copy.calcSavedNote}</p>
+      ) : (
+        <p className="mn-quiz-calc__copy">{copy.calcCopy}</p>
+      )}
+
+      {isBuilding ? (
+        <div className="mn-chat-q__vial mn-quiz-calc__vial" aria-hidden>
+          <div className="mn-chat-q__vial-track">
+            <div
+              className="mn-chat-q__vial-fill"
+              style={{ width: `${Math.max(6, Math.min(96, barPct))}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="mn-quiz-calc__status">
-        {isReady ? (
+        {isSent ? (
+          <>
+            <span aria-hidden>✓</span>
+            <span>{copy.calcEmailThanks}</span>
+          </>
+        ) : isReady ? (
           <>
             <span aria-hidden>✓</span>
             <span>{copy.calcReady}</span>
@@ -103,19 +131,22 @@ export function QuestionnaireCalculating({
         </button>
       ) : null}
 
-      {isBuilding ? (
+      {isSent ? null : isBuilding ? (
         <p className="mn-quiz-calc__note">{copy.calcKeepOpen}</p>
       ) : isReady ? (
         <p className="mn-quiz-calc__note">{copy.calcReadyNote}</p>
       ) : null}
 
-      <div className="mn-quiz-calc__support">
-        <a href={LINE_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
-          {copy.calcLine}
-        </a>
-      </div>
-
-      <p className="mn-quiz-calc__disclaimer">{copy.calcDisclaimer}</p>
+      {isSent ? null : (
+        <>
+          <div className="mn-quiz-calc__support">
+            <a href={LINE_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
+              {copy.calcLine}
+            </a>
+          </div>
+          <p className="mn-quiz-calc__disclaimer">{copy.calcDisclaimer}</p>
+        </>
+      )}
 
       {/* Slow/error: message + stacked email + submit (no retry). */}
       {showFallback ? (

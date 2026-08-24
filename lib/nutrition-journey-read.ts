@@ -9,6 +9,8 @@ import {
 
 export type NutritionJourneySnapshot = JourneyWorkTimeline &
   Readonly<{
+    copyFailed: boolean;
+    copyReady: boolean;
     hasHealthScore: boolean;
     planId: string;
   }>;
@@ -38,8 +40,10 @@ export async function getNutritionJourneySnapshot(
   const rows = await sql<
     Array<{
       assessment_status: string | null;
+      copy_task_status: string | null;
       has_paid_plan: boolean;
       health_score_score: string | number | null;
+      ai_hero_body: string | null;
       product_count: number | null;
       section_supplements: string | null;
       stack_coverage_percent: number | null;
@@ -51,6 +55,11 @@ export async function getNutritionJourneySnapshot(
       assessments.status::text as assessment_status,
       assessments.selected_plan is not null as has_paid_plan,
       assessments.health_score ->> 'score' as health_score_score,
+      coalesce(
+        assessments.health_score #>> '{pageContent,aiCopy,heroBody}',
+        assessments.health_score #>> '{pageContent,aiCopy,heroBody,en}'
+      ) as ai_hero_body,
+      copy_task.status::text as copy_task_status,
       formulations.visible_supplement_count,
       formulations.section_supplements,
       recs.product_count,
@@ -111,6 +120,14 @@ export async function getNutritionJourneySnapshot(
         '{}'::text[]
       ) as task_statuses
     ) task_rollups on true
+    left join lateral (
+      select tasks.status
+      from public.tasks
+      where tasks.plan_id = assessments.plan_id
+        and tasks.task_type = 'analyze_healthscore'
+      order by tasks.created_at desc
+      limit 1
+    ) copy_task on true
     where assessments.plan_id = ${planId}::uuid
     limit 1
   `;
@@ -123,6 +140,15 @@ export async function getNutritionJourneySnapshot(
   const score = Number(row.health_score_score);
   const hasHealthScore =
     Number.isFinite(score) || row.has_paid_plan === true;
+  const aiHero = String(row.ai_hero_body ?? "").trim();
+  const copyReady =
+    aiHero.length > 0 && !aiHero.startsWith("{") && !aiHero.startsWith("[");
+  const copyTaskStatus = String(row.copy_task_status ?? "");
+  const copyFailed =
+    !copyReady &&
+    (copyTaskStatus === "failed" ||
+      copyTaskStatus === "cancelled" ||
+      copyTaskStatus === "completed");
   const status: NutritionJourneyStatus = nutritionJourneyStatusFromCounts({
     assessmentStatus: row.assessment_status,
     hasPaidPlan: row.has_paid_plan === true,
@@ -138,6 +164,8 @@ export async function getNutritionJourneySnapshot(
 
   return {
     ...nutritionJourneyWorkTimeline({ hasHealthScore, status }),
+    copyFailed,
+    copyReady,
     hasHealthScore,
     planId
   };

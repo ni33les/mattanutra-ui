@@ -42,7 +42,7 @@ describe("after-pay journey progress stays truthful", () => {
 
   it("does not put a HealthScore calculating poll back on capture", () => {
     assert.doesNotMatch(chat, /pollHealthScore/);
-    assert.match(chat, /setCalcStatus\("ready"\);\s*router\.replace\(\s*resultsPath\(/);
+    assert.match(chat, /fetchHealthScoreCopyStatus/);
   });
 
   it("reads one journey snapshot and does not enqueue work", () => {

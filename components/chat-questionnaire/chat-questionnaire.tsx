@@ -40,6 +40,10 @@ import {
   QuestionnaireCalculating,
   type CalculatingStatus
 } from "@/components/chat-questionnaire/questionnaire-calculating";
+import {
+  fetchHealthScoreCopyStatus,
+  HEALTHSCORE_COPY_POLL_INTERVAL_MS
+} from "@/lib/healthscore-copy-client";
 import "./chat-questionnaire.css";
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
@@ -217,6 +221,7 @@ export function ChatQuestionnaire({
   const [labUnits, setLabUnits] = useState<Record<string, string>>({});
   const [processingError, setProcessingError] = useState("");
   const [calcStatus, setCalcStatus] = useState<CalculatingStatus>("building");
+  const [copyBarPct, setCopyBarPct] = useState(12);
   const [reviewOpen, setReviewOpen] = useState(false);
 
   const [stageFlash, setStageFlash] = useState<null | {
@@ -493,7 +498,9 @@ export function ChatQuestionnaire({
     }
 
     fallbackTimer.current = window.setTimeout(() => {
-      setCalcStatus((prev) => (prev === "ready" ? prev : "slow"));
+      setCalcStatus((prev) =>
+        prev === "ready" || prev === "sent" ? prev : "slow"
+      );
     }, CALC_FALLBACK_MS);
   }, []);
 
@@ -627,10 +634,7 @@ export function ChatQuestionnaire({
           void persistDeliveryEmail(queuedEmail, captured.planId);
         }
 
-        // Capture often returns status "captured"/"preparing" while a base score
-        // already exists — treat that as ready so the UI does not hang waiting
-        // for optional analysis enrichment tasks.
-        const ready = skipHealthScoreStep
+        const capturedOk = skipHealthScoreStep
           ? Boolean(captured.planId)
           : hasUsableHealthScore({
               status: captured.status,
@@ -638,8 +642,65 @@ export function ChatQuestionnaire({
               planId: captured.planId
             });
 
-        if (!ready) {
+        if (!capturedOk) {
           setCalcStatus("slow");
+          return;
+        }
+
+        if (skipHealthScoreStep) {
+          if (fallbackTimer.current) {
+            window.clearTimeout(fallbackTimer.current);
+          }
+          clearLocalState(locale);
+          trackBpmEvent("assessment_captured", {
+            email: queuedEmail || undefined,
+            eventType: "funnel",
+            locale,
+            planId: captured.planId,
+            properties: {
+              channel: "web",
+              questionnaireVersion: "v6-conversational",
+              uxVersion: UX_VERSION,
+              skipHealthScore: true
+            }
+          });
+          setCalcStatus("ready");
+          router.replace(
+            resultsPath(locale, captured.planId, paymentId, true)
+          );
+          return;
+        }
+
+        const copyDeadline = Date.now() + CALC_FALLBACK_MS;
+        let copyReady = false;
+        let copyFailed = false;
+        let attempt = 0;
+
+        while (Date.now() < copyDeadline) {
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, HEALTHSCORE_COPY_POLL_INTERVAL_MS);
+          });
+          attempt += 1;
+          setCopyBarPct(Math.min(90, 12 + attempt * 10));
+
+          try {
+            const copyStatus = await fetchHealthScoreCopyStatus(
+              captured.planId,
+              fetchWithTimeout as typeof fetch
+            );
+            copyReady = copyStatus.copyReady;
+            copyFailed = copyStatus.copyFailed;
+          } catch {
+            copyFailed = true;
+          }
+
+          if (copyReady || copyFailed) {
+            break;
+          }
+        }
+
+        if (!copyReady) {
+          setCalcStatus(copyFailed ? "error" : "slow");
           return;
         }
 
@@ -648,9 +709,7 @@ export function ChatQuestionnaire({
         }
 
         clearLocalState(locale);
-        trackBpmEvent(
-          skipHealthScoreStep ? "assessment_captured" : "healthscore_ready",
-          {
+        trackBpmEvent("healthscore_ready", {
           email: queuedEmail || undefined,
           eventType: "funnel",
           locale,
@@ -659,9 +718,10 @@ export function ChatQuestionnaire({
             channel: "web",
             questionnaireVersion: "v6-conversational",
             uxVersion: UX_VERSION,
-            skipHealthScore: skipHealthScoreStep
+            skipHealthScore: false
           }
         });
+        setCopyBarPct(100);
         setCalcStatus("ready");
         router.replace(
           resultsPath(locale, captured.planId, paymentId, skipHealthScoreStep)
@@ -1626,10 +1686,11 @@ export function ChatQuestionnaire({
       <QuestionnaireCalculating
         locale={locale}
         status={calcStatus}
-        canOpenResults={Boolean(resultPlanId || readyPlanId.current)}
+        barPct={copyBarPct}
+        canOpenResults={calcStatus === "ready"}
         onSeeResults={() => {
           const planId = readyPlanId.current || resultPlanId;
-          if (!planId) {
+          if (!planId || calcStatus !== "ready") {
             return;
           }
 
@@ -1638,6 +1699,12 @@ export function ChatQuestionnaire({
           );
         }}
         onEmailSubmit={onFallbackEmail}
+        onEmailComplete={() => {
+          if (fallbackTimer.current) {
+            window.clearTimeout(fallbackTimer.current);
+          }
+          setCalcStatus("sent");
+        }}
       />
     );
   }

@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { PublicNutritionShell } from "@/components/nutrition-flow/public-nutrition-shell";
+import { HealthScoreCopyGate } from "@/components/nutrition-flow/healthscore-copy-gate";
 import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
-import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
+import {
+  getStoredAssessmentPrefill,
+  hasHealthScoreAiCopy,
+  isUuid
+} from "@/lib/assessment-store";
 import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import {
@@ -117,6 +122,20 @@ export default async function NutritionHealthScorePage({
 
   if (!prefill?.healthScore) {
     redirect(nutritionQuizPath(locale, planId));
+  }
+
+  if (!hasHealthScoreAiCopy(prefill.healthScore)) {
+    return (
+      <main className="mn-customer-shell flex min-h-screen flex-col bg-[var(--mn-cream)] text-[var(--mn-ink)]">
+        <TitleBar
+          currentLocale={locale}
+          currentPath={currentPath}
+          title={dictionary.hero.eyebrow}
+        />
+        <HealthScoreCopyGate locale={locale} planId={planId} />
+        <SiteFooter content={dictionary.footer} locale={locale} />
+      </main>
+    );
   }
 
   const healthScore = refreshedHealthScore(

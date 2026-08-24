@@ -4,10 +4,6 @@ import { analyzeFoodGuidanceWithGrok } from "@/lib/food-guidance-analysis";
 import { analyzeFormulationWithGrok } from "@/lib/formulation-analysis";
 import { fetchDigitalOceanInvoicePreview } from "@/lib/finance-ledger";
 import type {
-  HealthScoreAdvice,
-  HealthScorePageAiCard,
-  HealthScorePageAiCopy,
-  HealthScorePaywallFeature,
   HealthScoreResult
 } from "@/lib/health-score";
 import { analyzeHealthScoreAdviceWithUsage } from "@/lib/health-score-analysis";
@@ -61,30 +57,19 @@ function hasHealthScoreAdvice(value: unknown) {
     value !== null && typeof value === "object"
       ? (value as HealthScoreResult)
       : null;
+  const heroBody = record?.pageContent?.aiCopy?.heroBody;
 
-  return (
-    Boolean(record?.advice) ||
-    Boolean(record?.pageContent?.aiCopy)
-  );
-}
+  if (typeof heroBody === "string") {
+    return heroBody.trim().length > 0;
+  }
 
-function localizedFallback(text: string | null | undefined) {
-  const fallback = text?.trim() || "Your HealthScore is ready.";
+  if (heroBody && typeof heroBody === "object") {
+    return Object.values(heroBody).some(
+      (item) => typeof item === "string" && item.trim().length > 0
+    );
+  }
 
-  return {
-    en: fallback,
-    th: fallback
-  };
-}
-
-function localizedFallbackCard(
-  title: string | null | undefined,
-  body: string | null | undefined
-): HealthScorePageAiCard {
-  return {
-    body: localizedFallback(body),
-    headline: localizedFallback(title)
-  };
+  return false;
 }
 
 async function configuredSql() {
@@ -226,109 +211,6 @@ function selectRetailerRecommendationOption(
     left.subtotalAmount - right.subtotalAmount ||
     compareNullableEta(left.etaDate, right.etaDate)
   )[0] ?? null;
-}
-
-function deterministicPaywallFeatures(
-  healthScore: HealthScoreResult
-): HealthScorePaywallFeature[] {
-  const seedCards = healthScore.pageContent?.copySeeds.methodCards ?? [];
-  const fallbackCards = [
-    {
-      body: "Your goals, routine, and safety context stay connected to the plan.",
-      title: "Personalized from your answers"
-    },
-    {
-      body: "The formula keeps only what fits your score and disclosed constraints.",
-      title: "Built by subtraction"
-    },
-    {
-      body: "The next step turns the score into supplement and product choices.",
-      title: "Ready for the full plan"
-    }
-  ];
-
-  return [...seedCards, ...fallbackCards].slice(0, 3).map((card) => ({
-    description: localizedFallback(card.body),
-    name: localizedFallback(card.title)
-  }));
-}
-
-function deterministicHealthScoreAdvice(
-  healthScore: HealthScoreResult
-): HealthScoreAdvice {
-  const seeds = healthScore.pageContent?.copySeeds;
-
-  return {
-    focusArea: localizedFallback(seeds?.pillarHeadline ?? healthScore.headline),
-    howToImprove: localizedFallback(
-      seeds?.highestLeverage?.text ??
-      healthScore.movers[0]?.label ??
-      healthScore.summary
-    ),
-    overview: localizedFallback(seeds?.heroBody ?? healthScore.summary),
-    paywallEyebrow: localizedFallback("Your plan is ready"),
-    paywallFeatures: deterministicPaywallFeatures(healthScore),
-    paywallSubtitle: localizedFallback(
-      "Open the full plan to turn this score into the exact formula and product stack."
-    ),
-    paywallTitle: localizedFallback("Turn your HealthScore into a plan")
-  };
-}
-
-function deterministicHealthScorePageCopy(
-  healthScore: HealthScoreResult
-): HealthScorePageAiCopy {
-  const seeds = healthScore.pageContent?.copySeeds;
-
-  return {
-    bandLine: localizedFallback(seeds?.bandLine ?? healthScore.headline),
-    findings: (seeds?.findings ?? []).slice(0, 3).map((finding) =>
-      localizedFallbackCard(finding.headline, finding.body)
-    ),
-    findingsHeadline: localizedFallback(seeds?.findingsHeadline),
-    findingsSub: localizedFallback(seeds?.findingsSub),
-    gapTrio: (seeds?.gapTrio ?? []).slice(0, 3).map((card) =>
-      localizedFallbackCard(card.headline, card.body)
-    ),
-    heroBody: localizedFallback(seeds?.heroBody ?? healthScore.summary),
-    heroTitle: localizedFallback(seeds?.goalMirror ?? healthScore.headline),
-    highestLeverageBody: localizedFallback(seeds?.highestLeverage?.text),
-    methodCards: (seeds?.methodCards ?? []).slice(0, 3).map((card) => ({
-      body: localizedFallback(card.body),
-      title: localizedFallback(card.title)
-    })),
-    methodHeadline: localizedFallback(seeds?.methodHeadline),
-    overview: localizedFallback(healthScore.summary),
-    paywallFeatures: deterministicPaywallFeatures(healthScore),
-    paywallSubtitle: localizedFallback(
-      "Open the full plan to turn this score into the exact formula and product stack."
-    ),
-    paywallTitle: localizedFallback("Turn your HealthScore into a plan"),
-    pillarHeadline: localizedFallback(seeds?.pillarHeadline),
-    relativityHeadline: localizedFallback(seeds?.relativity.headline),
-    relativitySub: localizedFallback(seeds?.relativity.sub),
-    strengthNote: localizedFallback(seeds?.strengthNote),
-    subtractionBody: localizedFallback(seeds?.subtraction.body)
-  };
-}
-
-function withDeterministicHealthScoreFallback(
-  healthScore: HealthScoreResult
-): HealthScoreResult {
-  return {
-    ...healthScore,
-    advice: healthScore.advice ?? deterministicHealthScoreAdvice(healthScore),
-    ...(healthScore.pageContent
-      ? {
-          pageContent: {
-            ...healthScore.pageContent,
-            aiCopy:
-              healthScore.pageContent.aiCopy ??
-              deterministicHealthScorePageCopy(healthScore)
-          }
-        }
-      : {})
-  };
 }
 
 function requireSentEmail(
@@ -532,7 +414,7 @@ export async function executeTaskWorkItem(
         cachedOrExisting: false,
         errorMessage: analysisErrorMessage(error),
         fallbackUsed: true,
-        healthScore: withDeterministicHealthScoreFallback(workItem.healthScore)
+        healthScore: workItem.healthScore
       };
     }
   }

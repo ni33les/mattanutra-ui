@@ -321,17 +321,26 @@ function asFoodGapSupport(value: unknown): FoodGapSupport | undefined {
 }
 
 export function hasHealthScoreAdvice(value: unknown) {
+  return hasHealthScoreAiCopy(value);
+}
+
+export function hasHealthScoreAiCopy(value: unknown) {
   const healthScore = asRecord(value);
-  const advice = asRecord(healthScore.advice);
-  const overview = advice.overview;
   const pageContent = asRecord(healthScore.pageContent);
   const aiCopy = asRecord(pageContent.aiCopy);
+  const heroBody = aiCopy.heroBody;
 
-  return (
-    Boolean(overview && typeof overview === "object") ||
-    Array.isArray(advice.paywallFeatures) ||
-    Object.keys(aiCopy).length > 0
-  );
+  if (typeof heroBody === "string") {
+    return heroBody.trim().length > 0;
+  }
+
+  if (heroBody && typeof heroBody === "object" && !Array.isArray(heroBody)) {
+    return Object.values(heroBody as Record<string, unknown>).some(
+      (item) => typeof item === "string" && item.trim().length > 0
+    );
+  }
+
+  return false;
 }
 
 function asArray<T>(value: unknown): T[] {

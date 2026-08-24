@@ -397,12 +397,14 @@ async function applyHealthScoreResult(
     taskId: task.id
   });
 
-  await sql`
-    update public.assessments set
-      health_score = ${sql.json(toJsonValue(healthScore))},
-      updated_at = now()
-    where plan_id = ${task.planId}::uuid
-  `;
+  if (!fallbackUsed) {
+    await sql`
+      update public.assessments set
+        health_score = ${sql.json(toJsonValue(healthScore))},
+        updated_at = now()
+      where plan_id = ${task.planId}::uuid
+    `;
+  }
   await eventually(afterCommit, async () => {
     await recordTaskXaiUsageCost({
       analysis: objectValue(payload.xaiUsage),

@@ -108,13 +108,16 @@ describe("assessment capture stays off the pregeneration wait path", () => {
     assert.match(snapshot, /status: "ready"/);
   });
 
-  it("navigates to HealthScore as soon as capture returns a score", () => {
+  it("waits for stored AI copy on the calculating splash before HealthScore", () => {
     assert.doesNotMatch(chat, /pollHealthScore/);
-    assert.doesNotMatch(chat, /POLL_ATTEMPTS|POLL_INTERVAL_MS/);
+    assert.match(chat, /fetchHealthScoreCopyStatus/);
+    assert.match(chat, /HEALTHSCORE_COPY_POLL_INTERVAL_MS/);
     assert.match(chat, /hasUsableHealthScore/);
+    assert.match(chat, /copyReady/);
+    assert.match(chat, /setCalcStatus\("sent"\)/);
     assert.match(
       chat,
-      /setCalcStatus\("ready"\);\s*router\.replace\(\s*resultsPath\(/
+      /if \(!copyReady\) \{\s*setCalcStatus\(copyFailed \? "error" : "slow"\)/
     );
   });
 
