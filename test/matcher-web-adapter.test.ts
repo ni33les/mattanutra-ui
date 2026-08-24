@@ -160,9 +160,9 @@ describe("matcher web adapter coverage mapping", () => {
     assert.match(config, /WEB_MATCHER_CONFIG/);
     assert.match(config, /WEB_COMPACT_MATCHER_CONFIG/);
     assert.match(config, /searchDeadlineMs: 400/);
-    assert.match(config, /initialBeamWidth: 96/);
-    assert.match(config, /maxBeamWidth: 192/);
-    assert.match(config, /sellerGroupLimit: 64/);
+    assert.match(config, /initialBeamWidth: 48/);
+    assert.match(config, /maxBeamWidth: 64/);
+    assert.match(config, /sellerGroupLimit: 48/);
     const adapter = await readFile("lib/matcher/adapters/web.ts", "utf8");
     assert.match(adapter, /WEB_COMPACT_MATCHER_CONFIG/);
     const search = await readFile("lib/matcher/search.ts", "utf8");
