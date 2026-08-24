@@ -8,7 +8,7 @@ import {
   Plus,
   type LucideIcon
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
   AdminCommunicationRow,
   AdminCommunicationsData,
@@ -133,6 +133,7 @@ export function AdminCommunicationsView({
     code: string;
     command: string;
     expiresAt: string;
+    id: string | null;
     lineUrl: string;
   } | null>(null);
   const [connectMethod, setConnectMethod] = useState<ConnectMethod>("line");
@@ -223,6 +224,7 @@ export function AdminCommunicationsView({
         code: json.token.code,
         command: json.token.command ?? `MN ${json.token.code}`,
         expiresAt: json.token.expiresAt,
+        id: typeof json.token.id === "string" ? json.token.id : null,
         lineUrl: json.token.lineUrl
       });
 
@@ -270,9 +272,14 @@ export function AdminCommunicationsView({
     }
   }
 
-  async function loadOrganisationSettings(organisationId: string) {
-    setSettingsBusy(true);
-    setSettingsError("");
+  async function loadOrganisationSettings(
+    organisationId: string,
+    options: Readonly<{ keepLineCode?: boolean; silent?: boolean }> = {}
+  ) {
+    if (!options.silent) {
+      setSettingsBusy(true);
+      setSettingsError("");
+    }
 
     try {
       const response = await fetch(
@@ -286,13 +293,52 @@ export function AdminCommunicationsView({
       }
 
       setSettings(json.settings);
-      setLineCode(null);
+
+      if (!options.keepLineCode) {
+        setLineCode(null);
+      }
     } catch {
-      setSettingsError("Could not load communication settings.");
+      if (!options.silent) {
+        setSettingsError("Could not load communication settings.");
+      }
     } finally {
-      setSettingsBusy(false);
+      if (!options.silent) {
+        setSettingsBusy(false);
+      }
     }
   }
+
+  const pendingLineCount = settings?.pendingLineConnections?.length ?? 0;
+  const selectedOrganisationId = settings?.selectedOrganisationId ?? "";
+
+  useEffect(() => {
+    if (!selectedOrganisationId || pendingLineCount < 1) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void loadOrganisationSettings(selectedOrganisationId, {
+        keepLineCode: true,
+        silent: true
+      });
+    }, 4000);
+
+    return () => window.clearInterval(timer);
+  }, [pendingLineCount, selectedOrganisationId]);
+
+  useEffect(() => {
+    if (!lineCode?.id || !settings) {
+      return;
+    }
+
+    const stillPending = (settings.pendingLineConnections ?? []).some(
+      (pending) => pending.id === lineCode.id
+    );
+
+    if (!stillPending) {
+      setLineCode(null);
+    }
+  }, [lineCode?.id, settings]);
 
   async function postOrganisationAction(body: Record<string, unknown>) {
     if (!settings) {
@@ -484,7 +530,7 @@ export function AdminCommunicationsView({
                         <td className="py-3 pr-4 font-medium text-gray-900">
                           Line
                           <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                            Waiting for LINE
+                            Pending
                           </span>
                         </td>
                         <td className="py-3 pr-4 text-gray-700">
@@ -493,8 +539,22 @@ export function AdminCommunicationsView({
                         <td className="py-3 pr-4 text-gray-600">
                           Send MN code in LINE before {formatGeneratedAt(pending.expiresAt, locale)}
                         </td>
-                        <td className="py-3 pr-4 text-xs text-gray-500">
-                          Pending
+                        <td className="py-3 pr-4">
+                          <button
+                            className="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={!settings.canManage || settingsBusy}
+                            onClick={() => {
+                              if (window.confirm("Delete this pending LINE connection?")) {
+                                void postOrganisationAction({
+                                  action: "delete_pending_line",
+                                  pendingLineId: pending.id
+                                });
+                              }
+                            }}
+                            type="button"
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -567,7 +627,8 @@ export function AdminCommunicationsView({
                         </td>
                       </tr>
                     ))}
-                    {settings.channels.length === 0 ? (
+                    {settings.channels.length === 0 &&
+                    (settings.pendingLineConnections ?? []).length === 0 ? (
                       <tr>
                         <td className="py-6 text-sm font-medium text-gray-500" colSpan={4}>
                           {emptyChannelCopy}

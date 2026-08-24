@@ -17,6 +17,9 @@ import {
 import { appendPlanChatMessage } from "@/lib/plan-concierge";
 import { enqueuePanyaCustomerChatReplyTask } from "@/lib/task-worker";
 import { t } from "@/lib/i18n-messages";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("line.webhook");
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -121,6 +124,10 @@ function adminConnectedReply(localeValue: string | null | undefined) {
   return t(locale, "outbound.lineWebhook.adminConnected");
 }
 
+function followSendCodeReply() {
+  return t("en", "outbound.lineWebhook.followSendCode");
+}
+
 function invalidLineConnectReply(scope: LineConnectCommand["scope"]) {
   if (scope === "admin") {
     return t("en", "outbound.lineWebhook.invalidAdmin");
@@ -167,6 +174,7 @@ export async function POST(request: Request) {
   const body = await request.text();
 
   if (!verifyLineSignature(body, request.headers.get("x-line-signature"))) {
+    log.warn("invalid_signature");
     return NextResponse.json({ message: "Invalid LINE signature" }, { status: 401 });
   }
 
@@ -187,7 +195,27 @@ export async function POST(request: Request) {
     const providerEventId = text(event.webhookEventId);
     const replyToken = text(event.replyToken);
 
-    if (!message || !recipientId) {
+    const eventType = text(event.type);
+
+    if (!recipientId) {
+      results.push({ ignored: true, reason: "unsupported_event" });
+      continue;
+    }
+
+    if (eventType === "follow") {
+      const replySent = replyToken
+        ? await replyToLine({
+            replyToken,
+            text: followSendCodeReply()
+          })
+        : false;
+
+      log.info("follow", { replySent, sourceType });
+      results.push({ follow: true, replySent });
+      continue;
+    }
+
+    if (!message) {
       results.push({ ignored: true, reason: "unsupported_event" });
       continue;
     }
@@ -212,6 +240,10 @@ export async function POST(request: Request) {
           text: adminConnectedReply(adminConnected.locale)
         });
 
+        log.info("admin_connected", {
+          replySent,
+          sourceType
+        });
         results.push({
           connected: true,
           connectionScope: "admin",

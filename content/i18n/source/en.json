@@ -9011,6 +9011,15 @@
     "variables": [],
     "allowMarkup": true
   },
+  "outbound.lineWebhook.followSendCode": {
+    "audience": "customer",
+    "defaultMessage": "To finish connecting MattaNutra, send the MN code from the admin page in this chat.",
+    "description": "LINE reply when someone adds the official account without sending the MN connect code.",
+    "namespace": "outbound.lineWebhook",
+    "surface": "line",
+    "translatable": true,
+    "variables": []
+  },
   "outbound.panya.quota.livingProtocol": {
     "audience": "customer",
     "defaultMessage": "You have used today's {limit, number} Nong Mata messages. You can continue tomorrow, and the MattaNutra team can still review anything urgent.",

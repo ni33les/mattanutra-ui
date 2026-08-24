@@ -6,6 +6,7 @@ import {
   adminCommunicationEventKeys,
   adminCommunicationEventScope,
   deleteDisabledOrganisationCommunicationChannel,
+  revokeOrganisationLineConnectToken,
   updateOrganisationCommunicationChannel,
   updateOrganisationNotificationPreference,
   upsertOrganisationCommunicationChannel,
@@ -161,6 +162,29 @@ export async function POST(request: NextRequest) {
             error instanceof Error
               ? error.message
               : "Could not delete communication channel"
+        },
+        { status: 400 }
+      );
+    }
+  } else if (action === "delete_pending_line") {
+    const pendingLineId = text(body.pendingLineId);
+
+    if (!pendingLineId) {
+      return NextResponse.json({ error: "Pending LINE connection is required" }, { status: 400 });
+    }
+
+    try {
+      await revokeOrganisationLineConnectToken({
+        organisationId,
+        tokenId: pendingLineId
+      });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Could not delete pending LINE connection"
         },
         { status: 400 }
       );

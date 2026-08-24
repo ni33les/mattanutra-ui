@@ -295,7 +295,15 @@ describe("communications channel selection", () => {
     assert.match(service, /listOrganisationPendingLineConnections/);
     assert.match(adminSettings, /pendingLineConnections/);
     assert.match(view, /pending-line-channel/);
-    assert.match(view, /Waiting for LINE/);
+    assert.match(view, />\s*Pending\s*</);
+    assert.doesNotMatch(view, /Waiting for LINE/);
+    assert.match(view, /action: "delete_pending_line"/);
+    assert.match(view, /Delete this pending LINE connection\?/);
+    assert.match(service, /revokeOrganisationLineConnectToken/);
+    assert.match(service, /status = 'revoked'/);
+    assert.match(organisationApi, /action === "delete_pending_line"/);
+    assert.match(webhook, /eventType === "follow"/);
+    assert.match(webhook, /outbound.lineWebhook.followSendCode/);
     assert.match(service, /deleteDisabledOrganisationCommunicationChannel/);
     assert.match(service, /Only disabled communication channels can be deleted/);
     assert.match(service, /const broadcastChannels =/);

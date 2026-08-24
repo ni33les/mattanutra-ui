@@ -129,6 +129,32 @@ export async function listOrganisationPendingLineConnections(input: Readonly<{
   });
 }
 
+export async function revokeOrganisationLineConnectToken(input: Readonly<{
+  organisationId: string;
+  tokenId: string;
+}>) {
+  if (!isUuid(input.organisationId) || !isUuid(input.tokenId)) {
+    throw new Error("LINE connection is invalid");
+  }
+
+  const sql = sqlOrThrow();
+  const rows = await sql<Array<{ id: string }>>`
+    update public.line_connect_tokens
+    set
+      status = 'revoked',
+      updated_at = now()
+    where id = ${input.tokenId}::uuid
+      and organisation_id = ${input.organisationId}::uuid
+      and status = 'active'
+      and consumed_at is null
+    returning id::text
+  `;
+
+  if (!rows[0]) {
+    throw new Error("Pending LINE connection was not found");
+  }
+}
+
 export async function listOrganisationNotificationPreferences(input: Readonly<{
   organisationId: string;
   sql?: Db;

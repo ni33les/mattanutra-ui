@@ -983,6 +983,7 @@
   "outbound.lineWebhook.invalidAdmin": "该 MattaNutra 代码无效或已过期。请在 Admin Communications 中生成新的 LINE 代码，然后再次发送 MN CODE。",
   "outbound.lineWebhook.invalidCustomer": "该 MattaNutra 代码无效或已过期。请打开你的 MattaNutra 页面获取新的 LINE 代码，然后再次发送 MN CODE。",
   "outbound.lineWebhook.invalidEither": "该 MattaNutra 代码无效或已过期。请生成新的 LINE 代码，然后再次发送 MN CODE。",
+  "outbound.lineWebhook.followSendCode": "要完成 MattaNutra 连接，请在此聊天中发送管理页上的 MN 代码。",
   "outbound.panya.quota.livingProtocol": "你今天已用完 {limit, number} 条 Nong Mata 消息。明天可以继续沟通；如有紧急问题，MattaNutra 团队会协助跟进。",
   "outbound.panya.quota.standard": "你今天已用完 {limit, number} 条 Nong Mata 消息。你仍可查看方案和订单；如果需要持续跟进和调整，动态健康方案会解锁更深入的支持。",
   "outbound.panya.reorderNudge": "距离你的 MattaNutra 订单大约三周了。\n如果当前配方仍然适合你，现在是安排续购的好时机，这样接近第 30 天时不容易断档。\n如果睡眠、压力、用药、旅行、饮食或目标发生了变化，请先重新填写评估再续购：{reassessmentUrl}\n你可以直接回复这里，Nong Mata 会帮你处理下一步。",

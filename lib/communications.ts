@@ -117,6 +117,7 @@ export {
   listOrganisationPendingLineConnections,
   listOrganisationNotificationPreferences,
   queueCustomerChatCommunicationDispatchTask,
+  revokeOrganisationLineConnectToken,
   recordInboundLineCommunication,
   updateOrganisationCommunicationChannel,
   updateOrganisationNotificationPreference,
