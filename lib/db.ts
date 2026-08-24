@@ -281,11 +281,11 @@ async function dumpSlowQuerySiblings(triggerMs: number) {
   siblingDumpInflight = true;
 
   try {
-    const listen = getListenSql();
+    const listen = globalDb.mattanutraListenSql;
 
     if (!listen) {
       console.info("[db:slow-siblings]", {
-        reason: "no_listen_sql",
+        reason: "listen_not_open",
         triggerMs
       });
       return;
@@ -357,6 +357,10 @@ function noteQuery(kind: PoolKind, startedAt: number, strings: unknown) {
   }
 }
 
+function isTaggedTemplate(strings: unknown): strings is TemplateStringsArray {
+  return Array.isArray(strings) && Array.isArray((strings as { raw?: unknown }).raw);
+}
+
 function instrumentSql(
   sql: postgres.Sql,
   kind: PoolKind
@@ -368,12 +372,23 @@ function instrumentSql(
     const startedAt = Date.now();
     const result = (
       sql as unknown as (...inner: unknown[]) => unknown
-    ).apply(this, args);
+    ).apply(sql, args);
 
-    if (result && typeof (result as Promise<unknown>).then === "function") {
-      return Promise.resolve(result).finally(() => {
-        noteQuery(kind, startedAt, args[0]);
-      });
+    if (
+      isTaggedTemplate(args[0]) &&
+      result &&
+      typeof (result as Promise<unknown>).then === "function"
+    ) {
+      return (result as Promise<unknown>).then(
+        (value) => {
+          noteQuery(kind, startedAt, args[0]);
+          return value;
+        },
+        (error: unknown) => {
+          noteQuery(kind, startedAt, args[0]);
+          throw error;
+        }
+      );
     }
 
     return result;
