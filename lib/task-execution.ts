@@ -655,10 +655,14 @@ export async function executeTaskWorkItem(
   if (workItem.taskType === "generate_product_recommendations") {
     const matcherStartedAt = Date.now();
     const retailerCandidateSets = workItem.retailerCandidateSets ?? [];
+    const allCandidates = retailerCandidateSets.flatMap((set) => set.candidates);
+    let matchCalls = 0;
     const recommendationVariants = PRODUCT_STACK_VARIANT_CONFIGS.map((config) => {
       const variantStartedAt = Date.now();
-      const retailerOptions = retailerCandidateSets.map((candidateSet) =>
-        retailerRecommendationOption({
+      const retailerOptions = retailerCandidateSets.map((candidateSet) => {
+        matchCalls += 1;
+
+        return retailerRecommendationOption({
           candidateSet,
           recommendations: recommendProductStackFullBeam({
             candidates: candidateSet.candidates,
@@ -670,21 +674,25 @@ export async function executeTaskWorkItem(
             stackPreference: config.stackPreference,
             targetProducts: config.targetProducts
           })
-        })
-      );
+        });
+      });
       const selectedRetailerOption =
         selectRetailerRecommendationOption(retailerOptions);
       const recommendations = selectedRetailerOption?.recommendations ??
-        recommendProductStackFullBeam({
-          candidates: workItem.candidates,
-          clientContext: workItem.clientContext,
-          clientSex: workItem.clientSex,
-          countryCode: workItem.countryCode,
-          maxProducts: config.maxProducts,
-          needs: workItem.needs,
-          stackPreference: config.stackPreference,
-          targetProducts: config.targetProducts
-        });
+        (() => {
+          matchCalls += 1;
+
+          return recommendProductStackFullBeam({
+            candidates: allCandidates,
+            clientContext: workItem.clientContext,
+            clientSex: workItem.clientSex,
+            countryCode: workItem.countryCode,
+            maxProducts: config.maxProducts,
+            needs: workItem.needs,
+            stackPreference: config.stackPreference,
+            targetProducts: config.targetProducts
+          });
+        })();
       const variantMatcherMs = Date.now() - variantStartedAt;
 
       return {
@@ -720,6 +728,16 @@ export async function executeTaskWorkItem(
       )?.recommendations ?? recommendationVariants[1]?.recommendations ??
       recommendationVariants[0].recommendations;
     const matcherMs = Date.now() - matcherStartedAt;
+
+    console.info("[matching:execute]", {
+      candidateLoadMs: workItem.candidateLoadMs ?? 0,
+      hydrateMs: workItem.hydrateMs ?? 0,
+      matchCalls,
+      matcherMs,
+      retailerCount: retailerCandidateSets.length,
+      sqlMs: workItem.sqlMs ?? 0,
+      taskId: workItem.taskId
+    });
 
     return {
       discovery: {

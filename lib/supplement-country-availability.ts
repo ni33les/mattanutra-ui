@@ -43,6 +43,41 @@ export type SupplementAvailabilityLookup = Readonly<{
 
 type Db = postgres.Sql | postgres.TransactionSql;
 
+const AVAILABILITY_TTL_MS = 10 * 60_000;
+
+const globalAvailability = globalThis as typeof globalThis & {
+  mattanutraSupplementAvailabilityCache?: Map<
+    string,
+    { at: number; lookup: SupplementAvailabilityLookup }
+  >;
+  mattanutraSupplementAvailabilityInflight?: Map<
+    string,
+    Promise<SupplementAvailabilityLookup>
+  >;
+};
+
+function availabilityCache() {
+  globalAvailability.mattanutraSupplementAvailabilityCache ??= new Map();
+
+  return globalAvailability.mattanutraSupplementAvailabilityCache;
+}
+
+function availabilityInflight() {
+  globalAvailability.mattanutraSupplementAvailabilityInflight ??= new Map();
+
+  return globalAvailability.mattanutraSupplementAvailabilityInflight;
+}
+
+function emptyAvailabilityLookup(
+  countryCode: string
+): SupplementAvailabilityLookup {
+  return {
+    byKey: new Map(),
+    bySupplementId: new Map(),
+    countryCode
+  };
+}
+
 type AvailabilityRow = Readonly<{
   aliases: string[] | null;
   country_code: string | null;
@@ -215,6 +250,109 @@ export async function getSupplementEffectiveAvailability(
   `;
 
   return supplementAvailabilityLookupFromRows(rows, countryCode);
+}
+
+export async function warmSupplementEffectiveAvailability(
+  countryCodeInput?: string | null
+) {
+  if (process.env.NODE_TEST_CONTEXT) {
+    return emptyAvailabilityLookup(
+      normalizeSupplementAvailabilityCountryCode(countryCodeInput)
+    );
+  }
+
+  const { getSql } = await import("@/lib/db");
+  const sql = getSql();
+
+  if (!sql) {
+    return emptyAvailabilityLookup(
+      normalizeSupplementAvailabilityCountryCode(countryCodeInput)
+    );
+  }
+
+  return cachedSupplementEffectiveAvailability(sql, countryCodeInput);
+}
+
+export async function cachedSupplementEffectiveAvailability(
+  sql: Db,
+  countryCodeInput?: string | null
+): Promise<SupplementAvailabilityLookup> {
+  const countryCode = normalizeSupplementAvailabilityCountryCode(countryCodeInput);
+
+  if (process.env.NODE_TEST_CONTEXT) {
+    return emptyAvailabilityLookup(countryCode);
+  }
+
+  const hit = availabilityCache().get(countryCode);
+
+  if (hit && Date.now() - hit.at < AVAILABILITY_TTL_MS) {
+    return hit.lookup;
+  }
+
+  const inflight = availabilityInflight().get(countryCode);
+
+  if (inflight) {
+    return inflight;
+  }
+
+  const pending = getSupplementEffectiveAvailability(sql, countryCode)
+    .then((lookup) => {
+      availabilityCache().set(countryCode, { at: Date.now(), lookup });
+
+      return lookup;
+    })
+    .finally(() => {
+      if (availabilityInflight().get(countryCode) === pending) {
+        availabilityInflight().delete(countryCode);
+      }
+    });
+
+  availabilityInflight().set(countryCode, pending);
+
+  return pending;
+}
+
+export function requireCachedSupplementEffectiveAvailability(
+  countryCodeInput?: string | null
+): SupplementAvailabilityLookup {
+  const countryCode = normalizeSupplementAvailabilityCountryCode(countryCodeInput);
+
+  if (process.env.NODE_TEST_CONTEXT) {
+    return emptyAvailabilityLookup(countryCode);
+  }
+
+  const hit = availabilityCache().get(countryCode);
+
+  if (hit && Date.now() - hit.at < AVAILABILITY_TTL_MS) {
+    return hit.lookup;
+  }
+
+  throw new Error("Product matching supplement availability is not ready");
+}
+
+export function enrichProductNeedsWithAvailabilityLookup(
+  needs: readonly ProductRecommendationNeed[],
+  lookup: SupplementAvailabilityLookup
+): ProductRecommendationNeed[] {
+  return needs.map((need) => {
+    if (need.itemType !== "supplement") {
+      return need;
+    }
+
+    const matched = availabilityForNeed(lookup, need);
+    const extra = matched
+      ? [matched.normalizedName, matched.name, ...matched.aliases]
+      : [];
+    const aliasKeys = [
+      ...productFactAliasKeys(need.displayName, need.aliasKeys),
+      ...extra.flatMap((alias) => productFactAliasKeys(alias))
+    ];
+
+    return {
+      ...need,
+      aliasKeys: [...new Set(aliasKeys)]
+    };
+  });
 }
 
 function availabilityForNeed(

@@ -9,10 +9,6 @@ import {
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import {
-  getLiveSaleEligibleRetailerCandidateSets
-} from "@/lib/admin-products";
-import { loadInStorePharmacyOrganisationId } from "@/lib/pharmacy-in-store";
-import {
   defaultProductCountryCode,
   normalizeProductCountryCode
 } from "@/lib/product-countries";
@@ -67,11 +63,8 @@ import {
   PAYMENT_CHECKOUT_PREGENERATION_SOURCE
 } from "@/lib/task-worker";
 import {
-  PRODUCT_STACK_VARIANT_CONFIGS,
   normalizeProductStackPreference,
-  recommendProductStackFullBeam,
   toRecommendedProduct,
-  type ProductClientSex,
   type ProductRecommendationResult,
   type ProductStackPreference
 } from "@/lib/product-recommendations";
@@ -2074,21 +2067,7 @@ async function queueUnknownProductReviewTasks(
   }
 }
 
-async function loadProductRecommendationClientSex(
-  sql: TaskServiceDb,
-  planId: string
-): Promise<ProductClientSex | null> {
-  const rows = await sql<Array<{ sex: string | null }>>`
-    select answers ->> 'sex' as sex
-    from public.assessments
-    where plan_id = ${planId}::uuid
-    order by updated_at desc
-    limit 1
-  `;
-  const sex = rows[0]?.sex;
 
-  return sex === "female" || sex === "male" ? sex : null;
-}
 
 async function loadProductRecommendationCountryCode(
   sql: TaskServiceDb,
@@ -2244,7 +2223,6 @@ async function applyProductRecommendationsResult(
     limit 1
   `;
   const locale: Locale = isLocale(localeRow?.locale) ? localeRow.locale : "en";
-  const clientSex = await loadProductRecommendationClientSex(sql, task.planId);
   const countryCode = await loadProductRecommendationCountryCode(sql, task.planId);
   const stackPreference = normalizeProductStackPreference(
     initialResult.diagnostics?.stackPreference ??
@@ -2261,66 +2239,7 @@ async function applyProductRecommendationsResult(
   }
 
   if (variants.length < 1) {
-    const retailerCandidateSets =
-      await getLiveSaleEligibleRetailerCandidateSets({
-        countryCode,
-        organisationId: await loadInStorePharmacyOrganisationId(sql, task.planId),
-        sql
-      });
-    const candidates = retailerCandidateSets.flatMap((set) => set.candidates);
-
-    variants = PRODUCT_STACK_VARIANT_CONFIGS.map((config) => ({
-      maxProducts: config.maxProducts,
-      result: (() => {
-        const retailerResults = retailerCandidateSets.map((set) => {
-          const result = recommendProductStackFullBeam({
-            candidates: set.candidates,
-            countryCode,
-            clientSex,
-            maxProducts: config.maxProducts,
-            needs: initialResult.clientNeeds,
-            stackPreference: config.stackPreference,
-            targetProducts: config.targetProducts
-          });
-          const subtotalAmount = result.recommendations.reduce(
-            (total, item) =>
-              total + (item.unitPriceAmount ?? item.product.priceAmount ?? 0),
-            0
-          );
-          const etaDate = result.recommendations
-            .map((item) => item.etaDate ?? item.product.retailEtaDate ?? null)
-            .filter((value): value is string => Boolean(value))
-            .sort()
-            .at(-1) ?? null;
-
-          return {
-            etaDate,
-            result,
-            set,
-            subtotalAmount
-          };
-        });
-        const selected = [...retailerResults].sort((left, right) =>
-          right.result.supplementProductCoveragePercent -
-            left.result.supplementProductCoveragePercent ||
-          right.result.totalPlanCoveragePercent -
-            left.result.totalPlanCoveragePercent ||
-          left.subtotalAmount - right.subtotalAmount ||
-          (left.etaDate ?? "").localeCompare(right.etaDate ?? "")
-        )[0];
-
-        return selected?.result ?? recommendProductStackFullBeam({
-          candidates,
-          countryCode,
-          clientSex,
-          maxProducts: config.maxProducts,
-          needs: initialResult.clientNeeds,
-          stackPreference: config.stackPreference,
-          targetProducts: config.targetProducts
-        });
-      })(),
-      stackPreference: config.stackPreference
-    }));
+    throw new Error("Product recommendation result is missing variants");
   }
 
   const selectedVariant =

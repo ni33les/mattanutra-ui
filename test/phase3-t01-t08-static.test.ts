@@ -4,12 +4,13 @@ import { describe, it } from "node:test";
 
 describe("Phase 3 T01/T08 shared eligibility", () => {
   it("loads live recommendations from sale-eligible Delight/retail rows only", async () => {
-    const [search, workItems, applier, live, cleanup] = await Promise.all([
+    const [search, workItems, applier, live, cleanup, execution] = await Promise.all([
       readFile("lib/admin-product-search.ts", "utf8"),
       readFile("lib/task-work-items.ts", "utf8"),
       readFile("lib/task-result-applier.ts", "utf8"),
       readFile("lib/agentic/catalogue/live.ts", "utf8"),
-      readFile("scripts/retail-approved-only-cleanup.ts", "utf8")
+      readFile("scripts/retail-approved-only-cleanup.ts", "utf8"),
+      readFile("lib/task-execution.ts", "utf8")
     ]);
 
     assert.match(search, /assessRetailSellability/);
@@ -25,15 +26,15 @@ describe("Phase 3 T01/T08 shared eligibility", () => {
       ),
       /loadProductRows\(input\.productId \?\? null\)/
     );
-    assert.match(workItems, /warmLiveRetailSnapshot/);
+    assert.match(workItems, /requireCachedLiveRetailSnapshot/);
     assert.doesNotMatch(
       workItems.slice(
         workItems.indexOf("async function retailerCandidateSetsFromLiveSnapshot"),
         workItems.indexOf("async function buildAdminCatalogueOptimizationWorkItem")
       ),
-      /getLiveSaleEligibleRetailerCandidateSets|loadProductRows|loadLiveRetailSnapshot\(/
+      /getLiveSaleEligibleRetailerCandidateSets|loadProductRows|loadLiveRetailSnapshot\(|warmLiveRetailSnapshot\(|loadPlanGenerationContext|buildProductSearchQueries/
     );
-    assert.match(applier, /getLiveSaleEligibleRetailerCandidateSets/);
+    assert.doesNotMatch(applier, /getLiveSaleEligibleRetailerCandidateSets/);
     assert.doesNotMatch(
       workItems.slice(
         workItems.indexOf("async function buildProductRecommendationsWorkItem"),
@@ -46,5 +47,13 @@ describe("Phase 3 T01/T08 shared eligibility", () => {
     assert.match(cleanup, /retail_customer_order_lines/);
     assert.doesNotMatch(search, /prd_[a-z0-9]+/);
     assert.doesNotMatch(workItems, /hardcodedSku|skuBlacklist/i);
+    assert.match(
+      execution.slice(
+        execution.indexOf('if (workItem.taskType === "generate_product_recommendations")'),
+        execution.indexOf("[matching:execute]")
+      ),
+      /retailerCandidateSets\.map/
+    );
+    assert.match(execution, /matchCalls/);
   });
 });

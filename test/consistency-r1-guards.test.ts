@@ -100,6 +100,13 @@ describe("consistency r1 regression guards", () => {
     );
     assert.match(db, /applyInteractiveTimeouts/);
     assert.match(db, /pool_initialized/);
+    assert.match(db, /INTERACTIVE_STATEMENT_TIMEOUT_MS/);
+    assert.match(db, /\[db:slow\]/);
+    assert.match(db, /withLocalStatementTimeout/);
+    assert.match(
+      db,
+      /set_config\('statement_timeout', \$\{String\(timeoutMs\)\}, true\)/
+    );
     assert.doesNotMatch(db, /connection\.statement_timeout/);
     assert.doesNotMatch(db, /connection\.options/);
   });

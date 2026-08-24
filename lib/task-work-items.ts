@@ -4,7 +4,11 @@ import {
   reconcileResolvedSafetyReviewFlags
 } from "@/lib/assessment-store";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
-import { getSql } from "@/lib/db";
+import {
+  getSql,
+  INTERACTIVE_STATEMENT_TIMEOUT_MS,
+  withLocalStatementTimeout
+} from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import type {
@@ -24,7 +28,7 @@ import {
   getProductRecommendationCandidates,
   type ProductRecommendationRetailerCandidateSet
 } from "@/lib/admin-products";
-import { warmLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
+import { requireCachedLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
 import {
   type AdminPlanCoverageSimulationData,
   type AdminPlanCoverageSimulationSampleTrace
@@ -37,11 +41,14 @@ import {
   defaultProductCountryCode,
   normalizeProductCountryCode
 } from "@/lib/product-countries";
-import { filterProductNeedsBySupplementAvailabilityForCountry } from "@/lib/supplement-country-availability";
+import {
+  enrichProductNeedsWithAvailabilityLookup,
+  filterProductNeedsBySupplementAvailability,
+  requireCachedSupplementEffectiveAvailability
+} from "@/lib/supplement-country-availability";
 import { loadActivePlanFeedback } from "@/lib/plan-feedback";
 import { loadActivePlanGuidanceAdjustments } from "@/lib/plan-guidance-adjustments";
 import {
-  buildProductSearchQueries,
   buildProductNeeds,
   normalizeProductStackPreference,
   productFactAliasKeys,
@@ -336,15 +343,15 @@ export type NutritionPlanRefinementWorkItem = Readonly<{
 }>;
 
 export type ProductRecommendationsWorkItem = Readonly<{
-  candidates: ProductCandidate[];
   candidateLoadMs?: number;
   clientContext: ProductRecommendationClientContext;
   clientSex: ProductClientSex | null;
   countryCode: string;
+  hydrateMs?: number;
   needs: ProductRecommendationNeed[];
   retailerCandidateSets: ProductRecommendationRetailerCandidateSet[];
   planId: string;
-  searchQueries: string[];
+  sqlMs?: number;
   stackPreference: ProductStackPreference;
   taskId: string;
   taskType: "generate_product_recommendations";
@@ -1803,7 +1810,7 @@ async function retailerCandidateSetsFromLiveSnapshot(
   countryCode: string,
   organisationId: string | null
 ): Promise<ProductRecommendationRetailerCandidateSet[]> {
-  const snapshot = await warmLiveRetailSnapshot(countryCode);
+  const snapshot = requireCachedLiveRetailSnapshot(countryCode);
 
   if (snapshot.products.length < 1 && !process.env.NODE_TEST_CONTEXT) {
     throw new Error("Product matching catalogue is not ready");
@@ -1860,50 +1867,108 @@ async function retailerCandidateSetsFromLiveSnapshot(
   }));
 }
 
-async function buildProductRecommendationsWorkItem(task: TaskRecord) {
-  const context = await buildNutritionAdvisorContext(task);
+async function loadMatchingPlanContext(planId: string) {
+  const sql = getSql();
 
-  if (!task.planId || !context.formulation) {
+  if (!sql) {
+    throw new Error("Product recommendation task requires a plan");
+  }
+
+  return withLocalStatementTimeout(
+    sql,
+    INTERACTIVE_STATEMENT_TIMEOUT_MS,
+    async (txn) => {
+      const rows = await txn<
+        Array<{
+          answers: unknown;
+          formulation: FormulationBlueprint | null;
+        }>
+      >`
+        select
+          assessments.answers,
+          formulations.formulation
+        from public.assessments
+        left join lateral (
+          select formulation
+          from public.formulations
+          where formulations.plan_id = assessments.plan_id
+            and (
+              model_version is null
+              or model_version not like '%:example'
+            )
+          order by version desc, generated_at desc
+          limit 1
+        ) formulations on true
+        where assessments.plan_id = ${planId}::uuid
+        limit 1
+      `;
+
+      return rows[0] ?? null;
+    }
+  );
+}
+
+async function buildProductRecommendationsWorkItem(task: TaskRecord) {
+  const hydrateStartedAt = Date.now();
+
+  if (!task.planId) {
     throw new Error("Product recommendation task requires a finalized plan");
   }
-  const countryCode = productCountryCodeFromAnswers(context.answers);
-  const sql = getSql();
-  const needs = await enrichProductNeedsWithAliases(
-    sql
-      ? await filterProductNeedsBySupplementAvailabilityForCountry(
-          sql,
-          buildProductNeeds({
-            foodGuidance: null,
-            formulation: context.formulation
-          }),
-          countryCode
-        )
-      : buildProductNeeds({
-          foodGuidance: null,
-          formulation: context.formulation
-        })
+
+  const sqlStartedAt = Date.now();
+  const row = await loadMatchingPlanContext(task.planId);
+  const sqlMs = Date.now() - sqlStartedAt;
+
+  if (!row?.formulation) {
+    throw new Error("Product recommendation task requires a finalized plan");
+  }
+
+  const countryCode = productCountryCodeFromAnswers(row.answers);
+  const lookup = requireCachedSupplementEffectiveAvailability(countryCode);
+  const needs = enrichProductNeedsWithAvailabilityLookup(
+    filterProductNeedsBySupplementAvailability(
+      buildProductNeeds({
+        foodGuidance: null,
+        formulation: row.formulation
+      }),
+      lookup
+    ),
+    lookup
   );
   const candidateLoadStartedAt = Date.now();
   const retailerCandidateSets = await retailerCandidateSetsFromLiveSnapshot(
     countryCode,
-    inStorePharmacyFromAnswers(context.answers)?.id ?? null
+    inStorePharmacyFromAnswers(row.answers)?.id ?? null
   );
-  const candidates = retailerCandidateSets.flatMap((set) => set.candidates);
+  const candidateLoadMs = Date.now() - candidateLoadStartedAt;
+  const hydrateMs = Date.now() - hydrateStartedAt;
+
+  console.info("[matching:work-item]", {
+    candidateCount: retailerCandidateSets.reduce(
+      (total, set) => total + set.candidates.length,
+      0
+    ),
+    candidateLoadMs,
+    hydrateMs,
+    retailerCount: retailerCandidateSets.length,
+    sqlMs,
+    taskId: task.id
+  });
 
   return {
-    candidates,
-    candidateLoadMs: Date.now() - candidateLoadStartedAt,
+    candidateLoadMs,
     clientContext: productRecommendationClientContextFromPlan(
-      context.answers,
-      context.planFeedback,
-      context.guidanceAdjustments
+      row.answers,
+      [],
+      []
     ),
-    clientSex: productClientSexFromAnswers(context.answers),
+    clientSex: productClientSexFromAnswers(row.answers),
     countryCode,
+    hydrateMs,
     needs,
     planId: task.planId,
     retailerCandidateSets,
-    searchQueries: buildProductSearchQueries(needs),
+    sqlMs,
     stackPreference: normalizeProductStackPreference(
       payloadText(task.payload, "stackPreference")
     ),

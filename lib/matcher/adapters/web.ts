@@ -44,9 +44,17 @@ function unitFromNeed(unit: string | null | undefined): MatcherUnit {
   return "mg";
 }
 
+const matcherProductByCandidate = new WeakMap<ProductCandidate, MatcherProduct>();
+
 function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
+  const cached = matcherProductByCandidate.get(candidate);
+
+  if (cached) {
+    return cached;
+  }
+
   const price = candidate.unitPriceAmount ?? candidate.priceAmount ?? 0;
-  return {
+  const mapped: MatcherProduct = {
     availableCountryCodes: candidate.availableCountryCodes ?? null,
     contributionSubjectIds: candidate.facts
       .map((fact) => fact.supplementId)
@@ -92,6 +100,10 @@ function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
     unknownSafetyAmount: false,
     unitPriceMinor: Math.round(price * 100)
   };
+
+  matcherProductByCandidate.set(candidate, mapped);
+
+  return mapped;
 }
 
 export function recommendWithMatcher(

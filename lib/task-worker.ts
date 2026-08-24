@@ -23,6 +23,7 @@ import {
   type ProductStackPreference
 } from "@/lib/product-recommendations";
 import { warmLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
+import { warmSupplementEffectiveAvailability } from "@/lib/supplement-country-availability";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCode
@@ -498,6 +499,9 @@ export async function enqueueAssessmentPregenerationTasks({
     ) ?? defaultProductCountryCode;
 
   void warmLiveRetailSnapshot(catalogueCountry).catch(() => {
+    /* matching work-item retries if the cache is still empty */
+  });
+  void warmSupplementEffectiveAvailability(catalogueCountry).catch(() => {
     /* matching work-item retries if the cache is still empty */
   });
 

@@ -1471,7 +1471,7 @@ describe("product coverage workflow", () => {
     assert.match(demandCacheSchemaScript, /unique \(demand_key, sample_index\)/);
     assert.match(demandCacheSchemaScript, /questionnaire_key,\s*sample_index/);
     assert.match(packageJson, /product-coverage:demand-cache:schema:apply/);
-    assert.match(taskWorkItems, /filterProductNeedsBySupplementAvailabilityForCountry/);
+    assert.match(taskWorkItems, /filterProductNeedsBySupplementAvailability/);
     assert.match(candidateSearch, /productHasCountryBlockedSupplement/);
     assert.match(candidateSearch, /getSupplementEffectiveAvailability/);
     assert.match(assessmentStore, /blocked_country/);

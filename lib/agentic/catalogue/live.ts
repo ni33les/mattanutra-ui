@@ -660,6 +660,29 @@ export async function warmLiveRetailSnapshot(
   }
 }
 
+export function requireCachedLiveRetailSnapshot(
+  countryCode: string
+): CatalogueSnapshot {
+  const code = countryCode.trim().toUpperCase() || "TH";
+
+  if (process.env.NODE_TEST_CONTEXT) {
+    return {
+      availabilityAsOf: new Date().toISOString(),
+      catalogueVersion: `retail-${code}-test`,
+      products: [],
+      supplements: FIXTURE_SUPPLEMENTS
+    };
+  }
+
+  const hit = liveCache().get(code);
+
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS && hit.snapshot.products.length > 0) {
+    return hit.snapshot;
+  }
+
+  throw new Error("Product matching catalogue is not ready");
+}
+
 export function cachedLiveThailandSnapshot(): Promise<CatalogueSnapshot> {
   return cachedLiveRetailSnapshot("TH");
 }
