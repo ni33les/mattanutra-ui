@@ -185,7 +185,35 @@ describe("product admin card layout", () => {
     assert.doesNotMatch(listQuery, /product_list_base/);
     assert.doesNotMatch(listQuery, /product_recommendation_items/);
     assert.doesNotMatch(listQuery, /jsonb_agg\([\s\S]*product_regulatory_approvals/);
-    assert.match(listQuery, /Math\.max\(INTERACTIVE_STATEMENT_TIMEOUT_MS, 8_000\)/);
+    assert.match(listQuery, /Math\.max\(INTERACTIVE_STATEMENT_TIMEOUT_MS, 15_000\)/);
+  });
+
+  it("opens product detail for catalogue UUIDs that Postgres stores", async () => {
+    const helpers = await readFile("lib/admin-product-helpers.ts", "utf8");
+    const detailPage = await readFile(
+      "app/[locale]/admin/products/[productId]/page.tsx",
+      "utf8"
+    );
+    const readModel = await readFile("lib/admin-product-read-model.ts", "utf8");
+    const detailReadPath = readModel.slice(
+      readModel.indexOf("export async function getAdminProductDetailData"),
+      readModel.indexOf("export async function getAdminProductsData")
+    );
+
+    assert.match(
+      helpers,
+      /\/\^\[0-9a-f\]\{8\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{12\}\$/i
+    );
+    assert.doesNotMatch(
+      helpers,
+      /\[1-5\]\[0-9a-f\]\{3\}-\[89ab\]\[0-9a-f\]\{3\}/
+    );
+    assert.match(detailPage, /isUuidValue\(productId\)/);
+    assert.doesNotMatch(detailPage, /isUuid\(productId\)/);
+    assert.match(
+      detailReadPath,
+      /Math\.max\(INTERACTIVE_STATEMENT_TIMEOUT_MS, 15_000\)/
+    );
   });
 
   it("shows an unavailable state when the product list cannot load", async () => {

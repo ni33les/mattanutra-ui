@@ -578,7 +578,7 @@ export async function getAdminProductListData(
   try {
     return await withLocalStatementTimeout(
       pool,
-      Math.max(INTERACTIVE_STATEMENT_TIMEOUT_MS, 8_000),
+      Math.max(INTERACTIVE_STATEMENT_TIMEOUT_MS, 15_000),
       async (sql) => {
         const searchFilter = hasSearch
           ? sql`
@@ -965,8 +965,18 @@ export async function getAdminProductDetailData(
     return null;
   }
 
+  const pool = getSql();
+
+  if (!pool) {
+    return null;
+  }
+
   try {
-    const rows = await loadProductRows(productId);
+    const rows = await withLocalStatementTimeout(
+      pool,
+      Math.max(INTERACTIVE_STATEMENT_TIMEOUT_MS, 15_000),
+      (sql) => loadProductRows(productId, { sql })
+    );
     const sourceRow = rows?.[0];
 
     if (!sourceRow) {

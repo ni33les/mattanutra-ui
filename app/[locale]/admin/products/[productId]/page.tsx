@@ -12,10 +12,10 @@ import {
 } from "@/lib/admin-access";
 import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import { normalizeAdminDashboardRange } from "@/lib/admin-dashboard-data";
+import { isUuidValue } from "@/lib/admin-product-helpers";
 import { getAdminProductDetailData } from "@/lib/admin-products";
 import { adminViewAllowed } from "@/lib/admin-rbac";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { isUuid } from "@/lib/assessment-store";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +69,7 @@ export default async function ProductDetailPage({
     searchParams
   ]);
 
-  if (!isLocale(rawLocale) || !isUuid(productId)) {
+  if (!isLocale(rawLocale) || !isUuidValue(productId)) {
     notFound();
   }
 
