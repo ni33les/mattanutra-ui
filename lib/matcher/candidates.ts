@@ -27,19 +27,21 @@ export function contributionFor(
   targetName: string,
   targetSubjectId: string
 ) {
+  const targetIds = subjectKeyVariants(targetSubjectId);
+
   return product.labelledContributions.filter((item) => {
     if (item.amount == null || item.amount <= 0) {
       return false;
     }
 
     if (item.subjectId) {
-      for (const targetId of subjectKeyVariants(targetSubjectId)) {
-        for (const factId of subjectKeyVariants(item.subjectId)) {
-          if (factId === targetId || productKeysMatch(targetId, factId)) {
-            return true;
-          }
-        }
+      const factIds = subjectKeyVariants(item.subjectId);
+
+      if (factIds.some((factId) => targetIds.includes(factId))) {
+        return true;
       }
+
+      return productKeysMatch(targetSubjectId, item.subjectId);
     }
 
     return Boolean(item.name?.trim() && targetName.trim()) &&
