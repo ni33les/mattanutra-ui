@@ -25,7 +25,7 @@ import {
   type AdminFlowNodeId
 } from "@/lib/admin-flow-data";
 import { getAdminReviewQueueData } from "@/lib/admin-review-queue";
-import { getAdminProductsData } from "@/lib/admin-products";
+import { getAdminProductListData } from "@/lib/admin-products";
 import { getAdminSupplementsData } from "@/lib/admin-supplements";
 import { getAdminTechnicalAlertsData } from "@/lib/admin-technical";
 import { getSql } from "@/lib/db";
@@ -1317,15 +1317,36 @@ export async function getAdminExternalQueryData(
   }
 
   if (view === "products") {
-    const data = await getAdminProductsData();
-    const rows = data.rows.filter(
-      (row) =>
-        (!params.status || row.status === params.status) &&
-        (!params.filters.source || row.platform === params.filters.source)
-    );
-    const { pageRows, pagination } = paginateAdminRows(rows, params);
+    const metric =
+      params.status === "approved"
+        ? "productsApproved"
+        : params.status === "ignored"
+          ? "productsIgnored"
+          : params.status === "pending_review"
+            ? "productsPendingReview"
+            : "";
+    const data = await getAdminProductListData({
+      limit: params.limit,
+      metric,
+      page: Math.floor(params.cursor / Math.max(1, params.limit)) + 1
+    });
+    const rows = params.filters.source
+      ? data.rows.filter((row) => row.platform === params.filters.source)
+      : data.rows;
+    const nextCursor =
+      data.page < data.totalPages
+        ? String(params.cursor + params.limit)
+        : null;
 
-    return adminQueryEnvelope({ ...data, rows: pageRows }, params, pagination);
+    return adminQueryEnvelope(
+      { ...data, rows },
+      params,
+      {
+        cursor: params.cursor > 0 ? String(params.cursor) : null,
+        limit: params.limit,
+        nextCursor
+      }
+    );
   }
 
   if (view === "product-recommendations") {

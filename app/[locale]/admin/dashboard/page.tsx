@@ -53,8 +53,7 @@ import {
 } from "@/lib/admin-retail-financials";
 import { emptyAdminFoodsData, getAdminFoodsData } from "@/lib/admin-foods";
 import {
-  emptyAdminProductsData,
-  getAdminProductsData
+  emptyAdminProductsData
 } from "@/lib/admin-products";
 import {
   emptyAdminRetailStockData,
@@ -267,7 +266,7 @@ export default async function LocalizedAdminDashboardPage({
   let foodsData = emptyAdminFoodsData();
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
-  let productsData = emptyAdminProductsData();
+  const productsData = emptyAdminProductsData();
   let planCoverageSimulationData = emptyAdminPlanCoverageSimulationData({
     countryCode: coverageCountryCode,
     databaseAvailable:
@@ -362,7 +361,6 @@ export default async function LocalizedAdminDashboardPage({
   } else if (view === "reviews") {
     foodsData = await getAdminFoodsData();
     reviewQueueData = await getAdminReviewQueueData();
-    productsData = await getAdminProductsData(range);
     supplementsData = await getAdminSupplementsData(range);
   } else if (view === "supplements") {
     supplementsData = await getAdminSupplementsData(range);

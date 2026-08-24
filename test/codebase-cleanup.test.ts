@@ -937,6 +937,19 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminProductReadModel, /\bAdminProductListRow\b/);
     assert.match(productListHelper, /limit \$\{normalized\.limit\}/);
     assert.doesNotMatch(productListHelper, /source_snapshot/);
+    assert.doesNotMatch(productListHelper, /product_recommendation_items/);
+    assert.doesNotMatch(
+      productListHelper,
+      /jsonb_agg\([\s\S]*product_regulatory_approvals/
+    );
+    assert.doesNotMatch(
+      readFileSync(new URL("../app/[locale]/admin/dashboard/page.tsx", import.meta.url), "utf8"),
+      /\bgetAdminProductsData\b/
+    );
+    assert.doesNotMatch(
+      readFileSync(new URL("../lib/admin-query-data.ts", import.meta.url), "utf8"),
+      /\bgetAdminProductsData\b/
+    );
     assert.match(adminProductUpdateRoute, /\bproductResponseRow\b/);
   });
 

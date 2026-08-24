@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
-import { getSql } from "@/lib/db";
+import {
+  getSql,
+  INTERACTIVE_STATEMENT_TIMEOUT_MS,
+  withLocalStatementTimeout
+} from "@/lib/db";
 import {
   appendSupplementAliasVersion,
   appendSupplementVersion
@@ -12,7 +16,6 @@ import {
 import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import {
-  getSupplementSelectionStatsBySupplement,
   type AdminSupplementSelectionStats
 } from "@/lib/admin-recommendation-insights";
 import { normalizeLocaleCode, type LocaleCode } from "@/lib/i18n";
@@ -581,17 +584,113 @@ export function isSupplementConfidence(
   return typeof value === "string" && confidences.has(value as SupplementConfidence);
 }
 
+async function loadSupplementDocument(
+  sql: postgres.Sql | postgres.TransactionSql,
+  supplementId: string
+): Promise<SupplementDbRow | null> {
+  const rows = await sql<SupplementDbRow[]>`
+    select
+      supplements.id::text,
+      supplements.name,
+      supplements.normalized_name,
+      supplements.category,
+      supplements.source_status,
+      supplements.ingredient_type,
+      supplements.primary_use_case,
+      supplements.list_status,
+      supplements.is_active,
+      supplements.updated_at,
+      limits.max_amount,
+      limits.max_unit,
+      limits.confidence,
+      limits.safety_flags,
+      limits.safety_notes,
+      coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
+      case
+        when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
+          then supplements.source_payload -> 'countryAvailability'
+        else '[]'::jsonb
+      end as country_availability,
+      coalesce(translation_rows.translations, '{}'::jsonb) as translations
+    from public.supplements supplements
+    left join lateral (
+      select *
+      from public.supplement_safety_limits limits
+      where limits.supplement_id = supplements.id
+      order by limits.version desc
+      limit 1
+    ) limits on true
+    left join lateral (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', supplement_aliases.id::text,
+            'name', supplement_aliases.alias
+          )
+          order by supplement_aliases.alias
+        ),
+        '[]'::jsonb
+      ) as aliases
+      from public.supplement_aliases supplement_aliases
+      where supplement_aliases.supplement_id = supplements.id
+        and supplement_aliases.normalized_alias <> supplements.normalized_name
+    ) alias_rows on true
+    left join lateral (
+      select coalesce(
+        jsonb_object_agg(
+          supplement_translations.locale,
+          jsonb_build_object(
+            'aliases', supplement_translations.aliases,
+            'categoryLabel', supplement_translations.category_label,
+            'locale', supplement_translations.locale,
+            'name', supplement_translations.name,
+            'primaryUseCase', supplement_translations.primary_use_case,
+            'safetyNotes', supplement_translations.safety_notes,
+            'status', supplement_translations.status,
+            'updatedAt', supplement_translations.updated_at
+          )
+        ),
+        '{}'::jsonb
+      ) as translations
+      from public.supplement_translations supplement_translations
+      where supplement_translations.supplement_id = supplements.id
+    ) translation_rows on true
+    where supplements.id = ${supplementId}::uuid
+      and coalesce(supplements.source_payload ->> 'deleted', 'false') <> 'true'
+    limit 1
+  `;
+
+  return rows[0] ?? null;
+}
+
+async function reloadAdminSupplement(
+  sql: postgres.Sql | postgres.TransactionSql,
+  supplementId: string
+): Promise<AdminSupplementRow> {
+  const row = await loadSupplementDocument(sql, supplementId);
+
+  if (!row) {
+    throw new Error("Supplement could not be reloaded");
+  }
+
+  return rowFromDb(row);
+}
+
 export async function getAdminSupplementsData(
   range: AdminDashboardRange = "all"
 ): Promise<AdminSupplementsData> {
-  const sql = getSql();
+  void range;
+  const pool = getSql();
 
-  if (!sql) {
+  if (!pool) {
     return emptyAdminSupplementsData();
   }
 
   try {
-    const rows = await sql<SupplementDbRow[]>`
+    const rows = await withLocalStatementTimeout(
+      pool,
+      INTERACTIVE_STATEMENT_TIMEOUT_MS,
+      (sql) => sql<SupplementDbRow[]>`
       select
         supplements.id::text,
         supplements.name,
@@ -608,13 +707,9 @@ export async function getAdminSupplementsData(
         limits.confidence,
         limits.safety_flags,
         limits.safety_notes,
-        coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
-        case
-          when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
-            then supplements.source_payload -> 'countryAvailability'
-          else '[]'::jsonb
-        end as country_availability,
-        coalesce(translation_rows.translations, '{}'::jsonb) as translations
+        '[]'::jsonb as aliases,
+        '[]'::jsonb as country_availability,
+        '{}'::jsonb as translations
       from public.supplements supplements
       left join lateral (
         select *
@@ -623,49 +718,12 @@ export async function getAdminSupplementsData(
         order by limits.version desc
         limit 1
       ) limits on true
-      left join lateral (
-        select coalesce(
-          jsonb_agg(
-            jsonb_build_object(
-              'id', supplement_aliases.id::text,
-              'name', supplement_aliases.alias
-            )
-            order by supplement_aliases.alias
-          ),
-          '[]'::jsonb
-        ) as aliases
-        from public.supplement_aliases supplement_aliases
-        where supplement_aliases.supplement_id = supplements.id
-          and supplement_aliases.normalized_alias <> supplements.normalized_name
-      ) alias_rows on true
-      left join lateral (
-        select coalesce(
-          jsonb_object_agg(
-            supplement_translations.locale,
-            jsonb_build_object(
-              'aliases', supplement_translations.aliases,
-              'categoryLabel', supplement_translations.category_label,
-              'locale', supplement_translations.locale,
-              'name', supplement_translations.name,
-              'primaryUseCase', supplement_translations.primary_use_case,
-              'safetyNotes', supplement_translations.safety_notes,
-              'status', supplement_translations.status,
-              'updatedAt', supplement_translations.updated_at
-            )
-          ),
-          '{}'::jsonb
-        ) as translations
-        from public.supplement_translations supplement_translations
-        where supplement_translations.supplement_id = supplements.id
-      ) translation_rows on true
       where coalesce(supplements.source_payload ->> 'deleted', 'false') <> 'true'
       order by supplements.category asc, supplements.name asc
       limit 1000
-    `;
-    const selectionStats = await getSupplementSelectionStatsBySupplement(range);
-    const mappedRows = rows.map((row) =>
-      rowFromDb(row, selectionStats.get(row.id))
+    `
     );
+    const mappedRows = rows.map((row) => rowFromDb(row));
 
     return {
       categories: [...new Set(mappedRows.map((row) => row.category))].sort(),
@@ -955,14 +1013,7 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     supplementId: input.id
   });
 
-  const data = await getAdminSupplementsData();
-  const row = data.rows.find((item) => item.id === input.id);
-
-  if (!row) {
-    throw new Error("Supplement update could not be reloaded");
-  }
-
-  return row;
+  return reloadAdminSupplement(sql, input.id);
 }
 
 export async function createAdminSupplement(input: CreateAdminSupplementInput) {
@@ -1007,14 +1058,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
   const existingId = existingRows[0]?.id;
 
   if (existingId) {
-    const data = await getAdminSupplementsData();
-    const row = data.rows.find((item) => item.id === existingId);
-
-    if (!row) {
-      throw new Error("Supplement could not be reloaded");
-    }
-
-    return row;
+    return reloadAdminSupplement(sql, existingId);
   }
 
   const supplementId = randomUUID();
@@ -1161,14 +1205,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
     )
   `;
 
-  const data = await getAdminSupplementsData();
-  const row = data.rows.find((item) => item.id === supplementId);
-
-  if (!row) {
-    throw new Error("Supplement create could not be reloaded");
-  }
-
-  return row;
+  return reloadAdminSupplement(sql, supplementId);
 }
 
 export async function deleteAdminSupplement(
@@ -1180,12 +1217,13 @@ export async function deleteAdminSupplement(
     throw new Error("Database is not configured");
   }
 
-  const data = await getAdminSupplementsData();
-  const before = data.rows.find((row) => row.id === input.id);
+  const beforeDocument = await loadSupplementDocument(sql, input.id);
 
-  if (!before) {
+  if (!beforeDocument) {
     throw new Error("Supplement not found");
   }
+
+  const before = rowFromDb(beforeDocument);
 
   const { productIdsUsingSupplement, refreshAndPersistProductValidations } =
     await import("@/lib/admin-product-writes");
@@ -1363,14 +1401,7 @@ export async function deleteAdminSupplementAlias(
     )
   `;
 
-  const data = await getAdminSupplementsData();
-  const row = data.rows.find((item) => item.id === input.supplementId);
-
-  if (!row) {
-    throw new Error("Supplement update could not be reloaded");
-  }
-
-  return row;
+  return reloadAdminSupplement(sql, input.supplementId);
 }
 
 export async function addAdminSupplementAlias(input: AddAdminSupplementAliasInput) {
@@ -1473,12 +1504,5 @@ export async function addAdminSupplementAlias(input: AddAdminSupplementAliasInpu
     )
   `;
 
-  const data = await getAdminSupplementsData();
-  const row = data.rows.find((item) => item.id === input.supplementId);
-
-  if (!row) {
-    throw new Error("Supplement update could not be reloaded");
-  }
-
-  return row;
+  return reloadAdminSupplement(sql, input.supplementId);
 }
