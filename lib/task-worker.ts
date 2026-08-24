@@ -483,24 +483,67 @@ export async function enqueueAssessmentPregenerationTasks({
     return null;
   }
 
+  const plan = DEFAULT_ASSESSMENT_PLAN;
   const inputHash = stableHash({ answers, locale });
   const taskGroupId = deterministicUuid(
     `mattanutra:task-group:assessment-pregeneration:${planId}:${inputHash}`
   );
+  const sharedPayload = {
+    answers,
+    inputHash,
+    locale,
+    plan,
+    pregeneration: true
+  };
   const healthScoreTaskId = assessmentSkipsHealthScore(answers)
     ? null
     : await enqueueHealthScoreAnalysisTask({
         planId,
         taskGroupId
       });
+  const formulationTaskId = await createWorkTask({
+    actorType: "deterministic",
+    businessValue: TASK_BUSINESS_VALUES.precision,
+    groupLabel: "Pre-generate nutrition guidance",
+    id: deterministicUuid(
+      `mattanutra:task:assessment-pregeneration:formulation:${planId}:${inputHash}`
+    ),
+    idempotencyKey: `assessment-pregeneration:formulation:${planId}:${inputHash}`,
+    idempotencyScope: "successful",
+    idempotencyScopeKey: `assessment-pregeneration:${planId}`,
+    payload: sharedPayload,
+    planId,
+    reasoningEffort: "none",
+    source: ASSESSMENT_PREGENERATION_SOURCE,
+    taskGroupId,
+    taskTitle: "Generate supplement plan",
+    taskType: "generate_supplement_guidance"
+  });
+  const productRecommendationTaskId = await enqueueProductRecommendationsTask({
+    dependsOnTaskId: formulationTaskId,
+    parentTaskId: formulationTaskId,
+    plan,
+    planId,
+    source: ASSESSMENT_PREGENERATION_SOURCE,
+    taskGroupId
+  });
+  const foodGapSupportTaskId = productRecommendationTaskId
+    ? await enqueueFoodGapSupportTask({
+        dependsOnTaskId: productRecommendationTaskId,
+        parentTaskId: productRecommendationTaskId,
+        planId,
+        source: ASSESSMENT_PREGENERATION_SOURCE,
+        taskGroupId
+      })
+    : null;
 
   return {
     foodGuidanceTaskId: null,
-    foodGapSupportTaskId: null,
-    formulationTaskId: null,
+    foodGapSupportTaskId,
+    formulationTaskId,
     healthScoreTaskId,
     nutritionReportTaskId: null,
-    productRecommendationTaskId: null,
+    productRecommendationTaskId,
     taskGroupId
   };
 }
@@ -1343,7 +1386,7 @@ export async function enqueueProductRecommendationsTask({
   stackPreference?: ProductStackPreference | null;
   taskGroupId?: string | null;
 }>) {
-  const sql = getSql();
+  const sql = getWorkerSql() ?? getSql();
 
   if (!sql || !isUuid(planId)) {
     return null;

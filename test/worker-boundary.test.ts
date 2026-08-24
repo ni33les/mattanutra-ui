@@ -561,15 +561,8 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       assessmentPregenerationSource,
-      /enqueueHealthScoreAnalysisTask/,
-      "assessment capture should prequeue HealthScore copy only",
-    );
-    assert.equal(
-      /generate_supplement_guidance|enqueueProductRecommendationsTask|enqueueFoodGapSupportTask/.test(
-        assessmentPregenerationSource,
-      ),
-      false,
-      "formulation and product matching wait until after purchase",
+      /enqueueHealthScoreAnalysisTask[\s\S]*generate_supplement_guidance[\s\S]*enqueueProductRecommendationsTask[\s\S]*enqueueFoodGapSupportTask/,
+      "assessment capture should prequeue HealthScore, supplement, product, and food-gap; matching depends on formula",
     );
     assert.match(
       taskWorkerSource,
@@ -605,6 +598,23 @@ describe("external worker boundaries", () => {
       /enqueueNutritionReportTask/.test(checkoutPregenerationSource),
       false,
       "checkout pre-generation must not queue a separate nutrition report task",
+    );
+    assert.match(
+      assessmentPregenerationSource,
+      /dependsOnTaskId: formulationTaskId[\s\S]*parentTaskId: formulationTaskId/,
+      "assessment product matching must be queued with the formula but depend on supplement success",
+    );
+    assert.match(
+      taskWorkerSource.slice(
+        taskWorkerSource.indexOf(
+          "export async function enqueueProductRecommendationsTask",
+        ),
+        taskWorkerSource.indexOf(
+          "export async function ensureFreshProductRecommendationsForReveal",
+        ),
+      ),
+      /getWorkerSql\(\) \?\? getSql\(\)/,
+      "product matching enqueue must stay off the interactive pool",
     );
     assert.match(
       paidPlanSource,

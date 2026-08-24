@@ -21,10 +21,10 @@ import {
 } from "@/lib/example-email";
 import { isLocale, publicLocales, type Locale } from "@/lib/i18n";
 import {
-  getLiveSaleEligibleRetailerCandidateSets,
   getProductRecommendationCandidates,
   type ProductRecommendationRetailerCandidateSet
 } from "@/lib/admin-products";
+import { loadLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
 import {
   type AdminPlanCoverageSimulationData,
   type AdminPlanCoverageSimulationSampleTrace
@@ -1799,6 +1799,62 @@ async function buildNutritionReportWorkItem(task: TaskRecord) {
   } satisfies NutritionReportWorkItem;
 }
 
+async function retailerCandidateSetsFromLiveSnapshot(
+  countryCode: string,
+  organisationId: string | null
+): Promise<ProductRecommendationRetailerCandidateSet[]> {
+  const snapshot = await loadLiveRetailSnapshot(countryCode);
+  const byRetailer = new Map<
+    string,
+    {
+      candidates: ProductCandidate[];
+      currency: string;
+      etaDates: Array<string | null>;
+      name: string;
+      subtotalAmount: number;
+    }
+  >();
+
+  for (const product of snapshot.products) {
+    if (!product.orderable) {
+      continue;
+    }
+
+    if (organisationId && product.sellerId !== organisationId) {
+      continue;
+    }
+
+    const candidate = product.candidate;
+    const retailerId =
+      candidate.selectedRetailerOrganisationId || product.sellerId;
+    const retailerName =
+      candidate.selectedRetailerName || product.sellerName || retailerId;
+    const retailer = byRetailer.get(retailerId) ?? {
+      candidates: [],
+      currency: candidate.currency,
+      etaDates: [],
+      name: retailerName,
+      subtotalAmount: 0
+    };
+
+    retailer.candidates.push(candidate);
+    retailer.etaDates.push(candidate.retailEtaDate ?? null);
+    retailer.subtotalAmount += candidate.priceAmount ?? 0;
+    byRetailer.set(retailerId, retailer);
+  }
+
+  return [...byRetailer].map(([id, retailer]) => ({
+    candidates: retailer.candidates,
+    currency: retailer.currency,
+    dispatchCity: null,
+    etaDate: retailer.etaDates.filter(Boolean).sort().at(-1) ?? null,
+    organisationId: id,
+    organisationName: retailer.name,
+    productCount: retailer.candidates.length,
+    subtotalAmount: retailer.subtotalAmount
+  }));
+}
+
 async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   const context = await buildNutritionAdvisorContext(task);
 
@@ -1823,11 +1879,10 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
         })
   );
   const candidateLoadStartedAt = Date.now();
-  const retailerCandidateSets =
-    await getLiveSaleEligibleRetailerCandidateSets({
-      countryCode,
-      organisationId: inStorePharmacyFromAnswers(context.answers)?.id ?? null
-    });
+  const retailerCandidateSets = await retailerCandidateSetsFromLiveSnapshot(
+    countryCode,
+    inStorePharmacyFromAnswers(context.answers)?.id ?? null
+  );
   const candidates = retailerCandidateSets.flatMap((set) => set.candidates);
 
   return {

@@ -14,7 +14,10 @@ describe("Phase 3 T01/T08 shared eligibility", () => {
 
     assert.match(search, /assessRetailSellability/);
     assert.match(search, /saleEligibleOnly: true/);
-    assert.match(search, /loadProductRows\(null, \{ productIds: retailProductIds \}\)/);
+    assert.match(
+      search,
+      /loadProductRows\(null, \{ productIds: retailProductIds, sql \}\)/
+    );
     assert.doesNotMatch(
       search.slice(
         search.indexOf("export async function getRetailerAwareProductRecommendationCandidateSets"),
@@ -22,7 +25,14 @@ describe("Phase 3 T01/T08 shared eligibility", () => {
       ),
       /loadProductRows\(input\.productId \?\? null\)/
     );
-    assert.match(workItems, /getLiveSaleEligibleRetailerCandidateSets/);
+    assert.match(workItems, /loadLiveRetailSnapshot/);
+    assert.doesNotMatch(
+      workItems.slice(
+        workItems.indexOf("async function buildProductRecommendationsWorkItem"),
+        workItems.indexOf("async function buildAdminCatalogueOptimizationWorkItem")
+      ),
+      /getLiveSaleEligibleRetailerCandidateSets|loadProductRows/
+    );
     assert.match(applier, /getLiveSaleEligibleRetailerCandidateSets/);
     assert.doesNotMatch(
       workItems.slice(
