@@ -27,7 +27,10 @@ import {
   getProductRecommendationCandidates,
   type ProductRecommendationRetailerCandidateSet
 } from "@/lib/admin-products";
-import { requireCachedLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
+import {
+  requireCachedLiveRetailSnapshot,
+  warmLiveRetailSnapshot
+} from "@/lib/agentic/catalogue/live";
 import {
   type AdminPlanCoverageSimulationData,
   type AdminPlanCoverageSimulationSampleTrace
@@ -43,7 +46,8 @@ import {
 import {
   enrichProductNeedsWithAvailabilityLookup,
   filterProductNeedsBySupplementAvailability,
-  requireCachedSupplementEffectiveAvailability
+  requireCachedSupplementEffectiveAvailability,
+  warmSupplementEffectiveAvailability
 } from "@/lib/supplement-country-availability";
 import { loadActivePlanFeedback } from "@/lib/plan-feedback";
 import { loadActivePlanGuidanceAdjustments } from "@/lib/plan-guidance-adjustments";
@@ -1809,6 +1813,7 @@ async function retailerCandidateSetsFromLiveSnapshot(
   countryCode: string,
   organisationId: string | null
 ): Promise<ProductRecommendationRetailerCandidateSet[]> {
+  await warmLiveRetailSnapshot(countryCode);
   const snapshot = requireCachedLiveRetailSnapshot(countryCode);
 
   if (snapshot.products.length < 1 && !process.env.NODE_TEST_CONTEXT) {
@@ -1875,7 +1880,9 @@ export function isRetryableMatchingWorkItemError(error: unknown) {
 
   return (
     message.includes(MATCHING_PLAN_NOT_READY_MESSAGE) ||
-    message.includes("canceling statement due to statement timeout")
+    message.includes("canceling statement due to statement timeout") ||
+    message.includes("Product matching catalogue is not ready") ||
+    message.includes("Product matching supplement availability is not ready")
   );
 }
 
@@ -1936,6 +1943,7 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   }
 
   const countryCode = productCountryCodeFromAnswers(row.answers);
+  await warmSupplementEffectiveAvailability(countryCode);
   const lookup = requireCachedSupplementEffectiveAvailability(countryCode);
   const needs = enrichProductNeedsWithAvailabilityLookup(
     filterProductNeedsBySupplementAvailability(

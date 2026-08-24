@@ -658,6 +658,16 @@ describe("external worker boundaries", () => {
       /INTERACTIVE_STATEMENT_TIMEOUT_MS/,
     );
     assert.match(
+      matchingWorkItems,
+      /await warmSupplementEffectiveAvailability\(countryCode\)/,
+      "matching hydrate must warm supplement availability instead of failing after a bounce",
+    );
+    assert.match(
+      matchingWorkItems,
+      /await warmLiveRetailSnapshot\(countryCode\)/,
+      "matching hydrate must warm the live catalogue instead of failing after a bounce",
+    );
+    assert.match(
       taskWorkerSource,
       /loadProductRecommendationFreshnessSnapshot[\s\S]*!forceNew && row\.formulationVersion >= 1 && !row\.reason[\s\S]*return null;/,
       "late product-matching enqueue points must not create duplicate runs when current recommendations already exist",
