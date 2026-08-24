@@ -13,6 +13,11 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   version: MATCHER_VERSION
 };
 
+export const WEB_MATCHER_CONFIG: MatcherConfig = {
+  ...DEFAULT_MATCHER_CONFIG,
+  searchDeadlineMs: 400
+};
+
 export const MATERIAL_COVERAGE_POINTS = 5;
 export const MATERIAL_PRICE_MINOR = 1000;
 export const MATERIAL_PILL_DELTA = 1;

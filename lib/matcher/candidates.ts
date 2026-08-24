@@ -149,6 +149,21 @@ function pruneVariants(variants: DoseVariant[]) {
   );
 }
 
+function variantLeavesTargetShortfall(
+  variant: DoseVariant,
+  request: CanonicalRequest
+) {
+  for (const [subjectId, amount] of variant.contributions) {
+    const target = request.targets.find((item) => item.subjectId === subjectId);
+
+    if (target && amount.units < target.requested.units) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function compileGroups(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
@@ -179,8 +194,14 @@ export function compileGroups(
 
       const variant = compileVariant({ dailyUnits, product, request });
 
-      if (variant) {
-        variants.push(variant);
+      if (!variant) {
+        break;
+      }
+
+      variants.push(variant);
+
+      if (!variantLeavesTargetShortfall(variant, request)) {
+        break;
       }
     }
 

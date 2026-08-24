@@ -155,6 +155,16 @@ describe("matcher web adapter coverage mapping", () => {
     );
     const candidates = await readFile("lib/matcher/candidates.ts", "utf8");
     assert.match(candidates, /MAX_DAILY_UNITS = 3/);
+    assert.match(candidates, /variantLeavesTargetShortfall/);
+    const config = await readFile("lib/matcher/config.ts", "utf8");
+    assert.match(config, /WEB_MATCHER_CONFIG/);
+    assert.match(config, /searchDeadlineMs: 400/);
+    const search = await readFile("lib/matcher/search.ts", "utf8");
+    assert.match(search, /hasUsefulBasket/);
+    assert.match(
+      search,
+      /if \(!runTrimmed \|\| width === config\.maxBeamWidth \|\| hasUsefulBasket\)/
+    );
     assert.doesNotMatch(candidates, /wanted\.includes\(name\)/);
     assert.doesNotMatch(candidates, /name\.includes\(wanted\)/);
     assert.doesNotMatch(
@@ -667,6 +677,10 @@ describe("matcher web adapter coverage mapping", () => {
       30
     );
     assert.equal(magnesium.recommendations[0]?.servingMultiplier, 1);
+    assert.equal(
+      magnesium.recommendations[0]?.product.id,
+      "mag-d3"
+    );
   });
 
   it("does not pick 3 servings when that would exceed a safety ceiling", () => {

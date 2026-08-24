@@ -303,7 +303,11 @@ function beamSearch(
     best = merged;
     trimmed = trimmed || runTrimmed;
 
-    if (!runTrimmed || width === config.maxBeamWidth) {
+    const hasUsefulBasket = best.some(
+      (state) => state.count > 0 && isUseful(state, request)
+    );
+
+    if (!runTrimmed || width === config.maxBeamWidth || hasUsefulBasket) {
       break;
     }
 

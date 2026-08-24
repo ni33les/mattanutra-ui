@@ -10,6 +10,7 @@ import type {
   MatchResult,
   MatcherConfig,
   MatcherLeftover,
+  ProductGroup,
   ScoredBasket
 } from "@/lib/matcher/types";
 
@@ -63,7 +64,8 @@ function leftoversFor(
 export function match(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
-  config: MatcherConfig = DEFAULT_MATCHER_CONFIG
+  config: MatcherConfig = DEFAULT_MATCHER_CONFIG,
+  compiledGroups?: readonly ProductGroup[]
 ): MatchResult {
   const baselineExposure = aggregateDailyExposure({
     current: request.currentSupplements,
@@ -90,11 +92,13 @@ export function match(
   }
 
   const deadlineAt = Date.now() + config.searchDeadlineMs;
-  const groups = compileGroups(
-    request,
-    catalog,
-    Math.max(Date.now(), deadlineAt - 400)
-  );
+  const groups = compiledGroups
+    ? [...compiledGroups]
+    : compileGroups(
+        request,
+        catalog,
+        Math.max(Date.now(), deadlineAt - 400)
+      );
   const sellers = groupsBySeller(groups, request);
   const scored: ScoredBasket[] = [];
   let mode: "bounded" | "exact" = "exact";

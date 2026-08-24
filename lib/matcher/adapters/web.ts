@@ -2,10 +2,12 @@ import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
 import { COVERAGE_SCALE, MATCHER_VERSION } from "@/lib/matcher/config";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
-import { contributionFor } from "@/lib/matcher/candidates";
+import { compileGroups, contributionFor } from "@/lib/matcher/candidates";
+import { WEB_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { match } from "@/lib/matcher";
+import type { CatalogSnapshot, ProductGroup } from "@/lib/matcher/types";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { publicCoveragePercent } from "@/lib/matcher/explainer";
 import {
@@ -58,6 +60,10 @@ function unitFromNeed(unit: string | null | undefined): MatcherUnit {
 }
 
 const matcherProductByCandidate = new WeakMap<ProductCandidate, MatcherProduct>();
+const compiledGroupsByCandidates = new WeakMap<
+  readonly ProductCandidate[],
+  { catalog: CatalogSnapshot; groups: ProductGroup[] }
+>();
 
 function labelledSubjectId(fact: ProductCandidate["facts"][number]) {
   const fromName = fact.normalizedName?.trim();
@@ -385,45 +391,76 @@ export function recommendWithMatcher(
 
   const dietary =
     input.clientContext?.preferredForm === "vegan" ? "vegan" : "any";
-  const result = match(
-    {
-      acceptedGapSubjectIds: [],
-      allowedForms: null,
-      conditionCodes: [...(input.clientContext?.conditions ?? [])],
-      currency: input.candidates[0]?.currency ?? "THB",
-      currentSupplements: currents,
-      destinationCountry: (input.countryCode ?? "TH").toUpperCase(),
-      dietaryPreference: dietary,
-      excludeSubjectIds: [],
-      leftovers: targets.leftovers,
-      maxDailyPills: null,
-      maxPriceMinor:
-        input.budgetAmount != null ? Math.round(input.budgetAmount * 100) : null,
-      maxProductCount: input.maxProducts ?? 6,
-      medicationCodes: [...(input.clientContext?.medicationTypes ?? [])],
-      omega3SourcePreference: impliedOmegaPreference(dietary, "any"),
-      optimization:
-        input.stackPreference === "compact" ? "fewest_pills" : "best_coverage",
-      profile: {
-        ageYears: 38,
-        lifeStage: matcherLifeStage(input.clientContext?.lifestage),
-        sex: input.clientSex === "female" || input.clientSex === "male"
-          ? input.clientSex
-          : "unspecified"
-      },
-      retainProductIds: [],
-      retainSubjectIds: [],
-      safetyCeilings: matcherSafetyCeilings(),
-      selectorMode:
-        input.stackPreference === "compact" ? "agentic" : "web_single",
-      targets: targets.targets
+  const request = {
+    acceptedGapSubjectIds: [],
+    allowedForms: null,
+    conditionCodes: [...(input.clientContext?.conditions ?? [])],
+    currency: input.candidates[0]?.currency ?? "THB",
+    currentSupplements: currents,
+    destinationCountry: (input.countryCode ?? "TH").toUpperCase(),
+    dietaryPreference: dietary,
+    excludeSubjectIds: [],
+    leftovers: targets.leftovers,
+    maxDailyPills: null,
+    maxPriceMinor:
+      input.budgetAmount != null ? Math.round(input.budgetAmount * 100) : null,
+    maxProductCount: input.maxProducts ?? 6,
+    medicationCodes: [...(input.clientContext?.medicationTypes ?? [])],
+    omega3SourcePreference: impliedOmegaPreference(dietary, "any"),
+    optimization:
+      input.stackPreference === "compact" ? "fewest_pills" : "best_coverage",
+    profile: {
+      ageYears: 38,
+      lifeStage: matcherLifeStage(input.clientContext?.lifestage),
+      sex: input.clientSex === "female" || input.clientSex === "male"
+        ? input.clientSex
+        : "unspecified"
     },
-    {
+    retainProductIds: [],
+    retainSubjectIds: [],
+    safetyCeilings: matcherSafetyCeilings(),
+    selectorMode:
+      input.stackPreference === "compact" ? "agentic" : "web_single",
+    targets: targets.targets
+  } as const;
+  const compileStartedAt = Date.now();
+  let compiled = compiledGroupsByCandidates.get(input.candidates);
+
+  if (!compiled) {
+    const catalog = {
       availabilityAsOf: new Date(0).toISOString(),
       catalogueVersion: "web",
       products: input.candidates.map(toMatcherProduct)
-    }
+    };
+    compiled = {
+      catalog,
+      groups: compileGroups(request, catalog)
+    };
+    compiledGroupsByCandidates.set(input.candidates, compiled);
+  }
+
+  const compileMs = Date.now() - compileStartedAt;
+  const searchStartedAt = Date.now();
+  const result = match(
+    request,
+    compiled.catalog,
+    WEB_MATCHER_CONFIG,
+    compiled.groups
   );
+  const variantCount = compiled.groups.reduce(
+    (sum, group) => sum + group.variants.length,
+    0
+  );
+
+  console.info("[matching:search]", {
+    compileMs,
+    groups: compiled.groups.length,
+    mode: result.searchMode,
+    searchMs: Date.now() - searchStartedAt,
+    stackPreference: input.stackPreference ?? "balanced",
+    trimmed: result.trimmed,
+    variants: variantCount
+  });
   const coverage = publicCoveragePercent(result.selected);
   const needDiagnostics = needDiagnosticsFromBasket(
     supplementNeeds,
