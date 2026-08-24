@@ -26,6 +26,10 @@ const journeyRead = readFileSync(
   new URL("../lib/nutrition-journey-read.ts", import.meta.url),
   "utf8"
 );
+const copyClient = readFileSync(
+  new URL("../lib/healthscore-copy-client.ts", import.meta.url),
+  "utf8"
+);
 
 describe("HealthScore page waits for real AI copy", () => {
   it("does not write seed templates into aiCopy when Grok fails", () => {
@@ -40,6 +44,15 @@ describe("HealthScore page waits for real AI copy", () => {
     assert.match(store, /export function hasHealthScoreAdvice\(value: unknown\) \{\s*return hasHealthScoreAiCopy\(value\);/);
     assert.match(journeyRead, /copyReady/);
     assert.match(journeyRead, /analyze_healthscore/);
+    assert.match(journeyRead, /export async function getHealthScoreCopySnapshot/);
+    assert.doesNotMatch(
+      journeyRead.slice(
+        journeyRead.indexOf("export async function getHealthScoreCopySnapshot"),
+        journeyRead.indexOf("export async function getNutritionJourneySnapshot")
+      ),
+      /product_recommendation_runs|formulations/
+    );
+    assert.match(copyClient, /journey\?view=copy/);
   });
 
   it("keeps HealthScore HTML off seed prose until copy exists", () => {

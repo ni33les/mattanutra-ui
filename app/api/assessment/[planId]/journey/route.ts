@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
-import { getNutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
+import {
+  getHealthScoreCopySnapshot,
+  getNutritionJourneySnapshot
+} from "@/lib/nutrition-journey-read";
 
 type JourneyRouteProps = Readonly<{
   params: Promise<{
@@ -11,7 +14,7 @@ type JourneyRouteProps = Readonly<{
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: JourneyRouteProps
 ) {
   const { planId } = await params;
@@ -26,7 +29,10 @@ export async function GET(
     );
   }
 
-  const snapshot = await getNutritionJourneySnapshot(planId);
+  const copyView = new URL(request.url).searchParams.get("view") === "copy";
+  const snapshot = copyView
+    ? await getHealthScoreCopySnapshot(planId)
+    : await getNutritionJourneySnapshot(planId);
 
   if (!snapshot) {
     return NextResponse.json(

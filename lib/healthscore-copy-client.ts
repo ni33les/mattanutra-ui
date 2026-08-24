@@ -11,7 +11,7 @@ export async function fetchHealthScoreCopyStatus(
   fetchImpl: typeof fetch = fetch
 ): Promise<HealthScoreCopyStatus> {
   const response = await fetchImpl(
-    `/api/assessment/${encodeURIComponent(planId)}/journey`,
+    `/api/assessment/${encodeURIComponent(planId)}/journey?view=copy`,
     { cache: "no-store" }
   );
 

@@ -47,6 +47,8 @@ describe("after-pay journey progress stays truthful", () => {
 
   it("reads one journey snapshot and does not enqueue work", () => {
     assert.match(journeyRoute, /getNutritionJourneySnapshot\(planId\)/);
+    assert.match(journeyRoute, /getHealthScoreCopySnapshot\(planId\)/);
+    assert.match(journeyRoute, /get\("view"\) === "copy"/);
     assert.doesNotMatch(journeyRoute, /enqueue|getWorkerSql|ensureAssessmentSchema/);
     assert.match(journeyRead, /from public\.assessments/);
     assert.match(journeyRead, /generate_supplement_guidance/);

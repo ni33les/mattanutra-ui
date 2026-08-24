@@ -561,8 +561,15 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       assessmentPregenerationSource,
-      /enqueueHealthScoreAnalysisTask[\s\S]*generate_supplement_guidance[\s\S]*enqueueProductRecommendationsTask[\s\S]*enqueueFoodGapSupportTask/,
-      "assessment capture should prequeue the single HealthScore, supplement, product, and food-gap graph",
+      /enqueueHealthScoreAnalysisTask/,
+      "assessment capture should prequeue HealthScore copy only",
+    );
+    assert.equal(
+      /generate_supplement_guidance|enqueueProductRecommendationsTask|enqueueFoodGapSupportTask/.test(
+        assessmentPregenerationSource,
+      ),
+      false,
+      "formulation and product matching wait until after purchase",
     );
     assert.match(
       taskWorkerSource,
@@ -573,11 +580,6 @@ describe("external worker boundaries", () => {
       /taskType: "generate_food_guidance"/.test(assessmentPregenerationSource),
       false,
       "assessment capture must not prequeue legacy food guidance",
-    );
-    assert.match(
-      assessmentPregenerationSource,
-      /enqueueFoodGapSupportTask\(\{[\s\S]*dependsOnTaskId: productRecommendationTaskId/,
-      "assessment capture should queue food-gap support early behind product matching",
     );
     assert.equal(
       /enqueueNutritionReportTask/.test(assessmentPregenerationSource),
@@ -605,9 +607,9 @@ describe("external worker boundaries", () => {
       "checkout pre-generation must not queue a separate nutrition report task",
     );
     assert.match(
-      taskWorkerSource,
-      /dependsOnTaskId: formulationTaskId[\s\S]*parentTaskId: formulationTaskId/,
-      "assessment product matching must be queued immediately but depend on supplement generation",
+      paidPlanSource,
+      /dependsOnTaskId: readiness\.formulationReady \? null : formulationTaskId[\s\S]*parentTaskId: formulationTaskId/,
+      "paid product matching must be queued immediately but depend on supplement generation",
     );
     assert.match(
       taskWorkerSource,

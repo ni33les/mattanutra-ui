@@ -674,10 +674,6 @@ export function ChatQuestionnaire({
         let copyFailed = false;
 
         while (Date.now() < copyDeadline) {
-          await new Promise((resolve) => {
-            window.setTimeout(resolve, HEALTHSCORE_COPY_POLL_INTERVAL_MS);
-          });
-
           try {
             const copyStatus = await fetchHealthScoreCopyStatus(
               captured.planId,
@@ -692,6 +688,10 @@ export function ChatQuestionnaire({
           if (copyReady || copyFailed) {
             break;
           }
+
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, HEALTHSCORE_COPY_POLL_INTERVAL_MS);
+          });
         }
 
         if (!copyReady) {

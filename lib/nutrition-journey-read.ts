@@ -28,6 +28,102 @@ function asStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string");
 }
 
+function heroTextFromStored(raw: string | null) {
+  const text = String(raw ?? "").trim();
+
+  if (!text) {
+    return "";
+  }
+
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text) as unknown;
+
+      if (typeof parsed === "string") {
+        return parsed.trim();
+      }
+
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const record = parsed as Record<string, unknown>;
+        const localized = [record.en, record.th, record["zh-CN"]].find(
+          (item) => typeof item === "string" && item.trim()
+        );
+
+        return typeof localized === "string" ? localized.trim() : "";
+      }
+    } catch {
+      return "";
+    }
+  }
+
+  return text;
+}
+
+function copyFlagsFromRow(row: {
+  ai_hero_body: string | null;
+  copy_task_status: string | null;
+}) {
+  const copyReady = heroTextFromStored(row.ai_hero_body).length > 0;
+  const copyTaskStatus = String(row.copy_task_status ?? "");
+  const copyFailed =
+    !copyReady &&
+    (copyTaskStatus === "failed" ||
+      copyTaskStatus === "cancelled" ||
+      copyTaskStatus === "completed");
+
+  return { copyFailed, copyReady };
+}
+
+export async function getHealthScoreCopySnapshot(planId: string) {
+  const sql = getSql();
+
+  if (!sql || !isUuid(planId)) {
+    return null;
+  }
+
+  const rows = await sql<
+    Array<{
+      ai_hero_body: string | null;
+      copy_task_status: string | null;
+    }>
+  >`
+    select
+      case
+        when jsonb_typeof(
+          assessments.health_score #> '{pageContent,aiCopy,heroBody}'
+        ) = 'string'
+          then assessments.health_score #>> '{pageContent,aiCopy,heroBody}'
+        else coalesce(
+          assessments.health_score #>> '{pageContent,aiCopy,heroBody,en}',
+          assessments.health_score #>> '{pageContent,aiCopy,heroBody,th}',
+          assessments.health_score #>> '{pageContent,aiCopy,heroBody,zh-CN}'
+        )
+      end as ai_hero_body,
+      copy_task.status::text as copy_task_status
+    from public.assessments
+    left join lateral (
+      select tasks.status
+      from public.tasks
+      where tasks.plan_id = assessments.plan_id
+        and tasks.task_type = 'analyze_healthscore'
+      order by tasks.created_at desc
+      limit 1
+    ) copy_task on true
+    where assessments.plan_id = ${planId}::uuid
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    planId,
+    ...copyFlagsFromRow(row)
+  };
+}
+
 export async function getNutritionJourneySnapshot(
   planId: string
 ): Promise<NutritionJourneySnapshot | null> {
@@ -55,10 +151,17 @@ export async function getNutritionJourneySnapshot(
       assessments.status::text as assessment_status,
       assessments.selected_plan is not null as has_paid_plan,
       assessments.health_score ->> 'score' as health_score_score,
-      coalesce(
-        assessments.health_score #>> '{pageContent,aiCopy,heroBody}',
-        assessments.health_score #>> '{pageContent,aiCopy,heroBody,en}'
-      ) as ai_hero_body,
+      case
+        when jsonb_typeof(
+          assessments.health_score #> '{pageContent,aiCopy,heroBody}'
+        ) = 'string'
+          then assessments.health_score #>> '{pageContent,aiCopy,heroBody}'
+        else coalesce(
+          assessments.health_score #>> '{pageContent,aiCopy,heroBody,en}',
+          assessments.health_score #>> '{pageContent,aiCopy,heroBody,th}',
+          assessments.health_score #>> '{pageContent,aiCopy,heroBody,zh-CN}'
+        )
+      end as ai_hero_body,
       copy_task.status::text as copy_task_status,
       formulations.visible_supplement_count,
       formulations.section_supplements,
@@ -140,15 +243,7 @@ export async function getNutritionJourneySnapshot(
   const score = Number(row.health_score_score);
   const hasHealthScore =
     Number.isFinite(score) || row.has_paid_plan === true;
-  const aiHero = String(row.ai_hero_body ?? "").trim();
-  const copyReady =
-    aiHero.length > 0 && !aiHero.startsWith("{") && !aiHero.startsWith("[");
-  const copyTaskStatus = String(row.copy_task_status ?? "");
-  const copyFailed =
-    !copyReady &&
-    (copyTaskStatus === "failed" ||
-      copyTaskStatus === "cancelled" ||
-      copyTaskStatus === "completed");
+  const { copyFailed, copyReady } = copyFlagsFromRow(row);
   const status: NutritionJourneyStatus = nutritionJourneyStatusFromCounts({
     assessmentStatus: row.assessment_status,
     hasPaidPlan: row.has_paid_plan === true,
