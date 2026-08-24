@@ -33,6 +33,7 @@ function need(
 }
 
 function candidate(input: Readonly<{
+  availableCountryCodes?: string[];
   facts: ReadonlyArray<{
     amount: number;
     name: string;
@@ -40,11 +41,13 @@ function candidate(input: Readonly<{
     unit: string;
   }>;
   id: string;
+  productAudience?: "both" | "female" | "male";
   title: string;
 }>): ProductCandidate {
   return {
     automatedSafetyPassed: true,
     availabilityStatus: "in_stock",
+    availableCountryCodes: input.availableCountryCodes ?? ["TH"],
     brandStatus: "approved",
     currency: "THB",
     facts: input.facts.map((fact) => ({
@@ -60,7 +63,7 @@ function candidate(input: Readonly<{
     labelStatus: "parsed",
     platform: "manual",
     priceAmount: 350,
-    productAudience: "both",
+    productAudience: input.productAudience ?? "both",
     productUrl: `https://example.com/${input.id}`,
     region: "TH",
     retailAvailabilityStatus: "available_now",
@@ -142,6 +145,15 @@ describe("matcher web adapter coverage mapping", () => {
     );
     assert.match(source, /amount:\s*fact\.amount \?\? 0/);
     assert.match(source, /unit:\s*fact\.unit/);
+    assert.match(source, /matcherProductOwnCoveragePercent/);
+    assert.doesNotMatch(source, /productCoveragePercent:\s*coverage/);
+    const candidates = await readFile("lib/matcher/candidates.ts", "utf8");
+    assert.doesNotMatch(candidates, /wanted\.includes\(name\)/);
+    assert.doesNotMatch(candidates, /name\.includes\(wanted\)/);
+    assert.doesNotMatch(
+      candidates,
+      /return product\.labelledContributions;\s*\n\s*\}/
+    );
     const live = await readFile("lib/agentic/catalogue/live.ts", "utf8");
     assert.doesNotMatch(
       live,
@@ -302,5 +314,234 @@ describe("matcher web adapter coverage mapping", () => {
 
     assert.equal(matcherProductCoversNeed(bioMag, magnesium), true);
     assert.equal(matcherProductCoversNeed(bioMag, creatine), false);
+  });
+
+  it("does not count Vitamin B1 as Vitamin B12", () => {
+    const vitaminB12 = dosedNeed({
+      amount: 500,
+      displayName: "Vitamin B12",
+      id: "supplement:vitamin-b12",
+      normalizedName: "vitamin_b12",
+      unit: "mcg"
+    });
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 7500,
+              name: "Vitamin B1",
+              normalizedName: "vitamin_b1",
+              unit: "mcg"
+            },
+            {
+              amount: 10,
+              name: "Vitamin B12",
+              normalizedName: "vitamin_b12",
+              unit: "mcg"
+            }
+          ],
+          id: "exec-b",
+          title: "BLACKMORES EXEC B 30'S"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [vitaminB12],
+      stackPreference: "balanced"
+    });
+    const b12 =
+      [...result.diagnostics.matchedNeeds, ...result.diagnostics.unmatchedNeeds].find(
+        (item) => item.id === "supplement:vitamin-b12"
+      )?.coveragePercent ?? 0;
+
+    assert.equal(b12, 2);
+    assert.ok(b12 < 10);
+  });
+
+  it("does not stamp the stack percent onto a creatine-only SKU", () => {
+    const magnesium = dosedNeed({
+      amount: 300,
+      displayName: "Magnesium",
+      id: "supplement:magnesium",
+      normalizedName: "magnesium",
+      unit: "mg"
+    });
+    const creatine = dosedNeed({
+      amount: 3000,
+      displayName: "Creatine",
+      id: "supplement:creatine",
+      normalizedName: "creatine",
+      unit: "mg"
+    });
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 300,
+              name: "Magnesium",
+              normalizedName: "magnesium",
+              unit: "mg"
+            }
+          ],
+          id: "bio-mag",
+          title: "Blackmores Bio Magnesium"
+        }),
+        candidate({
+          facts: [
+            {
+              amount: 3,
+              name: "Creatine",
+              normalizedName: "creatine",
+              unit: "g"
+            }
+          ],
+          id: "creatine-powder",
+          title: "Optimum Nutrition Micronized Creatine Monohydrate Powder"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [magnesium, creatine],
+      stackPreference: "balanced"
+    });
+    const creatineRow = result.recommendations.find(
+      (row) => row.product.id === "creatine-powder"
+    );
+
+    assert.ok(creatineRow);
+    assert.ok((result.stackCoveragePercent ?? 0) >= 90);
+    assert.notEqual(
+      creatineRow?.productCoveragePercent,
+      result.stackCoveragePercent
+    );
+    assert.ok((creatineRow?.productCoveragePercent ?? 100) <= 60);
+  });
+
+  it("keeps Pre 9+ Care Gold off male and non-pregnant adult stacks", () => {
+    const folate = dosedNeed({
+      amount: 400,
+      displayName: "Folate",
+      id: "supplement:folate",
+      normalizedName: "vitamin_b9",
+      unit: "mcg"
+    });
+    const prenatal = candidate({
+      facts: [
+        {
+          amount: 400,
+          name: "Folic acid",
+          normalizedName: "folic_acid",
+          unit: "mcg"
+        }
+      ],
+      id: "pre9",
+      title: "Blackmores Pre 9+ Care Gold"
+    });
+    const adult = candidate({
+      facts: [
+        {
+          amount: 400,
+          name: "Folic acid",
+          normalizedName: "folic_acid",
+          unit: "mcg"
+        }
+      ],
+      id: "folate-adult",
+      title: "Blackmores Folate"
+    });
+
+    const male = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [prenatal, adult],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [folate],
+      stackPreference: "balanced"
+    });
+    const adultFemale = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [prenatal, adult],
+      clientContext: { lifestage: "none/none/regular" },
+      clientSex: "female",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [folate],
+      stackPreference: "balanced"
+    });
+    const pregnant = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [prenatal],
+      clientContext: { lifestage: "pregnant" },
+      clientSex: "female",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [folate],
+      stackPreference: "balanced"
+    });
+
+    assert.equal(
+      male.recommendations.some((row) => row.product.id === "pre9"),
+      false
+    );
+    assert.equal(
+      adultFemale.recommendations.some((row) => row.product.id === "pre9"),
+      false
+    );
+    assert.equal(
+      pregnant.recommendations.some((row) => row.product.id === "pre9"),
+      true
+    );
+  });
+
+  it("does not match a Singapore SKU into a Thailand basket", () => {
+    const magnesium = dosedNeed({
+      amount: 300,
+      displayName: "Magnesium",
+      id: "supplement:magnesium",
+      normalizedName: "magnesium",
+      unit: "mg"
+    });
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          availableCountryCodes: ["SG"],
+          facts: [
+            {
+              amount: 300,
+              name: "Magnesium",
+              normalizedName: "magnesium",
+              unit: "mg"
+            }
+          ],
+          id: "sg-mag",
+          title: "Singapore Magnesium"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [magnesium],
+      stackPreference: "balanced"
+    });
+
+    assert.equal(result.recommendations.length, 0);
+    assert.equal(
+      [...result.diagnostics.matchedNeeds, ...result.diagnostics.unmatchedNeeds].find(
+        (item) => item.id === "supplement:magnesium"
+      )?.coveragePercent ?? 0,
+      0
+    );
   });
 });

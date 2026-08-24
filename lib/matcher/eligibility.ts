@@ -113,16 +113,22 @@ export function productEligible(
     return false;
   }
 
-  if (
-    (product.prenatalOrFertility ||
-      isPrenatalOrFertilitySku({
-        brandName: null,
-        facts: [],
-        title: product.title
-      })) &&
-    (sex === "male" || (request.profile.ageYears >= 40 && sex !== "female"))
-  ) {
-    return false;
+  const prenatalSku =
+    product.prenatalOrFertility ||
+    isPrenatalOrFertilitySku({
+      brandName: null,
+      facts: [],
+      title: product.title
+    });
+
+  if (prenatalSku) {
+    const prenatalLifeStage =
+      request.profile.lifeStage === "pregnant" ||
+      request.profile.lifeStage === "trying_to_conceive";
+
+    if (sex === "male" || !prenatalLifeStage) {
+      return false;
+    }
   }
 
   if (request.profile.lifeStage === "child" && product.productAudience === "male") {

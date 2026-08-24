@@ -57,6 +57,10 @@ describe("agentic live-catalogue matching constraints", () => {
       true
     );
     assert.equal(
+      isPrenatalOrFertilitySku({ title: "Blackmores Pre 9+ Care Gold", facts: [] }),
+      true
+    );
+    assert.equal(
       isNonAlgaeOmegaStandin({ title: "Super Omega 3-6-9", facts: [] }),
       true
     );
@@ -121,7 +125,24 @@ describe("agentic live-catalogue matching constraints", () => {
       state: stateFor(prenatal)
     });
     const names = (matched.selected?.basket ?? []).map((item) => item.productName);
-    assert.equal(names.some((name) => /conceive|prenatal|fertility/i.test(name)), false);
+    assert.equal(names.some((name) => /conceive|prenatal|fertility|pre 9/i.test(name)), false);
+  });
+
+  it("does not select Pre 9+ Care Gold for a 52-year-old man", () => {
+    const snapshot = fixtureSnapshot();
+    const donor =
+      snapshot.products.find((item) => /folate|folic/i.test(item.candidate.title)) ??
+      snapshot.products[0]!;
+    const prenatal = withTitle(donor, "Blackmores Pre 9+ Care Gold", "both");
+    const matched = matchPlan({
+      snapshot: {
+        ...snapshot,
+        products: [...snapshot.products, prenatal]
+      },
+      state: stateFor(prenatal)
+    });
+    const names = (matched.selected?.basket ?? []).map((item) => item.productName);
+    assert.equal(names.some((name) => /pre 9|prenatal|conceive/i.test(name)), false);
   });
 
   it("algae_only leftover is uncovered when the catalogue has no algae omega SKU", () => {

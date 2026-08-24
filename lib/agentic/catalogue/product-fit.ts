@@ -16,7 +16,7 @@ export function catalogueHaystack(
 export function isPrenatalOrFertilitySku(
   candidate: Pick<ProductCandidate, "brandName" | "facts" | "title">
 ) {
-  return /conceive|prenatal|pregnan|fertility|\bttc\b|gestation|maternal/i.test(
+  return /conceive|pre[-\s]?natal|pregnan|fertility|\bttc\b|gestation|maternal|maternity|\bpre\s*9\+?|\bpre9\b/i.test(
     catalogueHaystack(candidate)
   );
 }

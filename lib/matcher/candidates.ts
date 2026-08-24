@@ -1,5 +1,6 @@
 import { productEligible } from "@/lib/matcher/eligibility";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
+import { productKeysMatch } from "@/lib/product-key-matching";
 import type {
   CanonicalRequest,
   CatalogSnapshot,
@@ -11,34 +12,39 @@ import type {
 
 const MAX_DAILY_UNITS = 1;
 
-function contributionFor(
+function subjectKeyVariants(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return [];
+  }
+
+  return [...new Set([trimmed, trimmed.replace(/-/g, "_"), trimmed.replace(/_/g, "-")])];
+}
+
+export function contributionFor(
   product: MatcherProduct,
   targetName: string,
   targetSubjectId: string
 ) {
-  const wanted = targetName.trim().toLowerCase().replace(/folic acid/g, "folate");
-  const labelled = product.labelledContributions.filter((item) => {
-    if (item.subjectId && item.subjectId === targetSubjectId) {
-      return true;
+  return product.labelledContributions.filter((item) => {
+    if (item.amount == null || item.amount <= 0) {
+      return false;
     }
 
-    const name = item.name
-      .replace(/_/g, " ")
-      .trim()
-      .toLowerCase()
-      .replace(/folic acid/g, "folate");
-    return name === wanted || name.includes(wanted) || wanted.includes(name);
+    if (item.subjectId) {
+      for (const targetId of subjectKeyVariants(targetSubjectId)) {
+        for (const factId of subjectKeyVariants(item.subjectId)) {
+          if (factId === targetId || productKeysMatch(targetId, factId)) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return Boolean(item.name?.trim() && targetName.trim()) &&
+      productKeysMatch(targetName, item.name);
   });
-
-  if (labelled.length > 0) {
-    return labelled;
-  }
-
-  if (product.contributionSubjectIds.includes(targetSubjectId)) {
-    return product.labelledContributions;
-  }
-
-  return [];
 }
 
 export function compileVariant(input: Readonly<{

@@ -2,6 +2,9 @@ import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
 import { COVERAGE_SCALE, MATCHER_VERSION } from "@/lib/matcher/config";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
+import { contributionFor } from "@/lib/matcher/candidates";
+import { coverageUnits } from "@/lib/matcher/dominance";
+import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { match } from "@/lib/matcher";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { publicCoveragePercent } from "@/lib/matcher/explainer";
@@ -9,7 +12,12 @@ import {
   normalizeProductFactKey,
   productKeysMatch
 } from "@/lib/product-key-matching";
-import type { MatcherProduct, MatcherUnit, ScoredBasket } from "@/lib/matcher/types";
+import type {
+  LifeStage,
+  MatcherProduct,
+  MatcherUnit,
+  ScoredBasket
+} from "@/lib/matcher/types";
 import type {
   ProductCandidate,
   ProductRecommendationInput,
@@ -204,6 +212,94 @@ export function matcherProductCoversNeed(
   return false;
 }
 
+function matcherLifeStage(value: string | null | undefined): LifeStage {
+  const text = (value ?? "").toLowerCase().replace(/-/g, "_");
+
+  if (text.includes("pregnan")) {
+    return "pregnant";
+  }
+
+  if (
+    text.includes("trying_to_conceive") ||
+    text.includes("trying to conceive") ||
+    /\bttc\b/.test(text)
+  ) {
+    return "trying_to_conceive";
+  }
+
+  if (text.includes("breastfeed")) {
+    return "breastfeeding";
+  }
+
+  if (/\bchild\b/.test(text)) {
+    return "child";
+  }
+
+  return "adult";
+}
+
+function matcherProductOwnCoveragePercent(
+  product: MatcherProduct,
+  needs: readonly ProductRecommendationNeed[]
+) {
+  if (needs.length < 1) {
+    return 0;
+  }
+
+  let weightedUnits = 0;
+  let totalWeight = 0;
+
+  for (const need of needs) {
+    const weight = need.weight > 0 ? need.weight : 1;
+    totalWeight += weight;
+    const amount = need.targetDose?.amount ?? need.targetComparableAmount ?? 0;
+    const unit = need.targetDose ? unitFromNeed(need.targetDose.unit) : "mcg";
+    const subjectId = need.normalizedName || need.sourceId || need.id;
+    const requested = scaleAmount({
+      amount,
+      subjectId,
+      subjectName: need.displayName,
+      unit
+    });
+
+    if (isDoseError(requested) || requested.units <= BigInt(0)) {
+      continue;
+    }
+
+    let delivered = BigInt(0);
+
+    for (const fact of contributionFor(product, need.displayName, subjectId)) {
+      if (fact.amount == null || !fact.unit) {
+        continue;
+      }
+
+      const scaled = scaleAmount({
+        amount: fact.amount,
+        subjectId,
+        subjectName: need.displayName,
+        unit: fact.unit
+      });
+
+      if (isDoseError(scaled) || scaled.dim !== requested.dim) {
+        continue;
+      }
+
+      delivered += scaled.units;
+    }
+
+    weightedUnits += weight * coverageUnits(delivered, requested.units);
+  }
+
+  if (totalWeight <= 0) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.min(100, Math.round(weightedUnits / totalWeight / (COVERAGE_SCALE / 100)))
+  );
+}
+
 function needDiagnosticsFromBasket(
   needs: readonly ProductRecommendationNeed[],
   selected: ScoredBasket | null
@@ -274,7 +370,6 @@ export function recommendWithMatcher(
     return empty;
   }
 
-  const lifestage = input.clientContext?.lifestage;
   const dietary =
     input.clientContext?.preferredForm === "vegan" ? "vegan" : "any";
   const result = match(
@@ -298,13 +393,7 @@ export function recommendWithMatcher(
         input.stackPreference === "compact" ? "fewest_pills" : "best_coverage",
       profile: {
         ageYears: 38,
-        lifeStage:
-          lifestage === "child" ||
-          lifestage === "pregnant" ||
-          lifestage === "breastfeeding" ||
-          lifestage === "trying_to_conceive"
-            ? lifestage
-            : "adult",
+        lifeStage: matcherLifeStage(input.clientContext?.lifestage),
         sex: input.clientSex === "female" || input.clientSex === "male"
           ? input.clientSex
           : "unspecified"
@@ -334,6 +423,10 @@ export function recommendWithMatcher(
       continue;
     }
     const matcherProduct = toMatcherProduct(product);
+    const skuCoverage = matcherProductOwnCoveragePercent(
+      matcherProduct,
+      supplementNeeds
+    );
     recommendations.push({
       coveredNeeds: supplementNeeds.filter((need) =>
         matcherProductCoversNeed(matcherProduct, need)
@@ -344,15 +437,15 @@ export function recommendWithMatcher(
       etaDate: product.retailEtaDate ?? null,
       priceSource: product.priceSource ?? null,
       product,
-      productCoveragePercent: coverage,
+      productCoveragePercent: skuCoverage,
       rank: index + 1,
       retailSellableProductId: product.retailSellableProductId ?? null,
-      score: coverage,
+      score: skuCoverage,
       selectedRetailerName: product.selectedRetailerName ?? null,
       selectedRetailerOrganisationId:
         product.selectedRetailerOrganisationId ?? null,
       servingMultiplier: 1,
-      stackContributionPercent: coverage,
+      stackContributionPercent: skuCoverage,
       unitPriceAmount: product.unitPriceAmount ?? product.priceAmount ?? null,
       url: product.productUrl,
       unknownAtRecommendation: false,
