@@ -238,9 +238,22 @@ function matcherLifeStage(value: string | null | undefined): LifeStage {
   return "adult";
 }
 
+function servingMultiplierFromBasket(
+  productId: string,
+  selected: ScoredBasket | null
+) {
+  const variantId = selected?.variantIds.find((id) =>
+    id.startsWith(`${productId}:x`)
+  );
+  const parsed = Number(variantId?.match(/:x(\d+)$/)?.[1]);
+
+  return parsed === 2 || parsed === 3 ? parsed : 1;
+}
+
 function matcherProductOwnCoveragePercent(
   product: MatcherProduct,
-  needs: readonly ProductRecommendationNeed[]
+  needs: readonly ProductRecommendationNeed[],
+  servingMultiplier = 1
 ) {
   if (needs.length < 1) {
     return 0;
@@ -284,7 +297,7 @@ function matcherProductOwnCoveragePercent(
         continue;
       }
 
-      delivered += scaled.units;
+      delivered += scaled.units * BigInt(Math.max(1, servingMultiplier));
     }
 
     weightedUnits += weight * coverageUnits(delivered, requested.units);
@@ -401,7 +414,8 @@ export function recommendWithMatcher(
       retainProductIds: [],
       retainSubjectIds: [],
       safetyCeilings: matcherSafetyCeilings(),
-      selectorMode: "web_single",
+      selectorMode:
+        input.stackPreference === "compact" ? "agentic" : "web_single",
       targets: targets.targets
     },
     {
@@ -423,9 +437,14 @@ export function recommendWithMatcher(
       continue;
     }
     const matcherProduct = toMatcherProduct(product);
+    const servingMultiplier = servingMultiplierFromBasket(
+      product.id,
+      result.selected
+    );
     const skuCoverage = matcherProductOwnCoveragePercent(
       matcherProduct,
-      supplementNeeds
+      supplementNeeds,
+      servingMultiplier
     );
     recommendations.push({
       coveredNeeds: supplementNeeds.filter((need) =>
@@ -444,7 +463,7 @@ export function recommendWithMatcher(
       selectedRetailerName: product.selectedRetailerName ?? null,
       selectedRetailerOrganisationId:
         product.selectedRetailerOrganisationId ?? null,
-      servingMultiplier: 1,
+      servingMultiplier,
       stackContributionPercent: skuCoverage,
       unitPriceAmount: product.unitPriceAmount ?? product.priceAmount ?? null,
       url: product.productUrl,

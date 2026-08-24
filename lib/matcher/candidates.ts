@@ -10,7 +10,7 @@ import type {
   ScaledAmount
 } from "@/lib/matcher/types";
 
-const MAX_DAILY_UNITS = 1;
+const MAX_DAILY_UNITS = 3;
 
 function subjectKeyVariants(value: string) {
   const trimmed = value.trim();

@@ -145,7 +145,9 @@ export function selectOptions(input: Readonly<{
       .filter((item) => item.aggregateCoverage >= floor)
       .sort(
         (left, right) =>
-          left.dailyPills - right.dailyPills || compareDefault(left, right)
+          left.productCount - right.productCount ||
+          left.dailyPills - right.dailyPills ||
+          compareDefault(left, right)
       )[0];
 
     if (compact) {

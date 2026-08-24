@@ -7,6 +7,7 @@ import {
   recommendWithMatcher
 } from "../lib/matcher/adapters/web.ts";
 import { COVERAGE_SCALE } from "../lib/matcher/config.ts";
+import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import type { MatcherProduct } from "../lib/matcher/types.ts";
 import type {
   ProductCandidate,
@@ -146,8 +147,14 @@ describe("matcher web adapter coverage mapping", () => {
     assert.match(source, /amount:\s*fact\.amount \?\? 0/);
     assert.match(source, /unit:\s*fact\.unit/);
     assert.match(source, /matcherProductOwnCoveragePercent/);
+    assert.match(source, /servingMultiplierFromBasket/);
     assert.doesNotMatch(source, /productCoveragePercent:\s*coverage/);
+    assert.match(
+      source,
+      /selectorMode:\s*input\.stackPreference === "compact" \? "agentic" : "web_single"/
+    );
     const candidates = await readFile("lib/matcher/candidates.ts", "utf8");
+    assert.match(candidates, /MAX_DAILY_UNITS = 3/);
     assert.doesNotMatch(candidates, /wanted\.includes\(name\)/);
     assert.doesNotMatch(candidates, /name\.includes\(wanted\)/);
     assert.doesNotMatch(
@@ -244,8 +251,12 @@ describe("matcher web adapter coverage mapping", () => {
     );
 
     assert.ok((byNeed.get("supplement:magnesium") ?? 0) >= 90);
-    assert.ok((byNeed.get("supplement:omega-3") ?? 0) >= 55);
-    assert.ok((byNeed.get("supplement:omega-3") ?? 0) <= 70);
+    assert.ok((byNeed.get("supplement:omega-3") ?? 0) >= 90);
+    assert.equal(
+      result.recommendations.find((row) => row.product.id === "omega-dha")
+        ?.servingMultiplier,
+      2
+    );
     assert.ok((byNeed.get("supplement:vitamin-d3") ?? 100) < 20);
     assert.equal(byNeed.get("supplement:creatine") ?? 0, 0);
     assert.equal(
@@ -358,7 +369,8 @@ describe("matcher web adapter coverage mapping", () => {
         (item) => item.id === "supplement:vitamin-b12"
       )?.coveragePercent ?? 0;
 
-    assert.equal(b12, 2);
+    assert.equal(b12, 6);
+    assert.equal(result.recommendations[0]?.servingMultiplier, 3);
     assert.ok(b12 < 10);
   });
 
@@ -543,5 +555,276 @@ describe("matcher web adapter coverage mapping", () => {
       )?.coveragePercent ?? 0,
       0
     );
+  });
+
+  it("uses 2 servings when one underdoses and 3 when two still underdose", () => {
+    const coq10 = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 50,
+              name: "CoQ10",
+              normalizedName: "coq10",
+              unit: "mg"
+            }
+          ],
+          id: "coq10-50",
+          title: "BLACKMORES CO-Q10 50MG 30'S"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [
+        dosedNeed({
+          amount: 100,
+          displayName: "CoQ10",
+          id: "supplement:coq10",
+          normalizedName: "coq10",
+          unit: "mg"
+        })
+      ],
+      stackPreference: "balanced"
+    });
+    const d3 = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 5,
+              name: "Vitamin D3",
+              normalizedName: "vitamin_d3",
+              unit: "mcg"
+            }
+          ],
+          id: "d3-5",
+          title: "Low dose D3"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [
+        dosedNeed({
+          amount: 50,
+          displayName: "Vitamin D3",
+          id: "supplement:vitamin-d3",
+          normalizedName: "vitamin_d3",
+          unit: "mcg"
+        })
+      ],
+      stackPreference: "balanced"
+    });
+    const magnesium = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 301.5,
+              name: "Magnesium",
+              normalizedName: "magnesium",
+              unit: "mg"
+            }
+          ],
+          id: "mag-d3",
+          title: "BLACKMORE MAGNESIUM+D3 50'S"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [
+        dosedNeed({
+          amount: 300,
+          displayName: "Magnesium",
+          id: "supplement:magnesium",
+          normalizedName: "magnesium",
+          unit: "mg"
+        })
+      ],
+      stackPreference: "balanced"
+    });
+
+    assert.equal(coq10.recommendations[0]?.servingMultiplier, 2);
+    assert.equal(
+      [...coq10.diagnostics.matchedNeeds, ...coq10.diagnostics.unmatchedNeeds].find(
+        (item) => item.id === "supplement:coq10"
+      )?.coveragePercent,
+      100
+    );
+    assert.equal(d3.recommendations[0]?.servingMultiplier, 3);
+    assert.equal(
+      [...d3.diagnostics.matchedNeeds, ...d3.diagnostics.unmatchedNeeds].find(
+        (item) => item.id === "supplement:vitamin-d3"
+      )?.coveragePercent,
+      30
+    );
+    assert.equal(magnesium.recommendations[0]?.servingMultiplier, 1);
+  });
+
+  it("does not pick 3 servings when that would exceed a safety ceiling", () => {
+    setMatcherSafetyCeilings([
+      { maxAmount: 40, maxUnit: "mg", name: "Zinc", subjectId: "zinc" }
+    ]);
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 20,
+              name: "Zinc",
+              normalizedName: "zinc",
+              unit: "mg"
+            }
+          ],
+          id: "zinc-20",
+          title: "Zinc 20"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [
+        dosedNeed({
+          amount: 60,
+          displayName: "Zinc",
+          id: "supplement:zinc",
+          normalizedName: "zinc",
+          unit: "mg"
+        })
+      ],
+      stackPreference: "balanced"
+    });
+    setMatcherSafetyCeilings([]);
+
+    assert.ok((result.recommendations[0]?.servingMultiplier ?? 3) <= 2);
+    assert.notEqual(result.recommendations[0]?.servingMultiplier, 3);
+  });
+
+  it("uses a different compact search than balanced", () => {
+    const folate = dosedNeed({
+      amount: 400,
+      displayName: "Folate",
+      id: "supplement:folate",
+      normalizedName: "vitamin_b9",
+      unit: "mcg"
+    });
+    const magnesium = dosedNeed({
+      amount: 300,
+      displayName: "Magnesium",
+      id: "supplement:magnesium",
+      normalizedName: "magnesium",
+      unit: "mg"
+    });
+    const creatine = dosedNeed({
+      amount: 3000,
+      displayName: "Creatine",
+      id: "supplement:creatine",
+      normalizedName: "creatine",
+      unit: "mg"
+    });
+    const omega3 = dosedNeed({
+      amount: 1000,
+      displayName: "Omega-3",
+      id: "supplement:omega-3",
+      normalizedName: "omega_3",
+      unit: "mg"
+    });
+    const coq10 = dosedNeed({
+      amount: 100,
+      displayName: "CoQ10",
+      id: "supplement:coq10",
+      normalizedName: "coq10",
+      unit: "mg"
+    });
+    const candidates = [
+      candidate({
+        facts: [
+          {
+            amount: 400,
+            name: "Folic acid",
+            normalizedName: "folic_acid",
+            unit: "mcg"
+          },
+          {
+            amount: 300,
+            name: "Magnesium",
+            normalizedName: "magnesium",
+            unit: "mg"
+          }
+        ],
+        id: "multi",
+        title: "Two-need multi"
+      }),
+      candidate({
+        facts: [
+          {
+            amount: 3,
+            name: "Creatine",
+            normalizedName: "creatine",
+            unit: "g"
+          }
+        ],
+        id: "creatine-powder",
+        title: "Creatine powder"
+      }),
+      candidate({
+        facts: [
+          {
+            amount: 1000,
+            name: "Omega-3",
+            normalizedName: "omega_3",
+            unit: "mg"
+          }
+        ],
+        id: "omega",
+        title: "Omega DHA"
+      }),
+      candidate({
+        facts: [
+          {
+            amount: 100,
+            name: "CoQ10",
+            normalizedName: "coq10",
+            unit: "mg"
+          }
+        ],
+        id: "coq10",
+        title: "CoQ10 100"
+      })
+    ];
+    const input = {
+      budgetAmount: null,
+      candidates,
+      clientContext: null,
+      clientSex: "male" as const,
+      countryCode: "TH",
+      needs: [folate, magnesium, creatine, omega3, coq10]
+    };
+    const compact = recommendWithMatcher({
+      ...input,
+      maxProducts: 3,
+      stackPreference: "compact"
+    });
+    const balanced = recommendWithMatcher({
+      ...input,
+      maxProducts: 6,
+      stackPreference: "balanced"
+    });
+    const compactIds = compact.recommendations.map((row) => row.product.id).sort();
+    const balancedIds = balanced.recommendations.map((row) => row.product.id).sort();
+
+    assert.ok(compact.recommendations.length <= 3);
+    assert.ok(balanced.recommendations.length > compact.recommendations.length);
+    assert.notDeepEqual(compactIds, balancedIds);
   });
 });
