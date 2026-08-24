@@ -3,8 +3,15 @@ import {
   textValue
 } from "@/lib/openclaw-api";
 import { applyTaskFailureResult } from "@/lib/task-result-applier";
-import { failTask, getTaskBundle } from "@/lib/task-service";
-import { buildTaskWorkItem } from "@/lib/task-work-items";
+import {
+  failTask,
+  getTaskBundle,
+  releaseReservedTaskToQueue
+} from "@/lib/task-service";
+import {
+  buildTaskWorkItem,
+  isRetryableMatchingWorkItemError
+} from "@/lib/task-work-items";
 import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
@@ -64,6 +71,23 @@ export async function GET(request: Request, { params }: WorkItemRouteProps) {
     const errorMessage =
       error instanceof Error ? error.message : "Unable to build task work item";
     const agentId = access.principal?.agentId;
+
+    if (isRetryableMatchingWorkItemError(error)) {
+      try {
+        await releaseReservedTaskToQueue({
+          reservationId,
+          taskId: id,
+          workerSessionId
+        });
+      } catch {
+        /* fail-closed below if release itself fails */
+      }
+
+      return openClawJson(
+        { message: errorMessage, retryable: true },
+        { status: 409 }
+      );
+    }
 
     try {
       await failTask({

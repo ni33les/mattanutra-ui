@@ -415,6 +415,14 @@ describe("external worker boundaries", () => {
       /buildTaskWorkItem[\s\S]*failTask/,
       "work-item hydrate is a post-claim side effect and must fail-close the reserved task",
     );
+    const workItemCatch = workItemRouteSource.slice(
+      workItemRouteSource.indexOf("catch (error)"),
+    );
+    assert.match(
+      workItemCatch,
+      /isRetryableMatchingWorkItemError[\s\S]*releaseReservedTaskToQueue/,
+      "matching hydrate that is not ready must release the reservation instead of failing the task",
+    );
     assert.match(
       runnerSource,
       /client\.workItem\([\s\S]*continue;/,
@@ -635,6 +643,19 @@ describe("external worker boundaries", () => {
       taskWorkerSource,
       /dependencies: dependencyTaskId[\s\S]*type: "successful"/,
       "pending product matching must use task dependencies so reservation stays blocked until supplement success",
+    );
+    const matchingWorkItems = await readFile("lib/task-work-items.ts", "utf8");
+    assert.match(
+      matchingWorkItems,
+      /MATCHING_WORK_ITEM_STATEMENT_TIMEOUT_MS = 8_000/,
+      "matching work-item SQL must not use the 500ms interactive cap",
+    );
+    assert.doesNotMatch(
+      matchingWorkItems.slice(
+        matchingWorkItems.indexOf("async function loadMatchingPlanContext"),
+        matchingWorkItems.indexOf("async function buildProductRecommendationsWorkItem"),
+      ),
+      /INTERACTIVE_STATEMENT_TIMEOUT_MS/,
     );
     assert.match(
       taskWorkerSource,

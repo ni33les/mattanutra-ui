@@ -1442,11 +1442,15 @@ async function scheduleRetryForFailedTaskFromRecord(
   const delaySeconds = taskRetryDelaySeconds(retryAttempt, policy);
   const scheduledFor = new Date(Date.now() + delaySeconds * 1000);
   const payload = payloadRecord(input.task.payload);
+  const dependsOnTaskId = uuidOrNull(payload.dependsOnTaskId);
   const retryRootTaskId = taskLineageRootId(input.task);
   const created = await createTaskRecord(sql, {
     actorType: input.task.actorType,
     createdByAgentId: input.failedByAgentId,
     createdByTaskId: input.task.id,
+    dependencies: dependsOnTaskId
+      ? [{ taskId: dependsOnTaskId, type: "successful" as const }]
+      : undefined,
     description: input.task.description,
     idempotencyKey: input.task.idempotencyKey,
     idempotencyScope: "active",
@@ -1754,6 +1758,18 @@ export async function listQueuedTaskHeads() {
         and coalesce(actor_type, 'system') <> 'human'
         and scheduled_for <= now()
         and attempts < max_attempts
+        and not (
+          tasks.task_type = 'generate_product_recommendations'
+          and not exists (
+            select 1
+            from public.formulations
+            where formulations.plan_id = tasks.plan_id
+              and (
+                formulations.model_version is null
+                or formulations.model_version not like '%:example'
+              )
+          )
+        )
         and not exists (
           select 1
           from public.task_dependencies
@@ -1820,6 +1836,20 @@ async function claimedTaskIsBlocked(sql: Db, taskId: string) {
                   and task_approvals.status = 'approved'
               )
             )
+          )
+      ) or exists (
+        select 1
+        from public.tasks
+        where tasks.id = ${taskId}::uuid
+          and tasks.task_type = 'generate_product_recommendations'
+          and not exists (
+            select 1
+            from public.formulations
+            where formulations.plan_id = tasks.plan_id
+              and (
+                formulations.model_version is null
+                or formulations.model_version not like '%:example'
+              )
           )
       ) as blocked
     `,
@@ -2981,6 +3011,48 @@ export async function failTask(input: FailTaskInput) {
   });
 
   return task;
+}
+
+export async function releaseReservedTaskToQueue(input: Readonly<{
+  reservationId: string;
+  taskId: string;
+  workerSessionId?: string | null;
+}>) {
+  const sql = getRequiredSql();
+  const reservationId = uuidOrNull(input.reservationId);
+  const taskId = uuidOrNull(input.taskId);
+  const workerSessionId = uuidOrNull(input.workerSessionId);
+
+  if (!reservationId || !taskId) {
+    throw new Error("Releasing a reserved task requires reservationId and taskId");
+  }
+
+  await sql`
+    with released as (
+      update public.task_reservations set
+        status = 'released',
+        released_at = now()
+      where id = ${reservationId}::uuid
+        and task_id = ${taskId}::uuid
+        and status = 'active'
+        and (
+          ${workerSessionId}::uuid is null
+          or worker_session_id = ${workerSessionId}::uuid
+        )
+      returning task_id
+    )
+    update public.tasks set
+      status = 'queued',
+      reserved_by_agent_id = null,
+      lease_until = null,
+      started_at = null,
+      updated_at = now()
+    from released
+    where public.tasks.id = released.task_id
+      and public.tasks.status in ('reserved', 'running')
+  `;
+
+  notifyTaskQueueChanged();
 }
 
 export async function spawnChildTask(input: SpawnChildTaskInput) {

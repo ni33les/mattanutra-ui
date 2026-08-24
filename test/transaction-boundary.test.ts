@@ -408,6 +408,24 @@ describe("database transaction boundaries", () => {
       /started_at = null/,
       "blocked claims must clear started_at so matching does not look reserved before formula"
     );
+    const blockedBody = functionBody(source, "claimedTaskIsBlocked");
+    const peekBody = functionBody(source, "listQueuedTaskHeads");
+    assert.match(
+      blockedBody,
+      /generate_product_recommendations[\s\S]*from public\.formulations/,
+      "matching claims must stay blocked until a non-example formula exists even if the dep row is missing"
+    );
+    assert.match(
+      peekBody,
+      /generate_product_recommendations[\s\S]*from public\.formulations/,
+      "matching peek must not advertise a head until a non-example formula exists"
+    );
+    const retryBody = functionBody(source, "scheduleRetryForFailedTaskFromRecord");
+    assert.match(
+      retryBody,
+      /dependsOnTaskId[\s\S]*type: "successful"/,
+      "matching retries must copy payload.dependsOnTaskId so they stay behind formula"
+    );
   });
 
   it("keeps product version writes transaction-free and statement-atomic", async () => {

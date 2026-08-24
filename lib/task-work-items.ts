@@ -6,7 +6,6 @@ import {
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
 import {
   getSql,
-  INTERACTIVE_STATEMENT_TIMEOUT_MS,
   withLocalStatementTimeout
 } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
@@ -1867,6 +1866,19 @@ async function retailerCandidateSetsFromLiveSnapshot(
   }));
 }
 
+export const MATCHING_PLAN_NOT_READY_MESSAGE =
+  "Product recommendation task requires a finalized plan";
+const MATCHING_WORK_ITEM_STATEMENT_TIMEOUT_MS = 8_000;
+
+export function isRetryableMatchingWorkItemError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return (
+    message.includes(MATCHING_PLAN_NOT_READY_MESSAGE) ||
+    message.includes("canceling statement due to statement timeout")
+  );
+}
+
 async function loadMatchingPlanContext(planId: string) {
   const sql = getSql();
 
@@ -1876,7 +1888,7 @@ async function loadMatchingPlanContext(planId: string) {
 
   return withLocalStatementTimeout(
     sql,
-    INTERACTIVE_STATEMENT_TIMEOUT_MS,
+    MATCHING_WORK_ITEM_STATEMENT_TIMEOUT_MS,
     async (txn) => {
       const rows = await txn<
         Array<{
@@ -1912,7 +1924,7 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   const hydrateStartedAt = Date.now();
 
   if (!task.planId) {
-    throw new Error("Product recommendation task requires a finalized plan");
+    throw new Error(MATCHING_PLAN_NOT_READY_MESSAGE);
   }
 
   const sqlStartedAt = Date.now();
@@ -1920,7 +1932,7 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   const sqlMs = Date.now() - sqlStartedAt;
 
   if (!row?.formulation) {
-    throw new Error("Product recommendation task requires a finalized plan");
+    throw new Error(MATCHING_PLAN_NOT_READY_MESSAGE);
   }
 
   const countryCode = productCountryCodeFromAnswers(row.answers);
