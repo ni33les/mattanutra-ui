@@ -91,7 +91,7 @@ export function toCanonicalRequest(
     omega3SourcePreference: impliedOmegaPreference(
       dietary,
       state.requirements.omega3SourcePreference,
-      state.targets.map((item) => item.name)
+      state.targets.map((item) => item.requestedName ?? item.name)
     ),
     optimization: state.optimization,
     profile: state.profile,

@@ -16,6 +16,7 @@ export type LifeStage =
 export type PlanTarget = Readonly<{
   amount: number;
   name: string;
+  requestedName?: string;
   supplementId: string;
   unit: CatalogueUnit;
 }>;

@@ -5,6 +5,7 @@ import type { CatalogueSnapshot, CatalogueSupplement } from "@/lib/agentic/catal
 import { CONDITION_ALIASES, MEDICATION_ALIASES } from "@/lib/agentic/catalogue/names";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import type { AgenticConfig } from "@/lib/agentic/config";
+import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 import type {
   AcceptedGap,
   CanonicalPlanState,
@@ -367,6 +368,7 @@ export async function normalizePlanRequest(input: Readonly<{
     targets.push({
       amount: target.amount,
       name: supplement.name,
+      requestedName: target.name,
       supplementId: supplement.supplementId,
       unit: target.unit
     });
@@ -457,6 +459,19 @@ export async function normalizePlanRequest(input: Readonly<{
   };
 
   state = applyPlanAnswers(state, request);
+
+  const rawTargetNames = request.targets.map((item) => item.name);
+  state = {
+    ...state,
+    requirements: {
+      ...state.requirements,
+      omega3SourcePreference: impliedOmegaPreference(
+        state.requirements.dietaryPreference ?? "any",
+        state.requirements.omega3SourcePreference,
+        rawTargetNames
+      )
+    }
+  };
 
   return {
     hash: canonicalRequestHash(state),
