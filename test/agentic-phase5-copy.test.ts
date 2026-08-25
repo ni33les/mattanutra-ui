@@ -70,4 +70,44 @@ describe("Phase 5 discovery copy", () => {
       );
     }
   });
+
+  it("replays a completed match when polled with the same key and planHandle", async () => {
+    const store = createMemoryStore();
+    const created = {
+      idempotencyKey: "r4-poll-contract-02",
+      request: { locale: "en", targets: [{ amount: 500, name: "Vitamin C", unit: "mg" }] }
+    };
+    const completed = {
+      ok: true,
+      planHandle: "cap_completed_poll_handle_32chars_minx",
+      revision: 1,
+      status: "needs_input"
+    };
+    await commitIdempotency({
+      key: created.idempotencyKey,
+      now: "2026-08-25T00:00:00.000Z",
+      operation: "plan",
+      ownerScope: "dev:test:anon",
+      payload: created,
+      resourceIds: { planId: "plan-2" },
+      response: completed,
+      store
+    });
+    const poll = await beginIdempotency({
+      key: created.idempotencyKey,
+      now: "2026-08-25T00:00:04.000Z",
+      operation: "plan",
+      ownerScope: "dev:test:anon",
+      payload: {
+        expectedRevision: 1,
+        idempotencyKey: created.idempotencyKey,
+        planHandle: completed.planHandle
+      },
+      store
+    });
+    assert.equal(poll.kind, "replay");
+    if (poll.kind === "replay") {
+      assert.equal((poll.response as { status: string }).status, "needs_input");
+    }
+  });
 });

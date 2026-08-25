@@ -3,20 +3,20 @@ import { AGENTIC_IDEMPOTENCY_TTL_MS } from "@/lib/agentic/config";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import type { AgenticStore, IdempotencyRecord } from "@/lib/agentic/store/types";
 
-function isProcessingPoll(payload: unknown, responseJson: string) {
+function isPlanHandlePoll(payload: unknown, responseJson: string) {
   if (!payload || typeof payload !== "object") {
     return false;
   }
 
-  let previous: { planHandle?: unknown; status?: unknown } | null = null;
+  let previous: { planHandle?: unknown } | null = null;
 
   try {
-    previous = JSON.parse(responseJson) as { planHandle?: unknown; status?: unknown };
+    previous = JSON.parse(responseJson) as { planHandle?: unknown };
   } catch {
     return false;
   }
 
-  if (previous?.status !== "processing" || typeof previous.planHandle !== "string") {
+  if (typeof previous?.planHandle !== "string") {
     return false;
   }
 
@@ -89,7 +89,7 @@ export async function beginIdempotency<T>(input: Readonly<{
   }
 
   if (existing.requestHash !== requestHash) {
-    if (isProcessingPoll(input.payload, existing.responseJson)) {
+    if (isPlanHandlePoll(input.payload, existing.responseJson)) {
       return {
         kind: "replay",
         response: JSON.parse(existing.responseJson) as T
