@@ -4,7 +4,12 @@ import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
 import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
 import { evaluateSafety } from "@/lib/matcher/safety";
 import { searchGroups } from "@/lib/matcher/search";
-import { compareBaskets, scoreState, selectOptions } from "@/lib/matcher/selector";
+import {
+  compareBaskets,
+  salvagePartialBasket,
+  scoreState,
+  selectOptions
+} from "@/lib/matcher/selector";
 import type {
   CanonicalRequest,
   CatalogSnapshot,
@@ -169,6 +174,28 @@ export function match(
       compareBaskets(option.selected, winner.selected, request, config) < 0
     ) {
       winner = option;
+    }
+  }
+
+  if (!winner.selected || winner.selected.productCount < 1) {
+    for (const seller of sellers) {
+      const salvaged = salvagePartialBasket({
+        groups: seller.groups,
+        request,
+        sellerId: seller.sellerId
+      });
+
+      if (!salvaged) {
+        continue;
+      }
+
+      if (
+        !winner.selected ||
+        winner.selected.productCount < 1 ||
+        compareBaskets(salvaged, winner.selected, request, config) < 0
+      ) {
+        winner = { alternatives: [], selected: salvaged };
+      }
     }
   }
 

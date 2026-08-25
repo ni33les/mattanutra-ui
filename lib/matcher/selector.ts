@@ -11,7 +11,7 @@ import {
   coverageUnits,
   oversupplyScore
 } from "@/lib/matcher/dominance";
-import { reconstructVariants, revalidateState } from "@/lib/matcher/search";
+import { seedState, tryAddVariant, reconstructVariants, revalidateState } from "@/lib/matcher/search";
 import type {
   CanonicalRequest,
   MatcherConfig,
@@ -333,6 +333,98 @@ export function selectOptions(input: Readonly<{
   }
 
   return { alternatives: alternatives.slice(0, 2), selected };
+}
+
+export function salvagePartialBasket(input: Readonly<{
+  groups: readonly ProductGroup[];
+  request: CanonicalRequest;
+  sellerId: string;
+}>): ScoredBasket | null {
+  let state = seedState(input.request);
+  const used = new Set<string>();
+
+  for (const target of input.request.targets) {
+    const already =
+      coverageUnits(
+        state.delivered.get(target.subjectId) ?? BigInt(0),
+        target.requested.units
+      ) >= COVERED_THRESHOLD * 100;
+
+    if (already) {
+      continue;
+    }
+
+    const ranked = input.groups
+      .filter(
+        (group) =>
+          !used.has(group.productId) &&
+          group.variants.some((variant) =>
+            variant.contributions.has(target.subjectId)
+          )
+      )
+      .flatMap((group) =>
+        group.variants
+          .filter((variant) => variant.contributions.has(target.subjectId))
+          .map((variant) => ({ group, variant }))
+      )
+      .sort((left, right) => {
+        const leftUnits =
+          left.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
+        const rightUnits =
+          right.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
+
+        if (rightUnits !== leftUnits) {
+          return rightUnits > leftUnits ? 1 : -1;
+        }
+
+        if (left.variant.dailyPills !== right.variant.dailyPills) {
+          return left.variant.dailyPills - right.variant.dailyPills;
+        }
+
+        const leftPrice =
+          left.group.product.unitPriceMinor * left.variant.dailyUnits;
+        const rightPrice =
+          right.group.product.unitPriceMinor * right.variant.dailyUnits;
+
+        if (leftPrice !== rightPrice) {
+          return leftPrice - rightPrice;
+        }
+
+        return left.group.productId.localeCompare(right.group.productId);
+      });
+
+    for (const candidate of ranked) {
+      const next = tryAddVariant(
+        state,
+        candidate.variant,
+        candidate.group,
+        input.request
+      );
+
+      if (next) {
+        state = next;
+        used.add(candidate.group.productId);
+        break;
+      }
+    }
+  }
+
+  if (state.count < 1) {
+    return null;
+  }
+
+  const scored = scoreState({
+    groups: input.groups,
+    request: input.request,
+    sellerId: input.sellerId,
+    state
+  });
+
+  if (!scored) {
+    return null;
+  }
+
+  return { ...scored, reason: "Feasible partial stack" };
 }
 
 export function groupProduct(
