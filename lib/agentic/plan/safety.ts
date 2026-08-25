@@ -3,7 +3,7 @@ import { agenticMessage } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
 import {
-  adultPolicyCeilingExists,
+  catalogSubjectHasCeiling,
   isPediatricSafetyProfile,
   matcherSafetyCeilings
 } from "@/lib/matcher/safety-ceilings";
@@ -155,16 +155,15 @@ export function evaluateSafety(input: Readonly<{
       profile: input.state.profile,
       subjectId: row.supplementId
     });
-    const missingChildRule =
+    const missingRequiredBand =
       limit == null &&
-      isPediatricSafetyProfile(input.state.profile) &&
-      adultPolicyCeilingExists(matcherSafetyCeilings(), {
+      catalogSubjectHasCeiling(matcherSafetyCeilings(), {
         name: row.name,
         subjectId: row.supplementId
       }) &&
       row.totalExposureAmount > 0;
 
-    if (missingChildRule) {
+    if (missingRequiredBand) {
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
@@ -505,12 +504,21 @@ export function planStatus(input: Readonly<{
   if (
     input.selected.coverage.some(
       (row) =>
-        row.status === "upper_limit_risk" &&
         row.upperLimitAmount != null &&
         row.totalExposureAmount > row.upperLimitAmount
     )
   ) {
     return "blocked";
+  }
+
+  if (
+    input.selected.coverage.some(
+      (row) =>
+        row.upperLimitAmount != null &&
+        row.totalExposureAmount >= row.upperLimitAmount
+    )
+  ) {
+    return "needs_input";
   }
 
   const gaps = input.selected.coverage.filter(

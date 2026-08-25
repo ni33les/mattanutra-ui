@@ -1,4 +1,11 @@
-import type { LifeStage, MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
+import type {
+  LifeStage,
+  MatcherUnit,
+  SafetyCeiling,
+  SafetyLimitLifeStage,
+  SafetySourceScope
+} from "@/lib/matcher/types";
+import { MATCHER_SOURCE_SCOPE } from "@/lib/matcher/types";
 
 export type SafetyProfile = Readonly<{
   ageYears: number;
@@ -83,12 +90,34 @@ function normalizeName(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function identityKeys(subjectId: string) {
+  const raw = subjectId.trim().toLowerCase();
+  return [raw, raw.replace(/^supplement:/, ""), raw.replace(/^sup_/, "")];
+}
+
+function bandKey(
+  subjectId: string,
+  lifeStage: SafetyLimitLifeStage,
+  sourceScope: SafetySourceScope
+) {
+  return `${subjectId.trim().toLowerCase()}::${lifeStage}::${sourceScope}`;
+}
+
 type CeilingIndex = {
-  byId: Map<string, SafetyCeiling>;
-  byName: Map<string, SafetyCeiling>;
+  byBand: Map<string, SafetyCeiling>;
+  subjectIds: Set<string>;
+  names: Set<string>;
 };
 
 const ceilingIndexCache = new WeakMap<object, CeilingIndex>();
+
+function resolvedLifeStage(item: SafetyCeiling): SafetyLimitLifeStage {
+  return item.lifeStage ?? "adult";
+}
+
+function resolvedSourceScope(item: SafetyCeiling): SafetySourceScope {
+  return item.sourceScope ?? MATCHER_SOURCE_SCOPE;
+}
 
 function indexCeilings(ceilings: readonly SafetyCeiling[]): CeilingIndex {
   const cachedIndex = ceilingIndexCache.get(ceilings as object);
@@ -97,33 +126,29 @@ function indexCeilings(ceilings: readonly SafetyCeiling[]): CeilingIndex {
     return cachedIndex;
   }
 
-  const byId = new Map<string, SafetyCeiling>();
-  const byName = new Map<string, SafetyCeiling>();
+  const byBand = new Map<string, SafetyCeiling>();
+  const subjectIds = new Set<string>();
+  const names = new Set<string>();
 
   for (const item of ceilings) {
-    const id = item.subjectId.trim().toLowerCase();
-    byId.set(id, item);
-    byId.set(id.replace(/^supplement:/, ""), item);
-    byId.set(id.replace(/^sup_/, ""), item);
+    const lifeStage = resolvedLifeStage(item);
+    const sourceScope = resolvedSourceScope(item);
     const name = normalizeName(item.name);
 
-    if (name && !byName.has(name)) {
-      byName.set(name, item);
+    for (const id of identityKeys(item.subjectId)) {
+      subjectIds.add(id);
+      byBand.set(bandKey(id, lifeStage, sourceScope), item);
+    }
+
+    if (name) {
+      names.add(name);
+      byBand.set(bandKey(`name:${name}`, lifeStage, sourceScope), item);
     }
   }
 
-  const index = { byId, byName };
+  const index = { byBand, names, subjectIds };
   ceilingIndexCache.set(ceilings as object, index);
   return index;
-}
-
-const MAGNESIUM = /\bmagnesium\b/i;
-const VITAMIN_A = /\bvitamin\s*a\b|\bretinol\b/i;
-const VITAMIN_D = /\bvitamin\s*d|\bd3\b|\bcholecalciferol\b/i;
-const ZINC = /\bzinc\b/i;
-
-function haystackOf(input: Readonly<{ name?: string; subjectId: string }>) {
-  return `${input.name ?? ""} ${input.subjectId}`;
 }
 
 export function isPediatricSafetyProfile(
@@ -136,159 +161,94 @@ export function isPediatricSafetyProfile(
   return profile.lifeStage === "child" || profile.ageYears < 9;
 }
 
-function magnesiumUlMg(ageYears: number) {
-  if (ageYears <= 3) {
-    return 65;
+export function catalogLifeStageFor(
+  profile?: SafetyProfile | null
+): SafetyLimitLifeStage {
+  if (!profile) {
+    return "adult";
   }
 
-  if (ageYears <= 8) {
-    return 110;
+  if (profile.lifeStage === "pregnant") {
+    return "pregnant";
   }
 
-  return 350;
+  if (profile.lifeStage === "breastfeeding") {
+    return "breastfeeding";
+  }
+
+  const ageYears = profile.ageYears;
+  const pediatric = profile.lifeStage === "child" || ageYears < 9;
+
+  if (pediatric) {
+    if (ageYears <= 3) {
+      return "child_1_3";
+    }
+
+    if (ageYears <= 8) {
+      return "child_4_8";
+    }
+
+    if (ageYears <= 13) {
+      return "child_9_13";
+    }
+
+    if (ageYears <= 18) {
+      return "adolescent_14_18";
+    }
+  }
+
+  return "adult";
 }
 
-function vitaminD3UlIu(ageYears: number) {
-  if (ageYears < 1) {
-    return 1000;
-  }
-
-  if (ageYears <= 3) {
-    return 2500;
-  }
-
-  if (ageYears <= 8) {
-    return 3000;
-  }
-
-  return 4000;
-}
-
-function vitaminAUlMcg(ageYears: number) {
-  if (ageYears <= 3) {
-    return 600;
-  }
-
-  if (ageYears <= 8) {
-    return 900;
-  }
-
-  if (ageYears <= 13) {
-    return 1700;
-  }
-
-  if (ageYears <= 18) {
-    return 2800;
-  }
-
-  return 3000;
-}
-
-function zincUlMg(ageYears: number) {
-  if (ageYears <= 3) {
-    return 7;
-  }
-
-  if (ageYears <= 8) {
-    return 12;
-  }
-
-  if (ageYears <= 13) {
-    return 23;
-  }
-
-  if (ageYears <= 18) {
-    return 34;
-  }
-
-  return 40;
-}
-
-function nihBandFor(
-  input: Readonly<{ name?: string; subjectId: string }>,
-  ageYears: number
-): SafetyCeiling | null {
-  const hay = haystackOf(input);
-  const name = input.name?.trim() || input.subjectId;
-
-  if (MAGNESIUM.test(hay)) {
-    return {
-      maxAmount: magnesiumUlMg(ageYears),
-      maxUnit: "mg",
-      name,
-      subjectId: input.subjectId
-    };
-  }
-
-  if (VITAMIN_A.test(hay)) {
-    return {
-      maxAmount: vitaminAUlMcg(ageYears),
-      maxUnit: "mcg",
-      name,
-      subjectId: input.subjectId
-    };
-  }
-
-  if (VITAMIN_D.test(hay)) {
-    return {
-      maxAmount: vitaminD3UlIu(ageYears),
-      maxUnit: "IU",
-      name,
-      subjectId: input.subjectId
-    };
-  }
-
-  if (ZINC.test(hay)) {
-    return {
-      maxAmount: zincUlMg(ageYears),
-      maxUnit: "mg",
-      name,
-      subjectId: input.subjectId
-    };
-  }
-
-  return null;
-}
-
-export function fallbackSafetyCeiling(input: Readonly<{
-  name?: string;
-  profile?: SafetyProfile | null;
-  subjectId: string;
-}>): SafetyCeiling | null {
-  const ageYears = input.profile?.ageYears ?? 19;
-  return nihBandFor(input, ageYears);
-}
-
-function adminCeilingFor(
+function catalogCeilingFor(
   ceilings: readonly SafetyCeiling[],
-  input: Readonly<{ name?: string; subjectId: string }>
+  input: Readonly<{ name?: string; subjectId: string }>,
+  lifeStage: SafetyLimitLifeStage,
+  sourceScope: SafetySourceScope
 ): SafetyCeiling | null {
   if (ceilings.length < 1) {
     return null;
   }
 
   const index = indexCeilings(ceilings);
-  const raw = input.subjectId.trim().toLowerCase();
-  const byId =
-    index.byId.get(raw) ??
-    index.byId.get(raw.replace(/^supplement:/, "")) ??
-    index.byId.get(raw.replace(/^sup_/, ""));
 
-  if (byId) {
-    return byId;
+  for (const id of identityKeys(input.subjectId)) {
+    const found = index.byBand.get(bandKey(id, lifeStage, sourceScope));
+
+    if (found) {
+      return found;
+    }
   }
 
   const name = normalizeName(input.name ?? "");
-  return name ? index.byName.get(name) ?? null : null;
+  return name
+    ? index.byBand.get(bandKey(`name:${name}`, lifeStage, sourceScope)) ?? null
+    : null;
+}
+
+export function catalogSubjectHasCeiling(
+  ceilings: readonly SafetyCeiling[],
+  input: Readonly<{ name?: string; subjectId: string }>
+) {
+  if (ceilings.length < 1) {
+    return false;
+  }
+
+  const index = indexCeilings(ceilings);
+
+  if (identityKeys(input.subjectId).some((id) => index.subjectIds.has(id))) {
+    return true;
+  }
+
+  const name = normalizeName(input.name ?? "");
+  return Boolean(name && index.names.has(name));
 }
 
 export function adultPolicyCeilingExists(
   ceilings: readonly SafetyCeiling[],
   input: Readonly<{ name?: string; subjectId: string }>
 ) {
-  return Boolean(
-    adminCeilingFor(ceilings, input) || nihBandFor(input, 19)
-  );
+  return catalogSubjectHasCeiling(ceilings, input);
 }
 
 export function safetyCeilingFor(
@@ -299,15 +259,11 @@ export function safetyCeilingFor(
     subjectId: string;
   }>
 ) {
-  if (isPediatricSafetyProfile(input.profile)) {
-    const banded = nihBandFor(input, input.profile?.ageYears ?? 0);
-
-    if (banded) {
-      return banded;
-    }
-
-    return null;
-  }
-
-  return adminCeilingFor(ceilings, input) ?? fallbackSafetyCeiling(input);
+  const lifeStage = catalogLifeStageFor(input.profile);
+  return catalogCeilingFor(
+    ceilings,
+    input,
+    lifeStage,
+    MATCHER_SOURCE_SCOPE
+  );
 }

@@ -3,7 +3,8 @@ import { describe, it } from "node:test";
 import { fixtureSnapshot, FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
 import { matchPlan } from "../lib/agentic/plan/matching.ts";
 import { evaluateSafety } from "../lib/agentic/plan/safety.ts";
-import { fallbackSafetyCeiling } from "../lib/matcher/safety-ceilings.ts";
+import { ceilingsForSubjects } from "../lib/agentic/catalogue/supplemental-ul-reference.ts";
+import { safetyCeilingFor, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import {
   productRejectionReason,
   titleImpliesChildAgeBand,
@@ -120,6 +121,15 @@ describe("Phase 5 demographic eligibility", () => {
   });
 
   it("persists incidental nutrient amounts and blocks over-UL vitamin A", () => {
+    setMatcherSafetyCeilings(
+      ceilingsForSubjects([
+        ...FIXTURE_SUPPLEMENTS.flatMap((item) => [
+          { aliases: item.aliases, id: item.supplementId, name: item.name },
+          { aliases: item.aliases, id: item.uuid, name: item.name }
+        ]),
+        { id: "Vitamin A", name: "Vitamin A" }
+      ])
+    );
     const snapshot = fixtureSnapshot();
     const d3 = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Vitamin D3");
     assert.ok(d3);
@@ -202,11 +212,14 @@ describe("Phase 5 demographic eligibility", () => {
     });
     assert.ok(guidance.some((item) => item.code === "dose_review_required" && item.action === "block"));
     assert.equal(
-      fallbackSafetyCeiling({
-        name: "Vitamin A",
-        profile: { ageYears: 30, lifeStage: "pregnant" },
-        subjectId: "vitamin-a"
-      })?.maxAmount,
+      safetyCeilingFor(
+        ceilingsForSubjects([{ id: "vitamin-a", name: "Vitamin A" }]),
+        {
+          name: "Vitamin A",
+          profile: { ageYears: 30, lifeStage: "pregnant" },
+          subjectId: "vitamin-a"
+        }
+      )?.maxAmount,
       3000
     );
   });

@@ -1,0 +1,87 @@
+{
+  "authority": "NIH Office of Dietary Supplements",
+  "effectiveOn": "2026-08-25",
+  "notes": "Test-and-seed oracle only. Matching reads catalog rows, not this file. Magnesium ULs are supplemental (from supplements and medications). Iron ULs are NIH ODS total-intake ULs used as the catalog supplemental hard cap until a distinct supplement-only iron table exists.",
+  "nutrients": [
+    {
+      "aliases": ["Mg", "Magnesium glycinate", "Magnesium citrate"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 65 },
+        { "lifeStage": "child_4_8", "maxAmount": 110 },
+        { "lifeStage": "child_9_13", "maxAmount": 350 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 350 },
+        { "lifeStage": "adult", "maxAmount": 350 },
+        { "lifeStage": "pregnant", "maxAmount": 350 },
+        { "lifeStage": "breastfeeding", "maxAmount": 350 }
+      ],
+      "name": "Magnesium",
+      "sourceScope": "supplemental",
+      "unit": "mg"
+    },
+    {
+      "aliases": ["Ferrous", "Ferrous sulfate", "Ferrous sulphate", "Elemental iron"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 40 },
+        { "lifeStage": "child_4_8", "maxAmount": 40 },
+        { "lifeStage": "child_9_13", "maxAmount": 40 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 45 },
+        { "lifeStage": "adult", "maxAmount": 45 },
+        { "lifeStage": "pregnant", "maxAmount": 45 },
+        { "lifeStage": "breastfeeding", "maxAmount": 45 }
+      ],
+      "name": "Iron",
+      "sourceScope": "supplemental",
+      "unit": "mg"
+    },
+    {
+      "aliases": ["Vitamin D", "D3", "Cholecalciferol", "Vit D3", "Colecalciferol"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 2500 },
+        { "lifeStage": "child_4_8", "maxAmount": 3000 },
+        { "lifeStage": "child_9_13", "maxAmount": 4000 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 4000 },
+        { "lifeStage": "adult", "maxAmount": 4000 },
+        { "lifeStage": "pregnant", "maxAmount": 4000 },
+        { "lifeStage": "breastfeeding", "maxAmount": 4000 }
+      ],
+      "name": "Vitamin D3",
+      "sourceScope": "supplemental",
+      "unit": "IU"
+    },
+    {
+      "aliases": ["Zinc picolinate", "Zinc citrate"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/Zinc-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 7 },
+        { "lifeStage": "child_4_8", "maxAmount": 12 },
+        { "lifeStage": "child_9_13", "maxAmount": 23 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 34 },
+        { "lifeStage": "adult", "maxAmount": 40 },
+        { "lifeStage": "pregnant", "maxAmount": 40 },
+        { "lifeStage": "breastfeeding", "maxAmount": 40 }
+      ],
+      "name": "Zinc",
+      "sourceScope": "supplemental",
+      "unit": "mg"
+    },
+    {
+      "aliases": ["Retinol", "Vitamin A RAE", "Preformed vitamin A"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminA-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 600 },
+        { "lifeStage": "child_4_8", "maxAmount": 900 },
+        { "lifeStage": "child_9_13", "maxAmount": 1700 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 2800 },
+        { "lifeStage": "adult", "maxAmount": 3000 },
+        { "lifeStage": "pregnant", "maxAmount": 3000 },
+        { "lifeStage": "breastfeeding", "maxAmount": 3000 }
+      ],
+      "name": "Vitamin A",
+      "sourceScope": "supplemental",
+      "unit": "mcg"
+    }
+  ]
+}

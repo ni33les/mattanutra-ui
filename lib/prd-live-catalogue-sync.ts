@@ -89,6 +89,7 @@ const CATALOGUE_SYNC_ORDER = [
   "supplements",
   "supplement_aliases",
   "supplement_safety_limits",
+  "supplement_safety_limit_bands",
   "supplement_translations",
   "supplement_versions",
   "supplement_country_availability",
@@ -218,6 +219,10 @@ export const PRD_LIVE_CATALOGUE_TABLE_POLICIES: Record<string, TablePolicy> = {
   },
   supplement_safety_limits: {
     conflictColumns: ["supplement_id", "version"],
+    mode: "append_only"
+  },
+  supplement_safety_limit_bands: {
+    conflictColumns: ["supplement_id", "life_stage", "source_scope", "version"],
     mode: "append_only"
   },
   supplement_translations: {

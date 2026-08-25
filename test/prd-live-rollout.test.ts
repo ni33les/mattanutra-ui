@@ -95,6 +95,10 @@ describe("live-safe PRD rollout tooling", () => {
       "supplement_id|version"
     );
     assert.equal(
+      PRD_LIVE_CATALOGUE_TABLE_POLICIES.supplement_safety_limit_bands?.conflictColumns.join("|"),
+      "supplement_id|life_stage|source_scope|version"
+    );
+    assert.equal(
       PRD_LIVE_CATALOGUE_TABLE_POLICIES.supplement_safety_limits?.mode,
       "append_only"
     );

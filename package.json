@@ -74,6 +74,7 @@
     "product-coverage:demand-cache:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-product-coverage-demand-cache-schema.ts",
     "supplements:ashwagandha:country-repair": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/repair-ashwagandha-country-availability.ts",
     "supplements:country-availability:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-supplement-country-availability-schema.ts",
+    "supplements:safety-limit-bands:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-supplement-safety-limit-bands-schema.ts",
     "assessment:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-assessment-schema.ts",
     "foods:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-food-schema.ts",
     "recommendation-insights:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-recommendation-insights-schema.ts",

@@ -2,6 +2,7 @@ import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 import type { QaSubjectKey } from "@/lib/matcher/qa/subjects";
 import { QA_SUBJECTS } from "@/lib/matcher/qa/subjects";
+import { qaCatalogSafetyCeilings } from "@/lib/matcher/qa/safety-ceilings";
 import type {
   CanonicalCurrent,
   CanonicalRequest,
@@ -95,6 +96,7 @@ export function qaRequest(
     profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
     retainProductIds: [],
     retainSubjectIds: [],
+    safetyCeilings: qaCatalogSafetyCeilings(),
     selectorMode: "agentic",
     targets: [...QA_BASELINE_TARGETS],
     ...overrides

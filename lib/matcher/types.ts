@@ -52,10 +52,40 @@ export type CanonicalCurrent = Readonly<{
   unit: MatcherUnit;
 }>;
 
+export type SafetyLimitLifeStage =
+  | "adolescent_14_18"
+  | "adult"
+  | "breastfeeding"
+  | "child_1_3"
+  | "child_4_8"
+  | "child_9_13"
+  | "pregnant";
+
+export type SafetySourceScope = "supplemental" | "total";
+
+export const SAFETY_LIMIT_LIFE_STAGES = [
+  "child_1_3",
+  "child_4_8",
+  "child_9_13",
+  "adolescent_14_18",
+  "adult",
+  "pregnant",
+  "breastfeeding"
+] as const satisfies readonly SafetyLimitLifeStage[];
+
+export const SAFETY_SOURCE_SCOPES = [
+  "supplemental",
+  "total"
+] as const satisfies readonly SafetySourceScope[];
+
+export const MATCHER_SOURCE_SCOPE: SafetySourceScope = "supplemental";
+
 export type SafetyCeiling = Readonly<{
+  lifeStage?: SafetyLimitLifeStage;
   maxAmount: number;
   maxUnit: MatcherUnit;
   name: string;
+  sourceScope?: SafetySourceScope;
   subjectId: string;
 }>;
 

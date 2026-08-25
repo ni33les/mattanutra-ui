@@ -2820,6 +2820,23 @@ CREATE TABLE public.supplement_safety_limits (
     CONSTRAINT supplement_safety_limits_version_check CHECK ((version > 0))
 );
 
+CREATE TABLE public.supplement_safety_limit_bands (
+    id uuid NOT NULL,
+    supplement_id uuid NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    life_stage text DEFAULT 'adult'::text NOT NULL,
+    source_scope text DEFAULT 'supplemental'::text NOT NULL,
+    max_amount numeric(14,4) NOT NULL,
+    max_unit text NOT NULL,
+    source_url text,
+    basis_rationale text,
+    effective_on date,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT supplement_safety_limit_bands_life_stage_check CHECK ((life_stage = ANY (ARRAY['child_1_3'::text, 'child_4_8'::text, 'child_9_13'::text, 'adolescent_14_18'::text, 'adult'::text, 'pregnant'::text, 'breastfeeding'::text]))),
+    CONSTRAINT supplement_safety_limit_bands_source_scope_check CHECK ((source_scope = ANY (ARRAY['supplemental'::text, 'total'::text]))),
+    CONSTRAINT supplement_safety_limit_bands_version_check CHECK ((version > 0))
+);
+
 
 --
 -- Name: supplement_recommendation_selections; Type: TABLE; Schema: public; Owner: -
@@ -4075,6 +4092,12 @@ ALTER TABLE ONLY public.supplement_safety_limits
 
 ALTER TABLE ONLY public.supplement_safety_limits
     ADD CONSTRAINT supplement_safety_limits_supplement_id_version_key UNIQUE (supplement_id, version);
+
+ALTER TABLE ONLY public.supplement_safety_limit_bands
+    ADD CONSTRAINT supplement_safety_limit_bands_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.supplement_safety_limit_bands
+    ADD CONSTRAINT supplement_safety_limit_bands_band_version_key UNIQUE (supplement_id, life_stage, source_scope, version);
 
 
 --
@@ -5520,6 +5543,8 @@ CREATE INDEX supplement_recommendation_selections_supplement_idx ON public.suppl
 --
 
 CREATE INDEX supplement_safety_limits_supplement_idx ON public.supplement_safety_limits USING btree (supplement_id, version DESC);
+
+CREATE INDEX supplement_safety_limit_bands_band_idx ON public.supplement_safety_limit_bands USING btree (supplement_id, life_stage, source_scope, version DESC);
 
 
 --

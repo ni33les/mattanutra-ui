@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { evaluateSafety, planStatus } from "../lib/agentic/plan/safety.ts";
+import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import type {
   CanonicalPlanState,
   CoverageRow,
@@ -117,6 +118,16 @@ describe("plan status fail-closed on oversupply", () => {
   });
 
   it("blocks exposure above the magnesium UL", () => {
+    setMatcherSafetyCeilings([
+      {
+        lifeStage: "adult",
+        maxAmount: 350,
+        maxUnit: "mg",
+        name: "Magnesium",
+        sourceScope: "supplemental",
+        subjectId: "sup_mag"
+      }
+    ]);
     const selected = option([
       coverage({
         coveragePercent: 1023,
@@ -147,6 +158,16 @@ describe("plan status fail-closed on oversupply", () => {
   });
 
   it("keeps exact UL as needs_input rather than ready", () => {
+    setMatcherSafetyCeilings([
+      {
+        lifeStage: "adult",
+        maxAmount: 350,
+        maxUnit: "mg",
+        name: "Magnesium",
+        sourceScope: "supplemental",
+        subjectId: "sup_mag"
+      }
+    ]);
     const selected = option([
       coverage({
         coveragePercent: 175,

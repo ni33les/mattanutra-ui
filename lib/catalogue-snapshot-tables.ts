@@ -38,6 +38,11 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
+    description: "Life-stage and source-scoped supplemental upper limits used by matching.",
+    name: "supplement_safety_limit_bands",
+    requiredForReload: true
+  },
+  {
     description: "Locale-scalable supplement display copy and aliases.",
     name: "supplement_translations",
     requiredForReload: true
@@ -166,6 +171,7 @@ export const CATALOGUE_RELOAD_ORDER = [
   "supplements",
   "supplement_aliases",
   "supplement_safety_limits",
+  "supplement_safety_limit_bands",
   "supplement_translations",
   "supplement_versions",
   "supplement_country_availability",
@@ -217,6 +223,7 @@ export const CATALOGUE_TRUNCATE_ORDER = [
   "supplement_versions",
   "supplement_country_availability",
   "supplement_translations",
+  "supplement_safety_limit_bands",
   "supplement_safety_limits",
   "supplement_aliases",
   "supplements",

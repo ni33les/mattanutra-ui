@@ -7,6 +7,7 @@ export {
   type QaSubjectKey
 } from "@/lib/matcher/qa/subjects";
 export { QA_BASELINE_TARGETS, qaCurrent, qaRequest, qaTarget } from "@/lib/matcher/qa/request";
+export { qaCatalogSafetyCeilings } from "@/lib/matcher/qa/safety-ceilings";
 export {
   QA_BOUNDARY,
   QA_CORRUPT,

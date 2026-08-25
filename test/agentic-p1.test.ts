@@ -83,6 +83,18 @@ describe("agentic P1 pack fixes", () => {
   });
 
   it("does not mark a 50% retained zinc target ready", async () => {
+    const zinc = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Zinc");
+    assert.ok(zinc);
+    setMatcherSafetyCeilings([
+      {
+        lifeStage: "adult",
+        maxAmount: 40,
+        maxUnit: "mg",
+        name: "Zinc",
+        sourceScope: "supplemental",
+        subjectId: zinc.supplementId
+      }
+    ]);
     const runtime = runtimeFor();
     const result = await call(runtime, "plan", {
       idempotencyKey: "p1-retain-zinc-00001",

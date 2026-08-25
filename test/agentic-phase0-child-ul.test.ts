@@ -11,10 +11,11 @@ import { aggregateDailyExposure, isDoseError, scaleAmount } from "../lib/matcher
 import { match } from "../lib/matcher/index.ts";
 import { evaluateSafety as evaluateMatcherSafety } from "../lib/matcher/safety.ts";
 import { qaProduct, qaRequest, qaTarget } from "../lib/matcher/qa/index.ts";
+import { ceilingsForSubjects } from "../lib/agentic/catalogue/supplemental-ul-reference.ts";
 import {
-  fallbackSafetyCeiling,
   isPediatricSafetyProfile,
-  safetyCeilingFor
+  safetyCeilingFor,
+  setMatcherSafetyCeilings
 } from "../lib/matcher/safety-ceilings.ts";
 import type { SafetyCeiling } from "../lib/matcher/types.ts";
 
@@ -25,11 +26,33 @@ function supplement(name: string) {
 }
 
 const ADULT_ADMIN: SafetyCeiling = {
+  lifeStage: "adult",
   maxAmount: 350,
   maxUnit: "mg",
   name: "Magnesium",
+  sourceScope: "supplemental",
   subjectId: "sup_mag"
 };
+
+const CHILD_CATALOG: SafetyCeiling = {
+  lifeStage: "child_4_8",
+  maxAmount: 110,
+  maxUnit: "mg",
+  name: "Magnesium",
+  sourceScope: "supplemental",
+  subjectId: "sup_mag"
+};
+
+function installFixtureCatalogCeilings() {
+  setMatcherSafetyCeilings(
+    ceilingsForSubjects(
+      FIXTURE_SUPPLEMENTS.flatMap((item) => [
+        { aliases: item.aliases, id: item.supplementId, name: item.name },
+        { aliases: item.aliases, id: item.uuid, name: item.name }
+      ])
+    )
+  );
+}
 
 describe("Phase 0 child and life-stage upper limits", () => {
   it("does not classify an 8-year-old as an adult safety profile", () => {
@@ -47,8 +70,8 @@ describe("Phase 0 child and life-stage upper limits", () => {
     );
   });
 
-  it("uses the NIH 4-8 y magnesium UL of 110 mg and ignores adult admin 350 mg", () => {
-    const child = safetyCeilingFor([ADULT_ADMIN], {
+  it("uses the catalog 4-8 y magnesium UL of 110 mg and ignores adult admin 350 mg", () => {
+    const child = safetyCeilingFor([ADULT_ADMIN, CHILD_CATALOG], {
       name: "Magnesium",
       profile: { ageYears: 8, lifeStage: "child" },
       subjectId: "sup_mag"
@@ -56,7 +79,7 @@ describe("Phase 0 child and life-stage upper limits", () => {
     assert.equal(child?.maxAmount, 110);
     assert.equal(child?.maxUnit, "mg");
 
-    const adult = safetyCeilingFor([ADULT_ADMIN], {
+    const adult = safetyCeilingFor([ADULT_ADMIN, CHILD_CATALOG], {
       name: "Magnesium",
       profile: { ageYears: 52, lifeStage: "adult" },
       subjectId: "sup_mag"
@@ -69,12 +92,12 @@ describe("Phase 0 child and life-stage upper limits", () => {
     const adultProfile = { ageYears: 52, lifeStage: "adult" as const };
 
     assert.equal(upperLimitAmount("Magnesium", "mg", {
-      ceilings: [ADULT_ADMIN],
+      ceilings: [ADULT_ADMIN, CHILD_CATALOG],
       profile: childProfile,
       subjectId: "sup_mag"
     }), 110);
     assert.equal(upperLimitAmount("Magnesium", "mg", {
-      ceilings: [ADULT_ADMIN],
+      ceilings: [ADULT_ADMIN, CHILD_CATALOG],
       profile: adultProfile,
       subjectId: "sup_mag"
     }), 350);
@@ -172,6 +195,7 @@ describe("Phase 0 child and life-stage upper limits", () => {
   });
 
   it("blocks a child magnesium 130 mg fixture plan instead of applying 350 mg", () => {
+    installFixtureCatalogCeilings();
     const snapshot = freezeCatalogueSnapshot({
       ...fixtureSnapshot("2026-08-25T00:00:00.000Z"),
       catalogueVersion: "retail-TH-child-ul"
@@ -202,6 +226,7 @@ describe("Phase 0 child and life-stage upper limits", () => {
       percentOfUpperLimit: null,
       remainingGap: 130,
       upperLimitAmount: upperLimitAmount("Magnesium", "mg", {
+        ceilings: [ADULT_ADMIN, CHILD_CATALOG],
         profile: state.profile,
         subjectId: mag.supplementId
       })
@@ -254,7 +279,7 @@ describe("Phase 0 child and life-stage upper limits", () => {
     assert.equal(result.selected?.productIds.includes("G-MAG-200"), false);
     if (result.selected) {
       const mag = result.selected.exposure.totals.get("sup_mag");
-      const limit = fallbackSafetyCeiling({
+      const limit = safetyCeilingFor([ADULT_ADMIN, CHILD_CATALOG], {
         name: "Magnesium",
         profile: { ageYears: 8, lifeStage: "child" },
         subjectId: "sup_mag"

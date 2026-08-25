@@ -138,6 +138,7 @@ export const T10_CATALOGUE_GROUPS = {
     "supplements",
     "supplement_aliases",
     "supplement_safety_limits",
+    "supplement_safety_limit_bands",
     "supplement_translations",
     "supplement_versions",
     "supplement_country_availability"

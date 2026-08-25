@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { fixtureSnapshot, FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
 import { freezeCatalogueSnapshot } from "../lib/agentic/catalogue/freeze.ts";
+import { ceilingsForSubjects } from "../lib/agentic/catalogue/supplemental-ul-reference.ts";
 import { matchPlan } from "../lib/agentic/plan/matching.ts";
+import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { aug25PlanState } from "../lib/agentic/plan/mode-d.ts";
 import { convertAmount, scaleAmount } from "../lib/matcher/dose.ts";
 import { match } from "../lib/matcher/index.ts";
@@ -12,6 +14,17 @@ function supplement(name: string) {
   const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
   assert.ok(found, name);
   return found;
+}
+
+function installFixtureCatalogCeilings() {
+  setMatcherSafetyCeilings(
+    ceilingsForSubjects(
+      FIXTURE_SUPPLEMENTS.flatMap((item) => [
+        { aliases: item.aliases, id: item.supplementId, name: item.name },
+        { aliases: item.aliases, id: item.uuid, name: item.name }
+      ])
+    )
+  );
 }
 
 function catalog(products: ReturnType<typeof qaProduct>[]) {
@@ -156,6 +169,7 @@ describe("Phase 1 unit canonicalization", () => {
   });
 
   it("nets a 1000 IU current against a 50 mcg D3 target", () => {
+    installFixtureCatalogCeilings();
     const snapshot = freezeCatalogueSnapshot({
       ...fixtureSnapshot("2026-08-25T00:00:00.000Z"),
       catalogueVersion: "phase1-units"
@@ -191,6 +205,7 @@ describe("Phase 1 unit canonicalization", () => {
   });
 
   it("keeps fixture D3 IU and mcg plans on the same products and equivalent UL", () => {
+    installFixtureCatalogCeilings();
     const snapshot = freezeCatalogueSnapshot({
       ...fixtureSnapshot("2026-08-25T00:00:00.000Z"),
       catalogueVersion: "phase1-units"

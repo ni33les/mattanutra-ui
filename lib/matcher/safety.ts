@@ -1,7 +1,7 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
 import {
-  adultPolicyCeilingExists,
+  catalogSubjectHasCeiling,
   isPediatricSafetyProfile,
   matcherSafetyCeilingsUnavailable,
   safetyCeilingFor
@@ -195,15 +195,13 @@ export function evaluateSafety(input: Readonly<{
       const requested = input.request.targets.find(
         (item) => item.subjectId === subjectId
       )?.requested.units;
-      const missingChildRule =
-        isPediatricSafetyProfile(input.request.profile) &&
-        adultPolicyCeilingExists(input.request.safetyCeilings ?? [], {
+      const missingRequiredBand =
+        catalogSubjectHasCeiling(input.request.safetyCeilings ?? [], {
           name: nameOf(input.request, subjectId),
           subjectId
-        }) &&
-        total > BigInt(0);
+        }) && total > BigInt(0);
       if (
-        missingChildRule ||
+        missingRequiredBand ||
         (isTarget &&
           requested != null &&
           requested > BigInt(0) &&
