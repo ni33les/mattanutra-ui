@@ -1,5 +1,7 @@
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
-import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
+import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
+import { classifySnapshotTargets } from "@/lib/agentic/plan/classify";
+import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import {
   DEV_REJECTED_DUMP_LIMIT,
   impliedOmegaPreference,
@@ -8,12 +10,11 @@ import {
   publicCoveragePercent,
   summarizeRejections
 } from "@/lib/matcher";
-import { isCountablePillForm, variantPillBurden } from "@/lib/matcher/candidates";
+import { variantPillBurden } from "@/lib/matcher/candidates";
 import { amountFromScaled } from "@/lib/matcher/dose";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import type {
   CanonicalRequest,
-  MatcherProduct,
   MatcherUnit,
   ScoredBasket
 } from "@/lib/matcher/types";
@@ -29,40 +30,9 @@ import type {
   StackOption
 } from "@/lib/agentic/plan/types";
 
-function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
-  return {
-    availableCountryCodes: product.candidate.availableCountryCodes ?? null,
-    contributionSubjectIds: product.contributionSupplementIds,
-    currency: product.candidate.currency,
-    dailyPillsPerServing: product.dailyPills,
-    dietarySource: product.dietarySource,
-    form: product.form,
-    imageUrl: product.candidate.imageUrl?.trim() || null,
-    incompleteCommercialFacts: product.incompleteCommercialFacts,
-    labelledContributions: product.candidate.facts.map((fact) => ({
-      amount: fact.amount ?? fact.comparableAmount ?? 0,
-      name: fact.name,
-      subjectId: null,
-      unit: fact.unit
-    })),
-    omegaSource: product.omegaSource,
-    orderable: product.orderable,
-    prenatalOrFertility: isPrenatalOrFertilitySku(product.candidate),
-    productAudience: product.candidate.productAudience ?? "both",
-    productId: product.productId,
-    retailerSku: product.retailerSku,
-    sellerId: product.sellerId,
-    sellerName: product.sellerName,
-    source: product.source,
-    status: product.candidate.status ?? "approved",
-    stockStatus: product.stockStatus === "backorder" ? "backorder" : product.stockStatus === "unavailable" ? "unavailable" : "in_stock",
-    title: product.candidate.title,
-    unknownSafetyAmount: false,
-    unitPriceMinor: product.unitPriceMinor
-  };
-}
+export { toMatcherProduct };
 
-function toCanonicalRequest(
+export function toCanonicalRequest(
   state: CanonicalPlanState
 ): CanonicalRequest | { error: string; reason: "unsupported_unit" } {
   const targets = canonicalizeTargets({
@@ -345,12 +315,28 @@ export function matcherTelemetryFor(input: Readonly<{
   leftovers: readonly PlanLeftover[];
   rejected?: readonly RejectedCandidate[];
   selected: StackOption | null;
+  snapshot?: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): MatcherTelemetry {
   const rejected = input.rejected ?? [];
   const summary = summarizeRejections(rejected);
+  const request = toCanonicalRequest(input.state);
+  const classifications = input.snapshot
+    ? classifySnapshotTargets({
+        request,
+        selected: input.selected,
+        snapshot: input.snapshot,
+        state: input.state
+      })
+    : [];
 
   return {
+    ...(input.snapshot
+      ? {
+          availabilityAsOf: input.snapshot.availabilityAsOf,
+          snapshotId: catalogueSnapshotId(input.snapshot)
+        }
+      : {}),
     constraints: {
       ...input.state.requirements,
       conditionCodes: input.state.conditionCodes,
@@ -364,6 +350,7 @@ export function matcherTelemetryFor(input: Readonly<{
     ...(rejected.length > 0
       ? { rejectedAll: rejected.slice(0, DEV_REJECTED_DUMP_LIMIT) }
       : {}),
+    ...(classifications.length > 0 ? { targetClassifications: classifications } : {}),
     requestedDoses: [
       ...input.state.targets.map((item) => ({
         amount: item.amount,
@@ -410,16 +397,17 @@ export function matchPlan(input: Readonly<{
     };
   }
 
+  const snapshot = freezeCatalogueSnapshot(input.snapshot);
   const result = match(request, {
-    availabilityAsOf: input.snapshot.availabilityAsOf,
-    catalogueVersion: input.snapshot.catalogueVersion,
-    products: input.snapshot.products.map(toMatcherProduct)
+    availabilityAsOf: snapshot.availabilityAsOf,
+    catalogueVersion: snapshot.catalogueVersion,
+    products: snapshot.products.map(toMatcherProduct)
   });
   const selected = result.selected
-    ? toStackOption(input.state, input.snapshot, result.selected)
+    ? toStackOption(input.state, snapshot, result.selected)
     : null;
   const alternatives = result.alternatives.map((item) =>
-    toStackOption(input.state, input.snapshot, item)
+    toStackOption(input.state, snapshot, item)
   );
   const leftovers = leftoversFor(input.state, selected, alternatives[0] ?? null);
 

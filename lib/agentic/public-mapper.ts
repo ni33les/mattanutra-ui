@@ -299,6 +299,19 @@ function publicMatcherTelemetry(
       total: telemetry.rejected.total
     };
   }
+  if (telemetry.snapshotId) {
+    payload.catalogId = telemetry.snapshotId;
+  }
+  if (telemetry.availabilityAsOf) {
+    payload.availabilityAsOf = telemetry.availabilityAsOf;
+  }
+  if (telemetry.targetClassifications && telemetry.targetClassifications.length > 0) {
+    payload.targetClassifications = telemetry.targetClassifications.map((item) => ({
+      class: item.class,
+      coveragePercent: item.coveragePercent,
+      name: item.name
+    }));
+  }
 
   return Object.keys(payload).length > 0 ? { matcherTelemetry: payload } : {};
 }

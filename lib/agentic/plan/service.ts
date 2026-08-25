@@ -210,6 +210,7 @@ function composeResult(input: Readonly<{
       leftovers: input.leftovers,
       rejected: input.rejected ?? input.previous?.matcherTelemetry.rejectedAll,
       selected: input.selected,
+      snapshot: input.snapshot,
       state: pinnedState
     }),
     optimizationEvidence: {

@@ -153,7 +153,23 @@ export type RejectedCandidateSummary = Readonly<{
   total: number;
 }>;
 
+export type TargetClass =
+  | "available"
+  | "genuine_gap"
+  | "mapping_defect"
+  | "matcher_defect";
+
+export type TargetClassification = Readonly<{
+  class: TargetClass;
+  coveragePercent: number;
+  eligibleProductCount: number;
+  mappedProductCount: number;
+  name: string;
+  supplementId: string;
+}>;
+
 export type MatcherTelemetry = Readonly<{
+  availabilityAsOf?: string;
   constraints: PlanRequirements &
     Readonly<{
       conditionCodes: readonly string[];
@@ -172,6 +188,8 @@ export type MatcherTelemetry = Readonly<{
   }>[];
   requestedNames: readonly string[];
   selectedOptionId: string | null;
+  snapshotId?: string;
+  targetClassifications?: readonly TargetClassification[];
 }>;
 
 export type BasketItem = Readonly<{
