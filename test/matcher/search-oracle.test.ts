@@ -144,4 +144,116 @@ describe("matcher search oracle", () => {
     assert.deepEqual(result.selected?.productIds, ["B", "D"]);
     assert.equal(result.selected?.priceMinor, 171000);
   });
+
+  it("nets current D3 intake before selecting another product", () => {
+    const d3 = target("Vitamin D3", "sup_d3", 2000, "IU");
+    const current = scaleAmount({
+      amount: 1000,
+      subjectId: "sup_d3",
+      subjectName: "Vitamin D3",
+      unit: "IU"
+    });
+    assert.equal("reason" in current, false);
+    if ("reason" in current) {
+      throw new Error(current.message);
+    }
+    const request: CanonicalRequest = {
+      acceptedGapSubjectIds: [],
+      allowedForms: null,
+      conditionCodes: [],
+      currency: "THB",
+      currentSupplements: [
+        {
+          daily: current,
+          dailyAmount: 1000,
+          name: "Vitamin D3",
+          sourceId: "current-d3",
+          subjectId: "sup_d3",
+          unit: "IU"
+        }
+      ],
+      destinationCountry: "TH",
+      dietaryPreference: "any",
+      excludeSubjectIds: [],
+      leftovers: [],
+      maxDailyPills: null,
+      maxPriceMinor: null,
+      maxProductCount: 8,
+      medicationCodes: [],
+      omega3SourcePreference: "any",
+      optimization: "fewest_pills",
+      profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
+      retainProductIds: [],
+      retainSubjectIds: [],
+      selectorMode: "agentic",
+      targets: [d3]
+    };
+    const catalog = {
+      availabilityAsOf: "2026-01-01T00:00:00.000Z",
+      catalogueVersion: "netting-1",
+      products: [
+        sku({
+          id: "G-D3-1000",
+          name: "Vitamin D3",
+          subjectId: "sup_d3",
+          amount: 1000,
+          unit: "IU",
+          price: 10000
+        }),
+        sku({
+          id: "G-D3-1800",
+          name: "Vitamin D3",
+          subjectId: "sup_d3",
+          amount: 1800,
+          unit: "IU",
+          price: 12000
+        })
+      ]
+    };
+    const result = match(request, catalog);
+    assert.ok(result.selected);
+    assert.deepEqual(result.selected?.productIds, ["G-D3-1000"]);
+    assert.equal(publicCoveragePercent(result.selected), 100);
+  });
+
+  it("does not count powder servings as pills", () => {
+    const creatine = target("Creatine", "sup_creatine", 5, "mg");
+    const request: CanonicalRequest = {
+      acceptedGapSubjectIds: [],
+      allowedForms: null,
+      conditionCodes: [],
+      currency: "THB",
+      currentSupplements: [],
+      destinationCountry: "TH",
+      dietaryPreference: "any",
+      excludeSubjectIds: [],
+      leftovers: [],
+      maxDailyPills: null,
+      maxPriceMinor: null,
+      maxProductCount: 8,
+      medicationCodes: [],
+      omega3SourcePreference: "any",
+      optimization: "fewest_pills",
+      profile: { ageYears: 30, lifeStage: "adult", sex: "male" },
+      retainProductIds: [],
+      retainSubjectIds: [],
+      selectorMode: "agentic",
+      targets: [creatine]
+    };
+    const powder = sku({
+      id: "G-CREATINE-5G",
+      name: "Creatine",
+      subjectId: "sup_creatine",
+      amount: 5,
+      unit: "mg",
+      price: 15000
+    });
+    const result = match(request, {
+      availabilityAsOf: "2026-01-01T00:00:00.000Z",
+      catalogueVersion: "powder-1",
+      products: [{ ...powder, form: "powder", dailyPillsPerServing: 1 }]
+    });
+    assert.ok(result.selected);
+    assert.equal(result.selected?.dailyPills, 0);
+  });
 });

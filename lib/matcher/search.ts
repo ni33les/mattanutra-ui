@@ -41,7 +41,7 @@ export function seedState(request: CanonicalRequest): SearchState {
 
   return {
     count: 0,
-    delivered: new Map(),
+    delivered: new Map(exposure),
     exposure,
     nextGroupIndex: 0,
     pills: 0,
@@ -84,7 +84,7 @@ export function tryAddVariant(
     return null;
   }
 
-  const price = state.price + group.product.unitPriceMinor;
+  const price = state.price + group.product.unitPriceMinor * variant.dailyUnits;
 
   if (request.maxPriceMinor != null && price > request.maxPriceMinor) {
     return null;

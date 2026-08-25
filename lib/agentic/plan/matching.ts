@@ -1,6 +1,7 @@
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
 import { impliedOmegaPreference, match, optionIdFor, publicCoveragePercent } from "@/lib/matcher";
+import { isCountablePillForm, variantPillBurden } from "@/lib/matcher/candidates";
 import { amountFromScaled } from "@/lib/matcher/dose";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import type {
@@ -177,6 +178,16 @@ function coverageFor(
   });
 }
 
+function dailyUnitsForProduct(
+  productId: string,
+  variantIds: readonly string[]
+) {
+  const prefix = `${productId}:x`;
+  const variantId = variantIds.find((id) => id.startsWith(prefix));
+  const parsed = Number(variantId?.slice(prefix.length));
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+}
+
 function basketFromIds(
   state: CanonicalPlanState,
   snapshot: CatalogueSnapshot,
@@ -191,27 +202,38 @@ function basketFromIds(
       )
     )
     .filter((item): item is CatalogueProduct => Boolean(item))
-    .map((product) => ({
-      availabilityAsOf: snapshot.availabilityAsOf,
-      contributionSupplementIds: product.contributionSupplementIds,
-      currency: product.candidate.currency || state.currency,
-      dailyPills: product.dailyPills,
-      deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
-      fixture: product.source === "fixture",
-      form: product.form,
-      imageUrl: product.candidate.imageUrl?.trim() || null,
-      incompleteCommercialFacts: product.incompleteCommercialFacts,
-      lineTotalMinor: product.unitPriceMinor,
-      productId: product.productId,
-      productName: product.candidate.title,
-      quantity: 1,
-      retailerSku: product.retailerSku,
-      sellerId: product.sellerId,
-      sellerName: product.sellerName,
-      source: product.source,
-      stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
-      unitPriceMinor: product.unitPriceMinor
-    }));
+    .map((product) => {
+      const dailyUnits = dailyUnitsForProduct(product.productId, basket.variantIds);
+      const quantity = Math.max(1, dailyUnits);
+
+      return {
+        availabilityAsOf: snapshot.availabilityAsOf,
+        contributionSupplementIds: product.contributionSupplementIds,
+        currency: product.candidate.currency || state.currency,
+        dailyPills: variantPillBurden(
+          {
+            dailyPillsPerServing: product.dailyPills,
+            form: product.form
+          },
+          quantity
+        ),
+        deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
+        fixture: product.source === "fixture",
+        form: product.form,
+        imageUrl: product.candidate.imageUrl?.trim() || null,
+        incompleteCommercialFacts: product.incompleteCommercialFacts,
+        lineTotalMinor: product.unitPriceMinor * quantity,
+        productId: product.productId,
+        productName: product.candidate.title,
+        quantity,
+        retailerSku: product.retailerSku,
+        sellerId: product.sellerId,
+        sellerName: product.sellerName,
+        source: product.source,
+        stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
+        unitPriceMinor: product.unitPriceMinor
+      };
+    });
 }
 
 function toStackOption(

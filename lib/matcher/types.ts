@@ -169,6 +169,7 @@ export type Exposure = Readonly<{
 }>;
 
 export type DoseVariant = Readonly<{
+  amountPerUnit: ReadonlyMap<string, ScaledAmount>;
   contributions: ReadonlyMap<string, ScaledAmount>;
   dailyPills: number;
   dailyUnits: number;

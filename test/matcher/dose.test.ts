@@ -30,6 +30,7 @@ describe("matcher dose engine", () => {
       unit: "mg"
     };
     const variant: DoseVariant = {
+      amountPerUnit: new Map([["sup_zinc", zinc(25, "mg")]]),
       contributions: new Map([["sup_zinc", zinc(25, "mg")]]),
       dailyPills: 1,
       dailyUnits: 1,
@@ -61,6 +62,7 @@ describe("matcher dose engine", () => {
   it("DOSE-05 does not let pack count change daily exposure", () => {
     const once = zinc(25, "mg");
     const variant: DoseVariant = {
+      amountPerUnit: new Map([["sup_zinc", once]]),
       contributions: new Map([["sup_zinc", once]]),
       dailyPills: 1,
       dailyUnits: 1,
@@ -126,5 +128,38 @@ describe("matcher dose engine", () => {
       left.provenance.map((item) => item.sourceId),
       right.provenance.map((item) => item.sourceId)
     );
+  });
+
+  it("keeps amount-per-unit fixed when daily units change", () => {
+    const perUnit = zinc(25, "mg");
+    const x1: DoseVariant = {
+      amountPerUnit: new Map([["sup_zinc", perUnit]]),
+      contributions: new Map([["sup_zinc", perUnit]]),
+      dailyPills: 1,
+      dailyUnits: 1,
+      productId: "prd_zinc",
+      unknownSafetyAmount: false,
+      variantId: "prd_zinc:x1"
+    };
+    const x2: DoseVariant = {
+      amountPerUnit: new Map([["sup_zinc", perUnit]]),
+      contributions: new Map([["sup_zinc", { ...perUnit, units: perUnit.units * BigInt(2) }]]),
+      dailyPills: 2,
+      dailyUnits: 2,
+      productId: "prd_zinc",
+      unknownSafetyAmount: false,
+      variantId: "prd_zinc:x2"
+    };
+    assert.equal(x1.amountPerUnit.get("sup_zinc")?.units, x2.amountPerUnit.get("sup_zinc")?.units);
+    assert.equal(
+      x2.contributions.get("sup_zinc")?.units,
+      (x1.amountPerUnit.get("sup_zinc")?.units ?? BigInt(0)) * BigInt(x2.dailyUnits)
+    );
+    const exposure = aggregateDailyExposure({ current: [], variants: [x2] });
+    assert.equal("reason" in exposure, false);
+    if ("reason" in exposure) {
+      return;
+    }
+    assert.equal(amountFromScaled(exposure.totals.get("sup_zinc")!, "mg", "Zinc"), 50);
   });
 });

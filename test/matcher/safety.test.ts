@@ -63,6 +63,7 @@ describe("matcher safety engine", () => {
       return;
     }
     const variant: DoseVariant = {
+      amountPerUnit: new Map([["sup_zinc", amount]]),
       contributions: new Map([["sup_zinc", amount]]),
       dailyPills: 1,
       dailyUnits: 1,
@@ -109,6 +110,7 @@ describe("matcher safety engine", () => {
       return;
     }
     const variant: DoseVariant = {
+      amountPerUnit: new Map([["sup_zinc", amount]]),
       contributions: new Map([["sup_zinc", amount]]),
       dailyPills: 1,
       dailyUnits: 1,
@@ -198,6 +200,7 @@ describe("matcher safety engine", () => {
       return;
     }
     const variant: DoseVariant = {
+      amountPerUnit: new Map([["sup_zinc", amount]]),
       contributions: new Map([["sup_zinc", amount]]),
       dailyPills: 1,
       dailyUnits: 1,
@@ -253,6 +256,7 @@ describe("matcher safety engine", () => {
       return;
     }
     const variant: DoseVariant = {
+      amountPerUnit: new Map([["sup_mag", amount]]),
       contributions: new Map([["sup_mag", amount]]),
       dailyPills: 1,
       dailyUnits: 1,
@@ -313,6 +317,7 @@ describe("matcher safety engine", () => {
       return;
     }
     const variant: DoseVariant = {
+      amountPerUnit: new Map([["sup_d3", amount]]),
       contributions: new Map([["sup_d3", amount]]),
       dailyPills: 1,
       dailyUnits: 1,

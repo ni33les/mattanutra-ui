@@ -11,6 +11,41 @@ import type {
 } from "@/lib/matcher/types";
 
 const MAX_DAILY_UNITS = 3;
+const NON_PILL_FORM = /powder|liquid|sachet|oil|drops|\bml\b/i;
+
+export function isCountablePillForm(form: string) {
+  return !NON_PILL_FORM.test(form);
+}
+
+export function variantPillBurden(
+  product: Readonly<{ dailyPillsPerServing: number; form: string }>,
+  dailyUnits: number
+) {
+  if (!isCountablePillForm(product.form)) {
+    return 0;
+  }
+
+  return product.dailyPillsPerServing * dailyUnits;
+}
+
+export function remainingRequestedUnits(
+  request: CanonicalRequest,
+  subjectId: string
+) {
+  const target = request.targets.find((item) => item.subjectId === subjectId);
+
+  if (!target) {
+    return BigInt(0);
+  }
+
+  const current = request.currentSupplements
+    .filter((item) => item.subjectId === subjectId)
+    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
+
+  return target.requested.units > current
+    ? target.requested.units - current
+    : BigInt(0);
+}
 
 function subjectKeyVariants(value: string) {
   const trimmed = value.trim();
@@ -54,7 +89,7 @@ export function compileVariant(input: Readonly<{
   product: MatcherProduct;
   request: CanonicalRequest;
 }>): DoseVariant | null {
-  const contributions = new Map<string, ScaledAmount>();
+  const amountPerUnit = new Map<string, ScaledAmount>();
   let unknown = input.product.unknownSafetyAmount;
 
   for (const target of input.request.targets) {
@@ -82,31 +117,36 @@ export function compileVariant(input: Readonly<{
         continue;
       }
 
-      const daily = {
-        dim: scaled.dim,
-        subjectId: scaled.subjectId,
-        units: scaled.units * BigInt(input.dailyUnits)
-      };
-      const existing = contributions.get(target.subjectId);
-      contributions.set(
+      const existing = amountPerUnit.get(target.subjectId);
+      amountPerUnit.set(
         target.subjectId,
         existing
-          ? { ...daily, units: existing.units + daily.units }
-          : daily
+          ? { ...scaled, units: existing.units + scaled.units }
+          : scaled
       );
     }
   }
 
-  if (contributions.size < 1) {
+  if (amountPerUnit.size < 1) {
     return null;
   }
 
+  const contributions = new Map<string, ScaledAmount>();
+
+  for (const [subjectId, perUnit] of amountPerUnit) {
+    contributions.set(subjectId, {
+      ...perUnit,
+      units: perUnit.units * BigInt(input.dailyUnits)
+    });
+  }
+
   return {
+    amountPerUnit,
     contributions,
-    dailyPills: input.product.dailyPillsPerServing * input.dailyUnits,
+    dailyPills: variantPillBurden(input.product, input.dailyUnits),
     dailyUnits: input.dailyUnits,
     productId: input.product.productId,
-    unknownSafetyAmount: false,
+    unknownSafetyAmount: unknown,
     variantId: `${input.product.productId}:x${input.dailyUnits}`
   };
 }
@@ -158,7 +198,7 @@ function variantLeavesTargetShortfall(
   for (const [subjectId, amount] of variant.contributions) {
     const target = request.targets.find((item) => item.subjectId === subjectId);
 
-    if (target && amount.units < target.requested.units) {
+    if (target && amount.units < remainingRequestedUnits(request, subjectId)) {
       return true;
     }
   }
