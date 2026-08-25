@@ -1,6 +1,7 @@
 import { compileGroups, groupsBySeller } from "@/lib/matcher/candidates";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
+import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
 import { evaluateSafety } from "@/lib/matcher/safety";
 import { searchGroups } from "@/lib/matcher/search";
 import { compareBaskets, scoreState, selectOptions } from "@/lib/matcher/selector";
@@ -11,6 +12,7 @@ import type {
   MatcherConfig,
   MatcherLeftover,
   ProductGroup,
+  RejectedCandidate,
   ScoredBasket
 } from "@/lib/matcher/types";
 
@@ -81,9 +83,13 @@ export function match(
     });
 
     if (baseline.hardBlocked) {
+      const groups = compiledGroups
+        ? [...compiledGroups]
+        : compileGroups(request, catalog);
       return {
         alternatives: [],
         leftovers: leftoversFor(request, null),
+        rejected: rejectedCandidatesFor(request, catalog, groups),
         searchMode: "exact",
         selected: null,
         trimmed: false
@@ -99,6 +105,11 @@ export function match(
         catalog,
         Math.max(Date.now(), deadlineAt - 400)
       );
+  const rejected: readonly RejectedCandidate[] = rejectedCandidatesFor(
+    request,
+    catalog,
+    groups
+  );
   const sellers = groupsBySeller(
     groups,
     request,
@@ -164,6 +175,7 @@ export function match(
   return {
     alternatives: winner.alternatives,
     leftovers: leftoversFor(request, winner.selected),
+    rejected,
     searchMode: mode,
     selected: winner.selected,
     trimmed
@@ -175,6 +187,14 @@ export { scaleAmount, aggregateDailyExposure, isDoseError } from "@/lib/matcher/
 export { evaluateSafety } from "@/lib/matcher/safety";
 export { productEligible } from "@/lib/matcher/eligibility";
 export { compileGroups } from "@/lib/matcher/candidates";
-export { optionIdFor, publicCoveragePercent } from "@/lib/matcher/explainer";
+export {
+  optionIdFor,
+  publicCoveragePercent,
+  rejectedCandidatesFor,
+  summarizeRejections,
+  DEV_REJECTED_DUMP_LIMIT,
+  PUBLIC_REJECTED_SAMPLE_LIMIT
+} from "@/lib/matcher/explainer";
 export { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
+export { productRejectionReason } from "@/lib/matcher/eligibility";
 export type * from "@/lib/matcher/types";

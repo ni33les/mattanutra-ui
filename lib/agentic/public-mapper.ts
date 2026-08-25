@@ -288,6 +288,17 @@ function publicMatcherTelemetry(
   if (telemetry.selectedOptionId) {
     payload.selectedOptionId = telemetry.selectedOptionId;
   }
+  if (telemetry.rejected && telemetry.rejected.total > 0) {
+    payload.rejected = {
+      counts: telemetry.rejected.counts,
+      sample: telemetry.rejected.sample.map((item) => ({
+        productId: item.productId,
+        reason: item.reason,
+        title: item.title
+      })),
+      total: telemetry.rejected.total
+    };
+  }
 
   return Object.keys(payload).length > 0 ? { matcherTelemetry: payload } : {};
 }

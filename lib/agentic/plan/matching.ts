@@ -1,6 +1,13 @@
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
-import { impliedOmegaPreference, match, optionIdFor, publicCoveragePercent } from "@/lib/matcher";
+import {
+  DEV_REJECTED_DUMP_LIMIT,
+  impliedOmegaPreference,
+  match,
+  optionIdFor,
+  publicCoveragePercent,
+  summarizeRejections
+} from "@/lib/matcher";
 import { isCountablePillForm, variantPillBurden } from "@/lib/matcher/candidates";
 import { amountFromScaled } from "@/lib/matcher/dose";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
@@ -18,6 +25,7 @@ import type {
   CoverageRow,
   MatcherTelemetry,
   PlanLeftover,
+  RejectedCandidate,
   StackOption
 } from "@/lib/agentic/plan/types";
 
@@ -335,9 +343,13 @@ export function leftoversFor(
 
 export function matcherTelemetryFor(input: Readonly<{
   leftovers: readonly PlanLeftover[];
+  rejected?: readonly RejectedCandidate[];
   selected: StackOption | null;
   state: CanonicalPlanState;
 }>): MatcherTelemetry {
+  const rejected = input.rejected ?? [];
+  const summary = summarizeRejections(rejected);
+
   return {
     constraints: {
       ...input.state.requirements,
@@ -348,6 +360,10 @@ export function matcherTelemetryFor(input: Readonly<{
     leftovers: input.leftovers,
     productIds: input.selected?.basket.map((item) => item.productId) ?? [],
     productSkus: input.selected?.basket.map((item) => item.retailerSku) ?? [],
+    ...(summary.total > 0 ? { rejected: summary } : {}),
+    ...(rejected.length > 0
+      ? { rejectedAll: rejected.slice(0, DEV_REJECTED_DUMP_LIMIT) }
+      : {}),
     requestedDoses: [
       ...input.state.targets.map((item) => ({
         amount: item.amount,
@@ -378,6 +394,7 @@ export function matchPlan(input: Readonly<{
 }>): {
   alternatives: StackOption[];
   leftovers: PlanLeftover[];
+  rejected: RejectedCandidate[];
   selected: StackOption | null;
   unmetRequirements: string[];
 } {
@@ -387,6 +404,7 @@ export function matchPlan(input: Readonly<{
     return {
       alternatives: [],
       leftovers: [...input.state.leftovers],
+      rejected: [],
       selected: null,
       unmetRequirements: []
     };
@@ -408,6 +426,7 @@ export function matchPlan(input: Readonly<{
   return {
     alternatives,
     leftovers,
+    rejected: [...result.rejected],
     selected,
     unmetRequirements: unmetRequirementsFor({
       option: selected,

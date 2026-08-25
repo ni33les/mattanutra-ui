@@ -123,6 +123,36 @@ export type CanonicalPlanState = Readonly<{
   targets: readonly PlanTarget[];
 }>;
 
+export type RejectedCandidateReason =
+  | "budget"
+  | "excluded"
+  | "foreign_retailer"
+  | "form"
+  | "incidental_only"
+  | "incomplete_facts"
+  | "life_stage"
+  | "max_pills"
+  | "max_products"
+  | "not_approved"
+  | "not_orderable"
+  | "oos"
+  | "ul_exceeded"
+  | "vegan"
+  | "wrong_source";
+
+export type RejectedCandidate = Readonly<{
+  productId: string;
+  reason: RejectedCandidateReason;
+  sellerId: string;
+  title: string;
+}>;
+
+export type RejectedCandidateSummary = Readonly<{
+  counts: Readonly<Record<string, number>>;
+  sample: readonly RejectedCandidate[];
+  total: number;
+}>;
+
 export type MatcherTelemetry = Readonly<{
   constraints: PlanRequirements &
     Readonly<{
@@ -133,6 +163,8 @@ export type MatcherTelemetry = Readonly<{
   leftovers: readonly PlanLeftover[];
   productIds: readonly string[];
   productSkus: readonly string[];
+  rejected?: RejectedCandidateSummary;
+  rejectedAll?: readonly RejectedCandidate[];
   requestedDoses: readonly Readonly<{
     amount: number;
     name: string;

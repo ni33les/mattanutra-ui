@@ -126,6 +126,12 @@ describe("agentic live-catalogue matching constraints", () => {
     });
     const names = (matched.selected?.basket ?? []).map((item) => item.productName);
     assert.equal(names.some((name) => /conceive|prenatal|fertility|pre 9/i.test(name)), false);
+    assert.ok(
+      matched.rejected.some(
+        (item) =>
+          item.reason === "life_stage" && /conceive/i.test(item.title)
+      )
+    );
   });
 
   it("does not select Pre 9+ Care Gold for a 52-year-old man", () => {
@@ -143,6 +149,11 @@ describe("agentic live-catalogue matching constraints", () => {
     });
     const names = (matched.selected?.basket ?? []).map((item) => item.productName);
     assert.equal(names.some((name) => /pre 9|prenatal|conceive/i.test(name)), false);
+    assert.ok(
+      matched.rejected.some(
+        (item) => item.reason === "life_stage" && /pre 9/i.test(item.title)
+      )
+    );
   });
 
   it("algae_only leftover is uncovered when the catalogue has no algae omega SKU", () => {

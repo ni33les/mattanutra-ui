@@ -139,6 +139,7 @@ function composeResult(input: Readonly<{
   locale: Locale;
   leftovers: PlanResult["leftovers"];
   previous: PlanResult | null;
+  rejected?: PlanResult["matcherTelemetry"]["rejectedAll"];
   selected: StackOption | null;
   shownRevision: number;
   snapshot: CatalogueSnapshot;
@@ -207,6 +208,7 @@ function composeResult(input: Readonly<{
     leftovers: input.leftovers,
     matcherTelemetry: matcherTelemetryFor({
       leftovers: input.leftovers,
+      rejected: input.rejected ?? input.previous?.matcherTelemetry.rejectedAll,
       selected: input.selected,
       state: pinnedState
     }),
@@ -245,6 +247,7 @@ function buildResult(input: Readonly<{
     locale: input.locale,
     leftovers: matched.leftovers,
     previous: input.previous,
+    rejected: matched.rejected,
     selected: matched.selected,
     shownRevision: input.shownRevision,
     snapshot: input.snapshot,

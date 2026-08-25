@@ -212,9 +212,40 @@ export type ScoredBasket = Readonly<{
   variantIds: readonly string[];
 }>;
 
+export type RejectionReason =
+  | "budget"
+  | "excluded"
+  | "foreign_retailer"
+  | "form"
+  | "incidental_only"
+  | "incomplete_facts"
+  | "life_stage"
+  | "max_pills"
+  | "max_products"
+  | "not_approved"
+  | "not_orderable"
+  | "oos"
+  | "ul_exceeded"
+  | "vegan"
+  | "wrong_source";
+
+export type RejectedCandidate = Readonly<{
+  productId: string;
+  reason: RejectionReason;
+  sellerId: string;
+  title: string;
+}>;
+
+export type RejectedSummary = Readonly<{
+  counts: Readonly<Record<string, number>>;
+  sample: readonly RejectedCandidate[];
+  total: number;
+}>;
+
 export type MatchResult = Readonly<{
   alternatives: readonly ScoredBasket[];
   leftovers: readonly MatcherLeftover[];
+  rejected: readonly RejectedCandidate[];
   searchMode: "bounded" | "exact";
   selected: ScoredBasket | null;
   trimmed: boolean;

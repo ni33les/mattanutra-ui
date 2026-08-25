@@ -37,7 +37,10 @@ export async function persistMatcherTelemetry(input: Readonly<{
         ${input.revision},
         ${asJsonb(telemetry.requestedNames)}::jsonb,
         ${asJsonb(telemetry.requestedDoses)}::jsonb,
-        ${asJsonb(telemetry.constraints)}::jsonb,
+        ${asJsonb({
+          ...telemetry.constraints,
+          ...(telemetry.rejected ? { rejected: telemetry.rejected } : {})
+        })}::jsonb,
         ${telemetry.selectedOptionId},
         ${telemetry.coveragePercent},
         ${asJsonb(telemetry.productIds)}::jsonb,

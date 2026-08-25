@@ -3,30 +3,50 @@ import {
   isNonAlgaeOmegaLine,
   isPrenatalOrFertilitySku
 } from "@/lib/agentic/catalogue/product-fit";
-import type { CanonicalRequest, MatcherProduct } from "@/lib/matcher/types";
+import type {
+  CanonicalRequest,
+  MatcherProduct,
+  RejectionReason
+} from "@/lib/matcher/types";
 
-export function productEligible(
+function labelledFacts(product: MatcherProduct) {
+  return product.labelledContributions.map((item) => ({
+    amount: item.amount,
+    comparableAmount: null,
+    confidence: "high" as const,
+    itemType: "supplement" as const,
+    name: item.name,
+    normalizedName: item.name,
+    unit: item.unit
+  }));
+}
+
+export function productRejectionReason(
   product: MatcherProduct,
   request: CanonicalRequest
-) {
-  if (!product.orderable || product.incompleteCommercialFacts) {
-    return false;
+): RejectionReason | null {
+  if (!product.orderable) {
+    return "not_orderable";
+  }
+
+  if (product.incompleteCommercialFacts) {
+    return "incomplete_facts";
   }
 
   if (product.status !== "approved") {
-    return false;
+    return "not_approved";
   }
 
   if (product.stockStatus === "unavailable") {
-    return false;
+    return "oos";
   }
 
   if (product.unitPriceMinor <= 0) {
-    return false;
+    return "incomplete_facts";
   }
 
   if (product.unknownSafetyAmount) {
-    return false;
+    return "ul_exceeded";
   }
 
   if (
@@ -34,7 +54,15 @@ export function productEligible(
     product.availableCountryCodes.length > 0 &&
     !product.availableCountryCodes.includes(request.destinationCountry)
   ) {
-    return false;
+    return "foreign_retailer";
+  }
+
+  if (
+    product.currency &&
+    request.currency &&
+    product.currency !== request.currency
+  ) {
+    return "foreign_retailer";
   }
 
   const excluded = request.excludeSubjectIds;
@@ -44,12 +72,12 @@ export function productEligible(
       (item) => item.subjectId && excluded.includes(item.subjectId)
     )
   ) {
-    return false;
+    return "excluded";
   }
 
   if (request.allowedForms && request.allowedForms.length > 0) {
     if (!request.allowedForms.includes(product.form)) {
-      return false;
+      return "form";
     }
   }
 
@@ -57,7 +85,7 @@ export function productEligible(
     request.dietaryPreference === "plant_based" &&
     (product.dietarySource === "fish" || product.omegaSource === "fish")
   ) {
-    return false;
+    return "wrong_source";
   }
 
   const algaeOnly =
@@ -69,48 +97,32 @@ export function productEligible(
     (product.omegaSource === "fish" ||
       isNonAlgaeOmegaLine({
         brandName: null,
-        facts: product.labelledContributions.map((item) => ({
-          amount: item.amount,
-          comparableAmount: null,
-          confidence: "high" as const,
-          itemType: "supplement" as const,
-          name: item.name,
-          normalizedName: item.name,
-          unit: item.unit
-        })),
+        facts: labelledFacts(product),
         title: product.title
       }))
   ) {
-    return false;
+    return "wrong_source";
   }
 
   if (
     request.dietaryPreference === "vegan" &&
     isAnimalDerivedSku({
       brandName: null,
-      facts: product.labelledContributions.map((item) => ({
-        amount: item.amount,
-        comparableAmount: null,
-        confidence: "high" as const,
-        itemType: "supplement" as const,
-        name: item.name,
-        normalizedName: item.name,
-        unit: item.unit
-      })),
+      facts: labelledFacts(product),
       title: product.title
     })
   ) {
-    return false;
+    return "vegan";
   }
 
   const sex = request.profile.sex;
 
   if (sex === "male" && product.productAudience === "female") {
-    return false;
+    return "life_stage";
   }
 
   if (sex === "female" && product.productAudience === "male") {
-    return false;
+    return "life_stage";
   }
 
   const prenatalSku =
@@ -127,13 +139,20 @@ export function productEligible(
       request.profile.lifeStage === "trying_to_conceive";
 
     if (sex === "male" || !prenatalLifeStage) {
-      return false;
+      return "life_stage";
     }
   }
 
   if (request.profile.lifeStage === "child" && product.productAudience === "male") {
-    return false;
+    return "life_stage";
   }
 
-  return true;
+  return null;
+}
+
+export function productEligible(
+  product: MatcherProduct,
+  request: CanonicalRequest
+) {
+  return productRejectionReason(product, request) == null;
 }
