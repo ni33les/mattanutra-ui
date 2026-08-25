@@ -180,6 +180,29 @@ function meetsCoverageFloor(
   return item.aggregateCoverage >= coverageFloor(best, config);
 }
 
+function coverageDominates(left: ScoredBasket, right: ScoredBasket) {
+  const ids = new Set([
+    ...left.coverageBySubject.keys(),
+    ...right.coverageBySubject.keys()
+  ]);
+  let better = false;
+
+  for (const id of ids) {
+    const leftUnits = left.coverageBySubject.get(id) ?? 0;
+    const rightUnits = right.coverageBySubject.get(id) ?? 0;
+
+    if (leftUnits < rightUnits) {
+      return false;
+    }
+
+    if (leftUnits > rightUnits) {
+      better = true;
+    }
+  }
+
+  return better;
+}
+
 export function compareBaskets(
   left: ScoredBasket,
   right: ScoredBasket,
@@ -208,6 +231,14 @@ export function compareBaskets(
     }
 
     if (leftOk) {
+      if (coverageDominates(left, right)) {
+        return -1;
+      }
+
+      if (coverageDominates(right, left)) {
+        return 1;
+      }
+
       return (
         left.dailyPills - right.dailyPills ||
         left.productCount - right.productCount ||

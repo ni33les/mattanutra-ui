@@ -454,8 +454,11 @@ export function leftoversFor(
 }
 
 export function matcherTelemetryFor(input: Readonly<{
+  ackMs?: number;
   leftovers: readonly PlanLeftover[];
+  matchMs?: number;
   rejected?: readonly RejectedCandidate[];
+  searchDeadlineMs?: number;
   selected: StackOption | null;
   snapshot?: CatalogueSnapshot;
   state: CanonicalPlanState;
@@ -473,6 +476,11 @@ export function matcherTelemetryFor(input: Readonly<{
     : [];
 
   return {
+    ...(input.ackMs != null ? { ackMs: input.ackMs } : {}),
+    ...(input.matchMs != null ? { matchMs: input.matchMs } : {}),
+    ...(input.searchDeadlineMs != null
+      ? { searchDeadlineMs: input.searchDeadlineMs }
+      : {}),
     ...(input.snapshot
       ? {
           availabilityAsOf: input.snapshot.availabilityAsOf,

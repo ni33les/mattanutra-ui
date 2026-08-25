@@ -170,6 +170,7 @@ export type TargetClassification = Readonly<{
 }>;
 
 export type MatcherTelemetry = Readonly<{
+  ackMs?: number;
   availabilityAsOf?: string;
   constraints: PlanRequirements &
     Readonly<{
@@ -178,6 +179,7 @@ export type MatcherTelemetry = Readonly<{
     }>;
   coveragePercent: number | null;
   leftovers: readonly PlanLeftover[];
+  matchMs?: number;
   matcherVersion: string;
   productIds: readonly string[];
   productSkus: readonly string[];
@@ -189,6 +191,7 @@ export type MatcherTelemetry = Readonly<{
     unit: CatalogueUnit;
   }>[];
   requestedNames: readonly string[];
+  searchDeadlineMs?: number;
   selectedOptionId: string | null;
   snapshotId?: string;
   targetClassifications?: readonly TargetClassification[];

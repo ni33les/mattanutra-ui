@@ -31,6 +31,7 @@ import {
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
+import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import type {
   CanonicalPlanState,
   PlanAnswer,
@@ -135,9 +136,11 @@ function snapshotForPin(previous: PlanResult): CatalogueSnapshot {
 }
 
 function composeResult(input: Readonly<{
+  ackMs?: number;
   alternatives: readonly StackOption[];
   locale: Locale;
   leftovers: PlanResult["leftovers"];
+  matchMs?: number;
   previous: PlanResult | null;
   rejected?: PlanResult["matcherTelemetry"]["rejectedAll"];
   selected: StackOption | null;
@@ -207,8 +210,11 @@ function composeResult(input: Readonly<{
     guidanceRulesVersion: input.snapshot.catalogueVersion,
     leftovers: input.leftovers,
     matcherTelemetry: matcherTelemetryFor({
+      ackMs: input.ackMs,
       leftovers: input.leftovers,
+      matchMs: input.matchMs,
       rejected: input.rejected ?? input.previous?.matcherTelemetry.rejectedAll,
+      searchDeadlineMs: DEFAULT_MATCHER_CONFIG.searchDeadlineMs,
       selected: input.selected,
       snapshot: input.snapshot,
       state: pinnedState
@@ -237,16 +243,25 @@ function composeResult(input: Readonly<{
 
 function buildResult(input: Readonly<{
   locale: Locale;
+  matchStartedAt?: number;
   previous: PlanResult | null;
   shownRevision: number;
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): PlanResult {
   const matched = matchPlan({ snapshot: input.snapshot, state: input.state });
+  const matchMs =
+    input.matchStartedAt != null ? Math.max(0, Date.now() - input.matchStartedAt) : undefined;
+  const ackMs =
+    matchMs == null
+      ? undefined
+      : Math.min(matchMs, PLAN_MATCH_RETURN_BUDGET_MS);
   return composeResult({
+    ackMs,
     alternatives: matched.alternatives,
     locale: input.locale,
     leftovers: matched.leftovers,
+    matchMs,
     previous: input.previous,
     rejected: matched.rejected,
     selected: matched.selected,
@@ -497,6 +512,7 @@ function processingResult(input: Readonly<{
     leftovers,
     matcherTelemetry: matcherTelemetryFor({
       leftovers,
+      searchDeadlineMs: DEFAULT_MATCHER_CONFIG.searchDeadlineMs,
       selected,
       state: pinnedState
     }),
@@ -912,7 +928,8 @@ export async function planTool(input: Readonly<{
     }
   }
 
-  const work = runPlanMatch(prepared, input, loadLiveCatalogue);
+  const matchStartedAt = Date.now();
+  const work = runPlanMatch(prepared, input, loadLiveCatalogue, matchStartedAt);
   const raced = await Promise.race([
     work.then((result) => ({ done: true as const, result })),
     sleep(PLAN_MATCH_RETURN_BUDGET_MS).then(() => ({ done: false as const }))
@@ -922,10 +939,18 @@ export async function planTool(input: Readonly<{
     return raced.result;
   }
 
+  const ackMs = Math.max(0, Date.now() - matchStartedAt);
   return successFromResult({
     locale: prepared.locale,
     planHandle: prepared.planHandle,
-    result: prepared.processing,
+    result: {
+      ...prepared.processing,
+      matcherTelemetry: {
+        ...prepared.processing.matcherTelemetry,
+        ackMs,
+        searchDeadlineMs: DEFAULT_MATCHER_CONFIG.searchDeadlineMs
+      }
+    },
     revision: prepared.revision
   });
 }
@@ -939,7 +964,8 @@ function runPlanMatch(
     scope: CapabilityScope;
     store: AgenticStore;
   }>,
-  loadLiveCatalogue: boolean
+  loadLiveCatalogue: boolean,
+  matchStartedAt: number
 ) {
   const key = matchInflightKey(prepared.planId, prepared.revision);
   const existing = inflightPlanMatches.get(key);
@@ -948,7 +974,12 @@ function runPlanMatch(
     return existing;
   }
 
-  const work = completePreparedPlan(prepared, input, loadLiveCatalogue).finally(() => {
+  const work = completePreparedPlan(
+    prepared,
+    input,
+    loadLiveCatalogue,
+    matchStartedAt
+  ).finally(() => {
     inflightPlanMatches.delete(key);
   });
   inflightPlanMatches.set(key, work);
@@ -964,7 +995,8 @@ async function completePreparedPlan(
     scope: CapabilityScope;
     store: AgenticStore;
   }>,
-  loadLiveCatalogue: boolean
+  loadLiveCatalogue: boolean,
+  matchStartedAt: number
 ): Promise<PlanToolSuccess | AgenticErrorResult> {
   const country =
     prepared.state.destinationCountry ||
@@ -1120,6 +1152,7 @@ async function completePreparedPlan(
         })
       : buildResult({
           locale,
+          matchStartedAt,
           previous,
           shownRevision,
           snapshot,

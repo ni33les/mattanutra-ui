@@ -366,6 +366,15 @@ function publicMatcherTelemetry(
   if (telemetry.matcherVersion) {
     payload.matcherVersion = telemetry.matcherVersion;
   }
+  if (telemetry.ackMs != null) {
+    payload.ackMs = telemetry.ackMs;
+  }
+  if (telemetry.matchMs != null) {
+    payload.matchMs = telemetry.matchMs;
+  }
+  if (telemetry.searchDeadlineMs != null) {
+    payload.searchDeadlineMs = telemetry.searchDeadlineMs;
+  }
   if (telemetry.coveragePercent != null) {
     payload.coveragePercent = telemetry.coveragePercent;
   }

@@ -43,6 +43,11 @@ export async function persistMatcherTelemetry(input: Readonly<{
           ...(telemetry.matcherVersion
             ? { matcherVersion: telemetry.matcherVersion }
             : {}),
+          ...(telemetry.ackMs != null ? { ackMs: telemetry.ackMs } : {}),
+          ...(telemetry.matchMs != null ? { matchMs: telemetry.matchMs } : {}),
+          ...(telemetry.searchDeadlineMs != null
+            ? { searchDeadlineMs: telemetry.searchDeadlineMs }
+            : {}),
           ...(telemetry.snapshotId ? { snapshotId: telemetry.snapshotId } : {}),
           ...(telemetry.targetClassifications
             ? { targetClassifications: telemetry.targetClassifications }
