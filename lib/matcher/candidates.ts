@@ -6,8 +6,8 @@ import { productKeysMatch } from "@/lib/product-key-matching";
 import { exposureExceedsCeiling } from "@/lib/matcher/safety";
 import type {
   CanonicalRequest,
-  CatalogSnapshot,
   CanonicalTarget,
+  CatalogSnapshot,
   DoseVariant,
   MatcherProduct,
   ProductGroup,
@@ -229,6 +229,74 @@ function variantLeavesTargetShortfall(
   return false;
 }
 
+function carrierTitle(title: string) {
+  return /beta\s*glucan|dong[-\s]?quai|soy[-\s]?germ|conceive|pre[-\s]?natal|pre\s*9|\b50\+|multivitamin|multi\s*plus/i.test(
+    title
+  );
+}
+
+export function productIsDedicatedForTarget(
+  product: MatcherProduct,
+  target: CanonicalTarget
+) {
+  const labelled = contributionFor(product, target.name, target.subjectId);
+
+  if (labelled.length < 1) {
+    return false;
+  }
+
+  const hay = product.title.toLowerCase();
+  const needle = target.name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const titleMentions = needle.length >= 2 && hay.includes(needle);
+  const factCount = product.labelledContributions.filter(
+    (item) => item.amount != null && item.amount > 0
+  ).length;
+
+  if (carrierTitle(product.title) && factCount > 1 && !titleMentions) {
+    return false;
+  }
+
+  return titleMentions || factCount === 1;
+}
+
+function dedicatedTargetCount(product: MatcherProduct, request: CanonicalRequest) {
+  return request.targets.reduce(
+    (sum, target) => sum + (productIsDedicatedForTarget(product, target) ? 1 : 0),
+    0
+  );
+}
+
+function labelledTargetCount(product: MatcherProduct, request: CanonicalRequest) {
+  return request.targets.reduce(
+    (sum, target) =>
+      sum +
+      (contributionFor(product, target.name, target.subjectId).length > 0 ? 1 : 0),
+    0
+  );
+}
+
+function compareDedicatedThenId(
+  left: MatcherProduct,
+  right: MatcherProduct,
+  request: CanonicalRequest
+) {
+  const labelled =
+    labelledTargetCount(right, request) - labelledTargetCount(left, request);
+
+  if (labelled !== 0) {
+    return labelled;
+  }
+
+  const dedicated =
+    dedicatedTargetCount(right, request) - dedicatedTargetCount(left, request);
+
+  if (dedicated !== 0) {
+    return dedicated;
+  }
+
+  return left.productId.localeCompare(right.productId);
+}
+
 function mappedToRequest(
   product: MatcherProduct,
   request: CanonicalRequest
@@ -307,11 +375,15 @@ export function compileGroups(
   const products = [...catalog.products].sort((left, right) =>
     left.productId.localeCompare(right.productId)
   );
-  const mapped = products.filter((product) => mappedToRequest(product, request));
-  const labelled = products.filter(
-    (product) =>
-      !mappedToRequest(product, request) && labelledForRequest(product, request)
-  );
+  const mapped = products
+    .filter((product) => mappedToRequest(product, request))
+    .sort((left, right) => compareDedicatedThenId(left, right, request));
+  const labelled = products
+    .filter(
+      (product) =>
+        !mappedToRequest(product, request) && labelledForRequest(product, request)
+    )
+    .sort((left, right) => compareDedicatedThenId(left, right, request));
   const rest = products.filter(
     (product) =>
       !mappedToRequest(product, request) && !labelledForRequest(product, request)
@@ -401,6 +473,8 @@ function variantRankForTarget(
 
   return {
     coverage: coverageUnits(exposure, target.requested.units),
+    dedicated: productIsDedicatedForTarget(group.product, target) ? 1 : 0,
+    labelledTargets: labelledTargetCount(group.product, request),
     pills: variant.dailyPills,
     price: group.product.unitPriceMinor * variant.dailyUnits,
     productId: group.productId
@@ -432,11 +506,23 @@ export function bestGroupForTarget(
       if (
         !bestRank ||
         rank.coverage > bestRank.coverage ||
-        (rank.coverage === bestRank.coverage && rank.pills < bestRank.pills) ||
         (rank.coverage === bestRank.coverage &&
+          rank.labelledTargets > bestRank.labelledTargets) ||
+        (rank.coverage === bestRank.coverage &&
+          rank.labelledTargets === bestRank.labelledTargets &&
+          rank.dedicated > bestRank.dedicated) ||
+        (rank.coverage === bestRank.coverage &&
+          rank.labelledTargets === bestRank.labelledTargets &&
+          rank.dedicated === bestRank.dedicated &&
+          rank.pills < bestRank.pills) ||
+        (rank.coverage === bestRank.coverage &&
+          rank.labelledTargets === bestRank.labelledTargets &&
+          rank.dedicated === bestRank.dedicated &&
           rank.pills === bestRank.pills &&
           rank.price < bestRank.price) ||
         (rank.coverage === bestRank.coverage &&
+          rank.labelledTargets === bestRank.labelledTargets &&
+          rank.dedicated === bestRank.dedicated &&
           rank.pills === bestRank.pills &&
           rank.price === bestRank.price &&
           rank.productId < bestRank.productId)

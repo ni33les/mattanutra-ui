@@ -10,6 +10,10 @@ describe("Phase 5 discovery copy", () => {
     assert.doesNotMatch(description, /K2 unrecognized/i);
     assert.doesNotMatch(description, /unrecognised.{0,40}Vitamin K2/i);
     assert.doesNotMatch(description, /welness/i);
+    assert.match(
+      description,
+      /processing plan is polled with the same idempotencyKey and planHandle/i
+    );
     for (const item of FIXTURE_SUPPLEMENTS) {
       assert.match(
         description,

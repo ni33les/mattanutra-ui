@@ -24,8 +24,11 @@ function guidance(input: Readonly<{
   severity: SafetyGuidance["severity"];
   supplementIds: readonly string[];
   exposure?: number | null;
+  nutrientName?: string | null;
   requested?: number | null;
+  sourceScope?: SafetyGuidance["sourceScope"];
   threshold?: number | null;
+  unit?: string | null;
 }>): SafetyGuidance {
   const messageKey = `guidance.${input.code}`;
   const family =
@@ -49,11 +52,14 @@ function guidance(input: Readonly<{
     guidanceId,
     message: agenticMessage(input.locale, messageKey),
     messageKey,
+    nutrientName: input.nutrientName ?? null,
     productIds: input.productIds,
     rulesVersion: GUIDANCE_RULES_VERSION,
     severity: input.severity,
+    sourceScope: input.sourceScope ?? null,
     supplementIds: input.supplementIds,
-    threshold: input.threshold ?? null
+    threshold: input.threshold ?? null,
+    unit: input.unit ?? null
   };
 }
 
@@ -169,11 +175,14 @@ export function evaluateSafety(input: Readonly<{
         code: "dose_review_required",
         exposure: row.totalExposureAmount,
         locale: input.locale,
+        nutrientName: row.name,
         productIds,
         requested: row.requestedAmount,
         severity: "blocking",
+        sourceScope: "supplemental",
         supplementIds: [row.supplementId],
-        threshold: null
+        threshold: null,
+        unit: row.unit
       }));
     } else if (
       limit == null &&
@@ -185,35 +194,44 @@ export function evaluateSafety(input: Readonly<{
         code: "dose_review_required",
         exposure: row.totalExposureAmount,
         locale: input.locale,
+        nutrientName: row.name,
         productIds,
         requested: row.requestedAmount,
         severity: "blocking",
+        sourceScope: "supplemental",
         supplementIds: [row.supplementId],
-        threshold: null
+        threshold: null,
+        unit: row.unit
       }));
-    } else if (limit != null && row.totalExposureAmount > limit) {
+    } else if (limit != null && Number.isFinite(limit) && limit > 0 && row.totalExposureAmount > limit) {
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
         exposure: row.totalExposureAmount,
         locale: input.locale,
+        nutrientName: row.name,
         productIds,
         requested: row.requestedAmount,
         severity: "blocking",
+        sourceScope: "supplemental",
         supplementIds: [row.supplementId],
-        threshold: limit
+        threshold: limit,
+        unit: row.unit
       }));
-    } else if (limit != null && row.totalExposureAmount >= limit) {
+    } else if (limit != null && Number.isFinite(limit) && limit > 0 && row.totalExposureAmount >= limit) {
       items.push(guidance({
         action: "acknowledge",
         code: "dose_review_required",
         exposure: row.totalExposureAmount,
         locale: input.locale,
+        nutrientName: row.name,
         productIds,
         requested: row.requestedAmount,
         severity: "high",
+        sourceScope: "supplemental",
         supplementIds: [row.supplementId],
-        threshold: limit
+        threshold: limit,
+        unit: row.unit
       }));
     }
 
@@ -265,17 +283,33 @@ export function evaluateSafety(input: Readonly<{
       subjectId: nutrient.name
     });
 
-    if (limit != null && nutrient.amount > limit) {
+    if (
+      limit != null &&
+      Number.isFinite(limit) &&
+      limit > 0 &&
+      nutrient.amount > limit
+    ) {
+      const contributors = (input.selected?.basket ?? [])
+        .filter((item) =>
+          (item.incidentalNutrients ?? []).some(
+            (fact) =>
+              fact.name.trim().toLowerCase() === nutrient.name.trim().toLowerCase()
+          )
+        )
+        .map((item) => item.productId);
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
         exposure: nutrient.amount,
         locale: input.locale,
-        productIds,
+        nutrientName: nutrient.name,
+        productIds: contributors.length > 0 ? contributors : productIds,
         requested: 0,
         severity: "blocking",
+        sourceScope: "supplemental",
         supplementIds: [],
-        threshold: limit
+        threshold: limit,
+        unit: nutrient.unit
       }));
     }
   }
@@ -366,6 +400,38 @@ export function safetyQuestions(input: Readonly<{
         questionId: `q_gap_${row.supplementId}`
       });
     }
+  }
+
+  for (const leftover of input.state.leftovers) {
+    if (
+      leftover.reason !== "not_in_catalogue" &&
+      leftover.reason !== "uncovered"
+    ) {
+      continue;
+    }
+
+    if (leftover.severity !== "high" && leftover.severity !== "medium") {
+      continue;
+    }
+
+    const gapId = leftoverGapId(leftover);
+
+    if (input.state.acceptedGaps.some((gap) => gap.supplementId === gapId)) {
+      continue;
+    }
+
+    questions.push({
+      choices: [
+        {
+          choice: `accept_gap:${gapId}`,
+          effect: `acceptedGap=${gapId}`,
+          label: agenticMessage(input.locale, "plan.question.accept_gap")
+        }
+      ],
+      prompt: agenticMessage(input.locale, "plan.question.accept_gap"),
+      promptKey: "plan.question.accept_gap",
+      questionId: `q_gap_${gapId}`
+    });
   }
 
   const ackable = input.guidance.filter((item) => item.action === "acknowledge");
@@ -533,5 +599,22 @@ export function planStatus(input: Readonly<{
     return "needs_input";
   }
 
+  const pendingLeftovers = input.state.leftovers.filter(
+    (item) =>
+      (item.reason === "not_in_catalogue" || item.reason === "uncovered") &&
+      (item.severity === "high" || item.severity === "medium") &&
+      !input.state.acceptedGaps.some(
+        (gap) => gap.supplementId === leftoverGapId(item)
+      )
+  );
+
+  if (pendingLeftovers.length > 0) {
+    return "needs_input";
+  }
+
   return "ready";
+}
+
+export function leftoverGapId(item: Readonly<{ name: string; supplementId?: string }>) {
+  return item.supplementId || `leftover:${item.name}`;
 }

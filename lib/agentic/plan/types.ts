@@ -261,11 +261,14 @@ export type SafetyGuidance = Readonly<{
   guidanceId: string;
   message: string;
   messageKey: string;
+  nutrientName: string | null;
   productIds: readonly string[];
   rulesVersion: string;
   severity: "blocking" | "high" | "info";
+  sourceScope: "supplemental" | "total" | null;
   supplementIds: readonly string[];
   threshold: number | null;
+  unit: string | null;
 }>;
 
 export type PlanQuestion = Readonly<{

@@ -54,7 +54,7 @@ export const FIXTURE_SUPPLEMENTS: readonly CatalogueSupplement[] = [
   supplement("iron", "Iron", ["Ferrous", "Ferrous sulfate", "Ferrous sulphate"], ["mg"]),
   supplement("coq10", "CoQ10", ["Ubiquinone", "Ubiquinol", "Coenzyme Q10"], ["mg"]),
   supplement("collagen", "Collagen", ["Collagen peptides", "Hydrolyzed collagen"], ["g", "mg"]),
-  supplement("sterols", "Plant sterols", ["Phytosterols", "Plant sterol"], ["mg", "g"]),
+  supplement("sterols", "Plant sterols", ["Phytosterols", "Plant sterol", "Plant stanols", "Stanols", "Plant sterols / stanols", "Sterols"], ["mg", "g"]),
   supplement("creatine", "Creatine", ["Creatine monohydrate", "Creapure"], ["g", "mg"]),
   supplement("folate", "Folate", ["Folic acid", "Vitamin B9", "Folacin", "Methylfolate"], ["mcg", "mg"]),
   supplement("calcium", "Calcium", ["Calcium citrate", "Calcium carbonate"], ["mg", "g"]),
@@ -193,9 +193,13 @@ const PLAN_COPY_ALIASES = new Set([
 ]);
 
 export function recognisedNamesForPlanCopy() {
-  const names = FIXTURE_SUPPLEMENTS.map((item) => item.name);
+  const names: string[] = [];
 
   for (const item of FIXTURE_SUPPLEMENTS) {
+    if (!names.includes(item.name)) {
+      names.push(item.name);
+    }
+
     for (const alias of item.aliases) {
       if (PLAN_COPY_ALIASES.has(alias) && !names.includes(alias)) {
         names.push(alias);

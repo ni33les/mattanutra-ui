@@ -1,4 +1,5 @@
 import { compileGroups, groupsBySeller } from "@/lib/matcher/candidates";
+import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
 import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
@@ -74,6 +75,7 @@ export function match(
   config: MatcherConfig = DEFAULT_MATCHER_CONFIG,
   compiledGroups?: readonly ProductGroup[]
 ): MatchResult {
+  request = orderInvariantRequest(request);
   const baselineExposure = aggregateDailyExposure({
     current: request.currentSupplements,
     variants: []

@@ -175,9 +175,11 @@ export type SafetyFinding = Readonly<{
   exposureUnits: bigint | null;
   family: string;
   guidanceId: string;
+  nutrientName: string | null;
   ruleId: string;
   subjectId: string | null;
   thresholdUnits: bigint | null;
+  unit: string | null;
 }>;
 
 export type SafetyResult = Readonly<{

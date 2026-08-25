@@ -5,7 +5,7 @@ import {
   MATERIAL_PILL_DELTA,
   MATERIAL_PRICE_MINOR
 } from "@/lib/matcher/config";
-import { contributionFor } from "@/lib/matcher/candidates";
+import { contributionFor, productIsDedicatedForTarget } from "@/lib/matcher/candidates";
 import {
   aggregateCoverage,
   coverageUnits,
@@ -251,10 +251,15 @@ export function compareBaskets(
         return 1;
       }
 
+      const incidental = left.incidentalCount - right.incidentalCount;
+
+      if (incidental !== 0) {
+        return incidental;
+      }
+
       return (
         left.priceMinor - right.priceMinor ||
         left.oversupplyScore - right.oversupplyScore ||
-        left.incidentalCount - right.incidentalCount ||
         compareDefault(left, right)
       );
     }
@@ -413,6 +418,13 @@ export function salvagePartialBasket(input: Readonly<{
           .map((variant) => ({ group, variant }))
       )
       .sort((left, right) => {
+        const leftDedicated = productIsDedicatedForTarget(left.group.product, target);
+        const rightDedicated = productIsDedicatedForTarget(right.group.product, target);
+
+        if (leftDedicated !== rightDedicated) {
+          return leftDedicated ? -1 : 1;
+        }
+
         const want = target.requested.units;
         const leftUnits =
           left.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);

@@ -25,6 +25,20 @@ function guidanceId(code: string, family: string) {
   return ["gdn", code, family].join(":");
 }
 
+function pushFinding(
+  findings: SafetyFinding[],
+  input: Omit<SafetyFinding, "nutrientName" | "unit"> & {
+    nutrientName?: string | null;
+    unit?: string | null;
+  }
+) {
+  findings.push({
+    ...input,
+    nutrientName: input.nutrientName ?? null,
+    unit: input.unit ?? null
+  });
+}
+
 function nameOf(request: CanonicalRequest, subjectId: string | null) {
   if (!subjectId) {
     return "";
@@ -34,6 +48,18 @@ function nameOf(request: CanonicalRequest, subjectId: string | null) {
     request.targets.find((item) => item.subjectId === subjectId)?.name ??
     request.currentSupplements.find((item) => item.subjectId === subjectId)?.name ??
     subjectId
+  );
+}
+
+function unitOf(request: CanonicalRequest, subjectId: string | null) {
+  if (!subjectId) {
+    return null;
+  }
+
+  return (
+    request.targets.find((item) => item.subjectId === subjectId)?.requestedUnit ??
+    request.currentSupplements.find((item) => item.subjectId === subjectId)?.unit ??
+    null
   );
 }
 
@@ -121,7 +147,7 @@ export function evaluateSafety(input: Readonly<{
   const productIds = [...new Set(input.variants.map((item) => item.productId))].sort();
 
   if (matcherSafetyCeilingsUnavailable()) {
-    findings.push({
+    pushFinding(findings, {
       action: "block",
       code: "dose_review_required",
       contributors: productIds,
@@ -155,7 +181,7 @@ export function evaluateSafety(input: Readonly<{
     input.request.medicationCodes.includes("apixaban") &&
     omegaIds.length > 0
   ) {
-    findings.push({
+    pushFinding(findings, {
       action: "acknowledge",
       code: "medication_interaction",
       contributors: productIds,
@@ -171,7 +197,7 @@ export function evaluateSafety(input: Readonly<{
   }
 
   if (input.request.conditionCodes.includes("ckd") && magnesiumIds.length > 0) {
-    findings.push({
+    pushFinding(findings, {
       action: "block",
       code: "condition_review_required",
       contributors: productIds,
@@ -207,44 +233,50 @@ export function evaluateSafety(input: Readonly<{
           requested > BigInt(0) &&
           total * BigInt(100) > requested * BigInt(125))
       ) {
-        findings.push({
+        pushFinding(findings, {
           action: "block",
           code: "dose_review_required",
           contributors: productIds,
           exposureUnits: total,
           family: "dose",
           guidanceId: guidanceId("dose_review_required", "dose"),
+          nutrientName: nameOf(input.request, subjectId) || null,
           ruleId: `ul:missing:${subjectId}`,
           subjectId,
-          thresholdUnits: null
+          thresholdUnits: null,
+          unit: unitOf(input.request, subjectId)
         });
       }
       continue;
     }
 
     if (total > threshold.units) {
-      findings.push({
+      pushFinding(findings, {
         action: "block",
         code: "dose_review_required",
         contributors: productIds,
         exposureUnits: total,
         family: "dose",
         guidanceId: guidanceId("dose_review_required", "dose"),
+        nutrientName: nameOf(input.request, subjectId) || null,
         ruleId: `ul:${subjectId}`,
         subjectId,
-        thresholdUnits: threshold.units
+        thresholdUnits: threshold.units,
+        unit: unitOf(input.request, subjectId)
       });
     } else if (total === threshold.units) {
-      findings.push({
+      pushFinding(findings, {
         action: "acknowledge",
         code: "dose_review_required",
         contributors: productIds,
         exposureUnits: total,
         family: "dose",
         guidanceId: guidanceId("dose_review_required", "dose"),
+        nutrientName: nameOf(input.request, subjectId) || null,
         ruleId: `ul:${subjectId}`,
         subjectId,
-        thresholdUnits: threshold.units
+        thresholdUnits: threshold.units,
+        unit: unitOf(input.request, subjectId)
       });
     }
   }
@@ -315,22 +347,29 @@ export function evaluateSafety(input: Readonly<{
     }
 
     if (incidental.units > threshold.units) {
-      findings.push({
+      const unit =
+        input.products
+          .flatMap((item) => item.labelledContributions)
+          .find((fact) => (fact.subjectId || fact.name) === incidental.subjectId)
+          ?.unit ?? ceiling.maxUnit;
+      pushFinding(findings, {
         action: "block",
         code: "dose_review_required",
         contributors: productIds,
         exposureUnits: incidental.units,
         family: "dose",
         guidanceId: guidanceId("dose_review_required", "dose"),
+        nutrientName: incidental.name,
         ruleId: `ul:incidental:${incidental.subjectId}`,
         subjectId: incidental.subjectId,
-        thresholdUnits: threshold.units
+        thresholdUnits: threshold.units,
+        unit
       });
     }
   }
 
   if (zincSubject && zincCurrent > BigInt(0) && zincSelected > BigInt(0)) {
-    findings.push({
+    pushFinding(findings, {
       action: "acknowledge",
       code: "duplicate_or_overlap",
       contributors: productIds,
@@ -355,7 +394,7 @@ export function evaluateSafety(input: Readonly<{
     });
 
     if (pediatric.length > 0) {
-      findings.push({
+      pushFinding(findings, {
         action: "block",
         code: "pediatric_review_required",
         contributors: productIds,

@@ -46,7 +46,33 @@ export function canonicalizeTargets(input: Readonly<{
     });
   }
 
+  targets.sort(compareCanonicalTargetOrder);
   return { leftovers, targets };
+}
+
+export function compareCanonicalTargetOrder(
+  left: Readonly<{ name: string; requestedUnit?: string; subjectId: string; unit?: string }>,
+  right: Readonly<{ name: string; requestedUnit?: string; subjectId: string; unit?: string }>
+) {
+  return (
+    left.subjectId.localeCompare(right.subjectId) ||
+    left.name.localeCompare(right.name) ||
+    (left.requestedUnit ?? left.unit ?? "").localeCompare(
+      right.requestedUnit ?? right.unit ?? ""
+    )
+  );
+}
+
+export function orderInvariantRequest(request: CanonicalRequest): CanonicalRequest {
+  return {
+    ...request,
+    currentSupplements: [...request.currentSupplements].sort(
+      (left, right) =>
+        left.subjectId.localeCompare(right.subjectId) ||
+        left.sourceId.localeCompare(right.sourceId)
+    ),
+    targets: [...request.targets].sort(compareCanonicalTargetOrder)
+  };
 }
 
 export function canonicalizeCurrents(
