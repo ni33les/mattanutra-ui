@@ -151,7 +151,35 @@ export function evaluateSafety(input: Readonly<{
       subjectId: row.supplementId
     });
 
-    if (limit != null && row.totalExposureAmount >= limit) {
+    if (
+      limit == null &&
+      "coveragePercent" in row &&
+      row.coveragePercent > 125
+    ) {
+      items.push(guidance({
+        action: "block",
+        code: "dose_review_required",
+        exposure: row.totalExposureAmount,
+        locale: input.locale,
+        productIds,
+        requested: row.requestedAmount,
+        severity: "blocking",
+        supplementIds: [row.supplementId],
+        threshold: null
+      }));
+    } else if (limit != null && row.totalExposureAmount > limit) {
+      items.push(guidance({
+        action: "block",
+        code: "dose_review_required",
+        exposure: row.totalExposureAmount,
+        locale: input.locale,
+        productIds,
+        requested: row.requestedAmount,
+        severity: "blocking",
+        supplementIds: [row.supplementId],
+        threshold: limit
+      }));
+    } else if (limit != null && row.totalExposureAmount >= limit) {
       items.push(guidance({
         action: "acknowledge",
         code: "dose_review_required",
@@ -234,10 +262,17 @@ export function safetyQuestions(input: Readonly<{
     });
   }
 
+  const blockingDose = input.guidance.some(
+    (item) => item.code === "dose_review_required" && item.action === "block"
+  );
+
   for (const row of input.selected?.coverage ?? []) {
+    if (blockingDose && row.status === "upper_limit_risk") {
+      continue;
+    }
+
     if (
       row.status !== "covered" &&
-      row.status !== "over_target" &&
       !input.state.acceptedGaps.some((gap) => gap.supplementId === row.supplementId)
     ) {
       questions.push({
@@ -373,14 +408,6 @@ export function planStatus(input: Readonly<{
   state: CanonicalPlanState;
   unmetRequirements: readonly string[];
 }>): "blocked" | "needs_input" | "ready" {
-  if (
-    !input.selected ||
-    input.selected.basket.length === 0 ||
-    input.selected.coverage.every((row) => row.status === "uncovered")
-  ) {
-    return "blocked";
-  }
-
   if (input.guidance.some((item) => item.action === "block")) {
     return "blocked";
   }
@@ -389,12 +416,31 @@ export function planStatus(input: Readonly<{
     return "needs_input";
   }
 
+  if (
+    !input.selected ||
+    input.selected.basket.length === 0 ||
+    input.selected.coverage.every((row) => row.status === "uncovered")
+  ) {
+    return "blocked";
+  }
+
   if (input.questions.length > 0) {
     return "needs_input";
   }
 
+  if (
+    input.selected.coverage.some(
+      (row) =>
+        row.status === "upper_limit_risk" &&
+        row.upperLimitAmount != null &&
+        row.totalExposureAmount > row.upperLimitAmount
+    )
+  ) {
+    return "blocked";
+  }
+
   const gaps = input.selected.coverage.filter(
-    (row) => row.status !== "covered" && row.status !== "over_target"
+    (row) => row.status !== "covered"
   );
 
   if (

@@ -401,6 +401,14 @@ export function unmetRequirementsFor(input: Readonly<{
   const selected = input.option;
 
   if (!selected) {
+    if (input.state.requirements.maxPriceMinor != null) {
+      unmet.push("maxPriceMinor");
+    }
+
+    if (input.state.requirements.maxDailyPills != null) {
+      unmet.push("maxDailyPills");
+    }
+
     return unmet;
   }
 

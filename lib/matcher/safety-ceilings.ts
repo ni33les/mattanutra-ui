@@ -107,30 +107,59 @@ function indexCeilings(ceilings: readonly SafetyCeiling[]): CeilingIndex {
   return index;
 }
 
+const NIH_FALLBACK_CEILINGS: ReadonlyArray<{
+  maxAmount: number;
+  maxUnit: MatcherUnit;
+  pattern: RegExp;
+}> = [
+  { maxAmount: 350, maxUnit: "mg", pattern: /\bmagnesium\b/i },
+  { maxAmount: 4000, maxUnit: "IU", pattern: /\bvitamin\s*d|\bd3\b|\bcholecalciferol\b/i },
+  { maxAmount: 40, maxUnit: "mg", pattern: /\bzinc\b/i }
+];
+
+export function fallbackSafetyCeiling(input: Readonly<{
+  name?: string;
+  subjectId: string;
+}>): SafetyCeiling | null {
+  const name = `${input.name ?? ""} ${input.subjectId}`;
+
+  for (const item of NIH_FALLBACK_CEILINGS) {
+    if (item.pattern.test(name)) {
+      return {
+        maxAmount: item.maxAmount,
+        maxUnit: item.maxUnit,
+        name: input.name?.trim() || input.subjectId,
+        subjectId: input.subjectId
+      };
+    }
+  }
+
+  return null;
+}
+
 export function safetyCeilingFor(
   ceilings: readonly SafetyCeiling[],
   input: Readonly<{ name?: string; subjectId: string }>
 ) {
-  if (ceilings.length === 0) {
-    return null;
+  if (ceilings.length > 0) {
+    const index = indexCeilings(ceilings);
+    const raw = input.subjectId.trim().toLowerCase();
+    const byId =
+      index.byId.get(raw) ??
+      index.byId.get(raw.replace(/^supplement:/, "")) ??
+      index.byId.get(raw.replace(/^sup_/, ""));
+
+    if (byId) {
+      return byId;
+    }
+
+    const name = normalizeName(input.name ?? "");
+    const byName = name ? index.byName.get(name) ?? null : null;
+
+    if (byName) {
+      return byName;
+    }
   }
 
-  const index = indexCeilings(ceilings);
-  const raw = input.subjectId.trim().toLowerCase();
-  const byId =
-    index.byId.get(raw) ??
-    index.byId.get(raw.replace(/^supplement:/, "")) ??
-    index.byId.get(raw.replace(/^sup_/, ""));
-
-  if (byId) {
-    return byId;
-  }
-
-  const name = normalizeName(input.name ?? "");
-
-  if (!name) {
-    return null;
-  }
-
-  return index.byName.get(name) ?? null;
+  return fallbackSafetyCeiling(input);
 }

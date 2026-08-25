@@ -293,9 +293,21 @@ function bindSafetyAcknowledgement(input: Readonly<{
   state: CanonicalPlanState;
 }>): CanonicalPlanState {
   if (input.incomingAck) {
+    const previousTargets = input.previous?.requestSnapshot.targets ?? [];
+    const sameExposure = previousTargets.length === input.state.targets.length &&
+      previousTargets.every((item, index) => {
+        const next = input.state.targets[index];
+        return (
+          next != null &&
+          item.supplementId === next.supplementId &&
+          item.amount === next.amount &&
+          item.unit === next.unit
+        );
+      });
+
     return {
       ...input.state,
-      safetyAcknowledgement: input.incomingAck
+      safetyAcknowledgement: sameExposure ? input.incomingAck : null
     };
   }
 

@@ -185,12 +185,33 @@ export function evaluateSafety(input: Readonly<{
 
   for (const subjectId of ceilingSubjects) {
     const threshold = ceilingThreshold(input.request, subjectId);
+    const total = unitsOrZero(input.exposure.totals, subjectId);
+    const isTarget = input.request.targets.some((item) => item.subjectId === subjectId);
 
     if (!threshold) {
+      const requested = input.request.targets.find(
+        (item) => item.subjectId === subjectId
+      )?.requested.units;
+      if (
+        isTarget &&
+        requested != null &&
+        requested > BigInt(0) &&
+        total * BigInt(100) > requested * BigInt(125)
+      ) {
+        findings.push({
+          action: "block",
+          code: "dose_review_required",
+          contributors: productIds,
+          exposureUnits: total,
+          family: "dose",
+          guidanceId: guidanceId("dose_review_required", "dose"),
+          ruleId: `ul:missing:${subjectId}`,
+          subjectId,
+          thresholdUnits: null
+        });
+      }
       continue;
     }
-
-    const total = unitsOrZero(input.exposure.totals, subjectId);
 
     if (total > threshold.units) {
       findings.push({

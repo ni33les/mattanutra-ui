@@ -230,4 +230,118 @@ describe("matcher safety engine", () => {
       false
     );
   });
+
+  it("blocks magnesium exposure above the NIH supplemental UL when no admin ceiling is loaded", () => {
+    const amount = scaleAmount({
+      amount: 2046,
+      subjectId: "sup_mag",
+      subjectName: "Magnesium",
+      unit: "mg"
+    });
+    assert.equal("reason" in amount, false);
+    if ("reason" in amount) {
+      return;
+    }
+    const requested = scaleAmount({
+      amount: 200,
+      subjectId: "sup_mag",
+      subjectName: "Magnesium",
+      unit: "mg"
+    });
+    assert.equal("reason" in requested, false);
+    if ("reason" in requested) {
+      return;
+    }
+    const variant: DoseVariant = {
+      contributions: new Map([["sup_mag", amount]]),
+      dailyPills: 1,
+      dailyUnits: 1,
+      productId: "prd_mag",
+      unknownSafetyAmount: false,
+      variantId: "prd_mag:x1"
+    };
+    const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
+    assert.equal("reason" in exposure, false);
+    if ("reason" in exposure) {
+      return;
+    }
+    const safety = evaluateSafety({
+      exposure,
+      products: [],
+      request: request({
+        safetyCeilings: [],
+        targets: [
+          {
+            name: "Magnesium",
+            requested,
+            requestedAmount: 200,
+            requestedUnit: "mg",
+            subjectId: "sup_mag"
+          }
+        ]
+      }),
+      variants: [variant]
+    });
+    assert.equal(safety.hardBlocked, true);
+    assert.equal(
+      safety.findings.some(
+        (item) => item.code === "dose_review_required" && item.action === "block"
+      ),
+      true
+    );
+  });
+
+  it("blocks vitamin D exposure above 4000 IU when no admin ceiling is loaded", () => {
+    const amount = scaleAmount({
+      amount: 4600,
+      subjectId: "sup_d3",
+      subjectName: "Vitamin D3",
+      unit: "IU"
+    });
+    assert.equal("reason" in amount, false);
+    if ("reason" in amount) {
+      return;
+    }
+    const requested = scaleAmount({
+      amount: 2000,
+      subjectId: "sup_d3",
+      subjectName: "Vitamin D3",
+      unit: "IU"
+    });
+    assert.equal("reason" in requested, false);
+    if ("reason" in requested) {
+      return;
+    }
+    const variant: DoseVariant = {
+      contributions: new Map([["sup_d3", amount]]),
+      dailyPills: 1,
+      dailyUnits: 1,
+      productId: "prd_d3",
+      unknownSafetyAmount: false,
+      variantId: "prd_d3:x1"
+    };
+    const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
+    assert.equal("reason" in exposure, false);
+    if ("reason" in exposure) {
+      return;
+    }
+    const safety = evaluateSafety({
+      exposure,
+      products: [],
+      request: request({
+        safetyCeilings: [],
+        targets: [
+          {
+            name: "Vitamin D3",
+            requested,
+            requestedAmount: 2000,
+            requestedUnit: "IU",
+            subjectId: "sup_d3"
+          }
+        ]
+      }),
+      variants: [variant]
+    });
+    assert.equal(safety.hardBlocked, true);
+  });
 });

@@ -527,14 +527,8 @@ describe("agentic P1 pack fixes", () => {
         locale: "en",
         optimization: "balanced",
         profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
-        requirements: { maxPriceMinor: 100000 },
-        targets: [
-          { amount: 2000, name: "Vitamin D3", unit: "IU" },
-          { amount: 1000, name: "Omega-3", unit: "mg" },
-          { amount: 300, name: "Magnesium", unit: "mg" },
-          { amount: 1000, name: "Vitamin B12", unit: "mcg" },
-          { amount: 1000, name: "Vitamin C", unit: "mg" }
-        ]
+        requirements: { maxPriceMinor: 1000 },
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
     });
     assert.equal(result.status, "needs_input");
@@ -552,14 +546,8 @@ describe("agentic P1 pack fixes", () => {
         locale: "en",
         optimization: "balanced",
         profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
-        requirements: { maxPriceMinor: 100000 },
-        targets: [
-          { amount: 2000, name: "Vitamin D3", unit: "IU" },
-          { amount: 1000, name: "Omega-3", unit: "mg" },
-          { amount: 300, name: "Magnesium", unit: "mg" },
-          { amount: 1000, name: "Vitamin B12", unit: "mcg" },
-          { amount: 1000, name: "Vitamin C", unit: "mg" }
-        ]
+        requirements: { maxPriceMinor: 1000 },
+        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
       }
     });
     assert.equal(relaxed.status, "ready");
