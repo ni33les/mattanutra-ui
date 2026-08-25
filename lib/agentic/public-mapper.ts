@@ -369,11 +369,20 @@ function publicMatcherTelemetry(
   if (telemetry.ackMs != null) {
     payload.ackMs = telemetry.ackMs;
   }
+  if (telemetry.catalogueMs != null) {
+    payload.catalogueMs = telemetry.catalogueMs;
+  }
   if (telemetry.matchMs != null) {
     payload.matchMs = telemetry.matchMs;
   }
   if (telemetry.searchDeadlineMs != null) {
     payload.searchDeadlineMs = telemetry.searchDeadlineMs;
+  }
+  if (telemetry.searchMs != null) {
+    payload.searchMs = telemetry.searchMs;
+  }
+  if (telemetry.serializeMs != null) {
+    payload.serializeMs = telemetry.serializeMs;
   }
   if (telemetry.coveragePercent != null) {
     payload.coveragePercent = telemetry.coveragePercent;

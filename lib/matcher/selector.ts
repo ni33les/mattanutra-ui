@@ -231,6 +231,18 @@ export function compareBaskets(
     }
 
     if (leftOk) {
+      const pills = left.dailyPills - right.dailyPills;
+
+      if (pills !== 0) {
+        return pills;
+      }
+
+      const products = left.productCount - right.productCount;
+
+      if (products !== 0) {
+        return products;
+      }
+
       if (coverageDominates(left, right)) {
         return -1;
       }
@@ -240,8 +252,6 @@ export function compareBaskets(
       }
 
       return (
-        left.dailyPills - right.dailyPills ||
-        left.productCount - right.productCount ||
         left.priceMinor - right.priceMinor ||
         left.oversupplyScore - right.oversupplyScore ||
         left.incidentalCount - right.incidentalCount ||

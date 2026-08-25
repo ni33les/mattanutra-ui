@@ -82,6 +82,111 @@
       "name": "Vitamin A",
       "sourceScope": "supplemental",
       "unit": "mcg"
+    },
+    {
+      "aliases": ["Ascorbic acid", "Ascorbate"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminC-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 400 },
+        { "lifeStage": "child_4_8", "maxAmount": 650 },
+        { "lifeStage": "child_9_13", "maxAmount": 1200 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 1800 },
+        { "lifeStage": "adult", "maxAmount": 2000 },
+        { "lifeStage": "pregnant", "maxAmount": 2000 },
+        { "lifeStage": "breastfeeding", "maxAmount": 2000 }
+      ],
+      "name": "Vitamin C",
+      "sourceScope": "supplemental",
+      "unit": "mg"
+    },
+    {
+      "aliases": ["Folic acid", "Vitamin B9", "Folacin", "Methylfolate"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/Folate-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 300 },
+        { "lifeStage": "child_4_8", "maxAmount": 400 },
+        { "lifeStage": "child_9_13", "maxAmount": 600 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 800 },
+        { "lifeStage": "adult", "maxAmount": 1000 },
+        { "lifeStage": "pregnant", "maxAmount": 1000 },
+        { "lifeStage": "breastfeeding", "maxAmount": 1000 }
+      ],
+      "name": "Folate",
+      "sourceScope": "supplemental",
+      "unit": "mcg"
+    },
+    {
+      "aliases": ["Calcium citrate", "Calcium carbonate"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/Calcium-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 2500 },
+        { "lifeStage": "child_4_8", "maxAmount": 2500 },
+        { "lifeStage": "child_9_13", "maxAmount": 3000 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 3000 },
+        { "lifeStage": "adult", "maxAmount": 2500 },
+        { "lifeStage": "pregnant", "maxAmount": 2500 },
+        { "lifeStage": "breastfeeding", "maxAmount": 2500 }
+      ],
+      "name": "Calcium",
+      "sourceScope": "supplemental",
+      "unit": "mg"
+    },
+    {
+      "aliases": ["B6", "Pyridoxine"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 30 },
+        { "lifeStage": "child_4_8", "maxAmount": 40 },
+        { "lifeStage": "child_9_13", "maxAmount": 60 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 80 },
+        { "lifeStage": "adult", "maxAmount": 100 },
+        { "lifeStage": "pregnant", "maxAmount": 100 },
+        { "lifeStage": "breastfeeding", "maxAmount": 100 }
+      ],
+      "name": "Vitamin B6",
+      "sourceScope": "supplemental",
+      "unit": "mg"
+    },
+    {
+      "aliases": ["Potassium iodide", "Iodide"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/Iodine-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 200 },
+        { "lifeStage": "child_4_8", "maxAmount": 300 },
+        { "lifeStage": "child_9_13", "maxAmount": 600 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 900 },
+        { "lifeStage": "adult", "maxAmount": 1100 },
+        { "lifeStage": "pregnant", "maxAmount": 1100 },
+        { "lifeStage": "breastfeeding", "maxAmount": 1100 }
+      ],
+      "name": "Iodine",
+      "sourceScope": "supplemental",
+      "unit": "mcg"
+    },
+    {
+      "aliases": ["Selenomethionine"],
+      "authorityUrl": "https://ods.od.nih.gov/factsheets/Selenium-HealthProfessional/",
+      "bands": [
+        { "lifeStage": "child_1_3", "maxAmount": 90 },
+        { "lifeStage": "child_4_8", "maxAmount": 150 },
+        { "lifeStage": "child_9_13", "maxAmount": 280 },
+        { "lifeStage": "adolescent_14_18", "maxAmount": 400 },
+        { "lifeStage": "adult", "maxAmount": 400 },
+        { "lifeStage": "pregnant", "maxAmount": 400 },
+        { "lifeStage": "breastfeeding", "maxAmount": 400 }
+      ],
+      "name": "Selenium",
+      "sourceScope": "supplemental",
+      "unit": "mcg"
     }
+  ],
+  "noEstablishedSupplementalUl": [
+    "Omega-3",
+    "Vitamin B12",
+    "CoQ10",
+    "Collagen",
+    "Plant sterols",
+    "Creatine",
+    "Vitamin K2"
   ]
 }

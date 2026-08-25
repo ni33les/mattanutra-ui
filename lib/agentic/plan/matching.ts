@@ -455,11 +455,14 @@ export function leftoversFor(
 
 export function matcherTelemetryFor(input: Readonly<{
   ackMs?: number;
+  catalogueMs?: number;
   leftovers: readonly PlanLeftover[];
   matchMs?: number;
   rejected?: readonly RejectedCandidate[];
   searchDeadlineMs?: number;
+  searchMs?: number;
   selected: StackOption | null;
+  serializeMs?: number;
   snapshot?: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): MatcherTelemetry {
@@ -477,16 +480,29 @@ export function matcherTelemetryFor(input: Readonly<{
 
   return {
     ...(input.ackMs != null ? { ackMs: input.ackMs } : {}),
+    ...(input.catalogueMs != null ? { catalogueMs: input.catalogueMs } : {}),
     ...(input.matchMs != null ? { matchMs: input.matchMs } : {}),
     ...(input.searchDeadlineMs != null
       ? { searchDeadlineMs: input.searchDeadlineMs }
       : {}),
-    ...(input.snapshot
-      ? {
-          availabilityAsOf: input.snapshot.availabilityAsOf,
-          snapshotId: catalogueSnapshotId(input.snapshot)
-        }
-      : {}),
+    ...(input.searchMs != null ? { searchMs: input.searchMs } : {}),
+    ...(input.serializeMs != null ? { serializeMs: input.serializeMs } : {}),
+    ...(() => {
+      const snapshotId =
+        input.selected?.snapshotId ??
+        (input.snapshot && input.snapshot.products.length > 0
+          ? catalogueSnapshotId(input.snapshot)
+          : undefined);
+
+      return input.snapshot
+        ? {
+            availabilityAsOf: input.snapshot.availabilityAsOf,
+            ...(snapshotId ? { snapshotId } : {})
+          }
+        : snapshotId
+          ? { snapshotId }
+          : {};
+    })(),
     constraints: {
       ...input.state.requirements,
       conditionCodes: input.state.conditionCodes,

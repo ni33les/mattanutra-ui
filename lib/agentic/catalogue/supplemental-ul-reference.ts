@@ -29,6 +29,7 @@ export type SupplementalUlNutrient = Readonly<{
 export type SupplementalUlReference = Readonly<{
   authority: string;
   effectiveOn: string;
+  noEstablishedSupplementalUl: readonly string[];
   notes: string;
   nutrients: readonly SupplementalUlNutrient[];
 }>;
@@ -57,6 +58,9 @@ function parseReference(raw: unknown): SupplementalUlReference {
   return {
     authority: String(record.authority ?? ""),
     effectiveOn: String(record.effectiveOn ?? ""),
+    noEstablishedSupplementalUl: Array.isArray(record.noEstablishedSupplementalUl)
+      ? record.noEstablishedSupplementalUl.map((item) => String(item))
+      : [],
     notes: String(record.notes ?? ""),
     nutrients: nutrients.map((item) => {
       const nutrient = item as Record<string, unknown>;

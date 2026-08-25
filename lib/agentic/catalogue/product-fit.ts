@@ -21,6 +21,25 @@ export function isPrenatalOrFertilitySku(
   );
 }
 
+export function isFalseOmegaAttribution(
+  candidate: Pick<ProductCandidate, "brandName" | "facts" | "title"> | { title: string }
+) {
+  const hay =
+    "facts" in candidate
+      ? catalogueHaystack(candidate)
+      : candidate.title.toLowerCase();
+
+  if (/\balgae\b|\balgal\b/.test(hay)) {
+    return false;
+  }
+
+  return (
+    /3\s*-?\s*6\s*-?\s*9/.test(hay) ||
+    /\blecithin\b/.test(hay) ||
+    /\bkrill\b/.test(hay)
+  );
+}
+
 export function isNonAlgaeOmegaStandin(
   candidate: Pick<ProductCandidate, "brandName" | "facts" | "title">
 ) {
@@ -31,9 +50,7 @@ export function isNonAlgaeOmegaStandin(
   }
 
   return (
-    /3\s*-?\s*6\s*-?\s*9/.test(hay) ||
-    /\blecithin\b/.test(hay) ||
-    /\bkrill\b/.test(hay) ||
+    isFalseOmegaAttribution(candidate) ||
     /\bfish\s+oil\b/.test(hay) ||
     /super omega/.test(hay)
   );
@@ -87,12 +104,20 @@ export function inferOmegaSource(candidate: ProductCandidate): CatalogueProduct[
   return "none";
 }
 
+export function looksLikeOmegaLabel(value: string) {
+  return /\bomega|\bepa\b|\bdha\b|n-3|fish oil|algal/i.test(value);
+}
+
 export function shouldSkipOmegaContribution(name: string, candidate: ProductCandidate) {
+  if (isFalseOmegaAttribution(candidate) && looksLikeOmegaLabel(name)) {
+    return true;
+  }
+
   if (!/omega|epa|dha|algae|algal|n-3|fish oil/.test(`${name} ${catalogueHaystack(candidate)}`)) {
     return false;
   }
 
-  return isNonAlgaeOmegaStandin(candidate);
+  return isFalseOmegaAttribution(candidate);
 }
 
 export function supplementNameMatchesFact(

@@ -184,6 +184,28 @@ export function recognisedSupplementNames() {
   return [...names].sort((left, right) => left.localeCompare(right));
 }
 
+const PLAN_COPY_ALIASES = new Set([
+  "Algae omega-3",
+  "Folic acid",
+  "MK-7",
+  "Menaquinone-7",
+  "Vitamin B9"
+]);
+
+export function recognisedNamesForPlanCopy() {
+  const names = FIXTURE_SUPPLEMENTS.map((item) => item.name);
+
+  for (const item of FIXTURE_SUPPLEMENTS) {
+    for (const alias of item.aliases) {
+      if (PLAN_COPY_ALIASES.has(alias) && !names.includes(alias)) {
+        names.push(alias);
+      }
+    }
+  }
+
+  return names;
+}
+
 export const FIXTURE_PRODUCTS: readonly CatalogueProduct[] = [
   product({
     amount: 2000,

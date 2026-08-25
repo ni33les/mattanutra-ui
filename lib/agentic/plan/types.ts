@@ -172,6 +172,7 @@ export type TargetClassification = Readonly<{
 export type MatcherTelemetry = Readonly<{
   ackMs?: number;
   availabilityAsOf?: string;
+  catalogueMs?: number;
   constraints: PlanRequirements &
     Readonly<{
       conditionCodes: readonly string[];
@@ -192,7 +193,9 @@ export type MatcherTelemetry = Readonly<{
   }>[];
   requestedNames: readonly string[];
   searchDeadlineMs?: number;
+  searchMs?: number;
   selectedOptionId: string | null;
+  serializeMs?: number;
   snapshotId?: string;
   targetClassifications?: readonly TargetClassification[];
 }>;

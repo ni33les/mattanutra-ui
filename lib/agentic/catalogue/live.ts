@@ -8,6 +8,8 @@ import {
 } from "@/lib/agentic/catalogue/live-supplements";
 import {
   inferOmegaSource,
+  isFalseOmegaAttribution,
+  looksLikeOmegaLabel,
   shouldSkipOmegaContribution,
   supplementNameMatchesFact
 } from "@/lib/agentic/catalogue/product-fit";
@@ -103,8 +105,24 @@ function contributionSupplementIds(
         index.get(fact.supplementId.toLowerCase()) ??
         index.get(normalizeName(fact.supplementId));
 
-      if (mapped && !shouldSkipOmegaContribution(mapped, candidate)) {
-        ids.add(mapped);
+      if (mapped) {
+        const mappedSupplement = supplements.find(
+          (item) =>
+            item.supplementId === mapped ||
+            item.uuid === mapped ||
+            item.uuid.toLowerCase() === mapped.toLowerCase()
+        );
+        const mappedLooksOmega = looksLikeOmegaLabel(
+          `${mapped} ${mappedSupplement?.name ?? ""} ${(mappedSupplement?.aliases ?? []).join(" ")}`
+        );
+
+        if (isFalseOmegaAttribution(candidate) && mappedLooksOmega) {
+          continue;
+        }
+
+        if (!shouldSkipOmegaContribution(mapped, candidate)) {
+          ids.add(mapped);
+        }
         continue;
       }
     }

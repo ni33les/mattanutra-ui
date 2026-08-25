@@ -138,11 +138,13 @@ function snapshotForPin(previous: PlanResult): CatalogueSnapshot {
 function composeResult(input: Readonly<{
   ackMs?: number;
   alternatives: readonly StackOption[];
+  catalogueMs?: number;
   locale: Locale;
   leftovers: PlanResult["leftovers"];
   matchMs?: number;
   previous: PlanResult | null;
   rejected?: PlanResult["matcherTelemetry"]["rejectedAll"];
+  searchMs?: number;
   selected: StackOption | null;
   shownRevision: number;
   snapshot: CatalogueSnapshot;
@@ -211,10 +213,12 @@ function composeResult(input: Readonly<{
     leftovers: input.leftovers,
     matcherTelemetry: matcherTelemetryFor({
       ackMs: input.ackMs,
+      catalogueMs: input.catalogueMs,
       leftovers: input.leftovers,
       matchMs: input.matchMs,
       rejected: input.rejected ?? input.previous?.matcherTelemetry.rejectedAll,
       searchDeadlineMs: DEFAULT_MATCHER_CONFIG.searchDeadlineMs,
+      searchMs: input.searchMs,
       selected: input.selected,
       snapshot: input.snapshot,
       state: pinnedState
@@ -242,6 +246,7 @@ function composeResult(input: Readonly<{
 }
 
 function buildResult(input: Readonly<{
+  catalogueMs?: number;
   locale: Locale;
   matchStartedAt?: number;
   previous: PlanResult | null;
@@ -249,9 +254,11 @@ function buildResult(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): PlanResult {
+  const searchStartedAt = Date.now();
   const matched = matchPlan({ snapshot: input.snapshot, state: input.state });
+  const searchMs = Math.max(0, Date.now() - searchStartedAt);
   const matchMs =
-    input.matchStartedAt != null ? Math.max(0, Date.now() - input.matchStartedAt) : undefined;
+    input.matchStartedAt != null ? Math.max(0, Date.now() - input.matchStartedAt) : searchMs;
   const ackMs =
     matchMs == null
       ? undefined
@@ -259,11 +266,13 @@ function buildResult(input: Readonly<{
   return composeResult({
     ackMs,
     alternatives: matched.alternatives,
+    catalogueMs: input.catalogueMs,
     locale: input.locale,
     leftovers: matched.leftovers,
     matchMs,
     previous: input.previous,
     rejected: matched.rejected,
+    searchMs,
     selected: matched.selected,
     shownRevision: input.shownRevision,
     snapshot: input.snapshot,
@@ -405,8 +414,20 @@ function successFromResult(input: Readonly<{
   result: PlanResult;
   revision: number;
 }>): PlanToolSuccess {
+  const serializeStartedAt = Date.now();
+  const fields = publicPlanFields(input.result);
+  const serializeMs = Math.max(0, Date.now() - serializeStartedAt);
+  const telemetry =
+    fields.matcherTelemetry && typeof fields.matcherTelemetry === "object"
+      ? {
+          ...(fields.matcherTelemetry as Record<string, unknown>),
+          serializeMs
+        }
+      : { serializeMs };
+
   return {
-    ...publicPlanFields(input.result),
+    ...fields,
+    matcherTelemetry: telemetry,
     ...feedbackFields({
       locale: input.locale,
       revision: input.revision,
@@ -1001,12 +1022,14 @@ async function completePreparedPlan(
   const country =
     prepared.state.destinationCountry ||
     prepared.previous?.requestSnapshot.destinationCountry;
+  const catalogueStartedAt = Date.now();
   const snapshot =
     loadLiveCatalogue || prepared.resume
       ? await ensureCatalogueSnapshot(input.config.environment, country)
       : prepared.previous
         ? snapshotForPin(prepared.previous)
         : await ensureCatalogueSnapshot(input.config.environment, country);
+  const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
 
   const answers = prepared.answers;
   const ack = prepared.ack;
@@ -1151,6 +1174,7 @@ async function completePreparedPlan(
           state
         })
       : buildResult({
+          catalogueMs,
           locale,
           matchStartedAt,
           previous,

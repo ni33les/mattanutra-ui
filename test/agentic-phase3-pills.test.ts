@@ -47,6 +47,132 @@ function scored(
 }
 
 describe("Phase 3 fewest_pills ranking", () => {
+  it("does not let coverage-Pareto pick a larger stack when pills and products are worse", () => {
+    const tight = scored({
+      aggregateCoverage: 9_200,
+      coveredCount: 5,
+      coverageBySubject: new Map([
+        ["sup_d3", 10_000],
+        ["sup_omega", 9_000],
+        ["sup_mag", 10_000],
+        ["sup_b12", 6_000],
+        ["sup_c", 9_000]
+      ]),
+      dailyPills: 6,
+      productCount: 4,
+      productIds: ["A", "B", "C", "D"],
+      priceMinor: 70000
+    });
+    const loose = scored({
+      aggregateCoverage: 9_800,
+      coveredCount: 5,
+      coverageBySubject: new Map([
+        ["sup_d3", 10_000],
+        ["sup_omega", 12_000],
+        ["sup_mag", 10_000],
+        ["sup_b12", 8_000],
+        ["sup_c", 10_000]
+      ]),
+      dailyPills: 7,
+      productCount: 5,
+      productIds: ["A", "B", "C", "D", "E"],
+      priceMinor: 80000
+    });
+    assert.equal(
+      compareBaskets(
+        tight,
+        loose,
+        qaRequest({ optimization: "fewest_pills" })
+      ) < 0,
+      true
+    );
+  });
+
+  it("unconstrained fewest_pills is not strictly worse on pills and products than a 4/7 cap", () => {
+    const products = [
+      qaProduct({
+        facts: [{ amount: 2000, key: "d3" }],
+        id: "G-D3-2000",
+        pills: 1,
+        priceThb: 160
+      }),
+      qaProduct({
+        dietary: "fish",
+        facts: [{ amount: 1000, key: "omega" }],
+        form: "softgel",
+        id: "G-O3-FISH-1000",
+        omega: "fish",
+        pills: 2,
+        priceThb: 300
+      }),
+      qaProduct({
+        facts: [{ amount: 200, key: "mag" }],
+        id: "G-MAG-200",
+        pills: 1,
+        priceThb: 190
+      }),
+      qaProduct({
+        facts: [{ amount: 250, key: "b12" }],
+        id: "G-B12-250",
+        pills: 1,
+        priceThb: 140
+      }),
+      qaProduct({
+        facts: [{ amount: 500, key: "c" }],
+        id: "G-C-500",
+        pills: 1,
+        priceThb: 120
+      }),
+      qaProduct({
+        facts: [
+          { amount: 2000, key: "d3" },
+          { amount: 200, key: "mag" },
+          { amount: 8, key: "b12" }
+        ],
+        id: "G-EXTRA-PARTIAL",
+        pills: 2,
+        priceThb: 250
+      })
+    ];
+    const unconstrained = match(
+      qaRequest({
+        maxProductCount: 8,
+        optimization: "fewest_pills",
+        targets: [
+          qaTarget("d3", 2000),
+          qaTarget("omega", 1000),
+          qaTarget("mag", 200),
+          qaTarget("b12", 250),
+          qaTarget("c", 500)
+        ]
+      }),
+      catalog(products)
+    );
+    const capped = match(
+      qaRequest({
+        maxDailyPills: 7,
+        maxProductCount: 4,
+        optimization: "fewest_pills",
+        targets: [
+          qaTarget("d3", 2000),
+          qaTarget("omega", 1000),
+          qaTarget("mag", 200),
+          qaTarget("b12", 250),
+          qaTarget("c", 500)
+        ]
+      }),
+      catalog(products)
+    );
+    assert.ok(unconstrained.selected);
+    assert.ok(capped.selected);
+    if (unconstrained.selected.coveredCount === capped.selected.coveredCount) {
+      const worseOnBoth =
+        unconstrained.selected.dailyPills > capped.selected.dailyPills &&
+        unconstrained.selected.productCount > capped.selected.productCount;
+      assert.equal(worseOnBoth, false);
+    }
+  });
+
   it("M-01 still selects G-BASE-COMBO + G-O3-FISH-1000 at 4 pills", () => {
     const result = match(
       qaRequest({ optimization: "fewest_pills" }),

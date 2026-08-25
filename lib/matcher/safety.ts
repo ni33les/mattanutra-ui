@@ -249,6 +249,86 @@ export function evaluateSafety(input: Readonly<{
     }
   }
 
+  const targetIds = new Set(input.request.targets.map((item) => item.subjectId));
+  const productsById = new Map(input.products.map((item) => [item.productId, item]));
+  const incidentalByKey = new Map<string, { name: string; subjectId: string; units: bigint }>();
+
+  for (const variant of input.variants) {
+    const product = productsById.get(variant.productId);
+
+    if (!product) {
+      continue;
+    }
+
+    for (const fact of product.labelledContributions) {
+      if (
+        !fact.amount ||
+        fact.amount <= 0 ||
+        !fact.unit ||
+        (fact.subjectId && targetIds.has(fact.subjectId))
+      ) {
+        continue;
+      }
+
+      const subjectId = fact.subjectId || fact.name;
+      const scaled = scaleAmount({
+        amount: fact.amount * variant.dailyUnits,
+        subjectId,
+        subjectName: fact.name,
+        unit: fact.unit
+      });
+
+      if ("reason" in scaled) {
+        continue;
+      }
+
+      const key = subjectId.trim().toLowerCase();
+      const previous = incidentalByKey.get(key);
+      incidentalByKey.set(key, {
+        name: fact.name,
+        subjectId,
+        units: (previous?.units ?? BigInt(0)) + scaled.units
+      });
+    }
+  }
+
+  for (const incidental of incidentalByKey.values()) {
+    const ceiling = safetyCeilingFor(input.request.safetyCeilings ?? [], {
+      name: incidental.name,
+      profile: input.request.profile,
+      subjectId: incidental.subjectId
+    });
+
+    if (!ceiling) {
+      continue;
+    }
+
+    const threshold = scaleAmount({
+      amount: ceiling.maxAmount,
+      subjectId: incidental.subjectId,
+      subjectName: incidental.name,
+      unit: ceiling.maxUnit
+    });
+
+    if ("reason" in threshold) {
+      continue;
+    }
+
+    if (incidental.units > threshold.units) {
+      findings.push({
+        action: "block",
+        code: "dose_review_required",
+        contributors: productIds,
+        exposureUnits: incidental.units,
+        family: "dose",
+        guidanceId: guidanceId("dose_review_required", "dose"),
+        ruleId: `ul:incidental:${incidental.subjectId}`,
+        subjectId: incidental.subjectId,
+        thresholdUnits: threshold.units
+      });
+    }
+  }
+
   if (zincSubject && zincCurrent > BigInt(0) && zincSelected > BigInt(0)) {
     findings.push({
       action: "acknowledge",

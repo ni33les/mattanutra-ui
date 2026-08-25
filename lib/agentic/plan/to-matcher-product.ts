@@ -1,4 +1,7 @@
-import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
+import {
+  isFalseOmegaAttribution,
+  isPrenatalOrFertilitySku
+} from "@/lib/agentic/catalogue/product-fit";
 import type { CatalogueProduct } from "@/lib/agentic/catalogue/types";
 import { publicSupplementId } from "@/lib/agentic/contract/ids";
 import type { MatcherProduct } from "@/lib/matcher/types";
@@ -18,21 +21,30 @@ function contributionSubjectId(value: string | null | undefined) {
 }
 
 export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
+  const falseOmega = isFalseOmegaAttribution(product.candidate);
+  const labelledContributions = product.candidate.facts.map((fact) => {
+    const mappedId = contributionSubjectId(fact.supplementId);
+    return {
+      amount: fact.amount ?? fact.comparableAmount ?? 0,
+      name: fact.name,
+      subjectId: falseOmega ? null : mappedId,
+      unit: fact.unit
+    };
+  });
+  const contributionSubjectIds = falseOmega
+    ? [...new Set(labelledContributions.map((item) => item.subjectId).filter((id): id is string => Boolean(id)))]
+    : product.contributionSupplementIds;
+
   return {
     availableCountryCodes: product.candidate.availableCountryCodes ?? null,
-    contributionSubjectIds: product.contributionSupplementIds,
+    contributionSubjectIds,
     currency: product.candidate.currency,
     dailyPillsPerServing: product.dailyPills,
     dietarySource: product.dietarySource,
     form: product.form,
     imageUrl: product.candidate.imageUrl?.trim() || null,
     incompleteCommercialFacts: product.incompleteCommercialFacts,
-    labelledContributions: product.candidate.facts.map((fact) => ({
-      amount: fact.amount ?? fact.comparableAmount ?? 0,
-      name: fact.name,
-      subjectId: contributionSubjectId(fact.supplementId),
-      unit: fact.unit
-    })),
+    labelledContributions,
     omegaSource: product.omegaSource,
     orderable: product.orderable,
     prenatalOrFertility: isPrenatalOrFertilitySku(product.candidate),

@@ -1,6 +1,7 @@
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { productEligible } from "@/lib/matcher/eligibility";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
+import { isFalseOmegaAttribution } from "@/lib/agentic/catalogue/product-fit";
 import { productKeysMatch } from "@/lib/product-key-matching";
 import { exposureExceedsCeiling } from "@/lib/matcher/safety";
 import type {
@@ -66,6 +67,13 @@ export function contributionFor(
   targetSubjectId: string
 ) {
   const targetIds = subjectKeyVariants(targetSubjectId);
+
+  if (
+    isFalseOmegaAttribution({ title: product.title }) &&
+    /omega|epa|dha|n-3|fish oil/i.test(`${targetName} ${targetSubjectId}`)
+  ) {
+    return [];
+  }
 
   return product.labelledContributions.filter((item) => {
     if (item.amount == null || item.amount <= 0) {
