@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { compileGroups } from "../lib/matcher/candidates.ts";
 import { DEFAULT_MATCHER_CONFIG } from "../lib/matcher/config.ts";
 import { match } from "../lib/matcher/index.ts";
 import { publicCoveragePercent } from "../lib/matcher/explainer.ts";
@@ -158,6 +159,27 @@ describe("Phase 2 multi-target composition", () => {
     assert.equal(result.selected.productCount >= 1, true);
     assert.equal(ids(result).some((id) => /O3-FISH|MAG-200|D3-2000|B12-250|C-500/.test(id)), true);
     assert.equal(publicCoveragePercent(result.selected) > 0, true);
+  });
+
+  it("compiles mapped D3/omega/magnesium SKUs before unrelated noise", () => {
+    const noise = Array.from({ length: 40 }, (_, index) =>
+      qaProduct({
+        facts: [{ amount: 5, key: "creatine" }],
+        id: `AAA-NOISE-${String(index).padStart(2, "0")}`,
+        priceThb: 10 + index
+      })
+    );
+    const groups = compileGroups(
+      qaRequest({ targets: [d3, omega, mag] }),
+      catalog([...noise, G_D3, G_O3, G_MAG])
+    );
+    const compiled = groups.map((item) => item.productId);
+    const d3At = compiled.indexOf("G-D3-2000");
+    const noiseAt = compiled.findIndex((id) => id.startsWith("AAA-NOISE-"));
+    assert.equal(d3At >= 0, true);
+    if (noiseAt >= 0) {
+      assert.equal(d3At < noiseAt, true);
+    }
   });
 
   it("still returns a non-zero official five-target stack on QA-GOLD", () => {

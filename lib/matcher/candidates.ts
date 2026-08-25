@@ -221,16 +221,44 @@ function variantLeavesTargetShortfall(
   return false;
 }
 
+function mappedToRequest(
+  product: MatcherProduct,
+  request: CanonicalRequest
+) {
+  return request.targets.some((target) =>
+    product.contributionSubjectIds.includes(target.subjectId)
+  );
+}
+
+function labelledForRequest(
+  product: MatcherProduct,
+  request: CanonicalRequest
+) {
+  return request.targets.some(
+    (target) => contributionFor(product, target.name, target.subjectId).length > 0
+  );
+}
+
 export function compileGroups(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
   deadlineAt?: number
 ): ProductGroup[] {
   const groups: ProductGroup[] = [];
-
-  for (const product of [...catalog.products].sort((left, right) =>
+  const products = [...catalog.products].sort((left, right) =>
     left.productId.localeCompare(right.productId)
-  )) {
+  );
+  const mapped = products.filter((product) => mappedToRequest(product, request));
+  const labelled = products.filter(
+    (product) =>
+      !mappedToRequest(product, request) && labelledForRequest(product, request)
+  );
+  const rest = products.filter(
+    (product) =>
+      !mappedToRequest(product, request) && !labelledForRequest(product, request)
+  );
+
+  for (const product of [...mapped, ...labelled, ...rest]) {
     if (deadlineAt != null && Date.now() >= deadlineAt) {
       break;
     }
