@@ -68,6 +68,11 @@ const G_TRAP = qaProduct({
   id: "G-HIGH-TRAP",
   priceThb: 50
 });
+const G_C_OVER = qaProduct({
+  facts: [{ amount: 2000, key: "c" }],
+  id: "G-C-OVER",
+  priceThb: 80
+});
 
 describe("Phase 2 multi-target composition", () => {
   it("keeps D3+omega+magnesium when vitamin C is missing from the catalogue", () => {
@@ -84,6 +89,22 @@ describe("Phase 2 multi-target composition", () => {
     assert.equal(ids(result).includes("G-O3-FISH-1000"), true);
     assert.equal(ids(result).includes("G-MAG-200"), true);
     assert.ok(result.leftovers.some((item) => item.name === "Vitamin C"));
+  });
+
+  it("keeps D3+omega+magnesium when the only C SKU overshoots 125% without a UL", () => {
+    const result = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        targets: [d3, omega, mag, vitC]
+      }),
+      catalog([G_D3, G_O3, G_MAG, G_C_OVER])
+    );
+    assert.ok(result.selected);
+    assert.equal(result.selected.productCount >= 3, true);
+    assert.equal(ids(result).includes("G-D3-2000"), true);
+    assert.equal(ids(result).includes("G-O3-FISH-1000"), true);
+    assert.equal(ids(result).includes("G-MAG-200"), true);
+    assert.equal(ids(result).includes("G-C-OVER"), false);
   });
 
   it("does not collapse to zero when a UL trap is the only C/B12 SKU", () => {

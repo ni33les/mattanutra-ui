@@ -368,13 +368,25 @@ export function salvagePartialBasket(input: Readonly<{
           .map((variant) => ({ group, variant }))
       )
       .sort((left, right) => {
+        const want = target.requested.units;
         const leftUnits =
           left.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
         const rightUnits =
           right.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
+        const leftCover = coverageUnits(leftUnits, want);
+        const rightCover = coverageUnits(rightUnits, want);
 
-        if (rightUnits !== leftUnits) {
-          return rightUnits > leftUnits ? 1 : -1;
+        if (rightCover !== leftCover) {
+          return rightCover - leftCover;
+        }
+
+        const leftOver =
+          leftUnits > want ? leftUnits - want : BigInt(0);
+        const rightOver =
+          rightUnits > want ? rightUnits - want : BigInt(0);
+
+        if (leftOver !== rightOver) {
+          return leftOver > rightOver ? 1 : -1;
         }
 
         if (left.variant.dailyPills !== right.variant.dailyPills) {
@@ -401,7 +413,18 @@ export function salvagePartialBasket(input: Readonly<{
         input.request
       );
 
-      if (next) {
+      if (!next) {
+        continue;
+      }
+
+      const scored = scoreState({
+        groups: input.groups,
+        request: input.request,
+        sellerId: input.sellerId,
+        state: next
+      });
+
+      if (scored) {
         state = next;
         used.add(candidate.group.productId);
         break;
