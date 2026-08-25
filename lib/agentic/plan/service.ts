@@ -13,6 +13,7 @@ import {
   overwriteIdempotency
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
+import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
@@ -1030,6 +1031,7 @@ async function completePreparedPlan(
         ? snapshotForPin(prepared.previous)
         : await ensureCatalogueSnapshot(input.config.environment, country);
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
+  await refreshAdminSafetyCeilings();
 
   const answers = prepared.answers;
   const ack = prepared.ack;

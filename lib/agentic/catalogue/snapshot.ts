@@ -71,7 +71,7 @@ export async function ensureCatalogueSnapshot(
       if (liveReady) {
         cachedByCountry.set(code, live);
         lastSnapshot = live;
-        void refreshAdminSafetyCeilings();
+        await refreshAdminSafetyCeilings();
         return live;
       }
     } catch (error) {
