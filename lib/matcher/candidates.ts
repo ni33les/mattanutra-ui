@@ -322,26 +322,43 @@ export function compileGroups(
   }
 
   for (const target of request.targets) {
-    if (
-      remainingRequestedUnits(request, target.subjectId) <= BigInt(0) ||
-      groups.some((group) => groupCoversTarget(group, target.subjectId))
-    ) {
+    if (remainingRequestedUnits(request, target.subjectId) <= BigInt(0)) {
       continue;
     }
 
-    for (const product of mapped) {
+    if (bestGroupForTarget(groups, request, target.subjectId)) {
+      continue;
+    }
+
+    let added = 0;
+    const pool = [...mapped, ...labelled];
+
+    for (const product of pool) {
+      if (added >= 6) {
+        break;
+      }
+
       if (groups.some((group) => group.productId === product.productId)) {
         continue;
       }
 
-      if (!product.contributionSubjectIds.includes(target.subjectId)) {
+      if (
+        !product.contributionSubjectIds.includes(target.subjectId) &&
+        contributionFor(product, target.name, target.subjectId).length < 1
+      ) {
         continue;
       }
 
       const group = compileProductGroup(product, request);
 
-      if (group && groupCoversTarget(group, target.subjectId)) {
-        groups.push(group);
+      if (!group || !groupCoversTarget(group, target.subjectId)) {
+        continue;
+      }
+
+      groups.push(group);
+      added += 1;
+
+      if (bestGroupForTarget(groups, request, target.subjectId)) {
         break;
       }
     }
