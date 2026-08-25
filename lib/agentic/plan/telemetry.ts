@@ -40,6 +40,9 @@ export async function persistMatcherTelemetry(input: Readonly<{
         ${asJsonb({
           ...telemetry.constraints,
           ...(telemetry.rejected ? { rejected: telemetry.rejected } : {}),
+          ...(telemetry.matcherVersion
+            ? { matcherVersion: telemetry.matcherVersion }
+            : {}),
           ...(telemetry.snapshotId ? { snapshotId: telemetry.snapshotId } : {}),
           ...(telemetry.targetClassifications
             ? { targetClassifications: telemetry.targetClassifications }

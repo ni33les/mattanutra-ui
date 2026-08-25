@@ -6,19 +6,57 @@ import type {
   StackOption
 } from "@/lib/agentic/plan/types";
 
+export const PUBLIC_NUTRIENT_NAME_LIMIT = 12;
+
 export type PublicBasketItem = Readonly<{
   currency: string;
   dailyPills: number;
   fixture?: true;
   form: string;
   imageUrl?: string;
+  incidentalNutrientNames: readonly string[];
   lineTotalMinor: number;
+  pillsPerServing: number;
   productId: string;
   productName: string;
   quantity: number;
+  requestedNutrientNames: readonly string[];
+  servingsPerDay: number;
   source?: "fixture" | "retail";
   unitPriceMinor: number;
 }>;
+
+function boundedNames(names: readonly string[] | undefined) {
+  if (!Array.isArray(names) || names.length === 0) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const name of names) {
+    const trimmed = String(name ?? "").trim();
+
+    if (!trimmed) {
+      continue;
+    }
+
+    const key = trimmed.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    out.push(trimmed);
+
+    if (out.length >= PUBLIC_NUTRIENT_NAME_LIMIT) {
+      break;
+    }
+  }
+
+  return out;
+}
 
 export function publicBasketItem(item: BasketItem): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
@@ -27,10 +65,14 @@ export function publicBasketItem(item: BasketItem): PublicBasketItem {
     currency: item.currency,
     dailyPills: item.dailyPills,
     form: item.form,
+    incidentalNutrientNames: boundedNames(item.incidentalNutrientNames),
     lineTotalMinor: item.lineTotalMinor,
+    pillsPerServing: item.pillsPerServing,
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
+    requestedNutrientNames: boundedNames(item.requestedNutrientNames),
+    servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(imageUrl ? { imageUrl } : {}),
     ...(item.fixture || item.source === "fixture"
@@ -45,6 +87,7 @@ export function publicCoverage(row: CoverageRow) {
     currentAmount: row.currentAmount,
     deliveredAmount: row.deliveredAmount,
     name: row.name,
+    remainingGap: row.remainingGap,
     requestedAmount: row.requestedAmount,
     status: row.status,
     supplementId: row.supplementId,
@@ -133,9 +176,11 @@ export function publicTradeOffs(
 export function publicOption(option: StackOption, selected: StackOption | null) {
   return {
     basket: option.basket.map(publicBasketItem),
+    catalogId: option.snapshotId,
     coverage: option.coverage.map(publicCoverage),
     coveragePercent: option.coveragePercent,
     dailyPills: option.dailyPills,
+    matcherVersion: option.matcherVersion,
     optionId: option.optionId,
     productCount: option.basket.length,
     reason: clientReason(option.reason),
@@ -232,7 +277,10 @@ export function publicPlanFields(result: Pick<
     summary: result.summary,
     ...(selected
       ? {
+          catalogId: selected.snapshotId,
+          matcherVersion: selected.matcherVersion,
           optionId: selected.optionId,
+          reason: clientReason(selected.reason),
           tradeOffs: publicTradeOffs(selected, selected)
         }
       : {}),
@@ -273,6 +321,9 @@ function publicMatcherTelemetry(
 
   const payload: Record<string, unknown> = {};
 
+  if (telemetry.matcherVersion) {
+    payload.matcherVersion = telemetry.matcherVersion;
+  }
   if (telemetry.coveragePercent != null) {
     payload.coveragePercent = telemetry.coveragePercent;
   }
@@ -346,14 +397,22 @@ export function publicFrozenOrder(frozen: unknown) {
         fixture: Boolean(row.fixture) || row.source === "fixture",
         form: String(row.form ?? ""),
         imageUrl: typeof row.imageUrl === "string" && row.imageUrl.trim() ? row.imageUrl : null,
+        incidentalNutrientNames: Array.isArray(row.incidentalNutrientNames)
+          ? row.incidentalNutrientNames.map(String)
+          : [],
         incompleteCommercialFacts: false,
         lineTotalMinor: Number(row.lineTotalMinor) || 0,
+        pillsPerServing: Number(row.pillsPerServing) || 0,
         productId: String(row.productId ?? ""),
         productName: String(row.productName ?? ""),
         quantity: Number(row.quantity) || 1,
+        requestedNutrientNames: Array.isArray(row.requestedNutrientNames)
+          ? row.requestedNutrientNames.map(String)
+          : [],
         retailerSku: "",
         sellerId: "",
         sellerName: "",
+        servingsPerDay: Number(row.servingsPerDay) || Number(row.quantity) || 1,
         source: row.source === "fixture" || Boolean(row.fixture) ? "fixture" : "retail",
         stockStatus: "in_stock",
         unitPriceMinor: Number(row.unitPriceMinor) || 0

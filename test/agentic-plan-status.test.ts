@@ -14,6 +14,7 @@ function coverage(overrides: Partial<CoverageRow> = {}): CoverageRow {
     deliveredAmount: 200,
     name: "Magnesium",
     percentOfUpperLimit: null,
+    remainingGap: 200,
     requestedAmount: 200,
     status: "covered",
     supplementId: "sup_mag",
@@ -36,14 +37,18 @@ function option(rows: CoverageRow[]): StackOption {
         fixture: true,
         form: "capsule",
         imageUrl: null,
+        incidentalNutrientNames: [],
         incompleteCommercialFacts: false,
         lineTotalMinor: 120,
+        pillsPerServing: 1,
         productId: "prd_mag",
         productName: "Magnesium 200",
         quantity: 1,
+        requestedNutrientNames: ["Magnesium"],
         retailerSku: "G-MAG-200",
         sellerId: "seller",
         sellerName: "QA",
+        servingsPerDay: 1,
         source: "fixture",
         stockStatus: "in_stock",
         unitPriceMinor: 120
@@ -52,8 +57,10 @@ function option(rows: CoverageRow[]): StackOption {
     coverage: rows,
     coveragePercent: 100,
     dailyPills: 1,
+    matcherVersion: "pareto-hybrid-1",
     optionId: "opt_test",
     reason: "test",
+    snapshotId: "snap_testphase6",
     totalPriceMinor: 120
   };
 }

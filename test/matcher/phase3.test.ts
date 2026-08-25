@@ -320,6 +320,7 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
         constraints: { conditionCodes: [], medicationCodes: [] },
         coveragePercent: 100,
         leftovers: [],
+        matcherVersion: "pareto-hybrid-1",
         productIds: ["G-D3-2000"],
         productSkus: ["G-D3-2000"],
         rejected: summary,

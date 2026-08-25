@@ -177,6 +177,7 @@ export type MatcherTelemetry = Readonly<{
     }>;
   coveragePercent: number | null;
   leftovers: readonly PlanLeftover[];
+  matcherVersion: string;
   productIds: readonly string[];
   productSkus: readonly string[];
   rejected?: RejectedCandidateSummary;
@@ -201,14 +202,18 @@ export type BasketItem = Readonly<{
   fixture: boolean;
   form: string;
   imageUrl: string | null;
+  incidentalNutrientNames: readonly string[];
   incompleteCommercialFacts: boolean;
   lineTotalMinor: number;
+  pillsPerServing: number;
   productId: string;
   productName: string;
   quantity: number;
+  requestedNutrientNames: readonly string[];
   retailerSku: string;
   sellerId: string;
   sellerName: string;
+  servingsPerDay: number;
   source: "fixture" | "retail";
   stockStatus: "backorder" | "in_stock";
   unitPriceMinor: number;
@@ -220,6 +225,7 @@ export type CoverageRow = Readonly<{
   deliveredAmount: number;
   name: string;
   percentOfUpperLimit: number | null;
+  remainingGap: number;
   requestedAmount: number;
   status: "covered" | "over_target" | "partial" | "uncovered" | "upper_limit_risk";
   supplementId: string;
@@ -264,8 +270,10 @@ export type StackOption = Readonly<{
   coverage: readonly CoverageRow[];
   coveragePercent: number;
   dailyPills: number;
+  matcherVersion: string;
   optionId: string;
   reason: string;
+  snapshotId: string;
   totalPriceMinor: number;
 }>;
 

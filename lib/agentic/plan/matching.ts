@@ -5,12 +5,13 @@ import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import {
   DEV_REJECTED_DUMP_LIMIT,
   impliedOmegaPreference,
+  MATCHER_VERSION,
   match,
   optionIdFor,
   publicCoveragePercent,
   summarizeRejections
 } from "@/lib/matcher";
-import { variantPillBurden } from "@/lib/matcher/candidates";
+import { contributionFor, variantPillBurden } from "@/lib/matcher/candidates";
 import { amountFromScaled } from "@/lib/matcher/dose";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import type {
@@ -104,8 +105,7 @@ export function toCanonicalRequest(
 
 function coverageFor(
   state: CanonicalPlanState,
-  basket: ScoredBasket | null,
-  products: readonly CatalogueProduct[]
+  basket: ScoredBasket | null
 ): CoverageRow[] {
   return state.targets.map((target) => {
     const coverageUnits = basket?.coverageBySubject.get(target.supplementId) ?? 0;
@@ -147,6 +147,7 @@ function coverageFor(
         limit != null && limit > 0
           ? Math.round((totalExposureAmount / limit) * 100)
           : null,
+      remainingGap: Math.max(0, target.amount - currentAmount),
       requestedAmount: target.amount,
       status,
       supplementId: target.supplementId,
@@ -155,6 +156,71 @@ function coverageFor(
       upperLimitAmount: limit
     };
   });
+}
+
+const PUBLIC_NUTRIENT_NAME_LIMIT = 12;
+
+function uniqueBoundedNames(
+  names: readonly string[],
+  limit = PUBLIC_NUTRIENT_NAME_LIMIT
+) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const name of names) {
+    const trimmed = name.trim();
+
+    if (!trimmed) {
+      continue;
+    }
+
+    const key = trimmed.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    out.push(trimmed);
+
+    if (out.length >= limit) {
+      break;
+    }
+  }
+
+  return out;
+}
+
+function nutrientSplit(
+  product: CatalogueProduct,
+  state: CanonicalPlanState
+) {
+  const matcherProduct = toMatcherProduct(product);
+  const requested: string[] = [];
+  const incidental: string[] = [];
+
+  for (const fact of matcherProduct.labelledContributions) {
+    if (fact.amount == null || fact.amount <= 0 || !fact.name?.trim()) {
+      continue;
+    }
+
+    const matchesTarget = state.targets.some((target) =>
+      contributionFor(matcherProduct, target.name, target.supplementId).includes(
+        fact
+      )
+    );
+
+    if (matchesTarget) {
+      requested.push(fact.name);
+    } else {
+      incidental.push(fact.name);
+    }
+  }
+
+  return {
+    incidentalNutrientNames: uniqueBoundedNames(incidental),
+    requestedNutrientNames: uniqueBoundedNames(requested)
+  };
 }
 
 function dailyUnitsForProduct(
@@ -184,6 +250,7 @@ function basketFromIds(
     .map((product) => {
       const dailyUnits = dailyUnitsForProduct(product.productId, basket.variantIds);
       const quantity = Math.max(1, dailyUnits);
+      const nutrients = nutrientSplit(product, state);
 
       return {
         availabilityAsOf: snapshot.availabilityAsOf,
@@ -200,14 +267,18 @@ function basketFromIds(
         fixture: product.source === "fixture",
         form: product.form,
         imageUrl: product.candidate.imageUrl?.trim() || null,
+        incidentalNutrientNames: nutrients.incidentalNutrientNames,
         incompleteCommercialFacts: product.incompleteCommercialFacts,
         lineTotalMinor: product.unitPriceMinor * quantity,
+        pillsPerServing: product.dailyPills,
         productId: product.productId,
         productName: product.candidate.title,
         quantity,
+        requestedNutrientNames: nutrients.requestedNutrientNames,
         retailerSku: product.retailerSku,
         sellerId: product.sellerId,
         sellerName: product.sellerName,
+        servingsPerDay: quantity,
         source: product.source,
         stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
         unitPriceMinor: product.unitPriceMinor
@@ -223,11 +294,13 @@ function toStackOption(
   const items = basketFromIds(state, snapshot, basket);
   return {
     basket: items,
-    coverage: coverageFor(state, basket, snapshot.products),
+    coverage: coverageFor(state, basket),
     coveragePercent: publicCoveragePercent(basket),
     dailyPills: basket.dailyPills,
+    matcherVersion: MATCHER_VERSION,
     optionId: optionIdFor(basket.productIds),
     reason: basket.reason,
+    snapshotId: catalogueSnapshotId(snapshot),
     totalPriceMinor: basket.priceMinor
   };
 }
@@ -344,6 +417,7 @@ export function matcherTelemetryFor(input: Readonly<{
     },
     coveragePercent: input.selected?.coveragePercent ?? null,
     leftovers: input.leftovers,
+    matcherVersion: MATCHER_VERSION,
     productIds: input.selected?.basket.map((item) => item.productId) ?? [],
     productSkus: input.selected?.basket.map((item) => item.retailerSku) ?? [],
     ...(summary.total > 0 ? { rejected: summary } : {}),
