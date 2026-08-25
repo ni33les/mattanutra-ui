@@ -3,6 +3,45 @@ import { AGENTIC_IDEMPOTENCY_TTL_MS } from "@/lib/agentic/config";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import type { AgenticStore, IdempotencyRecord } from "@/lib/agentic/store/types";
 
+function isProcessingPoll(payload: unknown, responseJson: string) {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  let previous: { planHandle?: unknown; status?: unknown } | null = null;
+
+  try {
+    previous = JSON.parse(responseJson) as { planHandle?: unknown; status?: unknown };
+  } catch {
+    return false;
+  }
+
+  if (previous?.status !== "processing" || typeof previous.planHandle !== "string") {
+    return false;
+  }
+
+  const body = payload as Record<string, unknown>;
+  const handle = body.planHandle;
+
+  if (typeof handle !== "string" || handle !== previous.planHandle) {
+    return false;
+  }
+
+  if (body.request != null || body.selectOptionId != null) {
+    return false;
+  }
+
+  if (Array.isArray(body.answers) && body.answers.length > 0) {
+    return false;
+  }
+
+  if (body.safetyAcknowledgement != null) {
+    return false;
+  }
+
+  return true;
+}
+
 export function canonicalRequestHash(payload: unknown) {
   return createHash("sha256")
     .update(JSON.stringify(stable(payload)))
@@ -50,6 +89,13 @@ export async function beginIdempotency<T>(input: Readonly<{
   }
 
   if (existing.requestHash !== requestHash) {
+    if (isProcessingPoll(input.payload, existing.responseJson)) {
+      return {
+        kind: "replay",
+        response: JSON.parse(existing.responseJson) as T
+      };
+    }
+
     return {
       error: businessError({
         fieldPath: "idempotencyKey",
