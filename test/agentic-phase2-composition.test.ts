@@ -161,6 +161,25 @@ describe("Phase 2 multi-target composition", () => {
     assert.equal(publicCoveragePercent(result.selected) > 0, true);
   });
 
+  it("still compiles one mapped SKU per target after the compile deadline", () => {
+    const noise = Array.from({ length: 20 }, (_, index) =>
+      qaProduct({
+        facts: [{ amount: 5, key: "creatine" }],
+        id: `AAA-NOISE-${String(index).padStart(2, "0")}`,
+        priceThb: 10 + index
+      })
+    );
+    const groups = compileGroups(
+      qaRequest({ targets: [d3, omega, mag] }),
+      catalog([...noise, G_D3, G_O3, G_MAG]),
+      Date.now()
+    );
+    const compiled = new Set(groups.map((item) => item.productId));
+    assert.equal(compiled.has("G-D3-2000"), true);
+    assert.equal(compiled.has("G-O3-FISH-1000"), true);
+    assert.equal(compiled.has("G-MAG-200"), true);
+  });
+
   it("compiles mapped D3/omega/magnesium SKUs before unrelated noise", () => {
     const noise = Array.from({ length: 40 }, (_, index) =>
       qaProduct({

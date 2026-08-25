@@ -239,6 +239,57 @@ function labelledForRequest(
   );
 }
 
+function compileProductGroup(
+  product: MatcherProduct,
+  request: CanonicalRequest
+): ProductGroup | null {
+  if (!productEligible(product, request)) {
+    return null;
+  }
+
+  const variants: DoseVariant[] = [];
+
+  for (let dailyUnits = 1; dailyUnits <= MAX_DAILY_UNITS; dailyUnits += 1) {
+    if (
+      request.maxDailyPills != null &&
+      product.dailyPillsPerServing * dailyUnits > request.maxDailyPills
+    ) {
+      break;
+    }
+
+    const variant = compileVariant({ dailyUnits, product, request });
+
+    if (!variant) {
+      break;
+    }
+
+    variants.push(variant);
+
+    if (!variantLeavesTargetShortfall(variant, request)) {
+      break;
+    }
+  }
+
+  const kept = pruneVariants(variants);
+
+  if (kept.length < 1) {
+    return null;
+  }
+
+  return {
+    product,
+    productId: product.productId,
+    sellerId: product.sellerId,
+    variants: kept.sort((left, right) =>
+      left.variantId.localeCompare(right.variantId)
+    )
+  };
+}
+
+function groupCoversTarget(group: ProductGroup, subjectId: string) {
+  return group.variants.some((variant) => variant.contributions.has(subjectId));
+}
+
 export function compileGroups(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
@@ -263,44 +314,36 @@ export function compileGroups(
       break;
     }
 
-    if (!productEligible(product, request)) {
+    const group = compileProductGroup(product, request);
+
+    if (group) {
+      groups.push(group);
+    }
+  }
+
+  for (const target of request.targets) {
+    if (
+      remainingRequestedUnits(request, target.subjectId) <= BigInt(0) ||
+      groups.some((group) => groupCoversTarget(group, target.subjectId))
+    ) {
       continue;
     }
 
-    const variants: DoseVariant[] = [];
-
-    for (let dailyUnits = 1; dailyUnits <= MAX_DAILY_UNITS; dailyUnits += 1) {
-      if (
-        request.maxDailyPills != null &&
-        product.dailyPillsPerServing * dailyUnits > request.maxDailyPills
-      ) {
-        break;
+    for (const product of mapped) {
+      if (groups.some((group) => group.productId === product.productId)) {
+        continue;
       }
 
-      const variant = compileVariant({ dailyUnits, product, request });
-
-      if (!variant) {
-        break;
+      if (!product.contributionSubjectIds.includes(target.subjectId)) {
+        continue;
       }
 
-      variants.push(variant);
+      const group = compileProductGroup(product, request);
 
-      if (!variantLeavesTargetShortfall(variant, request)) {
+      if (group && groupCoversTarget(group, target.subjectId)) {
+        groups.push(group);
         break;
       }
-    }
-
-    const kept = pruneVariants(variants);
-
-    if (kept.length > 0) {
-      groups.push({
-        product,
-        productId: product.productId,
-        sellerId: product.sellerId,
-        variants: kept.sort((left, right) =>
-          left.variantId.localeCompare(right.variantId)
-        )
-      });
     }
   }
 
