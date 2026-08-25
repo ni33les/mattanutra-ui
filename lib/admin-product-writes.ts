@@ -8,6 +8,7 @@
 // Public surface re-exported via the barrel (lib/admin-products.ts) for
 // zero consumer breakage.
 
+import { flushMatchingCatalogueCaches } from "@/lib/agentic/catalogue/flush";
 import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
@@ -1305,6 +1306,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   }
 
   clearProductRecommendationCandidateCache();
+  flushMatchingCatalogueCaches();
 
   return row;
 }
@@ -1678,6 +1680,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   }
 
   clearProductRecommendationCandidateCache();
+  flushMatchingCatalogueCaches();
 
   return row;
 }
@@ -1981,6 +1984,7 @@ export async function deleteIgnoredAdminProduct(input: Readonly<{
   }
 
   clearProductRecommendationCandidateCache();
+  flushMatchingCatalogueCaches();
 
   return {
     deleted: true,

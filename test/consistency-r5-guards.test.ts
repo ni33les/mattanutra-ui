@@ -155,10 +155,12 @@ describe("consistency r5 regression guards", () => {
     assert.doesNotMatch(live, /refreshAdminSafetyCeilings/);
     assert.match(live, /left join lateral/);
     assert.match(live, /with tenants as materialized \(/);
-    assert.match(live, /fixtureIdByKey\.get\(fact\.supplementId\)/);
+    assert.match(live, /loadLiveSupplementsForCountry/);
+    assert.match(live, /buildContributionIndex/);
     assert.match(search, /loadProductRows\(null, \{ productIds: retailProductIds, sql \}\)/);
     assert.match(readModel, /sql\?: postgres\.Sql/);
-    assert.match(readModel, /options\.sql \?\? getSql\(\)/);
+    assert.match(readModel, /if \(!options\.sql\)/);
+    assert.match(readModel, /return withLocalStatementTimeout\(/);
   });
 
   it("does not open a worker pool or warm the catalogue at first-hit", async () => {

@@ -11,6 +11,11 @@ const cachedByCountry = new Map<string, CatalogueSnapshot>();
 let lastSnapshot: CatalogueSnapshot | null = null;
 let installedSnapshot: CatalogueSnapshot | null = null;
 
+export function resetCatalogueSnapshotCache() {
+  cachedByCountry.clear();
+  lastSnapshot = null;
+}
+
 function usesLiveCatalogue(environment?: AgenticEnvironment) {
   return environment === "dev" || environment === "uat" || environment === "prd";
 }
@@ -57,13 +62,16 @@ export async function ensureCatalogueSnapshot(
 
     try {
       const live = await cachedLiveRetailSnapshot(code);
+      const liveReady =
+        !live.catalogueVersion.endsWith("-loading") &&
+        !live.catalogueVersion.endsWith("-unavailable") &&
+        (live.products.length > 0 ||
+          (!process.env.NODE_TEST_CONTEXT && live.supplements.length > 0));
 
-      if (
-        live.products.length > 0 &&
-        !live.catalogueVersion.endsWith("-loading")
-      ) {
+      if (liveReady) {
         cachedByCountry.set(code, live);
         lastSnapshot = live;
+        void refreshAdminSafetyCeilings();
         return live;
       }
     } catch (error) {

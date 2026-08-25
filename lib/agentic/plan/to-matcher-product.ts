@@ -1,6 +1,21 @@
 import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
 import type { CatalogueProduct } from "@/lib/agentic/catalogue/types";
+import { publicSupplementId } from "@/lib/agentic/contract/ids";
 import type { MatcherProduct } from "@/lib/matcher/types";
+
+function contributionSubjectId(value: string | null | undefined) {
+  const raw = value?.trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  if (raw.startsWith("sup_")) {
+    return raw;
+  }
+
+  return publicSupplementId(raw);
+}
 
 export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
   return {
@@ -15,7 +30,7 @@ export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
     labelledContributions: product.candidate.facts.map((fact) => ({
       amount: fact.amount ?? fact.comparableAmount ?? 0,
       name: fact.name,
-      subjectId: null,
+      subjectId: contributionSubjectId(fact.supplementId),
       unit: fact.unit
     })),
     omegaSource: product.omegaSource,

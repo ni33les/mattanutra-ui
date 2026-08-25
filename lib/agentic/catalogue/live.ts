@@ -3,10 +3,15 @@ import { publicProductId } from "@/lib/agentic/contract/ids";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogue/market";
 import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
 import {
+  buildContributionIndex,
+  loadLiveSupplementsForCountry
+} from "@/lib/agentic/catalogue/live-supplements";
+import {
   inferOmegaSource,
   shouldSkipOmegaContribution,
   supplementNameMatchesFact
 } from "@/lib/agentic/catalogue/product-fit";
+import type { CatalogueSupplement } from "@/lib/agentic/catalogue/types";
 import {
   customerPriceFromRpp,
   DEFAULT_CUSTOMER_PRICE_MARGIN_PERCENT
@@ -80,33 +85,23 @@ function normalizeName(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function namesOfSupplement(item: (typeof FIXTURE_SUPPLEMENTS)[number]) {
+function namesOfSupplement(item: Pick<CatalogueSupplement, "aliases" | "name">) {
   return [item.name, ...item.aliases].map(normalizeName);
 }
 
-const fixtureIdByKey = (() => {
-  const keys = new Map<string, string>();
-
-  for (const item of FIXTURE_SUPPLEMENTS) {
-    keys.set(item.uuid, item.supplementId);
-    keys.set(item.supplementId, item.supplementId);
-
-    for (const name of namesOfSupplement(item)) {
-      if (name) {
-        keys.set(name, item.supplementId);
-      }
-    }
-  }
-
-  return keys;
-})();
-
-function contributionSupplementIds(candidate: ProductCandidate) {
+function contributionSupplementIds(
+  candidate: ProductCandidate,
+  index: Map<string, string>,
+  supplements: readonly CatalogueSupplement[]
+) {
   const ids = new Set<string>();
 
   for (const fact of candidate.facts ?? []) {
     if (fact.supplementId) {
-      const mapped = fixtureIdByKey.get(fact.supplementId);
+      const mapped =
+        index.get(fact.supplementId) ??
+        index.get(fact.supplementId.toLowerCase()) ??
+        index.get(normalizeName(fact.supplementId));
 
       if (mapped && !shouldSkipOmegaContribution(mapped, candidate)) {
         ids.add(mapped);
@@ -122,7 +117,7 @@ function contributionSupplementIds(candidate: ProductCandidate) {
 
     for (const key of keys) {
       const wanted = normalizeName(key);
-      const exact = fixtureIdByKey.get(wanted);
+      const exact = index.get(wanted);
 
       if (exact) {
         if (!shouldSkipOmegaContribution(wanted, candidate)) {
@@ -135,7 +130,7 @@ function contributionSupplementIds(candidate: ProductCandidate) {
         continue;
       }
 
-      const match = FIXTURE_SUPPLEMENTS.find((item) =>
+      const match = supplements.find((item) =>
         namesOfSupplement(item).some((name) =>
           supplementNameMatchesFact(name, wanted, candidate)
         )
@@ -221,7 +216,11 @@ function isSaleEligible(candidate: ProductCandidate) {
   );
 }
 
-function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | null {
+function toCatalogueProduct(
+  candidate: ProductCandidate,
+  supplements: readonly CatalogueSupplement[],
+  index: Map<string, string>
+): CatalogueProduct | null {
   if (!isSaleEligible(candidate)) {
     return null;
   }
@@ -232,7 +231,7 @@ function toCatalogueProduct(candidate: ProductCandidate): CatalogueProduct | nul
     return null;
   }
 
-  const contributions = contributionSupplementIds(candidate);
+  const contributions = contributionSupplementIds(candidate, index, supplements);
 
   if (contributions.length < 1) {
     return null;
@@ -432,6 +431,23 @@ export async function loadLiveRetailSnapshot(
     };
   }
 
+  let supplements = FIXTURE_SUPPLEMENTS;
+
+  try {
+    const liveSupplements = await loadLiveSupplementsForCountry(sql, code);
+
+    if (liveSupplements.length > 0) {
+      supplements = liveSupplements;
+    }
+  } catch (error) {
+    console.warn("Unable to load live supplements for MCP", {
+      countryCode: code,
+      error
+    });
+  }
+
+  const contributionIndex = buildContributionIndex(supplements);
+
   const skuRows = await sql<SnapshotSkuRow[]>`
     with tenants as materialized (
       select organisations.id, organisations.name, organisations.currency
@@ -519,7 +535,7 @@ export async function loadLiveRetailSnapshot(
       code,
       numberOrZero(row.margin_percent) || DEFAULT_CUSTOMER_PRICE_MARGIN_PERCENT
     );
-    const mapped = toCatalogueProduct(candidate);
+    const mapped = toCatalogueProduct(candidate, supplements, contributionIndex);
 
     if (!mapped) {
       continue;
@@ -555,7 +571,7 @@ export async function loadLiveRetailSnapshot(
     availabilityAsOf: new Date().toISOString(),
     catalogueVersion: `retail-${code}-${byListing.size}`,
     products: [...byListing.values()],
-    supplements: FIXTURE_SUPPLEMENTS
+    supplements
   };
 }
 
@@ -587,7 +603,7 @@ function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
 
   void loadLiveRetailSnapshot(code)
     .then((snapshot) => {
-      if (snapshot.products.length > 0) {
+      if (snapshot.products.length > 0 || snapshot.supplements.length > 0) {
         liveCache().set(code, { at: Date.now(), snapshot });
       }
 

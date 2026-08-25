@@ -74,6 +74,11 @@ export function matcherSafetyCeilingsCachedAt() {
   return cached?.at ?? 0;
 }
 
+export function resetMatcherSafetyCeilings() {
+  cached = null;
+  unavailable = false;
+}
+
 function normalizeName(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }

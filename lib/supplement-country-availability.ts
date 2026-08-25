@@ -123,6 +123,11 @@ function isoString(value: Date | string | null) {
   return value ? new Date(value).toISOString() : null;
 }
 
+export function resetSupplementAvailabilityCache() {
+  availabilityCache().clear();
+  availabilityInflight().clear();
+}
+
 export function emptySupplementAvailabilityLookup(
   countryCode = defaultProductCountryCode
 ): SupplementAvailabilityLookup {
@@ -192,16 +197,17 @@ export async function getSupplementEffectiveAvailability(
       supplements.normalized_name,
       supplements.list_status as global_list_status,
       supplements.is_active as global_active,
-      availability.country_code,
-      availability.status as explicit_status,
+      coalesce(table_rule.country_code, json_rule.country_code) as country_code,
+      coalesce(table_rule.status, json_rule.status) as explicit_status,
       case
-        when availability.status in ('allowed', 'blocked') then availability.status
+        when table_rule.status in ('allowed', 'blocked') then table_rule.status
+        when json_rule.status in ('allowed', 'blocked') then json_rule.status
         when supplements.is_active = false then 'blocked'
         when supplements.list_status = 'blocked' then 'blocked'
         else 'allowed'
       end as status,
-      availability.reason,
-      availability.source,
+      coalesce(table_rule.reason, json_rule.reason) as reason,
+      coalesce(table_rule.source, json_rule.source) as source,
       greatest(
         supplements.updated_at,
         supplements.updated_at
@@ -211,6 +217,9 @@ export async function getSupplementEffectiveAvailability(
         '{}'::text[]
       ) as aliases
     from public.supplements supplements
+    left join public.supplement_country_availability table_rule
+      on table_rule.supplement_id = supplements.id
+      and table_rule.country_code = ${countryCode}
     left join lateral (
       select
         coalesce(rule."countryCode", rule.country_code) as country_code,
@@ -233,9 +242,10 @@ export async function getSupplementEffectiveAvailability(
       where coalesce(rule."countryCode", rule.country_code) = ${countryCode}
         and rule.status in ('allowed', 'blocked')
       limit 1
-    ) availability on true
+    ) json_rule on true
     left join public.supplement_aliases
       on supplement_aliases.supplement_id = supplements.id
+    where coalesce(supplements.source_payload ->> 'deleted', 'false') <> 'true'
     group by
       supplements.id,
       supplements.name,
@@ -243,10 +253,14 @@ export async function getSupplementEffectiveAvailability(
       supplements.list_status,
       supplements.is_active,
       supplements.updated_at,
-      availability.country_code,
-      availability.status,
-      availability.reason,
-      availability.source
+      table_rule.country_code,
+      table_rule.status,
+      table_rule.reason,
+      table_rule.source,
+      json_rule.country_code,
+      json_rule.status,
+      json_rule.reason,
+      json_rule.source
   `;
 
   return supplementAvailabilityLookupFromRows(rows, countryCode);

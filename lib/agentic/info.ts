@@ -12,6 +12,7 @@ import { listDeliverableMarkets } from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
 import { recognisedSupplementNames } from "@/lib/agentic/catalogue/fixtures";
+import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
   RECOGNISED_CONDITION_CODES,
   RECOGNISED_MEDICATION_CODES
@@ -26,9 +27,50 @@ let infoCache: {
   value: ReturnType<typeof buildInfo>;
 } | null = null;
 
+export function resetInfoCache() {
+  infoCache = null;
+}
+
+async function recognisedNamesForMarkets(input: Readonly<{
+  config: AgenticConfig;
+  supportedCountries: ReadonlyArray<{ countryCode: string }>;
+}>) {
+  const names = new Set<string>();
+  const countries =
+    input.supportedCountries.length > 0
+      ? input.supportedCountries
+      : [{ countryCode: "TH" }];
+
+  for (const market of countries) {
+    try {
+      const snapshot = await ensureCatalogueSnapshot(
+        input.config.environment,
+        market.countryCode
+      );
+
+      for (const item of snapshot.supplements) {
+        names.add(item.name);
+
+        for (const alias of item.aliases) {
+          names.add(alias);
+        }
+      }
+    } catch {
+      // Keep whatever names we already collected.
+    }
+  }
+
+  if (names.size < 1) {
+    return recognisedSupplementNames();
+  }
+
+  return [...names].sort((left, right) => left.localeCompare(right));
+}
+
 function buildInfo(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
+  recognisedNames: readonly string[];
   supportedCountries: ReadonlyArray<{
     countryCode: string;
     countryName: string;
@@ -51,7 +93,7 @@ function buildInfo(input: Readonly<{
     conditionCodes: [...RECOGNISED_CONDITION_CODES],
     medicationCodes: [...RECOGNISED_MEDICATION_CODES],
     pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
-    recognisedNames: recognisedSupplementNames(),
+    recognisedNames: [...input.recognisedNames],
     schemaChecksum: AGENTIC_SCHEMA_CHECKSUM,
     serviceName: AGENTIC_SERVICE_NAME,
     serviceVersion: AGENTIC_SERVICE_VERSION,
@@ -78,7 +120,14 @@ export async function infoTool(input: Readonly<{
   const value =
     infoCache?.key === key
       ? infoCache.value
-      : buildInfo({ ...input, supportedCountries });
+      : buildInfo({
+          ...input,
+          recognisedNames: await recognisedNamesForMarkets({
+            config: input.config,
+            supportedCountries
+          }),
+          supportedCountries
+        });
 
   if (infoCache?.key !== key) {
     infoCache = { key, value };

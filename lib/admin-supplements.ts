@@ -19,6 +19,7 @@ import {
   type AdminSupplementSelectionStats
 } from "@/lib/admin-recommendation-insights";
 import { normalizeLocaleCode, type LocaleCode } from "@/lib/i18n";
+import { flushMatchingCatalogueCaches } from "@/lib/agentic/catalogue/flush";
 import {
   isSupplementCountryAvailabilityStatus,
   normalizeSupplementAvailabilityCountryCode,
@@ -497,6 +498,10 @@ async function replaceSupplementCountryAvailability(
 
   if (rows.length < 1) {
     await sql`
+      delete from public.supplement_country_availability
+      where supplement_id = ${supplementId}::uuid
+    `;
+    await sql`
       update public.supplements
       set
         source_payload = coalesce(source_payload, '{}'::jsonb) - 'countryAvailability',
@@ -506,6 +511,34 @@ async function replaceSupplementCountryAvailability(
     return;
   }
 
+  await sql`
+    delete from public.supplement_country_availability
+    where supplement_id = ${supplementId}::uuid
+  `;
+  await sql`
+    insert into public.supplement_country_availability (
+      supplement_id,
+      country_code,
+      status,
+      reason,
+      source
+    )
+    select
+      ${supplementId}::uuid,
+      row.country_code,
+      row.status,
+      row.reason,
+      ${actor ?? "admin_dashboard"}
+    from jsonb_to_recordset(${sql.json(rows.map((row) => ({
+      country_code: row.countryCode,
+      reason: row.reason ?? null,
+      status: row.status
+    })))}::jsonb) as row(
+      country_code text,
+      reason text,
+      status text
+    )
+  `;
   await sql`
     update public.supplements
     set
@@ -1013,6 +1046,7 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     supplementId: input.id
   });
 
+  flushMatchingCatalogueCaches();
   return reloadAdminSupplement(sql, input.id);
 }
 
@@ -1205,6 +1239,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
     )
   `;
 
+  flushMatchingCatalogueCaches();
   return reloadAdminSupplement(sql, supplementId);
 }
 
@@ -1319,6 +1354,7 @@ export async function deleteAdminSupplement(
 
   await refreshAndPersistProductValidations(sql, orphanedProductIds);
 
+  flushMatchingCatalogueCaches();
   return {
     deleted: true,
     orphanedProductIds,
@@ -1401,6 +1437,7 @@ export async function deleteAdminSupplementAlias(
     )
   `;
 
+  flushMatchingCatalogueCaches();
   return reloadAdminSupplement(sql, input.supplementId);
 }
 
