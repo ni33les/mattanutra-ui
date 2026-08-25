@@ -84,6 +84,8 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     const info = await call(runtime, "info", { locale: "en" });
     const names = (info.recognisedNames as string[]) ?? [];
     assert.ok(names.includes("Algae omega-3"));
+    assert.ok(names.includes("Vitamin K2"));
+    assert.ok(names.includes("MK-7"));
     assert.ok(names.includes("Folate"));
     assert.ok(((info.medicationCodes as string[]) ?? []).includes("apixaban"));
     assert.ok(((info.conditionCodes as string[]) ?? []).includes("ckd"));
@@ -100,9 +102,17 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.equal(plan.ok, true);
     assert.notEqual((plan.error as { reasonCode?: string } | undefined)?.reasonCode, "unknown_supplement");
     const leftovers = (plan.leftovers as Array<{ name?: string; reason?: string }>) ?? [];
-    assert.ok(leftovers.some((item) =>
-      String(item.name).toLowerCase().includes("k2") && item.reason === "not_in_catalogue"
-    ));
+    assert.equal(
+      leftovers.some((item) =>
+        String(item.name).toLowerCase().includes("k2") && item.reason === "not_in_catalogue"
+      ),
+      false
+    );
+    assert.ok(
+      leftovers.some((item) =>
+        String(item.name).toLowerCase().includes("k2") && item.reason === "uncovered"
+      ) || namesInBasket(plan).some((name) => /k2|mk-?7|menaquinone/i.test(name))
+    );
   });
 
   it("A2 answers+expectedRevision patch stays sticky", async () => {
@@ -250,7 +260,7 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     }
   });
 
-  it("A6 Vitamin K2 is a leftover, not INVALID_ARGUMENT", async () => {
+  it("A6 Vitamin K2 is recognised, not INVALID_ARGUMENT", async () => {
     const runtime = runtimeFor();
     const plan = await call(runtime, "plan", {
       idempotencyKey: "qa-a6-k2-leftover-001",
@@ -264,9 +274,17 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.equal(plan.ok, true);
     assert.equal(plan.error, undefined);
     const leftovers = (plan.leftovers as Array<{ name?: string; reason?: string }>) ?? [];
-    assert.ok(leftovers.some((item) =>
-      String(item.name).toLowerCase().includes("k2") && item.reason === "not_in_catalogue"
-    ));
+    assert.equal(
+      leftovers.some((item) =>
+        String(item.name).toLowerCase().includes("k2") && item.reason === "not_in_catalogue"
+      ),
+      false
+    );
+    assert.ok(
+      leftovers.some((item) =>
+        String(item.name).toLowerCase().includes("k2") && item.reason === "uncovered"
+      ) || namesInBasket(plan).some((name) => /k2|mk-?7|menaquinone/i.test(name))
+    );
   });
 
   it("A7 DEV fixtures are explicitly marked fixture", async () => {

@@ -3,7 +3,7 @@ import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
 import { evaluateSafety } from "@/lib/matcher/safety";
 import { searchGroups } from "@/lib/matcher/search";
-import { scoreState, selectOptions } from "@/lib/matcher/selector";
+import { compareBaskets, scoreState, selectOptions } from "@/lib/matcher/selector";
 import type {
   CanonicalRequest,
   CatalogSnapshot,
@@ -155,9 +155,7 @@ export function match(
 
     if (
       !winner.selected ||
-      option.selected.aggregateCoverage > winner.selected.aggregateCoverage ||
-      (option.selected.aggregateCoverage === winner.selected.aggregateCoverage &&
-        option.selected.priceMinor < winner.selected.priceMinor)
+      compareBaskets(option.selected, winner.selected, request, config) < 0
     ) {
       winner = option;
     }

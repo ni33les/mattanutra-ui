@@ -198,8 +198,11 @@ export type SearchState = Readonly<{
 export type ScoredBasket = Readonly<{
   aggregateCoverage: number;
   coverageBySubject: ReadonlyMap<string, number>;
+  coveredCount: number;
   dailyPills: number;
   exposure: Exposure;
+  incidentalCount: number;
+  oversupplyScore: number;
   priceMinor: number;
   productCount: number;
   productIds: readonly string[];

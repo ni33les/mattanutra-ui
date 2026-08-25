@@ -30,7 +30,7 @@ const MATCH_ALIAS_GROUPS: readonly (readonly string[])[] = [
   ["vitamin_d", "vitamin_d3", "d3", "cholecalciferol"],
   ["vitamin_e", "tocopherol", "alpha_tocopherol", "tocopheryl_acetate", "tocopheryl_succinate"],
   ["vitamin_k", "vitamin_k1", "phytonadione", "phylloquinone"],
-  ["vitamin_k2", "menaquinone", "mk_7", "mk7"],
+  ["vitamin_k2", "vitamin_k_2", "k2", "menaquinone", "menaquinone_7", "mk_7", "mk7"],
   ["coq10", "coenzyme_q10", "ubiquinone", "ubiquinol"],
   ["pea", "palmidrol", "palmitoylethanolamide"],
   ["ashwagandha", "ashwaganda", "withania_somnifera", "ashwagandha_root_extract"],

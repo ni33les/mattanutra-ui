@@ -41,6 +41,26 @@ export function aggregateCoverage(
   return Math.round(total / request.targets.length);
 }
 
+export function oversupplyScore(
+  request: CanonicalRequest,
+  delivered: ReadonlyMap<string, bigint>
+) {
+  let total = 0;
+
+  for (const target of request.targets) {
+    const got = delivered.get(target.subjectId) ?? BigInt(0);
+    const want = target.requested.units;
+
+    if (want <= BigInt(0) || got <= want) {
+      continue;
+    }
+
+    total += Number(((got - want) * BigInt(COVERAGE_SCALE)) / want);
+  }
+
+  return total;
+}
+
 export function dominatesAtLayer(
   left: SearchState,
   right: SearchState,

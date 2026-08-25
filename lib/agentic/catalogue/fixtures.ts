@@ -19,6 +19,7 @@ const SUPPLEMENT_UUIDS = {
   folate: "cccccccc-cccc-cccc-cccc-cccccccccccc",
   iodine: "a1a1a1a1-a1a1-41a1-a1a1-a1a1a1a1a1a1",
   iron: "77777777-7777-7777-7777-777777777777",
+  k2: "f1f1f1f1-f1f1-41f1-a1f1-f1f1f1f1f1f1",
   magnesium: "33333333-3333-3333-3333-333333333333",
   omega3: "22222222-2222-2222-2222-222222222222",
   selenium: "a2a2a2a2-a2a2-42a2-a2a2-a2a2a2a2a2a2",
@@ -59,7 +60,13 @@ export const FIXTURE_SUPPLEMENTS: readonly CatalogueSupplement[] = [
   supplement("calcium", "Calcium", ["Calcium citrate", "Calcium carbonate"], ["mg", "g"]),
   supplement("b6", "Vitamin B6", ["B6", "Pyridoxine"], ["mg", "mcg"]),
   supplement("iodine", "Iodine", ["Potassium iodide", "Iodide"], ["mcg"]),
-  supplement("selenium", "Selenium", ["Selenomethionine"], ["mcg"])
+  supplement("selenium", "Selenium", ["Selenomethionine"], ["mcg"]),
+  supplement(
+    "k2",
+    "Vitamin K2",
+    ["K2", "MK-7", "MK7", "Menaquinone-7", "Menaquinone", "Vitamin K-2"],
+    ["mcg", "mg"]
+  )
 ];
 
 function candidate(input: Readonly<{

@@ -409,7 +409,11 @@ export function recommendWithMatcher(
       input.budgetAmount != null ? Math.round(input.budgetAmount * 100) : null,
     maxProductCount: input.maxProducts ?? 6,
     medicationCodes: [...(input.clientContext?.medicationTypes ?? [])],
-    omega3SourcePreference: impliedOmegaPreference(dietary, "any"),
+    omega3SourcePreference: impliedOmegaPreference(
+      dietary,
+      "any",
+      targets.targets.map((item) => item.name)
+    ),
     optimization:
       input.stackPreference === "compact" ? "fewest_pills" : "best_coverage",
     profile: {

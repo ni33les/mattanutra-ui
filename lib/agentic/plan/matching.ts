@@ -111,7 +111,8 @@ function toCanonicalRequest(
     medicationCodes: state.medicationCodes,
     omega3SourcePreference: impliedOmegaPreference(
       dietary,
-      state.requirements.omega3SourcePreference
+      state.requirements.omega3SourcePreference,
+      state.targets.map((item) => item.name)
     ),
     optimization: state.optimization,
     profile: state.profile,

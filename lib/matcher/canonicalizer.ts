@@ -85,11 +85,26 @@ export function canonicalizeCurrents(
   return result;
 }
 
+const ALGAE_TARGET_NAME = /\balgae|\balgal\b/i;
+
+export function targetImpliesAlgaeOmega(name: string) {
+  return ALGAE_TARGET_NAME.test(name);
+}
+
 export function impliedOmegaPreference(
   dietary: DietaryPreference,
-  omega: OmegaPreference | null | undefined
+  omega: OmegaPreference | null | undefined,
+  targetNames: readonly string[] = []
 ): OmegaPreference {
   if (dietary === "vegan") {
+    return "algae_only";
+  }
+
+  if (omega === "algae_only") {
+    return "algae_only";
+  }
+
+  if (targetNames.some(targetImpliesAlgaeOmega)) {
     return "algae_only";
   }
 
