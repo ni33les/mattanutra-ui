@@ -195,8 +195,13 @@ export function compareBaskets(
   const floorBest = { ...probe, aggregateCoverage: bestCoverage };
 
   if (request.optimization === "fewest_pills") {
-    const leftOk = meetsCoverageFloor(left, floorBest, config);
-    const rightOk = meetsCoverageFloor(right, floorBest, config);
+    const bestCovered = Math.max(left.coveredCount, right.coveredCount);
+    const leftOk =
+      meetsCoverageFloor(left, floorBest, config) &&
+      left.coveredCount >= bestCovered;
+    const rightOk =
+      meetsCoverageFloor(right, floorBest, config) &&
+      right.coveredCount >= bestCovered;
 
     if (leftOk !== rightOk) {
       return leftOk ? -1 : 1;
@@ -204,7 +209,6 @@ export function compareBaskets(
 
     if (leftOk) {
       return (
-        right.coveredCount - left.coveredCount ||
         left.dailyPills - right.dailyPills ||
         left.productCount - right.productCount ||
         left.priceMinor - right.priceMinor ||

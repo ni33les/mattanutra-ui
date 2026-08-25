@@ -145,6 +145,16 @@ export function match(
         scored.push(basket);
       }
     }
+
+    const salvaged = salvagePartialBasket({
+      groups: seller.groups,
+      request,
+      sellerId: seller.sellerId
+    });
+
+    if (salvaged) {
+      scored.push(salvaged);
+    }
   }
 
   const bySeller = new Map<string, ScoredBasket[]>();
