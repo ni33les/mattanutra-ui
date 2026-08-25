@@ -113,6 +113,7 @@ function indexCeilings(ceilings: readonly SafetyCeiling[]): CeilingIndex {
 }
 
 const MAGNESIUM = /\bmagnesium\b/i;
+const VITAMIN_A = /\bvitamin\s*a\b|\bretinol\b/i;
 const VITAMIN_D = /\bvitamin\s*d|\bd3\b|\bcholecalciferol\b/i;
 const ZINC = /\bzinc\b/i;
 
@@ -158,6 +159,26 @@ function vitaminD3UlIu(ageYears: number) {
   return 4000;
 }
 
+function vitaminAUlMcg(ageYears: number) {
+  if (ageYears <= 3) {
+    return 600;
+  }
+
+  if (ageYears <= 8) {
+    return 900;
+  }
+
+  if (ageYears <= 13) {
+    return 1700;
+  }
+
+  if (ageYears <= 18) {
+    return 2800;
+  }
+
+  return 3000;
+}
+
 function zincUlMg(ageYears: number) {
   if (ageYears <= 3) {
     return 7;
@@ -189,6 +210,15 @@ function nihBandFor(
     return {
       maxAmount: magnesiumUlMg(ageYears),
       maxUnit: "mg",
+      name,
+      subjectId: input.subjectId
+    };
+  }
+
+  if (VITAMIN_A.test(hay)) {
+    return {
+      maxAmount: vitaminAUlMcg(ageYears),
+      maxUnit: "mcg",
       name,
       subjectId: input.subjectId
     };

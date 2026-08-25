@@ -9,6 +9,19 @@ import type {
   RejectionReason
 } from "@/lib/matcher/types";
 
+const SENIOR_TITLE =
+  /\b(?:for\s+)?(?:50|60|70)\s*\+|\b(?:50|60|70)-?plus\b|\bseniors?\b/i;
+const CHILD_TITLE =
+  /\b(?:children'?s|for children|kids|for kids|pediatric)\b/i;
+
+export function titleImpliesSeniorAgeBand(title: string) {
+  return SENIOR_TITLE.test(title);
+}
+
+export function titleImpliesChildAgeBand(title: string) {
+  return CHILD_TITLE.test(title);
+}
+
 function labelledFacts(product: MatcherProduct) {
   return product.labelledContributions.map((item) => ({
     amount: item.amount,
@@ -116,6 +129,7 @@ export function productRejectionReason(
   }
 
   const sex = request.profile.sex;
+  const { ageYears, lifeStage } = request.profile;
 
   if (sex === "male" && product.productAudience === "female") {
     return "life_stage";
@@ -135,15 +149,29 @@ export function productRejectionReason(
 
   if (prenatalSku) {
     const prenatalLifeStage =
-      request.profile.lifeStage === "pregnant" ||
-      request.profile.lifeStage === "trying_to_conceive";
+      lifeStage === "pregnant" || lifeStage === "trying_to_conceive";
 
     if (sex === "male" || !prenatalLifeStage) {
       return "life_stage";
     }
   }
 
-  if (request.profile.lifeStage === "child" && product.productAudience === "male") {
+  if (titleImpliesSeniorAgeBand(product.title)) {
+    if (
+      ageYears < 50 ||
+      lifeStage === "child" ||
+      lifeStage === "pregnant" ||
+      lifeStage === "trying_to_conceive"
+    ) {
+      return "life_stage";
+    }
+  }
+
+  if (titleImpliesChildAgeBand(product.title) && lifeStage !== "child") {
+    return "life_stage";
+  }
+
+  if (lifeStage === "child" && product.productAudience === "male") {
     return "life_stage";
   }
 

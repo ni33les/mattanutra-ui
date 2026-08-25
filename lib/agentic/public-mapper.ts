@@ -8,6 +8,12 @@ import type {
 
 export const PUBLIC_NUTRIENT_NAME_LIMIT = 12;
 
+export type PublicBasketNutrient = Readonly<{
+  amount: number;
+  name: string;
+  unit: string;
+}>;
+
 export type PublicBasketItem = Readonly<{
   currency: string;
   dailyPills: number;
@@ -15,6 +21,7 @@ export type PublicBasketItem = Readonly<{
   form: string;
   imageUrl?: string;
   incidentalNutrientNames: readonly string[];
+  incidentalNutrients: readonly PublicBasketNutrient[];
   lineTotalMinor: number;
   pillsPerServing: number;
   productId: string;
@@ -25,6 +32,40 @@ export type PublicBasketItem = Readonly<{
   source?: "fixture" | "retail";
   unitPriceMinor: number;
 }>;
+
+function boundedNutrients(items: BasketItem["incidentalNutrients"] | undefined) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const out: PublicBasketNutrient[] = [];
+
+  for (const item of items) {
+    const name = String(item?.name ?? "").trim();
+    const unit = String(item?.unit ?? "").trim();
+    const amount = Number(item?.amount);
+
+    if (!name || !unit || !Number.isFinite(amount) || amount <= 0) {
+      continue;
+    }
+
+    const key = name.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    out.push({ amount, name, unit });
+
+    if (out.length >= PUBLIC_NUTRIENT_NAME_LIMIT) {
+      break;
+    }
+  }
+
+  return out;
+}
 
 function boundedNames(names: readonly string[] | undefined) {
   if (!Array.isArray(names) || names.length === 0) {
@@ -66,6 +107,7 @@ export function publicBasketItem(item: BasketItem): PublicBasketItem {
     dailyPills: item.dailyPills,
     form: item.form,
     incidentalNutrientNames: boundedNames(item.incidentalNutrientNames),
+    incidentalNutrients: boundedNutrients(item.incidentalNutrients),
     lineTotalMinor: item.lineTotalMinor,
     pillsPerServing: item.pillsPerServing,
     productId: item.productId,
@@ -399,6 +441,9 @@ export function publicFrozenOrder(frozen: unknown) {
         imageUrl: typeof row.imageUrl === "string" && row.imageUrl.trim() ? row.imageUrl : null,
         incidentalNutrientNames: Array.isArray(row.incidentalNutrientNames)
           ? row.incidentalNutrientNames.map(String)
+          : [],
+        incidentalNutrients: Array.isArray(row.incidentalNutrients)
+          ? row.incidentalNutrients
           : [],
         incompleteCommercialFacts: false,
         lineTotalMinor: Number(row.lineTotalMinor) || 0,

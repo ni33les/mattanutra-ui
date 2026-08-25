@@ -232,6 +232,55 @@ export function evaluateSafety(input: Readonly<{
     }
   }
 
+  const incidentalTotals = new Map<string, { amount: number; name: string; unit: string }>();
+
+  for (const item of input.selected?.basket ?? []) {
+    for (const nutrient of item.incidentalNutrients ?? []) {
+      const key = nutrient.name.trim().toLowerCase();
+
+      if (!key) {
+        continue;
+      }
+
+      const previous = incidentalTotals.get(key);
+      incidentalTotals.set(key, {
+        amount: (previous?.amount ?? 0) + nutrient.amount,
+        name: nutrient.name,
+        unit: nutrient.unit
+      });
+    }
+  }
+
+  for (const nutrient of incidentalTotals.values()) {
+    const covered = coverageRows.some(
+      (row) => row.name.trim().toLowerCase() === nutrient.name.trim().toLowerCase()
+    );
+
+    if (covered) {
+      continue;
+    }
+
+    const limit = upperLimitAmount(nutrient.name, nutrient.unit, {
+      ceilings: matcherSafetyCeilings(),
+      profile: input.state.profile,
+      subjectId: nutrient.name
+    });
+
+    if (limit != null && nutrient.amount > limit) {
+      items.push(guidance({
+        action: "block",
+        code: "dose_review_required",
+        exposure: nutrient.amount,
+        locale: input.locale,
+        productIds,
+        requested: 0,
+        severity: "blocking",
+        supplementIds: [],
+        threshold: limit
+      }));
+    }
+  }
+
   if (input.state.profile.lifeStage === "child") {
     const pediatricIds = [zincCoverage?.supplementId, ironCoverage?.supplementId]
       .filter((item): item is string => Boolean(item));

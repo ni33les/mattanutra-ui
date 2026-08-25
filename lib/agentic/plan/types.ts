@@ -194,6 +194,12 @@ export type MatcherTelemetry = Readonly<{
   targetClassifications?: readonly TargetClassification[];
 }>;
 
+export type BasketNutrient = Readonly<{
+  amount: number;
+  name: string;
+  unit: CatalogueUnit;
+}>;
+
 export type BasketItem = Readonly<{
   availabilityAsOf: string;
   contributionSupplementIds: readonly string[];
@@ -204,6 +210,7 @@ export type BasketItem = Readonly<{
   form: string;
   imageUrl: string | null;
   incidentalNutrientNames: readonly string[];
+  incidentalNutrients: readonly BasketNutrient[];
   incompleteCommercialFacts: boolean;
   lineTotalMinor: number;
   pillsPerServing: number;

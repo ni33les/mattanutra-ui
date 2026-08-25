@@ -38,6 +38,7 @@ function option(rows: CoverageRow[]): StackOption {
         form: "capsule",
         imageUrl: null,
         incidentalNutrientNames: [],
+        incidentalNutrients: [],
         incompleteCommercialFacts: false,
         lineTotalMinor: 120,
         pillsPerServing: 1,

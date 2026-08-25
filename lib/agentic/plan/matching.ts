@@ -201,16 +201,64 @@ function uniqueBoundedNames(
   return out;
 }
 
+const CATALOGUE_UNITS = new Set([
+  "CFU",
+  "IU",
+  "g",
+  "mcg",
+  "mg",
+  "ml",
+  "serving"
+]);
+
+function uniqueBoundedNutrients(
+  facts: readonly { amount: number; name: string; unit: string }[],
+  limit = 12
+) {
+  const seen = new Set<string>();
+  const out: Array<{ amount: number; name: string; unit: BasketItem["incidentalNutrients"][number]["unit"] }> = [];
+
+  for (const fact of facts) {
+    const name = fact.name.trim();
+    const unit = fact.unit.trim();
+
+    if (!name || fact.amount <= 0 || !CATALOGUE_UNITS.has(unit)) {
+      continue;
+    }
+
+    const key = name.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    out.push({
+      amount: fact.amount,
+      name,
+      unit: unit as BasketItem["incidentalNutrients"][number]["unit"]
+    });
+
+    if (out.length >= limit) {
+      break;
+    }
+  }
+
+  return out;
+}
+
 function nutrientSplit(
   product: CatalogueProduct,
-  state: CanonicalPlanState
+  state: CanonicalPlanState,
+  servingsPerDay: number
 ) {
   const matcherProduct = toMatcherProduct(product);
-  const requested: string[] = [];
-  const incidental: string[] = [];
+  const requested: { amount: number; name: string; unit: string }[] = [];
+  const incidental: { amount: number; name: string; unit: string }[] = [];
+  const multiplier = Math.max(1, servingsPerDay);
 
   for (const fact of matcherProduct.labelledContributions) {
-    if (fact.amount == null || fact.amount <= 0 || !fact.name?.trim()) {
+    if (fact.amount == null || fact.amount <= 0 || !fact.name?.trim() || !fact.unit) {
       continue;
     }
 
@@ -219,17 +267,27 @@ function nutrientSplit(
         fact
       )
     );
+    const row = {
+      amount: fact.amount * multiplier,
+      name: fact.name,
+      unit: fact.unit
+    };
 
     if (matchesTarget) {
-      requested.push(fact.name);
+      requested.push(row);
     } else {
-      incidental.push(fact.name);
+      incidental.push(row);
     }
   }
 
+  const incidentalNutrients = uniqueBoundedNutrients(incidental);
+  const requestedNutrients = uniqueBoundedNutrients(requested);
+
   return {
-    incidentalNutrientNames: uniqueBoundedNames(incidental),
-    requestedNutrientNames: uniqueBoundedNames(requested)
+    incidentalNutrientNames: uniqueBoundedNames(incidentalNutrients.map((item) => item.name)),
+    incidentalNutrients,
+    requestedNutrientNames: uniqueBoundedNames(requestedNutrients.map((item) => item.name)),
+    requestedNutrients
   };
 }
 
@@ -260,7 +318,7 @@ function basketFromIds(
     .map((product) => {
       const dailyUnits = dailyUnitsForProduct(product.productId, basket.variantIds);
       const quantity = Math.max(1, dailyUnits);
-      const nutrients = nutrientSplit(product, state);
+      const nutrients = nutrientSplit(product, state, quantity);
 
       return {
         availabilityAsOf: snapshot.availabilityAsOf,
@@ -278,6 +336,7 @@ function basketFromIds(
         form: product.form,
         imageUrl: product.candidate.imageUrl?.trim() || null,
         incidentalNutrientNames: nutrients.incidentalNutrientNames,
+        incidentalNutrients: nutrients.incidentalNutrients,
         incompleteCommercialFacts: product.incompleteCommercialFacts,
         lineTotalMinor: product.unitPriceMinor * quantity,
         pillsPerServing: product.dailyPills,
