@@ -1,4 +1,7 @@
-import { safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
+import {
+  safetyCeilingFor,
+  type SafetyProfile
+} from "@/lib/matcher/safety-ceilings";
 import { scaleAmount } from "@/lib/matcher/dose";
 import type { MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
@@ -7,11 +10,13 @@ export function upperLimitAmount(
   unit: string,
   input: Readonly<{
     ceilings?: readonly SafetyCeiling[];
+    profile?: SafetyProfile | null;
     subjectId: string;
   }>
 ): number | null {
   const ceiling = safetyCeilingFor(input.ceilings ?? [], {
     name,
+    profile: input.profile,
     subjectId: input.subjectId
   });
 
@@ -49,5 +54,11 @@ export function upperLimitAmount(
     return null;
   }
 
-  return Number(scaled.units / asRequested.units);
+  const ratio = Number(scaled.units) / Number(asRequested.units);
+
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return null;
+  }
+
+  return Math.round(ratio * 1_000_000) / 1_000_000;
 }

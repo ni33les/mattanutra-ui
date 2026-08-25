@@ -2,7 +2,11 @@ import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
-import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
+import {
+  adultPolicyCeilingExists,
+  isPediatricSafetyProfile,
+  matcherSafetyCeilings
+} from "@/lib/matcher/safety-ceilings";
 import { doseComparable, fromComparable, roundDose } from "@/lib/agentic/plan/units";
 import type {
   CanonicalPlanState,
@@ -148,10 +152,31 @@ export function evaluateSafety(input: Readonly<{
   for (const row of coverageRows) {
     const limit = upperLimitAmount(row.name, row.unit, {
       ceilings: matcherSafetyCeilings(),
+      profile: input.state.profile,
       subjectId: row.supplementId
     });
+    const missingChildRule =
+      limit == null &&
+      isPediatricSafetyProfile(input.state.profile) &&
+      adultPolicyCeilingExists(matcherSafetyCeilings(), {
+        name: row.name,
+        subjectId: row.supplementId
+      }) &&
+      row.totalExposureAmount > 0;
 
-    if (
+    if (missingChildRule) {
+      items.push(guidance({
+        action: "block",
+        code: "dose_review_required",
+        exposure: row.totalExposureAmount,
+        locale: input.locale,
+        productIds,
+        requested: row.requestedAmount,
+        severity: "blocking",
+        supplementIds: [row.supplementId],
+        threshold: null
+      }));
+    } else if (
       limit == null &&
       "coveragePercent" in row &&
       row.coveragePercent > 125

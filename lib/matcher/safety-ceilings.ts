@@ -1,4 +1,9 @@
-import type { MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
+import type { LifeStage, MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
+
+export type SafetyProfile = Readonly<{
+  ageYears: number;
+  lifeStage: LifeStage;
+}>;
 
 export function parseAdminLimitUnit(value: string): MatcherUnit | null {
   const lower = value
@@ -107,59 +112,167 @@ function indexCeilings(ceilings: readonly SafetyCeiling[]): CeilingIndex {
   return index;
 }
 
-const NIH_FALLBACK_CEILINGS: ReadonlyArray<{
-  maxAmount: number;
-  maxUnit: MatcherUnit;
-  pattern: RegExp;
-}> = [
-  { maxAmount: 350, maxUnit: "mg", pattern: /\bmagnesium\b/i },
-  { maxAmount: 4000, maxUnit: "IU", pattern: /\bvitamin\s*d|\bd3\b|\bcholecalciferol\b/i },
-  { maxAmount: 40, maxUnit: "mg", pattern: /\bzinc\b/i }
-];
+const MAGNESIUM = /\bmagnesium\b/i;
+const VITAMIN_D = /\bvitamin\s*d|\bd3\b|\bcholecalciferol\b/i;
+const ZINC = /\bzinc\b/i;
 
-export function fallbackSafetyCeiling(input: Readonly<{
-  name?: string;
-  subjectId: string;
-}>): SafetyCeiling | null {
-  const name = `${input.name ?? ""} ${input.subjectId}`;
+function haystackOf(input: Readonly<{ name?: string; subjectId: string }>) {
+  return `${input.name ?? ""} ${input.subjectId}`;
+}
 
-  for (const item of NIH_FALLBACK_CEILINGS) {
-    if (item.pattern.test(name)) {
-      return {
-        maxAmount: item.maxAmount,
-        maxUnit: item.maxUnit,
-        name: input.name?.trim() || input.subjectId,
-        subjectId: input.subjectId
-      };
-    }
+export function isPediatricSafetyProfile(
+  profile?: SafetyProfile | null
+): boolean {
+  if (!profile) {
+    return false;
+  }
+
+  return profile.lifeStage === "child" || profile.ageYears < 9;
+}
+
+function magnesiumUlMg(ageYears: number) {
+  if (ageYears <= 3) {
+    return 65;
+  }
+
+  if (ageYears <= 8) {
+    return 110;
+  }
+
+  return 350;
+}
+
+function vitaminD3UlIu(ageYears: number) {
+  if (ageYears < 1) {
+    return 1000;
+  }
+
+  if (ageYears <= 3) {
+    return 2500;
+  }
+
+  if (ageYears <= 8) {
+    return 3000;
+  }
+
+  return 4000;
+}
+
+function zincUlMg(ageYears: number) {
+  if (ageYears <= 3) {
+    return 7;
+  }
+
+  if (ageYears <= 8) {
+    return 12;
+  }
+
+  if (ageYears <= 13) {
+    return 23;
+  }
+
+  if (ageYears <= 18) {
+    return 34;
+  }
+
+  return 40;
+}
+
+function nihBandFor(
+  input: Readonly<{ name?: string; subjectId: string }>,
+  ageYears: number
+): SafetyCeiling | null {
+  const hay = haystackOf(input);
+  const name = input.name?.trim() || input.subjectId;
+
+  if (MAGNESIUM.test(hay)) {
+    return {
+      maxAmount: magnesiumUlMg(ageYears),
+      maxUnit: "mg",
+      name,
+      subjectId: input.subjectId
+    };
+  }
+
+  if (VITAMIN_D.test(hay)) {
+    return {
+      maxAmount: vitaminD3UlIu(ageYears),
+      maxUnit: "IU",
+      name,
+      subjectId: input.subjectId
+    };
+  }
+
+  if (ZINC.test(hay)) {
+    return {
+      maxAmount: zincUlMg(ageYears),
+      maxUnit: "mg",
+      name,
+      subjectId: input.subjectId
+    };
   }
 
   return null;
 }
 
-export function safetyCeilingFor(
+export function fallbackSafetyCeiling(input: Readonly<{
+  name?: string;
+  profile?: SafetyProfile | null;
+  subjectId: string;
+}>): SafetyCeiling | null {
+  const ageYears = input.profile?.ageYears ?? 19;
+  return nihBandFor(input, ageYears);
+}
+
+function adminCeilingFor(
+  ceilings: readonly SafetyCeiling[],
+  input: Readonly<{ name?: string; subjectId: string }>
+): SafetyCeiling | null {
+  if (ceilings.length < 1) {
+    return null;
+  }
+
+  const index = indexCeilings(ceilings);
+  const raw = input.subjectId.trim().toLowerCase();
+  const byId =
+    index.byId.get(raw) ??
+    index.byId.get(raw.replace(/^supplement:/, "")) ??
+    index.byId.get(raw.replace(/^sup_/, ""));
+
+  if (byId) {
+    return byId;
+  }
+
+  const name = normalizeName(input.name ?? "");
+  return name ? index.byName.get(name) ?? null : null;
+}
+
+export function adultPolicyCeilingExists(
   ceilings: readonly SafetyCeiling[],
   input: Readonly<{ name?: string; subjectId: string }>
 ) {
-  if (ceilings.length > 0) {
-    const index = indexCeilings(ceilings);
-    const raw = input.subjectId.trim().toLowerCase();
-    const byId =
-      index.byId.get(raw) ??
-      index.byId.get(raw.replace(/^supplement:/, "")) ??
-      index.byId.get(raw.replace(/^sup_/, ""));
+  return Boolean(
+    adminCeilingFor(ceilings, input) || nihBandFor(input, 19)
+  );
+}
 
-    if (byId) {
-      return byId;
+export function safetyCeilingFor(
+  ceilings: readonly SafetyCeiling[],
+  input: Readonly<{
+    name?: string;
+    profile?: SafetyProfile | null;
+    subjectId: string;
+  }>
+) {
+  if (isPediatricSafetyProfile(input.profile)) {
+    const banded = nihBandFor(input, input.profile?.ageYears ?? 0);
+
+    if (banded) {
+      return banded;
     }
 
-    const name = normalizeName(input.name ?? "");
-    const byName = name ? index.byName.get(name) ?? null : null;
-
-    if (byName) {
-      return byName;
-    }
+    return null;
   }
 
-  return fallbackSafetyCeiling(input);
+  return adminCeilingFor(ceilings, input) ?? fallbackSafetyCeiling(input);
 }

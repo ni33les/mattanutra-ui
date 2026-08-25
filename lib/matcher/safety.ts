@@ -1,6 +1,8 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
 import {
+  adultPolicyCeilingExists,
+  isPediatricSafetyProfile,
   matcherSafetyCeilingsUnavailable,
   safetyCeilingFor
 } from "@/lib/matcher/safety-ceilings";
@@ -78,6 +80,7 @@ function ceilingThreshold(
 
   const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
     name: nameOf(request, subjectId),
+    profile: request.profile,
     subjectId
   });
 
@@ -192,11 +195,19 @@ export function evaluateSafety(input: Readonly<{
       const requested = input.request.targets.find(
         (item) => item.subjectId === subjectId
       )?.requested.units;
+      const missingChildRule =
+        isPediatricSafetyProfile(input.request.profile) &&
+        adultPolicyCeilingExists(input.request.safetyCeilings ?? [], {
+          name: nameOf(input.request, subjectId),
+          subjectId
+        }) &&
+        total > BigInt(0);
       if (
-        isTarget &&
-        requested != null &&
-        requested > BigInt(0) &&
-        total * BigInt(100) > requested * BigInt(125)
+        missingChildRule ||
+        (isTarget &&
+          requested != null &&
+          requested > BigInt(0) &&
+          total * BigInt(100) > requested * BigInt(125))
       ) {
         findings.push({
           action: "block",

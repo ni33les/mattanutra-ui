@@ -122,6 +122,7 @@ function coverageFor(
     const totalExposureAmount = currentAmount + deliveredAmount;
     const limit = upperLimitAmount(target.name, target.unit, {
       ceilings: matcherSafetyCeilings(),
+      profile: state.profile,
       subjectId: target.supplementId
     });
     let status: CoverageRow["status"] = "uncovered";
