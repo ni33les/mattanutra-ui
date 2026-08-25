@@ -26,7 +26,15 @@ const IU_TO_MASS_NG: ReadonlyArray<{
   ngPerIu: bigint;
 }> = [
   {
-    aliases: ["vitamin_d", "vitamin_d3", "d3", "cholecalciferol"],
+    aliases: [
+      "vitamin_d",
+      "vitamin_d3",
+      "d3",
+      "vit_d",
+      "vit_d3",
+      "cholecalciferol",
+      "colecalciferol"
+    ],
     ngPerIu: BigInt(25)
   },
   {
@@ -107,19 +115,69 @@ function checkedAdd(left: bigint, right: bigint): bigint | DoseError {
 
 function iuMassNg(subjectName: string): bigint | null {
   const key = subjectKey(subjectName);
-  const rule = IU_TO_MASS_NG.find((item) => item.aliases.includes(key));
+  const rule = IU_TO_MASS_NG.find(
+    (item) =>
+      item.aliases.includes(key) ||
+      item.aliases.some((alias) => key === alias || key.endsWith(`_${alias}`))
+  );
   return rule?.ngPerIu ?? null;
 }
 
 function normalizeUnit(unit: string): string {
-  return unit
+  const token = unit
     .trim()
     .toLowerCase()
+    .replace(/µ/g, "u")
+    .replace(/μ/g, "u")
     .replace("µg", "mcg")
-    .replace("ug", "mcg")
+    .replace(/\bug\b/g, "mcg")
     .replace(/colony\s*forming\s*units?/g, "cfu")
+    .replace(/international\s*units?/g, "iu")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+
+  if (token === "i_u" || token === "ius") {
+    return "iu";
+  }
+
+  if (token === "gm" || token === "gram" || token === "grams") {
+    return "g";
+  }
+
+  if (token === "milligram" || token === "milligrams") {
+    return "mg";
+  }
+
+  if (token === "microgram" || token === "micrograms") {
+    return "mcg";
+  }
+
+  return token;
+}
+
+export function convertAmount(input: Readonly<{
+  amount: number;
+  fromUnit: string;
+  subjectId: string;
+  subjectName: string;
+  toUnit: MatcherUnit;
+}>): number | null {
+  if (normalizeUnit(input.fromUnit) === normalizeUnit(input.toUnit)) {
+    return input.amount;
+  }
+
+  const scaled = scaleAmount({
+    amount: input.amount,
+    subjectId: input.subjectId,
+    subjectName: input.subjectName,
+    unit: input.fromUnit
+  });
+
+  if ("reason" in scaled) {
+    return null;
+  }
+
+  return amountFromScaled(scaled, input.toUnit, input.subjectName);
 }
 
 export function scaleAmount(input: Readonly<{

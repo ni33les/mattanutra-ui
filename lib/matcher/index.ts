@@ -183,7 +183,12 @@ export function match(
 }
 
 export { DEFAULT_MATCHER_CONFIG, MATCHER_VERSION } from "@/lib/matcher/config";
-export { scaleAmount, aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
+export {
+  scaleAmount,
+  convertAmount,
+  aggregateDailyExposure,
+  isDoseError
+} from "@/lib/matcher/dose";
 export { evaluateSafety } from "@/lib/matcher/safety";
 export { productEligible } from "@/lib/matcher/eligibility";
 export { compileGroups } from "@/lib/matcher/candidates";

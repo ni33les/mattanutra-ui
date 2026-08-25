@@ -12,7 +12,7 @@ import {
   summarizeRejections
 } from "@/lib/matcher";
 import { contributionFor, variantPillBurden } from "@/lib/matcher/candidates";
-import { amountFromScaled } from "@/lib/matcher/dose";
+import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import type {
   CanonicalRequest,
@@ -113,7 +113,16 @@ function coverageFor(
     const current = state.currentSupplements.filter(
       (item) => item.supplementId === target.supplementId
     );
-    const currentAmount = current.reduce((sum, item) => sum + item.dailyAmount, 0);
+    const currentAmount = current.reduce((sum, item) => {
+      const converted = convertAmount({
+        amount: item.dailyAmount,
+        fromUnit: item.unit,
+        subjectId: target.supplementId,
+        subjectName: target.name,
+        toUnit: target.unit
+      });
+      return sum + (converted ?? 0);
+    }, 0);
     const deliveredScaled = basket?.exposure.totals.get(target.supplementId);
     const deliveredTotal = deliveredScaled
       ? amountFromScaled(deliveredScaled, target.unit, target.name)

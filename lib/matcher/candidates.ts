@@ -100,19 +100,31 @@ export function compileVariant(input: Readonly<{
     );
 
     for (const fact of labelled) {
-      if (fact.amount == null || !fact.unit) {
+      if (fact.amount == null || fact.amount <= 0 || !fact.unit) {
         unknown = true;
         continue;
       }
 
-      const scaled = scaleAmount({
-        amount: fact.amount,
-        subjectId: target.subjectId,
-        subjectName: target.name,
-        unit: fact.unit
-      });
+      const names = [target.name, fact.name].filter(
+        (name): name is string => Boolean(name?.trim())
+      );
+      let scaled: ReturnType<typeof scaleAmount> | null = null;
 
-      if (isDoseError(scaled)) {
+      for (const subjectName of names) {
+        const attempt = scaleAmount({
+          amount: fact.amount,
+          subjectId: target.subjectId,
+          subjectName,
+          unit: fact.unit
+        });
+
+        if (!isDoseError(attempt)) {
+          scaled = attempt;
+          break;
+        }
+      }
+
+      if (!scaled) {
         unknown = true;
         continue;
       }
