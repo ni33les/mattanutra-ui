@@ -267,6 +267,38 @@ describe("plan status fail-closed on oversupply", () => {
     resetMatcherSafetyCeilings();
   });
 
+  it("does not ask accept_gap when remainingGap is 0 even if over_target", () => {
+    const selected = option([
+      coverage({
+        coveragePercent: 150,
+        deliveredAmount: 300,
+        remainingGap: 0,
+        requestedAmount: 200,
+        status: "over_target",
+        totalExposureAmount: 300
+      })
+    ]);
+    const questions = safetyQuestions({
+      guidance: [],
+      locale: "en",
+      selected,
+      shownRevision: 1,
+      state: state()
+    });
+    assert.equal(
+      questions.some((item) => item.questionId.startsWith("q_gap_")),
+      false
+    );
+    const status = planStatus({
+      guidance: [],
+      questions,
+      selected,
+      state: state(),
+      unmetRequirements: []
+    });
+    assert.equal(status, "ready");
+  });
+
   it("stamps catalog band id and version onto public UL guidance", () => {
     const bandId = "8c2b0d1a-4f3e-4a91-9b77-2c6d8e0f1a23";
     setMatcherSafetyCeilings([

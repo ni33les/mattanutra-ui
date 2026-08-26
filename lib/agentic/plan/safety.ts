@@ -549,6 +549,7 @@ export function safetyQuestions(input: Readonly<{
     }
 
     if (
+      row.remainingGap > 0 &&
       row.status !== "covered" &&
       !(row.status === "upper_limit_risk" && row.remainingGap === 0) &&
       !input.state.acceptedGaps.some((gap) => gap.supplementId === row.supplementId)
@@ -769,6 +770,7 @@ export function planStatus(input: Readonly<{
 
   const gaps = input.selected.coverage.filter(
     (row) =>
+      row.remainingGap > 0 &&
       row.status !== "covered" &&
       !(reviewAcked && row.status === "upper_limit_risk" && row.remainingGap === 0)
   );
