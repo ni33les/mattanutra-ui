@@ -107,6 +107,40 @@ export function createMemoryStore(): AgenticStore {
 
       return null;
     },
+    async getOpenOrderForPlanRevision(planId, planRevision) {
+      const matches = [...orders.values()]
+        .filter(
+          (record) =>
+            record.planId === planId &&
+            record.planRevision === planRevision &&
+            record.orderStatus === "open" &&
+            record.paymentStatus === "unpaid" &&
+            !record.cancelledAt &&
+            !record.expiredAt
+        )
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+
+      return matches[0] ? clone(matches[0]) : null;
+    },
+    async getExecuteResponseForOrder(orderId) {
+      const matches = [...idempotency.values()]
+        .filter(
+          (record) =>
+            record.operation === "execute" && record.resourceIds.orderId === orderId
+        )
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+      const first = matches[0];
+
+      if (!first) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(first.responseJson) as unknown;
+      } catch {
+        return null;
+      }
+    },
     async getOrderItems(orderId) {
       return clone(orderItems.get(orderId) ?? []);
     },
