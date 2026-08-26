@@ -73,6 +73,8 @@ function guidance(input: Readonly<{
   contributors?: readonly CoverageContributor[];
   exposure?: number | null;
   nutrientName?: string | null;
+  overflow?: number | null;
+  remainingGap?: number | null;
   requested?: number | null;
   ruleId?: string;
   rulesVersion?: string;
@@ -96,13 +98,22 @@ function guidance(input: Readonly<{
   const guidanceId = ["gdn", input.code, family].join(":");
   const contributorLabel =
     (input.contributors ?? [])
-      .map((item) => item.productName)
-      .filter((name) => Boolean(name?.trim()))
-      .join(", ") || "none selected";
+      .map((item) => {
+        const name = item.productName?.trim();
+        if (!name) {
+          return "";
+        }
+        return item.amount != null && item.unit
+          ? `${name} ${item.amount} ${item.unit}`
+          : name;
+      })
+      .filter(Boolean)
+      .join("; ") || "none selected";
   const nextAction =
     input.code === "condition_review_required"
       ? "do not execute; clinician review"
-      : input.code === "medication_interaction"
+      : input.code === "medication_interaction" ||
+          input.code === "duplicate_or_overlap"
         ? "acknowledge to continue"
         : "review before purchase";
 
@@ -116,6 +127,8 @@ function guidance(input: Readonly<{
       contributors: contributorLabel,
       nextAction,
       nutrientName: input.nutrientName ?? "",
+      overflow: input.overflow ?? 0,
+      remainingGap: input.remainingGap ?? 0,
       unit: input.unit ?? ""
     }),
     messageKey,
@@ -433,6 +446,7 @@ export function evaluateSafety(input: Readonly<{
         exposure: row.totalExposureAmount,
         locale: input.locale,
         nutrientName: row.name,
+        overflow: Math.max(0, row.deliveredAmount - row.requestedAmount),
         productIds: [
           ...new Set(
             rowContributors
@@ -440,10 +454,12 @@ export function evaluateSafety(input: Readonly<{
               .filter((id): id is string => Boolean(id))
           )
         ],
+        remainingGap: row.remainingGap,
         requested: row.requestedAmount,
         severity: "high",
         sourceScope: "supplemental",
         supplementIds: [row.supplementId],
+        threshold: row.upperLimitAmount,
         unit: row.unit
       }));
     }

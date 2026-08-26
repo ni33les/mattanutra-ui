@@ -185,5 +185,10 @@ describe("Phase 2 named incidental safety", () => {
     assert.equal(overlap.nutrientName, "Vitamin D3");
     assert.equal(overlap.unit, "IU");
     assert.equal(overlap.contributors?.length, 2);
+    assert.match(overlap.message, /Vitamin D3/);
+    assert.match(overlap.message, /Bio Calcium\+D3 600 IU/);
+    assert.match(overlap.message, /Joint Mobility Plus 1200 IU/);
+    assert.match(overlap.message, /remainingGap 200/);
+    assert.match(overlap.message, /acknowledge to continue/);
   });
 });

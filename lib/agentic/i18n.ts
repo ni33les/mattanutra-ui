@@ -135,9 +135,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "当前摄入加上所选产品的总暴露量需要剂量复核。"
   },
   "guidance.duplicate_or_overlap": {
-    en: "Selected products overlap on the same nutrient.",
-    th: "สินค้าที่เลือกมีสารอาหารซ้ำกัน",
-    "zh-CN": "所选产品在同一营养素上有重叠。"
+    en: "{nutrientName} ({unit}) from {contributors}. remainingGap {remainingGap}; overflow {overflow}. Next action: {nextAction}.",
+    th: "{nutrientName} ({unit}) จาก {contributors}. remainingGap {remainingGap}; overflow {overflow}. ขั้นตอนถัดไป: {nextAction}",
+    "zh-CN": "{nutrientName}（{unit}）来自 {contributors}。remainingGap {remainingGap}；overflow {overflow}。下一步：{nextAction}。"
   },
   "guidance.medication_interaction": {
     en: "{nutrientName} ({unit}) from {contributors} has a known interaction with a declared medication. Next action: {nextAction}.",
