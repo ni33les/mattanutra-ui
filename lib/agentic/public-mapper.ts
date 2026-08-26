@@ -451,6 +451,9 @@ function publicMatcherTelemetry(
       name: item.name
     }));
   }
+  if (telemetry.targetSetHash) {
+    payload.targetSetHash = telemetry.targetSetHash;
+  }
   if (telemetry.factLedgerHash) {
     payload.factLedgerHash = telemetry.factLedgerHash;
   }

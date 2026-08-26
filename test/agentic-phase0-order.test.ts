@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { canonicalTargetSetHash } from "../lib/matcher/canonicalizer.ts";
 import { match } from "../lib/matcher/index.ts";
 import { QA_GOLD_CATALOG, qaRequest, qaTarget } from "../lib/matcher/qa/index.ts";
 import type { CanonicalTarget } from "../lib/matcher/types.ts";
@@ -34,6 +35,25 @@ function permute(targets: CanonicalTarget[], seed: number) {
 }
 
 describe("Phase 0 target-order invariance", () => {
+  it("prints one canonical target-set hash for 20 official orders", () => {
+    const base = officialTargets();
+    const hashes = new Set<string>();
+
+    for (let seed = 0; seed < 20; seed += 1) {
+      hashes.add(
+        canonicalTargetSetHash(
+          qaRequest({ optimization: "fewest_pills", targets: permute(base, (seed + 1) * 17) })
+        )
+      );
+    }
+
+    assert.equal(hashes.size, 1);
+    assert.equal(
+      canonicalTargetSetHash(qaRequest({ optimization: "fewest_pills", targets: [...base].reverse() })),
+      [...hashes][0]
+    );
+  });
+
   it("keeps official fewest_pills products, pills and coverage across 20 permutations", () => {
     const base = officialTargets();
     const baseline = match(

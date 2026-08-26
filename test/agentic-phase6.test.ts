@@ -411,6 +411,43 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.notEqual(hashes[0], factLedgerHash([]));
   });
 
+  it("prints one canonical target-set hash for 20 official target orders", () => {
+    const base = aug25PlanState().targets;
+    const hashes = new Set<string>();
+
+    for (let index = 0; index < 20; index += 1) {
+      const rotated = [
+        ...base.slice(index % base.length),
+        ...base.slice(0, index % base.length)
+      ];
+      const telemetry = matcherTelemetryFor({
+        leftovers: [],
+        selected: null,
+        state: aug25PlanState({ targets: rotated })
+      });
+      assert.ok(telemetry.targetSetHash);
+      hashes.add(telemetry.targetSetHash);
+      const payload = publicPlanFields({
+        alternatives: [],
+        basket: [],
+        changeSummary: [],
+        coverage: [],
+        leftovers: [],
+        matcherTelemetry: telemetry,
+        questions: [],
+        safetyGuidance: [],
+        selected: null,
+        status: "blocked",
+        summary: "hash",
+        unmetRequirements: []
+      });
+      const publicTelemetry = payload.matcherTelemetry as { targetSetHash?: string };
+      assert.equal(publicTelemetry.targetSetHash, telemetry.targetSetHash);
+    }
+
+    assert.equal(hashes.size, 1);
+  });
+
   it("credits Conceive Well Vitamin D 400 IU as Vitamin D3 400 IU", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const base = live.products.find((item) => /d3/i.test(item.candidate.title));

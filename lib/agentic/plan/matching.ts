@@ -18,7 +18,11 @@ import {
 } from "@/lib/matcher/candidates";
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
-import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
+import {
+  canonicalTargetSetHash,
+  canonicalizeCurrents,
+  canonicalizeTargets
+} from "@/lib/matcher/canonicalizer";
 import { canonicalNutrientKey, productKeysMatch } from "@/lib/product-key-matching";
 import type {
   CanonicalRequest,
@@ -65,11 +69,18 @@ export function toCanonicalRequest(
     return targets;
   }
 
+  const currentRows = [...state.currentSupplements].sort(
+    (left, right) =>
+      left.supplementId.localeCompare(right.supplementId) ||
+      left.name.localeCompare(right.name) ||
+      left.unit.localeCompare(right.unit) ||
+      left.dailyAmount - right.dailyAmount
+  );
   const currents = canonicalizeCurrents(
-    state.currentSupplements.map((item, index) => ({
+    currentRows.map((item, index) => ({
       dailyAmount: item.dailyAmount,
       name: item.name,
-      sourceId: `${item.supplementId}:${index}`,
+      sourceId: `${item.supplementId}:${item.unit}:${item.dailyAmount}:${index}`,
       subjectId: item.supplementId,
       unit: item.unit
     }))
@@ -704,6 +715,7 @@ export function matcherTelemetryFor(input: Readonly<{
         .map((item) => item.name)
     ],
     selectedOptionId: input.selected?.optionId ?? null,
+    ...(!("error" in request) ? { targetSetHash: canonicalTargetSetHash(request) } : {}),
     ...(() => {
       const catalogueId =
         input.selected?.snapshotId ??

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { scaleAmount, isDoseError } from "@/lib/matcher/dose";
 import type {
   CanonicalCurrent,
@@ -63,16 +64,77 @@ export function compareCanonicalTargetOrder(
   );
 }
 
+function compareStrings(left: string, right: string) {
+  return left.localeCompare(right);
+}
+
 export function orderInvariantRequest(request: CanonicalRequest): CanonicalRequest {
   return {
     ...request,
+    acceptedGapSubjectIds: [...request.acceptedGapSubjectIds].sort(compareStrings),
+    allowedForms: request.allowedForms
+      ? [...request.allowedForms].sort(compareStrings)
+      : null,
+    conditionCodes: [...request.conditionCodes].sort(compareStrings),
     currentSupplements: [...request.currentSupplements].sort(
       (left, right) =>
         left.subjectId.localeCompare(right.subjectId) ||
-        left.sourceId.localeCompare(right.sourceId)
+        left.sourceId.localeCompare(right.sourceId) ||
+        left.name.localeCompare(right.name) ||
+        left.dailyAmount - right.dailyAmount
     ),
+    excludeSubjectIds: [...request.excludeSubjectIds].sort(compareStrings),
+    leftovers: [...request.leftovers].sort(
+      (left, right) =>
+        (left.subjectId ?? "").localeCompare(right.subjectId ?? "") ||
+        left.reason.localeCompare(right.reason) ||
+        left.name.localeCompare(right.name)
+    ),
+    medicationCodes: [...request.medicationCodes].sort(compareStrings),
+    retainProductIds: [...request.retainProductIds].sort(compareStrings),
+    retainSubjectIds: [...request.retainSubjectIds].sort(compareStrings),
     targets: [...request.targets].sort(compareCanonicalTargetOrder)
   };
+}
+
+export function canonicalTargetSetHash(request: CanonicalRequest): string {
+  const canonical = orderInvariantRequest(request);
+
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        acceptedGapSubjectIds: canonical.acceptedGapSubjectIds,
+        allowedForms: canonical.allowedForms,
+        conditionCodes: canonical.conditionCodes,
+        currency: canonical.currency,
+        currentSupplements: canonical.currentSupplements.map((item) => ({
+          amount: item.dailyAmount,
+          name: item.name,
+          subjectId: item.subjectId,
+          unit: item.unit
+        })),
+        destinationCountry: canonical.destinationCountry,
+        dietaryPreference: canonical.dietaryPreference,
+        excludeSubjectIds: canonical.excludeSubjectIds,
+        maxDailyPills: canonical.maxDailyPills,
+        maxPriceMinor: canonical.maxPriceMinor,
+        maxProductCount: canonical.maxProductCount,
+        medicationCodes: canonical.medicationCodes,
+        omega3SourcePreference: canonical.omega3SourcePreference,
+        optimization: canonical.optimization,
+        profile: canonical.profile,
+        retainProductIds: canonical.retainProductIds,
+        retainSubjectIds: canonical.retainSubjectIds,
+        selectorMode: canonical.selectorMode,
+        targets: canonical.targets.map((item) => ({
+          amount: item.requestedAmount,
+          name: item.name,
+          subjectId: item.subjectId,
+          unit: item.requestedUnit
+        }))
+      })
+    )
+    .digest("hex");
 }
 
 export function canonicalizeCurrents(

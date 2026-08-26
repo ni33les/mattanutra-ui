@@ -158,10 +158,13 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
       ackMs?: number;
       matchMs?: number;
       searchDeadlineMs?: number;
+      targetSetHash?: string;
     };
     assert.equal(publicTelemetry.ackMs, 180);
     assert.equal(publicTelemetry.matchMs, 420);
     assert.equal(publicTelemetry.searchDeadlineMs, 2_500);
+    assert.ok(telemetry.targetSetHash);
+    assert.equal(publicTelemetry.targetSetHash, telemetry.targetSetHash);
     assert.equal(JSON.stringify(payload).toLowerCase().includes("snapshot"), false);
   });
 });

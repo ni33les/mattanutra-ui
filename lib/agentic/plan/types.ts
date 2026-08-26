@@ -197,6 +197,7 @@ export type MatcherTelemetry = Readonly<{
   selectedOptionId: string | null;
   serializeMs?: number;
   snapshotId?: string;
+  targetSetHash?: string;
   targetClassifications?: readonly TargetClassification[];
   factLedgerHash?: string;
   factLedger?: readonly FactLedgerRow[];
