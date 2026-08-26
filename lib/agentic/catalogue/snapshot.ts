@@ -38,13 +38,57 @@ function emptyRetailSnapshot(code: string, suffix = "unavailable"): CatalogueSna
   };
 }
 
+function isFixtureCatalogue(snapshot: CatalogueSnapshot) {
+  return (
+    snapshot.catalogueVersion === "dev-3.0.0" ||
+    snapshot.products.some((item) => item.source === "fixture")
+  );
+}
+
+function allowInstalledSnapshot(environment?: AgenticEnvironment) {
+  if (!installedSnapshot) {
+    return false;
+  }
+
+  if (process.env.NODE_TEST_CONTEXT) {
+    return true;
+  }
+
+  if (!usesLiveCatalogue(environment)) {
+    return true;
+  }
+
+  return !isFixtureCatalogue(installedSnapshot);
+}
+
+function snapshotOrEmpty(
+  snapshot: CatalogueSnapshot | undefined,
+  code: string
+): CatalogueSnapshot {
+  if (!snapshot) {
+    return emptyRetailSnapshot(code);
+  }
+
+  if (!process.env.NODE_TEST_CONTEXT && isFixtureCatalogue(snapshot)) {
+    return emptyRetailSnapshot(code);
+  }
+
+  return snapshot;
+}
+
 export function getCatalogueSnapshot(countryCode?: string): CatalogueSnapshot {
   if (countryCode) {
     const code = countryKey(countryCode);
-    return cachedByCountry.get(code) ?? lastSnapshot ?? emptyRetailSnapshot(code);
+    return snapshotOrEmpty(
+      cachedByCountry.get(code) ?? lastSnapshot ?? undefined,
+      code
+    );
   }
 
-  return lastSnapshot ?? cachedByCountry.get("TH") ?? emptyRetailSnapshot("TH");
+  return snapshotOrEmpty(
+    lastSnapshot ?? cachedByCountry.get("TH") ?? undefined,
+    "TH"
+  );
 }
 
 export async function ensureCatalogueSnapshot(
@@ -53,8 +97,11 @@ export async function ensureCatalogueSnapshot(
 ): Promise<CatalogueSnapshot> {
   const code = countryKey(countryCode);
 
-  if (installedSnapshot) {
-    return cachedByCountry.get(code) ?? installedSnapshot;
+  if (allowInstalledSnapshot(environment) && installedSnapshot) {
+    return snapshotOrEmpty(
+      cachedByCountry.get(code) ?? installedSnapshot,
+      code
+    );
   }
 
   if (usesLiveCatalogue(environment)) {
@@ -65,7 +112,7 @@ export async function ensureCatalogueSnapshot(
       hit.catalogueVersion.startsWith(`retail-${code}-`) &&
       !hit.catalogueVersion.endsWith("-loading")
     ) {
-      return hit;
+      return snapshotOrEmpty(hit, code);
     }
 
     try {
@@ -92,7 +139,7 @@ export async function ensureCatalogueSnapshot(
     return emptyRetailSnapshot(code);
   }
 
-  return cachedByCountry.get(code) ?? emptyRetailSnapshot(code);
+  return snapshotOrEmpty(cachedByCountry.get(code), code);
 }
 
 export async function warmCatalogueSnapshot(

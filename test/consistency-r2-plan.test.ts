@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
+import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { isAgenticErrorResult } from "../lib/agentic/contract/errors.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
@@ -53,7 +54,12 @@ function timedStore(store: AgenticStore) {
   return { durations, store };
 }
 
+beforeEach(() => {
+  installGoldCatalogue();
+});
+
 afterEach(() => {
+  uninstallGoldCatalogue();
   setAgenticRuntimeForTests(null);
 });
 

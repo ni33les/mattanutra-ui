@@ -11,7 +11,6 @@ import { AGENTIC_TOOL_SCHEMAS } from "@/lib/agentic/contract";
 import { listDeliverableMarkets } from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
-import { recognisedSupplementNames } from "@/lib/agentic/catalogue/fixtures";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
   RECOGNISED_CONDITION_CODES,
@@ -58,10 +57,6 @@ async function recognisedNamesForMarkets(input: Readonly<{
     } catch {
       // Keep whatever names we already collected.
     }
-  }
-
-  if (names.size < 1) {
-    return recognisedSupplementNames();
   }
 
   return [...names].sort((left, right) => left.localeCompare(right));

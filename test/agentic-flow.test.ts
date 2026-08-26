@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
+import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import {
   createAgenticRuntime,
@@ -61,7 +62,12 @@ async function call(runtime: AgenticRuntime, name: string, args: unknown, id = 1
   return response.result.structuredContent as Record<string, unknown>;
 }
 
+beforeEach(() => {
+  installGoldCatalogue();
+});
+
 afterEach(() => {
+  uninstallGoldCatalogue();
   setAgenticRuntimeForTests(null);
 });
 

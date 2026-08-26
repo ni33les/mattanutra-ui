@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
+import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { readFileSync } from "node:fs";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import {
@@ -74,7 +75,12 @@ function namesInBasket(plan: Record<string, unknown>) {
   );
 }
 
+beforeEach(() => {
+  installGoldCatalogue();
+});
+
 afterEach(() => {
+  uninstallGoldCatalogue();
   setAgenticRuntimeForTests(null);
 });
 

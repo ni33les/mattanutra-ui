@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
+import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { loadAgenticConfig, assertInternalQaHarness } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import {
@@ -36,7 +37,12 @@ function runtimeFor(): AgenticRuntime {
   });
 }
 
+beforeEach(() => {
+  installGoldCatalogue();
+});
+
 afterEach(() => {
+  uninstallGoldCatalogue();
   setAgenticRuntimeForTests(null);
 });
 

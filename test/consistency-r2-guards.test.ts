@@ -111,7 +111,9 @@ describe("consistency r2 regression guards", () => {
       "lib/agentic/catalogue/snapshot.ts",
       "lib/agentic/catalogue/live.ts",
       "lib/agentic/catalogue/live-supplements.ts",
-      "lib/agentic/catalogue/load-safety-ceilings.ts"
+      "lib/agentic/catalogue/load-safety-ceilings.ts",
+      "lib/agentic/info.ts",
+      "lib/agentic/plan/service.ts"
     ];
 
     for (const file of files) {
@@ -120,6 +122,17 @@ describe("consistency r2 regression guards", () => {
       assert.doesNotMatch(body, /FIXTURE_SUPPLEMENTS/);
       assert.doesNotMatch(body, /overlayFixtureSupplementAliases/);
       assert.doesNotMatch(body, /fixtureIdsForName/);
+      assert.doesNotMatch(body, /recognisedSupplementNames/);
     }
+  });
+
+  it("fails closed on fixture catalogues in the live snapshot path", async () => {
+    const snapshot = await readFile("lib/agentic/catalogue/snapshot.ts", "utf8");
+    const info = await readFile("lib/agentic/info.ts", "utf8");
+
+    assert.match(snapshot, /function isFixtureCatalogue/);
+    assert.match(snapshot, /emptyRetailSnapshot\(code\)/);
+    assert.match(snapshot, /!process\.env\.NODE_TEST_CONTEXT && isFixtureCatalogue/);
+    assert.doesNotMatch(info, /recognisedSupplementNames\(\)/);
   });
 });

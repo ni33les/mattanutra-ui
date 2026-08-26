@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
+import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { parseCheckoutAddress } from "../lib/agentic/checkout-address.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
@@ -51,9 +52,13 @@ async function call(runtime: AgenticRuntime, name: string, args: unknown) {
   return response.result.structuredContent as Record<string, unknown>;
 }
 
+beforeEach(() => {
+  installGoldCatalogue();
+});
+
 afterEach(() => {
+  uninstallGoldCatalogue();
   setAgenticRuntimeForTests(null);
-  setMatcherSafetyCeilings([]);
 });
 
 describe("agentic P1 pack fixes", () => {

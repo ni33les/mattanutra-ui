@@ -59,6 +59,7 @@ export async function packProof(runtime: AgenticRuntime) {
   const checks: PackCheck[] = [];
   const stamp = `${Date.now()}`;
   const now = nowIso();
+  const originalSnapshot = getCatalogueSnapshot();
 
   const listed = await handleJsonRpc(runtime, { id: 1, method: "tools/list" });
   const toolNames = ((listed?.result?.tools as Array<{ name: string }> | undefined) ?? []).map(
@@ -242,7 +243,7 @@ export async function packProof(runtime: AgenticRuntime) {
     !isAgenticErrorResult(backordered) &&
     JSON.stringify(backordered.basket).includes("backorder");
   checks.push(check("D3-05", Boolean(hasBackorder || (!isAgenticErrorResult(backordered) && backordered.ok))));
-  replaceCatalogueSnapshot(null);
+  replaceCatalogueSnapshot(originalSnapshot);
 
   const restored = getCatalogueSnapshot();
   checks.push(
@@ -344,7 +345,7 @@ export async function packProof(runtime: AgenticRuntime) {
     scope: runtime.scope,
     store: runtime.store
   });
-  replaceCatalogueSnapshot(null);
+  replaceCatalogueSnapshot(originalSnapshot);
   checks.push(
     check(
       "D6-08",
