@@ -360,6 +360,50 @@ describe("Phase 6 bounded evidence fields", () => {
     );
   });
 
+  it("credits Conceive Well Vitamin D 400 IU as Vitamin D3 400 IU", () => {
+    const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
+    const base = live.products.find((item) => /d3/i.test(item.candidate.title));
+    assert.ok(base);
+    const d3 = supplement("Vitamin D3");
+    const prenatal = {
+      ...base,
+      contributionSupplementIds: [d3.supplementId],
+      productId: "prd_conceive_well_gold_d3",
+      retailerSku: "TH-CWG-D3",
+      candidate: {
+        ...base.candidate,
+        facts: [fact("Vitamin D", 400, "IU", "vitamin_d")],
+        title: "Blackmores Conceive Well Gold"
+      }
+    };
+    const snapshot = frozen([prenatal]);
+    const state = aug25PlanState({
+      profile: { ageYears: 32, lifeStage: "pregnant", sex: "female" },
+      targets: [
+        {
+          amount: 2000,
+          name: "Vitamin D3",
+          supplementId: d3.supplementId,
+          unit: "IU"
+        }
+      ]
+    });
+    const matched = matchPlan({ snapshot, state });
+    assert.ok(matched.selected);
+    const row = matched.selected.coverage.find((item) => item.supplementId === d3.supplementId);
+    assert.ok(row);
+    assert.equal(row.deliveredAmount, 400);
+    assert.equal(row.totalExposureAmount, 400);
+    assert.equal(row.remainingGap, 1600);
+    assert.deepEqual(
+      row.contributors?.map((item) => ({
+        amount: item.amount,
+        name: item.productName
+      })),
+      [{ amount: 400, name: "Blackmores Conceive Well Gold" }]
+    );
+  });
+
   it("stamps servings/day, pill burden, and incidental vs requested nutrients on basket lines", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const collagen = live.products.find((item) => /collagen/i.test(item.candidate.title));
