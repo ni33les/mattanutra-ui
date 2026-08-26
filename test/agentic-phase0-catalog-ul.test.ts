@@ -384,6 +384,65 @@ describe("Phase 0 catalog-sourced upper limits", () => {
     resetMatcherSafetyCeilings();
   });
 
+  it("blocks a request above the catalog UL even when delivered exposure is capped", () => {
+    installCatalogCeilings();
+    const snapshot = freezeCatalogueSnapshot({
+      ...fixtureSnapshot("2026-08-25T00:00:00.000Z"),
+      catalogueVersion: "retail-TH-request-above-ul"
+    });
+    const mag = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Magnesium");
+    const iron = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Iron");
+    assert.ok(mag);
+    assert.ok(iron);
+
+    const magState = aug25PlanState({
+      profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
+      targets: [
+        { amount: 700, name: "Magnesium", supplementId: mag.supplementId, unit: "mg" }
+      ]
+    });
+    const magMatched = matchPlan({ snapshot, state: magState });
+    const magGuidance = evaluateSafety({
+      locale: "en",
+      selected: magMatched.selected,
+      state: magState
+    });
+    assert.equal(
+      planStatus({
+        guidance: magGuidance,
+        questions: [],
+        selected: magMatched.selected,
+        state: magState,
+        unmetRequirements: magMatched.unmetRequirements
+      }),
+      "blocked"
+    );
+
+    const ironState = aug25PlanState({
+      profile: { ageYears: 32, lifeStage: "pregnant", sex: "female" },
+      targets: [
+        { amount: 46, name: "Iron", supplementId: iron.supplementId, unit: "mg" }
+      ]
+    });
+    const ironMatched = matchPlan({ snapshot, state: ironState });
+    const ironGuidance = evaluateSafety({
+      locale: "en",
+      selected: ironMatched.selected,
+      state: ironState
+    });
+    assert.equal(
+      planStatus({
+        guidance: ironGuidance,
+        questions: [],
+        selected: ironMatched.selected,
+        state: ironState,
+        unmetRequirements: ironMatched.unmetRequirements
+      }),
+      "blocked"
+    );
+    resetMatcherSafetyCeilings();
+  });
+
   it("prunes a 200 mg magnesium SKU from an 8-year-old search against catalog 110 mg", () => {
     const mag200 = qaProduct({
       facts: [{ amount: 200, key: "mag" }],

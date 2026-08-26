@@ -155,6 +155,35 @@ export function evaluateSafety(input: Readonly<{
     }));
   }
 
+  for (const target of input.state.targets) {
+    if (coverageRows.some((row) => row.supplementId === target.supplementId)) {
+      continue;
+    }
+
+    const limit = upperLimitAmount(target.name, target.unit, {
+      ceilings: matcherSafetyCeilings(),
+      profile: input.state.profile,
+      subjectId: target.supplementId
+    });
+
+    if (limit != null && Number.isFinite(limit) && limit > 0 && target.amount > limit) {
+      items.push(guidance({
+        action: "block",
+        code: "dose_review_required",
+        exposure: 0,
+        locale: input.locale,
+        nutrientName: target.name,
+        productIds,
+        requested: target.amount,
+        severity: "blocking",
+        sourceScope: "supplemental",
+        supplementIds: [target.supplementId],
+        threshold: limit,
+        unit: target.unit
+      }));
+    }
+  }
+
   for (const row of coverageRows) {
     const limit = upperLimitAmount(row.name, row.unit, {
       ceilings: matcherSafetyCeilings(),
@@ -201,6 +230,26 @@ export function evaluateSafety(input: Readonly<{
         sourceScope: "supplemental",
         supplementIds: [row.supplementId],
         threshold: null,
+        unit: row.unit
+      }));
+    } else if (
+      limit != null &&
+      Number.isFinite(limit) &&
+      limit > 0 &&
+      row.requestedAmount > limit
+    ) {
+      items.push(guidance({
+        action: "block",
+        code: "dose_review_required",
+        exposure: row.totalExposureAmount,
+        locale: input.locale,
+        nutrientName: row.name,
+        productIds,
+        requested: row.requestedAmount,
+        severity: "blocking",
+        sourceScope: "supplemental",
+        supplementIds: [row.supplementId],
+        threshold: limit,
         unit: row.unit
       }));
     } else if (limit != null && Number.isFinite(limit) && limit > 0 && row.totalExposureAmount > limit) {
