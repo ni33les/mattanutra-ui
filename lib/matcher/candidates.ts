@@ -633,20 +633,8 @@ export function compileGroups(
     )
     .sort((left, right) => compareDedicatedThenId(left, right, request));
 
-  const productLabelsUncoveredTarget = (product: MatcherProduct) =>
-    request.targets.some(
-      (target) =>
-        !targetHasCoveringGroup(groups, request, target.subjectId) &&
-        contributionFor(product, target.name, target.subjectId).length > 0
-    );
-
   const tryCompile = (product: MatcherProduct, ignoreDeadline = false) => {
-    if (
-      !ignoreDeadline &&
-      deadlineAt != null &&
-      Date.now() >= deadlineAt &&
-      !productLabelsUncoveredTarget(product)
-    ) {
+    if (!ignoreDeadline && deadlineAt != null && Date.now() >= deadlineAt) {
       return;
     }
 
@@ -677,6 +665,10 @@ export function compileGroups(
   }
 
   for (const product of otherMapped) {
+    if (deadlineAt != null && Date.now() >= deadlineAt) {
+      break;
+    }
+
     if (isCarrierNoise(product, request, groups)) {
       continue;
     }
@@ -695,32 +687,38 @@ export function compileGroups(
     }
   }
 
-  for (const product of labelled) {
-    if (isCarrierNoise(product, request, groups)) {
-      continue;
-    }
+  if (request.targets.length === 1) {
+    for (const product of labelled) {
+      if (deadlineAt != null && Date.now() >= deadlineAt) {
+        break;
+      }
 
-    const contributesUncovered = request.targets.some(
-      (target) =>
-        !targetHasCoveringGroup(groups, request, target.subjectId) &&
-        contributionFor(product, target.name, target.subjectId).length > 0
-    );
+      if (isCarrierNoise(product, request, groups)) {
+        continue;
+      }
 
-    if (!contributesUncovered) {
-      continue;
-    }
+      const contributesUncovered = request.targets.some(
+        (target) =>
+          !targetHasCoveringGroup(groups, request, target.subjectId) &&
+          contributionFor(product, target.name, target.subjectId).length > 0
+      );
 
-    const before = groups.length;
-    tryCompile(product);
-    const added = groups[groups.length - 1];
+      if (!contributesUncovered) {
+        continue;
+      }
 
-    if (
-      groups.length > before &&
-      added &&
-      !keepCompiledContributor(product, added, request)
-    ) {
-      groups.pop();
-      compiledIds.delete(product.productId);
+      const before = groups.length;
+      tryCompile(product);
+      const added = groups[groups.length - 1];
+
+      if (
+        groups.length > before &&
+        added &&
+        !keepCompiledContributor(product, added, request)
+      ) {
+        groups.pop();
+        compiledIds.delete(product.productId);
+      }
     }
   }
 
@@ -735,52 +733,38 @@ export function compileGroups(
 
     let belowFloorAdded = 0;
     const pool = [...mapped, ...labelled]
-      .filter(
-        (product) =>
-          product.contributionSubjectIds.includes(target.subjectId) ||
-          contributionFor(product, target.name, target.subjectId).length > 0
+      .filter((product) =>
+        product.contributionSubjectIds.includes(target.subjectId)
       )
       .sort((left, right) => {
-      const dedicated =
-        Number(productIsDedicatedForTarget(right, target)) -
-        Number(productIsDedicatedForTarget(left, target));
+        const dedicated =
+          Number(productIsDedicatedForTarget(right, target)) -
+          Number(productIsDedicatedForTarget(left, target));
 
-      if (dedicated !== 0) {
-        return dedicated;
-      }
+        if (dedicated !== 0) {
+          return dedicated;
+        }
 
-      const labelled =
-        labelledTargetCount(left, request) - labelledTargetCount(right, request);
+        const facts =
+          labelledTargetCount(left, request) - labelledTargetCount(right, request);
 
-      if (labelled !== 0) {
-        return labelled;
-      }
+        if (facts !== 0) {
+          return facts;
+        }
 
-      const extraCovered = (product: MatcherProduct) =>
-        request.targets.filter(
-          (item) =>
-            targetHasCoveringGroup(groups, request, item.subjectId) &&
-            contributionFor(product, item.name, item.subjectId).length > 0
-        ).length;
-      const extra = extraCovered(left) - extraCovered(right);
+        const amountOf = (product: MatcherProduct) =>
+          contributionFor(product, target.name, target.subjectId).reduce(
+            (sum, fact) => sum + (fact.amount ?? 0),
+            0
+          );
+        const amount = amountOf(right) - amountOf(left);
 
-      if (extra !== 0) {
-        return extra;
-      }
+        if (amount !== 0) {
+          return amount;
+        }
 
-      const amountOf = (product: MatcherProduct) =>
-        contributionFor(product, target.name, target.subjectId).reduce(
-          (sum, fact) => sum + (fact.amount ?? 0),
-          0
-        );
-      const amount = amountOf(right) - amountOf(left);
-
-      if (amount !== 0) {
-        return amount;
-      }
-
-      return left.productId.localeCompare(right.productId);
-    })
+        return left.productId.localeCompare(right.productId);
+      })
       .slice(0, 8);
 
     for (const product of pool) {
