@@ -333,6 +333,36 @@ export function targetHasCoveringGroup(
   );
 }
 
+function targetHasLowCollateralCoveringGroup(
+  groups: readonly ProductGroup[],
+  request: CanonicalRequest,
+  subjectId: string
+) {
+  const target = request.targets.find((item) => item.subjectId === subjectId);
+
+  if (!target) {
+    return false;
+  }
+
+  return groups.some((group) => {
+    if (!groupCoversTargetAtFloor(group, request, subjectId)) {
+      return false;
+    }
+
+    if (
+      highCollateralMultiTitle(group.product.title) &&
+      !productIsDedicatedForTarget(group.product, target)
+    ) {
+      return false;
+    }
+
+    return (
+      productIsDedicatedForTarget(group.product, target) ||
+      labelledTargetCount(group.product, request) <= 1
+    );
+  });
+}
+
 function isCarrierNoise(
   product: MatcherProduct,
   request: CanonicalRequest,
@@ -370,7 +400,7 @@ function isCarrierNoise(
   }
 
   return labelled.every((target) =>
-    targetHasCoveringGroup(groups, request, target.subjectId)
+    targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)
   );
 }
 
@@ -649,16 +679,25 @@ export function compileGroups(
       continue;
     }
 
-    if (targetHasCoveringGroup(groups, request, target.subjectId)) {
+    if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
       continue;
     }
 
     let belowFloorAdded = 0;
     const pool = [...mapped, ...labelled].sort((left, right) => {
-      const dedicated = compareDedicatedThenId(left, right, request);
+      const dedicated =
+        Number(productIsDedicatedForTarget(right, target)) -
+        Number(productIsDedicatedForTarget(left, target));
 
       if (dedicated !== 0) {
         return dedicated;
+      }
+
+      const labelled =
+        labelledTargetCount(left, request) - labelledTargetCount(right, request);
+
+      if (labelled !== 0) {
+        return labelled;
       }
 
       const extraCovered = (product: MatcherProduct) =>
@@ -667,12 +706,17 @@ export function compileGroups(
             targetHasCoveringGroup(groups, request, item.subjectId) &&
             contributionFor(product, item.name, item.subjectId).length > 0
         ).length;
+      const extra = extraCovered(left) - extraCovered(right);
 
-      return extraCovered(left) - extraCovered(right);
+      if (extra !== 0) {
+        return extra;
+      }
+
+      return left.productId.localeCompare(right.productId);
     });
 
     for (const product of pool) {
-      if (targetHasCoveringGroup(groups, request, target.subjectId)) {
+      if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
         break;
       }
 
@@ -694,7 +738,11 @@ export function compileGroups(
       const compiled = compileProductGroup(product, request);
       compiledIds.add(product.productId);
 
-      if (!compiled || !groupCoversTarget(compiled, target.subjectId)) {
+      if (
+        !compiled ||
+        !groupCoversTarget(compiled, target.subjectId) ||
+        !contributingVariantForTarget(compiled, request, target.subjectId)
+      ) {
         continue;
       }
 

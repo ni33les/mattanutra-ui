@@ -519,14 +519,14 @@ function absorbStandaloneWinners(input: Readonly<{
     });
 
     if (scored) {
-      best = pickBetterBasket(scored, best, input.request, input.config);
+      best = scored;
     }
   }
 
   const winners = coveringWinnersBasket(input);
 
-  if (winners) {
-    best = pickBetterBasket(winners, best, input.request, input.config);
+  if (winners && winners.coveredCount > best.coveredCount) {
+    best = winners;
   }
 
   return best;

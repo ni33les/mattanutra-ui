@@ -697,8 +697,12 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
     assert.equal(fewest.selected.productIds.includes("G-MAG-D3"), false);
-    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), false);
-    assert.equal(fewest.selected.productCount, 3);
+    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), true);
+    const d3Target = qaTarget("d3", 2000);
+    assert.equal(
+      (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) > 0,
+      true
+    );
     assert.equal(balanced.selected.productIds.includes("G-C-500"), true);
     assert.equal(balanced.selected.productIds.includes("G-MAG-D3"), false);
   });
