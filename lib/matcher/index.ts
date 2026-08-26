@@ -607,11 +607,6 @@ export function match(
         catalog,
         Math.max(Date.now(), deadlineAt - 400)
       );
-  const rejected: readonly RejectedCandidate[] = rejectedCandidatesFor(
-    request,
-    catalog,
-    groups
-  );
   const sellers = groupsBySeller(
     groups,
     request,
@@ -643,14 +638,16 @@ export function match(
       }
     }
 
-    const salvaged = salvagePartialBasket({
-      groups: seller.groups,
-      request,
-      sellerId: seller.sellerId
-    });
+    if (Date.now() < deadlineAt || scored.length < 1) {
+      const salvaged = salvagePartialBasket({
+        groups: seller.groups,
+        request,
+        sellerId: seller.sellerId
+      });
 
-    if (salvaged) {
-      scored.push(salvaged);
+      if (salvaged) {
+        scored.push(salvaged);
+      }
     }
   }
 
@@ -728,6 +725,11 @@ export function match(
       }
     }
   }
+
+  const rejected =
+    Date.now() < deadlineAt
+      ? rejectedCandidatesFor(request, catalog, groups)
+      : [];
 
   return {
     alternatives: winner.alternatives,
