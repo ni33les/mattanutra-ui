@@ -1,7 +1,9 @@
 import {
   bestCompactCoveringGroup,
+  compactMultiCoveringGroups,
   compileGroups,
   contributionFor,
+  coveringVariantForMostFloors,
   coveringVariantForTarget,
   groupsBySeller
 } from "@/lib/matcher/candidates";
@@ -220,6 +222,7 @@ function dropRedundantProducts(input: Readonly<{
 
       if (
         next.coveredCount >= current.coveredCount &&
+        next.dedicatedPartialCount >= current.dedicatedPartialCount &&
         (next.productCount < current.productCount ||
           next.dailyPills < current.dailyPills)
       ) {
@@ -285,6 +288,151 @@ function rebuildStateFromBasket(input: Readonly<{
   return { state, used };
 }
 
+function pickBetterBasket(
+  left: ScoredBasket,
+  right: ScoredBasket,
+  request: CanonicalRequest,
+  config: MatcherConfig
+) {
+  return compareBaskets(left, right, request, config) < 0 ? left : right;
+}
+
+function coveringWinnersBasket(input: Readonly<{
+  groups: readonly ProductGroup[];
+  request: CanonicalRequest;
+  selected: ScoredBasket;
+}>): ScoredBasket | null {
+  let state = seedState(input.request);
+  const used = new Set<string>();
+
+  for (const group of compactMultiCoveringGroups(input.groups, input.request)) {
+    if (used.has(group.productId)) {
+      continue;
+    }
+
+    const variant = coveringVariantForMostFloors(group, input.request);
+
+    if (!variant) {
+      continue;
+    }
+
+    const next = tryAddVariant(state, variant, group, input.request);
+
+    if (!next) {
+      continue;
+    }
+
+    const scored = scoreState({
+      groups: input.groups,
+      request: input.request,
+      sellerId: input.selected.sellerId,
+      state: next
+    });
+
+    if (!scored) {
+      continue;
+    }
+
+    state = next;
+    used.add(group.productId);
+  }
+
+  for (const target of input.request.targets) {
+    const winner = bestCompactCoveringGroup(
+      input.groups,
+      input.request,
+      target.subjectId
+    );
+
+    if (!winner || used.has(winner.productId)) {
+      continue;
+    }
+
+    const variant = coveringVariantForTarget(
+      winner,
+      input.request,
+      target.subjectId
+    );
+
+    if (!variant) {
+      continue;
+    }
+
+    const next = tryAddVariant(state, variant, winner, input.request);
+
+    if (!next) {
+      continue;
+    }
+
+    const scored = scoreState({
+      groups: input.groups,
+      request: input.request,
+      sellerId: input.selected.sellerId,
+      state: next
+    });
+
+    if (!scored) {
+      continue;
+    }
+
+    state = next;
+    used.add(winner.productId);
+  }
+
+  for (const variantId of input.selected.variantIds) {
+    const group = input.groups.find((item) =>
+      item.variants.some((variant) => variant.variantId === variantId)
+    );
+    const variant = group?.variants.find((item) => item.variantId === variantId);
+
+    if (!group || !variant || used.has(group.productId)) {
+      continue;
+    }
+
+    const next = tryAddVariant(state, variant, group, input.request);
+
+    if (!next) {
+      continue;
+    }
+
+    const current = scoreState({
+      groups: input.groups,
+      request: input.request,
+      sellerId: input.selected.sellerId,
+      state
+    });
+    const added = scoreState({
+      groups: input.groups,
+      request: input.request,
+      sellerId: input.selected.sellerId,
+      state: next
+    });
+
+    if (
+      !added ||
+      !current ||
+      (added.coveredCount <= current.coveredCount &&
+        added.dedicatedPartialCount <= current.dedicatedPartialCount)
+    ) {
+      continue;
+    }
+
+    state = next;
+    used.add(group.productId);
+  }
+
+  if (state.count < 1) {
+    return null;
+  }
+
+  return scoreState({
+    groups: input.groups,
+    request: input.request,
+    sellerId: input.selected.sellerId,
+    state
+  });
+}
+
 function absorbStandaloneWinners(input: Readonly<{
   config: MatcherConfig;
   groups: readonly ProductGroup[];
@@ -345,24 +493,28 @@ function absorbStandaloneWinners(input: Readonly<{
     changed = true;
   }
 
-  if (!changed) {
-    return input.selected;
+  let best = input.selected;
+
+  if (changed) {
+    const scored = scoreState({
+      groups: input.groups,
+      request: input.request,
+      sellerId: input.selected.sellerId,
+      state
+    });
+
+    if (scored) {
+      best = pickBetterBasket(scored, best, input.request, input.config);
+    }
   }
 
-  const scored = scoreState({
-    groups: input.groups,
-    request: input.request,
-    sellerId: input.selected.sellerId,
-    state
-  });
+  const winners = coveringWinnersBasket(input);
 
-  if (!scored) {
-    return input.selected;
+  if (winners) {
+    best = pickBetterBasket(winners, best, input.request, input.config);
   }
 
-  return compareBaskets(scored, input.selected, input.request, input.config) < 0
-    ? scored
-    : input.selected;
+  return best;
 }
 
 function leftoversFor(

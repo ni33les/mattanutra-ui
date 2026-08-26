@@ -5,7 +5,11 @@ import {
   MATERIAL_PILL_DELTA,
   MATERIAL_PRICE_MINOR
 } from "@/lib/matcher/config";
-import { contributionFor, productIsDedicatedForTarget } from "@/lib/matcher/candidates";
+import {
+  bestCompactCoveringGroup,
+  contributionFor,
+  productIsDedicatedForTarget
+} from "@/lib/matcher/candidates";
 import {
   aggregateCoverage,
   coverageUnits,
@@ -85,6 +89,56 @@ function coveredTargetCount(
   ).length;
 }
 
+function requestedLabelCountFor(
+  groups: readonly ProductGroup[],
+  productIds: readonly string[],
+  request: CanonicalRequest
+) {
+  const byId = new Map(groups.map((item) => [item.productId, item.product]));
+  let count = 0;
+
+  for (const productId of productIds) {
+    const product = byId.get(productId);
+
+    if (!product) {
+      continue;
+    }
+
+    count += request.targets.filter(
+      (target) => contributionFor(product, target.name, target.subjectId).length > 0
+    ).length;
+  }
+
+  return count;
+}
+
+function dedicatedPartialCountFor(
+  groups: readonly ProductGroup[],
+  productIds: readonly string[],
+  request: CanonicalRequest,
+  coverageBySubject: ReadonlyMap<string, number>
+) {
+  const byId = new Map(groups.map((item) => [item.productId, item.product]));
+  let count = 0;
+
+  for (const target of request.targets) {
+    if ((coverageBySubject.get(target.subjectId) ?? 0) >= COVERED_THRESHOLD * 100) {
+      continue;
+    }
+
+    const hasDedicated = productIds.some((productId) => {
+      const product = byId.get(productId);
+      return Boolean(product && productIsDedicatedForTarget(product, target));
+    });
+
+    if (hasDedicated) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
 export function scoreState(input: Readonly<{
   groups: readonly ProductGroup[];
   request: CanonicalRequest;
@@ -107,6 +161,12 @@ export function scoreState(input: Readonly<{
     coverageBySubject,
     coveredCount: coveredTargetCount(input.request, coverageBySubject),
     dailyPills: input.state.pills,
+    dedicatedPartialCount: dedicatedPartialCountFor(
+      input.groups,
+      productIds,
+      input.request,
+      coverageBySubject
+    ),
     exposure: validated.exposure,
     incidentalCount: incidentalNutrientCount(input.groups, productIds, input.request),
     oversupplyScore: oversupplyScore(input.request, input.state.delivered),
@@ -114,6 +174,11 @@ export function scoreState(input: Readonly<{
     productCount: input.state.count,
     productIds,
     reason: "Highest-coverage feasible stack",
+    requestedLabelCount: requestedLabelCountFor(
+      input.groups,
+      productIds,
+      input.request
+    ),
     safety: validated.safety,
     sellerId: input.sellerId,
     variantIds: input.state.selectedVariantIds
@@ -123,6 +188,10 @@ export function scoreState(input: Readonly<{
 function compareDefault(left: ScoredBasket, right: ScoredBasket) {
   if (right.coveredCount !== left.coveredCount) {
     return right.coveredCount - left.coveredCount;
+  }
+
+  if (right.dedicatedPartialCount !== left.dedicatedPartialCount) {
+    return right.dedicatedPartialCount - left.dedicatedPartialCount;
   }
 
   if (left.productCount !== right.productCount) {
@@ -144,16 +213,20 @@ function compareDefault(left: ScoredBasket, right: ScoredBasket) {
     return left.incidentalCount - right.incidentalCount;
   }
 
-  if (right.aggregateCoverage !== left.aggregateCoverage) {
-    return right.aggregateCoverage - left.aggregateCoverage;
+  if (left.requestedLabelCount !== right.requestedLabelCount) {
+    return left.requestedLabelCount - right.requestedLabelCount;
+  }
+
+  if (left.priceMinor !== right.priceMinor) {
+    return left.priceMinor - right.priceMinor;
   }
 
   if (left.oversupplyScore !== right.oversupplyScore) {
     return left.oversupplyScore - right.oversupplyScore;
   }
 
-  if (left.priceMinor !== right.priceMinor) {
-    return left.priceMinor - right.priceMinor;
+  if (right.aggregateCoverage !== left.aggregateCoverage) {
+    return right.aggregateCoverage - left.aggregateCoverage;
   }
 
   return left.productIds.join("|").localeCompare(right.productIds.join("|"));
@@ -193,10 +266,26 @@ function coverageDominates(left: ScoredBasket, right: ScoredBasket) {
     ...right.coverageBySubject.keys()
   ]);
   let better = false;
+  const floor = COVERED_THRESHOLD * 100;
 
   for (const id of ids) {
     const leftUnits = left.coverageBySubject.get(id) ?? 0;
     const rightUnits = right.coverageBySubject.get(id) ?? 0;
+    const leftOk = leftUnits >= floor;
+    const rightOk = rightUnits >= floor;
+
+    if (leftOk !== rightOk) {
+      if (!leftOk) {
+        return false;
+      }
+
+      better = true;
+      continue;
+    }
+
+    if (!leftOk) {
+      continue;
+    }
 
     if (leftUnits < rightUnits) {
       return false;
@@ -234,6 +323,13 @@ export function compareBaskets(
     }
 
     if (leftOk) {
+      const dedicatedPartial =
+        right.dedicatedPartialCount - left.dedicatedPartialCount;
+
+      if (dedicatedPartial !== 0) {
+        return dedicatedPartial;
+      }
+
       const pills = left.dailyPills - right.dailyPills;
 
       if (pills !== 0) {
@@ -258,6 +354,12 @@ export function compareBaskets(
 
       if (incidental !== 0) {
         return incidental;
+      }
+
+      const labels = left.requestedLabelCount - right.requestedLabelCount;
+
+      if (labels !== 0) {
+        return labels;
       }
 
       return (
@@ -395,8 +497,17 @@ export function salvagePartialBasket(input: Readonly<{
 }>): ScoredBasket | null {
   let state = seedState(input.request);
   const used = new Set<string>();
+  const coveringFirst = [
+    ...input.request.targets.filter((target) =>
+      Boolean(bestCompactCoveringGroup(input.groups, input.request, target.subjectId))
+    ),
+    ...input.request.targets.filter(
+      (target) =>
+        !bestCompactCoveringGroup(input.groups, input.request, target.subjectId)
+    )
+  ];
 
-  for (const target of input.request.targets) {
+  for (const target of coveringFirst) {
     const already =
       coverageUnits(
         state.delivered.get(target.subjectId) ?? BigInt(0),

@@ -253,6 +253,138 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(fewest.selected.dailyPills, 4);
   });
 
+  it("keeps a covering 50+ multi in official when it hits D3 90% under the catalog UL", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-covering-50plus",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 180,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 600, key: "d3" },
+            { amount: 105, key: "mag" },
+            { amount: 45, key: "c" }
+          ],
+          id: "G-50PLUS",
+          pills: 1,
+          priceThb: 150,
+          title: "Multivitamins for 50+"
+        })
+      ]
+    };
+    const fewest = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        profile: { ageYears: 52, lifeStage: "adult", sex: "male" }
+      }),
+      catalog
+    );
+    assert.ok(fewest.selected);
+    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
+    assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
+    assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
+    const d3Target = qaTarget("d3", 2000);
+    const d3Percent = Math.round(
+      (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
+    );
+    assert.equal(d3Percent >= 90, true);
+  });
+
+  it("keeps dedicated MAG, fish oil, and C instead of a below-floor magnesium+D3 combo", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-mag-d3-combo",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 180,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 200, key: "mag" },
+            { amount: 100, key: "d3" },
+            { amount: 60, key: "c" }
+          ],
+          id: "G-MAG-D3",
+          pills: 1,
+          priceThb: 90,
+          title: "Magnesium + D3"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 400, key: "d3" },
+            { amount: 50, key: "c" }
+          ],
+          id: "G-JOINT-D3-C",
+          pills: 2,
+          priceThb: 80,
+          title: "Joint Mobility Plus"
+        })
+      ]
+    };
+    const fewest = match(
+      qaRequest({ optimization: "fewest_pills" }),
+      catalog
+    );
+    const balanced = match(
+      qaRequest({ optimization: "balanced" }),
+      catalog
+    );
+    assert.ok(fewest.selected);
+    assert.ok(balanced.selected);
+    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
+    assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
+    assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
+    assert.equal(fewest.selected.productIds.includes("G-MAG-D3"), false);
+    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), false);
+    assert.equal(fewest.selected.productCount, 3);
+    assert.equal(balanced.selected.productIds.includes("G-C-500"), true);
+    assert.equal(balanced.selected.productIds.includes("G-MAG-D3"), false);
+  });
+
   it("keeps official gold products and pills across 20 target-order permutations", () => {
     const baseline = match(
       qaRequest({ optimization: "fewest_pills" }),

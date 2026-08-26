@@ -171,7 +171,6 @@ function exactSearch(
     }
 
     const group = groups[state.nextGroupIndex]!;
-    dfs(skipGroup(state));
 
     for (const variant of group.variants) {
       const next = tryAddVariant(state, variant, group, request);
@@ -180,6 +179,8 @@ function exactSearch(
         dfs(next);
       }
     }
+
+    dfs(skipGroup(state));
   };
 
   dfs(seed);

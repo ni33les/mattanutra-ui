@@ -232,6 +232,7 @@ export type ScoredBasket = Readonly<{
   coverageBySubject: ReadonlyMap<string, number>;
   coveredCount: number;
   dailyPills: number;
+  dedicatedPartialCount: number;
   exposure: Exposure;
   incidentalCount: number;
   oversupplyScore: number;
@@ -239,6 +240,7 @@ export type ScoredBasket = Readonly<{
   productCount: number;
   productIds: readonly string[];
   reason: string;
+  requestedLabelCount: number;
   safety: SafetyResult;
   sellerId: string;
   variantIds: readonly string[];
