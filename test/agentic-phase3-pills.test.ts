@@ -115,6 +115,31 @@ describe("Phase 3 fewest_pills ranking", () => {
     );
   });
 
+  it("counts a labelled B12-only complex as a dedicated partial", () => {
+    const withMegaB = scored({
+      coveredCount: 3,
+      dailyPills: 10,
+      dedicatedPartialCount: 2,
+      productIds: ["MAG", "O3", "C", "D3", "B12"],
+      priceMinor: 472500
+    });
+    const coveringOnly = scored({
+      coveredCount: 3,
+      dailyPills: 4,
+      dedicatedPartialCount: 0,
+      productIds: ["MAG", "O3", "C"],
+      priceMinor: 152800
+    });
+    assert.equal(
+      compareBaskets(
+        withMegaB,
+        coveringOnly,
+        qaRequest({ optimization: "fewest_pills" })
+      ) < 0,
+      true
+    );
+  });
+
   it("among the same dedicated-partial count, fewest_pills picks fewer pills", () => {
     const tenPills = scored({
       coveredCount: 3,

@@ -567,7 +567,16 @@ function absorbStandaloneWinners(input: Readonly<{
       const floorWinner = Boolean(winner && variant);
 
       if (!winner || !variant) {
-        if (belowFloorAdded >= 1) {
+        const alreadyLabelled = [...used].some((productId) => {
+          const group = input.groups.find((item) => item.productId === productId);
+          return Boolean(
+            group &&
+              contributionFor(group.product, target.name, target.subjectId).length >
+                0
+          );
+        });
+
+        if (belowFloorAdded >= 1 || alreadyLabelled) {
           break;
         }
 

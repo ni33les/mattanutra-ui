@@ -128,7 +128,28 @@ function dedicatedPartialCountFor(
 
     const hasDedicated = productIds.some((productId) => {
       const product = byId.get(productId);
-      return Boolean(product && productIsDedicatedForTarget(product, target));
+
+      if (!product) {
+        return false;
+      }
+
+      if (
+        /\bjoint\b/i.test(product.title) ||
+        /\b50\+|multivitamins for 50/i.test(product.title) ||
+        /\bextract\b|\bbacopa\b|\bturmeric\b/i.test(product.title)
+      ) {
+        return false;
+      }
+
+      if (productIsDedicatedForTarget(product, target)) {
+        return true;
+      }
+
+      const hits = request.targets.filter(
+        (item) => contributionFor(product, item.name, item.subjectId).length > 0
+      );
+
+      return hits.length === 1 && hits[0]?.subjectId === target.subjectId;
     });
 
     if (hasDedicated) {
@@ -532,13 +553,6 @@ export function salvagePartialBasket(input: Readonly<{
           .map((variant) => ({ group, variant }))
       )
       .sort((left, right) => {
-        const leftDedicated = productIsDedicatedForTarget(left.group.product, target);
-        const rightDedicated = productIsDedicatedForTarget(right.group.product, target);
-
-        if (leftDedicated !== rightDedicated) {
-          return leftDedicated ? -1 : 1;
-        }
-
         const want = target.requested.units;
         const leftUnits =
           left.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
@@ -546,9 +560,35 @@ export function salvagePartialBasket(input: Readonly<{
           right.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
         const leftCover = coverageUnits(leftUnits, want);
         const rightCover = coverageUnits(rightUnits, want);
+        const floor = COVERED_THRESHOLD * 100;
+        const leftOk = leftCover >= floor;
+        const rightOk = rightCover >= floor;
 
-        if (rightCover !== leftCover) {
-          return rightCover - leftCover;
+        if (leftOk !== rightOk) {
+          return leftOk ? -1 : 1;
+        }
+
+        if (input.request.optimization === "fewest_pills" && leftOk) {
+          if (left.variant.dailyPills !== right.variant.dailyPills) {
+            return left.variant.dailyPills - right.variant.dailyPills;
+          }
+        } else {
+          const leftDedicated = productIsDedicatedForTarget(
+            left.group.product,
+            target
+          );
+          const rightDedicated = productIsDedicatedForTarget(
+            right.group.product,
+            target
+          );
+
+          if (leftDedicated !== rightDedicated) {
+            return leftDedicated ? -1 : 1;
+          }
+
+          if (rightCover !== leftCover) {
+            return rightCover - leftCover;
+          }
         }
 
         const leftOver =
