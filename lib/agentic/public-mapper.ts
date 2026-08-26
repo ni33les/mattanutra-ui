@@ -28,6 +28,7 @@ export type PublicBasketItem = Readonly<{
   productName: string;
   quantity: number;
   requestedNutrientNames: readonly string[];
+  requestedNutrients?: readonly PublicBasketNutrient[];
   servingsPerDay: number;
   source?: "fixture" | "retail";
   unitPriceMinor: number;
@@ -114,6 +115,9 @@ export function publicBasketItem(item: BasketItem): PublicBasketItem {
     productName: item.productName,
     quantity: item.quantity,
     requestedNutrientNames: boundedNames(item.requestedNutrientNames),
+    ...(item.requestedNutrients && item.requestedNutrients.length > 0
+      ? { requestedNutrients: boundedNutrients(item.requestedNutrients) }
+      : {}),
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(imageUrl ? { imageUrl } : {}),
@@ -135,6 +139,16 @@ export function publicCoverage(row: CoverageRow) {
     supplementId: row.supplementId,
     totalExposureAmount: row.totalExposureAmount,
     unit: row.unit,
+    ...(row.contributors && row.contributors.length > 0
+      ? {
+          contributors: row.contributors.map((item) => ({
+            amount: item.amount,
+            productId: item.productId,
+            productName: item.productName,
+            unit: item.unit
+          }))
+        }
+      : {}),
     ...(row.upperLimitAmount != null
       ? {
           percentOfUpperLimit: row.percentOfUpperLimit,

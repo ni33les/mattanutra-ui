@@ -206,6 +206,13 @@ export type BasketNutrient = Readonly<{
   unit: CatalogueUnit;
 }>;
 
+export type CoverageContributor = Readonly<{
+  amount: number;
+  productId: string;
+  productName: string;
+  unit: CatalogueUnit;
+}>;
+
 export type BasketItem = Readonly<{
   availabilityAsOf: string;
   contributionSupplementIds: readonly string[];
@@ -224,6 +231,7 @@ export type BasketItem = Readonly<{
   productName: string;
   quantity: number;
   requestedNutrientNames: readonly string[];
+  requestedNutrients?: readonly BasketNutrient[];
   retailerSku: string;
   sellerId: string;
   sellerName: string;
@@ -234,6 +242,7 @@ export type BasketItem = Readonly<{
 }>;
 
 export type CoverageRow = Readonly<{
+  contributors?: readonly CoverageContributor[];
   coveragePercent: number;
   currentAmount: number;
   deliveredAmount: number;

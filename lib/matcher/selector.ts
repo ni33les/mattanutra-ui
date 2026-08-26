@@ -121,20 +121,8 @@ export function scoreState(input: Readonly<{
 }
 
 function compareDefault(left: ScoredBasket, right: ScoredBasket) {
-  if (right.aggregateCoverage !== left.aggregateCoverage) {
-    return right.aggregateCoverage - left.aggregateCoverage;
-  }
-
   if (right.coveredCount !== left.coveredCount) {
     return right.coveredCount - left.coveredCount;
-  }
-
-  if (left.incidentalCount !== right.incidentalCount) {
-    return left.incidentalCount - right.incidentalCount;
-  }
-
-  if (left.oversupplyScore !== right.oversupplyScore) {
-    return left.oversupplyScore - right.oversupplyScore;
   }
 
   if (left.productCount !== right.productCount) {
@@ -143,6 +131,18 @@ function compareDefault(left: ScoredBasket, right: ScoredBasket) {
 
   if (left.dailyPills !== right.dailyPills) {
     return left.dailyPills - right.dailyPills;
+  }
+
+  if (left.incidentalCount !== right.incidentalCount) {
+    return left.incidentalCount - right.incidentalCount;
+  }
+
+  if (right.aggregateCoverage !== left.aggregateCoverage) {
+    return right.aggregateCoverage - left.aggregateCoverage;
+  }
+
+  if (left.oversupplyScore !== right.oversupplyScore) {
+    return left.oversupplyScore - right.oversupplyScore;
   }
 
   if (left.priceMinor !== right.priceMinor) {

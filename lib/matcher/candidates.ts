@@ -1,3 +1,4 @@
+import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { productEligible } from "@/lib/matcher/eligibility";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -235,6 +236,91 @@ function carrierTitle(title: string) {
   );
 }
 
+function currentUnitsForSubject(request: CanonicalRequest, subjectId: string) {
+  return request.currentSupplements
+    .filter((item) => item.subjectId === subjectId)
+    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
+}
+
+export function groupCoversTargetAtFloor(
+  group: ProductGroup,
+  request: CanonicalRequest,
+  subjectId: string
+) {
+  const target = request.targets.find((item) => item.subjectId === subjectId);
+
+  if (!target || target.requested.units <= BigInt(0)) {
+    return false;
+  }
+
+  const current = currentUnitsForSubject(request, subjectId);
+  const floor = COVERED_THRESHOLD * 100;
+
+  for (const variant of group.variants) {
+    const contributed = variant.contributions.get(subjectId);
+
+    if (!contributed || contributed.units <= BigInt(0)) {
+      continue;
+    }
+
+    const exposure = current + contributed.units;
+
+    if (exposureExceedsCeiling(request, subjectId, exposure)) {
+      continue;
+    }
+
+    if (coverageUnits(exposure, target.requested.units) >= floor) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function targetHasCoveringGroup(
+  groups: readonly ProductGroup[],
+  request: CanonicalRequest,
+  subjectId: string
+) {
+  return groups.some((group) =>
+    groupCoversTargetAtFloor(group, request, subjectId)
+  );
+}
+
+function isCarrierNoise(
+  product: MatcherProduct,
+  request: CanonicalRequest,
+  groups: readonly ProductGroup[]
+) {
+  if (!carrierTitle(product.title)) {
+    return false;
+  }
+
+  if (
+    (request.profile.lifeStage === "pregnant" ||
+      request.profile.lifeStage === "trying_to_conceive") &&
+    /pre[-\s]?natal|conceive|pre\s*9/i.test(product.title)
+  ) {
+    return false;
+  }
+
+  if (request.targets.some((target) => productIsDedicatedForTarget(product, target))) {
+    return false;
+  }
+
+  const labelled = request.targets.filter(
+    (target) => contributionFor(product, target.name, target.subjectId).length > 0
+  );
+
+  if (labelled.length < 1) {
+    return true;
+  }
+
+  return labelled.every((target) =>
+    targetHasCoveringGroup(groups, request, target.subjectId)
+  );
+}
+
 export function productIsDedicatedForTarget(
   product: MatcherProduct,
   target: CanonicalTarget
@@ -384,14 +470,14 @@ export function compileGroups(
         !mappedToRequest(product, request) && labelledForRequest(product, request)
     )
     .sort((left, right) => compareDedicatedThenId(left, right, request));
-  const rest = products.filter(
-    (product) =>
-      !mappedToRequest(product, request) && !labelledForRequest(product, request)
-  );
 
-  for (const product of [...mapped, ...labelled, ...rest]) {
+  const tryCompile = (product: MatcherProduct) => {
     if (deadlineAt != null && Date.now() >= deadlineAt) {
-      break;
+      return;
+    }
+
+    if (groups.some((group) => group.productId === product.productId)) {
+      return;
     }
 
     const group = compileProductGroup(product, request);
@@ -399,6 +485,33 @@ export function compileGroups(
     if (group) {
       groups.push(group);
     }
+  };
+
+  const dedicatedMapped = mapped.filter((product) =>
+    request.targets.some((target) => productIsDedicatedForTarget(product, target))
+  );
+  const otherMapped = mapped.filter(
+    (product) => !dedicatedMapped.some((item) => item.productId === product.productId)
+  );
+
+  for (const product of dedicatedMapped) {
+    tryCompile(product);
+  }
+
+  for (const product of otherMapped) {
+    if (isCarrierNoise(product, request, groups)) {
+      continue;
+    }
+
+    tryCompile(product);
+  }
+
+  for (const product of labelled) {
+    if (isCarrierNoise(product, request, groups)) {
+      continue;
+    }
+
+    tryCompile(product);
   }
 
   for (const target of request.targets) {
@@ -406,7 +519,7 @@ export function compileGroups(
       continue;
     }
 
-    if (bestGroupForTarget(groups, request, target.subjectId)) {
+    if (targetHasCoveringGroup(groups, request, target.subjectId)) {
       continue;
     }
 
@@ -557,7 +670,14 @@ function seedPriorityGroups(
   }
 
   const rest = ranked.filter((item) => !seen.has(item.productId));
-  const limit = Math.max(sellerGroupLimit, priority.length);
+  const covering = request.targets.every(
+    (target) =>
+      remainingRequestedUnits(request, target.subjectId) <= BigInt(0) ||
+      targetHasCoveringGroup(priority, request, target.subjectId)
+  );
+  const limit = covering
+    ? Math.max(priority.length + 4, 8)
+    : Math.max(sellerGroupLimit, priority.length);
 
   return [...priority, ...rest].slice(0, limit);
 }

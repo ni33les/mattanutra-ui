@@ -105,7 +105,8 @@ export function toCanonicalRequest(
 
 function coverageFor(
   state: CanonicalPlanState,
-  basket: ScoredBasket | null
+  basket: ScoredBasket | null,
+  items: readonly BasketItem[] = []
 ): CoverageRow[] {
   return state.targets.map((target) => {
     const coverageUnits = basket?.coverageBySubject.get(target.supplementId) ?? 0;
@@ -148,7 +149,22 @@ function coverageFor(
       status = "upper_limit_risk";
     }
 
+    const contributors = items.flatMap((item) => {
+      const matching = (item.requestedNutrients ?? []).filter(
+        (nutrient) =>
+          nutrient.name.trim().toLowerCase() === target.name.trim().toLowerCase()
+      );
+
+      return matching.map((nutrient) => ({
+        amount: nutrient.amount,
+        productId: item.productId,
+        productName: item.productName,
+        unit: nutrient.unit
+      }));
+    });
+
     return {
+      contributors,
       coveragePercent,
       currentAmount,
       deliveredAmount,
@@ -344,6 +360,7 @@ function basketFromIds(
         productName: product.candidate.title,
         quantity,
         requestedNutrientNames: nutrients.requestedNutrientNames,
+        requestedNutrients: nutrients.requestedNutrients,
         retailerSku: product.retailerSku,
         sellerId: product.sellerId,
         sellerName: product.sellerName,
@@ -363,7 +380,7 @@ function toStackOption(
   const items = basketFromIds(state, snapshot, basket);
   return {
     basket: items,
-    coverage: coverageFor(state, basket),
+    coverage: coverageFor(state, basket, items),
     coveragePercent: publicCoveragePercent(basket),
     dailyPills: basket.dailyPills,
     matcherVersion: MATCHER_VERSION,
