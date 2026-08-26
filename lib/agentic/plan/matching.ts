@@ -150,17 +150,29 @@ function coverageFor(
     }
 
     const contributors = items.flatMap((item) => {
-      const matching = (item.requestedNutrients ?? []).filter(
-        (nutrient) =>
-          nutrient.name.trim().toLowerCase() === target.name.trim().toLowerCase()
-      );
+      const matching = (item.requestedNutrients ?? []).filter((nutrient) => {
+        const sameName =
+          nutrient.name.trim().toLowerCase() === target.name.trim().toLowerCase();
+        const omegaLike =
+          /omega|epa|dha|n-3/i.test(`${target.name} ${target.supplementId}`) &&
+          /omega|epa|dha|n-3/i.test(nutrient.name);
+        return sameName || omegaLike;
+      });
 
-      return matching.map((nutrient) => ({
-        amount: nutrient.amount,
-        productId: item.productId,
-        productName: item.productName,
-        unit: nutrient.unit
-      }));
+      if (matching.length > 0) {
+        const amount = matching.reduce((sum, nutrient) => sum + nutrient.amount, 0);
+        const unit = matching[0]?.unit ?? target.unit;
+        return [
+          {
+            amount,
+            productId: item.productId,
+            productName: item.productName,
+            unit
+          }
+        ];
+      }
+
+      return [];
     });
 
     return {

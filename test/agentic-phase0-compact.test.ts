@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { compileGroups } from "../lib/matcher/candidates.ts";
-import { match } from "../lib/matcher/index.ts";
 import { QA_GOLD_CATALOG, qaProduct, qaRequest, qaTarget } from "../lib/matcher/qa/index.ts";
 
 function catalog(products: ReturnType<typeof qaProduct>[]) {
