@@ -13,6 +13,7 @@ import { match } from "@/lib/matcher";
 import type { CatalogSnapshot, ProductGroup } from "@/lib/matcher/types";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { publicCoveragePercent } from "@/lib/matcher/explainer";
+import { whyProductMatches } from "@/lib/product-recommendation-metrics";
 import {
   normalizeProductFactKey,
   productKeysMatch
@@ -496,10 +497,11 @@ export function recommendWithMatcher(
       supplementNeeds,
       servingMultiplier
     );
+    const coveredNeeds = supplementNeeds.filter((need) =>
+      matcherProductCoversNeed(matcherProduct, need)
+    );
     recommendations.push({
-      coveredNeeds: supplementNeeds.filter((need) =>
-        matcherProductCoversNeed(matcherProduct, need)
-      ),
+      coveredNeeds,
       availabilityStatus:
         product.retailAvailabilityStatus ??
         (product.availabilityStatus === "in_stock" ? "available_now" : "available_now"),
@@ -518,7 +520,12 @@ export function recommendWithMatcher(
       unitPriceAmount: product.unitPriceAmount ?? product.priceAmount ?? null,
       url: product.productUrl,
       unknownAtRecommendation: false,
-      why: result.selected?.reason ?? "Selected stack"
+      why: whyProductMatches(
+        product,
+        coveredNeeds,
+        skuCoverage,
+        servingMultiplier
+      )
     });
   }
 
@@ -536,6 +543,7 @@ export function recommendWithMatcher(
       matchedNeeds: needDiagnostics.filter((item) => item.coveragePercent > 0),
       nearMisses: [],
       productsConsidered: input.candidates.length,
+      stackPreference: input.stackPreference ?? "balanced",
       unmatchedNeeds: needDiagnostics.filter((item) => item.coveragePercent <= 0),
       trace: {
         alternativeStacks: [],
@@ -545,6 +553,7 @@ export function recommendWithMatcher(
         searchMode: "full-beam",
         shortfalls: [],
         shortlistSize: input.candidates.length,
+        stackPreference: input.stackPreference ?? "balanced",
         utilityScore: coverage,
         weightDeltas: {},
         weights: {}

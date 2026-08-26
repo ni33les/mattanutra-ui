@@ -15,7 +15,8 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
 
 export const WEB_MATCHER_CONFIG: MatcherConfig = {
   ...DEFAULT_MATCHER_CONFIG,
-  searchDeadlineMs: 400
+  searchDeadlineMs: 400,
+  skipPostMatchCompact: true
 };
 
 export const WEB_COMPACT_MATCHER_CONFIG: MatcherConfig = {

@@ -129,6 +129,13 @@ function compareDefault(left: ScoredBasket, right: ScoredBasket) {
     return left.productCount - right.productCount;
   }
 
+  if (
+    left.coveredCount < 1 &&
+    right.aggregateCoverage !== left.aggregateCoverage
+  ) {
+    return right.aggregateCoverage - left.aggregateCoverage;
+  }
+
   if (left.dailyPills !== right.dailyPills) {
     return left.dailyPills - right.dailyPills;
   }

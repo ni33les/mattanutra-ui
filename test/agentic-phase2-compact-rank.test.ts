@@ -17,6 +17,41 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(result.selected.productIds.includes("G-D3-2000"), true);
   });
 
+  it("uses extra servings of one SKU before adding a second product when coverage is still partial", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-extra-servings",
+      products: [
+        qaProduct({
+          facts: [{ amount: 500, key: "d3" }],
+          id: "G-D3-500",
+          priceThb: 120,
+          title: "Vitamin D3 500 IU"
+        }),
+        qaProduct({
+          facts: [{ amount: 400, key: "d3" }],
+          id: "G-JOINT-D3",
+          priceThb: 180,
+          title: "Joint Mobility D3"
+        })
+      ]
+    };
+    const result = match(
+      qaRequest({
+        optimization: "balanced",
+        targets: [qaTarget("d3", 2000)]
+      }),
+      catalog
+    );
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("G-D3-500"), true);
+    const variant = result.selected.variantIds.find((id) =>
+      id.startsWith("G-D3-500:x")
+    );
+    assert.ok(variant);
+    assert.match(variant, /:x[23]$/);
+  });
+
   it("does not stuff extra SKUs onto standalone vitamin C", () => {
     const result = match(
       qaRequest({

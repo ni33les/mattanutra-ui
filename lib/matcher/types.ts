@@ -291,6 +291,7 @@ export type MatcherConfig = Readonly<{
   maxBeamWidth: number;
   searchDeadlineMs: number;
   sellerGroupLimit?: number;
+  skipPostMatchCompact?: boolean;
   usefulCoverageFloor: number;
   version: string;
 }>;

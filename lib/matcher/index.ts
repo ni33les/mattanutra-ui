@@ -513,7 +513,7 @@ export function match(
     }
   }
 
-  if (winner.selected) {
+  if (winner.selected && !config.skipPostMatchCompact) {
     const compact = dropRedundantProducts({
       groups,
       request,
