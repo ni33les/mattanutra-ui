@@ -1,3 +1,4 @@
+import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import type {
   BasketItem,
   CoverageContributor,
@@ -377,6 +378,9 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(result.leftovers && result.leftovers.length > 0
       ? { leftovers: result.leftovers }
+      : {}),
+    ...(result.status === "processing"
+      ? { pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS }
       : {}),
     ...publicMatcherTelemetry(result.matcherTelemetry)
   };

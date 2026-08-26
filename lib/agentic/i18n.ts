@@ -125,9 +125,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "所选产品不适合该年龄或人生阶段。"
   },
   "guidance.condition_review_required": {
-    en: "This stack should be reviewed with a qualified clinician because of a declared condition.",
-    th: "ควรให้ผู้เชี่ยวชาญตรวจทานสูตรนี้เนื่องจากมีภาวะสุขภาพที่แจ้งไว้",
-    "zh-CN": "因已声明的健康状况，该组合应咨询合格临床人员。"
+    en: "{nutrientName} ({unit}) from {contributors} needs clinician review because of a declared condition. Next action: {nextAction}.",
+    th: "{nutrientName} ({unit}) จาก {contributors} ควรให้ผู้เชี่ยวชาญตรวจทานเนื่องจากมีภาวะสุขภาพที่แจ้งไว้ ขั้นตอนถัดไป: {nextAction}",
+    "zh-CN": "因已声明的健康状况，{nutrientName}（{unit}，来源 {contributors}）需要临床复核。下一步：{nextAction}。"
   },
   "guidance.dose_review_required": {
     en: "Total exposure from current intake plus selected products needs a dose review.",
@@ -140,9 +140,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "所选产品在同一营养素上有重叠。"
   },
   "guidance.medication_interaction": {
-    en: "A selected nutrient has a known interaction with a declared medication.",
-    th: "สารอาหารที่เลือกมีปฏิกิริยาร่วมกับยาที่แจ้งไว้",
-    "zh-CN": "所选营养素与已声明药物存在已知相互作用。"
+    en: "{nutrientName} ({unit}) from {contributors} has a known interaction with a declared medication. Next action: {nextAction}.",
+    th: "{nutrientName} ({unit}) จาก {contributors} มีปฏิกิริยาร่วมกับยาที่แจ้งไว้ ขั้นตอนถัดไป: {nextAction}",
+    "zh-CN": "{nutrientName}（{unit}，来源 {contributors}）与已声明药物存在已知相互作用。下一步：{nextAction}。"
   },
   "guidance.pediatric_review_required": {
     en: "This paediatric stack needs qualified review before purchase.",

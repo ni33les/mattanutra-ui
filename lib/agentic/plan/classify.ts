@@ -8,6 +8,7 @@ import type { CanonicalRequest } from "@/lib/matcher/types";
 import type {
   CanonicalPlanState,
   CoverageRow,
+  MatcherTelemetry,
   PlanTarget,
   StackOption,
   TargetClassification,
@@ -48,6 +49,7 @@ function classifyOne(input: Readonly<{
   coverage: CoverageRow | undefined;
   eligibleCount: number;
   floorCoveringCount: number;
+  hasCertificate: boolean;
   mappedCount: number;
   unmappedLookalike: boolean;
 }>): TargetClass {
@@ -61,6 +63,10 @@ function classifyOne(input: Readonly<{
     return input.unmappedLookalike ? "mapping_defect" : "genuine_gap";
   }
 
+  if (input.hasCertificate) {
+    return "matcher_defect";
+  }
+
   if (input.eligibleCount < 1 || input.floorCoveringCount < 1) {
     return "genuine_gap";
   }
@@ -69,6 +75,7 @@ function classifyOne(input: Readonly<{
 }
 
 export function classifySnapshotTargets(input: Readonly<{
+  lossCertificates?: MatcherTelemetry["lossCertificates"];
   request?: CanonicalRequest | { error: string };
   selected: StackOption | null;
   snapshot: CatalogueSnapshot;
@@ -118,6 +125,11 @@ export function classifySnapshotTargets(input: Readonly<{
       coverage,
       eligibleCount: eligible.length,
       floorCoveringCount,
+      hasCertificate: Boolean(
+        input.lossCertificates?.some(
+          (item) => item.target_supplement_id === target.supplementId
+        )
+      ),
       mappedCount: mapped.length,
       unmappedLookalike
     });

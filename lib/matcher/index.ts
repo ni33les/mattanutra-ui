@@ -13,10 +13,11 @@ import {
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
 import { COVERED_THRESHOLD, DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
-import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
+import { aggregateDailyExposure, amountFromScaled, isDoseError } from "@/lib/matcher/dose";
 import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
 import { evaluateSafety } from "@/lib/matcher/safety";
-import { searchGroups, seedState, tryAddVariant } from "@/lib/matcher/search";
+import { safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
+import { reconstructVariants, searchGroups, seedState, tryAddVariant } from "@/lib/matcher/search";
 import {
   compareBaskets,
   salvagePartialBasket,
@@ -962,31 +963,87 @@ export function match(
   });
 
   const selectedIds = new Set(winner.selected?.productIds ?? []);
+  const selectedVariants = reconstructVariants(
+    groups,
+    winner.selected?.variantIds ?? []
+  );
   const lossCertificates = request.targets.flatMap((target) => {
     const frontier = targetFrontiers.find(
       (item) => item.subjectId === target.subjectId
     );
     const missing = (frontier?.productIds ?? []).filter((id) => !selectedIds.has(id));
+    const beforeUnits = selectedVariants.reduce(
+      (sum, variant) =>
+        sum + (variant.contributions.get(target.subjectId)?.units ?? BigInt(0)),
+      BigInt(0)
+    );
+    const beforeAmount = amountFromScaled(
+      {
+        dim: target.requested.dim,
+        subjectId: target.subjectId,
+        units: beforeUnits
+      },
+      target.requestedUnit,
+      target.name
+    );
+    const ceiling = safetyCeilingFor(request.safetyCeilings, {
+      name: target.name,
+      profile: request.profile,
+      subjectId: target.subjectId
+    });
 
     return missing.map((candidate_product_id) => {
       const group = groups.find((item) => item.productId === candidate_product_id);
       const joint = /\bjoint\b/i.test(group?.product.title ?? "");
+      const fact = group
+        ? contributionFor(group.product, target.name, target.subjectId)[0]
+        : undefined;
+      const variant = group
+        ? contributingVariantForTarget(group, request, target.subjectId)
+        : null;
+      const extra = variant?.contributions.get(target.subjectId)?.units ?? BigInt(0);
+      const afterAmount = amountFromScaled(
+        {
+          dim: target.requested.dim,
+          subjectId: target.subjectId,
+          units: beforeUnits + extra
+        },
+        target.requestedUnit,
+        target.name
+      );
+      const exceedsLimit =
+        ceiling != null &&
+        afterAmount != null &&
+        afterAmount > ceiling.maxAmount;
+      const compiled = Boolean(group);
+      const rejection_class = exceedsLimit
+        ? ("safety" as const)
+        : !compiled && trimmed
+          ? ("approximate" as const)
+          : !compiled
+            ? ("unavailable" as const)
+            : ("dominated" as const);
 
       return {
+        candidate_fact_id: fact
+          ? `${candidate_product_id}:${fact.name ?? target.name}:${fact.unit ?? target.requestedUnit}`
+          : null,
         candidate_product_id,
         catalogue_id: catalog.catalogueVersion,
         conflicting_product_ids: [...selectedIds],
-        conflicting_rule_id: joint
-          ? "joint_skip_multi_target"
-          : trimmed
-            ? "search_deadline"
-            : "combined_mode",
-        rejection_class: trimmed
-          ? ("approximate" as const)
+        conflicting_rule_id: exceedsLimit
+          ? `ul:${target.subjectId}`
           : joint
-            ? ("dominated" as const)
-            : ("dominated" as const),
-        target_supplement_id: target.subjectId
+            ? "joint_skip_multi_target"
+            : !compiled && trimmed
+              ? "search_deadline"
+              : "combined_mode",
+        exposure_after: afterAmount,
+        exposure_before: beforeAmount,
+        limit: ceiling?.maxAmount ?? null,
+        rejection_class,
+        target_supplement_id: target.subjectId,
+        unit: target.requestedUnit
       };
     });
   });

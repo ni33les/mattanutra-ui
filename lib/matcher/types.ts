@@ -280,10 +280,14 @@ export type RejectedSummary = Readonly<{
 }>;
 
 export type LossCertificate = Readonly<{
+  candidate_fact_id: string | null;
   candidate_product_id: string;
   catalogue_id: string;
   conflicting_product_ids: readonly string[];
   conflicting_rule_id: string;
+  exposure_after: number | null;
+  exposure_before: number | null;
+  limit: number | null;
   rejection_class:
     | "approximate"
     | "dominated"
@@ -292,6 +296,7 @@ export type LossCertificate = Readonly<{
     | "source"
     | "unavailable";
   target_supplement_id: string;
+  unit: string | null;
 }>;
 
 export type TargetFrontier = Readonly<{

@@ -23,7 +23,7 @@ import {
   canonicalizeCurrents,
   canonicalizeTargets
 } from "@/lib/matcher/canonicalizer";
-import { canonicalNutrientKey, productKeysMatch } from "@/lib/product-key-matching";
+import { normalizeProductKey, productKeysMatch } from "@/lib/product-key-matching";
 import type {
   CanonicalRequest,
   MatcherUnit,
@@ -258,7 +258,7 @@ export function factLedgerFor(input: Readonly<{
       const nutrient = item?.requestedNutrients?.find((entry) =>
         productKeysMatch(entry.name, target.name)
       );
-      const ruleId = canonicalNutrientKey(nutrient?.name ?? target.name);
+      const ruleId = normalizeProductKey(nutrient?.name ?? target.name);
       const productFactId = [
         contributor.productId ?? item?.productId ?? "",
         ruleId,
@@ -649,6 +649,7 @@ export function matcherTelemetryFor(input: Readonly<{
   const request = toCanonicalRequest(input.state);
   const classifications = input.snapshot
     ? classifySnapshotTargets({
+        lossCertificates: input.lossCertificates,
         request,
         selected: input.selected,
         snapshot: input.snapshot,

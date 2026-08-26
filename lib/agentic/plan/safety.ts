@@ -94,6 +94,17 @@ function guidance(input: Readonly<{
               ? "pediatric"
               : input.code;
   const guidanceId = ["gdn", input.code, family].join(":");
+  const contributorLabel =
+    (input.contributors ?? [])
+      .map((item) => item.productName)
+      .filter((name) => Boolean(name?.trim()))
+      .join(", ") || "none selected";
+  const nextAction =
+    input.code === "condition_review_required"
+      ? "do not execute; clinician review"
+      : input.code === "medication_interaction"
+        ? "acknowledge to continue"
+        : "review before purchase";
 
   return {
     action: input.action,
@@ -101,7 +112,12 @@ function guidance(input: Readonly<{
     contributors: input.contributors ?? [],
     exposure: input.exposure ?? null,
     guidanceId,
-    message: agenticMessage(input.locale, messageKey),
+    message: agenticMessage(input.locale, messageKey, {
+      contributors: contributorLabel,
+      nextAction,
+      nutrientName: input.nutrientName ?? "",
+      unit: input.unit ?? ""
+    }),
     messageKey,
     nutrientName: input.nutrientName ?? null,
     productIds: input.productIds,
@@ -196,23 +212,40 @@ export function evaluateSafety(input: Readonly<{
     items.push(guidance({
       action: "acknowledge",
       code: "medication_interaction",
+      contributors: omegaCoverage
+        ? exposureContributors(omegaCoverage)
+        : [],
       exposure: omegaCoverage?.totalExposureAmount ?? null,
       locale: input.locale,
+      nutrientName: omegaCoverage?.name ?? "Omega-3",
       productIds,
       requested: omegaCoverage?.requestedAmount ?? null,
       severity: "high",
-      supplementIds: omegaIds
+      sourceScope: "supplemental",
+      supplementIds: omegaIds,
+      unit: omegaCoverage?.unit ?? "mg"
     }));
   }
 
   if (input.state.conditionCodes.includes("ckd") && magnesiumIds.length > 0) {
+    const magnesiumCoverage =
+      input.selected?.coverage.find((row) => /magnesium/i.test(row.name)) ??
+      coverageFromPlan.find((row) => /magnesium/i.test(row.name));
     items.push(guidance({
       action: "block",
       code: "condition_review_required",
+      contributors: magnesiumCoverage
+        ? exposureContributors(magnesiumCoverage)
+        : [],
+      exposure: magnesiumCoverage?.totalExposureAmount ?? null,
       locale: input.locale,
+      nutrientName: magnesiumCoverage?.name ?? "Magnesium",
       productIds,
+      requested: magnesiumCoverage?.requestedAmount ?? null,
       severity: "blocking",
-      supplementIds: magnesiumIds
+      sourceScope: "supplemental",
+      supplementIds: magnesiumIds,
+      unit: magnesiumCoverage?.unit ?? "mg"
     }));
   }
 

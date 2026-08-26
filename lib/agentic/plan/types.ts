@@ -202,12 +202,17 @@ export type MatcherTelemetry = Readonly<{
   factLedgerHash?: string;
   factLedger?: readonly FactLedgerRow[];
   lossCertificates?: readonly Readonly<{
+    candidate_fact_id: string | null;
     candidate_product_id: string;
     catalogue_id: string;
     conflicting_product_ids: readonly string[];
     conflicting_rule_id: string;
+    exposure_after: number | null;
+    exposure_before: number | null;
+    limit: number | null;
     rejection_class: string;
     target_supplement_id: string;
+    unit: string | null;
   }>[];
   targetFrontiers?: readonly Readonly<{
     name: string;
