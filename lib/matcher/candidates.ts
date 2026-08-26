@@ -934,6 +934,16 @@ function seedPriorityGroups(
   }
 
   const rest = ranked.filter((item) => !seen.has(item.productId));
+  const covering = request.targets.every(
+    (target) =>
+      remainingRequestedUnits(request, target.subjectId) <= BigInt(0) ||
+      targetHasCoveringGroup(priority, request, target.subjectId)
+  );
+
+  if (covering) {
+    return priority;
+  }
+
   const limit = Math.max(priority.length + 4, 8);
 
   return [...priority, ...rest].slice(0, limit);

@@ -14,6 +14,7 @@ describe("Phase 4 search does not exhaust on simple targets", () => {
     );
     assert.ok(result.selected);
     assert.equal(result.trimmed, false);
+    assert.equal(result.searchMode, "exact");
     assert.equal(result.selected.productCount <= 2, true);
   });
 
