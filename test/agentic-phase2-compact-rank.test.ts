@@ -131,4 +131,33 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(result.selected.productIds.includes("G-C-500"), true);
     assert.equal(result.selected.productIds.includes("G-O3-FISH-1000"), true);
   });
+
+  it("keeps official gold products and pills across 20 target-order permutations", () => {
+    const baseline = match(
+      qaRequest({ optimization: "fewest_pills" }),
+      QA_GOLD_CATALOG
+    );
+    assert.ok(baseline.selected);
+    const expected = {
+      pills: baseline.selected.dailyPills,
+      products: [...baseline.selected.productIds]
+    };
+    const order = [
+      qaTarget("d3", 2000),
+      qaTarget("omega", 1000),
+      qaTarget("mag", 200),
+      qaTarget("b12", 250),
+      qaTarget("c", 500)
+    ];
+
+    for (let index = 0; index < 20; index += 1) {
+      const rotated = [...order.slice(index % order.length), ...order.slice(0, index % order.length)];
+      const result = match(
+        qaRequest({ optimization: "fewest_pills", targets: rotated }),
+        QA_GOLD_CATALOG
+      );
+      assert.deepEqual(result.selected?.productIds, expected.products);
+      assert.equal(result.selected?.dailyPills, expected.pills);
+    }
+  });
 });
