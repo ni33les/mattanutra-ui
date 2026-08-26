@@ -379,6 +379,167 @@ describe("Phase 2 compactness ranking", () => {
     );
   });
 
+  it("labels a maxDailyPills miss as hard_constraint max_pills not dominated", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-max-pills-cert",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 120,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [{ amount: 100, key: "b12" }],
+          id: "G-MEGA-B",
+          pills: 2,
+          priceThb: 180,
+          title: "Mega B Complex"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 200, key: "d3" },
+            { amount: 600, key: "calcium" }
+          ],
+          id: "G-BIO-CAL-D3",
+          pills: 1,
+          priceThb: 390,
+          title: "Bio Calcium+D3"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 10, key: "d3", name: "Vitamin D3", unit: "mcg" },
+            { amount: 50, key: "c" }
+          ],
+          id: "G-JOINT-D3",
+          pills: 1,
+          priceThb: 450,
+          title: "Blackmores Joint Mobility Plus"
+        })
+      ]
+    };
+    const result = match(
+      qaRequest({ maxDailyPills: 6, optimization: "fewest_pills" }),
+      catalog
+    );
+    const certs = result.lossCertificates ?? [];
+    assert.equal(certs.length >= 1, true);
+    assert.equal(
+      certs.some(
+        (item) =>
+          item.rejection_class === "hard_constraint" &&
+          item.conflicting_rule_id === "max_pills"
+      ),
+      true
+    );
+    assert.equal(
+      certs.some((item) => item.rejection_class === "dominated"),
+      false
+    );
+  });
+
+  it("labels a binding maxPriceMinor miss as hard_constraint budget not dominated", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-budget-cert",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 120,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [{ amount: 100, key: "b12" }],
+          id: "G-MEGA-B",
+          pills: 2,
+          priceThb: 180,
+          title: "Mega B Complex"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 200, key: "d3" },
+            { amount: 600, key: "calcium" }
+          ],
+          id: "G-BIO-CAL-D3",
+          pills: 1,
+          priceThb: 3900,
+          title: "Bio Calcium+D3"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 10, key: "d3", name: "Vitamin D3", unit: "mcg" },
+            { amount: 50, key: "c" }
+          ],
+          id: "G-JOINT-D3",
+          pills: 1,
+          priceThb: 4500,
+          title: "Blackmores Joint Mobility Plus"
+        })
+      ]
+    };
+    const unconstrained = match(
+      qaRequest({ optimization: "fewest_pills" }),
+      catalog
+    );
+    assert.ok(unconstrained.selected);
+    const result = match(
+      qaRequest({ maxPriceMinor: 80_000, optimization: "fewest_pills" }),
+      catalog
+    );
+    const certs = result.lossCertificates ?? [];
+    assert.equal(certs.length >= 1, true);
+    assert.equal(
+      certs.some(
+        (item) =>
+          item.rejection_class === "hard_constraint" &&
+          item.conflicting_rule_id === "budget"
+      ),
+      true
+    );
+    assert.equal(
+      certs.some((item) => item.rejection_class === "dominated"),
+      false
+    );
+  });
+
   it("keeps labelled D3 plus Joint on official when the pair still reaches 90%", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",

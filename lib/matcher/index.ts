@@ -1039,13 +1039,46 @@ export function match(
         afterAmount != null &&
         afterAmount > ceiling.maxAmount;
       const compiled = Boolean(group);
+      const extraPills = variant?.dailyPills ?? 0;
+      const extraPrice =
+        group && variant
+          ? group.product.unitPriceMinor * variant.dailyUnits
+          : 0;
+      const selectedPills = winner.selected?.dailyPills ?? 0;
+      const selectedPrice = winner.selected?.priceMinor ?? 0;
+      const bindsPills =
+        compiled &&
+        request.maxDailyPills != null &&
+        selectedPills + extraPills > request.maxDailyPills;
+      const bindsBudget =
+        compiled &&
+        request.maxPriceMinor != null &&
+        selectedPrice + extraPrice > request.maxPriceMinor;
+      const bindsCount =
+        compiled &&
+        selectedIds.size + 1 > request.maxProductCount;
       const rejection_class = exceedsLimit
         ? ("safety" as const)
-        : !compiled && trimmed
-          ? ("approximate" as const)
-          : !compiled
-            ? ("unavailable" as const)
-            : ("dominated" as const);
+        : bindsPills || bindsBudget || bindsCount
+          ? ("hard_constraint" as const)
+          : !compiled && trimmed
+            ? ("approximate" as const)
+            : !compiled
+              ? ("unavailable" as const)
+              : ("dominated" as const);
+      const conflicting_rule_id = exceedsLimit
+        ? `ul:${target.subjectId}`
+        : bindsPills
+          ? "max_pills"
+          : bindsBudget
+            ? "budget"
+            : bindsCount
+              ? "max_products"
+              : joint
+                ? "joint_skip_multi_target"
+                : !compiled && trimmed
+                  ? "search_deadline"
+                  : "combined_mode";
 
       return {
         candidate_fact_id: fact
@@ -1054,13 +1087,7 @@ export function match(
         candidate_product_id,
         catalogue_id: catalog.catalogueVersion,
         conflicting_product_ids: [...selectedIds],
-        conflicting_rule_id: exceedsLimit
-          ? `ul:${target.subjectId}`
-          : joint
-            ? "joint_skip_multi_target"
-            : !compiled && trimmed
-              ? "search_deadline"
-              : "combined_mode",
+        conflicting_rule_id,
         exposure_after: afterAmount,
         exposure_before: beforeAmount,
         limit: ceiling?.maxAmount ?? null,
