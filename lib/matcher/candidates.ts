@@ -638,7 +638,7 @@ export function compileGroups(
     }
 
     const before = groups.length;
-    tryCompile(product, true);
+    tryCompile(product, false);
     const added = groups[groups.length - 1];
 
     if (
@@ -690,7 +690,13 @@ export function compileGroups(
     }
 
     let belowFloorAdded = 0;
-    const pool = [...mapped, ...labelled].sort((left, right) => {
+    const pool = [...mapped, ...labelled]
+      .filter(
+        (product) =>
+          product.contributionSubjectIds.includes(target.subjectId) ||
+          contributionFor(product, target.name, target.subjectId).length > 0
+      )
+      .sort((left, right) => {
       const dedicated =
         Number(productIsDedicatedForTarget(right, target)) -
         Number(productIsDedicatedForTarget(left, target));
@@ -730,9 +736,18 @@ export function compileGroups(
       }
 
       return left.productId.localeCompare(right.productId);
-    });
+    })
+      .slice(0, 8);
 
     for (const product of pool) {
+      if (
+        deadlineAt != null &&
+        Date.now() >= deadlineAt &&
+        belowFloorAdded >= 1
+      ) {
+        break;
+      }
+
       if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
         break;
       }

@@ -605,7 +605,7 @@ export function match(
   if (!isDoseError(baselineExposure)) {
     const baseline = evaluateSafety({
       exposure: baselineExposure,
-      products: catalog.products,
+      products: [],
       request,
       variants: []
     });
