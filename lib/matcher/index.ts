@@ -332,6 +332,17 @@ function tryReplaceWeakerTargetSkus(input: Readonly<{
 }>) {
   const winnerUnits =
     input.variant.contributions.get(input.subjectId)?.units ?? BigInt(0);
+  const target = input.request.targets.find(
+    (item) => item.subjectId === input.subjectId
+  );
+  const currentUnits = input.request.currentSupplements
+    .filter((item) => item.subjectId === input.subjectId)
+    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
+  const winnerCoversFloor = Boolean(
+    target &&
+      coverageUnits(currentUnits + winnerUnits, target.requested.units) >=
+        COVERED_THRESHOLD * 100
+  );
   const keptIds = [...input.state.selectedVariantIds].filter((variantId) => {
     const found = groupVariantForId(input.groups, variantId);
 
@@ -343,6 +354,10 @@ function tryReplaceWeakerTargetSkus(input: Readonly<{
       found.variant.contributions.get(input.subjectId)?.units ?? BigInt(0);
 
     if (contributed <= BigInt(0)) {
+      return true;
+    }
+
+    if (!winnerCoversFloor) {
       return true;
     }
 
@@ -618,6 +633,14 @@ function absorbStandaloneWinners(input: Readonly<{
 
       if (replaced) {
         next = replaced;
+        const kept = new Set(
+          replaced.selectedVariantIds.map((id) => id.slice(0, id.lastIndexOf(":x")))
+        );
+        for (const productId of [...used]) {
+          if (!kept.has(productId)) {
+            used.delete(productId);
+          }
+        }
       }
 
       used.add(winner.productId);
