@@ -236,6 +236,11 @@ export function fuzzyTokensMatch(left: string, right: string) {
   return matched === shorter.length && matched / longer.length >= 0.6;
 }
 
+export function canonicalNutrientKey(value: string) {
+  const aliases = [...matchKeyAliases(value)].sort();
+  return aliases[0] ?? normalizeProductKey(value);
+}
+
 export function productKeysMatch(
   left: string,
   right: string,

@@ -3,7 +3,7 @@ import { coverageUnits } from "@/lib/matcher/dominance";
 import { productEligible } from "@/lib/matcher/eligibility";
 import { aggregateDailyExposure, isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { isFalseOmegaAttribution } from "@/lib/agentic/catalogue/product-fit";
-import { productKeysMatch } from "@/lib/product-key-matching";
+import { canonicalNutrientKey, productKeysMatch } from "@/lib/product-key-matching";
 import { evaluateSafety, exposureExceedsCeiling } from "@/lib/matcher/safety";
 import type {
   CanonicalRequest,
@@ -73,7 +73,14 @@ function labelledFactKey(
     return `id:${subject}`;
   }
 
-  return `name:${(fact.name ?? "").trim().toLowerCase()}|${(fact.unit ?? "").trim().toLowerCase()}`;
+  const name = (fact.name ?? "").trim();
+  const unit = (fact.unit ?? "").trim().toLowerCase();
+
+  if (!name) {
+    return `name:|${unit}`;
+  }
+
+  return `name:${canonicalNutrientKey(name)}|${unit}`;
 }
 
 export function collapseDuplicateLabelledFacts<

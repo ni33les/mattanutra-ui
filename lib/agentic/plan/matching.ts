@@ -18,6 +18,7 @@ import {
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
+import { productKeysMatch } from "@/lib/product-key-matching";
 import type {
   CanonicalRequest,
   MatcherUnit,
@@ -133,12 +134,13 @@ export function coverageFor(
     });
     const contributors = items.flatMap((item) => {
       const matching = (item.requestedNutrients ?? []).filter((nutrient) => {
-        const sameName =
-          nutrient.name.trim().toLowerCase() === target.name.trim().toLowerCase();
+        const sameNutrient =
+          productKeysMatch(nutrient.name, target.name) ||
+          productKeysMatch(nutrient.name, target.supplementId);
         const omegaLike =
           /omega|epa|dha|n-3/i.test(`${target.name} ${target.supplementId}`) &&
           /omega|epa|dha|n-3/i.test(nutrient.name);
-        return sameName || omegaLike;
+        return sameNutrient || omegaLike;
       });
 
       if (matching.length > 0) {

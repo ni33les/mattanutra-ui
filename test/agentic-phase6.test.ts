@@ -316,6 +316,50 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.equal(line.requestedNutrientNames.includes("Vitamin B12"), false);
   });
 
+  it("credits Conceive Well Folic acid 500 mcg as Vitamin B9 500 mcg", () => {
+    const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
+    const base = live.products.find((item) => /folate/i.test(item.candidate.title));
+    assert.ok(base);
+    const folate = supplement("Folate");
+    const prenatal = {
+      ...base,
+      contributionSupplementIds: [folate.supplementId],
+      productId: "prd_conceive_well_gold_b9",
+      retailerSku: "TH-CWG-B9",
+      candidate: {
+        ...base.candidate,
+        facts: [fact("Folic acid", 500, "mcg", "folic_acid")],
+        title: "Blackmores Conceive Well Gold"
+      }
+    };
+    const snapshot = frozen([prenatal]);
+    const state = aug25PlanState({
+      profile: { ageYears: 32, lifeStage: "pregnant", sex: "female" },
+      targets: [
+        {
+          amount: 500,
+          name: "Vitamin B9",
+          supplementId: folate.supplementId,
+          unit: "mcg"
+        }
+      ]
+    });
+    const matched = matchPlan({ snapshot, state });
+    assert.ok(matched.selected);
+    const row = matched.selected.coverage.find((item) => item.supplementId === folate.supplementId);
+    assert.ok(row);
+    assert.equal(row.deliveredAmount, 500);
+    assert.equal(row.totalExposureAmount, 500);
+    assert.equal(row.remainingGap, 0);
+    assert.deepEqual(
+      row.contributors?.map((item) => ({
+        amount: item.amount,
+        name: item.productName
+      })),
+      [{ amount: 500, name: "Blackmores Conceive Well Gold" }]
+    );
+  });
+
   it("stamps servings/day, pill burden, and incidental vs requested nutrients on basket lines", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const collagen = live.products.find((item) => /collagen/i.test(item.candidate.title));
