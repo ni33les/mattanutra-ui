@@ -1365,6 +1365,9 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(pay.includes('form.get("scenario") ?? "success"'), false);
     assert.match(pay, /Stripe Test Mode does not accept mock payment scenarios/);
     assert.match(join, /fulfillAgenticRetailCheckout/);
+    assert.match(checkout, /pharmacyRrpPayableAmounts/);
+    assert.equal(checkout.includes("retailerPayableAmount: item.unitPriceAmount"), false);
+    assert.match(order, /contributionMargin/);
     assert.match(join, /products.status = 'approved'/);
     assert.equal(join.includes("insert into public.products"), false);
     assert.equal(join.includes("insert into public.retail_sellable_products"), false);

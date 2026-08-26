@@ -1576,21 +1576,36 @@ export async function fulfillAgenticRetailCheckout(input: Readonly<{
   let payment = existing[0] ?? null;
 
   if (!payment) {
-    const quoteLines: QuoteLine[] = input.items.map((item) => ({
-      currency: input.currency,
-      etaDate: null,
-      imageUrl: null,
-      platformMarginPercent: null,
-      productId: item.productId,
-      productTitle: item.productName,
-      quantity: item.quantity,
-      retailerPayableAmount: item.unitPriceAmount,
-      retailerPayableNeedsReviewReason: null,
-      retailerPayableSource: "rrp",
-      retailSellableProductId: null,
-      rrpPriceAmount: item.unitPriceAmount,
-      unitPriceAmount: item.unitPriceAmount
-    }));
+    const catalogProductIds = [
+      ...new Set(input.items.map((item) => item.productId).filter(isUuid))
+    ];
+    const rrpByProductId = await pharmacyRrpPayableAmounts(
+      sql,
+      input.organisationId,
+      catalogProductIds
+    );
+    const quoteLines: QuoteLine[] = input.items.map((item) => {
+      const rrpPriceAmount = rrpByProductId.get(item.productId) ?? null;
+      const retailerPayableAmount =
+        rrpPriceAmount !== null && rrpPriceAmount > 0 ? rrpPriceAmount : null;
+
+      return {
+        currency: input.currency,
+        etaDate: null,
+        imageUrl: null,
+        platformMarginPercent: null,
+        productId: item.productId,
+        productTitle: item.productName,
+        quantity: item.quantity,
+        retailerPayableAmount,
+        retailerPayableNeedsReviewReason:
+          retailerPayableAmount == null ? "missing_retailer_payable_price" : null,
+        retailerPayableSource: retailerPayableAmount == null ? "missing" : "rrp",
+        retailSellableProductId: null,
+        rrpPriceAmount,
+        unitPriceAmount: item.unitPriceAmount
+      };
+    });
     const subtotalAmount = quoteSubtotalAmount(quoteLines);
     const shippingAmount = Math.max(0, input.shippingAmount);
     const totalAmount = input.totalAmount || subtotalAmount + shippingAmount;
@@ -1746,10 +1761,15 @@ export async function getRetailOrderByAgenticOrderId(agenticOrderId: string) {
   }
 
   const rows = await sql<Array<{
+    currency: string | null;
+    gross_customer_amount: string | number | null;
+    mattanutra_margin_amount: string | number | null;
     order_id: string;
     order_number: string;
     order_status: string;
     payment_id: string;
+    retailer_payable_amount: string | number | null;
+    settlement_status: string | null;
     tracking_url: string | null;
   }>>`
     select
@@ -1757,10 +1777,17 @@ export async function getRetailOrderByAgenticOrderId(agenticOrderId: string) {
       retail_customer_orders.order_number,
       retail_customer_orders.status as order_status,
       retail_checkout_payments.id::text as payment_id,
-      ${null}::text as tracking_url
+      ${null}::text as tracking_url,
+      retail_order_settlements.currency,
+      retail_order_settlements.gross_customer_amount,
+      retail_order_settlements.retailer_payable_amount,
+      retail_order_settlements.mattanutra_margin_amount,
+      retail_order_settlements.status as settlement_status
     from public.retail_checkout_payments
     join public.retail_customer_orders
       on retail_customer_orders.id = retail_checkout_payments.retail_customer_order_id
+    left join public.retail_order_settlements
+      on retail_order_settlements.retail_customer_order_id = retail_customer_orders.id
     where retail_checkout_payments.metadata->>'agenticOrderId' = ${agenticOrderId}
     order by retail_checkout_payments.created_at desc
     limit 1
@@ -1771,7 +1798,25 @@ export async function getRetailOrderByAgenticOrderId(agenticOrderId: string) {
     return null;
   }
 
+  const gross = Number(row.gross_customer_amount);
+  const payable = Number(row.retailer_payable_amount);
+  const margin = Number(row.mattanutra_margin_amount);
+  const contributionMargin =
+    row.currency &&
+    Number.isFinite(gross) &&
+    Number.isFinite(payable) &&
+    Number.isFinite(margin)
+      ? {
+          currency: row.currency,
+          grossCustomerAmount: gross / AMOUNT_MICROS_PER_UNIT,
+          mattanutraMarginAmount: margin / AMOUNT_MICROS_PER_UNIT,
+          retailerPayableAmount: payable / AMOUNT_MICROS_PER_UNIT,
+          status: row.settlement_status
+        }
+      : null;
+
   return {
+    contributionMargin,
     orderId: row.order_id,
     orderNumber: row.order_number,
     orderStatus: row.order_status,

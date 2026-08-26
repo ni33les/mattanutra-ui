@@ -180,6 +180,13 @@ export function orderPollView(input: Readonly<{
   localeMessage: (key: string) => string;
   order: OrderRecord | null;
   retail?: Readonly<{
+    contributionMargin?: Readonly<{
+      currency: string;
+      grossCustomerAmount: number;
+      mattanutraMarginAmount: number;
+      retailerPayableAmount: number;
+      status: string | null;
+    }> | null;
     orderId: string;
     orderNumber: string;
     orderStatus: string;
@@ -250,7 +257,10 @@ export function orderPollView(input: Readonly<{
             orderId: input.retail.orderId,
             orderNumber: input.retail.orderNumber,
             orderStatus: input.retail.orderStatus,
-            trackingUrl: input.retail.trackingUrl
+            trackingUrl: input.retail.trackingUrl,
+            ...(input.retail.contributionMargin
+              ? { contributionMargin: input.retail.contributionMargin }
+              : {})
           }
         }
       : {}),

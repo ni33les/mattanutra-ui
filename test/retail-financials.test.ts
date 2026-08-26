@@ -63,6 +63,8 @@ describe("retail financial settlements", () => {
     assert.match(checkout, /retailerPayableAmount/);
     assert.match(checkout, /shippingAmountMicros/);
     assert.match(checkout, /rrpPriceAmount/);
+    assert.match(checkout, /pharmacyRrpPayableAmounts/);
+    assert.equal(checkout.includes("retailerPayableAmount: item.unitPriceAmount"), false);
     assert.match(financials, /retailerPayableAmount/);
     assert.match(financials, /missing_retailer_payable_price/);
     assert.match(financials, /shippingAmountMicros/);

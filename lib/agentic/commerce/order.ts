@@ -3,6 +3,7 @@ import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilit
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { orderPollView } from "@/lib/agentic/commerce/state";
 import type { AgenticStore } from "@/lib/agentic/store/types";
+import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
 
 export async function orderTool(input: Readonly<{
   config: AgenticConfig;
@@ -41,6 +42,10 @@ export async function orderTool(input: Readonly<{
       : null;
   const orderNumber =
     link && !link.retailerReference.startsWith("th-mock-") ? link.retailerReference : null;
+  const settlement =
+    order && (order.paymentStatus === "paid" || order.paymentStatus === "refunded")
+      ? await getRetailOrderByAgenticOrderId(order.id)
+      : null;
 
   return orderPollView({
     checkoutUrl: order?.checkoutUrl ?? null,
@@ -49,6 +54,7 @@ export async function orderTool(input: Readonly<{
     order,
     retail: order && orderNumber
       ? {
+          contributionMargin: settlement?.contributionMargin ?? null,
           orderId: order.id,
           orderNumber,
           orderStatus: order.fulfilmentStatus,
