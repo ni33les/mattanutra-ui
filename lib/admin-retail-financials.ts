@@ -1295,12 +1295,13 @@ export async function voidPendingRetailOrderSettlement(
     update public.retail_order_settlements
     set
       status = 'voided',
+      mattanutra_margin_amount = 0,
       metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json(toJsonValue({
         voidReason: input.reason
       }))}::jsonb,
       updated_at = now()
     where retail_customer_order_id = ${input.orderId}::uuid
-      and status = 'pending'
+      and status in ('pending', 'due')
     returning id::text, organisation_id::text
   `;
   const settlement = rows[0] ?? null;

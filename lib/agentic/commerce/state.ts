@@ -137,6 +137,26 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
       updatedAt: input.now
     };
     await input.store.updateOrder(next);
+    try {
+      const { getSql } = await import("@/lib/db");
+      const { getRetailOrderByAgenticOrderId } = await import(
+        "@/lib/retail-product-checkout"
+      );
+      const { voidPendingRetailOrderSettlement } = await import(
+        "@/lib/admin-retail-financials"
+      );
+      const sql = getSql();
+      const retail = await getRetailOrderByAgenticOrderId(order.id);
+
+      if (sql && retail?.orderId) {
+        await voidPendingRetailOrderSettlement(sql, {
+          orderId: retail.orderId,
+          reason: "mcp_refund"
+        });
+      }
+    } catch {
+      // Settlement void is best-effort; paymentStatus is already refunded.
+    }
     return { applied: true, order: next };
   }
 
