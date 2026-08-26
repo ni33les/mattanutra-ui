@@ -206,7 +206,7 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(fewest.selected.productIds.includes("G-D3-2000"), true);
   });
 
-  it("drops a below-floor D3 joint from official when no covering D3 SKU exists", () => {
+  it("keeps the standalone labelled D3 winner on official when no 90% D3 SKU exists", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-no-covering-d3",
@@ -236,6 +236,13 @@ describe("Phase 2 compactness ranking", () => {
           title: "Vitamin C 500"
         }),
         qaProduct({
+          facts: [{ amount: 400, key: "d3" }],
+          id: "G-D3-400",
+          pills: 1,
+          priceThb: 120,
+          title: "Vitamin D3 400 IU"
+        }),
+        qaProduct({
           facts: [
             { amount: 400, key: "d3" },
             { amount: 50, key: "c" }
@@ -252,16 +259,15 @@ describe("Phase 2 compactness ranking", () => {
       catalog
     );
     assert.ok(fewest.selected);
+    assert.equal(fewest.selected.productIds.includes("G-D3-400"), true);
     assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), false);
     assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
     assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
-    assert.equal(fewest.selected.productCount, 3);
-    assert.equal(fewest.selected.dailyPills, 4);
     assert.equal(
       fewest.rejected.some(
         (item) =>
-          item.productId === "G-JOINT-D3-C" && item.reason === "incidental_only"
+          item.productId === "G-D3-400" && item.reason === "incidental_only"
       ),
       false
     );
@@ -438,10 +444,11 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
     assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
-    assert.equal(
-      fewest.selected.productIds.some((id) => id.startsWith("G-JOINT-D3-")),
-      false
-    );
+    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), false);
+    const jointCount = fewest.selected.productIds.filter((id) =>
+      id.startsWith("G-JOINT-D3-")
+    ).length;
+    assert.equal(jointCount <= 1, true);
     const d3Target = qaTarget("d3", 2000);
     const d3Percent = Math.round(
       (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100

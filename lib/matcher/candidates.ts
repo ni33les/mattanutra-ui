@@ -17,6 +17,7 @@ import type {
 
 const MAX_DAILY_UNITS = 3;
 const HIGH_COLLATERAL_MULTI_MAX_DAILY_UNITS = 1;
+const SALVAGE_BELOW_FLOOR_PER_TARGET = 3;
 const NON_PILL_FORM = /powder|liquid|sachet|oil|drops|\bml\b/i;
 
 export function isCountablePillForm(form: string) {
@@ -610,6 +611,7 @@ export function compileGroups(
       !keepCompiledContributor(product, added, request)
     ) {
       groups.pop();
+      compiledIds.delete(product.productId);
     }
   }
 
@@ -638,6 +640,7 @@ export function compileGroups(
       !keepCompiledContributor(product, added, request)
     ) {
       groups.pop();
+      compiledIds.delete(product.productId);
     }
   }
 
@@ -650,18 +653,17 @@ export function compileGroups(
       continue;
     }
 
-    let added = 0;
-    const pool = [...mapped, ...labelled];
+    let belowFloorAdded = 0;
+    const pool = [...mapped, ...labelled].sort((left, right) =>
+      compareDedicatedThenId(left, right, request)
+    );
 
     for (const product of pool) {
       if (targetHasCoveringGroup(groups, request, target.subjectId)) {
         break;
       }
 
-      if (
-        groups.some((group) => group.productId === product.productId) ||
-        compiledIds.has(product.productId)
-      ) {
+      if (groups.some((group) => group.productId === product.productId)) {
         continue;
       }
 
@@ -676,33 +678,47 @@ export function compileGroups(
         continue;
       }
 
+      const compiled = compileProductGroup(product, request);
       compiledIds.add(product.productId);
-      const group = compileProductGroup(product, request);
 
-      if (!group || !groupCoversTarget(group, target.subjectId)) {
+      if (!compiled || !groupCoversTarget(compiled, target.subjectId)) {
         continue;
       }
 
       const coversFloor = groupCoversTargetAtFloor(
-        group,
+        compiled,
         request,
         target.subjectId
       );
+      const facts = labelledTargetCount(product, request);
+      const alreadyContributes = groups.some((group) =>
+        groupCoversTarget(group, target.subjectId)
+      );
+      const keepBelowFloor =
+        request.targets.length === 1 ||
+        request.profile.lifeStage === "pregnant" ||
+        request.profile.lifeStage === "trying_to_conceive" ||
+        (belowFloorAdded < SALVAGE_BELOW_FLOOR_PER_TARGET &&
+          (facts <= 1 || !alreadyContributes));
+
+      if (!coversFloor && !keepBelowFloor) {
+        continue;
+      }
 
       if (
         !coversFloor &&
-        !(
-          (request.targets.length === 1 ||
-            request.profile.lifeStage === "pregnant" ||
-            request.profile.lifeStage === "trying_to_conceive") &&
-          groupCoversTarget(group, target.subjectId)
-        )
+        highCollateralMultiTitle(product.title) &&
+        !productIsDedicatedForTarget(product, target)
       ) {
         continue;
       }
 
-      groups.push(group);
-      added += 1;
+      compiledIds.add(product.productId);
+      groups.push(compiled);
+
+      if (!coversFloor) {
+        belowFloorAdded += 1;
+      }
     }
   }
 
@@ -786,6 +802,154 @@ export function coveringVariantForTarget(
         variant.dailyUnits < best.dailyUnits)
     ) {
       best = variant;
+    }
+  }
+
+  return best;
+}
+
+export function contributingVariantForTarget(
+  group: ProductGroup,
+  request: CanonicalRequest,
+  subjectId: string
+) {
+  const target = request.targets.find((item) => item.subjectId === subjectId);
+
+  if (!target || target.requested.units <= BigInt(0)) {
+    return null;
+  }
+
+  const current = currentUnitsFor(request, subjectId);
+  let best: DoseVariant | null = null;
+  let bestCoverage = -1;
+
+  for (const variant of group.variants) {
+    const contributed = variant.contributions.get(subjectId);
+
+    if (!contributed || contributed.units <= BigInt(0)) {
+      continue;
+    }
+
+    const exposure = current + contributed.units;
+
+    if (exposureExceedsCeiling(request, subjectId, exposure)) {
+      continue;
+    }
+
+    if (variantHardBlocked(group, variant, request)) {
+      continue;
+    }
+
+    const coverage = coverageUnits(exposure, target.requested.units);
+
+    if (
+      !best ||
+      coverage > bestCoverage ||
+      (coverage === bestCoverage && variant.dailyPills < best.dailyPills) ||
+      (coverage === bestCoverage &&
+        variant.dailyPills === best.dailyPills &&
+        variant.dailyUnits < best.dailyUnits)
+    ) {
+      best = variant;
+      bestCoverage = coverage;
+    }
+  }
+
+  return best;
+}
+
+export function bestStandaloneContributorGroup(
+  groups: readonly ProductGroup[],
+  request: CanonicalRequest,
+  subjectId: string,
+  used?: ReadonlySet<string>
+): ProductGroup | null {
+  const target = request.targets.find((item) => item.subjectId === subjectId);
+
+  if (!target) {
+    return null;
+  }
+
+  let best: ProductGroup | null = null;
+  let bestRank: {
+    coverage: number;
+    dedicated: number;
+    facts: number;
+    pills: number;
+    price: number;
+    productId: string;
+  } | null = null;
+  const alreadyHasContributor = Boolean(
+    used &&
+      [...used].some((productId) => {
+        const group = groups.find((item) => item.productId === productId);
+        return Boolean(
+          group && contributingVariantForTarget(group, request, subjectId)
+        );
+      })
+  );
+
+  for (const group of groups) {
+    if (used?.has(group.productId)) {
+      continue;
+    }
+
+    if (
+      highCollateralMultiTitle(group.product.title) &&
+      !productIsDedicatedForTarget(group.product, target)
+    ) {
+      continue;
+    }
+
+    const facts = labelledTargetCount(group.product, request);
+
+    if (alreadyHasContributor && facts > 1) {
+      continue;
+    }
+
+    const variant = contributingVariantForTarget(group, request, subjectId);
+
+    if (!variant) {
+      continue;
+    }
+
+    const contributed = variant.contributions.get(subjectId);
+    const exposure =
+      currentUnitsFor(request, subjectId) + (contributed?.units ?? BigInt(0));
+    const rank = {
+      coverage: coverageUnits(exposure, target.requested.units),
+      dedicated: productIsDedicatedForTarget(group.product, target) ? 1 : 0,
+      facts,
+      pills: variant.dailyPills,
+      price: group.product.unitPriceMinor * variant.dailyUnits,
+      productId: group.productId
+    };
+
+    if (
+      !bestRank ||
+      rank.dedicated > bestRank.dedicated ||
+      (rank.dedicated === bestRank.dedicated && rank.facts < bestRank.facts) ||
+      (rank.dedicated === bestRank.dedicated &&
+        rank.facts === bestRank.facts &&
+        rank.coverage > bestRank.coverage) ||
+      (rank.dedicated === bestRank.dedicated &&
+        rank.facts === bestRank.facts &&
+        rank.coverage === bestRank.coverage &&
+        rank.pills < bestRank.pills) ||
+      (rank.dedicated === bestRank.dedicated &&
+        rank.facts === bestRank.facts &&
+        rank.coverage === bestRank.coverage &&
+        rank.pills === bestRank.pills &&
+        rank.price < bestRank.price) ||
+      (rank.dedicated === bestRank.dedicated &&
+        rank.facts === bestRank.facts &&
+        rank.coverage === bestRank.coverage &&
+        rank.pills === bestRank.pills &&
+        rank.price === bestRank.price &&
+        rank.productId < bestRank.productId)
+    ) {
+      best = group;
+      bestRank = rank;
     }
   }
 

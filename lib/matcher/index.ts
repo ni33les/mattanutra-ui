@@ -1,8 +1,10 @@
 import {
   bestCompactCoveringGroup,
+  bestStandaloneContributorGroup,
   compactMultiCoveringGroups,
   compileGroups,
   contributionFor,
+  contributingVariantForTarget,
   coveringVariantForMostFloors,
   coveringVariantForTarget,
   groupsBySeller
@@ -456,41 +458,54 @@ function absorbStandaloneWinners(input: Readonly<{
   const floor = COVERED_THRESHOLD * 100;
 
   for (const target of input.request.targets) {
-    const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
+    while (true) {
+      const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
 
-    if (coverageUnits(delivered, target.requested.units) >= floor) {
-      continue;
+      if (coverageUnits(delivered, target.requested.units) >= floor) {
+        break;
+      }
+
+      const covering = bestCompactCoveringGroup(
+        input.groups,
+        input.request,
+        target.subjectId
+      );
+      let winner =
+        covering && !used.has(covering.productId) ? covering : null;
+      let variant = winner
+        ? coveringVariantForTarget(winner, input.request, target.subjectId)
+        : null;
+
+      if (!winner || !variant) {
+        winner = bestStandaloneContributorGroup(
+          input.groups,
+          input.request,
+          target.subjectId,
+          used
+        );
+        variant = winner
+          ? contributingVariantForTarget(
+              winner,
+              input.request,
+              target.subjectId
+            )
+          : null;
+      }
+
+      if (!winner || !variant) {
+        break;
+      }
+
+      const next = tryAddVariant(state, variant, winner, input.request);
+      used.add(winner.productId);
+
+      if (!next) {
+        continue;
+      }
+
+      state = next;
+      changed = true;
     }
-
-    const winner = bestCompactCoveringGroup(
-      input.groups,
-      input.request,
-      target.subjectId
-    );
-
-    if (!winner || used.has(winner.productId)) {
-      continue;
-    }
-
-    const variant = coveringVariantForTarget(
-      winner,
-      input.request,
-      target.subjectId
-    );
-
-    if (!variant) {
-      continue;
-    }
-
-    const next = tryAddVariant(state, variant, winner, input.request);
-
-    if (!next) {
-      continue;
-    }
-
-    state = next;
-    used.add(winner.productId);
-    changed = true;
   }
 
   let best = input.selected;
