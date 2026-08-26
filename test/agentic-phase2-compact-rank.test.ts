@@ -243,6 +243,72 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(fewest.selected.productIds.includes("G-D3-2000"), true);
   });
 
+  it("keeps Joint Mobility on official when Bio Calcium plus Joint still reach 90% D3", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-joint-plus-bio-calcium",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 120,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [{ amount: 100, key: "b12" }],
+          id: "G-MEGA-B",
+          pills: 2,
+          priceThb: 180,
+          title: "Mega B Complex"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 600, key: "d3" },
+            { amount: 600, key: "calcium" }
+          ],
+          id: "G-BIO-CAL-D3",
+          pills: 3,
+          priceThb: 390,
+          title: "Bio Calcium+D3"
+        }),
+        qaProduct({
+          facts: [{ amount: 1200, key: "d3" }],
+          id: "G-JOINT-D3",
+          pills: 3,
+          priceThb: 450,
+          title: "Blackmores Joint Mobility Plus"
+        })
+      ]
+    };
+    const result = match(qaRequest({ optimization: "fewest_pills" }), catalog);
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), true);
+    assert.equal(result.selected.productIds.includes("G-MEGA-B"), true);
+    const d3 = qaTarget("d3", 2000);
+    assert.equal(
+      Math.round((result.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
+      true
+    );
+  });
+
   it("keeps the standalone labelled D3 winner on official when no 90% D3 SKU exists", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",

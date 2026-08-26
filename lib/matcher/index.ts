@@ -576,7 +576,7 @@ function absorbStandaloneWinners(input: Readonly<{
           );
         });
 
-        if (belowFloorAdded >= 1 || alreadyLabelled) {
+        if (belowFloorAdded >= 1) {
           break;
         }
 
@@ -593,6 +593,17 @@ function absorbStandaloneWinners(input: Readonly<{
               target.subjectId
             )
           : null;
+
+        if (alreadyLabelled && winner && variant) {
+          const nextUnits =
+            delivered +
+            (variant.contributions.get(target.subjectId)?.units ?? BigInt(0));
+
+          if (coverageUnits(nextUnits, target.requested.units) < floor) {
+            winner = null;
+            variant = null;
+          }
+        }
       }
 
       if (!winner || !variant) {

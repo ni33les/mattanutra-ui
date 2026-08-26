@@ -1103,7 +1103,7 @@ export function bestStandaloneContributorGroup(
           !jointTitle(other.product.title) &&
           !highCollateralMultiTitle(other.product.title) &&
           labelledTargetCount(other.product, request) <= 1 &&
-          Boolean(contributingVariantForTarget(other, request, subjectId))
+          groupCoversTargetAtFloor(other, request, subjectId)
       )
     ) {
       continue;
