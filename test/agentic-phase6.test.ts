@@ -404,6 +404,97 @@ describe("Phase 6 bounded evidence fields", () => {
     );
   });
 
+  it("sums Conceive Well 400 IU and Joint Mobility 400 IU to 800 IU coverage and UL exposure", () => {
+    const d3 = supplement("Vitamin D3");
+    const state = aug25PlanState({
+      targets: [
+        {
+          amount: 2000,
+          name: "Vitamin D3",
+          supplementId: d3.supplementId,
+          unit: "IU"
+        }
+      ]
+    });
+    const item = (
+      productId: string,
+      productName: string,
+      nutrients: Array<{ amount: number; name: string; unit: "IU" | "mcg" }>
+    ) =>
+      ({
+        availabilityAsOf: "2026-08-26T00:00:00.000Z",
+        contributionSupplementIds: [d3.supplementId],
+        currency: "THB",
+        dailyPills: 1,
+        deliveryWindow: null,
+        fixture: true,
+        form: "capsule",
+        imageUrl: null,
+        incidentalNutrientNames: [],
+        incidentalNutrients: [],
+        incompleteCommercialFacts: false,
+        lineTotalMinor: 100,
+        pillsPerServing: 1,
+        productId,
+        productName,
+        quantity: 1,
+        requestedNutrientNames: nutrients.map((nutrient) => nutrient.name),
+        requestedNutrients: nutrients,
+        retailerSku: productId,
+        sellerId: "seller_th",
+        sellerName: "TH",
+        servingsPerDay: 1,
+        source: "fixture",
+        stockStatus: "in_stock",
+        unitPriceMinor: 100
+      }) as const;
+    const rows = coverageFor(
+      state,
+      {
+        aggregateCoverage: 4000,
+        coverageBySubject: new Map([[d3.supplementId, 4000]]),
+        coveredCount: 0,
+        dailyPills: 2,
+        dedicatedPartialCount: 2,
+        exposure: { provenance: [], totals: new Map() },
+        incidentalCount: 0,
+        oversupplyScore: 0,
+        priceMinor: 200,
+        productCount: 2,
+        productIds: ["prd_cw", "prd_joint"],
+        reason: "test",
+        requestedLabelCount: 2,
+        safety: { findings: [], hardBlocked: false, requiresAck: false },
+        sellerId: "seller_th",
+        variantIds: ["prd_cw:x1", "prd_joint:x1"]
+      },
+      [
+        item("prd_cw", "Blackmores Conceive Well Gold", [
+          { amount: 400, name: "Vitamin D", unit: "IU" }
+        ]),
+        item("prd_joint", "Blackmores Joint Mobility Plus", [
+          { amount: 10, name: "Vitamin D3", unit: "mcg" }
+        ])
+      ]
+    );
+    const row = rows.find((item) => item.supplementId === d3.supplementId);
+    assert.ok(row);
+    assert.equal(row.deliveredAmount, 800);
+    assert.equal(row.totalExposureAmount, 800);
+    assert.equal(row.remainingGap, 1200);
+    assert.equal(row.contributors?.length, 2);
+    assert.equal(
+      row.contributors?.reduce((sum, contrib) => sum + contrib.amount, 0),
+      800
+    );
+    if (row.upperLimitAmount != null && row.upperLimitAmount > 0) {
+      assert.equal(
+        row.percentOfUpperLimit,
+        Math.round((row.totalExposureAmount / row.upperLimitAmount) * 100)
+      );
+    }
+  });
+
   it("stamps servings/day, pill burden, and incidental vs requested nutrients on basket lines", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const collagen = live.products.find((item) => /collagen/i.test(item.candidate.title));
