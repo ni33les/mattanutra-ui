@@ -569,10 +569,7 @@ export function salvagePartialBasket(input: Readonly<{
         }
 
         if (leftOk) {
-          if (
-            input.request.optimization === "fewest_pills" &&
-            left.variant.dailyPills !== right.variant.dailyPills
-          ) {
+          if (left.variant.dailyPills !== right.variant.dailyPills) {
             return left.variant.dailyPills - right.variant.dailyPills;
           }
 

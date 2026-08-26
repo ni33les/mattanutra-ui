@@ -55,7 +55,15 @@ const MATCH_ALIAS_GROUPS: readonly (readonly string[])[] = [
   ["copper", "copper_gluconate", "copper_sulfate"],
   ["chromium", "chromium_picolinate"],
   ["manganese", "manganese_sulfate"],
-  ["calcium", "calcium_carbonate", "calcium_citrate"]
+  ["calcium", "calcium_carbonate", "calcium_citrate"],
+  [
+    "plant_sterols",
+    "plant_sterols_stanols",
+    "phytosterols",
+    "stanols",
+    "sterols",
+    "plant_stanols"
+  ]
 ];
 const MATCH_KEY_ALIASES: Record<string, readonly string[]> =
   Object.fromEntries(

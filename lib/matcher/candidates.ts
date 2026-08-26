@@ -135,7 +135,16 @@ export function contributionFor(
         return true;
       }
 
-      return productKeysMatch(targetSubjectId, item.subjectId);
+      const compact = (value: string) =>
+        value.replace(/^sup_/i, "").replace(/-/g, "").toLowerCase();
+
+      if (compact(item.subjectId) === compact(targetSubjectId)) {
+        return true;
+      }
+
+      if (productKeysMatch(targetSubjectId, item.subjectId)) {
+        return true;
+      }
     }
 
     return Boolean(item.name?.trim() && targetName.trim()) &&
