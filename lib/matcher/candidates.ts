@@ -654,9 +654,22 @@ export function compileGroups(
     }
 
     let belowFloorAdded = 0;
-    const pool = [...mapped, ...labelled].sort((left, right) =>
-      compareDedicatedThenId(left, right, request)
-    );
+    const pool = [...mapped, ...labelled].sort((left, right) => {
+      const dedicated = compareDedicatedThenId(left, right, request);
+
+      if (dedicated !== 0) {
+        return dedicated;
+      }
+
+      const extraCovered = (product: MatcherProduct) =>
+        request.targets.filter(
+          (item) =>
+            targetHasCoveringGroup(groups, request, item.subjectId) &&
+            contributionFor(product, item.name, item.subjectId).length > 0
+        ).length;
+
+      return extraCovered(left) - extraCovered(right);
+    });
 
     for (const product of pool) {
       if (targetHasCoveringGroup(groups, request, target.subjectId)) {
@@ -691,15 +704,20 @@ export function compileGroups(
         target.subjectId
       );
       const facts = labelledTargetCount(product, request);
-      const alreadyContributes = groups.some((group) =>
-        groupCoversTarget(group, target.subjectId)
+      const hasLowCollateralContributor = groups.some(
+        (group) =>
+          groupCoversTarget(group, target.subjectId) &&
+          labelledTargetCount(group.product, request) <= 1
       );
       const keepBelowFloor =
         request.targets.length === 1 ||
         request.profile.lifeStage === "pregnant" ||
         request.profile.lifeStage === "trying_to_conceive" ||
-        (belowFloorAdded < SALVAGE_BELOW_FLOOR_PER_TARGET &&
-          (facts <= 1 || !alreadyContributes));
+        (facts <= 1 &&
+          belowFloorAdded < SALVAGE_BELOW_FLOOR_PER_TARGET) ||
+        (facts > 1 &&
+          belowFloorAdded < 1 &&
+          !hasLowCollateralContributor);
 
       if (!coversFloor && !keepBelowFloor) {
         continue;
@@ -874,6 +892,7 @@ export function bestStandaloneContributorGroup(
   let bestRank: {
     coverage: number;
     dedicated: number;
+    extraCovered: number;
     facts: number;
     pills: number;
     price: number;
@@ -916,9 +935,15 @@ export function bestStandaloneContributorGroup(
     const contributed = variant.contributions.get(subjectId);
     const exposure =
       currentUnitsFor(request, subjectId) + (contributed?.units ?? BigInt(0));
+    const extraCovered = request.targets.filter(
+      (item) =>
+        item.subjectId !== subjectId &&
+        contributionFor(group.product, item.name, item.subjectId).length > 0
+    ).length;
     const rank = {
       coverage: coverageUnits(exposure, target.requested.units),
       dedicated: productIsDedicatedForTarget(group.product, target) ? 1 : 0,
+      extraCovered,
       facts,
       pills: variant.dailyPills,
       price: group.product.unitPriceMinor * variant.dailyUnits,
@@ -931,18 +956,25 @@ export function bestStandaloneContributorGroup(
       (rank.dedicated === bestRank.dedicated && rank.facts < bestRank.facts) ||
       (rank.dedicated === bestRank.dedicated &&
         rank.facts === bestRank.facts &&
+        rank.extraCovered < bestRank.extraCovered) ||
+      (rank.dedicated === bestRank.dedicated &&
+        rank.facts === bestRank.facts &&
+        rank.extraCovered === bestRank.extraCovered &&
         rank.coverage > bestRank.coverage) ||
       (rank.dedicated === bestRank.dedicated &&
         rank.facts === bestRank.facts &&
+        rank.extraCovered === bestRank.extraCovered &&
         rank.coverage === bestRank.coverage &&
         rank.pills < bestRank.pills) ||
       (rank.dedicated === bestRank.dedicated &&
         rank.facts === bestRank.facts &&
+        rank.extraCovered === bestRank.extraCovered &&
         rank.coverage === bestRank.coverage &&
         rank.pills === bestRank.pills &&
         rank.price < bestRank.price) ||
       (rank.dedicated === bestRank.dedicated &&
         rank.facts === bestRank.facts &&
+        rank.extraCovered === bestRank.extraCovered &&
         rank.coverage === bestRank.coverage &&
         rank.pills === bestRank.pills &&
         rank.price === bestRank.price &&
