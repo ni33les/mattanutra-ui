@@ -267,6 +267,44 @@ describe("Phase 2 compactness ranking", () => {
     );
   });
 
+  it("selects a labelled below-floor D3 SKU on standalone D3", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-standalone-d3",
+      products: [
+        qaProduct({
+          facts: [{ amount: 400, key: "d3" }],
+          id: "G-D3-400",
+          pills: 1,
+          priceThb: 120,
+          title: "Vitamin D3 400 IU"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        })
+      ]
+    };
+    const result = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        targets: [qaTarget("d3", 2000)]
+      }),
+      catalog
+    );
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("G-D3-400"), true);
+    assert.equal(
+      result.rejected.some(
+        (item) => item.productId === "G-D3-400" && item.reason === "incidental_only"
+      ),
+      false
+    );
+  });
+
   it("does not stack a 50+ multi to three pills just to inch D3", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",

@@ -509,6 +509,26 @@ function groupCoversTarget(group: ProductGroup, subjectId: string) {
   return group.variants.some((variant) => variant.contributions.has(subjectId));
 }
 
+function keepCompiledContributor(
+  product: MatcherProduct,
+  group: ProductGroup,
+  request: CanonicalRequest
+) {
+  return request.targets.some((target) => {
+    if (productIsDedicatedForTarget(product, target)) {
+      return true;
+    }
+
+    if (groupCoversTargetAtFloor(group, request, target.subjectId)) {
+      return true;
+    }
+
+    return (
+      request.targets.length === 1 && groupCoversTarget(group, target.subjectId)
+    );
+  });
+}
+
 export function compileGroups(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
@@ -584,11 +604,7 @@ export function compileGroups(
     if (
       groups.length > before &&
       added &&
-      !request.targets.some(
-        (target) =>
-          productIsDedicatedForTarget(product, target) ||
-          groupCoversTargetAtFloor(added, request, target.subjectId)
-      )
+      !keepCompiledContributor(product, added, request)
     ) {
       groups.pop();
     }
@@ -616,11 +632,7 @@ export function compileGroups(
     if (
       groups.length > before &&
       added &&
-      !request.targets.some(
-        (target) =>
-          productIsDedicatedForTarget(product, target) ||
-          groupCoversTargetAtFloor(added, request, target.subjectId)
-      )
+      !keepCompiledContributor(product, added, request)
     ) {
       groups.pop();
     }
@@ -674,7 +686,10 @@ export function compileGroups(
         target.subjectId
       );
 
-      if (!coversFloor) {
+      if (
+        !coversFloor &&
+        !(request.targets.length === 1 && groupCoversTarget(group, target.subjectId))
+      ) {
         continue;
       }
 
