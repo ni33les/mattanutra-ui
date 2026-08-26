@@ -772,4 +772,83 @@ describe("Phase 2 compactness ranking", () => {
       assert.equal(result.selected?.dailyPills, expected.pills);
     }
   });
+
+  it("keeps MAG, omega, C, one D3, and one B12 under 10 pills without joints or 50+", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-official-no-stuff",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 120,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [{ amount: 200, key: "d3" }],
+          id: "G-CALCIUM-D3-200",
+          pills: 1,
+          priceThb: 175,
+          title: "Bio Calcium+D3"
+        }),
+        qaProduct({
+          facts: [{ amount: 50, key: "b12" }],
+          id: "G-MEGA-B-50",
+          pills: 1,
+          priceThb: 97,
+          title: "Mega B Complex"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 400, key: "d3" },
+            { amount: 40, key: "c" }
+          ],
+          id: "G-JOINT-D3",
+          pills: 2,
+          priceThb: 220,
+          title: "Joint Mobility Plus"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 600, key: "d3" },
+            { amount: 5, key: "b12" },
+            { amount: 90, key: "c" }
+          ],
+          id: "G-MULTI-50PLUS",
+          pills: 1,
+          priceThb: 50,
+          title: "Multivitamins for 50+"
+        })
+      ]
+    };
+    const result = match(qaRequest({ optimization: "fewest_pills" }), catalog);
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("G-MAG-200"), true);
+    assert.equal(result.selected.productIds.includes("G-O3-FISH-1000"), true);
+    assert.equal(result.selected.productIds.includes("G-C-500"), true);
+    assert.equal(result.selected.productIds.includes("G-CALCIUM-D3-200"), true);
+    assert.equal(result.selected.productIds.includes("G-MEGA-B-50"), true);
+    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), false);
+    assert.equal(result.selected.productIds.includes("G-MULTI-50PLUS"), false);
+    assert.equal(result.selected.productCount <= 5, true);
+    assert.equal(result.selected.dailyPills <= 10, true);
+  });
 });

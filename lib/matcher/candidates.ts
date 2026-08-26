@@ -282,6 +282,10 @@ function highCollateralMultiTitle(title: string) {
   return /\b50\+|multivitamins for 50/i.test(title);
 }
 
+function jointTitle(title: string) {
+  return /\bjoint\b/i.test(title);
+}
+
 export function productHitsCoverageFloor(
   product: MatcherProduct,
   request: CanonicalRequest,
@@ -1036,6 +1040,22 @@ export function bestStandaloneContributorGroup(
     if (
       highCollateralMultiTitle(group.product.title) &&
       !productIsDedicatedForTarget(group.product, target)
+    ) {
+      continue;
+    }
+
+    if (
+      request.targets.length > 1 &&
+      jointTitle(group.product.title) &&
+      !productIsDedicatedForTarget(group.product, target) &&
+      groups.some(
+        (other) =>
+          other.productId !== group.productId &&
+          !jointTitle(other.product.title) &&
+          !highCollateralMultiTitle(other.product.title) &&
+          labelledTargetCount(other.product, request) <= 1 &&
+          Boolean(contributingVariantForTarget(other, request, subjectId))
+      )
     ) {
       continue;
     }
