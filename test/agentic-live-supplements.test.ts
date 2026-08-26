@@ -6,8 +6,8 @@ import {
   buildContributionIndex,
   catalogueSupplementFromLiveRow,
   isLiveSupplementAllowed,
-  overlayFixtureSupplementAliases
 } from "../lib/agentic/catalogue/live-supplements.ts";
+import { overlayFixtureSupplementAliases } from "../lib/agentic/catalogue/fixtures.ts";
 import { publicSupplementId } from "../lib/agentic/contract/ids.ts";
 
 describe("live country-aware supplements for matching", () => {

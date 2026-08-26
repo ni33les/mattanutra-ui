@@ -1,4 +1,3 @@
-import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
 import { publicSupplementId } from "@/lib/agentic/contract/ids";
 import { getSql } from "@/lib/db";
 import {
@@ -70,17 +69,6 @@ export async function refreshAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
   return inflight;
 }
 
-function fixtureIdsForName(name: string) {
-  const needle = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-
-  return FIXTURE_SUPPLEMENTS.filter((item) => {
-    const names = [item.name, ...item.aliases].map((value) =>
-      value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
-    );
-    return names.includes(needle);
-  }).flatMap((item) => [item.supplementId, item.uuid]);
-}
-
 async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
   try {
     const sql = getSql();
@@ -149,12 +137,6 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
         ...ceiling,
         subjectId: publicSupplementId(row.supplement_id)
       });
-      for (const fixtureId of fixtureIdsForName(row.name)) {
-        ceilings.push({
-          ...ceiling,
-          subjectId: fixtureId
-        });
-      }
     }
 
     if (ceilings.length === 0 && rows.length > 0) {

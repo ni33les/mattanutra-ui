@@ -1,6 +1,5 @@
 import type postgres from "postgres";
 import { publicSupplementId } from "@/lib/agentic/contract/ids";
-import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
 import type {
   CatalogueSupplement,
   CatalogueUnit
@@ -125,29 +124,6 @@ export function catalogueSupplementFromLiveRow(
   };
 }
 
-export function overlayFixtureSupplementAliases(
-  supplements: readonly CatalogueSupplement[]
-): CatalogueSupplement[] {
-  return supplements.map((item) => {
-    const fixture = FIXTURE_SUPPLEMENTS.find(
-      (candidate) => normalizeName(candidate.name) === normalizeName(item.name)
-    );
-
-    if (!fixture) {
-      return item;
-    }
-
-    return {
-      ...item,
-      acceptedUnits: uniqueNames([
-        ...item.acceptedUnits,
-        ...fixture.acceptedUnits
-      ]) as CatalogueUnit[],
-      aliases: uniqueNames([...item.aliases, ...fixture.aliases])
-    };
-  });
-}
-
 export function buildContributionIndex(
   supplements: readonly CatalogueSupplement[]
 ) {
@@ -242,20 +218,18 @@ export async function loadLiveSupplementsForCountry(
     ) json_rule on true
   `;
 
-  return overlayFixtureSupplementAliases(
-    rows
-      .map((row) =>
-        catalogueSupplementFromLiveRow({
-          aliases: row.aliases,
-          deleted: row.deleted,
-          factUnits: row.fact_units,
-          maxUnit: row.max_unit,
-          name: row.name,
-          status: row.status,
-          uuid: row.uuid
-        })
-      )
-      .filter((item): item is CatalogueSupplement => Boolean(item))
-      .sort((left, right) => left.name.localeCompare(right.name))
-  );
+  return rows
+    .map((row) =>
+      catalogueSupplementFromLiveRow({
+        aliases: row.aliases,
+        deleted: row.deleted,
+        factUnits: row.fact_units,
+        maxUnit: row.max_unit,
+        name: row.name,
+        status: row.status,
+        uuid: row.uuid
+      })
+    )
+    .filter((item): item is CatalogueSupplement => Boolean(item))
+    .sort((left, right) => left.name.localeCompare(right.name));
 }

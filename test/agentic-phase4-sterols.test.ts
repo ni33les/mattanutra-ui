@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
-import { overlayFixtureSupplementAliases } from "../lib/agentic/catalogue/live-supplements.ts";
+import { overlayFixtureSupplementAliases } from "../lib/agentic/catalogue/fixtures.ts";
 import { match } from "../lib/matcher/index.ts";
 import { QA_GOLD_CATALOG, qaRequest, qaTarget } from "../lib/matcher/qa/index.ts";
 

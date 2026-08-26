@@ -515,3 +515,24 @@ export function fixtureSnapshot(now = "2026-08-20T00:00:00.000Z"): CatalogueSnap
 export function fixtureSupplementById(supplementId: string) {
   return FIXTURE_SUPPLEMENTS.find((item) => item.supplementId === supplementId) ?? null;
 }
+
+export function overlayFixtureSupplementAliases(
+  supplements: readonly CatalogueSupplement[]
+): CatalogueSupplement[] {
+  return supplements.map((item) => {
+    const fixture = FIXTURE_SUPPLEMENTS.find(
+      (candidate) =>
+        candidate.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+    );
+
+    if (!fixture) {
+      return item;
+    }
+
+    return {
+      ...item,
+      acceptedUnits: [...new Set([...item.acceptedUnits, ...fixture.acceptedUnits])],
+      aliases: [...new Set([...item.aliases, ...fixture.aliases])]
+    };
+  });
+}

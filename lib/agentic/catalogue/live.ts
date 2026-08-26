@@ -1,7 +1,6 @@
 import { assessRetailSellability } from "@/lib/retail-sellability";
 import { publicProductId } from "@/lib/agentic/contract/ids";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogue/market";
-import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
 import {
   buildContributionIndex,
   loadLiveSupplementsForCountry
@@ -445,18 +444,14 @@ export async function loadLiveRetailSnapshot(
       availabilityAsOf: new Date().toISOString(),
       catalogueVersion: `retail-${code}-unavailable`,
       products: [],
-      supplements: FIXTURE_SUPPLEMENTS
+      supplements: []
     };
   }
 
-  let supplements = FIXTURE_SUPPLEMENTS;
+  let supplements: CatalogueSnapshot["supplements"] = [];
 
   try {
-    const liveSupplements = await loadLiveSupplementsForCountry(sql, code);
-
-    if (liveSupplements.length > 0) {
-      supplements = liveSupplements;
-    }
+    supplements = await loadLiveSupplementsForCountry(sql, code);
   } catch (error) {
     console.warn("Unable to load live supplements for MCP", {
       countryCode: code,
@@ -596,11 +591,15 @@ export async function loadLiveRetailSnapshot(
 function loadingSnapshot(countryCode: string): CatalogueSnapshot {
   const hit = liveCache().get(countryCode);
 
+  if (hit) {
+    return hit.snapshot;
+  }
+
   return {
     availabilityAsOf: new Date().toISOString(),
-    catalogueVersion: hit?.snapshot.catalogueVersion ?? `retail-${countryCode}-loading`,
-    products: hit?.snapshot.products ?? [],
-    supplements: FIXTURE_SUPPLEMENTS
+    catalogueVersion: `retail-${countryCode}-loading`,
+    products: [],
+    supplements: []
   };
 }
 
@@ -650,7 +649,7 @@ export async function cachedLiveRetailSnapshot(
       availabilityAsOf: new Date().toISOString(),
       catalogueVersion: `retail-${code}-test`,
       products: [],
-      supplements: FIXTURE_SUPPLEMENTS
+      supplements: []
     };
   }
 
@@ -710,7 +709,7 @@ export function requireCachedLiveRetailSnapshot(
       availabilityAsOf: new Date().toISOString(),
       catalogueVersion: `retail-${code}-test`,
       products: [],
-      supplements: FIXTURE_SUPPLEMENTS
+      supplements: []
     };
   }
 

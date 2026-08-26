@@ -105,4 +105,21 @@ describe("consistency r2 regression guards", () => {
     assert.doesNotMatch(planService, /fixtureSnapshot\(/);
     assert.doesNotMatch(planService, /FIXTURE_SUPPLEMENTS/);
   });
+
+  it("does not serve fixtures from live catalogue or UL loaders", async () => {
+    const files = [
+      "lib/agentic/catalogue/snapshot.ts",
+      "lib/agentic/catalogue/live.ts",
+      "lib/agentic/catalogue/live-supplements.ts",
+      "lib/agentic/catalogue/load-safety-ceilings.ts"
+    ];
+
+    for (const file of files) {
+      const body = await readFile(file, "utf8");
+      assert.doesNotMatch(body, /fixtureSnapshot/);
+      assert.doesNotMatch(body, /FIXTURE_SUPPLEMENTS/);
+      assert.doesNotMatch(body, /overlayFixtureSupplementAliases/);
+      assert.doesNotMatch(body, /fixtureIdsForName/);
+    }
+  });
 });

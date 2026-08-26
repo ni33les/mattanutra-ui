@@ -1,10 +1,13 @@
 import {
+  bestCompactCoveringGroup,
   compileGroups,
   contributionFor,
+  coveringVariantForTarget,
   groupsBySeller
 } from "@/lib/matcher/candidates";
+import { coverageUnits } from "@/lib/matcher/dominance";
 import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
-import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
+import { COVERED_THRESHOLD, DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
 import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
 import { evaluateSafety } from "@/lib/matcher/safety";
@@ -121,19 +124,14 @@ function keepIdsForMaterialBasket(
   return keep;
 }
 
-function rescoreKeptProducts(input: Readonly<{
+function rescoreWithKeep(input: Readonly<{
   groups: readonly ProductGroup[];
+  keep: ReadonlySet<string>;
   request: CanonicalRequest;
   selected: ScoredBasket;
 }>): ScoredBasket | null {
-  const keep = keepIdsForMaterialBasket(input.groups, input.request, input.selected);
-
-  if (keep.size === input.selected.productIds.length) {
-    return input.selected;
-  }
-
-  if (keep.size < 1) {
-    return input.selected;
+  if (input.keep.size < 1) {
+    return null;
   }
 
   let state = seedState(input.request);
@@ -145,7 +143,7 @@ function rescoreKeptProducts(input: Readonly<{
     );
     const variant = group?.variants.find((item) => item.variantId === variantId);
 
-    if (!group || !variant || used.has(group.productId) || !keep.has(group.productId)) {
+    if (!group || !variant || used.has(group.productId) || !input.keep.has(group.productId)) {
       continue;
     }
 
@@ -160,17 +158,192 @@ function rescoreKeptProducts(input: Readonly<{
   }
 
   if (state.count < 1) {
+    return null;
+  }
+
+  return scoreState({
+    groups: input.groups,
+    request: input.request,
+    sellerId: input.selected.sellerId,
+    state
+  });
+}
+
+function dropRedundantProducts(input: Readonly<{
+  groups: readonly ProductGroup[];
+  request: CanonicalRequest;
+  selected: ScoredBasket;
+}>): ScoredBasket {
+  let current = input.selected;
+  const singles = current.productIds.filter((productId) => {
+    const group = input.groups.find((item) => item.productId === productId);
+
+    if (!group) {
+      return false;
+    }
+
+    return (
+      input.request.targets.filter(
+        (target) =>
+          contributionFor(group.product, target.name, target.subjectId).length > 0
+      ).length <= 1
+    );
+  });
+
+  for (const productId of singles) {
+    const keep = new Set(current.productIds.filter((id) => id !== productId));
+    const next = rescoreWithKeep({
+      groups: input.groups,
+      keep,
+      request: input.request,
+      selected: current
+    });
+
+    if (!next) {
+      continue;
+    }
+
+    if (
+      next.coveredCount >= current.coveredCount &&
+      next.productCount < current.productCount
+    ) {
+      current = next;
+    }
+  }
+
+  return current;
+}
+
+function rescoreKeptProducts(input: Readonly<{
+  groups: readonly ProductGroup[];
+  request: CanonicalRequest;
+  selected: ScoredBasket;
+}>): ScoredBasket | null {
+  const keep = keepIdsForMaterialBasket(input.groups, input.request, input.selected);
+
+  if (keep.size === input.selected.productIds.length) {
     return input.selected;
   }
 
   return (
-    scoreState({
+    rescoreWithKeep({
       groups: input.groups,
+      keep,
       request: input.request,
-      sellerId: input.selected.sellerId,
-      state
+      selected: input.selected
     }) ?? input.selected
   );
+}
+
+function rebuildStateFromBasket(input: Readonly<{
+  groups: readonly ProductGroup[];
+  request: CanonicalRequest;
+  selected: ScoredBasket;
+}>) {
+  let state = seedState(input.request);
+  const used = new Set<string>();
+
+  for (const variantId of input.selected.variantIds) {
+    const group = input.groups.find((item) =>
+      item.variants.some((variant) => variant.variantId === variantId)
+    );
+    const variant = group?.variants.find((item) => item.variantId === variantId);
+
+    if (!group || !variant || used.has(group.productId)) {
+      continue;
+    }
+
+    const next = tryAddVariant(state, variant, group, input.request);
+
+    if (!next) {
+      continue;
+    }
+
+    state = next;
+    used.add(group.productId);
+  }
+
+  return { state, used };
+}
+
+function absorbStandaloneWinners(input: Readonly<{
+  config: MatcherConfig;
+  groups: readonly ProductGroup[];
+  request: CanonicalRequest;
+  selected: ScoredBasket;
+}>): ScoredBasket {
+  const uncovered = input.request.targets.filter(
+    (target) =>
+      (input.selected.coverageBySubject.get(target.subjectId) ?? 0) <
+      COVERED_THRESHOLD * 100
+  );
+
+  if (uncovered.length < 1) {
+    return input.selected;
+  }
+
+  const rebuilt = rebuildStateFromBasket(input);
+  let state = rebuilt.state;
+  const used = rebuilt.used;
+  let changed = false;
+  const floor = COVERED_THRESHOLD * 100;
+
+  for (const target of input.request.targets) {
+    const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
+
+    if (coverageUnits(delivered, target.requested.units) >= floor) {
+      continue;
+    }
+
+    const winner = bestCompactCoveringGroup(
+      input.groups,
+      input.request,
+      target.subjectId
+    );
+
+    if (!winner || used.has(winner.productId)) {
+      continue;
+    }
+
+    const variant = coveringVariantForTarget(
+      winner,
+      input.request,
+      target.subjectId
+    );
+
+    if (!variant) {
+      continue;
+    }
+
+    const next = tryAddVariant(state, variant, winner, input.request);
+
+    if (!next) {
+      continue;
+    }
+
+    state = next;
+    used.add(winner.productId);
+    changed = true;
+  }
+
+  if (!changed) {
+    return input.selected;
+  }
+
+  const scored = scoreState({
+    groups: input.groups,
+    request: input.request,
+    sellerId: input.selected.sellerId,
+    state
+  });
+
+  if (!scored) {
+    return input.selected;
+  }
+
+  return compareBaskets(scored, input.selected, input.request, input.config) < 0
+    ? scored
+    : input.selected;
 }
 
 function leftoversFor(
@@ -341,19 +514,26 @@ export function match(
   }
 
   if (winner.selected) {
-    const pruned = rescoreKeptProducts({
+    const compact = dropRedundantProducts({
       groups,
       request,
       selected: winner.selected
     });
-
-    if (
-      pruned &&
-      (pruned.productCount < winner.selected.productCount ||
-        pruned.productIds.join("|") === winner.selected.productIds.join("|"))
-    ) {
-      winner = { alternatives: winner.alternatives, selected: pruned };
-    }
+    const pruned = rescoreKeptProducts({
+      groups,
+      request,
+      selected: compact
+    });
+    const next = pruned ?? compact;
+    winner = {
+      alternatives: winner.alternatives,
+      selected: absorbStandaloneWinners({
+        config,
+        groups,
+        request,
+        selected: next
+      })
+    };
   }
 
   if (!winner.selected || winner.selected.productCount < 1) {

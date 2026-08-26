@@ -1,5 +1,4 @@
 import type { AgenticEnvironment } from "@/lib/agentic/config";
-import { fixtureSnapshot } from "@/lib/agentic/catalogue/fixtures";
 import {
   cachedLiveRetailSnapshot,
   warmLiveRetailSnapshot
@@ -30,13 +29,22 @@ function countryFromSnapshot(snapshot: CatalogueSnapshot) {
   return match?.[1] ?? "TH";
 }
 
+function emptyRetailSnapshot(code: string, suffix = "unavailable"): CatalogueSnapshot {
+  return {
+    availabilityAsOf: new Date().toISOString(),
+    catalogueVersion: `retail-${code}-${suffix}`,
+    products: [],
+    supplements: []
+  };
+}
+
 export function getCatalogueSnapshot(countryCode?: string): CatalogueSnapshot {
   if (countryCode) {
     const code = countryKey(countryCode);
-    return cachedByCountry.get(code) ?? lastSnapshot ?? fixtureSnapshot();
+    return cachedByCountry.get(code) ?? lastSnapshot ?? emptyRetailSnapshot(code);
   }
 
-  return lastSnapshot ?? cachedByCountry.get("TH") ?? fixtureSnapshot();
+  return lastSnapshot ?? cachedByCountry.get("TH") ?? emptyRetailSnapshot("TH");
 }
 
 export async function ensureCatalogueSnapshot(
@@ -81,26 +89,10 @@ export async function ensureCatalogueSnapshot(
       });
     }
 
-    if (environment === "uat" || environment === "prd") {
-      return {
-        availabilityAsOf: new Date().toISOString(),
-        catalogueVersion: `retail-${code}-unavailable`,
-        products: [],
-        supplements: fixtureSnapshot().supplements
-      };
-    }
+    return emptyRetailSnapshot(code);
   }
 
-  const cached = cachedByCountry.get(code);
-
-  if (cached) {
-    return cached;
-  }
-
-  const fixtures = fixtureSnapshot();
-  cachedByCountry.set(code, fixtures);
-  await refreshAdminSafetyCeilings();
-  return fixtures;
+  return cachedByCountry.get(code) ?? emptyRetailSnapshot(code);
 }
 
 export async function warmCatalogueSnapshot(
