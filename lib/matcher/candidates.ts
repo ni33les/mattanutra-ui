@@ -497,6 +497,7 @@ export function compileGroups(
   deadlineAt?: number
 ): ProductGroup[] {
   const groups: ProductGroup[] = [];
+  const compiledIds = new Set<string>();
   const products = [...catalog.products].sort((left, right) =>
     left.productId.localeCompare(right.productId)
   );
@@ -527,10 +528,14 @@ export function compileGroups(
       return;
     }
 
-    if (groups.some((group) => group.productId === product.productId)) {
+    if (
+      groups.some((group) => group.productId === product.productId) ||
+      compiledIds.has(product.productId)
+    ) {
       return;
     }
 
+    compiledIds.add(product.productId);
     const group = compileProductGroup(product, request);
 
     if (group) {
@@ -576,6 +581,16 @@ export function compileGroups(
       continue;
     }
 
+    const contributesUncovered = request.targets.some(
+      (target) =>
+        !targetHasCoveringGroup(groups, request, target.subjectId) &&
+        contributionFor(product, target.name, target.subjectId).length > 0
+    );
+
+    if (!contributesUncovered) {
+      continue;
+    }
+
     const before = groups.length;
     tryCompile(product);
     const added = groups[groups.length - 1];
@@ -610,7 +625,10 @@ export function compileGroups(
         break;
       }
 
-      if (groups.some((group) => group.productId === product.productId)) {
+      if (
+        groups.some((group) => group.productId === product.productId) ||
+        compiledIds.has(product.productId)
+      ) {
         continue;
       }
 
@@ -625,6 +643,7 @@ export function compileGroups(
         continue;
       }
 
+      compiledIds.add(product.productId);
       const group = compileProductGroup(product, request);
 
       if (!group || !groupCoversTarget(group, target.subjectId)) {
