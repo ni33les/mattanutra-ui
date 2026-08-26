@@ -5,6 +5,7 @@ import {
   compileGroups,
   contributionFor,
   contributingVariantForTarget,
+  labelledTargetCount,
   coveringVariantForMostFloors,
   coveringVariantForTarget,
   groupsBySeller
@@ -627,6 +628,74 @@ function absorbStandaloneWinners(input: Readonly<{
       state = next;
       changed = true;
     }
+  }
+
+  for (const target of input.request.targets) {
+    const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
+
+    if (coverageUnits(delivered, target.requested.units) >= floor) {
+      continue;
+    }
+
+    let best: { group: ProductGroup; variant: NonNullable<ReturnType<typeof contributingVariantForTarget>> } | null = null;
+
+    for (const group of input.groups) {
+      if (used.has(group.productId)) {
+        continue;
+      }
+
+      const variant = contributingVariantForTarget(
+        group,
+        input.request,
+        target.subjectId
+      );
+
+      if (!variant) {
+        continue;
+      }
+
+      const extra = variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
+      const nextUnits = delivered + extra;
+
+      if (coverageUnits(nextUnits, target.requested.units) < floor) {
+        continue;
+      }
+
+      const next = tryAddVariant(state, variant, group, input.request);
+
+      if (!next) {
+        continue;
+      }
+
+      if (
+        !best ||
+        labelledTargetCount(group.product, input.request) <
+          labelledTargetCount(best.group.product, input.request) ||
+        (labelledTargetCount(group.product, input.request) ===
+          labelledTargetCount(best.group.product, input.request) &&
+          variant.dailyPills < best.variant.dailyPills) ||
+        (labelledTargetCount(group.product, input.request) ===
+          labelledTargetCount(best.group.product, input.request) &&
+          variant.dailyPills === best.variant.dailyPills &&
+          group.productId < best.group.productId)
+      ) {
+        best = { group, variant };
+      }
+    }
+
+    if (!best) {
+      continue;
+    }
+
+    const next = tryAddVariant(state, best.variant, best.group, input.request);
+
+    if (!next) {
+      continue;
+    }
+
+    used.add(best.group.productId);
+    state = next;
+    changed = true;
   }
 
   if (!changed) {
