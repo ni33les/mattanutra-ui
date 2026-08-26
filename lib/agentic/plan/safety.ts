@@ -12,6 +12,7 @@ import {
 import { doseComparable, fromComparable, roundDose } from "@/lib/agentic/plan/units";
 import type {
   CanonicalPlanState,
+  CoverageContributor,
   CoverageRow,
   PlanQuestion,
   SafetyGuidance,
@@ -35,6 +36,33 @@ function catalogRule(
   };
 }
 
+function currentContributors(
+  row: Pick<CoverageRow, "currentAmount" | "name" | "unit">
+): CoverageContributor[] {
+  if (row.currentAmount <= 0) {
+    return [];
+  }
+
+  return [
+    {
+      amount: row.currentAmount,
+      productName: row.name,
+      source: "current",
+      unit: row.unit
+    }
+  ];
+}
+
+function exposureContributors(row: CoverageRow): CoverageContributor[] {
+  return [
+    ...currentContributors(row),
+    ...(row.contributors ?? []).map((item) => ({
+      ...item,
+      source: item.source ?? ("selected" as const)
+    }))
+  ];
+}
+
 function guidance(input: Readonly<{
   action: SafetyGuidance["action"];
   code: SafetyGuidance["code"];
@@ -42,6 +70,7 @@ function guidance(input: Readonly<{
   productIds: readonly string[];
   severity: SafetyGuidance["severity"];
   supplementIds: readonly string[];
+  contributors?: readonly CoverageContributor[];
   exposure?: number | null;
   nutrientName?: string | null;
   requested?: number | null;
@@ -69,6 +98,7 @@ function guidance(input: Readonly<{
   return {
     action: input.action,
     code: input.code,
+    contributors: input.contributors ?? [],
     exposure: input.exposure ?? null,
     guidanceId,
     message: agenticMessage(input.locale, messageKey),
@@ -235,10 +265,13 @@ export function evaluateSafety(input: Readonly<{
       }) &&
       row.totalExposureAmount > 0;
 
+    const rowContributors = exposureContributors(row);
+
     if (missingRequiredBand) {
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
+        contributors: rowContributors,
         exposure: row.totalExposureAmount,
         locale: input.locale,
         nutrientName: row.name,
@@ -264,6 +297,7 @@ export function evaluateSafety(input: Readonly<{
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
+        contributors: rowContributors,
         exposure: row.totalExposureAmount,
         locale: input.locale,
         nutrientName: row.name,
@@ -290,6 +324,7 @@ export function evaluateSafety(input: Readonly<{
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
+        contributors: rowContributors,
         exposure: row.totalExposureAmount,
         locale: input.locale,
         nutrientName: row.name,
@@ -311,6 +346,7 @@ export function evaluateSafety(input: Readonly<{
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
+        contributors: rowContributors,
         exposure: row.totalExposureAmount,
         locale: input.locale,
         nutrientName: row.name,
@@ -332,6 +368,7 @@ export function evaluateSafety(input: Readonly<{
       items.push(guidance({
         action: "acknowledge",
         code: "dose_review_required",
+        contributors: rowContributors,
         exposure: row.totalExposureAmount,
         locale: input.locale,
         nutrientName: row.name,
@@ -355,6 +392,7 @@ export function evaluateSafety(input: Readonly<{
       items.push(guidance({
         action: "acknowledge",
         code: "duplicate_or_overlap",
+        contributors: rowContributors,
         exposure: row.totalExposureAmount,
         locale: input.locale,
         productIds,
@@ -405,21 +443,31 @@ export function evaluateSafety(input: Readonly<{
       limit > 0 &&
       nutrient.amount > limit
     ) {
-      const contributors = (input.selected?.basket ?? [])
-        .filter((item) =>
-          (item.incidentalNutrients ?? []).some(
+      const incidentalRows = (input.selected?.basket ?? []).flatMap((item) =>
+        (item.incidentalNutrients ?? [])
+          .filter(
             (fact) =>
               fact.name.trim().toLowerCase() === nutrient.name.trim().toLowerCase()
           )
-        )
-        .map((item) => item.productId);
+          .map((fact) => ({
+            amount: fact.amount,
+            productId: item.productId,
+            productName: item.productName,
+            source: "selected" as const,
+            unit: fact.unit
+          }))
+      );
+      const incidentalProductIds = [
+        ...new Set(incidentalRows.map((item) => item.productId))
+      ];
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
+        contributors: incidentalRows,
         exposure: nutrient.amount,
         locale: input.locale,
         nutrientName: nutrient.name,
-        productIds: contributors.length > 0 ? contributors : productIds,
+        productIds: incidentalProductIds.length > 0 ? incidentalProductIds : productIds,
         requested: 0,
         severity: "blocking",
         sourceScope: "supplemental",

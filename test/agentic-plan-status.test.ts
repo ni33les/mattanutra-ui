@@ -246,4 +246,61 @@ describe("plan status fail-closed on oversupply", () => {
     assert.equal(published.rulesVersion, "7");
     resetMatcherSafetyCeilings();
   });
+
+  it("lists current-intake contributors on a magnesium UL block", () => {
+    setMatcherSafetyCeilings([
+      {
+        bandId: "8c2b0d1a-4f3e-4a91-9b77-2c6d8e0f1a23",
+        bandVersion: 7,
+        lifeStage: "adult",
+        maxAmount: 350,
+        maxUnit: "mg",
+        name: "Magnesium",
+        sourceScope: "supplemental",
+        subjectId: "sup_mag"
+      }
+    ]);
+    const selected = option([
+      coverage({
+        coveragePercent: 200,
+        currentAmount: 400,
+        deliveredAmount: 0,
+        percentOfUpperLimit: 114,
+        requestedAmount: 200,
+        status: "upper_limit_risk",
+        totalExposureAmount: 400,
+        upperLimitAmount: 350
+      })
+    ]);
+    const guidance = evaluateSafety({
+      locale: "en",
+      selected,
+      state: state()
+    });
+    const dose = guidance.find(
+      (item) => item.action === "block" && item.code === "dose_review_required"
+    );
+    assert.ok(dose);
+    assert.equal(dose.nutrientName, "Magnesium");
+    assert.equal(dose.exposure, 400);
+    assert.equal(dose.threshold, 350);
+    assert.deepEqual(dose.contributors, [
+      {
+        amount: 400,
+        productName: "Magnesium",
+        source: "current",
+        unit: "mg"
+      }
+    ]);
+    const published = publicSafetyGuidance(dose);
+    assert.deepEqual(published.contributors, [
+      {
+        amount: 400,
+        productName: "Magnesium",
+        source: "current",
+        unit: "mg"
+      }
+    ]);
+    resetMatcherSafetyCeilings();
+  });
 });

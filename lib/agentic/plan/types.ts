@@ -208,8 +208,9 @@ export type BasketNutrient = Readonly<{
 
 export type CoverageContributor = Readonly<{
   amount: number;
-  productId: string;
+  productId?: string;
   productName: string;
+  source?: "current" | "selected";
   unit: CatalogueUnit;
 }>;
 
@@ -266,6 +267,7 @@ export type SafetyGuidance = Readonly<{
     | "duplicate_or_overlap"
     | "medication_interaction"
     | "pediatric_review_required";
+  contributors: readonly CoverageContributor[];
   exposure: number | null;
   guidanceId: string;
   message: string;

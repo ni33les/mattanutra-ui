@@ -1,5 +1,6 @@
 import type {
   BasketItem,
+  CoverageContributor,
   CoverageRow,
   PlanResult,
   SafetyGuidance,
@@ -141,12 +142,7 @@ export function publicCoverage(row: CoverageRow) {
     unit: row.unit,
     ...(row.contributors && row.contributors.length > 0
       ? {
-          contributors: row.contributors.map((item) => ({
-            amount: item.amount,
-            productId: item.productId,
-            productName: item.productName,
-            unit: item.unit
-          }))
+          contributors: row.contributors.map(publicContributor)
         }
       : {}),
     ...(row.upperLimitAmount != null
@@ -245,6 +241,16 @@ export function publicOption(option: StackOption, selected: StackOption | null) 
   };
 }
 
+function publicContributor(item: CoverageContributor) {
+  return {
+    amount: item.amount,
+    productName: item.productName,
+    unit: item.unit,
+    ...(item.productId ? { productId: item.productId } : {}),
+    ...(item.source ? { source: item.source } : {})
+  };
+}
+
 export function publicSafetyGuidance(row: SafetyGuidance) {
   return {
     action: row.action,
@@ -262,7 +268,10 @@ export function publicSafetyGuidance(row: SafetyGuidance) {
     ...(row.exposure != null ? { exposure: row.exposure } : {}),
     ...(row.threshold != null ? { threshold: row.threshold } : {}),
     ...(row.productIds.length > 0 ? { productIds: row.productIds } : {}),
-    ...(row.supplementIds.length > 0 ? { supplementIds: row.supplementIds } : {})
+    ...(row.supplementIds.length > 0 ? { supplementIds: row.supplementIds } : {}),
+    ...(row.contributors.length > 0
+      ? { contributors: row.contributors.map(publicContributor) }
+      : {})
   };
 }
 
