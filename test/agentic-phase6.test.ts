@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS, fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
 import { freezeCatalogueSnapshot } from "../lib/agentic/catalogue/freeze.ts";
-import { matchPlan, matcherTelemetryFor } from "../lib/agentic/plan/matching.ts";
+import { coverageFor, matchPlan, matcherTelemetryFor } from "../lib/agentic/plan/matching.ts";
+import { normalizePlanRequest } from "../lib/agentic/plan/normalize.ts";
+import type { AgenticConfig } from "../lib/agentic/config.ts";
 import { aug25PlanState } from "../lib/agentic/plan/mode-d.ts";
 import { MATCHER_VERSION } from "../lib/matcher/config.ts";
 import {
@@ -176,6 +178,69 @@ describe("Phase 6 bounded evidence fields", () => {
       assert.equal(row.remainingGap, 0);
       assert.ok(row.totalExposureAmount >= row.requestedAmount);
     }
+  });
+
+  it("counts name-only 400 mg current Magnesium against the Magnesium target", async () => {
+    const mag = supplement("Magnesium");
+    const snapshot = freezeCatalogueSnapshot({
+      ...frozen(),
+      supplements: [
+        ...FIXTURE_SUPPLEMENTS,
+        {
+          acceptedUnits: ["mg"],
+          aliases: ["Magnesium"],
+          name: "Magnesium threonate",
+          supplementId: "sup_magnesium_threonate_test",
+          uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        }
+      ]
+    });
+    const config: AgenticConfig = {
+      activeMarkets: ["TH"],
+      buildId: "phase6-current-mg",
+      capabilitySecret: "test",
+      checkoutTtlMs: 1000,
+      continuation: "polling_only",
+      environment: "dev",
+      internalQaHarness: true,
+      paymentProvider: "mock",
+      planTtlMs: 1000,
+      siteUrl: "http://127.0.0.1",
+      thailandRetailerAdapter: "mock_thailand",
+      userAccountRequired: false
+    };
+    const normalized = await normalizePlanRequest({
+      config,
+      snapshot,
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
+        requirements: {},
+        currentSupplements: [
+          { name: "Magnesium", dailyAmount: 400, unit: "mg" }
+        ],
+        targets: [{ amount: 200, name: "Magnesium", unit: "mg" }]
+      }
+    });
+    assert.equal("error" in normalized, false);
+    if ("error" in normalized) {
+      return;
+    }
+    assert.equal(normalized.state.currentSupplements[0]?.supplementId, mag.supplementId);
+    const matched = matchPlan({ snapshot, state: normalized.state });
+    const coverage = matched.selected?.coverage ?? coverageFor(normalized.state, null);
+    const row = coverage.find((item) => item.name === "Magnesium");
+    assert.ok(row);
+    assert.equal(row.requestedAmount, 200);
+    assert.equal(row.currentAmount, 400);
+    assert.ok(row.totalExposureAmount >= 400);
+    assert.equal(row.remainingGap, 0);
+    assert.equal(
+      matched.leftovers.some((item) => item.name === "Magnesium" && item.reason === "uncovered"),
+      false
+    );
   });
 
   it("stamps servings/day, pill burden, and incidental vs requested nutrients on basket lines", () => {

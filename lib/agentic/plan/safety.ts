@@ -110,6 +110,7 @@ function zincExposure(
 }
 
 export function evaluateSafety(input: Readonly<{
+  coverage?: readonly CoverageRow[];
   locale: Locale;
   selected: StackOption | null;
   state: CanonicalPlanState;
@@ -122,9 +123,17 @@ export function evaluateSafety(input: Readonly<{
   const magnesiumIds = input.state.targets
     .filter((item) => /magnesium/i.test(item.name))
     .map((item) => item.supplementId);
-  const zincCoverage = zincExposure(input.selected, input.state);
-  const ironCoverage = input.selected?.coverage.find((row) => /iron/i.test(row.name));
-  const coverageRows = input.selected?.coverage ?? (zincCoverage ? [zincCoverage] : []);
+  const coverageFromPlan = input.coverage ?? input.selected?.coverage ?? [];
+  const zincCoverage =
+    coverageFromPlan.find((item) => /zinc/i.test(item.name)) ??
+    zincExposure(input.selected, input.state);
+  const ironCoverage = coverageFromPlan.find((row) => /iron/i.test(row.name));
+  const coverageRows =
+    coverageFromPlan.length > 0
+      ? [...coverageFromPlan]
+      : zincCoverage
+        ? [zincCoverage]
+        : [];
 
   const omegaCoverage = input.selected?.coverage.find((row) => /omega/i.test(row.name));
 

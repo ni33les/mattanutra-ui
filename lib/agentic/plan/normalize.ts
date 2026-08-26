@@ -98,6 +98,14 @@ function tokenSubsetMatch(left: string, right: string) {
 }
 
 function matchByName(snapshot: CatalogueSnapshot, wanted: string) {
+  const exactName = snapshot.supplements.filter(
+    (item) => normalizeName(item.name) === wanted
+  );
+
+  if (exactName.length === 1) {
+    return exactName;
+  }
+
   const exact = snapshot.supplements.filter((item) => namesOf(item).includes(wanted));
 
   if (exact.length === 1) {
@@ -105,7 +113,7 @@ function matchByName(snapshot: CatalogueSnapshot, wanted: string) {
   }
 
   if (exact.length > 1) {
-    return exact;
+    return [];
   }
 
   const prefix = snapshot.supplements.filter((item) =>

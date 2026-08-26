@@ -24,6 +24,7 @@ import {
   planRematchFingerprint
 } from "@/lib/agentic/plan/normalize";
 import {
+  coverageFor,
   leftoversFor,
   matcherTelemetryFor,
   matchPlan,
@@ -152,7 +153,9 @@ function composeResult(input: Readonly<{
   state: CanonicalPlanState;
   unmetRequirements: readonly string[];
 }>): PlanResult {
+  const coverage = input.selected?.coverage ?? coverageFor(input.state, null);
   const safety = evaluateSafety({
+    coverage,
     locale: input.locale,
     selected: input.selected,
     state: input.state
@@ -209,7 +212,7 @@ function composeResult(input: Readonly<{
     basket: input.selected?.basket ?? [],
     catalogueVersion: input.snapshot.catalogueVersion,
     changeSummary,
-    coverage: input.selected?.coverage ?? [],
+    coverage,
     guidanceRulesVersion: input.snapshot.catalogueVersion,
     leftovers: input.leftovers,
     matcherTelemetry: matcherTelemetryFor({

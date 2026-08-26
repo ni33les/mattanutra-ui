@@ -103,7 +103,7 @@ export function toCanonicalRequest(
   };
 }
 
-function coverageFor(
+export function coverageFor(
   state: CanonicalPlanState,
   basket: ScoredBasket | null,
   items: readonly BasketItem[] = []
@@ -423,14 +423,18 @@ export function leftoversFor(
   }
 
   if (!selected) {
-    for (const target of state.targets) {
+    for (const row of coverageFor(state, null)) {
+      if (row.remainingGap <= 0) {
+        continue;
+      }
+
       push({
-        amount: target.amount,
-        name: target.name,
-        reason: "uncovered",
-        severity: "high",
-        supplementId: target.supplementId,
-        unit: target.unit
+        amount: row.requestedAmount,
+        name: row.name,
+        reason: row.currentAmount > 0 ? "dose_gap" : "uncovered",
+        severity: row.currentAmount > 0 ? "medium" : "high",
+        supplementId: row.supplementId,
+        unit: row.unit
       });
     }
 
