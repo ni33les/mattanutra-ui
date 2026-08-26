@@ -58,7 +58,7 @@ function emptyAddress(country: string): AddressState {
     addressLine1: "",
     addressLine2: "",
     city: "",
-    country: country.trim().toUpperCase(),
+    country: country.trim().toUpperCase() || "TH",
     customerEmail: "",
     customerName: "",
     phone: "",
@@ -316,11 +316,19 @@ export function McpWebsiteCheckoutPanel(props: McpWebsiteCheckoutPanelProps) {
                     {labels.required}
                   </span>
                 </span>
-                <input
-                  className={`${inputClass(false)} bg-[var(--mn-cream)]`}
-                  readOnly
-                  value={displayCountryName(address.country, props.locale)}
-                />
+                <select
+                  autoComplete="country"
+                  className={inputClass(false)}
+                  id="country"
+                  name="country"
+                  onChange={(event) => update("country", event.target.value)}
+                  required
+                  value={address.country || "TH"}
+                >
+                  <option value={address.country || "TH"}>
+                    {displayCountryName(address.country || "TH", props.locale)}
+                  </option>
+                </select>
               </label>
               {field("customerName", labels.name, {
                 autoComplete: "name",

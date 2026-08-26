@@ -74,6 +74,7 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
   const shippingMinor = asMinor(props.shippingMinor);
   const taxMinor = asMinor(props.taxMinor);
   const totalPriceMinor = asMinor(props.totalPriceMinor);
+  const countryCode = (props.country || "TH").trim().toUpperCase() || "TH";
   const refundable = props.paid || Boolean(props.refundable);
   const unpaidOpen = !props.paid && !props.expired && !refundable;
   const scenarios = unpaidOpen
@@ -168,7 +169,6 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
           className="space-y-6"
           method="post"
         >
-          <input name="country" type="hidden" value={props.country} />
           <input name="returnTo" type="hidden" value={`/${props.locale}/mcp/checkout/${props.checkoutAccess}`} />
           <input name="success_url" readOnly type="hidden" value={props.successUrl} />
           <fieldset className="space-y-3 rounded-2xl border border-[var(--color-forest-glow)] bg-white p-5">
@@ -237,17 +237,22 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
               name="postalCode"
               required
             />
-            <label className="block space-y-1 text-sm" htmlFor="countryDisplay">
+            <label className="block space-y-1 text-sm" htmlFor="country">
               <span className="font-medium text-ink">
                 {agenticMessage(props.locale, "checkout.country")}
               </span>
-              <input
-                className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-[var(--brand-soft-green)] px-3 py-2 text-ink"
-                disabled
-                id="countryDisplay"
-                readOnly
-                value={displayCountryName(props.country, props.locale)}
-              />
+              <select
+                autoComplete="country"
+                className="w-full rounded-lg border border-[var(--color-forest-glow)] bg-white px-3 py-2 text-ink"
+                defaultValue={countryCode}
+                id="country"
+                name="country"
+                required
+              >
+                <option value={countryCode}>
+                  {displayCountryName(countryCode, props.locale)}
+                </option>
+              </select>
             </label>
           </fieldset>
           <label className="flex items-start gap-3 text-sm text-ink">
