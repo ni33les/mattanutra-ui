@@ -64,6 +64,44 @@ function subjectKeyVariants(value: string) {
   return [...new Set([trimmed, trimmed.replace(/-/g, "_"), trimmed.replace(/_/g, "-")])];
 }
 
+function labelledFactKey(
+  fact: Readonly<{ name?: string | null; subjectId?: string | null; unit?: string | null }>
+) {
+  const subject = fact.subjectId?.trim().toLowerCase() ?? "";
+
+  if (subject) {
+    return `id:${subject}`;
+  }
+
+  return `name:${(fact.name ?? "").trim().toLowerCase()}|${(fact.unit ?? "").trim().toLowerCase()}`;
+}
+
+export function collapseDuplicateLabelledFacts<
+  T extends Readonly<{
+    amount: number | null;
+    name?: string | null;
+    subjectId?: string | null;
+    unit?: string | null;
+  }>
+>(facts: readonly T[]): T[] {
+  const best = new Map<string, T>();
+
+  for (const fact of facts) {
+    if (fact.amount == null || fact.amount <= 0) {
+      continue;
+    }
+
+    const key = labelledFactKey(fact);
+    const existing = best.get(key);
+
+    if (!existing || fact.amount > (existing.amount ?? 0)) {
+      best.set(key, fact);
+    }
+  }
+
+  return [...best.values()];
+}
+
 export function contributionFor(
   product: MatcherProduct,
   targetName: string,
@@ -78,7 +116,7 @@ export function contributionFor(
     return [];
   }
 
-  return product.labelledContributions.filter((item) => {
+  const hits = product.labelledContributions.filter((item) => {
     if (item.amount == null || item.amount <= 0) {
       return false;
     }
@@ -96,6 +134,8 @@ export function contributionFor(
     return Boolean(item.name?.trim() && targetName.trim()) &&
       productKeysMatch(targetName, item.name);
   });
+
+  return collapseDuplicateLabelledFacts(hits);
 }
 
 export function compileVariant(input: Readonly<{

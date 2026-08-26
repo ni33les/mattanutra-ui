@@ -2,6 +2,7 @@ import {
   isFalseOmegaAttribution,
   isPrenatalOrFertilitySku
 } from "@/lib/agentic/catalogue/product-fit";
+import { collapseDuplicateLabelledFacts } from "@/lib/matcher/candidates";
 import type { CatalogueProduct } from "@/lib/agentic/catalogue/types";
 import { publicSupplementId } from "@/lib/agentic/contract/ids";
 import type { MatcherProduct } from "@/lib/matcher/types";
@@ -22,15 +23,17 @@ function contributionSubjectId(value: string | null | undefined) {
 
 export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
   const falseOmega = isFalseOmegaAttribution(product.candidate);
-  const labelledContributions = product.candidate.facts.map((fact) => {
-    const mappedId = contributionSubjectId(fact.supplementId);
-    return {
-      amount: fact.amount ?? fact.comparableAmount ?? 0,
-      name: fact.name,
-      subjectId: falseOmega ? null : mappedId,
-      unit: fact.unit
-    };
-  });
+  const labelledContributions = collapseDuplicateLabelledFacts(
+    product.candidate.facts.map((fact) => {
+      const mappedId = contributionSubjectId(fact.supplementId);
+      return {
+        amount: fact.amount ?? fact.comparableAmount ?? 0,
+        name: fact.name,
+        subjectId: falseOmega ? null : mappedId,
+        unit: fact.unit
+      };
+    })
+  );
   const contributionSubjectIds = falseOmega
     ? [...new Set(labelledContributions.map((item) => item.subjectId).filter((id): id is string => Boolean(id)))]
     : product.contributionSupplementIds;

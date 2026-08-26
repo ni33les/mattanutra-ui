@@ -289,32 +289,49 @@ function nutrientSplit(
   const requested: { amount: number; name: string; unit: string }[] = [];
   const incidental: { amount: number; name: string; unit: string }[] = [];
   const multiplier = Math.max(1, servingsPerDay);
+  const requestedKeys = new Set<string>();
+
+  for (const target of state.targets) {
+    for (const fact of contributionFor(
+      matcherProduct,
+      target.name,
+      target.supplementId
+    )) {
+      if (fact.amount == null || fact.amount <= 0 || !fact.name?.trim() || !fact.unit) {
+        continue;
+      }
+
+      const key = fact.name.trim().toLowerCase();
+
+      if (requestedKeys.has(key)) {
+        continue;
+      }
+
+      requestedKeys.add(key);
+      requested.push({
+        amount: fact.amount * multiplier,
+        name: fact.name,
+        unit: fact.unit
+      });
+    }
+  }
 
   for (const fact of matcherProduct.labelledContributions) {
     if (fact.amount == null || fact.amount <= 0 || !fact.name?.trim() || !fact.unit) {
       continue;
     }
 
-    const matchesTarget = state.targets.some((target) => {
-      const facts = contributionFor(
-        matcherProduct,
-        target.name,
-        target.supplementId
-      );
+    const key = fact.name.trim().toLowerCase();
 
-      return facts.includes(fact);
-    });
-    const row = {
+    if (requestedKeys.has(key)) {
+      continue;
+    }
+
+    incidental.push({
       amount: fact.amount * multiplier,
       name: fact.name,
       unit: fact.unit
-    };
-
-    if (matchesTarget) {
-      requested.push(row);
-    } else {
-      incidental.push(row);
-    }
+    });
   }
 
   const incidentalNutrients = uniqueBoundedNutrients(incidental);

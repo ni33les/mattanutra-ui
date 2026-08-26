@@ -11,6 +11,43 @@ describe("Phase 2 compactness ranking", () => {
     assert.match(source, /contributesUncovered/);
   });
 
+  it("does not double-count duplicate catalog D3 facts on one SKU", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-dup-d3-facts",
+      products: [
+        qaProduct({
+          facts: [
+            { amount: 200, key: "d3" },
+            { amount: 200, key: "d3" }
+          ],
+          id: "G-D3-DUP-200",
+          pills: 1,
+          priceThb: 120,
+          title: "Vitamin D3 200 IU"
+        })
+      ]
+    };
+    const result = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        targets: [qaTarget("d3", 2000)]
+      }),
+      catalog
+    );
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("G-D3-DUP-200"), true);
+    const d3 = qaTarget("d3", 2000);
+    const units = result.selected.coverageBySubject.get(d3.subjectId) ?? 0;
+    const variant = result.selected.variantIds.find((id) =>
+      id.startsWith("G-D3-DUP-200:x")
+    );
+    const servings = Number(variant?.slice("G-D3-DUP-200:x".length) || 1);
+    const expected = Math.round((200 * servings * 10_000) / 2000);
+    assert.equal(units, expected);
+    assert.equal(units === servings * 2000, false);
+  });
+
   it("does not stuff extra SKUs onto standalone D3 when a covering SKU exists", () => {
     const result = match(
       qaRequest({
