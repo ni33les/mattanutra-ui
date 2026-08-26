@@ -113,8 +113,6 @@ export function coverageFor(
   items: readonly BasketItem[] = []
 ): CoverageRow[] {
   return state.targets.map((target) => {
-    const coverageUnits = basket?.coverageBySubject.get(target.supplementId) ?? 0;
-    const rawCoveragePercent = Math.round(coverageUnits / 100);
     const current = state.currentSupplements.filter(
       (item) => item.supplementId === target.supplementId
     );
@@ -128,12 +126,6 @@ export function coverageFor(
       });
       return sum + (converted ?? 0);
     }, 0);
-    const deliveredScaled = basket?.exposure.totals.get(target.supplementId);
-    const deliveredTotal = deliveredScaled
-      ? amountFromScaled(deliveredScaled, target.unit, target.name)
-      : 0;
-    const deliveredAmount = Math.max(0, (deliveredTotal ?? 0) - currentAmount);
-    const totalExposureAmount = currentAmount + deliveredAmount;
     const limit = upperLimitAmount(target.name, target.unit, {
       ceilings: matcherSafetyCeilings(),
       profile: state.profile,
@@ -173,7 +165,25 @@ export function coverageFor(
       return [];
     });
 
-    const coveragePercent = rawCoveragePercent;
+    const deliveredFromFacts = contributors.reduce((sum, item) => sum + item.amount, 0);
+    const matcherUnits = basket?.coverageBySubject.get(target.supplementId) ?? 0;
+    const deliveredScaled = basket?.exposure.totals.get(target.supplementId);
+    const deliveredTotal = deliveredScaled
+      ? amountFromScaled(deliveredScaled, target.unit, target.name)
+      : 0;
+    const ignoreIncidentalFacts =
+      items.length > 0 && matcherUnits < 1 && deliveredFromFacts > 0;
+    const deliveredAmount = items.length > 0
+      ? ignoreIncidentalFacts
+        ? 0
+        : deliveredFromFacts
+      : Math.max(0, (deliveredTotal ?? 0) - currentAmount);
+    const publishedContributors = ignoreIncidentalFacts ? [] : contributors;
+    const totalExposureAmount = currentAmount + deliveredAmount;
+    const coveragePercent =
+      target.amount > 0
+        ? Math.round((totalExposureAmount / target.amount) * 100)
+        : 0;
     let status: CoverageRow["status"] = "uncovered";
 
     if (coveragePercent >= COVERED_THRESHOLD && coveragePercent <= 125) {
@@ -189,7 +199,7 @@ export function coverageFor(
     }
 
     return {
-      contributors,
+      contributors: publishedContributors,
       coveragePercent,
       currentAmount,
       deliveredAmount,
