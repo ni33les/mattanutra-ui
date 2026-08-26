@@ -256,7 +256,9 @@ export function productHitsCoverageFloor(
 
   const group = compileProductGroup(product, request);
   return Boolean(
-    group && groupCoversTargetAtFloor(group, request, target.subjectId)
+    group &&
+      groupCoversTargetAtFloor(group, request, target.subjectId) &&
+      contributingVariantForTarget(group, request, target.subjectId)
   );
 }
 
