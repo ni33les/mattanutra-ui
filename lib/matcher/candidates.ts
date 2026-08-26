@@ -775,14 +775,6 @@ export function compileGroups(
       .slice(0, 8);
 
     for (const product of pool) {
-      if (
-        deadlineAt != null &&
-        Date.now() >= deadlineAt &&
-        belowFloorAdded >= 1
-      ) {
-        break;
-      }
-
       if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
         break;
       }
@@ -1378,6 +1370,22 @@ function seedPriorityGroups(
     }
 
     const group = bestGroupForTarget(ranked, request, target.subjectId);
+
+    if (!group || seen.has(group.productId)) {
+      continue;
+    }
+
+    seen.add(group.productId);
+    priority.push(group);
+  }
+
+  for (const target of request.targets) {
+    const group = bestStandaloneContributorGroup(
+      ranked,
+      request,
+      target.subjectId,
+      seen
+    );
 
     if (!group || seen.has(group.productId)) {
       continue;

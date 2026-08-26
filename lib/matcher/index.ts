@@ -755,16 +755,14 @@ export function match(
       }
     }
 
-    if (Date.now() < deadlineAt || scored.length < 1) {
-      const salvaged = salvagePartialBasket({
-        groups: seller.groups,
-        request,
-        sellerId: seller.sellerId
-      });
+    const salvaged = salvagePartialBasket({
+      groups: seller.groups,
+      request,
+      sellerId: seller.sellerId
+    });
 
-      if (salvaged) {
-        scored.push(salvaged);
-      }
+    if (salvaged) {
+      scored.push(salvaged);
     }
   }
 

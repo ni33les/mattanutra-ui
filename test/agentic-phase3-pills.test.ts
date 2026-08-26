@@ -90,6 +90,56 @@ describe("Phase 3 fewest_pills ranking", () => {
     );
   });
 
+  it("keeps labelled dedicated partials over a lower-pill covering-only stack", () => {
+    const withPartials = scored({
+      coveredCount: 3,
+      dailyPills: 10,
+      dedicatedPartialCount: 2,
+      productIds: ["A", "B", "C", "D", "E"],
+      priceMinor: 472500
+    });
+    const coveringOnly = scored({
+      coveredCount: 3,
+      dailyPills: 4,
+      dedicatedPartialCount: 0,
+      productIds: ["A", "B", "C"],
+      priceMinor: 152800
+    });
+    assert.equal(
+      compareBaskets(
+        withPartials,
+        coveringOnly,
+        qaRequest({ optimization: "fewest_pills" })
+      ) < 0,
+      true
+    );
+  });
+
+  it("among the same dedicated-partial count, fewest_pills picks fewer pills", () => {
+    const tenPills = scored({
+      coveredCount: 3,
+      dailyPills: 10,
+      dedicatedPartialCount: 2,
+      productIds: ["A", "B", "C", "D", "E"],
+      priceMinor: 472500
+    });
+    const elevenPills = scored({
+      coveredCount: 3,
+      dailyPills: 11,
+      dedicatedPartialCount: 2,
+      productIds: ["A", "B", "C", "D", "F"],
+      priceMinor: 511100
+    });
+    assert.equal(
+      compareBaskets(
+        tenPills,
+        elevenPills,
+        qaRequest({ optimization: "fewest_pills" })
+      ) < 0,
+      true
+    );
+  });
+
   it("unconstrained fewest_pills is not strictly worse on pills and products than a 4/7 cap", () => {
     const products = [
       qaProduct({
