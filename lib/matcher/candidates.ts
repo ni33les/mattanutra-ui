@@ -896,8 +896,8 @@ export function compileGroups(
       });
     const strongest = [...ranked].sort((left, right) => {
       const amount =
-        convertedContributionUnits(right, target) -
-        convertedContributionUnits(left, target);
+        convertedContributionUnits(right, target) * BigInt(MAX_DAILY_UNITS) -
+        convertedContributionUnits(left, target) * BigInt(MAX_DAILY_UNITS);
 
       if (amount !== BigInt(0)) {
         return amount > BigInt(0) ? 1 : -1;
@@ -912,6 +912,19 @@ export function compileGroups(
       !pool.some((product) => product.productId === strongest.productId)
     ) {
       pool.unshift(strongest);
+    }
+
+    const jointCandidate = ranked.find(
+      (product) =>
+        jointTitle(product.title) &&
+        contributionFor(product, target.name, target.subjectId).length > 0
+    );
+
+    if (
+      jointCandidate &&
+      !pool.some((product) => product.productId === jointCandidate.productId)
+    ) {
+      pool.unshift(jointCandidate);
     }
 
     for (const product of pool) {
