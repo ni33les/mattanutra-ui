@@ -175,39 +175,58 @@ function dropRedundantProducts(input: Readonly<{
   selected: ScoredBasket;
 }>): ScoredBasket {
   let current = input.selected;
-  const singles = current.productIds.filter((productId) => {
-    const group = input.groups.find((item) => item.productId === productId);
+  let changed = true;
 
-    if (!group) {
-      return false;
+  while (changed) {
+    changed = false;
+    const pillsByProduct = new Map<string, number>();
+
+    for (const variantId of current.variantIds) {
+      const group = input.groups.find((item) =>
+        item.variants.some((variant) => variant.variantId === variantId)
+      );
+      const variant = group?.variants.find((item) => item.variantId === variantId);
+
+      if (!group || !variant) {
+        continue;
+      }
+
+      pillsByProduct.set(group.productId, variant.dailyPills);
     }
 
-    return (
-      input.request.targets.filter(
-        (target) =>
-          contributionFor(group.product, target.name, target.subjectId).length > 0
-      ).length <= 1
-    );
-  });
+    const ordered = [...current.productIds].sort((left, right) => {
+      const leftPills = pillsByProduct.get(left) ?? 0;
+      const rightPills = pillsByProduct.get(right) ?? 0;
 
-  for (const productId of singles) {
-    const keep = new Set(current.productIds.filter((id) => id !== productId));
-    const next = rescoreWithKeep({
-      groups: input.groups,
-      keep,
-      request: input.request,
-      selected: current
+      return rightPills - leftPills || left.localeCompare(right);
     });
 
-    if (!next) {
-      continue;
-    }
+    for (const productId of ordered) {
+      if (input.request.retainProductIds.includes(productId)) {
+        continue;
+      }
 
-    if (
-      next.coveredCount >= current.coveredCount &&
-      next.productCount < current.productCount
-    ) {
-      current = next;
+      const keep = new Set(current.productIds.filter((id) => id !== productId));
+      const next = rescoreWithKeep({
+        groups: input.groups,
+        keep,
+        request: input.request,
+        selected: current
+      });
+
+      if (!next) {
+        continue;
+      }
+
+      if (
+        next.coveredCount >= current.coveredCount &&
+        (next.productCount < current.productCount ||
+          next.dailyPills < current.dailyPills)
+      ) {
+        current = next;
+        changed = true;
+        break;
+      }
     }
   }
 

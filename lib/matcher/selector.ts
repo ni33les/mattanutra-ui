@@ -226,12 +226,8 @@ export function compareBaskets(
 
   if (request.optimization === "fewest_pills") {
     const bestCovered = Math.max(left.coveredCount, right.coveredCount);
-    const leftOk =
-      meetsCoverageFloor(left, floorBest, config) &&
-      left.coveredCount >= bestCovered;
-    const rightOk =
-      meetsCoverageFloor(right, floorBest, config) &&
-      right.coveredCount >= bestCovered;
+    const leftOk = left.coveredCount >= bestCovered;
+    const rightOk = right.coveredCount >= bestCovered;
 
     if (leftOk !== rightOk) {
       return leftOk ? -1 : 1;
