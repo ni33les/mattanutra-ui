@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { publicSafetyGuidance } from "../lib/agentic/public-mapper.ts";
-import { evaluateSafety, planStatus } from "../lib/agentic/plan/safety.ts";
+import { evaluateSafety, planStatus, safetyQuestions } from "../lib/agentic/plan/safety.ts";
 import {
   resetMatcherSafetyCeilings,
   setMatcherSafetyCeilings
@@ -200,6 +200,71 @@ describe("plan status fail-closed on oversupply", () => {
       unmetRequirements: []
     });
     assert.equal(status, "needs_input");
+  });
+
+  it("closes a bound review acknowledgement at exact UL with zero remaining gap", () => {
+    setMatcherSafetyCeilings([
+      {
+        lifeStage: "adult",
+        maxAmount: 350,
+        maxUnit: "mg",
+        name: "Magnesium",
+        sourceScope: "supplemental",
+        subjectId: "sup_mag"
+      }
+    ]);
+    const selected = option([
+      coverage({
+        coveragePercent: 175,
+        deliveredAmount: 350,
+        percentOfUpperLimit: 100,
+        remainingGap: 0,
+        requestedAmount: 350,
+        status: "upper_limit_risk",
+        totalExposureAmount: 350,
+        upperLimitAmount: 350
+      })
+    ]);
+    const guidance = evaluateSafety({
+      locale: "en",
+      selected,
+      state: state()
+    });
+    const ackIds = guidance
+      .filter((item) => item.action === "acknowledge")
+      .map((item) => item.guidanceId);
+    const acked = {
+      ...state(),
+      safetyAcknowledgement: {
+        confirmed: true as const,
+        guidanceIds: ackIds,
+        revision: 1
+      }
+    };
+    const questions = safetyQuestions({
+      guidance,
+      locale: "en",
+      selected,
+      shownRevision: 1,
+      state: acked
+    });
+    assert.equal(
+      questions.some((item) => item.questionId === "q_safety_ack"),
+      false
+    );
+    assert.equal(
+      questions.some((item) => item.questionId.startsWith("q_gap_")),
+      false
+    );
+    const status = planStatus({
+      guidance,
+      questions,
+      selected,
+      state: acked,
+      unmetRequirements: []
+    });
+    assert.equal(status, "ready");
+    resetMatcherSafetyCeilings();
   });
 
   it("stamps catalog band id and version onto public UL guidance", () => {

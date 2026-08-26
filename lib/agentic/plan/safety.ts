@@ -550,6 +550,7 @@ export function safetyQuestions(input: Readonly<{
 
     if (
       row.status !== "covered" &&
+      !(row.status === "upper_limit_risk" && row.remainingGap === 0) &&
       !input.state.acceptedGaps.some((gap) => gap.supplementId === row.supplementId)
     ) {
       questions.push({
@@ -747,7 +748,16 @@ export function planStatus(input: Readonly<{
     return "blocked";
   }
 
+  const reviewAcked =
+    input.state.safetyAcknowledgement?.confirmed === true &&
+    input.guidance
+      .filter((item) => item.action === "acknowledge")
+      .every((item) =>
+        Boolean(input.state.safetyAcknowledgement?.guidanceIds.includes(item.guidanceId))
+      );
+
   if (
+    !reviewAcked &&
     input.selected.coverage.some(
       (row) =>
         row.upperLimitAmount != null &&
@@ -758,7 +768,9 @@ export function planStatus(input: Readonly<{
   }
 
   const gaps = input.selected.coverage.filter(
-    (row) => row.status !== "covered"
+    (row) =>
+      row.status !== "covered" &&
+      !(reviewAcked && row.status === "upper_limit_risk" && row.remainingGap === 0)
   );
 
   if (
