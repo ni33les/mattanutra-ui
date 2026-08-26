@@ -168,17 +168,31 @@ export async function POST(request: Request, { params }: RouteProps) {
     return NextResponse.json({ message: "Unknown test scenario." }, { status: 400 });
   }
 
+  const event = mockEventForScenario({
+    amountMinor: asMinor(order.totalPriceMinor),
+    currency: order.currency,
+    orderId: order.id,
+    providerSessionId: order.providerSessionId,
+    scenario: requestedScenario
+  });
+
   await applyVerifiedPaymentEvent({
-    event: mockEventForScenario({
-      amountMinor: asMinor(order.totalPriceMinor),
-      currency: order.currency,
-      orderId: order.id,
-      providerSessionId: order.providerSessionId,
-      scenario: requestedScenario
-    }),
+    event,
     now,
     store: runtime.store
   });
+
+  if (requestedScenario === "processing_then_success") {
+    await applyVerifiedPaymentEvent({
+      event: {
+        ...event,
+        providerEventId: `${event.providerEventId}_success`,
+        status: "succeeded"
+      },
+      now,
+      store: runtime.store
+    });
+  }
 
   const paidForRetail = await runtime.store.getOrder(order.id);
 

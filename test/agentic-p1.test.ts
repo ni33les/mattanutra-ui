@@ -1360,6 +1360,8 @@ describe("agentic P1 pack fixes", () => {
     const support = readFileSync(new URL("../lib/agentic/support.ts", import.meta.url), "utf8");
 
     assert.match(pay, /joinMcpPaidOrderToRetail/);
+    assert.match(pay, /processing_then_success/);
+    assert.match(pay, /providerEventId: `\$\{event.providerEventId\}_success`/);
     assert.match(simulate, /joinMcpPaidOrderToRetail/);
     assert.match(pay, /postedScenario/);
     assert.equal(pay.includes('form.get("scenario") ?? "success"'), false);
