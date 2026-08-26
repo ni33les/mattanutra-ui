@@ -121,4 +121,42 @@ describe("execute key reuses one unpaid order", () => {
     assert.equal(replay.orderStatus, "completed");
     assert.ok(Number(replay.stateVersion) >= 2);
   });
+
+  it("does not mint a second chargeable order after pay", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "exec-dup-plan-0000000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
+        requirements: {},
+        targets: [{ amount: 500, name: "Vitamin C", unit: "mg" }]
+      }
+    });
+    assert.equal(plan.status, "ready");
+    const first = await call(runtime, "execute", {
+      expectedRevision: plan.revision,
+      idempotencyKey: "exec-dup-key-a-0000001",
+      planHandle: plan.planHandle
+    });
+    await simulatePayment({
+      config: runtime.config,
+      now: new Date().toISOString(),
+      orderHandle: String(first.orderHandle),
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const second = await call(runtime, "execute", {
+      expectedRevision: plan.revision,
+      idempotencyKey: "exec-dup-key-b-0000001",
+      planHandle: plan.planHandle
+    });
+    assert.equal(second.ok, true);
+    assert.equal(second.orderHandle, first.orderHandle);
+    assert.equal(second.paymentStatus, "paid");
+    assert.equal(second.orderStatus, "completed");
+  });
 });

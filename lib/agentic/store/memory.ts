@@ -122,6 +122,21 @@ export function createMemoryStore(): AgenticStore {
 
       return matches[0] ? clone(matches[0]) : null;
     },
+    async getActiveOrderForPlanRevision(planId, planRevision) {
+      const matches = [...orders.values()]
+        .filter(
+          (record) =>
+            record.planId === planId &&
+            record.planRevision === planRevision &&
+            record.orderStatus !== "expired" &&
+            record.orderStatus !== "cancelled" &&
+            !record.cancelledAt &&
+            !record.expiredAt
+        )
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+
+      return matches[0] ? clone(matches[0]) : null;
+    },
     async getExecuteResponseForOrder(orderId) {
       const matches = [...idempotency.values()]
         .filter(

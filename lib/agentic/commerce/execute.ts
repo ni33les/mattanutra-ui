@@ -218,37 +218,37 @@ export async function executeTool(input: Readonly<{
       return executeError(locale, "availability_changed");
     }
 
-    const openOrder = await store.getOpenOrderForPlanRevision(
+    const existingOrder = await store.getActiveOrderForPlanRevision(
       plan.id,
       plan.currentRevision
     );
 
-    if (
-      openOrder &&
-      openOrder.orderStatus === "open" &&
-      openOrder.paymentStatus === "unpaid" &&
-      !openOrder.cancelledAt &&
-      !openOrder.expiredAt &&
-      (!openOrder.checkoutExpiresAt || openOrder.checkoutExpiresAt > input.now)
-    ) {
-      const prior = await store.getExecuteResponseForOrder(openOrder.id);
+    if (existingOrder) {
+      const prior = await store.getExecuteResponseForOrder(existingOrder.id);
       const reused =
         prior && typeof prior === "object"
           ? (prior as ExecuteSuccess)
           : null;
 
-      if (reused?.ok === true && reused.orderHandle && reused.checkoutUrl) {
+      if (reused?.ok === true && reused.orderHandle) {
+        const live = await withLiveOrderState({
+          config: input.config,
+          now: input.now,
+          scope: input.scope,
+          store,
+          stored: reused
+        });
         await commitIdempotency({
           key: input.idempotencyKey,
           now: input.now,
           operation: "execute",
           ownerScope,
           payload,
-          resourceIds: { orderId: openOrder.id },
-          response: reused,
+          resourceIds: { orderId: existingOrder.id },
+          response: live,
           store
         });
-        return reused;
+        return live;
       }
     }
 

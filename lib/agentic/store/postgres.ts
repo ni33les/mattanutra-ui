@@ -126,6 +126,20 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
       `;
       return row ? mapOrder(row) : null;
     },
+    async getActiveOrderForPlanRevision(planId, planRevision) {
+      const [row] = await sql`
+        select * from public.agentic_orders
+        where plan_id = ${planId}::uuid
+          and plan_revision = ${planRevision}
+          and order_status not in ('expired', 'cancelled')
+          and cancelled_at is null
+          and expired_at is null
+        order by created_at asc
+        limit 1
+        for update
+      `;
+      return row ? mapOrder(row) : null;
+    },
     async getExecuteResponseForOrder(orderId) {
       const [row] = await sql`
         select response_json from public.agentic_idempotency_records

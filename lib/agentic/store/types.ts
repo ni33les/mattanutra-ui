@@ -212,6 +212,10 @@ export type AgenticStore = {
     planId: string,
     planRevision: number
   ): Promise<OrderRecord | null>;
+  getActiveOrderForPlanRevision(
+    planId: string,
+    planRevision: number
+  ): Promise<OrderRecord | null>;
   getExecuteResponseForOrder(orderId: string): Promise<unknown | null>;
   getOrderItems(orderId: string): Promise<readonly OrderItemRecord[]>;
   getOutboxPending(): Promise<readonly OutboxEventRecord[]>;
