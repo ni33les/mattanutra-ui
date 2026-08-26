@@ -267,3 +267,15 @@ export function safetyCeilingFor(
     MATCHER_SOURCE_SCOPE
   );
 }
+
+export function catalogBandRuleId(ceiling: SafetyCeiling | null | undefined) {
+  const id = ceiling?.bandId?.trim();
+  return id ? id : null;
+}
+
+export function catalogBandRulesVersion(ceiling: SafetyCeiling | null | undefined) {
+  const version = ceiling?.bandVersion;
+  return typeof version === "number" && Number.isInteger(version) && version > 0
+    ? String(version)
+    : null;
+}

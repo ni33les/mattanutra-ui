@@ -253,6 +253,8 @@ export function publicSafetyGuidance(row: SafetyGuidance) {
     message: row.message,
     messageKey: row.messageKey,
     requiresSafetyAcknowledgement: row.action === "acknowledge" || row.action === "block",
+    ruleId: row.ruleId,
+    rulesVersion: row.rulesVersion,
     severity: row.severity,
     ...(row.nutrientName ? { nutrientName: row.nutrientName } : {}),
     ...(row.unit ? { unit: row.unit } : {}),

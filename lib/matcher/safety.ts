@@ -1,6 +1,7 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
 import {
+  catalogBandRuleId,
   catalogSubjectHasCeiling,
   isPediatricSafetyProfile,
   matcherSafetyCeilingsUnavailable,
@@ -127,6 +128,19 @@ function ceilingThreshold(
   return resolved;
 }
 
+function catalogUlRuleId(
+  request: CanonicalRequest,
+  subjectId: string,
+  fallback: string
+) {
+  const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
+    name: nameOf(request, subjectId),
+    profile: request.profile,
+    subjectId
+  });
+  return catalogBandRuleId(ceiling) ?? fallback;
+}
+
 export function exposureExceedsCeiling(
   request: CanonicalRequest,
   subjectId: string,
@@ -241,7 +255,7 @@ export function evaluateSafety(input: Readonly<{
           family: "dose",
           guidanceId: guidanceId("dose_review_required", "dose"),
           nutrientName: nameOf(input.request, subjectId) || null,
-          ruleId: `ul:missing:${subjectId}`,
+          ruleId: catalogUlRuleId(input.request, subjectId, `ul:missing:${subjectId}`),
           subjectId,
           thresholdUnits: null,
           unit: unitOf(input.request, subjectId)
@@ -259,7 +273,7 @@ export function evaluateSafety(input: Readonly<{
         family: "dose",
         guidanceId: guidanceId("dose_review_required", "dose"),
         nutrientName: nameOf(input.request, subjectId) || null,
-        ruleId: `ul:${subjectId}`,
+        ruleId: catalogUlRuleId(input.request, subjectId, `ul:${subjectId}`),
         subjectId,
         thresholdUnits: threshold.units,
         unit: unitOf(input.request, subjectId)
@@ -273,7 +287,7 @@ export function evaluateSafety(input: Readonly<{
         family: "dose",
         guidanceId: guidanceId("dose_review_required", "dose"),
         nutrientName: nameOf(input.request, subjectId) || null,
-        ruleId: `ul:${subjectId}`,
+        ruleId: catalogUlRuleId(input.request, subjectId, `ul:${subjectId}`),
         subjectId,
         thresholdUnits: threshold.units,
         unit: unitOf(input.request, subjectId)
@@ -360,7 +374,7 @@ export function evaluateSafety(input: Readonly<{
         family: "dose",
         guidanceId: guidanceId("dose_review_required", "dose"),
         nutrientName: incidental.name,
-        ruleId: `ul:incidental:${incidental.subjectId}`,
+        ruleId: catalogBandRuleId(ceiling) ?? `ul:incidental:${incidental.subjectId}`,
         subjectId: incidental.subjectId,
         thresholdUnits: threshold.units,
         unit

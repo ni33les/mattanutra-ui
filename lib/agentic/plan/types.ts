@@ -272,6 +272,7 @@ export type SafetyGuidance = Readonly<{
   messageKey: string;
   nutrientName: string | null;
   productIds: readonly string[];
+  ruleId: string;
   rulesVersion: string;
   severity: "blocking" | "high" | "info";
   sourceScope: "supplemental" | "total" | null;

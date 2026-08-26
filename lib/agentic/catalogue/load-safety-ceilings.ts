@@ -79,6 +79,8 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
 
     const rows = await sql<
       Array<{
+        band_id: string;
+        band_version: string | number;
         life_stage: string | null;
         max_amount: string | number | null;
         max_unit: string;
@@ -88,6 +90,8 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
       }>
     >`
       select distinct on (supplements.id, bands.life_stage, bands.source_scope)
+        bands.id::text as band_id,
+        bands.version as band_version,
         supplements.id::text as supplement_id,
         supplements.name,
         bands.life_stage,
@@ -124,7 +128,12 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
         continue;
       }
 
+      const bandVersion = Number(row.band_version);
       const ceiling = {
+        ...(row.band_id.trim() ? { bandId: row.band_id.trim() } : {}),
+        ...(Number.isInteger(bandVersion) && bandVersion > 0
+          ? { bandVersion }
+          : {}),
         lifeStage,
         maxAmount: amount,
         maxUnit: unit,

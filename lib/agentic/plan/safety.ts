@@ -3,9 +3,11 @@ import { agenticMessage } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
 import {
+  catalogBandRuleId,
+  catalogBandRulesVersion,
   catalogSubjectHasCeiling,
-  isPediatricSafetyProfile,
-  matcherSafetyCeilings
+  matcherSafetyCeilings,
+  safetyCeilingFor
 } from "@/lib/matcher/safety-ceilings";
 import { doseComparable, fromComparable, roundDose } from "@/lib/agentic/plan/units";
 import type {
@@ -15,6 +17,23 @@ import type {
   SafetyGuidance,
   StackOption
 } from "@/lib/agentic/plan/types";
+
+function catalogRule(
+  name: string,
+  subjectId: string,
+  profile: CanonicalPlanState["profile"],
+  fallbackRuleId: string
+) {
+  const ceiling = safetyCeilingFor(matcherSafetyCeilings(), {
+    name,
+    profile,
+    subjectId
+  });
+  return {
+    ruleId: catalogBandRuleId(ceiling) ?? fallbackRuleId,
+    rulesVersion: catalogBandRulesVersion(ceiling) ?? GUIDANCE_RULES_VERSION
+  };
+}
 
 function guidance(input: Readonly<{
   action: SafetyGuidance["action"];
@@ -26,6 +45,8 @@ function guidance(input: Readonly<{
   exposure?: number | null;
   nutrientName?: string | null;
   requested?: number | null;
+  ruleId?: string;
+  rulesVersion?: string;
   sourceScope?: SafetyGuidance["sourceScope"];
   threshold?: number | null;
   unit?: string | null;
@@ -54,7 +75,8 @@ function guidance(input: Readonly<{
     messageKey,
     nutrientName: input.nutrientName ?? null,
     productIds: input.productIds,
-    rulesVersion: GUIDANCE_RULES_VERSION,
+    ruleId: input.ruleId ?? family,
+    rulesVersion: input.rulesVersion ?? GUIDANCE_RULES_VERSION,
     severity: input.severity,
     sourceScope: input.sourceScope ?? null,
     supplementIds: input.supplementIds,
@@ -188,7 +210,13 @@ export function evaluateSafety(input: Readonly<{
         sourceScope: "supplemental",
         supplementIds: [target.supplementId],
         threshold: limit,
-        unit: target.unit
+        unit: target.unit,
+        ...catalogRule(
+          target.name,
+          target.supplementId,
+          input.state.profile,
+          `ul:${target.supplementId}`
+        )
       }));
     }
   }
@@ -220,7 +248,13 @@ export function evaluateSafety(input: Readonly<{
         sourceScope: "supplemental",
         supplementIds: [row.supplementId],
         threshold: null,
-        unit: row.unit
+        unit: row.unit,
+        ...catalogRule(
+          row.name,
+          row.supplementId,
+          input.state.profile,
+          `ul:missing:${row.supplementId}`
+        )
       }));
     } else if (
       limit == null &&
@@ -239,7 +273,13 @@ export function evaluateSafety(input: Readonly<{
         sourceScope: "supplemental",
         supplementIds: [row.supplementId],
         threshold: null,
-        unit: row.unit
+        unit: row.unit,
+        ...catalogRule(
+          row.name,
+          row.supplementId,
+          input.state.profile,
+          `ul:missing:${row.supplementId}`
+        )
       }));
     } else if (
       limit != null &&
@@ -259,7 +299,13 @@ export function evaluateSafety(input: Readonly<{
         sourceScope: "supplemental",
         supplementIds: [row.supplementId],
         threshold: limit,
-        unit: row.unit
+        unit: row.unit,
+        ...catalogRule(
+          row.name,
+          row.supplementId,
+          input.state.profile,
+          `ul:${row.supplementId}`
+        )
       }));
     } else if (limit != null && Number.isFinite(limit) && limit > 0 && row.totalExposureAmount > limit) {
       items.push(guidance({
@@ -274,7 +320,13 @@ export function evaluateSafety(input: Readonly<{
         sourceScope: "supplemental",
         supplementIds: [row.supplementId],
         threshold: limit,
-        unit: row.unit
+        unit: row.unit,
+        ...catalogRule(
+          row.name,
+          row.supplementId,
+          input.state.profile,
+          `ul:${row.supplementId}`
+        )
       }));
     } else if (limit != null && Number.isFinite(limit) && limit > 0 && row.totalExposureAmount >= limit) {
       items.push(guidance({
@@ -289,7 +341,13 @@ export function evaluateSafety(input: Readonly<{
         sourceScope: "supplemental",
         supplementIds: [row.supplementId],
         threshold: limit,
-        unit: row.unit
+        unit: row.unit,
+        ...catalogRule(
+          row.name,
+          row.supplementId,
+          input.state.profile,
+          `ul:${row.supplementId}`
+        )
       }));
     }
 
@@ -367,7 +425,13 @@ export function evaluateSafety(input: Readonly<{
         sourceScope: "supplemental",
         supplementIds: [],
         threshold: limit,
-        unit: nutrient.unit
+        unit: nutrient.unit,
+        ...catalogRule(
+          nutrient.name,
+          nutrient.name,
+          input.state.profile,
+          `ul:incidental:${nutrient.name}`
+        )
       }));
     }
   }

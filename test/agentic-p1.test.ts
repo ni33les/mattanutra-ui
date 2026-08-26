@@ -727,7 +727,14 @@ describe("agentic P1 pack fixes", () => {
     const encoded = JSON.stringify(plan);
     assert.equal(encoded.includes(":null"), false);
     assert.equal(/:\s*\[\]/.test(encoded), false);
-    assert.equal(encoded.includes("rulesVersion"), false);
+    assert.equal(encoded.includes("rulesVersion"), true);
+    assert.equal(encoded.includes("ruleId"), true);
+    const guidance = plan.safetyGuidance as Array<{
+      ruleId: string;
+      rulesVersion: string;
+    }>;
+    assert.ok(guidance.length > 0);
+    assert.ok(guidance.every((item) => item.ruleId.length > 0 && item.rulesVersion.length > 0));
   });
 
   it("exposes a DEV checkout test scenario selector", () => {

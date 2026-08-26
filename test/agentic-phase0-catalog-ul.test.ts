@@ -56,6 +56,15 @@ const CHILD_MG: SafetyCeiling = {
 };
 
 describe("Phase 0 catalog-sourced upper limits", () => {
+  it("loads catalog safety band ids and versions onto matcher ceilings", () => {
+    const source = readFileSync("lib/agentic/catalogue/load-safety-ceilings.ts", "utf8");
+    assert.match(source, /bands\.id::text as band_id/);
+    assert.match(source, /bands\.version as band_version/);
+    assert.match(source, /bandId:/);
+    assert.match(source, /bandVersion/);
+    assert.doesNotMatch(source, /maxAmount:\s*350/);
+  });
+
   it("does not encode NIH milligram constants in the matcher selector", () => {
     const source = readFileSync("lib/matcher/safety-ceilings.ts", "utf8");
     assert.doesNotMatch(source, /nihBandFor/);
