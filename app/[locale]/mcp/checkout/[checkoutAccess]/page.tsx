@@ -75,7 +75,7 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
     sessionId: sessionId || undefined
   });
 
-  if (paidTracking) {
+  if (paidTracking && runtime.config.paymentProvider !== "mock") {
     redirect(paidTracking);
   }
 

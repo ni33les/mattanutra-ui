@@ -52,4 +52,37 @@ describe("agentic checkout country field", () => {
     assert.equal(/<input[^>]*name="country"[^>]*type="hidden"/.test(html), false);
     assert.match(html, /value="TH"/);
   });
+
+  it("keeps a named country field and refund scenario on the paid checkout", () => {
+    const html = renderToStaticMarkup(
+      createElement(AgenticCheckoutPanel, {
+        checkoutAccess: "chk_test_access_token_32chars_min",
+        country: "TH",
+        currency: "THB",
+        expired: false,
+        items: [
+          {
+            dailyPills: 1,
+            form: "capsule",
+            lineTotalMinor: 10000,
+            productName: "BIO C",
+            quantity: 1
+          }
+        ],
+        locale: "en",
+        orderReference: "MN-TEST",
+        paid: true,
+        refundable: true,
+        shippingMinor: 0,
+        subtotalMinor: 10000,
+        successUrl: "/en/order/track/x",
+        taxMinor: 0,
+        totalPriceMinor: 10000
+      })
+    );
+    assert.match(html, /<select[^>]*name="country"/);
+    assert.match(html, /name="scenario"/);
+    assert.match(html, /value="refund"/);
+    assert.match(html, /method="post"/);
+  });
 });
