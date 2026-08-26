@@ -109,7 +109,31 @@ export function collapseDuplicateLabelledFacts<
   return [...best.values()];
 }
 
+const contributionMemo = new WeakMap<MatcherProduct, Map<string, ReturnType<typeof contributionForFresh>>>();
+
 export function contributionFor(
+  product: MatcherProduct,
+  targetName: string,
+  targetSubjectId: string
+) {
+  const key = `${targetName}\0${targetSubjectId}`;
+  let byTarget = contributionMemo.get(product);
+
+  if (!byTarget) {
+    byTarget = new Map();
+    contributionMemo.set(product, byTarget);
+  }
+
+  if (byTarget.has(key)) {
+    return byTarget.get(key)!;
+  }
+
+  const hits = contributionForFresh(product, targetName, targetSubjectId);
+  byTarget.set(key, hits);
+  return hits;
+}
+
+function contributionForFresh(
   product: MatcherProduct,
   targetName: string,
   targetSubjectId: string
@@ -710,7 +734,7 @@ export function compileGroups(
   );
 
   for (const product of dedicatedMapped) {
-    tryCompile(product, true);
+    tryCompile(product, false);
   }
 
   for (const product of otherMapped) {

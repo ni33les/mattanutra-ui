@@ -249,20 +249,39 @@ export function canonicalNutrientKey(value: string) {
   return aliases[0] ?? normalizeProductKey(value);
 }
 
+const productKeysMatchMemo = new Map<string, boolean>();
+
 export function productKeysMatch(
   left: string,
   right: string,
   leftAliases: readonly string[] = [],
   rightAliases: readonly string[] = []
 ) {
-  const leftKeys = matchKeyAliases(left, leftAliases);
-  const rightKeys = matchKeyAliases(right, rightAliases);
+  const memoable = leftAliases.length < 1 && rightAliases.length < 1;
+  const memoKey = memoable
+    ? left < right
+      ? `${left}\0${right}`
+      : `${right}\0${left}`
+    : "";
+  if (memoable) {
+    const cached = productKeysMatchMemo.get(memoKey);
 
-  if ([...leftKeys].some((alias) => rightKeys.has(alias))) {
-    return true;
+    if (cached !== undefined) {
+      return cached;
+    }
   }
 
-  return [...leftKeys].some((leftKey) =>
-    [...rightKeys].some((rightKey) => fuzzyTokensMatch(leftKey, rightKey))
-  );
+  const leftKeys = matchKeyAliases(left, leftAliases);
+  const rightKeys = matchKeyAliases(right, rightAliases);
+  const matched =
+    [...leftKeys].some((alias) => rightKeys.has(alias)) ||
+    [...leftKeys].some((leftKey) =>
+      [...rightKeys].some((rightKey) => fuzzyTokensMatch(leftKey, rightKey))
+    );
+
+  if (memoable) {
+    productKeysMatchMemo.set(memoKey, matched);
+  }
+
+  return matched;
 }
