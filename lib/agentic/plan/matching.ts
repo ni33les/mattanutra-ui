@@ -150,14 +150,22 @@ export function coverageFor(
       });
 
       if (matching.length > 0) {
-        const amount = matching.reduce((sum, nutrient) => sum + nutrient.amount, 0);
-        const unit = matching[0]?.unit ?? target.unit;
+        const amount = matching.reduce((sum, nutrient) => {
+          const converted = convertAmount({
+            amount: nutrient.amount,
+            fromUnit: nutrient.unit,
+            subjectId: target.supplementId,
+            subjectName: target.name,
+            toUnit: target.unit
+          });
+          return sum + (converted ?? 0);
+        }, 0);
         return [
           {
             amount,
             productId: item.productId,
             productName: item.productName,
-            unit
+            unit: target.unit
           }
         ];
       }
