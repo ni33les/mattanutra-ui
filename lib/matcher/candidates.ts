@@ -524,7 +524,10 @@ function keepCompiledContributor(
     }
 
     return (
-      request.targets.length === 1 && groupCoversTarget(group, target.subjectId)
+      (request.targets.length === 1 ||
+        request.profile.lifeStage === "pregnant" ||
+        request.profile.lifeStage === "trying_to_conceive") &&
+      groupCoversTarget(group, target.subjectId)
     );
   });
 }
@@ -688,7 +691,12 @@ export function compileGroups(
 
       if (
         !coversFloor &&
-        !(request.targets.length === 1 && groupCoversTarget(group, target.subjectId))
+        !(
+          (request.targets.length === 1 ||
+            request.profile.lifeStage === "pregnant" ||
+            request.profile.lifeStage === "trying_to_conceive") &&
+          groupCoversTarget(group, target.subjectId)
+        )
       ) {
         continue;
       }
