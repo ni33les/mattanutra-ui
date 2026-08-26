@@ -10,6 +10,7 @@ import { issueCapability, resolveCapability } from "@/lib/agentic/capabilities";
 import {
   beginIdempotency,
   commitIdempotency,
+  isIdempotencyRace,
   overwriteIdempotency
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
@@ -700,7 +701,45 @@ export async function planTool(input: Readonly<{
     }
   }
 
-  const prepared = await input.store.transaction(async (store) => {
+  let prepared: PreparedPlanCommand | AgenticErrorResult;
+  try {
+    prepared = await persistPreparedPlan();
+  } catch (error) {
+    if (!isIdempotencyRace(error)) {
+      throw error;
+    }
+
+    const raced = await beginIdempotency<PlanToolSuccess>({
+      key: input.payload.idempotencyKey,
+      now: input.now,
+      operation: "plan",
+      ownerScope,
+      payload: input.payload,
+      store: input.store
+    });
+
+    if (raced.kind === "conflict") {
+      return raced.error;
+    }
+
+    if (raced.kind !== "replay") {
+      throw error;
+    }
+
+    if (raced.response.status !== "processing") {
+      return raced.response;
+    }
+
+    payload = {
+      ...input.payload,
+      expectedRevision: raced.response.revision,
+      planHandle: raced.response.planHandle
+    };
+    prepared = await persistPreparedPlan();
+  }
+
+  async function persistPreparedPlan() {
+    return input.store.transaction(async (store) => {
     const answers = incomingAnswers(payload);
     const ack = incomingAck(payload);
     const selectOptionId =
@@ -926,7 +965,8 @@ export async function planTool(input: Readonly<{
       shownRevision,
       state
     } satisfies PreparedPlanCommand;
-  });
+    });
+  }
 
   if (!prepared || typeof prepared !== "object" || !("planId" in prepared)) {
     return prepared as AgenticErrorResult;

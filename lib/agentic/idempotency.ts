@@ -139,6 +139,35 @@ export async function commitIdempotency(input: Readonly<{
   return record;
 }
 
+export function isIdempotencyRace(error: unknown) {
+  if (error instanceof Error && error.message === "idempotency_conflict") {
+    return true;
+  }
+
+  if (!error || typeof error !== "object") {
+    return /idempotency_conflict|agentic_idempotency_records_pkey/i.test(
+      String(error)
+    );
+  }
+
+  const record = error as {
+    code?: unknown;
+    constraint?: unknown;
+    constraint_name?: unknown;
+    message?: unknown;
+  };
+  const constraint = String(record.constraint ?? record.constraint_name ?? "");
+  const message = String(record.message ?? "");
+
+  if (record.code === "23505" && /agentic_idempotency_records/i.test(constraint)) {
+    return true;
+  }
+
+  return /idempotency_conflict|agentic_idempotency_records_pkey/i.test(
+    `${constraint} ${message}`
+  );
+}
+
 export async function overwriteIdempotency(input: Readonly<{
   key: string;
   now: string;

@@ -1,7 +1,16 @@
 import { createHash } from "node:crypto";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 
+const snapshotIdMemo = new Map<string, string>();
+
 export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
+  const memoKey = `${snapshot.catalogueVersion}:${snapshot.availabilityAsOf}:${snapshot.products.length}`;
+  const cached = snapshotIdMemo.get(memoKey);
+
+  if (cached) {
+    return cached;
+  }
+
   const hash = createHash("sha256");
   hash.update(snapshot.catalogueVersion);
   hash.update("\0");
@@ -21,7 +30,9 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
     hash.update("\n");
   }
 
-  return `snap_${hash.digest("hex").slice(0, 16)}`;
+  const id = `snap_${hash.digest("hex").slice(0, 16)}`;
+  snapshotIdMemo.set(memoKey, id);
+  return id;
 }
 
 export function freezeCatalogueSnapshot(

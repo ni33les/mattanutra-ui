@@ -209,8 +209,13 @@ export function createMemoryStore(): AgenticStore {
     },
     async insertIdempotency(record) {
       const key = idempotencyKey(record.operation, record.ownerScope, record.key);
+      const existing = idempotency.get(key);
 
-      if (idempotency.has(key)) {
+      if (existing) {
+        if (existing.requestHash === record.requestHash) {
+          return;
+        }
+
         throw new Error("idempotency_conflict");
       }
 

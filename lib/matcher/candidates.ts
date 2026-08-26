@@ -501,7 +501,7 @@ function dedicatedTargetCount(product: MatcherProduct, request: CanonicalRequest
   );
 }
 
-function labelledTargetCount(product: MatcherProduct, request: CanonicalRequest) {
+export function labelledTargetCount(product: MatcherProduct, request: CanonicalRequest) {
   return request.targets.reduce(
     (sum, target) =>
       sum +
@@ -550,7 +550,40 @@ function labelledForRequest(
   );
 }
 
+const compiledGroupMemo = new WeakMap<
+  MatcherProduct,
+  { group: ProductGroup | null; token: string }
+>();
+
+function compileSessionToken(request: CanonicalRequest) {
+  return [
+    request.optimization,
+    request.profile.lifeStage,
+    request.maxDailyPills ?? "",
+    request.maxProductCount,
+    request.dietaryPreference,
+    request.omega3SourcePreference,
+    request.targets.map((target) => target.subjectId).join(",")
+  ].join("|");
+}
+
 function compileProductGroup(
+  product: MatcherProduct,
+  request: CanonicalRequest
+): ProductGroup | null {
+  const token = compileSessionToken(request);
+  const hit = compiledGroupMemo.get(product);
+
+  if (hit && hit.token === token) {
+    return hit.group;
+  }
+
+  const group = compileProductGroupFresh(product, request);
+  compiledGroupMemo.set(product, { group, token });
+  return group;
+}
+
+function compileProductGroupFresh(
   product: MatcherProduct,
   request: CanonicalRequest
 ): ProductGroup | null {

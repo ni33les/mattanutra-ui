@@ -364,4 +364,77 @@ describe("Phase 3 fewest_pills ranking", () => {
       oracle.selected?.productIds ?? []
     );
   });
+
+  it("picks dedicated MAGNESIUM over MAGNESIUM+D3 when both cover Mag at the floor", () => {
+    const result = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        targets: [
+          qaTarget("d3", 2000),
+          qaTarget("omega", 1000),
+          qaTarget("mag", 200),
+          qaTarget("b12", 250),
+          qaTarget("c", 500)
+        ]
+      }),
+      catalog([
+        qaProduct({
+          facts: [
+            { amount: 200, key: "d3" },
+            { amount: 600, key: "calcium" }
+          ],
+          id: "prd_bio_calcium_d3",
+          pills: 3,
+          priceThb: 390,
+          title: "Bio Calcium+D3"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "prd_vistra_omega",
+          omega: "fish",
+          pills: 2,
+          priceThb: 850,
+          title: "Vistra Omega 3"
+        }),
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "prd_magnesium",
+          pills: 1,
+          priceThb: 290,
+          title: "MAGNESIUM"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 200, key: "mag" },
+            { amount: 400, key: "d3" }
+          ],
+          id: "prd_magnesium_d3",
+          pills: 1,
+          priceThb: 250,
+          title: "MAGNESIUM+D3 50'S"
+        }),
+        qaProduct({
+          facts: [{ amount: 100, key: "b12" }],
+          id: "prd_mega_b",
+          pills: 2,
+          priceThb: 390,
+          title: "Mega B Complex"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "prd_bio_c",
+          pills: 2,
+          priceThb: 390,
+          title: "BIO C"
+        })
+      ])
+    );
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("prd_magnesium"), true);
+    assert.equal(result.selected.productIds.includes("prd_magnesium_d3"), false);
+    assert.equal(result.selected.productIds.includes("prd_mega_b"), true);
+    assert.equal(result.selected.productIds.includes("prd_vistra_omega"), true);
+  });
 });

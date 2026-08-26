@@ -868,7 +868,7 @@ export function match(
   const rejected =
     Date.now() >= deadlineAt
       ? []
-      : rejectedCandidatesFor(request, catalog, groups);
+      : rejectedCandidatesFor(request, catalog, groups, deadlineAt);
 
   const targetFrontiers = request.targets.map((target) => {
     const covering = bestCompactCoveringGroup(groups, request, target.subjectId);

@@ -99,12 +99,16 @@ function seedUnusableReason(
 export function rejectedCandidatesFor(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
-  groups: readonly ProductGroup[]
+  groups: readonly ProductGroup[],
+  deadlineAt?: number
 ): RejectedCandidate[] {
   const compiled = new Map(groups.map((item) => [item.productId, item]));
   const rejected: RejectedCandidate[] = [];
 
   for (const product of catalog.products) {
+    if (deadlineAt != null && Date.now() >= deadlineAt) {
+      break;
+    }
     const eligibility = productRejectionReason(product, request);
 
     if (eligibility) {

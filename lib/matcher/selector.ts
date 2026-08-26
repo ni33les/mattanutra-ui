@@ -8,6 +8,7 @@ import {
 import {
   bestCompactCoveringGroup,
   contributionFor,
+  labelledTargetCount,
   productIsDedicatedForTarget
 } from "@/lib/matcher/candidates";
 import {
@@ -569,6 +570,30 @@ export function salvagePartialBasket(input: Readonly<{
         }
 
         if (leftOk) {
+          const leftDedicated = productIsDedicatedForTarget(
+            left.group.product,
+            target
+          );
+          const rightDedicated = productIsDedicatedForTarget(
+            right.group.product,
+            target
+          );
+
+          if (leftDedicated && rightDedicated) {
+            const leftFacts = labelledTargetCount(
+              left.group.product,
+              input.request
+            );
+            const rightFacts = labelledTargetCount(
+              right.group.product,
+              input.request
+            );
+
+            if (leftFacts !== rightFacts) {
+              return leftFacts - rightFacts;
+            }
+          }
+
           if (left.variant.dailyPills !== right.variant.dailyPills) {
             return left.variant.dailyPills - right.variant.dailyPills;
           }

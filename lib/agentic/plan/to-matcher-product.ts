@@ -21,7 +21,15 @@ function contributionSubjectId(value: string | null | undefined) {
   return publicSupplementId(raw);
 }
 
+const matcherProductMemo = new WeakMap<CatalogueProduct, MatcherProduct>();
+
 export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
+  const cached = matcherProductMemo.get(product);
+
+  if (cached) {
+    return cached;
+  }
+
   const falseOmega = isFalseOmegaAttribution(product.candidate);
   const labelledContributions = collapseDuplicateLabelledFacts(
     product.candidate.facts.map((fact) => {
@@ -38,7 +46,7 @@ export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
     ? [...new Set(labelledContributions.map((item) => item.subjectId).filter((id): id is string => Boolean(id)))]
     : product.contributionSupplementIds;
 
-  return {
+  const created: MatcherProduct = {
     availableCountryCodes: product.candidate.availableCountryCodes ?? null,
     contributionSubjectIds,
     currency: product.candidate.currency,
@@ -68,4 +76,7 @@ export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
     unknownSafetyAmount: false,
     unitPriceMinor: product.unitPriceMinor
   };
+
+  matcherProductMemo.set(product, created);
+  return created;
 }

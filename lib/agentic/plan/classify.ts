@@ -79,6 +79,10 @@ export function classifySnapshotTargets(input: Readonly<{
     (input.selected?.coverage ?? []).map((row) => [row.supplementId, row])
   );
 
+  const matcherByProductId = new Map(
+    input.snapshot.products.map((product) => [product.productId, toMatcherProduct(product)])
+  );
+
   return input.state.targets.map((target) => {
     const mapped = input.snapshot.products.filter((product) =>
       mappedToTarget(product, target)
@@ -88,7 +92,10 @@ export function classifySnapshotTargets(input: Readonly<{
         return product.orderable && product.stockStatus !== "unavailable";
       }
 
-      return productEligible(toMatcherProduct(product), request);
+      return productEligible(
+        matcherByProductId.get(product.productId) ?? toMatcherProduct(product),
+        request
+      );
     });
     const unmappedLookalike = mapped.length < 1 &&
       input.snapshot.products.some((product) => looksLikeTarget(product, target));
@@ -101,7 +108,7 @@ export function classifySnapshotTargets(input: Readonly<{
       canonicalTarget && request && !("error" in request)
         ? eligible.filter((product) =>
             productHitsCoverageFloor(
-              toMatcherProduct(product),
+              matcherByProductId.get(product.productId) ?? toMatcherProduct(product),
               request,
               canonicalTarget
             )

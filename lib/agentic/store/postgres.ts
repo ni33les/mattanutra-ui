@@ -300,7 +300,7 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
       `;
     },
     async insertIdempotency(record) {
-      await sql`
+      const rows = await sql`
         insert into public.agentic_idempotency_records (
           operation, owner_scope, idempotency_key, request_hash, resource_ids, response_json, created_at, expires_at
         ) values (
@@ -308,7 +308,13 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
           ${asJson(record.resourceIds)}, ${asJson(JSON.parse(record.responseJson))},
           ${record.createdAt}::timestamptz, ${record.expiresAt}::timestamptz
         )
+        on conflict (operation, owner_scope, idempotency_key) do nothing
+        returning operation
       `;
+
+      if (rows.length < 1) {
+        throw new Error("idempotency_conflict");
+      }
     },
     async insertOrder(record) {
       await sql`

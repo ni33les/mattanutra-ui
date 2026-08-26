@@ -4,7 +4,8 @@ import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
 import { AGENTIC_TOOL_DESCRIPTIONS } from "../lib/agentic/contract/index.ts";
 import {
   beginIdempotency,
-  commitIdempotency
+  commitIdempotency,
+  isIdempotencyRace
 } from "../lib/agentic/idempotency.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 
@@ -109,5 +110,57 @@ describe("Phase 5 discovery copy", () => {
     if (poll.kind === "replay") {
       assert.equal((poll.response as { status: string }).status, "needs_input");
     }
+  });
+
+  it("treats a duplicate idempotency insert of the same hash as a race, not a 500", async () => {
+    const store = createMemoryStore();
+    const payload = {
+      idempotencyKey: "r17-idem-race-same-hash-01",
+      request: { locale: "en", targets: [{ amount: 500, name: "Vitamin C", unit: "mg" }] }
+    };
+    const processing = {
+      ok: true,
+      planHandle: "cap_r17_idem_race_handle_32chars_min",
+      revision: 1,
+      status: "processing"
+    };
+    await commitIdempotency({
+      key: payload.idempotencyKey,
+      now: "2026-08-26T00:00:00.000Z",
+      operation: "plan",
+      ownerScope: "dev:test:anon",
+      payload,
+      resourceIds: { planId: "plan-race-1" },
+      response: processing,
+      store
+    });
+    await commitIdempotency({
+      key: payload.idempotencyKey,
+      now: "2026-08-26T00:00:00.100Z",
+      operation: "plan",
+      ownerScope: "dev:test:anon",
+      payload,
+      resourceIds: { planId: "plan-race-1" },
+      response: processing,
+      store
+    });
+    const replay = await beginIdempotency({
+      key: payload.idempotencyKey,
+      now: "2026-08-26T00:00:00.200Z",
+      operation: "plan",
+      ownerScope: "dev:test:anon",
+      payload,
+      store
+    });
+    assert.equal(replay.kind, "replay");
+    assert.equal(isIdempotencyRace(new Error("idempotency_conflict")), true);
+    assert.equal(
+      isIdempotencyRace({
+        code: "23505",
+        constraint: "agentic_idempotency_records_pkey"
+      }),
+      true
+    );
+    assert.equal(isIdempotencyRace(new Error("other")), false);
   });
 });
