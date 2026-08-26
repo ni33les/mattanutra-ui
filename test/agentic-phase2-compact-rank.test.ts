@@ -313,6 +313,216 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(d3Percent >= 90, true);
   });
 
+  it("still compiles a covering 50+ SKU when many below-floor D3 joints exist", () => {
+    const joints = Array.from({ length: 8 }, (_, index) =>
+      qaProduct({
+        facts: [
+          { amount: 400, key: "d3" },
+          { amount: 40, key: "c" }
+        ],
+        id: `G-JOINT-D3-${index + 1}`,
+        pills: 2,
+        priceThb: 80 + index,
+        title: `Joint Mobility ${index + 1}`
+      })
+    );
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-covering-50plus-noisy",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 180,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 600, key: "d3" },
+            { amount: 105, key: "mag" },
+            { amount: 45, key: "c" }
+          ],
+          id: "G-50PLUS",
+          pills: 1,
+          priceThb: 150,
+          title: "Multivitamins for 50+"
+        }),
+        ...joints
+      ]
+    };
+    const fewest = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        profile: { ageYears: 52, lifeStage: "adult", sex: "male" }
+      }),
+      catalog
+    );
+    assert.ok(fewest.selected);
+    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
+    const d3Target = qaTarget("d3", 2000);
+    const d3Percent = Math.round(
+      (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
+    );
+    assert.equal(d3Percent >= 90, true);
+    assert.equal(
+      fewest.selected.productIds.some((id) => id.startsWith("G-JOINT-D3-")),
+      false
+    );
+  });
+
+  it("does not absorb a covering B12 SKU that fails an incidental catalog UL", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-b12-incidental-ul",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 180,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 600, key: "d3" },
+            { amount: 105, key: "mag" },
+            { amount: 45, key: "c" }
+          ],
+          id: "G-50PLUS",
+          pills: 1,
+          priceThb: 150,
+          title: "Multivitamins for 50+"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 250, key: "b12" },
+            { amount: 50, key: "zinc" }
+          ],
+          id: "G-B12-ZINC-UL",
+          pills: 1,
+          priceThb: 90,
+          title: "Vitamin B12 Zinc Complex"
+        })
+      ]
+    };
+    const fewest = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        profile: { ageYears: 52, lifeStage: "adult", sex: "male" }
+      }),
+      catalog
+    );
+    assert.ok(fewest.selected);
+    assert.equal(fewest.selected.productIds.includes("G-B12-ZINC-UL"), false);
+    const b12Target = qaTarget("b12", 250);
+    const b12Percent = Math.round(
+      (fewest.selected.coverageBySubject.get(b12Target.subjectId) ?? 0) / 100
+    );
+    assert.equal(b12Percent >= 90, false);
+    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
+  });
+
+  it("absorbs a UL-feasible dedicated B12 covering SKU into official", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-b12-covering",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 180,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 600, key: "d3" },
+            { amount: 105, key: "mag" },
+            { amount: 45, key: "c" }
+          ],
+          id: "G-50PLUS",
+          pills: 1,
+          priceThb: 150,
+          title: "Multivitamins for 50+"
+        }),
+        qaProduct({
+          facts: [{ amount: 250, key: "b12" }],
+          id: "G-B12-250",
+          pills: 1,
+          priceThb: 90,
+          title: "Vitamin B12 250"
+        })
+      ]
+    };
+    const fewest = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        profile: { ageYears: 52, lifeStage: "adult", sex: "male" }
+      }),
+      catalog
+    );
+    assert.ok(fewest.selected);
+    assert.equal(fewest.selected.productIds.includes("G-B12-250"), true);
+    const b12Target = qaTarget("b12", 250);
+    const b12Percent = Math.round(
+      (fewest.selected.coverageBySubject.get(b12Target.subjectId) ?? 0) / 100
+    );
+    assert.equal(b12Percent >= 90, true);
+    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
+  });
+
   it("keeps dedicated MAG, fish oil, and C instead of a below-floor magnesium+D3 combo", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",

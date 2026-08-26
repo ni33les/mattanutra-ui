@@ -493,8 +493,20 @@ export function compileGroups(
     )
     .sort((left, right) => compareDedicatedThenId(left, right, request));
 
-  const tryCompile = (product: MatcherProduct) => {
-    if (deadlineAt != null && Date.now() >= deadlineAt) {
+  const productLabelsUncoveredTarget = (product: MatcherProduct) =>
+    request.targets.some(
+      (target) =>
+        !targetHasCoveringGroup(groups, request, target.subjectId) &&
+        contributionFor(product, target.name, target.subjectId).length > 0
+    );
+
+  const tryCompile = (product: MatcherProduct, ignoreDeadline = false) => {
+    if (
+      !ignoreDeadline &&
+      deadlineAt != null &&
+      Date.now() >= deadlineAt &&
+      !productLabelsUncoveredTarget(product)
+    ) {
       return;
     }
 
@@ -517,7 +529,7 @@ export function compileGroups(
   );
 
   for (const product of dedicatedMapped) {
-    tryCompile(product);
+    tryCompile(product, true);
   }
 
   for (const product of otherMapped) {
@@ -525,7 +537,7 @@ export function compileGroups(
       continue;
     }
 
-    tryCompile(product);
+    tryCompile(product, true);
   }
 
   for (const product of labelled) {
@@ -549,7 +561,7 @@ export function compileGroups(
     const pool = [...mapped, ...labelled];
 
     for (const product of pool) {
-      if (added >= 6) {
+      if (targetHasCoveringGroup(groups, request, target.subjectId)) {
         break;
       }
 
@@ -570,12 +582,18 @@ export function compileGroups(
         continue;
       }
 
+      const coversFloor = groupCoversTargetAtFloor(
+        group,
+        request,
+        target.subjectId
+      );
+
+      if (!coversFloor && added >= 6) {
+        continue;
+      }
+
       groups.push(group);
       added += 1;
-
-      if (bestGroupForTarget(groups, request, target.subjectId)) {
-        break;
-      }
     }
   }
 
