@@ -9,7 +9,6 @@ import {
   type CapabilityScope
 } from "@/lib/agentic/capabilities";
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
-import { lookupRetailOrderForAgentic } from "@/lib/agentic/commerce/retail-join";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
 export type SupportSuccess = Readonly<{
@@ -155,7 +154,10 @@ export async function supportTool(input: Readonly<{
   });
 
   const supportCase = await input.store.getSupportCase(caseId);
-  const retail = await lookupRetailOrderForAgentic(orderCapability.resourceId);
+  const { getRetailOrderByAgenticOrderId } = await import(
+    "@/lib/retail-product-checkout"
+  );
+  const retail = await getRetailOrderByAgenticOrderId(orderCapability.resourceId);
 
   const response: SupportSuccess = {
     caseReference: supportCase?.caseReference ?? humanCaseReference(caseId),

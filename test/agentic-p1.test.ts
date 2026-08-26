@@ -1370,6 +1370,9 @@ describe("agentic P1 pack fixes", () => {
     assert.match(checkout, /pharmacyRrpPayableAmounts/);
     assert.equal(checkout.includes("retailerPayableAmount: item.unitPriceAmount"), false);
     assert.match(order, /contributionMargin/);
+    assert.match(order, /orderId: settlement.orderId/);
+    assert.match(support, /getRetailOrderByAgenticOrderId/);
+    assert.equal(order.includes("orderId: order.id"), false);
     assert.match(join, /products.status = 'approved'/);
     assert.equal(join.includes("insert into public.products"), false);
     assert.equal(join.includes("insert into public.retail_sellable_products"), false);
@@ -1453,8 +1456,8 @@ describe("agentic P1 pack fixes", () => {
     assert.match(checkout, /createRetailCustomerOrderFromPayment/);
     assert.match(feedback, /persistMcpPlanFeedback/);
     assert.match(feedback, /savePlanFeedback|persistMcpPlanFeedback/);
-    assert.match(order, /getRetailLink/);
-    assert.match(support, /lookupRetailOrderForAgentic/);
+    assert.match(order, /getRetailOrderByAgenticOrderId/);
+    assert.match(support, /getRetailOrderByAgenticOrderId/);
   });
 
   it("executes the same ready revision twice with different idempotency keys", async () => {

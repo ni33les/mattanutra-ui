@@ -34,16 +34,11 @@ export async function orderTool(input: Readonly<{
 
   const order = await input.store.getOrder(capability.resourceId);
   const locale = negotiateLocale(input.locale);
-  const link =
-    order?.paymentStatus === "paid" ||
-    order?.paymentStatus === "refunded" ||
-    order?.paymentStatus === "partially_refunded"
-      ? await input.store.getRetailLink(order.id)
-      : null;
-  const orderNumber =
-    link && !link.retailerReference.startsWith("th-mock-") ? link.retailerReference : null;
   const settlement =
-    order && (order.paymentStatus === "paid" || order.paymentStatus === "refunded")
+    order &&
+    (order.paymentStatus === "paid" ||
+      order.paymentStatus === "refunded" ||
+      order.paymentStatus === "partially_refunded")
       ? await getRetailOrderByAgenticOrderId(order.id)
       : null;
 
@@ -52,13 +47,13 @@ export async function orderTool(input: Readonly<{
     found: Boolean(order),
     localeMessage: (key) => agenticMessage(locale, key),
     order,
-    retail: order && orderNumber
+    retail: order && settlement
       ? {
-          contributionMargin: settlement?.contributionMargin ?? null,
-          orderId: order.id,
-          orderNumber,
-          orderStatus: order.fulfilmentStatus,
-          trackingUrl: `/${locale}/order/track/${encodeURIComponent(orderNumber)}`
+          contributionMargin: settlement.contributionMargin ?? null,
+          orderId: settlement.orderId,
+          orderNumber: settlement.orderNumber,
+          orderStatus: settlement.orderStatus,
+          trackingUrl: `/${locale}/order/track/${encodeURIComponent(settlement.orderNumber)}`
         }
       : null
   });
