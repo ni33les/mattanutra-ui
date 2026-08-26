@@ -185,7 +185,7 @@ function coverageFor(
         limit != null && limit > 0
           ? Math.round((totalExposureAmount / limit) * 100)
           : null,
-      remainingGap: Math.max(0, target.amount - currentAmount),
+      remainingGap: Math.max(0, target.amount - totalExposureAmount),
       requestedAmount: target.amount,
       status,
       supplementId: target.supplementId,

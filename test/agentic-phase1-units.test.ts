@@ -200,7 +200,10 @@ describe("Phase 1 unit canonicalization", () => {
     assert.equal(row.unit, "mcg");
     assert.equal(row.requestedAmount, 50);
     assert.equal(row.currentAmount, 25);
-    assert.equal(row.remainingGap, 25);
+    assert.equal(
+      row.remainingGap,
+      Math.max(0, row.requestedAmount - row.totalExposureAmount)
+    );
     assert.equal(row.totalExposureAmount, row.currentAmount + row.deliveredAmount);
   });
 

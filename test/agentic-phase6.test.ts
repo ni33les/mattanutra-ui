@@ -115,16 +115,19 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.equal(table.length, 5);
     for (const row of table) {
       assert.equal(row.current, 0);
-      assert.equal(row.remainingGap, row.requested);
+      assert.equal(row.remainingGap, Math.max(0, row.requested - row.totalExposure));
       assert.equal(typeof row.delivered, "number");
       assert.equal(row.totalExposure, row.current + row.delivered);
       assert.ok(["covered", "over_target", "partial", "uncovered", "upper_limit_risk"].includes(row.status));
+      if (row.status === "covered" || row.status === "over_target") {
+        assert.equal(row.remainingGap, 0);
+      }
     }
 
     const d3 = table.find((row) => row.name === "Vitamin D3");
     assert.ok(d3);
     assert.equal(d3.requested, 2000);
-    assert.equal(d3.remainingGap, 2000);
+    assert.equal(d3.remainingGap, Math.max(0, d3.requested - d3.totalExposure));
   });
 
   it("nets remaining gap from current intake without rewriting requested", () => {
@@ -154,8 +157,25 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.ok(row);
     assert.equal(row.requestedAmount, 2000);
     assert.equal(row.currentAmount, 1000);
-    assert.equal(row.remainingGap, 1000);
+    assert.equal(
+      row.remainingGap,
+      Math.max(0, row.requestedAmount - row.totalExposureAmount)
+    );
     assert.equal(row.totalExposureAmount, row.currentAmount + row.deliveredAmount);
+  });
+
+  it("sets remainingGap 0 when delivered meets the requested amount", () => {
+    const snapshot = frozen();
+    const matched = matchPlan({ snapshot, state: aug25PlanState() });
+    assert.ok(matched.selected);
+    const covered = matched.selected.coverage.filter(
+      (row) => row.status === "covered" || row.status === "over_target"
+    );
+    assert.ok(covered.length > 0);
+    for (const row of covered) {
+      assert.equal(row.remainingGap, 0);
+      assert.ok(row.totalExposureAmount >= row.requestedAmount);
+    }
   });
 
   it("stamps servings/day, pill burden, and incidental vs requested nutrients on basket lines", () => {
