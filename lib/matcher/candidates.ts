@@ -253,48 +253,10 @@ export function productHitsCoverageFloor(
     return false;
   }
 
-  const facts = contributionFor(product, target.name, target.subjectId);
-
-  if (facts.length < 1) {
-    return false;
-  }
-
-  for (let dailyUnits = 1; dailyUnits <= MAX_DAILY_UNITS; dailyUnits += 1) {
-    let units = BigInt(0);
-
-    for (const fact of facts) {
-      if (fact.amount == null || fact.amount <= 0 || !fact.unit) {
-        continue;
-      }
-
-      const scaled = scaleAmount({
-        amount: fact.amount * dailyUnits,
-        subjectId: target.subjectId,
-        subjectName: target.name,
-        unit: fact.unit
-      });
-
-      if (!isDoseError(scaled)) {
-        units += scaled.units;
-      }
-    }
-
-    if (units <= BigInt(0)) {
-      continue;
-    }
-
-    const exposure = currentUnitsFor(request, target.subjectId) + units;
-
-    if (exposureExceedsCeiling(request, target.subjectId, exposure)) {
-      continue;
-    }
-
-    if (coverageUnits(exposure, target.requested.units) >= COVERED_THRESHOLD * 100) {
-      return true;
-    }
-  }
-
-  return false;
+  const group = compileProductGroup(product, request);
+  return Boolean(
+    group && groupCoversTargetAtFloor(group, request, target.subjectId)
+  );
 }
 
 function currentUnitsForSubject(request: CanonicalRequest, subjectId: string) {
