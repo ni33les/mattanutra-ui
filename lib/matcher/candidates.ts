@@ -943,16 +943,26 @@ export function compileGroups(
           belowFloorAdded < 1 &&
           !hasLowCollateralContributor);
 
-      const oneServingUnits = (group: ProductGroup) =>
-        group.variants.find((variant) => variant.dailyUnits === 1)?.contributions.get(
-          target.subjectId
-        )?.units ?? BigInt(0);
+      const servingUnits = (group: ProductGroup, dailyUnits: number | "best") => {
+        if (dailyUnits === "best") {
+          return group.variants.reduce((best, variant) => {
+            const units = variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
+            return units > best ? units : best;
+          }, BigInt(0));
+        }
+
+        return (
+          group.variants.find((variant) => variant.dailyUnits === dailyUnits)?.contributions.get(
+            target.subjectId
+          )?.units ?? BigInt(0)
+        );
+      };
       const labelledUnits = groups.reduce((best, group) => {
         if (labelledTargetCount(group.product, request) > 1) {
           return best;
         }
 
-        const units = oneServingUnits(group);
+        const units = servingUnits(group, 1);
         return units > best ? units : best;
       }, BigInt(0));
       const jointClosesFloor =
@@ -961,7 +971,7 @@ export function compileGroups(
         coverageUnits(
           currentUnitsForSubject(request, target.subjectId) +
             labelledUnits +
-            oneServingUnits(compiled),
+            servingUnits(compiled, "best"),
           target.requested.units
         ) >= COVERED_THRESHOLD * 100;
 
