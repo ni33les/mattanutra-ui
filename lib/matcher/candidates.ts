@@ -998,7 +998,7 @@ export function compileGroups(
           return best;
         }
 
-        const units = servingUnits(group, 1);
+        const units = servingUnits(group, "best");
         return units > best ? units : best;
       }, BigInt(0));
       const jointClosesFloor =
@@ -1048,6 +1048,32 @@ function currentUnitsFor(request: CanonicalRequest, subjectId: string) {
   return request.currentSupplements
     .filter((item) => item.subjectId === subjectId)
     .reduce((sum, item) => sum + item.daily.units, BigInt(0));
+}
+
+function usedContributorUnits(
+  groups: readonly ProductGroup[],
+  request: CanonicalRequest,
+  subjectId: string,
+  used?: ReadonlySet<string>
+) {
+  if (!used || used.size < 1) {
+    return BigInt(0);
+  }
+
+  let total = BigInt(0);
+
+  for (const productId of used) {
+    const group = groups.find((item) => item.productId === productId);
+
+    if (!group) {
+      continue;
+    }
+
+    const variant = contributingVariantForTarget(group, request, subjectId);
+    total += variant?.contributions.get(subjectId)?.units ?? BigInt(0);
+  }
+
+  return total;
 }
 
 function variantRankForTarget(
@@ -1225,21 +1251,21 @@ export function bestStandaloneContributorGroup(
       request.targets.length > 1 &&
       jointTitle(group.product.title) &&
       !productIsDedicatedForTarget(group.product, target) &&
-      groups.some(
-        (other) =>
-          other.productId !== group.productId &&
-          !jointTitle(other.product.title) &&
-          !highCollateralMultiTitle(other.product.title) &&
-          labelledTargetCount(other.product, request) <= 1 &&
-          groupCoversTargetAtFloor(other, request, subjectId)
-      )
+      used &&
+      used.size > 0 &&
+      [...used].some((productId) => {
+        const other = groups.find((item) => item.productId === productId);
+
+        return Boolean(
+          other &&
+            other.productId !== group.productId &&
+            !jointTitle(other.product.title) &&
+            !highCollateralMultiTitle(other.product.title) &&
+            labelledTargetCount(other.product, request) <= 1 &&
+            groupCoversTargetAtFloor(other, request, subjectId)
+        );
+      })
     ) {
-      continue;
-    }
-
-    const facts = labelledTargetCount(group.product, request);
-
-    if (alreadyHasContributor && facts > 1) {
       continue;
     }
 
@@ -1247,6 +1273,23 @@ export function bestStandaloneContributorGroup(
 
     if (!variant) {
       continue;
+    }
+
+    const facts = labelledTargetCount(group.product, request);
+
+    if (alreadyHasContributor && facts > 1) {
+      const extra = variant.contributions.get(subjectId)?.units ?? BigInt(0);
+      const combined =
+        currentUnitsFor(request, subjectId) +
+        usedContributorUnits(groups, request, subjectId, used) +
+        extra;
+
+      if (
+        coverageUnits(combined, target.requested.units) <
+        COVERED_THRESHOLD * 100
+      ) {
+        continue;
+      }
     }
 
     const contributed = variant.contributions.get(subjectId);

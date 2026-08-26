@@ -309,7 +309,77 @@ describe("Phase 2 compactness ranking", () => {
     );
   });
 
-  it("keeps the standalone labelled D3 winner on official when no 90% D3 SKU exists", () => {
+  it("keeps live Joint 10 mcg with Bio Calcium 200 IU extra servings to reach 90% D3", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-live-joint-10mcg",
+      products: [
+        qaProduct({
+          facts: [{ amount: 200, key: "mag" }],
+          id: "G-MAG-200",
+          pills: 1,
+          priceThb: 120,
+          title: "Magnesium 200"
+        }),
+        qaProduct({
+          dietary: "fish",
+          facts: [{ amount: 1000, key: "omega" }],
+          form: "softgel",
+          id: "G-O3-FISH-1000",
+          omega: "fish",
+          pills: 2,
+          priceThb: 300,
+          title: "G-O3-FISH-1000 Fish Oil"
+        }),
+        qaProduct({
+          facts: [{ amount: 500, key: "c" }],
+          id: "G-C-500",
+          pills: 1,
+          priceThb: 100,
+          title: "Vitamin C 500"
+        }),
+        qaProduct({
+          facts: [{ amount: 100, key: "b12" }],
+          id: "G-MEGA-B",
+          pills: 2,
+          priceThb: 180,
+          title: "Mega B Complex"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 200, key: "d3" },
+            { amount: 600, key: "calcium" }
+          ],
+          id: "G-BIO-CAL-D3",
+          pills: 1,
+          priceThb: 390,
+          title: "Bio Calcium+D3"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 10, key: "d3", name: "Vitamin D3", unit: "mcg" },
+            { amount: 50, key: "c" }
+          ],
+          id: "G-JOINT-D3",
+          pills: 1,
+          priceThb: 450,
+          title: "Blackmores Joint Mobility Plus"
+        })
+      ]
+    };
+    const result = match(qaRequest({ optimization: "fewest_pills" }), catalog);
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), true);
+    assert.equal(result.selected.productIds.includes("G-BIO-CAL-D3"), true);
+    assert.equal(result.selected.productIds.includes("G-MEGA-B"), true);
+    const d3 = qaTarget("d3", 2000);
+    assert.equal(
+      Math.round((result.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
+      true
+    );
+  });
+
+  it("keeps labelled D3 plus Joint on official when the pair still reaches 90%", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-no-covering-d3",
@@ -363,10 +433,15 @@ describe("Phase 2 compactness ranking", () => {
     );
     assert.ok(fewest.selected);
     assert.equal(fewest.selected.productIds.includes("G-D3-400"), true);
-    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), false);
+    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), true);
     assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
     assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
+    const d3 = qaTarget("d3", 2000);
+    assert.equal(
+      Math.round((fewest.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
+      true
+    );
     assert.equal(
       fewest.rejected.some(
         (item) =>
@@ -839,7 +914,7 @@ describe("Phase 2 compactness ranking", () => {
     }
   });
 
-  it("keeps MAG, omega, C, one D3, and one B12 under 10 pills without joints or 50+", () => {
+  it("keeps MAG, omega, C, Bio Calcium, Mega B, and Joint when Joint still reaches 90% D3", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-official-no-stuff",
@@ -912,9 +987,12 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(result.selected.productIds.includes("G-C-500"), true);
     assert.equal(result.selected.productIds.includes("G-CALCIUM-D3-200"), true);
     assert.equal(result.selected.productIds.includes("G-MEGA-B-50"), true);
-    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), false);
+    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), true);
     assert.equal(result.selected.productIds.includes("G-MULTI-50PLUS"), false);
-    assert.equal(result.selected.productCount <= 5, true);
-    assert.equal(result.selected.dailyPills <= 10, true);
+    const d3 = qaTarget("d3", 2000);
+    assert.equal(
+      Math.round((result.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
+      true
+    );
   });
 });
