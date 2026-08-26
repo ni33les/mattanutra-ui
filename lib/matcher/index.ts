@@ -458,6 +458,8 @@ function absorbStandaloneWinners(input: Readonly<{
   const floor = COVERED_THRESHOLD * 100;
 
   for (const target of input.request.targets) {
+    let belowFloorAdded = 0;
+
     while (true) {
       const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
 
@@ -475,8 +477,13 @@ function absorbStandaloneWinners(input: Readonly<{
       let variant = winner
         ? coveringVariantForTarget(winner, input.request, target.subjectId)
         : null;
+      const floorWinner = Boolean(winner && variant);
 
       if (!winner || !variant) {
+        if (belowFloorAdded >= 1) {
+          break;
+        }
+
         winner = bestStandaloneContributorGroup(
           input.groups,
           input.request,
@@ -505,6 +512,10 @@ function absorbStandaloneWinners(input: Readonly<{
 
       state = next;
       changed = true;
+
+      if (!floorWinner) {
+        belowFloorAdded += 1;
+      }
     }
   }
 

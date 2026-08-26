@@ -266,7 +266,7 @@ function currentUnitsForSubject(request: CanonicalRequest, subjectId: string) {
     .reduce((sum, item) => sum + item.daily.units, BigInt(0));
 }
 
-function variantHardBlocked(
+export function variantHardBlocked(
   group: ProductGroup,
   variant: DoseVariant,
   request: CanonicalRequest
@@ -356,10 +356,14 @@ function targetHasLowCollateralCoveringGroup(
       return false;
     }
 
-    return (
-      productIsDedicatedForTarget(group.product, target) ||
-      labelledTargetCount(group.product, request) <= 1
-    );
+    if (
+      !productIsDedicatedForTarget(group.product, target) &&
+      labelledTargetCount(group.product, request) > 1
+    ) {
+      return false;
+    }
+
+    return Boolean(contributingVariantForTarget(group, request, subjectId));
   });
 }
 
@@ -710,6 +714,17 @@ export function compileGroups(
 
       if (extra !== 0) {
         return extra;
+      }
+
+      const amountOf = (product: MatcherProduct) =>
+        contributionFor(product, target.name, target.subjectId).reduce(
+          (sum, fact) => sum + (fact.amount ?? 0),
+          0
+        );
+      const amount = amountOf(right) - amountOf(left);
+
+      if (amount !== 0) {
+        return amount;
       }
 
       return left.productId.localeCompare(right.productId);
