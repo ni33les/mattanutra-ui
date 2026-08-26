@@ -545,8 +545,6 @@ function absorbStandaloneWinners(input: Readonly<{
   const maxSteps = Math.max(4, input.groups.length + 2);
 
   for (const target of input.request.targets) {
-    let belowFloorAdded = 0;
-
     for (let step = 0; step < maxSteps; step += 1) {
       const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
 
@@ -564,7 +562,6 @@ function absorbStandaloneWinners(input: Readonly<{
       let variant = winner
         ? coveringVariantForTarget(winner, input.request, target.subjectId)
         : null;
-      const floorWinner = Boolean(winner && variant);
 
       if (!winner || !variant) {
         const alreadyLabelled = [...used].some((productId) => {
@@ -575,10 +572,6 @@ function absorbStandaloneWinners(input: Readonly<{
                 0
           );
         });
-
-        if (belowFloorAdded >= 1) {
-          break;
-        }
 
         winner = bestStandaloneContributorGroup(
           input.groups,
@@ -633,10 +626,6 @@ function absorbStandaloneWinners(input: Readonly<{
 
       state = next;
       changed = true;
-
-      if (!floorWinner) {
-        belowFloorAdded += 1;
-      }
     }
   }
 
