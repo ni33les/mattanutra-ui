@@ -11,7 +11,7 @@ import {
 } from "@/lib/agentic/capabilities";
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import type { PaymentPort } from "@/lib/agentic/commerce/payment";
-import type { AgenticStore } from "@/lib/agentic/store/types";
+import type { AgenticStore, OrderRecord } from "@/lib/agentic/store/types";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
 import { publicFrozenItems } from "@/lib/agentic/public-mapper";
@@ -47,12 +47,49 @@ export type ExecuteSuccess = Readonly<{
   ok: true;
   orderHandle: string;
   orderReference: string;
-  orderStatus: "open";
-  paymentStatus: "unpaid";
+  orderStatus: OrderRecord["orderStatus"];
+  paymentStatus: OrderRecord["paymentStatus"];
   pollAfterSeconds: number;
-  stateVersion: 1;
+  stateVersion: number;
   successUrl: string;
 }>;
+
+async function withLiveOrderState(input: Readonly<{
+  config: AgenticConfig;
+  now: string;
+  scope: CapabilityScope;
+  store: AgenticStore;
+  stored: ExecuteSuccess;
+}>): Promise<ExecuteSuccess> {
+  const capability = await resolveCapability({
+    action: "order.read",
+    config: input.config,
+    handle: input.stored.orderHandle,
+    now: input.now,
+    resourceType: "order",
+    scope: input.scope,
+    store: input.store
+  });
+
+  if (!capability) {
+    return input.stored;
+  }
+
+  const order = await input.store.getOrder(capability.resourceId);
+
+  if (!order) {
+    return input.stored;
+  }
+
+  return {
+    ...input.stored,
+    checkoutExpiresAt: order.checkoutExpiresAt ?? input.stored.checkoutExpiresAt,
+    checkoutUrl: order.checkoutUrl ?? input.stored.checkoutUrl,
+    orderStatus: order.orderStatus,
+    paymentStatus: order.paymentStatus,
+    stateVersion: order.stateVersion
+  };
+}
 
 export async function executeTool(input: Readonly<{
   config: AgenticConfig;
@@ -83,7 +120,13 @@ export async function executeTool(input: Readonly<{
   }
 
   if (replay.kind === "replay") {
-    return replay.response;
+    return withLiveOrderState({
+      config: input.config,
+      now: input.now,
+      scope: input.scope,
+      store: input.store,
+      stored: replay.response
+    });
   }
 
   const peeked = await resolveCapability({

@@ -9,6 +9,7 @@ import {
   type AgenticRuntime
 } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
+import { simulatePayment } from "../lib/agentic/qa/simulate.ts";
 
 function runtimeFor(): AgenticRuntime {
   return createAgenticRuntime({
@@ -78,5 +79,46 @@ describe("execute key reuses one unpaid order", () => {
     assert.equal(second.paymentStatus, "unpaid");
     assert.equal(first.orderStatus, "open");
     assert.equal(second.orderStatus, "open");
+  });
+
+  it("replays execute with the live payment state after pay", async () => {
+    const runtime = runtimeFor();
+    const plan = await call(runtime, "plan", {
+      idempotencyKey: "exec-replay-plan-0000001",
+      request: {
+        destinationCountry: "TH",
+        locale: "en",
+        optimization: "balanced",
+        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
+        requirements: {},
+        targets: [{ amount: 500, name: "Vitamin C", unit: "mg" }]
+      }
+    });
+    assert.equal(plan.status, "ready");
+    const key = "exec-replay-key-same-0001";
+    const first = await call(runtime, "execute", {
+      expectedRevision: plan.revision,
+      idempotencyKey: key,
+      planHandle: plan.planHandle
+    });
+    assert.equal(first.paymentStatus, "unpaid");
+    await simulatePayment({
+      config: runtime.config,
+      now: new Date().toISOString(),
+      orderHandle: String(first.orderHandle),
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const replay = await call(runtime, "execute", {
+      expectedRevision: plan.revision,
+      idempotencyKey: key,
+      planHandle: plan.planHandle
+    });
+    assert.equal(replay.ok, true);
+    assert.equal(replay.orderHandle, first.orderHandle);
+    assert.equal(replay.paymentStatus, "paid");
+    assert.equal(replay.orderStatus, "completed");
+    assert.ok(Number(replay.stateVersion) >= 2);
   });
 });
