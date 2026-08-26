@@ -930,7 +930,7 @@ export function compileGroups(
       const facts = labelledTargetCount(product, request);
       const hasLowCollateralContributor = groups.some(
         (group) =>
-          groupCoversTargetAtFloor(group, request, target.subjectId) &&
+          groupCoversTarget(group, target.subjectId) &&
           labelledTargetCount(group.product, request) <= 1
       );
       const keepBelowFloor =
@@ -943,7 +943,38 @@ export function compileGroups(
           belowFloorAdded < 1 &&
           !hasLowCollateralContributor);
 
-      if (!coversFloor && !keepBelowFloor) {
+      const oneServingUnits = (group: ProductGroup) =>
+        group.variants.find((variant) => variant.dailyUnits === 1)?.contributions.get(
+          target.subjectId
+        )?.units ?? BigInt(0);
+      const labelledUnits = groups.reduce((best, group) => {
+        if (labelledTargetCount(group.product, request) > 1) {
+          return best;
+        }
+
+        const units = oneServingUnits(group);
+        return units > best ? units : best;
+      }, BigInt(0));
+      const jointClosesFloor =
+        jointTitle(product.title) &&
+        labelledUnits > BigInt(0) &&
+        coverageUnits(
+          currentUnitsForSubject(request, target.subjectId) +
+            labelledUnits +
+            oneServingUnits(compiled),
+          target.requested.units
+        ) >= COVERED_THRESHOLD * 100;
+
+      if (!coversFloor && !keepBelowFloor && !jointClosesFloor) {
+        continue;
+      }
+
+      if (
+        !coversFloor &&
+        jointTitle(product.title) &&
+        labelledUnits > BigInt(0) &&
+        !jointClosesFloor
+      ) {
         continue;
       }
 
