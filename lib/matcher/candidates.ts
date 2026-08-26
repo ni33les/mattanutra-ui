@@ -836,7 +836,30 @@ export function compileGroups(
     }
 
     if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
-      continue;
+      const covering = bestCompactCoveringGroup(groups, request, target.subjectId);
+      const oneServingCoversFloor = Boolean(
+        covering?.variants.some((variant) => {
+          if (variant.dailyUnits !== 1) {
+            return false;
+          }
+
+          const contributed = variant.contributions.get(target.subjectId);
+          if (!contributed) {
+            return false;
+          }
+
+          return (
+            coverageUnits(
+              currentUnitsForSubject(request, target.subjectId) + contributed.units,
+              target.requested.units
+            ) >= COVERED_THRESHOLD * 100
+          );
+        })
+      );
+
+      if (oneServingCoversFloor) {
+        continue;
+      }
     }
 
     let belowFloorAdded = 0;
