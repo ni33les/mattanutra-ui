@@ -13,7 +13,6 @@ import {
 } from "@/lib/matcher";
 import {
   contributionFor,
-  productIsDedicatedForTarget,
   variantPillBurden
 } from "@/lib/matcher/candidates";
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
@@ -303,35 +302,7 @@ function nutrientSplit(
         target.supplementId
       );
 
-      if (!facts.includes(fact)) {
-        return false;
-      }
-
-      if (
-        productIsDedicatedForTarget(matcherProduct, {
-          name: target.name,
-          requested: {
-            dim: "mass_ng",
-            subjectId: target.supplementId,
-            units: BigInt(0)
-          },
-          requestedAmount: target.amount,
-          requestedUnit: target.unit as MatcherUnit,
-          subjectId: target.supplementId
-        })
-      ) {
-        return true;
-      }
-
-      const daily = convertAmount({
-        amount: fact.amount * multiplier,
-        fromUnit: fact.unit,
-        subjectId: target.supplementId,
-        subjectName: target.name,
-        toUnit: target.unit
-      });
-
-      return daily != null && daily >= (target.amount * COVERED_THRESHOLD) / 100;
+      return facts.includes(fact);
     });
     const row = {
       amount: fact.amount * multiplier,
