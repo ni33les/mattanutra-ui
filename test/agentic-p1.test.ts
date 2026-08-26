@@ -754,6 +754,13 @@ describe("agentic P1 pack fixes", () => {
     assert.match(panel, /partial_refund/);
     assert.match(panel, /refundable/);
     assert.match(panel, /paid page keeps an authorized refund form/);
+    assert.match(panel, /Order tracking/);
+    assert.match(panel, /trackingHref/);
+    const payRoute = readFileSync(
+      new URL("../app/api/mcp/checkout/[checkoutAccess]/pay/route.ts", import.meta.url),
+      "utf8"
+    );
+    assert.equal(payRoute.includes("resolveAgenticPaidTrackingPath"), false);
     const website = readFileSync(
       new URL("../components/mcp-website-checkout-panel.tsx", import.meta.url),
       "utf8"
@@ -1362,6 +1369,8 @@ describe("agentic P1 pack fixes", () => {
     assert.match(pay, /joinMcpPaidOrderToRetail/);
     assert.match(pay, /processing_then_success/);
     assert.match(pay, /providerEventId: `\$\{event.providerEventId\}_success`/);
+    assert.equal(pay.includes("resolveAgenticPaidTrackingPath"), false);
+    assert.match(pay, /\/en\/mcp\/checkout\/\$\{checkoutAccess\}/);
     assert.match(simulate, /joinMcpPaidOrderToRetail/);
     assert.match(pay, /postedScenario/);
     assert.equal(pay.includes('form.get("scenario") ?? "success"'), false);

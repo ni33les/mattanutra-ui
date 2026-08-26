@@ -8,7 +8,6 @@ import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
 import { isPaymentScenario, scenarioSubmitsOms } from "@/lib/agentic/qa/simulate";
 import { joinMcpPaidOrderToRetail } from "@/lib/agentic/commerce/retail-join";
-import { resolveAgenticPaidTrackingPath } from "@/lib/agentic/commerce/checkout-return";
 import { createAgenticStripeCheckoutSession } from "@/lib/agentic/commerce/stripe-adapter";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { asMinor } from "@/lib/agentic/money";
@@ -221,19 +220,6 @@ export async function POST(request: Request, { params }: RouteProps) {
   };
 
   if (formPosted) {
-    if (paid?.paymentStatus === "paid") {
-      const localeMatch = returnTo.match(/\/(en|th|zh-CN)\//);
-      const tracking = await resolveAgenticPaidTrackingPath({
-        checkoutAccess,
-        locale: localeMatch?.[1] ?? "en",
-        runtime
-      });
-
-      if (tracking) {
-        return NextResponse.redirect(new URL(tracking, runtime.config.siteUrl), 303);
-      }
-    }
-
     const target = new URL(
       returnTo.startsWith("/") ? returnTo : `/en/mcp/checkout/${checkoutAccess}`,
       runtime.config.siteUrl

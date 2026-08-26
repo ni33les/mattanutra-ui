@@ -38,6 +38,7 @@ type AgenticCheckoutPanelProps = Readonly<{
   paid: boolean;
   refundable?: boolean;
   successUrl: string;
+  trackingHref?: string | null;
   shippingMinor: number;
   subtotalMinor: number;
   taxMinor: number;
@@ -156,6 +157,14 @@ export function AgenticCheckoutPanel(props: AgenticCheckoutPanelProps) {
       {props.paid ? (
         <p className="rounded-lg bg-[var(--brand-soft-green)] px-4 py-3">
           {agenticMessage(props.locale, "checkout.paid")}
+          {props.trackingHref ? (
+            <>
+              {" "}
+              <a className="underline" href={props.trackingHref}>
+                Order tracking
+              </a>
+            </>
+          ) : null}
         </p>
       ) : null}
       {props.expired && !props.paid ? (
