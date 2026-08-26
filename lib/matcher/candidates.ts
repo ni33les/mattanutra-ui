@@ -806,8 +806,10 @@ export function compileGroups(
 
     let belowFloorAdded = 0;
     const pool = [...mapped, ...labelled]
-      .filter((product) =>
-        product.contributionSubjectIds.includes(target.subjectId)
+      .filter(
+        (product) =>
+          product.contributionSubjectIds.includes(target.subjectId) ||
+          contributionFor(product, target.name, target.subjectId).length > 0
       )
       .sort((left, right) => {
         const dedicated =
