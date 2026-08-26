@@ -930,7 +930,7 @@ export function compileGroups(
       const facts = labelledTargetCount(product, request);
       const hasLowCollateralContributor = groups.some(
         (group) =>
-          groupCoversTarget(group, target.subjectId) &&
+          groupCoversTargetAtFloor(group, request, target.subjectId) &&
           labelledTargetCount(group.product, request) <= 1
       );
       const keepBelowFloor =
