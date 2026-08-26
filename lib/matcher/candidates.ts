@@ -734,7 +734,7 @@ export function compileGroups(
   );
 
   for (const product of dedicatedMapped) {
-    tryCompile(product, false);
+    tryCompile(product, true);
   }
 
   for (const product of otherMapped) {
