@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
 import { classifySnapshotTargets } from "@/lib/agentic/plan/classify";
@@ -18,7 +19,7 @@ import {
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
-import { productKeysMatch } from "@/lib/product-key-matching";
+import { canonicalNutrientKey, productKeysMatch } from "@/lib/product-key-matching";
 import type {
   CanonicalRequest,
   MatcherUnit,
@@ -30,6 +31,7 @@ import type {
   BasketItem,
   CanonicalPlanState,
   CoverageRow,
+  FactLedgerRow,
   MatcherTelemetry,
   PlanLeftover,
   RejectedCandidate,
@@ -219,6 +221,80 @@ export function coverageFor(
       upperLimitAmount: limit
     };
   });
+}
+
+export function factLedgerFor(input: Readonly<{
+  catalogueId: string;
+  selected: StackOption | null;
+  state: CanonicalPlanState;
+}>): FactLedgerRow[] {
+  if (!input.selected) {
+    return [];
+  }
+
+  const rows: FactLedgerRow[] = [];
+  const seen = new Set<string>();
+
+  for (const target of input.state.targets) {
+    const coverage = input.selected.coverage.find(
+      (row) => row.supplementId === target.supplementId
+    );
+
+    for (const contributor of coverage?.contributors ?? []) {
+      const item = input.selected.basket.find(
+        (basketItem) => basketItem.productId === contributor.productId
+      );
+      const nutrient = item?.requestedNutrients?.find((entry) =>
+        productKeysMatch(entry.name, target.name)
+      );
+      const ruleId = canonicalNutrientKey(nutrient?.name ?? target.name);
+      const productFactId = [
+        contributor.productId ?? item?.productId ?? "",
+        ruleId,
+        contributor.unit
+      ].join(":");
+      const key = `${target.supplementId}:${productFactId}`;
+
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      rows.push({
+        amount: contributor.amount,
+        canonicalSupplementId: target.supplementId,
+        catalogueId: input.catalogueId,
+        normalizationRuleId: ruleId,
+        productFactId,
+        productId: contributor.productId ?? item?.productId ?? "",
+        unit: contributor.unit
+      });
+    }
+  }
+
+  return rows.sort(
+    (left, right) =>
+      left.canonicalSupplementId.localeCompare(right.canonicalSupplementId) ||
+      left.productFactId.localeCompare(right.productFactId)
+  );
+}
+
+export function factLedgerHash(rows: readonly FactLedgerRow[]): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        rows.map((row) => ({
+          amount: row.amount,
+          canonicalSupplementId: row.canonicalSupplementId,
+          catalogueId: row.catalogueId,
+          normalizationRuleId: row.normalizationRuleId,
+          productFactId: row.productFactId,
+          productId: row.productId,
+          unit: row.unit
+        }))
+      )
+    )
+    .digest("hex");
 }
 
 const PUBLIC_NUTRIENT_NAME_LIMIT = 12;
@@ -627,7 +703,26 @@ export function matcherTelemetryFor(input: Readonly<{
         .filter((item) => item.reason === "not_in_catalogue")
         .map((item) => item.name)
     ],
-    selectedOptionId: input.selected?.optionId ?? null
+    selectedOptionId: input.selected?.optionId ?? null,
+    ...(() => {
+      const catalogueId =
+        input.selected?.snapshotId ??
+        (input.snapshot ? catalogueSnapshotId(input.snapshot) : "");
+      const ledger = factLedgerFor({
+        catalogueId,
+        selected: input.selected,
+        state: input.state
+      });
+
+      if (ledger.length < 1) {
+        return {};
+      }
+
+      return {
+        factLedger: ledger,
+        factLedgerHash: factLedgerHash(ledger)
+      };
+    })()
   };
 }
 

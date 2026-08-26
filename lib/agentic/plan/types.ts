@@ -198,6 +198,18 @@ export type MatcherTelemetry = Readonly<{
   serializeMs?: number;
   snapshotId?: string;
   targetClassifications?: readonly TargetClassification[];
+  factLedgerHash?: string;
+  factLedger?: readonly FactLedgerRow[];
+}>;
+
+export type FactLedgerRow = Readonly<{
+  amount: number;
+  canonicalSupplementId: string;
+  catalogueId: string;
+  normalizationRuleId: string;
+  productFactId: string;
+  productId: string;
+  unit: string;
 }>;
 
 export type BasketNutrient = Readonly<{

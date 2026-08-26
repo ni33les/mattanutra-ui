@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS, fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
 import { freezeCatalogueSnapshot } from "../lib/agentic/catalogue/freeze.ts";
-import { coverageFor, matchPlan, matcherTelemetryFor } from "../lib/agentic/plan/matching.ts";
+import {
+  coverageFor,
+  factLedgerHash,
+  matchPlan,
+  matcherTelemetryFor
+} from "../lib/agentic/plan/matching.ts";
 import { normalizePlanRequest } from "../lib/agentic/plan/normalize.ts";
 import type { AgenticConfig } from "../lib/agentic/config.ts";
 import { aug25PlanState } from "../lib/agentic/plan/mode-d.ts";
@@ -358,6 +363,52 @@ describe("Phase 6 bounded evidence fields", () => {
       })),
       [{ amount: 500, name: "Blackmores Conceive Well Gold" }]
     );
+  });
+
+  it("hashes Folate, Folic acid and Vitamin B9 ledgers the same for Conceive Well", () => {
+    const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
+    const base = live.products.find((item) => /folate/i.test(item.candidate.title));
+    assert.ok(base);
+    const folate = supplement("Folate");
+    const prenatal = {
+      ...base,
+      contributionSupplementIds: [folate.supplementId],
+      productId: "prd_conceive_well_gold_hash",
+      retailerSku: "TH-CWG-HASH",
+      candidate: {
+        ...base.candidate,
+        facts: [fact("Folic acid", 500, "mcg", "folic_acid")],
+        title: "Blackmores Conceive Well Gold"
+      }
+    };
+    const snapshot = frozen([prenatal]);
+    const hashes = ["Folate", "Folic acid", "Vitamin B9"].map((name) => {
+      const state = aug25PlanState({
+        profile: { ageYears: 32, lifeStage: "pregnant", sex: "female" },
+        targets: [
+          {
+            amount: 500,
+            name,
+            supplementId: folate.supplementId,
+            unit: "mcg"
+          }
+        ]
+      });
+      const matched = matchPlan({ snapshot, state });
+      const telemetry = matcherTelemetryFor({
+        leftovers: matched.leftovers,
+        selected: matched.selected,
+        snapshot,
+        state
+      });
+      assert.ok(telemetry.factLedgerHash);
+      assert.equal(telemetry.factLedger?.length, 1);
+      assert.equal(telemetry.factLedger?.[0]?.amount, 500);
+      return telemetry.factLedgerHash;
+    });
+    assert.equal(hashes[0], hashes[1]);
+    assert.equal(hashes[1], hashes[2]);
+    assert.notEqual(hashes[0], factLedgerHash([]));
   });
 
   it("credits Conceive Well Vitamin D 400 IU as Vitamin D3 400 IU", () => {
