@@ -523,6 +523,48 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
   });
 
+  it("keeps a below-floor B12 SKU when the covering B12 SKU is UL-blocked", () => {
+    const catalog = {
+      availabilityAsOf: "2026-08-26T00:00:00.000Z",
+      catalogueVersion: "phase2-b12-partial-not-empty",
+      products: [
+        qaProduct({
+          facts: [
+            { amount: 250, key: "b12" },
+            { amount: 50, key: "zinc" }
+          ],
+          id: "G-B12-ZINC-UL",
+          pills: 1,
+          priceThb: 90,
+          title: "Vitamin B12 Zinc Complex"
+        }),
+        qaProduct({
+          facts: [{ amount: 30, key: "b12" }],
+          id: "G-B12-30",
+          pills: 1,
+          priceThb: 60,
+          title: "Vitamin B12 30"
+        })
+      ]
+    };
+    const result = match(
+      qaRequest({
+        optimization: "balanced",
+        targets: [qaTarget("b12", 250)]
+      }),
+      catalog
+    );
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("G-B12-ZINC-UL"), false);
+    assert.equal(result.selected.productIds.includes("G-B12-30"), true);
+    const percent = Math.round(
+      (result.selected.coverageBySubject.get(qaTarget("b12", 250).subjectId) ??
+        0) / 100
+    );
+    assert.equal(percent >= 90, false);
+    assert.equal(percent > 0, true);
+  });
+
   it("keeps dedicated MAG, fish oil, and C instead of a below-floor magnesium+D3 combo", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",

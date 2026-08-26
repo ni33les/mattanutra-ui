@@ -955,7 +955,7 @@ function seedPriorityGroups(
   const covering = request.targets.every(
     (target) =>
       remainingRequestedUnits(request, target.subjectId) <= BigInt(0) ||
-      targetHasCoveringGroup(priority, request, target.subjectId)
+      Boolean(bestCompactCoveringGroup(priority, request, target.subjectId))
   );
 
   if (covering) {
