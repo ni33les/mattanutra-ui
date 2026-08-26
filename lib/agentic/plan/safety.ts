@@ -421,17 +421,30 @@ export function evaluateSafety(input: Readonly<{
       }));
     }
 
-    if (row.currentAmount > 0 && row.deliveredAmount > 0) {
+    const overlap =
+      rowContributors.length >= 2 ||
+      (row.currentAmount > 0 && row.deliveredAmount > 0);
+
+    if (overlap) {
       items.push(guidance({
         action: "acknowledge",
         code: "duplicate_or_overlap",
         contributors: rowContributors,
         exposure: row.totalExposureAmount,
         locale: input.locale,
-        productIds,
+        nutrientName: row.name,
+        productIds: [
+          ...new Set(
+            rowContributors
+              .map((item) => item.productId)
+              .filter((id): id is string => Boolean(id))
+          )
+        ],
         requested: row.requestedAmount,
         severity: "high",
-        supplementIds: [row.supplementId]
+        sourceScope: "supplemental",
+        supplementIds: [row.supplementId],
+        unit: row.unit
       }));
     }
   }

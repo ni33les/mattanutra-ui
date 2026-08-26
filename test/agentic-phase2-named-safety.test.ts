@@ -113,4 +113,77 @@ describe("Phase 2 named incidental safety", () => {
     const dose = guidance.find((item) => item.code === "dose_review_required");
     assert.equal(dose, undefined);
   });
+
+  it("emits overlap guidance when two selected D3 SKUs contribute", () => {
+    const selected: StackOption = {
+      ...optionWithIncidental("Vitamin A", 1, "mcg"),
+      basket: [
+        {
+          ...optionWithIncidental("Vitamin A", 1, "mcg").basket[0]!,
+          productId: "prd_bio",
+          productName: "Bio Calcium+D3",
+          requestedNutrientNames: ["Vitamin D3"]
+        },
+        {
+          ...optionWithIncidental("Vitamin A", 1, "mcg").basket[0]!,
+          productId: "prd_joint",
+          productName: "Joint Mobility Plus",
+          requestedNutrientNames: ["Vitamin D3"]
+        }
+      ],
+      coverage: [
+        {
+          contributors: [
+            {
+              amount: 600,
+              productId: "prd_bio",
+              productName: "Bio Calcium+D3",
+              source: "selected",
+              unit: "IU"
+            },
+            {
+              amount: 1200,
+              productId: "prd_joint",
+              productName: "Joint Mobility Plus",
+              source: "selected",
+              unit: "IU"
+            }
+          ],
+          coveragePercent: 90,
+          currentAmount: 0,
+          deliveredAmount: 1800,
+          name: "Vitamin D3",
+          percentOfUpperLimit: 45,
+          remainingGap: 200,
+          requestedAmount: 2000,
+          status: "covered",
+          supplementId: "sup_d3",
+          totalExposureAmount: 1800,
+          unit: "IU",
+          upperLimitAmount: 4000
+        }
+      ]
+    };
+    const guidance = evaluateSafety({
+      locale: "en",
+      selected,
+      state: {
+        ...aug25PlanState(),
+        targets: [
+          {
+            amount: 2000,
+            name: "Vitamin D3",
+            supplementId: "sup_d3",
+            unit: "IU"
+          }
+        ]
+      }
+    });
+    const overlap = guidance.find((item) => item.code === "duplicate_or_overlap");
+    assert.ok(overlap);
+    assert.equal(overlap.action, "acknowledge");
+    assert.equal(overlap.nutrientName, "Vitamin D3");
+    assert.equal(overlap.unit, "IU");
+    assert.equal(overlap.contributors?.length, 2);
+  });
 });
