@@ -391,6 +391,12 @@ export function compareBaskets(
         return dedicatedPartial;
       }
 
+      const exactTitle = right.titleExactCount - left.titleExactCount;
+
+      if (exactTitle !== 0) {
+        return exactTitle;
+      }
+
       const pills = left.dailyPills - right.dailyPills;
 
       if (pills !== 0) {
@@ -401,12 +407,6 @@ export function compareBaskets(
 
       if (products !== 0) {
         return products;
-      }
-
-      const exactTitle = right.titleExactCount - left.titleExactCount;
-
-      if (exactTitle !== 0) {
-        return exactTitle;
       }
 
       if (coverageDominates(left, right)) {
