@@ -128,7 +128,7 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
   });
 
   it("records ackMs, matchMs and searchDeadlineMs on DEV matcher telemetry", () => {
-    assert.equal(PLAN_MATCH_RETURN_BUDGET_MS, 1_500);
+    assert.equal(PLAN_MATCH_RETURN_BUDGET_MS, 3_000);
     const telemetry = matcherTelemetryFor({
       ackMs: 180,
       leftovers: [],

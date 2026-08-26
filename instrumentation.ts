@@ -27,4 +27,14 @@ export async function register() {
         error instanceof Error ? error.message : error
       );
     });
+  void import("./lib/agentic/catalogue/boot-warm")
+    .then((mod) => {
+      mod.startCatalogueBootWarm();
+    })
+    .catch((error) => {
+      console.warn(
+        "Unable to start catalogue boot warm",
+        error instanceof Error ? error.message : error
+      );
+    });
 }

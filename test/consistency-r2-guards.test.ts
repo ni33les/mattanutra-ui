@@ -72,7 +72,7 @@ describe("consistency r2 regression guards", () => {
       assert.doesNotMatch(body, /\bmatch\s*\(/);
     }
 
-    assert.match(source, /PLAN_MATCH_RETURN_BUDGET_MS = 1_500/);
+    assert.match(source, /PLAN_MATCH_RETURN_BUDGET_MS = 3_000/);
     assert.match(source, /Promise\.race/);
     assert.match(source, /overwriteIdempotency/);
     assert.match(source, /status: "processing"/);

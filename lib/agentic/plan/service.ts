@@ -44,7 +44,7 @@ import type {
 } from "@/lib/agentic/plan/types";
 
 export const PLAN_FEEDBACK_AFTER_REVISIONS = 3;
-export const PLAN_MATCH_RETURN_BUDGET_MS = 1_500;
+export const PLAN_MATCH_RETURN_BUDGET_MS = 3_000;
 
 const inflightPlanMatches = new Map<
   string,
