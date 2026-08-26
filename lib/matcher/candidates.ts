@@ -686,6 +686,41 @@ function keepCompiledContributor(
   });
 }
 
+function convertedContributionUnits(
+  product: MatcherProduct,
+  target: CanonicalTarget
+) {
+  let total = BigInt(0);
+
+  for (const fact of contributionFor(product, target.name, target.subjectId)) {
+    if (fact.amount == null || fact.amount <= 0 || !fact.unit) {
+      continue;
+    }
+
+    let scaled = scaleAmount({
+      amount: fact.amount,
+      subjectId: target.subjectId,
+      subjectName: target.name,
+      unit: fact.unit
+    });
+
+    if (isDoseError(scaled)) {
+      scaled = scaleAmount({
+        amount: fact.amount,
+        subjectId: target.subjectId,
+        subjectName: fact.name ?? target.name,
+        unit: fact.unit
+      });
+    }
+
+    if (!isDoseError(scaled)) {
+      total += scaled.units;
+    }
+  }
+
+  return total;
+}
+
 export function compileGroups(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
@@ -805,7 +840,7 @@ export function compileGroups(
     }
 
     let belowFloorAdded = 0;
-    const pool = [...mapped, ...labelled]
+    const ranked = [...mapped, ...labelled]
       .filter(
         (product) =>
           product.contributionSubjectIds.includes(target.subjectId) ||
@@ -827,20 +862,34 @@ export function compileGroups(
           return facts;
         }
 
-        const amountOf = (product: MatcherProduct) =>
-          contributionFor(product, target.name, target.subjectId).reduce(
-            (sum, fact) => sum + (fact.amount ?? 0),
-            0
-          );
-        const amount = amountOf(right) - amountOf(left);
+        const amount = convertedContributionUnits(right, target) -
+          convertedContributionUnits(left, target);
 
-        if (amount !== 0) {
-          return amount;
+        if (amount !== BigInt(0)) {
+          return amount > BigInt(0) ? 1 : -1;
         }
 
         return left.productId.localeCompare(right.productId);
-      })
-      .slice(0, 8);
+      });
+    const strongest = [...ranked].sort((left, right) => {
+      const amount =
+        convertedContributionUnits(right, target) -
+        convertedContributionUnits(left, target);
+
+      if (amount !== BigInt(0)) {
+        return amount > BigInt(0) ? 1 : -1;
+      }
+
+      return left.productId.localeCompare(right.productId);
+    })[0];
+    const pool = ranked.slice(0, 8);
+
+    if (
+      strongest &&
+      !pool.some((product) => product.productId === strongest.productId)
+    ) {
+      pool.unshift(strongest);
+    }
 
     for (const product of pool) {
       if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
