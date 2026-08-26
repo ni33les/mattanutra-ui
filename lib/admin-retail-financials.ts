@@ -1289,8 +1289,11 @@ export async function voidPendingRetailOrderSettlement(
   }
 
   const rows = await sql<Array<{
+    currency: string;
+    gross_customer_amount: string | number;
     id: string;
     organisation_id: string;
+    refund_finance_transaction_id: string | null;
   }>>`
     update public.retail_order_settlements
     set
@@ -1301,13 +1304,62 @@ export async function voidPendingRetailOrderSettlement(
       }))}::jsonb,
       updated_at = now()
     where retail_customer_order_id = ${input.orderId}::uuid
-      and status in ('pending', 'due')
-    returning id::text, organisation_id::text
+      and status <> 'voided'
+    returning
+      id::text,
+      organisation_id::text,
+      currency,
+      gross_customer_amount,
+      refund_finance_transaction_id::text
   `;
   const settlement = rows[0] ?? null;
 
   if (!settlement) {
-    return null;
+    const existing = await sql<Array<{ id: string }>>`
+      select id::text
+      from public.retail_order_settlements
+      where retail_customer_order_id = ${input.orderId}::uuid
+        and status = 'voided'
+      limit 1
+    `;
+    return existing[0]?.id ?? null;
+  }
+
+  if (!settlement.refund_finance_transaction_id) {
+    const gross = Math.round(Number(settlement.gross_customer_amount));
+    if (gross > 0) {
+      const fx = await resolveUsdRateForCurrency(settlement.currency, { sql });
+      const transactionId = await recordFinanceTransaction({
+        amount: gross,
+        category: "refund",
+        currency: settlement.currency,
+        description: `MCP refund for settlement ${settlement.id}`,
+        entryType: "actual",
+        from: "mattanutra:retail-revenue",
+        fromAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
+        fxRateId: fx.fxRateId,
+        metadata: {
+          orderId: input.orderId,
+          reason: input.reason,
+          settlementId: settlement.id
+        },
+        provider: "mcp_refund",
+        source: "retail_order_settlement",
+        sourceRef: `retail-settlement:${settlement.id}:refund`,
+        sql,
+        to: "customer:refund",
+        usdRate: fx.usdRate
+      });
+
+      if (transactionId) {
+        await sql`
+          update public.retail_order_settlements
+          set refund_finance_transaction_id = ${transactionId}::uuid,
+              updated_at = now()
+          where id = ${settlement.id}::uuid
+        `;
+      }
+    }
   }
 
   await writeBpmEvent({
