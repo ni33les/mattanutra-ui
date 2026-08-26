@@ -90,6 +90,36 @@ function coveredTargetCount(
   ).length;
 }
 
+function titleExactCountFor(
+  groups: readonly ProductGroup[],
+  productIds: readonly string[],
+  request: CanonicalRequest
+) {
+  const byId = new Map(groups.map((item) => [item.productId, item.product]));
+  const normalize = (value: string) =>
+    value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  let count = 0;
+
+  for (const productId of productIds) {
+    const product = byId.get(productId);
+
+    if (!product) {
+      continue;
+    }
+
+    const title = normalize(product.title);
+    if (
+      request.targets.some(
+        (target) => title === normalize(target.name) && title.length >= 2
+      )
+    ) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
 function requestedLabelCountFor(
   groups: readonly ProductGroup[],
   productIds: readonly string[],
@@ -196,6 +226,11 @@ export function scoreState(input: Readonly<{
     productCount: input.state.count,
     productIds,
     reason: "Highest-coverage feasible stack",
+    titleExactCount: titleExactCountFor(
+      input.groups,
+      productIds,
+      input.request
+    ),
     requestedLabelCount: requestedLabelCountFor(
       input.groups,
       productIds,
@@ -233,6 +268,10 @@ function compareDefault(left: ScoredBasket, right: ScoredBasket) {
 
   if (left.incidentalCount !== right.incidentalCount) {
     return left.incidentalCount - right.incidentalCount;
+  }
+
+  if (right.titleExactCount !== left.titleExactCount) {
+    return right.titleExactCount - left.titleExactCount;
   }
 
   if (left.requestedLabelCount !== right.requestedLabelCount) {
@@ -362,6 +401,12 @@ export function compareBaskets(
 
       if (products !== 0) {
         return products;
+      }
+
+      const exactTitle = right.titleExactCount - left.titleExactCount;
+
+      if (exactTitle !== 0) {
+        return exactTitle;
       }
 
       if (coverageDominates(left, right)) {
@@ -591,6 +636,18 @@ export function salvagePartialBasket(input: Readonly<{
 
             if (leftFacts !== rightFacts) {
               return leftFacts - rightFacts;
+            }
+
+            const needle = target.name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+            const leftExact =
+              left.group.product.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() ===
+              needle;
+            const rightExact =
+              right.group.product.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() ===
+              needle;
+
+            if (leftExact !== rightExact) {
+              return leftExact ? -1 : 1;
             }
           }
 

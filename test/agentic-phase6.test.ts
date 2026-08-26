@@ -570,6 +570,7 @@ describe("Phase 6 bounded evidence fields", () => {
         productIds: ["prd_cw", "prd_joint"],
         reason: "test",
         requestedLabelCount: 2,
+        titleExactCount: 0,
         safety: { findings: [], hardBlocked: false, requiresAck: false },
         sellerId: "seller_th",
         variantIds: ["prd_cw:x1", "prd_joint:x1"]

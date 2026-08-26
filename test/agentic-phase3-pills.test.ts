@@ -41,6 +41,7 @@ function scored(
     productCount: overrides.productIds.length,
     reason: "",
     requestedLabelCount: 0,
+    titleExactCount: 0,
     safety: emptySafety(),
     sellerId: "seller_th",
     variantIds: [],

@@ -243,6 +243,7 @@ export type ScoredBasket = Readonly<{
   productIds: readonly string[];
   reason: string;
   requestedLabelCount: number;
+  titleExactCount: number;
   safety: SafetyResult;
   sellerId: string;
   variantIds: readonly string[];
