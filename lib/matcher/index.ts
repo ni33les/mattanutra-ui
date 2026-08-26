@@ -666,9 +666,24 @@ function leftoversFor(
     const percent = Math.round(coverage / 100);
 
     if (!selected || percent <= 0) {
+      const constraint =
+        selected &&
+        request.maxProductCount != null &&
+        selected.productCount >= request.maxProductCount
+          ? "hard_constraint:maxProductCount"
+          : selected &&
+              request.maxDailyPills != null &&
+              selected.dailyPills >= request.maxDailyPills
+            ? "hard_constraint:maxDailyPills"
+            : selected &&
+                request.maxPriceMinor != null &&
+                selected.priceMinor >= request.maxPriceMinor
+              ? "hard_constraint:maxPriceMinor"
+              : undefined;
       push({
         amount: target.requestedAmount,
         name: target.name,
+        ...(constraint ? { note: constraint } : {}),
         reason: "uncovered",
         severity: "high",
         subjectId: target.subjectId,
@@ -855,12 +870,68 @@ export function match(
       ? []
       : rejectedCandidatesFor(request, catalog, groups);
 
+  const targetFrontiers = request.targets.map((target) => {
+    const covering = bestCompactCoveringGroup(groups, request, target.subjectId);
+    const standalone = bestStandaloneContributorGroup(
+      groups,
+      request,
+      target.subjectId
+    );
+    const productIds = [
+      ...new Set(
+        [covering?.productId, standalone?.productId].filter(
+          (id): id is string => Boolean(id)
+        )
+      )
+    ];
+
+    return {
+      name: target.name,
+      productIds,
+      subjectId: target.subjectId
+    };
+  });
+
+  const selectedIds = new Set(winner.selected?.productIds ?? []);
+  const lossCertificates = request.targets.flatMap((target) => {
+    const frontier = targetFrontiers.find(
+      (item) => item.subjectId === target.subjectId
+    );
+    const missing = (frontier?.productIds ?? []).filter((id) => !selectedIds.has(id));
+
+    return missing.map((candidate_product_id) => {
+      const group = groups.find((item) => item.productId === candidate_product_id);
+      const joint = /\bjoint\b/i.test(group?.product.title ?? "");
+
+      return {
+        candidate_product_id,
+        catalogue_id: catalog.catalogueVersion,
+        conflicting_product_ids: [...selectedIds],
+        conflicting_rule_id: joint
+          ? "joint_skip_multi_target"
+          : trimmed
+            ? "search_deadline"
+            : "combined_mode",
+        rejection_class: trimmed
+          ? ("approximate" as const)
+          : joint
+            ? ("dominated" as const)
+            : ("dominated" as const),
+        target_supplement_id: target.subjectId
+      };
+    });
+  });
+
   return {
     alternatives: winner.alternatives,
     leftovers: leftoversFor(request, winner.selected),
+    ...(lossCertificates.length > 0 ? { lossCertificates } : {}),
     rejected,
     searchMode: mode,
     selected: winner.selected,
+    ...(targetFrontiers.some((item) => item.productIds.length > 0)
+      ? { targetFrontiers }
+      : {}),
     trimmed
   };
 }

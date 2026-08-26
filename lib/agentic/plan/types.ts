@@ -201,6 +201,19 @@ export type MatcherTelemetry = Readonly<{
   targetClassifications?: readonly TargetClassification[];
   factLedgerHash?: string;
   factLedger?: readonly FactLedgerRow[];
+  lossCertificates?: readonly Readonly<{
+    candidate_product_id: string;
+    catalogue_id: string;
+    conflicting_product_ids: readonly string[];
+    conflicting_rule_id: string;
+    rejection_class: string;
+    target_supplement_id: string;
+  }>[];
+  targetFrontiers?: readonly Readonly<{
+    name: string;
+    productIds: readonly string[];
+    subjectId: string;
+  }>[];
 }>;
 
 export type FactLedgerRow = Readonly<{

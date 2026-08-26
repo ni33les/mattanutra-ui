@@ -278,12 +278,35 @@ export type RejectedSummary = Readonly<{
   total: number;
 }>;
 
+export type LossCertificate = Readonly<{
+  candidate_product_id: string;
+  catalogue_id: string;
+  conflicting_product_ids: readonly string[];
+  conflicting_rule_id: string;
+  rejection_class:
+    | "approximate"
+    | "dominated"
+    | "hard_constraint"
+    | "safety"
+    | "source"
+    | "unavailable";
+  target_supplement_id: string;
+}>;
+
+export type TargetFrontier = Readonly<{
+  name: string;
+  productIds: readonly string[];
+  subjectId: string;
+}>;
+
 export type MatchResult = Readonly<{
   alternatives: readonly ScoredBasket[];
   leftovers: readonly MatcherLeftover[];
+  lossCertificates?: readonly LossCertificate[];
   rejected: readonly RejectedCandidate[];
   searchMode: "bounded" | "exact";
   selected: ScoredBasket | null;
+  targetFrontiers?: readonly TargetFrontier[];
   trimmed: boolean;
 }>;
 

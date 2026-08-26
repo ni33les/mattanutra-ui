@@ -143,6 +143,7 @@ function composeResult(input: Readonly<{
   catalogueMs?: number;
   locale: Locale;
   leftovers: PlanResult["leftovers"];
+  lossCertificates?: PlanResult["matcherTelemetry"]["lossCertificates"];
   matchMs?: number;
   previous: PlanResult | null;
   rejected?: PlanResult["matcherTelemetry"]["rejectedAll"];
@@ -151,6 +152,7 @@ function composeResult(input: Readonly<{
   shownRevision: number;
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
+  targetFrontiers?: PlanResult["matcherTelemetry"]["targetFrontiers"];
   unmetRequirements: readonly string[];
 }>): PlanResult {
   const coverage = input.selected?.coverage ?? coverageFor(input.state, null);
@@ -219,13 +221,15 @@ function composeResult(input: Readonly<{
       ackMs: input.ackMs,
       catalogueMs: input.catalogueMs,
       leftovers: input.leftovers,
+      lossCertificates: input.lossCertificates,
       matchMs: input.matchMs,
       rejected: input.rejected ?? input.previous?.matcherTelemetry.rejectedAll,
       searchDeadlineMs: DEFAULT_MATCHER_CONFIG.searchDeadlineMs,
       searchMs: input.searchMs,
       selected: input.selected,
       snapshot: input.snapshot,
-      state: pinnedState
+      state: pinnedState,
+      targetFrontiers: input.targetFrontiers
     }),
     optimizationEvidence: {
       mode: pinnedState.optimization,
@@ -273,6 +277,7 @@ function buildResult(input: Readonly<{
     catalogueMs: input.catalogueMs,
     locale: input.locale,
     leftovers: matched.leftovers,
+    lossCertificates: matched.lossCertificates,
     matchMs,
     previous: input.previous,
     rejected: matched.rejected,
@@ -281,6 +286,7 @@ function buildResult(input: Readonly<{
     shownRevision: input.shownRevision,
     snapshot: input.snapshot,
     state: input.state,
+    targetFrontiers: matched.targetFrontiers,
     unmetRequirements: matched.unmetRequirements
   });
 }

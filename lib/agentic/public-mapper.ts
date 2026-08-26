@@ -460,6 +460,12 @@ function publicMatcherTelemetry(
   if (telemetry.factLedger && telemetry.factLedger.length > 0) {
     payload.factLedger = telemetry.factLedger;
   }
+  if (telemetry.targetFrontiers && telemetry.targetFrontiers.length > 0) {
+    payload.targetFrontiers = telemetry.targetFrontiers;
+  }
+  if (telemetry.lossCertificates && telemetry.lossCertificates.length > 0) {
+    payload.lossCertificates = telemetry.lossCertificates;
+  }
 
   return Object.keys(payload).length > 0 ? { matcherTelemetry: payload } : {};
 }

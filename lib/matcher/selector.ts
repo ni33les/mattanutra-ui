@@ -568,11 +568,34 @@ export function salvagePartialBasket(input: Readonly<{
           return leftOk ? -1 : 1;
         }
 
-        if (input.request.optimization === "fewest_pills" && leftOk) {
-          if (left.variant.dailyPills !== right.variant.dailyPills) {
+        if (leftOk) {
+          if (
+            input.request.optimization === "fewest_pills" &&
+            left.variant.dailyPills !== right.variant.dailyPills
+          ) {
             return left.variant.dailyPills - right.variant.dailyPills;
           }
-        } else {
+
+          if (input.request.optimization === "lowest_cost") {
+            const leftPrice =
+              left.group.product.unitPriceMinor * left.variant.dailyUnits;
+            const rightPrice =
+              right.group.product.unitPriceMinor * right.variant.dailyUnits;
+
+            if (leftPrice !== rightPrice) {
+              return leftPrice - rightPrice;
+            }
+          }
+
+          if (
+            input.request.optimization === "best_coverage" &&
+            rightCover !== leftCover
+          ) {
+            return rightCover - leftCover;
+          }
+        }
+
+        if (!(input.request.optimization === "fewest_pills" && leftOk)) {
           const leftDedicated = productIsDedicatedForTarget(
             left.group.product,
             target

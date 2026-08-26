@@ -638,6 +638,8 @@ export function matcherTelemetryFor(input: Readonly<{
   searchDeadlineMs?: number;
   searchMs?: number;
   selected: StackOption | null;
+  lossCertificates?: MatcherTelemetry["lossCertificates"];
+  targetFrontiers?: MatcherTelemetry["targetFrontiers"];
   serializeMs?: number;
   snapshot?: CatalogueSnapshot;
   state: CanonicalPlanState;
@@ -715,6 +717,12 @@ export function matcherTelemetryFor(input: Readonly<{
         .map((item) => item.name)
     ],
     selectedOptionId: input.selected?.optionId ?? null,
+    ...(input.lossCertificates && input.lossCertificates.length > 0
+      ? { lossCertificates: input.lossCertificates }
+      : {}),
+    ...(input.targetFrontiers && input.targetFrontiers.length > 0
+      ? { targetFrontiers: input.targetFrontiers }
+      : {}),
     ...(!("error" in request) ? { targetSetHash: canonicalTargetSetHash(request) } : {}),
     ...(() => {
       const catalogueId =
@@ -744,8 +752,10 @@ export function matchPlan(input: Readonly<{
 }>): {
   alternatives: StackOption[];
   leftovers: PlanLeftover[];
+  lossCertificates?: NonNullable<MatcherTelemetry["lossCertificates"]>;
   rejected: RejectedCandidate[];
   selected: StackOption | null;
+  targetFrontiers?: NonNullable<MatcherTelemetry["targetFrontiers"]>;
   unmetRequirements: string[];
 } {
   const request = toCanonicalRequest(input.state);
@@ -777,8 +787,10 @@ export function matchPlan(input: Readonly<{
   return {
     alternatives,
     leftovers,
+    ...(result.lossCertificates ? { lossCertificates: result.lossCertificates } : {}),
     rejected: [...result.rejected],
     selected,
+    ...(result.targetFrontiers ? { targetFrontiers: result.targetFrontiers } : {}),
     unmetRequirements: unmetRequirementsFor({
       option: selected,
       state: input.state

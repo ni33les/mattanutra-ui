@@ -448,6 +448,24 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.equal(hashes.size, 1);
   });
 
+  it("records per-target frontiers and a D3 loss certificate on official fewest_pills", () => {
+    const snapshot = frozen();
+    const state = aug25PlanState();
+    const matched = matchPlan({ snapshot, state });
+    assert.ok(matched.selected);
+    assert.ok((matched.targetFrontiers ?? []).length >= 1);
+    assert.equal(matched.targetFrontiers?.length, state.targets.length);
+    const telemetry = matcherTelemetryFor({
+      leftovers: matched.leftovers,
+      lossCertificates: matched.lossCertificates,
+      selected: matched.selected,
+      snapshot,
+      state,
+      targetFrontiers: matched.targetFrontiers
+    });
+    assert.equal(telemetry.targetFrontiers?.length, matched.targetFrontiers?.length);
+  });
+
   it("credits Conceive Well Vitamin D 400 IU as Vitamin D3 400 IU", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const base = live.products.find((item) => /d3/i.test(item.candidate.title));
