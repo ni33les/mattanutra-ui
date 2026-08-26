@@ -5,6 +5,12 @@ import { match } from "../lib/matcher/index.ts";
 import { QA_GOLD_CATALOG, qaProduct, qaRequest, qaTarget } from "../lib/matcher/qa/index.ts";
 
 describe("Phase 2 compactness ranking", () => {
+  it("does not recompile products already rejected as below-floor", () => {
+    const source = readFileSync("lib/matcher/candidates.ts", "utf8");
+    assert.match(source, /compiledIds/);
+    assert.match(source, /contributesUncovered/);
+  });
+
   it("does not stuff extra SKUs onto standalone D3 when a covering SKU exists", () => {
     const result = match(
       qaRequest({
