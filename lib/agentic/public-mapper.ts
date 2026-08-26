@@ -451,6 +451,12 @@ function publicMatcherTelemetry(
       name: item.name
     }));
   }
+  if (telemetry.factLedgerHash) {
+    payload.factLedgerHash = telemetry.factLedgerHash;
+  }
+  if (telemetry.factLedger && telemetry.factLedger.length > 0) {
+    payload.factLedger = telemetry.factLedger;
+  }
 
   return Object.keys(payload).length > 0 ? { matcherTelemetry: payload } : {};
 }
