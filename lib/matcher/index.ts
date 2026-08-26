@@ -727,7 +727,7 @@ export function match(
   }
 
   const rejected =
-    winner.selected || Date.now() >= deadlineAt
+    Date.now() >= deadlineAt
       ? []
       : rejectedCandidatesFor(request, catalog, groups);
 

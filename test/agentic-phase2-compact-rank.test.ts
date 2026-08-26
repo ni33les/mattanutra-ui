@@ -253,7 +253,7 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(fewest.selected.dailyPills, 4);
   });
 
-  it("keeps a covering 50+ multi in official when it hits D3 90% under the catalog UL", () => {
+  it("does not stack a 50+ multi to three pills just to inch D3", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-covering-50plus",
@@ -303,17 +303,24 @@ describe("Phase 2 compactness ranking", () => {
       catalog
     );
     assert.ok(fewest.selected);
-    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
     assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
+    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
     const d3Target = qaTarget("d3", 2000);
     const d3Percent = Math.round(
       (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
     );
-    assert.equal(d3Percent >= 90, true);
+    assert.equal(d3Percent >= 90, false);
+    const fiftyServings = fewest.selected.variantIds.filter((id) =>
+      id.startsWith("G-50PLUS:x")
+    );
+    assert.equal(
+      fiftyServings.every((id) => !/:x3$/.test(id)),
+      true
+    );
   });
 
-  it("still compiles a covering 50+ SKU when many below-floor D3 joints exist", () => {
+  it("does not stuff below-floor D3 joints to fake a 90% D3 cover", () => {
     const joints = Array.from({ length: 8 }, (_, index) =>
       qaProduct({
         facts: [
@@ -376,16 +383,18 @@ describe("Phase 2 compactness ranking", () => {
       catalog
     );
     assert.ok(fewest.selected);
-    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
-    const d3Target = qaTarget("d3", 2000);
-    const d3Percent = Math.round(
-      (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
-    );
-    assert.equal(d3Percent >= 90, true);
+    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
+    assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
+    assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
     assert.equal(
       fewest.selected.productIds.some((id) => id.startsWith("G-JOINT-D3-")),
       false
     );
+    const d3Target = qaTarget("d3", 2000);
+    const d3Percent = Math.round(
+      (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
+    );
+    assert.equal(d3Percent >= 90, false);
   });
 
   it("does not absorb a covering B12 SKU that fails an incidental catalog UL", () => {
@@ -454,7 +463,6 @@ describe("Phase 2 compactness ranking", () => {
       (fewest.selected.coverageBySubject.get(b12Target.subjectId) ?? 0) / 100
     );
     assert.equal(b12Percent >= 90, false);
-    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
   });
 
   it("absorbs a UL-feasible dedicated B12 covering SKU into official", () => {
@@ -520,7 +528,6 @@ describe("Phase 2 compactness ranking", () => {
       (fewest.selected.coverageBySubject.get(b12Target.subjectId) ?? 0) / 100
     );
     assert.equal(b12Percent >= 90, true);
-    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
   });
 
   it("keeps a below-floor B12 SKU when the covering B12 SKU is UL-blocked", () => {

@@ -16,6 +16,7 @@ import type {
 } from "@/lib/matcher/types";
 
 const MAX_DAILY_UNITS = 3;
+const HIGH_COLLATERAL_MULTI_MAX_DAILY_UNITS = 1;
 const NON_PILL_FORM = /powder|liquid|sachet|oil|drops|\bml\b/i;
 
 export function isCountablePillForm(form: string) {
@@ -236,6 +237,10 @@ function carrierTitle(title: string) {
   );
 }
 
+function highCollateralMultiTitle(title: string) {
+  return /\b50\+|multivitamins for 50/i.test(title);
+}
+
 function currentUnitsForSubject(request: CanonicalRequest, subjectId: string) {
   return request.currentSupplements
     .filter((item) => item.subjectId === subjectId)
@@ -314,6 +319,13 @@ function isCarrierNoise(
   request: CanonicalRequest,
   groups: readonly ProductGroup[]
 ) {
+  if (
+    highCollateralMultiTitle(product.title) &&
+    !request.targets.some((target) => productIsDedicatedForTarget(product, target))
+  ) {
+    return true;
+  }
+
   if (!carrierTitle(product.title)) {
     return false;
   }
@@ -432,8 +444,13 @@ function compileProductGroup(
   }
 
   const variants: DoseVariant[] = [];
+  const maxDailyUnits =
+    highCollateralMultiTitle(product.title) &&
+    !request.targets.some((target) => productIsDedicatedForTarget(product, target))
+      ? HIGH_COLLATERAL_MULTI_MAX_DAILY_UNITS
+      : MAX_DAILY_UNITS;
 
-  for (let dailyUnits = 1; dailyUnits <= MAX_DAILY_UNITS; dailyUnits += 1) {
+  for (let dailyUnits = 1; dailyUnits <= maxDailyUnits; dailyUnits += 1) {
     if (
       request.maxDailyPills != null &&
       product.dailyPillsPerServing * dailyUnits > request.maxDailyPills
@@ -537,7 +554,21 @@ export function compileGroups(
       continue;
     }
 
+    const before = groups.length;
     tryCompile(product, true);
+    const added = groups[groups.length - 1];
+
+    if (
+      groups.length > before &&
+      added &&
+      !request.targets.some(
+        (target) =>
+          productIsDedicatedForTarget(product, target) ||
+          groupCoversTargetAtFloor(added, request, target.subjectId)
+      )
+    ) {
+      groups.pop();
+    }
   }
 
   for (const product of labelled) {
@@ -545,7 +576,21 @@ export function compileGroups(
       continue;
     }
 
+    const before = groups.length;
     tryCompile(product);
+    const added = groups[groups.length - 1];
+
+    if (
+      groups.length > before &&
+      added &&
+      !request.targets.some(
+        (target) =>
+          productIsDedicatedForTarget(product, target) ||
+          groupCoversTargetAtFloor(added, request, target.subjectId)
+      )
+    ) {
+      groups.pop();
+    }
   }
 
   for (const target of request.targets) {
@@ -569,6 +614,10 @@ export function compileGroups(
         continue;
       }
 
+      if (isCarrierNoise(product, request, groups)) {
+        continue;
+      }
+
       if (
         !product.contributionSubjectIds.includes(target.subjectId) &&
         contributionFor(product, target.name, target.subjectId).length < 1
@@ -588,7 +637,7 @@ export function compileGroups(
         target.subjectId
       );
 
-      if (!coversFloor && added >= 6) {
+      if (!coversFloor) {
         continue;
       }
 
