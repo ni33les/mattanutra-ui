@@ -243,6 +243,79 @@ describe("Phase 6 bounded evidence fields", () => {
     );
   });
 
+  it("does not treat incidental sub-floor B12 as a 3% match", () => {
+    const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
+    const base = live.products.find((item) => /magnesium/i.test(item.candidate.title));
+    assert.ok(base);
+    const d3 = supplement("Vitamin D3");
+    const b12 = supplement("Vitamin B12");
+    const c = supplement("Vitamin C");
+    const fifty = withFacts(
+      {
+        ...base,
+        contributionSupplementIds: [d3.supplementId, b12.supplementId, c.supplementId],
+        productId: "prd_fifty_plus_incidental_b12",
+        retailerSku: "TH-50PLUS-B12"
+      },
+      [
+        fact("Vitamin D3", 600, "IU", "vitamin_d3"),
+        fact("Vitamin B12", 2.4, "mcg", "vitamin_b12"),
+        fact("Vitamin C", 45, "mg", "vitamin_c")
+      ],
+      [d3.supplementId, b12.supplementId, c.supplementId]
+    );
+    const snapshot = frozen([
+      {
+        ...fifty,
+        candidate: {
+          ...fifty.candidate,
+          title: "Blackmores Multivitamins for 50+"
+        }
+      }
+    ]);
+    const state = aug25PlanState({
+      targets: [
+        {
+          amount: 2000,
+          name: "Vitamin D3",
+          supplementId: d3.supplementId,
+          unit: "IU"
+        },
+        {
+          amount: 250,
+          name: "Vitamin B12",
+          supplementId: b12.supplementId,
+          unit: "mcg"
+        }
+      ]
+    });
+    const matched = matchPlan({ snapshot, state });
+    assert.ok(matched.selected);
+    const b12Row = matched.selected.coverage.find((row) => row.name === "Vitamin B12");
+    assert.ok(b12Row);
+    assert.equal(b12Row.coveragePercent, 0);
+    assert.equal(b12Row.status, "uncovered");
+    assert.ok(b12Row.remainingGap > 0);
+    assert.equal(
+      Math.max(0, b12Row.requestedAmount - b12Row.totalExposureAmount),
+      b12Row.remainingGap
+    );
+    assert.equal(
+      matched.leftovers.some(
+        (item) =>
+          item.name === "Vitamin B12" &&
+          (item.reason === "dose_gap" || item.reason === "uncovered") &&
+          !String(item.note ?? "").includes("covered 3%")
+      ),
+      true
+    );
+    const line = matched.selected.basket.find((item) =>
+      /50\+/.test(item.productName)
+    );
+    assert.ok(line);
+    assert.equal(line.requestedNutrientNames.includes("Vitamin B12"), false);
+  });
+
   it("stamps servings/day, pill burden, and incidental vs requested nutrients on basket lines", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const collagen = live.products.find((item) => /collagen/i.test(item.candidate.title));

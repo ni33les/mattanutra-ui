@@ -11,7 +11,12 @@ import {
   publicCoveragePercent,
   summarizeRejections
 } from "@/lib/matcher";
-import { contributionFor, variantPillBurden } from "@/lib/matcher/candidates";
+import {
+  contributionFor,
+  productIsDedicatedForTarget,
+  variantPillBurden
+} from "@/lib/matcher/candidates";
+import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import type {
@@ -110,7 +115,7 @@ export function coverageFor(
 ): CoverageRow[] {
   return state.targets.map((target) => {
     const coverageUnits = basket?.coverageBySubject.get(target.supplementId) ?? 0;
-    const coveragePercent = Math.round(coverageUnits / 100);
+    const rawCoveragePercent = Math.round(coverageUnits / 100);
     const current = state.currentSupplements.filter(
       (item) => item.supplementId === target.supplementId
     );
@@ -135,20 +140,6 @@ export function coverageFor(
       profile: state.profile,
       subjectId: target.supplementId
     });
-    let status: CoverageRow["status"] = "uncovered";
-
-    if (coveragePercent >= 90 && coveragePercent <= 125) {
-      status = "covered";
-    } else if (coveragePercent > 125) {
-      status = "over_target";
-    } else if (coveragePercent > 0) {
-      status = "partial";
-    }
-
-    if (limit != null && totalExposureAmount >= limit) {
-      status = "upper_limit_risk";
-    }
-
     const contributors = items.flatMap((item) => {
       const matching = (item.requestedNutrients ?? []).filter((nutrient) => {
         const sameName =
@@ -174,6 +165,23 @@ export function coverageFor(
 
       return [];
     });
+
+    const matchedCover =
+      rawCoveragePercent >= COVERED_THRESHOLD || contributors.length > 0;
+    const coveragePercent = matchedCover ? rawCoveragePercent : 0;
+    let status: CoverageRow["status"] = "uncovered";
+
+    if (coveragePercent >= COVERED_THRESHOLD && coveragePercent <= 125) {
+      status = "covered";
+    } else if (coveragePercent > 125) {
+      status = "over_target";
+    } else if (coveragePercent > 0) {
+      status = "partial";
+    }
+
+    if (limit != null && totalExposureAmount >= limit) {
+      status = "upper_limit_risk";
+    }
 
     return {
       contributors,
@@ -290,11 +298,43 @@ function nutrientSplit(
       continue;
     }
 
-    const matchesTarget = state.targets.some((target) =>
-      contributionFor(matcherProduct, target.name, target.supplementId).includes(
-        fact
-      )
-    );
+    const matchesTarget = state.targets.some((target) => {
+      const facts = contributionFor(
+        matcherProduct,
+        target.name,
+        target.supplementId
+      );
+
+      if (!facts.includes(fact)) {
+        return false;
+      }
+
+      if (
+        productIsDedicatedForTarget(matcherProduct, {
+          name: target.name,
+          requested: {
+            dim: "mass_ng",
+            subjectId: target.supplementId,
+            units: BigInt(0)
+          },
+          requestedAmount: target.amount,
+          requestedUnit: target.unit as MatcherUnit,
+          subjectId: target.supplementId
+        })
+      ) {
+        return true;
+      }
+
+      const daily = convertAmount({
+        amount: fact.amount * multiplier,
+        fromUnit: fact.unit,
+        subjectId: target.supplementId,
+        subjectName: target.name,
+        toUnit: target.unit
+      });
+
+      return daily != null && daily >= (target.amount * COVERED_THRESHOLD) / 100;
+    });
     const row = {
       amount: fact.amount * multiplier,
       name: fact.name,
@@ -443,14 +483,25 @@ export function leftoversFor(
 
   for (const row of selected.coverage) {
     if (row.status === "uncovered") {
-      push({
-        amount: row.requestedAmount,
-        name: row.name,
-        reason: "uncovered",
-        severity: "high",
-        supplementId: row.supplementId,
-        unit: row.unit
-      });
+      if (row.deliveredAmount > 0) {
+        push({
+          amount: row.requestedAmount,
+          name: row.name,
+          reason: "dose_gap",
+          severity: "medium",
+          supplementId: row.supplementId,
+          unit: row.unit
+        });
+      } else {
+        push({
+          amount: row.requestedAmount,
+          name: row.name,
+          reason: "uncovered",
+          severity: "high",
+          supplementId: row.supplementId,
+          unit: row.unit
+        });
+      }
     } else if (row.status === "partial") {
       push({
         amount: row.requestedAmount,
