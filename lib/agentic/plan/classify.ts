@@ -1,5 +1,6 @@
 import { catalogueHaystack } from "@/lib/agentic/catalogue/product-fit";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
+import { productHitsCoverageFloor } from "@/lib/matcher/candidates";
 import { productEligible } from "@/lib/matcher/eligibility";
 import { productKeysMatch } from "@/lib/product-key-matching";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
@@ -46,6 +47,7 @@ function looksLikeTarget(product: CatalogueProduct, target: PlanTarget) {
 function classifyOne(input: Readonly<{
   coverage: CoverageRow | undefined;
   eligibleCount: number;
+  floorCoveringCount: number;
   mappedCount: number;
   unmappedLookalike: boolean;
 }>): TargetClass {
@@ -59,7 +61,7 @@ function classifyOne(input: Readonly<{
     return input.unmappedLookalike ? "mapping_defect" : "genuine_gap";
   }
 
-  if (input.eligibleCount < 1) {
+  if (input.eligibleCount < 1 || input.floorCoveringCount < 1) {
     return "genuine_gap";
   }
 
@@ -91,9 +93,24 @@ export function classifySnapshotTargets(input: Readonly<{
     const unmappedLookalike = mapped.length < 1 &&
       input.snapshot.products.some((product) => looksLikeTarget(product, target));
     const coverage = coverageById.get(target.supplementId);
+    const canonicalTarget =
+      request && !("error" in request)
+        ? request.targets.find((item) => item.subjectId === target.supplementId)
+        : undefined;
+    const floorCoveringCount =
+      canonicalTarget && request && !("error" in request)
+        ? eligible.filter((product) =>
+            productHitsCoverageFloor(
+              toMatcherProduct(product),
+              request,
+              canonicalTarget
+            )
+          ).length
+        : eligible.length;
     const targetClass = classifyOne({
       coverage,
       eligibleCount: eligible.length,
+      floorCoveringCount,
       mappedCount: mapped.length,
       unmappedLookalike
     });

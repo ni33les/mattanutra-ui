@@ -8,6 +8,7 @@ import {
 } from "../../lib/matcher/explainer.ts";
 import { productRejectionReason } from "../../lib/matcher/eligibility.ts";
 import { publicPlanFields } from "../../lib/agentic/public-mapper.ts";
+import { qaCatalogSafetyCeilings } from "../../lib/matcher/qa/safety-ceilings.ts";
 import type {
   CanonicalRequest,
   CanonicalTarget,
@@ -223,7 +224,10 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
   });
 
   it("records ul_exceeded for G-HIGH-TRAP", () => {
-    const result = match(request(), catalog([G_D3_2000, G_HIGH_TRAP]));
+    const result = match(
+      request({ safetyCeilings: qaCatalogSafetyCeilings() }),
+      catalog([G_D3_2000, G_HIGH_TRAP])
+    );
     assert.deepEqual(reasonsFor("G-HIGH-TRAP", result), ["ul_exceeded"]);
     assert.equal(result.selected?.productIds.includes("G-HIGH-TRAP"), false);
   });

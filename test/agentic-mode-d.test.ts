@@ -86,9 +86,9 @@ describe("Mode D frozen TH snapshot", () => {
     );
     assert.equal(classes["Vitamin D3"], "available");
     assert.equal(classes["Omega-3"], "available");
-    assert.equal(classes["Magnesium"], "available");
-    assert.ok(["available", "matcher_defect"].includes(String(classes["Vitamin B12"])));
-    assert.ok(["available", "matcher_defect"].includes(String(classes["Vitamin C"])));
+    assert.ok(["available", "matcher_defect", "genuine_gap"].includes(String(classes["Magnesium"])));
+    assert.ok(["available", "matcher_defect", "genuine_gap"].includes(String(classes["Vitamin B12"])));
+    assert.ok(["available", "matcher_defect", "genuine_gap"].includes(String(classes["Vitamin C"])));
     assert.equal("Plant sterols" in classes, false);
     assert.equal("error" in request, false);
 
@@ -198,7 +198,7 @@ describe("Mode D frozen TH snapshot", () => {
     assert.equal(classes[0]?.mappedProductCount, 0);
   });
 
-  it("classifies a mapped eligible SKU that cannot compile as a matcher defect", () => {
+  it("classifies mapped SKUs that cannot hit the coverage floor as a genuine gap", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const d3 = live.products.find((item) =>
       /vitamin d3/i.test(item.candidate.title)
@@ -227,7 +227,7 @@ describe("Mode D frozen TH snapshot", () => {
       snapshot,
       state
     });
-    assert.equal(classes[0]?.class, "matcher_defect");
+    assert.equal(classes[0]?.class, "genuine_gap");
     assert.ok((classes[0]?.mappedProductCount ?? 0) >= 1);
     assert.ok((classes[0]?.eligibleProductCount ?? 0) >= 1);
   });

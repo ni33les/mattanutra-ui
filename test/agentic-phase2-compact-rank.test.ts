@@ -258,6 +258,13 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
     assert.equal(fewest.selected.productCount, 3);
     assert.equal(fewest.selected.dailyPills, 4);
+    assert.equal(
+      fewest.rejected.some(
+        (item) =>
+          item.productId === "G-JOINT-D3-C" && item.reason === "incidental_only"
+      ),
+      false
+    );
   });
 
   it("does not stack a 50+ multi to three pills just to inch D3", () => {

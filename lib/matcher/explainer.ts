@@ -147,7 +147,15 @@ export function rejectedCandidatesFor(
       continue;
     }
 
-    rejected.push(asRejected(product, "incidental_only"));
+    for (const [subjectId, amount] of variant.contributions) {
+      const next =
+        (seedState(request).exposure.get(subjectId) ?? BigInt(0)) + amount.units;
+
+      if (exposureExceedsCeiling(request, subjectId, next)) {
+        rejected.push(asRejected(product, "ul_exceeded"));
+        break;
+      }
+    }
   }
 
   return rejected.sort(

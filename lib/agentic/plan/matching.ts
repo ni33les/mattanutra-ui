@@ -166,16 +166,14 @@ export function coverageFor(
       return [];
     });
 
-    const matchedCover =
-      rawCoveragePercent >= COVERED_THRESHOLD || contributors.length > 0;
-    const coveragePercent = matchedCover ? rawCoveragePercent : 0;
+    const coveragePercent = rawCoveragePercent;
     let status: CoverageRow["status"] = "uncovered";
 
     if (coveragePercent >= COVERED_THRESHOLD && coveragePercent <= 125) {
       status = "covered";
     } else if (coveragePercent > 125) {
       status = "over_target";
-    } else if (coveragePercent > 0) {
+    } else if (coveragePercent > 0 && contributors.length > 0) {
       status = "partial";
     }
 
@@ -506,7 +504,6 @@ export function leftoversFor(
       push({
         amount: row.requestedAmount,
         name: row.name,
-        note: `covered ${row.coveragePercent}%`,
         reason: "dose_gap",
         severity: "medium",
         supplementId: row.supplementId,
