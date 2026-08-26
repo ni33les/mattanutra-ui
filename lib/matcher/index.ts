@@ -290,6 +290,83 @@ function rebuildStateFromBasket(input: Readonly<{
   return { state, used };
 }
 
+function groupVariantForId(
+  groups: readonly ProductGroup[],
+  variantId: string
+) {
+  for (const group of groups) {
+    const variant = group.variants.find((item) => item.variantId === variantId);
+
+    if (variant) {
+      return { group, variant };
+    }
+  }
+
+  return null;
+}
+
+function labelledRequestCount(
+  product: ProductGroup["product"],
+  request: CanonicalRequest
+) {
+  return request.targets.reduce(
+    (sum, target) =>
+      sum +
+      (contributionFor(product, target.name, target.subjectId).length > 0 ? 1 : 0),
+    0
+  );
+}
+
+function tryReplaceWeakerTargetSkus(input: Readonly<{
+  groups: readonly ProductGroup[];
+  request: CanonicalRequest;
+  selected: ScoredBasket;
+  state: ReturnType<typeof seedState>;
+  subjectId: string;
+  variant: NonNullable<
+    ReturnType<typeof contributingVariantForTarget>
+  >;
+  winner: ProductGroup;
+}>) {
+  const winnerUnits =
+    input.variant.contributions.get(input.subjectId)?.units ?? BigInt(0);
+  const keptIds = [...input.state.selectedVariantIds].filter((variantId) => {
+    const found = groupVariantForId(input.groups, variantId);
+
+    if (!found) {
+      return false;
+    }
+
+    const contributed =
+      found.variant.contributions.get(input.subjectId)?.units ?? BigInt(0);
+
+    if (contributed <= BigInt(0)) {
+      return true;
+    }
+
+    if (labelledRequestCount(found.group.product, input.request) > 1) {
+      return true;
+    }
+
+    return contributed >= winnerUnits;
+  });
+
+  if (keptIds.length === input.state.selectedVariantIds.length) {
+    return null;
+  }
+
+  const rebuilt = rebuildStateFromBasket({
+    groups: input.groups,
+    request: input.request,
+    selected: {
+      ...input.selected,
+      variantIds: keptIds
+    }
+  });
+
+  return tryAddVariant(rebuilt.state, input.variant, input.winner, input.request);
+}
+
 function pickBetterBasket(
   left: ScoredBasket,
   right: ScoredBasket,
@@ -451,16 +528,26 @@ function absorbStandaloneWinners(input: Readonly<{
     return input.selected;
   }
 
-  const rebuilt = rebuildStateFromBasket(input);
+  const coveringBase = coveringWinnersBasket(input);
+  const base =
+    coveringBase && coveringBase.coveredCount > input.selected.coveredCount
+      ? coveringBase
+      : input.selected;
+  const rebuilt = rebuildStateFromBasket({
+    groups: input.groups,
+    request: input.request,
+    selected: base
+  });
   let state = rebuilt.state;
   const used = rebuilt.used;
   let changed = false;
   const floor = COVERED_THRESHOLD * 100;
+  const maxSteps = Math.max(4, input.groups.length + 2);
 
   for (const target of input.request.targets) {
     let belowFloorAdded = 0;
 
-    while (true) {
+    for (let step = 0; step < maxSteps; step += 1) {
       const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
 
       if (coverageUnits(delivered, target.requested.units) >= floor) {
@@ -503,7 +590,21 @@ function absorbStandaloneWinners(input: Readonly<{
         break;
       }
 
-      const next = tryAddVariant(state, variant, winner, input.request);
+      let next = tryAddVariant(state, variant, winner, input.request);
+      const replaced = tryReplaceWeakerTargetSkus({
+        groups: input.groups,
+        request: input.request,
+        selected: base,
+        state,
+        subjectId: target.subjectId,
+        variant,
+        winner
+      });
+
+      if (replaced) {
+        next = replaced;
+      }
+
       used.add(winner.productId);
 
       if (!next) {
@@ -519,28 +620,18 @@ function absorbStandaloneWinners(input: Readonly<{
     }
   }
 
-  let best = input.selected;
+  if (!changed) {
+    return base;
+  }
 
-  if (changed) {
-    const scored = scoreState({
+  return (
+    scoreState({
       groups: input.groups,
       request: input.request,
-      sellerId: input.selected.sellerId,
+      sellerId: base.sellerId,
       state
-    });
-
-    if (scored) {
-      best = scored;
-    }
-  }
-
-  const winners = coveringWinnersBasket(input);
-
-  if (winners && winners.coveredCount > best.coveredCount) {
-    best = winners;
-  }
-
-  return best;
+    }) ?? base
+  );
 }
 
 function leftoversFor(
