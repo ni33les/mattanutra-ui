@@ -20,10 +20,22 @@ if (!process.execArgv.includes(strip)) {
     process.exit(code ?? 1);
   });
 } else {
-  const { loadDetCatalog, runDetPack } = await import("../test/agentic-det-pack.test.ts");
-  const catalog = await loadDetCatalog();
-  const a = runDetPack(catalog);
-  const b = runDetPack(catalog);
+  const { freezeKey, loadDetCatalog, runDetPack } = await import(
+    "../test/agentic-det-pack.test.ts"
+  );
+  const catA = await loadDetCatalog();
+  const catB = await loadDetCatalog();
+  const freezeA = freezeKey(catA);
+  const freezeB = freezeKey(catB);
+
+  if (freezeA !== freezeB) {
+    console.error("FAIL freeze");
+    process.exit(1);
+  }
+
+  const catalog = { ...catA, freezePeer: catB };
+  const a = await runDetPack(catalog);
+  const b = await runDetPack(catalog);
   const left = JSON.stringify(a);
   const right = JSON.stringify(b);
 

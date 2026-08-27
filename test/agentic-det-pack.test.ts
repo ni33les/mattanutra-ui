@@ -1,21 +1,28 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import nextEnv from "@next/env";
 import { AGENTIC_POLL_AFTER_SECONDS } from "../lib/agentic/config.ts";
+import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { freezeCatalogueSnapshot } from "../lib/agentic/catalogue/freeze.ts";
 import { loadLiveRetailSnapshot } from "../lib/agentic/catalogue/live.ts";
 import { refreshAdminSafetyCeilings } from "../lib/agentic/catalogue/load-safety-ceilings.ts";
+import {
+  replaceCatalogueSnapshot
+} from "../lib/agentic/catalogue/snapshot.ts";
 import type { CatalogueSnapshot } from "../lib/agentic/catalogue/types.ts";
 import { matchPlan } from "../lib/agentic/plan/matching.ts";
 import { evaluateSafety } from "../lib/agentic/plan/safety.ts";
-import { PLAN_MATCH_RETURN_BUDGET_MS } from "../lib/agentic/plan/service.ts";
+import { PLAN_MATCH_RETURN_BUDGET_MS, planTool } from "../lib/agentic/plan/service.ts";
+import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import type {
   CanonicalPlanState,
   CoverageContributor,
   SafetyGuidance,
   StackOption
 } from "../lib/agentic/plan/types.ts";
+import { COVERED_THRESHOLD } from "../lib/matcher/config.ts";
 import {
   catalogBandRuleId,
   matcherSafetyCeilings,
@@ -32,6 +39,7 @@ const C_ID = "sup_a34da45efcf05dbd8a0e7d4f9fc7b71c";
 
 export type DetPackCatalog = Readonly<{
   ceilings: readonly SafetyCeiling[];
+  freezePeer?: DetPackCatalog;
   snapshot: CatalogueSnapshot;
 }>;
 
@@ -46,10 +54,12 @@ export type DetPackReport = Readonly<{
     agenticUsesWeb400: boolean;
     budgetMs: number;
     fixtureInBasket: boolean;
+    freezeOk: boolean;
     liveMissIsEmptyRetail: boolean;
     packTimeToReady400: number;
+    pinKeptOption: boolean;
+    pinWithoutRematch: boolean;
     pollAfterSeconds: number;
-    rematchOnAnswers: boolean;
   }>;
   scores: Readonly<{
     efficiency: number;
@@ -82,6 +92,23 @@ function sortedJson(value: unknown): unknown {
   return value;
 }
 
+export function freezeKey(catalog: DetPackCatalog) {
+  return JSON.stringify(
+    sortedJson({
+      catalogueVersion: catalog.snapshot.catalogueVersion,
+      ceilings: catalog.ceilings.map((row) => ({
+        bandId: row.bandId ?? null,
+        lifeStage: row.lifeStage ?? null,
+        maxAmount: row.maxAmount,
+        maxUnit: row.maxUnit,
+        sourceScope: row.sourceScope ?? null,
+        subjectId: row.subjectId
+      })),
+      productIds: catalog.snapshot.products.map((item) => item.productId).slice().sort()
+    })
+  );
+}
+
 function planState(overrides: Partial<CanonicalPlanState> = {}): CanonicalPlanState {
   return {
     acceptedGaps: [],
@@ -110,6 +137,17 @@ function officialTargets(): CanonicalPlanState["targets"] {
     { amount: 250, name: "Vitamin B12", supplementId: B12_ID, unit: "mcg" },
     { amount: 500, name: "Vitamin C", supplementId: C_ID, unit: "mg" }
   ];
+}
+
+function officialRequest() {
+  return {
+    destinationCountry: "TH",
+    locale: "en",
+    optimization: "fewest_pills" as const,
+    profile: { ageYears: 52, lifeStage: "adult" as const, sex: "male" as const },
+    requirements: {},
+    targets: officialTargets()
+  };
 }
 
 function emptyCatalog(snapshot: CatalogueSnapshot) {
@@ -148,11 +186,17 @@ function safetyRows(rows: readonly SafetyGuidance[]) {
       contributors: [...row.contributors]
         .map((item: CoverageContributor) => ({
           amount: item.amount,
+          productId: item.productId ?? null,
           productName: item.productName
         }))
-        .sort((left, right) => left.productName.localeCompare(right.productName)),
+        .sort(
+          (left, right) =>
+            String(left.productId).localeCompare(String(right.productId)) ||
+            left.productName.localeCompare(right.productName)
+        ),
       exposure: row.exposure,
-      ruleId: row.ruleId
+      ruleId: row.ruleId,
+      supplementIds: [...row.supplementIds].slice().sort()
     }))
     .sort(
       (left, right) =>
@@ -179,15 +223,20 @@ function caseShape(input: Readonly<{
   };
 }
 
+function magProductIds(selected: StackOption | null) {
+  return new Set(
+    (selected?.basket ?? [])
+      .filter((item) => item.contributionSupplementIds.includes(MAG_ID))
+      .map((item) => item.productId)
+  );
+}
+
 function magOptionFrom(selected: StackOption | null): StackOption | null {
   if (!selected) {
     return null;
   }
 
-  const item = selected.basket.find(
-    (row) =>
-      row.contributionSupplementIds.includes(MAG_ID) || /magnesium/i.test(row.productName)
-  );
+  const item = selected.basket.find((row) => row.contributionSupplementIds.includes(MAG_ID));
   const coverage = selected.coverage.find((row) => row.supplementId === MAG_ID);
 
   if (!item || !coverage) {
@@ -201,28 +250,140 @@ function magOptionFrom(selected: StackOption | null): StackOption | null {
   };
 }
 
-function magContributorAmount(selected: StackOption | null) {
-  const row = selected?.coverage.find((item) => item.supplementId === MAG_ID);
-  if (row && row.totalExposureAmount > 0) {
-    return row.totalExposureAmount;
-  }
-
-  const named = (selected?.coverage ?? [])
-    .flatMap((item) => item.contributors ?? [])
-    .find((item) => /magnesium/i.test(item.productName));
-  return named?.amount ?? 0;
+function magDoseBlock(guidance: readonly SafetyGuidance[]) {
+  return guidance.find(
+    (item) =>
+      item.action === "block" &&
+      item.code === "dose_review_required" &&
+      item.supplementIds.includes(MAG_ID)
+  );
 }
 
-function magDoseBlock(guidance: readonly SafetyGuidance[]) {
-  const blocks = guidance.filter(
-    (item) => item.action === "block" && item.code === "dose_review_required"
+function computedMagExposure(selected: StackOption | null, block: SafetyGuidance | undefined) {
+  const magIds = magProductIds(selected);
+  const fromBlock = (block?.contributors ?? []).filter(
+    (item) => item.productId && magIds.has(item.productId)
   );
-  return (
-    blocks.find(
-      (item) =>
-        item.supplementIds.includes(MAG_ID) || /magnesium/i.test(item.nutrientName ?? "")
-    ) ?? blocks[0]
+  const sum = fromBlock.reduce((total, item) => total + Number(item.amount), 0);
+  if (sum > 0) {
+    return sum;
+  }
+
+  const row = selected?.coverage.find((item) => item.supplementId === MAG_ID);
+  return row?.totalExposureAmount ?? 0;
+}
+
+function targetCoveredOrLeftover(input: Readonly<{
+  leftovers: readonly { reason: string; supplementId?: string }[];
+  selected: StackOption | null;
+  target: CanonicalPlanState["targets"][number];
+}>) {
+  const row = input.selected?.coverage.find(
+    (item) => item.supplementId === input.target.supplementId
   );
+  if (row && row.coveragePercent >= COVERED_THRESHOLD) {
+    return true;
+  }
+
+  return input.leftovers.some(
+    (item) =>
+      item.supplementId === input.target.supplementId &&
+      (item.reason === "dose_gap" || item.reason === "not_in_catalogue")
+  );
+}
+
+function coveredTargetsHaveContributionIds(selected: StackOption | null) {
+  if (!selected) {
+    return false;
+  }
+
+  return officialTargets().every((target) => {
+    const row = selected.coverage.find((item) => item.supplementId === target.supplementId);
+    if (!row || row.coveragePercent < COVERED_THRESHOLD) {
+      return true;
+    }
+
+    return selected.basket.some((item) =>
+      item.contributionSupplementIds.includes(target.supplementId)
+    );
+  });
+}
+
+function fewestPillsWins(input: Readonly<{
+  balanced: ReturnType<typeof matchPlan>;
+  fewest: ReturnType<typeof matchPlan>;
+}>) {
+  const selected = input.fewest.selected;
+  if (!selected) {
+    return false;
+  }
+
+  const generated = [input.fewest.selected, input.balanced.selected, ...input.balanced.alternatives]
+    .filter((item): item is StackOption => Boolean(item));
+  if (generated.length === 0) {
+    return false;
+  }
+
+  const minPills = Math.min(...generated.map((item) => item.dailyPills));
+  return selected.dailyPills === minPills && selected.optionId.length > 0;
+}
+
+async function pinWithoutRematch(snapshot: CatalogueSnapshot) {
+  replaceCatalogueSnapshot(snapshot);
+  const store = createMemoryStore();
+  const config = loadAgenticConfig();
+  const scope = {
+    environment: "dev" as const,
+    principalScope: "det-pack",
+    tenantScope: "mattanutra"
+  };
+  const now = "2026-08-27T00:00:00.000Z";
+  const created = await planTool({
+    config,
+    now,
+    payload: {
+      idempotencyKey: `det-pack-create-${randomUUID()}`,
+      request: officialRequest()
+    },
+    scope,
+    store
+  });
+
+  if (!("ok" in created) || created.ok !== true || !created.planHandle || !created.optionId) {
+    return { pinKeptOption: false, pinWithoutRematch: false };
+  }
+
+  const question = created.questions?.[0];
+  const choice = question?.choices?.[0]?.choice;
+  if (!question || !choice) {
+    return { pinKeptOption: false, pinWithoutRematch: false };
+  }
+
+  const pinned = await planTool({
+    config,
+    now,
+    payload: {
+      answers: [{ choice, questionId: question.questionId }],
+      expectedRevision: created.revision,
+      idempotencyKey: `det-pack-pin-${randomUUID()}`,
+      planHandle: created.planHandle
+    },
+    scope,
+    store
+  });
+
+  if (!("ok" in pinned) || pinned.ok !== true) {
+    return { pinKeptOption: false, pinWithoutRematch: false };
+  }
+
+  const rematchMs = (
+    pinned as { matcherTelemetry?: { matchMs?: number } }
+  ).matcherTelemetry?.matchMs;
+
+  return {
+    pinKeptOption: pinned.optionId === created.optionId,
+    pinWithoutRematch: rematchMs == null
+  };
 }
 
 export async function loadDetCatalog(): Promise<DetPackCatalog> {
@@ -235,30 +396,19 @@ export async function loadDetCatalog(): Promise<DetPackCatalog> {
   };
 }
 
-export function runDetPack(input: DetPackCatalog): DetPackReport {
+export async function runDetPack(input: DetPackCatalog): Promise<DetPackReport> {
   setMatcherSafetyCeilings([...input.ceilings]);
   const snapshot = input.snapshot;
+  const freezePeer = input.freezePeer ?? (await loadDetCatalog());
+  const freezeOk = freezeKey(input) === freezeKey(freezePeer);
   const serviceSource = readFileSync(new URL("../lib/agentic/plan/service.ts", import.meta.url), "utf8");
   const snapshotSource = readFileSync(
     new URL("../lib/agentic/catalogue/snapshot.ts", import.meta.url),
     "utf8"
   );
-  const agenticDir = readFileSync(new URL("../lib/agentic/plan/service.ts", import.meta.url), "utf8");
-  const agenticUsesWeb400 = /WEB_MATCHER_CONFIG/.test(agenticDir);
-  const rematchOnAnswers =
-    !/buildPinnedResult/.test(serviceSource) || !/pinPrevious/.test(serviceSource);
+  const agenticUsesWeb400 = /WEB_MATCHER_CONFIG/.test(serviceSource);
   const liveMissIsEmptyRetail =
     /emptyRetailSnapshot/.test(snapshotSource) && !/fixtureSnapshot/.test(snapshotSource);
-
-  const efficiency = {
-    agenticUsesWeb400,
-    budgetMs: PLAN_MATCH_RETURN_BUDGET_MS,
-    fixtureInBasket: false,
-    liveMissIsEmptyRetail,
-    packTimeToReady400: packTimeToReady(506, 400, 3),
-    pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
-    rematchOnAnswers
-  };
 
   const catalog = {
     catalogueVersion: snapshot.catalogueVersion,
@@ -270,32 +420,40 @@ export function runDetPack(input: DetPackCatalog): DetPackReport {
     return sortedJson({
       catalog,
       cases: [],
-      efficiency,
+      efficiency: {
+        agenticUsesWeb400,
+        budgetMs: PLAN_MATCH_RETURN_BUDGET_MS,
+        fixtureInBasket: false,
+        freezeOk,
+        liveMissIsEmptyRetail,
+        packTimeToReady400: packTimeToReady(506, 400, 3),
+        pinKeptOption: false,
+        pinWithoutRematch: false,
+        pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS
+      },
       scores: { efficiency: 0, matching: 0, safety: 0 }
     }) as DetPackReport;
   }
 
-  const official = matchPlan({
+  const officialState = planState({ targets: officialTargets() });
+  const official = matchPlan({ snapshot, state: officialState });
+  const balanced = matchPlan({
     snapshot,
-    state: planState({ targets: officialTargets() })
+    state: planState({ optimization: "balanced", targets: officialTargets() })
   });
   const officialSafety = evaluateSafety({
     locale: "en",
     selected: official.selected,
-    state: planState({ targets: officialTargets() })
+    state: officialState
   });
-  const mag351 = matchPlan({
-    snapshot,
-    state: planState({
-      targets: [{ amount: 351, name: "Magnesium", supplementId: MAG_ID, unit: "mg" }]
-    })
+  const mag351State = planState({
+    targets: [{ amount: 351, name: "Magnesium", supplementId: MAG_ID, unit: "mg" }]
   });
+  const mag351 = matchPlan({ snapshot, state: mag351State });
   const mag351Safety = evaluateSafety({
     locale: "en",
     selected: mag351.selected,
-    state: planState({
-      targets: [{ amount: 351, name: "Magnesium", supplementId: MAG_ID, unit: "mg" }]
-    })
+    state: mag351State
   });
   const ckdState = planState({
     conditionCodes: ["ckd"],
@@ -308,39 +466,52 @@ export function runDetPack(input: DetPackCatalog): DetPackReport {
     selected: ckdSelected,
     state: ckdState
   });
+  const pin = await pinWithoutRematch(snapshot);
 
   const liveRetail =
     snapshot.catalogueVersion.startsWith("retail-TH-") &&
     snapshot.products.length > 0 &&
     snapshot.products.every((item) => item.source !== "fixture");
-  const selectedOk = Boolean(official.selected?.optionId) && (official.selected?.basket.length ?? 0) > 0;
-  const d3 = official.selected?.coverage.find((row) => row.supplementId === D3_ID);
-  const names = (official.selected?.basket ?? []).map((item) => item.productName).join(" ");
-  const pair =
-    /bio calcium\+d3/i.test(names) && /joint mobility plus/i.test(names);
-  const b12Gap = official.leftovers.some(
-    (item) =>
-      (item.supplementId === B12_ID || /b12|vitamin b12/i.test(item.name)) &&
-      item.reason === "dose_gap"
-  );
   const fixtureInBasket = (official.selected?.basket ?? []).some(
     (item) => item.source === "fixture" || item.fixture
   );
+  const coverageVector = officialTargets().every((target) =>
+    targetCoveredOrLeftover({
+      leftovers: official.leftovers,
+      selected: official.selected,
+      target
+    })
+  );
+  const contributionIds = coveredTargetsHaveContributionIds(official.selected);
+  const leftoverHonesty = officialTargets().every((target) => {
+    const row = official.selected?.coverage.find(
+      (item) => item.supplementId === target.supplementId
+    );
+    if (row && row.coveragePercent >= COVERED_THRESHOLD) {
+      return true;
+    }
+
+    return official.leftovers.some(
+      (item) =>
+        item.supplementId === target.supplementId &&
+        (item.reason === "dose_gap" || item.reason === "not_in_catalogue")
+    );
+  });
 
   let matching = 0;
   if (liveRetail) {
     matching += 2;
   }
-  if (selectedOk) {
+  if (fewestPillsWins({ balanced, fewest: official })) {
     matching += 2;
   }
-  if ((d3?.coveragePercent ?? 0) >= 90) {
+  if (coverageVector) {
     matching += 2;
   }
-  if (pair) {
+  if (contributionIds) {
     matching += 2;
   }
-  if (b12Gap) {
+  if (leftoverHonesty) {
     matching += 2;
   }
 
@@ -352,7 +523,11 @@ export function runDetPack(input: DetPackCatalog): DetPackReport {
     })
   );
   const mag351Block = magDoseBlock(mag351Safety);
-  const magAmount = magContributorAmount(mag351.selected);
+  const magIds = magProductIds(mag351.selected);
+  const magContribs = (mag351Block?.contributors ?? []).filter(
+    (item) => item.productId && magIds.has(item.productId) && Number(item.amount) > 0
+  );
+  const computedExposure = computedMagExposure(mag351.selected, mag351Block);
   const mag351Ok = Boolean(
     mag351Block &&
       mag351Block.action === "block" &&
@@ -361,20 +536,32 @@ export function runDetPack(input: DetPackCatalog): DetPackReport {
       mag351Block.ruleId === magBandId &&
       mag351Block.exposure != null &&
       mag351Block.exposure > 0 &&
-      mag351Block.exposure === magAmount &&
-      mag351Block.contributors.some(
-        (item) => item.productName.trim().length > 0 && Number(item.amount) > 0
-      )
+      computedExposure > 0 &&
+      mag351Block.exposure === computedExposure &&
+      magContribs.length > 0 &&
+      magContribs.reduce((sum, item) => sum + Number(item.amount), 0) === mag351Block.exposure
   );
   const ckdBlock = ckdSafety.find(
-    (item) => item.action === "block" && item.code === "condition_review_required"
+    (item) =>
+      item.action === "block" &&
+      item.code === "condition_review_required" &&
+      item.supplementIds.includes(MAG_ID)
   );
-  const ckdOk = Boolean(ckdBlock && ckdBlock.exposure != null && ckdBlock.exposure > 0);
+  const ckdOk = Boolean(
+    ckdBlock &&
+      ckdBlock.exposure != null &&
+      ckdBlock.exposure > 0 &&
+      ckdBlock.code !== "duplicate_or_overlap" &&
+      ckdSafety.every(
+        (item) =>
+          item.code !== "condition_review_required" || item.action === "block"
+      )
+  );
   const mag200Safe = !officialSafety.some(
     (item) =>
       item.action === "block" &&
       item.code === "dose_review_required" &&
-      (item.supplementIds.includes(MAG_ID) || /magnesium/i.test(item.nutrientName ?? ""))
+      item.supplementIds.includes(MAG_ID)
   );
 
   let safety = 0;
@@ -402,10 +589,10 @@ export function runDetPack(input: DetPackCatalog): DetPackReport {
   if (!agenticUsesWeb400 && (official.selected != null || official.leftovers.length > 0)) {
     efficiencyScore += 2;
   }
-  if (!rematchOnAnswers) {
+  if (pin.pinKeptOption && pin.pinWithoutRematch) {
     efficiencyScore += 2;
   }
-  if (liveMissIsEmptyRetail && !fixtureInBasket) {
+  if (freezeOk && liveMissIsEmptyRetail && !fixtureInBasket) {
     efficiencyScore += 2;
   }
 
@@ -435,8 +622,15 @@ export function runDetPack(input: DetPackCatalog): DetPackReport {
       }
     ],
     efficiency: {
-      ...efficiency,
-      fixtureInBasket
+      agenticUsesWeb400,
+      budgetMs: PLAN_MATCH_RETURN_BUDGET_MS,
+      fixtureInBasket,
+      freezeOk,
+      liveMissIsEmptyRetail,
+      packTimeToReady400: packTimeToReady(506, 400, 3),
+      pinKeptOption: pin.pinKeptOption,
+      pinWithoutRematch: pin.pinWithoutRematch,
+      pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS
     },
     scores: {
       efficiency: efficiencyScore,
@@ -454,7 +648,8 @@ if (invokedAsTest) {
   describe("deterministic matcher pack", () => {
     it("runs three properties against the live catalog", async () => {
       const loaded = await loadDetCatalog();
-      const report = runDetPack(loaded);
+      const peer = await loadDetCatalog();
+      const report = await runDetPack({ ...loaded, freezePeer: peer });
       console.log(JSON.stringify(report.scores));
       assert.equal(typeof report.scores.matching, "number");
       assert.equal(typeof report.scores.safety, "number");
