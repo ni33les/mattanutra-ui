@@ -362,7 +362,9 @@ export function runDetPack(input: DetPackCatalog): DetPackReport {
       mag351Block.exposure != null &&
       mag351Block.exposure > 0 &&
       mag351Block.exposure === magAmount &&
-      mag351Block.contributors.some((item) => /magnesium/i.test(item.productName))
+      mag351Block.contributors.some(
+        (item) => item.productName.trim().length > 0 && Number(item.amount) > 0
+      )
   );
   const ckdBlock = ckdSafety.find(
     (item) => item.action === "block" && item.code === "condition_review_required"
