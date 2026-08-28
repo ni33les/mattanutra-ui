@@ -30,7 +30,9 @@ export {
 } from "@/lib/agentic/contract/schemas";
 export {
   schemaIssueToError,
+  schemaIssuesToError,
   validateToolInput,
+  validateToolIssues,
   type SchemaIssue
 } from "@/lib/agentic/contract/validate";
 export {

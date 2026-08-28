@@ -1055,17 +1055,23 @@ export async function runAePack(): Promise<AePackReport> {
           idempotencyKey: "ae13-create-000001",
           request: multiRequest()
         });
-        const options = [
-          {
-            optionId: created.optionId,
-            reason: created.reason,
-            reasonKey: created.reasonKey,
-            stackSummary: created.stackSummary
-          },
-          ...alternativesOf(created)
-        ];
+        const listed = Array.isArray(created.options)
+          ? created.options.map(asRecord)
+          : [
+              {
+                optionId: created.optionId,
+                reason: created.reason,
+                reasonKey: created.reasonKey,
+                stackSummary: created.stackSummary
+              },
+              ...alternativesOf(created)
+            ];
+        const options = listed;
         const ids = options.map((item) => String(asRecord(item).optionId ?? ""));
-        const other = alternativesOf(created)[0];
+        const other =
+          options.find(
+            (item) => item.selected === false || item.optionId !== created.optionId
+          ) ?? options[1];
         const otherId = String(asRecord(other).optionId ?? "");
         const before = harness.port.getCallCount();
         const selected = await harness.call("plan", {

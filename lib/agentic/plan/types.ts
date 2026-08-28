@@ -109,6 +109,8 @@ export type PlanLeftover = Readonly<{
 
 export type CanonicalPlanState = Readonly<{
   acceptedGaps: readonly AcceptedGap[];
+  acknowledgedUnassessedConditionCodes?: readonly string[];
+  acknowledgedUnassessedMedicationCodes?: readonly string[];
   conditionCodes: readonly string[];
   currency: string;
   currentSupplements: readonly CurrentSupplement[];
@@ -249,6 +251,7 @@ export type SelectionReason = Readonly<{
   code: "best_available" | "covers_target" | "reduces_cost" | "reduces_pills" | "retained_by_user";
   message: string;
   messageKey: string;
+  requestedNames?: readonly string[];
   requestedSupplementIds: readonly string[];
 }>;
 

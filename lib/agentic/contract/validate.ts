@@ -344,10 +344,112 @@ export function validateToolInput(
   schema: JsonSchema,
   value: unknown
 ): SchemaIssue | null {
-  return validateNode(schema, schema, value, "");
+  return validateToolIssues(schema, value)[0] ?? null;
 }
 
-export function schemaIssueToError(issue: SchemaIssue): AgenticErrorResult {
+export function validateToolIssues(
+  schema: JsonSchema,
+  value: unknown
+): SchemaIssue[] {
+  if (Array.isArray(schema.oneOf) && isRecord(value) && typeof value.operation === "string") {
+    for (const option of schema.oneOf) {
+      if (!isRecord(option)) {
+        continue;
+      }
+
+      const properties = isRecord(option.properties)
+        ? (option.properties as Record<string, JsonSchema>)
+        : {};
+      const operation = properties.operation;
+
+      if (isRecord(operation) && operation.const === value.operation) {
+        return collectNode(schema, option as JsonSchema, value, "");
+      }
+    }
+  }
+
+  const issue = validateNode(schema, schema, value, "");
+  return issue ? [issue] : [];
+}
+
+function collectNode(
+  root: JsonSchema,
+  schema: JsonSchema,
+  value: unknown,
+  path: string
+): SchemaIssue[] {
+  const resolved = resolveRef(root, schema);
+  const type = schemaType(resolved);
+
+  if (type === "object" || resolved.properties || resolved.additionalProperties === false) {
+    if (!isRecord(value)) {
+      return [
+        {
+          fieldPath: path || "request",
+          message: "Expected an object.",
+          reasonCode: "required"
+        }
+      ];
+    }
+
+    const properties = isRecord(resolved.properties)
+      ? (resolved.properties as Record<string, JsonSchema>)
+      : {};
+    const required = Array.isArray(resolved.required)
+      ? resolved.required.filter((item): item is string => typeof item === "string")
+      : [];
+    const issues: SchemaIssue[] = [];
+
+    for (const key of required) {
+      if (!(key in value) || value[key] === undefined) {
+        issues.push({
+          fieldPath: joinPath(path, key),
+          message: `${key} is required.`,
+          reasonCode: "required"
+        });
+      }
+    }
+
+    if (resolved.additionalProperties === false) {
+      for (const key of Object.keys(value)) {
+        if (!(key in properties)) {
+          issues.push({
+            fieldPath: joinPath(path, key),
+            message: `Unexpected property ${key}.`,
+            reasonCode: "unexpected_property"
+          });
+        }
+      }
+    }
+
+    for (const [key, child] of Object.entries(properties)) {
+      if (!(key in value) || value[key] === undefined) {
+        continue;
+      }
+
+      issues.push(...collectNode(root, child, value[key], joinPath(path, key)));
+    }
+
+    return issues;
+  }
+
+  const issue = validateNode(root, schema, value, path);
+  return issue ? [issue] : [];
+}
+
+export function schemaIssuesToError(issues: readonly SchemaIssue[]): AgenticErrorResult {
+  const issue = issues[0] ?? {
+    fieldPath: "request",
+    message: "The request is not valid.",
+    reasonCode: "required" as const
+  };
+  return schemaIssueToError(issue, issues);
+}
+
+export function schemaIssueToError(
+  issue: SchemaIssue,
+  extras: readonly SchemaIssue[] = [issue]
+): AgenticErrorResult {
   const reasonCode =
     issue.reasonCode === "duplicate_supplement"
       ? "duplicate_supplement"
@@ -355,14 +457,21 @@ export function schemaIssueToError(issue: SchemaIssue): AgenticErrorResult {
         ? "legacy_id"
         : issue.reasonCode;
 
+  const listed = extras.length > 0 ? extras : [issue];
   return businessError({
     fieldPath: issue.fieldPath,
-    issues: [
-      {
-        fieldPath: issue.fieldPath,
-        messageKey: `mcp.errors.${reasonCode}`
-      }
-    ],
+    issues: listed.map((item) => {
+      const code =
+        item.reasonCode === "duplicate_supplement"
+          ? "duplicate_supplement"
+          : item.reasonCode === "legacy_id"
+            ? "legacy_id"
+            : item.reasonCode;
+      return {
+        fieldPath: item.fieldPath,
+        messageKey: `mcp.errors.${code}`
+      };
+    }),
     message: issue.message,
     reasonCode: "invalid_request"
   });

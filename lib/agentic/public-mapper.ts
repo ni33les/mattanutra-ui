@@ -110,21 +110,51 @@ function boundedNames(names: readonly string[] | undefined) {
   return out;
 }
 
-function defaultSelectionReason(item: BasketItem, locale: string): SelectionReason {
-  if (item.selectionReason) {
-    return item.selectionReason;
-  }
+const OPTION_REASON_CODES = [
+  "balanced",
+  "fewest_pills",
+  "highest_coverage",
+  "lowest_cost"
+] as const;
 
+function defaultSelectionReason(item: BasketItem, locale: string): SelectionReason {
+  const requestedNames = boundedNames(item.requestedNutrientNames);
   const requestedSupplementIds = item.contributionSupplementIds.filter((id) =>
     id.startsWith("sup_")
   );
   const negotiated = negotiateLocale(locale);
-
-  return {
-    code: "covers_target",
+  const base = item.selectionReason ?? {
+    code: "covers_target" as const,
     message: agenticMessage(negotiated, "plan.selection.covers_target"),
     messageKey: "plan.selection.covers_target",
     requestedSupplementIds
+  };
+
+  return {
+    ...base,
+    requestedNames: base.requestedNames ?? requestedNames,
+    requestedSupplementIds: base.requestedSupplementIds.length
+      ? base.requestedSupplementIds
+      : requestedSupplementIds
+  };
+}
+
+function optionReasonFields(option: StackOption, locale: string) {
+  const negotiated = negotiateLocale(locale);
+  for (const code of OPTION_REASON_CODES) {
+    const key = `plan.option.${code}`;
+    const message = agenticMessage(negotiated, key);
+    if (option.reason === message || option.reason === key) {
+      return { code, key, message };
+    }
+  }
+
+  return {
+    code: "fewest_pills" as const,
+    key: "plan.option.fewest_pills",
+    message:
+      clientReason(option.reason) ||
+      agenticMessage(negotiateLocale(locale), "plan.option.fewest_pills")
   };
 }
 
@@ -283,18 +313,15 @@ export function publicOption(
   locale = "en"
 ) {
   const currency = option.basket[0]?.currency ?? "THB";
-  const reasonKey = "plan.option.fewest_pills";
+  const reason = optionReasonFields(option, locale);
   return {
-    basket: option.basket.map((item) => publicBasketItem(item, locale)),
-    coverage: option.coverage.map(publicCoverage),
     coveragePercent: option.coveragePercent,
-    dailyPills: option.dailyPills,
     optionId: option.optionId,
-    productCount: option.basket.length,
-    reason: clientReason(option.reason) || agenticMessage(negotiateLocale(locale), reasonKey),
-    reasonKey,
+    reason: reason.message,
+    reasonCode: reason.code,
+    reasonKey: reason.key,
+    selected: Boolean(selected && option.optionId === selected.optionId),
     stackSummary: stackSummaryFor(option.basket, currency),
-    totalPriceMinor: option.totalPriceMinor,
     tradeOffs: publicTradeOffs(option, selected)
   };
 }
@@ -368,9 +395,16 @@ export function publicPlanFields(result: Pick<
       : null;
   const medicationCodes = snapshot?.medicationCodes ?? [];
   const conditionCodes = snapshot?.conditionCodes ?? [];
-  const requiresSafetyAcknowledgement = result.safetyGuidance.some(
-    (item) => item.action === "acknowledge" || item.action === "block"
-  );
+  const ackable = result.safetyGuidance.filter((item) => item.action === "acknowledge");
+  const ackBound = snapshot?.safetyAcknowledgement;
+  const acknowledgementStatus =
+    ackable.length === 0
+      ? "not_required"
+      : ackBound?.confirmed === true &&
+          ackable.every((item) => ackBound.guidanceIds.includes(item.guidanceId))
+        ? "acknowledged"
+        : "pending";
+  const requiresSafetyAcknowledgement = acknowledgementStatus === "pending";
   const alternatives = result.alternatives.filter((item) => {
     if (!selected) {
       return true;
@@ -401,6 +435,12 @@ export function publicPlanFields(result: Pick<
     ...new Set(conditionCodes.map((code) => CONDITION_ALIASES[code]).filter(Boolean) as string[])
   ];
   const unassessedConditionCodes = conditionCodes.filter((code) => !CONDITION_ALIASES[code]);
+  const acknowledgedUnassessed = [
+    ...new Set([
+      ...(snapshot?.acknowledgedUnassessedMedicationCodes ?? []),
+      ...(snapshot?.acknowledgedUnassessedConditionCodes ?? [])
+    ])
+  ];
   const safetyScope =
     unassessedMedicationCodes.length > 0 || unassessedConditionCodes.length > 0
       ? "partial"
@@ -433,12 +473,17 @@ export function publicPlanFields(result: Pick<
     unassessedMedicationCodes,
     assessedConditionCodes,
     unassessedConditionCodes,
+    ...(acknowledgedUnassessed.length > 0
+      ? { acknowledgedUnassessed }
+      : {}),
     ...(result.basket.length > 0 ? { stackSummary: stackSummaryFor(result.basket, currency) } : {}),
+    acknowledgementStatus,
     ...(selected
       ? {
           optionId: selected.optionId,
-          reason: clientReason(selected.reason),
-          reasonKey: "plan.option.fewest_pills"
+          reason: optionReasonFields(selected, locale).message,
+          reasonCode: optionReasonFields(selected, locale).code,
+          reasonKey: optionReasonFields(selected, locale).key
         }
       : {}),
     ...(result.questions.length > 0
@@ -449,9 +494,16 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(guidanceIds.length > 0 ? { guidanceIds } : {}),
     ...(requiresSafetyAcknowledgement ? { requiresSafetyAcknowledgement: true } : {}),
-    ...(alternatives.length > 0
+    ...(selected || alternatives.length > 0
       ? {
-          alternatives: alternatives.map((item) => publicOption(item, selected, locale))
+          options: [selected, ...alternatives]
+            .filter((item): item is NonNullable<typeof item> => Boolean(item))
+            .filter(
+              (item, index, list) =>
+                list.findIndex((row) => row.optionId === item.optionId) === index
+            )
+            .slice(0, 3)
+            .map((item) => publicOption(item, selected, locale))
         }
       : {}),
     ...(result.leftovers && result.leftovers.length > 0

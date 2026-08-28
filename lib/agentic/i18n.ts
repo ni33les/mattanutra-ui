@@ -135,14 +135,19 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "当前摄入加上所选产品的总暴露量需要剂量复核。"
   },
   "guidance.duplicate_or_overlap": {
-    en: "{nutrientName} ({unit}) from {contributors}. remainingGap {remainingGap}; overflow {overflow}. Next action: {nextAction}.",
-    th: "{nutrientName} ({unit}) จาก {contributors}. remainingGap {remainingGap}; overflow {overflow}. ขั้นตอนถัดไป: {nextAction}",
-    "zh-CN": "{nutrientName}（{unit}）来自 {contributors}。remainingGap {remainingGap}；overflow {overflow}。下一步：{nextAction}。"
+    en: "{nutrientName} ({unit}) from {contributors}. remainingGap {remainingGap}; overflow {overflow}.",
+    th: "{nutrientName} ({unit}) จาก {contributors}. remainingGap {remainingGap}; overflow {overflow}.",
+    "zh-CN": "{nutrientName}（{unit}）来自 {contributors}。remainingGap {remainingGap}；overflow {overflow}。"
+  },
+  "guidance.informational_overlap": {
+    en: "{nutrientName} ({unit}) from {contributors}. Remaining {remainingGap}.",
+    th: "{nutrientName} ({unit}) จาก {contributors} คงเหลือ {remainingGap}",
+    "zh-CN": "{nutrientName}（{unit}）来自 {contributors}。剩余 {remainingGap}。"
   },
   "guidance.medication_interaction": {
-    en: "{nutrientName} ({unit}) from {contributors} has a known interaction with a declared medication. Next action: {nextAction}.",
-    th: "{nutrientName} ({unit}) จาก {contributors} มีปฏิกิริยาร่วมกับยาที่แจ้งไว้ ขั้นตอนถัดไป: {nextAction}",
-    "zh-CN": "{nutrientName}（{unit}，来源 {contributors}）与已声明药物存在已知相互作用。下一步：{nextAction}。"
+    en: "{nutrientName} from the selected products has a known interaction with a declared medication.",
+    th: "โอเมกา 3 จากสินค้าที่เลือกมีปฏิกิริยากับยาที่แจ้งไว้",
+    "zh-CN": "{nutrientName}（来源所选产品）与已声明药物存在已知相互作用。"
   },
   "guidance.pediatric_review_required": {
     en: "This paediatric stack needs qualified review before purchase.",
@@ -321,7 +326,7 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
   },
   "plan.question.safety_review": {
     en: "Review the safety facts and confirm with the person first.",
-    th: "ตรวจทานข้อมูลความปลอดภัยแล้วยืนยันก่อนสร้างการชำระเงิน",
+    th: "ตรวจทานข้อมูลความปลอดภัยแล้วยืนยันกับผู้ใช้ก่อน",
     "zh-CN": "请先查看安全说明并确认，然后我们才会冻结结账。"
   },
   "plan.question.relax_max_price": {
@@ -349,9 +354,14 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "สูตรนี้ถูกบล็อกจนกว่าจะเปลี่ยนข้อจำกัดหรือตัวเลือกความปลอดภัย",
     "zh-CN": "在客户更改硬性限制或安全选择之前，该组合被阻止。"
   },
+  "plan.question.acknowledge_safety": {
+    en: "Confirm the safety facts",
+    th: "ยืนยันข้อมูลความปลอดภัย",
+    "zh-CN": "确认安全说明"
+  },
   "plan.summary.needs_input": {
     en: "One more choice is needed before this stack is ready to buy.",
-    th: "ต้องเลือกอีกหนึ่งข้อก่อนสูตรนี้พร้อมซื้อ",
+    th: "สูตรพร้อมแล้ว โปรดยืนยันกับผู้ใช้ก่อน",
     "zh-CN": "购买前还需要客户做一个选择。"
   },
   "plan.summary.processing": {
@@ -388,6 +398,21 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     en: "Fewer daily pills",
     th: "เม็ดต่อวันน้อยกว่า",
     "zh-CN": "更少的每日粒数"
+  },
+  "plan.option.lowest_cost": {
+    en: "Lower cost",
+    th: "ค่าใช้จ่ายต่ำกว่า",
+    "zh-CN": "更低费用"
+  },
+  "plan.option.highest_coverage": {
+    en: "Higher coverage",
+    th: "ครอบคลุมมากกว่า",
+    "zh-CN": "更高覆盖"
+  },
+  "plan.option.balanced": {
+    en: "Balanced stack",
+    th: "สมดุลทั้งค่าใช้จ่ายและเม็ด",
+    "zh-CN": "更均衡的组合"
   },
   "mcp.errors.invalid_request": {
     en: "The request is not valid.",

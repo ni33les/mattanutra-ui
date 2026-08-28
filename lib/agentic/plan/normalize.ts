@@ -225,10 +225,24 @@ export function applyPlanAnswers(
 
   for (const answer of answers) {
     if (answer.choice === "acknowledge_unassessed") {
+      const unassessedMeds = next.medicationCodes.filter((code) => !MEDICATION_ALIASES[code]);
+      const unassessedConditions = next.conditionCodes.filter(
+        (code) => !CONDITION_ALIASES[code]
+      );
       next = {
         ...next,
-        conditionCodes: next.conditionCodes.filter((code) => CONDITION_ALIASES[code]),
-        medicationCodes: next.medicationCodes.filter((code) => MEDICATION_ALIASES[code])
+        acknowledgedUnassessedConditionCodes: [
+          ...new Set([
+            ...(next.acknowledgedUnassessedConditionCodes ?? []),
+            ...unassessedConditions
+          ])
+        ],
+        acknowledgedUnassessedMedicationCodes: [
+          ...new Set([
+            ...(next.acknowledgedUnassessedMedicationCodes ?? []),
+            ...unassessedMeds
+          ])
+        ]
       };
     }
 

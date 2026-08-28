@@ -111,9 +111,13 @@ function compactInfo(input: Readonly<{
   }>;
   userAccountRequired: boolean;
 }>) {
+  const currencies = [
+    ...new Set(input.supportedCountries.map((item) => item.currency).filter(Boolean))
+  ];
   return {
     conditionCodes: [...input.conditionCodes],
     continuation: input.continuation,
+    currencies,
     medicationCodes: [...input.medicationCodes],
     ok: true as const,
     pollAfterSeconds: input.pollAfterSeconds,

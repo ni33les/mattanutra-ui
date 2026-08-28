@@ -86,7 +86,11 @@ function guidance(input: Readonly<{
   threshold?: number | null;
   unit?: string | null;
 }>): SafetyGuidance {
-  const messageKey = `guidance.${input.code}`;
+  const informationalOverlap =
+    input.code === "duplicate_or_overlap" && input.action === "review";
+  const messageKey = informationalOverlap
+    ? "guidance.informational_overlap"
+    : `guidance.${input.code}`;
   const family =
     input.code === "medication_interaction"
       ? "omega3+anticoagulant"
@@ -99,7 +103,12 @@ function guidance(input: Readonly<{
             : input.code === "pediatric_review_required"
               ? "pediatric"
               : input.code;
-  const guidanceId = ["gdn", input.code, family].join(":");
+  const factSlug = String(input.nutrientName ?? family)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const guidanceId = ["gdn", input.code, family, factSlug || "fact"].join(":");
   const contributorLabel =
     (input.contributors ?? [])
       .map((item) => {
@@ -116,10 +125,11 @@ function guidance(input: Readonly<{
   const nextAction =
     input.code === "condition_review_required"
       ? "stop and seek clinician review"
-      : input.code === "medication_interaction" ||
-          input.code === "duplicate_or_overlap"
-        ? "acknowledge to continue"
-        : "review before purchase";
+      : informationalOverlap
+        ? "listed for awareness"
+        : input.code === "medication_interaction"
+          ? "listed as a safety fact"
+          : "review before purchase";
 
   return {
     action: input.action,
@@ -589,9 +599,15 @@ export function safetyQuestions(input: Readonly<{
   unmetRequirements?: readonly string[];
 }>): PlanQuestion[] {
   const questions: PlanQuestion[] = [];
-  const unassessedMeds = input.state.medicationCodes.filter((code) => !MEDICATION_ALIASES[code]);
+  const acknowledgedMeds = new Set(input.state.acknowledgedUnassessedMedicationCodes ?? []);
+  const acknowledgedConditions = new Set(
+    input.state.acknowledgedUnassessedConditionCodes ?? []
+  );
+  const unassessedMeds = input.state.medicationCodes.filter(
+    (code) => !MEDICATION_ALIASES[code] && !acknowledgedMeds.has(code)
+  );
   const unassessedConditions = input.state.conditionCodes.filter(
-    (code) => !CONDITION_ALIASES[code]
+    (code) => !CONDITION_ALIASES[code] && !acknowledgedConditions.has(code)
   );
 
   if (unassessedMeds.length > 0 || unassessedConditions.length > 0) {
@@ -723,8 +739,8 @@ export function safetyQuestions(input: Readonly<{
           {
             choice: "acknowledge_safety",
             effect: "safetyAcknowledgement.confirmed=true",
-            label: agenticMessage(input.locale, "plan.question.safety_review"),
-            labelKey: "plan.question.safety_review"
+            label: agenticMessage(input.locale, "plan.question.acknowledge_safety"),
+            labelKey: "plan.question.acknowledge_safety"
           }
         ],
         prompt: agenticMessage(input.locale, "plan.question.safety_review"),

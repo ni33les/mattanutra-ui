@@ -1,8 +1,8 @@
 import {
   AGENTIC_TOOL_SCHEMAS,
   isAgenticErrorResult,
-  schemaIssueToError,
-  validateToolInput
+  schemaIssuesToError,
+  validateToolIssues
 } from "@/lib/agentic/contract";
 import { infoTool } from "@/lib/agentic/info";
 import { withLivePlanRequest } from "@/lib/agentic/plan/warm-dev";
@@ -107,10 +107,10 @@ async function callTool(
       : rawArgs === undefined
         ? {}
         : rawArgs;
-  const issue = validateToolInput(schema, args);
+  const issues = validateToolIssues(schema, args);
 
-  if (issue) {
-    return { result: toolResult(schemaIssueToError(issue), true) };
+  if (issues.length > 0) {
+    return { result: toolResult(schemaIssuesToError(issues), true) };
   }
 
   const params = record(args);
