@@ -911,8 +911,7 @@ export async function runAePack(): Promise<AePackReport> {
           stringList(created.unassessedMedicationCodes).length === 0 &&
           guidance.length === 1 &&
           only.action === "acknowledge" &&
-          (only.requiresSafetyAcknowledgement === true ||
-            created.requiresSafetyAcknowledgement === true) &&
+          created.acknowledgementStatus === "pending" &&
           Number.isFinite(exposure) &&
           exposure > 0 &&
           exposure === contributorSum &&

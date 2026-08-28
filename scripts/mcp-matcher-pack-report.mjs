@@ -7,6 +7,7 @@ import {
 } from "../test/agentic-det-pack.test.ts";
 import { canonicalAeReport, runAePack } from "../test/agentic-ae-pack.test.ts";
 import { canonicalAeC2Report, runAeC2Pack } from "../test/agentic-ae-c2-pack.test.ts";
+import { canonicalAeC3Report, runAeC3Pack } from "../test/agentic-ae-c3-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -199,6 +200,81 @@ const ROWS = [
     id: "AX2-13",
     purpose:
       "Ordinary info is only the agent capability boundary: countries, locales, codes, continuation — no catalogue or performance dump"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-01",
+    purpose: "A ready plan is small and has no matcher internals"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-02",
+    purpose: "Get, answer, select and revise use that same clean contract"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-03",
+    purpose: "A bad create returns one small field-level error"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-04",
+    purpose: "Pending safety ack is one status: pending — never a competing boolean"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-05",
+    purpose: "After the safety answer, ack is acknowledged and get does not rematch"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-06",
+    purpose: "Acknowledging warfarin does not pretend we assessed it"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-07",
+    purpose: "Acknowledging diabetes stays a condition, not a medicine"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-08",
+    purpose: "Option reason code, key and message come from one value"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-09",
+    purpose: "Product reasons name only the requested targets that caused selection"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-10",
+    purpose: "Selecting an option keeps the other compact options for comparison"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-11",
+    purpose: "Thai option reasons are Thai, like the rest of the plan copy"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-12",
+    purpose: "Product cost, shipping and estimated payable total are three named amounts"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-13",
+    purpose: "Processing is a tiny poll payload; get does not start another match"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-14",
+    purpose: "Only create and a real requirements change call the matcher"
+  },
+  {
+    category: "MCP planning",
+    id: "AX3-15",
+    purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
   }
 ];
 
@@ -227,6 +303,7 @@ export function canonicalPack(run) {
   return JSON.stringify({
     contract: JSON.parse(canonicalAeReport(run.contract)),
     honesty: JSON.parse(canonicalAeC2Report(run.honesty)),
+    planning: JSON.parse(canonicalAeC3Report(run.planning)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -242,9 +319,13 @@ export function snapshotFromRun(run) {
   const honesty = Object.fromEntries(
     run.honesty.cases.map((item) => [item.id, item.result])
   );
+  const planning = Object.fromEntries(
+    run.planning.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
+    planning,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -280,7 +361,11 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("AX2-") ? "honesty" : "contract";
+  const section = id.startsWith("AX3-")
+    ? "planning"
+    : id.startsWith("AX2-")
+      ? "honesty"
+      : "contract";
   const oldValue = baseline[section]?.[id];
   const newValue = current;
   if (oldValue === "PASS" && newValue === "FAIL") {
@@ -299,6 +384,7 @@ export function sectionTotals(run) {
   const matcherPass = matching.passed && safety.passed && efficiency.passed;
   const contractPass = run.contract.passedCases === run.contract.totalCases;
   const honestyPass = run.honesty.passedCases === run.honesty.totalCases;
+  const planningPass = run.planning.passedCases === run.planning.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -308,11 +394,15 @@ export function sectionTotals(run) {
       passed: honestyPass,
       text: `${run.honesty.passedCases}/${run.honesty.totalCases}`
     },
+    planning: {
+      passed: planningPass,
+      text: `${run.planning.passedCases}/${run.planning.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
     },
-    packPass: matcherPass && contractPass && honestyPass
+    packPass: matcherPass && contractPass && honestyPass && planningPass
   };
 }
 
@@ -320,6 +410,9 @@ export function printTable(run) {
   const baseline = loadBaseline();
   const byId = new Map(run.contract.cases.map((item) => [item.id, item]));
   for (const item of run.honesty.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.planning.cases) {
     byId.set(item.id, item);
   }
 
@@ -364,6 +457,9 @@ export function printTable(run) {
   console.log(
     `MCP honesty: ${totals.honesty.text} — ${totals.honesty.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `MCP planning: ${totals.planning.text} — ${totals.planning.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -390,5 +486,6 @@ export async function runPackOnce() {
   await resetAfterMatcher();
   const contract = await runAePack();
   const honesty = await runAeC2Pack();
-  return { contract, honesty, matcher };
+  const planning = await runAeC3Pack();
+  return { contract, honesty, planning, matcher };
 }

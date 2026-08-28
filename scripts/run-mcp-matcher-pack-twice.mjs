@@ -41,11 +41,13 @@ if (!process.execArgv.includes(strip)) {
           a: {
             contract: a.contract.passedCases,
             honesty: a.honesty.passedCases,
+            planning: a.planning.passedCases,
             matcher: a.matcher.scores
           },
           b: {
             contract: b.contract.passedCases,
             honesty: b.honesty.passedCases,
+            planning: b.planning.passedCases,
             matcher: b.matcher.scores
           }
         },

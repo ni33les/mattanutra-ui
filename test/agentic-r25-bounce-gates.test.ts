@@ -398,8 +398,10 @@ describe("R25 bounce gates — R24 crash class", () => {
       unmetRequirements: []
     });
     assert.equal(plan.shippingMinor, 5000);
-    assert.equal(plan.subtotalMinor, 618000);
-    assert.equal(plan.totalPriceMinor, 623000);
+    assert.equal((plan.stackSummary as { totalPriceMinor?: number }).totalPriceMinor, 618000);
+    assert.equal(plan.estimatedOrderTotalMinor, 623000);
+    assert.equal("subtotalMinor" in plan, false);
+    assert.equal("totalPriceMinor" in plan, false);
 
     const mapper = readFileSync(
       new URL("../lib/agentic/public-mapper.ts", import.meta.url),

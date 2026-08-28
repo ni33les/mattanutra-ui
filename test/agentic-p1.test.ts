@@ -147,7 +147,7 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(first.status, "needs_input");
     const guidanceIds = first.guidanceIds as string[];
     assert.ok(Array.isArray(guidanceIds) && guidanceIds.length > 0);
-    assert.equal(first.requiresSafetyAcknowledgement, true);
+    assert.equal(first.acknowledgementStatus, "pending");
     assert.deepEqual(first.medicationCodes, ["apixaban"]);
     const fromGuidance = (first.safetyGuidance as Array<{ guidanceId: string }>).map(
       (item) => item.guidanceId
@@ -515,7 +515,10 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(result.status, "ready");
     assert.equal("requestSnapshot" in result, false);
     assert.equal("supplements" in result, false);
-    assert.equal(typeof result.productCount, "number");
+    assert.equal(
+      typeof (result.stackSummary as { productCount?: number } | undefined)?.productCount,
+      "number"
+    );
   });
 
   it("rejects agent-supplied currency as an unexpected property", async () => {
@@ -640,10 +643,11 @@ describe("agentic P1 pack fixes", () => {
     assert.equal("catalogueVersion" in plan, false);
     assert.equal("optimizationEvidence" in plan, false);
     assert.equal("availabilityAsOf" in plan, false);
-    assert.ok((plan.productCount as number) >= 1);
-    const alternatives = (plan.alternatives as Array<{ productCount?: number; tradeOffs?: unknown }>) ?? [];
-    for (const option of alternatives) {
-      assert.equal(typeof option.productCount, "number");
+    const stackSummary = (plan.stackSummary ?? {}) as { productCount?: number };
+    assert.ok((stackSummary.productCount ?? 0) >= 1);
+    const options = (plan.options as Array<{ stackSummary?: { productCount?: number }; tradeOffs?: unknown }>) ?? [];
+    for (const option of options) {
+      assert.equal(typeof option.stackSummary?.productCount, "number");
       assert.equal(typeof option.tradeOffs, "object");
     }
   });
@@ -727,7 +731,12 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(plan.status, "blocked");
     const guidanceIds = plan.guidanceIds as string[] | undefined;
     assert.ok(Array.isArray(guidanceIds) && guidanceIds.length > 0);
-    assert.equal(plan.requiresSafetyAcknowledgement, true);
+    assert.equal(plan.acknowledgementStatus, "not_required");
+    assert.ok(
+      ((plan.safetyGuidance as Array<{ action?: string }>) ?? []).some(
+        (item) => item.action === "block"
+      )
+    );
     assert.deepEqual(plan.conditionCodes, ["ckd"]);
     const encoded = JSON.stringify(plan);
     assert.equal(encoded.includes(":null"), false);
@@ -843,10 +852,14 @@ describe("agentic P1 pack fixes", () => {
       }
     });
     assert.equal(unknown.ok, true);
-    const leftovers = (unknown.leftovers as Array<{ name?: string; reason?: string }>) ?? [];
-    assert.ok(leftovers.some((item) =>
-      String(item.name).toLowerCase() === "unobtainium" && item.reason === "not_in_catalogue"
-    ));
+    const coverage = (unknown.coverage as Array<{ name?: string; status?: string }>) ?? [];
+    const questions = (unknown.questions as Array<{ prompt?: string; questionId?: string }>) ?? [];
+    assert.ok(
+      coverage.some((row) => String(row.name).toLowerCase() === "unobtainium") ||
+        questions.some((item) =>
+          /unobtainium/i.test(`${item.prompt ?? ""} ${item.questionId ?? ""}`)
+        )
+    );
     assert.equal(JSON.stringify(unknown).toLowerCase().includes("legacy ids are not accepted"), false);
   });
 
@@ -1221,7 +1234,7 @@ describe("agentic P1 pack fixes", () => {
       }
     });
     assert.equal(first.status, "needs_input");
-    assert.equal(first.requiresSafetyAcknowledgement, true);
+    assert.equal(first.acknowledgementStatus, "pending");
     assert.ok(Array.isArray(first.guidanceIds) && (first.guidanceIds as string[]).length > 0);
     assert.ok(
       ((first.questions as Array<{ questionId?: string }>) ?? []).some(
@@ -1263,7 +1276,11 @@ describe("agentic P1 pack fixes", () => {
     });
     assert.equal(blocked.status, "blocked");
     assert.ok(Array.isArray(blocked.guidanceIds) && (blocked.guidanceIds as string[]).length > 0);
-    assert.equal(blocked.requiresSafetyAcknowledgement, true);
+    assert.ok(
+      ((blocked.safetyGuidance as Array<{ action?: string }>) ?? []).some(
+        (item) => item.action === "block"
+      )
+    );
     assert.deepEqual(blocked.conditionCodes, ["ckd"]);
   });
 

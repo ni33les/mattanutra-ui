@@ -118,11 +118,71 @@ const OPTION_REASON_CODES = [
   "lowest_cost"
 ] as const;
 
-function defaultSelectionReason(item: BasketItem, locale: string): SelectionReason {
-  const requestedNames = boundedNames(item.requestedNutrientNames);
-  const requestedSupplementIds = item.contributionSupplementIds.filter((id) =>
-    id.startsWith("sup_")
+type RequestedTargets = Readonly<{
+  names: ReadonlySet<string>;
+  supplementIds: ReadonlySet<string>;
+}>;
+
+function requestedTargetsFrom(
+  snapshot: PlanResult["requestSnapshot"] | null | undefined
+): RequestedTargets {
+  const names = new Set(
+    (snapshot?.targets ?? [])
+      .map((item) => String(item.name ?? "").trim().toLowerCase())
+      .filter(Boolean)
   );
+  const supplementIds = new Set(
+    (snapshot?.targets ?? [])
+      .map((item) => String(item.supplementId ?? "").trim())
+      .filter(Boolean)
+  );
+  return { names, supplementIds };
+}
+
+function incidentalNameSet(item: BasketItem) {
+  return new Set(
+    [
+      ...boundedNames(item.incidentalNutrientNames),
+      ...boundedNutrients(item.incidentalNutrients).map((row) => row.name)
+    ].map((name) => name.toLowerCase())
+  );
+}
+
+function filterRequestedNames(item: BasketItem, targets: RequestedTargets) {
+  const raw = boundedNames(item.requestedNutrientNames);
+  if (targets.names.size > 0) {
+    return raw.filter((name) => targets.names.has(name.toLowerCase()));
+  }
+  const incidental = incidentalNameSet(item);
+  return raw.filter((name) => !incidental.has(name.toLowerCase()));
+}
+
+function filterRequestedNutrients(item: BasketItem, targets: RequestedTargets) {
+  const raw = boundedNutrients(item.requestedNutrients);
+  if (targets.names.size > 0) {
+    return raw.filter((row) => targets.names.has(row.name.toLowerCase()));
+  }
+  const incidental = incidentalNameSet(item);
+  return raw.filter((row) => !incidental.has(row.name.toLowerCase()));
+}
+
+function filterRequestedIds(item: BasketItem, targets: RequestedTargets) {
+  const fromReason = item.selectionReason?.requestedSupplementIds ?? [];
+  const fromItem = item.contributionSupplementIds.filter((id) => id.startsWith("sup_"));
+  const raw = [...new Set((fromReason.length > 0 ? fromReason : fromItem).filter(Boolean))];
+  if (targets.supplementIds.size > 0) {
+    return raw.filter((id) => targets.supplementIds.has(id));
+  }
+  return raw;
+}
+
+function defaultSelectionReason(
+  item: BasketItem,
+  locale: string,
+  targets: RequestedTargets
+): SelectionReason {
+  const requestedNames = filterRequestedNames(item, targets);
+  const requestedSupplementIds = filterRequestedIds(item, targets);
   const negotiated = negotiateLocale(locale);
   const base = item.selectionReason ?? {
     code: "covers_target" as const,
@@ -133,39 +193,49 @@ function defaultSelectionReason(item: BasketItem, locale: string): SelectionReas
 
   return {
     ...base,
-    requestedNames: base.requestedNames ?? requestedNames,
-    requestedSupplementIds: base.requestedSupplementIds.length
-      ? base.requestedSupplementIds
-      : requestedSupplementIds
+    requestedNames,
+    requestedSupplementIds: requestedSupplementIds.length
+      ? requestedSupplementIds
+      : base.requestedSupplementIds
   };
 }
 
 function optionReasonFields(option: StackOption, locale: string) {
   const negotiated = negotiateLocale(locale);
+  const raw = option.reason.trim();
   for (const code of OPTION_REASON_CODES) {
     const key = `plan.option.${code}`;
-    const message = agenticMessage(negotiated, key);
-    if (option.reason === message || option.reason === key) {
-      return { code, key, message };
+    const localized = agenticMessage(negotiated, key);
+    if (
+      raw === code ||
+      raw === key ||
+      raw === localized ||
+      raw === agenticMessage("en", key) ||
+      raw === agenticMessage("th", key) ||
+      raw === agenticMessage("zh-CN", key)
+    ) {
+      return { code, key, message: localized };
     }
   }
 
   return {
     code: "fewest_pills" as const,
     key: "plan.option.fewest_pills",
-    message:
-      clientReason(option.reason) ||
-      agenticMessage(negotiateLocale(locale), "plan.option.fewest_pills")
+    message: agenticMessage(negotiated, "plan.option.fewest_pills")
   };
 }
 
-export function publicBasketItem(item: BasketItem, locale = "en"): PublicBasketItem {
+export function publicBasketItem(
+  item: BasketItem,
+  locale = "en",
+  targets: RequestedTargets = { names: new Set(), supplementIds: new Set() }
+): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
   const daysOfSupply = item.daysOfSupply ?? 30;
   const incidentalNutrientNames = boundedNames(item.incidentalNutrientNames);
   const incidentalNutrients = boundedNutrients(item.incidentalNutrients);
-  const requestedNutrientNames = boundedNames(item.requestedNutrientNames);
-  const requestedNutrients = boundedNutrients(item.requestedNutrients);
+  const requestedNutrientNames = filterRequestedNames(item, targets);
+  const requestedNutrients = filterRequestedNutrients(item, targets);
 
   return {
     currency: item.currency,
@@ -177,7 +247,7 @@ export function publicBasketItem(item: BasketItem, locale = "en"): PublicBasketI
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
-    selectionReason: defaultSelectionReason(item, locale),
+    selectionReason: defaultSelectionReason(item, locale, targets),
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(incidentalNutrientNames.length > 0 ? { incidentalNutrientNames } : {}),
@@ -239,9 +309,6 @@ export function publicCoverage(row: CoverageRow) {
   };
 }
 
-const INTERNAL_TRADEOFF =
-  /\b(beam|snapshot|tie[-\s]?break|catalogueVersion|guidanceRulesVersion|optimizationEvidence)\b/i;
-
 function clientTradeOffSummary(
   option: StackOption,
   selected: StackOption | null,
@@ -256,14 +323,6 @@ function clientTradeOffSummary(
   }
 
   return "No material difference versus the selected stack";
-}
-
-function clientReason(reason: string) {
-  if (!reason.trim() || INTERNAL_TRADEOFF.test(reason)) {
-    return "Selected stack";
-  }
-
-  return reason;
 }
 
 export function publicTradeOffs(
@@ -339,14 +398,23 @@ function publicContributor(item: CoverageContributor) {
   };
 }
 
-export function publicSafetyGuidance(row: SafetyGuidance) {
+export function publicSafetyGuidance(
+  row: SafetyGuidance,
+  acknowledgementStatus: "acknowledged" | "not_required" | "pending" = "not_required"
+) {
+  const rowStatus =
+    row.action === "acknowledge" || row.action === "block"
+      ? acknowledgementStatus === "acknowledged"
+        ? "acknowledged"
+        : "pending"
+      : "not_required";
   return {
     action: row.action,
+    acknowledgementStatus: rowStatus,
     code: row.code,
     guidanceId: row.guidanceId,
     message: row.message,
     messageKey: row.messageKey,
-    requiresSafetyAcknowledgement: row.action === "acknowledge" || row.action === "block",
     ruleId: row.ruleId,
     rulesVersion: row.rulesVersion,
     severity: row.severity,
@@ -407,10 +475,7 @@ export function publicPlanFields(result: Pick<
           ackable.every((item) => ackBound.guidanceIds.includes(item.guidanceId))
         ? "acknowledged"
         : "pending";
-  const requiresSafetyAcknowledgement =
-    acknowledgementStatus === "pending" ||
-    result.status === "blocked" ||
-    result.safetyGuidance.some((item) => item.action === "block");
+  const requestedTargets = requestedTargetsFrom(snapshot);
   const alternatives = result.alternatives.filter((item) => {
     if (!selected) {
       return true;
@@ -441,11 +506,11 @@ export function publicPlanFields(result: Pick<
     ...new Set(conditionCodes.map((code) => CONDITION_ALIASES[code]).filter(Boolean) as string[])
   ];
   const unassessedConditionCodes = conditionCodes.filter((code) => !CONDITION_ALIASES[code]);
-  const acknowledgedUnassessed = [
-    ...new Set([
-      ...(snapshot?.acknowledgedUnassessedMedicationCodes ?? []),
-      ...(snapshot?.acknowledgedUnassessedConditionCodes ?? [])
-    ])
+  const acknowledgedUnassessedMedicationCodes = [
+    ...new Set(snapshot?.acknowledgedUnassessedMedicationCodes ?? [])
+  ];
+  const acknowledgedUnassessedConditionCodes = [
+    ...new Set(snapshot?.acknowledgedUnassessedConditionCodes ?? [])
   ];
   const safetyScope =
     unassessedMedicationCodes.length > 0 || unassessedConditionCodes.length > 0
@@ -467,12 +532,11 @@ export function publicPlanFields(result: Pick<
 
   return {
     ...(result.basket.length > 0
-      ? { basket: result.basket.map((item) => publicBasketItem(item, locale)) }
+      ? { basket: result.basket.map((item) => publicBasketItem(item, locale, requestedTargets)) }
       : {}),
     ...(result.coverage.length > 0
       ? { coverage: result.coverage.map(publicCoverage) }
       : {}),
-    productCount: result.basket.length,
     status: result.status,
     summary: result.summary,
     summaryKey: `plan.summary.${result.status}`,
@@ -485,16 +549,18 @@ export function publicPlanFields(result: Pick<
     ...(unassessedConditionCodes.length > 0 ? { unassessedConditionCodes } : {}),
     ...(medicationCodes.length > 0 ? { medicationCodes: [...medicationCodes] } : {}),
     ...(conditionCodes.length > 0 ? { conditionCodes: [...conditionCodes] } : {}),
-    ...(acknowledgedUnassessed.length > 0
-      ? { acknowledgedUnassessed }
+    ...(acknowledgedUnassessedMedicationCodes.length > 0
+      ? { acknowledgedUnassessedMedicationCodes }
+      : {}),
+    ...(acknowledgedUnassessedConditionCodes.length > 0
+      ? { acknowledgedUnassessedConditionCodes }
       : {}),
     ...(result.basket.length > 0 ? { stackSummary: stackSummaryFor(result.basket, currency) } : {}),
     acknowledgementStatus,
     ...(result.status !== "processing" && (selected || result.basket.length > 0)
       ? {
           shippingMinor: payable.shippingMinor,
-          subtotalMinor: payable.subtotalMinor,
-          totalPriceMinor: payable.totalPriceMinor
+          estimatedOrderTotalMinor: payable.totalPriceMinor
         }
       : {}),
     ...(selected
@@ -510,10 +576,13 @@ export function publicPlanFields(result: Pick<
       ? { questions: publicQuestions(result.questions) }
       : {}),
     ...(result.safetyGuidance.length > 0
-      ? { safetyGuidance: result.safetyGuidance.map(publicSafetyGuidance) }
+      ? {
+          safetyGuidance: result.safetyGuidance.map((item) =>
+            publicSafetyGuidance(item, acknowledgementStatus)
+          )
+        }
       : {}),
     ...(guidanceIds.length > 0 ? { guidanceIds } : {}),
-    ...(requiresSafetyAcknowledgement ? { requiresSafetyAcknowledgement: true } : {}),
     ...(selected || alternatives.length > 0
       ? {
           options: [selected, ...alternatives]
@@ -525,9 +594,6 @@ export function publicPlanFields(result: Pick<
             .slice(0, 3)
             .map((item) => publicOption(item, selected, locale))
         }
-      : {}),
-    ...(result.leftovers && result.leftovers.length > 0
-      ? { leftovers: result.leftovers }
       : {}),
     ...(result.status === "processing"
       ? { pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS }

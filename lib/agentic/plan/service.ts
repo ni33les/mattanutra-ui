@@ -308,6 +308,20 @@ function buildResult(input: Readonly<{
   });
 }
 
+function advertisedAlternatives(
+  previous: PlanResult,
+  selected: StackOption
+): StackOption[] {
+  const rows = [previous.selected, ...previous.alternatives].filter(
+    (item): item is StackOption => Boolean(item)
+  );
+  return rows.filter(
+    (item, index, list) =>
+      item.optionId !== selected.optionId &&
+      list.findIndex((row) => row.optionId === item.optionId) === index
+  );
+}
+
 function buildPinnedResult(input: Readonly<{
   locale: Locale;
   previous: PlanResult;
@@ -324,7 +338,7 @@ function buildPinnedResult(input: Readonly<{
   );
 
   return composeResult({
-    alternatives: input.previous.alternatives,
+    alternatives: advertisedAlternatives(input.previous, input.selected),
     locale: input.locale,
     leftovers,
     previous: input.previous,

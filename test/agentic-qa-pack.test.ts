@@ -110,6 +110,7 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.equal(plan.ok, true);
     assert.notEqual((plan.error as { reasonCode?: string } | undefined)?.reasonCode, "unknown_supplement");
     const leftovers = (plan.leftovers as Array<{ name?: string; reason?: string }>) ?? [];
+    const coverage = (plan.coverage as Array<{ name?: string; status?: string }>) ?? [];
     assert.equal(
       leftovers.some((item) =>
         String(item.name).toLowerCase().includes("k2") && item.reason === "not_in_catalogue"
@@ -119,7 +120,12 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.ok(
       leftovers.some((item) =>
         String(item.name).toLowerCase().includes("k2") && item.reason === "uncovered"
-      ) || namesInBasket(plan).some((name) => /k2|mk-?7|menaquinone/i.test(name))
+      ) ||
+        coverage.some(
+          (row) =>
+            String(row.name).toLowerCase().includes("k2") && row.status === "uncovered"
+        ) ||
+        namesInBasket(plan).some((name) => /k2|mk-?7|menaquinone/i.test(name))
     );
   });
 
@@ -282,6 +288,7 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.equal(plan.ok, true);
     assert.equal(plan.error, undefined);
     const leftovers = (plan.leftovers as Array<{ name?: string; reason?: string }>) ?? [];
+    const coverage = (plan.coverage as Array<{ name?: string; status?: string }>) ?? [];
     assert.equal(
       leftovers.some((item) =>
         String(item.name).toLowerCase().includes("k2") && item.reason === "not_in_catalogue"
@@ -291,7 +298,12 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.ok(
       leftovers.some((item) =>
         String(item.name).toLowerCase().includes("k2") && item.reason === "uncovered"
-      ) || namesInBasket(plan).some((name) => /k2|mk-?7|menaquinone/i.test(name))
+      ) ||
+        coverage.some(
+          (row) =>
+            String(row.name).toLowerCase().includes("k2") && row.status === "uncovered"
+        ) ||
+        namesInBasket(plan).some((name) => /k2|mk-?7|menaquinone/i.test(name))
     );
   });
 
