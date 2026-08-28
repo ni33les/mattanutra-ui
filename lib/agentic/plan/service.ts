@@ -297,10 +297,20 @@ function targetNameGroups(
   targets: CanonicalPlanState["targets"],
   size: number
 ) {
-  const groups: Array<{ names: string[] }> = [];
+  const groups: Array<{
+    names: string[];
+    targets: Array<{ amount: number; name: string; unit: string }>;
+  }> = [];
   for (let index = 0; index < targets.length; index += size) {
+    const slice = targets.slice(index, index + size);
+    const executable = slice.map((item) => ({
+      amount: item.amount,
+      name: item.requestedName ?? item.name,
+      unit: item.unit
+    }));
     groups.push({
-      names: targets.slice(index, index + size).map((item) => item.requestedName ?? item.name)
+      names: executable.map((item) => item.name),
+      targets: executable
     });
   }
   return groups;

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   beginDeterministicIdsForTests,
@@ -539,6 +540,17 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           /"oneOf"/.test(schemaBlob) ||
           /\$defs/.test(schemaBlob) ||
           /PlanRequest/.test(schemaBlob);
+        const snapshot = JSON.parse(
+          readFileSync(new URL("../contract/mcp/3.0.0/tools.json", import.meta.url), "utf8")
+        ) as { tools?: Array<{ inputSchema?: unknown; name?: string }> };
+        const snapshotPlan = asRecord(
+          (snapshot.tools ?? []).find((item) => item.name === "plan")?.inputSchema
+        );
+        const snapshotBlob = JSON.stringify(snapshotPlan);
+        const snapshotDump =
+          /"oneOf"/.test(snapshotBlob) ||
+          /\$defs/.test(snapshotBlob) ||
+          /PlanRequest/.test(snapshotBlob);
         const first = await harness.call("plan", {
           idempotencyKey: "short",
           operation: "create"
@@ -553,6 +565,7 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
         });
         const ok =
           !advertisedDump &&
+          !snapshotDump &&
           compactErrorOk(first, ["idempotencyKey", "request"]) &&
           JSON.stringify(first) === JSON.stringify(second) &&
           schemaDumpHits(raw).length === 0 &&
@@ -561,6 +574,7 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           ? pass("AX7-01", { bytes: jsonSize(first) })
           : fail("AX7-01", {
               advertisedDump,
+              snapshotDump,
               code:
                 asRecord(first.error).errorCode ??
                 asRecord(first.error).error_code ??
@@ -570,6 +584,10 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
               schemaTokens: {
                 defs: /\$defs/.test(schemaBlob),
                 oneOf: /"oneOf"/.test(schemaBlob)
+              },
+              snapshotTokens: {
+                defs: /\$defs/.test(snapshotBlob),
+                oneOf: /"oneOf"/.test(snapshotBlob)
               }
             });
       })
@@ -771,21 +789,44 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
                 status: broad.status ?? null
               });
         }
-        const grouped = groups.map((group) =>
-          Array.isArray(group)
-            ? group.map((item) =>
-                typeof item === "string" ? item : String(asRecord(item).name ?? "")
-              )
-            : stringList(asRecord(group).targets ?? asRecord(group).names)
-        );
-        const flat = grouped.flat().filter(Boolean);
-        const unique = new Set(flat);
-        const reconstruct = flat.join("|") === original.join("|") && unique.size === original.length;
+        function executableTargets(group: unknown) {
+          const row = asRecord(group);
+          const raw = Array.isArray(group)
+            ? group
+            : Array.isArray(row.targets)
+              ? row.targets
+              : Array.isArray(row.names)
+                ? row.names
+                : [];
+          return raw
+            .map((item) => {
+              if (typeof item === "string") {
+                return null;
+              }
+              const target = asRecord(item);
+              const name = String(target.name ?? "");
+              const amount = Number(target.amount);
+              const unit = String(target.unit ?? "");
+              if (!name || !unit || !Number.isFinite(amount) || amount <= 0) {
+                return null;
+              }
+              return { amount, name, unit };
+            })
+            .filter((item): item is { amount: number; name: string; unit: string } =>
+              Boolean(item)
+            );
+        }
+        const grouped = groups.map(executableTargets);
+        const flat = grouped.flat();
+        const originalKey = THIRTY_TARGETS.map(
+          (item) => `${item.name}|${item.amount}|${item.unit}`
+        ).join(";");
+        const reconstruct =
+          flat.map((item) => `${item.name}|${item.amount}|${item.unit}`).join(";") ===
+            originalKey &&
+          grouped.every((group) => group.length > 0);
         const followUps = [];
-        for (const [index, names] of grouped.entries()) {
-          const targets = names
-            .map((name) => THIRTY_TARGETS.find((item) => item.name === name))
-            .filter((item): item is (typeof THIRTY_TARGETS)[number] => Boolean(item));
+        for (const [index, targets] of grouped.entries()) {
           const result = await harness.call("plan", {
             idempotencyKey: `ax704-group-${String(index).padStart(6, "0")}`,
             operation: "create",

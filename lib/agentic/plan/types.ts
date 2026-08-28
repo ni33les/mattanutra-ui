@@ -360,7 +360,14 @@ export type StackOption = Readonly<{
 export type PlanBreadth = Readonly<{
   maxTargetsPerRequest: number;
   reasonCode: "request_too_broad";
-  suggestedGroups: readonly Readonly<{ names: readonly string[] }>[];
+  suggestedGroups: readonly Readonly<{
+    names: readonly string[];
+    targets: readonly Readonly<{
+      amount: number;
+      name: string;
+      unit: string;
+    }>[];
+  }>[];
 }>;
 
 export type PlanResult = Readonly<{

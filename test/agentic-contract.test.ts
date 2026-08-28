@@ -7,6 +7,7 @@ import {
   AGENTIC_TOOL_DESCRIPTIONS,
   AGENTIC_UAT_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_SCHEMAS,
+  PLAN_ADVERTISED_SCHEMA,
   validateToolInput
 } from "../lib/agentic/contract/index.ts";
 import {
@@ -54,7 +55,9 @@ describe("agentic MCP contract 3.0.0", () => {
     for (const tool of snapshot.tools) {
       assert.deepEqual(
         tool.inputSchema,
-        AGENTIC_TOOL_SCHEMAS[tool.name as keyof typeof AGENTIC_TOOL_SCHEMAS]
+        tool.name === "plan"
+          ? PLAN_ADVERTISED_SCHEMA
+          : AGENTIC_TOOL_SCHEMAS[tool.name as keyof typeof AGENTIC_TOOL_SCHEMAS]
       );
       assert.equal(
         tool.description,
@@ -204,6 +207,12 @@ describe("agentic MCP contract 3.0.0", () => {
 
     for (const tool of tools) {
       const schema = JSON.stringify(tool.inputSchema);
+      if (tool.name === "plan") {
+        assert.match(schema, /"additionalProperties":true/);
+        assert.equal(/"oneOf"/.test(schema), false);
+        assert.equal(/\$defs/.test(schema), false);
+        continue;
+      }
       assert.match(schema, /"additionalProperties":false/);
     }
   });
