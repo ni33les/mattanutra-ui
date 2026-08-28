@@ -414,6 +414,56 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "สมดุลทั้งค่าใช้จ่ายและเม็ด",
     "zh-CN": "更均衡的组合"
   },
+  "plan.tradeoff.selected": {
+    en: "Selected option",
+    th: "ตัวเลือกที่เลือก",
+    "zh-CN": "已选方案"
+  },
+  "plan.tradeoff.same": {
+    en: "No material difference",
+    th: "ไม่ต่างจากตัวเลือกที่เลือก",
+    "zh-CN": "与已选方案无实质差别"
+  },
+  "plan.tradeoff.price_up": {
+    en: "+{baht} THB",
+    th: "แพงกว่า {baht} บาท",
+    "zh-CN": "贵 {baht} THB"
+  },
+  "plan.tradeoff.price_down": {
+    en: "{baht} THB less",
+    th: "ถูกกว่า {baht} บาท",
+    "zh-CN": "便宜 {baht} THB"
+  },
+  "plan.tradeoff.coverage_up": {
+    en: "+{percent} more complete",
+    th: "ครอบคลุมเพิ่ม {percent}%",
+    "zh-CN": "更完整 {percent}%"
+  },
+  "plan.tradeoff.coverage_down": {
+    en: "{percent} less complete",
+    th: "ครอบคลุมน้อยกว่า {percent}%",
+    "zh-CN": "完整度低 {percent}%"
+  },
+  "plan.tradeoff.pills_up": {
+    en: "+{count} more daily units",
+    th: "เม็ดต่อวันมากกว่า {count}",
+    "zh-CN": "每日多 {count} 粒"
+  },
+  "plan.tradeoff.pills_down": {
+    en: "{count} fewer daily units",
+    th: "เม็ดต่อวันน้อยกว่า {count}",
+    "zh-CN": "每日少 {count} 粒"
+  },
+  "plan.tradeoff.products_up": {
+    en: "+{count} more items",
+    th: "สินค้ามากกว่า {count} รายการ",
+    "zh-CN": "多 {count} 件商品"
+  },
+  "plan.tradeoff.products_down": {
+    en: "{count} fewer items",
+    th: "สินค้าน้อยกว่า {count} รายการ",
+    "zh-CN": "少 {count} 件商品"
+  },
   "mcp.errors.invalid_request": {
     en: "The request is not valid.",
     th: "คำขอไม่ถูกต้อง",

@@ -8,6 +8,7 @@ import {
 import { canonicalAeReport, runAePack } from "../test/agentic-ae-pack.test.ts";
 import { canonicalAeC2Report, runAeC2Pack } from "../test/agentic-ae-c2-pack.test.ts";
 import { canonicalAeC3Report, runAeC3Pack } from "../test/agentic-ae-c3-pack.test.ts";
+import { canonicalAeC4Report, runAeC4Pack } from "../test/agentic-ae-c4-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -275,6 +276,51 @@ const ROWS = [
     category: "MCP planning",
     id: "AX3-15",
     purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-01",
+    purpose: "A finished plan still has no matcher or catalogue internals"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-02",
+    purpose: "A bad create returns one small field-level error"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-03",
+    purpose: "Option reasons match the real coverage, cost and pill extremes"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-04",
+    purpose: "Option reason code, key and message come from one value"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-05",
+    purpose: "An EPA fact still names the requested Omega-3 target"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-06",
+    purpose: "A hard block cannot be acknowledged; the only move is to change the request"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-07",
+    purpose: "Thai option comparisons are keyed Thai, not satang-English"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-08",
+    purpose: "The clean serializer still keeps every earlier agentic behaviour"
+  },
+  {
+    category: "MCP explanations",
+    id: "AX4-09",
+    purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
   }
 ];
 
@@ -304,6 +350,7 @@ export function canonicalPack(run) {
     contract: JSON.parse(canonicalAeReport(run.contract)),
     honesty: JSON.parse(canonicalAeC2Report(run.honesty)),
     planning: JSON.parse(canonicalAeC3Report(run.planning)),
+    explanations: JSON.parse(canonicalAeC4Report(run.explanations)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -322,10 +369,14 @@ export function snapshotFromRun(run) {
   const planning = Object.fromEntries(
     run.planning.cases.map((item) => [item.id, item.result])
   );
+  const explanations = Object.fromEntries(
+    run.explanations.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
     planning,
+    explanations,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -361,11 +412,13 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("AX3-")
-    ? "planning"
-    : id.startsWith("AX2-")
-      ? "honesty"
-      : "contract";
+  const section = id.startsWith("AX4-")
+    ? "explanations"
+    : id.startsWith("AX3-")
+      ? "planning"
+      : id.startsWith("AX2-")
+        ? "honesty"
+        : "contract";
   const oldValue = baseline[section]?.[id];
   const newValue = current;
   if (oldValue === "PASS" && newValue === "FAIL") {
@@ -385,6 +438,7 @@ export function sectionTotals(run) {
   const contractPass = run.contract.passedCases === run.contract.totalCases;
   const honestyPass = run.honesty.passedCases === run.honesty.totalCases;
   const planningPass = run.planning.passedCases === run.planning.totalCases;
+  const explanationsPass = run.explanations.passedCases === run.explanations.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -398,11 +452,16 @@ export function sectionTotals(run) {
       passed: planningPass,
       text: `${run.planning.passedCases}/${run.planning.totalCases}`
     },
+    explanations: {
+      passed: explanationsPass,
+      text: `${run.explanations.passedCases}/${run.explanations.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
     },
-    packPass: matcherPass && contractPass && honestyPass && planningPass
+    packPass:
+      matcherPass && contractPass && honestyPass && planningPass && explanationsPass
   };
 }
 
@@ -413,6 +472,9 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.planning.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.explanations.cases) {
     byId.set(item.id, item);
   }
 
@@ -460,6 +522,9 @@ export function printTable(run) {
   console.log(
     `MCP planning: ${totals.planning.text} — ${totals.planning.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `MCP explanations: ${totals.explanations.text} — ${totals.explanations.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -487,5 +552,6 @@ export async function runPackOnce() {
   const contract = await runAePack();
   const honesty = await runAeC2Pack();
   const planning = await runAeC3Pack();
-  return { contract, honesty, planning, matcher };
+  const explanations = await runAeC4Pack();
+  return { contract, honesty, planning, explanations, matcher };
 }

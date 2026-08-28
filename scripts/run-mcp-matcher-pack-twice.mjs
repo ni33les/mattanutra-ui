@@ -42,12 +42,14 @@ if (!process.execArgv.includes(strip)) {
             contract: a.contract.passedCases,
             honesty: a.honesty.passedCases,
             planning: a.planning.passedCases,
+            explanations: a.explanations.passedCases,
             matcher: a.matcher.scores
           },
           b: {
             contract: b.contract.passedCases,
             honesty: b.honesty.passedCases,
             planning: b.planning.passedCases,
+            explanations: b.explanations.passedCases,
             matcher: b.matcher.scores
           }
         },

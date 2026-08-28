@@ -119,24 +119,35 @@ const OPTION_REASON_CODES = [
 ] as const;
 
 type RequestedTargets = Readonly<{
+  nameById: ReadonlyMap<string, string>;
   names: ReadonlySet<string>;
   supplementIds: ReadonlySet<string>;
 }>;
 
+type OptionReasonCode = (typeof OPTION_REASON_CODES)[number];
+
 function requestedTargetsFrom(
   snapshot: PlanResult["requestSnapshot"] | null | undefined
 ): RequestedTargets {
-  const names = new Set(
-    (snapshot?.targets ?? [])
-      .map((item) => String(item.name ?? "").trim().toLowerCase())
-      .filter(Boolean)
-  );
-  const supplementIds = new Set(
-    (snapshot?.targets ?? [])
-      .map((item) => String(item.supplementId ?? "").trim())
-      .filter(Boolean)
-  );
-  return { names, supplementIds };
+  const nameById = new Map<string, string>();
+  const names = new Set<string>();
+  const supplementIds = new Set<string>();
+
+  for (const item of snapshot?.targets ?? []) {
+    const id = String(item.supplementId ?? "").trim();
+    const name = String(item.name ?? "").trim();
+    if (name) {
+      names.add(name.toLowerCase());
+    }
+    if (id) {
+      supplementIds.add(id);
+      if (name && !nameById.has(id)) {
+        nameById.set(id, name);
+      }
+    }
+  }
+
+  return { nameById, names, supplementIds };
 }
 
 function incidentalNameSet(item: BasketItem) {
@@ -159,6 +170,12 @@ function filterRequestedNames(item: BasketItem, targets: RequestedTargets) {
 
 function filterRequestedNutrients(item: BasketItem, targets: RequestedTargets) {
   const raw = boundedNutrients(item.requestedNutrients);
+  const canonical = new Set(
+    canonicalRequestedNames(item, targets).map((name) => name.toLowerCase())
+  );
+  if (canonical.size > 0) {
+    return raw.filter((row) => canonical.has(row.name.toLowerCase()));
+  }
   if (targets.names.size > 0) {
     return raw.filter((row) => targets.names.has(row.name.toLowerCase()));
   }
@@ -176,12 +193,39 @@ function filterRequestedIds(item: BasketItem, targets: RequestedTargets) {
   return raw;
 }
 
+function canonicalRequestedNames(item: BasketItem, targets: RequestedTargets) {
+  const ids = filterRequestedIds(item, targets);
+  if (targets.nameById.size > 0 && ids.length > 0) {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (const id of ids) {
+      const name = targets.nameById.get(id);
+      if (!name) {
+        continue;
+      }
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      names.push(name);
+      if (names.length >= PUBLIC_NUTRIENT_NAME_LIMIT) {
+        break;
+      }
+    }
+    if (names.length > 0) {
+      return names;
+    }
+  }
+  return filterRequestedNames(item, targets);
+}
+
 function defaultSelectionReason(
   item: BasketItem,
   locale: string,
   targets: RequestedTargets
 ): SelectionReason {
-  const requestedNames = filterRequestedNames(item, targets);
+  const requestedNames = canonicalRequestedNames(item, targets);
   const requestedSupplementIds = filterRequestedIds(item, targets);
   const negotiated = negotiateLocale(locale);
   const base = item.selectionReason ?? {
@@ -200,8 +244,49 @@ function defaultSelectionReason(
   };
 }
 
-function optionReasonFields(option: StackOption, locale: string) {
+function truthfulReasonMap(options: readonly StackOption[]) {
+  const assigned = new Map<string, OptionReasonCode>();
+  if (options.length === 0) {
+    return assigned;
+  }
+
+  const maxCoverage = Math.max(...options.map((item) => item.coveragePercent));
+  const minCost = Math.min(...options.map((item) => item.totalPriceMinor));
+  const minPills = Math.min(...options.map((item) => item.dailyPills));
+  const coverageWinners = options.filter((item) => item.coveragePercent === maxCoverage);
+  const costWinners = options.filter((item) => item.totalPriceMinor === minCost);
+  const pillWinners = options.filter((item) => item.dailyPills === minPills);
+
+  if (coverageWinners.length === 1) {
+    assigned.set(coverageWinners[0]!.optionId, "highest_coverage");
+  }
+  if (costWinners.length === 1 && !assigned.has(costWinners[0]!.optionId)) {
+    assigned.set(costWinners[0]!.optionId, "lowest_cost");
+  }
+  if (pillWinners.length === 1 && !assigned.has(pillWinners[0]!.optionId)) {
+    assigned.set(pillWinners[0]!.optionId, "fewest_pills");
+  }
+  for (const option of options) {
+    if (!assigned.has(option.optionId)) {
+      assigned.set(option.optionId, "balanced");
+    }
+  }
+  return assigned;
+}
+
+function optionReasonFields(
+  option: StackOption,
+  locale: string,
+  advertised: readonly StackOption[] = []
+) {
   const negotiated = negotiateLocale(locale);
+  const group = advertised.length > 0 ? advertised : [option];
+  if (group.length >= 2) {
+    const code = truthfulReasonMap(group).get(option.optionId) ?? "balanced";
+    const key = `plan.option.${code}`;
+    return { code, key, message: agenticMessage(negotiated, key) };
+  }
+
   const raw = option.reason.trim();
   for (const code of OPTION_REASON_CODES) {
     const key = `plan.option.${code}`;
@@ -228,13 +313,17 @@ function optionReasonFields(option: StackOption, locale: string) {
 export function publicBasketItem(
   item: BasketItem,
   locale = "en",
-  targets: RequestedTargets = { names: new Set(), supplementIds: new Set() }
+  targets: RequestedTargets = {
+    nameById: new Map(),
+    names: new Set(),
+    supplementIds: new Set()
+  }
 ): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
   const daysOfSupply = item.daysOfSupply ?? 30;
   const incidentalNutrientNames = boundedNames(item.incidentalNutrientNames);
   const incidentalNutrients = boundedNutrients(item.incidentalNutrients);
-  const requestedNutrientNames = filterRequestedNames(item, targets);
+  const requestedNutrientNames = canonicalRequestedNames(item, targets);
   const requestedNutrients = filterRequestedNutrients(item, targets);
 
   return {
@@ -309,27 +398,73 @@ export function publicCoverage(row: CoverageRow) {
   };
 }
 
-function clientTradeOffSummary(
+function formatBaht(minor: number) {
+  const baht = Math.abs(minor) / 100;
+  return Number.isInteger(baht) ? String(baht) : baht.toFixed(2);
+}
+
+function tradeOffPresentation(
   option: StackOption,
   selected: StackOption | null,
-  parts: readonly string[]
+  locale: string
 ) {
-  if (parts.length > 0) {
-    return parts.join("; ");
-  }
-
+  const negotiated = negotiateLocale(locale);
   if (!selected || option.optionId === selected.optionId) {
-    return "Selected stack";
+    return {
+      summary: agenticMessage(negotiated, "plan.tradeoff.selected"),
+      summaryKey: "plan.tradeoff.selected"
+    };
   }
 
-  return "No material difference versus the selected stack";
+  const priceDeltaMinor = option.totalPriceMinor - selected.totalPriceMinor;
+  const coverageDeltaPercent = option.coveragePercent - selected.coveragePercent;
+  const pillDelta = option.dailyPills - selected.dailyPills;
+  const productCountDelta = option.basket.length - selected.basket.length;
+
+  if (priceDeltaMinor !== 0) {
+    const key = priceDeltaMinor > 0 ? "plan.tradeoff.price_up" : "plan.tradeoff.price_down";
+    return {
+      summary: agenticMessage(negotiated, key, { baht: formatBaht(priceDeltaMinor) }),
+      summaryKey: key
+    };
+  }
+  if (coverageDeltaPercent !== 0) {
+    const key =
+      coverageDeltaPercent > 0 ? "plan.tradeoff.coverage_up" : "plan.tradeoff.coverage_down";
+    return {
+      summary: agenticMessage(negotiated, key, { percent: Math.abs(coverageDeltaPercent) }),
+      summaryKey: key
+    };
+  }
+  if (pillDelta !== 0) {
+    const key = pillDelta > 0 ? "plan.tradeoff.pills_up" : "plan.tradeoff.pills_down";
+    return {
+      summary: agenticMessage(negotiated, key, { count: Math.abs(pillDelta) }),
+      summaryKey: key
+    };
+  }
+  if (productCountDelta !== 0) {
+    const key =
+      productCountDelta > 0 ? "plan.tradeoff.products_up" : "plan.tradeoff.products_down";
+    return {
+      summary: agenticMessage(negotiated, key, { count: Math.abs(productCountDelta) }),
+      summaryKey: key
+    };
+  }
+
+  return {
+    summary: agenticMessage(negotiated, "plan.tradeoff.same"),
+    summaryKey: "plan.tradeoff.same"
+  };
 }
 
 export function publicTradeOffs(
   option: StackOption,
-  selected: StackOption | null
+  selected: StackOption | null,
+  locale = "en"
 ) {
   const productCount = option.basket.length;
+  const copy = tradeOffPresentation(option, selected, locale);
 
   if (!selected) {
     return {
@@ -337,45 +472,33 @@ export function publicTradeOffs(
       pillDelta: 0,
       priceDeltaMinor: 0,
       productCountDelta: 0,
-      summary: clientTradeOffSummary(option, null, [])
+      summary: copy.summary,
+      summaryKey: copy.summaryKey
     };
   }
 
-  const priceDeltaMinor = option.totalPriceMinor - selected.totalPriceMinor;
-  const coverageDeltaPercent = option.coveragePercent - selected.coveragePercent;
-  const pillDelta = option.dailyPills - selected.dailyPills;
-  const productCountDelta = productCount - selected.basket.length;
-  const parts: string[] = [];
-
-  if (priceDeltaMinor !== 0) {
-    parts.push(`${priceDeltaMinor > 0 ? "+" : ""}${priceDeltaMinor} satang`);
-  }
-  if (coverageDeltaPercent !== 0) {
-    parts.push(`${coverageDeltaPercent > 0 ? "+" : ""}${coverageDeltaPercent}% coverage`);
-  }
-  if (pillDelta !== 0) {
-    parts.push(`${pillDelta > 0 ? "+" : ""}${pillDelta} pills`);
-  }
-  if (productCountDelta !== 0) {
-    parts.push(`${productCountDelta > 0 ? "+" : ""}${productCountDelta} products`);
-  }
-
   return {
-    coverageDeltaPercent,
-    pillDelta,
-    priceDeltaMinor,
-    productCountDelta,
-    summary: clientTradeOffSummary(option, selected, parts)
+    coverageDeltaPercent: option.coveragePercent - selected.coveragePercent,
+    pillDelta: option.dailyPills - selected.dailyPills,
+    priceDeltaMinor: option.totalPriceMinor - selected.totalPriceMinor,
+    productCountDelta: productCount - selected.basket.length,
+    summary: copy.summary,
+    summaryKey: copy.summaryKey
   };
 }
 
 export function publicOption(
   option: StackOption,
   selected: StackOption | null,
-  locale = "en"
+  locale = "en",
+  advertised: readonly StackOption[] = []
 ) {
   const currency = option.basket[0]?.currency ?? "THB";
-  const reason = optionReasonFields(option, locale);
+  const group = advertised.length > 0 ? advertised : selected ? [selected, option] : [option];
+  const unique = group.filter(
+    (item, index, list) => list.findIndex((row) => row.optionId === item.optionId) === index
+  );
+  const reason = optionReasonFields(option, locale, unique);
   return {
     coveragePercent: option.coveragePercent,
     optionId: option.optionId,
@@ -384,7 +507,7 @@ export function publicOption(
     reasonKey: reason.key,
     selected: Boolean(selected && option.optionId === selected.optionId),
     stackSummary: stackSummaryFor(option.basket, currency),
-    tradeOffs: publicTradeOffs(option, selected)
+    tradeOffs: publicTradeOffs(option, selected, locale)
   };
 }
 
@@ -403,11 +526,13 @@ export function publicSafetyGuidance(
   acknowledgementStatus: "acknowledged" | "not_required" | "pending" = "not_required"
 ) {
   const rowStatus =
-    row.action === "acknowledge" || row.action === "block"
-      ? acknowledgementStatus === "acknowledged"
-        ? "acknowledged"
-        : "pending"
-      : "not_required";
+    row.action === "block"
+      ? "not_applicable"
+      : row.action === "acknowledge"
+        ? acknowledgementStatus === "acknowledged"
+          ? "acknowledged"
+          : "pending"
+        : "not_required";
   return {
     action: row.action,
     acknowledgementStatus: rowStatus,
@@ -529,6 +654,12 @@ export function publicPlanFields(result: Pick<
     selected?.totalPriceMinor ??
     result.basket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
   const payable = payableSnapshot({ subtotalMinor });
+  const advertisedOptions = [selected, ...alternatives]
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .filter(
+      (item, index, list) => list.findIndex((row) => row.optionId === item.optionId) === index
+    )
+    .slice(0, 3);
 
   return {
     ...(result.basket.length > 0
@@ -566,10 +697,10 @@ export function publicPlanFields(result: Pick<
     ...(selected
       ? {
           optionId: selected.optionId,
-          reason: optionReasonFields(selected, locale).message,
-          reasonCode: optionReasonFields(selected, locale).code,
-          reasonKey: optionReasonFields(selected, locale).key,
-          tradeOffs: publicTradeOffs(selected, selected)
+          reason: optionReasonFields(selected, locale, advertisedOptions).message,
+          reasonCode: optionReasonFields(selected, locale, advertisedOptions).code,
+          reasonKey: optionReasonFields(selected, locale, advertisedOptions).key,
+          tradeOffs: publicTradeOffs(selected, selected, locale)
         }
       : {}),
     ...(result.questions.length > 0
@@ -583,16 +714,11 @@ export function publicPlanFields(result: Pick<
         }
       : {}),
     ...(guidanceIds.length > 0 ? { guidanceIds } : {}),
-    ...(selected || alternatives.length > 0
+    ...(advertisedOptions.length > 0
       ? {
-          options: [selected, ...alternatives]
-            .filter((item): item is NonNullable<typeof item> => Boolean(item))
-            .filter(
-              (item, index, list) =>
-                list.findIndex((row) => row.optionId === item.optionId) === index
-            )
-            .slice(0, 3)
-            .map((item) => publicOption(item, selected, locale))
+          options: advertisedOptions.map((item) =>
+            publicOption(item, selected, locale, advertisedOptions)
+          )
         }
       : {}),
     ...(result.status === "processing"
