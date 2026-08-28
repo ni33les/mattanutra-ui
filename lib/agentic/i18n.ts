@@ -450,7 +450,7 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "{parts}"
   },
   "plan.tradeoff.price_up": {
-    en: "+{baht} THB",
+    en: "{baht} THB more",
     th: "แพงกว่า {baht} บาท",
     "zh-CN": "贵 {baht} THB"
   },
@@ -460,23 +460,33 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "便宜 {baht} THB"
   },
   "plan.tradeoff.coverage_up": {
-    en: "+{percent} more complete",
+    en: "{percent} percentage points higher coverage",
     th: "ครอบคลุมเพิ่ม {percent}%",
-    "zh-CN": "更完整 {percent}%"
+    "zh-CN": "覆盖率高 {percent} 个百分点"
   },
   "plan.tradeoff.coverage_down": {
-    en: "{percent} less complete",
+    en: "{percent} percentage points lower coverage",
     th: "ครอบคลุมน้อยกว่า {percent}%",
-    "zh-CN": "完整度低 {percent}%"
+    "zh-CN": "覆盖率低 {percent} 个百分点"
   },
   "plan.tradeoff.pills_up": {
-    en: "+{count} more daily units",
+    en: "{count} more daily units",
     th: "เม็ดต่อวันมากกว่า {count}",
+    "zh-CN": "每日多 {count} 粒"
+  },
+  "plan.tradeoff.pills_up_one": {
+    en: "{count} more daily unit",
+    th: "มากกว่า {count} เม็ดต่อวัน",
     "zh-CN": "每日多 {count} 粒"
   },
   "plan.tradeoff.pills_down": {
     en: "{count} fewer daily units",
     th: "เม็ดต่อวันน้อยกว่า {count}",
+    "zh-CN": "每日少 {count} 粒"
+  },
+  "plan.tradeoff.pills_down_one": {
+    en: "{count} fewer daily unit",
+    th: "น้อยกว่า {count} เม็ดต่อวัน",
     "zh-CN": "每日少 {count} 粒"
   },
   "plan.tradeoff.products_up": {

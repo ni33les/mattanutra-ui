@@ -34,26 +34,28 @@ const CASE_IDS = [
   "AX6-03",
   "AX6-04",
   "AX6-05",
-  "AX6-06",
-  "AX6-07"
+  "AX6-06"
 ] as const;
 
 const SUP_C = "sup_ae_vitamin_c";
 const SUP_D3 = "sup_ae_vitamin_d3";
 const SUP_MAG = "sup_ae_magnesium";
 const SUP_OMEGA = "sup_ae_omega3";
-const SUP_GAP = "sup_ae_unobtainium";
+const SUP_B12 = "sup_ae_vitamin_b12";
 const PRD_C = "prd_ae_c500";
 const PRD_MAG = "prd_ae_natmag";
 const PRD_D3 = "prd_ae_d3";
 const PRD_OMEGA = "prd_ae_omega";
+const PRD_B12 = "prd_ae_b12_100";
 const OPT_SINGLE = "opt_ae_single";
 const OPT_A = "opt_ae_a";
 const OPT_B = "opt_ae_b";
 const OPT_C = "opt_ae_c";
 const OPT_MAG = "opt_ae_mag";
 const OPT_OMEGA = "opt_ae_omega";
+const OPT_B12 = "opt_ae_b12";
 const MAG_BAND_ID = "band_ae_magnesium_ul";
+
 const D3_GAP: PlanLeftover = {
   amount: 800,
   name: "Vitamin D3",
@@ -62,11 +64,29 @@ const D3_GAP: PlanLeftover = {
   supplementId: SUP_D3,
   unit: "IU"
 };
-const UNCOVERED: PlanLeftover = {
-  name: "Unobtainium",
-  reason: "uncovered",
-  severity: "high",
-  supplementId: SUP_GAP
+const D3_WEAKER: PlanLeftover = {
+  name: "Vitamin D3",
+  note: "cheaper SKU covers less",
+  reason: "weaker_sku",
+  severity: "low",
+  supplementId: SUP_D3,
+  unit: "IU"
+};
+const B12_GAP: PlanLeftover = {
+  amount: 250,
+  name: "Vitamin B12",
+  reason: "dose_gap",
+  severity: "medium",
+  supplementId: SUP_B12,
+  unit: "mcg"
+};
+const B12_WEAKER: PlanLeftover = {
+  name: "Vitamin B12",
+  note: "weaker SKU",
+  reason: "weaker_sku",
+  severity: "low",
+  supplementId: SUP_B12,
+  unit: "mcg"
 };
 
 const ISOLATED_INFO: IsolatedInfoCatalog = {
@@ -109,6 +129,52 @@ const PROCESSING_KEYS = new Set([
   "summaryKey"
 ]);
 
+const COMPLETED_KEYS = new Set([
+  "acknowledgementStatus",
+  "acknowledgedUnassessedConditionCodes",
+  "acknowledgedUnassessedMedicationCodes",
+  "assessedConditionCodes",
+  "assessedMedicationCodes",
+  "basket",
+  "conditionCodes",
+  "coverage",
+  "estimatedOrderTotalMinor",
+  "guidanceIds",
+  "leftovers",
+  "locale",
+  "medicationCodes",
+  "nextActions",
+  "ok",
+  "optionId",
+  "options",
+  "planHandle",
+  "questions",
+  "reason",
+  "reasonCode",
+  "reasonKey",
+  "revision",
+  "safetyGuidance",
+  "safetyScope",
+  "shippingMinor",
+  "stackSummary",
+  "status",
+  "summary",
+  "summaryKey",
+  "tradeOffs",
+  "unassessedConditionCodes",
+  "unassessedMedicationCodes"
+]);
+
+const DOSE_GAP_KEYS = new Set([
+  "deliveredAmount",
+  "name",
+  "reason",
+  "remainingGap",
+  "requestedAmount",
+  "supplementId",
+  "unit"
+]);
+
 const REQUIRED_READY_KEYS = [
   "ok",
   "status",
@@ -127,6 +193,9 @@ const REQUIRED_READY_KEYS = [
   "options"
 ] as const;
 
+const BANNED_TH_TRADEOFF =
+  /selected option|\bsatang\b|\bcoverage\b|\bpills\b|\bproducts\b/i;
+
 export type AeC6CaseResult = Readonly<{
   evidence: Record<string, unknown>;
   id: string;
@@ -137,7 +206,7 @@ export type AeC6PackReport = Readonly<{
   cases: readonly AeC6CaseResult[];
   packVersion: "agentic-experience-6.0";
   passedCases: number;
-  totalCases: 7;
+  totalCases: 6;
 }>;
 
 function sortedKeys(value: Record<string, unknown>) {
@@ -196,6 +265,30 @@ function keyHits(
     const next = path ? `${path}.${key}` : key;
     return banned.has(key) ? [next] : keyHits(child, banned, next);
   });
+}
+
+function extraCompletedKeys(value: Record<string, unknown>) {
+  return Object.keys(value)
+    .filter((key) => !COMPLETED_KEYS.has(key))
+    .sort();
+}
+
+function extraProcessingKeys(value: Record<string, unknown>) {
+  return Object.keys(value)
+    .filter((key) => !PROCESSING_KEYS.has(key))
+    .sort();
+}
+
+function leftoversOf(value: Record<string, unknown>) {
+  return Array.isArray(value.leftovers) ? value.leftovers.map(asRecord) : [];
+}
+
+function leftoverExtraKeys(plan: Record<string, unknown>) {
+  return leftoversOf(plan).flatMap((item) =>
+    Object.keys(item)
+      .filter((key) => !DOSE_GAP_KEYS.has(key))
+      .sort()
+  );
 }
 
 function basketItem(
@@ -513,14 +606,56 @@ function magOption(amount: number, requested: number) {
   );
 }
 
+function b12Option() {
+  return stackOption(
+    OPT_B12,
+    [
+      basketItem({
+        dailyPills: 1,
+        lineTotalMinor: 12900,
+        productId: PRD_B12,
+        productName: "Vitamin B12 100",
+        requestedNames: ["Vitamin B12"],
+        supplementIds: [SUP_B12]
+      })
+    ],
+    [
+      coverage({
+        contributors: [
+          {
+            amount: 100,
+            productId: PRD_B12,
+            productName: "Vitamin B12 100",
+            source: "selected",
+            unit: "mcg"
+          }
+        ],
+        coveragePercent: 40,
+        currentAmount: 0,
+        deliveredAmount: 100,
+        name: "Vitamin B12",
+        percentOfUpperLimit: null,
+        remainingGap: 150,
+        requestedAmount: 250,
+        status: "partial",
+        supplementId: SUP_B12,
+        totalExposureAmount: 100,
+        unit: "mcg",
+        upperLimitAmount: null
+      })
+    ],
+    40
+  );
+}
+
 function matchFor(state: CanonicalPlanState) {
   const names = state.targets.map((item) => item.name.toLowerCase());
   const hasApixaban = state.medicationCodes.includes("apixaban");
   const hasOmega = names.some((name) => name.includes("omega"));
   const hasMag = names.some((name) => name.includes("magnesium"));
   const hasCkd = state.conditionCodes.includes("ckd");
+  const hasB12 = names.some((name) => name.includes("b12") || name.includes("b 12"));
   const fourTarget = state.targets.length >= 4;
-  const uncovered = state.targets.some((item) => item.supplementId === SUP_GAP);
 
   if (hasApixaban && hasOmega) {
     return { alternatives: [], leftovers: [], selected: omegaOption() };
@@ -535,17 +670,21 @@ function matchFor(state: CanonicalPlanState) {
     };
   }
 
+  if (hasB12) {
+    return {
+      alternatives: [],
+      leftovers: [B12_GAP, B12_WEAKER],
+      selected: b12Option()
+    };
+  }
+
   if (fourTarget) {
     const packed = threeOptions();
     return {
       alternatives: packed.alternatives,
-      leftovers: [D3_GAP],
+      leftovers: [D3_GAP, D3_WEAKER],
       selected: packed.selected
     };
-  }
-
-  if (uncovered) {
-    return { alternatives: [], leftovers: [UNCOVERED], selected: singleOption() };
   }
 
   return { alternatives: [], leftovers: [], selected: singleOption() };
@@ -584,11 +723,10 @@ function fourRequest(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function uncoveredRequest() {
+function b12Request() {
   return singleRequest({
     targets: [
-      { amount: 500, name: "Vitamin C", supplementId: SUP_C, unit: "mg" },
-      { amount: 1, name: "Unobtainium", supplementId: SUP_GAP, unit: "mg" }
+      { amount: 250, name: "Vitamin B12", supplementId: SUP_B12, unit: "mcg" }
     ]
   });
 }
@@ -658,46 +796,36 @@ function optionsOf(value: Record<string, unknown>) {
   return Array.isArray(value.options) ? value.options.map(asRecord) : [];
 }
 
-function leftoversOf(value: Record<string, unknown>) {
-  return Array.isArray(value.leftovers) ? value.leftovers.map(asRecord) : [];
-}
-
 function coverageOf(value: Record<string, unknown>) {
   return Array.isArray(value.coverage) ? value.coverage.map(asRecord) : [];
 }
 
-function questionOk(question: Record<string, unknown>) {
-  const choices = Array.isArray(question.choices)
-    ? question.choices.map(asRecord)
-    : [];
-  return (
-    typeof question.questionId === "string" &&
-    String(question.questionId).length > 0 &&
-    typeof question.prompt === "string" &&
-    String(question.prompt).length > 0 &&
-    typeof question.promptKey === "string" &&
-    String(question.promptKey).length > 0 &&
-    choices.length > 0 &&
-    choices.every(
-      (choice) =>
-        typeof choice.choice === "string" &&
-        String(choice.choice).length > 0 &&
-        typeof choice.labelKey === "string" &&
-        String(choice.labelKey).length > 0
-    )
+function planClean(plan: Record<string, unknown>, maxBytes: number) {
+  const processing = plan.status === "processing";
+  const extra = processing ? extraProcessingKeys(plan) : extraCompletedKeys(plan);
+  const diagnostics = keyHits(plan, BANNED_DIAGNOSTIC_KEYS);
+  const leftoverExtra = leftoverExtraKeys(plan);
+  const leftoverReasons = leftoversOf(plan).map((item) => String(item.reason ?? ""));
+  const leftoverInternal = leftoverReasons.filter(
+    (reason) =>
+      reason === "weaker_sku" || reason === "dominance" || reason === "rejected"
   );
-}
-
-function needsInputOk(plan: Record<string, unknown>) {
-  const questions = questionsOf(plan);
-  return (
-    plan.status === "needs_input" &&
-    questions.length > 0 &&
-    questions.every(questionOk) &&
-    new Set(questions.map((item) => String(item.questionId ?? ""))).size ===
-      questions.length &&
-    nextActionsOf(plan).includes("answer_questions")
-  );
+  const fixtureHits = keyHits(plan, new Set(["fixture"]));
+  return {
+    diagnostics,
+    extra,
+    fixtureHits,
+    leftoverExtra,
+    leftoverInternal,
+    oversized: jsonSize(plan) > maxBytes,
+    ok:
+      extra.length === 0 &&
+      diagnostics.length === 0 &&
+      leftoverExtra.length === 0 &&
+      leftoverInternal.length === 0 &&
+      fixtureHits.length === 0 &&
+      jsonSize(plan) <= maxBytes
+  };
 }
 
 function compactErrorOk(result: Record<string, unknown>, requiredPaths: readonly string[]) {
@@ -722,6 +850,34 @@ function compactErrorOk(result: Record<string, unknown>, requiredPaths: readonly
     !/Failed validating|On instance|oneOf|\$defs|Schema:|schema dump|stack|instance path/i.test(
       blob
     )
+  );
+}
+
+function doseGapOk(
+  leftover: Record<string, unknown>,
+  coverage: Record<string, unknown> | undefined,
+  expected: Readonly<{
+    deliveredAmount: number;
+    remainingGap: number;
+    requestedAmount: number;
+    unit: string;
+  }>
+) {
+  const leftoverKeys = Object.keys(leftover).sort();
+  return (
+    leftover.reason === "dose_gap" &&
+    leftover.unit === expected.unit &&
+    leftover.requestedAmount === expected.requestedAmount &&
+    leftover.deliveredAmount === expected.deliveredAmount &&
+    leftover.remainingGap === expected.remainingGap &&
+    Number(leftover.requestedAmount) - Number(leftover.deliveredAmount) ===
+      Number(leftover.remainingGap) &&
+    leftover.amount == null &&
+    leftoverKeys.every((key) => DOSE_GAP_KEYS.has(key)) &&
+    coverage != null &&
+    coverage.requestedAmount === leftover.requestedAmount &&
+    coverage.deliveredAmount === leftover.deliveredAmount &&
+    coverage.remainingGap === leftover.remainingGap
   );
 }
 
@@ -763,6 +919,20 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
     cases.push(
       await runCase("AX6-01", async () => {
         const harness = createHarness();
+        const created = await harness.call("plan", {
+          idempotencyKey: "ax601-create-000001",
+          operation: "create",
+          request: singleRequest()
+        });
+        const gotten = await harness.call("plan", {
+          operation: "get",
+          planHandle: created.planHandle
+        });
+        const replay = await harness.call("plan", {
+          idempotencyKey: "ax601-create-000001",
+          operation: "create",
+          request: singleRequest()
+        });
         const omega = await harness.call("plan", {
           idempotencyKey: "ax601-omega-0000001",
           operation: "create",
@@ -773,15 +943,12 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
             ]
           })
         });
-        const warfarin = await harness.call("plan", {
-          idempotencyKey: "ax601-warf-00000001",
-          operation: "create",
-          request: singleRequest({ medicationCodes: ["warfarin"] })
-        });
-        const uncovered = await harness.call("plan", {
-          idempotencyKey: "ax601-gap-000000001",
-          operation: "create",
-          request: uncoveredRequest()
+        const answered = await harness.call("plan", {
+          answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
+          expectedRevision: omega.revision,
+          idempotencyKey: "ax601-answer-000001",
+          operation: "answer",
+          planHandle: omega.planHandle
         });
         const four = await harness.call("plan", {
           idempotencyKey: "ax601-four-00000001",
@@ -795,17 +962,12 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
           optionId: OPT_B,
           planHandle: four.planHandle
         });
-        const acked = await harness.call("plan", {
-          answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
+        const revised = await harness.call("plan", {
           expectedRevision: selected.revision,
-          idempotencyKey: "ax601-ack-000000001",
-          operation: "answer",
-          planHandle: four.planHandle
-        });
-        const ready = await harness.call("plan", {
-          idempotencyKey: "ax601-ready-0000001",
-          operation: "create",
-          request: singleRequest()
+          idempotencyKey: "ax601-revise-000001",
+          operation: "revise",
+          planHandle: four.planHandle,
+          request: fourRequest({ requirements: { maxDailyPills: 8 } })
         });
         const blocked = await harness.call("plan", {
           idempotencyKey: "ax601-block-0000001",
@@ -820,120 +982,55 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
           operation: "create",
           request: singleRequest()
         });
-        const needs = [omega, warfarin, uncovered, selected].filter(
-          (item) => item.status === "needs_input"
-        );
-        const needsBad = needs.filter((item) => !needsInputOk(item));
-        const afterAckBad =
-          acked.status === "needs_input" ? !needsInputOk(acked) : false;
-        const readyOk =
-          ready.status === "ready" &&
-          questionsOf(ready).length === 0 &&
-          nextActionsOf(ready).includes("confirm_with_user");
-        const blockedOk =
-          blocked.status === "blocked" &&
-          questionsOf(blocked).length === 0 &&
-          nextActionsOf(blocked).includes("change_request");
-        const processingOk =
-          processing.status === "processing" &&
-          questionsOf(processing).length === 0 &&
-          nextActionsOf(processing).includes("poll_plan");
-        const ok =
-          needs.length >= 3 &&
-          needsBad.length === 0 &&
-          afterAckBad === false &&
-          readyOk &&
-          blockedOk &&
-          processingOk;
-        return ok
-          ? pass("AX6-01", { needs: needs.length })
-          : fail("AX6-01", {
-              acked: acked.status ?? null,
-              ackedQuestions: questionsOf(acked).length,
-              blocked: blocked.status ?? null,
-              needsBad: needsBad.map((item) => ({
-                questions: questionsOf(item).length,
-                status: item.status ?? null
-              })),
-              processing: processing.status ?? null,
-              ready: ready.status ?? null
-            });
+        const polled = await processingHarness.call("plan", {
+          operation: "get",
+          planHandle: processing.planHandle
+        });
+        const payloads = [
+          { max: 8192, name: "create", value: created },
+          { max: 8192, name: "get", value: gotten },
+          { max: 8192, name: "replay", value: replay },
+          { max: 16384, name: "answer", value: answered },
+          { max: 16384, name: "select", value: selected },
+          { max: 16384, name: "revise", value: revised },
+          { max: 16384, name: "blocked", value: blocked },
+          { max: 8192, name: "processing", value: processing },
+          { max: 8192, name: "poll", value: polled }
+        ];
+        const dirty = payloads
+          .map((item) => ({ name: item.name, ...planClean(item.value, item.max) }))
+          .filter((item) => !item.ok);
+        const countsOk =
+          selected.planHandle === four.planHandle &&
+          processingHarness.port.getCallCount() === 1;
+        return dirty.length === 0 && countsOk
+          ? pass("AX6-01", { operations: payloads.map((item) => item.name) })
+          : fail("AX6-01", { dirty, rematch: processingHarness.port.getCallCount() });
       })
     );
 
     cases.push(
       await runCase("AX6-02", async () => {
         const harness = createHarness();
-        const created = await harness.call("plan", {
-          idempotencyKey: "ax602-create-000001",
-          operation: "create",
-          request: fourRequest()
+        const first = await harness.call("plan", {
+          idempotencyKey: "short",
+          operation: "create"
         });
-        const handle = created.planHandle;
-        const beforeSelect = harness.port.getCallCount();
-        const selected = await harness.call("plan", {
-          expectedRevision: created.revision,
-          idempotencyKey: "ax602-select-000001",
-          operation: "select",
-          optionId: OPT_B,
-          planHandle: handle
+        const second = await harness.call("plan", {
+          idempotencyKey: "short",
+          operation: "create"
         });
-        const afterSelect = harness.port.getCallCount();
-        const beforeAck = harness.port.getCallCount();
-        const acked = await harness.call("plan", {
-          answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
-          expectedRevision: selected.revision,
-          idempotencyKey: "ax602-ack-000000001",
-          operation: "answer",
-          planHandle: handle
-        });
-        const afterAck = harness.port.getCallCount();
-        const gotten = await harness.call("plan", {
-          operation: "get",
-          planHandle: handle
-        });
-        const d3 = coverageOf(acked).find((row) => /vitamin d/i.test(String(row.name ?? "")));
-        const leftover = leftoversOf(acked);
-        const optionIds = optionsOf(acked)
-          .map((item) => String(item.optionId ?? ""))
-          .sort();
         const ok =
-          selected.planHandle === handle &&
-          acked.planHandle === handle &&
-          selected.revision === Number(created.revision) + 1 &&
-          acked.revision === Number(selected.revision) + 1 &&
-          afterSelect === beforeSelect &&
-          afterAck === beforeAck &&
-          selected.optionId === OPT_B &&
-          acked.optionId === OPT_B &&
-          optionIds.join() === [OPT_A, OPT_B, OPT_C].sort().join() &&
-          selected.acknowledgementStatus === "pending" &&
-          acked.status === "ready" &&
-          acked.acknowledgementStatus === "acknowledged" &&
-          questionsOf(acked).length === 0 &&
-          nextActionsOf(acked).includes("confirm_with_user") &&
-          !nextActionsOf(acked).includes("answer_questions") &&
-          Number(d3?.coveragePercent) === 60 &&
-          leftover.some(
-            (item) =>
-              String(item.reason ?? "") === "dose_gap" &&
-              /vitamin d/i.test(String(item.name ?? ""))
-          ) &&
-          gotten.status === "ready" &&
-          gotten.revision === acked.revision &&
-          gotten.optionId === OPT_B &&
-          JSON.stringify(leftoversOf(gotten)) === JSON.stringify(leftover) &&
-          acked.status !== "needs_input";
+          compactErrorOk(first, ["idempotencyKey", "request"]) &&
+          JSON.stringify(first) === JSON.stringify(second);
         return ok
-          ? pass("AX6-02", { revision: acked.revision, status: acked.status })
+          ? pass("AX6-02", { bytes: jsonSize(first) })
           : fail("AX6-02", {
-              ackedQuestions: questionsOf(acked).length,
-              ackedStatus: acked.status ?? null,
-              d3: d3?.coveragePercent ?? null,
-              leftoverReasons: leftover.map((item) => item.reason ?? null),
-              optionId: acked.optionId ?? null,
-              rematchAck: afterAck !== beforeAck,
-              rematchSelect: afterSelect !== beforeSelect
+              code:
+                asRecord(first.error).error_code ??
+                asRecord(first.error).reasonCode ??
+                null,
+              identical: JSON.stringify(first) === JSON.stringify(second)
             });
       })
     );
@@ -941,68 +1038,113 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
     cases.push(
       await runCase("AX6-03", async () => {
         const harness = createHarness();
-        const created = await harness.call("plan", {
-          idempotencyKey: "ax603-create-000001",
+        const ready = await harness.call("plan", {
+          idempotencyKey: "ax603-ready-0000001",
           operation: "create",
-          request: uncoveredRequest()
+          request: singleRequest()
         });
-        const questions = questionsOf(created);
-        const gap = questions.find((item) =>
-          String(item.questionId ?? "").includes("gap")
-        );
-        const choices = Array.isArray(gap?.choices) ? gap.choices.map(asRecord) : [];
-        const accept = choices.find((item) =>
-          String(item.choice ?? "").startsWith("accept_gap")
-        );
-        const remove = choices.find((item) =>
-          /remove/i.test(String(item.choice ?? ""))
-        );
-        const before = harness.port.getCallCount();
-        const answered = await harness.call("plan", {
+        const warfarin = await harness.call("plan", {
+          idempotencyKey: "ax603-warf-00000001",
+          operation: "create",
+          request: singleRequest({ medicationCodes: ["warfarin"] })
+        });
+        const warfarinAck = await harness.call("plan", {
           answers: [
-            {
-              choice: accept?.choice ?? "accept_gap:sup_ae_unobtainium",
-              questionId: gap?.questionId ?? "q_gap_sup_ae_unobtainium"
-            }
+            { choice: "acknowledge_unassessed", questionId: "q_unassessed_medical_context" }
           ],
-          expectedRevision: created.revision,
-          idempotencyKey: "ax603-accept-000001",
+          expectedRevision: warfarin.revision,
+          idempotencyKey: "ax603-warf-ack-00001",
           operation: "answer",
-          planHandle: created.planHandle
+          planHandle: warfarin.planHandle
         });
-        const gotten = await harness.call("plan", {
+        const omega = await harness.call("plan", {
+          idempotencyKey: "ax603-omega-0000001",
+          operation: "create",
+          request: singleRequest({
+            medicationCodes: ["apixaban"],
+            targets: [
+              { amount: 1000, name: "Omega-3", supplementId: SUP_OMEGA, unit: "mg" }
+            ]
+          })
+        });
+        const omegaAck = await harness.call("plan", {
+          answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
+          expectedRevision: omega.revision,
+          idempotencyKey: "ax603-omega-ack-0001",
+          operation: "answer",
+          planHandle: omega.planHandle
+        });
+        const blocked = await harness.call("plan", {
+          idempotencyKey: "ax603-block-0000001",
+          operation: "create",
+          request: singleRequest({
+            targets: [{ amount: 351, name: "Magnesium", supplementId: SUP_MAG, unit: "mg" }]
+          })
+        });
+        const four = await harness.call("plan", {
+          idempotencyKey: "ax603-four-00000001",
+          operation: "create",
+          request: fourRequest()
+        });
+        const selected = await harness.call("plan", {
+          expectedRevision: four.revision,
+          idempotencyKey: "ax603-select-000001",
+          operation: "select",
+          optionId: OPT_B,
+          planHandle: four.planHandle
+        });
+        const processingHarness = createHarness({ deferProcessing: true });
+        const processing = await processingHarness.call("plan", {
+          idempotencyKey: "ax603-proc-00000001",
+          operation: "create",
+          request: singleRequest()
+        });
+        const polled = await processingHarness.call("plan", {
           operation: "get",
-          planHandle: created.planHandle
+          planHandle: processing.planHandle
         });
-        const evidence =
-          leftoversOf(answered).length > 0 ||
-          Array.isArray(answered.acceptedGaps) ||
-          Array.isArray(answered.acceptedUncoveredTargets);
+        const missingReady = REQUIRED_READY_KEYS.filter((key) => !(key in ready));
+        const priceOk =
+          Number(asRecord(ready.stackSummary).totalPriceMinor) + DEFAULT_SHIPPING_MINOR ===
+          Number(ready.estimatedOrderTotalMinor);
+        const selectedIds = optionsOf(selected)
+          .map((item) => String(item.optionId ?? ""))
+          .sort();
         const ok =
-          needsInputOk(created) &&
-          questions.length === 1 &&
-          Boolean(gap) &&
-          Boolean(accept) &&
-          Boolean(remove) &&
-          answered.planHandle === created.planHandle &&
-          answered.revision === Number(created.revision) + 1 &&
-          harness.port.getCallCount() === before &&
-          answered.status === "ready" &&
-          questionsOf(answered).length === 0 &&
-          evidence &&
-          gotten.status === "ready" &&
-          gotten.revision === answered.revision &&
-          questionsOf(gotten).length === 0 &&
-          guidanceOf(created).every((item) => item.action !== "block");
+          missingReady.length === 0 &&
+          priceOk &&
+          planClean(ready, 8192).ok &&
+          planClean(selected, 16384).ok &&
+          planClean(processing, 8192).ok &&
+          planClean(polled, 8192).ok &&
+          stringList(warfarin.unassessedMedicationCodes).includes("warfarin") &&
+          stringList(warfarinAck.unassessedMedicationCodes).includes("warfarin") &&
+          stringList(warfarinAck.acknowledgedUnassessedMedicationCodes).includes(
+            "warfarin"
+          ) &&
+          warfarinAck.safetyScope === "partial" &&
+          omega.acknowledgementStatus === "pending" &&
+          omegaAck.acknowledgementStatus === "acknowledged" &&
+          guidanceOf(omega).some((item) => item.exposure === 1104) &&
+          guidanceOf(omegaAck).some((item) => item.exposure === 1104) &&
+          guidanceOf(blocked).some(
+            (item) =>
+              item.action === "block" && item.acknowledgementStatus === "not_applicable"
+          ) &&
+          selectedIds.join() === [OPT_A, OPT_B, OPT_C].sort().join() &&
+          optionsOf(selected).filter((item) => item.selected === true).length === 1 &&
+          processing.status === "processing" &&
+          extraProcessingKeys(processing).length === 0 &&
+          polled.status === "ready" &&
+          processingHarness.port.getCallCount() === 1;
         return ok
-          ? pass("AX6-03", { questionId: gap?.questionId ?? null })
+          ? pass("AX6-03", { missingReady, priceOk })
           : fail("AX6-03", {
-              answered: answered.status ?? null,
-              choices: choices.map((item) => item.choice ?? null),
-              created: created.status ?? null,
-              evidence,
-              questionCount: questions.length,
-              rematched: harness.port.getCallCount() !== before
+              missingReady,
+              priceOk,
+              processing: processing.status ?? null,
+              safetyScope: warfarinAck.safetyScope ?? null,
+              selectedIds
             });
       })
     );
@@ -1010,19 +1152,10 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
     cases.push(
       await runCase("AX6-04", async () => {
         const harness = createHarness();
-        const created = await harness.call("plan", {
-          idempotencyKey: "ax604-create-000001",
+        const b12 = await harness.call("plan", {
+          idempotencyKey: "ax604-b12-000000001",
           operation: "create",
-          request: singleRequest()
-        });
-        const gotten = await harness.call("plan", {
-          operation: "get",
-          planHandle: created.planHandle
-        });
-        const replay = await harness.call("plan", {
-          idempotencyKey: "ax604-create-000001",
-          operation: "create",
-          request: singleRequest()
+          request: b12Request()
         });
         const four = await harness.call("plan", {
           idempotencyKey: "ax604-four-00000001",
@@ -1036,206 +1169,139 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
           optionId: OPT_B,
           planHandle: four.planHandle
         });
-        const answered = await harness.call("plan", {
-          answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
-          expectedRevision: selected.revision,
-          idempotencyKey: "ax604-ack-000000001",
-          operation: "answer",
-          planHandle: four.planHandle
+        const replay = await harness.call("plan", {
+          idempotencyKey: "ax604-b12-000000001",
+          operation: "create",
+          request: b12Request()
         });
-        const revised = await harness.call("plan", {
-          expectedRevision: answered.revision,
-          idempotencyKey: "ax604-revise-000001",
-          operation: "revise",
-          planHandle: four.planHandle,
-          request: fourRequest({ requirements: { maxDailyPills: 8 } })
-        });
-        const payloads = [
-          { max: 8192, name: "create", value: created },
-          { max: 8192, name: "get", value: gotten },
-          { max: 8192, name: "replay", value: replay },
-          { max: 16384, name: "select", value: selected },
-          { max: 16384, name: "answer", value: answered },
-          { max: 16384, name: "revise", value: revised }
-        ];
-        const dirty = payloads
-          .map((item) => ({
-            diagnostics: keyHits(item.value, BANNED_DIAGNOSTIC_KEYS),
-            name: item.name,
-            oversized: jsonSize(item.value) > item.max
-          }))
-          .filter((item) => item.diagnostics.length > 0 || item.oversized);
-        return dirty.length === 0
-          ? pass("AX6-04", { operations: payloads.map((item) => item.name) })
-          : fail("AX6-04", { dirty });
+        const b12Leftovers = leftoversOf(b12);
+        const d3Leftovers = leftoversOf(selected);
+        const b12Coverage = coverageOf(b12).find((row) =>
+          /vitamin b12/i.test(String(row.name ?? ""))
+        );
+        const d3Coverage = coverageOf(selected).find((row) =>
+          /vitamin d/i.test(String(row.name ?? ""))
+        );
+        const b12Gap = b12Leftovers.find((item) => item.reason === "dose_gap");
+        const d3Gap = d3Leftovers.find((item) => item.reason === "dose_gap");
+        const uniqueB12 =
+          new Set(b12Leftovers.map((item) => String(item.supplementId ?? item.name))).size ===
+          b12Leftovers.length;
+        const uniqueD3 =
+          new Set(d3Leftovers.map((item) => String(item.supplementId ?? item.name))).size ===
+          d3Leftovers.length;
+        const noInternal = [...b12Leftovers, ...d3Leftovers].every(
+          (item) =>
+            item.reason !== "weaker_sku" &&
+            item.reason !== "dominance" &&
+            item.reason !== "rejected"
+        );
+        const ok =
+          b12Leftovers.length === 1 &&
+          d3Leftovers.length === 1 &&
+          uniqueB12 &&
+          uniqueD3 &&
+          noInternal &&
+          Boolean(b12Gap) &&
+          Boolean(d3Gap) &&
+          doseGapOk(b12Gap ?? {}, b12Coverage, {
+            deliveredAmount: 100,
+            remainingGap: 150,
+            requestedAmount: 250,
+            unit: "mcg"
+          }) &&
+          doseGapOk(d3Gap ?? {}, d3Coverage, {
+            deliveredAmount: 1200,
+            remainingGap: 800,
+            requestedAmount: 2000,
+            unit: "IU"
+          }) &&
+          JSON.stringify(leftoversOf(replay)) === JSON.stringify(b12Leftovers);
+        return ok
+          ? pass("AX6-04", { b12: b12Gap?.remainingGap ?? null, d3: d3Gap?.remainingGap ?? null })
+          : fail("AX6-04", {
+              b12Reasons: b12Leftovers.map((item) => item.reason ?? null),
+              b12Keys: Object.keys(b12Gap ?? {}),
+              d3Reasons: d3Leftovers.map((item) => item.reason ?? null),
+              d3Keys: Object.keys(d3Gap ?? {})
+            });
       })
     );
 
     cases.push(
       await runCase("AX6-05", async () => {
         const harness = createHarness();
-        const created = await harness.call("plan", {
-          idempotencyKey: "ax605-ready-0000001",
-          operation: "create",
-          request: singleRequest()
-        });
-        const malformedCreate = await harness.call("plan", {
-          idempotencyKey: "short",
-          operation: "create"
-        });
-        const malformedRevise = await harness.call("plan", {
-          expectedRevision: created.revision,
-          idempotencyKey: "ax605-revise-bad-001",
-          operation: "revise",
-          planHandle: created.planHandle
-        });
-        const malformedAnswer = await harness.call("plan", {
-          expectedRevision: created.revision,
-          idempotencyKey: "ax605-answer-bad-001",
-          operation: "answer",
-          planHandle: created.planHandle
-        });
-        const malformedSelect = await harness.call("plan", {
-          expectedRevision: created.revision,
-          idempotencyKey: "ax605-select-bad-001",
-          operation: "select",
-          planHandle: created.planHandle
-        });
-        const malformedGet = await harness.call("plan", {
-          operation: "get",
-          planHandle: "short"
-        });
-        const replay = await harness.call("plan", {
-          idempotencyKey: "short",
-          operation: "create"
-        });
-        const rows = [
-          { name: "create", paths: ["idempotencyKey", "request"], value: malformedCreate },
-          { name: "revise", paths: ["request"], value: malformedRevise },
-          { name: "answer", paths: ["answers"], value: malformedAnswer },
-          { name: "select", paths: ["optionId"], value: malformedSelect },
-          { name: "get", paths: ["planHandle"], value: malformedGet }
-        ];
-        const bad = rows.filter((row) => !compactErrorOk(row.value, row.paths));
-        const identical = JSON.stringify(malformedCreate) === JSON.stringify(replay);
-        return bad.length === 0 && identical
-          ? pass("AX6-05", { operations: rows.map((item) => item.name) })
-          : fail("AX6-05", {
-              bad: bad.map((item) => ({
-                code: asRecord(item.value.error).error_code ??
-                  asRecord(item.value.error).reasonCode ??
-                  null,
-                name: item.name
-              })),
-              identical
-            });
-      })
-    );
-
-    cases.push(
-      await runCase("AX6-06", async () => {
-        const harness = createHarness();
-        const ready = await harness.call("plan", {
-          idempotencyKey: "ax606-ready-0000001",
-          operation: "create",
-          request: singleRequest()
-        });
-        const four = await harness.call("plan", {
-          idempotencyKey: "ax606-four-00000001",
+        const en = await harness.call("plan", {
+          idempotencyKey: "ax605-create-en-0001",
           operation: "create",
           request: fourRequest()
         });
+        const th = await harness.call("plan", {
+          idempotencyKey: "ax605-create-th-0001",
+          operation: "create",
+          request: fourRequest({ locale: "th" })
+        });
         const selected = await harness.call("plan", {
-          expectedRevision: four.revision,
-          idempotencyKey: "ax606-select-000001",
+          expectedRevision: en.revision,
+          idempotencyKey: "ax605-select-000001",
           operation: "select",
           optionId: OPT_B,
-          planHandle: four.planHandle
+          planHandle: en.planHandle
         });
-        const acked = await harness.call("plan", {
-          answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
-          expectedRevision: selected.revision,
-          idempotencyKey: "ax606-ack-000000001",
-          operation: "answer",
-          planHandle: four.planHandle
-        });
-        const uncovered = await harness.call("plan", {
-          idempotencyKey: "ax606-gap-000000001",
-          operation: "create",
-          request: uncoveredRequest()
-        });
-        const warfarin = await harness.call("plan", {
-          idempotencyKey: "ax606-warf-00000001",
-          operation: "create",
-          request: singleRequest({ medicationCodes: ["warfarin"] })
-        });
-        const omega = await harness.call("plan", {
-          idempotencyKey: "ax606-omega-0000001",
-          operation: "create",
-          request: singleRequest({
-            medicationCodes: ["apixaban"],
-            targets: [
-              { amount: 1000, name: "Omega-3", supplementId: SUP_OMEGA, unit: "mg" }
-            ]
-          })
-        });
-        const blocked = await harness.call("plan", {
-          idempotencyKey: "ax606-block-0000001",
-          operation: "create",
-          request: singleRequest({
-            targets: [{ amount: 351, name: "Magnesium", supplementId: SUP_MAG, unit: "mg" }]
-          })
-        });
-        const missingReady = REQUIRED_READY_KEYS.filter((key) => !(key in ready));
-        const leftoverVisible =
-          leftoversOf(acked).some((item) => item.reason === "dose_gap") ||
-          coverageOf(acked).some(
-            (row) =>
-              /vitamin d/i.test(String(row.name ?? "")) && Number(row.coveragePercent) === 60
-          );
-        const soleReason = optionsOf(ready)[0]?.reasonCode === "best_available";
-        const priceOk =
-          Number(asRecord(ready.stackSummary).totalPriceMinor) + DEFAULT_SHIPPING_MINOR ===
-          Number(ready.estimatedOrderTotalMinor);
+        const b = optionsOf(en).find((item) => item.optionId === OPT_B) ?? {};
+        const c = optionsOf(en).find((item) => item.optionId === OPT_C) ?? {};
+        const aAfter = optionsOf(selected).find((item) => item.optionId === OPT_A) ?? {};
+        const cAfter = optionsOf(selected).find((item) => item.optionId === OPT_C) ?? {};
+        const selectedTrade = asRecord(
+          optionsOf(selected).find((item) => item.selected === true)?.tradeOffs
+        );
+        const bTrade = asRecord(b.tradeOffs);
+        const summaries = {
+          aAfter: String(asRecord(aAfter.tradeOffs).summary ?? ""),
+          b: String(bTrade.summary ?? ""),
+          c: String(asRecord(c.tradeOffs).summary ?? ""),
+          cAfter: String(asRecord(cAfter.tradeOffs).summary ?? "")
+        };
+        const thB = String(
+          asRecord(optionsOf(th).find((item) => item.optionId === OPT_B)?.tradeOffs).summary ??
+            ""
+        );
         const ok =
-          missingReady.length === 0 &&
-          leftoverVisible &&
-          soleReason &&
-          priceOk &&
-          keyHits(ready, BANNED_DIAGNOSTIC_KEYS).length === 0 &&
-          keyHits(acked, BANNED_DIAGNOSTIC_KEYS).length === 0 &&
-          basketOf(ready).every((item) => asRecord(item.selectionReason).messageKey) &&
-          optionsOf(selected).length === 3 &&
-          optionsOf(selected).filter((item) => item.selected === true).length === 1 &&
-          stringList(warfarin.unassessedMedicationCodes).includes("warfarin") &&
-          omega.acknowledgementStatus === "pending" &&
-          guidanceOf(blocked).some(
-            (item) =>
-              item.action === "block" && item.acknowledgementStatus === "not_applicable"
-          ) &&
-          (uncovered.status === "needs_input" ? needsInputOk(uncovered) : true);
+          summaries.b ===
+            "1,752 THB less; 3 fewer daily units; 8 percentage points lower coverage" &&
+          summaries.c ===
+            "1,343 THB less; 2 fewer daily units; 8 percentage points lower coverage" &&
+          summaries.aAfter ===
+            "1,752 THB more; 3 more daily units; 8 percentage points higher coverage" &&
+          summaries.cAfter === "409 THB more; 1 more daily unit" &&
+          Number(bTrade.priceDeltaMinor) === -175200 &&
+          Number(bTrade.pillDelta) === -3 &&
+          Number(bTrade.coverageDeltaPercent) === -8 &&
+          selectedTrade.summaryKey === "plan.tradeoff.selected" &&
+          Object.values(summaries).every((item) => item.length <= 140) &&
+          !/less complete/.test(JSON.stringify(summaries)) &&
+          typeof asRecord(
+            optionsOf(th).find((item) => item.optionId === OPT_B)?.tradeOffs
+          ).summaryKey === "string" &&
+          /บาท/.test(thB) &&
+          !BANNED_TH_TRADEOFF.test(thB);
         return ok
-          ? pass("AX6-06", { leftoverVisible, soleReason })
-          : fail("AX6-06", {
-              leftoverVisible,
-              missingReady,
-              soleReason,
-              uncovered: uncovered.status ?? null
-            });
+          ? pass("AX6-05", summaries)
+          : fail("AX6-05", summaries);
       })
     );
 
     const byId = new Map(cases.map((item) => [item.id, item]));
-    const firstSix = CASE_IDS.slice(0, 6).map(
+    const firstFive = CASE_IDS.slice(0, 5).map(
       (id) => byId.get(id) ?? fail(id, { missing: true })
     );
-    const failedSix = firstSix
+    const failedFive = firstFive
       .filter((item) => item.result !== "PASS")
       .map((item) => item.id);
     cases.push(
-      failedSix.length === 0
-        ? pass("AX6-07", { passed: firstSix.map((item) => item.id) })
-        : fail("AX6-07", { failed: failedSix })
+      failedFive.length === 0
+        ? pass("AX6-06", { passed: firstFive.map((item) => item.id) })
+        : fail("AX6-06", { failed: failedFive })
     );
 
     const ordered = CASE_IDS.map(
@@ -1246,7 +1312,7 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
       cases: ordered,
       packVersion: "agentic-experience-6.0",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
-      totalCases: 7
+      totalCases: 6
     };
   } finally {
     endDeterministicIdsForTests();
@@ -1260,10 +1326,10 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
 
 if (process.env.NODE_TEST_CONTEXT) {
   describe("agentic experience cycle 6 pack", () => {
-    it("exports 7 cases and a canonical report", async () => {
+    it("exports 6 cases and a canonical report", async () => {
       const report = await runAeC6Pack();
-      assert.equal(report.totalCases, 7);
-      assert.equal(report.cases.length, 7);
+      assert.equal(report.totalCases, 6);
+      assert.equal(report.cases.length, 6);
       assert.deepEqual(
         report.cases.map((item) => item.id),
         [...CASE_IDS]

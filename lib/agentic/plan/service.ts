@@ -34,7 +34,7 @@ import {
 } from "@/lib/agentic/plan/matching";
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
-import { publicMatcherTelemetry, publicPlanFields } from "@/lib/agentic/public-mapper";
+import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import type {
   CanonicalPlanState,
@@ -451,7 +451,6 @@ function isTerminalPlanStatus(
 }
 
 function successFromResult(input: Readonly<{
-  includeDiagnostics?: boolean;
   locale: Locale;
   planHandle: string;
   result: PlanResult;
@@ -477,8 +476,7 @@ function successFromResult(input: Readonly<{
     ...fields,
     ok: true,
     planHandle: input.planHandle,
-    revision: input.revision,
-    ...(input.includeDiagnostics ? publicMatcherTelemetry(input.result.matcherTelemetry) : {})
+    revision: input.revision
   };
 }
 
@@ -985,7 +983,6 @@ export async function planTool(input: Readonly<{
     );
 
     const processingResponse = successFromResult({
-      includeDiagnostics: false,
       locale,
       planHandle: planHandle!,
       result: processing,
@@ -1038,7 +1035,6 @@ export async function planTool(input: Readonly<{
 
     if (isPoll) {
       const response = successFromResult({
-        includeDiagnostics: !input.matchPort,
         locale: prepared.locale,
         planHandle: prepared.planHandle,
         result: prepared.previous,
@@ -1076,7 +1072,6 @@ export async function planTool(input: Readonly<{
       (result as { status?: unknown }).status !== "processing"
     ) {
       return successFromResult({
-        includeDiagnostics: false,
         locale: prepared.locale,
         planHandle: prepared.planHandle,
         result: prepared.processing,
@@ -1098,7 +1093,6 @@ export async function planTool(input: Readonly<{
 
   const ackMs = Math.max(0, Date.now() - matchStartedAt);
   return successFromResult({
-    includeDiagnostics: !input.matchPort,
     locale: prepared.locale,
     planHandle: prepared.planHandle,
     result: {
@@ -1387,7 +1381,6 @@ async function persistTerminalPlan(input: Readonly<{
   skipSideEffects?: boolean;
 }>): Promise<PlanToolSuccess> {
   const response = successFromResult({
-    includeDiagnostics: !input.skipSideEffects,
     locale: input.locale,
     planHandle: input.planHandle,
     result: input.result,

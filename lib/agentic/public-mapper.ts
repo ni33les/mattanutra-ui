@@ -507,10 +507,18 @@ function tradeOffPresentation(
     });
   }
   if (pillDelta !== 0) {
-    const key = pillDelta > 0 ? "plan.tradeoff.pills_up" : "plan.tradeoff.pills_down";
+    const count = Math.abs(pillDelta);
+    const key =
+      pillDelta > 0
+        ? count === 1
+          ? "plan.tradeoff.pills_up_one"
+          : "plan.tradeoff.pills_up"
+        : count === 1
+          ? "plan.tradeoff.pills_down_one"
+          : "plan.tradeoff.pills_down";
     parts.push({
       key,
-      text: agenticMessage(negotiated, key, { count: Math.abs(pillDelta) })
+      text: agenticMessage(negotiated, key, { count })
     });
   }
   if (coverageDeltaPercent !== 0) {
@@ -659,14 +667,81 @@ export function publicQuestions(
   }));
 }
 
-function publicLeftover(item: PlanLeftover) {
-  return {
-    name: item.name,
-    reason: item.reason,
-    ...(item.amount != null ? { amount: item.amount } : {}),
-    ...(item.unit ? { unit: item.unit } : {}),
-    ...(item.supplementId ? { supplementId: item.supplementId } : {})
-  };
+const PUBLIC_LEFTOVER_REASONS = new Set(["dose_gap", "not_in_catalogue", "uncovered"]);
+
+function leftoverKey(item: Pick<PlanLeftover, "name" | "supplementId">) {
+  return item.supplementId || item.name.trim().toLowerCase();
+}
+
+function coverageForLeftover(
+  item: PlanLeftover,
+  coverage: readonly CoverageRow[]
+) {
+  return coverage.find(
+    (row) =>
+      (item.supplementId && row.supplementId === item.supplementId) ||
+      row.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+  );
+}
+
+function publicLeftovers(
+  leftovers: readonly PlanLeftover[] | undefined,
+  coverage: readonly CoverageRow[]
+) {
+  if (!leftovers || leftovers.length === 0) {
+    return [];
+  }
+
+  const out: Array<Record<string, unknown>> = [];
+  const seen = new Set<string>();
+
+  for (const item of leftovers) {
+    if (!PUBLIC_LEFTOVER_REASONS.has(item.reason)) {
+      continue;
+    }
+
+    const key = leftoverKey(item);
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    const row = coverageForLeftover(item, coverage);
+
+    if (item.reason === "dose_gap") {
+      const requestedAmount = row?.requestedAmount ?? item.amount;
+      const deliveredAmount = row?.deliveredAmount ?? 0;
+      const remainingGap =
+        row?.remainingGap ??
+        Math.max(0, (requestedAmount ?? 0) - deliveredAmount);
+      const unit = item.unit ?? row?.unit;
+
+      if (requestedAmount == null || unit == null) {
+        continue;
+      }
+
+      out.push({
+        name: item.name,
+        reason: "dose_gap",
+        unit,
+        requestedAmount,
+        deliveredAmount,
+        remainingGap,
+        ...(item.supplementId ? { supplementId: item.supplementId } : {})
+      });
+      continue;
+    }
+
+    out.push({
+      name: item.name,
+      reason: item.reason,
+      ...(item.supplementId ? { supplementId: item.supplementId } : {}),
+      ...(item.unit ? { unit: item.unit } : {})
+    });
+  }
+
+  return out;
 }
 
 export function publicPlanFields(result: Pick<
@@ -723,6 +798,7 @@ export function publicPlanFields(result: Pick<
   });
 
   const locale = snapshot?.locale ?? "en";
+  const leftovers = publicLeftovers(result.leftovers, result.coverage);
   const assessedMedicationCodes = [
     ...new Set(medicationCodes.map((code) => MEDICATION_ALIASES[code]).filter(Boolean) as string[])
   ];
@@ -810,9 +886,7 @@ export function publicPlanFields(result: Pick<
     ...(result.questions.length > 0
       ? { questions: publicQuestions(result.questions) }
       : {}),
-    ...(result.leftovers && result.leftovers.length > 0
-      ? { leftovers: result.leftovers.map(publicLeftover) }
-      : {}),
+    ...(leftovers.length > 0 ? { leftovers } : {}),
     ...(result.safetyGuidance.length > 0
       ? {
           safetyGuidance: result.safetyGuidance.map((item) =>

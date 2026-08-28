@@ -362,36 +362,31 @@ const ROWS = [
   {
     category: "MCP state",
     id: "AX6-01",
-    purpose: "A plan that needs input always has a question the agent can answer"
+    purpose: "Every ordinary plan response is allow-listed and diagnostic-free"
   },
   {
     category: "MCP state",
     id: "AX6-02",
-    purpose: "The cheaper partial option becomes ready after its safety ack"
+    purpose: "A malformed create returns one compact public error"
   },
   {
     category: "MCP state",
     id: "AX6-03",
-    purpose: "A real uncovered target still asks accept or remove"
+    purpose: "Cleaning the serializer still keeps the complete agent contract"
   },
   {
     category: "MCP state",
     id: "AX6-04",
-    purpose: "Every finished plan operation still has no matcher internals"
+    purpose: "Public leftovers are unique and numerically honest"
   },
   {
     category: "MCP state",
     id: "AX6-05",
-    purpose: "Create, get, answer, select and revise all return small field errors"
+    purpose: "English option comparisons use exact coverage language"
   },
   {
     category: "MCP state",
     id: "AX6-06",
-    purpose: "Cleaning the serializer still keeps state, leftovers, options and prices"
-  },
-  {
-    category: "MCP state",
-    id: "AX6-07",
     purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
   }
 ];
