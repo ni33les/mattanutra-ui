@@ -6,6 +6,7 @@ import {
 import {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_TOOL_SCHEMAS,
+  PLAN_ADVERTISED_SCHEMA,
   agenticServerInstructions,
   agenticToolDescriptions,
   isAgenticErrorResult,
@@ -101,7 +102,7 @@ export function toolList(environment: AgenticEnvironment = "dev") {
   const descriptions = agenticToolDescriptions(environment);
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: descriptions[name],
-    inputSchema: AGENTIC_TOOL_SCHEMAS[name],
+    inputSchema: name === "plan" ? PLAN_ADVERTISED_SCHEMA : AGENTIC_TOOL_SCHEMAS[name],
     name
   }));
 }

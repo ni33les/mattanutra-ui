@@ -45,6 +45,7 @@ if (!process.execArgv.includes(strip)) {
             explanations: a.explanations.passedCases,
             copy: a.copy.passedCases,
             state: a.state.passedCases,
+            boundary: a.boundary.passedCases,
             matcher: a.matcher.scores
           },
           b: {
@@ -54,6 +55,7 @@ if (!process.execArgv.includes(strip)) {
             explanations: b.explanations.passedCases,
             copy: b.copy.passedCases,
             state: b.state.passedCases,
+            boundary: b.boundary.passedCases,
             matcher: b.matcher.scores
           }
         },

@@ -31,6 +31,8 @@ export const AGENTIC_REASON_CODES = [
   "stale_safety_acknowledgement",
   "stale_revision",
   "invalid_request",
+  "request_too_broad",
+  "too_short",
   "unsafe_content"
 ] as const;
 
@@ -39,9 +41,14 @@ export type AgenticReasonCode = (typeof AGENTIC_REASON_CODES)[number];
 export type AgenticBusinessError = Readonly<{
   category: AgenticErrorCategory;
   currentRevision?: number;
+  errorCode: AgenticErrorCategory | AgenticReasonCode;
   error_code: AgenticErrorCategory | AgenticReasonCode;
   fieldPath: string | null;
-  issues?: readonly Readonly<{ fieldPath: string; messageKey: string }>[];
+  issues?: readonly Readonly<{
+    fieldPath: string;
+    messageKey: string;
+    reasonCode: string;
+  }>[];
   message: string;
   messageKey: string;
   nextActions?: readonly string[];
@@ -67,11 +74,13 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
   plan_not_ready: "FAILED_PRECONDITION",
   positive_number_required: "INVALID_ARGUMENT",
   rate_limited: "RESOURCE_EXHAUSTED",
+  request_too_broad: "INVALID_ARGUMENT",
   required: "INVALID_ARGUMENT",
   revision_conflict: "ABORTED",
   stale_revision: "ABORTED",
   stale_safety_acknowledgement: "ABORTED",
   temporarily_unavailable: "UNAVAILABLE",
+  too_short: "INVALID_ARGUMENT",
   unexpected_property: "INVALID_ARGUMENT",
   unsafe_content: "INVALID_ARGUMENT",
   unsupported_country: "INVALID_ARGUMENT",
@@ -88,7 +97,11 @@ const RETRYABLE: ReadonlySet<AgenticReasonCode> = new Set([
 export function businessError(input: Readonly<{
   currentRevision?: number;
   fieldPath?: string | null;
-  issues?: readonly Readonly<{ fieldPath: string; messageKey: string }>[];
+  issues?: readonly Readonly<{
+    fieldPath: string;
+    messageKey: string;
+    reasonCode: string;
+  }>[];
   message: string;
   messageKey?: string;
   nextActions?: readonly string[];
@@ -96,21 +109,26 @@ export function businessError(input: Readonly<{
 }>): AgenticErrorResult {
   const category = CATEGORY_BY_REASON[input.reasonCode];
   const messageKey = input.messageKey ?? `mcp.errors.${input.reasonCode}`;
+  const errorCode =
+    input.reasonCode === "invalid_request" || input.reasonCode === "stale_revision"
+      ? input.reasonCode
+      : category;
+  const issues = input.issues
+    ? [...input.issues].sort((left, right) => left.fieldPath.localeCompare(right.fieldPath))
+    : undefined;
 
   return {
     error: {
       category,
-      error_code:
-        input.reasonCode === "invalid_request" || input.reasonCode === "stale_revision"
-          ? input.reasonCode
-          : category,
+      errorCode,
+      error_code: errorCode,
       fieldPath: input.fieldPath ?? null,
       message: input.message,
       messageKey,
       reasonCode: input.reasonCode,
       retryable: RETRYABLE.has(input.reasonCode),
       ...(input.currentRevision != null ? { currentRevision: input.currentRevision } : {}),
-      ...(input.issues ? { issues: input.issues } : {}),
+      ...(issues ? { issues } : {}),
       ...(input.nextActions ? { nextActions: input.nextActions } : {})
     },
     ok: false

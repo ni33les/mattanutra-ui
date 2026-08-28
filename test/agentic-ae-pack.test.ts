@@ -671,37 +671,31 @@ export async function runAePack(): Promise<AePackReport> {
         const tools = Array.isArray(listed.tools) ? listed.tools.map(asRecord) : [];
         const plan = tools.find((tool) => tool.name === "plan") ?? {};
         const schema = asRecord(plan.inputSchema);
+        const properties = asRecord(schema.properties);
+        const operation = asRecord(properties.operation);
+        const enumOps = Array.isArray(operation.enum)
+          ? operation.enum.filter((item): item is string => typeof item === "string")
+          : [];
         const branches = Array.isArray(schema.oneOf) ? schema.oneOf.map(asRecord) : [];
-        const operations = branches.map((branch) => {
-          const properties = asRecord(branch.properties);
-          return asRecord(properties.operation).const;
-        });
-        const requiredByOp = Object.fromEntries(
-          branches.map((branch) => {
-            const properties = asRecord(branch.properties);
-            const op = String(asRecord(properties.operation).const ?? "");
-            const required = Array.isArray(branch.required) ? branch.required : [];
-            return [op, required];
-          })
-        );
+        const branchOps = branches.map((branch) => {
+          const branchProperties = asRecord(branch.properties);
+          return String(asRecord(branchProperties.operation).const ?? "");
+        }).filter(Boolean);
+        const operations = enumOps.length > 0 ? enumOps : branchOps;
         const expected = ["create", "revise", "answer", "select", "get"];
         const ok =
-          operations.length === 5 &&
           expected.every((item) => operations.includes(item)) &&
-          (requiredByOp.create as unknown[] | undefined)?.includes("operation") &&
-          (requiredByOp.create as unknown[] | undefined)?.includes("idempotencyKey") &&
-          (requiredByOp.create as unknown[] | undefined)?.includes("request") &&
-          (requiredByOp.revise as unknown[] | undefined)?.includes("planHandle") &&
-          (requiredByOp.revise as unknown[] | undefined)?.includes("expectedRevision") &&
-          (requiredByOp.revise as unknown[] | undefined)?.includes("request") &&
-          (requiredByOp.answer as unknown[] | undefined)?.includes("answers") &&
-          (requiredByOp.select as unknown[] | undefined)?.includes("optionId") &&
-          (requiredByOp.get as unknown[] | undefined)?.includes("planHandle") &&
-          !((requiredByOp.get as unknown[] | undefined) ?? []).includes("request") &&
-          !((requiredByOp.get as unknown[] | undefined) ?? []).includes("expectedRevision");
+          typeof properties.idempotencyKey === "object" &&
+          typeof properties.request === "object" &&
+          typeof properties.planHandle === "object" &&
+          typeof properties.expectedRevision === "object" &&
+          typeof properties.optionId === "object" &&
+          typeof properties.answers === "object" &&
+          !/"\$defs"/.test(JSON.stringify(schema)) &&
+          !Array.isArray(schema.oneOf);
         return ok
-          ? pass("AE-02", { operations })
-          : fail("AE-02", { operations, requiredByOp });
+          ? pass("AE-02", { operations: expected })
+          : fail("AE-02", { operations, requiredByOp: {} });
       })
     );
 

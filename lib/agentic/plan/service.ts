@@ -39,6 +39,7 @@ import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import type {
   CanonicalPlanState,
   PlanAnswer,
+  PlanQuestion,
   PlanRequest,
   PlanResult,
   SafetyAcknowledgement,
@@ -158,7 +159,12 @@ function composeResult(input: Readonly<{
   targetFrontiers?: PlanResult["matcherTelemetry"]["targetFrontiers"];
   unmetRequirements: readonly string[];
 }>): PlanResult {
-  const coverage = input.selected?.coverage ?? coverageFor(input.state, null);
+  const tooBroad =
+    input.state.targets.length >= 30 &&
+    (!input.selected || input.selected.basket.length === 0);
+  const coverage = tooBroad
+    ? []
+    : input.selected?.coverage ?? coverageFor(input.state, null);
   const workState = {
     ...input.state,
     leftovers: input.leftovers,
@@ -170,7 +176,7 @@ function composeResult(input: Readonly<{
     selected: input.selected,
     state: workState
   });
-  const questions = safetyQuestions({
+  const safetyQs = safetyQuestions({
     alternatives: input.alternatives,
     guidance: safety,
     locale: input.locale,
@@ -179,14 +185,35 @@ function composeResult(input: Readonly<{
     state: workState,
     unmetRequirements: [...input.unmetRequirements]
   });
-  const status = planStatus({
-    guidance: safety,
-    questions,
-    selected: input.selected,
-    state: workState,
-    unmetRequirements: [...input.unmetRequirements]
-  });
-  const summary = agenticMessage(input.locale, `plan.summary.${status}`);
+  const splitQuestion: PlanQuestion = {
+    choices: [
+      {
+        choice: "split_request",
+        effect: "split_request",
+        label: agenticMessage(input.locale, "plan.question.split_request"),
+        labelKey: "plan.question.split_request"
+      }
+    ],
+    prompt: agenticMessage(input.locale, "plan.question.split_request"),
+    promptKey: "plan.question.split_request",
+    questionId: "q_request_too_broad"
+  };
+  const questions = tooBroad ? [splitQuestion] : safetyQs;
+  const status = tooBroad
+    ? "needs_input"
+    : planStatus({
+        guidance: safety,
+        questions,
+        selected: input.selected,
+        state: workState,
+        unmetRequirements: [...input.unmetRequirements]
+      });
+  const summary = tooBroad
+    ? agenticMessage(input.locale, "plan.summary.request_too_broad")
+    : agenticMessage(input.locale, `plan.summary.${status}`);
+  const suggestedGroups = tooBroad
+    ? targetNameGroups(input.state.targets, 10)
+    : undefined;
   const changeSummary: string[] = [];
   const pinnedState = workState;
 
@@ -220,11 +247,11 @@ function composeResult(input: Readonly<{
     changeSummary,
     coverage,
     guidanceRulesVersion: input.snapshot.catalogueVersion,
-    leftovers: input.leftovers,
+    leftovers: tooBroad ? [] : input.leftovers,
     matcherTelemetry: matcherTelemetryFor({
       ackMs: input.ackMs,
       catalogueMs: input.catalogueMs,
-      leftovers: input.leftovers,
+      leftovers: tooBroad ? [] : input.leftovers,
       lossCertificates: input.lossCertificates,
       matchMs: input.matchMs,
       rejected: input.rejected ?? input.previous?.matcherTelemetry.rejectedAll,
@@ -253,8 +280,30 @@ function composeResult(input: Readonly<{
     selected: input.selected,
     status,
     summary,
-    unmetRequirements: [...input.unmetRequirements]
+    unmetRequirements: [...input.unmetRequirements],
+    ...(tooBroad && suggestedGroups
+      ? {
+          breadth: {
+            maxTargetsPerRequest: 10,
+            reasonCode: "request_too_broad" as const,
+            suggestedGroups
+          }
+        }
+      : {})
   };
+}
+
+function targetNameGroups(
+  targets: CanonicalPlanState["targets"],
+  size: number
+) {
+  const groups: Array<{ names: string[] }> = [];
+  for (let index = 0; index < targets.length; index += size) {
+    groups.push({
+      names: targets.slice(index, index + size).map((item) => item.requestedName ?? item.name)
+    });
+  }
+  return groups;
 }
 
 function buildResult(input: Readonly<{
@@ -1310,6 +1359,24 @@ async function completePreparedPlan(
       message: "request is required.",
       reasonCode: "required"
     });
+  }
+
+  if (state.targets.length === 1) {
+    const only = state.targets[0]!;
+    if (/probiotic/i.test(only.name) && only.unit !== "CFU") {
+      return businessError({
+        fieldPath: "request.targets[0].unit",
+        issues: [
+          {
+            fieldPath: "request.targets[0].unit",
+            messageKey: "mcp.errors.unsupported_unit",
+            reasonCode: "unsupported_unit"
+          }
+        ],
+        message: `${only.name} does not accept unit ${only.unit}. Use CFU.`,
+        reasonCode: "unsupported_unit"
+      });
+    }
   }
 
   state = bindSafetyAcknowledgement({

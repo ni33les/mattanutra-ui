@@ -357,12 +357,19 @@ export type StackOption = Readonly<{
   totalPriceMinor: number;
 }>;
 
+export type PlanBreadth = Readonly<{
+  maxTargetsPerRequest: number;
+  reasonCode: "request_too_broad";
+  suggestedGroups: readonly Readonly<{ names: readonly string[] }>[];
+}>;
+
 export type PlanResult = Readonly<{
   alternatives: readonly StackOption[];
   appliedRequirements: readonly string[];
   assumptions: readonly string[];
   availabilityAsOf: string;
   basket: readonly BasketItem[];
+  breadth?: PlanBreadth;
   catalogueVersion: string;
   changeSummary: readonly string[];
   coverage: readonly CoverageRow[];

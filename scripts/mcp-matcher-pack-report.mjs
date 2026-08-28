@@ -11,6 +11,7 @@ import { canonicalAeC3Report, runAeC3Pack } from "../test/agentic-ae-c3-pack.tes
 import { canonicalAeC4Report, runAeC4Pack } from "../test/agentic-ae-c4-pack.test.ts";
 import { canonicalAeC5Report, runAeC5Pack } from "../test/agentic-ae-c5-pack.test.ts";
 import { canonicalAeC6Report, runAeC6Pack } from "../test/agentic-ae-c6-pack.test.ts";
+import { canonicalAeC7Report, runAeC7Pack } from "../test/agentic-ae-c7-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -388,6 +389,36 @@ const ROWS = [
     category: "MCP state",
     id: "AX6-06",
     purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
+  },
+  {
+    category: "MCP boundary",
+    id: "AX7-01",
+    purpose: "Raw schema dumps are impossible at the public boundary"
+  },
+  {
+    category: "MCP boundary",
+    id: "AX7-02",
+    purpose: "Every plan operation uses one compact validation contract"
+  },
+  {
+    category: "MCP boundary",
+    id: "AX7-03",
+    purpose: "A 30-target request is meaningful or explicitly too broad"
+  },
+  {
+    category: "MCP boundary",
+    id: "AX7-04",
+    purpose: "Broad-request recovery preserves every target"
+  },
+  {
+    category: "MCP boundary",
+    id: "AX7-05",
+    purpose: "Incidental composition uses progressive disclosure"
+  },
+  {
+    category: "MCP boundary",
+    id: "AX7-06",
+    purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
   }
 ];
 
@@ -420,6 +451,7 @@ export function canonicalPack(run) {
     explanations: JSON.parse(canonicalAeC4Report(run.explanations)),
     copy: JSON.parse(canonicalAeC5Report(run.copy)),
     state: JSON.parse(canonicalAeC6Report(run.state)),
+    boundary: JSON.parse(canonicalAeC7Report(run.boundary)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -447,6 +479,9 @@ export function snapshotFromRun(run) {
   const state = Object.fromEntries(
     run.state.cases.map((item) => [item.id, item.result])
   );
+  const boundary = Object.fromEntries(
+    run.boundary.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
@@ -454,6 +489,7 @@ export function snapshotFromRun(run) {
     explanations,
     copy,
     state,
+    boundary,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -489,7 +525,9 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("AX6-")
+  const section = id.startsWith("AX7-")
+    ? "boundary"
+    : id.startsWith("AX6-")
     ? "state"
     : id.startsWith("AX5-")
       ? "copy"
@@ -522,6 +560,7 @@ export function sectionTotals(run) {
   const explanationsPass = run.explanations.passedCases === run.explanations.totalCases;
   const copyPass = run.copy.passedCases === run.copy.totalCases;
   const statePass = run.state.passedCases === run.state.totalCases;
+  const boundaryPass = run.boundary.passedCases === run.boundary.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -547,6 +586,10 @@ export function sectionTotals(run) {
       passed: statePass,
       text: `${run.state.passedCases}/${run.state.totalCases}`
     },
+    boundary: {
+      passed: boundaryPass,
+      text: `${run.boundary.passedCases}/${run.boundary.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
@@ -558,7 +601,8 @@ export function sectionTotals(run) {
       planningPass &&
       explanationsPass &&
       copyPass &&
-      statePass
+      statePass &&
+      boundaryPass
   };
 }
 
@@ -578,6 +622,9 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.state.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.boundary.cases) {
     byId.set(item.id, item);
   }
 
@@ -634,6 +681,9 @@ export function printTable(run) {
   console.log(
     `MCP state: ${totals.state.text} — ${totals.state.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `MCP boundary: ${totals.boundary.text} — ${totals.boundary.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -664,5 +714,6 @@ export async function runPackOnce() {
   const explanations = await runAeC4Pack();
   const copy = await runAeC5Pack();
   const state = await runAeC6Pack();
-  return { contract, honesty, planning, explanations, copy, state, matcher };
+  const boundary = await runAeC7Pack();
+  return { contract, honesty, planning, explanations, copy, state, boundary, matcher };
 }

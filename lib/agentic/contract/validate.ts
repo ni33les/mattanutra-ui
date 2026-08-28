@@ -13,7 +13,8 @@ export type SchemaIssue = Readonly<{
     | "positive_number_required"
     | "unsupported_unit"
     | "duplicate_supplement"
-    | "legacy_id";
+    | "legacy_id"
+    | "too_short";
 }>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -251,7 +252,7 @@ function validateNode(
       return {
         fieldPath: path || "request",
         message: "String is too short.",
-        reasonCode: "required"
+        reasonCode: "too_short"
       };
     }
 
@@ -489,7 +490,8 @@ export function schemaIssueToError(
             : item.reasonCode;
       return {
         fieldPath: item.fieldPath,
-        messageKey: `mcp.errors.${code}`
+        messageKey: `mcp.errors.${code}`,
+        reasonCode: code
       };
     }),
     message: issue.message,

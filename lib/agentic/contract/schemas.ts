@@ -268,6 +268,25 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
   ]
 };
 
+export const PLAN_ADVERTISED_SCHEMA: JsonSchema = {
+  additionalProperties: true,
+  properties: {
+    answers: { type: "array" },
+    expectedRevision: { type: "integer" },
+    idempotencyKey: { type: "string" },
+    operation: {
+      enum: ["answer", "create", "get", "revise", "select"],
+      type: "string"
+    },
+    optionId: { type: "string" },
+    planHandle: { type: "string" },
+    request: { type: "object" },
+    safetyAcknowledgement: { type: "object" },
+    selectOptionId: { type: "string" }
+  },
+  type: "object"
+};
+
 export const EXECUTE_INPUT_SCHEMA: JsonSchema = {
   additionalProperties: false,
   properties: {

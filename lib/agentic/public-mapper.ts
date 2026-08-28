@@ -16,7 +16,7 @@ import type {
   StackOption
 } from "@/lib/agentic/plan/types";
 
-export const PUBLIC_NUTRIENT_NAME_LIMIT = 12;
+export const PUBLIC_NUTRIENT_NAME_LIMIT = 8;
 
 export type PublicBasketNutrient = Readonly<{
   amount: number;
@@ -395,8 +395,11 @@ export function publicBasketItem(
 ): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
   const daysOfSupply = item.daysOfSupply ?? 30;
-  const incidentalNutrientNames = boundedNames(item.incidentalNutrientNames);
-  const incidentalNutrients = boundedNutrients(item.incidentalNutrients);
+  const incidentalSourceNames =
+    item.incidentalNutrientNames && item.incidentalNutrientNames.length > 0
+      ? item.incidentalNutrientNames
+      : (item.incidentalNutrients ?? []).map((row) => row.name);
+  const incidentalNutrientNames = boundedNames(incidentalSourceNames);
   const requestedNutrientNames = canonicalRequestedNames(item, targets);
   const requestedNutrients = filterRequestedNutrients(item, targets);
 
@@ -414,7 +417,12 @@ export function publicBasketItem(
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(incidentalNutrientNames.length > 0 ? { incidentalNutrientNames } : {}),
-    ...(incidentalNutrients.length > 0 ? { incidentalNutrients } : {}),
+    ...(incidentalSourceNames.length > incidentalNutrientNames.length
+      ? {
+          incidentalOmittedCount:
+            incidentalSourceNames.length - incidentalNutrientNames.length
+        }
+      : {}),
     ...(requestedNutrientNames.length > 0 ? { requestedNutrientNames } : {}),
     ...(requestedNutrients.length > 0 ? { requestedNutrients } : {}),
     ...(imageUrl ? { imageUrl } : {}),
@@ -757,7 +765,7 @@ export function publicPlanFields(result: Pick<
   | "summary"
   | "unmetRequirements"
 > &
-  Partial<Pick<PlanResult, "leftovers" | "matcherTelemetry">>) {
+  Partial<Pick<PlanResult, "breadth" | "leftovers" | "matcherTelemetry">>) {
   const selected = result.selected;
   const guidanceIds = result.safetyGuidance.map((item) => item.guidanceId);
   const snapshot =
@@ -817,14 +825,17 @@ export function publicPlanFields(result: Pick<
     unassessedMedicationCodes.length > 0 || unassessedConditionCodes.length > 0
       ? "partial"
       : "complete";
+  const tooBroad = result.breadth?.reasonCode === "request_too_broad";
   const nextActions =
     result.status === "processing"
       ? ["poll_plan"]
-      : result.status === "needs_input"
-        ? ["answer_questions"]
-        : result.status === "ready"
-          ? ["confirm_with_user"]
-          : ["change_request"];
+      : tooBroad
+        ? ["split_request"]
+        : result.status === "needs_input"
+          ? ["answer_questions"]
+          : result.status === "ready"
+            ? ["confirm_with_user"]
+            : ["change_request"];
   const currency = result.basket[0]?.currency ?? "THB";
   const subtotalMinor =
     selected?.totalPriceMinor ??
@@ -850,9 +861,16 @@ export function publicPlanFields(result: Pick<
       : {}),
     status: result.status,
     summary: result.summary,
-    summaryKey: `plan.summary.${result.status}`,
+    summaryKey: tooBroad ? "plan.summary.request_too_broad" : `plan.summary.${result.status}`,
     locale,
     nextActions,
+    ...(tooBroad
+      ? {
+          reasonCode: "request_too_broad",
+          maxTargetsPerRequest: result.breadth?.maxTargetsPerRequest ?? 10,
+          suggestedGroups: result.breadth?.suggestedGroups ?? []
+        }
+      : {}),
     safetyScope,
     ...(assessedMedicationCodes.length > 0 ? { assessedMedicationCodes } : {}),
     ...(unassessedMedicationCodes.length > 0 ? { unassessedMedicationCodes } : {}),

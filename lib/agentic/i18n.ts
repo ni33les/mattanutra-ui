@@ -264,6 +264,26 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "สารอาหารนี้ไม่รับหน่วยดังกล่าว",
     "zh-CN": "该补充剂不接受此单位。"
   },
+  "mcp.errors.too_short": {
+    en: "This value is too short.",
+    th: "ค่านี้น้อยเกินไป",
+    "zh-CN": "该值过短。"
+  },
+  "mcp.errors.request_too_broad": {
+    en: "This request is too broad. Split it into smaller groups.",
+    th: "คำขอกว้างเกินไป โปรดแยกเป้าหมายเป็นกลุ่มย่อย",
+    "zh-CN": "该请求范围过宽。请拆成更小的目标组。"
+  },
+  "plan.summary.request_too_broad": {
+    en: "This request is too broad. Split it into smaller groups of targets.",
+    th: "คำขอกว้างเกินไป โปรดแยกเป้าหมายเป็นกลุ่มย่อยแล้วส่งใหม่",
+    "zh-CN": "该请求范围过宽。请把目标拆成更小的组后再继续。"
+  },
+  "plan.question.split_request": {
+    en: "Split this request into smaller target groups?",
+    th: "ต้องการแยกคำขอเป็นกลุ่มเป้าหมายย่อยหรือไม่",
+    "zh-CN": "是否把该请求拆成更小的目标组？"
+  },
   "order.not_found": {
     en: "Order not found.",
     th: "ไม่พบคำสั่งซื้อ",
