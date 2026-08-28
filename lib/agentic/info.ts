@@ -99,10 +99,53 @@ function buildInfo(input: Readonly<{
   };
 }
 
+function compactInfo(input: Readonly<{
+  conditionCodes: readonly string[];
+  continuation: string;
+  medicationCodes: readonly string[];
+  pollAfterSeconds: number;
+  supportedCountries: ReadonlyArray<{
+    countryCode: string;
+    countryName: string;
+    currency: string;
+  }>;
+  userAccountRequired: boolean;
+}>) {
+  return {
+    conditionCodes: [...input.conditionCodes],
+    continuation: input.continuation,
+    medicationCodes: [...input.medicationCodes],
+    ok: true as const,
+    pollAfterSeconds: input.pollAfterSeconds,
+    supportedCountries: [...input.supportedCountries],
+    supportedLocales: ["en", "th", "zh-CN"],
+    userAccountRequired: input.userAccountRequired
+  };
+}
+
 export async function infoTool(input: Readonly<{
   config: AgenticConfig;
+  isolatedInfo?: {
+    conditionCodes: readonly string[];
+    medicationCodes: readonly string[];
+    supportedCountries: ReadonlyArray<{
+      countryCode: string;
+      countryName: string;
+      currency: string;
+    }>;
+  };
   locale?: string;
 }>) {
+  if (input.isolatedInfo) {
+    return compactInfo({
+      conditionCodes: input.isolatedInfo.conditionCodes,
+      continuation: "polling_only",
+      medicationCodes: input.isolatedInfo.medicationCodes,
+      pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
+      supportedCountries: input.isolatedInfo.supportedCountries,
+      userAccountRequired: false
+    });
+  }
   const markets = await listDeliverableMarkets();
   const supportedCountries = markets.map((market) => ({
     countryCode: market.countryCode,

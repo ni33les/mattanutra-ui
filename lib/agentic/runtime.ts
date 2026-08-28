@@ -7,9 +7,24 @@ import {
 } from "@/lib/agentic/commerce/payment";
 import { createStripePaymentAdapter } from "@/lib/agentic/commerce/stripe-adapter";
 import type { CapabilityScope } from "@/lib/agentic/capabilities";
+import type { PlanMatchPort } from "@/lib/agentic/plan/match-port";
+
+export type IsolatedInfoCatalog = Readonly<{
+  conditionCodes: readonly string[];
+  medicationCodes: readonly string[];
+  supportedCountries: ReadonlyArray<{
+    countryCode: string;
+    countryName: string;
+    currency: string;
+  }>;
+}>;
 
 export type AgenticRuntime = Readonly<{
   config: AgenticConfig;
+  deferProcessing?: boolean;
+  isolatedInfo?: IsolatedInfoCatalog;
+  matchPort?: PlanMatchPort;
+  now?: string;
   payment: PaymentPort;
   scope: CapabilityScope;
   store: AgenticStore;
@@ -27,6 +42,10 @@ export function createAgenticRuntime(overrides?: Partial<AgenticRuntime>): Agent
 
   return {
     config,
+    ...(overrides?.deferProcessing ? { deferProcessing: true } : {}),
+    ...(overrides?.isolatedInfo ? { isolatedInfo: overrides.isolatedInfo } : {}),
+    ...(overrides?.matchPort ? { matchPort: overrides.matchPort } : {}),
+    ...(overrides?.now ? { now: overrides.now } : {}),
     payment:
       overrides?.payment ??
       (config.paymentProvider === "mock"
@@ -61,5 +80,5 @@ export function setAgenticRuntimeForTests(runtime: AgenticRuntime | null) {
 }
 
 export function nowIso() {
-  return new Date().toISOString();
+  return overridesRuntime?.now ?? new Date().toISOString();
 }

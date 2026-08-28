@@ -31,6 +31,59 @@ export {
 } from "@/lib/agentic/mcp/rpc";
 export { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 
+function inferPlanOperation(params: Record<string, unknown>) {
+  if (typeof params.operation === "string") {
+    return params.operation;
+  }
+
+  if (!params.planHandle) {
+    return "create";
+  }
+
+  if (Array.isArray(params.answers) && params.answers.length > 0) {
+    return "answer";
+  }
+
+  if (
+    typeof params.optionId === "string" ||
+    typeof params.selectOptionId === "string"
+  ) {
+    return "select";
+  }
+
+  if (params.request != null) {
+    return "revise";
+  }
+
+  return "get";
+}
+
+function withPlanOperation(args: unknown): unknown {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    return args;
+  }
+
+  const params = args as Record<string, unknown>;
+  const operation = inferPlanOperation(params);
+
+  if (operation === "get") {
+    return {
+      operation: "get",
+      planHandle: params.planHandle
+    };
+  }
+
+  return {
+    ...params,
+    operation,
+    ...(operation === "select" &&
+    typeof params.optionId !== "string" &&
+    typeof params.selectOptionId === "string"
+      ? { optionId: params.selectOptionId }
+      : {})
+  };
+}
+
 async function callTool(
   runtime: AgenticRuntime,
   name: string,
@@ -48,7 +101,12 @@ async function callTool(
   }
 
   const schema = AGENTIC_TOOL_SCHEMAS[canonical];
-  const args = rawArgs === undefined ? {} : rawArgs;
+  const args =
+    canonical === "plan"
+      ? withPlanOperation(rawArgs === undefined ? {} : rawArgs)
+      : rawArgs === undefined
+        ? {}
+        : rawArgs;
   const issue = validateToolInput(schema, args);
 
   if (issue) {
@@ -56,7 +114,7 @@ async function callTool(
   }
 
   const params = record(args);
-  const now = nowIso();
+  const now = runtime.now ?? nowIso();
 
   let value: unknown;
 
@@ -64,6 +122,7 @@ async function callTool(
     case "info":
       value = await infoTool({
         config: runtime.config,
+        isolatedInfo: runtime.isolatedInfo,
         locale: typeof params.locale === "string" ? params.locale : undefined
       });
       break;
@@ -71,6 +130,8 @@ async function callTool(
       value = await withLivePlanRequest(() =>
         planTool({
           config: runtime.config,
+          deferProcessing: runtime.deferProcessing,
+          matchPort: runtime.matchPort,
           now,
           payload: {
             answers: params.answers,
@@ -78,15 +139,28 @@ async function callTool(
               typeof params.expectedRevision === "number"
                 ? params.expectedRevision
                 : undefined,
-            idempotencyKey: String(params.idempotencyKey),
+            idempotencyKey:
+              typeof params.idempotencyKey === "string"
+                ? params.idempotencyKey
+                : undefined,
+            operation:
+              params.operation === "answer" ||
+              params.operation === "create" ||
+              params.operation === "get" ||
+              params.operation === "revise" ||
+              params.operation === "select"
+                ? params.operation
+                : undefined,
             planHandle:
               typeof params.planHandle === "string" ? params.planHandle : undefined,
             request: params.request,
             safetyAcknowledgement: params.safetyAcknowledgement,
             selectOptionId:
-              typeof params.selectOptionId === "string"
-                ? params.selectOptionId
-                : undefined
+              typeof params.optionId === "string"
+                ? params.optionId
+                : typeof params.selectOptionId === "string"
+                  ? params.selectOptionId
+                  : undefined
           },
           scope: runtime.scope,
           store: runtime.store
@@ -158,7 +232,11 @@ export async function handleJsonRpc(
   runtime: AgenticRuntime,
   body: JsonRpcRequest
 ): Promise<JsonRpcResponse | null> {
-  const light = await handleLightweightJsonRpc(runtime.config, body);
+  const light = await handleLightweightJsonRpc(
+    runtime.config,
+    body,
+    runtime.isolatedInfo
+  );
 
   if (light !== undefined) {
     return light;

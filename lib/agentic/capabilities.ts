@@ -19,7 +19,34 @@ export function hashCapability(secret: string, handle: string) {
   return createHmac("sha256", secret).update(handle).digest("hex");
 }
 
+let testHandleSeq: number | null = null;
+let testUuidSeq: number | null = null;
+
+export function beginDeterministicIdsForTests() {
+  testHandleSeq = 0;
+  testUuidSeq = 0;
+}
+
+export function endDeterministicIdsForTests() {
+  testHandleSeq = null;
+  testUuidSeq = null;
+}
+
+export function nextTestUuid() {
+  if (testUuidSeq == null) {
+    return crypto.randomUUID();
+  }
+
+  testUuidSeq += 1;
+  return `00000000-0000-4000-8000-${String(testUuidSeq).padStart(12, "0")}`;
+}
+
 export function issueHandle() {
+  if (testHandleSeq != null) {
+    testHandleSeq += 1;
+    return `cap_ae${String(testHandleSeq).padStart(30, "0")}`;
+  }
+
   return `cap_${randomBytes(HANDLE_BYTES).toString("base64url")}`;
 }
 
@@ -44,7 +71,7 @@ export async function issueCapability(input: Readonly<{
     environment: input.scope.environment,
     expiresAt: input.expiresAt ?? null,
     hash: hashCapability(input.config.capabilitySecret, handle),
-    id: crypto.randomUUID(),
+    id: nextTestUuid(),
     issuedAt: input.now,
     keyVersion: 1,
     principalScope: input.scope.principalScope,

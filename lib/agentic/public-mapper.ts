@@ -1,10 +1,16 @@
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
+import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
+import {
+  CONDITION_ALIASES,
+  MEDICATION_ALIASES
+} from "@/lib/agentic/catalogue/names";
 import type {
   BasketItem,
   CoverageContributor,
   CoverageRow,
   PlanResult,
   SafetyGuidance,
+  SelectionReason,
   StackOption
 } from "@/lib/agentic/plan/types";
 
@@ -19,6 +25,7 @@ export type PublicBasketNutrient = Readonly<{
 export type PublicBasketItem = Readonly<{
   currency: string;
   dailyPills: number;
+  daysOfSupply?: number | null;
   fixture?: true;
   form: string;
   imageUrl?: string;
@@ -31,6 +38,7 @@ export type PublicBasketItem = Readonly<{
   quantity: number;
   requestedNutrientNames: readonly string[];
   requestedNutrients?: readonly PublicBasketNutrient[];
+  selectionReason?: SelectionReason;
   servingsPerDay: number;
   source?: "fixture" | "retail";
   unitPriceMinor: number;
@@ -102,12 +110,32 @@ function boundedNames(names: readonly string[] | undefined) {
   return out;
 }
 
-export function publicBasketItem(item: BasketItem): PublicBasketItem {
+function defaultSelectionReason(item: BasketItem, locale: string): SelectionReason {
+  if (item.selectionReason) {
+    return item.selectionReason;
+  }
+
+  const requestedSupplementIds = item.contributionSupplementIds.filter((id) =>
+    id.startsWith("sup_")
+  );
+  const negotiated = negotiateLocale(locale);
+
+  return {
+    code: "covers_target",
+    message: agenticMessage(negotiated, "plan.selection.covers_target"),
+    messageKey: "plan.selection.covers_target",
+    requestedSupplementIds
+  };
+}
+
+export function publicBasketItem(item: BasketItem, locale = "en"): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
+  const daysOfSupply = item.daysOfSupply ?? 30;
 
   return {
     currency: item.currency,
     dailyPills: item.dailyPills,
+    daysOfSupply,
     form: item.form,
     incidentalNutrientNames: boundedNames(item.incidentalNutrientNames),
     incidentalNutrients: boundedNutrients(item.incidentalNutrients),
@@ -120,12 +148,35 @@ export function publicBasketItem(item: BasketItem): PublicBasketItem {
     ...(item.requestedNutrients && item.requestedNutrients.length > 0
       ? { requestedNutrients: boundedNutrients(item.requestedNutrients) }
       : {}),
+    selectionReason: defaultSelectionReason(item, locale),
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(imageUrl ? { imageUrl } : {}),
     ...(item.fixture || item.source === "fixture"
       ? { fixture: true as const, source: "fixture" as const }
       : {})
+  };
+}
+
+export function stackSummaryFor(basket: readonly BasketItem[], currency: string) {
+  const productCount = basket.length;
+  const totalDailyPills = basket.reduce((sum, item) => sum + (Number(item.dailyPills) || 0), 0);
+  const totalPriceMinor = basket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
+  const supplyDays = basket.reduce((min, item) => {
+    const days = Number(item.daysOfSupply ?? 30);
+    return days > 0 && days < min ? days : min;
+  }, Number.POSITIVE_INFINITY);
+  const safeSupply = Number.isFinite(supplyDays) && supplyDays > 0 ? supplyDays : 0;
+  const dailyCostMinor =
+    safeSupply > 0 ? Math.round(totalPriceMinor / safeSupply) : 0;
+
+  return {
+    currency,
+    dailyCostMinor,
+    productCount,
+    supplyDays: safeSupply,
+    totalDailyPills,
+    totalPriceMinor
   };
 }
 
@@ -226,17 +277,23 @@ export function publicTradeOffs(
   };
 }
 
-export function publicOption(option: StackOption, selected: StackOption | null) {
+export function publicOption(
+  option: StackOption,
+  selected: StackOption | null,
+  locale = "en"
+) {
+  const currency = option.basket[0]?.currency ?? "THB";
+  const reasonKey = "plan.option.fewest_pills";
   return {
-    basket: option.basket.map(publicBasketItem),
-    catalogId: option.snapshotId,
+    basket: option.basket.map((item) => publicBasketItem(item, locale)),
     coverage: option.coverage.map(publicCoverage),
     coveragePercent: option.coveragePercent,
     dailyPills: option.dailyPills,
-    matcherVersion: option.matcherVersion,
     optionId: option.optionId,
     productCount: option.basket.length,
-    reason: clientReason(option.reason),
+    reason: clientReason(option.reason) || agenticMessage(negotiateLocale(locale), reasonKey),
+    reasonKey,
+    stackSummary: stackSummaryFor(option.basket, currency),
     totalPriceMinor: option.totalPriceMinor,
     tradeOffs: publicTradeOffs(option, selected)
   };
@@ -270,9 +327,7 @@ export function publicSafetyGuidance(row: SafetyGuidance) {
     ...(row.threshold != null ? { threshold: row.threshold } : {}),
     ...(row.productIds.length > 0 ? { productIds: row.productIds } : {}),
     ...(row.supplementIds.length > 0 ? { supplementIds: row.supplementIds } : {}),
-    ...(row.contributors.length > 0
-      ? { contributors: row.contributors.map(publicContributor) }
-      : {})
+    contributors: row.contributors.map(publicContributor)
   };
 }
 
@@ -282,7 +337,8 @@ export function publicQuestions(
   return questions.map((question) => ({
     choices: question.choices.map((choice) => ({
       choice: choice.choice,
-      label: choice.label
+      label: choice.label,
+      labelKey: choice.labelKey ?? question.promptKey
     })),
     prompt: question.prompt,
     promptKey: question.promptKey,
@@ -336,9 +392,32 @@ export function publicPlanFields(result: Pick<
     return !sameProducts;
   });
 
+  const locale = snapshot?.locale ?? "en";
+  const assessedMedicationCodes = [
+    ...new Set(medicationCodes.map((code) => MEDICATION_ALIASES[code]).filter(Boolean) as string[])
+  ];
+  const unassessedMedicationCodes = medicationCodes.filter((code) => !MEDICATION_ALIASES[code]);
+  const assessedConditionCodes = [
+    ...new Set(conditionCodes.map((code) => CONDITION_ALIASES[code]).filter(Boolean) as string[])
+  ];
+  const unassessedConditionCodes = conditionCodes.filter((code) => !CONDITION_ALIASES[code]);
+  const safetyScope =
+    unassessedMedicationCodes.length > 0 || unassessedConditionCodes.length > 0
+      ? "partial"
+      : "complete";
+  const nextActions =
+    result.status === "processing"
+      ? ["poll_plan"]
+      : result.status === "needs_input"
+        ? ["answer_questions"]
+        : result.status === "ready"
+          ? ["confirm_with_user"]
+          : ["change_request"];
+  const currency = result.basket[0]?.currency ?? "THB";
+
   return {
     ...(result.basket.length > 0
-      ? { basket: result.basket.map(publicBasketItem) }
+      ? { basket: result.basket.map((item) => publicBasketItem(item, locale)) }
       : {}),
     ...(result.coverage.length > 0
       ? { coverage: result.coverage.map(publicCoverage) }
@@ -346,17 +425,21 @@ export function publicPlanFields(result: Pick<
     productCount: result.basket.length,
     status: result.status,
     summary: result.summary,
+    summaryKey: `plan.summary.${result.status}`,
+    locale,
+    nextActions,
+    safetyScope,
+    assessedMedicationCodes,
+    unassessedMedicationCodes,
+    assessedConditionCodes,
+    unassessedConditionCodes,
+    ...(result.basket.length > 0 ? { stackSummary: stackSummaryFor(result.basket, currency) } : {}),
     ...(selected
       ? {
-          catalogId: selected.snapshotId,
-          matcherVersion: selected.matcherVersion,
           optionId: selected.optionId,
           reason: clientReason(selected.reason),
-          tradeOffs: publicTradeOffs(selected, selected)
+          reasonKey: "plan.option.fewest_pills"
         }
-      : {}),
-    ...(result.changeSummary.length > 0
-      ? { changeSummary: result.changeSummary }
       : {}),
     ...(result.questions.length > 0
       ? { questions: publicQuestions(result.questions) }
@@ -366,14 +449,9 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(guidanceIds.length > 0 ? { guidanceIds } : {}),
     ...(requiresSafetyAcknowledgement ? { requiresSafetyAcknowledgement: true } : {}),
-    ...(medicationCodes.length > 0 ? { medicationCodes } : {}),
-    ...(conditionCodes.length > 0 ? { conditionCodes } : {}),
-    ...(result.unmetRequirements.length > 0
-      ? { unmetRequirements: result.unmetRequirements }
-      : {}),
     ...(alternatives.length > 0
       ? {
-          alternatives: alternatives.map((item) => publicOption(item, selected))
+          alternatives: alternatives.map((item) => publicOption(item, selected, locale))
         }
       : {}),
     ...(result.leftovers && result.leftovers.length > 0
@@ -381,12 +459,11 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(result.status === "processing"
       ? { pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS }
-      : {}),
-    ...publicMatcherTelemetry(result.matcherTelemetry)
+      : {})
   };
 }
 
-function publicMatcherTelemetry(
+export function publicMatcherTelemetry(
   telemetry: PlanResult["matcherTelemetry"] | undefined
 ) {
   if (!telemetry) {

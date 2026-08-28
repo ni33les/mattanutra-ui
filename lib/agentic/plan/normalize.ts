@@ -224,6 +224,14 @@ export function applyPlanAnswers(
   const acceptedGaps = [...state.acceptedGaps];
 
   for (const answer of answers) {
+    if (answer.choice === "acknowledge_unassessed") {
+      next = {
+        ...next,
+        conditionCodes: next.conditionCodes.filter((code) => CONDITION_ALIASES[code]),
+        medicationCodes: next.medicationCodes.filter((code) => MEDICATION_ALIASES[code])
+      };
+    }
+
     if (answer.choice === "allow_algae_only") {
       next = {
         ...next,

@@ -18,6 +18,10 @@ import type {
   SafetyGuidance,
   StackOption
 } from "@/lib/agentic/plan/types";
+import {
+  CONDITION_ALIASES,
+  MEDICATION_ALIASES
+} from "@/lib/agentic/catalogue/names";
 
 function catalogRule(
   name: string,
@@ -111,7 +115,7 @@ function guidance(input: Readonly<{
       .join("; ") || "none selected";
   const nextAction =
     input.code === "condition_review_required"
-      ? "do not execute; clinician review"
+      ? "stop and seek clinician review"
       : input.code === "medication_interaction" ||
           input.code === "duplicate_or_overlap"
         ? "acknowledge to continue"
@@ -258,7 +262,13 @@ export function evaluateSafety(input: Readonly<{
       severity: "blocking",
       sourceScope: "supplemental",
       supplementIds: magnesiumIds,
-      unit: magnesiumCoverage?.unit ?? "mg"
+      unit: magnesiumCoverage?.unit ?? "mg",
+      ...catalogRule(
+        "Magnesium",
+        magnesiumIds[0] ?? "Magnesium",
+        input.state.profile,
+        "magnesium+ckd"
+      )
     }));
   }
 
@@ -439,8 +449,12 @@ export function evaluateSafety(input: Readonly<{
       (row.currentAmount > 0 && row.deliveredAmount > 0);
 
     if (overlap) {
+      const harmful =
+        input.state.medicationCodes.length > 0 ||
+        input.state.conditionCodes.length > 0 ||
+        (row.upperLimitAmount != null && row.totalExposureAmount > row.upperLimitAmount);
       items.push(guidance({
-        action: "acknowledge",
+        action: harmful ? "acknowledge" : "review",
         code: "duplicate_or_overlap",
         contributors: rowContributors,
         exposure: row.totalExposureAmount,
@@ -456,7 +470,7 @@ export function evaluateSafety(input: Readonly<{
         ],
         remainingGap: row.remainingGap,
         requested: row.requestedAmount,
-        severity: "high",
+        severity: harmful ? "high" : "info",
         sourceScope: "supplemental",
         supplementIds: [row.supplementId],
         threshold: row.upperLimitAmount,
@@ -575,6 +589,27 @@ export function safetyQuestions(input: Readonly<{
   unmetRequirements?: readonly string[];
 }>): PlanQuestion[] {
   const questions: PlanQuestion[] = [];
+  const unassessedMeds = input.state.medicationCodes.filter((code) => !MEDICATION_ALIASES[code]);
+  const unassessedConditions = input.state.conditionCodes.filter(
+    (code) => !CONDITION_ALIASES[code]
+  );
+
+  if (unassessedMeds.length > 0 || unassessedConditions.length > 0) {
+    questions.push({
+      choices: [
+        {
+          choice: "acknowledge_unassessed",
+          effect: "acknowledge_unassessed",
+          label: agenticMessage(input.locale, "plan.question.acknowledge_unassessed"),
+          labelKey: "plan.question.acknowledge_unassessed"
+        }
+      ],
+      prompt: agenticMessage(input.locale, "plan.question.unassessed_medical_context"),
+      promptKey: "plan.question.unassessed_medical_context",
+      questionId: "q_unassessed_medical_context"
+    });
+  }
+
   const omegaTarget = input.state.targets.find((item) => /omega/i.test(item.name));
 
   if (
@@ -587,12 +622,14 @@ export function safetyQuestions(input: Readonly<{
         {
           choice: "allow_algae_only",
           effect: "requirements.omega3SourcePreference=algae_only",
-          label: agenticMessage(input.locale, "plan.question.algae_only")
+          label: agenticMessage(input.locale, "plan.question.algae_only"),
+          labelKey: "plan.question.algae_only"
         },
         {
           choice: "relax_plant_based",
           effect: "requirements.dietaryPreference=any",
-          label: agenticMessage(input.locale, "plan.question.relax_plant_based")
+          label: agenticMessage(input.locale, "plan.question.relax_plant_based"),
+          labelKey: "plan.question.relax_plant_based"
         }
       ],
       prompt: agenticMessage(input.locale, "plan.question.algae_only"),
@@ -613,6 +650,7 @@ export function safetyQuestions(input: Readonly<{
     if (
       row.remainingGap > 0 &&
       row.status !== "covered" &&
+      row.status !== "partial" &&
       !(row.status === "upper_limit_risk" && row.remainingGap === 0) &&
       !input.state.acceptedGaps.some((gap) => gap.supplementId === row.supplementId)
     ) {
@@ -621,12 +659,14 @@ export function safetyQuestions(input: Readonly<{
           {
             choice: `accept_gap:${row.supplementId}`,
             effect: `acceptedGap=${row.supplementId}`,
-            label: agenticMessage(input.locale, "plan.question.accept_gap")
+            label: agenticMessage(input.locale, "plan.question.accept_gap"),
+            labelKey: "plan.question.accept_gap"
           },
           {
             choice: `remove_target:${row.supplementId}`,
             effect: `remove target ${row.supplementId}`,
-            label: agenticMessage(input.locale, "plan.question.remove_target")
+            label: agenticMessage(input.locale, "plan.question.remove_target"),
+            labelKey: "plan.question.remove_target"
           }
         ],
         prompt: agenticMessage(input.locale, "plan.question.accept_gap"),
@@ -659,7 +699,8 @@ export function safetyQuestions(input: Readonly<{
         {
           choice: `accept_gap:${gapId}`,
           effect: `acceptedGap=${gapId}`,
-          label: agenticMessage(input.locale, "plan.question.accept_gap")
+          label: agenticMessage(input.locale, "plan.question.accept_gap"),
+          labelKey: "plan.question.accept_gap"
         }
       ],
       prompt: agenticMessage(input.locale, "plan.question.accept_gap"),
@@ -682,7 +723,8 @@ export function safetyQuestions(input: Readonly<{
           {
             choice: "acknowledge_safety",
             effect: "safetyAcknowledgement.confirmed=true",
-            label: agenticMessage(input.locale, "plan.question.safety_review")
+            label: agenticMessage(input.locale, "plan.question.safety_review"),
+            labelKey: "plan.question.safety_review"
           }
         ],
         prompt: agenticMessage(input.locale, "plan.question.safety_review"),
@@ -701,7 +743,8 @@ export function safetyQuestions(input: Readonly<{
       {
         choice: "relax_max_price",
         effect: "requirements.maxPriceMinor=",
-        label: agenticMessage(input.locale, "plan.question.relax_max_price")
+        label: agenticMessage(input.locale, "plan.question.relax_max_price"),
+        labelKey: "plan.question.relax_max_price"
       }
     ];
 
@@ -710,7 +753,8 @@ export function safetyQuestions(input: Readonly<{
         choices.push({
           choice: `select_option:${option.optionId}`,
           effect: `selectOptionId=${option.optionId}`,
-          label: agenticMessage(input.locale, "plan.question.select_option")
+          label: agenticMessage(input.locale, "plan.question.select_option"),
+          labelKey: "plan.question.select_option"
         });
       }
     }
@@ -729,7 +773,8 @@ export function safetyQuestions(input: Readonly<{
       {
         choice: "relax_max_pills",
         effect: "requirements.maxDailyPills=",
-        label: agenticMessage(input.locale, "plan.question.relax_max_pills")
+        label: agenticMessage(input.locale, "plan.question.relax_max_pills"),
+        labelKey: "plan.question.relax_max_pills"
       }
     ];
 
@@ -738,7 +783,8 @@ export function safetyQuestions(input: Readonly<{
         choices.push({
           choice: `select_option:${option.optionId}`,
           effect: `selectOptionId=${option.optionId}`,
-          label: agenticMessage(input.locale, "plan.question.select_option")
+          label: agenticMessage(input.locale, "plan.question.select_option"),
+          labelKey: "plan.question.select_option"
         });
       }
     }
@@ -762,7 +808,8 @@ export function safetyQuestions(input: Readonly<{
         {
           choice: `drop_retain:${productId}`,
           effect: `requirements.retainProductIds-=${productId}`,
-          label: agenticMessage(input.locale, "plan.question.drop_retain")
+          label: agenticMessage(input.locale, "plan.question.drop_retain"),
+          labelKey: "plan.question.drop_retain"
         }
       ],
       prompt: agenticMessage(input.locale, "plan.question.drop_retain"),
@@ -834,6 +881,7 @@ export function planStatus(input: Readonly<{
     (row) =>
       row.remainingGap > 0 &&
       row.status !== "covered" &&
+      row.status !== "partial" &&
       !(reviewAcked && row.status === "upper_limit_risk" && row.remainingGap === 0)
   );
 

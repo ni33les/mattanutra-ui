@@ -245,11 +245,19 @@ export type CoverageContributor = Readonly<{
   unit: CatalogueUnit;
 }>;
 
+export type SelectionReason = Readonly<{
+  code: "best_available" | "covers_target" | "reduces_cost" | "reduces_pills" | "retained_by_user";
+  message: string;
+  messageKey: string;
+  requestedSupplementIds: readonly string[];
+}>;
+
 export type BasketItem = Readonly<{
   availabilityAsOf: string;
   contributionSupplementIds: readonly string[];
   currency: string;
   dailyPills: number;
+  daysOfSupply?: number | null;
   deliveryWindow: string | null;
   fixture: boolean;
   form: string;
@@ -265,6 +273,7 @@ export type BasketItem = Readonly<{
   requestedNutrientNames: readonly string[];
   requestedNutrients?: readonly BasketNutrient[];
   retailerSku: string;
+  selectionReason?: SelectionReason;
   sellerId: string;
   sellerName: string;
   servingsPerDay: number;
@@ -319,6 +328,7 @@ export type PlanQuestion = Readonly<{
     choice: string;
     effect: string;
     label: string;
+    labelKey?: string;
   }>[];
   prompt: string;
   promptKey: string;

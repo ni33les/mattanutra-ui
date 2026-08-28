@@ -206,12 +206,11 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
     {
       additionalProperties: false,
       properties: {
-        expectedRevision: { minimum: 1, type: "integer" },
         idempotencyKey: IDEMPOTENCY_KEY,
-        planHandle: HANDLE,
+        operation: { const: "create" },
         request: PLAN_REQUEST
       },
-      required: ["idempotencyKey", "request"],
+      required: ["operation", "idempotencyKey", "request"],
       type: "object"
     },
     {
@@ -219,15 +218,11 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
       properties: {
         expectedRevision: { minimum: 1, type: "integer" },
         idempotencyKey: IDEMPOTENCY_KEY,
+        operation: { const: "revise" },
         planHandle: HANDLE,
-        selectOptionId: { minLength: 8, type: "string" }
+        request: PLAN_REQUEST
       },
-      required: [
-        "idempotencyKey",
-        "planHandle",
-        "expectedRevision",
-        "selectOptionId"
-      ],
+      required: ["operation", "idempotencyKey", "planHandle", "expectedRevision", "request"],
       type: "object"
     },
     {
@@ -236,10 +231,38 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
         answers: PLAN_ANSWERS,
         expectedRevision: { minimum: 1, type: "integer" },
         idempotencyKey: IDEMPOTENCY_KEY,
+        operation: { const: "answer" },
         planHandle: HANDLE,
         safetyAcknowledgement: PLAN_SAFETY_ACK
       },
-      required: ["idempotencyKey", "planHandle", "expectedRevision"],
+      required: ["operation", "idempotencyKey", "planHandle", "expectedRevision", "answers"],
+      type: "object"
+    },
+    {
+      additionalProperties: false,
+      properties: {
+        expectedRevision: { minimum: 1, type: "integer" },
+        idempotencyKey: IDEMPOTENCY_KEY,
+        operation: { const: "select" },
+        optionId: { minLength: 8, type: "string" },
+        planHandle: HANDLE
+      },
+      required: [
+        "operation",
+        "idempotencyKey",
+        "planHandle",
+        "expectedRevision",
+        "optionId"
+      ],
+      type: "object"
+    },
+    {
+      additionalProperties: false,
+      properties: {
+        operation: { const: "get" },
+        planHandle: HANDLE
+      },
+      required: ["operation", "planHandle"],
       type: "object"
     }
   ]

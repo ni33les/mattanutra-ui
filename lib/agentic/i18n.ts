@@ -320,7 +320,7 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "是否从请求中移除该营养素？"
   },
   "plan.question.safety_review": {
-    en: "Review the safety facts and confirm before we freeze a checkout.",
+    en: "Review the safety facts and confirm with the person first.",
     th: "ตรวจทานข้อมูลความปลอดภัยแล้วยืนยันก่อนสร้างการชำระเงิน",
     "zh-CN": "请先查看安全说明并确认，然后我们才会冻结结账。"
   },
@@ -345,12 +345,12 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "是否取消保留该产品以便继续匹配？"
   },
   "plan.summary.blocked": {
-    en: "This stack is blocked until the client changes a hard constraint or safety choice.",
+    en: "This stack is blocked until a hard constraint or safety choice is changed.",
     th: "สูตรนี้ถูกบล็อกจนกว่าจะเปลี่ยนข้อจำกัดหรือตัวเลือกความปลอดภัย",
     "zh-CN": "在客户更改硬性限制或安全选择之前，该组合被阻止。"
   },
   "plan.summary.needs_input": {
-    en: "One client choice is needed before this stack is ready to buy.",
+    en: "One more choice is needed before this stack is ready to buy.",
     th: "ต้องเลือกอีกหนึ่งข้อก่อนสูตรนี้พร้อมซื้อ",
     "zh-CN": "购买前还需要客户做一个选择。"
   },
@@ -360,9 +360,44 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "仍在匹配中。请轮询此方案，直到状态为 ready、needs_input 或 blocked。"
   },
   "plan.summary.ready": {
-    en: "A purchasable stack is ready. Confirm with the person before execute.",
-    th: "สูตรพร้อมซื้อแล้ว ยืนยันกับลูกค้าก่อน execute",
-    "zh-CN": "可购买组合已就绪。执行前请先得到当事人确认。"
+    en: "A purchasable stack is ready. Confirm with the person first.",
+    th: "สูตรพร้อมซื้อแล้ว โปรดยืนยันกับผู้ใช้ก่อน",
+    "zh-CN": "可购买组合已就绪。请先与当事人确认。"
+  },
+  "plan.question.unassessed_medical_context": {
+    en: "This medication or condition is outside the codes MattaNutra can assess. Continue without that assessment?",
+    th: "รายการนี้ไม่อยู่ในรหัสที่ประเมินได้ ต้องการไปต่อโดยไม่ประเมินหรือไม่",
+    "zh-CN": "该用药或状况不在可评估代码内。是否在不评估的情况下继续？"
+  },
+  "plan.question.acknowledge_unassessed": {
+    en: "Continue without that assessment",
+    th: "ไปต่อโดยไม่ประเมิน",
+    "zh-CN": "不评估并继续"
+  },
+  "plan.selection.covers_target": {
+    en: "This product covers a requested nutrient.",
+    th: "สินค้านี้ครอบคลุมสารอาหารที่ขอ",
+    "zh-CN": "该产品覆盖所请求的营养素。"
+  },
+  "plan.selection.reduces_pills": {
+    en: "This product keeps the daily pill count lower.",
+    th: "สินค้านี้ช่วยให้จำนวนเม็ดต่อวันต่ำลง",
+    "zh-CN": "该产品有助于降低每日粒数。"
+  },
+  "plan.option.fewest_pills": {
+    en: "Fewer daily pills",
+    th: "เม็ดต่อวันน้อยกว่า",
+    "zh-CN": "更少的每日粒数"
+  },
+  "mcp.errors.invalid_request": {
+    en: "The request is not valid.",
+    th: "คำขอไม่ถูกต้อง",
+    "zh-CN": "请求无效。"
+  },
+  "mcp.errors.stale_revision": {
+    en: "This plan changed. Reload the current plan and retry.",
+    th: "แผนนี้มีการเปลี่ยนแปลง โหลดแผนปัจจุบันแล้วลองใหม่",
+    "zh-CN": "方案已变更。请重新加载当前方案后再试。"
   },
   "support.acknowledgement": {
     en: "Your message is recorded. The case is open and has not yet been reviewed.",

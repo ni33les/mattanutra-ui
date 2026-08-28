@@ -14,6 +14,7 @@ import {
   type AgenticPublicToolName
 } from "@/lib/agentic/contract";
 import { infoTool } from "@/lib/agentic/info";
+import type { IsolatedInfoCatalog } from "@/lib/agentic/runtime";
 
 export type JsonRpcRequest = Readonly<{
   id?: number | string | null;
@@ -207,7 +208,8 @@ export function mcpCallNeedsStore(body: unknown) {
 
 export async function handleLightweightJsonRpc(
   config: AgenticConfig,
-  body: JsonRpcRequest
+  body: JsonRpcRequest,
+  isolatedInfo?: IsolatedInfoCatalog
 ): Promise<JsonRpcResponse | null | undefined> {
   const id = body.id ?? null;
   const method = body.method ?? "";
@@ -284,6 +286,7 @@ export async function handleLightweightJsonRpc(
 
     const value = await infoTool({
       config,
+      isolatedInfo,
       locale: typeof locale === "string" ? locale : undefined
     });
 

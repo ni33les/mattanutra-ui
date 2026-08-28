@@ -6,7 +6,8 @@ import {
   type AgenticErrorResult
 } from "@/lib/agentic/contract/errors";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
-import { issueCapability, resolveCapability } from "@/lib/agentic/capabilities";
+import { issueCapability, nextTestUuid, resolveCapability } from "@/lib/agentic/capabilities";
+import type { PlanMatchPort } from "@/lib/agentic/plan/match-port";
 import {
   beginIdempotency,
   commitIdempotency,
@@ -33,7 +34,7 @@ import {
 } from "@/lib/agentic/plan/matching";
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
-import { publicPlanFields } from "@/lib/agentic/public-mapper";
+import { publicMatcherTelemetry, publicPlanFields } from "@/lib/agentic/public-mapper";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import type {
   CanonicalPlanState,
@@ -55,7 +56,8 @@ const inflightPlanMatches = new Map<
 export type PlanToolInput = Readonly<{
   answers?: unknown;
   expectedRevision?: number;
-  idempotencyKey: string;
+  idempotencyKey?: string;
+  operation?: "answer" | "create" | "get" | "revise" | "select";
   planHandle?: string;
   request?: unknown;
   safetyAcknowledgement?: unknown;
@@ -257,6 +259,7 @@ function composeResult(input: Readonly<{
 function buildResult(input: Readonly<{
   catalogueMs?: number;
   locale: Locale;
+  matchPort?: PlanMatchPort;
   matchStartedAt?: number;
   previous: PlanResult | null;
   shownRevision: number;
@@ -264,7 +267,20 @@ function buildResult(input: Readonly<{
   state: CanonicalPlanState;
 }>): PlanResult {
   const searchStartedAt = Date.now();
-  const matched = matchPlan({ snapshot: input.snapshot, state: input.state });
+  const portMatch = input.matchPort?.match(input.state);
+  const matched = portMatch
+    ? {
+        alternatives: portMatch.alternatives,
+        leftovers: portMatch.leftovers,
+        lossCertificates: undefined,
+        rejected: [],
+        selected: portMatch.selected,
+        unmetRequirements: unmetRequirementsFor({
+          option: portMatch.selected,
+          state: input.state
+        })
+      }
+    : matchPlan({ snapshot: input.snapshot, state: input.state });
   const searchMs = Math.max(0, Date.now() - searchStartedAt);
   const matchMs =
     input.matchStartedAt != null ? Math.max(0, Date.now() - input.matchStartedAt) : searchMs;
@@ -420,33 +436,34 @@ function isTerminalPlanStatus(
 }
 
 function successFromResult(input: Readonly<{
+  includeDiagnostics?: boolean;
   locale: Locale;
   planHandle: string;
   result: PlanResult;
   revision: number;
 }>): PlanToolSuccess {
-  const serializeStartedAt = Date.now();
   const fields = publicPlanFields(input.result);
-  const serializeMs = Math.max(0, Date.now() - serializeStartedAt);
-  const telemetry =
-    fields.matcherTelemetry && typeof fields.matcherTelemetry === "object"
-      ? {
-          ...(fields.matcherTelemetry as Record<string, unknown>),
-          serializeMs
-        }
-      : { serializeMs };
+
+  if (input.result.status === "processing") {
+    return {
+      locale: input.locale,
+      nextActions: ["poll_plan"],
+      ok: true as const,
+      planHandle: input.planHandle,
+      pollAfterSeconds: 3,
+      revision: input.revision,
+      status: "processing",
+      summary: fields.summary,
+      summaryKey: "plan.summary.processing"
+    };
+  }
 
   return {
     ...fields,
-    matcherTelemetry: telemetry,
-    ...feedbackFields({
-      locale: input.locale,
-      revision: input.revision,
-      status: input.result.status
-    }),
     ok: true,
     planHandle: input.planHandle,
-    revision: input.revision
+    revision: input.revision,
+    ...(input.includeDiagnostics ? publicMatcherTelemetry(input.result.matcherTelemetry) : {})
   };
 }
 
@@ -650,6 +667,8 @@ type PreparedPlanCommand = Readonly<{
 
 export async function planTool(input: Readonly<{
   config: AgenticConfig;
+  deferProcessing?: boolean;
+  matchPort?: PlanMatchPort;
   now: string;
   payload: PlanToolInput;
   scope: CapabilityScope;
@@ -657,16 +676,21 @@ export async function planTool(input: Readonly<{
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
   const requestedDestination = requestRecord(input.payload.request)?.destinationCountry;
   const loadLiveCatalogue =
-    hasFullRequest(input.payload) || !input.payload.planHandle;
+    !input.matchPort &&
+    (hasFullRequest(input.payload) || !input.payload.planHandle);
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
-  const replay = await beginIdempotency<PlanToolSuccess>({
-    key: input.payload.idempotencyKey,
-    now: input.now,
-    operation: "plan",
-    ownerScope,
-    payload: input.payload,
-    store: input.store
-  });
+  const skipIdempotency =
+    input.payload.operation === "get" || !input.payload.idempotencyKey;
+  const replay = skipIdempotency
+    ? ({ kind: "fresh" } as const)
+    : await beginIdempotency<PlanToolSuccess>({
+        key: input.payload.idempotencyKey!,
+        now: input.now,
+        operation: "plan",
+        ownerScope,
+        payload: input.payload,
+        store: input.store
+      });
 
   if (replay.kind === "conflict") {
     return replay.error;
@@ -686,7 +710,11 @@ export async function planTool(input: Readonly<{
     };
   }
 
-  if (hasFullRequest(payload) && typeof requestedDestination === "string") {
+  if (
+    !input.matchPort &&
+    hasFullRequest(payload) &&
+    typeof requestedDestination === "string"
+  ) {
     const market = await resolveMarket({
       countryCode: requestedDestination,
       locale:
@@ -709,14 +737,16 @@ export async function planTool(input: Readonly<{
       throw error;
     }
 
-    const raced = await beginIdempotency<PlanToolSuccess>({
-      key: input.payload.idempotencyKey,
-      now: input.now,
-      operation: "plan",
-      ownerScope,
-      payload: input.payload,
-      store: input.store
-    });
+    const raced = skipIdempotency
+      ? ({ kind: "fresh" } as const)
+      : await beginIdempotency<PlanToolSuccess>({
+          key: input.payload.idempotencyKey!,
+          now: input.now,
+          operation: "plan",
+          ownerScope,
+          payload: input.payload,
+          store: input.store
+        });
 
     if (raced.kind === "conflict") {
       return raced.error;
@@ -773,11 +803,20 @@ export async function planTool(input: Readonly<{
 
       const plan = await store.getPlan(capability.resourceId);
 
-      if (!plan || plan.currentRevision !== payload.expectedRevision) {
+      if (!plan) {
+        return businessError({ message: "Not found.", reasonCode: "not_found" });
+      }
+
+      if (
+        payload.operation !== "get" &&
+        plan.currentRevision !== payload.expectedRevision
+      ) {
         return businessError({
+          currentRevision: plan.currentRevision,
           fieldPath: "expectedRevision",
-          message: "The plan revision is stale. Reload the latest revision.",
-          reasonCode: "revision_conflict"
+          message: "This plan changed. Reload the current plan and retry.",
+          nextActions: ["reload_plan"],
+          reasonCode: "stale_revision"
         });
       }
 
@@ -804,7 +843,7 @@ export async function planTool(input: Readonly<{
         revision = plan.currentRevision + 1;
       }
     } else {
-      planId = crypto.randomUUID();
+      planId = nextTestUuid();
     }
 
     if (ack && previous && ack.revision !== shownRevision) {
@@ -931,22 +970,25 @@ export async function planTool(input: Readonly<{
     );
 
     const processingResponse = successFromResult({
+      includeDiagnostics: false,
       locale,
       planHandle: planHandle!,
       result: processing,
       revision
     });
 
-    await commitIdempotency({
-      key: input.payload.idempotencyKey,
-      now: input.now,
-      operation: "plan",
-      ownerScope,
-      payload: input.payload,
-      resourceIds: { planId },
-      response: processingResponse,
-      store
-    });
+    if (input.payload.idempotencyKey) {
+      await commitIdempotency({
+        key: input.payload.idempotencyKey,
+        now: input.now,
+        operation: "plan",
+        ownerScope,
+        payload: input.payload,
+        resourceIds: { planId },
+        response: processingResponse,
+        store
+      });
+    }
 
     return {
       answers,
@@ -981,25 +1023,54 @@ export async function planTool(input: Readonly<{
 
     if (isPoll) {
       const response = successFromResult({
+        includeDiagnostics: !input.matchPort,
         locale: prepared.locale,
         planHandle: prepared.planHandle,
         result: prepared.previous,
         revision: prepared.revision
       });
-      await commitTerminalIdempotency({
-        key: input.payload.idempotencyKey,
-        now: input.now,
-        ownerScope,
-        payload: input.payload,
-        planId: prepared.planId,
-        response,
-        store: input.store
-      });
+      if (input.payload.idempotencyKey) {
+        await commitTerminalIdempotency({
+          key: input.payload.idempotencyKey,
+          now: input.now,
+          ownerScope,
+          payload: input.payload,
+          planId: prepared.planId,
+          response,
+          store: input.store
+        });
+      }
       return response;
     }
   }
 
   const matchStartedAt = Date.now();
+  if (input.matchPort || input.deferProcessing) {
+    const result = await runPlanMatch(
+      prepared,
+      input,
+      loadLiveCatalogue,
+      matchStartedAt
+    );
+    if (
+      input.deferProcessing &&
+      payload.operation === "create" &&
+      result &&
+      typeof result === "object" &&
+      (result as { ok?: unknown }).ok === true &&
+      (result as { status?: unknown }).status !== "processing"
+    ) {
+      return successFromResult({
+        includeDiagnostics: false,
+        locale: prepared.locale,
+        planHandle: prepared.planHandle,
+        result: prepared.processing,
+        revision: prepared.revision
+      });
+    }
+    return result;
+  }
+
   const work = runPlanMatch(prepared, input, loadLiveCatalogue, matchStartedAt);
   const raced = await Promise.race([
     work.then((result) => ({ done: true as const, result })),
@@ -1012,6 +1083,7 @@ export async function planTool(input: Readonly<{
 
   const ackMs = Math.max(0, Date.now() - matchStartedAt);
   return successFromResult({
+    includeDiagnostics: !input.matchPort,
     locale: prepared.locale,
     planHandle: prepared.planHandle,
     result: {
@@ -1030,6 +1102,7 @@ function runPlanMatch(
   prepared: PreparedPlanCommand,
   input: Readonly<{
     config: AgenticConfig;
+    matchPort?: PlanMatchPort;
     now: string;
     payload: PlanToolInput;
     scope: CapabilityScope;
@@ -1061,6 +1134,7 @@ async function completePreparedPlan(
   prepared: PreparedPlanCommand,
   input: Readonly<{
     config: AgenticConfig;
+    matchPort?: PlanMatchPort;
     now: string;
     payload: PlanToolInput;
     scope: CapabilityScope;
@@ -1073,14 +1147,24 @@ async function completePreparedPlan(
     prepared.state.destinationCountry ||
     prepared.previous?.requestSnapshot.destinationCountry;
   const catalogueStartedAt = Date.now();
+  const isolated = Boolean(input.matchPort);
   const snapshot =
-    loadLiveCatalogue || prepared.resume
-      ? await ensureCatalogueSnapshot(input.config.environment, country)
-      : prepared.previous
-        ? snapshotForPin(prepared.previous)
-        : await ensureCatalogueSnapshot(input.config.environment, country);
+    isolated
+      ? {
+          availabilityAsOf: input.now,
+          catalogueVersion: "isolated",
+          products: [],
+          supplements: []
+        }
+      : loadLiveCatalogue || prepared.resume
+        ? await ensureCatalogueSnapshot(input.config.environment, country)
+        : prepared.previous
+          ? snapshotForPin(prepared.previous)
+          : await ensureCatalogueSnapshot(input.config.environment, country);
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
-  await refreshAdminSafetyCeilings();
+  if (!isolated) {
+    await refreshAdminSafetyCeilings();
+  }
 
   const answers = prepared.answers;
   const ack = prepared.ack;
@@ -1130,14 +1214,39 @@ async function completePreparedPlan(
       planHandle: prepared.planHandle,
       planId: prepared.planId,
       result: nextResult,
-      revision
+      revision,
+      skipSideEffects: isolated
     });
   }
 
   let state: CanonicalPlanState;
   let pinPrevious = false;
 
-  if (hasFullRequest(input.payload) && !prepared.resume) {
+  if (isolated) {
+    if (hasFullRequest(input.payload) && !prepared.resume) {
+      const merged = applyPlanAnswers(prepared.state, { answers });
+      pinPrevious = Boolean(
+        previous &&
+          planRematchFingerprint(previous.requestSnapshot) ===
+            planRematchFingerprint(merged)
+      );
+      state = pinPrevious
+        ? {
+            ...merged,
+            leftovers: previous!.requestSnapshot.leftovers,
+            pinnedOptionId: previous!.selected?.optionId ?? null
+          }
+        : merged;
+    } else if (previous) {
+      pinPrevious = !hasFullRequest(input.payload);
+      state = applyPlanAnswers(
+        pinPrevious ? previous.requestSnapshot : prepared.state,
+        { answers }
+      );
+    } else {
+      state = applyPlanAnswers(prepared.state, { answers });
+    }
+  } else if (hasFullRequest(input.payload) && !prepared.resume) {
     const normalized = await normalizePlanRequest({
       config: input.config,
       request: input.payload.request,
@@ -1227,6 +1336,7 @@ async function completePreparedPlan(
       : buildResult({
           catalogueMs,
           locale,
+          matchPort: input.matchPort,
           matchStartedAt,
           previous,
           shownRevision,
@@ -1241,7 +1351,8 @@ async function completePreparedPlan(
     planHandle: prepared.planHandle,
     planId: prepared.planId,
     result,
-    revision
+    revision,
+    skipSideEffects: isolated
   });
 }
 
@@ -1258,8 +1369,10 @@ async function persistTerminalPlan(input: Readonly<{
   planId: string;
   result: PlanResult;
   revision: number;
+  skipSideEffects?: boolean;
 }>): Promise<PlanToolSuccess> {
   const response = successFromResult({
+    includeDiagnostics: !input.skipSideEffects,
     locale: input.locale,
     planHandle: input.planHandle,
     result: input.result,
@@ -1291,23 +1404,27 @@ async function persistTerminalPlan(input: Readonly<{
       await store.insertPlanRevision(record);
     }
 
-    await commitTerminalIdempotency({
-      key: input.input.payload.idempotencyKey,
-      now: input.input.now,
-      ownerScope: input.ownerScope,
-      payload: input.input.payload,
-      planId: input.planId,
-      response,
-      store
-    });
+    if (input.input.payload.idempotencyKey) {
+      await commitTerminalIdempotency({
+        key: input.input.payload.idempotencyKey,
+        now: input.input.now,
+        ownerScope: input.ownerScope,
+        payload: input.input.payload,
+        planId: input.planId,
+        response,
+        store
+      });
+    }
   });
 
-  schedulePersistPlanSideEffects({
-    locale: input.locale,
-    planId: input.planId,
-    result: input.result,
-    revision: input.revision
-  });
+  if (!input.skipSideEffects) {
+    schedulePersistPlanSideEffects({
+      locale: input.locale,
+      planId: input.planId,
+      result: input.result,
+      revision: input.revision
+    });
+  }
   return response;
 }
 

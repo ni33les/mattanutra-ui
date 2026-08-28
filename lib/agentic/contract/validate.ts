@@ -357,7 +357,13 @@ export function schemaIssueToError(issue: SchemaIssue): AgenticErrorResult {
 
   return businessError({
     fieldPath: issue.fieldPath,
+    issues: [
+      {
+        fieldPath: issue.fieldPath,
+        messageKey: `mcp.errors.${reasonCode}`
+      }
+    ],
     message: issue.message,
-    reasonCode
+    reasonCode: "invalid_request"
   });
 }
