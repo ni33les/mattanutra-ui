@@ -273,7 +273,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
     resetMatcherSafetyCeilings();
   });
 
-  it("keeps exact catalog UL as needs_input even after acknowledgement", () => {
+  it("keeps exact catalog UL ready after acknowledgement when no questions remain", () => {
     const selected = {
       basket: [
         {
@@ -340,7 +340,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
       }),
       unmetRequirements: []
     });
-    assert.equal(status, "needs_input");
+    assert.equal(status, "ready");
   });
 
   it("blocks a child 130 mg magnesium fixture plan using catalog 110 mg", () => {

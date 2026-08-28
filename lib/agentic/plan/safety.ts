@@ -696,28 +696,27 @@ export function safetyQuestions(input: Readonly<{
     }
   }
 
+  const askedGapIds = new Set(
+    questions
+      .filter((item) => item.questionId.startsWith("q_gap_"))
+      .map((item) => item.questionId.slice("q_gap_".length))
+  );
+
   for (const leftover of input.state.leftovers) {
-    if (input.state.pinnedOptionId) {
-      continue;
-    }
-
-    if (
-      leftover.reason !== "not_in_catalogue" &&
-      leftover.reason !== "uncovered"
-    ) {
-      continue;
-    }
-
-    if (leftover.severity !== "high" && leftover.severity !== "medium") {
+    if (!leftoverRequiresDecision(leftover)) {
       continue;
     }
 
     const gapId = leftoverGapId(leftover);
 
-    if (input.state.acceptedGaps.some((gap) => gap.supplementId === gapId)) {
+    if (
+      askedGapIds.has(gapId) ||
+      input.state.acceptedGaps.some((gap) => gap.supplementId === gapId)
+    ) {
       continue;
     }
 
+    askedGapIds.add(gapId);
     questions.push({
       choices: [
         {
@@ -725,6 +724,12 @@ export function safetyQuestions(input: Readonly<{
           effect: `acceptedGap=${gapId}`,
           label: agenticMessage(input.locale, "plan.question.accept_gap"),
           labelKey: "plan.question.accept_gap"
+        },
+        {
+          choice: `remove_target:${gapId}`,
+          effect: `remove target ${gapId}`,
+          label: agenticMessage(input.locale, "plan.question.remove_target"),
+          labelKey: "plan.question.remove_target"
         }
       ],
       prompt: agenticMessage(input.locale, "plan.question.accept_gap"),
@@ -852,12 +857,11 @@ export function planStatus(input: Readonly<{
   state: CanonicalPlanState;
   unmetRequirements: readonly string[];
 }>): "blocked" | "needs_input" | "ready" {
+  void input.state;
+  void input.unmetRequirements;
+
   if (input.guidance.some((item) => item.action === "block")) {
     return "blocked";
-  }
-
-  if (input.unmetRequirements.length > 0) {
-    return "needs_input";
   }
 
   if (
@@ -882,56 +886,18 @@ export function planStatus(input: Readonly<{
     return "blocked";
   }
 
-  const reviewAcked =
-    input.state.safetyAcknowledgement?.confirmed === true &&
-    input.guidance
-      .filter((item) => item.action === "acknowledge")
-      .every((item) =>
-        Boolean(input.state.safetyAcknowledgement?.guidanceIds.includes(item.guidanceId))
-      );
-
-  if (
-    input.selected.coverage.some(
-      (row) =>
-        row.upperLimitAmount != null &&
-        row.totalExposureAmount >= row.upperLimitAmount
-    )
-  ) {
-    return "needs_input";
-  }
-
-  const gaps = input.selected.coverage.filter(
-    (row) =>
-      row.remainingGap > 0 &&
-      row.status !== "covered" &&
-      row.status !== "partial" &&
-      !(reviewAcked && row.status === "upper_limit_risk" && row.remainingGap === 0)
-  );
-
-  if (
-    gaps.some(
-      (row) => !input.state.acceptedGaps.some((gap) => gap.supplementId === row.supplementId)
-    )
-  ) {
-    return "needs_input";
-  }
-
-  const pendingLeftovers = input.state.leftovers.filter(
-    (item) =>
-      (item.reason === "not_in_catalogue" || item.reason === "uncovered") &&
-      (item.severity === "high" || item.severity === "medium") &&
-      !input.state.acceptedGaps.some(
-        (gap) => gap.supplementId === leftoverGapId(item)
-      )
-  );
-
-  if (pendingLeftovers.length > 0) {
-    return "needs_input";
-  }
-
   return "ready";
 }
 
 export function leftoverGapId(item: Readonly<{ name: string; supplementId?: string }>) {
   return item.supplementId || `leftover:${item.name}`;
+}
+
+function leftoverRequiresDecision(
+  item: Readonly<{ reason: string; severity: "high" | "low" | "medium" }>
+) {
+  return (
+    (item.reason === "not_in_catalogue" || item.reason === "uncovered") &&
+    (item.severity === "high" || item.severity === "medium")
+  );
 }

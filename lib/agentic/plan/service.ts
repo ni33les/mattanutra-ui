@@ -159,11 +159,16 @@ function composeResult(input: Readonly<{
   unmetRequirements: readonly string[];
 }>): PlanResult {
   const coverage = input.selected?.coverage ?? coverageFor(input.state, null);
+  const workState = {
+    ...input.state,
+    leftovers: input.leftovers,
+    pinnedOptionId: input.selected?.optionId ?? input.state.pinnedOptionId
+  };
   const safety = evaluateSafety({
     coverage,
     locale: input.locale,
     selected: input.selected,
-    state: input.state
+    state: workState
   });
   const questions = safetyQuestions({
     alternatives: input.alternatives,
@@ -171,23 +176,19 @@ function composeResult(input: Readonly<{
     locale: input.locale,
     selected: input.selected,
     shownRevision: input.shownRevision,
-    state: input.state,
+    state: workState,
     unmetRequirements: [...input.unmetRequirements]
   });
   const status = planStatus({
     guidance: safety,
     questions,
     selected: input.selected,
-    state: input.state,
+    state: workState,
     unmetRequirements: [...input.unmetRequirements]
   });
   const summary = agenticMessage(input.locale, `plan.summary.${status}`);
   const changeSummary: string[] = [];
-  const pinnedState = {
-    ...input.state,
-    leftovers: input.leftovers,
-    pinnedOptionId: input.selected?.optionId ?? input.state.pinnedOptionId
-  };
+  const pinnedState = workState;
 
   if (input.previous) {
     if (input.previous.status !== status) {

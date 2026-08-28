@@ -103,6 +103,7 @@ const PUBLIC_PLAN_KEYS = new Set([
   "estimatedOrderTotalMinor",
   "guidanceIds",
   "locale",
+  "leftovers",
   "medicationCodes",
   "nextActions",
   "ok",
@@ -313,7 +314,6 @@ function isClean(plan: Record<string, unknown>, maxBytes: number) {
     report.diagnostics.length === 0 &&
     report.competing.length === 0 &&
     report.genericAck === false &&
-    report.leftovers === false &&
     report.missingEstimated === false &&
     report.topProductCount === false &&
     report.topSubtotal === false &&

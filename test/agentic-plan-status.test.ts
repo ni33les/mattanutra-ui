@@ -263,7 +263,7 @@ describe("plan status fail-closed on oversupply", () => {
       state: acked,
       unmetRequirements: []
     });
-    assert.equal(status, "needs_input");
+    assert.equal(status, "ready");
     resetMatcherSafetyCeilings();
   });
 

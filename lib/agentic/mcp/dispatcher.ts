@@ -92,8 +92,7 @@ function withPlanOperation(args: unknown): unknown {
   if (operation === "answer") {
     return {
       ...params,
-      operation,
-      answers: Array.isArray(params.answers) ? params.answers : []
+      operation
     };
   }
 

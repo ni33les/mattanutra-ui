@@ -9,6 +9,7 @@ import type {
   BasketItem,
   CoverageContributor,
   CoverageRow,
+  PlanLeftover,
   PlanResult,
   SafetyGuidance,
   SelectionReason,
@@ -658,6 +659,16 @@ export function publicQuestions(
   }));
 }
 
+function publicLeftover(item: PlanLeftover) {
+  return {
+    name: item.name,
+    reason: item.reason,
+    ...(item.amount != null ? { amount: item.amount } : {}),
+    ...(item.unit ? { unit: item.unit } : {}),
+    ...(item.supplementId ? { supplementId: item.supplementId } : {})
+  };
+}
+
 export function publicPlanFields(result: Pick<
   PlanResult,
   | "alternatives"
@@ -798,6 +809,9 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(result.questions.length > 0
       ? { questions: publicQuestions(result.questions) }
+      : {}),
+    ...(result.leftovers && result.leftovers.length > 0
+      ? { leftovers: result.leftovers.map(publicLeftover) }
       : {}),
     ...(result.safetyGuidance.length > 0
       ? {

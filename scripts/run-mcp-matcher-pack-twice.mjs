@@ -44,6 +44,7 @@ if (!process.execArgv.includes(strip)) {
             planning: a.planning.passedCases,
             explanations: a.explanations.passedCases,
             copy: a.copy.passedCases,
+            state: a.state.passedCases,
             matcher: a.matcher.scores
           },
           b: {
@@ -52,6 +53,7 @@ if (!process.execArgv.includes(strip)) {
             planning: b.planning.passedCases,
             explanations: b.explanations.passedCases,
             copy: b.copy.passedCases,
+            state: b.state.passedCases,
             matcher: b.matcher.scores
           }
         },
