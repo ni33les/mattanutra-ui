@@ -38,7 +38,8 @@ const CASE_IDS = [
   "AX2-09",
   "AX2-10",
   "AX2-11",
-  "AX2-12"
+  "AX2-12",
+  "AX2-13"
 ] as const;
 
 const SUP_C = "sup_ae_vitamin_c";
@@ -159,7 +160,7 @@ export type AeC2PackReport = Readonly<{
   cases: readonly AeC2CaseResult[];
   packVersion: "agentic-experience-2.0";
   passedCases: number;
-  totalCases: 12;
+  totalCases: 13;
 }>;
 
 function sortedKeys(value: Record<string, unknown>) {
@@ -1046,10 +1047,16 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
         const harness = createHarness();
         const info = await harness.call("info", {});
         const keys = Object.keys(info);
-        const currencies = stringList(info.currencies);
         const countries = Array.isArray(info.supportedCountries)
-          ? info.supportedCountries
+          ? info.supportedCountries.map(asRecord)
           : [];
+        const currencies = [
+          ...new Set(
+            countries
+              .map((item) => String(item.currency ?? "").trim())
+              .filter(Boolean)
+          )
+        ];
         const ok =
           info.ok === true &&
           jsonSize(info) <= 4096 &&
@@ -1455,6 +1462,68 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
       })
     );
 
+    cases.push(
+      await runCase("AX2-13", async () => {
+        const harness = createHarness();
+        const first = await harness.call("info", {});
+        const second = await harness.call("info", {});
+        const keys = Object.keys(first).sort();
+        const allowed = [
+          "ok",
+          "serviceName",
+          "contractVersion",
+          "supportedCountries",
+          "supportedLocales",
+          "medicationCodes",
+          "conditionCodes",
+          "userAccountRequired",
+          "continuation",
+          "pollAfterSeconds",
+          "supportAvailable"
+        ];
+        const extra = keys.filter((key) => !allowed.includes(key));
+        const missing = allowed.filter((key) => !keys.includes(key));
+        const countries = Array.isArray(first.supportedCountries)
+          ? first.supportedCountries.map(asRecord)
+          : [];
+        const currencies = countries
+          .map((item) => String(item.currency ?? "").trim())
+          .filter(Boolean);
+        const blob = JSON.stringify(first);
+        const ok =
+          first.ok === true &&
+          second.ok === true &&
+          blob === JSON.stringify(second) &&
+          jsonSize(first) <= 4096 &&
+          extra.length === 0 &&
+          missing.length === 0 &&
+          first.serviceName === "MattaNutra" &&
+          first.contractVersion === "3.0.0" &&
+          first.supportAvailable === true &&
+          first.userAccountRequired === false &&
+          first.continuation === "polling_only" &&
+          Number(first.pollAfterSeconds) > 0 &&
+          countries.length > 0 &&
+          currencies.length > 0 &&
+          stringList(first.supportedLocales).includes("en") &&
+          stringList(first.medicationCodes).includes("apixaban") &&
+          stringList(first.conditionCodes).includes("ckd") &&
+          !/recognisedNames|catalogueGaps|latency|schemaChecksum|migrationVersion|environment|buildId|checkoutBuild|matcherTelemetry|catalogueVersion/i.test(
+            blob
+          ) &&
+          bannedDiagnosticHits(first).length === 0;
+        return ok
+          ? pass("AX2-13", { bytes: jsonSize(first), keys })
+          : fail("AX2-13", {
+              bytes: jsonSize(first),
+              extra,
+              identical: blob === JSON.stringify(second),
+              keys,
+              missing
+            });
+      })
+    );
+
     const byId = new Map(cases.map((item) => [item.id, item]));
     const ordered = CASE_IDS.map(
       (id) => byId.get(id) ?? fail(id, { missing: true })
@@ -1464,7 +1533,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
       cases: ordered,
       packVersion: "agentic-experience-2.0",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
-      totalCases: 12
+      totalCases: 13
     };
   } finally {
     endDeterministicIdsForTests();
@@ -1478,10 +1547,10 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
 
 if (process.env.NODE_TEST_CONTEXT) {
   describe("agentic experience cycle 2 pack", () => {
-    it("exports 12 cases and a canonical report", async () => {
+    it("exports 13 cases and a canonical report", async () => {
       const report = await runAeC2Pack();
-      assert.equal(report.totalCases, 12);
-      assert.equal(report.cases.length, 12);
+      assert.equal(report.totalCases, 13);
+      assert.equal(report.cases.length, 13);
       assert.deepEqual(
         report.cases.map((item) => item.id),
         [...CASE_IDS]

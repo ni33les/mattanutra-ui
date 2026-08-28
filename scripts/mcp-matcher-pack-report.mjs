@@ -193,6 +193,12 @@ const ROWS = [
     category: "MCP honesty",
     id: "AX2-12",
     purpose: "Thai plan copy stays Thai-keyed, including option reasons"
+  },
+  {
+    category: "MCP honesty",
+    id: "AX2-13",
+    purpose:
+      "Ordinary info is only the agent capability boundary: countries, locales, codes, continuation — no catalogue or performance dump"
   }
 ];
 

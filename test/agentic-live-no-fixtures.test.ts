@@ -6,7 +6,7 @@ import {
   replaceCatalogueSnapshot,
   resetCatalogueSnapshotCache
 } from "../lib/agentic/catalogue/snapshot.ts";
-import { infoTool, resetInfoCache } from "../lib/agentic/info.ts";
+import { engineeringInfo, resetInfoCache } from "../lib/agentic/info.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 
 function withoutTestContext<T>(work: () => T | Promise<T>) {
@@ -51,7 +51,7 @@ describe("live catalogue never serves fixtures", () => {
     replaceCatalogueSnapshot(null);
     resetCatalogueSnapshotCache();
     resetInfoCache();
-    const info = await infoTool({ config: loadAgenticConfig() });
+    const info = await engineeringInfo({ config: loadAgenticConfig() });
     assert.deepEqual(info.recognisedNames, []);
   });
 });

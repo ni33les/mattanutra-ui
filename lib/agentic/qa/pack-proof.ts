@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AGENTIC_CONTRACT_VERSION, AGENTIC_MIGRATION_VERSION } from "@/lib/agentic/config";
-import { AGENTIC_SCHEMA_CHECKSUM, infoTool } from "@/lib/agentic/info";
+import { AGENTIC_SCHEMA_CHECKSUM, engineeringInfo, infoTool } from "@/lib/agentic/info";
 import { handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
 import { planTool } from "@/lib/agentic/plan/service";
 import { executeTool } from "@/lib/agentic/commerce/execute";
@@ -66,6 +66,7 @@ export async function packProof(runtime: AgenticRuntime) {
     (item) => item.name
   );
   const info = await infoTool({ config: runtime.config });
+  const diagnostics = await engineeringInfo({ config: runtime.config });
 
   checks.push(
     check(
@@ -74,10 +75,17 @@ export async function packProof(runtime: AgenticRuntime) {
     )
   );
   checks.push(
-    check("D1-09", Boolean(info.schemaChecksum && info.migrationVersion === AGENTIC_MIGRATION_VERSION), {
-      migrationVersion: info.migrationVersion,
-      schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
-    })
+    check(
+      "D1-09",
+      Boolean(
+        diagnostics.schemaChecksum &&
+          diagnostics.migrationVersion === AGENTIC_MIGRATION_VERSION
+      ),
+      {
+        migrationVersion: diagnostics.migrationVersion,
+        schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
+      }
+    )
   );
 
   const isolation = await isolationProof(runtime);

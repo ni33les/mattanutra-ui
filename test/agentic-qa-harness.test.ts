@@ -21,7 +21,7 @@ import {
 import { isQaErrorResult } from "../lib/agentic/qa/errors.ts";
 import { AGENTIC_PUBLIC_TOOLS } from "../lib/agentic/contract/index.ts";
 import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
-import { infoTool } from "../lib/agentic/info.ts";
+import { engineeringInfo } from "../lib/agentic/info.ts";
 import { recordMcpTiming } from "../lib/agentic/metrics.ts";
 import { isOpaqueCapabilityHandle } from "../lib/agentic/capabilities.ts";
 
@@ -260,8 +260,8 @@ describe("DEV internal QA harness", () => {
     recordMcpTiming("info", 12);
     recordMcpTiming("execute", 40);
     recordMcpTiming("order", 18);
-    const info = await infoTool({ config: runtime.config, locale: "en" });
-    const infoAgain = await infoTool({ config: runtime.config, locale: "en" });
+    const info = await engineeringInfo({ config: runtime.config, locale: "en" });
+    const infoAgain = await engineeringInfo({ config: runtime.config, locale: "en" });
     if (runtime.config.environment === "dev") {
       assert.equal(
         typeof (info as { latency?: { info?: { p95Ms?: number } } }).latency?.info?.p95Ms,

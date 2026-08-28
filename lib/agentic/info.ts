@@ -22,9 +22,43 @@ export const AGENTIC_SCHEMA_CHECKSUM = createHash("sha256")
   .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
   .digest("hex");
 
+export const PUBLIC_INFO_ALLOW_LIST = [
+  "ok",
+  "serviceName",
+  "contractVersion",
+  "supportedCountries",
+  "supportedLocales",
+  "medicationCodes",
+  "conditionCodes",
+  "userAccountRequired",
+  "continuation",
+  "pollAfterSeconds",
+  "supportAvailable"
+] as const;
+
+export type PublicInfoCountry = Readonly<{
+  countryCode: string;
+  countryName: string;
+  currency: string;
+}>;
+
+export type PublicInfo = Readonly<{
+  conditionCodes: readonly string[];
+  continuation: "polling_only";
+  contractVersion: string;
+  medicationCodes: readonly string[];
+  ok: true;
+  pollAfterSeconds: number;
+  serviceName: string;
+  supportAvailable: true;
+  supportedCountries: readonly PublicInfoCountry[];
+  supportedLocales: readonly string[];
+  userAccountRequired: false;
+}>;
+
 let infoCache: {
   key: string;
-  value: ReturnType<typeof buildInfo>;
+  value: PublicInfo;
 } | null = null;
 
 export function resetInfoCache() {
@@ -63,24 +97,58 @@ async function recognisedNamesForMarkets(input: Readonly<{
   return [...names].sort((left, right) => left.localeCompare(right));
 }
 
-function buildInfo(input: Readonly<{
+function publicCapabilityInfo(input: Readonly<{
+  conditionCodes: readonly string[];
+  medicationCodes: readonly string[];
+  supportedCountries: readonly PublicInfoCountry[];
+}>): PublicInfo {
+  return {
+    ok: true,
+    serviceName: AGENTIC_SERVICE_NAME,
+    contractVersion: AGENTIC_CONTRACT_VERSION,
+    supportedCountries: input.supportedCountries.map((item) => ({
+      countryCode: item.countryCode,
+      countryName: item.countryName,
+      currency: item.currency
+    })),
+    supportedLocales: ["en", "th", "zh-CN"],
+    medicationCodes: [...input.medicationCodes],
+    conditionCodes: [...input.conditionCodes],
+    userAccountRequired: false,
+    continuation: "polling_only",
+    pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
+    supportAvailable: true
+  };
+}
+
+async function supportedCountriesFor(config: AgenticConfig) {
+  const markets = await listDeliverableMarkets();
+  const countries = markets.map((market) => ({
+    countryCode: market.countryCode,
+    countryName: market.countryName,
+    currency: market.currency
+  }));
+  void config;
+  return countries;
+}
+
+export async function engineeringInfo(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
-  recognisedNames: readonly string[];
-  supportedCountries: ReadonlyArray<{
-    countryCode: string;
-    countryName: string;
-    currency: string;
-  }>;
 }>) {
   void negotiateLocale(input.locale);
-
+  const supportedCountries = await supportedCountriesFor(input.config);
+  const recognisedNames = await recognisedNamesForMarkets({
+    config: input.config,
+    supportedCountries
+  });
+  const catalogueGaps = await listCatalogueGaps();
   return {
     authenticationMode: "anonymous_capability_handles",
     buildId: input.config.buildId,
     checkoutBuild: input.config.buildId,
     checkoutMode: "external_merchant_hosted",
-    continuation: "polling_only",
+    continuation: "polling_only" as const,
     contractVersion: AGENTIC_CONTRACT_VERSION,
     coreFlow: "plan -> execute -> external checkout -> order polling",
     environment: input.config.environment,
@@ -89,42 +157,18 @@ function buildInfo(input: Readonly<{
     conditionCodes: [...RECOGNISED_CONDITION_CODES],
     medicationCodes: [...RECOGNISED_MEDICATION_CODES],
     pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
-    recognisedNames: [...input.recognisedNames],
+    recognisedNames,
     schemaChecksum: AGENTIC_SCHEMA_CHECKSUM,
     serviceName: AGENTIC_SERVICE_NAME,
     serviceVersion: AGENTIC_SERVICE_VERSION,
-    supportAvailable: true,
-    supportedCountries: [...input.supportedCountries],
+    supportAvailable: true as const,
+    supportedCountries,
     supportedLocales: ["en", "th", "zh-CN"],
-    userAccountRequired: false
-  };
-}
-
-function compactInfo(input: Readonly<{
-  conditionCodes: readonly string[];
-  continuation: string;
-  medicationCodes: readonly string[];
-  pollAfterSeconds: number;
-  supportedCountries: ReadonlyArray<{
-    countryCode: string;
-    countryName: string;
-    currency: string;
-  }>;
-  userAccountRequired: boolean;
-}>) {
-  const currencies = [
-    ...new Set(input.supportedCountries.map((item) => item.currency).filter(Boolean))
-  ];
-  return {
-    conditionCodes: [...input.conditionCodes],
-    continuation: input.continuation,
-    currencies,
-    medicationCodes: [...input.medicationCodes],
-    ok: true as const,
-    pollAfterSeconds: input.pollAfterSeconds,
-    supportedCountries: [...input.supportedCountries],
-    supportedLocales: ["en", "th", "zh-CN"],
-    userAccountRequired: input.userAccountRequired
+    userAccountRequired: false as const,
+    ...(catalogueGaps.length > 0 ? { catalogueGaps } : {}),
+    ...(input.config.environment === "dev"
+      ? { latency: mcpLatencySnapshot(input.config.buildId) }
+      : {})
   };
 }
 
@@ -140,54 +184,28 @@ export async function infoTool(input: Readonly<{
     }>;
   };
   locale?: string;
-}>) {
+}>): Promise<PublicInfo> {
+  void negotiateLocale(input.locale);
+
   if (input.isolatedInfo) {
-    return compactInfo({
+    return publicCapabilityInfo({
       conditionCodes: input.isolatedInfo.conditionCodes,
-      continuation: "polling_only",
       medicationCodes: input.isolatedInfo.medicationCodes,
-      pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
-      supportedCountries: input.isolatedInfo.supportedCountries,
-      userAccountRequired: false
+      supportedCountries: input.isolatedInfo.supportedCountries
     });
   }
-  const markets = await listDeliverableMarkets();
-  const supportedCountries = markets.map((market) => ({
-    countryCode: market.countryCode,
-    countryName: market.countryName,
-    currency: market.currency
-  }));
-  const key = `${input.config.buildId}:${input.config.environment}:${supportedCountries
-    .map((item) => item.countryCode)
-    .join(",")}`;
-  const value =
-    infoCache?.key === key
-      ? infoCache.value
-      : buildInfo({
-          ...input,
-          recognisedNames: await recognisedNamesForMarkets({
-            config: input.config,
-            supportedCountries
-          }),
-          supportedCountries
-        });
 
-  if (infoCache?.key !== key) {
-    infoCache = { key, value };
+  const supportedCountries = await supportedCountriesFor(input.config);
+  const key = supportedCountries.map((item) => item.countryCode).join(",");
+  if (infoCache?.key === key) {
+    return infoCache.value;
   }
 
-  const catalogueGaps = await listCatalogueGaps();
-  const withGaps = {
-    ...value,
-    ...(catalogueGaps.length > 0 ? { catalogueGaps } : {})
-  };
-
-  if (input.config.environment !== "dev") {
-    return withGaps;
-  }
-
-  return {
-    ...withGaps,
-    latency: mcpLatencySnapshot(input.config.buildId)
-  };
+  const value = publicCapabilityInfo({
+    conditionCodes: RECOGNISED_CONDITION_CODES,
+    medicationCodes: RECOGNISED_MEDICATION_CODES,
+    supportedCountries
+  });
+  infoCache = { key, value };
+  return value;
 }

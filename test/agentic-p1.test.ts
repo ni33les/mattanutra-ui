@@ -23,6 +23,7 @@ import {
   payableSnapshot
 } from "../lib/agentic/money.ts";
 import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
+import { engineeringInfo } from "../lib/agentic/info.ts";
 
 function supplementId(name: string) {
   const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
@@ -611,8 +612,12 @@ describe("agentic P1 pack fixes", () => {
     const info = await call(runtime, "info", {});
     assert.equal("supplements" in info, false);
     assert.equal("catalogueVersion" in info, false);
-    assert.equal(typeof info.schemaChecksum, "string");
-    assert.equal(info.migrationVersion, "agentic-3.0.0");
+    assert.equal("recognisedNames" in info, false);
+    assert.equal("schemaChecksum" in info, false);
+    assert.equal("migrationVersion" in info, false);
+    assert.equal("buildId" in info, false);
+    assert.equal(info.serviceName, "MattaNutra");
+    assert.equal(info.contractVersion, "3.0.0");
     assert.ok(Array.isArray(info.supportedCountries));
     assert.ok(
       (info.supportedCountries as Array<{ countryCode: string }>).every(
@@ -1194,7 +1199,7 @@ describe("agentic P1 pack fixes", () => {
 
   it("scores D1-09 from info schemaChecksum and migrationVersion", async () => {
     const runtime = runtimeFor();
-    const info = await call(runtime, "info", { locale: "en" });
+    const info = await engineeringInfo({ config: runtime.config, locale: "en" });
     assert.equal(typeof info.schemaChecksum, "string");
     assert.equal((info.schemaChecksum as string).length, 64);
     assert.equal(info.migrationVersion, "agentic-3.0.0");

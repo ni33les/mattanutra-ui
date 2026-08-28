@@ -10,6 +10,7 @@ import {
 } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import { engineeringInfo } from "../lib/agentic/info.ts";
 import { AGENTIC_SERVER_INSTRUCTIONS } from "../lib/agentic/contract/instructions.ts";
 import {
   everyLineHasHttpImage,
@@ -88,7 +89,8 @@ describe("Official MattaNutra Agentic QA Pack", () => {
   it("A1 info lists names and codes; Algae omega-3 does not 400", async () => {
     const runtime = runtimeFor();
     const info = await call(runtime, "info", { locale: "en" });
-    const names = (info.recognisedNames as string[]) ?? [];
+    const engineering = await engineeringInfo({ config: runtime.config, locale: "en" });
+    const names = (engineering.recognisedNames as string[]) ?? [];
     assert.ok(names.includes("Algae omega-3"));
     assert.ok(names.includes("Vitamin K2"));
     assert.ok(names.includes("MK-7"));
