@@ -224,32 +224,7 @@ export async function executeTool(input: Readonly<{
     );
 
     if (existingOrder) {
-      const prior = await store.getExecuteResponseForOrder(existingOrder.id);
-      const reused =
-        prior && typeof prior === "object"
-          ? (prior as ExecuteSuccess)
-          : null;
-
-      if (reused?.ok === true && reused.orderHandle) {
-        const live = await withLiveOrderState({
-          config: input.config,
-          now: input.now,
-          scope: input.scope,
-          store,
-          stored: reused
-        });
-        await commitIdempotency({
-          key: input.idempotencyKey,
-          now: input.now,
-          operation: "execute",
-          ownerScope,
-          payload,
-          resourceIds: { orderId: existingOrder.id },
-          response: live,
-          store
-        });
-        return live;
-      }
+      return executeError(locale, "revision_conflict", "expectedRevision");
     }
 
     const payable = payableSnapshot({

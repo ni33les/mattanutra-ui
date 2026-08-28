@@ -21,7 +21,7 @@ export const AGENTIC_TOOL_DESCRIPTIONS = {
   info: "Check where MattaNutra can deliver, which locales it supports, and which medication and condition codes it can assess before you plan a stack. This does not create a plan or start a purchase.",
   order:
     "Read payment and fulfilment for an existing checkout using only the order handle. Poll no faster than pollAfterSeconds until the order is completed, cancelled, or expired.",
-  plan: "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
+  plan: "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
   support:
     "Create or reply to a help case for an existing order. Omit supportHandle to open a case; include it to reply."
 } as const;

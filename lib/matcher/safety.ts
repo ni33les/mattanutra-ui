@@ -1,4 +1,5 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
+import { OVER_TARGET_THRESHOLD } from "@/lib/matcher/config";
 import { scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
 import {
   catalogBandRuleId,
@@ -150,6 +151,71 @@ export function exposureExceedsCeiling(
   return threshold != null && exposureUnits > threshold.units;
 }
 
+export function exposureOvershootsTarget(
+  request: CanonicalRequest,
+  subjectId: string,
+  exposureUnits: bigint
+) {
+  const target = request.targets.find((item) => item.subjectId === subjectId);
+
+  if (!target || target.requested.units <= BigInt(0)) {
+    return false;
+  }
+
+  return (
+    exposureUnits * BigInt(100) >
+    target.requested.units * BigInt(OVER_TARGET_THRESHOLD)
+  );
+}
+
+export function variantDedicatedOvershoot(
+  request: CanonicalRequest,
+  contributions: DoseVariant["contributions"],
+  dailyUnits = 1
+) {
+  if (dailyUnits > 1) {
+    return false;
+  }
+
+  const contributing = request.targets.filter(
+    (target) => (contributions.get(target.subjectId)?.units ?? BigInt(0)) > BigInt(0)
+  );
+
+  if (contributing.length !== 1) {
+    return false;
+  }
+
+  const target = contributing[0]!;
+  const units = contributions.get(target.subjectId)?.units ?? BigInt(0);
+
+  if (!exposureOvershootsTarget(request, target.subjectId, units)) {
+    return false;
+  }
+
+  const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
+    name: target.name,
+    profile: request.profile,
+    subjectId: target.subjectId
+  });
+
+  if (!ceiling) {
+    return true;
+  }
+
+  const scaled = scaleAmount({
+    amount: ceiling.maxAmount,
+    subjectId: target.subjectId,
+    subjectName: ceiling.name || target.name,
+    unit: ceiling.maxUnit
+  });
+
+  if ("reason" in scaled || units < scaled.units) {
+    return false;
+  }
+
+  return units * BigInt(100) > target.requested.units * BigInt(250);
+}
+
 export function evaluateSafety(input: Readonly<{
   exposure: Exposure;
   products: readonly MatcherProduct[];
@@ -220,7 +286,11 @@ export function evaluateSafety(input: Readonly<{
         : null,
       family: "magnesium+ckd",
       guidanceId: guidanceId("condition_review_required", "magnesium+ckd"),
-      ruleId: "magnesium+ckd",
+      ruleId: catalogUlRuleId(
+        input.request,
+        magnesiumIds[0] ?? "",
+        "magnesium+ckd"
+      ),
       subjectId: magnesiumIds[0] ?? null,
       thresholdUnits: null
     });
@@ -439,7 +509,11 @@ export function evaluateSafety(input: Readonly<{
 
   return {
     findings: sorted,
-    hardBlocked: sorted.some((item) => item.action === "block"),
+    hardBlocked: sorted.some(
+      (item) =>
+        item.action === "block" &&
+        item.code !== "condition_review_required"
+    ),
     requiresAck: sorted.some((item) => item.action === "acknowledge")
   };
 }

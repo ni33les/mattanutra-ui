@@ -181,14 +181,15 @@ describe("Phase 2 named incidental safety", () => {
     });
     const overlap = guidance.find((item) => item.code === "duplicate_or_overlap");
     assert.ok(overlap);
-    assert.equal(overlap.action, "acknowledge");
+    assert.notEqual(overlap.action, "acknowledge");
+    assert.equal(overlap.severity === "high" || overlap.severity === "blocking", false);
+    assert.equal(overlap.messageKey, "guidance.informational_overlap");
     assert.equal(overlap.nutrientName, "Vitamin D3");
     assert.equal(overlap.unit, "IU");
     assert.equal(overlap.contributors?.length, 2);
     assert.match(overlap.message, /Vitamin D3/);
     assert.match(overlap.message, /Bio Calcium\+D3 600 IU/);
     assert.match(overlap.message, /Joint Mobility Plus 1200 IU/);
-    assert.match(overlap.message, /remainingGap 200/);
-    assert.match(overlap.message, /acknowledge to continue/);
+    assert.equal(/acknowledge to continue/i.test(overlap.message), false);
   });
 });

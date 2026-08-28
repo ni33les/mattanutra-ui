@@ -1824,3 +1824,23 @@ export async function getRetailOrderByAgenticOrderId(agenticOrderId: string) {
     trackingUrl: `/${"en"}/order/track/${encodeURIComponent(row.order_number)}`
   };
 }
+
+export async function cancelRetailCustomerOrderForAgenticRefund(agenticOrderId: string) {
+  if (!agenticOrderId) {
+    return;
+  }
+
+  const sql = getSql() as Db | null;
+
+  if (!sql) {
+    return;
+  }
+
+  await sql`
+    update public.retail_customer_orders
+    set status = 'cancelled', updated_at = now()
+    from public.retail_checkout_payments
+    where retail_customer_orders.id = retail_checkout_payments.retail_customer_order_id
+      and retail_checkout_payments.metadata->>'agenticOrderId' = ${agenticOrderId}
+  `;
+}

@@ -109,12 +109,9 @@ describe("Mode D frozen TH snapshot", () => {
     const encoded = JSON.stringify(publicPayload);
     assert.equal("catalogueVersion" in publicPayload, false);
     assert.equal(encoded.includes("rejectedAll"), false);
-    assert.equal(
-      (publicPayload as { matcherTelemetry?: { catalogId?: string } }).matcherTelemetry
-        ?.catalogId,
-      telemetry.snapshotId
-    );
-    assert.equal(JSON.stringify(publicPayload).toLowerCase().includes("snapshot"), false);
+    assert.equal("matcherTelemetry" in publicPayload, false);
+    assert.equal("catalogId" in publicPayload, false);
+    assert.equal(encoded.toLowerCase().includes("snapshot"), false);
   });
 
   it("classifies missing plant sterols as a genuine gap, not invented coverage", () => {

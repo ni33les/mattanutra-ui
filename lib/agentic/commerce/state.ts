@@ -131,6 +131,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
   if (input.event.status === "refunded" || input.event.status === "partially_refunded") {
     const next: OrderRecord = {
       ...order,
+      fulfilmentStatus: "cancelled",
       latestPaymentAttempt: input.event.status,
       latestPaymentReason: null,
       paymentStatus: input.event.status,
@@ -139,9 +140,10 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     await input.store.updateOrder(next);
     try {
       const { getSql } = await import("@/lib/db");
-      const { getRetailOrderByAgenticOrderId } = await import(
-        "@/lib/retail-product-checkout"
-      );
+      const {
+        cancelRetailCustomerOrderForAgenticRefund,
+        getRetailOrderByAgenticOrderId
+      } = await import("@/lib/retail-product-checkout");
       const { voidPendingRetailOrderSettlement } = await import(
         "@/lib/admin-retail-financials"
       );
@@ -154,6 +156,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
           reason: "mcp_refund"
         });
       }
+      await cancelRetailCustomerOrderForAgenticRefund(order.id);
     } catch {
       // Settlement void is best-effort; paymentStatus is already refunded.
     }

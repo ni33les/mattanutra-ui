@@ -44,6 +44,10 @@ function inferPlanOperation(params: Record<string, unknown>) {
     return "answer";
   }
 
+  if (params.safetyAcknowledgement != null) {
+    return "answer";
+  }
+
   if (
     typeof params.optionId === "string" ||
     typeof params.selectOptionId === "string"
@@ -73,14 +77,29 @@ function withPlanOperation(args: unknown): unknown {
     };
   }
 
+  if (operation === "select") {
+    const optionId =
+      typeof params.optionId === "string" ? params.optionId : params.selectOptionId;
+    const { selectOptionId: _selectOptionId, ...rest } = params;
+    void _selectOptionId;
+    return {
+      ...rest,
+      operation,
+      optionId
+    };
+  }
+
+  if (operation === "answer") {
+    return {
+      ...params,
+      operation,
+      answers: Array.isArray(params.answers) ? params.answers : []
+    };
+  }
+
   return {
     ...params,
-    operation,
-    ...(operation === "select" &&
-    typeof params.optionId !== "string" &&
-    typeof params.selectOptionId === "string"
-      ? { optionId: params.selectOptionId }
-      : {})
+    operation
   };
 }
 

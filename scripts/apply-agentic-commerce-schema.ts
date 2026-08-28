@@ -228,7 +228,15 @@ select
     end * count(*)
   )::int as add_priority
 from public.agentic_matcher_events as events
-cross join lateral jsonb_array_elements(events.leftovers) as leftover
+cross join lateral jsonb_array_elements(
+  case jsonb_typeof(events.leftovers)
+    when 'array' then events.leftovers
+    when 'string' then jsonb_build_array(
+      jsonb_build_object('name', events.leftovers #>> '{}')
+    )
+    else '[]'::jsonb
+  end
+) as leftover
 group by 1, 2, 3;
 
 create table if not exists public.agentic_qa_scenario_runs (

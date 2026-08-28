@@ -124,7 +124,10 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
       AGENTIC_SERVER_INSTRUCTIONS,
       /Vitamin K2, MK-7 and Menaquinone-7 map to one recognised supplement and do not become leftover not_in_catalogue/
     );
-    assert.match(AGENTIC_TOOL_DESCRIPTIONS.plan, /Vitamin K2, MK-7 and Menaquinone-7/);
+    assert.doesNotMatch(
+      AGENTIC_TOOL_DESCRIPTIONS.plan,
+      /Recognised names include[\s\S]*Vitamin K2/
+    );
   });
 
   it("records ackMs, matchMs and searchDeadlineMs on DEV matcher telemetry", () => {
@@ -140,6 +143,7 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
     assert.equal(telemetry.ackMs, 180);
     assert.equal(telemetry.matchMs, 420);
     assert.equal(telemetry.searchDeadlineMs, 2_500);
+    assert.ok(telemetry.targetSetHash);
     const payload = publicPlanFields({
       alternatives: [],
       basket: [],
@@ -154,17 +158,9 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
       summary: "blocked",
       unmetRequirements: []
     });
-    const publicTelemetry = payload.matcherTelemetry as {
-      ackMs?: number;
-      matchMs?: number;
-      searchDeadlineMs?: number;
-      targetSetHash?: string;
-    };
-    assert.equal(publicTelemetry.ackMs, 180);
-    assert.equal(publicTelemetry.matchMs, 420);
-    assert.equal(publicTelemetry.searchDeadlineMs, 2_500);
-    assert.ok(telemetry.targetSetHash);
-    assert.equal(publicTelemetry.targetSetHash, telemetry.targetSetHash);
+    assert.equal("matcherTelemetry" in payload, false);
+    assert.equal(JSON.stringify(payload).includes("ackMs"), false);
+    assert.equal(JSON.stringify(payload).includes("matchMs"), false);
     assert.equal(JSON.stringify(payload).toLowerCase().includes("snapshot"), false);
   });
 });

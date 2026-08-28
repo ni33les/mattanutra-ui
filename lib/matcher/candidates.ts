@@ -4,7 +4,11 @@ import { productEligible } from "@/lib/matcher/eligibility";
 import { aggregateDailyExposure, isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { isFalseOmegaAttribution } from "@/lib/agentic/catalogue/product-fit";
 import { canonicalNutrientKey, productKeysMatch } from "@/lib/product-key-matching";
-import { evaluateSafety, exposureExceedsCeiling } from "@/lib/matcher/safety";
+import {
+  evaluateSafety,
+  exposureExceedsCeiling,
+  variantDedicatedOvershoot
+} from "@/lib/matcher/safety";
 import type {
   CanonicalRequest,
   CanonicalTarget,
@@ -19,6 +23,10 @@ const MAX_DAILY_UNITS = 3;
 const HIGH_COLLATERAL_MULTI_MAX_DAILY_UNITS = 1;
 const SALVAGE_BELOW_FLOOR_PER_TARGET = 3;
 const NON_PILL_FORM = /powder|liquid|sachet|oil|drops|\bml\b/i;
+
+function listingId(product: Readonly<{ productId: string; sellerId: string }>) {
+  return `${product.sellerId}:${product.productId}`;
+}
 
 export function isCountablePillForm(form: string) {
   return !NON_PILL_FORM.test(form);
@@ -253,7 +261,7 @@ export function compileVariant(input: Readonly<{
     dailyUnits: input.dailyUnits,
     productId: input.product.productId,
     unknownSafetyAmount: unknown,
-    variantId: `${input.product.productId}:x${input.dailyUnits}`
+    variantId: `${listingId(input.product)}:x${input.dailyUnits}`
   };
 }
 
@@ -366,12 +374,49 @@ export function variantHardBlocked(
     return true;
   }
 
+  const targetIds = new Set(request.targets.map((item) => item.subjectId));
   return evaluateSafety({
     exposure,
     products: [group.product],
     request,
     variants: [variant]
-  }).hardBlocked;
+  }).findings.some(
+    (item) =>
+      item.action === "block" &&
+      item.code !== "condition_review_required" &&
+      (item.subjectId == null ||
+        targetIds.has(item.subjectId) ||
+        request.currentSupplements.some((row) => row.subjectId === item.subjectId))
+  );
+}
+
+export function variantIncidentalUlBlocked(
+  group: ProductGroup,
+  variant: DoseVariant,
+  request: CanonicalRequest
+) {
+  const exposure = aggregateDailyExposure({
+    current: request.currentSupplements,
+    variants: [variant]
+  });
+
+  if (isDoseError(exposure)) {
+    return true;
+  }
+
+  const targetIds = new Set(request.targets.map((item) => item.subjectId));
+  return evaluateSafety({
+    exposure,
+    products: [group.product],
+    request,
+    variants: [variant]
+  }).findings.some(
+    (item) =>
+      item.action === "block" &&
+      item.code === "dose_review_required" &&
+      item.subjectId != null &&
+      !targetIds.has(item.subjectId)
+  );
 }
 
 export function groupCoversTargetAtFloor(
@@ -462,7 +507,7 @@ function isCarrierNoise(
     highCollateralMultiTitle(product.title) &&
     !request.targets.some((target) => productIsDedicatedForTarget(product, target))
   ) {
-    return true;
+    return groups.length > 0;
   }
 
   if (!carrierTitle(product.title)) {
@@ -677,6 +722,13 @@ function keepCompiledContributor(
       return true;
     }
 
+    if (
+      highCollateralMultiTitle(product.title) &&
+      groupCoversTarget(group, target.subjectId)
+    ) {
+      return true;
+    }
+
     return (
       (request.targets.length === 1 ||
         request.profile.lifeStage === "pregnant" ||
@@ -747,13 +799,13 @@ export function compileGroups(
     }
 
     if (
-      groups.some((group) => group.productId === product.productId) ||
-      compiledIds.has(product.productId)
+      groups.some((group) => listingId(group.product) === listingId(product)) ||
+      compiledIds.has(listingId(product))
     ) {
       return;
     }
 
-    compiledIds.add(product.productId);
+    compiledIds.add(listingId(product));
     const group = compileProductGroup(product, request);
 
     if (group) {
@@ -791,7 +843,7 @@ export function compileGroups(
       !keepCompiledContributor(product, added, request)
     ) {
       groups.pop();
-      compiledIds.delete(product.productId);
+      compiledIds.delete(listingId(product));
     }
   }
 
@@ -825,7 +877,7 @@ export function compileGroups(
         !keepCompiledContributor(product, added, request)
       ) {
         groups.pop();
-        compiledIds.delete(product.productId);
+        compiledIds.delete(listingId(product));
       }
     }
   }
@@ -932,7 +984,7 @@ export function compileGroups(
         break;
       }
 
-      if (groups.some((group) => group.productId === product.productId)) {
+      if (groups.some((group) => listingId(group.product) === listingId(product))) {
         continue;
       }
 
@@ -948,7 +1000,7 @@ export function compileGroups(
       }
 
       const compiled = compileProductGroup(product, request);
-      compiledIds.add(product.productId);
+      compiledIds.add(listingId(product));
 
       if (
         !compiled ||
@@ -1027,12 +1079,13 @@ export function compileGroups(
       if (
         !coversFloor &&
         highCollateralMultiTitle(product.title) &&
-        !productIsDedicatedForTarget(product, target)
+        !productIsDedicatedForTarget(product, target) &&
+        targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)
       ) {
         continue;
       }
 
-      compiledIds.add(product.productId);
+      compiledIds.add(listingId(product));
       groups.push(compiled);
 
       if (!coversFloor) {
@@ -1136,6 +1189,10 @@ export function coveringVariantForTarget(
       continue;
     }
 
+    if (variantDedicatedOvershoot(request, variant.contributions, variant.dailyUnits)) {
+      continue;
+    }
+
     if (coverageUnits(exposure, target.requested.units) < floor) {
       continue;
     }
@@ -1182,6 +1239,10 @@ export function contributingVariantForTarget(
     }
 
     if (variantHardBlocked(group, variant, request)) {
+      continue;
+    }
+
+    if (variantDedicatedOvershoot(request, variant.contributions, variant.dailyUnits)) {
       continue;
     }
 
@@ -1382,6 +1443,10 @@ export function coveringVariantForMostFloors(
 
   for (const variant of group.variants) {
     if (variantHardBlocked(group, variant, request)) {
+      continue;
+    }
+
+    if (variantDedicatedOvershoot(request, variant.contributions, variant.dailyUnits)) {
       continue;
     }
 

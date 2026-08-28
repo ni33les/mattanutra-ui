@@ -9,7 +9,8 @@ import {
   bestCompactCoveringGroup,
   contributionFor,
   labelledTargetCount,
-  productIsDedicatedForTarget
+  productIsDedicatedForTarget,
+  variantIncidentalUlBlocked
 } from "@/lib/matcher/candidates";
 import {
   aggregateCoverage,
@@ -192,12 +193,18 @@ function dedicatedPartialCountFor(
 }
 
 export function scoreState(input: Readonly<{
+  allowIncidentalBlock?: boolean;
   groups: readonly ProductGroup[];
   request: CanonicalRequest;
   sellerId: string;
   state: SearchState;
 }>): ScoredBasket | null {
-  const validated = revalidateState(input.state, input.groups, input.request);
+  const validated = revalidateState(
+    input.state,
+    input.groups,
+    input.request,
+    { allowIncidentalBlock: input.allowIncidentalBlock }
+  );
 
   if (!validated) {
     return null;
@@ -719,6 +726,13 @@ export function salvagePartialBasket(input: Readonly<{
       });
 
     for (const candidate of ranked) {
+      if (
+        variantIncidentalUlBlocked(candidate.group, candidate.variant, input.request) &&
+        input.groups.length > 1
+      ) {
+        continue;
+      }
+
       const next = tryAddVariant(
         state,
         candidate.variant,
@@ -731,6 +745,7 @@ export function salvagePartialBasket(input: Readonly<{
       }
 
       const scored = scoreState({
+        allowIncidentalBlock: true,
         groups: input.groups,
         request: input.request,
         sellerId: input.sellerId,
@@ -750,6 +765,7 @@ export function salvagePartialBasket(input: Readonly<{
   }
 
   const scored = scoreState({
+    allowIncidentalBlock: true,
     groups: input.groups,
     request: input.request,
     sellerId: input.sellerId,

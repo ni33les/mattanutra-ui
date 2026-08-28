@@ -8,7 +8,8 @@ import {
   labelledTargetCount,
   coveringVariantForMostFloors,
   coveringVariantForTarget,
-  groupsBySeller
+  groupsBySeller,
+  variantIncidentalUlBlocked
 } from "@/lib/matcher/candidates";
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
@@ -620,6 +621,11 @@ function absorbStandaloneWinners(input: Readonly<{
         break;
       }
 
+      if (variantIncidentalUlBlocked(winner, variant, input.request)) {
+        used.add(winner.productId);
+        continue;
+      }
+
       let next = tryAddVariant(state, variant, winner, input.request);
       const replaced = tryReplaceWeakerTargetSkus({
         groups: input.groups,
@@ -675,6 +681,10 @@ function absorbStandaloneWinners(input: Readonly<{
       );
 
       if (!variant) {
+        continue;
+      }
+
+      if (variantIncidentalUlBlocked(group, variant, input.request)) {
         continue;
       }
 
@@ -914,13 +924,17 @@ export function match(
   }
 
   if (winner.selected && !config.skipPostMatchCompact) {
+    const sellerGroups = groups.filter(
+      (item) =>
+        !winner.selected?.sellerId || item.sellerId === winner.selected.sellerId
+    );
     const compact = dropRedundantProducts({
-      groups,
+      groups: sellerGroups,
       request,
       selected: winner.selected
     });
     const pruned = rescoreKeptProducts({
-      groups,
+      groups: sellerGroups,
       request,
       selected: compact
     });
@@ -929,7 +943,7 @@ export function match(
       alternatives: winner.alternatives,
       selected: absorbStandaloneWinners({
         config,
-        groups,
+        groups: sellerGroups,
         request,
         selected: next
       })

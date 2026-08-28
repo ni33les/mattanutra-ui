@@ -413,6 +413,24 @@ function collectNode(
     if (resolved.additionalProperties === false) {
       for (const key of Object.keys(value)) {
         if (!(key in properties)) {
+          if (/^sexAtBirth$/i.test(key)) {
+            if (!("sex" in value) || value.sex === undefined) {
+              issues.push({
+                fieldPath: joinPath(path, "sex"),
+                message: "sex is required.",
+                reasonCode: "required"
+              });
+              continue;
+            }
+
+            issues.push({
+              fieldPath: path || "profile",
+              message: "Unexpected property.",
+              reasonCode: "unexpected_property"
+            });
+            continue;
+          }
+
           issues.push({
             fieldPath: joinPath(path, key),
             message: `Unexpected property ${key}.`,
@@ -458,6 +476,8 @@ export function schemaIssueToError(
         : issue.reasonCode;
 
   const listed = extras.length > 0 ? extras : [issue];
+  const mappedReason =
+    reasonCode === "unexpected_property" ? "unexpected_property" : "invalid_request";
   return businessError({
     fieldPath: issue.fieldPath,
     issues: listed.map((item) => {
@@ -473,6 +493,6 @@ export function schemaIssueToError(
       };
     }),
     message: issue.message,
-    reasonCode: "invalid_request"
+    reasonCode: mappedReason
   });
 }

@@ -108,7 +108,10 @@ function guidance(input: Readonly<{
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-  const guidanceId = ["gdn", input.code, family, factSlug || "fact"].join(":");
+  const guidanceId =
+    input.code === "duplicate_or_overlap"
+      ? ["gdn", input.code, family, factSlug || "fact"].join(":")
+      : ["gdn", input.code, family].join(":");
   const contributorLabel =
     (input.contributors ?? [])
       .map((item) => {
@@ -385,7 +388,8 @@ export function evaluateSafety(input: Readonly<{
       limit != null &&
       Number.isFinite(limit) &&
       limit > 0 &&
-      row.requestedAmount > limit
+      row.requestedAmount > limit &&
+      row.currentAmount <= 0
     ) {
       items.push(guidance({
         action: "block",
@@ -693,6 +697,10 @@ export function safetyQuestions(input: Readonly<{
   }
 
   for (const leftover of input.state.leftovers) {
+    if (input.state.pinnedOptionId) {
+      continue;
+    }
+
     if (
       leftover.reason !== "not_in_catalogue" &&
       leftover.reason !== "uncovered"
@@ -883,7 +891,6 @@ export function planStatus(input: Readonly<{
       );
 
   if (
-    !reviewAcked &&
     input.selected.coverage.some(
       (row) =>
         row.upperLimitAmount != null &&

@@ -17,7 +17,7 @@
       "name": "info"
     },
     {
-      "description": "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
+      "description": "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
       "inputSchema": {
         "$defs": {
           "PlanRequest": {

@@ -253,7 +253,7 @@ function servingMultiplierFromBasket(
   selected: ScoredBasket | null
 ) {
   const variantId = selected?.variantIds.find((id) =>
-    id.startsWith(`${productId}:x`)
+    id.includes(`${productId}:x`) || id.startsWith(`${productId}:x`)
   );
   const parsed = Number(variantId?.match(/:x(\d+)$/)?.[1]);
 

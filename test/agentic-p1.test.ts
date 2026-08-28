@@ -915,9 +915,9 @@ describe("agentic P1 pack fixes", () => {
       reasonCode: string;
     };
     assert.equal(stale.ok, false);
-    assert.equal(staleError.reasonCode, "revision_conflict");
+    assert.equal(staleError.reasonCode, "stale_revision");
     assert.equal(staleError.category, "ABORTED");
-    assert.equal(staleError.error_code, "ABORTED");
+    assert.equal(staleError.error_code, "stale_revision");
 
     const missing = await handleJsonRpc(runtime, {
       id: 11,

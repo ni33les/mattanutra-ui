@@ -16,6 +16,7 @@ import {
   RECOGNISED_CONDITION_CODES,
   RECOGNISED_MEDICATION_CODES
 } from "@/lib/agentic/catalogue/names";
+import { listCatalogueGaps } from "@/lib/agentic/plan/telemetry";
 
 export const AGENTIC_SCHEMA_CHECKSUM = createHash("sha256")
   .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
@@ -175,12 +176,18 @@ export async function infoTool(input: Readonly<{
     infoCache = { key, value };
   }
 
+  const catalogueGaps = await listCatalogueGaps();
+  const withGaps = {
+    ...value,
+    ...(catalogueGaps.length > 0 ? { catalogueGaps } : {})
+  };
+
   if (input.config.environment !== "dev") {
-    return value;
+    return withGaps;
   }
 
   return {
-    ...value,
+    ...withGaps,
     latency: mcpLatencySnapshot(input.config.buildId)
   };
 }

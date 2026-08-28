@@ -6,7 +6,11 @@ import {
   paretoPrune
 } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError, unitsOrZero } from "@/lib/matcher/dose";
-import { evaluateSafety, exposureExceedsCeiling } from "@/lib/matcher/safety";
+import {
+  evaluateSafety,
+  exposureExceedsCeiling,
+  variantDedicatedOvershoot
+} from "@/lib/matcher/safety";
 import type {
   CanonicalRequest,
   DoseVariant,
@@ -69,6 +73,10 @@ export function tryAddVariant(
   request: CanonicalRequest
 ): SearchState | null {
   if (pediatricBlocked(request, variant)) {
+    return null;
+  }
+
+  if (variantDedicatedOvershoot(request, variant.contributions, variant.dailyUnits)) {
     return null;
   }
 
@@ -359,7 +367,8 @@ export function reconstructVariants(
 export function revalidateState(
   state: SearchState,
   groups: readonly ProductGroup[],
-  request: CanonicalRequest
+  request: CanonicalRequest,
+  options?: Readonly<{ allowIncidentalBlock?: boolean }>
 ) {
   const variants = reconstructVariants(groups, state.selectedVariantIds);
   const exposure = aggregateDailyExposure({
@@ -379,7 +388,23 @@ export function revalidateState(
   });
 
   if (safety.hardBlocked) {
-    return null;
+    if (!options?.allowIncidentalBlock) {
+      return null;
+    }
+
+    const targetIds = new Set(request.targets.map((item) => item.subjectId));
+    const targetBlocked = safety.findings.some(
+      (item) =>
+        item.action === "block" &&
+        item.code !== "condition_review_required" &&
+        (item.subjectId == null ||
+          targetIds.has(item.subjectId) ||
+          request.currentSupplements.some((row) => row.subjectId === item.subjectId))
+    );
+
+    if (targetBlocked) {
+      return null;
+    }
   }
 
   for (const target of request.targets) {

@@ -1,5 +1,6 @@
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
+import { payableSnapshot } from "@/lib/agentic/money";
 import {
   CONDITION_ALIASES,
   MEDICATION_ALIASES
@@ -29,14 +30,14 @@ export type PublicBasketItem = Readonly<{
   fixture?: true;
   form: string;
   imageUrl?: string;
-  incidentalNutrientNames: readonly string[];
-  incidentalNutrients: readonly PublicBasketNutrient[];
+  incidentalNutrientNames?: readonly string[];
+  incidentalNutrients?: readonly PublicBasketNutrient[];
   lineTotalMinor: number;
   pillsPerServing: number;
   productId: string;
   productName: string;
   quantity: number;
-  requestedNutrientNames: readonly string[];
+  requestedNutrientNames?: readonly string[];
   requestedNutrients?: readonly PublicBasketNutrient[];
   selectionReason?: SelectionReason;
   servingsPerDay: number;
@@ -161,26 +162,28 @@ function optionReasonFields(option: StackOption, locale: string) {
 export function publicBasketItem(item: BasketItem, locale = "en"): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
   const daysOfSupply = item.daysOfSupply ?? 30;
+  const incidentalNutrientNames = boundedNames(item.incidentalNutrientNames);
+  const incidentalNutrients = boundedNutrients(item.incidentalNutrients);
+  const requestedNutrientNames = boundedNames(item.requestedNutrientNames);
+  const requestedNutrients = boundedNutrients(item.requestedNutrients);
 
   return {
     currency: item.currency,
     dailyPills: item.dailyPills,
     daysOfSupply,
     form: item.form,
-    incidentalNutrientNames: boundedNames(item.incidentalNutrientNames),
-    incidentalNutrients: boundedNutrients(item.incidentalNutrients),
     lineTotalMinor: item.lineTotalMinor,
     pillsPerServing: item.pillsPerServing,
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
-    requestedNutrientNames: boundedNames(item.requestedNutrientNames),
-    ...(item.requestedNutrients && item.requestedNutrients.length > 0
-      ? { requestedNutrients: boundedNutrients(item.requestedNutrients) }
-      : {}),
     selectionReason: defaultSelectionReason(item, locale),
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
+    ...(incidentalNutrientNames.length > 0 ? { incidentalNutrientNames } : {}),
+    ...(incidentalNutrients.length > 0 ? { incidentalNutrients } : {}),
+    ...(requestedNutrientNames.length > 0 ? { requestedNutrientNames } : {}),
+    ...(requestedNutrients.length > 0 ? { requestedNutrients } : {}),
     ...(imageUrl ? { imageUrl } : {}),
     ...(item.fixture || item.source === "fixture"
       ? { fixture: true as const, source: "fixture" as const }
@@ -404,7 +407,10 @@ export function publicPlanFields(result: Pick<
           ackable.every((item) => ackBound.guidanceIds.includes(item.guidanceId))
         ? "acknowledged"
         : "pending";
-  const requiresSafetyAcknowledgement = acknowledgementStatus === "pending";
+  const requiresSafetyAcknowledgement =
+    acknowledgementStatus === "pending" ||
+    result.status === "blocked" ||
+    result.safetyGuidance.some((item) => item.action === "block");
   const alternatives = result.alternatives.filter((item) => {
     if (!selected) {
       return true;
@@ -454,6 +460,10 @@ export function publicPlanFields(result: Pick<
           ? ["confirm_with_user"]
           : ["change_request"];
   const currency = result.basket[0]?.currency ?? "THB";
+  const subtotalMinor =
+    selected?.totalPriceMinor ??
+    result.basket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
+  const payable = payableSnapshot({ subtotalMinor });
 
   return {
     ...(result.basket.length > 0
@@ -469,21 +479,31 @@ export function publicPlanFields(result: Pick<
     locale,
     nextActions,
     safetyScope,
-    assessedMedicationCodes,
-    unassessedMedicationCodes,
-    assessedConditionCodes,
-    unassessedConditionCodes,
+    ...(assessedMedicationCodes.length > 0 ? { assessedMedicationCodes } : {}),
+    ...(unassessedMedicationCodes.length > 0 ? { unassessedMedicationCodes } : {}),
+    ...(assessedConditionCodes.length > 0 ? { assessedConditionCodes } : {}),
+    ...(unassessedConditionCodes.length > 0 ? { unassessedConditionCodes } : {}),
+    ...(medicationCodes.length > 0 ? { medicationCodes: [...medicationCodes] } : {}),
+    ...(conditionCodes.length > 0 ? { conditionCodes: [...conditionCodes] } : {}),
     ...(acknowledgedUnassessed.length > 0
       ? { acknowledgedUnassessed }
       : {}),
     ...(result.basket.length > 0 ? { stackSummary: stackSummaryFor(result.basket, currency) } : {}),
     acknowledgementStatus,
+    ...(result.status !== "processing" && (selected || result.basket.length > 0)
+      ? {
+          shippingMinor: payable.shippingMinor,
+          subtotalMinor: payable.subtotalMinor,
+          totalPriceMinor: payable.totalPriceMinor
+        }
+      : {}),
     ...(selected
       ? {
           optionId: selected.optionId,
           reason: optionReasonFields(selected, locale).message,
           reasonCode: optionReasonFields(selected, locale).code,
-          reasonKey: optionReasonFields(selected, locale).key
+          reasonKey: optionReasonFields(selected, locale).key,
+          tradeOffs: publicTradeOffs(selected, selected)
         }
       : {}),
     ...(result.questions.length > 0

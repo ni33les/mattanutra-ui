@@ -415,8 +415,27 @@ function nutrientSplit(
       }
 
       requestedKeys.add(key);
+      const scaled = fact.amount * multiplier;
+      const comparable =
+        convertAmount({
+          amount: scaled,
+          fromUnit: fact.unit,
+          subjectId: target.supplementId,
+          subjectName: target.name,
+          toUnit: target.unit
+        }) ?? scaled;
+
+      if (target.amount > 0 && comparable * 10 < target.amount) {
+        incidental.push({
+          amount: scaled,
+          name: fact.name,
+          unit: fact.unit
+        });
+        continue;
+      }
+
       requested.push({
-        amount: fact.amount * multiplier,
+        amount: scaled,
         name: fact.name,
         unit: fact.unit
       });
@@ -456,9 +475,11 @@ function dailyUnitsForProduct(
   productId: string,
   variantIds: readonly string[]
 ) {
-  const prefix = `${productId}:x`;
-  const variantId = variantIds.find((id) => id.startsWith(prefix));
-  const parsed = Number(variantId?.slice(prefix.length));
+  const marker = `${productId}:x`;
+  const variantId = variantIds.find(
+    (id) => id.includes(marker) || id.startsWith(`${marker}`)
+  );
+  const parsed = Number(variantId?.slice((variantId?.lastIndexOf(":x") ?? -1) + 2));
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
 }
 

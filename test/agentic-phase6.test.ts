@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS, fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
-import { freezeCatalogueSnapshot } from "../lib/agentic/catalogue/freeze.ts";
+import {
+  catalogueSnapshotId,
+  freezeCatalogueSnapshot
+} from "../lib/agentic/catalogue/freeze.ts";
 import {
   coverageFor,
   factLedgerHash,
@@ -441,8 +444,8 @@ describe("Phase 6 bounded evidence fields", () => {
         summary: "hash",
         unmetRequirements: []
       });
-      const publicTelemetry = payload.matcherTelemetry as { targetSetHash?: string };
-      assert.equal(publicTelemetry.targetSetHash, telemetry.targetSetHash);
+      assert.equal("matcherTelemetry" in payload, false);
+      assert.equal(JSON.stringify(payload).includes("targetSetHash"), false);
     }
 
     assert.equal(hashes.size, 1);
@@ -701,24 +704,15 @@ describe("Phase 6 bounded evidence fields", () => {
       (basket[0].incidentalNutrientNames as string[]).length <= PUBLIC_NUTRIENT_NAME_LIMIT,
       true
     );
-    assert.equal(payload.matcherVersion, MATCHER_VERSION);
-    assert.equal(payload.catalogId, telemetry.snapshotId);
-    assert.equal(
-      (payload.matcherTelemetry as { matcherVersion?: string; catalogId?: string }).matcherVersion,
-      MATCHER_VERSION
-    );
-    assert.equal(
-      (payload.matcherTelemetry as { catalogId?: string }).catalogId,
-      telemetry.snapshotId
-    );
+    assert.equal(telemetry.matcherVersion, MATCHER_VERSION);
+    assert.equal(telemetry.snapshotId, catalogueSnapshotId(snapshot));
+    assert.equal("matcherVersion" in payload, false);
+    assert.equal("catalogId" in payload, false);
+    assert.equal("matcherTelemetry" in payload, false);
     assert.ok(String(payload.reason ?? "").length > 0);
     const encoded = JSON.stringify(payload);
     assert.equal(encoded.includes("rejectedAll"), false);
     assert.equal(encoded.toLowerCase().includes("snapshot"), false);
     assert.equal("snapshotId" in payload, false);
-    assert.equal(
-      JSON.stringify(payload.matcherTelemetry ?? {}).includes("snapshotId"),
-      false
-    );
   });
 });

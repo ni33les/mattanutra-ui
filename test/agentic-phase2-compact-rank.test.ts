@@ -40,9 +40,9 @@ describe("Phase 2 compactness ranking", () => {
     const d3 = qaTarget("d3", 2000);
     const units = result.selected.coverageBySubject.get(d3.subjectId) ?? 0;
     const variant = result.selected.variantIds.find((id) =>
-      id.startsWith("G-D3-DUP-200:x")
+      id.includes("G-D3-DUP-200:x")
     );
-    const servings = Number(variant?.slice("G-D3-DUP-200:x".length) || 1);
+    const servings = Number(variant?.match(/:x(\d+)$/)?.[1] || 1);
     const expected = Math.round((200 * servings * 10_000) / 2000);
     assert.equal(units, expected);
     assert.equal(units === servings * 2000, false);
@@ -90,7 +90,7 @@ describe("Phase 2 compactness ranking", () => {
     assert.ok(result.selected);
     assert.equal(result.selected.productIds.includes("G-D3-500"), true);
     const variant = result.selected.variantIds.find((id) =>
-      id.startsWith("G-D3-500:x")
+      id.includes("G-D3-500:x")
     );
     assert.ok(variant);
     assert.match(variant, /:x[23]$/);
@@ -709,7 +709,7 @@ describe("Phase 2 compactness ranking", () => {
     );
     assert.equal(d3Percent >= 90, false);
     const fiftyServings = fewest.selected.variantIds.filter((id) =>
-      id.startsWith("G-50PLUS:x")
+      id.includes("G-50PLUS:x")
     );
     assert.equal(
       fiftyServings.every((id) => !/:x3$/.test(id)),
