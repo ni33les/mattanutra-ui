@@ -113,6 +113,7 @@ function boundedNames(names: readonly string[] | undefined) {
 
 const OPTION_REASON_CODES = [
   "balanced",
+  "best_available",
   "fewest_pills",
   "highest_coverage",
   "lowest_cost"
@@ -220,27 +221,114 @@ function canonicalRequestedNames(item: BasketItem, targets: RequestedTargets) {
   return filterRequestedNames(item, targets);
 }
 
+function joinNames(names: readonly string[], locale: string) {
+  if (names.length <= 1) {
+    return names[0] ?? "";
+  }
+
+  const lead = names.slice(0, -1).join(", ");
+  const last = names[names.length - 1] ?? "";
+  if (locale === "th") {
+    return `${lead} และ ${last}`;
+  }
+  if (locale === "zh-CN") {
+    return names.join("、");
+  }
+  return `${lead} and ${last}`;
+}
+
+function formatDose(amount: number) {
+  return Number.isInteger(amount) ? String(amount) : String(amount);
+}
+
+function lineCoverage(
+  item: BasketItem,
+  coverage: readonly CoverageRow[],
+  supplementId?: string
+) {
+  const rows = coverage.filter((row) =>
+    supplementId ? row.supplementId === supplementId : true
+  );
+  for (const row of rows) {
+    const hit = row.contributors?.find(
+      (contributor) => contributor.productId === item.productId
+    );
+    if (hit) {
+      return {
+        amount: hit.amount,
+        name: row.name,
+        remainingGap: row.remainingGap,
+        unit: hit.unit || row.unit
+      };
+    }
+  }
+
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    amount: row.deliveredAmount,
+    name: row.name,
+    remainingGap: row.remainingGap,
+    unit: row.unit
+  };
+}
+
 function defaultSelectionReason(
   item: BasketItem,
   locale: string,
-  targets: RequestedTargets
+  targets: RequestedTargets,
+  coverage: readonly CoverageRow[] = []
 ): SelectionReason {
   const requestedNames = canonicalRequestedNames(item, targets);
   const requestedSupplementIds = filterRequestedIds(item, targets);
   const negotiated = negotiateLocale(locale);
-  const base = item.selectionReason ?? {
-    code: "covers_target" as const,
-    message: agenticMessage(negotiated, "plan.selection.covers_target"),
-    messageKey: "plan.selection.covers_target",
+  const primaryId = requestedSupplementIds[0];
+  const facts = lineCoverage(item, coverage, primaryId);
+  const gap =
     requestedSupplementIds
-  };
+      .map((id) => lineCoverage(item, coverage, id))
+      .find((row) => row && row.remainingGap > 0) ?? null;
+
+  let code: SelectionReason["code"] = "covers_target";
+  let messageKey = "plan.selection.covers_target_named";
+  let message = agenticMessage(negotiated, messageKey, {
+    name: requestedNames[0] ?? facts?.name ?? item.productName
+  });
+
+  if (requestedNames.length >= 2) {
+    code = "consolidates_targets";
+    messageKey = "plan.selection.consolidates_targets";
+    message = agenticMessage(negotiated, messageKey, {
+      names: joinNames(requestedNames, negotiated)
+    });
+  } else if (gap && gap.remainingGap > 0) {
+    code = "best_available_dose";
+    messageKey = "plan.selection.best_available_dose";
+    message = agenticMessage(negotiated, messageKey, {
+      gap: formatDose(gap.remainingGap),
+      name: requestedNames[0] ?? gap.name,
+      unit: gap.unit
+    });
+  } else if (facts && Number.isFinite(facts.amount)) {
+    messageKey = "plan.selection.covers_target";
+    message = agenticMessage(negotiated, messageKey, {
+      amount: formatDose(facts.amount),
+      name: requestedNames[0] ?? facts.name,
+      unit: facts.unit
+    });
+  }
 
   return {
-    ...base,
+    code,
+    message,
+    messageKey,
     requestedNames,
     requestedSupplementIds: requestedSupplementIds.length
       ? requestedSupplementIds
-      : base.requestedSupplementIds
+      : item.selectionReason?.requestedSupplementIds ?? []
   };
 }
 
@@ -281,33 +369,17 @@ function optionReasonFields(
 ) {
   const negotiated = negotiateLocale(locale);
   const group = advertised.length > 0 ? advertised : [option];
-  if (group.length >= 2) {
-    const code = truthfulReasonMap(group).get(option.optionId) ?? "balanced";
-    const key = `plan.option.${code}`;
-    return { code, key, message: agenticMessage(negotiated, key) };
+  if (group.length < 2) {
+    return {
+      code: "best_available" as const,
+      key: "plan.option.best_available",
+      message: agenticMessage(negotiated, "plan.option.best_available")
+    };
   }
 
-  const raw = option.reason.trim();
-  for (const code of OPTION_REASON_CODES) {
-    const key = `plan.option.${code}`;
-    const localized = agenticMessage(negotiated, key);
-    if (
-      raw === code ||
-      raw === key ||
-      raw === localized ||
-      raw === agenticMessage("en", key) ||
-      raw === agenticMessage("th", key) ||
-      raw === agenticMessage("zh-CN", key)
-    ) {
-      return { code, key, message: localized };
-    }
-  }
-
-  return {
-    code: "fewest_pills" as const,
-    key: "plan.option.fewest_pills",
-    message: agenticMessage(negotiated, "plan.option.fewest_pills")
-  };
+  const code = truthfulReasonMap(group).get(option.optionId) ?? "balanced";
+  const key = `plan.option.${code}`;
+  return { code, key, message: agenticMessage(negotiated, key) };
 }
 
 export function publicBasketItem(
@@ -317,7 +389,8 @@ export function publicBasketItem(
     nameById: new Map(),
     names: new Set(),
     supplementIds: new Set()
-  }
+  },
+  coverage: readonly CoverageRow[] = []
 ): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
   const daysOfSupply = item.daysOfSupply ?? 30;
@@ -336,7 +409,7 @@ export function publicBasketItem(
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
-    selectionReason: defaultSelectionReason(item, locale, targets),
+    selectionReason: defaultSelectionReason(item, locale, targets, coverage),
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(incidentalNutrientNames.length > 0 ? { incidentalNutrientNames } : {}),
@@ -400,7 +473,10 @@ export function publicCoverage(row: CoverageRow) {
 
 function formatBaht(minor: number) {
   const baht = Math.abs(minor) / 100;
-  return Number.isInteger(baht) ? String(baht) : baht.toFixed(2);
+  const raw = Number.isInteger(baht) ? String(baht) : baht.toFixed(2);
+  const [whole, fraction] = raw.split(".");
+  const grouped = (whole ?? raw).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return fraction ? `${grouped}.${fraction}` : grouped;
 }
 
 function tradeOffPresentation(
@@ -420,41 +496,54 @@ function tradeOffPresentation(
   const coverageDeltaPercent = option.coveragePercent - selected.coveragePercent;
   const pillDelta = option.dailyPills - selected.dailyPills;
   const productCountDelta = option.basket.length - selected.basket.length;
+  const parts: Array<{ key: string; text: string }> = [];
 
   if (priceDeltaMinor !== 0) {
     const key = priceDeltaMinor > 0 ? "plan.tradeoff.price_up" : "plan.tradeoff.price_down";
-    return {
-      summary: agenticMessage(negotiated, key, { baht: formatBaht(priceDeltaMinor) }),
-      summaryKey: key
-    };
+    parts.push({
+      key,
+      text: agenticMessage(negotiated, key, { baht: formatBaht(priceDeltaMinor) })
+    });
+  }
+  if (pillDelta !== 0) {
+    const key = pillDelta > 0 ? "plan.tradeoff.pills_up" : "plan.tradeoff.pills_down";
+    parts.push({
+      key,
+      text: agenticMessage(negotiated, key, { count: Math.abs(pillDelta) })
+    });
   }
   if (coverageDeltaPercent !== 0) {
     const key =
       coverageDeltaPercent > 0 ? "plan.tradeoff.coverage_up" : "plan.tradeoff.coverage_down";
-    return {
-      summary: agenticMessage(negotiated, key, { percent: Math.abs(coverageDeltaPercent) }),
-      summaryKey: key
-    };
+    parts.push({
+      key,
+      text: agenticMessage(negotiated, key, { percent: Math.abs(coverageDeltaPercent) })
+    });
   }
-  if (pillDelta !== 0) {
-    const key = pillDelta > 0 ? "plan.tradeoff.pills_up" : "plan.tradeoff.pills_down";
-    return {
-      summary: agenticMessage(negotiated, key, { count: Math.abs(pillDelta) }),
-      summaryKey: key
-    };
-  }
-  if (productCountDelta !== 0) {
+  if (productCountDelta !== 0 && parts.length === 0) {
     const key =
       productCountDelta > 0 ? "plan.tradeoff.products_up" : "plan.tradeoff.products_down";
+    parts.push({
+      key,
+      text: agenticMessage(negotiated, key, { count: Math.abs(productCountDelta) })
+    });
+  }
+
+  if (parts.length === 0) {
     return {
-      summary: agenticMessage(negotiated, key, { count: Math.abs(productCountDelta) }),
-      summaryKey: key
+      summary: agenticMessage(negotiated, "plan.tradeoff.same"),
+      summaryKey: "plan.tradeoff.same"
     };
   }
 
+  if (parts.length === 1) {
+    return { summary: parts[0]!.text, summaryKey: parts[0]!.key };
+  }
+
+  const partsText = parts.map((item) => item.text).join("; ");
   return {
-    summary: agenticMessage(negotiated, "plan.tradeoff.same"),
-    summaryKey: "plan.tradeoff.same"
+    summary: agenticMessage(negotiated, "plan.tradeoff.composed", { parts: partsText }),
+    summaryKey: "plan.tradeoff.composed"
   };
 }
 
@@ -663,7 +752,11 @@ export function publicPlanFields(result: Pick<
 
   return {
     ...(result.basket.length > 0
-      ? { basket: result.basket.map((item) => publicBasketItem(item, locale, requestedTargets)) }
+      ? {
+          basket: result.basket.map((item) =>
+            publicBasketItem(item, locale, requestedTargets, result.coverage)
+          )
+        }
       : {}),
     ...(result.coverage.length > 0
       ? { coverage: result.coverage.map(publicCoverage) }

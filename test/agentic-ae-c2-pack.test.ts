@@ -93,8 +93,8 @@ const OPTION_REASON = {
 
 const THAI_COPY = {
   choice: "ยืนยันข้อมูลความปลอดภัย",
-  optionReason: OPTION_REASON.fewest_pills.th,
-  productReason: "สินค้านี้ครอบคลุมสารอาหารที่ขอ",
+  optionReason: "ตัวเลือกที่ใช้ได้ดีที่สุด",
+  productReason: "สินค้านี้ให้ Omega-3 1104 mg ต่อวัน",
   question: "ตรวจทานข้อมูลความปลอดภัยแล้วยืนยันกับผู้ใช้ก่อน",
   safety: "โอเมกา 3 จากสินค้าที่เลือกมีปฏิกิริยากับยาที่แจ้งไว้",
   summary: "สูตรพร้อมแล้ว โปรดยืนยันกับผู้ใช้ก่อน"

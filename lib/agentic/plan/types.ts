@@ -248,7 +248,14 @@ export type CoverageContributor = Readonly<{
 }>;
 
 export type SelectionReason = Readonly<{
-  code: "best_available" | "covers_target" | "reduces_cost" | "reduces_pills" | "retained_by_user";
+  code:
+    | "best_available"
+    | "best_available_dose"
+    | "consolidates_targets"
+    | "covers_target"
+    | "reduces_cost"
+    | "reduces_pills"
+    | "retained_by_user";
   message: string;
   messageKey: string;
   requestedNames?: readonly string[];

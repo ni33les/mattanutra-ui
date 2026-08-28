@@ -9,6 +9,7 @@ import { canonicalAeReport, runAePack } from "../test/agentic-ae-pack.test.ts";
 import { canonicalAeC2Report, runAeC2Pack } from "../test/agentic-ae-c2-pack.test.ts";
 import { canonicalAeC3Report, runAeC3Pack } from "../test/agentic-ae-c3-pack.test.ts";
 import { canonicalAeC4Report, runAeC4Pack } from "../test/agentic-ae-c4-pack.test.ts";
+import { canonicalAeC5Report, runAeC5Pack } from "../test/agentic-ae-c5-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -321,6 +322,41 @@ const ROWS = [
     category: "MCP explanations",
     id: "AX4-09",
     purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
+  },
+  {
+    category: "MCP copy",
+    id: "AX5-01",
+    purpose: "Every finished plan operation still has no matcher internals"
+  },
+  {
+    category: "MCP copy",
+    id: "AX5-02",
+    purpose: "A bad create returns one small field-level error"
+  },
+  {
+    category: "MCP copy",
+    id: "AX5-03",
+    purpose: "Cleaning the serializer does not drop state, safety, options or prices"
+  },
+  {
+    category: "MCP copy",
+    id: "AX5-04",
+    purpose: "Each product line names its real job, not a generic filler sentence"
+  },
+  {
+    category: "MCP copy",
+    id: "AX5-05",
+    purpose: "A lone option is “best available”, not a fake comparison"
+  },
+  {
+    category: "MCP copy",
+    id: "AX5-06",
+    purpose: "Option summaries state price, pills and coverage when they all change"
+  },
+  {
+    category: "MCP copy",
+    id: "AX5-07",
+    purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
   }
 ];
 
@@ -351,6 +387,7 @@ export function canonicalPack(run) {
     honesty: JSON.parse(canonicalAeC2Report(run.honesty)),
     planning: JSON.parse(canonicalAeC3Report(run.planning)),
     explanations: JSON.parse(canonicalAeC4Report(run.explanations)),
+    copy: JSON.parse(canonicalAeC5Report(run.copy)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -372,11 +409,15 @@ export function snapshotFromRun(run) {
   const explanations = Object.fromEntries(
     run.explanations.cases.map((item) => [item.id, item.result])
   );
+  const copy = Object.fromEntries(
+    run.copy.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
     planning,
     explanations,
+    copy,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -412,13 +453,15 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("AX4-")
-    ? "explanations"
-    : id.startsWith("AX3-")
-      ? "planning"
-      : id.startsWith("AX2-")
-        ? "honesty"
-        : "contract";
+  const section = id.startsWith("AX5-")
+    ? "copy"
+    : id.startsWith("AX4-")
+      ? "explanations"
+      : id.startsWith("AX3-")
+        ? "planning"
+        : id.startsWith("AX2-")
+          ? "honesty"
+          : "contract";
   const oldValue = baseline[section]?.[id];
   const newValue = current;
   if (oldValue === "PASS" && newValue === "FAIL") {
@@ -439,6 +482,7 @@ export function sectionTotals(run) {
   const honestyPass = run.honesty.passedCases === run.honesty.totalCases;
   const planningPass = run.planning.passedCases === run.planning.totalCases;
   const explanationsPass = run.explanations.passedCases === run.explanations.totalCases;
+  const copyPass = run.copy.passedCases === run.copy.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -456,12 +500,21 @@ export function sectionTotals(run) {
       passed: explanationsPass,
       text: `${run.explanations.passedCases}/${run.explanations.totalCases}`
     },
+    copy: {
+      passed: copyPass,
+      text: `${run.copy.passedCases}/${run.copy.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
     },
     packPass:
-      matcherPass && contractPass && honestyPass && planningPass && explanationsPass
+      matcherPass &&
+      contractPass &&
+      honestyPass &&
+      planningPass &&
+      explanationsPass &&
+      copyPass
   };
 }
 
@@ -475,6 +528,9 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.explanations.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.copy.cases) {
     byId.set(item.id, item);
   }
 
@@ -525,6 +581,9 @@ export function printTable(run) {
   console.log(
     `MCP explanations: ${totals.explanations.text} — ${totals.explanations.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `MCP copy: ${totals.copy.text} — ${totals.copy.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -553,5 +612,6 @@ export async function runPackOnce() {
   const honesty = await runAeC2Pack();
   const planning = await runAeC3Pack();
   const explanations = await runAeC4Pack();
-  return { contract, honesty, planning, explanations, matcher };
+  const copy = await runAeC5Pack();
+  return { contract, honesty, planning, explanations, copy, matcher };
 }

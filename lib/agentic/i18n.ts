@@ -385,9 +385,24 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "不评估并继续"
   },
   "plan.selection.covers_target": {
-    en: "This product covers a requested nutrient.",
-    th: "สินค้านี้ครอบคลุมสารอาหารที่ขอ",
-    "zh-CN": "该产品覆盖所请求的营养素。"
+    en: "This product covers {name} at {amount} {unit} per day.",
+    th: "สินค้านี้ให้ {name} {amount} {unit} ต่อวัน",
+    "zh-CN": "该产品每天提供 {amount} {unit} {name}。"
+  },
+  "plan.selection.covers_target_named": {
+    en: "This product covers {name}.",
+    th: "สินค้านี้ครอบคลุม {name}",
+    "zh-CN": "该产品覆盖 {name}。"
+  },
+  "plan.selection.consolidates_targets": {
+    en: "This product covers {names} together.",
+    th: "สินค้านี้ครอบคลุม {names} ในรายการเดียว",
+    "zh-CN": "该产品同时覆盖 {names}。"
+  },
+  "plan.selection.best_available_dose": {
+    en: "This product is the best available {name} dose and still leaves {gap} {unit}.",
+    th: "สินค้านี้เป็นขนาด {name} ที่ทำได้ดีที่สุด และยังขาด {gap} {unit}",
+    "zh-CN": "该产品是可获得的最佳 {name} 剂量，仍缺 {gap} {unit}。"
   },
   "plan.selection.reduces_pills": {
     en: "This product keeps the daily pill count lower.",
@@ -414,6 +429,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "สมดุลทั้งค่าใช้จ่ายและเม็ด",
     "zh-CN": "更均衡的组合"
   },
+  "plan.option.best_available": {
+    en: "Best available match",
+    th: "ตัวเลือกที่ใช้ได้ดีที่สุด",
+    "zh-CN": "当前最佳可得方案"
+  },
   "plan.tradeoff.selected": {
     en: "Selected option",
     th: "ตัวเลือกที่เลือก",
@@ -423,6 +443,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     en: "No material difference",
     th: "ไม่ต่างจากตัวเลือกที่เลือก",
     "zh-CN": "与已选方案无实质差别"
+  },
+  "plan.tradeoff.composed": {
+    en: "{parts}",
+    th: "{parts}",
+    "zh-CN": "{parts}"
   },
   "plan.tradeoff.price_up": {
     en: "+{baht} THB",
