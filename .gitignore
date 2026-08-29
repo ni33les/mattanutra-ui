@@ -32,3 +32,8 @@ reports/
 
 # hand-off extract cache (source of truth remains files/ttf.zip)
 .cache/
+
+# local matcher/checkout diag scratch
+scripts/_r21-*
+scripts/_r22-*
+tmp/

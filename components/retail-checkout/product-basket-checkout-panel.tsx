@@ -9,6 +9,7 @@ import type {
   ProductBasketProduct,
   ProductBasketQuotePreview
 } from "@/components/retail-checkout/product-basket-types";
+import type { RetailCheckoutFrozenLine } from "@/lib/retail-product-checkout";
 import { trackBpmEvent } from "@/lib/bpm-client";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import type { Locale } from "@/lib/i18n";
@@ -32,6 +33,7 @@ type AddressState = {
 type CheckoutState = {
   address: AddressState;
   addressLine2Visible: boolean;
+  agentAuthorized: boolean;
   billingAddress: AddressState;
   billingAddressLine2Visible: boolean;
   billingSameAsShipping: boolean;
@@ -39,13 +41,20 @@ type CheckoutState = {
 };
 
 type ProductBasketCheckoutPanelProps = Readonly<{
+  agenticOrderId?: string | null;
+  destinationCountry?: string | null;
+  frozenLines?: readonly RetailCheckoutFrozenLine[];
+  initialQuotePreview?: ProductBasketQuotePreview | null;
   locale: Locale;
+  mode?: "web" | "agentic";
+  orderReference?: string | null;
   planId: string;
   publishableKey: string;
   removedItemIds: readonly string[];
   selectedRetailerOrganisationId?: string | null;
   selectedItemIds: readonly string[];
   selectedProducts: readonly ProductBasketProduct[];
+  shippingAmount?: number | null;
 }>;
 
 type FieldConfig = Readonly<{
@@ -59,6 +68,8 @@ type FieldConfig = Readonly<{
 const copy = {
   en: {
     addAddressLine2: "+ Add apartment, suite, or building",
+    agentAuthorized: "I authorize this AI agent to place this order for me",
+    agentAuthorizedRequired: "Tick AI-agent authorization to continue.",
     addressLine1: "Address",
     addressLine2: "Apartment, suite, or building",
     billing: "Billing address",
@@ -96,6 +107,7 @@ const copy = {
     stripeLoading: "Loading secure payment...",
     subtotal: "Subtotal",
     tax: "Tax",
+    testMode: "Stripe Test Mode — non-live checkout",
     title: "Checkout",
     total: "Total",
     unavailable: "Unavailable",
@@ -105,6 +117,8 @@ const copy = {
   },
   th: {
     addAddressLine2: "+ เพิ่มอพาร์ตเมนต์ ห้อง หรืออาคาร",
+    agentAuthorized: "ฉันอนุญาตให้เอเจนต์ AI สั่งซื้อนี้แทนฉัน",
+    agentAuthorizedRequired: "โปรดยืนยันการอนุญาตเอเจนต์ AI เพื่อดำเนินการต่อ",
     addressLine1: "ที่อยู่",
     addressLine2: "อพาร์ตเมนต์ ห้อง หรืออาคาร",
     billing: "ที่อยู่สำหรับออกบิล",
@@ -142,6 +156,7 @@ const copy = {
     stripeLoading: "กำลังโหลดหน้าชำระเงินที่ปลอดภัย...",
     subtotal: "ยอดรวมสินค้า",
     tax: "ภาษี",
+    testMode: "Stripe Test Mode — ไม่ใช่การชำระเงินจริง",
     title: "ชำระเงิน",
     total: "ยอดชำระ",
     unavailable: "ไม่พร้อมชำระเงิน",
@@ -151,6 +166,8 @@ const copy = {
   },
   "zh-CN": {
     addAddressLine2: "+ 添加公寓、套房或楼栋",
+    agentAuthorized: "我授权此 AI 代理代我下单",
+    agentAuthorizedRequired: "请勾选 AI 代理授权后再继续。",
     addressLine1: "地址",
     addressLine2: "公寓、套房或楼栋",
     billing: "账单地址",
@@ -188,6 +205,7 @@ const copy = {
     stripeLoading: "正在加载安全付款...",
     subtotal: "小计",
     tax: "税费",
+    testMode: "Stripe Test Mode — 非正式付款",
     title: "结账",
     total: "总计",
     unavailable: "暂不能结账",
@@ -346,21 +364,33 @@ function labelForField(
 }
 
 export function ProductBasketCheckoutPanel({
+  agenticOrderId = null,
+  destinationCountry = null,
+  frozenLines = [],
+  initialQuotePreview = null,
   locale,
+  mode = "web",
+  orderReference = null,
   planId,
   publishableKey,
   removedItemIds,
   selectedRetailerOrganisationId = null,
   selectedItemIds,
-  selectedProducts
+  selectedProducts,
+  shippingAmount: shippingAmountFrozen = null
 }: ProductBasketCheckoutPanelProps) {
   const labels = copy[locale];
+  const checkoutMode = mode === "agentic" ? "agentic" : "web";
   const [checkout, setCheckout] = useState<CheckoutState>(() => {
     const address = initialAddress();
+    if (destinationCountry) {
+      address.country = destinationCountry;
+    }
 
     return {
       address,
       addressLine2Visible: false,
+      agentAuthorized: false,
       billingAddress: emptyBillingAddress(address),
       billingAddressLine2Visible: false,
       billingSameAsShipping: true,
@@ -370,7 +400,7 @@ export function ProductBasketCheckoutPanel({
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [quotePreview, setQuotePreview] =
-    useState<ProductBasketQuotePreview | null>(null);
+    useState<ProductBasketQuotePreview | null>(initialQuotePreview);
   const [isLoading, setIsLoading] = useState(false);
   const [isCompletingMock, setIsCompletingMock] = useState(false);
   const [paymentId, setPaymentId] = useState<string | null>(null);
@@ -411,7 +441,8 @@ export function ProductBasketCheckoutPanel({
   const formIsValid =
     Object.keys(shippingErrors).length === 0 &&
     Object.keys(billingErrors).length === 0 &&
-    selectedItemIds.length > 0;
+    selectedItemIds.length > 0 &&
+    (checkoutMode !== "agentic" || checkout.agentAuthorized);
   const subtotal = quotePreview?.subtotalAmount ?? 0;
   const shippingAmount = quotePreview?.shippingAmount ?? 0;
   const currency = quotePreview?.currency || "THB";
@@ -514,6 +545,13 @@ export function ProductBasketCheckoutPanel({
   }): Promise<ProductBasketQuotePreview | null> => {
     setError("");
 
+    if (checkoutMode === "agentic") {
+      if (initialQuotePreview) {
+        setQuotePreview(initialQuotePreview);
+      }
+      return initialQuotePreview;
+    }
+
     try {
       const response = await fetch("/api/retail/basket/availability", {
         body: JSON.stringify({
@@ -562,6 +600,8 @@ export function ProductBasketCheckoutPanel({
     }
   }, [
     checkout.address.country,
+    checkoutMode,
+    initialQuotePreview,
     labels.error,
     locale,
     planId,
@@ -598,6 +638,11 @@ export function ProductBasketCheckoutPanel({
       return;
     }
 
+    if (checkoutMode === "agentic" && !checkout.agentAuthorized) {
+      setError(labels.agentAuthorizedRequired);
+      return;
+    }
+
     const activeQuotePreview = quotePreview ?? (await previewQuote());
 
     if (!activeQuotePreview?.canCheckout) {
@@ -624,15 +669,21 @@ export function ProductBasketCheckoutPanel({
       const response = await fetch("/api/retail/checkout/session", {
         body: JSON.stringify({
           address: checkout.address,
+          agentAuthorized: checkout.agentAuthorized,
+          agenticOrderId,
           billingAddress: checkout.billingSameAsShipping
             ? checkout.address
             : checkout.billingAddress,
           billingSameAsShipping: checkout.billingSameAsShipping,
+          frozenLines,
           locale,
+          mode: checkoutMode,
           planId,
           removedItemIds,
           selectedRetailerOrganisationId,
-          selectedItemIds
+          selectedItemIds,
+          shippingAmount:
+            shippingAmountFrozen ?? activeQuotePreview.shippingAmount ?? null
         }),
         cache: "no-store",
         headers: { "content-type": "application/json" },
@@ -669,9 +720,14 @@ export function ProductBasketCheckoutPanel({
       setIsLoading(false);
     }
   }, [
+    agenticOrderId,
     checkout.address,
+    checkout.agentAuthorized,
     checkout.billingAddress,
     checkout.billingSameAsShipping,
+    checkoutMode,
+    frozenLines,
+    labels.agentAuthorizedRequired,
     labels.cannotDeliver,
     labels.error,
     labels.unavailableBody,
@@ -683,6 +739,7 @@ export function ProductBasketCheckoutPanel({
     removedItemIds,
     selectedRetailerOrganisationId,
     selectedItemIds,
+    shippingAmountFrozen,
     touchInvalidFields
   ]);
 
@@ -743,6 +800,7 @@ export function ProductBasketCheckoutPanel({
           autoComplete={config.autoComplete}
           className={inputClass(Boolean(errorMessage))}
           inputMode={config.inputMode}
+          name={config.field}
           onBlur={() => markTouched(scope, config.field)}
           onChange={(event) => updateAddress(scope, config.field, event.target.value)}
           required={!config.optional}
@@ -801,6 +859,16 @@ export function ProductBasketCheckoutPanel({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="space-y-5">
           <section className="mn-commerce-card">
+            {checkoutMode === "agentic" ? (
+              <p className="mb-4 rounded-lg bg-[var(--mn-cream)] px-4 py-3 text-sm font-semibold text-[var(--mn-teal-deep)]">
+                {labels.testMode}
+              </p>
+            ) : null}
+            {orderReference ? (
+              <p className="text-sm font-semibold text-[var(--mn-ink-soft)]">
+                {orderReference}
+              </p>
+            ) : null}
             <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
               {labels.title}
             </h2>
@@ -838,6 +906,8 @@ export function ProductBasketCheckoutPanel({
                 <select
                   autoComplete="shipping country"
                   className={inputClass(Boolean(visibleError("shipping", "country", shippingErrors)))}
+                  disabled={Boolean(destinationCountry)}
+                  name="country"
                   onBlur={() => markTouched("shipping", "country")}
                   onChange={(event) => updateAddress("shipping", "country", event.target.value)}
                   value={checkout.address.country}
@@ -1029,6 +1099,24 @@ export function ProductBasketCheckoutPanel({
                   )}
                 </div>
               </div>
+            ) : null}
+
+            {checkoutMode === "agentic" ? (
+              <label className="mt-4 flex items-start gap-3 rounded-xl bg-white p-3 text-sm font-semibold text-[var(--mn-ink)] ring-1 ring-[var(--mn-line)]">
+                <input
+                  checked={checkout.agentAuthorized}
+                  className="mt-1 size-4 accent-[var(--mn-teal-deep)]"
+                  name="agentAuthorized"
+                  onChange={(event) =>
+                    setCheckout((current) => ({
+                      ...current,
+                      agentAuthorized: event.target.checked
+                    }))
+                  }
+                  type="checkbox"
+                />
+                {labels.agentAuthorized}
+              </label>
             ) : null}
 
             {error ? (

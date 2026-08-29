@@ -172,6 +172,44 @@ describe("retail product checkout static contracts", () => {
     assert.match(workflowService, /await queueRetailOrderCustomerLineUpdate/);
   });
 
+  it("runs agentic checkout on the same web session, BPM, finance and fulfilment rail", () => {
+    const execute = readFileSync(
+      new URL("../lib/agentic/commerce/execute.ts", import.meta.url),
+      "utf8"
+    );
+    const sessionApi = readFileSync(
+      new URL("../app/api/retail/checkout/session/route.ts", import.meta.url),
+      "utf8"
+    );
+    const stripeAdapter = readFileSync(
+      new URL("../lib/agentic/commerce/stripe-adapter.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(checkoutService, /mode\?: "web" \| "agentic"/);
+    assert.match(checkoutService, /agentAuthorized/);
+    assert.match(checkoutService, /frozenLines/);
+    assert.match(checkoutService, /channel: checkoutMode === "agentic" \? "mcp" : "web"/);
+    assert.match(checkoutService, /kind: "retail_product_checkout"/);
+    assert.match(checkoutService, /retail_product_checkout_requested/);
+    assert.match(checkoutService, /retail_product_payment_succeeded/);
+    assert.match(checkoutService, /queuePlatformRetailRevenueNotification/);
+    assert.match(checkoutService, /recordRetailCheckoutFinance/);
+    assert.match(checkoutService, /sendRetailOrderWorkflowEmail/);
+    assert.match(sessionApi, /mode === "agentic"/);
+    assert.match(checkoutPage, /mode === "agentic"/);
+    assert.match(checkoutPage, /AgenticCheckoutPanel/);
+    assert.match(checkoutPage, /paymentProvider === "mock"/);
+    assert.match(checkoutPanel, /agentAuthorized/);
+    assert.match(checkoutPanel, /mode: checkoutMode/);
+    assert.match(checkoutService, /projectRetailPaidOntoAgenticOrder/);
+    assert.match(execute, /\/basket\/checkout\?mode=agentic/);
+    assert.doesNotMatch(execute, /\/mcp\/checkout\/\$\{/);
+    assert.doesNotMatch(
+      stripeAdapter,
+      /await joinMcpPaidOrderToRetail\(\{\s*now,\s*order: applied\.order/
+    );
+  });
+
 	it("uses customer-facing wording for awaiting-stock order updates", () => {
 	    assert.match(trackingPage, /awaiting_stock: "Order processing"/);
 	    assert.match(trackingPage, /const displayStatus = displayOrderStatus\(order\)/);

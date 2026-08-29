@@ -283,7 +283,7 @@ describe("admin RBAC", () => {
 	    assert.match(stockPlanner, /system\.retail_stock_planner_credential_generated/);
 	    assert.match(stockPlannerScript, /seedRetailStockPlannerAgent\(sql\)/);
 	    assert.match(taskService, /task_organisations\.organisation_type = 'platform'/);
-	    assert.match(taskService, /tasks\.organisation_id = \$\{accessScope\.organisationId\}::uuid/);
+	    assert.match(taskService, /tasks\.organisation_id = \$\{input\.accessScope\.organisationId\}::uuid/);
 	  });
 
   it("maps admin access APIs to access permissions while leaving passkey auth public", () => {

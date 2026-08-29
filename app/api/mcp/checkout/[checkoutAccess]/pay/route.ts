@@ -7,8 +7,6 @@ import { mockEventForScenario } from "@/lib/agentic/commerce/payment";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
 import { isPaymentScenario, scenarioSubmitsOms } from "@/lib/agentic/qa/simulate";
-import { joinMcpPaidOrderToRetail } from "@/lib/agentic/commerce/retail-join";
-import { createAgenticStripeCheckoutSession } from "@/lib/agentic/commerce/stripe-adapter";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { asMinor } from "@/lib/agentic/money";
 
@@ -146,19 +144,12 @@ export async function POST(request: Request, { params }: RouteProps) {
       );
     }
 
-    const session = await createAgenticStripeCheckoutSession({
-      checkoutAccess,
-      customerEmail: parsed.address.customerEmail,
-      customerName: parsed.address.customerName,
-      locale: "en",
-      orderId: order.id,
-      runtime,
-      totalPriceMinor: asMinor(order.totalPriceMinor)
-    });
-
     return NextResponse.json(
-      { clientSecret: session.clientSecret, ok: true, sessionId: session.sessionId },
-      { headers: { "Cache-Control": "no-store" } }
+      {
+        checkoutUrl: `/en/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutAccess)}`,
+        message: "Pay on MattaNutra basket checkout."
+      },
+      { headers: { "Cache-Control": "no-store" }, status: 409 }
     );
   }
 
@@ -193,17 +184,6 @@ export async function POST(request: Request, { params }: RouteProps) {
     });
   }
 
-  const paidForRetail = await runtime.store.getOrder(order.id);
-
-  if (paidForRetail?.paymentStatus === "paid") {
-    await joinMcpPaidOrderToRetail({
-      now,
-      order: paidForRetail,
-      request,
-      store: runtime.store
-    });
-  }
-
   if (scenarioSubmitsOms(requestedScenario)) {
     await processOmsOutbox({ now, store: runtime.store });
   }
@@ -221,7 +201,9 @@ export async function POST(request: Request, { params }: RouteProps) {
 
   if (formPosted) {
     const target = new URL(
-      returnTo.startsWith("/") ? returnTo : `/en/mcp/checkout/${checkoutAccess}`,
+      returnTo.startsWith("/")
+        ? returnTo
+        : `/en/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutAccess)}`,
       runtime.config.siteUrl
     );
     target.searchParams.set("paymentStatus", String(result.paymentStatus ?? ""));

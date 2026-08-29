@@ -1,10 +1,6 @@
 import { hashCapability } from "@/lib/agentic/capabilities";
-import {
-  joinMcpPaidOrderToRetail,
-  lookupRetailOrderForAgentic
-} from "@/lib/agentic/commerce/retail-join";
-import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
-import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
+import { lookupRetailOrderForAgentic } from "@/lib/agentic/commerce/retail-join";
+import type { AgenticRuntime } from "@/lib/agentic/runtime";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { applyPaidAgenticStripeSession } from "@/lib/agentic/commerce/stripe-adapter";
 
@@ -60,23 +56,7 @@ export async function resolveAgenticPaidTrackingPath(input: Readonly<{
   }
 
   const existing = await lookupRetailOrderForAgentic(order.id);
-  const joined =
-    existing ??
-    (await joinMcpPaidOrderToRetail({
-      now: nowIso(),
-      order,
-      store: input.runtime.store
-    }));
-
-  if (joined && !existing) {
-    await processOmsOutbox({
-      adapter: input.runtime.config.thailandRetailerAdapter,
-      now: nowIso(),
-      store: input.runtime.store
-    });
-  }
-
-  const trackingUrl = existing?.trackingUrl ?? joined?.trackingUrl;
+  const trackingUrl = existing?.trackingUrl;
 
   if (!trackingUrl) {
     return withFromMcp(

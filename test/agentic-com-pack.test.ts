@@ -180,6 +180,15 @@ async function pay(
 
 function checkoutAccessOf(execute: Record<string, unknown>) {
   const url = typeof execute.checkoutUrl === "string" ? execute.checkoutUrl : "";
+  try {
+    const parsed = new URL(url, "https://mattanutra.example");
+    const order = parsed.searchParams.get("order");
+    if (order) {
+      return order;
+    }
+  } catch {
+    // Fall through to legacy MCP checkout path parsing.
+  }
   const match = url.match(/\/mcp\/checkout\/([^/?#]+)/);
   return match?.[1] ?? "";
 }
@@ -1060,6 +1069,7 @@ async function com29() {
     });
     const money = moneyFromFrozen(executed.frozenPlan);
     const ok =
+      String(executed.checkoutUrl).includes("/basket/checkout?mode=agentic") &&
       html.includes(String(executed.orderReference)) &&
       html.includes("THB") &&
       html.includes(COM_PRD_B12.candidate.title) &&

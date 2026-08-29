@@ -101,6 +101,7 @@ export function isDocsOnly(file) {
     file.endsWith(".md") ||
     file.startsWith("docs/") ||
     file.startsWith(".codex/") ||
+    file.startsWith("files/") ||
     file === ".gitignore"
   );
 }

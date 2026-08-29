@@ -235,7 +235,7 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
         planHandle: HANDLE,
         safetyAcknowledgement: PLAN_SAFETY_ACK
       },
-      required: ["operation", "idempotencyKey", "planHandle", "expectedRevision", "answers"],
+      required: ["operation", "idempotencyKey", "planHandle", "expectedRevision"],
       type: "object"
     },
     {
@@ -280,7 +280,23 @@ export const PLAN_ADVERTISED_SCHEMA: JsonSchema = {
     },
     optionId: { type: "string" },
     planHandle: { type: "string" },
-    request: { type: "object" },
+    request: {
+      additionalProperties: true,
+      properties: {
+        profile: {
+          additionalProperties: true,
+          properties: {
+            sex: {
+              description: "female, male, intersex, or unspecified",
+              enum: ["female", "male", "intersex", "unspecified"],
+              type: "string"
+            }
+          },
+          type: "object"
+        }
+      },
+      type: "object"
+    },
     safetyAcknowledgement: { type: "object" },
     selectOptionId: { type: "string" }
   },

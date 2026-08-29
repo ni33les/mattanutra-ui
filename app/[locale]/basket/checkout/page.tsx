@@ -2,9 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { AgenticCheckoutPanel } from "@/components/agentic-checkout-panel";
 import { ProductBasketCheckoutPanel } from "@/components/retail-checkout/product-basket-checkout-panel";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
+import { loadAgenticBasketCheckout } from "@/lib/agentic/commerce/basket-checkout";
+import { mcpOrderTrackSuccessPath } from "@/lib/agentic/commerce/checkout-return";
+import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
+import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
@@ -16,10 +21,16 @@ import { stripePublishableKey } from "@/lib/stripe-payments";
 type BasketCheckoutPageProps = Readonly<{
   params: Promise<{ locale: string }>;
   searchParams: Promise<{
+    attempt?: string;
+    mode?: string;
+    order?: string;
+    paymentStatus?: string;
     plan?: string;
+    reason?: string;
     removed?: string;
     retailer?: string;
     selected?: string;
+    stateVersion?: string;
   }>;
 }>;
 
@@ -140,14 +151,41 @@ export default async function BasketCheckoutPage({
 
   const locale: Locale = rawLocale;
   const query = await searchParams;
+  const checkoutMode = query.mode === "agentic" ? "agentic" : "web";
+  const checkoutAccess =
+    typeof query.order === "string" ? query.order.trim() : "";
+  const agenticBasket =
+    checkoutMode === "agentic"
+      ? await loadAgenticBasketCheckout({
+          checkoutAccess,
+          locale
+        })
+      : null;
+
+  const mockHarness = agenticBasket?.paymentProvider === "mock";
+
+  if (checkoutMode === "agentic") {
+    if (!agenticBasket) {
+      notFound();
+    }
+
+    if (agenticBasket.paid && agenticBasket.trackingPath && !mockHarness) {
+      redirect(agenticBasket.trackingPath);
+    }
+  }
+
   const planId =
-    typeof query.plan === "string" && isUuid(query.plan) ? query.plan : null;
-  const selectedItemIds = parseIds(query.selected);
+    agenticBasket?.planId ??
+    (typeof query.plan === "string" && isUuid(query.plan) ? query.plan : null);
+  const selectedItemIds = agenticBasket
+    ? [...agenticBasket.selectedItemIds]
+    : parseIds(query.selected);
   const removedItemIds = parseIds(query.removed);
   const selectedRetailerOrganisationId =
-    typeof query.retailer === "string" && isUuid(query.retailer)
+    agenticBasket?.selectedRetailerOrganisationId ??
+    (typeof query.retailer === "string" && isUuid(query.retailer)
       ? query.retailer
-      : null;
+      : null);
 
   if (!planId) {
     redirect(`/${locale}/nutrition`);
@@ -156,11 +194,31 @@ export default async function BasketCheckoutPage({
   const dictionary = getDictionary(locale);
   const labels = getNamespace<BasketCheckoutCopy>(locale, "customer.basketCheckout");
   const currentPath = `/${locale}/basket/checkout`;
-  const selectedProducts = await selectedProductsForCheckout(
-    planId,
-    selectedItemIds,
-    locale
-  );
+  const selectedProducts = agenticBasket
+    ? agenticBasket.selectedProducts
+    : await selectedProductsForCheckout(
+        planId,
+        selectedItemIds,
+        locale
+      );
+  const queryResult =
+    mockHarness && typeof query.paymentStatus === "string"
+      ? `paymentStatus=${query.paymentStatus} attempt=${query.attempt ?? "none"} reason=${query.reason ?? "none"} v${query.stateVersion ?? "?"}`
+      : null;
+  const counts =
+    mockHarness && agenticBasket
+      ? await redactedOrderCounts({
+          orderId: agenticBasket.agenticOrderId,
+          runtime: getLiveAgenticRuntime()
+        })
+      : null;
+  const lastResult = [
+    queryResult,
+    counts ? `TEST-DRIVER EVIDENCE (not payment truth) ${JSON.stringify(counts)}` : null
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const currentBasketPath = `/${locale}/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutAccess)}`;
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -188,15 +246,42 @@ export default async function BasketCheckoutPage({
             {selectedItemIds.length < 1 ? labels.empty : labels.body}
           </p>
         </div>
-        {selectedItemIds.length < 1 ? null : (
-          <ProductBasketCheckoutPanel
+        {selectedItemIds.length < 1 ? null : mockHarness && agenticBasket ? (
+          <AgenticCheckoutPanel
+            checkoutAccess={checkoutAccess}
+            country={agenticBasket.destinationCountry}
+            currency={agenticBasket.currency}
+            expired={agenticBasket.expired}
+            items={agenticBasket.items}
+            lastResult={lastResult || null}
             locale={locale}
+            orderReference={agenticBasket.orderReference}
+            paid={agenticBasket.paid}
+            refundable={agenticBasket.refundable}
+            returnTo={currentBasketPath}
+            shippingMinor={agenticBasket.shippingMinor}
+            subtotalMinor={agenticBasket.subtotalMinor}
+            successUrl={mcpOrderTrackSuccessPath(locale)}
+            taxMinor={agenticBasket.taxMinor}
+            totalPriceMinor={agenticBasket.totalPriceMinor}
+            trackingHref={agenticBasket.trackingPath}
+          />
+        ) : (
+          <ProductBasketCheckoutPanel
+            agenticOrderId={agenticBasket?.agenticOrderId ?? null}
+            destinationCountry={agenticBasket?.destinationCountry ?? null}
+            frozenLines={agenticBasket?.frozenLines ?? []}
+            initialQuotePreview={agenticBasket?.quotePreview ?? null}
+            locale={locale}
+            mode={checkoutMode}
+            orderReference={agenticBasket?.orderReference ?? null}
             planId={planId}
             publishableKey={stripePublishableKey()}
             removedItemIds={removedItemIds}
             selectedRetailerOrganisationId={selectedRetailerOrganisationId}
             selectedItemIds={selectedItemIds}
             selectedProducts={selectedProducts}
+            shippingAmount={agenticBasket?.shippingAmount ?? null}
           />
         )}
       </section>

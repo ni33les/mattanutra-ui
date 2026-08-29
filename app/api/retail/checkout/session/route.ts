@@ -28,6 +28,32 @@ function stringArray(value: unknown) {
     : [];
 }
 
+function frozenLinesFromUnknown(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    const row = record(item);
+    const productId = typeof row.productId === "string" ? row.productId : "";
+    const productName = typeof row.productName === "string" ? row.productName : "";
+    const quantity = Math.max(1, Math.floor(Number(row.quantity) || 0));
+    const unitPriceAmount = Number(row.unitPriceAmount);
+
+    if (!productId || !productName || !Number.isFinite(unitPriceAmount) || unitPriceAmount < 0) {
+      return [];
+    }
+
+    return [{
+      productId,
+      productName,
+      quantity,
+      retailerSku: typeof row.retailerSku === "string" ? row.retailerSku : null,
+      unitPriceAmount
+    }];
+  });
+}
+
 export async function POST(request: Request) {
   const limited = enforceRateLimit(
     request,
@@ -48,16 +74,36 @@ export async function POST(request: Request) {
 
   const locale = isRetailCheckoutLocale(body.locale) ? body.locale : null;
   const planId = typeof body.planId === "string" ? body.planId : "";
+  const mode = body.mode === "agentic" ? "agentic" : "web";
+  const frozenLines = frozenLinesFromUnknown(body.frozenLines);
   const selectedItemIds = stringArray(body.selectedItemIds);
   const selectedRetailerOrganisationId =
     typeof body.selectedRetailerOrganisationId === "string" &&
     isUuid(body.selectedRetailerOrganisationId)
       ? body.selectedRetailerOrganisationId
       : null;
+  const agenticOrderId =
+    typeof body.agenticOrderId === "string" && body.agenticOrderId.trim()
+      ? body.agenticOrderId.trim()
+      : null;
+  const shippingAmount =
+    body.shippingAmount == null ? null : Number(body.shippingAmount);
 
-  if (!locale || !isUuid(planId) || selectedItemIds.length < 1) {
+  if (
+    !locale ||
+    !isUuid(planId) ||
+    (mode === "web" && selectedItemIds.length < 1) ||
+    (mode === "agentic" && frozenLines.length < 1)
+  ) {
     return NextResponse.json(
       { message: "Invalid basket checkout request" },
+      { headers: { "Cache-Control": "no-store" }, status: 400 }
+    );
+  }
+
+  if (mode === "agentic" && (body.agentAuthorized !== true || !agenticOrderId)) {
+    return NextResponse.json(
+      { message: "AI-agent authorization is required." },
       { headers: { "Cache-Control": "no-store" }, status: 400 }
     );
   }
@@ -65,14 +111,25 @@ export async function POST(request: Request) {
   try {
     const session = await createRetailCheckoutSession({
       address: retailCheckoutAddressFromUnknown(body.address),
+      agentAuthorized: body.agentAuthorized === true,
+      agenticOrderId,
       billingAddress: retailCheckoutAddressFromUnknown(body.billingAddress),
       billingSameAsShipping: body.billingSameAsShipping !== false,
+      frozenLines,
       locale,
+      mode,
       planId,
       removedItemIds: stringArray(body.removedItemIds),
       request,
       selectedRetailerOrganisationId,
-      selectedItemIds
+      selectedItemIds:
+        selectedItemIds.length > 0
+          ? selectedItemIds
+          : frozenLines.map((line) => line.productId),
+      shippingAmount:
+        shippingAmount != null && Number.isFinite(shippingAmount)
+          ? shippingAmount
+          : null
     });
 
     return NextResponse.json(session, {

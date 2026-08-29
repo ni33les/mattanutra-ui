@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import type postgres from "postgres";
 import { isUuid } from "@/lib/assessment-store";
+import { parsePublicId } from "@/lib/agentic/contract/ids";
 import { getSql } from "@/lib/db";
 import { FINANCE_ACCOUNT_IDS, recordFinanceTransaction } from "@/lib/finance-ledger";
 import { createPendingRetailOrderSettlement } from "@/lib/admin-retail-financials";
@@ -51,16 +52,29 @@ export type RetailCheckoutAddress = Readonly<{
   notes?: string | null;
 }>;
 
+export type RetailCheckoutFrozenLine = Readonly<{
+  productId: string;
+  productName: string;
+  quantity: number;
+  retailerSku?: string | null;
+  unitPriceAmount: number;
+}>;
+
 export type RetailCheckoutQuoteInput = Readonly<{
   address: RetailCheckoutAddress;
+  agentAuthorized?: boolean;
+  agenticOrderId?: string | null;
   billingAddress?: RetailCheckoutAddress | null;
   billingSameAsShipping?: boolean | null;
+  frozenLines?: readonly RetailCheckoutFrozenLine[];
   locale: Locale;
+  mode?: "web" | "agentic";
   planId: string;
   removedItemIds?: readonly string[];
   request?: Request;
   selectedRetailerOrganisationId?: string | null;
   selectedItemIds: readonly string[];
+  shippingAmount?: number | null;
 }>;
 
 type CheckoutPaymentRow = Readonly<{
@@ -430,6 +444,164 @@ async function pharmacyRrpPayableAmounts(
   return amounts;
 }
 
+function catalogueProductUuid(productId: string) {
+  return parsePublicId(productId, "prd_") ?? (isUuid(productId) ? productId : null);
+}
+
+async function projectRetailPaidOntoAgenticOrder(input: Readonly<{
+  agenticOrderId: unknown;
+  orderNumber: string;
+  payment: CheckoutPaymentRow;
+}>) {
+  const agenticOrderId = cleanText(input.agenticOrderId);
+
+  if (!agenticOrderId) {
+    return;
+  }
+
+  try {
+    const { nextTestUuid } = await import("@/lib/agentic/capabilities");
+    const { getLiveAgenticRuntime } = await import("@/lib/agentic/live-runtime");
+    const { processOmsOutbox } = await import("@/lib/agentic/retail/mock-thailand");
+    const { nowIso } = await import("@/lib/agentic/runtime");
+    const runtime = getLiveAgenticRuntime();
+    const now = nowIso();
+    const order = await runtime.store.getOrder(agenticOrderId);
+
+    if (!order) {
+      return;
+    }
+
+    const sessionId =
+      cleanText(input.payment.stripe_checkout_session_id) ||
+      `retail_${input.payment.id}`;
+    let next = order;
+
+    if (order.paymentStatus !== "paid") {
+      next = {
+        ...order,
+        completedAt: now,
+        latestPaymentAttempt: "succeeded",
+        latestPaymentReason: null,
+        orderStatus: "completed",
+        paymentStatus: "paid",
+        providerSessionId: sessionId,
+        stateVersion: order.stateVersion === 1 ? 2 : order.stateVersion,
+        updatedAt: now
+      };
+      await runtime.store.updateOrder(next);
+      await runtime.store.insertPaymentAudit({
+        createdAt: now,
+        id: nextTestUuid(),
+        orderId: order.id,
+        type: "payment_confirmed"
+      });
+      await runtime.store.insertOutbox({
+        createdAt: now,
+        id: nextTestUuid(),
+        orderId: order.id,
+        payload: { orderId: order.id, source: "retail_product_checkout" },
+        processedAt: null,
+        type: "OMS_SUBMIT"
+      });
+    } else if (order.providerSessionId !== sessionId) {
+      next = {
+        ...order,
+        providerSessionId: sessionId,
+        updatedAt: now
+      };
+      await runtime.store.updateOrder(next);
+    }
+
+    const linked = await runtime.store.getRetailLink(order.id);
+
+    if (!linked) {
+      await runtime.store.insertRetailLink({
+        adapter: "retail_product_checkout",
+        createdAt: now,
+        orderId: order.id,
+        retailerReference: input.orderNumber
+      });
+    }
+
+    await processOmsOutbox({
+      adapter: runtime.config.thailandRetailerAdapter,
+      now,
+      store: runtime.store
+    });
+  } catch (error) {
+    console.warn("Unable to project retail paid onto agentic order", {
+      agenticOrderId,
+      error
+    });
+  }
+}
+
+async function delightOrganisationId(sql: RetailCheckoutDb) {
+  const named = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.organisations
+    where organisation_type = 'tenant'
+      and status = 'active'
+      and lower(name) = 'delight pharmacy'
+    order by created_at asc
+    limit 1
+  `;
+  if (named[0]?.id) {
+    return named[0].id;
+  }
+  const fallback = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.organisations
+    where organisation_type = 'tenant'
+      and status = 'active'
+      and name ilike 'Delight%'
+    order by created_at asc
+    limit 1
+  `;
+  return fallback[0]?.id ?? null;
+}
+
+async function ensureAssessmentForPlan(
+  sql: RetailCheckoutDb,
+  input: Readonly<{
+    address: RetailCheckoutAddress;
+    locale: Locale;
+    planId: string;
+  }>
+) {
+  await sql`
+    insert into public.assessments (
+      plan_id,
+      locale,
+      status,
+      answers,
+      answer_summary,
+      first_name,
+      contact_email,
+      contact_email_captured_at,
+      health_score,
+      updated_at
+    )
+    values (
+      ${input.planId}::uuid,
+      ${input.locale},
+      'captured',
+      '{}'::jsonb,
+      '{}'::jsonb,
+      ${input.address.customerName},
+      ${input.address.customerEmail},
+      now(),
+      '{}'::jsonb,
+      now()
+    )
+    on conflict (plan_id) do update set
+      contact_email = coalesce(public.assessments.contact_email, excluded.contact_email),
+      first_name = coalesce(public.assessments.first_name, excluded.first_name),
+      updated_at = now()
+  `;
+}
+
 export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInput) {
   if (!isUuid(input.planId)) {
     throw new Error("Plan is required");
@@ -459,78 +631,177 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     assertAddress(billingAddress);
   }
 
-  const selectedProductIds = [...new Set(input.selectedItemIds.filter(isUuid))];
+  const checkoutMode = input.mode === "agentic" ? "agentic" : "web";
   const removedItemIds = [...new Set((input.removedItemIds ?? []).filter(Boolean))];
 
-  if (selectedProductIds.length < 1) {
-    throw new Error("Select at least one product before checkout");
+  if (checkoutMode === "agentic") {
+    if (input.agentAuthorized !== true) {
+      throw new Error("AI-agent authorization is required.");
+    }
+    if (!input.agenticOrderId) {
+      throw new Error("Agentic order is required");
+    }
+    await ensureAssessmentForPlan(sql, {
+      address,
+      locale: input.locale,
+      planId: input.planId
+    });
   }
 
-  const recommendations = await latestRecommendations(sql, input.planId, selectedProductIds);
-  const runId = recommendations[0]?.run_id ?? null;
-  const availability = await resolveRegionalBasketAvailability({
-    lines: selectedProductIds.map((productId) => ({ productId, quantity: 1 })),
-    preference: "cheapest_price",
-    preferredRetailerOrganisationId: input.selectedRetailerOrganisationId,
-    shippingCountry: address.country,
-    sql
-  });
+  let selectedProductIds = [...new Set(input.selectedItemIds.filter(isUuid))];
+  let quoteLines: QuoteLine[] = [];
+  let retailerId = "";
+  let shippingAmount = 0;
+  let availability: unknown = null;
+  let runId: string | null = null;
+  let currency = "THB";
+  let subtotalAmount = 0;
+  let totalAmount = 0;
+  let platformMarginPercent: number | null = null;
 
-  if (!availability.canCheckout || !availability.selectedRetailer) {
-    throw new Error("No single retailer can fulfill the selected basket");
-  }
-
-  const retailerId = availability.selectedRetailer.organisationId;
-  const { getCustomerPriceMarginPercent } = await import("@/lib/customer-pricing");
-  const platformMarginPercent = await getCustomerPriceMarginPercent({ sql });
-  const rrpByProductId = await pharmacyRrpPayableAmounts(
-    sql,
-    retailerId,
-    selectedProductIds
-  );
-  const recommendationByProductId = new Map(
-    recommendations.map((item) => [item.product_id, item])
-  );
-  const quoteLines: QuoteLine[] = availability.payableLines.map((line) => {
-    const recommendation = recommendationByProductId.get(line.productId);
-    const unitPriceAmount = money(line.unitPriceAmount) ?? 0;
-
-    if (!recommendation || unitPriceAmount <= 0) {
-      throw new Error("Selected product is missing checkout pricing");
+  if (checkoutMode === "agentic") {
+    const frozen = input.frozenLines ?? [];
+    if (frozen.length < 1) {
+      throw new Error("Select at least one product before checkout");
     }
-
-    // Pharmacy is paid RRP; customer unit price already includes platform %.
-    const rrpPriceAmount = rrpByProductId.get(line.productId) ?? null;
-    const retailerPayableAmount = rrpPriceAmount;
-
-    if (retailerPayableAmount === null) {
-      throw new Error("Selected product is missing retail price (RRP)");
+    selectedProductIds = [
+      ...new Set(
+        frozen
+          .map((line) => catalogueProductUuid(line.productId))
+          .filter((id): id is string => Boolean(id))
+      )
+    ];
+    if (selectedProductIds.length < 1) {
+      throw new Error("Select at least one product before checkout");
     }
-
-    return {
-      currency: line.currency ?? availability.currency ?? "THB",
-      etaDate: line.etaDate,
-      imageUrl: recommendation.image_url,
-      platformMarginPercent,
-      productId: line.productId,
-      productTitle: recommendation.title,
-      quantity: 1,
-      retailerPayableAmount,
-      retailerPayableNeedsReviewReason: null,
-      retailerPayableSource: "rrp",
-      retailSellableProductId: line.retailSellableProductId,
-      rrpPriceAmount,
-      unitPriceAmount
+    retailerId =
+      input.selectedRetailerOrganisationId && isUuid(input.selectedRetailerOrganisationId)
+        ? input.selectedRetailerOrganisationId
+        : (await delightOrganisationId(sql)) ?? "";
+    if (!retailerId) {
+      throw new Error("No single retailer can fulfill the selected basket");
+    }
+    const { getCustomerPriceMarginPercent } = await import("@/lib/customer-pricing");
+    platformMarginPercent = await getCustomerPriceMarginPercent({ sql });
+    const rrpByProductId = await pharmacyRrpPayableAmounts(sql, retailerId, selectedProductIds);
+    quoteLines = frozen.map((line) => {
+      const productId = catalogueProductUuid(line.productId);
+      if (!productId) {
+        throw new Error("Selected product is missing checkout pricing");
+      }
+      const rrpPriceAmount = rrpByProductId.get(productId) ?? null;
+      const retailerPayableAmount =
+        rrpPriceAmount !== null && rrpPriceAmount > 0 ? rrpPriceAmount : null;
+      return {
+        currency: "THB",
+        etaDate: null,
+        imageUrl: null,
+        platformMarginPercent,
+        productId,
+        productTitle: line.productName,
+        quantity: Math.max(1, Math.floor(line.quantity) || 1),
+        retailerPayableAmount,
+        retailerPayableNeedsReviewReason:
+          retailerPayableAmount == null ? "missing_retailer_payable_price" : null,
+        retailerPayableSource: retailerPayableAmount == null ? "missing" : "rrp",
+        retailSellableProductId: null,
+        rrpPriceAmount,
+        unitPriceAmount: line.unitPriceAmount
+      };
+    });
+    subtotalAmount = quoteSubtotalAmount(quoteLines);
+    shippingAmount = Math.max(0, Number(input.shippingAmount) || 0);
+    totalAmount = subtotalAmount + shippingAmount;
+    currency = quoteLines[0]?.currency ?? "THB";
+    availability = {
+      channel: "mcp",
+      selectedRetailer: { organisationId: retailerId },
+      shippingSource: "mcp"
     };
-  });
-  const subtotalAmount = quoteSubtotalAmount(quoteLines);
-  const shippingAmount = availability.shippingAmount;
-  const totalAmount = availability.totalAmount || subtotalAmount + shippingAmount;
-  const currency = quoteLines[0]?.currency ?? availability.currency ?? "THB";
+  } else {
+    if (selectedProductIds.length < 1) {
+      throw new Error("Select at least one product before checkout");
+    }
+
+    const recommendations = await latestRecommendations(
+      sql,
+      input.planId,
+      selectedProductIds
+    );
+    runId = recommendations[0]?.run_id ?? null;
+    const resolved = await resolveRegionalBasketAvailability({
+      lines: selectedProductIds.map((productId) => ({ productId, quantity: 1 })),
+      preference: "cheapest_price",
+      preferredRetailerOrganisationId: input.selectedRetailerOrganisationId,
+      shippingCountry: address.country,
+      sql
+    });
+
+    if (!resolved.canCheckout || !resolved.selectedRetailer) {
+      throw new Error("No single retailer can fulfill the selected basket");
+    }
+
+    availability = resolved;
+    retailerId = resolved.selectedRetailer.organisationId;
+    const { getCustomerPriceMarginPercent } = await import("@/lib/customer-pricing");
+    platformMarginPercent = await getCustomerPriceMarginPercent({ sql });
+    const rrpByProductId = await pharmacyRrpPayableAmounts(
+      sql,
+      retailerId,
+      selectedProductIds
+    );
+    const recommendationByProductId = new Map(
+      recommendations.map((item) => [item.product_id, item])
+    );
+    quoteLines = resolved.payableLines.map((line) => {
+      const recommendation = recommendationByProductId.get(line.productId);
+      const unitPriceAmount = money(line.unitPriceAmount) ?? 0;
+
+      if (!recommendation || unitPriceAmount <= 0) {
+        throw new Error("Selected product is missing checkout pricing");
+      }
+
+      // Pharmacy is paid RRP; customer unit price already includes platform %.
+      const rrpPriceAmount = rrpByProductId.get(line.productId) ?? null;
+      const retailerPayableAmount = rrpPriceAmount;
+
+      if (retailerPayableAmount === null) {
+        throw new Error("Selected product is missing retail price (RRP)");
+      }
+
+      return {
+        currency: line.currency ?? resolved.currency ?? "THB",
+        etaDate: line.etaDate,
+        imageUrl: recommendation.image_url,
+        platformMarginPercent,
+        productId: line.productId,
+        productTitle: recommendation.title,
+        quantity: 1,
+        retailerPayableAmount,
+        retailerPayableNeedsReviewReason: null,
+        retailerPayableSource: "rrp",
+        retailSellableProductId: line.retailSellableProductId,
+        rrpPriceAmount,
+        unitPriceAmount
+      };
+    });
+    subtotalAmount = quoteSubtotalAmount(quoteLines);
+    shippingAmount = resolved.shippingAmount;
+    totalAmount = resolved.totalAmount || subtotalAmount + shippingAmount;
+    currency = quoteLines[0]?.currency ?? resolved.currency ?? "THB";
+  }
+
+  const checkoutChannel = checkoutMode === "agentic" ? "mcp" : "web";
+  const shippingSource =
+    checkoutMode === "agentic"
+      ? "mcp"
+      : objectValue(availability).shippingSource ?? null;
   const idempotencyKey = idempotencyHash({
     address,
+    agenticOrderId: input.agenticOrderId ?? null,
     billingAddress,
     billingSameAsShipping,
+    channel: checkoutMode === "agentic" ? "mcp" : "web",
     planId: input.planId,
     runId,
     selectedRetailerOrganisationId: input.selectedRetailerOrganisationId ?? null,
@@ -595,11 +866,13 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
         ${sql.json(toJsonValue(quoteLines))}::jsonb,
         ${sql.json(toJsonValue(availability))}::jsonb,
         ${sql.json(toJsonValue({
+          agenticOrderId: checkoutMode === "agentic" ? input.agenticOrderId : null,
           billingAddress,
           billingSameAsShipping,
+          channel: checkoutMode === "agentic" ? "mcp" : "web",
           freeShipping: shippingAmount <= 0,
           shippingAmount,
-          shippingSource: availability.shippingSource,
+          shippingSource,
           subtotalAmount,
           taxAmount: 0,
           taxDisplay: "included",
@@ -631,6 +904,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     locale: input.locale,
     planId: input.planId,
     properties: {
+      channel: checkoutChannel,
       checkoutPaymentId: payment.id,
       lineCount: quoteLines.length,
       removedItemCount: removedItemIds.length,
@@ -709,17 +983,21 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     ],
     locale: stripeLocale(input.locale),
     metadata: {
+      channel: checkoutChannel,
       kind: "retail_product_checkout",
       locale: input.locale,
       paymentId: payment.id,
-      planId: input.planId
+      planId: input.planId,
+      ...(input.agenticOrderId ? { agenticOrderId: input.agenticOrderId } : {})
     },
     mode: "payment",
     payment_intent_data: {
       metadata: {
+        channel: checkoutChannel,
         kind: "retail_product_checkout",
         paymentId: payment.id,
-        planId: input.planId
+        planId: input.planId,
+        ...(input.agenticOrderId ? { agenticOrderId: input.agenticOrderId } : {})
       }
     },
     return_url: `${siteBaseUrl()}/${input.locale}/basket/return?session_id={CHECKOUT_SESSION_ID}`,
@@ -1073,6 +1351,18 @@ async function fulfillRetailCheckoutPayment(
   payment: CheckoutPaymentRow
 ) {
   if (payment.status === "fulfilled" && payment.retail_customer_order_id) {
+    const existingOrder = await sql<Array<{ order_number: string }>>`
+      select order_number
+      from public.retail_customer_orders
+      where id = ${payment.retail_customer_order_id}::uuid
+      limit 1
+    `;
+    await projectRetailPaidOntoAgenticOrder({
+      agenticOrderId: objectValue(payment.metadata).agenticOrderId,
+      orderNumber:
+        existingOrder[0]?.order_number ?? payment.retail_customer_order_id,
+      payment
+    });
     return payment;
   }
 
@@ -1150,6 +1440,12 @@ async function fulfillRetailCheckoutPayment(
   } catch (error) {
     console.warn("Unable to schedule Nong Mata reorder callback", error);
   }
+
+  await projectRetailPaidOntoAgenticOrder({
+    agenticOrderId: objectValue(updated.metadata).agenticOrderId,
+    orderNumber,
+    payment: updated
+  });
 
   return {
     ...updated,

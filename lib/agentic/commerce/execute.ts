@@ -413,7 +413,7 @@ async function executeFresh(
       now: input.now,
       order: draftOrder
     });
-    const checkoutUrl = `${input.config.siteUrl}/en/mcp/checkout/${checkoutIssued.handle}`;
+    const checkoutUrl = `${input.config.siteUrl}/${locale}/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutIssued.handle)}`;
     const successUrl = `${input.config.siteUrl}/en/order/track`;
     const order = {
       ...draftOrder,

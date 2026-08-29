@@ -2,7 +2,6 @@ import Stripe from "stripe";
 import { stripeLocale, stripePaymentConfig } from "@/lib/stripe-payment-config";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
-import { joinMcpPaidOrderToRetail } from "@/lib/agentic/commerce/retail-join";
 import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import { asMinor } from "@/lib/agentic/money";
@@ -266,11 +265,6 @@ export async function tryApplyAgenticStripeEvent(input: Readonly<{
   }
 
   if (applied.order.paymentStatus === "paid") {
-    await joinMcpPaidOrderToRetail({
-      now,
-      order: applied.order,
-      store: input.runtime.store
-    });
     await processOmsOutbox({
       adapter: input.runtime.config.thailandRetailerAdapter,
       now,

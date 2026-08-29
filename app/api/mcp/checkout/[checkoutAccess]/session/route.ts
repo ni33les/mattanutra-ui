@@ -3,10 +3,7 @@ import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import { nowIso } from "@/lib/agentic/runtime";
 import { hashCapability } from "@/lib/agentic/capabilities";
 import { parseCheckoutAddress } from "@/lib/agentic/checkout-address";
-import { createAgenticStripeCheckoutSession } from "@/lib/agentic/commerce/stripe-adapter";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { asMinor } from "@/lib/agentic/money";
-import { stripePublishableKey } from "@/lib/stripe-payments";
 import { isLocale } from "@/lib/i18n";
 
 export const runtime = "nodejs";
@@ -103,23 +100,13 @@ export async function POST(request: Request, { params }: RouteProps) {
   });
 
   const locale = isLocale(body.locale) ? body.locale : "en";
-  const session = await createAgenticStripeCheckoutSession({
-    checkoutAccess,
-    customerEmail: parsed.address.customerEmail,
-    customerName: parsed.address.customerName,
-    locale,
-    orderId: order.id,
-    runtime,
-    totalPriceMinor: asMinor(order.totalPriceMinor)
-  });
 
   return NextResponse.json(
     {
-      clientSecret: session.clientSecret,
-      ok: true,
-      publishableKey: stripePublishableKey(),
-      sessionId: session.sessionId
+      checkoutUrl: `/${locale}/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutAccess)}`,
+      message: "Pay on MattaNutra basket checkout.",
+      ok: false
     },
-    { headers: { "Cache-Control": "no-store" } }
+    { headers: { "Cache-Control": "no-store" }, status: 409 }
   );
 }

@@ -144,7 +144,7 @@ describe("agentic DEV flow", () => {
     assert.equal(executed.orderStatus, "open");
     assert.equal(executed.paymentStatus, "unpaid");
     assert.equal(executed.stateVersion, 1);
-    assert.match(String(executed.checkoutUrl), /\/mcp\/checkout\//);
+    assert.match(String(executed.checkoutUrl), /\/basket\/checkout\?mode=agentic/);
 
     const declined = await simulatePayment({
       config: runtime.config,

@@ -408,12 +408,24 @@ export function publicBasketItem(
       : (item.incidentalNutrients ?? []).map((row) => row.name);
   const incidentalNutrientNames = boundedNames(incidentalSourceNames);
   const contributions = positiveContributions(item, coverage, targets);
-  const requestedNutrientNames = contributions.map((row) => row.name);
-  const requestedNutrients = contributions.map((row) => ({
-    amount: row.amount,
-    name: row.name,
-    unit: row.unit
-  }));
+  const requestedNutrients =
+    contributions.length > 0
+      ? contributions.map((row) => ({
+          amount: row.amount,
+          name: row.name,
+          unit: row.unit
+        }))
+      : (item.requestedNutrients ?? []).map((row) => ({
+          amount: row.amount,
+          name: row.name,
+          unit: row.unit
+        }));
+  const requestedNutrientNames =
+    requestedNutrients.length > 0
+      ? requestedNutrients.map((row) => row.name)
+      : Array.isArray(item.requestedNutrientNames)
+        ? [...item.requestedNutrientNames]
+        : [];
 
   return {
     currency: item.currency,
@@ -900,7 +912,16 @@ export function publicPlanFields(result: Pick<
     ...(acknowledgedUnassessedConditionCodes.length > 0
       ? { acknowledgedUnassessedConditionCodes }
       : {}),
-    ...(result.basket.length > 0 ? { stackSummary: stackSummaryFor(result.basket, currency) } : {}),
+    ...(result.basket.length > 0
+      ? {
+          stackSummary: {
+            ...stackSummaryFor(result.basket, currency),
+            ...(selected && Number.isFinite(selected.totalPriceMinor)
+              ? { totalPriceMinor: selected.totalPriceMinor }
+              : {})
+          }
+        }
+      : {}),
     acknowledgementStatus,
     ...(result.status !== "processing" && (selected || result.basket.length > 0)
       ? {

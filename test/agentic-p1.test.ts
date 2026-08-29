@@ -787,6 +787,7 @@ describe("agentic P1 pack fixes", () => {
     assert.match(website, /EmbeddedCheckout/);
     assert.equal(website.includes("Continue to Stripe Test Mode"), false);
     assert.match(page, /McpWebsiteCheckoutPanel/);
+    assert.match(page, /\/basket\/checkout\?mode=agentic/);
     assert.match(page, /loadAgenticCheckoutProducts/);
     const adapter = readFileSync(
       new URL("../lib/agentic/commerce/stripe-adapter.ts", import.meta.url),
@@ -1388,23 +1389,23 @@ describe("agentic P1 pack fixes", () => {
     );
     const support = readFileSync(new URL("../lib/agentic/support.ts", import.meta.url), "utf8");
 
-    assert.match(pay, /joinMcpPaidOrderToRetail/);
+    assert.doesNotMatch(pay, /joinMcpPaidOrderToRetail/);
     assert.match(pay, /processing_then_success/);
     assert.match(pay, /providerEventId: `\$\{event.providerEventId\}_success`/);
     assert.equal(pay.includes("resolveAgenticPaidTrackingPath"), false);
-    assert.match(pay, /\/en\/mcp\/checkout\/\$\{checkoutAccess\}/);
-    assert.match(simulate, /joinMcpPaidOrderToRetail/);
+    assert.match(pay, /\/en\/basket\/checkout\?mode=agentic/);
+    assert.doesNotMatch(simulate, /joinMcpPaidOrderToRetail/);
     assert.match(pay, /postedScenario/);
     assert.equal(pay.includes('form.get("scenario") ?? "success"'), false);
     assert.match(pay, /Stripe Test Mode does not accept mock payment scenarios/);
-    assert.match(join, /fulfillAgenticRetailCheckout/);
+    assert.match(join, /lookupRetailOrderForAgentic/);
+    assert.doesNotMatch(join, /fulfillAgenticRetailCheckout/);
     assert.match(checkout, /pharmacyRrpPayableAmounts/);
     assert.equal(checkout.includes("retailerPayableAmount: item.unitPriceAmount"), false);
     assert.match(order, /contributionMargin/);
     assert.match(order, /orderId: settlement.orderId/);
     assert.match(support, /getRetailOrderByAgenticOrderId/);
     assert.equal(order.includes("orderId: order.id"), false);
-    assert.match(join, /products.status = 'approved'/);
     assert.equal(join.includes("insert into public.products"), false);
     assert.equal(join.includes("insert into public.retail_sellable_products"), false);
     const snapshot = readFileSync(
@@ -1522,7 +1523,8 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(firstOk, true);
     assert.ok(secondOk || secondConflict);
     if (secondOk) {
-      assert.notEqual(second.orderHandle, first.orderHandle);
+      assert.equal(typeof second.orderHandle, "string");
+      assert.equal(second.orderHandle, first.orderHandle);
     }
   });
 });

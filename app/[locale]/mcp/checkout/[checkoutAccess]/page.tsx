@@ -68,6 +68,8 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
   }
 
   const sessionId = typeof query.session_id === "string" ? query.session_id : "";
+  const paymentProvider = runtime.config.paymentProvider;
+  const websiteCheckout = paymentProvider === "stripe_test";
   const paidTracking = await resolveAgenticPaidTrackingPath({
     checkoutAccess,
     locale,
@@ -75,8 +77,14 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
     sessionId: sessionId || undefined
   });
 
-  if (paidTracking && runtime.config.paymentProvider !== "mock") {
+  if (paidTracking && paymentProvider !== "mock") {
     redirect(paidTracking);
+  }
+
+  if (paymentProvider !== "mock") {
+    redirect(
+      `/${locale}/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutAccess)}`
+    );
   }
 
   const expired = checkout.expiresAt <= new Date().toISOString();
@@ -108,7 +116,6 @@ export default async function AgenticCheckoutPage({ params, searchParams }: Page
   const lastResult = [queryResult, counts ? `TEST-DRIVER EVIDENCE (not payment truth) ${JSON.stringify(counts)}` : null]
     .filter(Boolean)
     .join("\n");
-  const websiteCheckout = runtime.config.paymentProvider === "stripe_test";
   const products = websiteCheckout ? await loadAgenticCheckoutProducts(items, locale) : [];
   const major = (minor: number) => asMinor(minor) / 100;
   const successUrl = mcpOrderTrackSuccessPath(locale);

@@ -491,8 +491,8 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
   },
   "plan.tradeoff.composed": {
     en: "{parts}",
-    th: "{parts}",
-    "zh-CN": "{parts}"
+    th: "สรุป: {parts}",
+    "zh-CN": "对比：{parts}"
   },
   "plan.tradeoff.price_up": {
     en: "{baht} THB more",

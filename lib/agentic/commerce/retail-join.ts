@@ -1,12 +1,8 @@
-import { isUuid, parsePublicId } from "@/lib/agentic/contract/ids";
+import { isUuid } from "@/lib/agentic/contract/ids";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { DEFAULT_SHIPPING_MINOR } from "@/lib/agentic/money";
-import { parseCheckoutAddress, type CheckoutAddress } from "@/lib/agentic/checkout-address";
 import type { OrderRecord } from "@/lib/agentic/store/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { CoverageRow, PlanResult } from "@/lib/agentic/plan/types";
-
-const DELIGHT_ORGANISATION_NAME = "Delight Pharmacy";
 
 export type AgenticRetailJoinResult = Readonly<{
   orderId: string;
@@ -15,33 +11,8 @@ export type AgenticRetailJoinResult = Readonly<{
   trackingUrl: string;
 }>;
 
-function fallbackAddress(country: string): CheckoutAddress {
-  return {
-    addressLine1: "Address on file",
-    city: "City",
-    country: country.trim().toUpperCase() || "TH",
-    customerEmail: "mcp-orders@mattanutra.com",
-    customerName: "MattaNutra MCP",
-    phone: "+66812345678",
-    postalCode: "00000",
-    province: "Province"
-  };
-}
-
 function asLocale(value: unknown): Locale {
   return isLocale(value) ? value : "en";
-}
-
-function majorFromMinor(minor: number) {
-  return Math.max(0, minor) / 100;
-}
-
-function normalizedTitle(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9ก-๙]+/g, " ").trim();
-}
-
-function productUuid(productId: string) {
-  return parsePublicId(productId, "prd_") ?? (isUuid(productId) ? productId : null);
 }
 
 async function loadSql() {
@@ -50,93 +21,6 @@ async function loadSql() {
     return getSql();
   } catch {
     return null;
-  }
-}
-
-async function resolveRetailerOrganisationId() {
-  const sql = await loadSql();
-
-  if (!sql) {
-    return null;
-  }
-
-  const named = await sql<Array<{ id: string }>>`
-    select id::text
-    from public.organisations
-    where organisation_type = 'tenant'
-      and status = 'active'
-      and lower(name) = lower(${DELIGHT_ORGANISATION_NAME})
-    order by created_at asc
-    limit 1
-  `;
-  const fallback = named[0]
-    ? named
-    : await sql<Array<{ id: string }>>`
-        select id::text
-        from public.organisations
-        where organisation_type = 'tenant'
-          and status = 'active'
-          and name ilike 'Delight%'
-        order by created_at asc
-        limit 1
-      `;
-
-  return fallback[0]?.id ?? null;
-}
-
-async function ensureCatalogueProduct(input: Readonly<{
-  organisationId: string;
-  productId: string;
-  productName: string;
-  retailerSku: string;
-  unitPriceAmount: number;
-}>) {
-  const sql = await loadSql();
-
-  if (!sql) {
-    return null;
-  }
-
-  const wanted = productUuid(input.productId);
-  const title = input.productName.trim() || input.retailerSku || "MCP product";
-  const normalized = normalizedTitle(title);
-
-  const matched = await sql<Array<{ id: string }>>`
-    select products.id::text
-    from public.products
-    join public.retail_sellable_products
-      on retail_sellable_products.product_id = products.id
-      and retail_sellable_products.organisation_id = ${input.organisationId}::uuid
-      and retail_sellable_products.status = 'active'
-    where products.status = 'approved'
-      and (
-        ${wanted}::uuid is not null and products.id = ${wanted}::uuid
-        or products.normalized_title = ${normalized}
-        or lower(products.title) = lower(${title})
-        or ${input.retailerSku} <> '' and products.external_product_id = ${input.retailerSku}
-      )
-    order by
-      case when ${wanted}::uuid is not null and products.id = ${wanted}::uuid then 0 else 1 end,
-      products.created_at asc
-    limit 1
-  `;
-
-  return matched[0]?.id ?? null;
-}
-
-function addressFromCheckout(value: string | null, country: string): CheckoutAddress {
-  const plannedCountry = country.trim().toUpperCase() || "TH";
-
-  if (!value) {
-    return fallbackAddress(plannedCountry);
-  }
-
-  try {
-    const parsedJson = JSON.parse(value) as { address?: unknown };
-    const parsed = parseCheckoutAddress(parsedJson.address ?? parsedJson, plannedCountry);
-    return "address" in parsed ? parsed.address : fallbackAddress(plannedCountry);
-  } catch {
-    return fallbackAddress(plannedCountry);
   }
 }
 
@@ -201,85 +85,7 @@ export async function joinMcpPaidOrderToRetail(input: Readonly<{
   try {
     const existing = await lookupRetailOrderForAgentic(input.order.id);
 
-    if (existing) {
-      const linked = await input.store.getRetailLink(input.order.id);
-
-      if (!linked) {
-        await input.store.insertRetailLink({
-          adapter: "retail_product_checkout",
-          createdAt: input.now,
-          orderId: input.order.id,
-          retailerReference: existing.orderNumber
-        });
-      }
-
-      return existing;
-    }
-
-    const organisationId = await resolveRetailerOrganisationId();
-
-    if (!organisationId) {
-      throw new Error("Retail organisation was not found for MCP pay");
-    }
-
-    const [items, checkout] = await Promise.all([
-      input.store.getOrderItems(input.order.id),
-      input.store.getCheckoutByOrderId(input.order.id)
-    ]);
-    const mapped = [];
-
-    for (const item of items) {
-      const productId = await ensureCatalogueProduct({
-        organisationId,
-        productId: item.productId,
-        productName: item.productName,
-        retailerSku: item.retailerSku,
-        unitPriceAmount: majorFromMinor(item.unitPriceMinor)
-      });
-
-      if (!productId) {
-        continue;
-      }
-
-      mapped.push({
-        productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        retailerSku: item.retailerSku,
-        unitPriceAmount: majorFromMinor(item.unitPriceMinor)
-      });
-    }
-
-    if (mapped.length < 1) {
-      throw new Error("MCP pay could not map catalogue products for retail fulfillment");
-    }
-
-    const frozen = input.order.frozenPlan && typeof input.order.frozenPlan === "object"
-      ? (input.order.frozenPlan as Record<string, unknown>)
-      : {};
-    const shippingAmount = majorFromMinor(
-      typeof frozen.shippingMinor === "number" ? frozen.shippingMinor : DEFAULT_SHIPPING_MINOR
-    );
-    const totalAmount = majorFromMinor(input.order.totalPriceMinor);
-    const { fulfillAgenticRetailCheckout } = await import("@/lib/retail-product-checkout");
-    const result = await fulfillAgenticRetailCheckout({
-      address: addressFromCheckout(
-        checkout?.encryptedAddress ?? null,
-        input.order.destinationCountry
-      ),
-      agenticOrderId: input.order.id,
-      agenticOrderReference: input.order.reference,
-      currency: input.order.currency,
-      items: mapped,
-      locale: asLocale("en"),
-      organisationId,
-      planId: input.order.planId,
-      request: input.request,
-      shippingAmount,
-      totalAmount
-    });
-
-    if (!result) {
+    if (!existing) {
       return null;
     }
 
@@ -290,11 +96,11 @@ export async function joinMcpPaidOrderToRetail(input: Readonly<{
         adapter: "retail_product_checkout",
         createdAt: input.now,
         orderId: input.order.id,
-        retailerReference: result.orderNumber
+        retailerReference: existing.orderNumber
       });
     }
 
-    return result;
+    return existing;
   } catch (error) {
     console.error("Unable to join MCP pay to retail checkout", {
       error,

@@ -7,7 +7,6 @@ import {
 } from "@/lib/agentic/commerce/payment";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
-import { joinMcpPaidOrderToRetail } from "@/lib/agentic/commerce/retail-join";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
@@ -100,16 +99,6 @@ export async function simulatePayment(input: Readonly<{
     });
   } else {
     await applyVerifiedPaymentEvent({ event, now: input.now, store: input.store });
-  }
-
-  const paidForRetail = await input.store.getOrder(order.id);
-
-  if (paidForRetail?.paymentStatus === "paid") {
-    await joinMcpPaidOrderToRetail({
-      now: input.now,
-      order: paidForRetail,
-      store: input.store
-    });
   }
 
   if (scenarioSubmitsOms(input.scenario)) {
