@@ -91,6 +91,18 @@ describe("supplement admin popup", () => {
     assert.match(service, /source_payload/);
     assert.match(createRoute, /parseCountryAvailability/);
     assert.match(updateRoute, /parseCountryAvailability/);
+    assert.match(view, /safetyBands/);
+    assert.match(view, /SAFETY_LIMIT_LIFE_STAGES/);
+    assert.match(service, /safetyBands/);
+    assert.match(service, /life_stage = 'adult'/);
+    assert.match(createRoute, /parseAdminSupplementSafetyBands/);
+    assert.match(updateRoute, /parseAdminSupplementSafetyBands/);
+    assert.match(schema, /life_stage text DEFAULT 'adult' NOT NULL/);
+    assert.match(schema, /source_scope text DEFAULT 'supplemental' NOT NULL/);
+    assert.match(
+      schema,
+      /UNIQUE \(supplement_id, life_stage, source_scope, version\)/
+    );
     assert.match(view, /Country rules/);
     assert.match(view, /item\.status === "blocked" \? "Blocked" : "Allowed"/);
     assert.match(view, /\{item\.countryCode\}/);

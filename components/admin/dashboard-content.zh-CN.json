@@ -908,6 +908,7 @@
     "exportJson": "导出 JSON",
     "maxAmount": "数量",
     "maxUnit": "单位",
+    "safetyBands": "分年龄段安全上限",
     "name": "名称",
     "newSupplement": "新建补充剂",
     "newSupplementHint": "输入补充剂名称，使用 AI 建议详情，然后审核并保存。",

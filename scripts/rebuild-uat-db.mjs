@@ -258,6 +258,7 @@ for (const scriptName of [
   "product-offers:schema:remove",
   "product-coverage:demand-cache:schema:apply",
   "supplements:country-availability:schema:apply",
+  "supplements:safety-limit-life-stages:schema:apply",
   "recommendation-insights:schema:apply",
   "thai-tax:schema:apply",
   "foods:schema:apply",

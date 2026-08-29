@@ -4,6 +4,7 @@ import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
 const serviceName = "mattanutra-ui-dev.service";
 const schemaScripts = [
   "supplements:country-availability:schema:apply",
+  "supplements:safety-limit-life-stages:schema:apply",
   "products:soft-delete:schema:apply",
   "products:v9:schema:apply",
   "product-coverage:demand-cache:schema:apply",

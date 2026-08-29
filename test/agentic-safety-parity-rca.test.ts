@@ -161,6 +161,8 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
       "utf8"
     );
     assert.match(load, /from public\.supplement_safety_limits/);
+    assert.match(load, /limits\.life_stage/);
+    assert.match(load, /limits\.source_scope/);
     assert.doesNotMatch(load, /supplement_safety_limit_bands/);
 
     const versions = readFileSync(
@@ -177,6 +179,9 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
     assert.doesNotMatch(dev, /supplements:safety-limit-bands:schema:apply/);
     assert.doesNotMatch(uat, /supplements:safety-limit-bands:schema:apply/);
     assert.doesNotMatch(prd, /supplements:safety-limit-bands:schema:apply/);
+    assert.match(dev, /supplements:safety-limit-life-stages:schema:apply/);
+    assert.match(uat, /supplements:safety-limit-life-stages:schema:apply/);
+    assert.match(prd, /supplements:safety-limit-life-stages:schema:apply/);
 
     const smoke = readFileSync(new URL("../scripts/uat-smoke.mjs", import.meta.url), "utf8");
     assert.match(smoke, /"supplement_safety_limits"/);

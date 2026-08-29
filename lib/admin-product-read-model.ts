@@ -328,6 +328,8 @@ export async function loadProductRows(
         select max_amount, max_unit, safety_flags
         from public.supplement_safety_limits
         where supplement_safety_limits.supplement_id = coalesce(product_facts.supplement_id, supplement_match_rows.supplement_id)
+          and life_stage = 'adult'
+          and source_scope = 'supplemental'
         order by version desc
         limit 1
       ) supplement_safety_limits on true

@@ -829,6 +829,7 @@ export type AdminContent = Readonly<{
     exportJson: string;
     maxAmount: string;
     maxUnit: string;
+    safetyBands: string;
     name: string;
     newSupplement: string;
     newSupplementHint: string;
@@ -1734,6 +1735,7 @@ const baseContent = {
       exportJson: "Export JSON",
       maxAmount: "Amount",
       maxUnit: "Unit",
+      safetyBands: "Life-stage safety bands",
       name: "Name",
       newSupplement: "New supplement",
       newSupplementHint:
@@ -2644,6 +2646,7 @@ const baseContent = {
       exportJson: "ส่งออก JSON",
       maxAmount: "ปริมาณ",
       maxUnit: "หน่วย",
+      safetyBands: "ขีดจำกัดตามช่วงวัย",
       name: "ชื่อ",
       newSupplement: "อาหารเสริมใหม่",
       newSupplementHint:

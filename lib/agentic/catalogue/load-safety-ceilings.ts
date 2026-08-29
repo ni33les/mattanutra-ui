@@ -81,19 +81,23 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
       Array<{
         band_id: string;
         band_version: string | number;
+        life_stage: string | null;
         max_amount: string | number | null;
         max_unit: string;
         name: string;
+        source_scope: string | null;
         supplement_id: string;
       }>
     >`
-      select distinct on (supplements.id)
+      select distinct on (supplements.id, limits.life_stage, limits.source_scope)
         limits.id::text as band_id,
         limits.version as band_version,
         supplements.id::text as supplement_id,
         supplements.name,
+        limits.life_stage,
         limits.max_amount,
-        limits.max_unit
+        limits.max_unit,
+        limits.source_scope
       from public.supplement_safety_limits limits
       join public.supplements supplements
         on supplements.id = limits.supplement_id
@@ -101,6 +105,8 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
         and limits.max_amount > 0
       order by
         supplements.id,
+        limits.life_stage,
+        limits.source_scope,
         limits.version desc
     `;
 
@@ -109,8 +115,8 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
     for (const row of rows) {
       const amount = Number(row.max_amount);
       const unit = asMatcherUnit(row.max_unit);
-      const lifeStage = asLifeStage(null);
-      const sourceScope = asSourceScope(null);
+      const lifeStage = asLifeStage(row.life_stage);
+      const sourceScope = asSourceScope(row.source_scope);
 
       if (
         !Number.isFinite(amount) ||

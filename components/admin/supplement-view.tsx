@@ -10,10 +10,15 @@ import {
 } from "@headlessui/react";
 import type {
   AdminSupplementRow,
+  AdminSupplementSafetyBand,
   AdminSupplementsData,
   SupplementConfidence,
   SupplementListStatus
 } from "@/lib/admin-supplements";
+import {
+  MATCHER_SOURCE_SCOPE,
+  SAFETY_LIMIT_LIFE_STAGES
+} from "@/lib/matcher/types";
 import {
   adminLocalizedFallbackLabel,
   adminLocalizedSupplementText
@@ -95,6 +100,7 @@ function supplementExportRow(row: AdminSupplementRow) {
     maxAmount: row.maxAmount,
     maxUnit: row.maxUnit,
     name: row.name,
+    safetyBands: row.safetyBands,
     primaryUseCase: row.primaryUseCase ?? "",
     safetyFlags: row.safetyFlags,
     safetyNotes: row.safetyNotes ?? "",
@@ -123,6 +129,7 @@ function supplementRowsToCsv(rows: readonly AdminSupplementRow[]) {
     "countryAvailability",
     "maxAmount",
     "maxUnit",
+    "safetyBands",
     "safetyFlags",
     "safetyNotes",
     "aliases",
@@ -249,6 +256,7 @@ export function AdminSupplementsView({
       maxAmount: null,
       maxUnit: "",
       name: "",
+      safetyBands: [],
       primaryUseCase: null,
       safetyFlags: [],
       safetyNotes: null,
@@ -293,6 +301,7 @@ export function AdminSupplementsView({
           maxUnit: row.maxUnit,
           name: row.name,
           primaryUseCase: row.primaryUseCase,
+          safetyBands: row.safetyBands,
           safetyFlags: row.safetyFlags,
           safetyNotes: row.safetyNotes
         }),
@@ -353,6 +362,7 @@ export function AdminSupplementsView({
           maxUnit: row.maxUnit,
           name,
           primaryUseCase: row.primaryUseCase,
+          safetyBands: row.safetyBands,
           safetyFlags: row.safetyFlags,
           safetyNotes: row.safetyNotes
         }),
@@ -748,6 +758,42 @@ export function AdminSupplementsView({
       ) : null}
     </section>
   );
+}
+
+const SAFETY_BAND_LABELS: Record<(typeof SAFETY_LIMIT_LIFE_STAGES)[number], string> = {
+  adolescent_14_18: "Adolescent 14–18",
+  adult: "Adult",
+  breastfeeding: "Breastfeeding",
+  child_1_3: "Child 1–3",
+  child_4_8: "Child 4–8",
+  child_9_13: "Child 9–13",
+  pregnant: "Pregnant"
+};
+
+function upsertSafetyBand(
+  bands: readonly AdminSupplementSafetyBand[],
+  lifeStage: (typeof SAFETY_LIMIT_LIFE_STAGES)[number],
+  maxAmount: number | null,
+  maxUnit: string
+): AdminSupplementSafetyBand[] {
+  const next = bands.filter(
+    (band) =>
+      !(band.lifeStage === lifeStage && band.sourceScope === MATCHER_SOURCE_SCOPE)
+  );
+
+  if (maxAmount == null || !Number.isFinite(maxAmount) || maxAmount <= 0 || !maxUnit.trim()) {
+    return next;
+  }
+
+  return [
+    ...next,
+    {
+      lifeStage,
+      maxAmount,
+      maxUnit,
+      sourceScope: MATCHER_SOURCE_SCOPE
+    }
+  ];
 }
 
 export function formatSupplementDose(row: AdminSupplementRow, locale: Locale) {
@@ -1316,14 +1362,21 @@ export function SupplementDetailsModal({
                         : ""
                     )}
                     min="0"
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const maxAmount =
+                        event.target.value === ""
+                          ? null
+                          : Number(event.target.value);
                       onChange({
-                        maxAmount:
-                          event.target.value === ""
-                            ? null
-                            : Number(event.target.value)
-                      })
-                    }
+                        maxAmount,
+                        safetyBands: upsertSafetyBand(
+                          draft.safetyBands,
+                          "adult",
+                          maxAmount,
+                          draft.maxUnit
+                        )
+                      });
+                    }}
                     step="any"
                     type="number"
                     value={draft.maxAmount ?? ""}
@@ -1341,7 +1394,15 @@ export function SupplementDetailsModal({
                         : ""
                     )}
                     onChange={(event) =>
-                      onChange({ maxUnit: event.target.value })
+                      onChange({
+                        maxUnit: event.target.value,
+                        safetyBands: upsertSafetyBand(
+                          draft.safetyBands,
+                          "adult",
+                          draft.maxAmount,
+                          event.target.value
+                        )
+                      })
                     }
                     value={draft.maxUnit}
                   >
@@ -1353,6 +1414,104 @@ export function SupplementDetailsModal({
                     ))}
                   </select>
                 </label>
+              </div>
+
+              <div className="grid gap-2 text-sm font-medium text-gray-700">
+                {labels.supplements.safetyBands}
+                <div className="rounded-xl bg-white p-3 ring-1 ring-gray-200">
+                  <div className="grid gap-2">
+                    {SAFETY_LIMIT_LIFE_STAGES.map((lifeStage) => {
+                      const band = draft.safetyBands.find(
+                        (item) =>
+                          item.lifeStage === lifeStage &&
+                          item.sourceScope === MATCHER_SOURCE_SCOPE
+                      );
+                      const amount =
+                        lifeStage === "adult"
+                          ? draft.maxAmount
+                          : band?.maxAmount ?? null;
+                      const unit =
+                        lifeStage === "adult"
+                          ? draft.maxUnit
+                          : band?.maxUnit || draft.maxUnit;
+
+                      return (
+                        <label
+                          className="grid grid-cols-[minmax(0,1fr)_7rem_8rem] items-center gap-2 text-xs font-medium text-gray-600"
+                          key={lifeStage}
+                        >
+                          <span>{SAFETY_BAND_LABELS[lifeStage]}</span>
+                          <input
+                            className={inputClass}
+                            min="0"
+                            onChange={(event) => {
+                              const maxAmount =
+                                event.target.value === ""
+                                  ? null
+                                  : Number(event.target.value);
+                              if (lifeStage === "adult") {
+                                onChange({
+                                  maxAmount,
+                                  safetyBands: upsertSafetyBand(
+                                    draft.safetyBands,
+                                    "adult",
+                                    maxAmount,
+                                    draft.maxUnit
+                                  )
+                                });
+                                return;
+                              }
+                              onChange({
+                                safetyBands: upsertSafetyBand(
+                                  draft.safetyBands,
+                                  lifeStage,
+                                  maxAmount,
+                                  unit
+                                )
+                              });
+                            }}
+                            step="any"
+                            type="number"
+                            value={amount ?? ""}
+                          />
+                          <select
+                            className={inputClass}
+                            onChange={(event) => {
+                              if (lifeStage === "adult") {
+                                onChange({
+                                  maxUnit: event.target.value,
+                                  safetyBands: upsertSafetyBand(
+                                    draft.safetyBands,
+                                    "adult",
+                                    draft.maxAmount,
+                                    event.target.value
+                                  )
+                                });
+                                return;
+                              }
+                              onChange({
+                                safetyBands: upsertSafetyBand(
+                                  draft.safetyBands,
+                                  lifeStage,
+                                  amount,
+                                  event.target.value
+                                )
+                              });
+                            }}
+                            value={unit}
+                          >
+                            <option value="">{labels.supplements.none}</option>
+                            {unitOptions.map((item) => (
+                              <option key={item} value={item}>
+                                {item}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-2 text-sm font-medium text-gray-700">

@@ -361,6 +361,7 @@ export function reviewRowToSupplementDraft(
     maxUnit: row.maxUnit ?? "",
     name: row.supplementName,
     primaryUseCase: null,
+    safetyBands: [],
     safetyFlags: [],
     safetyNotes: reviewContextText(labels, row),
     sourceStatus: "recommended_add",

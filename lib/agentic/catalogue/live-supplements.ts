@@ -175,6 +175,8 @@ export async function loadLiveSupplementsForCountry(
         select limits.max_unit
         from public.supplement_safety_limits limits
         where limits.supplement_id = supplements.id
+          and limits.life_stage = 'adult'
+          and limits.source_scope = 'supplemental'
           and limits.max_amount is not null
           and limits.max_amount > 0
         order by limits.version desc

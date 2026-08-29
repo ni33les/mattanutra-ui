@@ -8,6 +8,7 @@ import {
   type AdminSupplementTranslationInput,
   type SupplementListStatus,
   deleteAdminSupplement,
+  parseAdminSupplementSafetyBands,
   updateAdminSupplement
 } from "@/lib/admin-supplements";
 import { isUuid } from "@/lib/assessment-store";
@@ -268,6 +269,7 @@ export async function PATCH(
       maxAmount: amountValue(body.maxAmount),
       maxUnit: textOrNull(body.maxUnit) ?? "",
       name,
+      safetyBands: parseAdminSupplementSafetyBands(body.safetyBands),
       primaryUseCase: body.primaryUseCase === undefined
         ? undefined
         : textOrNull(body.primaryUseCase),

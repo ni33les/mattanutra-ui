@@ -61,6 +61,8 @@ describe("Phase 0 catalog-sourced upper limits", () => {
     assert.match(source, /from public\.supplement_safety_limits/);
     assert.match(source, /limits\.id::text as band_id/);
     assert.match(source, /limits\.version as band_version/);
+    assert.match(source, /limits\.life_stage/);
+    assert.match(source, /limits\.source_scope/);
     assert.match(source, /bandId:/);
     assert.match(source, /bandVersion/);
     assert.doesNotMatch(source, /supplement_safety_limit_bands/);

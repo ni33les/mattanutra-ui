@@ -655,6 +655,8 @@ export async function validateProductImportForApproval(input: Readonly<{
         select max_amount, max_unit
         from public.supplement_safety_limits
         where supplement_safety_limits.supplement_id = supplements.id
+          and life_stage = 'adult'
+          and source_scope = 'supplemental'
         order by version desc
         limit 1
       ) supplement_safety_limits on true

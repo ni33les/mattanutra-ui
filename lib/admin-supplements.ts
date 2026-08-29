@@ -14,6 +14,15 @@ import {
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
 import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
+import type {
+  SafetyLimitLifeStage,
+  SafetySourceScope
+} from "@/lib/matcher/types";
+import {
+  MATCHER_SOURCE_SCOPE,
+  SAFETY_LIMIT_LIFE_STAGES,
+  SAFETY_SOURCE_SCOPES
+} from "@/lib/matcher/types";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import {
   type AdminSupplementSelectionStats
@@ -59,6 +68,13 @@ export type AdminSupplementTranslation = Readonly<{
   updatedAt: string | null;
 }>;
 
+export type AdminSupplementSafetyBand = Readonly<{
+  lifeStage: SafetyLimitLifeStage;
+  maxAmount: number;
+  maxUnit: string;
+  sourceScope: SafetySourceScope;
+}>;
+
 export type AdminSupplementRow = Readonly<{
   aliases: AdminSupplementAlias[];
   category: string;
@@ -71,6 +87,7 @@ export type AdminSupplementRow = Readonly<{
   maxUnit: string;
   name: string;
   primaryUseCase: string | null;
+  safetyBands: AdminSupplementSafetyBand[];
   safetyFlags: SupplementSafetyFlag[];
   safetyNotes: string | null;
   selectionStats?: AdminSupplementSelectionStats;
@@ -105,6 +122,7 @@ type SupplementDbRow = Readonly<{
   name: string;
   normalized_name: string;
   primary_use_case: string | null;
+  safety_bands: unknown;
   safety_flags: string[] | null;
   safety_notes: string | null;
   source_status: "core" | "recommended_add";
@@ -133,6 +151,7 @@ export type UpdateAdminSupplementInput = Readonly<{
   maxUnit: string;
   name?: string | null;
   primaryUseCase?: string | null;
+  safetyBands?: readonly AdminSupplementSafetyBand[] | null;
   safetyFlags: SupplementSafetyFlag[];
   safetyNotes: string | null;
   translations?: ReadonlyArray<AdminSupplementTranslationInput> | null;
@@ -148,6 +167,7 @@ export type CreateAdminSupplementInput = Readonly<{
   maxUnit?: string | null;
   name: string;
   primaryUseCase?: string | null;
+  safetyBands?: readonly AdminSupplementSafetyBand[] | null;
   safetyFlags?: SupplementSafetyFlag[] | null;
   safetyNotes?: string | null;
   translations?: ReadonlyArray<AdminSupplementTranslationInput> | null;
@@ -205,6 +225,66 @@ function numberOrNull(value: number | string | null) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isSafetyLimitLifeStage(value: unknown): value is SafetyLimitLifeStage {
+  return (
+    typeof value === "string" &&
+    (SAFETY_LIMIT_LIFE_STAGES as readonly string[]).includes(value)
+  );
+}
+
+function isSafetySourceScope(value: unknown): value is SafetySourceScope {
+  return (
+    typeof value === "string" &&
+    (SAFETY_SOURCE_SCOPES as readonly string[]).includes(value)
+  );
+}
+
+function safetyBandsFromDb(value: unknown): AdminSupplementSafetyBand[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item): AdminSupplementSafetyBand[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const lifeStage = record.lifeStage ?? record.life_stage;
+    const sourceScope = record.sourceScope ?? record.source_scope;
+    const maxAmount = numberOrNull(
+      typeof record.maxAmount === "number" || typeof record.maxAmount === "string"
+        ? record.maxAmount
+        : typeof record.max_amount === "number" || typeof record.max_amount === "string"
+          ? record.max_amount
+          : null
+    );
+    const maxUnit = typeof record.maxUnit === "string"
+      ? record.maxUnit
+      : typeof record.max_unit === "string"
+        ? record.max_unit
+        : "";
+
+    if (
+      !isSafetyLimitLifeStage(lifeStage) ||
+      !isSafetySourceScope(sourceScope) ||
+      maxAmount == null ||
+      maxAmount <= 0 ||
+      !maxUnit
+    ) {
+      return [];
+    }
+
+    return [{ lifeStage, maxAmount, maxUnit, sourceScope }];
+  });
+}
+
+export function parseAdminSupplementSafetyBands(
+  value: unknown
+): AdminSupplementSafetyBand[] {
+  return safetyBandsFromDb(value);
 }
 
 function aliasesFromDb(value: unknown): AdminSupplementAlias[] {
@@ -575,6 +655,7 @@ function rowFromDb(
     maxUnit: row.max_unit,
     name: row.name,
     primaryUseCase: row.primary_use_case,
+    safetyBands: safetyBandsFromDb(row.safety_bands),
     safetyFlags: normalizeSupplementSafetyFlags(row.safety_flags),
     safetyNotes: row.safety_notes,
     ...(selectionStats ? { selectionStats } : {}),
@@ -638,6 +719,7 @@ async function loadSupplementDocument(
       limits.confidence,
       limits.safety_flags,
       limits.safety_notes,
+      coalesce(band_rows.safety_bands, '[]'::jsonb) as safety_bands,
       coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
       case
         when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
@@ -650,9 +732,37 @@ async function loadSupplementDocument(
       select *
       from public.supplement_safety_limits limits
       where limits.supplement_id = supplements.id
+        and limits.life_stage = 'adult'
+        and limits.source_scope = 'supplemental'
       order by limits.version desc
       limit 1
     ) limits on true
+    left join lateral (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'lifeStage', band.life_stage,
+            'sourceScope', band.source_scope,
+            'maxAmount', band.max_amount,
+            'maxUnit', band.max_unit
+          )
+          order by band.life_stage, band.source_scope
+        ),
+        '[]'::jsonb
+      ) as safety_bands
+      from (
+        select distinct on (band_limits.life_stage, band_limits.source_scope)
+          band_limits.life_stage,
+          band_limits.source_scope,
+          band_limits.max_amount,
+          band_limits.max_unit
+        from public.supplement_safety_limits band_limits
+        where band_limits.supplement_id = supplements.id
+          and band_limits.max_amount is not null
+          and band_limits.max_amount > 0
+        order by band_limits.life_stage, band_limits.source_scope, band_limits.version desc
+      ) band
+    ) band_rows on true
     left join lateral (
       select coalesce(
         jsonb_agg(
@@ -740,6 +850,7 @@ export async function getAdminSupplementsData(
         limits.confidence,
         limits.safety_flags,
         limits.safety_notes,
+        coalesce(band_rows.safety_bands, '[]'::jsonb) as safety_bands,
         '[]'::jsonb as aliases,
         '[]'::jsonb as country_availability,
         '{}'::jsonb as translations
@@ -748,9 +859,37 @@ export async function getAdminSupplementsData(
         select *
         from public.supplement_safety_limits limits
         where limits.supplement_id = supplements.id
+          and limits.life_stage = 'adult'
+          and limits.source_scope = 'supplemental'
         order by limits.version desc
         limit 1
       ) limits on true
+      left join lateral (
+        select coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'lifeStage', band.life_stage,
+              'sourceScope', band.source_scope,
+              'maxAmount', band.max_amount,
+              'maxUnit', band.max_unit
+            )
+            order by band.life_stage, band.source_scope
+          ),
+          '[]'::jsonb
+        ) as safety_bands
+        from (
+          select distinct on (band_limits.life_stage, band_limits.source_scope)
+            band_limits.life_stage,
+            band_limits.source_scope,
+            band_limits.max_amount,
+            band_limits.max_unit
+          from public.supplement_safety_limits band_limits
+          where band_limits.supplement_id = supplements.id
+            and band_limits.max_amount is not null
+            and band_limits.max_amount > 0
+          order by band_limits.life_stage, band_limits.source_scope, band_limits.version desc
+        ) band
+      ) band_rows on true
       where coalesce(supplements.source_payload ->> 'deleted', 'false') <> 'true'
       order by supplements.category asc, supplements.name asc
       limit 1000
@@ -768,6 +907,55 @@ export async function getAdminSupplementsData(
   } catch (error) {
     console.error("Unable to load admin supplements", error);
     return emptyAdminSupplementsData();
+  }
+}
+
+async function appendConfiguredSafetyBands(
+  sql: postgres.Sql | postgres.TransactionSql,
+  input: Readonly<{
+    confidence: SupplementConfidence;
+    maxAmount: number | null;
+    maxUnit: string;
+    safetyBands?: readonly AdminSupplementSafetyBand[] | null;
+    safetyFlags: readonly SupplementSafetyFlag[];
+    safetyNotes: string | null;
+    supplementId: string;
+  }>
+) {
+  await appendSupplementSafetyLimitVersion(sql, {
+    confidence: input.confidence,
+    lifeStage: "adult",
+    maxAmount: input.maxAmount,
+    maxUnit: input.maxUnit,
+    safetyFlags: input.safetyFlags,
+    safetyNotes: input.safetyNotes,
+    sourceScope: MATCHER_SOURCE_SCOPE,
+    supplementId: input.supplementId
+  });
+
+  for (const band of input.safetyBands ?? []) {
+    if (
+      band.lifeStage === "adult" &&
+      band.sourceScope === MATCHER_SOURCE_SCOPE
+    ) {
+      continue;
+    }
+
+    if (!(band.maxAmount > 0) || !band.maxUnit.trim()) {
+      continue;
+    }
+
+    await appendSupplementSafetyLimitVersion(sql, {
+      confidence: input.confidence,
+      lifeStage: band.lifeStage,
+      maxAmount: band.maxAmount,
+      maxUnit: band.maxUnit,
+      safetyFlags: input.safetyFlags,
+      safetyNotes: input.safetyNotes,
+      skipIfUnchanged: true,
+      sourceScope: band.sourceScope,
+      supplementId: input.supplementId
+    });
   }
 }
 
@@ -795,6 +983,7 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       limits.confidence,
       limits.safety_flags,
       limits.safety_notes,
+      coalesce(band_rows.safety_bands, '[]'::jsonb) as safety_bands,
       coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
       case
         when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
@@ -807,9 +996,37 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       select *
       from public.supplement_safety_limits limits
       where limits.supplement_id = supplements.id
+        and limits.life_stage = 'adult'
+        and limits.source_scope = 'supplemental'
       order by limits.version desc
       limit 1
     ) limits on true
+    left join lateral (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'lifeStage', band.life_stage,
+            'sourceScope', band.source_scope,
+            'maxAmount', band.max_amount,
+            'maxUnit', band.max_unit
+          )
+          order by band.life_stage, band.source_scope
+        ),
+        '[]'::jsonb
+      ) as safety_bands
+      from (
+        select distinct on (band_limits.life_stage, band_limits.source_scope)
+          band_limits.life_stage,
+          band_limits.source_scope,
+          band_limits.max_amount,
+          band_limits.max_unit
+        from public.supplement_safety_limits band_limits
+        where band_limits.supplement_id = supplements.id
+          and band_limits.max_amount is not null
+          and band_limits.max_amount > 0
+        order by band_limits.life_stage, band_limits.source_scope, band_limits.version desc
+      ) band
+    ) band_rows on true
     left join lateral (
       select coalesce(
         jsonb_agg(
@@ -984,10 +1201,11 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     `;
   }
 
-  await appendSupplementSafetyLimitVersion(sql, {
+  await appendConfiguredSafetyBands(sql, {
     confidence: input.confidence,
     maxAmount: input.maxAmount,
     maxUnit: input.maxUnit,
+    safetyBands: input.safetyBands,
     safetyFlags: input.safetyFlags,
     safetyNotes: input.safetyNotes,
     supplementId: input.id
@@ -1198,10 +1416,11 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
     on conflict (normalized_alias) do nothing
   `;
 
-  await appendSupplementSafetyLimitVersion(sql, {
+  await appendConfiguredSafetyBands(sql, {
     confidence,
     maxAmount: input.maxAmount ?? null,
     maxUnit,
+    safetyBands: input.safetyBands,
     safetyFlags,
     safetyNotes: input.safetyNotes?.trim() || null,
     supplementId

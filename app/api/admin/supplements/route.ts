@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
   createAdminSupplement,
+  parseAdminSupplementSafetyBands,
   isSupplementConfidence,
   isSupplementListStatus,
   type AdminSupplementCountryAvailabilityInput,
@@ -186,6 +187,7 @@ export async function POST(request: Request) {
       maxAmount: amountValue(body.maxAmount),
       maxUnit: textOrNull(body.maxUnit, 80),
       name,
+      safetyBands: parseAdminSupplementSafetyBands(body.safetyBands),
       primaryUseCase: textOrNull(body.primaryUseCase),
       safetyFlags: normalizeSupplementSafetyFlags(body.safetyFlags),
       safetyNotes: textOrNull(body.safetyNotes),

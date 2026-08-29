@@ -2805,6 +2805,8 @@ CREATE TABLE public.supplement_safety_limits (
     id uuid NOT NULL,
     supplement_id uuid NOT NULL,
     version integer DEFAULT 1 NOT NULL,
+    life_stage text DEFAULT 'adult' NOT NULL,
+    source_scope text DEFAULT 'supplemental' NOT NULL,
     max_amount numeric(14,4),
     max_unit text NOT NULL,
     basis_rationale text,
@@ -2816,7 +2818,9 @@ CREATE TABLE public.supplement_safety_limits (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT supplement_safety_limits_confidence_check CHECK ((confidence = ANY (ARRAY['high'::text, 'moderate'::text, 'low'::text]))),
+    CONSTRAINT supplement_safety_limits_life_stage_check CHECK ((life_stage = ANY (ARRAY['child_1_3'::text, 'child_4_8'::text, 'child_9_13'::text, 'adolescent_14_18'::text, 'adult'::text, 'pregnant'::text, 'breastfeeding'::text]))),
     CONSTRAINT supplement_safety_limits_safety_flags_check CHECK ((safety_flags <@ ARRAY['allergy_caution'::text, 'bleeding_risk'::text, 'condition_caution'::text, 'contamination_risk'::text, 'exclude_automated_use'::text, 'general_caution'::text, 'hormone_caution'::text, 'kidney_caution'::text, 'liver_caution'::text, 'medication_interaction'::text, 'pregnancy_caution'::text, 'regulatory_risk'::text, 'stimulant'::text, 'upper_dose_risk'::text])),
+    CONSTRAINT supplement_safety_limits_source_scope_check CHECK ((source_scope = ANY (ARRAY['supplemental'::text, 'total'::text]))),
     CONSTRAINT supplement_safety_limits_version_check CHECK ((version > 0))
 );
 
@@ -4091,7 +4095,7 @@ ALTER TABLE ONLY public.supplement_safety_limits
 --
 
 ALTER TABLE ONLY public.supplement_safety_limits
-    ADD CONSTRAINT supplement_safety_limits_supplement_id_version_key UNIQUE (supplement_id, version);
+    ADD CONSTRAINT supplement_safety_limits_band_version_key UNIQUE (supplement_id, life_stage, source_scope, version);
 
 ALTER TABLE ONLY public.supplement_safety_limit_bands
     ADD CONSTRAINT supplement_safety_limit_bands_pkey PRIMARY KEY (id);

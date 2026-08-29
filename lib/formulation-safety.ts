@@ -322,6 +322,8 @@ async function loadSupplementLookup(sql: TaskServiceDb, countryCode: string) {
       select *
       from public.supplement_safety_limits limits
       where limits.supplement_id = supplements.id
+        and limits.life_stage = 'adult'
+        and limits.source_scope = 'supplemental'
       order by limits.version desc
       limit 1
     ) limits on true

@@ -835,6 +835,8 @@ export async function increaseProductFactSafetyLimit(input: Readonly<{
       select *
       from public.supplement_safety_limits
       where supplement_safety_limits.supplement_id = product_facts.supplement_id
+        and life_stage = 'adult'
+        and source_scope = 'supplemental'
       order by version desc
       limit 1
     ) limits on true
