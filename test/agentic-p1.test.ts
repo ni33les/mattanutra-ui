@@ -787,7 +787,14 @@ describe("agentic P1 pack fixes", () => {
       "utf8"
     );
     assert.match(executeSource, /successUrl/);
-    assert.match(executeSource, /\/en\/order\/track/);
+    assert.doesNotMatch(
+      executeSource,
+      /\$\{input\.config\.siteUrl\}\/en\/order\/track`/
+    );
+    assert.match(
+      executeSource,
+      /order\/track\/\$\{encodeURIComponent\(orderNumber\)\}/
+    );
     const returnPage = readFileSync(
       new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/return/page.tsx", import.meta.url),
       "utf8"

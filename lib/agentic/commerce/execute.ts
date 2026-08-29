@@ -16,6 +16,7 @@ import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
 import { expireCheckoutIfDue } from "@/lib/agentic/commerce/state";
 import { publicFrozenItems } from "@/lib/agentic/public-mapper";
+import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
@@ -97,7 +98,7 @@ export type ExecuteSuccess = Readonly<{
   paymentStatus: OrderRecord["paymentStatus"];
   pollAfterSeconds: number;
   stateVersion: number;
-  successUrl: string;
+  successUrl?: string;
 }>;
 
 async function withLiveOrderState(input: Readonly<{
@@ -134,7 +135,7 @@ async function withLiveOrderState(input: Readonly<{
       store: input.store
     })) ?? loaded;
 
-  return {
+  const live: ExecuteSuccess = {
     ...input.stored,
     checkoutExpiresAt: order.checkoutExpiresAt ?? input.stored.checkoutExpiresAt,
     checkoutUrl: order.checkoutUrl ?? input.stored.checkoutUrl,
@@ -142,6 +143,27 @@ async function withLiveOrderState(input: Readonly<{
     paymentStatus: order.paymentStatus,
     stateVersion: order.stateVersion
   };
+
+  if (order.paymentStatus === "paid") {
+    const retail = await getRetailOrderByAgenticOrderId(order.id);
+    const orderNumber = retail?.orderNumber?.trim();
+    if (orderNumber) {
+      const locale = negotiateLocale(
+        typeof order.frozenPlan === "object" &&
+          order.frozenPlan &&
+          "locale" in order.frozenPlan
+          ? String((order.frozenPlan as { locale?: unknown }).locale ?? "en")
+          : "en"
+      );
+      return {
+        ...live,
+        successUrl: `${input.config.siteUrl}/${locale}/order/track/${encodeURIComponent(orderNumber)}`
+      };
+    }
+  }
+
+  const { successUrl: _omitBareSuccessUrl, ...withoutSuccessUrl } = live;
+  return withoutSuccessUrl;
 }
 
 export async function executeTool(input: Readonly<{
@@ -415,7 +437,6 @@ async function executeFresh(
       order: draftOrder
     });
     const checkoutUrl = `${input.config.siteUrl}/${locale}/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutIssued.handle)}`;
-    const successUrl = `${input.config.siteUrl}/en/order/track`;
     const order = {
       ...draftOrder,
       checkoutUrl,
@@ -459,8 +480,7 @@ async function executeFresh(
       orderStatus: "open",
       paymentStatus: "unpaid",
       pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
-      stateVersion: 1,
-      successUrl
+      stateVersion: 1
     };
 
     await commitIdempotency({

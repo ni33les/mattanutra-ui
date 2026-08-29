@@ -1546,31 +1546,45 @@ async function com47() {
   });
 }
 
+function isBareOrderTrackUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return false;
+  }
+
+  let pathname = value.trim();
+  try {
+    pathname = new URL(value).pathname;
+  } catch {
+    // relative path
+  }
+
+  return /^\/[A-Za-z0-9-]+\/order\/track\/?$/.test(pathname);
+}
+
 async function com48() {
   return withCase(async (runtime) => {
     const seeded = await seedPlanA(runtime);
     const executed = await executeReady(runtime, seeded, key("48-su"));
-    const successUrl = String(executed.successUrl ?? "");
-    let pathname = "";
-    try {
-      pathname = new URL(successUrl).pathname;
-    } catch {
-      pathname = "";
-    }
-    const trackIndexPath = fileURLToPath(
-      new URL("../app/[locale]/order/track/page.tsx", import.meta.url)
+    const executeSrc = readFileSync(
+      new URL("../lib/agentic/commerce/execute.ts", import.meta.url),
+      "utf8"
     );
-    const exists = existsSync(trackIndexPath);
-    const source = exists ? readFileSync(trackIndexPath, "utf8") : "";
+    const successUrl =
+      typeof executed.successUrl === "string" ? executed.successUrl : null;
+    const omitted =
+      executed.successUrl == null ||
+      executed.successUrl === undefined ||
+      executed.successUrl === "";
     const ok =
-      /^https?:\/\//.test(successUrl) &&
-      pathname === "/en/order/track" &&
-      exists &&
-      /not ordered|no order|enter your order number/i.test(source) &&
-      !/This page could not be found/i.test(source);
+      executed.ok === true &&
+      omitted &&
+      !isBareOrderTrackUrl(successUrl) &&
+      !isBareOrderTrackUrl(executed.checkoutUrl) &&
+      !executeSrc.includes("${input.config.siteUrl}/en/order/track`") &&
+      !executeSrc.includes("${input.config.siteUrl}/${locale}/order/track`");
     return verdict("COM-48", ok, {
-      exists,
-      pathname,
+      checkoutUrl: String(executed.checkoutUrl ?? ""),
+      omitted,
       successUrl
     });
   });
@@ -1595,14 +1609,22 @@ async function com49() {
     const specificWhenPresent =
       tracking === "" || /\/order\/track\/[^/?#]+/.test(tracking);
     const notBareWhenPresent = tracking === "" || !/\/order\/track\/?$/.test(tracking);
+    const executeSrc = readFileSync(
+      new URL("../lib/agentic/commerce/execute.ts", import.meta.url),
+      "utf8"
+    );
     const ok =
       paid.paymentStatus === "paid" &&
+      !isBareOrderTrackUrl(paid.successUrl) &&
+      !isBareOrderTrackUrl(executed.successUrl) &&
+      !executeSrc.includes("${input.config.siteUrl}/en/order/track`") &&
       orderSrc.includes("order/track/${encodeURIComponent(settlement.orderNumber)}") &&
       checkoutSrc.includes("order/track/${encodeURIComponent(") &&
       specificWhenPresent &&
       notBareWhenPresent;
     return verdict("COM-49", ok, {
       paymentStatus: paid.paymentStatus ?? null,
+      paidSuccessUrl: paid.successUrl ?? null,
       tracking: tracking || null
     });
   });
