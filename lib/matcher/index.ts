@@ -1023,7 +1023,7 @@ export function match(
       target.requestedUnit,
       target.name
     );
-    const ceiling = safetyCeilingFor(request.safetyCeilings, {
+    const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
       name: target.name,
       profile: request.profile,
       subjectId: target.subjectId

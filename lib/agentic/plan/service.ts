@@ -362,6 +362,7 @@ function buildResult(input: Readonly<{
         lossCertificates: undefined,
         rejected: [],
         selected: portMatch.selected,
+        targetFrontiers: undefined,
         unmetRequirements: unmetRequirementsFor({
           option: portMatch.selected,
           state: input.state
@@ -555,7 +556,7 @@ function successFromResult(input: Readonly<{
       status: "processing",
       summary: fields.summary,
       summaryKey: "plan.summary.processing"
-    };
+    } as PlanToolSuccess;
   }
 
   return {

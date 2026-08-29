@@ -59,7 +59,11 @@ function currentContributors(
   ];
 }
 
-function exposureContributors(row: CoverageRow): CoverageContributor[] {
+function exposureContributors(
+  row: Pick<CoverageRow, "currentAmount" | "name" | "unit"> & {
+    contributors?: CoverageRow["contributors"];
+  }
+): CoverageContributor[] {
   return [
     ...currentContributors(row),
     ...(row.contributors ?? []).map((item) => ({
@@ -166,16 +170,7 @@ function guidance(input: Readonly<{
 function zincExposure(
   selected: StackOption | null,
   state: CanonicalPlanState
-): Pick<
-  CoverageRow,
-  | "currentAmount"
-  | "deliveredAmount"
-  | "name"
-  | "requestedAmount"
-  | "supplementId"
-  | "totalExposureAmount"
-  | "unit"
-> | null {
+): CoverageRow | null {
   const row = selected?.coverage.find((item) => /zinc/i.test(item.name));
 
   if (row) {
@@ -199,13 +194,19 @@ function zincExposure(
   const currentAmount = roundDose(fromComparable(currentComparable, unit, "Zinc"));
 
   return {
+    contributors: [],
+    coveragePercent: 0,
     currentAmount,
     deliveredAmount: 0,
     name: "Zinc",
+    percentOfUpperLimit: null,
+    remainingGap: 0,
     requestedAmount: 0,
+    status: "uncovered",
     supplementId: first.supplementId,
     totalExposureAmount: currentAmount,
-    unit
+    unit,
+    upperLimitAmount: null
   };
 }
 
@@ -360,11 +361,7 @@ export function evaluateSafety(input: Readonly<{
           `ul:missing:${row.supplementId}`
         )
       }));
-    } else if (
-      limit == null &&
-      "coveragePercent" in row &&
-      row.coveragePercent > 125
-    ) {
+    } else if (limit == null && row.coveragePercent > 125) {
       items.push(guidance({
         action: "block",
         code: "dose_review_required",

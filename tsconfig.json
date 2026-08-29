@@ -37,6 +37,11 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "test",
+    "scripts/_r21-r8-permutations.ts",
+    "scripts/_r22-absorb-diag.ts",
+    "scripts/_r22-joint-diag.ts",
+    "scripts/_r22-pair-diag.ts"
   ]
 }
