@@ -25,9 +25,23 @@ export async function POST(
   }
 
   const { paymentId } = await params;
+  let scenario = "success";
 
   try {
-    const result = await completeMockRetailCheckout({ paymentId, request });
+    const body = (await request.json()) as { scenario?: unknown };
+    if (typeof body.scenario === "string" && body.scenario.trim()) {
+      scenario = body.scenario.trim();
+    }
+  } catch {
+    scenario = "success";
+  }
+
+  try {
+    const result = await completeMockRetailCheckout({
+      paymentId,
+      request,
+      scenario
+    });
 
     if (!result) {
       return NextResponse.json(

@@ -353,6 +353,7 @@ async function executeFresh(
       expiredAt: null,
       frozenPlan: {
         catalogueVersion: snapshot.catalogueVersion,
+        channel: "agentic",
         countryCode: result.requestSnapshot.destinationCountry || ACTIVE_MARKET_COUNTRY,
         coveragePercent: selected.coveragePercent,
         currency: result.requestSnapshot.currency,

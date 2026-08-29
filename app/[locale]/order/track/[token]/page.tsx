@@ -5,6 +5,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { orderTrackFormulationHref } from "@/lib/order-track-presentation";
+import { nutritionRevealPath } from "@/lib/nutrition-paths";
 import { getTrackingOrderByReference } from "@/lib/retail-product-checkout";
 import { localizedRouteMetadata } from "@/lib/seo";
 
@@ -46,6 +48,7 @@ const orderTrackingCopy = {
     trackShipment: "Track shipment",
     trackingNumber: "Tracking number",
     returnToAgent: "Please return to your AI Agent Chat.",
+    formulationLink: "View your formula",
     yourItems: "Your Items",
     metadataTitle: "Track Your Order | MattaNutra"
   },
@@ -81,6 +84,7 @@ const orderTrackingCopy = {
     trackShipment: "ติดตามพัสดุ",
     trackingNumber: "หมายเลขติดตาม",
     returnToAgent: "กรุณากลับไปที่แชทผู้ช่วย AI ของคุณ",
+    formulationLink: "ดูสูตรของคุณ",
     yourItems: "รายการของคุณ",
     metadataTitle: "ติดตามคำสั่งซื้อ | MattaNutra"
   },
@@ -113,6 +117,7 @@ const orderTrackingCopy = {
     trackShipment: "追踪配送",
     trackingNumber: "追踪号",
     returnToAgent: "请返回你的 AI 助手对话。",
+    formulationLink: "查看你的配方",
     yourItems: "你的商品",
     metadataTitle: "追踪你的订单 | MattaNutra"
   }
@@ -282,6 +287,16 @@ export default async function CustomerOrderTrackingPage({ params, searchParams }
   const order = await getTrackingOrderByReference(token, locale);
   const currentPath = `/${locale}/order/track/${encodeURIComponent(token)}`;
   const fromAgent = query.from === "mcp" || query.from === "agent";
+  const formulationHref =
+    order && order.checkoutChannel === "web"
+      ? nutritionRevealPath(locale, order.planId)
+      : order
+        ? orderTrackFormulationHref({
+            channel: order.checkoutChannel,
+            locale,
+            planId: order.planId
+          })
+        : null;
 
   if (!order) {
     return (
@@ -337,6 +352,15 @@ export default async function CustomerOrderTrackingPage({ params, searchParams }
           <p className="mt-4 text-base leading-7 text-[var(--mn-ink-soft)]">
             {copy.subtitle}
           </p>
+          {formulationHref ? (
+            <a
+              className="mt-6 inline-flex text-sm font-bold text-[var(--mn-teal-deep)]"
+              data-testid="formulation-link"
+              href={formulationHref}
+            >
+              {copy.formulationLink}
+            </a>
+          ) : null}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">

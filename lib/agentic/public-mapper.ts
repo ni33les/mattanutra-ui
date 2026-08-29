@@ -1068,6 +1068,7 @@ export function publicFrozenOrder(frozen: unknown) {
 
   return {
     catalogueVersion: record.catalogueVersion,
+    channel: record.channel === "agentic" ? "agentic" : record.channel === "web" ? "web" : record.channel,
     countryCode: record.countryCode,
     coveragePercent: record.coveragePercent,
     currency: record.currency,

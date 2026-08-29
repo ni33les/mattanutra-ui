@@ -674,18 +674,21 @@ export async function packProof(runtime: AgenticRuntime) {
 
   let panel = "";
   try {
-    panel = readFileSync(join(process.cwd(), "components/agentic-checkout-panel.tsx"), "utf8");
+    panel = readFileSync(
+      join(process.cwd(), "components/retail-checkout/product-basket-checkout-panel.tsx"),
+      "utf8"
+    );
   } catch {
     panel = "";
   }
   checks.push(
     check(
       "D9-07",
-      panel.includes("checkout.agentAuth") &&
-        panel.includes("checkout.test_mode") &&
-        panel.includes("subtotalMinor") &&
+      panel.includes("agentAuthorized") &&
+        panel.includes("testMode") &&
         panel.includes("scenario=expire") &&
-        panel.includes("three_ds_cancelled")
+        panel.includes("three_ds_cancelled") &&
+        panel.includes("decline_insufficient_funds")
     )
   );
   checks.push(

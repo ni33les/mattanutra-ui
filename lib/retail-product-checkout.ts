@@ -35,6 +35,7 @@ import {
 } from "@/lib/retail-order-workflow";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { schedulePanyaReorderCallbackForOrder } from "@/lib/panya";
+import { orderCheckoutChannel } from "@/lib/order-track-presentation";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
 type RetailCheckoutDb = postgres.Sql | postgres.TransactionSql;
@@ -123,6 +124,7 @@ type QuoteLine = Readonly<{
 
 type TrackingOrder = Readonly<{
   address: Record<string, unknown>;
+  checkoutChannel: "agentic" | "web";
   currency: string;
   customerEmail: string | null;
   customerName: string | null;
@@ -153,6 +155,10 @@ function objectValue(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+function orderCheckoutChannelFromPayment(metadata: unknown) {
+  return orderCheckoutChannel(objectValue(metadata).channel);
 }
 
 async function queuePlatformRetailRevenueNotification(
@@ -446,6 +452,113 @@ async function pharmacyRrpPayableAmounts(
 
 function catalogueProductUuid(productId: string) {
   return parsePublicId(productId, "prd_") ?? (isUuid(productId) ? productId : null);
+}
+
+async function projectRetailMockScenarioOntoAgenticOrder(input: Readonly<{
+  agenticOrderId: unknown;
+  payment: CheckoutPaymentRow;
+  scenario: string;
+}>) {
+  const agenticOrderId = cleanText(input.agenticOrderId);
+
+  if (!agenticOrderId) {
+    return;
+  }
+
+  const { getLiveAgenticRuntime } = await import("@/lib/agentic/live-runtime");
+  const { mockEventForScenario } = await import("@/lib/agentic/commerce/payment");
+  const { applyVerifiedPaymentEvent } = await import("@/lib/agentic/commerce/state");
+  const { asMinor } = await import("@/lib/agentic/money");
+  const { nowIso } = await import("@/lib/agentic/runtime");
+  const { processOmsOutbox } = await import("@/lib/agentic/retail/mock-thailand");
+  const { isPaymentScenario, scenarioSubmitsOms } = await import(
+    "@/lib/agentic/qa/simulate"
+  );
+
+  if (!isPaymentScenario(input.scenario)) {
+    return;
+  }
+
+  const runtime = getLiveAgenticRuntime();
+  const order = await runtime.store.getOrder(agenticOrderId);
+
+  if (!order) {
+    return;
+  }
+
+  const now = nowIso();
+  const sessionId =
+    cleanText(input.payment.stripe_checkout_session_id) ||
+    order.providerSessionId ||
+    `retail_${input.payment.id}`;
+  const event = mockEventForScenario({
+    amountMinor: asMinor(order.totalPriceMinor),
+    currency: order.currency,
+    orderId: order.id,
+    providerSessionId: sessionId,
+    scenario: input.scenario
+  });
+
+  await applyVerifiedPaymentEvent({
+    event,
+    now,
+    store: runtime.store
+  });
+
+  if (input.scenario === "processing_then_success") {
+    await applyVerifiedPaymentEvent({
+      event: {
+        ...event,
+        providerEventId: `${event.providerEventId}_success`,
+        status: "succeeded"
+      },
+      now,
+      store: runtime.store
+    });
+  }
+
+  if (scenarioSubmitsOms(input.scenario)) {
+    await processOmsOutbox({
+      adapter: runtime.config.thailandRetailerAdapter,
+      now,
+      store: runtime.store
+    });
+  }
+}
+
+function mockPaymentScenario(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "success";
+}
+
+function isSuccessMockScenario(scenario: string) {
+  return (
+    scenario === "success" ||
+    scenario === "three_ds_succeeded" ||
+    scenario === "processing_then_success" ||
+    scenario === "duplicate_success"
+  );
+}
+
+function mockFailureMessage(scenario: string) {
+  switch (scenario) {
+    case "decline_insufficient_funds":
+      return "Payment declined: insufficient funds.";
+    case "provider_unavailable":
+      return "Payment provider unavailable.";
+    case "three_ds_required":
+      return "3-D Secure is required. Choose three_ds_succeeded or three_ds_failed.";
+    case "three_ds_cancelled":
+      return "3-D Secure was cancelled.";
+    case "three_ds_failed":
+      return "3-D Secure failed.";
+    case "expire":
+      return "Checkout expired.";
+    case "refund":
+    case "partial_refund":
+      return "Refund fixtures require a paid checkout.";
+    default:
+      return `Mock payment scenario '${scenario}' did not complete payment.`;
+  }
 }
 
 async function projectRetailPaidOntoAgenticOrder(input: Readonly<{
@@ -1460,6 +1573,7 @@ async function fulfillRetailCheckoutPayment(
 export async function completeMockRetailCheckout(input: Readonly<{
   paymentId: string;
   request?: Request;
+  scenario?: string | null;
 }>) {
   if (!isUuid(input.paymentId)) {
     return null;
@@ -1477,6 +1591,103 @@ export async function completeMockRetailCheckout(input: Readonly<{
 
   if (config.mode !== "mock") {
     throw new Error("Mock payment completion is only available in dev mock mode");
+  }
+
+  const scenario = mockPaymentScenario(input.scenario);
+
+  if (!isSuccessMockScenario(scenario)) {
+    const current = await sql<CheckoutPaymentRow[]>`
+      select *
+      from public.retail_checkout_payments
+      where id = ${input.paymentId}::uuid
+        and stripe_mode = 'mock'
+      limit 1
+    `;
+    const payment = current[0] ?? null;
+
+    if (!payment) {
+      return null;
+    }
+
+    const paid =
+      payment.status === "paid" || payment.status === "fulfilled";
+
+    if ((scenario === "refund" || scenario === "partial_refund") && paid) {
+      await projectRetailMockScenarioOntoAgenticOrder({
+        agenticOrderId: objectValue(payment.metadata).agenticOrderId,
+        payment,
+        scenario
+      });
+      await recordVersion(
+        sql,
+        payment.id,
+        "mock_payment_refunded",
+        "system",
+        `mock_product_payment:${scenario}`
+      );
+      return {
+        message: scenario === "partial_refund"
+          ? "Partial refund simulated."
+          : "Refund simulated.",
+        paymentId: payment.id
+      };
+    }
+
+    if (paid) {
+      throw new Error("This checkout is already paid.");
+    }
+
+    const nextStatus =
+      scenario === "expire"
+        ? "expired"
+        : scenario === "three_ds_cancelled"
+          ? "cancelled"
+          : null;
+
+    if (nextStatus) {
+      await sql`
+        update public.retail_checkout_payments
+        set status = ${nextStatus},
+          updated_at = now()
+        where id = ${payment.id}::uuid
+          and stripe_mode = 'mock'
+      `;
+    }
+
+    await recordVersion(
+      sql,
+      payment.id,
+      "mock_payment_failed",
+      "system",
+      `mock_product_payment:${scenario}`
+    );
+    void writeBpmEvent({
+      actorType: "system",
+      emittedBy: "retail_product_checkout",
+      eventName: "retail_product_payment_failed",
+      eventStatus: "failed",
+      eventType: "payment",
+      locale: payment.locale,
+      planId: payment.plan_id,
+      properties: {
+        channel: objectValue(payment.metadata).channel ?? "web",
+        checkoutPaymentId: payment.id,
+        scenario,
+        stripeMode: payment.stripe_mode
+      },
+      valueAmount: Number(payment.amount) / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: payment.currency
+    });
+    await projectRetailMockScenarioOntoAgenticOrder({
+      agenticOrderId: objectValue(payment.metadata).agenticOrderId,
+      payment,
+      scenario
+    });
+
+    return {
+      message: mockFailureMessage(scenario),
+      paymentId: payment.id
+    };
   }
 
   const rows = await sql<CheckoutPaymentRow[]>`
@@ -1751,6 +1962,7 @@ export async function getTrackingOrderByReference(
 
   return {
     address: objectValue(row.shipping_address),
+    checkoutChannel: orderCheckoutChannelFromPayment(row.metadata),
     currency: row.currency,
     customerEmail: row.customer_email,
     customerName: row.customer_name,

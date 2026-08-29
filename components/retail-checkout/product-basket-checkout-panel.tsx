@@ -17,6 +17,20 @@ import { displayCountryName, productCountryOptions } from "@/lib/product-countri
 
 const CHECKOUT_SESSION_TIMEOUT_MS = 15_000;
 
+export const RETAIL_MOCK_PAYMENT_SCENARIOS = [
+  "success",
+  "decline_insufficient_funds",
+  "processing_then_success",
+  "provider_unavailable",
+  "three_ds_required",
+  "three_ds_succeeded",
+  "three_ds_failed",
+  "three_ds_cancelled",
+  "expire",
+  "refund",
+  "partial_refund"
+] as const;
+
 type AddressState = {
   addressLine1: string;
   addressLine2: string;
@@ -46,6 +60,7 @@ type ProductBasketCheckoutPanelProps = Readonly<{
   frozenLines?: readonly RetailCheckoutFrozenLine[];
   initialQuotePreview?: ProductBasketQuotePreview | null;
   locale: Locale;
+  mockPayment?: boolean;
   mode?: "web" | "agentic";
   orderReference?: string | null;
   planId: string;
@@ -86,7 +101,10 @@ const copy = {
     free: "Free",
     included: "Included",
     invalidEmail: "Enter a valid email address.",
-    mockCta: "Simulate successful payment",
+    mockCta: "Simulate payment",
+    mockIntro:
+      "DEV mock payment. No Stripe keys or card details are needed. Choose success, decline_insufficient_funds, scenario=expire, three_ds_cancelled, three_ds_failed, three_ds_succeeded, or scenario=refund.",
+    mockScenario: "Test scenario",
     name: "Full name",
     notes: "Delivery notes",
     optional: "optional",
@@ -135,7 +153,10 @@ const copy = {
     free: "ฟรี",
     included: "รวมแล้ว",
     invalidEmail: "กรุณากรอกอีเมลให้ถูกต้อง",
-    mockCta: "จำลองการชำระเงินสำเร็จ",
+    mockCta: "จำลองการชำระเงิน",
+    mockIntro:
+      "โหมดพัฒนาใช้การชำระเงินจำลอง ไม่ต้องใช้คีย์ Stripe หรือข้อมูลบัตร เลือก success, decline_insufficient_funds, expire, three_ds_cancelled หรือ refund",
+    mockScenario: "สถานการณ์ทดสอบ",
     name: "ชื่อ-นามสกุล",
     notes: "หมายเหตุการจัดส่ง",
     optional: "ไม่บังคับ",
@@ -184,7 +205,10 @@ const copy = {
     free: "免费",
     included: "已包含",
     invalidEmail: "请输入有效邮箱。",
-    mockCta: "模拟支付成功",
+    mockCta: "模拟支付",
+    mockIntro:
+      "开发模式使用模拟支付，无需 Stripe 密钥或银行卡。可选择 success、decline_insufficient_funds、expire、three_ds_cancelled 或 refund。",
+    mockScenario: "测试场景",
     name: "姓名",
     notes: "配送备注",
     optional: "可选",
@@ -369,6 +393,7 @@ export function ProductBasketCheckoutPanel({
   frozenLines = [],
   initialQuotePreview = null,
   locale,
+  mockPayment = false,
   mode = "web",
   orderReference = null,
   planId,
@@ -405,6 +430,9 @@ export function ProductBasketCheckoutPanel({
   const [isCompletingMock, setIsCompletingMock] = useState(false);
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [mockReady, setMockReady] = useState(false);
+  const [mockScenario, setMockScenario] = useState<(typeof RETAIL_MOCK_PAYMENT_SCENARIOS)[number]>(
+    "success"
+  );
   const trimmedPublishableKey = publishableKey.trim();
   const hasValidStripePublishableKey = /^pk_(test|live)_/.test(
     trimmedPublishableKey
@@ -629,18 +657,18 @@ export function ProductBasketCheckoutPanel({
     return loadQuotePreview({ confirmDelivery: true });
   }, [formIsValid, loadQuotePreview, touchInvalidFields]);
 
-  const createSession = useCallback(async () => {
+  const createSession = useCallback(async (): Promise<string | null> => {
     setError("");
 
     if (!formIsValid) {
       touchInvalidFields();
       setError("Please complete the required checkout details.");
-      return;
+      return null;
     }
 
     if (checkoutMode === "agentic" && !checkout.agentAuthorized) {
       setError(labels.agentAuthorizedRequired);
-      return;
+      return null;
     }
 
     const activeQuotePreview = quotePreview ?? (await previewQuote());
@@ -654,7 +682,7 @@ export function ProductBasketCheckoutPanel({
             )
           : labels.unavailableBody
       );
-      return;
+      return null;
     }
 
     setIsLoading(true);
@@ -704,7 +732,7 @@ export function ProductBasketCheckoutPanel({
 
       if (body.mock) {
         setMockReady(true);
-        return;
+        return body.paymentId;
       }
 
       void fetch(`/api/retail/checkout/${encodeURIComponent(body.paymentId)}`, {
@@ -713,8 +741,10 @@ export function ProductBasketCheckoutPanel({
       });
 
       setClientSecret(body.clientSecret ?? null);
+      return body.paymentId;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : labels.error);
+      return null;
     } finally {
       window.clearTimeout(timeout);
       setIsLoading(false);
@@ -743,8 +773,9 @@ export function ProductBasketCheckoutPanel({
     touchInvalidFields
   ]);
 
-  const completeMock = useCallback(async () => {
-    if (!paymentId) {
+  const completeMock = useCallback(async (overridePaymentId?: string | null) => {
+    const id = overridePaymentId || paymentId;
+    if (!id) {
       return;
     }
 
@@ -753,9 +784,11 @@ export function ProductBasketCheckoutPanel({
 
     try {
       const response = await fetch(
-        `/api/retail/checkout/${encodeURIComponent(paymentId)}/mock-complete`,
+        `/api/retail/checkout/${encodeURIComponent(id)}/mock-complete`,
         {
+          body: JSON.stringify({ scenario: mockScenario }),
           cache: "no-store",
+          headers: { "content-type": "application/json" },
           method: "POST"
         }
       );
@@ -764,16 +797,30 @@ export function ProductBasketCheckoutPanel({
         message?: string;
       };
 
-      if (!response.ok || !body.destination) {
+      if (!response.ok) {
         throw new Error(body.message || labels.error);
       }
 
-      window.location.assign(body.destination);
+      if (body.destination) {
+        window.location.assign(body.destination);
+        return;
+      }
+
+      throw new Error(body.message || labels.error);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : labels.error);
       setIsCompletingMock(false);
     }
-  }, [labels.error, paymentId]);
+  }, [labels.error, mockScenario, paymentId]);
+
+  const runMockPayment = useCallback(async () => {
+    const id = paymentId ?? (await createSession());
+    if (!id) {
+      return;
+    }
+
+    await completeMock(id);
+  }, [completeMock, createSession, paymentId]);
 
   const renderInput = (
     scope: "billing" | "shipping",
@@ -859,7 +906,7 @@ export function ProductBasketCheckoutPanel({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="space-y-5">
           <section className="mn-commerce-card">
-            {checkoutMode === "agentic" ? (
+            {checkoutMode === "agentic" || mockPayment || mockReady ? (
               <p className="mb-4 rounded-lg bg-[var(--mn-cream)] px-4 py-3 text-sm font-semibold text-[var(--mn-teal-deep)]">
                 {labels.testMode}
               </p>
@@ -1125,6 +1172,34 @@ export function ProductBasketCheckoutPanel({
               </p>
             ) : null}
 
+            {mockPayment || mockReady ? (
+              <div className="mt-4 space-y-3 rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
+                <p className="text-sm leading-6 text-[var(--mn-ink-soft)]">
+                  {labels.mockIntro}
+                </p>
+                <label className="grid gap-1 text-sm font-semibold text-[var(--mn-ink)]" htmlFor="scenario">
+                  <span>{labels.mockScenario}</span>
+                  <select
+                    className={inputClass(false)}
+                    id="scenario"
+                    name="scenario"
+                    onChange={(event) =>
+                      setMockScenario(
+                        event.target.value as (typeof RETAIL_MOCK_PAYMENT_SCENARIOS)[number]
+                      )
+                    }
+                    value={mockScenario}
+                  >
+                    {RETAIL_MOCK_PAYMENT_SCENARIOS.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+
             {clientSecret ? (
               <div className="mt-5">
                 <p className="mb-4 text-sm font-bold text-[var(--mn-teal-deep)]">
@@ -1143,8 +1218,8 @@ export function ProductBasketCheckoutPanel({
                 className="mn-primary-button mt-5 w-full justify-center"
                 disabled={isLoading || isCompletingMock || !canPay}
                 onClick={() => {
-                  if (mockReady) {
-                    void completeMock();
+                  if (mockPayment || mockReady) {
+                    void runMockPayment();
                     return;
                   }
 
@@ -1153,8 +1228,8 @@ export function ProductBasketCheckoutPanel({
                 type="button"
               >
                 <CreditCard aria-hidden className="size-4" />
-                {mockReady
-                  ? isCompletingMock
+                {mockPayment || mockReady
+                  ? isCompletingMock || isLoading
                     ? labels.stripeLoading
                     : labels.mockCta
                   : isLoading
@@ -1198,8 +1273,8 @@ export function ProductBasketCheckoutPanel({
             className="mn-primary-button w-fit"
             disabled={isLoading || isCompletingMock || !canPay || Boolean(clientSecret)}
             onClick={() => {
-              if (mockReady) {
-                void completeMock();
+              if (mockPayment || mockReady) {
+                void runMockPayment();
                 return;
               }
 
@@ -1208,7 +1283,7 @@ export function ProductBasketCheckoutPanel({
             type="button"
           >
             <CreditCard aria-hidden className="size-4" />
-            {mockReady ? labels.mockCta : labels.continue}
+            {mockPayment || mockReady ? labels.mockCta : labels.continue}
           </button>
         </div>
       </div>

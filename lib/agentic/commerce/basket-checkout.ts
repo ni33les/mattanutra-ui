@@ -1,4 +1,3 @@
-import type { AgenticCheckoutItem } from "@/components/agentic-checkout-panel";
 import { hashCapability } from "@/lib/agentic/capabilities";
 import { loadAgenticCheckoutProducts } from "@/lib/agentic/commerce/checkout-products";
 import { lookupRetailOrderForAgentic } from "@/lib/agentic/commerce/retail-join";
@@ -14,6 +13,14 @@ import { isUuid, parsePublicId } from "@/lib/agentic/contract/ids";
 import type { Locale } from "@/lib/i18n";
 import type { ProductBasketProduct, ProductBasketQuotePreview } from "@/components/retail-checkout/product-basket-types";
 import type { RetailCheckoutFrozenLine } from "@/lib/retail-product-checkout";
+
+export type AgenticCheckoutItem = Readonly<{
+  dailyPills: number;
+  form: string;
+  lineTotalMinor: number;
+  productName: string;
+  quantity: number;
+}>;
 
 export type AgenticBasketCheckout = Readonly<{
   agenticOrderId: string;

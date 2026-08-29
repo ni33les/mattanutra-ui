@@ -353,10 +353,23 @@ export function orderPollView(input: Readonly<{
         ? "open_checkout"
         : "poll";
 
+  const frozenOrder = publicFrozenOrder(order.frozenPlan);
+  const frozenRecord =
+    frozenOrder && typeof frozenOrder === "object"
+      ? (frozenOrder as Record<string, unknown>)
+      : {};
+  const channel =
+    frozenRecord.channel === "agentic" || frozenRecord.channel === "web"
+      ? frozenRecord.channel
+      : String(order.checkoutUrl ?? "").includes("mode=agentic")
+        ? "agentic"
+        : "web";
+
   return {
+    channel,
     checkoutExpiresAt: order.checkoutExpiresAt,
     checkoutUrl: input.checkoutUrl,
-    frozenOrder: publicFrozenOrder(order.frozenPlan),
+    frozenOrder,
     fulfilment: {
       deliveryWindow: null,
       reasonCode,

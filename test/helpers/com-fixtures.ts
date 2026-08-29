@@ -87,7 +87,11 @@ export const COM_CASE_IDS = [
   "COM-43",
   "COM-44",
   "COM-45",
-  "COM-46"
+  "COM-46",
+  "COM-47",
+  "COM-48",
+  "COM-49",
+  "COM-50"
 ] as const;
 
 export type ComCaseId = (typeof COM_CASE_IDS)[number];

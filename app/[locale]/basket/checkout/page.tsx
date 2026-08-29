@@ -2,20 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { AgenticCheckoutPanel } from "@/components/agentic-checkout-panel";
 import { ProductBasketCheckoutPanel } from "@/components/retail-checkout/product-basket-checkout-panel";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { loadAgenticBasketCheckout } from "@/lib/agentic/commerce/basket-checkout";
-import { mcpOrderTrackSuccessPath } from "@/lib/agentic/commerce/checkout-return";
-import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
-import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { getNamespace } from "@/lib/i18n-messages";
 import { nutritionRevealPath } from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
+import { stripePaymentConfig } from "@/lib/stripe-payment-config";
 import { stripePublishableKey } from "@/lib/stripe-payments";
 
 type BasketCheckoutPageProps = Readonly<{
@@ -162,14 +159,12 @@ export default async function BasketCheckoutPage({
         })
       : null;
 
-  const mockHarness = agenticBasket?.paymentProvider === "mock";
-
   if (checkoutMode === "agentic") {
     if (!agenticBasket) {
       notFound();
     }
 
-    if (agenticBasket.paid && agenticBasket.trackingPath && !mockHarness) {
+    if (agenticBasket.paid && agenticBasket.trackingPath) {
       redirect(agenticBasket.trackingPath);
     }
   }
@@ -201,25 +196,6 @@ export default async function BasketCheckoutPage({
         selectedItemIds,
         locale
       );
-  const queryResult =
-    mockHarness && typeof query.paymentStatus === "string"
-      ? `paymentStatus=${query.paymentStatus} attempt=${query.attempt ?? "none"} reason=${query.reason ?? "none"} v${query.stateVersion ?? "?"}`
-      : null;
-  const counts =
-    mockHarness && agenticBasket
-      ? await redactedOrderCounts({
-          orderId: agenticBasket.agenticOrderId,
-          runtime: getLiveAgenticRuntime()
-        })
-      : null;
-  const lastResult = [
-    queryResult,
-    counts ? `TEST-DRIVER EVIDENCE (not payment truth) ${JSON.stringify(counts)}` : null
-  ]
-    .filter(Boolean)
-    .join("\n");
-  const currentBasketPath = `/${locale}/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutAccess)}`;
-
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
@@ -246,33 +222,14 @@ export default async function BasketCheckoutPage({
             {selectedItemIds.length < 1 ? labels.empty : labels.body}
           </p>
         </div>
-        {selectedItemIds.length < 1 ? null : mockHarness && agenticBasket ? (
-          <AgenticCheckoutPanel
-            checkoutAccess={checkoutAccess}
-            country={agenticBasket.destinationCountry}
-            currency={agenticBasket.currency}
-            expired={agenticBasket.expired}
-            items={agenticBasket.items}
-            lastResult={lastResult || null}
-            locale={locale}
-            orderReference={agenticBasket.orderReference}
-            paid={agenticBasket.paid}
-            refundable={agenticBasket.refundable}
-            returnTo={currentBasketPath}
-            shippingMinor={agenticBasket.shippingMinor}
-            subtotalMinor={agenticBasket.subtotalMinor}
-            successUrl={mcpOrderTrackSuccessPath(locale)}
-            taxMinor={agenticBasket.taxMinor}
-            totalPriceMinor={agenticBasket.totalPriceMinor}
-            trackingHref={agenticBasket.trackingPath}
-          />
-        ) : (
+        {selectedItemIds.length < 1 ? null : (
           <ProductBasketCheckoutPanel
             agenticOrderId={agenticBasket?.agenticOrderId ?? null}
             destinationCountry={agenticBasket?.destinationCountry ?? null}
             frozenLines={agenticBasket?.frozenLines ?? []}
             initialQuotePreview={agenticBasket?.quotePreview ?? null}
             locale={locale}
+            mockPayment={stripePaymentConfig().mode === "mock"}
             mode={checkoutMode}
             orderReference={agenticBasket?.orderReference ?? null}
             planId={planId}

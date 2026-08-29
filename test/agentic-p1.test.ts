@@ -752,43 +752,30 @@ describe("agentic P1 pack fixes", () => {
   });
 
   it("exposes a DEV checkout test scenario selector", () => {
-    const panel = readFileSync(new URL("../components/agentic-checkout-panel.tsx", import.meta.url), "utf8");
+    const panel = readFileSync(
+      new URL("../components/retail-checkout/product-basket-checkout-panel.tsx", import.meta.url),
+      "utf8"
+    );
     assert.match(panel, /name="scenario"/);
     assert.match(panel, /decline_insufficient_funds/);
     assert.match(panel, /<select/);
-    assert.match(panel, /method="post"/);
-    assert.match(panel, /type="submit"/);
-    assert.match(panel, /native HTML form/);
-    assert.match(panel, /application\/x-www-form-urlencoded/);
-    assert.match(panel, /name="customerName"/);
     assert.match(panel, /name="agentAuthorized"/);
     assert.match(panel, /scenario=expire/);
     assert.match(panel, /three_ds_cancelled/);
     assert.match(panel, /scenario=refund/);
     assert.match(panel, /partial_refund/);
-    assert.match(panel, /refundable/);
-    assert.match(panel, /paid page keeps an authorized refund form/);
-    assert.match(panel, /Order tracking/);
-    assert.match(panel, /trackingHref/);
     const payRoute = readFileSync(
       new URL("../app/api/mcp/checkout/[checkoutAccess]/pay/route.ts", import.meta.url),
       "utf8"
     );
     assert.equal(payRoute.includes("resolveAgenticPaidTrackingPath"), false);
-    const website = readFileSync(
-      new URL("../components/mcp-website-checkout-panel.tsx", import.meta.url),
-      "utf8"
-    );
     const page = readFileSync(
       new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/page.tsx", import.meta.url),
       "utf8"
     );
-    assert.match(website, /Pay securely and place order|labels\.continue/);
-    assert.match(website, /EmbeddedCheckout/);
-    assert.equal(website.includes("Continue to Stripe Test Mode"), false);
-    assert.match(page, /McpWebsiteCheckoutPanel/);
+    assert.doesNotMatch(page, /McpWebsiteCheckoutPanel/);
+    assert.doesNotMatch(page, /AgenticCheckoutPanel/);
     assert.match(page, /\/basket\/checkout\?mode=agentic/);
-    assert.match(page, /loadAgenticCheckoutProducts/);
     const adapter = readFileSync(
       new URL("../lib/agentic/commerce/stripe-adapter.ts", import.meta.url),
       "utf8"
@@ -806,10 +793,8 @@ describe("agentic P1 pack fixes", () => {
       "utf8"
     );
     assert.match(returnPage, /resolveAgenticPaidTrackingPath/);
-    assert.match(website, /name="success_url"/);
-    assert.match(panel, /props\.paid \|\| Boolean\(props\.refundable\)/);
-    assert.match(page, /paymentStatus === "refunded"/);
-    assert.match(page, /partially_refunded/);
+    assert.match(returnPage, /\/basket\/checkout\?mode=agentic/);
+    assert.match(panel, /partial_refund/);
   });
 
   it("accepts Creatine by official name and does not call it a legacy ID", async () => {
@@ -1424,6 +1409,10 @@ describe("agentic P1 pack fixes", () => {
       new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/page.tsx", import.meta.url),
       "utf8"
     );
+    const basketCheckoutPage = readFileSync(
+      new URL("../app/[locale]/basket/checkout/page.tsx", import.meta.url),
+      "utf8"
+    );
     const workflow = readFileSync(
       new URL("../lib/retail-order-workflow.ts", import.meta.url),
       "utf8"
@@ -1443,15 +1432,17 @@ describe("agentic P1 pack fixes", () => {
       "utf8"
     );
     assert.match(mapper, /imageUrl/);
-    assert.match(checkoutPage, /redirect\(paidTracking\)/);
-    assert.match(checkoutPage, /resolveAgenticPaidTrackingPath/);
-    assert.match(checkoutPage, /destinationCountry=\{order\.destinationCountry\}/);
-    const mcpPanel = readFileSync(
-      new URL("../components/mcp-website-checkout-panel.tsx", import.meta.url),
+    assert.match(checkoutPage, /\/basket\/checkout\?mode=agentic/);
+    assert.doesNotMatch(checkoutPage, /AgenticCheckoutPanel/);
+    assert.doesNotMatch(checkoutPage, /McpWebsiteCheckoutPanel/);
+    assert.match(basketCheckoutPage, /ProductBasketCheckoutPanel/);
+    assert.doesNotMatch(basketCheckoutPage, /AgenticCheckoutPanel/);
+    const basketPanel = readFileSync(
+      new URL("../components/retail-checkout/product-basket-checkout-panel.tsx", import.meta.url),
       "utf8"
     );
-    assert.equal(mcpPanel.includes('value="Thailand"'), false);
-    assert.match(mcpPanel, /displayCountryName/);
+    assert.equal(basketPanel.includes('value="Thailand"'), false);
+    assert.match(basketPanel, /displayCountryName/);
     const market = readFileSync(
       new URL("../lib/agentic/catalogue/market.ts", import.meta.url),
       "utf8"

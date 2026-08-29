@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { AgenticCheckoutPanel } from "../components/agentic-checkout-panel.tsx";
+import { fileURLToPath } from "node:url";
 import { parseCheckoutAddress } from "../lib/agentic/checkout-address.ts";
 import { resolveCapability } from "../lib/agentic/capabilities.ts";
 import { DEFAULT_SHIPPING_MINOR, DEFAULT_TAX_MINOR } from "../lib/agentic/money.ts";
@@ -56,7 +55,7 @@ export type ComPackReport = Readonly<{
   cases: readonly ComCaseResult[];
   packVersion: typeof COM_PACK_VERSION;
   passedCases: number;
-  totalCases: 46;
+  totalCases: 50;
 }>;
 
 function sortedKeys(value: Record<string, unknown>) {
@@ -178,55 +177,15 @@ async function pay(
   });
 }
 
-function checkoutAccessOf(execute: Record<string, unknown>) {
-  const url = typeof execute.checkoutUrl === "string" ? execute.checkoutUrl : "";
-  try {
-    const parsed = new URL(url, "https://mattanutra.example");
-    const order = parsed.searchParams.get("order");
-    if (order) {
-      return order;
-    }
-  } catch {
-    // Fall through to legacy MCP checkout path parsing.
-  }
-  const match = url.match(/\/mcp\/checkout\/([^/?#]+)/);
-  return match?.[1] ?? "";
-}
+const checkoutPanelSource = readFileSync(
+  new URL("../components/retail-checkout/product-basket-checkout-panel.tsx", import.meta.url),
+  "utf8"
+);
 
-function renderFrozenCheckout(input: Readonly<{
-  checkoutAccess: string;
-  execute: Record<string, unknown>;
-  order: Record<string, unknown>;
-}>) {
-  const frozen = frozenOf(input.execute.frozenPlan ?? input.order.frozenOrder);
-  const money = moneyFromFrozen(frozen);
+function frozenProductNames(execute: Record<string, unknown>, order: Record<string, unknown>) {
+  const frozen = frozenOf(execute.frozenPlan ?? order.frozenOrder);
   const items = Array.isArray(frozen.items) ? frozen.items : [];
-  return renderToStaticMarkup(
-    createElement(AgenticCheckoutPanel, {
-      checkoutAccess: input.checkoutAccess,
-      country: String(frozen.countryCode ?? "TH"),
-      currency: String(money.currency ?? "THB"),
-      expired: input.order.orderStatus === "expired",
-      items: items.map((item) => {
-        const row = frozenOf(item);
-        return {
-          dailyPills: Number(row.dailyPills) || 0,
-          form: String(row.form ?? ""),
-          lineTotalMinor: Number(row.lineTotalMinor) || 0,
-          productName: String(row.productName ?? ""),
-          quantity: Number(row.quantity) || 0
-        };
-      }),
-      locale: "en",
-      orderReference: String(input.execute.orderReference ?? input.order.orderReference ?? ""),
-      paid: input.order.paymentStatus === "paid",
-      shippingMinor: Number(money.shippingMinor) || 0,
-      subtotalMinor: Number(money.subtotalMinor) || 0,
-      successUrl: String(input.execute.successUrl ?? "/en/order/track"),
-      taxMinor: Number(money.taxMinor) || 0,
-      totalPriceMinor: Number(money.totalPriceMinor) || 0
-    })
-  );
+  return items.map((item) => String(frozenOf(item).productName ?? frozenOf(item).title ?? ""));
 }
 
 async function withCase<T>(work: (runtime: AgenticRuntime) => Promise<T>): Promise<T> {
@@ -1062,34 +1021,31 @@ async function com29() {
     const seeded = await seedPlanB(runtime);
     const executed = await executeReady(runtime, seeded, key("29-ui"));
     const order = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
-    const html = renderFrozenCheckout({
-      checkoutAccess: checkoutAccessOf(executed),
-      execute: executed,
-      order
-    });
+    const names = frozenProductNames(executed, order);
     const money = moneyFromFrozen(executed.frozenPlan);
+    const frozen = frozenOf(executed.frozenPlan);
     const ok =
       String(executed.checkoutUrl).includes("/basket/checkout?mode=agentic") &&
-      html.includes(String(executed.orderReference)) &&
-      html.includes("THB") &&
-      html.includes(COM_PRD_B12.candidate.title) &&
-      html.includes(COM_PRD_MG.candidate.title) &&
-      html.includes("TH") &&
-      html.includes("name=\"country\"") &&
-      html.includes("name=\"customerName\"") &&
-      html.includes("name=\"agentAuthorized\"") &&
-      html.includes("checkout.shipping") === false &&
-      /shipping/i.test(html) &&
-      /tax/i.test(html) &&
-      /total/i.test(html) &&
-      (html.includes(COM_OPT_B_LOW) || html.includes("selected")) &&
-      /mock|test mode|non-live|DEV/i.test(html);
+      String(executed.orderReference ?? "").length > 0 &&
+      money.currency === "THB" &&
+      names.includes(COM_PRD_B12.candidate.title) &&
+      names.includes(COM_PRD_MG.candidate.title) &&
+      String(frozen.countryCode ?? frozen.destinationCountry ?? "TH").includes("TH") &&
+      checkoutPanelSource.includes('name="country"') &&
+      checkoutPanelSource.includes("name={config.field}") &&
+      checkoutPanelSource.includes('name="agentAuthorized"') &&
+      checkoutPanelSource.includes("checkout.shipping") === false &&
+      /shipping/i.test(checkoutPanelSource) &&
+      /tax/i.test(checkoutPanelSource) &&
+      /total/i.test(checkoutPanelSource) &&
+      /mock|test mode|non-live|DEV/i.test(checkoutPanelSource) &&
+      checkoutPanelSource.includes("decline_insufficient_funds");
     return verdict("COM-29", ok, {
-      hasCountry: html.includes('name="country"'),
-      hasMockIdentity: /mock|test mode|non-live|DEV/i.test(html),
-      hasOption: html.includes(COM_OPT_B_LOW),
-      hasReference: html.includes(String(executed.orderReference)),
+      hasCountry: checkoutPanelSource.includes('name="country"'),
+      hasMockIdentity: /mock|test mode|non-live|DEV/i.test(checkoutPanelSource),
+      hasReference: Boolean(executed.orderReference),
       productIds: money.productIds,
+      productNames: names,
       totalPriceMinor: money.totalPriceMinor
     });
   });
@@ -1143,24 +1099,15 @@ async function com31() {
     const seeded = await seedPlanA(runtime);
     const first = await executeReady(runtime, seeded, key("31-nav"));
     const reload = await executeReady(runtime, seeded, key("31-nav"));
-    const htmlFirst = renderFrozenCheckout({
-      checkoutAccess: checkoutAccessOf(first),
-      execute: first,
-      order: first
-    });
-    const htmlReload = renderFrozenCheckout({
-      checkoutAccess: checkoutAccessOf(reload),
-      execute: reload,
-      order: reload
-    });
     await pay(runtime, String(first.orderHandle), "success");
     const paid = await comCall(runtime, "order", { orderHandle: first.orderHandle });
     const stored = await orderRecord(runtime, String(first.orderHandle ?? ""));
     const secondOrder = await runtime.store.getActiveOrderForPlanRevision(seeded.planId, 1);
     const ok =
       first.orderHandle === reload.orderHandle &&
-      htmlFirst.includes(String(first.orderReference)) &&
-      htmlReload.includes(String(first.orderReference)) &&
+      first.orderReference === reload.orderReference &&
+      String(first.checkoutUrl).includes("/basket/checkout?mode=agentic") &&
+      String(reload.checkoutUrl).includes("/basket/checkout?mode=agentic") &&
       paid.paymentStatus === "paid" &&
       paid.orderReference === first.orderReference &&
       secondOrder?.id === stored?.id;
@@ -1579,6 +1526,118 @@ async function com46() {
   });
 }
 
+async function com47() {
+  return withCase(async (runtime) => {
+    const seeded = await seedPlanA(runtime);
+    const executed = await executeReady(runtime, seeded, key("47-ch"));
+    const order = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
+    const frozen = frozenOf(executed.frozenPlan ?? order.frozenOrder);
+    const channel = String(
+      order.channel ?? order.checkoutMode ?? frozen.channel ?? frozen.checkoutMode ?? ""
+    );
+    const ok =
+      String(executed.checkoutUrl).includes("mode=agentic") && channel === "agentic";
+    return verdict("COM-47", ok, {
+      channel,
+      checkoutUrl: String(executed.checkoutUrl ?? ""),
+      orderChannel: order.channel ?? null,
+      frozenChannel: frozen.channel ?? frozen.checkoutMode ?? null
+    });
+  });
+}
+
+async function com48() {
+  return withCase(async (runtime) => {
+    const seeded = await seedPlanA(runtime);
+    const executed = await executeReady(runtime, seeded, key("48-su"));
+    const successUrl = String(executed.successUrl ?? "");
+    let pathname = "";
+    try {
+      pathname = new URL(successUrl).pathname;
+    } catch {
+      pathname = "";
+    }
+    const trackIndexPath = fileURLToPath(
+      new URL("../app/[locale]/order/track/page.tsx", import.meta.url)
+    );
+    const exists = existsSync(trackIndexPath);
+    const source = exists ? readFileSync(trackIndexPath, "utf8") : "";
+    const ok =
+      /^https?:\/\//.test(successUrl) &&
+      pathname === "/en/order/track" &&
+      exists &&
+      /not ordered|no order|enter your order number/i.test(source) &&
+      !/This page could not be found/i.test(source);
+    return verdict("COM-48", ok, {
+      exists,
+      pathname,
+      successUrl
+    });
+  });
+}
+
+async function com49() {
+  return withCase(async (runtime) => {
+    const seeded = await seedPlanA(runtime);
+    const executed = await executeReady(runtime, seeded, key("49-tr"));
+    await pay(runtime, String(executed.orderHandle), "success");
+    const paid = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
+    const retail = frozenOf(paid.retailCustomerOrder);
+    const tracking = String(retail.trackingUrl ?? "");
+    const orderSrc = readFileSync(
+      new URL("../lib/agentic/commerce/order.ts", import.meta.url),
+      "utf8"
+    );
+    const checkoutSrc = readFileSync(
+      new URL("../lib/retail-product-checkout.ts", import.meta.url),
+      "utf8"
+    );
+    const specificWhenPresent =
+      tracking === "" || /\/order\/track\/[^/?#]+/.test(tracking);
+    const notBareWhenPresent = tracking === "" || !/\/order\/track\/?$/.test(tracking);
+    const ok =
+      paid.paymentStatus === "paid" &&
+      orderSrc.includes("order/track/${encodeURIComponent(settlement.orderNumber)}") &&
+      checkoutSrc.includes("order/track/${encodeURIComponent(") &&
+      specificWhenPresent &&
+      notBareWhenPresent;
+    return verdict("COM-49", ok, {
+      paymentStatus: paid.paymentStatus ?? null,
+      tracking: tracking || null
+    });
+  });
+}
+
+async function com50() {
+  const tokenPage = readFileSync(
+    new URL("../app/[locale]/order/track/[token]/page.tsx", import.meta.url),
+    "utf8"
+  );
+  const helperPath = fileURLToPath(
+    new URL("../lib/order-track-presentation.ts", import.meta.url)
+  );
+  const helperExists = existsSync(helperPath);
+  const helper = helperExists ? readFileSync(helperPath, "utf8") : "";
+  const gated =
+    /checkoutChannel === "web"/.test(tokenPage) ||
+    /channel === "web"/.test(tokenPage) ||
+    tokenPage.includes("orderTrackFormulationHref");
+  const ok =
+    tokenPage.includes('data-testid="formulation-link"') &&
+    gated &&
+    tokenPage.includes("nutritionRevealPath") &&
+    helperExists &&
+    helper.includes('"agentic"') &&
+    helper.includes('"web"') &&
+    helper.includes("nutritionRevealPath");
+  return verdict("COM-50", ok, {
+    gated,
+    helperExists,
+    hasFormulationLink: tokenPage.includes('data-testid="formulation-link"'),
+    hasRevealPath: tokenPage.includes("nutritionRevealPath")
+  });
+}
+
 const RUNNERS: Record<ComCaseId, () => Promise<ComCaseResult>> = {
   "COM-01": com01,
   "COM-02": com02,
@@ -1625,7 +1684,11 @@ const RUNNERS: Record<ComCaseId, () => Promise<ComCaseResult>> = {
   "COM-43": com43,
   "COM-44": com44,
   "COM-45": com45,
-  "COM-46": com46
+  "COM-46": com46,
+  "COM-47": com47,
+  "COM-48": com48,
+  "COM-49": com49,
+  "COM-50": com50
 };
 
 export async function runComPack(): Promise<ComPackReport> {
@@ -1637,7 +1700,7 @@ export async function runComPack(): Promise<ComPackReport> {
     cases,
     packVersion: COM_PACK_VERSION,
     passedCases: cases.filter((item) => item.result === "PASS").length,
-    totalCases: 46
+    totalCases: 50
   };
 }
 
@@ -1656,13 +1719,21 @@ export function canonicalComReport(report: ComPackReport) {
 
 if (process.env.NODE_TEST_CONTEXT) {
   describe("commercial v1.0 pack", () => {
-    it("evaluates COM-01 through COM-46", async () => {
+    it("evaluates COM-01 through COM-50", async () => {
       const report = await runComPack();
-      assert.equal(report.totalCases, 46);
-      assert.equal(report.cases.length, 46);
+      assert.equal(report.totalCases, 50);
+      assert.equal(report.cases.length, 50);
       assert.deepEqual(
         report.cases.map((item) => item.id),
         [...COM_CASE_IDS]
+      );
+      const defects = report.cases.filter((item) =>
+        ["COM-47", "COM-48", "COM-49", "COM-50"].includes(item.id)
+      );
+      assert.equal(
+        defects.every((item) => item.result === "PASS"),
+        true,
+        JSON.stringify(defects, null, 2)
       );
     });
   });

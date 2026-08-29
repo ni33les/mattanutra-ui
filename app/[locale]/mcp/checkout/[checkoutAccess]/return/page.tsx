@@ -34,5 +34,7 @@ export default async function AgenticCheckoutReturnPage({
     redirect(dest);
   }
 
-  redirect(`/${locale}/mcp/checkout/${encodeURIComponent(checkoutAccess)}`);
+  redirect(
+    `/${locale}/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutAccess)}`
+  );
 }
