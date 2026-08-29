@@ -39,6 +39,7 @@ const requiredTables = [
   "retail_shopping_list_lines",
   "retail_shopping_lists",
   "supplement_country_availability",
+  "supplement_safety_limit_bands",
   "tasks",
   "worker_sessions",
 ];

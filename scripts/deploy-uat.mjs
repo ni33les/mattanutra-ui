@@ -107,6 +107,9 @@ async function applyRuntimeSchema(env) {
   await run(npmCommand, ["run", "supplements:country-availability:schema:apply"], {
     env
   });
+  await run(npmCommand, ["run", "supplements:safety-limit-bands:schema:apply"], {
+    env
+  });
   await run(npmCommand, ["run", "products:soft-delete:schema:apply"], {
     env
   });
