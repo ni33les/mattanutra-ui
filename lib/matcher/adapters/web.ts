@@ -383,10 +383,6 @@ export function recommendWithMatcher(
     totalPlanCoveragePercent: 0
   };
 
-  if ("error" in targets) {
-    return empty;
-  }
-
   const currents = canonicalizeCurrents([]);
 
   if ("error" in currents) {

@@ -287,6 +287,50 @@ export const PLAN_ADVERTISED_SCHEMA: JsonSchema = {
   type: "object"
 };
 
+export const EXECUTE_ADVERTISED_SCHEMA: JsonSchema = {
+  additionalProperties: true,
+  properties: {
+    expectedRevision: { type: "integer" },
+    idempotencyKey: { type: "string" },
+    planHandle: { type: "string" }
+  },
+  type: "object"
+};
+
+export const ORDER_ADVERTISED_SCHEMA: JsonSchema = {
+  additionalProperties: true,
+  properties: {
+    orderHandle: { type: "string" }
+  },
+  type: "object"
+};
+
+export const SUPPORT_ADVERTISED_SCHEMA: JsonSchema = {
+  additionalProperties: true,
+  properties: {
+    idempotencyKey: { type: "string" },
+    message: { type: "string" },
+    orderHandle: { type: "string" },
+    supportHandle: { type: "string" }
+  },
+  type: "object"
+};
+
+export const FEEDBACK_ADVERTISED_SCHEMA: JsonSchema = {
+  additionalProperties: true,
+  properties: {
+    consentConfirmed: { type: "boolean" },
+    expectedRevision: { type: "integer" },
+    idempotencyKey: { type: "string" },
+    optionId: { type: "string" },
+    planHandle: { type: "string" },
+    points: { type: "array" },
+    rating: { type: "integer" },
+    summary: { type: "string" }
+  },
+  type: "object"
+};
+
 export const EXECUTE_INPUT_SCHEMA: JsonSchema = {
   additionalProperties: false,
   properties: {
@@ -345,11 +389,20 @@ export const FEEDBACK_INPUT_SCHEMA: JsonSchema = {
   type: "object"
 };
 
-export const AGENTIC_TOOL_SCHEMAS = {
+export const AGENTIC_INPUT_SCHEMAS = {
   execute: EXECUTE_INPUT_SCHEMA,
   feedback: FEEDBACK_INPUT_SCHEMA,
   info: INFO_INPUT_SCHEMA,
   order: ORDER_INPUT_SCHEMA,
   plan: PLAN_INPUT_SCHEMA,
   support: SUPPORT_INPUT_SCHEMA
+} as const;
+
+export const AGENTIC_TOOL_SCHEMAS = {
+  execute: EXECUTE_ADVERTISED_SCHEMA,
+  feedback: FEEDBACK_ADVERTISED_SCHEMA,
+  info: INFO_INPUT_SCHEMA,
+  order: ORDER_ADVERTISED_SCHEMA,
+  plan: PLAN_ADVERTISED_SCHEMA,
+  support: SUPPORT_ADVERTISED_SCHEMA
 } as const;

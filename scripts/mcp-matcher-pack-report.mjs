@@ -12,6 +12,8 @@ import { canonicalAeC4Report, runAeC4Pack } from "../test/agentic-ae-c4-pack.tes
 import { canonicalAeC5Report, runAeC5Pack } from "../test/agentic-ae-c5-pack.test.ts";
 import { canonicalAeC6Report, runAeC6Pack } from "../test/agentic-ae-c6-pack.test.ts";
 import { canonicalAeC7Report, runAeC7Pack } from "../test/agentic-ae-c7-pack.test.ts";
+import { canonicalAeC8Report, runAeC8Pack } from "../test/agentic-ae-c8-pack.test.ts";
+import { canonicalComReport, runComPack } from "../test/agentic-com-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -419,6 +421,271 @@ const ROWS = [
     category: "MCP boundary",
     id: "AX7-06",
     purpose: "The one pack still holds matcher quality plus all earlier agentic cases"
+  },
+  {
+    category: "MCP evidence",
+    id: "AX8-01",
+    purpose: "Incidental nutrients cannot become coverage claims"
+  },
+  {
+    category: "MCP evidence",
+    id: "AX8-02",
+    purpose: "Every product explanation is exactly the positive-contributor set"
+  },
+  {
+    category: "MCP evidence",
+    id: "AX8-03",
+    purpose: "Broad unresolved targets use one labelled review structure"
+  },
+  {
+    category: "MCP evidence",
+    id: "AX8-04",
+    purpose: "One answer applies multiple gap decisions without rematching"
+  },
+  {
+    category: "MCP evidence",
+    id: "AX8-05",
+    purpose: "Every leftover uses one complete numerical contract"
+  },
+  {
+    category: "MCP evidence",
+    id: "AX8-06",
+    purpose: "Explanation and gap contracts remain concise and localisable"
+  },
+  {
+    category: "MCP evidence",
+    id: "AX8-07",
+    purpose: "Complete agentic and matcher regression gates remain deterministic"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-01",
+    purpose: "A ready plan creates one open unpaid v1 order and checkout"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-02",
+    purpose: "needs_input and blocked plans return plan_not_ready with empty stores"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-03",
+    purpose: "Exact execute replay returns the same order, checkout, expiry and snapshot"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-04",
+    purpose: "A different valid key for the same revision recovers the existing identity"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-05",
+    purpose: "Same key with a changed payload is idempotency_conflict"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-06",
+    purpose: "A genuine stale revision returns currentRevision and reload_plan"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-07",
+    purpose: "Frozen line totals, shipping, tax, payable total and currency reconcile"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-08",
+    purpose: "The selected option ID is frozen on execute and order reads"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-09",
+    purpose: "An earlier order stays unchanged after the plan advances"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-10",
+    purpose: "Acknowledged safety guidance IDs stay on the frozen snapshot"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-11",
+    purpose: "A new ready revision may create one separate order"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-12",
+    purpose: "Fresh checkout is open, unpaid, v1, with fulfilment not_started"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-13",
+    purpose: "Decline stays on the same unpaid order and creates no OMS handoff"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-14",
+    purpose: "Decline then success on the same order reaches paid completed v2 once"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-15",
+    purpose: "Direct success reaches paid completed v2 with one capture and one OMS intent"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-16",
+    purpose: "Duplicate provider events are successful no-ops"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-17",
+    purpose: "A late decline cannot reverse paid state"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-18",
+    purpose: "Processing and mocked 3DS never claim premature success"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-19",
+    purpose: "Polling without events does not change state or version"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-20",
+    purpose: "A completed read has receipt, amount, currency and no payment retry"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-21",
+    purpose: "Clock expiry is one terminal unpaid transition; later pay cannot reopen"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-22",
+    purpose: "Unpaid expiry creates no refund; paid cancel or refund is explicit"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-23",
+    purpose: "Unknown, tampered and foreign handles return identical not_found"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-24",
+    purpose: "Support create is idempotent on the exact replay"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-25",
+    purpose: "Support reply stays on the same case; isolation is not_found"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-26",
+    purpose: "Feedback requires consent and cannot mutate commerce state"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-27",
+    purpose: "Malformed execute, order, support and feedback return compact invalid_request"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-28",
+    purpose: "Public commercial responses leak no schema, secrets or diagnostics"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-29",
+    purpose: "Checkout render matches the frozen order, THB, TH and mock payment identity"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-30",
+    purpose: "Missing or foreign address fields are recoverable and cannot switch country"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-31",
+    purpose: "Reload keeps one order; success page and MCP order agree after pay"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-32",
+    purpose: "One paid order produces one OMS intent and one retailer order"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-33",
+    purpose: "OMS payload is frozen SKUs, delivery and money only"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-34",
+    purpose: "OMS timeout retry does not duplicate the retailer order"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-35",
+    purpose: "Accepted or processing fulfilment does not change money or payment truth"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-36",
+    purpose: "Shipped state exposes stable carrier tracking"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-37",
+    purpose: "A delivery exception is explicit with a customer next action"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-38",
+    purpose: "The agent learns fulfilment only by later order polling"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-39",
+    purpose: "A full refund reconciles with captured payment and keeps the receipt"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-40",
+    purpose: "A partial refund is an explicit reconciled state"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-41",
+    purpose: "A duplicate refund event is a no-op"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-42",
+    purpose: "Wrong amount or currency fails closed and raises an operations alert"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-43",
+    purpose: "Delivered is terminal and cannot move backwards"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-44",
+    purpose: "Happy path is one order, checkout, capture, receipt, retailer order and delivered"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-45",
+    purpose: "Decline then retry keeps the same option, basket, amount and currency"
+  },
+  {
+    category: "MCP commercial",
+    id: "COM-46",
+    purpose: "A fixed exception reaches exactly one explicit recoverable outcome"
   }
 ];
 
@@ -452,6 +719,8 @@ export function canonicalPack(run) {
     copy: JSON.parse(canonicalAeC5Report(run.copy)),
     state: JSON.parse(canonicalAeC6Report(run.state)),
     boundary: JSON.parse(canonicalAeC7Report(run.boundary)),
+    evidence: JSON.parse(canonicalAeC8Report(run.evidence)),
+    commercial: JSON.parse(canonicalComReport(run.commercial)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -482,6 +751,12 @@ export function snapshotFromRun(run) {
   const boundary = Object.fromEntries(
     run.boundary.cases.map((item) => [item.id, item.result])
   );
+  const evidence = Object.fromEntries(
+    run.evidence.cases.map((item) => [item.id, item.result])
+  );
+  const commercial = Object.fromEntries(
+    run.commercial.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
@@ -490,6 +765,8 @@ export function snapshotFromRun(run) {
     copy,
     state,
     boundary,
+    evidence,
+    commercial,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -525,7 +802,11 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("AX7-")
+  const section = id.startsWith("COM-")
+    ? "commercial"
+    : id.startsWith("AX8-")
+    ? "evidence"
+    : id.startsWith("AX7-")
     ? "boundary"
     : id.startsWith("AX6-")
     ? "state"
@@ -561,6 +842,8 @@ export function sectionTotals(run) {
   const copyPass = run.copy.passedCases === run.copy.totalCases;
   const statePass = run.state.passedCases === run.state.totalCases;
   const boundaryPass = run.boundary.passedCases === run.boundary.totalCases;
+  const evidencePass = run.evidence.passedCases === run.evidence.totalCases;
+  const commercialPass = run.commercial.passedCases === run.commercial.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -590,6 +873,14 @@ export function sectionTotals(run) {
       passed: boundaryPass,
       text: `${run.boundary.passedCases}/${run.boundary.totalCases}`
     },
+    evidence: {
+      passed: evidencePass,
+      text: `${run.evidence.passedCases}/${run.evidence.totalCases}`
+    },
+    commercial: {
+      passed: commercialPass,
+      text: `${run.commercial.passedCases}/${run.commercial.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
@@ -602,7 +893,9 @@ export function sectionTotals(run) {
       explanationsPass &&
       copyPass &&
       statePass &&
-      boundaryPass
+      boundaryPass &&
+      evidencePass &&
+      commercialPass
   };
 }
 
@@ -625,6 +918,12 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.boundary.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.evidence.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.commercial.cases) {
     byId.set(item.id, item);
   }
 
@@ -684,6 +983,12 @@ export function printTable(run) {
   console.log(
     `MCP boundary: ${totals.boundary.text} — ${totals.boundary.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `MCP evidence: ${totals.evidence.text} — ${totals.evidence.passed ? "PASS" : "FAIL"}`
+  );
+  console.log(
+    `MCP commercial: ${totals.commercial.text} — ${totals.commercial.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -715,5 +1020,19 @@ export async function runPackOnce() {
   const copy = await runAeC5Pack();
   const state = await runAeC6Pack();
   const boundary = await runAeC7Pack();
-  return { contract, honesty, planning, explanations, copy, state, boundary, matcher };
+  const evidence = await runAeC8Pack();
+  await resetAfterMatcher();
+  const commercial = await runComPack();
+  return {
+    contract,
+    honesty,
+    planning,
+    explanations,
+    copy,
+    state,
+    boundary,
+    evidence,
+    commercial,
+    matcher
+  };
 }

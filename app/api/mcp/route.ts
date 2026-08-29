@@ -3,14 +3,12 @@ import { createLogger } from "@/lib/logger";
 import { requestCorrelationId } from "@/lib/request-correlation";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { loadAgenticConfig } from "@/lib/agentic/config";
-import {
-  AGENTIC_PUBLIC_TOOLS,
-  agenticServerInstructions
-} from "@/lib/agentic/contract";
+import { agenticServerInstructions } from "@/lib/agentic/contract";
 import {
   canonicalPublicToolName,
   handleLightweightJsonRpc,
   mcpCallNeedsStore,
+  toolList,
   type JsonRpcRequest
 } from "@/lib/agentic/mcp/rpc";
 import { recordMcpTiming } from "@/lib/agentic/metrics";
@@ -198,7 +196,7 @@ export async function GET(request: Request) {
     {
       contractVersion: "3.0.0",
       instructions: agenticServerInstructions(config.environment),
-      tools: [...AGENTIC_PUBLIC_TOOLS],
+      tools: toolList(config.environment),
       transport: "streamable-http"
     },
     { headers: { "Cache-Control": "no-store" } }

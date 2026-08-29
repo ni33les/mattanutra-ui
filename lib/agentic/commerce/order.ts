@@ -1,7 +1,7 @@
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
-import { orderPollView } from "@/lib/agentic/commerce/state";
+import { expireCheckoutIfDue, orderPollView } from "@/lib/agentic/commerce/state";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
 
@@ -32,7 +32,12 @@ export async function orderTool(input: Readonly<{
     });
   }
 
-  const order = await input.store.getOrder(capability.resourceId);
+  const loaded = await input.store.getOrder(capability.resourceId);
+  const order = await expireCheckoutIfDue({
+    now: input.now,
+    order: loaded,
+    store: input.store
+  });
   const locale = negotiateLocale(input.locale);
   const settlement =
     order &&
@@ -41,10 +46,14 @@ export async function orderTool(input: Readonly<{
       order.paymentStatus === "partially_refunded")
       ? await getRetailOrderByAgenticOrderId(order.id)
       : null;
+  const fulfilmentEvents = order
+    ? await input.store.listFulfilmentEvents(order.id)
+    : [];
 
   return orderPollView({
     checkoutUrl: order?.checkoutUrl ?? null,
     found: Boolean(order),
+    fulfilmentEvents,
     localeMessage: (key) => agenticMessage(locale, key),
     order,
     retail: order && settlement

@@ -51,8 +51,10 @@ export type AgenticBusinessError = Readonly<{
   }>[];
   message: string;
   messageKey: string;
+  nextAction?: string;
   nextActions?: readonly string[];
   reasonCode: AgenticReasonCode;
+  requestedRevision?: number;
   retryable: boolean;
 }>;
 
@@ -90,6 +92,7 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
 
 const RETRYABLE: ReadonlySet<AgenticReasonCode> = new Set([
   "rate_limited",
+  "revision_conflict",
   "stale_revision",
   "temporarily_unavailable"
 ]);
@@ -104,8 +107,11 @@ export function businessError(input: Readonly<{
   }>[];
   message: string;
   messageKey?: string;
+  nextAction?: string;
   nextActions?: readonly string[];
   reasonCode: AgenticReasonCode;
+  requestedRevision?: number;
+  retryable?: boolean;
 }>): AgenticErrorResult {
   const category = CATEGORY_BY_REASON[input.reasonCode];
   const messageKey = input.messageKey ?? `mcp.errors.${input.reasonCode}`;
@@ -126,9 +132,11 @@ export function businessError(input: Readonly<{
       message: input.message,
       messageKey,
       reasonCode: input.reasonCode,
-      retryable: RETRYABLE.has(input.reasonCode),
+      retryable: input.retryable ?? RETRYABLE.has(input.reasonCode),
       ...(input.currentRevision != null ? { currentRevision: input.currentRevision } : {}),
+      ...(input.requestedRevision != null ? { requestedRevision: input.requestedRevision } : {}),
       ...(issues ? { issues } : {}),
+      ...(input.nextAction ? { nextAction: input.nextAction } : {}),
       ...(input.nextActions ? { nextActions: input.nextActions } : {})
     },
     ok: false

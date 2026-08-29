@@ -6,7 +6,10 @@ import {
   endDeterministicIdsForTests
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import { AGENTIC_TOOL_SCHEMAS } from "../lib/agentic/contract/index.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { publicCoverage } from "../lib/agentic/public-mapper.ts";
+import { canonicalizeTargets } from "../lib/matcher/canonicalizer.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
   BasketItem,
@@ -436,6 +439,7 @@ function planRequest(
 
 type Harness = Readonly<{
   call: (name: string, args: unknown) => Promise<Record<string, unknown>>;
+  initialize: () => Promise<unknown>;
   list: () => Promise<unknown>;
   raw: (args: unknown) => Promise<unknown>;
   store: ReturnType<typeof createMemoryStore>;
@@ -454,6 +458,13 @@ function createHarness(): Harness {
 
   return {
     store,
+    async initialize() {
+      return handleJsonRpc(runtime, {
+        id: 0,
+        method: "initialize",
+        params: { protocolVersion: "2025-03-26" }
+      });
+    },
     async list() {
       return handleJsonRpc(runtime, {
         id: 1,
@@ -551,6 +562,35 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           /"oneOf"/.test(snapshotBlob) ||
           /\$defs/.test(snapshotBlob) ||
           /PlanRequest/.test(snapshotBlob);
+        const innerSchemaBlob = JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan);
+        const innerDump =
+          /"oneOf"/.test(innerSchemaBlob) ||
+          /\$defs/.test(innerSchemaBlob) ||
+          /PlanRequest/.test(innerSchemaBlob);
+        const initialized = asRecord(asRecord(await harness.initialize()).result);
+        const initializedTools = Array.isArray(initialized.tools)
+          ? initialized.tools
+          : [];
+        const initializedPlan = advertisedPlanSchema({
+          result: { tools: initializedTools }
+        });
+        const initializedBlob = JSON.stringify(initializedPlan);
+        const initializedDump =
+          initializedTools.length === 0 ||
+          /"oneOf"/.test(initializedBlob) ||
+          /\$defs/.test(initializedBlob) ||
+          /PlanRequest/.test(initializedBlob);
+        const wellKnown = JSON.parse(
+          readFileSync(new URL("../public/.well-known/mcp.json", import.meta.url), "utf8")
+        ) as { tools?: Array<{ inputSchema?: unknown; name?: string }> };
+        const wellKnownPlan = asRecord(
+          (wellKnown.tools ?? []).find((item) => item.name === "plan")?.inputSchema
+        );
+        const wellKnownBlob = JSON.stringify(wellKnownPlan);
+        const wellKnownDump =
+          /"oneOf"/.test(wellKnownBlob) ||
+          /\$defs/.test(wellKnownBlob) ||
+          /PlanRequest/.test(wellKnownBlob);
         const first = await harness.call("plan", {
           idempotencyKey: "short",
           operation: "create"
@@ -566,6 +606,9 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
         const ok =
           !advertisedDump &&
           !snapshotDump &&
+          !innerDump &&
+          !initializedDump &&
+          !wellKnownDump &&
           compactErrorOk(first, ["idempotencyKey", "request"]) &&
           JSON.stringify(first) === JSON.stringify(second) &&
           schemaDumpHits(raw).length === 0 &&
@@ -574,7 +617,10 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           ? pass("AX7-01", { bytes: jsonSize(first) })
           : fail("AX7-01", {
               advertisedDump,
+              initializedDump,
+              innerDump,
               snapshotDump,
+              wellKnownDump,
               code:
                 asRecord(first.error).errorCode ??
                 asRecord(first.error).error_code ??
@@ -817,14 +863,37 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
             );
         }
         const grouped = groups.map(executableTargets);
-        const flat = grouped.flat();
-        const originalKey = THIRTY_TARGETS.map(
+        const unsupported = Array.isArray(broad.unsupportedTargets)
+          ? broad.unsupportedTargets.map(asRecord)
+          : [];
+        const unsupportedKeys = unsupported
+          .map((item) => {
+            const name = String(item.name ?? "");
+            const amount = Number(item.amount);
+            const unit = String(item.unit ?? "");
+            if (!name || !unit || !Number.isFinite(amount) || amount <= 0) {
+              return "";
+            }
+            return `${name}|${amount}|${unit}`;
+          })
+          .filter(Boolean);
+        const originalKeys = THIRTY_TARGETS.map(
           (item) => `${item.name}|${item.amount}|${item.unit}`
-        ).join(";");
+        );
+        const recovered = new Set([
+          ...grouped.flat().map((item) => `${item.name}|${item.amount}|${item.unit}`),
+          ...unsupportedKeys
+        ]);
         const reconstruct =
-          flat.map((item) => `${item.name}|${item.amount}|${item.unit}`).join(";") ===
-            originalKey &&
-          grouped.every((group) => group.length > 0);
+          originalKeys.every((key) => recovered.has(key)) &&
+          recovered.size === originalKeys.length &&
+          grouped.every((group) => group.length > 0) &&
+          grouped.every((group) => group.every((item) => item.name !== "Vitamin A")) &&
+          unsupported.some(
+            (item) =>
+              item.name === "Vitamin A" &&
+              item.reason === "unsupported_unit_conversion"
+          );
         const followUps = [];
         for (const [index, targets] of grouped.entries()) {
           const result = await harness.call("plan", {
@@ -835,15 +904,30 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           followUps.push(result.status ?? null);
         }
         const followOk = followUps.every(
-          (status) =>
-            status === "ready" || status === "needs_input" || status === "blocked"
+          (status) => status === "ready" || status === "needs_input"
         );
-        return reconstruct && grouped.length > 0 && followOk
-          ? pass("AX7-04", { groups: grouped.length })
+        const mixedUnits = canonicalizeTargets({
+          targets: [
+            { amount: 500, name: "Vitamin C", subjectId: "sup_c", unit: "mg" },
+            { amount: 3000, name: "Vitamin A", subjectId: "sup_a", unit: "IU" }
+          ]
+        });
+        const mixedOk =
+          !("error" in mixedUnits) &&
+          mixedUnits.targets.some((item) => item.name === "Vitamin C") &&
+          mixedUnits.leftovers.some(
+            (item) =>
+              /vitamin a/i.test(item.name) &&
+              item.reason === "unsupported_unit_conversion"
+          );
+        return reconstruct && grouped.length > 0 && followOk && mixedOk
+          ? pass("AX7-04", { groups: grouped.length, unsupported: unsupported.length })
           : fail("AX7-04", {
               followUps,
               groupCount: grouped.length,
-              reconstruct
+              mixedReason: mixedUnits.leftovers.map((item) => item.reason),
+              reconstruct,
+              unsupported: unsupported.map((item) => item.reason ?? item.name)
             });
       })
     );
@@ -867,13 +951,31 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           ? line.incidentalNutrients
           : [];
         const requested = stringList(line.requestedNutrientNames);
+        const rounded = publicCoverage({
+          coveragePercent: 70,
+          currentAmount: 0,
+          deliveredAmount: 0.7000000000000002,
+          name: "Iron",
+          remainingGap: 0.5499999999999998,
+          requestedAmount: 8,
+          status: "partial",
+          supplementId: "sup_iron",
+          totalExposureAmount: 37.349999999999994,
+          unit: "mg",
+          percentOfUpperLimit: null,
+          upperLimitAmount: null,
+          contributors: []
+        });
         const ok =
           requested.some((name) => /vitamin c/i.test(name)) &&
           amounts.length === 0 &&
           names.length <= 8 &&
           names.length > 0 &&
           jsonSize(four) <= 16384 &&
-          asRecord(line.selectionReason).messageKey;
+          asRecord(line.selectionReason).messageKey &&
+          rounded.deliveredAmount === 0.7 &&
+          rounded.remainingGap === 0.55 &&
+          rounded.totalExposureAmount === 37.35;
         return ok
           ? pass("AX7-05", { incidentalNames: names.length, fourBytes: jsonSize(four) })
           : fail("AX7-05", {

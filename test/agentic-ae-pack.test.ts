@@ -286,7 +286,16 @@ function multiOptionA(locale: string) {
         supplementId: SUP_C,
         totalExposureAmount: 500,
         unit: "mg",
-        upperLimitAmount: null
+        upperLimitAmount: null,
+        contributors: [
+          {
+            amount: 500,
+            productId: PRD_C,
+            productName: "Vitamin C 500",
+            source: "selected",
+            unit: "mg"
+          }
+        ]
       }),
       coverage({
         coveragePercent: 100,
@@ -300,7 +309,16 @@ function multiOptionA(locale: string) {
         supplementId: SUP_D3,
         totalExposureAmount: 2000,
         unit: "IU",
-        upperLimitAmount: null
+        upperLimitAmount: null,
+        contributors: [
+          {
+            amount: 2000,
+            productId: PRD_C2,
+            productName: "Vitamin D3 1000",
+            source: "selected",
+            unit: "IU"
+          }
+        ]
       })
     ],
     locale
@@ -1015,6 +1033,8 @@ export async function runAePack(): Promise<AePackReport> {
         });
         const allowed = new Set([
           "best_available",
+          "best_available_dose",
+          "consolidates_targets",
           "covers_target",
           "reduces_cost",
           "reduces_pills",

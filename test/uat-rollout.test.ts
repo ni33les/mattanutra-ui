@@ -150,6 +150,26 @@ describe("UAT destructive rebuild master data guardrails", () => {
       /seed-uat-minimal-runtime\.ts/,
     );
     assert.match(packageJson.scripts?.["deploy:uat"] ?? "", /deploy-uat\.mjs/);
+    assert.match(uatDeployScript, /agentic:schema:apply/);
+    assert.match(uatRebuildScript, /agentic:schema:apply/);
+    assert.match(uatSmokeScript, /agentic_plans/);
+    assert.match(uatSmokeScript, /agentic_orders/);
+    assert.match(uatSmokeScript, /agentic_fulfilment_events/);
+    const mockOms = readFileSync(
+      new URL("../lib/agentic/retail/mock-thailand.ts", import.meta.url),
+      "utf8",
+    );
+    const stripeAdapter = readFileSync(
+      new URL("../lib/agentic/commerce/stripe-adapter.ts", import.meta.url),
+      "utf8",
+    );
+    const checkoutReturn = readFileSync(
+      new URL("../lib/agentic/commerce/checkout-return.ts", import.meta.url),
+      "utf8",
+    );
+    assert.match(mockOms, /adapter !== "mock_thailand"/);
+    assert.match(stripeAdapter, /thailandRetailerAdapter/);
+    assert.match(checkoutReturn, /thailandRetailerAdapter/);
     assert.match(uatRebuildScript, /scripts\/reset-dev-db\.mjs/);
     assert.match(uatRebuildScript, /scripts\/catalogue-reload\.ts/);
     assert.match(uatRebuildScript, /scripts\/uat-preserved-config\.ts/);

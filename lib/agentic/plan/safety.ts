@@ -14,10 +14,12 @@ import type {
   CanonicalPlanState,
   CoverageContributor,
   CoverageRow,
+  GapReviewTarget,
   PlanQuestion,
   SafetyGuidance,
   StackOption
 } from "@/lib/agentic/plan/types";
+import { publicAmount } from "@/lib/agentic/public-mapper";
 import {
   CONDITION_ALIASES,
   MEDICATION_ALIASES
@@ -661,81 +663,76 @@ export function safetyQuestions(input: Readonly<{
   const blockingDose = input.guidance.some(
     (item) => item.code === "dose_review_required" && item.action === "block"
   );
+  const review = unresolvedGapReview(input, blockingDose);
+  const decisionItems = review.filter(
+    (item) =>
+      item.reason === "uncovered" ||
+      item.reason === "unsupported_unit_conversion" ||
+      item.reason === "not_in_catalogue"
+  );
+  const includeDose = decisionItems.length >= 2;
+  const items = includeDose ? review : decisionItems;
 
-  for (const row of input.selected?.coverage ?? []) {
-    if (blockingDose && row.status === "upper_limit_risk") {
-      continue;
-    }
-
-    if (
-      row.remainingGap > 0 &&
-      row.status !== "covered" &&
-      row.status !== "partial" &&
-      !(row.status === "upper_limit_risk" && row.remainingGap === 0) &&
-      !input.state.acceptedGaps.some((gap) => gap.supplementId === row.supplementId)
-    ) {
+  if (items.length >= 2) {
+    const names = items.map((item) => item.name);
+    questions.push({
+      choices: items.flatMap((item) => {
+        const id = item.supplementId || leftoverGapId(item);
+        return [
+          {
+            choice: `accept_gap:${id}`,
+            effect: `acceptedGap=${id}`,
+            label: agenticMessage(input.locale, "plan.question.accept_gap_named", {
+              name: item.name
+            }),
+            labelKey: "plan.question.accept_gap_named"
+          },
+          {
+            choice: `remove_target:${id}`,
+            effect: `remove target ${id}`,
+            label: agenticMessage(input.locale, "plan.question.remove_target_named", {
+              name: item.name
+            }),
+            labelKey: "plan.question.remove_target_named"
+          }
+        ];
+      }),
+      prompt: agenticMessage(input.locale, "plan.question.unresolved_targets", {
+        names: names.join(", ")
+      }),
+      promptKey: "plan.question.unresolved_targets",
+      questionId: "q_unresolved_targets",
+      targets: items
+    });
+  } else {
+    for (const item of items) {
+      const gapId = item.supplementId || leftoverGapId(item);
       questions.push({
         choices: [
           {
-            choice: `accept_gap:${row.supplementId}`,
-            effect: `acceptedGap=${row.supplementId}`,
-            label: agenticMessage(input.locale, "plan.question.accept_gap"),
-            labelKey: "plan.question.accept_gap"
+            choice: `accept_gap:${gapId}`,
+            effect: `acceptedGap=${gapId}`,
+            label: agenticMessage(input.locale, "plan.question.accept_gap_named", {
+              name: item.name
+            }),
+            labelKey: "plan.question.accept_gap_named"
           },
           {
-            choice: `remove_target:${row.supplementId}`,
-            effect: `remove target ${row.supplementId}`,
-            label: agenticMessage(input.locale, "plan.question.remove_target"),
-            labelKey: "plan.question.remove_target"
+            choice: `remove_target:${gapId}`,
+            effect: `remove target ${gapId}`,
+            label: agenticMessage(input.locale, "plan.question.remove_target_named", {
+              name: item.name
+            }),
+            labelKey: "plan.question.remove_target_named"
           }
         ],
-        prompt: agenticMessage(input.locale, "plan.question.accept_gap"),
-        promptKey: "plan.question.accept_gap",
-        questionId: `q_gap_${row.supplementId}`
+        prompt: agenticMessage(input.locale, "plan.question.accept_gap_named", {
+          name: item.name
+        }),
+        promptKey: "plan.question.accept_gap_named",
+        questionId: `q_gap_${gapId}`
       });
     }
-  }
-
-  const askedGapIds = new Set(
-    questions
-      .filter((item) => item.questionId.startsWith("q_gap_"))
-      .map((item) => item.questionId.slice("q_gap_".length))
-  );
-
-  for (const leftover of input.state.leftovers) {
-    if (!leftoverRequiresDecision(leftover)) {
-      continue;
-    }
-
-    const gapId = leftoverGapId(leftover);
-
-    if (
-      askedGapIds.has(gapId) ||
-      input.state.acceptedGaps.some((gap) => gap.supplementId === gapId)
-    ) {
-      continue;
-    }
-
-    askedGapIds.add(gapId);
-    questions.push({
-      choices: [
-        {
-          choice: `accept_gap:${gapId}`,
-          effect: `acceptedGap=${gapId}`,
-          label: agenticMessage(input.locale, "plan.question.accept_gap"),
-          labelKey: "plan.question.accept_gap"
-        },
-        {
-          choice: `remove_target:${gapId}`,
-          effect: `remove target ${gapId}`,
-          label: agenticMessage(input.locale, "plan.question.remove_target"),
-          labelKey: "plan.question.remove_target"
-        }
-      ],
-      prompt: agenticMessage(input.locale, "plan.question.accept_gap"),
-      promptKey: "plan.question.accept_gap",
-      questionId: `q_gap_${gapId}`
-    });
   }
 
   const ackable = input.guidance.filter((item) => item.action === "acknowledge");
@@ -864,16 +861,16 @@ export function planStatus(input: Readonly<{
     return "blocked";
   }
 
+  if (input.questions.length > 0) {
+    return "needs_input";
+  }
+
   if (
     !input.selected ||
     input.selected.basket.length === 0 ||
     input.selected.coverage.every((row) => row.status === "uncovered")
   ) {
     return "blocked";
-  }
-
-  if (input.questions.length > 0) {
-    return "needs_input";
   }
 
   if (
@@ -893,11 +890,105 @@ export function leftoverGapId(item: Readonly<{ name: string; supplementId?: stri
   return item.supplementId || `leftover:${item.name}`;
 }
 
+function unresolvedGapReview(
+  input: Readonly<{
+    selected: StackOption | null;
+    state: CanonicalPlanState;
+  }>,
+  blockingDose: boolean
+): GapReviewTarget[] {
+  const accepted = new Set(input.state.acceptedGaps.map((item) => item.supplementId));
+  const requestedIds = new Set(input.state.targets.map((item) => item.supplementId));
+  const requestedNames = new Set(
+    input.state.targets.map((item) => item.name.trim().toLowerCase())
+  );
+  const items: GapReviewTarget[] = [];
+  const seen = new Set<string>();
+
+  function push(row: GapReviewTarget) {
+    const key = row.supplementId || row.name.trim().toLowerCase();
+    if (!key || seen.has(key) || (row.supplementId && accepted.has(row.supplementId))) {
+      return;
+    }
+    seen.add(key);
+    items.push(row);
+  }
+
+  for (const leftover of input.state.leftovers) {
+    const id = leftoverGapId(leftover);
+    if (accepted.has(id)) {
+      continue;
+    }
+    const stillRequested =
+      leftover.reason === "not_in_catalogue" ||
+      (leftover.supplementId != null && requestedIds.has(leftover.supplementId)) ||
+      requestedNames.has(leftover.name.trim().toLowerCase());
+    if (!stillRequested) {
+      continue;
+    }
+    const coverage = input.selected?.coverage.find(
+      (row) =>
+        (leftover.supplementId && row.supplementId === leftover.supplementId) ||
+        row.name.trim().toLowerCase() === leftover.name.trim().toLowerCase()
+    );
+    const requestedAmount = publicAmount(
+      Number(coverage?.requestedAmount ?? leftover.amount ?? 0)
+    );
+    const deliveredAmount =
+      leftover.reason === "dose_gap"
+        ? publicAmount(Number(coverage?.deliveredAmount ?? 0))
+        : 0;
+    const remainingGap = publicAmount(Math.max(0, requestedAmount - deliveredAmount));
+    if (remainingGap <= 0 || !leftover.unit) {
+      continue;
+    }
+    push({
+      decisions: ["accept_gap", "remove_target"],
+      deliveredAmount,
+      name: leftover.name,
+      reason: leftover.reason,
+      remainingGap,
+      requestedAmount,
+      unit: leftover.unit,
+      ...(leftover.supplementId ? { supplementId: leftover.supplementId } : {})
+    });
+  }
+
+  for (const row of input.selected?.coverage ?? []) {
+    if (blockingDose && row.status === "upper_limit_risk") {
+      continue;
+    }
+    if (
+      row.remainingGap <= 0 ||
+      row.status === "covered" ||
+      row.status === "partial" ||
+      accepted.has(row.supplementId) ||
+      !requestedIds.has(row.supplementId)
+    ) {
+      continue;
+    }
+    push({
+      decisions: ["accept_gap", "remove_target"],
+      deliveredAmount: publicAmount(row.deliveredAmount),
+      name: row.name,
+      reason: "uncovered",
+      remainingGap: publicAmount(row.remainingGap),
+      requestedAmount: publicAmount(row.requestedAmount),
+      supplementId: row.supplementId,
+      unit: row.unit
+    });
+  }
+
+  return items;
+}
+
 function leftoverRequiresDecision(
   item: Readonly<{ reason: string; severity: "high" | "low" | "medium" }>
 ) {
   return (
-    (item.reason === "not_in_catalogue" || item.reason === "uncovered") &&
+    (item.reason === "not_in_catalogue" ||
+      item.reason === "uncovered" ||
+      item.reason === "unsupported_unit_conversion") &&
     (item.severity === "high" || item.severity === "medium")
   );
 }

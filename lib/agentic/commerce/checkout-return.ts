@@ -69,7 +69,11 @@ export async function resolveAgenticPaidTrackingPath(input: Readonly<{
     }));
 
   if (joined && !existing) {
-    await processOmsOutbox({ now: nowIso(), store: input.runtime.store });
+    await processOmsOutbox({
+      adapter: input.runtime.config.thailandRetailerAdapter,
+      now: nowIso(),
+      store: input.runtime.store
+    });
   }
 
   const trackingUrl = existing?.trackingUrl ?? joined?.trackingUrl;

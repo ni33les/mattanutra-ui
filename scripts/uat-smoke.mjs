@@ -16,6 +16,12 @@ const externalSecretChecksStrict =
 const lineWebhookUrl = `${targetBaseUrl}/api/line/webhook`;
 const expectedLineWebhookUrl = "https://uat.mattanutra.com/api/line/webhook";
 const requiredTables = [
+  "agentic_fulfilment_events",
+  "agentic_idempotency_records",
+  "agentic_order_items",
+  "agentic_orders",
+  "agentic_outbox_events",
+  "agentic_plans",
   "communication_channels",
   "communication_messages",
   "customer_line_connect_tokens",

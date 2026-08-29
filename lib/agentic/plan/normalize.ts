@@ -305,10 +305,33 @@ export function applyPlanAnswers(
     }
   }
 
+  const remainingIds = new Set(next.targets.map((item) => item.supplementId));
+  const remainingNames = new Set(next.targets.map((item) => item.name.trim().toLowerCase()));
+  const acceptedIds = new Set(acceptedGaps.map((item) => item.supplementId));
   return {
     ...next,
     acceptedGaps,
-    leftovers: state.leftovers,
+    leftovers: state.leftovers.filter((item) => {
+      if (item.supplementId && !remainingIds.has(item.supplementId) && item.reason !== "not_in_catalogue") {
+        return false;
+      }
+      if (
+        item.reason !== "not_in_catalogue" &&
+        !remainingNames.has(item.name.trim().toLowerCase()) &&
+        !(item.supplementId && remainingIds.has(item.supplementId))
+      ) {
+        return false;
+      }
+      if (
+        item.supplementId &&
+        acceptedIds.has(item.supplementId) &&
+        item.reason !== "unsupported_unit_conversion" &&
+        item.reason !== "dose_gap"
+      ) {
+        return false;
+      }
+      return true;
+    }),
     pinnedOptionId: state.pinnedOptionId
   };
 }

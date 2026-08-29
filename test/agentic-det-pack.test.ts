@@ -355,19 +355,23 @@ async function pinWithoutRematch(snapshot: CatalogueSnapshot) {
 
   const question = created.questions?.[0];
   const choice = question?.choices?.[0]?.choice;
-  if (!question || !choice) {
-    return { pinKeptOption: false, pinWithoutRematch: false };
-  }
-
   const pinned = await planTool({
     config,
     now,
-    payload: {
-      answers: [{ choice, questionId: question.questionId }],
-      expectedRevision: created.revision,
-      idempotencyKey: `det-pack-pin-${randomUUID()}`,
-      planHandle: created.planHandle
-    },
+    payload:
+      question && choice
+        ? {
+            answers: [{ choice, questionId: question.questionId }],
+            expectedRevision: created.revision,
+            idempotencyKey: `det-pack-pin-${randomUUID()}`,
+            planHandle: created.planHandle
+          }
+        : {
+            expectedRevision: created.revision,
+            idempotencyKey: `det-pack-pin-${randomUUID()}`,
+            planHandle: created.planHandle,
+            selectOptionId: created.optionId
+          },
     scope,
     store
   });

@@ -95,6 +95,7 @@ export type PlanLeftoverReason =
   | "dose_gap"
   | "not_in_catalogue"
   | "uncovered"
+  | "unsupported_unit_conversion"
   | "weaker_sku";
 
 export type PlanLeftover = Readonly<{
@@ -333,6 +334,17 @@ export type SafetyGuidance = Readonly<{
   unit: string | null;
 }>;
 
+export type GapReviewTarget = Readonly<{
+  decisions: readonly string[];
+  deliveredAmount: number;
+  name: string;
+  reason: string;
+  remainingGap: number;
+  requestedAmount: number;
+  supplementId?: string;
+  unit: string;
+}>;
+
 export type PlanQuestion = Readonly<{
   choices: readonly Readonly<{
     choice: string;
@@ -343,6 +355,7 @@ export type PlanQuestion = Readonly<{
   prompt: string;
   promptKey: string;
   questionId: string;
+  targets?: readonly GapReviewTarget[];
 }>;
 
 export type StackOption = Readonly<{
@@ -368,10 +381,19 @@ export type PlanBreadth = Readonly<{
       unit: string;
     }>[];
   }>[];
+  unsupportedTargets?: readonly Readonly<{
+    amount: number;
+    name: string;
+    reason: "unsupported_unit_conversion";
+    unit: string;
+  }>[];
 }>;
 
 export type PlanResult = Readonly<{
   alternatives: readonly StackOption[];
+  gapReview?: Readonly<{
+    targets: readonly GapReviewTarget[];
+  }>;
   appliedRequirements: readonly string[];
   assumptions: readonly string[];
   availabilityAsOf: string;

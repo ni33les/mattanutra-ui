@@ -6,7 +6,6 @@ import {
 import {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_TOOL_SCHEMAS,
-  PLAN_ADVERTISED_SCHEMA,
   agenticServerInstructions,
   agenticToolDescriptions,
   isAgenticErrorResult,
@@ -102,7 +101,7 @@ export function toolList(environment: AgenticEnvironment = "dev") {
   const descriptions = agenticToolDescriptions(environment);
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: descriptions[name],
-    inputSchema: name === "plan" ? PLAN_ADVERTISED_SCHEMA : AGENTIC_TOOL_SCHEMAS[name],
+    inputSchema: AGENTIC_TOOL_SCHEMAS[name],
     name
   }));
 }
@@ -222,14 +221,15 @@ export async function handleLightweightJsonRpc(
       jsonrpc: "2.0",
       result: {
         capabilities: {
-          tools: { listChanged: false }
+          tools: { listChanged: true }
         },
         instructions: agenticServerInstructions(config.environment),
         protocolVersion: "2025-03-26",
         serverInfo: {
           name: mcpServerInfoName(config.environment),
           version: AGENTIC_SERVICE_VERSION
-        }
+        },
+        tools: toolList(config.environment)
       }
     };
   }

@@ -271,7 +271,11 @@ export async function tryApplyAgenticStripeEvent(input: Readonly<{
       order: applied.order,
       store: input.runtime.store
     });
-    await processOmsOutbox({ now, store: input.runtime.store });
+    await processOmsOutbox({
+      adapter: input.runtime.config.thailandRetailerAdapter,
+      now,
+      store: input.runtime.store
+    });
   }
 
   return { applied: applied.applied, ok: true, source: AGENTIC_STRIPE_SOURCE };

@@ -163,6 +163,16 @@ create table if not exists public.agentic_fulfilment_events (
   created_at timestamptz not null default now()
 );
 
+create index if not exists agentic_orders_plan_revision_idx
+  on public.agentic_orders (plan_id, plan_revision);
+
+create index if not exists agentic_fulfilment_events_order_created_idx
+  on public.agentic_fulfilment_events (order_id, created_at);
+
+create index if not exists agentic_idempotency_execute_order_idx
+  on public.agentic_idempotency_records ((resource_ids->>'orderId'))
+  where operation = 'execute';
+
 create table if not exists public.agentic_support_cases (
   id uuid primary key,
   order_id uuid not null references public.agentic_orders(id) on delete restrict,

@@ -1,5 +1,5 @@
 import {
-  AGENTIC_TOOL_SCHEMAS,
+  AGENTIC_INPUT_SCHEMAS,
   isAgenticErrorResult,
   schemaIssuesToError,
   validateToolIssues
@@ -118,7 +118,7 @@ async function callTool(
     };
   }
 
-  const schema = AGENTIC_TOOL_SCHEMAS[canonical];
+  const schema = AGENTIC_INPUT_SCHEMAS[canonical];
   const args =
     canonical === "plan"
       ? withPlanOperation(rawArgs === undefined ? {} : rawArgs)

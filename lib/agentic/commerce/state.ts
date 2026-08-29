@@ -1,7 +1,11 @@
-import { randomUUID } from "node:crypto";
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
+import { nextTestUuid } from "@/lib/agentic/capabilities";
 import { businessError } from "@/lib/agentic/contract/errors";
-import type { AgenticStore, OrderRecord } from "@/lib/agentic/store/types";
+import type {
+  AgenticStore,
+  FulfilmentEventRecord,
+  OrderRecord
+} from "@/lib/agentic/store/types";
 import type { VerifiedPaymentEvent } from "@/lib/agentic/commerce/payment";
 import { publicFrozenOrder } from "@/lib/agentic/public-mapper";
 
@@ -30,7 +34,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
 
   await input.store.insertProviderEvent({
     createdAt: input.now,
-    id: randomUUID(),
+    id: nextTestUuid(),
     orderId: order.id,
     payload: input.event,
     provider: "mock",
@@ -39,7 +43,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
 
   await input.store.insertPaymentAttempt({
     createdAt: input.now,
-    id: randomUUID(),
+    id: nextTestUuid(),
     orderId: order.id,
     providerEventId: input.event.providerEventId,
     reason: input.event.reason,
@@ -62,6 +66,19 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     return { applied: false, order: next };
   }
 
+  const closed =
+    order.paymentStatus === "paid" ||
+    order.orderStatus === "expired" ||
+    order.orderStatus === "cancelled";
+
+  if (
+    closed &&
+    input.event.status !== "refunded" &&
+    input.event.status !== "partially_refunded"
+  ) {
+    return { applied: false, order };
+  }
+
   if (input.event.status === "declined" && input.event.reason === "three_ds_cancelled") {
     const next: OrderRecord = {
       ...order,
@@ -76,7 +93,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     await input.store.updateOrder(next);
     await input.store.insertPaymentAudit({
       createdAt: input.now,
-      id: randomUUID(),
+      id: nextTestUuid(),
       orderId: order.id,
       type: "payment_cancelled"
     });
@@ -94,7 +111,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     await input.store.updateOrder(next);
     await input.store.insertPaymentAudit({
       createdAt: input.now,
-      id: randomUUID(),
+      id: nextTestUuid(),
       orderId: order.id,
       type: input.event.status === "unavailable" ? "payment_unavailable" : "payment_declined"
     });
@@ -114,17 +131,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
   }
 
   if (input.event.status === "expired") {
-    const next: OrderRecord = {
-      ...order,
-      checkoutUrl: null,
-      expiredAt: input.now,
-      latestPaymentAttempt: "expired",
-      latestPaymentReason: "expired",
-      orderStatus: "expired",
-      paymentStatus: "unpaid",
-      updatedAt: input.now
-    };
-    await input.store.updateOrder(next);
+    const next = await expireUnpaidOrder({ now: input.now, order, store: input.store });
     return { applied: true, order: next };
   }
 
@@ -163,7 +170,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     return { applied: true, order: next };
   }
 
-  if (order.paymentStatus === "paid") {
+  if (order.paymentStatus === "paid" || order.orderStatus === "expired") {
     return { applied: false, order };
   }
 
@@ -181,13 +188,13 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
   await input.store.updateOrder(next);
   await input.store.insertPaymentAudit({
     createdAt: input.now,
-    id: randomUUID(),
+    id: nextTestUuid(),
     orderId: order.id,
     type: "payment_confirmed"
   });
   await input.store.insertOutbox({
     createdAt: input.now,
-    id: randomUUID(),
+    id: nextTestUuid(),
     orderId: order.id,
     payload: { orderId: order.id },
     processedAt: null,
@@ -197,9 +204,95 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
   return { applied: true, order: next };
 }
 
+async function expireUnpaidOrder(input: Readonly<{
+  now: string;
+  order: OrderRecord;
+  store: AgenticStore;
+}>): Promise<OrderRecord> {
+  if (input.order.orderStatus === "expired") {
+    return input.order;
+  }
+
+  const next: OrderRecord = {
+    ...input.order,
+    checkoutUrl: null,
+    expiredAt: input.now,
+    latestPaymentAttempt: "expired",
+    latestPaymentReason: "expired",
+    orderStatus: "expired",
+    paymentStatus: "unpaid",
+    stateVersion: input.order.stateVersion === 1 ? 2 : input.order.stateVersion,
+    updatedAt: input.now
+  };
+  await input.store.updateOrder(next);
+  return next;
+}
+
+export async function expireCheckoutIfDue(input: Readonly<{
+  now: string;
+  order: OrderRecord | null;
+  store: AgenticStore;
+}>): Promise<OrderRecord | null> {
+  const order = input.order;
+  if (!order) {
+    return null;
+  }
+  if (order.orderStatus !== "open" || order.paymentStatus !== "unpaid") {
+    return order;
+  }
+  if (!order.checkoutExpiresAt || Date.parse(input.now) < Date.parse(order.checkoutExpiresAt)) {
+    return order;
+  }
+  return expireUnpaidOrder({ now: input.now, order, store: input.store });
+}
+
+function fulfilmentTracking(
+  retail: Readonly<{ orderNumber: string; trackingUrl: string }> | null | undefined,
+  events: readonly FulfilmentEventRecord[]
+) {
+  if (retail) {
+    return [{ number: retail.orderNumber, url: retail.trackingUrl }];
+  }
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const payload = events[index]?.payload;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      continue;
+    }
+    const record = payload as Record<string, unknown>;
+    const number =
+      typeof record.tracking === "string"
+        ? record.tracking
+        : typeof record.number === "string"
+          ? record.number
+          : null;
+    const url = typeof record.url === "string" ? record.url : null;
+    if (number) {
+      return [{ number, url: url ?? `https://track.th-mock.test/${number}` }];
+    }
+  }
+
+  return [];
+}
+
+function fulfilmentReason(events: readonly FulfilmentEventRecord[]) {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event?.status !== "exception") {
+      continue;
+    }
+    const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload)
+      ? (event.payload as Record<string, unknown>)
+      : {};
+    return typeof payload.reasonCode === "string" ? payload.reasonCode : "fulfilment_exception";
+  }
+  return null;
+}
+
 export function orderPollView(input: Readonly<{
   checkoutUrl: string | null;
   found: boolean;
+  fulfilmentEvents?: readonly FulfilmentEventRecord[];
   localeMessage: (key: string) => string;
   order: OrderRecord | null;
   retail?: Readonly<{
@@ -226,6 +319,7 @@ export function orderPollView(input: Readonly<{
   }
 
   const order = input.order;
+  const events = input.fulfilmentEvents ?? [];
   const paid = order.paymentStatus === "paid";
   const declined = order.latestPaymentAttempt === "declined";
   const processing = order.paymentStatus === "processing";
@@ -233,20 +327,31 @@ export function orderPollView(input: Readonly<{
   const cancelled = order.orderStatus === "cancelled";
   const refunded =
     order.paymentStatus === "refunded" || order.paymentStatus === "partially_refunded";
+  const exception = order.fulfilmentStatus === "exception";
+  const reasonCode = fulfilmentReason(events);
   const terminal = paid || expired || refunded || cancelled;
   const messageKey = cancelled
     ? "order.cancelled"
     : expired
       ? "order.expired"
-      : declined
-        ? "order.payment_declined_retry"
-        : paid
-          ? "order.paid"
-          : processing
-            ? "order.processing"
-            : refunded
-              ? "order.refunded"
-              : "order.open_unpaid";
+      : exception
+        ? "order.fulfilment_exception"
+        : declined
+          ? "order.payment_declined_retry"
+          : paid
+            ? "order.paid"
+            : processing
+              ? "order.processing"
+              : refunded
+                ? "order.refunded"
+                : "order.open_unpaid";
+  const nextAction = exception
+    ? "contact_support"
+    : terminal
+      ? "none"
+      : declined || order.paymentStatus === "unpaid"
+        ? "open_checkout"
+        : "poll";
 
   return {
     checkoutExpiresAt: order.checkoutExpiresAt,
@@ -254,24 +359,16 @@ export function orderPollView(input: Readonly<{
     frozenOrder: publicFrozenOrder(order.frozenPlan),
     fulfilment: {
       deliveryWindow: null,
+      reasonCode,
       status: order.fulfilmentStatus,
-      tracking: input.retail
-        ? [
-            {
-              number: input.retail.orderNumber,
-              url: input.retail.trackingUrl
-            }
-          ]
-        : []
+      tracking: fulfilmentTracking(input.retail, events)
     },
     latestPaymentAttempt: order.latestPaymentAttempt,
     latestPaymentReason: order.latestPaymentReason,
     lookupStatus: "found",
     message: input.localeMessage(messageKey),
     messageKey,
-    nextAction: terminal ? "none" : declined || order.paymentStatus === "unpaid"
-      ? "open_checkout"
-      : "poll",
+    nextAction,
     ok: true as const,
     orderReference: order.reference,
     ...(input.retail

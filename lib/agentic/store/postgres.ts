@@ -299,6 +299,21 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
         values (${record.id}::uuid, ${record.orderId}::uuid, ${record.status}, ${asJson(record.payload)}, ${record.createdAt}::timestamptz)
       `;
     },
+    async listFulfilmentEvents(orderId) {
+      const rows = await sql`
+        select id, order_id, status, payload, created_at
+        from public.agentic_fulfilment_events
+        where order_id = ${orderId}::uuid
+        order by created_at asc
+      `;
+      return rows.map((row) => ({
+        createdAt: toIso(row.created_at),
+        id: row.id,
+        orderId: row.order_id,
+        payload: row.payload,
+        status: row.status
+      }));
+    },
     async insertIdempotency(record) {
       const rows = await sql`
         insert into public.agentic_idempotency_records (

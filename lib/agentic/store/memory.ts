@@ -207,6 +207,9 @@ export function createMemoryStore(): AgenticStore {
       list.push(clone(record));
       fulfilment.set(record.orderId, list);
     },
+    async listFulfilmentEvents(orderId) {
+      return clone(fulfilment.get(orderId) ?? []);
+    },
     async insertIdempotency(record) {
       const key = idempotencyKey(record.operation, record.ownerScope, record.key);
       const existing = idempotency.get(key);

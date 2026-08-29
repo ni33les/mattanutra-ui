@@ -70,7 +70,7 @@ function boundedNutrients(items: BasketItem["incidentalNutrients"] | undefined) 
     }
 
     seen.add(key);
-    out.push({ amount, name, unit });
+    out.push({ amount: publicAmount(amount), name, unit });
 
     if (out.length >= PUBLIC_NUTRIENT_NAME_LIMIT) {
       break;
@@ -161,65 +161,58 @@ function incidentalNameSet(item: BasketItem) {
   );
 }
 
-function filterRequestedNames(item: BasketItem, targets: RequestedTargets) {
-  const raw = boundedNames(item.requestedNutrientNames);
-  if (targets.names.size > 0) {
-    return raw.filter((name) => targets.names.has(name.toLowerCase()));
-  }
-  const incidental = incidentalNameSet(item);
-  return raw.filter((name) => !incidental.has(name.toLowerCase()));
-}
+type PositiveContribution = Readonly<{
+  amount: number;
+  name: string;
+  remainingGap: number;
+  supplementId: string;
+  unit: string;
+}>;
 
-function filterRequestedNutrients(item: BasketItem, targets: RequestedTargets) {
-  const raw = boundedNutrients(item.requestedNutrients);
-  const canonical = new Set(
-    canonicalRequestedNames(item, targets).map((name) => name.toLowerCase())
+function isRequestedTarget(row: CoverageRow, targets: RequestedTargets) {
+  if (targets.supplementIds.size === 0 && targets.names.size === 0) {
+    return true;
+  }
+  return (
+    (row.supplementId && targets.supplementIds.has(row.supplementId)) ||
+    targets.names.has(row.name.trim().toLowerCase())
   );
-  if (canonical.size > 0) {
-    return raw.filter((row) => canonical.has(row.name.toLowerCase()));
-  }
-  if (targets.names.size > 0) {
-    return raw.filter((row) => targets.names.has(row.name.toLowerCase()));
-  }
-  const incidental = incidentalNameSet(item);
-  return raw.filter((row) => !incidental.has(row.name.toLowerCase()));
 }
 
-function filterRequestedIds(item: BasketItem, targets: RequestedTargets) {
-  const fromReason = item.selectionReason?.requestedSupplementIds ?? [];
-  const fromItem = item.contributionSupplementIds.filter((id) => id.startsWith("sup_"));
-  const raw = [...new Set((fromReason.length > 0 ? fromReason : fromItem).filter(Boolean))];
-  if (targets.supplementIds.size > 0) {
-    return raw.filter((id) => targets.supplementIds.has(id));
-  }
-  return raw;
-}
-
-function canonicalRequestedNames(item: BasketItem, targets: RequestedTargets) {
-  const ids = filterRequestedIds(item, targets);
-  if (targets.nameById.size > 0 && ids.length > 0) {
-    const names: string[] = [];
-    const seen = new Set<string>();
-    for (const id of ids) {
-      const name = targets.nameById.get(id);
-      if (!name) {
-        continue;
-      }
-      const key = name.toLowerCase();
-      if (seen.has(key)) {
-        continue;
-      }
-      seen.add(key);
-      names.push(name);
-      if (names.length >= PUBLIC_NUTRIENT_NAME_LIMIT) {
-        break;
-      }
+function positiveContributions(
+  item: BasketItem,
+  coverage: readonly CoverageRow[],
+  targets: RequestedTargets
+): PositiveContribution[] {
+  const out: PositiveContribution[] = [];
+  const seen = new Set<string>();
+  for (const row of coverage) {
+    if (!isRequestedTarget(row, targets)) {
+      continue;
     }
-    if (names.length > 0) {
-      return names;
+    const hit = (row.contributors ?? []).find(
+      (contributor) =>
+        contributor.productId === item.productId &&
+        Number(contributor.amount) > 0 &&
+        String(contributor.unit || row.unit || "").length > 0
+    );
+    if (!hit) {
+      continue;
     }
+    const key = row.supplementId || row.name.trim().toLowerCase();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push({
+      amount: publicAmount(Number(hit.amount)),
+      name: row.name,
+      remainingGap: publicAmount(Number(row.remainingGap) || 0),
+      supplementId: row.supplementId,
+      unit: String(hit.unit || row.unit)
+    });
   }
-  return filterRequestedNames(item, targets);
+  return out;
 }
 
 function joinNames(names: readonly string[], locale: string) {
@@ -238,8 +231,17 @@ function joinNames(names: readonly string[], locale: string) {
   return `${lead} and ${last}`;
 }
 
+export function publicAmount(value: number) {
+  if (!Number.isFinite(value)) {
+    return value;
+  }
+  const rounded = Math.round(value * 100) / 100;
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
 function formatDose(amount: number) {
-  return Number.isInteger(amount) ? String(amount) : String(amount);
+  const rounded = publicAmount(amount);
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
 function lineCoverage(
@@ -278,58 +280,63 @@ function lineCoverage(
 }
 
 function defaultSelectionReason(
-  item: BasketItem,
-  locale: string,
-  targets: RequestedTargets,
-  coverage: readonly CoverageRow[] = []
+  contributions: readonly PositiveContribution[],
+  locale: string
 ): SelectionReason {
-  const requestedNames = canonicalRequestedNames(item, targets);
-  const requestedSupplementIds = filterRequestedIds(item, targets);
+  const requestedNames = contributions.map((item) => item.name);
+  const requestedSupplementIds = contributions
+    .map((item) => item.supplementId)
+    .filter(Boolean);
   const negotiated = negotiateLocale(locale);
-  const primaryId = requestedSupplementIds[0];
-  const facts = lineCoverage(item, coverage, primaryId);
-  const gap =
-    requestedSupplementIds
-      .map((id) => lineCoverage(item, coverage, id))
-      .find((row) => row && row.remainingGap > 0) ?? null;
+  const first = contributions[0];
+  const gap = contributions.find((item) => item.remainingGap > 0) ?? null;
 
-  let code: SelectionReason["code"] = "covers_target";
-  let messageKey = "plan.selection.covers_target_named";
-  let message = agenticMessage(negotiated, messageKey, {
-    name: requestedNames[0] ?? facts?.name ?? item.productName
-  });
+  if (contributions.length === 0) {
+    return {
+      code: "best_available",
+      message: agenticMessage(negotiated, "plan.selection.in_selected_stack"),
+      messageKey: "plan.selection.in_selected_stack",
+      requestedNames: [],
+      requestedSupplementIds: []
+    };
+  }
 
-  if (requestedNames.length >= 2) {
-    code = "consolidates_targets";
-    messageKey = "plan.selection.consolidates_targets";
-    message = agenticMessage(negotiated, messageKey, {
-      names: joinNames(requestedNames, negotiated)
-    });
-  } else if (gap && gap.remainingGap > 0) {
-    code = "best_available_dose";
-    messageKey = "plan.selection.best_available_dose";
-    message = agenticMessage(negotiated, messageKey, {
-      gap: formatDose(gap.remainingGap),
-      name: requestedNames[0] ?? gap.name,
-      unit: gap.unit
-    });
-  } else if (facts && Number.isFinite(facts.amount)) {
-    messageKey = "plan.selection.covers_target";
-    message = agenticMessage(negotiated, messageKey, {
-      amount: formatDose(facts.amount),
-      name: requestedNames[0] ?? facts.name,
-      unit: facts.unit
-    });
+  if (contributions.length >= 2) {
+    return {
+      code: "consolidates_targets",
+      message: agenticMessage(negotiated, "plan.selection.consolidates_targets", {
+        names: joinNames(requestedNames, negotiated)
+      }),
+      messageKey: "plan.selection.consolidates_targets",
+      requestedNames,
+      requestedSupplementIds
+    };
+  }
+
+  if (gap) {
+    return {
+      code: "best_available_dose",
+      message: agenticMessage(negotiated, "plan.selection.best_available_dose", {
+        gap: formatDose(gap.remainingGap),
+        name: first.name,
+        unit: gap.unit
+      }),
+      messageKey: "plan.selection.best_available_dose",
+      requestedNames,
+      requestedSupplementIds
+    };
   }
 
   return {
-    code,
-    message,
-    messageKey,
+    code: "covers_target",
+    message: agenticMessage(negotiated, "plan.selection.covers_target", {
+      amount: formatDose(first.amount),
+      name: first.name,
+      unit: first.unit
+    }),
+    messageKey: "plan.selection.covers_target",
     requestedNames,
-    requestedSupplementIds: requestedSupplementIds.length
-      ? requestedSupplementIds
-      : item.selectionReason?.requestedSupplementIds ?? []
+    requestedSupplementIds
   };
 }
 
@@ -400,8 +407,13 @@ export function publicBasketItem(
       ? item.incidentalNutrientNames
       : (item.incidentalNutrients ?? []).map((row) => row.name);
   const incidentalNutrientNames = boundedNames(incidentalSourceNames);
-  const requestedNutrientNames = canonicalRequestedNames(item, targets);
-  const requestedNutrients = filterRequestedNutrients(item, targets);
+  const contributions = positiveContributions(item, coverage, targets);
+  const requestedNutrientNames = contributions.map((row) => row.name);
+  const requestedNutrients = contributions.map((row) => ({
+    amount: row.amount,
+    name: row.name,
+    unit: row.unit
+  }));
 
   return {
     currency: item.currency,
@@ -413,7 +425,7 @@ export function publicBasketItem(
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
-    selectionReason: defaultSelectionReason(item, locale, targets, coverage),
+    selectionReason: defaultSelectionReason(contributions, locale),
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(incidentalNutrientNames.length > 0 ? { incidentalNutrientNames } : {}),
@@ -456,15 +468,15 @@ export function stackSummaryFor(basket: readonly BasketItem[], currency: string)
 
 export function publicCoverage(row: CoverageRow) {
   return {
-    coveragePercent: row.coveragePercent,
-    currentAmount: row.currentAmount,
-    deliveredAmount: row.deliveredAmount,
+    coveragePercent: publicAmount(row.coveragePercent),
+    currentAmount: publicAmount(row.currentAmount),
+    deliveredAmount: publicAmount(row.deliveredAmount),
     name: row.name,
-    remainingGap: row.remainingGap,
-    requestedAmount: row.requestedAmount,
+    remainingGap: publicAmount(row.remainingGap),
+    requestedAmount: publicAmount(row.requestedAmount),
     status: row.status,
     supplementId: row.supplementId,
-    totalExposureAmount: row.totalExposureAmount,
+    totalExposureAmount: publicAmount(row.totalExposureAmount),
     unit: row.unit,
     ...(row.contributors && row.contributors.length > 0
       ? {
@@ -473,8 +485,11 @@ export function publicCoverage(row: CoverageRow) {
       : {}),
     ...(row.upperLimitAmount != null
       ? {
-          percentOfUpperLimit: row.percentOfUpperLimit,
-          upperLimitAmount: row.upperLimitAmount
+          percentOfUpperLimit:
+            row.percentOfUpperLimit == null
+              ? row.percentOfUpperLimit
+              : publicAmount(row.percentOfUpperLimit),
+          upperLimitAmount: publicAmount(row.upperLimitAmount)
         }
       : {})
   };
@@ -619,7 +634,7 @@ export function publicOption(
 
 function publicContributor(item: CoverageContributor) {
   return {
-    amount: item.amount,
+    amount: publicAmount(item.amount),
     productName: item.productName,
     unit: item.unit,
     ...(item.productId ? { productId: item.productId } : {}),
@@ -652,8 +667,8 @@ export function publicSafetyGuidance(
     ...(row.nutrientName ? { nutrientName: row.nutrientName } : {}),
     ...(row.unit ? { unit: row.unit } : {}),
     ...(row.sourceScope ? { sourceScope: row.sourceScope } : {}),
-    ...(row.exposure != null ? { exposure: row.exposure } : {}),
-    ...(row.threshold != null ? { threshold: row.threshold } : {}),
+    ...(row.exposure != null ? { exposure: publicAmount(row.exposure) } : {}),
+    ...(row.threshold != null ? { threshold: publicAmount(row.threshold) } : {}),
     ...(row.productIds.length > 0 ? { productIds: row.productIds } : {}),
     ...(row.supplementIds.length > 0 ? { supplementIds: row.supplementIds } : {}),
     contributors: row.contributors.map(publicContributor)
@@ -671,11 +686,19 @@ export function publicQuestions(
     })),
     prompt: question.prompt,
     promptKey: question.promptKey,
-    questionId: question.questionId
+    questionId: question.questionId,
+    ...(question.targets && question.targets.length > 0
+      ? { targets: question.targets }
+      : {})
   }));
 }
 
-const PUBLIC_LEFTOVER_REASONS = new Set(["dose_gap", "not_in_catalogue", "uncovered"]);
+const PUBLIC_LEFTOVER_REASONS = new Set([
+  "dose_gap",
+  "not_in_catalogue",
+  "uncovered",
+  "unsupported_unit_conversion"
+]);
 
 function leftoverKey(item: Pick<PlanLeftover, "name" | "supplementId">) {
   return item.supplementId || item.name.trim().toLowerCase();
@@ -716,36 +739,26 @@ function publicLeftovers(
 
     seen.add(key);
     const row = coverageForLeftover(item, coverage);
-
-    if (item.reason === "dose_gap") {
-      const requestedAmount = row?.requestedAmount ?? item.amount;
-      const deliveredAmount = row?.deliveredAmount ?? 0;
-      const remainingGap =
-        row?.remainingGap ??
-        Math.max(0, (requestedAmount ?? 0) - deliveredAmount);
-      const unit = item.unit ?? row?.unit;
-
-      if (requestedAmount == null || unit == null) {
-        continue;
-      }
-
-      out.push({
-        name: item.name,
-        reason: "dose_gap",
-        unit,
-        requestedAmount,
-        deliveredAmount,
-        remainingGap,
-        ...(item.supplementId ? { supplementId: item.supplementId } : {})
-      });
+    const unit = item.unit ?? row?.unit;
+    if (!unit) {
       continue;
     }
-
+    const requestedAmount = publicAmount(Number(row?.requestedAmount ?? item.amount ?? 0));
+    const deliveredAmount = publicAmount(
+      item.reason === "dose_gap" ? Number(row?.deliveredAmount ?? 0) : 0
+    );
+    const remainingGap = publicAmount(Math.max(0, requestedAmount - deliveredAmount));
+    if (remainingGap <= 0) {
+      continue;
+    }
     out.push({
       name: item.name,
       reason: item.reason,
-      ...(item.supplementId ? { supplementId: item.supplementId } : {}),
-      ...(item.unit ? { unit: item.unit } : {})
+      unit,
+      requestedAmount,
+      deliveredAmount,
+      remainingGap,
+      ...(item.supplementId ? { supplementId: item.supplementId } : {})
     });
   }
 
@@ -765,7 +778,7 @@ export function publicPlanFields(result: Pick<
   | "summary"
   | "unmetRequirements"
 > &
-  Partial<Pick<PlanResult, "breadth" | "leftovers" | "matcherTelemetry">>) {
+  Partial<Pick<PlanResult, "breadth" | "gapReview" | "leftovers" | "matcherTelemetry">>) {
   const selected = result.selected;
   const guidanceIds = result.safetyGuidance.map((item) => item.guidanceId);
   const snapshot =
@@ -868,7 +881,10 @@ export function publicPlanFields(result: Pick<
       ? {
           reasonCode: "request_too_broad",
           maxTargetsPerRequest: result.breadth?.maxTargetsPerRequest ?? 10,
-          suggestedGroups: result.breadth?.suggestedGroups ?? []
+          suggestedGroups: result.breadth?.suggestedGroups ?? [],
+          ...(result.breadth?.unsupportedTargets?.length
+            ? { unsupportedTargets: result.breadth.unsupportedTargets }
+            : {})
         }
       : {}),
     safetyScope,
@@ -903,6 +919,9 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(result.questions.length > 0
       ? { questions: publicQuestions(result.questions) }
+      : {}),
+    ...(result.gapReview?.targets?.length
+      ? { gapReview: { targets: result.gapReview.targets } }
       : {}),
     ...(leftovers.length > 0 ? { leftovers } : {}),
     ...(result.safetyGuidance.length > 0
@@ -1015,7 +1034,7 @@ export function publicMatcherTelemetry(
 }
 
 export function publicFrozenItems(items: readonly BasketItem[]) {
-  return items.map(publicBasketItem);
+  return items.map((item) => publicBasketItem(item));
 }
 
 export function publicFrozenOrder(frozen: unknown) {
@@ -1027,6 +1046,8 @@ export function publicFrozenOrder(frozen: unknown) {
   const rawItems = Array.isArray(record.items) ? record.items : [];
 
   return {
+    catalogueVersion: record.catalogueVersion,
+    countryCode: record.countryCode,
     coveragePercent: record.coveragePercent,
     currency: record.currency,
     dailyPills: record.dailyPills,
@@ -1068,8 +1089,12 @@ export function publicFrozenOrder(frozen: unknown) {
         unitPriceMinor: Number(row.unitPriceMinor) || 0
       });
     }),
+    market: record.market,
     planRevision: record.planRevision,
+    safetyGuidanceIds: record.safetyGuidanceIds,
+    selectedOptionId: record.selectedOptionId,
     shippingMinor: record.shippingMinor,
+    snapshotId: record.snapshotId,
     subtotalMinor: record.subtotalMinor,
     taxMinor: record.taxMinor,
     totalPriceMinor: record.totalPriceMinor

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
@@ -6,6 +5,7 @@ import { humanOrderReference } from "@/lib/agentic/contract/ids";
 import {
   hashCapability,
   issueCapability,
+  nextTestUuid,
   resolveCapability,
   type CapabilityScope
 } from "@/lib/agentic/capabilities";
@@ -14,22 +14,42 @@ import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import type { AgenticStore, OrderRecord } from "@/lib/agentic/store/types";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
+import { expireCheckoutIfDue } from "@/lib/agentic/commerce/state";
 import { publicFrozenItems } from "@/lib/agentic/public-mapper";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
+import {
+  ACTIVE_MARKET_COUNTRY,
+  ACTIVE_RETAILER_ID,
+  ACTIVE_RETAILER_NAME
+} from "@/lib/agentic/catalogue/market";
 import {
   DEFAULT_SHIPPING_MINOR,
   DEFAULT_TAX_MINOR,
   payableSnapshot
 } from "@/lib/agentic/money";
 
+const executeLocks = new WeakMap<AgenticStore, Map<string, Promise<unknown>>>();
+
+function enqueueExecute<T>(
+  store: AgenticStore,
+  key: string,
+  work: () => Promise<T>
+): Promise<T> {
+  const locks = executeLocks.get(store) ?? new Map<string, Promise<unknown>>();
+  executeLocks.set(store, locks);
+  const previous = locks.get(key) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(() => work());
+  locks.set(key, next);
+  return next;
+}
+
 function executeError(
   locale: Locale,
   reasonCode:
     | "availability_changed"
     | "not_found"
-    | "plan_not_ready"
-    | "revision_conflict",
+    | "plan_not_ready",
   fieldPath?: string
 ) {
   return businessError({
@@ -37,6 +57,32 @@ function executeError(
     message: agenticMessage(locale, `mcp.errors.${reasonCode}`),
     reasonCode
   });
+}
+
+function revisionConflict(
+  locale: Locale,
+  requestedRevision: number,
+  currentRevision: number
+) {
+  return businessError({
+    currentRevision,
+    fieldPath: "expectedRevision",
+    message: agenticMessage(locale, "mcp.errors.revision_conflict"),
+    nextAction: "reload_plan",
+    nextActions: ["reload_plan"],
+    reasonCode: "revision_conflict",
+    requestedRevision,
+    retryable: true
+  });
+}
+
+function isExecuteSuccess(value: unknown): value is ExecuteSuccess {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      (value as { ok?: unknown }).ok === true &&
+      typeof (value as { orderHandle?: unknown }).orderHandle === "string"
+  );
 }
 
 export type ExecuteSuccess = Readonly<{
@@ -75,11 +121,18 @@ async function withLiveOrderState(input: Readonly<{
     return input.stored;
   }
 
-  const order = await input.store.getOrder(capability.resourceId);
+  const loaded = await input.store.getOrder(capability.resourceId);
 
-  if (!order) {
+  if (!loaded) {
     return input.stored;
   }
+
+  const order =
+    (await expireCheckoutIfDue({
+      now: input.now,
+      order: loaded,
+      store: input.store
+    })) ?? loaded;
 
   return {
     ...input.stored,
@@ -129,6 +182,27 @@ export async function executeTool(input: Readonly<{
     });
   }
 
+  return enqueueExecute(
+    input.store,
+    `${ownerScope}:${input.planHandle}:${input.expectedRevision}`,
+    () => executeFresh(input, ownerScope, payload)
+  );
+}
+
+async function executeFresh(
+  input: Readonly<{
+    config: AgenticConfig;
+    expectedRevision: number;
+    idempotencyKey: string;
+    now: string;
+    payment: PaymentPort;
+    planHandle: string;
+    scope: CapabilityScope;
+    store: AgenticStore;
+  }>,
+  ownerScope: string,
+  payload: Readonly<{ expectedRevision: number; planHandle: string }>
+) {
   const peeked = await resolveCapability({
     action: "plan.execute",
     config: input.config,
@@ -150,7 +224,7 @@ export async function executeTool(input: Readonly<{
   }
 
   if (peekedPlan.currentRevision !== input.expectedRevision) {
-    return executeError("en", "revision_conflict", "expectedRevision");
+    return revisionConflict("en", input.expectedRevision, peekedPlan.currentRevision);
   }
 
   const peekedRevision = await input.store.getPlanRevision(
@@ -190,7 +264,7 @@ export async function executeTool(input: Readonly<{
     }
 
     if (plan.currentRevision !== input.expectedRevision) {
-      return executeError("en", "revision_conflict", "expectedRevision");
+      return revisionConflict("en", input.expectedRevision, plan.currentRevision);
     }
 
     const revision = await store.getPlanRevision(plan.id, plan.currentRevision);
@@ -224,7 +298,29 @@ export async function executeTool(input: Readonly<{
     );
 
     if (existingOrder) {
-      return executeError(locale, "revision_conflict", "expectedRevision");
+      const stored = await store.getExecuteResponseForOrder(existingOrder.id);
+      if (!isExecuteSuccess(stored)) {
+        return executeError(locale, "not_found");
+      }
+      const recovered = await withLiveOrderState({
+        config: input.config,
+        now: input.now,
+        scope: input.scope,
+        store,
+        stored
+      });
+
+      await commitIdempotency({
+        key: input.idempotencyKey,
+        now: input.now,
+        operation: "execute",
+        ownerScope,
+        payload,
+        resourceIds: { orderId: existingOrder.id },
+        response: recovered,
+        store
+      });
+      return recovered;
     }
 
     const payable = payableSnapshot({
@@ -232,7 +328,7 @@ export async function executeTool(input: Readonly<{
       subtotalMinor: selected.totalPriceMinor,
       taxMinor: DEFAULT_TAX_MINOR
     });
-    const orderId = randomUUID();
+    const orderId = nextTestUuid();
     const reference = humanOrderReference(orderId);
     const checkoutIssued = await issueCapability({
       allowedActions: ["checkout.pay"],
@@ -256,13 +352,22 @@ export async function executeTool(input: Readonly<{
       environment: input.scope.environment,
       expiredAt: null,
       frozenPlan: {
+        catalogueVersion: snapshot.catalogueVersion,
+        countryCode: result.requestSnapshot.destinationCountry || ACTIVE_MARKET_COUNTRY,
         coveragePercent: selected.coveragePercent,
         currency: result.requestSnapshot.currency,
         dailyPills: selected.dailyPills,
         items: publicFrozenItems(selected.basket),
+        market: {
+          countryCode: result.requestSnapshot.destinationCountry || ACTIVE_MARKET_COUNTRY,
+          retailerId: ACTIVE_RETAILER_ID,
+          retailerName: ACTIVE_RETAILER_NAME
+        },
         planRevision: plan.currentRevision,
         safetyGuidanceIds: result.safetyGuidance.map((item) => item.guidanceId),
+        selectedOptionId: selected.optionId,
         shippingMinor: payable.shippingMinor,
+        snapshotId: selected.snapshotId,
         subtotalMinor: payable.subtotalMinor,
         taxMinor: payable.taxMinor,
         totalPriceMinor: payable.totalPriceMinor
@@ -290,7 +395,7 @@ export async function executeTool(input: Readonly<{
         currency: item.currency || result.requestSnapshot.currency,
         dailyPills: item.dailyPills,
         form: item.form,
-        id: randomUUID(),
+        id: nextTestUuid(),
         lineTotalMinor: item.lineTotalMinor,
         orderId,
         productId: item.productId,
@@ -322,7 +427,7 @@ export async function executeTool(input: Readonly<{
       createdAt: input.now,
       encryptedAddress: null,
       expiresAt: session.expiresAt,
-      id: randomUUID(),
+      id: nextTestUuid(),
       orderId,
       providerSessionId: session.providerSessionId,
       shippingMinor: payable.shippingMinor,

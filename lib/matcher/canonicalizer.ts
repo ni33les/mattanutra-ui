@@ -18,7 +18,7 @@ export function canonicalizeTargets(input: Readonly<{
     subjectId: string;
     unit: MatcherUnit;
   }>[];
-}>): { leftovers: MatcherLeftover[]; targets: CanonicalTarget[] } | { error: string; reason: "unsupported_unit" } {
+}>): { leftovers: MatcherLeftover[]; targets: CanonicalTarget[] } {
   const targets: CanonicalTarget[] = [];
   const leftovers: MatcherLeftover[] = [...(input.leftovers ?? [])];
 
@@ -31,11 +31,15 @@ export function canonicalizeTargets(input: Readonly<{
     });
 
     if (isDoseError(requested)) {
-      if (requested.reason === "unsupported_unit") {
-        return { error: requested.message, reason: "unsupported_unit" };
-      }
-
-      return { error: requested.message, reason: "unsupported_unit" };
+      leftovers.push({
+        amount: target.amount,
+        name: target.name,
+        reason: "unsupported_unit_conversion",
+        severity: "high",
+        subjectId: target.subjectId,
+        unit: target.unit
+      });
+      continue;
     }
 
     targets.push({

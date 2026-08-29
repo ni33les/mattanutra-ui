@@ -65,10 +65,6 @@ export function toCanonicalRequest(
     }))
   });
 
-  if ("error" in targets) {
-    return targets;
-  }
-
   const currentRows = [...state.currentSupplements].sort(
     (left, right) =>
       left.supplementId.localeCompare(right.supplementId) ||
@@ -595,7 +591,20 @@ export function leftoversFor(
     return leftovers;
   }
 
+  const requestedIds = new Set(state.targets.map((item) => item.supplementId));
+  const requestedNames = new Set(state.targets.map((item) => item.name.trim().toLowerCase()));
+  const accepted = new Set(state.acceptedGaps.map((item) => item.supplementId));
+
   for (const row of selected.coverage) {
+    if (accepted.has(row.supplementId)) {
+      continue;
+    }
+    if (
+      !requestedIds.has(row.supplementId) &&
+      !requestedNames.has(row.name.trim().toLowerCase())
+    ) {
+      continue;
+    }
     if (row.status === "uncovered") {
       if (row.deliveredAmount > 0) {
         push({
@@ -804,7 +813,37 @@ export function matchPlan(input: Readonly<{
   const alternatives = result.alternatives.map((item) =>
     toStackOption(input.state, snapshot, item)
   );
-  const leftovers = leftoversFor(input.state, selected, alternatives[0] ?? null);
+  const leftovers = [...leftoversFor(input.state, selected, alternatives[0] ?? null)];
+  const seen = new Set(leftovers.map((item) => `${item.reason}:${item.name}`));
+  for (const item of request.leftovers) {
+    if (!item.unit) {
+      continue;
+    }
+    const mapped = {
+      amount: item.amount,
+      name: item.name,
+      reason: item.reason,
+      severity: item.severity,
+      supplementId: item.subjectId,
+      unit: item.unit
+    };
+    const existing = leftovers.findIndex(
+      (row) =>
+        (item.subjectId && row.supplementId === item.subjectId) ||
+        row.name === item.name
+    );
+    if (item.reason === "unsupported_unit_conversion" && existing >= 0) {
+      leftovers[existing] = mapped;
+      seen.add(`${mapped.reason}:${mapped.name}`);
+      continue;
+    }
+    const key = `${item.reason}:${item.name}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    leftovers.push(mapped);
+  }
 
   return {
     alternatives,

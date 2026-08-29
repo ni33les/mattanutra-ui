@@ -248,6 +248,7 @@ for (const scriptName of [
   "communications:schema:apply",
   "panya:schema:apply",
   "payments:schema:apply",
+  "agentic:schema:apply",
   "retail-checkout:schema:apply",
   "retail-financials:schema:apply",
   "retail-stock:schema:apply",

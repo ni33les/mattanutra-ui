@@ -123,7 +123,12 @@ export type MatcherLeftover = Readonly<{
   amount?: number;
   name: string;
   note?: string;
-  reason: "dose_gap" | "not_in_catalogue" | "uncovered" | "weaker_sku";
+  reason:
+    | "dose_gap"
+    | "not_in_catalogue"
+    | "uncovered"
+    | "unsupported_unit_conversion"
+    | "weaker_sku";
   severity: "high" | "low" | "medium";
   subjectId?: string;
   unit?: MatcherUnit;

@@ -6,8 +6,10 @@ import {
   AGENTIC_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_DESCRIPTIONS,
   AGENTIC_UAT_SERVER_INSTRUCTIONS,
+  AGENTIC_INPUT_SCHEMAS,
   AGENTIC_TOOL_SCHEMAS,
   PLAN_ADVERTISED_SCHEMA,
+  PLAN_INPUT_SCHEMA,
   validateToolInput
 } from "../lib/agentic/contract/index.ts";
 import {
@@ -34,7 +36,9 @@ describe("agentic MCP contract 3.0.0", () => {
     ]);
     assert.equal(Object.keys(AGENTIC_TOOL_SCHEMAS).length, 6);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("sexAtBirth"), false);
-    assert.match(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan), /"sex"/);
+    assert.match(JSON.stringify(PLAN_INPUT_SCHEMA), /"sex"/);
+    assert.equal(/"oneOf"/.test(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan)), false);
+    assert.equal(/\$defs/.test(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan)), false);
     assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 6);
   });
 
@@ -55,9 +59,7 @@ describe("agentic MCP contract 3.0.0", () => {
     for (const tool of snapshot.tools) {
       assert.deepEqual(
         tool.inputSchema,
-        tool.name === "plan"
-          ? PLAN_ADVERTISED_SCHEMA
-          : AGENTIC_TOOL_SCHEMAS[tool.name as keyof typeof AGENTIC_TOOL_SCHEMAS]
+        AGENTIC_TOOL_SCHEMAS[tool.name as keyof typeof AGENTIC_TOOL_SCHEMAS]
       );
       assert.equal(
         tool.description,
@@ -193,7 +195,7 @@ describe("agentic MCP contract 3.0.0", () => {
     }
   });
 
-  it("tools/list returns the six schemas with additionalProperties false", async () => {
+  it("tools/list advertises shallow commercial envelopes", async () => {
     const runtime = createAgenticRuntime();
     const response = await handleJsonRpc(runtime, {
       id: 2,
@@ -207,13 +209,13 @@ describe("agentic MCP contract 3.0.0", () => {
 
     for (const tool of tools) {
       const schema = JSON.stringify(tool.inputSchema);
-      if (tool.name === "plan") {
-        assert.match(schema, /"additionalProperties":true/);
-        assert.equal(/"oneOf"/.test(schema), false);
-        assert.equal(/\$defs/.test(schema), false);
+      if (tool.name === "info") {
+        assert.match(schema, /"additionalProperties":false/);
         continue;
       }
-      assert.match(schema, /"additionalProperties":false/);
+      assert.match(schema, /"additionalProperties":true/);
+      assert.equal(/"oneOf"/.test(schema), false);
+      assert.equal(/\$defs/.test(schema), false);
     }
   });
 
@@ -237,7 +239,7 @@ describe("agentic MCP contract 3.0.0", () => {
     ];
 
     for (const [name, payload] of samples) {
-      const issue = validateToolInput(AGENTIC_TOOL_SCHEMAS[name], payload);
+      const issue = validateToolInput(AGENTIC_INPUT_SCHEMAS[name], payload);
       assert.equal(issue?.reasonCode, "unexpected_property", name);
     }
   });

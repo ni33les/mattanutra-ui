@@ -65,7 +65,9 @@ export type OrderRecord = Readonly<{
   fulfilmentStatus:
     | "cancelled"
     | "delivered"
+    | "exception"
     | "not_started"
+    | "packed"
     | "processing"
     | "shipped";
   id: string;
@@ -236,6 +238,7 @@ export type AgenticStore = {
   insertCheckout(record: CheckoutSessionRecord): Promise<void>;
   insertFeedback(record: FeedbackRecord): Promise<void>;
   insertFulfilmentEvent(record: FulfilmentEventRecord): Promise<void>;
+  listFulfilmentEvents(orderId: string): Promise<readonly FulfilmentEventRecord[]>;
   insertIdempotency(record: IdempotencyRecord): Promise<void>;
   insertOrder(record: OrderRecord): Promise<void>;
   insertOrderItems(items: readonly OrderItemRecord[]): Promise<void>;

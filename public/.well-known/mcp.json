@@ -1,0 +1,154 @@
+{
+  "contractVersion": "3.0.0",
+  "name": "mattanutra_dev",
+  "tools": [
+    {
+      "description": "Check where MattaNutra can deliver, which locales it supports, and which medication and condition codes it can assess before you plan a stack. This does not create a plan or start a purchase.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "locale": {
+            "description": "Optional BCP 47 response locale.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "info"
+    },
+    {
+      "description": "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
+      "inputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "answers": {
+            "type": "array"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "answer",
+              "create",
+              "get",
+              "revise",
+              "select"
+            ],
+            "type": "string"
+          },
+          "optionId": {
+            "type": "string"
+          },
+          "planHandle": {
+            "type": "string"
+          },
+          "request": {
+            "type": "object"
+          },
+          "safetyAcknowledgement": {
+            "type": "object"
+          },
+          "selectOptionId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "plan"
+    },
+    {
+      "description": "After the person confirms one ready plan, create a single MattaNutra checkout for that revision. Send the plan handle, expected revision, and a stable idempotency key. Do not call this for a plan that still needs answers.",
+      "inputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "planHandle": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "execute"
+    },
+    {
+      "description": "Read payment and fulfilment for an existing checkout using only the order handle. Poll no faster than pollAfterSeconds until the order is completed, cancelled, or expired.",
+      "inputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "orderHandle": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "order"
+    },
+    {
+      "description": "Create or reply to a help case for an existing order. Omit supportHandle to open a case; include it to reply.",
+      "inputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "orderHandle": {
+            "type": "string"
+          },
+          "supportHandle": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "support"
+    },
+    {
+      "description": "Submit optional consented improvement notes for one plan revision. This never changes a plan or checkout. Require consentConfirmed=true.",
+      "inputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "consentConfirmed": {
+            "type": "boolean"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "optionId": {
+            "type": "string"
+          },
+          "planHandle": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array"
+          },
+          "rating": {
+            "type": "integer"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "feedback"
+    }
+  ],
+  "transport": "streamable-http",
+  "url": "https://dev.mattanutra.com/api/mcp"
+}

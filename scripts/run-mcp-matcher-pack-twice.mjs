@@ -46,6 +46,8 @@ if (!process.execArgv.includes(strip)) {
             copy: a.copy.passedCases,
             state: a.state.passedCases,
             boundary: a.boundary.passedCases,
+            evidence: a.evidence.passedCases,
+            commercial: a.commercial.passedCases,
             matcher: a.matcher.scores
           },
           b: {
@@ -56,6 +58,8 @@ if (!process.execArgv.includes(strip)) {
             copy: b.copy.passedCases,
             state: b.state.passedCases,
             boundary: b.boundary.passedCases,
+            evidence: b.evidence.passedCases,
+            commercial: b.commercial.passedCases,
             matcher: b.matcher.scores
           }
         },
@@ -67,11 +71,11 @@ if (!process.execArgv.includes(strip)) {
   }
 
   const totals = printTable(a);
-  if (totals.packPass && !existsSync(BASELINE_PATH)) {
+  if (totals.packPass && !existsSync(BASELINE_PATH) && process.env.WRITE_MATCHER_BASELINE === "1") {
     writeBaseline(a);
     console.log(`Baseline: wrote ${BASELINE_PATH}`);
-  } else if (!totals.packPass && !existsSync(BASELINE_PATH)) {
-    console.log("Baseline: not written (pack not green)");
+  } else if (!existsSync(BASELINE_PATH)) {
+    console.log("Baseline: not written");
   }
 
   process.exit(totals.packPass ? 0 : 1);

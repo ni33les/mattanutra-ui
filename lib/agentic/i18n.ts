@@ -319,6 +319,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "คำสั่งซื้อหมดอายุก่อนชำระเงิน",
     "zh-CN": "该订单在付款前已过期。"
   },
+  "order.fulfilment_exception": {
+    en: "There is a delivery problem. Contact support for the next step.",
+    th: "มีปัญหาการจัดส่ง กรุณาติดต่อฝ่ายสนับสนุน",
+    "zh-CN": "配送出现问题，请联系支持以获取下一步。"
+  },
   "order.refunded": {
     en: "This order was refunded.",
     th: "คำสั่งซื้อนี้ได้รับการคืนเงินแล้ว",
@@ -328,6 +333,26 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     en: "Accept this uncovered target and continue?",
     th: "ยอมรับเป้าหมายที่ยังไม่ครบแล้วไปต่อหรือไม่",
     "zh-CN": "是否接受该未覆盖目标并继续？"
+  },
+  "plan.question.accept_gap_named": {
+    en: "Accept remaining {name} gap",
+    th: "ยอมรับส่วนที่ยังขาดของ {name}",
+    "zh-CN": "接受剩余的 {name} 缺口"
+  },
+  "plan.question.remove_target_named": {
+    en: "Remove {name} from the request",
+    th: "ลบ {name} ออกจากคำขอ",
+    "zh-CN": "从请求中移除 {name}"
+  },
+  "plan.question.unresolved_targets": {
+    en: "Review remaining gaps for {names}.",
+    th: "ตรวจทานส่วนที่ยังไม่ครบสำหรับ {names}",
+    "zh-CN": "请复查 {names} 的剩余缺口。"
+  },
+  "plan.selection.in_selected_stack": {
+    en: "This product is in the selected stack.",
+    th: "สินค้านี้เป็นส่วนหนึ่งของสูตรที่เลือก",
+    "zh-CN": "该产品在已选组合中。"
   },
   "plan.question.algae_only": {
     en: "Search algae-only Omega-3 sources?",

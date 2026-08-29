@@ -36,6 +36,7 @@ import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
+import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import type {
   CanonicalPlanState,
   PlanAnswer,
@@ -211,9 +212,8 @@ function composeResult(input: Readonly<{
   const summary = tooBroad
     ? agenticMessage(input.locale, "plan.summary.request_too_broad")
     : agenticMessage(input.locale, `plan.summary.${status}`);
-  const suggestedGroups = tooBroad
-    ? targetNameGroups(input.state.targets, 10)
-    : undefined;
+  const split = tooBroad ? targetNameGroups(input.state.targets, 10) : undefined;
+  const suggestedGroups = split?.groups;
   const changeSummary: string[] = [];
   const pinnedState = workState;
 
@@ -275,6 +275,13 @@ function composeResult(input: Readonly<{
       ]
     },
     questions,
+    ...(questions.find((item) => item.targets && item.targets.length > 0)?.targets
+      ? {
+          gapReview: {
+            targets: questions.find((item) => item.targets && item.targets.length > 0)!.targets!
+          }
+        }
+      : {}),
     requestSnapshot: pinnedState,
     safetyGuidance: [...safety],
     selected: input.selected,
@@ -286,7 +293,10 @@ function composeResult(input: Readonly<{
           breadth: {
             maxTargetsPerRequest: 10,
             reasonCode: "request_too_broad" as const,
-            suggestedGroups
+            suggestedGroups,
+            ...(split?.unsupported.length
+              ? { unsupportedTargets: split.unsupported }
+              : {})
           }
         }
       : {})
@@ -297,23 +307,40 @@ function targetNameGroups(
   targets: CanonicalPlanState["targets"],
   size: number
 ) {
+  const feasible: Array<{ amount: number; name: string; unit: string }> = [];
+  const unsupported: Array<{
+    amount: number;
+    name: string;
+    reason: "unsupported_unit_conversion";
+    unit: string;
+  }> = [];
+  for (const item of targets) {
+    const name = item.requestedName ?? item.name;
+    const row = { amount: item.amount, name, unit: item.unit };
+    const scaled = scaleAmount({
+      amount: item.amount,
+      subjectId: item.supplementId,
+      subjectName: name,
+      unit: item.unit
+    });
+    if (isDoseError(scaled)) {
+      unsupported.push({ ...row, reason: "unsupported_unit_conversion" });
+      continue;
+    }
+    feasible.push(row);
+  }
   const groups: Array<{
     names: string[];
     targets: Array<{ amount: number; name: string; unit: string }>;
   }> = [];
-  for (let index = 0; index < targets.length; index += size) {
-    const slice = targets.slice(index, index + size);
-    const executable = slice.map((item) => ({
-      amount: item.amount,
-      name: item.requestedName ?? item.name,
-      unit: item.unit
-    }));
+  for (let index = 0; index < feasible.length; index += size) {
+    const slice = feasible.slice(index, index + size);
     groups.push({
-      names: executable.map((item) => item.name),
-      targets: executable
+      names: slice.map((item) => item.name),
+      targets: slice
     });
   }
-  return groups;
+  return { groups, unsupported };
 }
 
 function buildResult(input: Readonly<{

@@ -63,27 +63,18 @@
     {
       "description": "After the person confirms one ready plan, create a single MattaNutra checkout for that revision. Send the plan handle, expected revision, and a stable idempotency key. Do not call this for a plan that still needs answers.",
       "inputSchema": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "expectedRevision": {
-            "minimum": 1,
             "type": "integer"
           },
           "idempotencyKey": {
-            "maxLength": 128,
-            "minLength": 16,
             "type": "string"
           },
           "planHandle": {
-            "minLength": 32,
             "type": "string"
           }
         },
-        "required": [
-          "planHandle",
-          "expectedRevision",
-          "idempotencyKey"
-        ],
         "type": "object"
       },
       "name": "execute"
@@ -91,16 +82,12 @@
     {
       "description": "Read payment and fulfilment for an existing checkout using only the order handle. Poll no faster than pollAfterSeconds until the order is completed, cancelled, or expired.",
       "inputSchema": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "orderHandle": {
-            "minLength": 32,
             "type": "string"
           }
         },
-        "required": [
-          "orderHandle"
-        ],
         "type": "object"
       },
       "name": "order"
@@ -108,32 +95,21 @@
     {
       "description": "Create or reply to a help case for an existing order. Omit supportHandle to open a case; include it to reply.",
       "inputSchema": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "idempotencyKey": {
-            "maxLength": 128,
-            "minLength": 16,
             "type": "string"
           },
           "message": {
-            "maxLength": 4000,
-            "minLength": 1,
             "type": "string"
           },
           "orderHandle": {
-            "minLength": 32,
             "type": "string"
           },
           "supportHandle": {
-            "minLength": 32,
             "type": "string"
           }
         },
-        "required": [
-          "orderHandle",
-          "idempotencyKey",
-          "message"
-        ],
         "type": "object"
       },
       "name": "support"
@@ -141,55 +117,33 @@
     {
       "description": "Submit optional consented improvement notes for one plan revision. This never changes a plan or checkout. Require consentConfirmed=true.",
       "inputSchema": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "consentConfirmed": {
-            "const": true
+            "type": "boolean"
           },
           "expectedRevision": {
-            "minimum": 1,
             "type": "integer"
           },
           "idempotencyKey": {
-            "maxLength": 128,
-            "minLength": 16,
             "type": "string"
           },
           "optionId": {
-            "minLength": 8,
             "type": "string"
           },
           "planHandle": {
-            "minLength": 32,
             "type": "string"
           },
           "points": {
-            "items": {
-              "maxLength": 240,
-              "minLength": 1,
-              "type": "string"
-            },
-            "maxItems": 8,
-            "type": "array",
-            "uniqueItems": true
+            "type": "array"
           },
           "rating": {
-            "maximum": 5,
-            "minimum": 1,
             "type": "integer"
           },
           "summary": {
-            "maxLength": 1000,
-            "minLength": 1,
             "type": "string"
           }
         },
-        "required": [
-          "idempotencyKey",
-          "planHandle",
-          "expectedRevision",
-          "consentConfirmed"
-        ],
         "type": "object"
       },
       "name": "feedback"
