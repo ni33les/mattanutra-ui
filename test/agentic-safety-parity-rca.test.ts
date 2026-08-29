@@ -155,20 +155,32 @@ afterEach(() => {
 });
 
 describe("RCA safety-parity — Magnesium catalogue bands", () => {
-  it("RCA-02: UAT deploy applies the same safety-limit-bands schema as DEV", () => {
+  it("RCA-02: MCP, admin writes, and deploy use supplement_safety_limits, not bands", () => {
+    const load = readFileSync(
+      new URL("../lib/agentic/catalogue/load-safety-ceilings.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(load, /from public\.supplement_safety_limits/);
+    assert.doesNotMatch(load, /supplement_safety_limit_bands/);
+
+    const versions = readFileSync(
+      new URL("../lib/supplement-safety-limit-versions.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(versions, /insert into public\.supplement_safety_limits/);
+    assert.doesNotMatch(versions, /supplement_safety_limit_bands/);
+    assert.doesNotMatch(versions, /appendSupplementSafetyLimitBandVersion/);
+
     const dev = readFileSync(new URL("../scripts/deploy-dev.mjs", import.meta.url), "utf8");
     const uat = readFileSync(new URL("../scripts/deploy-uat.mjs", import.meta.url), "utf8");
     const prd = readFileSync(new URL("../scripts/deploy-prd.mjs", import.meta.url), "utf8");
-    assert.match(dev, /supplements:safety-limit-bands:schema:apply/);
-    assert.match(uat, /supplements:safety-limit-bands:schema:apply/);
-    assert.match(prd, /supplements:safety-limit-bands:schema:apply/);
-    assert.match(
-      readFileSync(
-        new URL("../lib/agentic/catalogue/load-safety-ceilings.ts", import.meta.url),
-        "utf8"
-      ),
-      /supplement_safety_limit_bands/
-    );
+    assert.doesNotMatch(dev, /supplements:safety-limit-bands:schema:apply/);
+    assert.doesNotMatch(uat, /supplements:safety-limit-bands:schema:apply/);
+    assert.doesNotMatch(prd, /supplements:safety-limit-bands:schema:apply/);
+
+    const smoke = readFileSync(new URL("../scripts/uat-smoke.mjs", import.meta.url), "utf8");
+    assert.match(smoke, /"supplement_safety_limits"/);
+    assert.doesNotMatch(smoke, /supplement_safety_limit_bands/);
   });
 
   it("RCA-07: Magnesium 351 mg with the adult 350 mg band is blocked", () => {

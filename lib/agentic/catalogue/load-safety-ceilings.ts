@@ -81,33 +81,27 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
       Array<{
         band_id: string;
         band_version: string | number;
-        life_stage: string | null;
         max_amount: string | number | null;
         max_unit: string;
         name: string;
-        source_scope: string | null;
         supplement_id: string;
       }>
     >`
-      select distinct on (supplements.id, bands.life_stage, bands.source_scope)
-        bands.id::text as band_id,
-        bands.version as band_version,
+      select distinct on (supplements.id)
+        limits.id::text as band_id,
+        limits.version as band_version,
         supplements.id::text as supplement_id,
         supplements.name,
-        bands.life_stage,
-        bands.max_amount,
-        bands.max_unit,
-        bands.source_scope
-      from public.supplement_safety_limit_bands bands
+        limits.max_amount,
+        limits.max_unit
+      from public.supplement_safety_limits limits
       join public.supplements supplements
-        on supplements.id = bands.supplement_id
-      where bands.max_amount is not null
-        and bands.max_amount > 0
+        on supplements.id = limits.supplement_id
+      where limits.max_amount is not null
+        and limits.max_amount > 0
       order by
         supplements.id,
-        bands.life_stage,
-        bands.source_scope,
-        bands.version desc
+        limits.version desc
     `;
 
     const ceilings: SafetyCeiling[] = [];
@@ -115,8 +109,8 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
     for (const row of rows) {
       const amount = Number(row.max_amount);
       const unit = asMatcherUnit(row.max_unit);
-      const lifeStage = asLifeStage(row.life_stage);
-      const sourceScope = asSourceScope(row.source_scope);
+      const lifeStage = asLifeStage(null);
+      const sourceScope = asSourceScope(null);
 
       if (
         !Number.isFinite(amount) ||

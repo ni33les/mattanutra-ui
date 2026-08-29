@@ -4,7 +4,6 @@ import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
 const serviceName = "mattanutra-ui-dev.service";
 const schemaScripts = [
   "supplements:country-availability:schema:apply",
-  "supplements:safety-limit-bands:schema:apply",
   "products:soft-delete:schema:apply",
   "products:v9:schema:apply",
   "product-coverage:demand-cache:schema:apply",
@@ -81,8 +80,6 @@ async function applyOrVerifyRuntimeSchema() {
     if (process.env.DB_URL) {
       console.log("[deploy:dev] Applying agentic schema via DB_URL...");
       await run(npmCommand, ["run", "agentic:schema:apply"]);
-      console.log("[deploy:dev] Applying supplement safety limit bands via DB_URL...");
-      await run(npmCommand, ["run", "supplements:safety-limit-bands:schema:apply"]);
     }
     return;
   }

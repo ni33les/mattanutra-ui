@@ -24,7 +24,6 @@ const forwardSchemaScripts = [
   "product-regulatory:schema:apply",
   "product-coverage:demand-cache:schema:apply",
   "supplements:country-availability:schema:apply",
-  "supplements:safety-limit-bands:schema:apply",
   "assessment:schema:apply",
   "foods:schema:apply",
   "recommendation-insights:schema:apply",
