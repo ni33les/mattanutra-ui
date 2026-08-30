@@ -204,13 +204,15 @@ export default async function BasketCheckoutPage({
         title={dictionary.hero.eyebrow}
       />
       <section className="mx-auto w-full max-w-5xl flex-1 px-6 py-12 sm:px-8 lg:py-16">
-        <Link
-          className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[var(--mn-teal-deep)]"
-          href={nutritionRevealPath(locale, planId)}
-        >
-          <ArrowLeft aria-hidden className="size-4" />
-          {labels.back}
-        </Link>
+        {checkoutMode === "agentic" ? null : (
+          <Link
+            className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[var(--mn-teal-deep)]"
+            href={nutritionRevealPath(locale, planId)}
+          >
+            <ArrowLeft aria-hidden className="size-4" />
+            {labels.back}
+          </Link>
+        )}
         <div className="mb-8 max-w-3xl">
           <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
             {labels.eyebrow}

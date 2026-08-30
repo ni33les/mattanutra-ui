@@ -415,7 +415,7 @@ export function ProductBasketCheckoutPanel({
     return {
       address,
       addressLine2Visible: false,
-      agentAuthorized: false,
+      agentAuthorized: checkoutMode === "agentic",
       billingAddress: emptyBillingAddress(address),
       billingAddressLine2Visible: false,
       billingSameAsShipping: true,
@@ -469,8 +469,7 @@ export function ProductBasketCheckoutPanel({
   const formIsValid =
     Object.keys(shippingErrors).length === 0 &&
     Object.keys(billingErrors).length === 0 &&
-    selectedItemIds.length > 0 &&
-    (checkoutMode !== "agentic" || checkout.agentAuthorized);
+    selectedItemIds.length > 0;
   const subtotal = quotePreview?.subtotalAmount ?? 0;
   const shippingAmount = quotePreview?.shippingAmount ?? 0;
   const currency = quotePreview?.currency || "THB";
@@ -666,11 +665,6 @@ export function ProductBasketCheckoutPanel({
       return null;
     }
 
-    if (checkoutMode === "agentic" && !checkout.agentAuthorized) {
-      setError(labels.agentAuthorizedRequired);
-      return null;
-    }
-
     const activeQuotePreview = quotePreview ?? (await previewQuote());
 
     if (!activeQuotePreview?.canCheckout) {
@@ -697,7 +691,7 @@ export function ProductBasketCheckoutPanel({
       const response = await fetch("/api/retail/checkout/session", {
         body: JSON.stringify({
           address: checkout.address,
-          agentAuthorized: checkout.agentAuthorized,
+          agentAuthorized: checkoutMode === "agentic" ? true : checkout.agentAuthorized,
           agenticOrderId,
           billingAddress: checkout.billingSameAsShipping
             ? checkout.address
@@ -752,12 +746,10 @@ export function ProductBasketCheckoutPanel({
   }, [
     agenticOrderId,
     checkout.address,
-    checkout.agentAuthorized,
     checkout.billingAddress,
     checkout.billingSameAsShipping,
     checkoutMode,
     frozenLines,
-    labels.agentAuthorizedRequired,
     labels.cannotDeliver,
     labels.error,
     labels.unavailableBody,
@@ -1149,21 +1141,7 @@ export function ProductBasketCheckoutPanel({
             ) : null}
 
             {checkoutMode === "agentic" ? (
-              <label className="mt-4 flex items-start gap-3 rounded-xl bg-white p-3 text-sm font-semibold text-[var(--mn-ink)] ring-1 ring-[var(--mn-line)]">
-                <input
-                  checked={checkout.agentAuthorized}
-                  className="mt-1 size-4 accent-[var(--mn-teal-deep)]"
-                  name="agentAuthorized"
-                  onChange={(event) =>
-                    setCheckout((current) => ({
-                      ...current,
-                      agentAuthorized: event.target.checked
-                    }))
-                  }
-                  type="checkbox"
-                />
-                {labels.agentAuthorized}
-              </label>
+              <input name="agentAuthorized" type="hidden" value="true" />
             ) : null}
 
             {error ? (

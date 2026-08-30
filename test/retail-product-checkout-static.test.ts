@@ -197,13 +197,17 @@ describe("retail product checkout static contracts", () => {
     assert.match(checkoutService, /sendRetailOrderWorkflowEmail/);
     assert.match(sessionApi, /mode === "agentic"/);
     assert.match(checkoutPage, /mode === "agentic"/);
+    assert.match(checkoutPage, /checkoutMode === "agentic" \? null/);
     assert.doesNotMatch(checkoutPage, /AgenticCheckoutPanel/);
     assert.match(checkoutPage, /ProductBasketCheckoutPanel/);
     assert.match(checkoutPage, /mockPayment=\{stripePaymentConfig\(\)\.mode === "mock"\}/);
     assert.match(checkoutPanel, /name="scenario"/);
     assert.match(checkoutPanel, /decline_insufficient_funds/);
     assert.match(checkoutPanel, /runMockPayment/);
-    assert.match(checkoutPanel, /agentAuthorized/);
+    assert.match(
+      checkoutPanel,
+      /<input name="agentAuthorized" type="hidden" value="true" \/>/
+    );
     assert.match(checkoutPanel, /mode: checkoutMode/);
     assert.match(checkoutService, /projectRetailPaidOntoAgenticOrder/);
     assert.match(execute, /\/basket\/checkout\?mode=agentic/);
