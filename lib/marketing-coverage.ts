@@ -1,4 +1,4 @@
-export const FORMULA_NEED_COVERED_PERCENT = 90;
+export const FORMULA_NEED_COVERED_PERCENT = 0;
 
 type NeedCoverageRow = Readonly<{
   coveragePercent: number;
@@ -25,7 +25,7 @@ export function formulaNeedCount(needs: readonly NeedCoverageRow[]) {
 
 export function coveredFormulaNeedCount(needs: readonly NeedCoverageRow[]) {
   return formulaNeedRows(needs).filter(
-    (need) => boundedNeedPercent(need.coveragePercent) >= FORMULA_NEED_COVERED_PERCENT
+    (need) => boundedNeedPercent(need.coveragePercent) > FORMULA_NEED_COVERED_PERCENT
   ).length;
 }
 

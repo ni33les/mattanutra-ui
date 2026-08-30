@@ -80,7 +80,7 @@ describe("marketing coverage is unweighted", () => {
     );
   });
 
-  it("matches the live reveal table: equal average 82%, and 2% B12 is not covered", () => {
+  it("matches the live reveal table: equal average 82%, and any positive coverage counts", () => {
     const needs = [
       { coveragePercent: 60, itemType: "supplement" },
       { coveragePercent: 100, itemType: "supplement" },
@@ -96,6 +96,6 @@ describe("marketing coverage is unweighted", () => {
 
     assert.equal(formulaNeedCount(needs), 10);
     assert.equal(marketingCoveragePercentFromNeedCoverage(needs), 82);
-    assert.equal(coveredFormulaNeedCount(needs), 6);
+    assert.equal(coveredFormulaNeedCount(needs), 10);
   });
 });

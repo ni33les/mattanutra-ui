@@ -322,7 +322,7 @@ describe("selected stack coverage marketing percent", () => {
     assert.equal(percent, 75);
   });
 
-  it("does not count a 2% nutrient as covered", () => {
+  it("counts any positive coverage as covered", () => {
     assert.equal(
       coveredFormulaNeedCount([
         { coveragePercent: 60, itemType: "supplement" },
@@ -336,7 +336,14 @@ describe("selected stack coverage marketing percent", () => {
         { coveragePercent: 100, itemType: "supplement" },
         { coveragePercent: 100, itemType: "supplement" },
       ]),
-      6,
+      10,
+    );
+    assert.equal(
+      coveredFormulaNeedCount([
+        { coveragePercent: 0, itemType: "supplement" },
+        { coveragePercent: 100, itemType: "supplement" },
+      ]),
+      1,
     );
   });
 });
