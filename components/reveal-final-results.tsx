@@ -34,6 +34,7 @@ import {
   visibleSupplementRecommendationCount,
 } from "@/components/formulation-support-helpers";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
+import { formatCurrencyAmount } from "@/lib/currencies";
 import {
   formatTemplate,
   getLocalizedText,
@@ -1699,6 +1700,23 @@ function RevealProductsFinalSection({
                         supplementLabelById,
                       })}
                     </p>
+                    {(() => {
+                      const unitPrice =
+                        product.price?.amount ??
+                        product.retailer?.unitPriceAmount ??
+                        null;
+                      const lineCurrency =
+                        product.price?.currency ?? selectedBasketCurrency;
+
+                      return unitPrice != null ? (
+                        <p
+                          className="mt-4 mn-reveal-font-display text-lg font-medium italic text-[var(--mn-teal-deep)]"
+                          data-testid="reveal-product-price"
+                        >
+                          {formatCurrencyAmount(locale, unitPrice, lineCurrency)}
+                        </p>
+                      ) : null;
+                    })()}
                     <button
                       className="product-remove-btn mt-6 w-fit rounded-full border border-[var(--mn-line)] bg-transparent px-3.5 py-1.5 mn-reveal-font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-ink-soft)] transition hover:border-[var(--mn-reveal-caution-edge)] hover:bg-[var(--mn-reveal-caution-bg)] hover:text-[var(--mn-reveal-caution-ink)]"
                       onClick={() => {

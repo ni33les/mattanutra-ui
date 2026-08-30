@@ -313,6 +313,26 @@ describe("HealthScore v4 deterministic scoring", () => {
     const gapText = JSON.stringify(rested.pageContent?.copySeeds.gapTrio ?? []);
     assert.equal(/didn.t have time to recover|recovery is too short/i.test(gapText), false);
     assert.equal(/sedentary|sits low/i.test(gapText), false);
+    assert.equal(/short or broken sleep/i.test(gapText), false);
+    assert.equal(/lever you are not pulling/i.test(gapText), false);
+    assert.equal(/high stress load/i.test(gapText), false);
+  });
+
+  it("does not call excellent sleep, 50km-week activity, or low stress a gap", () => {
+    const result = computeHealthScore(
+      {
+        ...excellentProfile(),
+        activity: "athlete",
+        energy: "excellent",
+        sleepHrs: "8-9",
+        stress: "low"
+      },
+      "en"
+    );
+    const gapText = JSON.stringify(result.pageContent?.copySeeds.gapTrio ?? []);
+    assert.equal(/short or broken sleep/i.test(gapText), false);
+    assert.equal(/lever you are not pulling/i.test(gapText), false);
+    assert.equal(/high stress load/i.test(gapText), false);
   });
 
   it("moves sleep and activity scores when answers move", () => {

@@ -30,6 +30,10 @@ const copyClient = readFileSync(
   new URL("../lib/healthscore-copy-client.ts", import.meta.url),
   "utf8"
 );
+const gate = readFileSync(
+  new URL("../components/nutrition-flow/healthscore-copy-gate.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("HealthScore page waits for real AI copy", () => {
   it("does not write seed templates into aiCopy when Grok fails", () => {
@@ -56,6 +60,8 @@ describe("HealthScore page waits for real AI copy", () => {
       /product_recommendation_runs|formulations/
     );
     assert.match(copyClient, /journey\?view=copy/);
+    assert.match(journeyRead, /hasHealthScoreAiCopy\(row\.health_score\)/);
+    assert.doesNotMatch(journeyRead, /ai_hero_body/);
   });
 
   it("keeps HealthScore HTML off seed prose until copy exists", () => {
@@ -66,5 +72,6 @@ describe("HealthScore page waits for real AI copy", () => {
     assert.doesNotMatch(calculating, /mn-quiz-calc__vial|barPct/);
     assert.doesNotMatch(calculating, /calcLonger/);
     assert.match(calculating, /showEmailEscape/);
+    assert.match(gate, /canOpenResults=\{false\}/);
   });
 });

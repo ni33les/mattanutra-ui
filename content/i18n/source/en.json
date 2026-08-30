@@ -8349,7 +8349,7 @@
     "translatable": true
   },
   "customer.revealLabels.formulaCategoryExplain.foundation": {
-    "defaultMessage": "Daily basics that most people benefit from keeping topped up.",
+    "defaultMessage": "Take these every day.",
     "description": "Plain-language explanation for the Foundation formula group.",
     "namespace": "customer.revealLabels",
     "audience": "customer",
@@ -8358,7 +8358,7 @@
     "translatable": true
   },
   "customer.revealLabels.formulaCategoryExplain.foundationAddOn": {
-    "defaultMessage": "Extra daily support on top of the basics, chosen from your answers.",
+    "defaultMessage": "Good to add if you can afford them.",
     "description": "Plain-language explanation for the Foundation add-on formula group.",
     "namespace": "customer.revealLabels",
     "audience": "customer",
@@ -8376,7 +8376,7 @@
     "translatable": true
   },
   "customer.revealLabels.formulaCategoryExplain.targeted": {
-    "defaultMessage": "Chosen specifically for your goals and current answers.",
+    "defaultMessage": "Chosen for your situation right now.",
     "description": "Plain-language explanation for the Targeted formula group.",
     "namespace": "customer.revealLabels",
     "audience": "customer",

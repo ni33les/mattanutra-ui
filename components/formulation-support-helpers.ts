@@ -134,6 +134,16 @@ function supplementFallbackKey(id: string, name: string) {
   return "";
 }
 
+function isPlaceholderSupplementName(value: string) {
+  const compact = value.trim().toLowerCase();
+
+  return (
+    !compact ||
+    /^\d+$/.test(compact) ||
+    /^(ingredient|ส่วนผสม|营养素|成分)\s*(number|#|ที่|号)?\s*\d+$/i.test(compact)
+  );
+}
+
 export function localizedSupplementName(
   value: LocalizedText,
   id: string,
@@ -151,27 +161,30 @@ export function localizedSupplementName(
       : typeof value === "string"
         ? value.trim()
         : "";
+  const candidates = [
+    localeText,
+    english,
+    ...Object.values(record ?? {}).filter(
+      (item): item is string => typeof item === "string"
+    )
+  ];
 
-  if (localeText) {
-    return localeText;
-  }
-
-  if (english) {
-    return english;
-  }
-
-  if (record) {
-    for (const item of Object.values(record)) {
-      if (typeof item === "string" && item.trim()) {
-        return item.trim();
-      }
+  for (const candidate of candidates) {
+    const trimmed = candidate.trim();
+    if (trimmed && !isPlaceholderSupplementName(trimmed)) {
+      return trimmed;
     }
   }
 
   const fallbackId = typeof id === "string" ? id.trim() : "";
-  if (fallbackId && !/^(sup_|prd_)?[0-9a-f-]{8,}$/i.test(fallbackId)) {
+  if (
+    fallbackId &&
+    !/^(sup_|prd_)?[0-9a-f-]{8,}$/i.test(fallbackId) &&
+    !isPlaceholderSupplementName(fallbackId)
+  ) {
     return fallbackId;
   }
+
   return english || localeText;
 }
 

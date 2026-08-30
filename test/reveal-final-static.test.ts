@@ -63,6 +63,24 @@ function assertOrder(source: string, labels: readonly string[]) {
 }
 
 describe("final reveal UX", () => {
+  it("explains Foundation, Add-on, and Targeted in one line each", () => {
+    assert.match(i18nSource, /"Take these every day\."/);
+    assert.match(i18nSource, /"Good to add if you can afford them\."/);
+    assert.match(i18nSource, /"Chosen for your situation right now\."/);
+    assert.match(i18nThai, /กินเหล่านี้ทุกวัน/);
+    assert.match(i18nChinese, /请每天服用这些。/);
+  });
+
+  it("shows a unit price on each recommended product card next to Remove", () => {
+    assert.match(reveal, /formatCurrencyAmount/);
+    assert.match(reveal, /data-testid="reveal-product-price"/);
+    assert.match(reveal, /product-remove-btn/);
+    assert.match(
+      reveal,
+      /product\.price\?\.amount \?\?[\s\S]*product\.retailer\?\.unitPriceAmount/,
+    );
+  });
+
   it("routes the existing formulation wrapper into the final reveal surface", () => {
     assert.match(wrapper, /RevealFinalResultsPage/);
     assert.match(wrapper, /productCoveragePending=\{productCoveragePending\}/);

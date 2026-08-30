@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import {
+  localizedSupplementName,
   selectedFoodSupport,
   visibleSupplementRecommendationCount,
 } from "../components/formulation-support-helpers.ts";
@@ -137,6 +138,25 @@ describe("formulation food support", () => {
     });
 
     assert.equal(visibleSupplementRecommendationCount(payload), 6);
+  });
+
+  it("falls back to English when Thai supplement names are missing or numbered placeholders", () => {
+    assert.equal(
+      localizedSupplementName({ en: "Magnesium glycinate", th: "" }, "sup-1", "th"),
+      "Magnesium glycinate",
+    );
+    assert.equal(
+      localizedSupplementName(
+        { en: "Zinc", th: "ingredient number 9" },
+        "sup-2",
+        "th",
+      ),
+      "Zinc",
+    );
+    assert.equal(
+      localizedSupplementName({ en: "Omega-3", th: "ส่วนผสมที่ 9" }, "sup-3", "th"),
+      "Omega-3",
+    );
   });
 
   it("lets formulation AI choose a supplement count within the intended range", async () => {

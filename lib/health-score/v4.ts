@@ -971,12 +971,32 @@ function gapPillarCard(
   };
 }
 
+function answersRuleOutGapCopy(
+  pillar: HealthScorePillarContent,
+  answers: NormalizedAnswers
+) {
+  if (pillar.id === "sleep") {
+    return ["7-8", "8-9", "9+"].includes(answers.sleepHrs);
+  }
+
+  if (pillar.id === "activity") {
+    return ["active", "athlete"].includes(answers.activity);
+  }
+
+  if (pillar.id === "stress") {
+    return ["verylow", "low"].includes(answers.stress);
+  }
+
+  return false;
+}
+
 function gapOrStrengthCard(
   pillar: HealthScorePillarContent & { name: PillarName },
   number: string,
-  locale: Locale
+  locale: Locale,
+  answers: NormalizedAnswers
 ): HealthScoreGapCard {
-  if (pillar.value >= 70) {
+  if (pillar.value >= 70 || answersRuleOutGapCopy(pillar, answers)) {
     return {
       body: localizedPillarStrength(pillar.name, locale, { value: pillar.value }),
       headline: healthScorePageText(locale, "strengthHeadline", {
@@ -999,11 +1019,13 @@ function buildGapTrio(
   locale: Locale
 ) {
   const weak = pillars.slice().sort((first, second) => first.value - second.value);
-  const cards: HealthScoreGapCard[] = [gapOrStrengthCard(weak[0], "01", locale)];
+  const cards: HealthScoreGapCard[] = [
+    gapOrStrengthCard(weak[0], "01", locale, answers)
+  ];
   const linkedLow = weak.filter((pillar) => pillar.goalLinked && pillar.value < 70);
   const second =
     linkedLow.find((pillar) => pillar.name !== weak[0].name) ?? weak[1];
-  cards.push(gapOrStrengthCard(second, "02", locale));
+  cards.push(gapOrStrengthCard(second, "02", locale, answers));
 
   const symptoms = answers.symptoms.filter((symptom) => symptom !== "great");
 
@@ -1026,7 +1048,8 @@ function buildGapTrio(
     cards.push(gapOrStrengthCard(
       weak.find((pillar) => !used.has(pillar.name)) ?? weak[weak.length - 1],
       "03",
-      locale
+      locale,
+      answers
     ));
   }
 
