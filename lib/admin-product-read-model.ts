@@ -458,6 +458,8 @@ type ProductListStatsDbRow = Readonly<{
   summary_missing_image: string | number;
   summary_pending_review: string | number;
   summary_regulatory_approved: string | number;
+  summary_sellable: string | number;
+  summary_ineligible: string | number;
 }>;
 
 function cleanListText(value: unknown, max = 200) {
@@ -648,11 +650,25 @@ export async function getAdminProductListData(
               where product_regulatory_approvals.product_id = products.id
                 and product_regulatory_approvals.status in ('verified', 'sourced')
             ) as has_regulatory_approval,
+            exists (
+              select 1
+              from public.retail_sellable_products sellable
+              left join public.retail_product_stock stock
+                on stock.organisation_id = sellable.organisation_id
+               and stock.product_id = sellable.product_id
+              where sellable.product_id = products.id
+                and sellable.status = 'active'
+                and coalesce(sellable.rrp_price_amount, 0) > 0
+                and (
+                  coalesce(stock.stock_quantity, 0) > 0
+                  or coalesce(sellable.backorder_policy, 'allow') <> 'deny'
+                )
+            ) as has_active_sellable,
             coalesce(nullif(lower(trim(products.brand_name)), ''), '__unknown_manufacturer__') as manufacturer_key
           from public.products
           where products.status <> 'deleted'
         `;
-        const [summaryRows, manufacturerRows, pageRows] = await Promise.all([
+        const [summaryRows, manufacturerRows, retailerRows, pageRows] = await Promise.all([
           sql<ProductListStatsDbRow[]>`
             select
               count(*) as summary_total,
@@ -662,7 +678,13 @@ export async function getAdminProductListData(
               count(*) filter (where validation_label = 'Missing Facts') as summary_missing_facts,
               count(*) filter (where validation_label = 'Missing Image') as summary_missing_image,
               count(*) filter (where validation_label = 'Dirty Data') as summary_dirty_data,
-              count(*) filter (where has_regulatory_approval) as summary_regulatory_approved
+              count(*) filter (where has_regulatory_approval) as summary_regulatory_approved,
+              count(*) filter (
+                where business_state = 'approved' and has_active_sellable
+              ) as summary_sellable,
+              count(*) filter (
+                where not (business_state = 'approved' and has_active_sellable)
+              ) as summary_ineligible
             from (${labelled}) labelled
           `,
           sql<ProductListManufacturerRow[]>`
@@ -675,6 +697,18 @@ export async function getAdminProductListData(
             group by key, label
             order by total desc, label asc
             limit 200
+          `,
+          sql<Array<{ id: string; name: string }>>`
+            select
+              organisations.id::text,
+              organisations.name
+            from public.organisations
+            where exists (
+              select 1
+              from public.retail_sellable_products sellable
+              where sellable.organisation_id = organisations.id
+            )
+            order by organisations.name asc
           `,
           sql<ProductListDbRow[]>`
             with labelled as (${labelled}),
@@ -691,6 +725,18 @@ export async function getAdminProductListData(
                   or (${normalized.metric} = 'productsMissingFacts' and labelled.validation_label = 'Missing Facts')
                   or (${normalized.metric} = 'productsMissingImages' and labelled.validation_label = 'Missing Image')
                   or (${normalized.metric} = 'productsRegulatoryApproved' and labelled.has_regulatory_approval)
+                  or (
+                    ${normalized.metric} = 'productsSellable'
+                    and labelled.business_state = 'approved'
+                    and labelled.has_active_sellable
+                  )
+                  or (
+                    ${normalized.metric} = 'productsIneligible'
+                    and not (
+                      labelled.business_state = 'approved'
+                      and labelled.has_active_sellable
+                    )
+                  )
                 )
                 ${searchFilter}
             ),
@@ -780,6 +826,10 @@ export async function getAdminProductListData(
         return {
           databaseAvailable: true,
           generatedAt: new Date().toISOString(),
+          exportRetailers: retailerRows.map((row) => ({
+            id: row.id,
+            name: row.name
+          })),
           manufacturerOptions: manufacturerRows.map((row) => ({
             key: row.key,
             label: row.label,
@@ -803,6 +853,8 @@ export async function getAdminProductListData(
             missingImage: numberOrNull(stats?.summary_missing_image) ?? 0,
             pendingReview: numberOrNull(stats?.summary_pending_review) ?? 0,
             regulatoryApproved: numberOrNull(stats?.summary_regulatory_approved) ?? 0,
+            sellable: numberOrNull(stats?.summary_sellable) ?? 0,
+            ineligible: numberOrNull(stats?.summary_ineligible) ?? 0,
             total: numberOrNull(stats?.summary_total) ?? 0
           },
           totalPages: Math.max(1, Math.ceil(totalRows / pageSize)),

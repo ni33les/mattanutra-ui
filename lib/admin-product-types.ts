@@ -249,6 +249,8 @@ export type AdminProductListData = Readonly<{
     missingImage: number;
     pendingReview: number;
     regulatoryApproved: number;
+    sellable: number;
+    ineligible: number;
     total: number;
   };
   totalRows: number;
@@ -257,6 +259,10 @@ export type AdminProductListData = Readonly<{
     key: string;
     label: string;
     total: number;
+  }>;
+  exportRetailers: Array<{
+    id: string;
+    name: string;
   }>;
 }>;
 
@@ -483,8 +489,11 @@ export function emptyAdminProductListData(
       missingImage: 0,
       pendingReview: 0,
       regulatoryApproved: 0,
+      sellable: 0,
+      ineligible: 0,
       total: 0
     },
+    exportRetailers: [],
     totalPages: 0,
     totalRows: 0
   };

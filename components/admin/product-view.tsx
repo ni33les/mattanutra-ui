@@ -57,6 +57,7 @@ import {
   type ProductBusinessState,
   type ProductMetricFilter,
 } from "@/components/admin/product-view-helpers";
+import { AdminModal } from "@/components/admin/ui";
 import {
   AddProductFromUrlModal,
   LocalizedFallbackBadge,
@@ -285,10 +286,31 @@ export function AdminProductListView({
   const [addProductUrl, setAddProductUrl] = useState("");
   const [addProductSaving, setAddProductSaving] = useState(false);
   const [addProductError, setAddProductError] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportRetailerId, setExportRetailerId] = useState("");
+  const [exportIncludePrices, setExportIncludePrices] = useState(false);
   const viewLabels = productViewLabels[locale];
-  const exportHref = `/api/admin/products/catalogue/export?scope=approved${
-    accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : ""
-  }`;
+  function exportHref(includePrices: boolean, organisationId: string) {
+    const params = new URLSearchParams();
+    params.set("scope", "approved");
+    if (accessToken) {
+      params.set("access_token", accessToken);
+    }
+    if (data.query.search) {
+      params.set("search", data.query.search);
+    }
+    if (data.query.brand) {
+      params.set("brand", data.query.brand);
+    }
+    if (data.query.metric && data.query.metric !== "productsTotal") {
+      params.set("metric", data.query.metric);
+    }
+    if (includePrices && organisationId) {
+      params.set("includePrices", "1");
+      params.set("organisationId", organisationId);
+    }
+    return `/api/admin/products/catalogue/export?${params.toString()}`;
+  }
   const metrics = productMetricCardsFromSummary({
     locale,
     summary: data.summary,
@@ -336,13 +358,6 @@ export function AdminProductListView({
     return `/${locale}/admin/products/${productId}${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`;
   }
 
-  function handleMetricSelect(metricId: BusinessMetric["id"]) {
-    window.location.href = productListHref({
-      metric: metricId as string,
-      page: 1
-    });
-  }
-
   async function handleAddProductSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAddProductSaving(true);
@@ -388,13 +403,18 @@ export function AdminProductListView({
   return (
     <section className="mt-8 space-y-6">
       <div className="flex justify-end gap-2">
-        <a
+        <button
           className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
           data-testid="approved-products-export"
-          href={exportHref}
+          onClick={() => {
+            setExportRetailerId(data.exportRetailers[0]?.id ?? "");
+            setExportIncludePrices(false);
+            setExportOpen(true);
+          }}
+          type="button"
         >
           {viewLabels.exportCsv}
-        </a>
+        </button>
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
           onClick={() => {
@@ -420,9 +440,75 @@ export function AdminProductListView({
         />
       ) : null}
 
+      {exportOpen ? (
+        <AdminModal
+          onClose={() => setExportOpen(false)}
+          panelClassName="max-w-lg"
+          size="sm"
+          title={viewLabels.exportCsv}
+        >
+          <div className="space-y-4 p-5">
+            <p className="text-sm text-gray-600">{viewLabels.exportFilterHint}</p>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
+              <input
+                checked={!exportIncludePrices}
+                onChange={() => setExportIncludePrices(false)}
+                type="radio"
+                name="product-export-prices"
+              />
+              {viewLabels.exportCatalogueOnly}
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
+              <input
+                checked={exportIncludePrices}
+                disabled={data.exportRetailers.length < 1}
+                onChange={() => setExportIncludePrices(true)}
+                type="radio"
+                name="product-export-prices"
+              />
+              {viewLabels.exportIncludePrices}
+            </label>
+            {exportIncludePrices ? (
+              <label className="grid gap-2 text-sm font-medium text-gray-700">
+                {viewLabels.exportRetailer}
+                <select
+                  className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  onChange={(event) => setExportRetailerId(event.target.value)}
+                  value={exportRetailerId}
+                >
+                  {data.exportRetailers.map((retailer) => (
+                    <option key={retailer.id} value={retailer.id}>
+                      {retailer.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <a
+              aria-disabled={exportIncludePrices && !exportRetailerId}
+              className={classNames(
+                "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm transition",
+                exportIncludePrices && !exportRetailerId
+                  ? "pointer-events-none bg-gray-300"
+                  : "bg-[#1FA77A] hover:bg-[#188865]"
+              )}
+              href={exportHref(exportIncludePrices, exportRetailerId)}
+              onClick={() => setExportOpen(false)}
+            >
+              {viewLabels.exportDownload}
+            </a>
+          </div>
+        </AdminModal>
+      ) : null}
+
       <BusinessStatsGrid
         metrics={metrics}
-        onMetricSelect={handleMetricSelect}
+        metricHref={(metricId) =>
+          productListHref({
+            metric: metricId as string,
+            page: 1
+          })
+        }
         selectedMetricId={data.query.metric || "productsTotal"}
       />
 

@@ -287,7 +287,16 @@ test("admin sidebar navigation preserves scroll position across menu clicks", ()
   assert.match(shared, /sessionStorage\.setItem\(ADMIN_SIDEBAR_SCROLL_KEY/);
   assert.match(shared, /sessionStorage\.getItem\(ADMIN_SIDEBAR_SCROLL_KEY\)/);
   assert.match(shared, /scroll=\{false\}/);
+  assert.match(shared, /data-admin-sidebar-scroll/);
   assert.match(shared, /onNavigate=\{rememberSidebarScroll\}/);
+  assert.match(
+    shared.slice(shared.indexOf("export function BusinessStatsGrid")),
+    /<Link[\s\S]*prefetch=\{false\}[\s\S]*scroll=\{false\}/,
+  );
+  assert.match(
+    shared.slice(shared.indexOf("export function BusinessStatsGrid")),
+    /sessionStorage\.setItem\(\s*ADMIN_SIDEBAR_SCROLL_KEY/,
+  );
 });
 
 test("admin login has a working registry-driven locale switcher", () => {

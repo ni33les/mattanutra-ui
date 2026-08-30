@@ -110,12 +110,19 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const payload = await buildApprovedProductCatalogueCsv();
+      const includePrices = url.searchParams.get("includePrices") === "1";
+      const payload = await buildApprovedProductCatalogueCsv({
+        brand: textOrNull(url.searchParams.get("brand"), 200),
+        includePrices,
+        metric: textOrNull(url.searchParams.get("metric"), 80),
+        organisationId: organisationId,
+        search: textOrNull(url.searchParams.get("search"), 200)
+      });
 
       return new Response(payload.csv, {
         headers: {
           "Cache-Control": "no-store",
-          "Content-Disposition": 'attachment; filename="approved-products.csv"',
+          "Content-Disposition": 'attachment; filename="products.csv"',
           "Content-Type": "text/csv; charset=utf-8"
         }
       });

@@ -175,7 +175,13 @@ describe("product admin card layout", () => {
 
     assert.match(listQuery, /filtered_count as \(/);
     assert.match(listQuery, /summary_total/);
+    assert.match(listQuery, /summary_sellable/);
+    assert.match(listQuery, /summary_ineligible/);
+    assert.match(listQuery, /retail_sellable_products/);
+    assert.match(listQuery, /productsSellable/);
+    assert.match(listQuery, /productsIneligible/);
     assert.match(listQuery, /total: numberOrNull\(stats\?\.summary_total\) \?\? 0/);
+    assert.match(listQuery, /sellable: numberOrNull\(stats\?\.summary_sellable\) \?\? 0/);
     assert.match(
       listQuery,
       /products\.image_url is null or btrim\(products\.image_url\) = '' then 'Missing Image'/,

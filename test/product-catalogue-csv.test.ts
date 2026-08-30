@@ -319,15 +319,21 @@ describe("product catalogue CSV", () => {
   });
 
   it("wires product and retail admin import/export controls", async () => {
-    const [productView, retailView, exportRoute, importRoute, service] =
+    const [productView, retailView, exportRoute, importRoute, service, helpers] =
       await Promise.all([
         readFile("components/admin/product-view.tsx", "utf8"),
         readFile("components/admin/retail-stock-view.tsx", "utf8"),
         readFile("app/api/admin/products/catalogue/export/route.ts", "utf8"),
         readFile("app/api/admin/products/catalogue/import/route.ts", "utf8"),
         readFile("lib/product-catalogue-csv.ts", "utf8"),
+        readFile("components/admin/product-view-helpers.ts", "utf8"),
       ]);
 
+    assert.match(helpers, /exportCsv: "Export CSV"/);
+    assert.match(helpers, /exportIncludePrices: "Include wholesale and retail prices"/);
+    assert.match(helpers, /exportFilterHint:/);
+    assert.match(helpers, /search: "Search"/);
+    assert.match(helpers, /addProduct: "Add"/);
     assert.match(
       productView,
       /\/api\/admin\/products\/catalogue\/export\?scope=platform/,
@@ -353,7 +359,17 @@ describe("product catalogue CSV", () => {
     assert.doesNotMatch(exportRoute, /buildProductCatalogueCsv/);
     assert.match(exportRoute, /buildApprovedProductCatalogueCsv/);
     assert.match(exportRoute, /text\/csv; charset=utf-8/);
-    assert.match(exportRoute, /approved-products\.csv/);
+    assert.match(exportRoute, /products\.csv/);
+    assert.match(productView, /metricHref/);
+    assert.match(productView, /exportRetailers/);
+    assert.match(productView, /exportIncludePrices/);
+    assert.doesNotMatch(
+      productView.slice(productView.indexOf("export function AdminProductListView")),
+      /window\.location\.href = productListHref/,
+    );
+    assert.match(service, /PRODUCT_EXPORT_PRICE_HEADERS/);
+    assert.match(service, /includePrices/);
+    assert.match(service, /organisationId/);
     assert.match(importRoute, /applyProductCatalogueCsvImport/);
     assert.match(service, /createAdminProduct/);
     assert.match(service, /updateAdminProduct/);

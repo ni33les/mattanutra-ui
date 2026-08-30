@@ -18,7 +18,7 @@ import { t } from "@/lib/i18n-messages";
 import type { MessageId } from "@/content/i18n/generated";
 import type { AdminContent, AdminDashboardView, AdminNavItem } from "@/components/admin/dashboard-content";
 
-const ADMIN_SIDEBAR_SCROLL_KEY = "mattanutra:admin-sidebar-scroll";
+export const ADMIN_SIDEBAR_SCROLL_KEY = "mattanutra:admin-sidebar-scroll";
 
 export function classNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -522,6 +522,7 @@ export function SidebarContent({
   return (
     <div
       className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4"
+      data-admin-sidebar-scroll="true"
       onScroll={() => {
         const node = scrollRef.current;
 
@@ -807,10 +808,12 @@ function formatBusinessMetricAxisValue(
 
 export function BusinessStatsGrid({
   metrics,
+  metricHref,
   onMetricSelect,
   selectedMetricId
 }: Readonly<{
   metrics: BusinessMetric[];
+  metricHref?: (id: BusinessMetric["id"]) => string;
   onMetricSelect?: (id: BusinessMetric["id"]) => void;
   selectedMetricId?: BusinessMetric["id"];
 }>) {
@@ -829,13 +832,45 @@ export function BusinessStatsGrid({
               </p>
             </>
           );
+          const clickable = Boolean(metricHref || onMetricSelect);
           const classes = classNames(
             selected ? "bg-gray-50 ring-1 ring-inset ring-gray-200" : "bg-white",
             "px-5 py-6 text-left transition",
-            onMetricSelect && !selected && "hover:bg-gray-50",
-            onMetricSelect &&
+            clickable && !selected && "hover:bg-gray-50",
+            clickable &&
               "focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]"
           );
+          const href = metricHref?.(metric.id);
+
+          if (href) {
+            return (
+              <Link
+                className={`${classes} block`}
+                href={href}
+                key={metric.id}
+                onClick={() => {
+                  if (typeof window === "undefined") {
+                    return;
+                  }
+
+                  const node = document.querySelector(
+                    "[data-admin-sidebar-scroll]"
+                  ) as HTMLElement | null;
+
+                  if (node) {
+                    window.sessionStorage.setItem(
+                      ADMIN_SIDEBAR_SCROLL_KEY,
+                      String(node.scrollTop)
+                    );
+                  }
+                }}
+                prefetch={false}
+                scroll={false}
+              >
+                {content}
+              </Link>
+            );
+          }
 
           return onMetricSelect ? (
             <button

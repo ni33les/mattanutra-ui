@@ -52,6 +52,33 @@ export const APPROVED_PRODUCT_EXPORT_HEADERS = [
   "Updated At"
 ] as const;
 
+export const PRODUCT_EXPORT_PRICE_HEADERS = [
+  "Wholesale",
+  "Retail (RRP)",
+  "Currency"
+] as const;
+
+export type ProductCatalogueCsvFilter = Readonly<{
+  brand?: string | null;
+  includePrices?: boolean;
+  metric?: string | null;
+  organisationId?: string | null;
+  search?: string | null;
+}>;
+
+function productExportSearchTerms(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(" ")
+    .map((term) => term.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
 export type PlatformProductCatalogueJson = Readonly<{
   generatedAt: string;
   productCount: number;
@@ -1054,27 +1081,172 @@ function csvCell(value: unknown) {
   return text;
 }
 
-export async function buildApprovedProductCatalogueCsv() {
+export async function buildApprovedProductCatalogueCsv(
+  filter: ProductCatalogueCsvFilter = {}
+) {
   const sql = getSql();
 
   if (!sql) {
     throw new Error("Database is not configured");
   }
 
+  const brand = (filter.brand ?? "").trim();
+  const metric = (filter.metric ?? "").trim();
+  const searchTerms = productExportSearchTerms(filter.search ?? "");
+  const organisationId = isUuidValue(filter.organisationId)
+    ? filter.organisationId
+    : null;
+  const includePrices = Boolean(filter.includePrices && organisationId);
+  const searchFilter =
+    searchTerms.length > 0
+      ? sql`
+        and not exists (
+          select 1
+          from unnest(${searchTerms}::text[]) as term(value)
+          where not (
+            position(
+              term.value in lower(concat_ws(
+                ' ',
+                products.title,
+                products.brand_name,
+                products.description
+              ))
+            ) > 0
+            or exists (
+              select 1
+              from public.product_facts facts
+              where facts.product_id = products.id
+                and position(term.value in lower(coalesce(facts.name, ''))) > 0
+            )
+          )
+        )
+      `
+      : sql``;
+  const brandFilter =
+    brand === ""
+      ? sql``
+      : sql`and coalesce(nullif(lower(trim(products.brand_name)), ''), '__unknown_manufacturer__') = ${brand}`;
+  const metricFilter = sql`
+    and (
+      ${metric} = ''
+      or ${metric} = 'productsTotal'
+      or (
+        ${metric} = 'productsApproved'
+        and products.status = 'approved'
+        and coalesce(products.validation_status, 'failed') = 'pass'
+        and not exists (
+          select 1 from public.product_imports
+          where product_imports.product_id = products.id
+            and product_imports.status = 'pending_review'
+        )
+      )
+      or (
+        ${metric} = 'productsPendingReview'
+        and (
+          exists (
+            select 1 from public.product_imports
+            where product_imports.product_id = products.id
+              and product_imports.status = 'pending_review'
+          )
+          or (
+            products.status = 'approved'
+            and coalesce(products.validation_status, 'failed') <> 'pass'
+          )
+          or products.status not in ('approved', 'ignored', 'deleted')
+        )
+      )
+      or (${metric} = 'productsIgnored' and products.status = 'ignored')
+      or (
+        ${metric} = 'productsMissingFacts'
+        and products.image_url is not null
+        and btrim(products.image_url) <> ''
+        and (
+          products.label_status <> 'parsed'
+          or coalesce(products.validation_reasons, '{}'::text[]) && array['no_dosed_facts', 'no_canonical_match']::text[]
+        )
+      )
+      or (
+        ${metric} = 'productsMissingImages'
+        and (products.image_url is null or btrim(products.image_url) = '')
+      )
+      or (
+        ${metric} = 'productsRegulatoryApproved'
+        and exists (
+          select 1 from public.product_regulatory_approvals
+          where product_regulatory_approvals.product_id = products.id
+            and product_regulatory_approvals.status in ('verified', 'sourced')
+        )
+      )
+      or (
+        ${metric} = 'productsSellable'
+        and products.status = 'approved'
+        and coalesce(products.validation_status, 'failed') = 'pass'
+        and not exists (
+          select 1 from public.product_imports
+          where product_imports.product_id = products.id
+            and product_imports.status = 'pending_review'
+        )
+        and exists (
+          select 1
+          from public.retail_sellable_products sellable
+          left join public.retail_product_stock stock
+            on stock.organisation_id = sellable.organisation_id
+           and stock.product_id = sellable.product_id
+          where sellable.product_id = products.id
+            and sellable.status = 'active'
+            and coalesce(sellable.rrp_price_amount, 0) > 0
+            and (
+              coalesce(stock.stock_quantity, 0) > 0
+              or coalesce(sellable.backorder_policy, 'allow') <> 'deny'
+            )
+        )
+      )
+      or (
+        ${metric} = 'productsIneligible'
+        and not (
+          products.status = 'approved'
+          and coalesce(products.validation_status, 'failed') = 'pass'
+          and not exists (
+            select 1 from public.product_imports
+            where product_imports.product_id = products.id
+              and product_imports.status = 'pending_review'
+          )
+          and exists (
+            select 1
+            from public.retail_sellable_products sellable
+            left join public.retail_product_stock stock
+              on stock.organisation_id = sellable.organisation_id
+             and stock.product_id = sellable.product_id
+            where sellable.product_id = products.id
+              and sellable.status = 'active'
+              and coalesce(sellable.rrp_price_amount, 0) > 0
+              and (
+                coalesce(stock.stock_quantity, 0) > 0
+                or coalesce(sellable.backorder_policy, 'allow') <> 'deny'
+              )
+          )
+        )
+      )
+    )
+  `;
+
   const rows = await sql<
     Array<{
       barcode: string | null;
       brand_name: string | null;
       country_codes: string[] | null;
+      currency: string | null;
       fda_approval: string | null;
       image_url: string | null;
       manufacturer_sku: string | null;
       product_id: string;
       product_url: string | null;
+      retail_price_amount: string | number | null;
       status: string;
       thai_name: string | null;
       title: string;
       updated_at: Date | string;
+      wholesale_price_amount: string | number | null;
     }>
   >`
     select
@@ -1089,7 +1261,20 @@ export async function buildApprovedProductCatalogueCsv() {
       barcode.identifier_value as barcode,
       fda.approval_number as fda_approval,
       th.title as thai_name,
-      country_rows.country_codes
+      country_rows.country_codes,
+      ${
+        includePrices
+          ? sql`
+            priced.wholesale_price_amount,
+            priced.rrp_price_amount as retail_price_amount,
+            priced.currency
+          `
+          : sql`
+            null::numeric as wholesale_price_amount,
+            null::numeric as retail_price_amount,
+            null::text as currency
+          `
+      }
     from public.products
     left join lateral (
       select identifier_value
@@ -1125,12 +1310,37 @@ export async function buildApprovedProductCatalogueCsv() {
       from public.product_countries
       where product_countries.product_id = products.id
     ) country_rows on true
-    where products.status = 'approved'
+    ${
+      includePrices
+        ? sql`
+          left join lateral (
+            select
+              sellable.wholesale_price_amount,
+              sellable.rrp_price_amount,
+              sellable.currency
+            from public.retail_sellable_products sellable
+            where sellable.organisation_id = ${organisationId}::uuid
+              and sellable.product_id = products.id
+              and sellable.status <> 'deleted'
+            order by sellable.updated_at desc
+            limit 1
+          ) priced on true
+        `
+        : sql``
+    }
+    where products.status <> 'deleted'
+      ${brandFilter}
+      ${metricFilter}
+      ${searchFilter}
     order by lower(coalesce(products.brand_name, '')), lower(products.title), products.id
   `;
 
+  const headers = includePrices
+    ? [...APPROVED_PRODUCT_EXPORT_HEADERS, ...PRODUCT_EXPORT_PRICE_HEADERS]
+    : [...APPROVED_PRODUCT_EXPORT_HEADERS];
+
   const lines = [
-    APPROVED_PRODUCT_EXPORT_HEADERS.join(","),
+    headers.join(","),
     ...rows.map((row) =>
       [
         row.product_id,
@@ -1144,7 +1354,14 @@ export async function buildApprovedProductCatalogueCsv() {
         row.fda_approval,
         row.product_url,
         row.image_url,
-        isoDateTime(row.updated_at)
+        isoDateTime(row.updated_at),
+        ...(includePrices
+          ? [
+              row.wholesale_price_amount,
+              row.retail_price_amount,
+              row.currency
+            ]
+          : [])
       ]
         .map(csvCell)
         .join(",")
