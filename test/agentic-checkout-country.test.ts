@@ -18,7 +18,8 @@ describe("agentic checkout country field", () => {
 
   it("does not render an empty hidden-only country field when destination is missing", () => {
     assert.match(panel, /name="country"/);
-    assert.equal(panel.includes('type="hidden"') && /name="country"/.test(panel), false);
+    assert.doesNotMatch(panel, /<input[^>]*type="hidden"[^>]*name="country"/);
+    assert.doesNotMatch(panel, /<input[^>]*name="country"[^>]*type="hidden"/);
     assert.match(panel, /address\.country = destinationCountry/);
   });
 

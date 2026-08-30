@@ -364,8 +364,8 @@ describe("landing page v16 library-only port", () => {
     assert.match(visualKnowledgeArticle, /<LibraryVisualPage/);
     assert.match(libraryVisualPage, /from "next\/image"/);
     assert.match(libraryVisualPage, /<Image/);
-    assert.match(libraryVisualPage, /width=\{node\.width\}/);
-    assert.match(libraryVisualPage, /height=\{node\.height\}/);
+    assert.match(libraryVisualPage, /width=\{displayWidth\}/);
+    assert.match(libraryVisualPage, /height=\{displayHeight\}/);
     assert.match(libraryVisualPage, /sizes=/);
     assert.match(libraryVisualPage, /priority=\{priority\}/);
     assert.match(libraryVisualPage, /node\.tag === "button"/);

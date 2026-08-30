@@ -21,8 +21,9 @@ function enclosingFunctionName(source: string, index: number) {
   const matches = [
     ...prefix.matchAll(
       /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*(?:<[^>]*>)?\s*\(/g
-    )
-  ];
+    ),
+    ...prefix.matchAll(/\basync\s+([A-Za-z0-9_]+)\s*(?:<[^>]*>)?\s*\(/g)
+  ].sort((left, right) => (left.index ?? 0) - (right.index ?? 0));
 
   return matches.at(-1)?.[1] ?? "(unknown)";
 }
@@ -66,7 +67,7 @@ function functionBody(source: string, functionName: string) {
 describe("database transaction boundaries", () => {
   it("keeps runtime code free of explicit app-level transactions", async () => {
     const allowedBegins = new Map<string, readonly string[]>([
-      ["lib/agentic/store/postgres.ts", ["createPostgresStore"]],
+      ["lib/agentic/store/postgres.ts", ["transaction"]],
       ["lib/db.ts", ["withLocalStatementTimeout"]]
     ]);
     const files = [
@@ -213,7 +214,14 @@ describe("database transaction boundaries", () => {
           "claimQueuedTaskRow"
         ]
       ],
-      ["lib/task-worker.ts", ["claimDueCronActions"]]
+      ["lib/task-worker.ts", ["claimDueCronActions"]],
+      [
+        "lib/agentic/store/postgres.ts",
+        [
+          "getActiveOrderForPlanRevision",
+          "getOpenOrderForPlanRevision"
+        ]
+      ]
     ]);
     const files = [
       ...(await filesUnder("app")),

@@ -78,8 +78,9 @@ describe("recommendation selection projections", () => {
     assert.match(recommendationInsights, /row\.list_status === "blocked"/);
     assert.match(productSearch, /getRetailerAwareProductRecommendationCandidateSets/);
     assert.match(productSearch, /sellable\.status = 'active'/);
-    assert.match(productSearch, /availableNow <= 0 && !backorderAllowed/);
-    assert.match(productSearch, /retailOverridePriceAmount === null[\s\S]*master_list_country_rrp_margin[\s\S]*retail_override/);
+    assert.match(productSearch, /assessRetailSellability/);
+    assert.match(productSearch, /out_of_stock_no_backorder/);
+    assert.match(productSearch, /priceSource: "master_list_country_rrp_margin"/);
     assert.match(taskExecution, /retailerCandidateSets\.map/);
     assert.match(taskExecution, /selectRetailerRecommendationOption/);
     assert.match(taskExecution, /retailerOptions: retailerOptions\.map/);

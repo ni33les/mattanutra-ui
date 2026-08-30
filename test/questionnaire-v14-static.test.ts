@@ -233,7 +233,7 @@ describe("questionnaire v14 UX on v6 schema", () => {
     );
     assert.match(calc, /showEmailEscape/);
     assert.match(calc, /calc-emailbox|email-stack/);
-    assert.match(wait, /nongPoseSrc\(\"wai\"\)/);
+    assert.match(wait, /pose="wai"/);
     assert.match(calc, /CalculatingWait/);
     // No retry button in fallback UI
     assert.doesNotMatch(calc, /calcRetry/);

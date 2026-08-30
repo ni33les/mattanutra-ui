@@ -169,7 +169,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
     );
     assert.match(mockOms, /adapter !== "mock_thailand"/);
     assert.match(stripeAdapter, /thailandRetailerAdapter/);
-    assert.match(checkoutReturn, /thailandRetailerAdapter/);
+    assert.match(checkoutReturn, /applyPaidAgenticStripeSession/);
     assert.match(uatRebuildScript, /scripts\/reset-dev-db\.mjs/);
     assert.match(uatRebuildScript, /scripts\/catalogue-reload\.ts/);
     assert.match(uatRebuildScript, /scripts\/uat-preserved-config\.ts/);

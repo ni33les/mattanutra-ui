@@ -19,7 +19,7 @@ import {
 } from "@/lib/questionnaire/engine";
 import { finalizeAssessmentCapture } from "@/lib/questionnaire/agents/capture-agent";
 import { emitQuestionnaireEvents } from "@/lib/questionnaire/agents/progress-agent";
-import { nongPoseSrc } from "@/lib/questionnaire/poses";
+import { NongPoseImage } from "@/components/chat-questionnaire/nong-pose-image";
 import type {
   LogMessage,
   QuestionnaireEvent,
@@ -1142,8 +1142,7 @@ export function ChatQuestionnaire({
           data-testid="paged-question"
         >
           <div className={avatarClass(msg.pose)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={nongPoseSrc(msg.pose)} alt="" />
+            <NongPoseImage height={56} pose={msg.pose} width={52} />
           </div>
           <div className="mn-chat-q__bubble">
             <div className="mn-chat-q__q">
@@ -1173,8 +1172,7 @@ export function ChatQuestionnaire({
           data-testid={msg.kind === "react" ? "insight-react" : "insight-ack"}
         >
           <div className={avatarClass(msg.pose)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={nongPoseSrc(msg.pose)} alt="" />
+            <NongPoseImage height={56} pose={msg.pose} width={52} />
           </div>
           <div className="mn-chat-q__bubble">
             {msg.kind === "react" ? (
@@ -1194,8 +1192,7 @@ export function ChatQuestionnaire({
           data-testid="halfway-health-preview"
         >
           <div className={avatarClass(msg.pose)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={nongPoseSrc(msg.pose)} alt="" />
+            <NongPoseImage height={80} pose={msg.pose} width={76} />
           </div>
           <div className="mn-chat-q__bubble mn-chat-q__bubble--health-preview">
             <div className="mn-chat-q__health-preview-title">{msg.title}</div>
@@ -1711,12 +1708,10 @@ export function ChatQuestionnaire({
           data-testid="section-stage-overlay"
         >
           <div className="mn-quiz-stage__card">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={nongPoseSrc(stageFlash.pose)}
-              alt=""
-              width={180}
+            <NongPoseImage
               height={180}
+              pose={stageFlash.pose}
+              width={180}
             />
             {stageFlash.eyebrow ? (
               <div className="mn-quiz-stage__eyebrow">{stageFlash.eyebrow}</div>

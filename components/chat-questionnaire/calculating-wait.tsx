@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { nongPoseSrc } from "@/lib/questionnaire/poses";
+import { NongPoseImage } from "@/components/chat-questionnaire/nong-pose-image";
 
 const LINE_SUPPORT_URL = "https://line.me/R/ti/p/%40344enooi";
 
@@ -32,8 +32,12 @@ export function CalculatingWait({
 }: CalculatingWaitProps) {
   return (
     <div className="mn-quiz-calc" data-testid={testId} aria-live="polite">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="mn-quiz-calc__nong" src={nongPoseSrc("wai")} alt="" />
+      <NongPoseImage
+        className="mn-quiz-calc__nong"
+        height={225}
+        pose="wai"
+        width={210}
+      />
       <div className="mn-quiz-calc__kicker">{copy.kicker}</div>
       <h1 className="mn-quiz-calc__title">{copy.title}</h1>
       <p className="mn-quiz-calc__copy">{copy.body}</p>

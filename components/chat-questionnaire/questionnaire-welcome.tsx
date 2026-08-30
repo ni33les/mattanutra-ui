@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { Locale } from "@/lib/i18n";
-import { nongPoseSrc } from "@/lib/questionnaire/poses";
+import { NongPoseImage } from "@/components/chat-questionnaire/nong-pose-image";
 import welcomePack from "@/content/questionnaire/v6/welcome.json";
 
 export type WelcomeLang = "en" | "th" | "zh";
@@ -55,11 +55,12 @@ export function QuestionnaireWelcome({
           <section className="mn-quiz-welcome__hero">
             <div className="mn-quiz-welcome__mascot-wrap">
               <div className="mn-quiz-welcome__glow" aria-hidden />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className="mn-quiz-welcome__mascot"
-                src={nongPoseSrc("celebrate")}
+              <NongPoseImage
                 alt={copy.mascotAlt}
+                className="mn-quiz-welcome__mascot"
+                height={320}
+                pose="celebrate"
+                width={320}
               />
             </div>
             <div className="mn-quiz-welcome__copy">

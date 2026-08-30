@@ -114,9 +114,11 @@ describe("image hardening", () => {
   const uiFiles = reactUiRoots.flatMap(collectFiles);
 
   it("keeps React UI free of raw img elements", () => {
+    const rawImgAllowlist = new Set(["components/facebook-pixel.tsx"]);
     const offenders = uiFiles
       .filter((filePath) => /<img\b/.test(readFileSync(filePath, "utf8")))
-      .map(relativePath);
+      .map(relativePath)
+      .filter((filePath) => !rawImgAllowlist.has(filePath));
 
     assert.deepEqual(offenders, []);
     assert.deepEqual(

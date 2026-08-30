@@ -926,7 +926,8 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminProductUi, /saveApprovalDialog/);
     assert.doesNotMatch(adminProductView, /draft\.fdaApprovalNumber/);
     assert.doesNotMatch(adminProductView, /\bProductOffersEditor\b/);
-    assert.doesNotMatch(adminProductView, /\bAdminModal\b/);
+    assert.doesNotMatch(adminProductView, /\bProductModal\b/);
+    assert.match(adminProductView, /\bAdminModal\b/);
   });
 
   it("keeps product list payloads lightweight for the admin grid", () => {

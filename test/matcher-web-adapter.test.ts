@@ -20,10 +20,10 @@ function need(
 ): ProductRecommendationNeed {
   return {
     aliasKeys: overrides.aliasKeys ?? [overrides.normalizedName],
-    category: "Foundation",
+    category: overrides.itemType === "food" ? "Food" : "Foundation",
     displayName: overrides.displayName,
     id: overrides.id,
-    itemType: "supplement",
+    itemType: overrides.itemType ?? "supplement",
     normalizedName: overrides.normalizedName,
     sourceId: overrides.sourceId,
     targetComparableAmount: overrides.targetComparableAmount ?? null,
@@ -35,11 +35,12 @@ function need(
 
 function candidate(input: Readonly<{
   availableCountryCodes?: string[];
+  brandName?: string;
   facts: ReadonlyArray<{
-    amount: number;
+    amount: number | null;
     name: string;
     normalizedName: string;
-    unit: string;
+    unit: string | null;
   }>;
   id: string;
   productAudience?: "both" | "female" | "male";
@@ -49,6 +50,7 @@ function candidate(input: Readonly<{
     automatedSafetyPassed: true,
     availabilityStatus: "in_stock",
     availableCountryCodes: input.availableCountryCodes ?? ["TH"],
+    brandName: input.brandName ?? "Delight",
     brandStatus: "approved",
     currency: "THB",
     facts: input.facts.map((fact) => ({
@@ -846,5 +848,243 @@ describe("matcher web adapter coverage mapping", () => {
     assert.ok(compact.recommendations.length <= 3);
     assert.ok(balanced.recommendations.length > compact.recommendations.length);
     assert.notDeepEqual(compactIds, balancedIds);
+  });
+
+  it("keeps food needs out of marketing coverage", () => {
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 25,
+              name: "Vitamin D3",
+              normalizedName: "vitamin_d3",
+              unit: "mcg"
+            }
+          ],
+          id: "d3",
+          title: "Vitamin D3"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [
+        dosedNeed({
+          amount: 25,
+          displayName: "Vitamin D3",
+          id: "supplement:vitamin-d3",
+          normalizedName: "vitamin_d3",
+          unit: "mcg"
+        }),
+        need({
+          displayName: "Chia Seeds",
+          id: "food:chia",
+          itemType: "food",
+          normalizedName: "chia_seeds",
+          sourceId: "chia",
+          targetComparableAmount: 1000,
+          targetText: "1 tbsp/day"
+        })
+      ],
+      stackPreference: "balanced"
+    });
+
+    assert.equal(result.stackCoveragePercent, 100);
+    assert.equal(result.supplementProductCoveragePercent, 100);
+    assert.equal(result.foodCoveragePercent, 0);
+    assert.equal(result.totalPlanCoveragePercent, 100);
+    assert.equal(
+      result.diagnostics.unmatchedNeeds.some((item) => item.itemType === "supplement"),
+      false
+    );
+  });
+
+  it("keeps productAudience female SKUs off male stacks", () => {
+    const folate = dosedNeed({
+      amount: 400,
+      displayName: "Folate",
+      id: "supplement:folate",
+      normalizedName: "folate",
+      unit: "mcg"
+    });
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 400,
+              name: "Folate",
+              normalizedName: "folate",
+              unit: "mcg"
+            }
+          ],
+          id: "women-folate",
+          productAudience: "female",
+          title: "Women Folate"
+        }),
+        candidate({
+          facts: [
+            {
+              amount: 400,
+              name: "Folate",
+              normalizedName: "folate",
+              unit: "mcg"
+            }
+          ],
+          id: "general-folate",
+          title: "Adult Folate"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [folate],
+      stackPreference: "balanced"
+    });
+
+    assert.equal(result.recommendations[0]?.product.id, "general-folate");
+    assert.equal(
+      result.recommendations.some((row) => row.product.id === "women-folate"),
+      false
+    );
+  });
+
+  it("does not treat a null-amount labelled fact as coverage", () => {
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: null,
+              name: "Taurine",
+              normalizedName: "taurine",
+              unit: null
+            }
+          ],
+          id: "undosed-taurine",
+          title: "Taurine"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [
+        dosedNeed({
+          amount: 500,
+          displayName: "Taurine",
+          id: "supplement:taurine",
+          normalizedName: "taurine",
+          unit: "mg"
+        })
+      ],
+      stackPreference: "balanced"
+    });
+    const taurine = [...result.diagnostics.matchedNeeds, ...result.diagnostics.unmatchedNeeds].find(
+      (item) => item.id === "supplement:taurine"
+    );
+
+    assert.equal(result.recommendations.length, 0);
+    assert.equal(taurine?.coveragePercent ?? 0, 0);
+  });
+
+  it("does not stack duplicate pack variants of the same covering SKU", () => {
+    const curcumin = dosedNeed({
+      amount: 500,
+      displayName: "Curcumin",
+      id: "supplement:curcumin",
+      normalizedName: "curcumin",
+      unit: "mg"
+    });
+    const facts = [
+      {
+        amount: 500,
+        name: "Curcumin",
+        normalizedName: "curcumin",
+        unit: "mg"
+      }
+    ] as const;
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          brandName: "DHC",
+          facts,
+          id: "dhc-turmeric-single",
+          title: "DHC Concentrated Turmeric 30-Day Supply"
+        }),
+        candidate({
+          brandName: "DHC",
+          facts,
+          id: "dhc-turmeric-two-pack",
+          title: "DHC Concentrated Turmeric 30-Day Supply 2-Pack"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [curcumin],
+      stackPreference: "balanced"
+    });
+
+    assert.equal(result.recommendations.length, 1);
+    assert.equal(
+      result.recommendations.filter((item) => /turmeric/i.test(item.product.title)).length,
+      1
+    );
+  });
+
+  it("does not pick 3 servings when a collateral nutrient would exceed its ceiling", () => {
+    setMatcherSafetyCeilings([
+      { maxAmount: 40, maxUnit: "mg", name: "Iron", subjectId: "iron" }
+    ]);
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 100,
+              name: "Magnesium",
+              normalizedName: "magnesium",
+              unit: "mg"
+            },
+            {
+              amount: 20,
+              name: "Iron",
+              normalizedName: "iron",
+              unit: "mg"
+            }
+          ],
+          id: "mag-iron",
+          title: "Magnesium with Iron"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [
+        dosedNeed({
+          amount: 300,
+          displayName: "Magnesium",
+          id: "supplement:magnesium",
+          normalizedName: "magnesium",
+          unit: "mg"
+        })
+      ],
+      stackPreference: "balanced"
+    });
+    setMatcherSafetyCeilings([]);
+
+    assert.ok((result.recommendations[0]?.servingMultiplier ?? 3) <= 2);
+    assert.notEqual(result.recommendations[0]?.servingMultiplier, 3);
   });
 });

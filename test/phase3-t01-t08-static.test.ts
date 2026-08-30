@@ -27,12 +27,19 @@ describe("Phase 3 T01/T08 shared eligibility", () => {
       /loadProductRows\(input\.productId \?\? null\)/
     );
     assert.match(workItems, /requireCachedLiveRetailSnapshot/);
+    assert.match(
+      workItems.slice(
+        workItems.indexOf("async function retailerCandidateSetsFromLiveSnapshot"),
+        workItems.indexOf("async function buildAdminCatalogueOptimizationWorkItem")
+      ),
+      /warmLiveRetailSnapshot/
+    );
     assert.doesNotMatch(
       workItems.slice(
         workItems.indexOf("async function retailerCandidateSetsFromLiveSnapshot"),
         workItems.indexOf("async function buildAdminCatalogueOptimizationWorkItem")
       ),
-      /getLiveSaleEligibleRetailerCandidateSets|loadProductRows|loadLiveRetailSnapshot\(|warmLiveRetailSnapshot\(|loadPlanGenerationContext|buildProductSearchQueries/
+      /getLiveSaleEligibleRetailerCandidateSets|loadProductRows|loadPlanGenerationContext|buildProductSearchQueries/
     );
     assert.doesNotMatch(applier, /getLiveSaleEligibleRetailerCandidateSets/);
     assert.doesNotMatch(

@@ -41,7 +41,6 @@ describe("Phase 4 T09/T15/T16", () => {
       pharmacy,
       search,
       workItems,
-      applier,
       capture,
       quiz,
       inStorePage,
@@ -51,7 +50,6 @@ describe("Phase 4 T09/T15/T16", () => {
       readFile("lib/pharmacy-in-store.ts", "utf8"),
       readFile("lib/admin-product-search.ts", "utf8"),
       readFile("lib/task-work-items.ts", "utf8"),
-      readFile("lib/task-result-applier.ts", "utf8"),
       readFile("app/api/assessment/route.ts", "utf8"),
       readFile("components/chat-questionnaire/chat-questionnaire.tsx", "utf8"),
       readFile("app/[locale]/p/[pharmacyId]/page.tsx", "utf8"),
@@ -65,8 +63,8 @@ describe("Phase 4 T09/T15/T16", () => {
     assert.doesNotMatch(pharmacy, /delight-pharmacy|enchanted-pharmacy/);
     assert.match(search, /organisationId\?: string \| null/);
     assert.match(search, /organisations.id = \$\{organisationId\}::uuid/);
-    assert.match(workItems, /inStorePharmacyFromAnswers\(context.answers\)/);
-    assert.match(applier, /loadInStorePharmacyOrganisationId/);
+    assert.match(workItems, /inStorePharmacyFromAnswers\(row\.answers\)/);
+    assert.match(pharmacy, /export async function loadInStorePharmacyOrganisationId/);
     assert.match(capture, /skipHealthScore/);
     assert.match(capture, /healthScore: skipHealthScore/);
     assert.match(capture, /selectedPlan: skipHealthScore \? DEFAULT_ASSESSMENT_PLAN : null/);
@@ -88,15 +86,18 @@ describe("Phase 4 T09/T15/T16", () => {
     ]);
 
     assert.match(csv, /export async function buildApprovedProductCatalogueCsv/);
-    assert.match(csv, /where products.status = 'approved'/);
+    assert.match(
+      csv.slice(csv.indexOf("export async function buildApprovedProductCatalogueCsv")),
+      /products\.status = 'approved'/
+    );
     assert.doesNotMatch(
       csv.slice(csv.indexOf("buildApprovedProductCatalogueCsv")),
       /prd_\w+|fixture dump|hardcodedSku/i
     );
     assert.match(route, /scope === "approved"/);
     assert.match(route, /buildApprovedProductCatalogueCsv/);
-    assert.match(route, /approved-products.csv/);
-    assert.match(view, /scope=approved/);
+    assert.match(route, /filename="products.csv"/);
+    assert.match(view, /params\.set\("scope", "approved"\)/);
     assert.match(view, /data-testid="approved-products-export"/);
     assert.match(view, /viewLabels.exportCsv/);
   });

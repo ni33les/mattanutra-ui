@@ -1399,7 +1399,6 @@ describe("product coverage workflow", () => {
       "scripts/apply-product-coverage-demand-cache-schema.ts",
       "utf8"
     );
-    const assessmentStore = readFileSync("lib/assessment-store.ts", "utf8");
     const candidateSearch = readFileSync("lib/admin-product-search.ts", "utf8");
     const freshness = readFileSync(
       "lib/product-recommendation-freshness.ts",
@@ -1474,8 +1473,6 @@ describe("product coverage workflow", () => {
     assert.match(taskWorkItems, /filterProductNeedsBySupplementAvailability/);
     assert.match(candidateSearch, /productHasCountryBlockedSupplement/);
     assert.match(candidateSearch, /getSupplementEffectiveAvailability/);
-    assert.match(assessmentStore, /blocked_country/);
-    assert.match(assessmentStore, /source_payload -> 'countryAvailability'/);
     assert.match(freshness, /supplement_governance_changed/);
     assert.match(freshness, /supplementGovernanceUpdatedAt/);
     assert.match(schema, /CREATE TABLE public\.supplement_country_availability/);

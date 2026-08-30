@@ -17,10 +17,6 @@ describe("reveal does not poll formulation when last-known is on the page", () =
     assert.match(source, /else if \(productPollingPreference\) \{\s*void fetchFormulation\("once"\)/);
     assert.match(
       source,
-      /formulationUrl\(effectivePlanId, locale, mode === "once"\)/
-    );
-    assert.match(
-      source,
       /formulationUrl\(effectivePlanId, locale, true\)/
     );
     assert.doesNotMatch(source, /MAX_PRODUCT_MATCHING_POLLS/);

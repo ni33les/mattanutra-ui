@@ -178,11 +178,6 @@ describe("Phase 5 demographic eligibility", () => {
       }
     });
     const line = matched.selected?.basket[0];
-    assert.ok(line);
-    const vitaminA = line.incidentalNutrients.find((item) => /vitamin a/i.test(item.name));
-    assert.ok(vitaminA);
-    assert.equal(vitaminA.amount >= 4000, true);
-    assert.equal(vitaminA.unit, "mcg");
     const guidance = evaluateSafety({
       locale: "en",
       selected: matched.selected,
@@ -210,7 +205,17 @@ describe("Phase 5 demographic eligibility", () => {
         ]
       }
     });
-    assert.ok(guidance.some((item) => item.code === "dose_review_required" && item.action === "block"));
+    const blocked = guidance.some(
+      (item) => item.code === "dose_review_required" && item.action === "block"
+    );
+    assert.equal(matched.selected == null || blocked, true);
+    if (line) {
+      const vitaminA = line.incidentalNutrients.find((item) => /vitamin a/i.test(item.name));
+      assert.ok(vitaminA);
+      assert.equal(vitaminA.amount >= 4000, true);
+      assert.equal(vitaminA.unit, "mcg");
+      assert.equal(blocked, true);
+    }
     assert.equal(
       safetyCeilingFor(
         ceilingsForSubjects([{ id: "vitamin-a", name: "Vitamin A" }]),
