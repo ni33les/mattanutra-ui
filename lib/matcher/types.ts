@@ -213,6 +213,7 @@ export type DoseVariant = Readonly<{
   dailyPills: number;
   dailyUnits: number;
   productId: string;
+  safetyExposure?: ReadonlyMap<string, ScaledAmount>;
   unknownSafetyAmount: boolean;
   variantId: string;
 }>;

@@ -414,7 +414,7 @@ export function recommendWithMatcher(
     optimization:
       input.stackPreference === "compact" ? "fewest_pills" : "best_coverage",
     profile: {
-      ageYears: 38,
+      ageYears: input.clientContext?.ageYears ?? 38,
       lifeStage: matcherLifeStage(input.clientContext?.lifestage),
       sex: input.clientSex === "female" || input.clientSex === "male"
         ? input.clientSex

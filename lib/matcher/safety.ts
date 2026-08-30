@@ -1,6 +1,6 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { OVER_TARGET_THRESHOLD } from "@/lib/matcher/config";
-import { scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
+import { isDoseError, scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
 import {
   catalogBandRuleId,
   catalogSubjectHasCeiling,
@@ -147,8 +147,82 @@ export function exposureExceedsCeiling(
   subjectId: string,
   exposureUnits: bigint
 ) {
-  const threshold = ceilingThreshold(request, subjectId);
-  return threshold != null && exposureUnits > threshold.units;
+  return stackUnitsViolateCeiling(request, subjectId, nameOf(request, subjectId), exposureUnits);
+}
+
+export function labelledSafetyExposure(
+  product: MatcherProduct,
+  dailyUnits: number
+) {
+  const exposure = new Map<string, ScaledAmount>();
+
+  for (const fact of product.labelledContributions) {
+    if (!fact.amount || fact.amount <= 0 || !fact.unit) {
+      continue;
+    }
+
+    const subjectId = (fact.subjectId || fact.name).trim();
+
+    if (!subjectId) {
+      continue;
+    }
+
+    const scaled = scaleAmount({
+      amount: fact.amount * dailyUnits,
+      subjectId,
+      subjectName: fact.name,
+      unit: fact.unit
+    });
+
+    if (isDoseError(scaled)) {
+      continue;
+    }
+
+    const previous = exposure.get(subjectId);
+    exposure.set(
+      subjectId,
+      previous ? { ...scaled, units: previous.units + scaled.units } : scaled
+    );
+  }
+
+  return exposure;
+}
+
+export function stackUnitsViolateCeiling(
+  request: CanonicalRequest,
+  subjectId: string,
+  name: string,
+  exposureUnits: bigint
+) {
+  if (exposureUnits <= BigInt(0)) {
+    return false;
+  }
+
+  const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
+    name,
+    profile: request.profile,
+    subjectId
+  });
+
+  if (ceiling) {
+    const threshold = scaleAmount({
+      amount: ceiling.maxAmount,
+      subjectId,
+      subjectName: ceiling.name || name || subjectId,
+      unit: ceiling.maxUnit
+    });
+
+    if (isDoseError(threshold)) {
+      return true;
+    }
+
+    return exposureUnits > threshold.units;
+  }
+
+  return catalogSubjectHasCeiling(request.safetyCeilings ?? [], {
+    name,
+    subjectId
+  });
 }
 
 export function exposureOvershootsTarget(

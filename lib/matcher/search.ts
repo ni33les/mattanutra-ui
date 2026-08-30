@@ -8,7 +8,8 @@ import {
 import { aggregateDailyExposure, isDoseError, unitsOrZero } from "@/lib/matcher/dose";
 import {
   evaluateSafety,
-  exposureExceedsCeiling,
+  labelledSafetyExposure,
+  stackUnitsViolateCeiling,
   variantDedicatedOvershoot
 } from "@/lib/matcher/safety";
 import type {
@@ -100,17 +101,34 @@ export function tryAddVariant(
 
   const delivered = cloneMap(state.delivered);
   const exposure = cloneMap(state.exposure);
+  const safetyExposure =
+    variant.safetyExposure ??
+    labelledSafetyExposure(group.product, variant.dailyUnits);
+  const additions =
+    safetyExposure.size > 0 ? safetyExposure : variant.contributions;
 
-  for (const [subjectId, amount] of variant.contributions) {
+  for (const [subjectId, amount] of additions) {
     const nextExposure =
       (exposure.get(subjectId) ?? BigInt(0)) + amount.units;
+    const nutrientName =
+      group.product.labelledContributions.find(
+        (fact) => (fact.subjectId || fact.name) === subjectId
+      )?.name ?? subjectId;
 
-    if (exposureExceedsCeiling(request, subjectId, nextExposure)) {
+    if (
+      stackUnitsViolateCeiling(request, subjectId, nutrientName, nextExposure)
+    ) {
       return null;
     }
 
-    delivered.set(subjectId, (delivered.get(subjectId) ?? BigInt(0)) + amount.units);
     exposure.set(subjectId, nextExposure);
+  }
+
+  for (const [subjectId, amount] of variant.contributions) {
+    delivered.set(
+      subjectId,
+      (delivered.get(subjectId) ?? BigInt(0)) + amount.units
+    );
   }
 
   return {

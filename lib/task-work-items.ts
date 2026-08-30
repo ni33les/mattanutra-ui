@@ -474,6 +474,28 @@ function stringArrayFromRecord(record: Record<string, unknown>, key: string) {
     : [];
 }
 
+function ageYearsFromQuestionnaire(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const compact = value.trim().toLowerCase();
+
+  if (compact.endsWith("+")) {
+    const parsed = Number(compact.slice(0, -1));
+    return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
+  }
+
+  const bounds = compact.split("-").map((part) => Number(part));
+
+  if (bounds.length === 2 && bounds.every((part) => Number.isFinite(part))) {
+    return Math.round((bounds[0] + bounds[1]) / 2);
+  }
+
+  const parsed = Number(compact);
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
+}
+
 function productRecommendationClientContextFromPlan(
   answers: unknown,
   planFeedback: readonly PlanFeedbackItem[],
@@ -495,6 +517,7 @@ function productRecommendationClientContextFromPlan(
   ].filter(Boolean).join("/");
 
   return {
+    ageYears: ageYearsFromQuestionnaire(textFromRecord(record, "age")),
     budgetPreference: textFromRecord(record, "budget"),
     conditions: cautions,
     currentSupplements: textFromRecord(record, "supplements"),

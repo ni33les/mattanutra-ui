@@ -7,6 +7,7 @@ import { canonicalNutrientKey, productKeysMatch } from "@/lib/product-key-matchi
 import {
   evaluateSafety,
   exposureExceedsCeiling,
+  labelledSafetyExposure,
   variantDedicatedOvershoot
 } from "@/lib/matcher/safety";
 import type {
@@ -260,6 +261,7 @@ export function compileVariant(input: Readonly<{
     dailyPills: variantPillBurden(input.product, input.dailyUnits),
     dailyUnits: input.dailyUnits,
     productId: input.product.productId,
+    safetyExposure: labelledSafetyExposure(input.product, input.dailyUnits),
     unknownSafetyAmount: unknown,
     variantId: `${listingId(input.product)}:x${input.dailyUnits}`
   };

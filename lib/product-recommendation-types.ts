@@ -166,6 +166,7 @@ export type ProductRecommendationResult = Readonly<{
 }>;
 
 export type ProductRecommendationClientContext = Readonly<{
+  ageYears?: number | null;
   budgetAmount?: number | null;
   budgetPreference?: string | null;
   conditions?: readonly string[];

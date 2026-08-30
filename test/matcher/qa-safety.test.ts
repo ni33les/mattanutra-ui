@@ -6,9 +6,11 @@ import { evaluateSafety } from "../../lib/matcher/safety.ts";
 import {
   QA_GOLD_CATALOG,
   QA_UNSAFE_ONLY,
+  qaCatalogSafetyCeilings,
   qaRequest,
   qaTarget
 } from "../../lib/matcher/qa/index.ts";
+import { qaProduct } from "../../lib/matcher/qa/product.ts";
 import type { DoseVariant } from "../../lib/matcher/types.ts";
 
 function ids(result: ReturnType<typeof match>) {
@@ -137,6 +139,115 @@ describe("QA-GOLD safety stacks", () => {
     });
     assert.equal(ids(result).includes("G-D3-2000"), false);
     assert.ok(result.rejected.some((item) => item.productId === "G-D3-2000"));
+  });
+
+  it("refuses a stack whose labelled zinc exceeds the adult UL", () => {
+    const catalog = {
+      ...QA_GOLD_CATALOG,
+      products: [
+        ...QA_GOLD_CATALOG.products,
+        qaProduct({
+          facts: [
+            { amount: 200, key: "mag" },
+            { amount: 30, key: "zinc" }
+          ],
+          id: "MULTI-ZN-30",
+          priceThb: 180
+        }),
+        qaProduct({
+          facts: [
+            { amount: 2000, key: "d3" },
+            { amount: 20, key: "zinc" }
+          ],
+          id: "D3-ZN-20",
+          priceThb: 170
+        })
+      ]
+    };
+    const result = match(
+      qaRequest({
+        maxProductCount: 2,
+        targets: [qaTarget("mag", 200), qaTarget("d3", 2000)]
+      }),
+      catalog
+    );
+    const selected = ids(result);
+    assert.equal(
+      selected.includes("MULTI-ZN-30") && selected.includes("D3-ZN-20"),
+      false
+    );
+  });
+
+  it("uses the pregnant zinc UL, not the adult UL, for a pregnant profile", () => {
+    const zincCeilings = qaCatalogSafetyCeilings().map((ceiling) =>
+      ceiling.subjectId === "sup_zinc" && ceiling.lifeStage === "pregnant"
+        ? { ...ceiling, maxAmount: 25 }
+        : ceiling
+    );
+    const catalog = {
+      ...QA_GOLD_CATALOG,
+      products: [
+        qaProduct({
+          facts: [
+            { amount: 200, key: "mag" },
+            { amount: 15, key: "zinc" }
+          ],
+          id: "MULTI-ZN-15",
+          priceThb: 180
+        }),
+        qaProduct({
+          facts: [
+            { amount: 2000, key: "d3" },
+            { amount: 15, key: "zinc" }
+          ],
+          id: "D3-ZN-15",
+          priceThb: 170
+        })
+      ]
+    };
+    const result = match(
+      qaRequest({
+        maxProductCount: 2,
+        profile: { ageYears: 32, lifeStage: "pregnant", sex: "female" },
+        safetyCeilings: zincCeilings,
+        targets: [qaTarget("mag", 200), qaTarget("d3", 2000)]
+      }),
+      catalog
+    );
+    const selected = ids(result);
+    assert.equal(
+      selected.includes("MULTI-ZN-15") && selected.includes("D3-ZN-15"),
+      false
+    );
+  });
+
+  it("fails closed when zinc has a table UL but not for this life stage", () => {
+    const withoutPregnantZinc = qaCatalogSafetyCeilings().filter(
+      (ceiling) =>
+        !(ceiling.subjectId === "sup_zinc" && ceiling.lifeStage === "pregnant")
+    );
+    const catalog = {
+      ...QA_GOLD_CATALOG,
+      products: [
+        qaProduct({
+          facts: [
+            { amount: 200, key: "mag" },
+            { amount: 10, key: "zinc" }
+          ],
+          id: "MULTI-ZN-10",
+          priceThb: 180
+        })
+      ]
+    };
+    const result = match(
+      qaRequest({
+        profile: { ageYears: 32, lifeStage: "pregnant", sex: "female" },
+        safetyCeilings: withoutPregnantZinc,
+        targets: [qaTarget("mag", 200)]
+      }),
+      catalog
+    );
+    assert.equal(ids(result).includes("MULTI-ZN-10"), false);
   });
 
   it("UNSAFE-ONLY is not selected even as the only covering SKU", () => {
