@@ -19,6 +19,7 @@ import type { FormulationResult } from "@/lib/formulation-types";
 import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import { isLocale, locales, type Locale, type LocaleCode } from "@/lib/i18n";
 import { visibleSupplementRecommendationCount } from "@/lib/nutrition-journey-status";
+import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
 import { nutritionProgressPath } from "@/lib/nutrition-paths";
 import {
   paymentCheckoutPath,
@@ -450,7 +451,11 @@ function evaluatedIngredientCount(
 }
 
 function catalogueFitPercent(formula: FormulationResult | null) {
-  const value = formula?.productRecommendations?.stackCoveragePercent;
+  const needCoverage = formula?.productRecommendations?.needCoverage;
+  const value =
+    needCoverage && needCoverage.length > 0
+      ? marketingCoveragePercentFromNeedCoverage(needCoverage)
+      : formula?.productRecommendations?.stackCoveragePercent;
 
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return null;

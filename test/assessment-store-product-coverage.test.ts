@@ -172,4 +172,160 @@ describe("assessment store product coverage reconciliation", () => {
     assert.equal(result.recommendations[0]?.stackCoveragePercent, 20);
     assert.equal(result.recommendations[0]?.productCoveragePercent, 20);
   });
+
+  it("publishes unweighted formula coverage for marketing when rank weights differ", () => {
+    const result = reconcileProductRecommendationCoverage({
+      foodGuidance: [],
+      rawNeedCoverage: [
+        {
+          bestRejectedProductId: null,
+          bestRejectedReason: null,
+          coveragePercent: 0,
+          displayName: "Vitamin D3",
+          id: "supplement:vitamin-d3",
+          itemType: "supplement"
+        },
+        {
+          bestRejectedProductId: null,
+          bestRejectedReason: null,
+          coveragePercent: 100,
+          displayName: "Omega-3",
+          id: "supplement:omega-3",
+          itemType: "supplement"
+        },
+        {
+          bestRejectedProductId: null,
+          bestRejectedReason: null,
+          coveragePercent: 100,
+          displayName: "Magnesium",
+          id: "supplement:magnesium",
+          itemType: "supplement"
+        },
+        {
+          bestRejectedProductId: null,
+          bestRejectedReason: null,
+          coveragePercent: 0,
+          displayName: "Vitamin B12",
+          id: "supplement:vitamin-b12",
+          itemType: "supplement"
+        },
+        {
+          bestRejectedProductId: null,
+          bestRejectedReason: null,
+          coveragePercent: 100,
+          displayName: "CoQ10",
+          id: "supplement:coq10",
+          itemType: "supplement"
+        },
+        {
+          bestRejectedProductId: null,
+          bestRejectedReason: null,
+          coveragePercent: 100,
+          displayName: "Vitamin C",
+          id: "supplement:vitamin-c",
+          itemType: "supplement"
+        },
+        {
+          bestRejectedProductId: null,
+          bestRejectedReason: null,
+          coveragePercent: 100,
+          displayName: "Zinc",
+          id: "supplement:zinc",
+          itemType: "supplement"
+        },
+        {
+          bestRejectedProductId: null,
+          bestRejectedReason: null,
+          coveragePercent: 100,
+          displayName: "Creatine",
+          id: "supplement:creatine",
+          itemType: "supplement"
+        }
+      ],
+      storedStackCoveragePercent: 62,
+      recommendations: [
+        recommendation({
+          covers: ["omega-3"],
+          productCoveragePercent: 21,
+          stackContributionPercent: 21
+        })
+      ],
+      supplementBreakdown: [
+        {
+          category: "Vitamin",
+          dailyDose: { en: "2000 IU/day", th: "2000 IU/day" },
+          effectivenessRank: 1,
+          id: "vitamin-d3",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Vitamin D3", th: "Vitamin D3" }
+        },
+        {
+          category: "Fatty acid",
+          dailyDose: { en: "1000 mg/day", th: "1000 mg/day" },
+          effectivenessRank: 2,
+          id: "omega-3",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Omega-3", th: "Omega-3" }
+        },
+        {
+          category: "Mineral",
+          dailyDose: { en: "200 mg/day", th: "200 mg/day" },
+          effectivenessRank: 3,
+          id: "magnesium",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Magnesium", th: "Magnesium" }
+        },
+        {
+          category: "Vitamin",
+          dailyDose: { en: "500 mcg/day", th: "500 mcg/day" },
+          effectivenessRank: 4,
+          id: "vitamin-b12",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Vitamin B12", th: "Vitamin B12" }
+        },
+        {
+          category: "Targeted",
+          dailyDose: { en: "100 mg/day", th: "100 mg/day" },
+          effectivenessRank: 5,
+          id: "coq10",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "CoQ10", th: "CoQ10" }
+        },
+        {
+          category: "Vitamin",
+          dailyDose: { en: "500 mg/day", th: "500 mg/day" },
+          effectivenessRank: 6,
+          id: "vitamin-c",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Vitamin C", th: "Vitamin C" }
+        },
+        {
+          category: "Mineral",
+          dailyDose: { en: "15 mg/day", th: "15 mg/day" },
+          effectivenessRank: 7,
+          id: "zinc",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Zinc", th: "Zinc" }
+        },
+        {
+          category: "Amino acid",
+          dailyDose: { en: "3 g/day", th: "3 g/day" },
+          effectivenessRank: 8,
+          id: "creatine",
+          rationale: { en: "", th: "" },
+          status: "add",
+          supplement: { en: "Creatine", th: "Creatine" }
+        }
+      ]
+    });
+
+    assert.equal(result.stackCoveragePercent, 75);
+  });
 });

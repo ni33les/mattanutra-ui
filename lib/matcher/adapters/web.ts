@@ -12,7 +12,7 @@ import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { match } from "@/lib/matcher";
 import type { CatalogSnapshot, ProductGroup } from "@/lib/matcher/types";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
-import { publicCoveragePercent } from "@/lib/matcher/explainer";
+import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
 import { whyProductMatches } from "@/lib/product-recommendation-metrics";
 import {
   normalizeProductFactKey,
@@ -471,11 +471,11 @@ export function recommendWithMatcher(
     trimmed: result.trimmed,
     variants: variantCount
   });
-  const coverage = publicCoveragePercent(result.selected);
   const needDiagnostics = needDiagnosticsFromBasket(
     supplementNeeds,
     result.selected
   );
+  const coverage = marketingCoveragePercentFromNeedCoverage(needDiagnostics);
   const byId = new Map(input.candidates.map((item) => [item.id, item]));
   const recommendations: ProductRecommendationSelection[] = [];
   for (const [index, productId] of (result.selected?.productIds ?? []).entries()) {

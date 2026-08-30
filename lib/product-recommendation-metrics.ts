@@ -237,6 +237,34 @@ export function stackCoveragePercent(
   return totalWeight > 0 ? (weightedCoverage / totalWeight) * 100 : 0;
 }
 
+function clampCoverageRatio(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(1, Math.max(0, value));
+}
+
+export function unweightedStackCoveragePercent(
+  coverage: Map<string, number>,
+  needs: readonly ProductRecommendationNeed[]
+) {
+  const rows = needs.filter((need) => need.itemType !== "food");
+
+  if (rows.length < 1) {
+    return 0;
+  }
+
+  const total = rows.reduce(
+    (sum, need) => sum + clampCoverageRatio(coverage.get(need.id) ?? 0),
+    0
+  );
+
+  return (total / rows.length) * 100;
+}
+
+export { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
+
 export function diagnosticNeeds(
   needs: ProductRecommendationNeed[],
   coverage: Map<string, number>,

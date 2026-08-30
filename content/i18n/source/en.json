@@ -7539,7 +7539,7 @@
     "translatable": true
   },
   "customer.revealFinalCopy.formulaMatchTooltip": {
-    "defaultMessage": "How closely the selected products meet the doses in your formula, averaged across covered nutrients.",
+    "defaultMessage": "Share of formula nutrients the selected products cover. Each nutrient counts equally, including any still uncovered.",
     "description": "Final reveal copy field formulaMatchTooltip.",
     "namespace": "customer.revealFinalCopy",
     "audience": "customer",

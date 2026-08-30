@@ -25,6 +25,7 @@ import {
   productFactAudienceMismatchReason,
   safePercent,
   stackCoveragePercent,
+  unweightedStackCoveragePercent,
   visibleCoveragePercent,
   whyProductMatches,
   type CoverageResult
@@ -2847,13 +2848,11 @@ function recommendProductStackExact(
   const productNeedsCoverage = selectedStack
     ? stackCoverageForNeeds(selectedStack.entries, scoringNeeds)
     : new Map<string, number>();
-  const supplementProductCoveragePercent = safePercent(
-    stackCoveragePercent(productNeedsCoverage, scoringNeeds)
+  const marketingCoveragePercent = safePercent(
+    unweightedStackCoveragePercent(productNeedsCoverage, scoringNeeds)
   );
   const foodCoveragePercent = 0;
-  const totalPlanCoveragePercent = safePercent(
-    stackCoveragePercent(finalCoverage, scoringNeeds)
-  );
+  const totalPlanCoveragePercent = marketingCoveragePercent;
   const needDiagnostics = diagnosticNeeds(
     scoringNeeds,
     finalCoverage,
@@ -2922,7 +2921,7 @@ function recommendProductStackExact(
       ),
       coverage: {
         foodCoveragePercent,
-        supplementProductCoveragePercent,
+        supplementProductCoveragePercent: marketingCoveragePercent,
         totalPlanCoveragePercent
       },
       factIssues: factIssueExclusions(exclusions),
@@ -2939,8 +2938,8 @@ function recommendProductStackExact(
       ? recommendationsFromV2Stack(selectedStack, scoringNeeds)
       : [],
     foodCoveragePercent,
-    stackCoveragePercent: supplementProductCoveragePercent,
-    supplementProductCoveragePercent,
+    stackCoveragePercent: marketingCoveragePercent,
+    supplementProductCoveragePercent: marketingCoveragePercent,
     totalPlanCoveragePercent
   } satisfies ProductRecommendationResult;
 }

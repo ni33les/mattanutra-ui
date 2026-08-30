@@ -821,7 +821,7 @@
   "customer.revealFinalCopy.foodNote": "产品负责已计算的补充剂剂量和购物篮计算。食物作为同一配方需求的日常支持展示，并不替代配方。",
   "customer.revealFinalCopy.formulaHint": "点开任一营养素查看理由",
   "customer.revealFinalCopy.formulaMatch": "配方匹配",
-  "customer.revealFinalCopy.formulaMatchTooltip": "所选产品与配方剂量的接近程度，按已覆盖营养素平均计算。",
+  "customer.revealFinalCopy.formulaMatchTooltip": "所选产品覆盖配方营养素的比例。每种营养素同等计算，包括尚未覆盖的。",
   "customer.revealFinalCopy.khunAlt": "Khun Dream，清迈 Delight Pharmacy 执业药师",
   "customer.revealFinalCopy.khunCredentialOne": "泰国 FDA 注册",
   "customer.revealFinalCopy.khunCredentialThree": "清迈本地",

@@ -12,6 +12,7 @@ import type {
   RecommendedProduct,
 } from "@/lib/formulation-types";
 import type { Locale } from "@/lib/i18n";
+import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
 import {
   nutritionHealthScorePath,
   nutritionRevealPath,
@@ -212,6 +213,12 @@ export function selectedStackCoverage(
     | undefined,
   products: RecommendedProduct[],
 ) {
+  const needCoverage = productRecommendations?.needCoverage;
+
+  if (needCoverage && needCoverage.length > 0) {
+    return marketingCoveragePercentFromNeedCoverage(needCoverage);
+  }
+
   return Math.max(
     0,
     Math.round(

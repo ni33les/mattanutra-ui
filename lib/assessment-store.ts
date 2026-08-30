@@ -35,6 +35,7 @@ import {
   buildProductNeeds,
   type ProductRecommendationNeed
 } from "@/lib/product-recommendations";
+import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
 import { getSql } from "@/lib/db";
 import { uuidArray } from "@/lib/sql-arrays";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
@@ -568,29 +569,6 @@ function currentNeedCoverage(
     });
 }
 
-function weightedCoveragePercent(
-  needs: readonly ProductRecommendationNeed[],
-  coverageLookup: ReadonlyMap<string, number>
-) {
-  const totalWeight = needs.reduce((total, need) => total + need.weight, 0);
-
-  if (totalWeight <= 0) {
-    return 0;
-  }
-
-  const coveredWeight = needs.reduce((total, need) => {
-    const coveragePercent =
-      coverageLookup.get(need.id) ??
-      coverageLookup.get(need.sourceId) ??
-      coverageLookup.get(normalizeReviewName(need.displayName)) ??
-      0;
-
-    return total + need.weight * Math.min(1, Math.max(0, coveragePercent / 100));
-  }, 0);
-
-  return Math.min(100, Math.max(0, Math.round((coveredWeight / totalWeight) * 100)));
-}
-
 function weightedContributionPercent(
   selectedNeeds: readonly ProductRecommendationNeed[],
   denominatorNeeds: readonly ProductRecommendationNeed[],
@@ -652,7 +630,7 @@ export function reconcileProductRecommendationCoverage(input: Readonly<{
   const reasonLookup = productCoverageReasonLookup(input.rawNeedCoverage);
   const needCoverage = currentNeedCoverage(currentNeeds, coverageLookup, reasonLookup);
   const productNeeds = currentNeeds.filter((need) => need.itemType === "supplement");
-  const fromNeeds = weightedCoveragePercent(productNeeds, coverageLookup);
+  const fromNeeds = marketingCoveragePercentFromNeedCoverage(needCoverage);
   const storedStackCoveragePercent = boundedPercentOrNull(
     input.storedStackCoveragePercent
   );

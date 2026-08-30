@@ -137,7 +137,7 @@ describe("matcher web adapter coverage mapping", () => {
     assert.doesNotMatch(source, /coveredNeeds:\s*supplementNeeds,/);
     assert.match(
       source,
-      /coveredNeeds:\s*supplementNeeds\.filter\(\(need\) =>\s*matcherProductCoversNeed/
+      /const coveredNeeds = supplementNeeds\.filter\(\(need\) =>\s*matcherProductCoversNeed/
     );
     assert.match(source, /needDiagnosticsFromBasket/);
     assert.doesNotMatch(

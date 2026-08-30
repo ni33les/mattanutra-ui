@@ -256,6 +256,19 @@ function scored(overrides: Partial<ScoredBasket> & { productIds: readonly string
 }
 
 describe("matcher phase 2 oversupply, source, and ontology", () => {
+  it("MCP coveragePercent averages targets equally when one is uncovered", () => {
+    const result = match(
+      request({
+        maxProductCount: 1,
+        targets: [omega, d3]
+      }),
+      catalog([G_O3_FISH_1000])
+    );
+    assert.ok(result.selected);
+    assert.deepEqual(result.selected?.productIds, ["G-O3-FISH-1000"]);
+    assert.equal(publicCoveragePercent(result.selected), 50);
+  });
+
   it("M-01 fewest_pills selects G-BASE-COMBO + G-O3-FISH-1000", () => {
     const result = match(request({ optimization: "fewest_pills" }), catalog());
     assert.ok(result.selected);

@@ -821,7 +821,7 @@
   "customer.revealFinalCopy.foodNote": "ผลิตภัณฑ์ดูแลขนาดสารอาหารและการคำนวณตะกร้า ส่วนอาหารแสดงเป็นการสนับสนุนในชีวิตประจำวันสำหรับความต้องการเดียวกันในสูตร ไม่ใช่สิ่งทดแทนสูตร",
   "customer.revealFinalCopy.formulaHint": "แตะสารอาหารเพื่อดูเหตุผล",
   "customer.revealFinalCopy.formulaMatch": "ความตรงกับสูตร",
-  "customer.revealFinalCopy.formulaMatchTooltip": "ความใกล้เคียงของผลิตภัณฑ์ที่เลือกกับขนาดในสูตร เฉลี่ยจากสารอาหารที่ครอบคลุม",
+  "customer.revealFinalCopy.formulaMatchTooltip": "สัดส่วนสารอาหารในสูตรที่ผลิตภัณฑ์ที่เลือกครอบคลุม นับทุกตัวเท่ากัน รวมตัวที่ยังไม่ครอบคลุม",
   "customer.revealFinalCopy.khunAlt": "คุณดรีม เภสัชกรประจำ Delight Pharmacy เชียงใหม่",
   "customer.revealFinalCopy.khunCredentialOne": "ขึ้นทะเบียน อย. ไทย",
   "customer.revealFinalCopy.khunCredentialThree": "ประจำเชียงใหม่",

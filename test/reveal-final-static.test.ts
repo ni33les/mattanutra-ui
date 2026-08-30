@@ -63,6 +63,14 @@ function assertOrder(source: string, labels: readonly string[]) {
 }
 
 describe("final reveal UX", () => {
+  it("explains formula match as an equal average of all formula nutrients", () => {
+    assert.match(
+      i18nSource,
+      /Each nutrient counts equally, including any still uncovered/,
+    );
+    assert.doesNotMatch(i18nSource, /averaged across covered nutrients/);
+  });
+
   it("explains Foundation, Add-on, and Targeted in one line each", () => {
     assert.match(i18nSource, /"Take these every day\."/);
     assert.match(i18nSource, /"Good to add if you can afford them\."/);

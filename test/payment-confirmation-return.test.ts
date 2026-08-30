@@ -50,6 +50,7 @@ describe("assessment payment confirmation page", () => {
     assert.match(assessmentReturnPage, /getStoredFormulationResult/);
     assert.match(assessmentReturnPage, /computeHealthScore/);
     assert.match(assessmentReturnPage, /visibleSupplementRecommendationCount/);
+    assert.match(assessmentReturnPage, /marketingCoveragePercentFromNeedCoverage/);
     assert.match(assessmentReturnPage, /productRecommendations\?\.stackCoveragePercent/);
     assert.match(assessmentReturnPage, /AMOUNT_MICROS_PER_UNIT/);
     assert.match(assessmentReturnPage, /formatCurrencyAmount/);

@@ -1054,6 +1054,29 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(result.stackCoveragePercent, 87);
   });
 
+  it("reports unweighted marketing coverage after rank-weighted selection", () => {
+    const result = recommendProductStackV2({
+      candidates: [
+        product({ amount: 1, id: "coq10-full", name: "CoQ10" }),
+        product({ amount: 1, id: "omega-full", name: "Omega-3" }),
+        product({ amount: 0.12, id: "creatine-tiny", name: "Creatine" })
+      ],
+      maxProducts: 6,
+      needs: [
+        need("coq10", "CoQ10", 7),
+        need("omega_3", "Omega-3", 6),
+        need("creatine", "Creatine", 2)
+      ]
+    });
+
+    assert.deepEqual(
+      result.recommendations.map((item) => item.product.id),
+      ["coq10-full", "omega-full"]
+    );
+    assert.equal(result.stackCoveragePercent, 67);
+    assert.equal(result.supplementProductCoveragePercent, 67);
+  });
+
   it("does not increase serving count when another fact would exceed its safety limit", () => {
     const base = product({
       amount: 0.25,

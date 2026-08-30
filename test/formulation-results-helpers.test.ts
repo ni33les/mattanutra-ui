@@ -5,6 +5,7 @@ import {
   resultHasProductStackRows,
   resultHasTransientEmptyProductRecommendations,
 } from "../lib/product-recommendation-readiness.ts";
+import { selectedStackCoverage } from "../components/formulation-results-helpers.tsx";
 import {
   defaultProductStackPreferenceForResult,
   productRecommendationOptionsForResult,
@@ -233,5 +234,88 @@ describe("formulation results product recommendation readiness", () => {
 
     assert.equal(resultHasTransientEmptyProductRecommendations(payload), false);
     assert.equal(resultHasPendingProductRecommendations(payload), false);
+  });
+});
+
+describe("selected stack coverage marketing percent", () => {
+  it("uses an equal average of need coverage instead of the stored weighted stack percent", () => {
+    const percent = selectedStackCoverage(
+      {
+        matchedCount: 6,
+        needCoverage: [
+          {
+            bestRejectedProductId: null,
+            bestRejectedReason: null,
+            coveragePercent: 0,
+            displayName: "Vitamin D3",
+            id: "supplement:vitamin-d3",
+            itemType: "supplement"
+          },
+          {
+            bestRejectedProductId: null,
+            bestRejectedReason: null,
+            coveragePercent: 100,
+            displayName: "Omega-3",
+            id: "supplement:omega-3",
+            itemType: "supplement"
+          },
+          {
+            bestRejectedProductId: null,
+            bestRejectedReason: null,
+            coveragePercent: 100,
+            displayName: "Magnesium",
+            id: "supplement:magnesium",
+            itemType: "supplement"
+          },
+          {
+            bestRejectedProductId: null,
+            bestRejectedReason: null,
+            coveragePercent: 0,
+            displayName: "Vitamin B12",
+            id: "supplement:vitamin-b12",
+            itemType: "supplement"
+          },
+          {
+            bestRejectedProductId: null,
+            bestRejectedReason: null,
+            coveragePercent: 100,
+            displayName: "CoQ10",
+            id: "supplement:coq10",
+            itemType: "supplement"
+          },
+          {
+            bestRejectedProductId: null,
+            bestRejectedReason: null,
+            coveragePercent: 100,
+            displayName: "Vitamin C",
+            id: "supplement:vitamin-c",
+            itemType: "supplement"
+          },
+          {
+            bestRejectedProductId: null,
+            bestRejectedReason: null,
+            coveragePercent: 100,
+            displayName: "Zinc",
+            id: "supplement:zinc",
+            itemType: "supplement"
+          },
+          {
+            bestRejectedProductId: null,
+            bestRejectedReason: null,
+            coveragePercent: 100,
+            displayName: "Creatine",
+            id: "supplement:creatine",
+            itemType: "supplement"
+          }
+        ],
+        needsCount: 8,
+        stackCoveragePercent: 62,
+        stackPreference: "balanced",
+        status: "ready"
+      },
+      []
+    );
+
+    assert.equal(percent, 75);
   });
 });
