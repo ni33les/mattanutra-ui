@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { marketingCoveragePercentFromNeedCoverage } from "../lib/marketing-coverage.ts";
+import {
+  coveredFormulaNeedCount,
+  formulaNeedCount,
+  marketingCoveragePercentFromNeedCoverage
+} from "../lib/marketing-coverage.ts";
 import {
   stackCoveragePercent,
   unweightedStackCoveragePercent
@@ -74,5 +78,24 @@ describe("marketing coverage is unweighted", () => {
       ]),
       100
     );
+  });
+
+  it("matches the live reveal table: equal average 82%, and 2% B12 is not covered", () => {
+    const needs = [
+      { coveragePercent: 60, itemType: "supplement" },
+      { coveragePercent: 100, itemType: "supplement" },
+      { coveragePercent: 88, itemType: "supplement" },
+      { coveragePercent: 2, itemType: "supplement" },
+      { coveragePercent: 100, itemType: "supplement" },
+      { coveragePercent: 100, itemType: "supplement" },
+      { coveragePercent: 100, itemType: "supplement" },
+      { coveragePercent: 66, itemType: "supplement" },
+      { coveragePercent: 100, itemType: "supplement" },
+      { coveragePercent: 100, itemType: "supplement" }
+    ];
+
+    assert.equal(formulaNeedCount(needs), 10);
+    assert.equal(marketingCoveragePercentFromNeedCoverage(needs), 82);
+    assert.equal(coveredFormulaNeedCount(needs), 6);
   });
 });

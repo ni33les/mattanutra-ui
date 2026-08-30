@@ -12,7 +12,13 @@ import type {
   RecommendedProduct,
 } from "@/lib/formulation-types";
 import type { Locale } from "@/lib/i18n";
-import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
+import {
+  coveredFormulaNeedCount,
+  formulaNeedCount,
+  marketingCoveragePercentFromNeedCoverage
+} from "@/lib/marketing-coverage";
+
+export { coveredFormulaNeedCount, formulaNeedCount };
 import {
   nutritionHealthScorePath,
   nutritionRevealPath,

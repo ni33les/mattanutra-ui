@@ -63,6 +63,11 @@ function assertOrder(source: string, labels: readonly string[]) {
 }
 
 describe("final reveal UX", () => {
+  it("counts covered nutrients from dose percent, not product cover tags", () => {
+    assert.match(reveal, /coveredFormulaNeedCount\(needCoverage\)/);
+    assert.match(reveal, /formulaNeedCount\(needCoverage\)/);
+  });
+
   it("explains formula match as an equal average of all formula nutrients", () => {
     assert.match(
       i18nSource,

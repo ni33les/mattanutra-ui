@@ -8,6 +8,8 @@ import { LandingReveal } from "@/components/landing-reveal";
 import { PreviewPaywallPanel } from "@/components/formulation-results-panels";
 import { SafeImage } from "@/components/safe-image";
 import {
+  coveredFormulaNeedCount,
+  formulaNeedCount,
   productCoveredNeedCount,
   replaceRevealStackUrl,
   revealContextChips,
@@ -1158,7 +1160,10 @@ function RevealProductsFinalSection({
     activeProductRecommendations,
     products,
   );
-  const productNeedCount = productCoveredNeedCount(products);
+  const needCoverage = activeProductRecommendations?.needCoverage ?? [];
+  const formulaNeeds = formulaNeedCount(needCoverage);
+  const productNeedCount =
+    formulaNeeds > 0 ? formulaNeeds : productCoveredNeedCount(products);
   const supplementLabelById = new Map(
     visibleFormulaIngredients(result.supplementBreakdown).map((ingredient) => [
       ingredient.id,
@@ -1335,8 +1340,13 @@ function RevealProductsFinalSection({
       selectedProductOption?.productRecommendations.refreshing,
   );
   const coveredProductNeedCount = Math.min(
-    Math.max(0, productNeedCount),
-    Math.max(0, supplementSelectedCount),
+    Math.max(
+      0,
+      formulaNeeds > 0
+        ? coveredFormulaNeedCount(needCoverage)
+        : productCoveredNeedCount(products),
+    ),
+    Math.max(0, supplementSelectedCount, productNeedCount),
   );
   const productSelectedText = localizedCountText(products.length, locale, true);
   const coveredProductNeedText = localizedCountText(

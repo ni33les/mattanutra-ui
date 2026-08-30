@@ -5,7 +5,10 @@ import {
   resultHasProductStackRows,
   resultHasTransientEmptyProductRecommendations,
 } from "../lib/product-recommendation-readiness.ts";
-import { selectedStackCoverage } from "../components/formulation-results-helpers.tsx";
+import {
+  coveredFormulaNeedCount,
+  selectedStackCoverage,
+} from "../components/formulation-results-helpers.tsx";
 import {
   defaultProductStackPreferenceForResult,
   productRecommendationOptionsForResult,
@@ -317,5 +320,23 @@ describe("selected stack coverage marketing percent", () => {
     );
 
     assert.equal(percent, 75);
+  });
+
+  it("does not count a 2% nutrient as covered", () => {
+    assert.equal(
+      coveredFormulaNeedCount([
+        { coveragePercent: 60, itemType: "supplement" },
+        { coveragePercent: 100, itemType: "supplement" },
+        { coveragePercent: 88, itemType: "supplement" },
+        { coveragePercent: 2, itemType: "supplement" },
+        { coveragePercent: 100, itemType: "supplement" },
+        { coveragePercent: 100, itemType: "supplement" },
+        { coveragePercent: 100, itemType: "supplement" },
+        { coveragePercent: 66, itemType: "supplement" },
+        { coveragePercent: 100, itemType: "supplement" },
+        { coveragePercent: 100, itemType: "supplement" },
+      ]),
+      6,
+    );
   });
 });
