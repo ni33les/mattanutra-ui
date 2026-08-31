@@ -418,6 +418,19 @@ export async function applyHygeiaImport(input: Readonly<{
         continue;
       }
 
+      const approved = await sql<Array<{ approved: boolean }>>`
+        select exists (
+          select 1
+          from public.products
+          where id = ${row.productId}::uuid
+            and status = 'approved'
+        ) as approved
+      `;
+
+      if (!approved[0]?.approved) {
+        continue;
+      }
+
       const existing = await sql<Array<{
         id: string | null;
         stock_quantity: number | string | null;

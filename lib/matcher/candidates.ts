@@ -967,6 +967,11 @@ export function compileGroups(
       pool.unshift(strongest);
     }
 
+    const dedicatedCoveringExists = ranked.some(
+      (product) =>
+        productIsDedicatedForTarget(product, target) &&
+        productHitsCoverageFloor(product, request, target)
+    );
     const jointCandidate = ranked.find(
       (product) =>
         jointTitle(product.title) &&
@@ -975,12 +980,17 @@ export function compileGroups(
 
     if (
       jointCandidate &&
+      !dedicatedCoveringExists &&
       !pool.some((product) => product.productId === jointCandidate.productId)
     ) {
       pool.unshift(jointCandidate);
     }
 
     for (const product of pool) {
+      if (dedicatedCoveringExists && jointTitle(product.title)) {
+        continue;
+      }
+
       if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
         break;
       }

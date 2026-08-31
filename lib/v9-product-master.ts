@@ -958,7 +958,7 @@ export async function seedV9RetailTenants(
     order by lower(name)
   `;
   const sellableProducts = products.filter(
-    (product) => product.status !== "ignored" && product.price
+    (product) => product.status === "approved" && product.price
   );
   let retailSellablesSeeded = 0;
   let retailStockSeeded = 0;

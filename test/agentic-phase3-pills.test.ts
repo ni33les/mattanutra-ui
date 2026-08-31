@@ -366,6 +366,68 @@ describe("Phase 3 fewest_pills ranking", () => {
     );
   });
 
+  it("picks dedicated Vitamin D3 over three Joint Mobility capsules", () => {
+    const result = match(
+      qaRequest({
+        optimization: "fewest_pills",
+        targets: [
+          qaTarget("creatine", 3),
+          qaTarget("mag", 150),
+          qaTarget("d3", 1000)
+        ]
+      }),
+      catalog([
+        qaProduct({
+          facts: [{ amount: 3, key: "creatine" }],
+          form: "powder",
+          id: "prd_creatine",
+          pills: 0,
+          priceThb: 1166,
+          title: "Optimum Nutrition Creatine Powder"
+        }),
+        qaProduct({
+          facts: [{ amount: 150, key: "mag" }],
+          id: "prd_magnesium",
+          pills: 1,
+          priceThb: 475,
+          title: "MAGNESIUM"
+        }),
+        qaProduct({
+          facts: [{ amount: 1000, key: "d3" }],
+          id: "prd_d3_1000",
+          pills: 1,
+          priceThb: 441,
+          title: "Blackmores Vitamin D3 1000 IU"
+        }),
+        qaProduct({
+          facts: [
+            { amount: 10, key: "d3", name: "Vitamin D3", unit: "mcg" },
+            { amount: 10, key: "collagen", name: "Collagen", unit: "mg" },
+            { amount: 50, key: "c" }
+          ],
+          id: "prd_joint",
+          pills: 1,
+          priceThb: 441,
+          title: "Blackmores Joint Mobility Plus"
+        })
+      ])
+    );
+    assert.ok(result.selected);
+    assert.equal(result.selected.productIds.includes("prd_d3_1000"), true);
+    assert.equal(result.selected.productIds.includes("prd_joint"), false);
+    assert.equal(result.selected.productIds.includes("prd_magnesium"), true);
+    const d3 = qaTarget("d3", 1000);
+    const d3Variant = result.selected.variantIds.find((id) =>
+      id.includes("prd_d3_1000:")
+    );
+    const servings = Number(d3Variant?.match(/:x(\d+)$/)?.[1] || 1);
+    assert.equal(servings, 1);
+    assert.equal(
+      Math.round((result.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
+      true
+    );
+  });
+
   it("picks dedicated MAGNESIUM over MAGNESIUM+D3 when both cover Mag at the floor", () => {
     const result = match(
       qaRequest({

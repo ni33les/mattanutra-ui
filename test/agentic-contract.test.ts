@@ -5,10 +5,11 @@ import {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_DESCRIPTIONS,
+  AGENTIC_PRD_SERVER_INSTRUCTIONS,
+  AGENTIC_PRD_TOOL_DESCRIPTIONS,
   AGENTIC_UAT_SERVER_INSTRUCTIONS,
   AGENTIC_INPUT_SCHEMAS,
   AGENTIC_TOOL_SCHEMAS,
-  PLAN_ADVERTISED_SCHEMA,
   PLAN_INPUT_SCHEMA,
   validateToolInput
 } from "../lib/agentic/contract/index.ts";
@@ -42,6 +43,11 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.equal(/"oneOf"/.test(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan)), false);
     assert.equal(/\$defs/.test(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan)), false);
     assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 6);
+    const planRequest = JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan);
+    assert.match(planRequest, /info\.medicationCodes/);
+    assert.match(planRequest, /info\.conditionCodes/);
+    assert.match(planRequest, /excludeSupplementIds/);
+    assert.match(planRequest, /name, amount, and unit only/);
   });
 
   it("keeps the checked-in contract snapshot in sync", () => {
@@ -166,6 +172,37 @@ describe("agentic MCP contract 3.0.0", () => {
     );
     assert.deepEqual(names, [...AGENTIC_PUBLIC_TOOLS]);
     assert.equal((result.serverInfo as { name: string }).name, "mattanutra_uat");
+  });
+
+  it("uses live PRD instructions without Stripe Test Mode", async () => {
+    const runtime = createAgenticRuntime({
+      config: {
+        ...createAgenticRuntime().config,
+        environment: "prd",
+        internalQaHarness: false,
+        paymentProvider: "stripe_live",
+        thailandRetailerAdapter: "thailand_live",
+        capabilitySecret: "prd-test-capability-key-not-for-dev"
+      }
+    });
+    const response = await handleJsonRpc(runtime, {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "initialize"
+    });
+    const result = rpcResult(response);
+    assert.equal(result.instructions, AGENTIC_PRD_SERVER_INSTRUCTIONS);
+    assert.match(String(result.instructions), /Polling is the only continuation method/);
+    assert.match(String(result.instructions), /order\(orderHandle\)/);
+    assert.equal(String(result.instructions).includes("Stripe Test Mode"), false);
+    assert.equal(String(result.instructions).includes("4242"), false);
+    assert.equal(String(result.instructions).includes("dev-mcp-qa-token"), false);
+    assert.equal(AGENTIC_PRD_TOOL_DESCRIPTIONS.execute.includes("Stripe Test Mode"), false);
+    const listed = await handleJsonRpc(runtime, { id: 2, method: "tools/list" });
+    const execute = ((listed?.result?.tools as Array<{ description: string; name: string }>) ?? [])
+      .find((tool) => tool.name === "execute");
+    assert.equal(execute?.description.includes("Stripe Test Mode"), false);
+    assert.equal((result.serverInfo as { name: string }).name, "MattaNutra");
   });
 
   it("accepts bare, single-prefixed and double-prefixed tools/call names", async () => {

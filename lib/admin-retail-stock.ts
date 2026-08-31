@@ -637,7 +637,10 @@ export async function updateRetailShoppingList(
         and organisation_id = ${list.organisation_id}::uuid
     `;
 
-    if (wholesalePriceAmount !== null || retailPriceAmount !== null) {
+    if (
+      (wholesalePriceAmount !== null || retailPriceAmount !== null) &&
+      (await productApproved(sql, existing.product_id))
+    ) {
       await sql`
         insert into public.retail_sellable_products (
           organisation_id,

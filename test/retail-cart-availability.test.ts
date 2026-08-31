@@ -92,6 +92,19 @@ describe("retail cart availability", () => {
     assert.equal(availability.reason, "Stock is insufficient and backorder is disabled.");
   });
 
+  it("blocks checkout when the platform product is not approved", () => {
+    const availability = resolveRetailCartLineAvailabilityFromRow({
+      now,
+      productId: "product-1",
+      quantity: 1,
+      row: row({ product_status: "pending_review", stock_quantity: 10 })
+    });
+
+    assert.equal(availability.canCheckout, false);
+    assert.equal(availability.availabilityStatus, "unavailable");
+    assert.equal(availability.reason, "Master product is not approved for sale.");
+  });
+
   it("blocks checkout when the retailer has not listed the product for sale", () => {
     const availability = resolveRetailCartLineAvailabilityFromRow({
       now,

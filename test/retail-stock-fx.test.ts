@@ -76,6 +76,18 @@ describe("retail stock and FX infrastructure", () => {
     assert.match(schema, /retail_stock_movements_type_check CHECK/);
     assert.match(schema, /retail_stock_movements_void_check CHECK/);
     assert.match(schema, /retail_stock_reorder_advice_org_product_key UNIQUE \(organisation_id, product_id\)/);
+    const approvedListing = readFileSync(
+      "scripts/apply-retail-sellable-approved-trigger.ts",
+      "utf8"
+    );
+    assert.match(
+      approvedListing,
+      /create trigger retail_sellable_requires_approved_product/
+    );
+    assert.match(
+      approvedListing,
+      /Only approved platform products can be selected for retail/
+    );
     assert.match(migration, /create table if not exists public\.retail_sellable_products/);
     assert.match(migration, /drop constraint if exists retail_sellable_products_active_price_check/);
     assert.match(migration, /alter table public\.product_countries[\s\S]*add column if not exists rrp_price_amount/);

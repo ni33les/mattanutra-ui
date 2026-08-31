@@ -35,6 +35,8 @@ const PLAN_REQUEST: JsonSchema = {
   properties: {
     answers: PLAN_ANSWERS,
     conditionCodes: {
+      description:
+        "Condition codes from info.conditionCodes. Send here, not on profile.conditions.",
       items: { type: "string" },
       type: "array",
       uniqueItems: true
@@ -65,11 +67,15 @@ const PLAN_REQUEST: JsonSchema = {
     },
     locale: { type: "string" },
     medicationCodes: {
+      description:
+        "Medication codes from info.medicationCodes. Send here, not on profile.medications.",
       items: { type: "string" },
       type: "array",
       uniqueItems: true
     },
     optimization: {
+      description:
+        "A string, not an object: balanced, best_coverage, lowest_cost, or fewest_pills.",
       enum: ["balanced", "best_coverage", "lowest_cost", "fewest_pills"],
       type: "string"
     },
@@ -97,6 +103,8 @@ const PLAN_REQUEST: JsonSchema = {
     },
     requirements: {
       additionalProperties: false,
+      description:
+        "Plan constraints. Exclusions are excludeSupplementIds, not a top-level exclude list.",
       properties: {
         allowedForms: {
           items: {
@@ -146,6 +154,7 @@ const PLAN_REQUEST: JsonSchema = {
     },
     safetyAcknowledgement: PLAN_SAFETY_ACK,
     targets: {
+      description: "Agreed nutrient targets. Each item is name, amount, and unit only.",
       items: {
         additionalProperties: false,
         properties: {

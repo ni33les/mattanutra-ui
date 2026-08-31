@@ -92,6 +92,7 @@
                 "uniqueItems": true
               },
               "conditionCodes": {
+                "description": "Condition codes from info.conditionCodes. Send here, not on profile.conditions.",
                 "items": {
                   "type": "string"
                 },
@@ -145,6 +146,7 @@
                 "type": "string"
               },
               "medicationCodes": {
+                "description": "Medication codes from info.medicationCodes. Send here, not on profile.medications.",
                 "items": {
                   "type": "string"
                 },
@@ -152,6 +154,7 @@
                 "uniqueItems": true
               },
               "optimization": {
+                "description": "A string, not an object: balanced, best_coverage, lowest_cost, or fewest_pills.",
                 "enum": [
                   "balanced",
                   "best_coverage",
@@ -203,6 +206,7 @@
               },
               "requirements": {
                 "additionalProperties": false,
+                "description": "Plan constraints. Exclusions are excludeSupplementIds, not a top-level exclude list.",
                 "properties": {
                   "allowedForms": {
                     "items": {
@@ -304,6 +308,7 @@
                 "type": "object"
               },
               "targets": {
+                "description": "Agreed nutrient targets. Each item is name, amount, and unit only.",
                 "items": {
                   "additionalProperties": false,
                   "properties": {

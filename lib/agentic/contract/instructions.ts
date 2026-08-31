@@ -42,12 +42,41 @@ export const AGENTIC_UAT_TOOL_DESCRIPTIONS = {
     "Create or reply to support for an existing order using its orderHandle. Omit supportHandle to create a case; include it to reply."
 } as const;
 
+export const AGENTIC_PRD_SERVER_INSTRUCTIONS =
+  "The purchasing flow is plan, then execute, then external MattaNutra checkout, then order polling. Polling is the only continuation method. Never represent payment as confirmed until order returns completed. After execute, the customer opens checkoutUrl on MattaNutra, enters delivery details for the planned destination country, ticks AI-agent authorization, and pays. Do not use Stripe test cards. Do not use DEV mock payment scenarios or the DEV internal evidence harness. Do not use any callback, webhook-to-agent, or return-to-agent path. The calling agent learns payment and fulfilment ONLY by polling order(orderHandle). Call tools only by the short names info, plan, execute, order, support, feedback. Never prefix a server name onto those tool names. HARD RULE 6 — HOST FEEDBACK: After execute, or after 3 plan calls on the same planHandle, you MUST call feedback with rating 1-5 and points for stuck points (consentConfirmed=true). Feedback is stored in plan_feedback. This is required in ordinary conversation. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching; send a full request only when targets or requirements change. optionId stays sticky until the host selects another option or changes targets. Send plan request.profile.sex as female or male; omit the field if unknown. MattaNutra supplies product and safety facts; it does not diagnose or replace qualified clinical advice.";
+
+export const AGENTIC_PRD_TOOL_DESCRIPTIONS = {
+  execute:
+    "After the person confirms one ready plan, create a single MattaNutra checkout for that revision. Send only planHandle, expectedRevision and a stable idempotencyKey. After checkoutUrl returns, the customer pays on the merchant checkout. Do not call for needs_input or blocked plans.",
+  feedback: AGENTIC_UAT_TOOL_DESCRIPTIONS.feedback,
+  info: AGENTIC_UAT_TOOL_DESCRIPTIONS.info,
+  order: AGENTIC_UAT_TOOL_DESCRIPTIONS.order,
+  plan: AGENTIC_UAT_TOOL_DESCRIPTIONS.plan,
+  support: AGENTIC_UAT_TOOL_DESCRIPTIONS.support
+} as const;
+
 export function agenticServerInstructions(environment: "dev" | "prd" | "uat") {
-  return environment === "dev" ? AGENTIC_SERVER_INSTRUCTIONS : AGENTIC_UAT_SERVER_INSTRUCTIONS;
+  if (environment === "dev") {
+    return AGENTIC_SERVER_INSTRUCTIONS;
+  }
+
+  if (environment === "prd") {
+    return AGENTIC_PRD_SERVER_INSTRUCTIONS;
+  }
+
+  return AGENTIC_UAT_SERVER_INSTRUCTIONS;
 }
 
 export function agenticToolDescriptions(environment: "dev" | "prd" | "uat") {
-  return environment === "dev" ? AGENTIC_TOOL_DESCRIPTIONS : AGENTIC_UAT_TOOL_DESCRIPTIONS;
+  if (environment === "dev") {
+    return AGENTIC_TOOL_DESCRIPTIONS;
+  }
+
+  if (environment === "prd") {
+    return AGENTIC_PRD_TOOL_DESCRIPTIONS;
+  }
+
+  return AGENTIC_UAT_TOOL_DESCRIPTIONS;
 }
 
 export const AGENTIC_PUBLIC_TOOLS = [
