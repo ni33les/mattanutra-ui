@@ -17,7 +17,7 @@
       "name": "info"
     },
     {
-      "description": "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. Send profile.ageYears (not profile.age), profile.sex (female, male, or unspecified), and profile.lifeStage. Send medications as request.medicationCodes and conditions as request.conditionCodes — not profile.medications, profile.conditions, medications, or conditions. Exclusions are request.requirements.excludeSupplementIds. request.optimization is one of balanced, best_coverage, lowest_cost, fewest_pills (a string, not an object). Target objects are name, amount, unit only. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
+      "description": "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. Send profile.ageYears (not profile.age), profile.sex (female or male; omit the field if unknown), and profile.lifeStage. Send medications as request.medicationCodes and conditions as request.conditionCodes — not profile.medications, profile.conditions, medications, or conditions. Exclusions are request.requirements.excludeSupplementIds. request.optimization is one of balanced, best_coverage, lowest_cost, fewest_pills (a string, not an object). Target objects are name, amount, unit only. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -187,18 +187,16 @@
                     "type": "string"
                   },
                   "sex": {
-                    "description": "Person sex: female, male, or unspecified.",
+                    "description": "Person sex: female or male. Omit the field if unknown.",
                     "enum": [
                       "female",
-                      "male",
-                      "unspecified"
+                      "male"
                     ],
                     "type": "string"
                   }
                 },
                 "required": [
                   "ageYears",
-                  "sex",
                   "lifeStage"
                 ],
                 "type": "object"

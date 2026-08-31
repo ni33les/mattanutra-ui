@@ -1466,7 +1466,7 @@ describe("agentic P1 pack fixes", () => {
     assert.match(tracking, /Please return to your AI Agent Chat/);
     assert.match(workflow, /Payment was received/);
     assert.equal(workflow.includes("Thank you for trusting MattaNutra"), false);
-    assert.match(schema, /required: \["ageYears", "sex", "lifeStage"\]/);
+    assert.match(schema, /required: \["ageYears", "lifeStage"\]/);
     assert.equal(schema.includes("sexAtBirth"), false);
     assert.match(join, /persistMcpPlanFeedback/);
     assert.match(join, /persistAssessmentSubmission/);

@@ -21,7 +21,7 @@ export type LifeStage =
   | "pregnant"
   | "trying_to_conceive";
 
-export type MatcherSex = "female" | "male" | "unspecified";
+export type MatcherSex = "female" | "male";
 
 export type OptimizationMode =
   | "balanced"
@@ -110,7 +110,7 @@ export type CanonicalRequest = Readonly<{
   profile: Readonly<{
     ageYears: number;
     lifeStage: LifeStage;
-    sex: MatcherSex;
+    sex?: MatcherSex;
   }>;
   retainProductIds: readonly string[];
   retainSubjectIds: readonly string[];
