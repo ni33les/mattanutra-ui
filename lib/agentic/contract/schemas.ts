@@ -87,12 +87,12 @@ const PLAN_REQUEST: JsonSchema = {
           type: "string"
         },
         sex: {
-          description: "Person sex: female or male. Omit if unknown.",
-          enum: ["female", "male"],
+          description: "Person sex: female, male, or unspecified.",
+          enum: ["female", "male", "unspecified"],
           type: "string"
         }
       },
-      required: ["ageYears", "lifeStage"],
+      required: ["ageYears", "sex", "lifeStage"],
       type: "object"
     },
     requirements: {

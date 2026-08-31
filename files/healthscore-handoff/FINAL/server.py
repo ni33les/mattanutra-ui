@@ -51,7 +51,7 @@ class Answers(BaseModel):
     """
     # Demographics
     age: str                                                      # required: "18-25" | "26-35" | "36-45" | "46-55" | "56-65" | "66+"
-    sex: Optional[str] = None                                      # "male" | "female"
+    sex: str = "unspecified"                                       # "male" | "female" | "unspecified"
     country: str = "Thailand"
     reproStatus: Optional[str] = None                              # "pregnant" | "breastfeeding" | "none"
     menopause: Optional[str] = None                                # "pre" | "peri" | "post" | "none"
