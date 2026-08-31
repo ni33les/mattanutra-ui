@@ -10,7 +10,11 @@ import {
   mirrorImageToFirstParty,
   type FirstPartyImageStorageConfig
 } from "@/lib/first-party-image-mirror";
-import { isFirstPartyImageUrl } from "@/lib/first-party-image-rules";
+import {
+  isFirstPartyImageUrl,
+  isSameEnvironmentFirstPartyImage,
+  retargetSharedSpacesImageUrl
+} from "@/lib/first-party-image-rules";
 
 async function tinyPng() {
   return sharp({
@@ -221,6 +225,75 @@ describe("first-party image mirroring", () => {
       skippedReason: "first_party",
       url: "/uploads/dev/content/product.webp"
     });
+  });
+
+  it("does not skip a UAT Spaces URL when mirroring in PRD", async () => {
+    const bytes = await tinyPng();
+    const uploadedKeys: string[] = [];
+    const result = await mirrorImageToFirstParty({
+      config: fakeSpacesConfig,
+      entityId: "product-123",
+      environment: "prd",
+      fetcher: async () => imageResponse(bytes),
+      imageUrl:
+        "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/uat/products/product-123/old.png",
+      namespace: "products",
+      uploader: async (input) => {
+        uploadedKeys.push(input.key);
+        return {
+          key: input.key,
+          url: `${fakeSpacesConfig.publicBaseUrl}/${input.key}`
+        };
+      }
+    });
+
+    assert.equal(result.mirrored, true);
+    assert.equal(result.skippedReason, null);
+    assert.match(uploadedKeys[0] ?? "", /^prd\/products\/product-123\//);
+  });
+
+  it("still skips a same-environment Spaces URL", async () => {
+    const result = await mirrorImageToFirstParty({
+      config: fakeSpacesConfig,
+      entityId: "product-123",
+      environment: "prd",
+      fetcher: async () => {
+        throw new Error("same-env Spaces URLs should not be fetched");
+      },
+      imageUrl:
+        "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/prd/products/product-123/kept.png",
+      namespace: "products",
+      uploader: async () => {
+        throw new Error("same-env Spaces URLs should not be uploaded");
+      }
+    });
+
+    assert.equal(result.mirrored, false);
+    assert.equal(result.skippedReason, "first_party");
+    assert.equal(
+      result.url,
+      "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/prd/products/product-123/kept.png"
+    );
+  });
+
+  it("retargets a UAT Spaces product URL onto the PRD prefix without deleting the source", () => {
+    const uat =
+      "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/uat/products/abc/hash.png";
+    assert.equal(
+      retargetSharedSpacesImageUrl(uat, "prd"),
+      "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/prd/products/abc/hash.png"
+    );
+    assert.equal(
+      isSameEnvironmentFirstPartyImage(uat, "prd"),
+      false
+    );
+    assert.equal(
+      isSameEnvironmentFirstPartyImage(
+        "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/prd/products/abc/hash.png",
+        "prd"
+      ),
+      true
+    );
   });
 
   it("builds environment-scoped Spaces keys", () => {

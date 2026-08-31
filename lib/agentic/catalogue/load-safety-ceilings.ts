@@ -86,6 +86,7 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
         max_unit: string;
         name: string;
         source_scope: string | null;
+        source_url: string | null;
         supplement_id: string;
       }>
     >`
@@ -97,7 +98,8 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
         limits.life_stage,
         limits.max_amount,
         limits.max_unit,
-        limits.source_scope
+        limits.source_scope,
+        limits.source_url
       from public.supplement_safety_limits limits
       join public.supplements supplements
         on supplements.id = limits.supplement_id
@@ -129,11 +131,13 @@ async function loadAdminSafetyCeilings(): Promise<SafetyCeiling[]> {
       }
 
       const bandVersion = Number(row.band_version);
+      const authorityUrl = row.source_url?.trim() || null;
       const ceiling = {
         ...(row.band_id.trim() ? { bandId: row.band_id.trim() } : {}),
         ...(Number.isInteger(bandVersion) && bandVersion > 0
           ? { bandVersion }
           : {}),
+        ...(authorityUrl ? { authorityUrl } : {}),
         lifeStage,
         maxAmount: amount,
         maxUnit: unit,

@@ -6,7 +6,7 @@ import { closeSqlPool, getSql } from "@/lib/db";
 import {
   imageUrlHost,
   isExternalRuntimeImageUrl,
-  isFirstPartyImageUrl,
+  isSameEnvironmentFirstPartyImage,
   normalizeRuntimeImageUrl
 } from "@/lib/first-party-image-rules";
 import {
@@ -241,6 +241,7 @@ async function mirrorExternalUrl(input: Readonly<{
 
 function classifyCandidate(input: Readonly<{
   column: string;
+  environment: FirstPartyImageEnvironment;
   id: string;
   report: MutableReport;
   table: FirstPartyImageBackfillRow["table"];
@@ -264,7 +265,7 @@ function classifyCandidate(input: Readonly<{
     return null;
   }
 
-  if (isFirstPartyImageUrl(normalized)) {
+  if (isSameEnvironmentFirstPartyImage(normalized, input.environment)) {
     addRow(input.report, {
       column: input.column,
       detail: null,
@@ -322,6 +323,7 @@ async function backfillProducts(input: Readonly<{
   for (const row of rows) {
     const url = classifyCandidate({
       column: "image_url",
+      environment: input.environment,
       id: row.id,
       report: input.report,
       table: "products",
@@ -418,6 +420,7 @@ async function backfillProductImports(input: Readonly<{
     for (const sourceUrl of sourceUrls) {
       const url = classifyCandidate({
         column: "image_urls",
+        environment: input.environment,
         id: row.id,
         report: input.report,
         table: "product_imports",
@@ -533,6 +536,7 @@ async function backfillBlogPosts(input: Readonly<{
 
       const url = classifyCandidate({
         column: field[0],
+        environment: input.environment,
         id: row.id,
         report: input.report,
         table: "blog_posts",
@@ -636,6 +640,7 @@ async function backfillTestimonials(input: Readonly<{
   for (const row of rows) {
     const url = classifyCandidate({
       column: "author_image_url",
+      environment: input.environment,
       id: row.id,
       report: input.report,
       table: "testimonials",

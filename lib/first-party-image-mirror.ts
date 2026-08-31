@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 
 import { contentImageCacheControl } from "@/lib/content-image-storage";
@@ -8,6 +8,7 @@ import {
   imageUrlHost,
   isExternalRuntimeImageUrl,
   isFirstPartyImageUrl,
+  isSameEnvironmentFirstPartyImage,
   normalizeRuntimeImageUrl
 } from "@/lib/first-party-image-rules";
 
@@ -600,6 +601,44 @@ async function uploadFirstPartyImageToSpaces(
   };
 }
 
+export async function copySharedSpacesObject(input: Readonly<{
+  config?: FirstPartyImageStorageConfig | null;
+  destinationKey: string;
+  sourceKey: string;
+}>) {
+  const config = input.config ?? firstPartyImageStorageConfigFromEnv();
+
+  if (!config) {
+    throw new Error("DigitalOcean Spaces is not configured.");
+  }
+
+  const client = new S3Client({
+    credentials: {
+      accessKeyId: config.accessKeyId.trim(),
+      secretAccessKey: config.secretAccessKey.trim()
+    },
+    endpoint: config.endpoint,
+    forcePathStyle: false,
+    region: "us-east-1"
+  });
+
+  await client.send(
+    new CopyObjectCommand({
+      ACL: "public-read",
+      Bucket: config.bucket,
+      CopySource: `/${config.bucket}/${input.sourceKey}`,
+      Key: input.destinationKey,
+      MetadataDirective: "COPY"
+    })
+  );
+
+  return {
+    destinationKey: input.destinationKey,
+    sourceKey: input.sourceKey,
+    url: `${config.publicBaseUrl}/${input.destinationKey}`
+  };
+}
+
 export async function storeFirstPartyImageBytes(input: Readonly<{
   config?: FirstPartyImageStorageConfig | null;
   entityId: string;
@@ -719,7 +758,12 @@ export async function mirrorImageToFirstParty(input: Readonly<{
     };
   }
 
-  if (isFirstPartyImageUrl(imageUrl)) {
+  const environment = firstPartyImageStorageEnvironment(input.environment);
+
+  if (
+    isFirstPartyImageUrl(imageUrl) &&
+    isSameEnvironmentFirstPartyImage(imageUrl, environment)
+  ) {
     return {
       metadata: null,
       mirrored: false,
@@ -728,7 +772,7 @@ export async function mirrorImageToFirstParty(input: Readonly<{
     };
   }
 
-  if (!isExternalRuntimeImageUrl(imageUrl)) {
+  if (!isExternalRuntimeImageUrl(imageUrl) && !isFirstPartyImageUrl(imageUrl)) {
     throw new Error(`Image URL must be HTTPS: ${imageUrl}`);
   }
 
@@ -763,7 +807,6 @@ export async function mirrorImageToFirstParty(input: Readonly<{
     );
   }
 
-  const environment = firstPartyImageStorageEnvironment(input.environment);
   const key = firstPartyImageStorageKey({
     entityId: input.entityId,
     environment,

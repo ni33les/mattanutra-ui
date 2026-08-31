@@ -81,6 +81,7 @@ export const SAFETY_SOURCE_SCOPES = [
 export const MATCHER_SOURCE_SCOPE: SafetySourceScope = "supplemental";
 
 export type SafetyCeiling = Readonly<{
+  authorityUrl?: string | null;
   bandId?: string;
   bandVersion?: number;
   lifeStage?: SafetyLimitLifeStage;

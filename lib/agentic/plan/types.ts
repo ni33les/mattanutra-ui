@@ -294,6 +294,7 @@ export type BasketItem = Readonly<{
 }>;
 
 export type CoverageRow = Readonly<{
+  authorityUrl?: string | null;
   contributors?: readonly CoverageContributor[];
   coveragePercent: number;
   currentAmount: number;
@@ -302,6 +303,7 @@ export type CoverageRow = Readonly<{
   percentOfUpperLimit: number | null;
   remainingGap: number;
   requestedAmount: number;
+  sourceScope?: "supplemental" | "total" | null;
   status: "covered" | "over_target" | "partial" | "uncovered" | "upper_limit_risk";
   supplementId: string;
   totalExposureAmount: number;

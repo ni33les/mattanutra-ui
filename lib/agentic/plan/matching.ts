@@ -30,7 +30,10 @@ import type {
   ScoredBasket
 } from "@/lib/matcher/types";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
-import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
+import {
+  matcherSafetyCeilings,
+  safetyCeilingFor
+} from "@/lib/matcher/safety-ceilings";
 import type {
   BasketItem,
   CanonicalPlanState,
@@ -136,8 +139,15 @@ export function coverageFor(
       });
       return sum + (converted ?? 0);
     }, 0);
+    const ceilings = matcherSafetyCeilings();
+    const ceiling = safetyCeilingFor(ceilings, {
+      conditionCodes: state.conditionCodes,
+      name: target.name,
+      profile: state.profile,
+      subjectId: target.supplementId
+    });
     const limit = upperLimitAmount(target.name, target.unit, {
-      ceilings: matcherSafetyCeilings(),
+      ceilings,
       conditionCodes: state.conditionCodes,
       profile: state.profile,
       subjectId: target.supplementId
@@ -211,6 +221,7 @@ export function coverageFor(
     }
 
     return {
+      authorityUrl: ceiling?.authorityUrl ?? null,
       contributors: publishedContributors,
       coveragePercent,
       currentAmount,
@@ -222,6 +233,7 @@ export function coverageFor(
           : null,
       remainingGap: Math.max(0, target.amount - totalExposureAmount),
       requestedAmount: target.amount,
+      sourceScope: ceiling?.sourceScope ?? null,
       status,
       supplementId: target.supplementId,
       totalExposureAmount,

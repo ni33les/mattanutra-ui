@@ -500,7 +500,9 @@ export function publicCoverage(row: CoverageRow) {
           upperLimitAmount: publicAmount(row.upperLimitAmount),
           ...(row.percentOfUpperLimit != null
             ? { percentOfUpperLimit: publicAmount(row.percentOfUpperLimit) }
-            : {})
+            : {}),
+          ...(row.sourceScope ? { sourceScope: row.sourceScope } : {}),
+          ...(row.authorityUrl ? { authorityUrl: row.authorityUrl } : {})
         }
       : {})
   };
