@@ -21,7 +21,7 @@ export type LifeStage =
   | "pregnant"
   | "trying_to_conceive";
 
-export type MatcherSex = "female" | "intersex" | "male" | "unspecified";
+export type MatcherSex = "female" | "male" | "unspecified";
 
 export type OptimizationMode =
   | "balanced"

@@ -450,7 +450,7 @@ No QA mutation control appears in info.
           "properties": {
             "ageYears": {"type": "integer", "minimum": 0, "maximum": 120},
             "sex": {
-              "enum": ["female", "male", "intersex", "unspecified"]
+              "enum": ["female", "male", "unspecified"]
             },
             "lifeStage": {
               "enum": ["adult", "child", "pregnant", "breastfeeding", "trying_to_conceive"]

@@ -44,7 +44,7 @@ export type PlanProfile = Readonly<{
   ageYears: number;
   goals?: readonly string[];
   lifeStage: LifeStage;
-  sex: "female" | "intersex" | "male" | "unspecified";
+  sex: "female" | "male" | "unspecified";
 }>;
 
 export type SafetyAcknowledgement = Readonly<{

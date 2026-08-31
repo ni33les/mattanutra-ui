@@ -87,8 +87,8 @@ const PLAN_REQUEST: JsonSchema = {
           type: "string"
         },
         sex: {
-          description: "Person sex: female, male, intersex, or unspecified.",
-          enum: ["female", "male", "intersex", "unspecified"],
+          description: "Person sex: female, male, or unspecified.",
+          enum: ["female", "male", "unspecified"],
           type: "string"
         }
       },
