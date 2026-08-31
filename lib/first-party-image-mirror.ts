@@ -280,6 +280,8 @@ function digitalOceanCredentialPair(value: string) {
 }
 
 function digitalOceanSecretFromKey(value: string) {
+  rejectEncryptedAppSpecSecret(value);
+
   const separator = value.includes(":") ? ":" : value.includes("|") ? "|" : "";
 
   if (!separator) {
@@ -294,15 +296,36 @@ function digitalOceanSecretFromKey(value: string) {
     );
   }
 
+  rejectEncryptedAppSpecSecret(secretAccessKey);
   return secretAccessKey;
+}
+
+function rejectEncryptedAppSpecSecret(value: string) {
+  if (value.startsWith("EV[") && value.endsWith("]")) {
+    throw new Error(
+      "DO_SPACES_KEY looks like an encrypted App Platform spec value, not the Spaces secret."
+    );
+  }
+}
+
+const DIGITALOCEAN_ACCESS_KEY_ID_PATTERN = /^DO[A-Z0-9]{18}$/;
+
+function digitalOceanPairAccessKeyId(value: string) {
+  const separator = value.includes(":") ? ":" : value.includes("|") ? "|" : "";
+
+  if (!separator) {
+    return null;
+  }
+
+  const accessKeyId = value.slice(0, value.indexOf(separator)).trim();
+  return DIGITALOCEAN_ACCESS_KEY_ID_PATTERN.test(accessKeyId) ? accessKeyId : null;
 }
 
 /**
  * Spaces access key id used by the MattaNutra bucket (non-secret identifier).
- * UAT sets DO_SPACES_KEY_ID explicitly; PRD historically only set DO_SPACES_KEY.
- * Always prefer this project key id over any access-key prefix embedded in KEY
- * (legacy access:secret pairs can have a stale access half and still carry a
- * valid secret after the separator).
+ * UAT/PRD set DO_SPACES_KEY_ID explicitly. When KEY is a live access:secret
+ * pair whose access half is a DigitalOcean key id, use that pair; otherwise
+ * fall back to this project key id and ignore a non-DO prefix.
  */
 const DEFAULT_DO_SPACES_KEY_ID = "DO801NRCNL3HYHXKRJEG";
 
@@ -336,9 +359,10 @@ function digitalOceanCredentialsFromEnv() {
     );
   }
 
-  // Access key id: explicit env wins, else project default (never trust a
-  // possibly-stale access prefix inside DO_SPACES_KEY alone).
-  const accessKeyId = explicitAccessKeyId || DEFAULT_DO_SPACES_KEY_ID;
+  const accessKeyId =
+    explicitAccessKeyId ||
+    (digitalOceanSecretKey ? digitalOceanPairAccessKeyId(digitalOceanSecretKey) : null) ||
+    DEFAULT_DO_SPACES_KEY_ID;
 
   return {
     accessKeyId,

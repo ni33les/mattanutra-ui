@@ -411,4 +411,43 @@ describe("first-party image mirroring", () => {
     assert.equal(config?.accessKeyId, "DO801NRCNL3HYHXKRJEG");
     assert.equal(config?.secretAccessKey, "digitalocean-secret");
   });
+
+  it("uses a DigitalOcean-shaped access half from KEY when KEY_ID is absent", () => {
+    const config = withEnv(
+      {
+        DO_SPACES_ACCESS_KEY: undefined,
+        DO_SPACES_ACCESS_KEY_ID: undefined,
+        DO_SPACES_CDN_ENDPOINT: "https://cdn.example.com",
+        DO_SPACES_ENDPOINT: "https://mattanutra.sgp1.digitaloceanspaces.com",
+        DO_SPACES_KEY: "DO00LIVEACCESSKEYID9:digitalocean-secret",
+        DO_SPACES_KEY_ID: undefined,
+        DO_SPACES_SECRET_KEY: undefined,
+        DO_SPACES_SECRET_ACCESS_KEY: undefined
+      },
+      () => firstPartyImageStorageConfigFromEnv()
+    );
+
+    assert.equal(config?.accessKeyId, "DO00LIVEACCESSKEYID9");
+    assert.equal(config?.secretAccessKey, "digitalocean-secret");
+  });
+
+  it("rejects an encrypted App Platform spec value used as DO_SPACES_KEY", () => {
+    assert.throws(
+      () =>
+        withEnv(
+          {
+            DO_SPACES_ACCESS_KEY: undefined,
+            DO_SPACES_ACCESS_KEY_ID: undefined,
+            DO_SPACES_CDN_ENDPOINT: "https://cdn.example.com",
+            DO_SPACES_ENDPOINT: "https://mattanutra.sgp1.digitaloceanspaces.com",
+            DO_SPACES_KEY: "EV[1:abc:def==]",
+            DO_SPACES_KEY_ID: "DO00LIVEACCESSKEYID9",
+            DO_SPACES_SECRET_KEY: undefined,
+            DO_SPACES_SECRET_ACCESS_KEY: undefined
+          },
+          () => firstPartyImageStorageConfigFromEnv()
+        ),
+      /encrypted App Platform spec value/
+    );
+  });
 });

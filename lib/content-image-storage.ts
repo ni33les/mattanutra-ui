@@ -123,6 +123,8 @@ function digitalOceanCredentialPair(value: string) {
 }
 
 function digitalOceanSecretFromKey(value: string) {
+  rejectEncryptedAppSpecSecret(value);
+
   const separator = value.includes(":") ? ":" : value.includes("|") ? "|" : "";
 
   if (!separator) {
@@ -137,7 +139,29 @@ function digitalOceanSecretFromKey(value: string) {
     );
   }
 
+  rejectEncryptedAppSpecSecret(secretAccessKey);
   return secretAccessKey;
+}
+
+function rejectEncryptedAppSpecSecret(value: string) {
+  if (value.startsWith("EV[") && value.endsWith("]")) {
+    throw new Error(
+      "DO_SPACES_KEY looks like an encrypted App Platform spec value, not the Spaces secret."
+    );
+  }
+}
+
+const DIGITALOCEAN_ACCESS_KEY_ID_PATTERN = /^DO[A-Z0-9]{18}$/;
+
+function digitalOceanPairAccessKeyId(value: string) {
+  const separator = value.includes(":") ? ":" : value.includes("|") ? "|" : "";
+
+  if (!separator) {
+    return null;
+  }
+
+  const accessKeyId = value.slice(0, value.indexOf(separator)).trim();
+  return DIGITALOCEAN_ACCESS_KEY_ID_PATTERN.test(accessKeyId) ? accessKeyId : null;
 }
 
 /**
@@ -174,7 +198,10 @@ function digitalOceanCredentialsFromEnv() {
     );
   }
 
-  const accessKeyId = explicitAccessKeyId || DEFAULT_DO_SPACES_KEY_ID;
+  const accessKeyId =
+    explicitAccessKeyId ||
+    (digitalOceanSecretKey ? digitalOceanPairAccessKeyId(digitalOceanSecretKey) : null) ||
+    DEFAULT_DO_SPACES_KEY_ID;
 
   return {
     accessKeyId,
