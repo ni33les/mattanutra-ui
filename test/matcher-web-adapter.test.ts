@@ -34,8 +34,10 @@ function need(
 }
 
 function candidate(input: Readonly<{
+  automatedSafetyPassed?: boolean;
   availableCountryCodes?: string[];
   brandName?: string;
+  brandStatus?: ProductCandidate["brandStatus"];
   facts: ReadonlyArray<{
     amount: number | null;
     name: string;
@@ -44,14 +46,17 @@ function candidate(input: Readonly<{
   }>;
   id: string;
   productAudience?: "both" | "female" | "male";
+  retailSellableProductId?: string | null;
+  status?: ProductCandidate["status"];
   title: string;
+  validationStatus?: "failed" | "pass";
 }>): ProductCandidate {
   return {
-    automatedSafetyPassed: true,
+    automatedSafetyPassed: input.automatedSafetyPassed ?? true,
     availabilityStatus: "in_stock",
     availableCountryCodes: input.availableCountryCodes ?? ["TH"],
     brandName: input.brandName ?? "Delight",
-    brandStatus: "approved",
+    brandStatus: input.brandStatus ?? "approved",
     currency: "THB",
     facts: input.facts.map((fact) => ({
       amount: fact.amount,
@@ -70,10 +75,18 @@ function candidate(input: Readonly<{
     productUrl: `https://example.com/${input.id}`,
     region: "TH",
     retailAvailabilityStatus: "available_now",
+    retailSellableProductId: input.retailSellableProductId ?? `sellable-${input.id}`,
     selectedRetailerName: "Delight Pharmacy",
     selectedRetailerOrganisationId: "delight",
-    status: "approved",
-    title: input.title
+    status: input.status ?? "approved",
+    title: input.title,
+    validation: {
+      checkedAt: new Date(0).toISOString(),
+      matchableFactCount: input.facts.length,
+      reasons: [],
+      status: input.validationStatus ?? "pass",
+      summary: ""
+    }
   };
 }
 
@@ -1087,4 +1100,80 @@ describe("matcher web adapter coverage mapping", () => {
     assert.ok((result.recommendations[0]?.servingMultiplier ?? 3) <= 2);
     assert.notEqual(result.recommendations[0]?.servingMultiplier, 3);
   });
+
+  it("does not recommend a pending leftover SKU", () => {
+    const vitaminD3 = dosedNeed({
+      amount: 25,
+      displayName: "Vitamin D3",
+      id: "supplement:vitamin-d3",
+      normalizedName: "vitamin_d3",
+      unit: "mcg"
+    });
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          facts: [
+            {
+              amount: 25,
+              name: "Vitamin D3",
+              normalizedName: "vitamin_d3",
+              unit: "mcg"
+            }
+          ],
+          id: "pending-d3",
+          status: "pending_review",
+          title: "Leftover pending D3"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [vitaminD3],
+      stackPreference: "compact"
+    });
+
+    assert.equal(result.recommendations.length, 0);
+  });
+
+  it("may recommend an approved selected SKU whose validation or brand is not pass", () => {
+    const vitaminD3 = dosedNeed({
+      amount: 25,
+      displayName: "Vitamin D3",
+      id: "supplement:vitamin-d3",
+      normalizedName: "vitamin_d3",
+      unit: "mcg"
+    });
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({
+          automatedSafetyPassed: false,
+          brandStatus: "pending_review",
+          facts: [
+            {
+              amount: 25,
+              name: "Vitamin D3",
+              normalizedName: "vitamin_d3",
+              unit: "mcg"
+            }
+          ],
+          id: "approved-dirty-d3",
+          status: "approved",
+          title: "Approved D3 with failed validation",
+          validationStatus: "failed"
+        })
+      ],
+      clientContext: null,
+      clientSex: "male",
+      countryCode: "TH",
+      maxProducts: 6,
+      needs: [vitaminD3],
+      stackPreference: "compact"
+    });
+
+    assert.equal(result.recommendations.some((row) => row.product.id === "approved-dirty-d3"), true);
+  });
 });
+

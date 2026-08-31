@@ -632,16 +632,7 @@ export async function getAdminProductListData(
               else 'Needs Review'
             end as validation_label,
             case
-              when exists (
-                select 1
-                from public.product_imports
-                where product_imports.product_id = products.id
-                  and product_imports.status = 'pending_review'
-              ) then 'pending_review'
-              when products.status = 'approved'
-                and coalesce(products.validation_status, 'failed') <> 'pass' then 'pending_review'
-              when products.status = 'approved' then 'approved'
-              when products.status = 'ignored' then 'ignored'
+              when products.status in ('approved', 'ignored', 'pending_review') then products.status
               else 'pending_review'
             end as business_state,
             exists (
@@ -672,9 +663,9 @@ export async function getAdminProductListData(
           sql<ProductListStatsDbRow[]>`
             select
               count(*) as summary_total,
-              count(*) filter (where business_state = 'approved') as summary_approved,
-              count(*) filter (where business_state = 'pending_review') as summary_pending_review,
-              count(*) filter (where business_state = 'ignored') as summary_ignored,
+              count(*) filter (where labelled.status = 'approved') as summary_approved,
+              count(*) filter (where labelled.status = 'pending_review') as summary_pending_review,
+              count(*) filter (where labelled.status = 'ignored') as summary_ignored,
               count(*) filter (where validation_label = 'Missing Facts') as summary_missing_facts,
               count(*) filter (where validation_label = 'Missing Image') as summary_missing_image,
               count(*) filter (where validation_label = 'Dirty Data') as summary_dirty_data,

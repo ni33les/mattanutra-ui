@@ -43,10 +43,12 @@ import {
   productIdentifiersLateralJoin,
   retailStockPipelineKey
 } from "@/lib/admin-retail-stock-pipeline";
+import { stockRowIsSelected } from "@/lib/admin-retail-stock-eligibility";
 import type {
   AdminRetailCustomerOrderShipment,
   AdminRetailOperationsTask,
-  AdminRetailStockData
+  AdminRetailStockData,
+  AdminRetailStockRow
 } from "@/lib/admin-retail-stock-types";
 
 export function emptyAdminRetailStockData(): AdminRetailStockData {
@@ -1006,14 +1008,61 @@ export async function getAdminRetailStockData(
     tasksByCustomerOrderId.set(task.sourceEntityId, existing);
   }
 
-  const approvedCountRows = await sql<Array<{ n: number }>>`
-    select count(*)::int as n
-    from public.products
-    where status = 'approved'
-  `;
+  const mappedStock = stockRows.map(mapRetailStockRow);
+  const unselectedApproved: AdminRetailStockRow[] = [];
+
+  for (const organisation of organisations) {
+    const selectedProductIds = new Set(
+      mappedStock
+        .filter(
+          (row) =>
+            row.organisationId === organisation.id && stockRowIsSelected(row)
+        )
+        .map((row) => row.productId)
+    );
+    const presentProductIds = new Set(
+      mappedStock
+        .filter((row) => row.organisationId === organisation.id)
+        .map((row) => row.productId)
+    );
+
+    for (const product of productRows) {
+      if (
+        selectedProductIds.has(product.id) ||
+        presentProductIds.has(product.id)
+      ) {
+        continue;
+      }
+
+      unselectedApproved.push({
+        backorderPolicy: "allow",
+        brandName: product.brand_name,
+        currency: organisation.currency || "THB",
+        ean13: product.ean13,
+        id: `unselected:${organisation.id}:${product.id}`,
+        imageUrl: product.image_url,
+        leadTimeDays: 0,
+        manufacturerSku: product.manufacturer_sku,
+        notes: null,
+        organisationId: organisation.id,
+        organisationName: organisation.name,
+        productId: product.id,
+        productKind: product.product_kind,
+        productStatus: "approved",
+        productTitle: product.title,
+        retailOverridePriceAmount: null,
+        retailPriceAmount: null,
+        retailSellableProductId: null,
+        status: "disabled",
+        stockQuantity: 0,
+        updatedAt: new Date(0).toISOString(),
+        wholesalePriceAmount: null
+      });
+    }
+  }
 
   return {
-    approvedProductCount: approvedCountRows[0]?.n ?? 0,
+    approvedProductCount: 0,
     auditEvents,
     canFilterOrganisation: canReadAllRetailStock(context),
     canRouteRegionalCheckout: canRouteRegionalCheckout(context),
@@ -1042,7 +1091,7 @@ export async function getAdminRetailStockData(
     pipeline: pipelineRows,
     productOptions: productRows.map(mapRetailProductOptionRow),
     reorderAdvice: adviceRows.map(mapRetailStockReorderAdviceRow),
-    rows: stockRows.map(mapRetailStockRow),
+    rows: [...mappedStock, ...unselectedApproved],
     shoppingListLines: shoppingListLineRows.map(mapRetailShoppingListLineRow),
     shoppingLists: shoppingListRows.map(mapRetailShoppingListRow),
     tasks

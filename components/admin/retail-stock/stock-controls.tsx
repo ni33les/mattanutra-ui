@@ -68,10 +68,10 @@ export function statusLabel(labels: AdminContent, status: RetailStockStatus) {
   }
 
   if (status === "disabled") {
-    return labels.stock.disabled;
+    return labels.stock.unselected ?? labels.stock.disabled;
   }
 
-  return labels.access.active;
+  return labels.stock.selectedForSale ?? labels.access.active;
 }
 
 export function backorderPolicyLabel(

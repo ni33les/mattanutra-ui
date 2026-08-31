@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { productMatchingReadiness } from "../lib/product-matching-readiness.ts";
+import {
+  productIsMatchable,
+  productMatchingReadiness
+} from "../lib/product-matching-readiness.ts";
 
 function baseProduct() {
   return {
@@ -30,6 +33,23 @@ describe("product matching readiness", () => {
     assert.deepEqual(
       readiness.checks.filter((check) => !check.passed),
       []
+    );
+  });
+
+  it("treats approved status as matchable even when brand is still pending", () => {
+    assert.equal(
+      productIsMatchable({
+        ...baseProduct(),
+        brandStatus: "pending_review"
+      }),
+      true
+    );
+    assert.equal(
+      productIsMatchable({
+        ...baseProduct(),
+        status: "pending_review"
+      }),
+      false
     );
   });
 

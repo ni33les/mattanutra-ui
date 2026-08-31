@@ -405,11 +405,9 @@ export type AdminContent = Readonly<{
     importCsv: string;
 	    inStock: string;
 	    chooseProduct: string;
-    approvedProducts: string;
-    eligibleForSale: string;
-    eligibleForSaleShort: string;
-    ineligibleForSale: string;
-    ineligibleForSaleShort: string;
+    unselected: string;
+    onSale: string;
+    onSaleShort: string;
     ineligibleInactive: string;
     ineligibleMissingRrp: string;
     ineligibleNoStock: string;
@@ -1172,16 +1170,14 @@ const baseContent = {
       importCsv: "Import CSV",
       inStock: "Stock OK",
       chooseProduct: "Choose product",
-      approvedProducts: "Approved products",
-      eligibleForSale: "Eligible for sale",
-      eligibleForSaleShort: "Eligible",
-      ineligibleForSale: "Ineligible for sale",
-      ineligibleForSaleShort: "Ineligible",
-      ineligibleInactive: "Inactive",
+      unselected: "Unselected",
+      onSale: "On sale",
+      onSaleShort: "On sale",
+      ineligibleInactive: "Unselected",
       ineligibleMissingRrp: "Missing RRP",
       ineligibleNoStock: "Out of stock, no backorder",
       ineligibleNotApproved: "Not approved",
-      selectedForSale: "Selected for sale",
+      selectedForSale: "Selected",
       brand: "Brand",
       leadTimeDays: "Lead time",
       lowStock: "Low stock",
@@ -2086,16 +2082,14 @@ const baseContent = {
       importCsv: "นำเข้า CSV",
       inStock: "สต็อกปกติ",
       chooseProduct: "เลือกสินค้า",
-      approvedProducts: "สินค้าที่อนุมัติแล้ว",
-      eligibleForSale: "พร้อมขาย",
-      eligibleForSaleShort: "พร้อมขาย",
-      ineligibleForSale: "ไม่พร้อมขาย",
-      ineligibleForSaleShort: "ไม่พร้อมขาย",
-      ineligibleInactive: "ปิดใช้งาน",
+      unselected: "ยังไม่เลือก",
+      onSale: "วางขาย",
+      onSaleShort: "วางขาย",
+      ineligibleInactive: "ยังไม่เลือก",
       ineligibleMissingRrp: "ไม่มีราคา RRP",
       ineligibleNoStock: "หมดสต็อกและไม่รับ backorder",
       ineligibleNotApproved: "ยังไม่อนุมัติ",
-      selectedForSale: "ที่ร้านเลือกขาย",
+      selectedForSale: "ที่ร้านเลือกแล้ว",
       brand: "แบรนด์",
       leadTimeDays: "ระยะเวลานำ",
       lowStock: "สต็อกต่ำ",

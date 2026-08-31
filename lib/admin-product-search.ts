@@ -364,9 +364,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       }
       and ${
         input.saleEligibleOnly
-          ? sql`products.status = 'approved'
-            and (products.brand_id is null or product_brands.status = 'approved')
-            and coalesce(products.validation_status, 'pass') = 'pass'`
+          ? sql`products.status = 'approved'`
           : sql`products.status <> 'deleted'`
       }
     order by lower(organisations.name), sellable.updated_at desc

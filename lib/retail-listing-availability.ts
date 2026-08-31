@@ -18,3 +18,13 @@ export function listingIsAvailable(input: Readonly<{
     listingIsSelected(input.listingStatus)
   );
 }
+
+export function productIsUnselectedForRetail(input: Readonly<{
+  listingStatus: string | null | undefined;
+  productStatus: string | null | undefined;
+}>) {
+  return (
+    productIsApprovedForRetail(input.productStatus) &&
+    !listingIsSelected(input.listingStatus)
+  );
+}

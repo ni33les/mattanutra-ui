@@ -1,4 +1,7 @@
-import { productIsApprovedForRetail } from "@/lib/retail-listing-availability";
+import {
+  listingIsSelected,
+  productIsApprovedForRetail
+} from "@/lib/retail-listing-availability";
 
 export type RetailStockEligibilityRow = Readonly<{
   backorderPolicy: "allow" | "deny";
@@ -9,8 +12,22 @@ export type RetailStockEligibilityRow = Readonly<{
   stockQuantity: number;
 }>;
 
+export type RetailStockUnavailableLabels = Readonly<{
+  ineligibleForSale?: string;
+  ineligibleInactive?: string;
+  ineligibleMissingRrp?: string;
+  ineligibleNoStock?: string;
+  ineligibleNotApproved?: string;
+}>;
+
 export function stockRowIsSelected(row: RetailStockEligibilityRow) {
-  return Boolean(row.retailSellableProductId);
+  return Boolean(row.retailSellableProductId) && listingIsSelected(row.status);
+}
+
+export function stockRowIsUnselected(row: RetailStockEligibilityRow) {
+  return (
+    productIsApprovedForRetail(row.productStatus) && !stockRowIsSelected(row)
+  );
 }
 
 export function stockRowEligibleForSale(row: RetailStockEligibilityRow) {
@@ -18,7 +35,7 @@ export function stockRowEligibleForSale(row: RetailStockEligibilityRow) {
     return false;
   }
 
-  if (!stockRowIsSelected(row) || row.status !== "active") {
+  if (!stockRowIsSelected(row)) {
     return false;
   }
 
@@ -30,22 +47,24 @@ export function stockRowEligibleForSale(row: RetailStockEligibilityRow) {
   return row.stockQuantity > 0 || row.backorderPolicy !== "deny";
 }
 
-export function stockRowIneligibleReason(
+export function stockRowIsOnSale(row: RetailStockEligibilityRow) {
+  return stockRowEligibleForSale(row);
+}
+
+export function stockRowIsUnavailable(row: RetailStockEligibilityRow) {
+  return stockRowIsSelected(row) && !stockRowIsOnSale(row);
+}
+
+export function stockRowUnavailableReason(
   row: RetailStockEligibilityRow,
-  labels: Readonly<{
-    ineligibleForSale?: string;
-    ineligibleInactive?: string;
-    ineligibleMissingRrp?: string;
-    ineligibleNoStock?: string;
-    ineligibleNotApproved?: string;
-  }>
+  labels: RetailStockUnavailableLabels
 ) {
   if (!productIsApprovedForRetail(row.productStatus)) {
     return labels.ineligibleNotApproved ?? "Not approved";
   }
 
-  if (!stockRowIsSelected(row) || row.status !== "active") {
-    return labels.ineligibleInactive ?? "Inactive";
+  if (!stockRowIsSelected(row)) {
+    return labels.ineligibleInactive ?? "Unselected";
   }
 
   const rrp = row.retailPriceAmount;
@@ -57,5 +76,12 @@ export function stockRowIneligibleReason(
     return labels.ineligibleNoStock ?? "Out of stock, no backorder";
   }
 
-  return labels.ineligibleForSale ?? "Ineligible for sale";
+  return labels.ineligibleForSale ?? "Unavailable";
+}
+
+export function stockRowIneligibleReason(
+  row: RetailStockEligibilityRow,
+  labels: RetailStockUnavailableLabels
+) {
+  return stockRowUnavailableReason(row, labels);
 }

@@ -108,7 +108,10 @@ import {
 import {
   stockRowEligibleForSale,
   stockRowIneligibleReason,
-  stockRowIsSelected
+  stockRowIsOnSale,
+  stockRowIsSelected,
+  stockRowIsUnavailable,
+  stockRowIsUnselected
 } from "@/lib/admin-retail-stock-eligibility";
 
 type StockResponse = Readonly<{
@@ -138,10 +141,10 @@ type RetailStockPanel =
 
 type RetailStockFilter =
   | "all"
-  | "approved"
-  | "selected_for_sale"
-  | "eligible_for_sale"
-  | "ineligible_for_sale";
+  | "unselected"
+  | "selected"
+  | "on_sale"
+  | "unavailable";
 
 type MovementDraft = Readonly<{
   expiresAt: string;
@@ -442,20 +445,20 @@ export function AdminRetailStockView({
             return true;
           }
 
-          if (selectedStockFilter === "approved") {
-            return row.productStatus === "approved";
+          if (selectedStockFilter === "unselected") {
+            return stockRowIsUnselected(row);
           }
 
-          if (selectedStockFilter === "selected_for_sale") {
+          if (selectedStockFilter === "selected") {
             return stockRowIsSelected(row);
           }
 
-          if (selectedStockFilter === "eligible_for_sale") {
-            return stockRowEligibleForSale(row);
+          if (selectedStockFilter === "on_sale") {
+            return stockRowIsOnSale(row);
           }
 
-          if (selectedStockFilter === "ineligible_for_sale") {
-            return !stockRowEligibleForSale(row);
+          if (selectedStockFilter === "unavailable") {
+            return stockRowIsUnavailable(row);
           }
 
           return true;
@@ -616,39 +619,40 @@ export function AdminRetailStockView({
     }
 
     return {
-      eligible_for_sale: eligible,
-      ineligible_for_sale: organisationStockRows.length - eligible,
-      selected_for_sale: selectedRows.length
+      on_sale: eligible,
+      selected: selectedRows.length,
+      unavailable: selectedRows.filter(stockRowIsUnavailable).length,
+      unselected: organisationStockRows.filter(stockRowIsUnselected).length
     };
   }, [organisationStockRows]);
   const stockMetrics: BusinessMetric[] = [
     {
       color: businessMetricColors.total,
-      id: "approved",
-      label: labels.stock.approvedProducts ?? "Approved products",
+      id: "unselected",
+      label: labels.stock.unselected ?? "Unselected",
       series: [],
-      value: formatNumber(data.approvedProductCount, locale)
+      value: formatNumber(stockSummary.unselected, locale)
     },
     {
       color: businessMetricColors.active,
-      id: "selected_for_sale",
-      label: labels.stock.selectedForSale ?? "Selected for sale",
+      id: "selected",
+      label: labels.stock.selectedForSale ?? "Selected",
       series: [],
-      value: formatNumber(stockSummary.selected_for_sale, locale)
+      value: formatNumber(stockSummary.selected, locale)
     },
     {
       color: businessMetricColors.succeeded,
-      id: "eligible_for_sale",
-      label: labels.stock.eligibleForSale ?? "Eligible for sale",
+      id: "on_sale",
+      label: labels.stock.onSale ?? "On sale",
       series: [],
-      value: formatNumber(stockSummary.eligible_for_sale, locale)
+      value: formatNumber(stockSummary.on_sale, locale)
     },
     {
       color: businessMetricColors.failed,
-      id: "ineligible_for_sale",
-      label: labels.stock.ineligibleForSale ?? "Ineligible for sale",
+      id: "unavailable",
+      label: labels.stock.unavailable ?? "Unavailable",
       series: [],
-      value: formatNumber(stockSummary.ineligible_for_sale, locale)
+      value: formatNumber(stockSummary.unavailable, locale)
     }
   ];
 
@@ -2250,7 +2254,7 @@ export function AdminRetailStockView({
                     <th className="py-2 pr-4">{labels.stock.organisation}</th>
                   ) : null}
                   <th className="py-2 pr-4">
-                    {labels.stock.eligibleForSale ?? "Eligible for sale"}
+                    {labels.stock.onSale ?? "On sale"}
                   </th>
                   <th className="py-2 pr-4">{labels.stock.stockQuantity}</th>
                   <th className="py-2 pr-4">{wholesaleHeader}</th>
@@ -2277,7 +2281,8 @@ export function AdminRetailStockView({
 		                  row,
 		                  adviceByStockId.get(row.id)
 		                );
-                const eligibleForSale = stockRowEligibleForSale(row);
+                const onSale = stockRowIsOnSale(row);
+                const unavailable = stockRowIsUnavailable(row);
 
                 return (
                   <tr
@@ -2321,21 +2326,27 @@ export function AdminRetailStockView({
                       <span
                         className={classNames(
                           "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
-                          eligibleForSale
+                          onSale
                             ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
-                            : "bg-amber-50 text-amber-800 ring-amber-100"
+                            : unavailable
+                              ? "bg-amber-50 text-amber-800 ring-amber-100"
+                              : "bg-gray-50 text-gray-700 ring-gray-200"
                         )}
                         title={
-                          eligibleForSale
-                            ? labels.stock.eligibleForSale ?? "Eligible for sale"
-                            : stockRowIneligibleReason(row, labels.stock)
+                          onSale
+                            ? labels.stock.onSale ?? "On sale"
+                            : unavailable
+                              ? stockRowIneligibleReason(row, labels.stock)
+                              : labels.stock.unselected ?? "Unselected"
                         }
                       >
-                        {eligibleForSale
-                          ? labels.stock.eligibleForSaleShort ?? "Eligible"
-                          : labels.stock.ineligibleForSaleShort ?? "Ineligible"}
+                        {onSale
+                          ? labels.stock.onSaleShort ?? "On sale"
+                          : unavailable
+                            ? labels.stock.unavailable ?? "Unavailable"
+                            : labels.stock.unselected ?? "Unselected"}
                       </span>
-                      {!eligibleForSale ? (
+                      {unavailable ? (
                         <div className="mt-1 max-w-[10rem] text-xs text-gray-500">
                           {stockRowIneligibleReason(row, labels.stock)}
                         </div>
@@ -4292,7 +4303,7 @@ export function AdminRetailStockView({
                   }
                   value={editor.draft.status}
                 >
-                  {(["active", "disabled", "deleted"] as const).map((status) => (
+                  {(["active", "disabled"] as const).map((status) => (
                     <option key={status} value={status}>
                       {statusLabel(labels, status)}
                     </option>

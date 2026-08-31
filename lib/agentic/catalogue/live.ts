@@ -536,8 +536,6 @@ export async function loadLiveRetailSnapshot(
       where product_facts.product_id = products.id
     ) fact_rows on true
     where products.status = 'approved'
-      and coalesce(products.validation_status, 'pass') = 'pass'
-      and (products.brand_id is null or product_brands.status = 'approved')
   `;
   const byListing = new Map<string, CatalogueProduct>();
 

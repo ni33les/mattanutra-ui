@@ -12,24 +12,39 @@ const dashboard = readFileSync(
 );
 
 describe("retail stock sale eligibility filters and reorders layout", () => {
-  it("exposes approved, selected, eligible, and ineligible stock stats", () => {
-    assert.match(stockView, /id: "approved"/);
-    assert.match(stockView, /selected_for_sale/);
-    assert.match(stockView, /eligible_for_sale/);
-    assert.match(stockView, /ineligible_for_sale/);
-    assert.match(stockView, /stockRowEligibleForSale/);
+  it("exposes unselected, selected, on sale, and unavailable stock stats", () => {
+    assert.match(stockView, /id: "unselected"/);
+    assert.match(stockView, /id: "selected"/);
+    assert.match(stockView, /id: "on_sale"/);
+    assert.match(stockView, /id: "unavailable"/);
+    assert.match(stockView, /stockRowIsUnselected/);
     assert.match(stockView, /stockRowIsSelected/);
+    assert.match(stockView, /stockRowIsOnSale/);
+    assert.match(stockView, /stockRowIsUnavailable/);
+    assert.doesNotMatch(stockView, /id: "approved"/);
+    assert.doesNotMatch(stockView, /eligible_for_sale/);
+    assert.doesNotMatch(stockView, /ineligible_for_sale/);
     assert.doesNotMatch(stockView, /id: "in_stock"/);
     assert.doesNotMatch(stockView, /id: "low_stock"/);
     assert.doesNotMatch(stockView, /id: "out_of_stock"/);
-    assert.match(dashboard, /approvedProducts: "Approved products"/);
-    assert.match(dashboard, /selectedForSale: "Selected for sale"/);
-    assert.match(dashboard, /eligibleForSale: "Eligible for sale"/);
-    assert.match(dashboard, /ineligibleForSale: "Ineligible for sale"/);
+    assert.match(dashboard, /unselected: "Unselected"/);
+    assert.match(dashboard, /selectedForSale: "Selected"/);
+    assert.match(dashboard, /onSale: "On sale"/);
+    assert.match(dashboard, /unavailable: "Unavailable"/);
     assert.match(dashboard, /ineligibleNotApproved: "Not approved"/);
+    assert.doesNotMatch(dashboard, /eligibleForSale: "Eligible for sale"/);
+    assert.doesNotMatch(dashboard, /approvedProducts: "Approved products"/);
     assert.doesNotMatch(stockView, /approvedCountSuffix/);
     assert.doesNotMatch(stockView, /selected_approved/);
     assert.doesNotMatch(dashboard, /approvedCountSuffix/);
+  });
+
+  it("offers Selected and Unselected in the listing editor, not deleted", () => {
+    assert.match(stockView, /\(\["active", "disabled"\] as const\)/);
+    assert.doesNotMatch(
+      stockView,
+      /\(\["active", "disabled", "deleted"\] as const\)/
+    );
   });
 
   it("keeps reorders backorder heading outside the data table body", () => {

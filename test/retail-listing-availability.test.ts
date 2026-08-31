@@ -5,15 +5,18 @@ import {
   listingIsAvailable,
   listingIsSelected,
   ONLY_APPROVED_PLATFORM_PRODUCTS_MAY_BE_SELECTED,
-  productIsApprovedForRetail
+  productIsApprovedForRetail,
+  productIsUnselectedForRetail
 } from "../lib/retail-listing-availability.ts";
 
 describe("retail listing availability", () => {
   it("treats only approved plus selected as available", () => {
     assert.equal(productIsApprovedForRetail("approved"), true);
     assert.equal(productIsApprovedForRetail("pending_review"), false);
+    assert.equal(productIsApprovedForRetail("ignored"), false);
     assert.equal(listingIsSelected("active"), true);
     assert.equal(listingIsSelected("disabled"), false);
+    assert.equal(listingIsSelected(null), false);
     assert.equal(
       listingIsAvailable({ listingStatus: "active", productStatus: "approved" }),
       true
@@ -27,6 +30,51 @@ describe("retail listing availability", () => {
     );
     assert.equal(
       listingIsAvailable({ listingStatus: "disabled", productStatus: "approved" }),
+      false
+    );
+  });
+
+  it("derives unselected as available and not selected", () => {
+    assert.equal(
+      productIsUnselectedForRetail({
+        listingStatus: null,
+        productStatus: "approved"
+      }),
+      true
+    );
+    assert.equal(
+      productIsUnselectedForRetail({
+        listingStatus: "disabled",
+        productStatus: "approved"
+      }),
+      true
+    );
+    assert.equal(
+      productIsUnselectedForRetail({
+        listingStatus: "active",
+        productStatus: "approved"
+      }),
+      false
+    );
+    assert.equal(
+      productIsUnselectedForRetail({
+        listingStatus: null,
+        productStatus: "pending_review"
+      }),
+      false
+    );
+    assert.equal(
+      productIsUnselectedForRetail({
+        listingStatus: null,
+        productStatus: "ignored"
+      }),
+      false
+    );
+    assert.equal(
+      productIsUnselectedForRetail({
+        listingStatus: "active",
+        productStatus: "pending_review"
+      }),
       false
     );
   });

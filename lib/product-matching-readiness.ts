@@ -85,6 +85,12 @@ function brandStatusReason(status: ProductStatus | null) {
   return "Brand is still pending review.";
 }
 
+export function productIsMatchable(
+  input: Pick<ProductMatchingReadinessInput, "status">
+) {
+  return input.status === "approved";
+}
+
 export function productMatchingReadiness(
   input: ProductMatchingReadinessInput
 ): ProductMatchingReadiness {
