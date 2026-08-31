@@ -446,11 +446,11 @@ No QA mutation control appears in info.
         "profile": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["ageYears", "sex", "lifeStage"],
+          "required": ["ageYears", "lifeStage"],
           "properties": {
             "ageYears": {"type": "integer", "minimum": 0, "maximum": 120},
             "sex": {
-              "enum": ["female", "male", "unspecified"]
+              "enum": ["female", "male"]
             },
             "lifeStage": {
               "enum": ["adult", "child", "pregnant", "breastfeeding", "trying_to_conceive"]

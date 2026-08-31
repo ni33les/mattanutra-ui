@@ -381,7 +381,7 @@ describe("Official MattaNutra Agentic QA Pack", () => {
       }
     });
     assert.equal(rejected.ok, false);
-    assert.equal(/sexAtBirth/i.test(JSON.stringify(rejected.error ?? {})), false);
+    assert.equal((rejected.error as { reasonCode?: string } | undefined)?.reasonCode, "unexpected_property");
   });
 
   it("A12 Folate is not the Creatine fixture", async () => {

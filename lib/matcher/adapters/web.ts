@@ -416,9 +416,9 @@ export function recommendWithMatcher(
     profile: {
       ageYears: input.clientContext?.ageYears ?? 38,
       lifeStage: matcherLifeStage(input.clientContext?.lifestage),
-      sex: input.clientSex === "female" || input.clientSex === "male"
-        ? input.clientSex
-        : "unspecified"
+      ...(input.clientSex === "female" || input.clientSex === "male"
+        ? { sex: input.clientSex }
+        : {})
     },
     retainProductIds: [],
     retainSubjectIds: [],

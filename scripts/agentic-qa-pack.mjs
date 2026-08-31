@@ -471,7 +471,7 @@ async function main() {
     !/sexAtBirth/i.test(listedBlob) &&
       !/sexAtBirth/i.test(JSON.stringify(infoTool ?? {})) &&
       planProfileHasSex(planTool) &&
-      !/sexAtBirth/i.test(sexError),
+      sexOnly.ok === false,
     "sex not sexAtBirth"
   );
 
