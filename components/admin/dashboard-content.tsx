@@ -406,7 +406,6 @@ export type AdminContent = Readonly<{
 	    inStock: string;
 	    chooseProduct: string;
     approvedProducts: string;
-    approvedCountSuffix: string;
     eligibleForSale: string;
     eligibleForSaleShort: string;
     ineligibleForSale: string;
@@ -1174,7 +1173,6 @@ const baseContent = {
       inStock: "Stock OK",
       chooseProduct: "Choose product",
       approvedProducts: "Approved products",
-      approvedCountSuffix: "approved",
       eligibleForSale: "Eligible for sale",
       eligibleForSaleShort: "Eligible",
       ineligibleForSale: "Ineligible for sale",
@@ -2089,7 +2087,6 @@ const baseContent = {
       inStock: "สต็อกปกติ",
       chooseProduct: "เลือกสินค้า",
       approvedProducts: "สินค้าที่อนุมัติแล้ว",
-      approvedCountSuffix: "รายการที่อนุมัติ",
       eligibleForSale: "พร้อมขาย",
       eligibleForSaleShort: "พร้อมขาย",
       ineligibleForSale: "ไม่พร้อมขาย",

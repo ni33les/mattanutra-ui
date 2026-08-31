@@ -607,9 +607,6 @@ export function AdminRetailStockView({
 
   const stockSummary = useMemo(() => {
     const selectedRows = organisationStockRows.filter(stockRowIsSelected);
-    const selectedApproved = selectedRows.filter(
-      (row) => row.productStatus === "approved"
-    ).length;
     let eligible = 0;
 
     for (const row of organisationStockRows) {
@@ -621,7 +618,6 @@ export function AdminRetailStockView({
     return {
       eligible_for_sale: eligible,
       ineligible_for_sale: organisationStockRows.length - eligible,
-      selected_approved: selectedApproved,
       selected_for_sale: selectedRows.length
     };
   }, [organisationStockRows]);
@@ -635,9 +631,6 @@ export function AdminRetailStockView({
     },
     {
       color: businessMetricColors.active,
-      detail: `${formatNumber(stockSummary.selected_approved, locale)} ${
-        labels.stock.approvedCountSuffix ?? "approved"
-      }`,
       id: "selected_for_sale",
       label: labels.stock.selectedForSale ?? "Selected for sale",
       series: [],

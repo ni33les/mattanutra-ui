@@ -27,6 +27,9 @@ describe("retail stock sale eligibility filters and reorders layout", () => {
     assert.match(dashboard, /eligibleForSale: "Eligible for sale"/);
     assert.match(dashboard, /ineligibleForSale: "Ineligible for sale"/);
     assert.match(dashboard, /ineligibleNotApproved: "Not approved"/);
+    assert.doesNotMatch(stockView, /approvedCountSuffix/);
+    assert.doesNotMatch(stockView, /selected_approved/);
+    assert.doesNotMatch(dashboard, /approvedCountSuffix/);
   });
 
   it("keeps reorders backorder heading outside the data table body", () => {
