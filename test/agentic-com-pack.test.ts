@@ -985,7 +985,7 @@ async function com28() {
     );
     const shallowAdvertised = commercial.every((tool) => {
       const schema = frozenOf(tool.inputSchema);
-      return schema.additionalProperties === true && !("oneOf" in schema) && !("$defs" in schema);
+      return schema.additionalProperties === false && !("oneOf" in schema) && !("$defs" in schema);
     });
     const qaListed = tools.some((tool) =>
       ["simulate", "evidence", "packProof", "isolationProof"].includes(String(tool.name))

@@ -17,17 +17,37 @@
       "name": "info"
     },
     {
-      "description": "Create or refine a supplement stack from agreed nutrient targets, profile (profile.sex is female, male, intersex, or unspecified), current intake, and constraints. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
+      "description": "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. Send profile.ageYears (not profile.age), profile.sex (female, male, intersex, or unspecified), and profile.lifeStage. Send medications as request.medicationCodes and conditions as request.conditionCodes — not profile.medications, profile.conditions, medications, or conditions. Exclusions are request.requirements.excludeSupplementIds. request.optimization is one of balanced, best_coverage, lowest_cost, fewest_pills (a string, not an object). Target objects are name, amount, unit only. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
       "inputSchema": {
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
           "answers": {
-            "type": "array"
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "choice": {
+                  "type": "string"
+                },
+                "questionId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "questionId",
+                "choice"
+              ],
+              "type": "object"
+            },
+            "type": "array",
+            "uniqueItems": true
           },
           "expectedRevision": {
+            "minimum": 1,
             "type": "integer"
           },
           "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 16,
             "type": "string"
           },
           "operation": {
@@ -41,19 +61,133 @@
             "type": "string"
           },
           "optionId": {
+            "minLength": 8,
             "type": "string"
           },
           "planHandle": {
+            "minLength": 32,
             "type": "string"
           },
           "request": {
-            "additionalProperties": true,
+            "additionalProperties": false,
             "properties": {
+              "answers": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "choice": {
+                      "type": "string"
+                    },
+                    "questionId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "questionId",
+                    "choice"
+                  ],
+                  "type": "object"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "conditionCodes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "currentSupplements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dailyAmount": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "supplementId": {
+                      "pattern": "^sup_",
+                      "type": "string"
+                    },
+                    "unit": {
+                      "enum": [
+                        "mcg",
+                        "mg",
+                        "g",
+                        "IU",
+                        "CFU",
+                        "ml",
+                        "serving"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "dailyAmount",
+                    "unit"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              "destinationCountry": {
+                "description": "ISO 3166-1 alpha-2 destination. Call info for supportedCountries. If MattaNutra does not deliver there yet, plan returns unsupported_country with a polite cannot-deliver message.",
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              "locale": {
+                "type": "string"
+              },
+              "medicationCodes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "optimization": {
+                "enum": [
+                  "balanced",
+                  "best_coverage",
+                  "lowest_cost",
+                  "fewest_pills"
+                ],
+                "type": "string"
+              },
               "profile": {
-                "additionalProperties": true,
+                "additionalProperties": false,
                 "properties": {
+                  "ageYears": {
+                    "maximum": 120,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "goals": {
+                    "items": {
+                      "maxLength": 80,
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "lifeStage": {
+                    "enum": [
+                      "adult",
+                      "child",
+                      "pregnant",
+                      "breastfeeding",
+                      "trying_to_conceive"
+                    ],
+                    "type": "string"
+                  },
                   "sex": {
-                    "description": "female, male, intersex, or unspecified",
+                    "description": "Person sex: female, male, intersex, or unspecified.",
                     "enum": [
                       "female",
                       "male",
@@ -63,16 +197,191 @@
                     "type": "string"
                   }
                 },
+                "required": [
+                  "ageYears",
+                  "sex",
+                  "lifeStage"
+                ],
                 "type": "object"
+              },
+              "requirements": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowedForms": {
+                    "items": {
+                      "enum": [
+                        "capsule",
+                        "softgel",
+                        "tablet",
+                        "powder",
+                        "liquid",
+                        "gummy",
+                        "sachet",
+                        "other"
+                      ],
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "dietaryPreference": {
+                    "enum": [
+                      "any",
+                      "plant_based",
+                      "vegan"
+                    ],
+                    "type": "string"
+                  },
+                  "excludeSupplementIds": {
+                    "items": {
+                      "pattern": "^sup_",
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "maxDailyPills": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "maxPriceMinor": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxProductCount": {
+                    "maximum": 30,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "omega3SourcePreference": {
+                    "enum": [
+                      "any",
+                      "algae_only",
+                      "fish_allowed"
+                    ],
+                    "type": "string"
+                  },
+                  "retainProductIds": {
+                    "items": {
+                      "pattern": "^prd_",
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "retainSupplementIds": {
+                    "items": {
+                      "pattern": "^sup_",
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "type": "object"
+              },
+              "safetyAcknowledgement": {
+                "additionalProperties": false,
+                "properties": {
+                  "confirmed": {
+                    "const": true
+                  },
+                  "guidanceIds": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "revision",
+                  "guidanceIds",
+                  "confirmed"
+                ],
+                "type": "object"
+              },
+              "targets": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "amount": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    },
+                    "name": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "supplementId": {
+                      "pattern": "^sup_",
+                      "type": "string"
+                    },
+                    "unit": {
+                      "enum": [
+                        "mcg",
+                        "mg",
+                        "g",
+                        "IU",
+                        "CFU",
+                        "ml",
+                        "serving"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "amount",
+                    "unit"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 30,
+                "minItems": 1,
+                "type": "array"
               }
             },
+            "required": [
+              "locale",
+              "destinationCountry",
+              "optimization",
+              "profile",
+              "requirements",
+              "targets"
+            ],
             "type": "object"
           },
           "safetyAcknowledgement": {
+            "additionalProperties": false,
+            "properties": {
+              "confirmed": {
+                "const": true
+              },
+              "guidanceIds": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "revision": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "revision",
+              "guidanceIds",
+              "confirmed"
+            ],
             "type": "object"
-          },
-          "selectOptionId": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -82,18 +391,27 @@
     {
       "description": "After the person confirms one ready plan, create a single MattaNutra checkout for that revision. Send the plan handle, expected revision, and a stable idempotency key. Do not call this for a plan that still needs answers.",
       "inputSchema": {
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
           "expectedRevision": {
+            "minimum": 1,
             "type": "integer"
           },
           "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 16,
             "type": "string"
           },
           "planHandle": {
+            "minLength": 32,
             "type": "string"
           }
         },
+        "required": [
+          "planHandle",
+          "expectedRevision",
+          "idempotencyKey"
+        ],
         "type": "object"
       },
       "name": "execute"
@@ -101,12 +419,16 @@
     {
       "description": "Read payment and fulfilment for an existing checkout using only the order handle. Poll no faster than pollAfterSeconds until the order is completed, cancelled, or expired.",
       "inputSchema": {
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
           "orderHandle": {
+            "minLength": 32,
             "type": "string"
           }
         },
+        "required": [
+          "orderHandle"
+        ],
         "type": "object"
       },
       "name": "order"
@@ -114,21 +436,32 @@
     {
       "description": "Create or reply to a help case for an existing order. Omit supportHandle to open a case; include it to reply.",
       "inputSchema": {
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
           "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 16,
             "type": "string"
           },
           "message": {
+            "maxLength": 4000,
+            "minLength": 1,
             "type": "string"
           },
           "orderHandle": {
+            "minLength": 32,
             "type": "string"
           },
           "supportHandle": {
+            "minLength": 32,
             "type": "string"
           }
         },
+        "required": [
+          "orderHandle",
+          "idempotencyKey",
+          "message"
+        ],
         "type": "object"
       },
       "name": "support"
@@ -136,33 +469,55 @@
     {
       "description": "Submit optional consented improvement notes for one plan revision. This never changes a plan or checkout. Require consentConfirmed=true.",
       "inputSchema": {
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
           "consentConfirmed": {
-            "type": "boolean"
+            "const": true
           },
           "expectedRevision": {
+            "minimum": 1,
             "type": "integer"
           },
           "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 16,
             "type": "string"
           },
           "optionId": {
+            "minLength": 8,
             "type": "string"
           },
           "planHandle": {
+            "minLength": 32,
             "type": "string"
           },
           "points": {
-            "type": "array"
+            "items": {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "type": "array",
+            "uniqueItems": true
           },
           "rating": {
+            "maximum": 5,
+            "minimum": 1,
             "type": "integer"
           },
           "summary": {
+            "maxLength": 1000,
+            "minLength": 1,
             "type": "string"
           }
         },
+        "required": [
+          "idempotencyKey",
+          "planHandle",
+          "expectedRevision",
+          "consentConfirmed"
+        ],
         "type": "object"
       },
       "name": "feedback"

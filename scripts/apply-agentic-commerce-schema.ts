@@ -1,4 +1,4 @@
-import { getSql } from "@/lib/db";
+import postgres from "postgres";
 
 const schemaSql = `
 create table if not exists public.agentic_plans (
@@ -271,12 +271,76 @@ create table if not exists public.agentic_qa_scenario_runs (
 );
 `;
 
-const sql = getSql();
-
-if (!sql) {
-  throw new Error("Database is not configured");
+function connectionString() {
+  return (
+    process.env.DB_SCHEMA_URL?.trim() ||
+    process.env.DB_OWNER_URL?.trim() ||
+    process.env.PRD_DB_OWNER_URL?.trim() ||
+    process.env.DB_URL?.trim() ||
+    ""
+  );
 }
+
+function shouldUseSsl(connection: string) {
+  const url = new URL(connection);
+  const sslMode = url.searchParams.get("sslmode")?.toLowerCase();
+
+  return (
+    url.hostname.endsWith(".db.ondigitalocean.com") ||
+    sslMode === "require" ||
+    sslMode === "verify-ca" ||
+    sslMode === "verify-full"
+  );
+}
+
+const connection = connectionString();
+
+if (!connection) {
+  throw new Error("DB_SCHEMA_URL, DB_OWNER_URL, or DB_URL is required to apply agentic commerce schema");
+}
+
+const sql = postgres(connection, {
+  connection: {
+    application_name:
+      process.env.DB_APPLICATION_NAME ?? "mattanutra-agentic-schema"
+  },
+  idle_timeout: 5,
+  max: 1,
+  prepare: false,
+  ...(shouldUseSsl(connection) ? { ssl: "require" } : {})
+});
 
 await sql.unsafe(schemaSql);
 
+await sql.unsafe(`
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'mn') then
+    grant select, insert, update, delete on
+      public.agentic_plans,
+      public.agentic_plan_revisions,
+      public.agentic_capabilities,
+      public.agentic_idempotency_records,
+      public.agentic_orders,
+      public.agentic_order_items,
+      public.agentic_checkout_sessions,
+      public.agentic_payment_attempts,
+      public.agentic_provider_events,
+      public.agentic_payment_audits,
+      public.agentic_outbox_events,
+      public.agentic_retail_order_links,
+      public.agentic_fulfilment_events,
+      public.agentic_support_cases,
+      public.agentic_support_messages,
+      public.agentic_feedback,
+      public.agentic_matcher_events,
+      public.agentic_qa_scenario_runs
+    to mn;
+    grant select on public.agentic_catalogue_gaps to mn;
+  end if;
+end
+$$;
+`);
+
 console.log("Agentic commerce schema applied");
+await sql.end({ timeout: 5 });

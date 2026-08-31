@@ -269,80 +269,19 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
 };
 
 export const PLAN_ADVERTISED_SCHEMA: JsonSchema = {
-  additionalProperties: true,
+  additionalProperties: false,
   properties: {
-    answers: { type: "array" },
-    expectedRevision: { type: "integer" },
-    idempotencyKey: { type: "string" },
+    answers: PLAN_ANSWERS,
+    expectedRevision: { minimum: 1, type: "integer" },
+    idempotencyKey: IDEMPOTENCY_KEY,
     operation: {
       enum: ["answer", "create", "get", "revise", "select"],
       type: "string"
     },
-    optionId: { type: "string" },
-    planHandle: { type: "string" },
-    request: {
-      additionalProperties: true,
-      properties: {
-        profile: {
-          additionalProperties: true,
-          properties: {
-            sex: {
-              description: "female, male, intersex, or unspecified",
-              enum: ["female", "male", "intersex", "unspecified"],
-              type: "string"
-            }
-          },
-          type: "object"
-        }
-      },
-      type: "object"
-    },
-    safetyAcknowledgement: { type: "object" },
-    selectOptionId: { type: "string" }
-  },
-  type: "object"
-};
-
-export const EXECUTE_ADVERTISED_SCHEMA: JsonSchema = {
-  additionalProperties: true,
-  properties: {
-    expectedRevision: { type: "integer" },
-    idempotencyKey: { type: "string" },
-    planHandle: { type: "string" }
-  },
-  type: "object"
-};
-
-export const ORDER_ADVERTISED_SCHEMA: JsonSchema = {
-  additionalProperties: true,
-  properties: {
-    orderHandle: { type: "string" }
-  },
-  type: "object"
-};
-
-export const SUPPORT_ADVERTISED_SCHEMA: JsonSchema = {
-  additionalProperties: true,
-  properties: {
-    idempotencyKey: { type: "string" },
-    message: { type: "string" },
-    orderHandle: { type: "string" },
-    supportHandle: { type: "string" }
-  },
-  type: "object"
-};
-
-export const FEEDBACK_ADVERTISED_SCHEMA: JsonSchema = {
-  additionalProperties: true,
-  properties: {
-    consentConfirmed: { type: "boolean" },
-    expectedRevision: { type: "integer" },
-    idempotencyKey: { type: "string" },
-    optionId: { type: "string" },
-    planHandle: { type: "string" },
-    points: { type: "array" },
-    rating: { type: "integer" },
-    summary: { type: "string" }
+    optionId: { minLength: 8, type: "string" },
+    planHandle: HANDLE,
+    request: PLAN_REQUEST,
+    safetyAcknowledgement: PLAN_SAFETY_ACK
   },
   type: "object"
 };
@@ -404,6 +343,11 @@ export const FEEDBACK_INPUT_SCHEMA: JsonSchema = {
   ],
   type: "object"
 };
+
+export const EXECUTE_ADVERTISED_SCHEMA = EXECUTE_INPUT_SCHEMA;
+export const ORDER_ADVERTISED_SCHEMA = ORDER_INPUT_SCHEMA;
+export const SUPPORT_ADVERTISED_SCHEMA = SUPPORT_INPUT_SCHEMA;
+export const FEEDBACK_ADVERTISED_SCHEMA = FEEDBACK_INPUT_SCHEMA;
 
 export const AGENTIC_INPUT_SCHEMAS = {
   execute: EXECUTE_INPUT_SCHEMA,

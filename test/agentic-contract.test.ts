@@ -209,14 +209,17 @@ describe("agentic MCP contract 3.0.0", () => {
 
     for (const tool of tools) {
       const schema = JSON.stringify(tool.inputSchema);
-      if (tool.name === "info") {
-        assert.match(schema, /"additionalProperties":false/);
-        continue;
-      }
-      assert.match(schema, /"additionalProperties":true/);
+      assert.match(schema, /"additionalProperties":false/);
       assert.equal(/"oneOf"/.test(schema), false);
       assert.equal(/\$defs/.test(schema), false);
     }
+
+    const plan = tools.find((tool) => tool.name === "plan");
+    const planSchema = JSON.stringify(plan?.inputSchema);
+    assert.match(planSchema, /"medicationCodes"/);
+    assert.match(planSchema, /"conditionCodes"/);
+    assert.match(planSchema, /"ageYears"/);
+    assert.match(planSchema, /"lifeStage"/);
   });
 
   it("rejects unexpected properties on every tool", () => {
