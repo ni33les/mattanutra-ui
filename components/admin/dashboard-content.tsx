@@ -405,6 +405,8 @@ export type AdminContent = Readonly<{
     importCsv: string;
 	    inStock: string;
 	    chooseProduct: string;
+    approvedProducts: string;
+    approvedCountSuffix: string;
     eligibleForSale: string;
     eligibleForSaleShort: string;
     ineligibleForSale: string;
@@ -412,6 +414,8 @@ export type AdminContent = Readonly<{
     ineligibleInactive: string;
     ineligibleMissingRrp: string;
     ineligibleNoStock: string;
+    ineligibleNotApproved: string;
+    selectedForSale: string;
     brand: string;
     leadTimeDays: string;
     lowStock: string;
@@ -1169,6 +1173,8 @@ const baseContent = {
       importCsv: "Import CSV",
       inStock: "Stock OK",
       chooseProduct: "Choose product",
+      approvedProducts: "Approved products",
+      approvedCountSuffix: "approved",
       eligibleForSale: "Eligible for sale",
       eligibleForSaleShort: "Eligible",
       ineligibleForSale: "Ineligible for sale",
@@ -1176,6 +1182,8 @@ const baseContent = {
       ineligibleInactive: "Inactive",
       ineligibleMissingRrp: "Missing RRP",
       ineligibleNoStock: "Out of stock, no backorder",
+      ineligibleNotApproved: "Not approved",
+      selectedForSale: "Selected for sale",
       brand: "Brand",
       leadTimeDays: "Lead time",
       lowStock: "Low stock",
@@ -2080,6 +2088,8 @@ const baseContent = {
       importCsv: "นำเข้า CSV",
       inStock: "สต็อกปกติ",
       chooseProduct: "เลือกสินค้า",
+      approvedProducts: "สินค้าที่อนุมัติแล้ว",
+      approvedCountSuffix: "รายการที่อนุมัติ",
       eligibleForSale: "พร้อมขาย",
       eligibleForSaleShort: "พร้อมขาย",
       ineligibleForSale: "ไม่พร้อมขาย",
@@ -2087,6 +2097,8 @@ const baseContent = {
       ineligibleInactive: "ปิดใช้งาน",
       ineligibleMissingRrp: "ไม่มีราคา RRP",
       ineligibleNoStock: "หมดสต็อกและไม่รับ backorder",
+      ineligibleNotApproved: "ยังไม่อนุมัติ",
+      selectedForSale: "ที่ร้านเลือกขาย",
       brand: "แบรนด์",
       leadTimeDays: "ระยะเวลานำ",
       lowStock: "สต็อกต่ำ",

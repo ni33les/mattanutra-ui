@@ -440,6 +440,7 @@ export type AdminRetailStockData = Readonly<{
   canFilterOrganisation: boolean;
   canRouteRegionalCheckout: boolean;
   canWrite: boolean;
+  approvedProductCount: number;
   auditEvents: AdminRetailAuditEvent[];
   carrierAccounts: AdminRetailCarrierAccount[];
   customerOrderLines: AdminRetailCustomerOrderLine[];

@@ -572,10 +572,11 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(stockControls, /daysCover <= leadTimeDays \+ 1/);
 	    assert.match(stockControls, /daysCover === null && row\.stockQuantity < 3/);
 		    assert.match(stockControls, /row\.status !== "active"/);
-		    assert.match(view, /id: "all"[\s\S]*label: labels\.stock\.all/);
-		    assert.match(view, /value: formatNumber\(organisationStockRows\.length, locale\)/);
-		    assert.match(view, /labels\.stock\.inStock/);
-		    assert.match(view, /labels\.stock\.lowStock/);
+		    assert.match(view, /id: "approved"/);
+		    assert.match(view, /id: "selected_for_sale"/);
+		    assert.match(view, /approvedProductCount/);
+		    assert.doesNotMatch(view, /id: "in_stock"/);
+		    assert.doesNotMatch(view, /id: "low_stock"/);
 	    assert.doesNotMatch(view, /id: "active"[\s\S]*label: labels\.access\.active/);
 	    assert.doesNotMatch(view, /id: "disabled"[\s\S]*label: labels\.stock\.disabled/);
 	    assert.match(view, /current === metricId \? "all" : \(metricId as RetailStockFilter\)/);

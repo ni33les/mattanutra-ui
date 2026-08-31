@@ -12,12 +12,21 @@ const dashboard = readFileSync(
 );
 
 describe("retail stock sale eligibility filters and reorders layout", () => {
-  it("exposes eligible/ineligible stock stats and filters", () => {
+  it("exposes approved, selected, eligible, and ineligible stock stats", () => {
+    assert.match(stockView, /id: "approved"/);
+    assert.match(stockView, /selected_for_sale/);
     assert.match(stockView, /eligible_for_sale/);
     assert.match(stockView, /ineligible_for_sale/);
     assert.match(stockView, /stockRowEligibleForSale/);
+    assert.match(stockView, /stockRowIsSelected/);
+    assert.doesNotMatch(stockView, /id: "in_stock"/);
+    assert.doesNotMatch(stockView, /id: "low_stock"/);
+    assert.doesNotMatch(stockView, /id: "out_of_stock"/);
+    assert.match(dashboard, /approvedProducts: "Approved products"/);
+    assert.match(dashboard, /selectedForSale: "Selected for sale"/);
     assert.match(dashboard, /eligibleForSale: "Eligible for sale"/);
     assert.match(dashboard, /ineligibleForSale: "Ineligible for sale"/);
+    assert.match(dashboard, /ineligibleNotApproved: "Not approved"/);
   });
 
   it("keeps reorders backorder heading outside the data table body", () => {

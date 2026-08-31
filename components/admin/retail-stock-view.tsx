@@ -103,9 +103,13 @@ import {
   retailAvailabilityLabel,
   statusLabel,
   stockAvailabilityStatus,
-  type RetailStockAvailabilityStatus,
   type StockDraft
 } from "@/components/admin/retail-stock/stock-controls";
+import {
+  stockRowEligibleForSale,
+  stockRowIneligibleReason,
+  stockRowIsSelected
+} from "@/lib/admin-retail-stock-eligibility";
 
 type StockResponse = Readonly<{
   data?: AdminRetailStockData;
@@ -134,45 +138,10 @@ type RetailStockPanel =
 
 type RetailStockFilter =
   | "all"
+  | "approved"
+  | "selected_for_sale"
   | "eligible_for_sale"
-  | "ineligible_for_sale"
-  | "in_stock"
-  | "low_stock"
-  | "out_of_stock";
-
-/** Sale eligibility: active + RRP > 0 + (in stock or backorder allowed). */
-function stockRowEligibleForSale(row: AdminRetailStockRow): boolean {
-  if (row.status !== "active") {
-    return false;
-  }
-
-  const rrp = row.retailPriceAmount;
-  if (typeof rrp !== "number" || !Number.isFinite(rrp) || rrp <= 0) {
-    return false;
-  }
-
-  return row.stockQuantity > 0 || row.backorderPolicy !== "deny";
-}
-
-function stockRowIneligibleReason(
-  row: AdminRetailStockRow,
-  labels: AdminContent["stock"]
-): string {
-  if (row.status !== "active") {
-    return labels.ineligibleInactive ?? "Inactive";
-  }
-
-  const rrp = row.retailPriceAmount;
-  if (typeof rrp !== "number" || !Number.isFinite(rrp) || rrp <= 0) {
-    return labels.ineligibleMissingRrp ?? "Missing RRP";
-  }
-
-  if (row.stockQuantity <= 0 && row.backorderPolicy === "deny") {
-    return labels.ineligibleNoStock ?? "Out of stock, no backorder";
-  }
-
-  return labels.ineligibleForSale ?? "Ineligible for sale";
-}
+  | "ineligible_for_sale";
 
 type MovementDraft = Readonly<{
   expiresAt: string;
@@ -473,6 +442,14 @@ export function AdminRetailStockView({
             return true;
           }
 
+          if (selectedStockFilter === "approved") {
+            return row.productStatus === "approved";
+          }
+
+          if (selectedStockFilter === "selected_for_sale") {
+            return stockRowIsSelected(row);
+          }
+
           if (selectedStockFilter === "eligible_for_sale") {
             return stockRowEligibleForSale(row);
           }
@@ -481,10 +458,7 @@ export function AdminRetailStockView({
             return !stockRowEligibleForSale(row);
           }
 
-          return (
-            stockAvailabilityStatus(row, adviceByStockId.get(row.id)) ===
-            selectedStockFilter
-          );
+          return true;
         })
         .filter((row) =>
           searchMatches(stockSearch, [
@@ -500,7 +474,7 @@ export function AdminRetailStockView({
             statusLabel(labels, row.status)
           ])
         ),
-    [adviceByStockId, labels, organisationStockRows, selectedStockFilter, stockSearch]
+    [labels, organisationStockRows, selectedStockFilter, stockSearch]
   );
 
   const defaultOrganisationId =
@@ -632,43 +606,42 @@ export function AdminRetailStockView({
   }, [adviceRows, rows]);
 
   const stockSummary = useMemo(() => {
-    const summary: Record<RetailStockAvailabilityStatus, number> & {
-      eligible_for_sale: number;
-      ineligible_for_sale: number;
-    } = {
-      eligible_for_sale: 0,
-      in_stock: 0,
-      ineligible_for_sale: 0,
-      low_stock: 0,
-      out_of_stock: 0
-    };
+    const selectedRows = organisationStockRows.filter(stockRowIsSelected);
+    const selectedApproved = selectedRows.filter(
+      (row) => row.productStatus === "approved"
+    ).length;
+    let eligible = 0;
 
     for (const row of organisationStockRows) {
-      const availabilityStatus = stockAvailabilityStatus(
-        row,
-        adviceByStockId.get(row.id)
-      );
-
-      if (availabilityStatus) {
-        summary[availabilityStatus] += 1;
-      }
-
       if (stockRowEligibleForSale(row)) {
-        summary.eligible_for_sale += 1;
-      } else {
-        summary.ineligible_for_sale += 1;
+        eligible += 1;
       }
     }
 
-    return summary;
-  }, [adviceByStockId, organisationStockRows]);
+    return {
+      eligible_for_sale: eligible,
+      ineligible_for_sale: organisationStockRows.length - eligible,
+      selected_approved: selectedApproved,
+      selected_for_sale: selectedRows.length
+    };
+  }, [organisationStockRows]);
   const stockMetrics: BusinessMetric[] = [
     {
       color: businessMetricColors.total,
-      id: "all",
-      label: labels.stock.all,
+      id: "approved",
+      label: labels.stock.approvedProducts ?? "Approved products",
       series: [],
-      value: formatNumber(organisationStockRows.length, locale)
+      value: formatNumber(data.approvedProductCount, locale)
+    },
+    {
+      color: businessMetricColors.active,
+      detail: `${formatNumber(stockSummary.selected_approved, locale)} ${
+        labels.stock.approvedCountSuffix ?? "approved"
+      }`,
+      id: "selected_for_sale",
+      label: labels.stock.selectedForSale ?? "Selected for sale",
+      series: [],
+      value: formatNumber(stockSummary.selected_for_sale, locale)
     },
     {
       color: businessMetricColors.succeeded,
@@ -683,27 +656,6 @@ export function AdminRetailStockView({
       label: labels.stock.ineligibleForSale ?? "Ineligible for sale",
       series: [],
       value: formatNumber(stockSummary.ineligible_for_sale, locale)
-    },
-    {
-      color: businessMetricColors.succeeded,
-      id: "in_stock",
-      label: labels.stock.inStock,
-      series: [],
-      value: formatNumber(stockSummary.in_stock, locale)
-    },
-    {
-      color: businessMetricColors.medium,
-      id: "low_stock",
-      label: labels.stock.lowStock,
-      series: [],
-      value: formatNumber(stockSummary.low_stock, locale)
-    },
-    {
-      color: businessMetricColors.failed,
-      id: "out_of_stock",
-      label: labels.stock.outOfStock,
-      series: [],
-      value: formatNumber(stockSummary.out_of_stock, locale)
     }
   ];
 

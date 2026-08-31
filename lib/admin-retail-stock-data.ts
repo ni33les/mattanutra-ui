@@ -51,6 +51,7 @@ import type {
 
 export function emptyAdminRetailStockData(): AdminRetailStockData {
   return {
+    approvedProductCount: 0,
     auditEvents: [],
     canFilterOrganisation: false,
     canRouteRegionalCheckout: false,
@@ -1005,7 +1006,14 @@ export async function getAdminRetailStockData(
     tasksByCustomerOrderId.set(task.sourceEntityId, existing);
   }
 
+  const approvedCountRows = await sql<Array<{ n: number }>>`
+    select count(*)::int as n
+    from public.products
+    where status = 'approved'
+  `;
+
   return {
+    approvedProductCount: approvedCountRows[0]?.n ?? 0,
     auditEvents,
     canFilterOrganisation: canReadAllRetailStock(context),
     canRouteRegionalCheckout: canRouteRegionalCheckout(context),

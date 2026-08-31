@@ -685,6 +685,7 @@ export function SidebarContent({
 
 export type BusinessMetric = Readonly<{
   color: string;
+  detail?: string;
   format?: "currency" | "number" | "percent";
   id: string;
   label: string;
@@ -829,6 +830,11 @@ export function BusinessStatsGrid({
                 <span className="text-4xl font-semibold tracking-tight text-gray-900">
                   {metric.value}
                 </span>
+                {metric.detail ? (
+                  <span className="text-sm font-medium text-gray-500">
+                    {metric.detail}
+                  </span>
+                ) : null}
               </p>
             </>
           );
