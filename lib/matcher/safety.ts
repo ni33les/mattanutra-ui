@@ -19,7 +19,6 @@ import type {
 } from "@/lib/matcher/types";
 
 const ZINC = /zinc/i;
-const MAGNESIUM = /magnesium/i;
 const OMEGA = /omega/i;
 const IRON = /iron/i;
 
@@ -107,6 +106,7 @@ function ceilingThreshold(
   }
 
   const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
+    conditionCodes: request.conditionCodes,
     name: nameOf(request, subjectId),
     profile: request.profile,
     subjectId
@@ -135,6 +135,7 @@ function catalogUlRuleId(
   fallback: string
 ) {
   const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
+    conditionCodes: request.conditionCodes,
     name: nameOf(request, subjectId),
     profile: request.profile,
     subjectId
@@ -314,7 +315,6 @@ export function evaluateSafety(input: Readonly<{
     });
   }
   const omegaIds = subjectIdsMatching(input.request, OMEGA);
-  const magnesiumIds = subjectIdsMatching(input.request, MAGNESIUM);
   const zincIds = subjectIdsMatching(input.request, ZINC);
   const ironIds = subjectIdsMatching(input.request, IRON);
   const zincSubject = zincIds[0] ?? null;
@@ -346,26 +346,6 @@ export function evaluateSafety(input: Readonly<{
       guidanceId: guidanceId("medication_interaction", "omega3+anticoagulant"),
       ruleId: "omega3+anticoagulant",
       subjectId: omegaIds[0] ?? null,
-      thresholdUnits: null
-    });
-  }
-
-  if (input.request.conditionCodes.includes("ckd") && magnesiumIds.length > 0) {
-    pushFinding(findings, {
-      action: "block",
-      code: "condition_review_required",
-      contributors: productIds,
-      exposureUnits: magnesiumIds[0]
-        ? unitsOrZero(input.exposure.totals, magnesiumIds[0])
-        : null,
-      family: "magnesium+ckd",
-      guidanceId: guidanceId("condition_review_required", "magnesium+ckd"),
-      ruleId: catalogUlRuleId(
-        input.request,
-        magnesiumIds[0] ?? "",
-        "magnesium+ckd"
-      ),
-      subjectId: magnesiumIds[0] ?? null,
       thresholdUnits: null
     });
   }
@@ -422,7 +402,7 @@ export function evaluateSafety(input: Readonly<{
         thresholdUnits: threshold.units,
         unit: unitOf(input.request, subjectId)
       });
-    } else if (total === threshold.units) {
+    } else if (threshold.units > BigInt(0) && total === threshold.units) {
       pushFinding(findings, {
         action: "acknowledge",
         code: "dose_review_required",
@@ -583,11 +563,7 @@ export function evaluateSafety(input: Readonly<{
 
   return {
     findings: sorted,
-    hardBlocked: sorted.some(
-      (item) =>
-        item.action === "block" &&
-        item.code !== "condition_review_required"
-    ),
+    hardBlocked: sorted.some((item) => item.action === "block"),
     requiresAck: sorted.some((item) => item.action === "acknowledge")
   };
 }

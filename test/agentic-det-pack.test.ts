@@ -548,18 +548,13 @@ export async function runDetPack(input: DetPackCatalog): Promise<DetPackReport> 
   const ckdBlock = ckdSafety.find(
     (item) =>
       item.action === "block" &&
-      item.code === "condition_review_required" &&
+      item.code === "dose_review_required" &&
       item.supplementIds.includes(MAG_ID)
   );
   const ckdOk = Boolean(
     ckdBlock &&
-      ckdBlock.exposure != null &&
-      ckdBlock.exposure > 0 &&
-      ckdBlock.code !== "duplicate_or_overlap" &&
-      ckdSafety.every(
-        (item) =>
-          item.code !== "condition_review_required" || item.action === "block"
-      )
+      ckdBlock.threshold === 0 &&
+      ckdBlock.code !== "duplicate_or_overlap"
   );
   const mag200Safe = !officialSafety.some(
     (item) =>

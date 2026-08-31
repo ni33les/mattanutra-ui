@@ -414,7 +414,6 @@ export function revalidateState(
     const targetBlocked = safety.findings.some(
       (item) =>
         item.action === "block" &&
-        item.code !== "condition_review_required" &&
         (item.subjectId == null ||
           targetIds.has(item.subjectId) ||
           request.currentSupplements.some((row) => row.subjectId === item.subjectId))

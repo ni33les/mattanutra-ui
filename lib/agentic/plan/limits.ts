@@ -5,16 +5,22 @@ import {
 import { scaleAmount } from "@/lib/matcher/dose";
 import type { MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
+export function amountExceedsCeiling(amount: number, limit: number | null) {
+  return limit != null && Number.isFinite(limit) && amount > limit;
+}
+
 export function upperLimitAmount(
   name: string,
   unit: string,
   input: Readonly<{
     ceilings?: readonly SafetyCeiling[];
+    conditionCodes?: readonly string[] | null;
     profile?: SafetyProfile | null;
     subjectId: string;
   }>
 ): number | null {
   const ceiling = safetyCeilingFor(input.ceilings ?? [], {
+    conditionCodes: input.conditionCodes,
     name,
     profile: input.profile,
     subjectId: input.subjectId

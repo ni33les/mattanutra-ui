@@ -235,7 +235,7 @@ describe("R25 bounce gates — R24 crash class", () => {
     });
     assert.equal("exposure" in omitted, true);
     assert.equal(omitted.exposure, 0);
-    assert.ok(Array.isArray(omitted.contributors));
+    assert.equal(omitted.contributors ?? undefined, undefined);
   });
 
   it("shows CKD Mag exposure > 0 when a Mag SKU is selected", () => {
@@ -258,29 +258,21 @@ describe("R25 bounce gates — R24 crash class", () => {
       state: planState({ conditionCodes: ["ckd"] })
     });
     const block = guidance.find(
-      (item) => item.action === "block" && item.code === "condition_review_required"
+      (item) => item.action === "block" && item.code === "dose_review_required"
     );
     assert.ok(block);
     assertHardBlockComplete(block);
     assert.ok(Number(block.exposure) > 0, "CKD Mag silent zero");
     assert.equal(block.exposure, 301.5);
-    assert.equal(block.ruleId, MAG_BAND_ID);
+    assert.equal(block.threshold, 0);
     assert.ok(
       block.contributors.some((row) => /magnesium/i.test(row.productName))
     );
 
     const published = publicSafetyGuidance(block);
     assert.ok(Number(published.exposure) > 0);
+    assert.equal(published.threshold, 0);
     assert.equal("exposure" in published, true);
-
-    const matcherSafety = readFileSync(
-      new URL("../lib/matcher/safety.ts", import.meta.url),
-      "utf8"
-    );
-    assert.match(
-      matcherSafety,
-      /item\.code !== "condition_review_required"/
-    );
   });
 
   it("cancels fulfilment and moves retail off awaiting_stock on refund", async () => {

@@ -134,6 +134,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ปริมาณรวมจากการทานอยู่แล้วบวกสินค้าที่เลือกควรได้รับการตรวจทานขนาด",
     "zh-CN": "当前摄入加上所选产品的总暴露量需要剂量复核。"
   },
+  "guidance.dose_review_required_remaining_zero": {
+    en: "{nutrientName} remaining allowed is 0 {unit} because of a declared condition. Next action: {nextAction}.",
+    th: "{nutrientName} ปริมาณที่ยังได้รับอนุญาตคือ 0 {unit} เนื่องจากภาวะที่แจ้งไว้ ขั้นตอนถัดไป: {nextAction}",
+    "zh-CN": "因已声明的健康状况，{nutrientName} 剩余允许量为 0 {unit}。下一步：{nextAction}。"
+  },
   "guidance.duplicate_or_overlap": {
     en: "{nutrientName} ({unit}) from {contributors}. remainingGap {remainingGap}; overflow {overflow}.",
     th: "{nutrientName} ({unit}) จาก {contributors}. remainingGap {remainingGap}; overflow {overflow}.",

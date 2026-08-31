@@ -138,6 +138,7 @@ export function coverageFor(
     }, 0);
     const limit = upperLimitAmount(target.name, target.unit, {
       ceilings: matcherSafetyCeilings(),
+      conditionCodes: state.conditionCodes,
       profile: state.profile,
       subjectId: target.supplementId
     });

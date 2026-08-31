@@ -1,7 +1,7 @@
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
-import { upperLimitAmount } from "@/lib/agentic/plan/limits";
+import { amountExceedsCeiling, upperLimitAmount } from "@/lib/agentic/plan/limits";
 import {
   catalogBandRuleId,
   catalogBandRulesVersion,
@@ -29,9 +29,11 @@ function catalogRule(
   name: string,
   subjectId: string,
   profile: CanonicalPlanState["profile"],
-  fallbackRuleId: string
+  fallbackRuleId: string,
+  conditionCodes: readonly string[] = []
 ) {
   const ceiling = safetyCeilingFor(matcherSafetyCeilings(), {
+    conditionCodes,
     name,
     profile,
     subjectId
@@ -94,9 +96,15 @@ function guidance(input: Readonly<{
 }>): SafetyGuidance {
   const informationalOverlap =
     input.code === "duplicate_or_overlap" && input.action === "review";
+  const remainingZero =
+    input.code === "dose_review_required" &&
+    input.action === "block" &&
+    input.threshold === 0;
   const messageKey = informationalOverlap
     ? "guidance.informational_overlap"
-    : `guidance.${input.code}`;
+    : remainingZero
+      ? "guidance.dose_review_required_remaining_zero"
+      : `guidance.${input.code}`;
   const family =
     input.code === "medication_interaction"
       ? "omega3+anticoagulant"
@@ -132,10 +140,12 @@ function guidance(input: Readonly<{
       .filter(Boolean)
       .join("; ") || "none selected";
   const nextAction =
-    input.code === "condition_review_required"
-      ? "stop and seek clinician review"
-      : informationalOverlap
-        ? "listed for awareness"
+    remainingZero
+      ? "do not add this nutrient"
+      : input.code === "condition_review_required"
+        ? "stop and seek clinician review"
+        : informationalOverlap
+          ? "listed for awareness"
         : input.code === "medication_interaction"
           ? "listed as a safety fact"
           : "review before purchase";
@@ -221,9 +231,6 @@ export function evaluateSafety(input: Readonly<{
   const omegaIds = input.state.targets
     .filter((item) => /omega/i.test(item.name))
     .map((item) => item.supplementId);
-  const magnesiumIds = input.state.targets
-    .filter((item) => /magnesium/i.test(item.name))
-    .map((item) => item.supplementId);
   const coverageFromPlan = input.coverage ?? input.selected?.coverage ?? [];
   const zincCoverage =
     coverageFromPlan.find((item) => /zinc/i.test(item.name)) ??
@@ -260,34 +267,6 @@ export function evaluateSafety(input: Readonly<{
     }));
   }
 
-  if (input.state.conditionCodes.includes("ckd") && magnesiumIds.length > 0) {
-    const magnesiumCoverage =
-      input.selected?.coverage.find((row) => /magnesium/i.test(row.name)) ??
-      coverageFromPlan.find((row) => /magnesium/i.test(row.name));
-    items.push(guidance({
-      action: "block",
-      code: "condition_review_required",
-      contributors: magnesiumCoverage
-        ? exposureContributors(magnesiumCoverage)
-        : [],
-      exposure: magnesiumCoverage?.totalExposureAmount ?? null,
-      locale: input.locale,
-      nutrientName: magnesiumCoverage?.name ?? "Magnesium",
-      productIds,
-      requested: magnesiumCoverage?.requestedAmount ?? null,
-      severity: "blocking",
-      sourceScope: "supplemental",
-      supplementIds: magnesiumIds,
-      unit: magnesiumCoverage?.unit ?? "mg",
-      ...catalogRule(
-        "Magnesium",
-        magnesiumIds[0] ?? "Magnesium",
-        input.state.profile,
-        "magnesium+ckd"
-      )
-    }));
-  }
-
   for (const target of input.state.targets) {
     if (coverageRows.some((row) => row.supplementId === target.supplementId)) {
       continue;
@@ -295,11 +274,12 @@ export function evaluateSafety(input: Readonly<{
 
     const limit = upperLimitAmount(target.name, target.unit, {
       ceilings: matcherSafetyCeilings(),
+      conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
       subjectId: target.supplementId
     });
 
-    if (limit != null && Number.isFinite(limit) && limit > 0 && target.amount > limit) {
+    if (amountExceedsCeiling(target.amount, limit)) {
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
@@ -317,7 +297,60 @@ export function evaluateSafety(input: Readonly<{
           target.name,
           target.supplementId,
           input.state.profile,
-          `ul:${target.supplementId}`
+          `ul:${target.supplementId}`,
+          input.state.conditionCodes
+        )
+      }));
+    }
+  }
+
+  for (const leftover of input.state.leftovers) {
+    const amount = leftover.amount;
+    const unit = leftover.unit;
+    if (amount == null || !unit) {
+      continue;
+    }
+    const subjectId = leftover.supplementId || leftover.name;
+    if (
+      coverageRows.some(
+        (row) =>
+          row.supplementId === leftover.supplementId ||
+          row.name.trim().toLowerCase() === leftover.name.trim().toLowerCase()
+      ) ||
+      input.state.targets.some(
+        (target) =>
+          target.supplementId === leftover.supplementId ||
+          target.name.trim().toLowerCase() === leftover.name.trim().toLowerCase()
+      )
+    ) {
+      continue;
+    }
+    const limit = upperLimitAmount(leftover.name, unit, {
+      ceilings: matcherSafetyCeilings(),
+      conditionCodes: input.state.conditionCodes,
+      profile: input.state.profile,
+      subjectId
+    });
+    if (amountExceedsCeiling(amount, limit)) {
+      items.push(guidance({
+        action: "block",
+        code: "dose_review_required",
+        exposure: 0,
+        locale: input.locale,
+        nutrientName: leftover.name,
+        productIds,
+        requested: amount,
+        severity: "blocking",
+        sourceScope: "supplemental",
+        supplementIds: leftover.supplementId ? [leftover.supplementId] : [],
+        threshold: limit,
+        unit,
+        ...catalogRule(
+          leftover.name,
+          subjectId,
+          input.state.profile,
+          `ul:${subjectId}`,
+          input.state.conditionCodes
         )
       }));
     }
@@ -326,6 +359,7 @@ export function evaluateSafety(input: Readonly<{
   for (const row of coverageRows) {
     const limit = upperLimitAmount(row.name, row.unit, {
       ceilings: matcherSafetyCeilings(),
+      conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
       subjectId: row.supplementId
     });
@@ -358,7 +392,8 @@ export function evaluateSafety(input: Readonly<{
           row.name,
           row.supplementId,
           input.state.profile,
-          `ul:missing:${row.supplementId}`
+          `ul:missing:${row.supplementId}`,
+          input.state.conditionCodes
         )
       }));
     } else if (limit == null && row.coveragePercent > 125) {
@@ -380,14 +415,12 @@ export function evaluateSafety(input: Readonly<{
           row.name,
           row.supplementId,
           input.state.profile,
-          `ul:missing:${row.supplementId}`
+          `ul:missing:${row.supplementId}`,
+          input.state.conditionCodes
         )
       }));
     } else if (
-      limit != null &&
-      Number.isFinite(limit) &&
-      limit > 0 &&
-      row.requestedAmount > limit &&
+      amountExceedsCeiling(row.requestedAmount, limit) &&
       row.currentAmount <= 0
     ) {
       items.push(guidance({
@@ -408,10 +441,11 @@ export function evaluateSafety(input: Readonly<{
           row.name,
           row.supplementId,
           input.state.profile,
-          `ul:${row.supplementId}`
+          `ul:${row.supplementId}`,
+          input.state.conditionCodes
         )
       }));
-    } else if (limit != null && Number.isFinite(limit) && limit > 0 && row.totalExposureAmount > limit) {
+    } else if (amountExceedsCeiling(row.totalExposureAmount, limit)) {
       items.push(guidance({
         action: "block",
         code: "dose_review_required",
@@ -430,10 +464,16 @@ export function evaluateSafety(input: Readonly<{
           row.name,
           row.supplementId,
           input.state.profile,
-          `ul:${row.supplementId}`
+          `ul:${row.supplementId}`,
+          input.state.conditionCodes
         )
       }));
-    } else if (limit != null && Number.isFinite(limit) && limit > 0 && row.totalExposureAmount >= limit) {
+    } else if (
+      limit != null &&
+      Number.isFinite(limit) &&
+      limit > 0 &&
+      row.totalExposureAmount >= limit
+    ) {
       items.push(guidance({
         action: "acknowledge",
         code: "dose_review_required",
@@ -452,7 +492,8 @@ export function evaluateSafety(input: Readonly<{
           row.name,
           row.supplementId,
           input.state.profile,
-          `ul:${row.supplementId}`
+          `ul:${row.supplementId}`,
+          input.state.conditionCodes
         )
       }));
     }
@@ -522,16 +563,12 @@ export function evaluateSafety(input: Readonly<{
 
     const limit = upperLimitAmount(nutrient.name, nutrient.unit, {
       ceilings: matcherSafetyCeilings(),
+      conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
       subjectId: nutrient.name
     });
 
-    if (
-      limit != null &&
-      Number.isFinite(limit) &&
-      limit > 0 &&
-      nutrient.amount > limit
-    ) {
+    if (amountExceedsCeiling(nutrient.amount, limit)) {
       const incidentalRows = (input.selected?.basket ?? []).flatMap((item) =>
         (item.incidentalNutrients ?? [])
           .filter(
@@ -567,7 +604,8 @@ export function evaluateSafety(input: Readonly<{
           nutrient.name,
           nutrient.name,
           input.state.profile,
-          `ul:incidental:${nutrient.name}`
+          `ul:incidental:${nutrient.name}`,
+          input.state.conditionCodes
         )
       }));
     }

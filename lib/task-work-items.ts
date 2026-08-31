@@ -38,6 +38,7 @@ import {
 import {
   ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE
 } from "@/lib/admin-catalogue-optimization-jobs";
+import { kidneyAnswerToConditionCode } from "@/lib/matcher/condition-ceilings";
 import { inStorePharmacyFromAnswers } from "@/lib/pharmacy-in-store";
 import {
   defaultProductCountryCode,
@@ -502,9 +503,10 @@ function productRecommendationClientContextFromPlan(
   guidanceAdjustments: readonly PlanGuidanceAdjustment[]
 ): ProductRecommendationClientContext {
   const record = payloadRecord(answers);
+  const kidney = textFromRecord(record, "kidney");
   const cautions = [
     ...stringArrayFromRecord(record, "suppAllergies"),
-    textFromRecord(record, "kidney"),
+    kidneyAnswerToConditionCode(kidney),
     textFromRecord(record, "liver"),
     textFromRecord(record, "surgery"),
     textFromRecord(record, "antibiotics"),

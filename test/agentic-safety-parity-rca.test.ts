@@ -261,7 +261,7 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
     assert.equal(coverage.status, "covered");
   });
 
-  it("RCA-10: CKD plus Magnesium is blocked by the condition rule", () => {
+  it("RCA-10: CKD plus Magnesium is blocked by remaining allowed 0", () => {
     installAdultMagBand();
     const item = magItem(200);
     const coverage = magCoverage({ amount: 200, requested: 200, limit: 350 });
@@ -272,9 +272,10 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
     });
     const guidance = evaluateSafety({ locale: "en", selected, state });
     const block = guidance.find(
-      (row) => row.action === "block" && row.code === "condition_review_required"
+      (row) => row.action === "block" && row.code === "dose_review_required"
     );
     assert.ok(block);
+    assert.equal(block?.threshold, 0);
     assert.equal(Number(block.exposure) > 0, true);
     assert.equal(
       planStatus({

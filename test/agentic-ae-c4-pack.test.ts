@@ -1160,7 +1160,7 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
         }
 
         const magOk = checkBlock(mag, "dose_review_required");
-        const ckdOk = checkBlock(ckd, "condition_review_required");
+        const ckdOk = checkBlock(ckd, "dose_review_required");
         setMatcherSafetyCeilings([]);
         return magOk && ckdOk
           ? pass("AX4-06", {

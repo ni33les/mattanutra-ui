@@ -497,11 +497,10 @@ export function publicCoverage(row: CoverageRow) {
       : {}),
     ...(row.upperLimitAmount != null
       ? {
-          percentOfUpperLimit:
-            row.percentOfUpperLimit == null
-              ? row.percentOfUpperLimit
-              : publicAmount(row.percentOfUpperLimit),
-          upperLimitAmount: publicAmount(row.upperLimitAmount)
+          upperLimitAmount: publicAmount(row.upperLimitAmount),
+          ...(row.percentOfUpperLimit != null
+            ? { percentOfUpperLimit: publicAmount(row.percentOfUpperLimit) }
+            : {})
         }
       : {})
   };
@@ -683,7 +682,9 @@ export function publicSafetyGuidance(
     ...(row.threshold != null ? { threshold: publicAmount(row.threshold) } : {}),
     ...(row.productIds.length > 0 ? { productIds: row.productIds } : {}),
     ...(row.supplementIds.length > 0 ? { supplementIds: row.supplementIds } : {}),
-    contributors: row.contributors.map(publicContributor)
+    ...(row.contributors.length > 0
+      ? { contributors: row.contributors.map(publicContributor) }
+      : {})
   };
 }
 

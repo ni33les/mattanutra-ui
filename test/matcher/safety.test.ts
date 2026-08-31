@@ -147,7 +147,7 @@ describe("matcher safety engine", () => {
     );
   });
 
-  it("SAFE-04 blocks CKD plus magnesium at request level", () => {
+  it("SAFE-04 blocks CKD plus magnesium at the stack UL", () => {
     const mag = scaleAmount({
       amount: 300,
       subjectId: "sup_mag",
@@ -158,6 +158,15 @@ describe("matcher safety engine", () => {
     if ("reason" in mag) {
       return;
     }
+    const variant: DoseVariant = {
+      amountPerUnit: new Map([["sup_mag", mag]]),
+      contributions: new Map([["sup_mag", mag]]),
+      dailyPills: 1,
+      dailyUnits: 1,
+      productId: "prd_mag",
+      unknownSafetyAmount: false,
+      variantId: "prd_mag:x1"
+    };
     const next = request({
       conditionCodes: ["ckd"],
       targets: [
@@ -170,7 +179,7 @@ describe("matcher safety engine", () => {
         }
       ]
     });
-    const exposure = aggregateDailyExposure({ current: [], variants: [] });
+    const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
       return;
@@ -179,13 +188,14 @@ describe("matcher safety engine", () => {
       exposure,
       products: [],
       request: next,
-      variants: []
+      variants: [variant]
     });
-    assert.equal(safety.hardBlocked, true);
-    assert.equal(
-      safety.findings.some((item) => item.code === "condition_review_required"),
-      true
+    const block = safety.findings.find(
+      (item) => item.code === "dose_review_required" && item.action === "block"
     );
+    assert.equal(safety.hardBlocked, true);
+    assert.ok(block);
+    assert.equal(block?.thresholdUnits, BigInt(0));
   });
 
   it("SAFE-01 does not fire zinc UL at 39.999 mg", () => {
