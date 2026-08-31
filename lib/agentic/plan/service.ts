@@ -533,8 +533,13 @@ function sleep(ms: number) {
 
 function isTerminalPlanStatus(
   status: PlanResult["status"]
-): status is "blocked" | "needs_input" | "ready" {
-  return status === "blocked" || status === "needs_input" || status === "ready";
+): status is "blocked" | "needs_input" | "no_purchase" | "ready" {
+  return (
+    status === "blocked" ||
+    status === "needs_input" ||
+    status === "no_purchase" ||
+    status === "ready"
+  );
 }
 
 function successFromResult(input: Readonly<{

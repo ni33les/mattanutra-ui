@@ -888,8 +888,7 @@ export function planStatus(input: Readonly<{
   selected: StackOption | null;
   state: CanonicalPlanState;
   unmetRequirements: readonly string[];
-}>): "blocked" | "needs_input" | "ready" {
-  void input.state;
+}>): "blocked" | "needs_input" | "no_purchase" | "ready" {
   void input.unmetRequirements;
 
   if (input.guidance.some((item) => item.action === "block")) {
@@ -900,21 +899,44 @@ export function planStatus(input: Readonly<{
     return "needs_input";
   }
 
+  const coverage = input.selected?.coverage ?? [];
+  const missingPrerequisite = input.state.targets.some(
+    (target) =>
+      target.importance === "conditional" &&
+      target.prerequisite?.status !== "satisfied"
+  );
+  const coreOrRequired = coverage.filter((row) => {
+    const target = input.state.targets.find((item) => item.supplementId === row.supplementId);
+    return target?.importance === "core" || target?.importance === "required" || !target?.importance;
+  });
+  const coreUnresolved = coreOrRequired.some(
+    (row) =>
+      row.status === "uncovered" ||
+      row.status === "gap" ||
+      row.status === "partial"
+  );
+  const basketEmpty = !input.selected || input.selected.basket.length === 0;
+
   if (
-    !input.selected ||
-    input.selected.basket.length === 0 ||
-    input.selected.coverage.every((row) => row.status === "uncovered")
+    input.selected?.coverage.some(
+      (row) =>
+        row.upperLimitAmount != null &&
+        row.totalExposureAmount > row.upperLimitAmount &&
+        row.status !== "conditional_deferred"
+    )
   ) {
     return "blocked";
   }
 
-  if (
-    input.selected.coverage.some(
-      (row) =>
-        row.upperLimitAmount != null &&
-        row.totalExposureAmount > row.upperLimitAmount
-    )
-  ) {
+  if (basketEmpty) {
+    if (missingPrerequisite && !coreUnresolved) {
+      return "needs_input";
+    }
+
+    if (!coreUnresolved) {
+      return "no_purchase";
+    }
+
     return "blocked";
   }
 

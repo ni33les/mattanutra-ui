@@ -13,8 +13,12 @@ import type {
 export function canonicalizeTargets(input: Readonly<{
   leftovers?: readonly MatcherLeftover[];
   targets: readonly Readonly<{
+    acceptableMaximum?: number;
+    acceptableMinimum?: number;
     amount: number;
+    importance?: CanonicalTarget["importance"];
     name: string;
+    prerequisite?: CanonicalTarget["prerequisite"];
     subjectId: string;
     unit: MatcherUnit;
   }>[];
@@ -43,7 +47,15 @@ export function canonicalizeTargets(input: Readonly<{
     }
 
     targets.push({
+      ...(target.acceptableMaximum != null
+        ? { acceptableMaximum: target.acceptableMaximum }
+        : {}),
+      ...(target.acceptableMinimum != null
+        ? { acceptableMinimum: target.acceptableMinimum }
+        : {}),
+      importance: target.importance ?? "required",
       name: target.name,
+      ...(target.prerequisite ? { prerequisite: target.prerequisite } : {}),
       requested,
       requestedAmount: target.amount,
       requestedUnit: target.unit,
@@ -144,7 +156,9 @@ export function canonicalTargetSetHash(request: CanonicalRequest): string {
 export function canonicalizeCurrents(
   currents: readonly Readonly<{
     dailyAmount: number;
+    daysRemaining?: number;
     name: string;
+    productId?: string;
     sourceId: string;
     subjectId: string;
     unit: MatcherUnit;
@@ -167,7 +181,9 @@ export function canonicalizeCurrents(
     result.push({
       daily,
       dailyAmount: current.dailyAmount,
+      ...(current.daysRemaining != null ? { daysRemaining: current.daysRemaining } : {}),
       name: current.name,
+      ...(current.productId ? { productId: current.productId } : {}),
       sourceId: current.sourceId,
       subjectId: current.subjectId,
       unit: current.unit

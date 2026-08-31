@@ -46,7 +46,9 @@ const PLAN_REQUEST: JsonSchema = {
         additionalProperties: false,
         properties: {
           dailyAmount: { exclusiveMinimum: 0, type: "number" },
+          daysRemaining: { minimum: 0, type: "number" },
           name: { type: "string" },
+          productId: { pattern: "^prd_", type: "string" },
           supplementId: { pattern: "^sup_", type: "string" },
           unit: {
             enum: ["mcg", "mg", "g", "IU", "CFU", "ml", "serving"],
@@ -58,6 +60,36 @@ const PLAN_REQUEST: JsonSchema = {
       },
       maxItems: 50,
       type: "array"
+    },
+    costHorizonsDays: {
+      items: { minimum: 1, type: "integer" },
+      minItems: 1,
+      type: "array",
+      uniqueItems: true
+    },
+    baseline: {
+      additionalProperties: false,
+      properties: {
+        items: {
+          items: {
+            additionalProperties: false,
+            properties: {
+              daysRemaining: { minimum: 0, type: "number" },
+              productId: { pattern: "^prd_", type: "string" },
+              quantity: { exclusiveMinimum: 0, type: "number" }
+            },
+            required: ["productId", "quantity"],
+            type: "object"
+          },
+          type: "array"
+        },
+        type: {
+          enum: ["current_basket", "separate_direct_products"],
+          type: "string"
+        }
+      },
+      required: ["type"],
+      type: "object"
     },
     destinationCountry: {
       description:
@@ -154,12 +186,43 @@ const PLAN_REQUEST: JsonSchema = {
     },
     safetyAcknowledgement: PLAN_SAFETY_ACK,
     targets: {
-      description: "Agreed nutrient targets. Each item is name, amount, and unit only.",
+      description:
+        "Agreed nutrient targets. Each item has name, amount, and unit. Optional importance, acceptableRange, and prerequisite preserve core/optional/conditional intent. A target without importance remains required.",
       items: {
         additionalProperties: false,
         properties: {
+          acceptableRange: {
+            additionalProperties: false,
+            properties: {
+              maximum: { exclusiveMinimum: 0, type: "number" },
+              minimum: { exclusiveMinimum: 0, type: "number" },
+              unit: {
+                enum: ["mcg", "mg", "g", "IU", "CFU", "ml", "serving"],
+                type: "string"
+              }
+            },
+            required: ["minimum", "maximum", "unit"],
+            type: "object"
+          },
           amount: { exclusiveMinimum: 0, type: "number" },
+          importance: {
+            enum: ["core", "optional", "conditional", "required"],
+            type: "string"
+          },
           name: { minLength: 1, type: "string" },
+          prerequisite: {
+            additionalProperties: false,
+            properties: {
+              nextAction: { minLength: 1, type: "string" },
+              reasonCode: { minLength: 1, type: "string" },
+              status: {
+                enum: ["satisfied", "unsatisfied", "unknown"],
+                type: "string"
+              }
+            },
+            required: ["status"],
+            type: "object"
+          },
           supplementId: { pattern: "^sup_", type: "string" },
           unit: {
             enum: ["mcg", "mg", "g", "IU", "CFU", "ml", "serving"],

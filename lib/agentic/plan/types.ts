@@ -13,9 +13,28 @@ export type LifeStage =
   | "pregnant"
   | "trying_to_conceive";
 
+export type TargetImportance = "conditional" | "core" | "optional" | "required";
+
+export type TargetPrerequisiteStatus = "satisfied" | "unknown" | "unsatisfied";
+
+export type TargetAcceptableRange = Readonly<{
+  maximum: number;
+  minimum: number;
+  unit: CatalogueUnit;
+}>;
+
+export type TargetPrerequisite = Readonly<{
+  nextAction?: string;
+  reasonCode?: string;
+  status: TargetPrerequisiteStatus;
+}>;
+
 export type PlanTarget = Readonly<{
+  acceptableRange?: TargetAcceptableRange;
   amount: number;
+  importance?: TargetImportance;
   name: string;
+  prerequisite?: TargetPrerequisite;
   requestedName?: string;
   supplementId: string;
   unit: CatalogueUnit;
@@ -23,7 +42,9 @@ export type PlanTarget = Readonly<{
 
 export type CurrentSupplement = Readonly<{
   dailyAmount: number;
+  daysRemaining?: number;
   name: string;
+  productId?: string;
   supplementId: string;
   unit: CatalogueUnit;
 }>;
@@ -59,22 +80,38 @@ export type PlanAnswer = Readonly<{
 }>;
 
 export type PlanRequestTarget = Readonly<{
+  acceptableRange?: TargetAcceptableRange;
   amount: number;
+  importance?: TargetImportance;
   name: string;
+  prerequisite?: TargetPrerequisite;
   supplementId?: string;
   unit: CatalogueUnit;
 }>;
 
 export type PlanRequestCurrent = Readonly<{
   dailyAmount: number;
+  daysRemaining?: number;
   name: string;
+  productId?: string;
   supplementId?: string;
   unit: CatalogueUnit;
 }>;
 
+export type PlanBaseline = Readonly<{
+  items?: readonly Readonly<{
+    daysRemaining?: number;
+    productId: string;
+    quantity: number;
+  }>[];
+  type: "current_basket" | "separate_direct_products";
+}>;
+
 export type PlanRequest = Readonly<{
   answers?: readonly PlanAnswer[];
+  baseline?: PlanBaseline;
   conditionCodes?: readonly string[];
+  costHorizonsDays?: readonly number[];
   currentSupplements?: readonly PlanRequestCurrent[];
   destinationCountry: string;
   locale: string;
@@ -304,7 +341,19 @@ export type CoverageRow = Readonly<{
   remainingGap: number;
   requestedAmount: number;
   sourceScope?: "supplemental" | "total" | null;
-  status: "covered" | "over_target" | "partial" | "uncovered" | "upper_limit_risk";
+  importance?: TargetImportance;
+  nextAction?: string;
+  reasonCode?: string;
+  status:
+    | "already_covered"
+    | "conditional_deferred"
+    | "covered"
+    | "gap"
+    | "optional_omitted"
+    | "over_target"
+    | "partial"
+    | "uncovered"
+    | "upper_limit_risk";
   supplementId: string;
   totalExposureAmount: number;
   unit: CatalogueUnit;
@@ -415,7 +464,7 @@ export type PlanResult = Readonly<{
   requestSnapshot: CanonicalPlanState;
   safetyGuidance: readonly SafetyGuidance[];
   selected: StackOption | null;
-  status: "blocked" | "needs_input" | "processing" | "ready";
+  status: "blocked" | "needs_input" | "no_purchase" | "processing" | "ready";
   summary: string;
   unmetRequirements: readonly string[];
 }>;

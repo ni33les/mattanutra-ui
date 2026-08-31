@@ -61,8 +61,12 @@ export function toCanonicalRequest(
       unit: item.unit as MatcherUnit | undefined
     })),
     targets: state.targets.map((item) => ({
+      acceptableMaximum: item.acceptableRange?.maximum,
+      acceptableMinimum: item.acceptableRange?.minimum,
       amount: item.amount,
+      importance: item.importance ?? "required",
       name: item.name,
+      prerequisite: item.prerequisite,
       subjectId: item.supplementId,
       unit: item.unit
     }))
@@ -78,7 +82,9 @@ export function toCanonicalRequest(
   const currents = canonicalizeCurrents(
     currentRows.map((item, index) => ({
       dailyAmount: item.dailyAmount,
+      daysRemaining: item.daysRemaining,
       name: item.name,
+      productId: item.productId,
       sourceId: `${item.supplementId}:${item.unit}:${item.dailyAmount}:${index}`,
       subjectId: item.supplementId,
       unit: item.unit
@@ -207,16 +213,32 @@ export function coverageFor(
         ? Math.round((totalExposureAmount / target.amount) * 100)
         : 0;
     let status: CoverageRow["status"] = "uncovered";
+    const importance = target.importance ?? "required";
+    const deferredConditional =
+      importance === "conditional" &&
+      target.prerequisite?.status !== "satisfied";
 
-    if (coveragePercent >= COVERED_THRESHOLD && coveragePercent <= 125) {
+    if (deferredConditional) {
+      status = "conditional_deferred";
+    } else if (
+      currentAmount > 0 &&
+      coveragePercent >= COVERED_THRESHOLD &&
+      deliveredAmount <= 0
+    ) {
+      status = "already_covered";
+    } else if (coveragePercent >= COVERED_THRESHOLD && coveragePercent <= 125) {
       status = "covered";
     } else if (coveragePercent > 125) {
       status = "over_target";
+    } else if (importance === "optional" && deliveredAmount <= 0) {
+      status = "optional_omitted";
     } else if (coveragePercent > 0 && contributors.length > 0) {
       status = "partial";
+    } else if (importance === "core" || importance === "required") {
+      status = "gap";
     }
 
-    if (limit != null && totalExposureAmount >= limit) {
+    if (limit != null && totalExposureAmount >= limit && !deferredConditional) {
       status = "upper_limit_risk";
     }
 
@@ -226,7 +248,14 @@ export function coverageFor(
       coveragePercent,
       currentAmount,
       deliveredAmount,
+      importance,
       name: target.name,
+      ...(deferredConditional
+        ? {
+            nextAction: target.prerequisite?.nextAction,
+            reasonCode: target.prerequisite?.reasonCode
+          }
+        : {}),
       percentOfUpperLimit:
         limit != null && limit > 0
           ? Math.round((totalExposureAmount / limit) * 100)
@@ -587,7 +616,12 @@ export function leftoversFor(
 
   if (!selected) {
     for (const row of coverageFor(state, null)) {
-      if (row.remainingGap <= 0) {
+      if (
+        row.remainingGap <= 0 ||
+        row.status === "conditional_deferred" ||
+        row.status === "optional_omitted" ||
+        row.status === "already_covered"
+      ) {
         continue;
       }
 
@@ -618,7 +652,7 @@ export function leftoversFor(
     ) {
       continue;
     }
-    if (row.status === "uncovered") {
+    if (row.status === "uncovered" || row.status === "gap") {
       if (row.deliveredAmount > 0) {
         push({
           amount: row.requestedAmount,

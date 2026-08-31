@@ -35,8 +35,18 @@ export type DietaryPreference = "any" | "plant_based" | "vegan";
 
 export type OmegaPreference = "algae_only" | "any" | "fish_allowed";
 
+export type TargetImportance = "conditional" | "core" | "optional" | "required";
+
 export type CanonicalTarget = Readonly<{
+  acceptableMaximum?: number;
+  acceptableMinimum?: number;
+  importance: TargetImportance;
   name: string;
+  prerequisite?: Readonly<{
+    nextAction?: string;
+    reasonCode?: string;
+    status: "satisfied" | "unknown" | "unsatisfied";
+  }>;
   requested: ScaledAmount;
   requestedAmount: number;
   requestedUnit: MatcherUnit;
@@ -46,7 +56,9 @@ export type CanonicalTarget = Readonly<{
 export type CanonicalCurrent = Readonly<{
   daily: ScaledAmount;
   dailyAmount: number;
+  daysRemaining?: number;
   name: string;
+  productId?: string;
   sourceId: string;
   subjectId: string;
   unit: MatcherUnit;

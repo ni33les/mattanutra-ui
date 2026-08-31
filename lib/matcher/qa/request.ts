@@ -30,6 +30,7 @@ export function qaTarget(
   }
 
   return {
+    importance: "required",
     name: name ?? subject.name,
     requested,
     requestedAmount: amount,

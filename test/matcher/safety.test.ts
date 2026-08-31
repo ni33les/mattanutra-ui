@@ -39,6 +39,7 @@ function request(overrides: Partial<CanonicalRequest> = {}): CanonicalRequest {
     selectorMode: "agentic",
     targets: [
       {
+        importance: "required",
         name: "Zinc",
         requested: zinc,
         requestedAmount: 25,
@@ -171,7 +172,8 @@ describe("matcher safety engine", () => {
       conditionCodes: ["ckd"],
       targets: [
         {
-          name: "Magnesium",
+          importance: "required",
+      name: "Magnesium",
           requested: mag,
           requestedAmount: 300,
           requestedUnit: "mg",

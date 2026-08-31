@@ -33,6 +33,7 @@ function target(
     throw new Error(requested.message);
   }
   return {
+    importance: "required",
     name,
     requested,
     requestedAmount: amount,

@@ -490,6 +490,9 @@ export function publicCoverage(row: CoverageRow) {
     supplementId: row.supplementId,
     totalExposureAmount: publicAmount(row.totalExposureAmount),
     unit: row.unit,
+    ...(row.importance ? { importance: row.importance } : {}),
+    ...(row.reasonCode ? { reasonCode: row.reasonCode } : {}),
+    ...(row.nextAction ? { nextAction: row.nextAction } : {}),
     ...(row.contributors && row.contributors.length > 0
       ? {
           contributors: row.contributors.map(publicContributor)
@@ -863,7 +866,9 @@ export function publicPlanFields(result: Pick<
           ? ["answer_questions"]
           : result.status === "ready"
             ? ["confirm_with_user"]
-            : ["change_request"];
+            : result.status === "no_purchase"
+              ? []
+              : ["change_request"];
   const currency = result.basket[0]?.currency ?? "THB";
   const subtotalMinor =
     selected?.totalPriceMinor ??

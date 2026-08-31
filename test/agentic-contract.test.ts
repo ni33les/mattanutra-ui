@@ -47,7 +47,7 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.match(planRequest, /info\.medicationCodes/);
     assert.match(planRequest, /info\.conditionCodes/);
     assert.match(planRequest, /excludeSupplementIds/);
-    assert.match(planRequest, /name, amount, and unit only/);
+    assert.match(planRequest, /name, amount, and unit/);
   });
 
   it("keeps the checked-in contract snapshot in sync", () => {

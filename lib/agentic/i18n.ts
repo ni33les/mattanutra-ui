@@ -415,9 +415,14 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "购买前还需要客户做一个选择。"
   },
   "plan.summary.processing": {
-    en: "Matching is still running. Poll this plan until status is ready, needs_input, or blocked.",
-    th: "กำลังจับคู่อยู่ ตรวจสอบแผนนี้จนกว่าสถานะจะเป็น ready, needs_input หรือ blocked",
-    "zh-CN": "仍在匹配中。请轮询此方案，直到状态为 ready、needs_input 或 blocked。"
+    en: "Matching is still running. Poll this plan until status is ready, needs_input, no_purchase, or blocked.",
+    th: "กำลังจับคู่อยู่ ตรวจสอบแผนนี้จนกว่าสถานะจะเป็น ready, needs_input, no_purchase หรือ blocked",
+    "zh-CN": "仍在匹配中。请轮询此方案，直到状态为 ready、needs_input、no_purchase 或 blocked。"
+  },
+  "plan.summary.no_purchase": {
+    en: "Nothing needs to be bought for the accepted goals. Confirm that outcome with the person.",
+    th: "เป้าหมายที่ยอมรับแล้วไม่ต้องซื้อเพิ่ม โปรดยืนยันผลนี้กับผู้ใช้",
+    "zh-CN": "已接受的目标无需再买。请先与当事人确认该结果。"
   },
   "plan.summary.ready": {
     en: "A purchasable stack is ready. Confirm with the person first.",

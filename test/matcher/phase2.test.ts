@@ -36,6 +36,7 @@ function target(
     throw new Error("reason" in requested ? requested.message : "dose");
   }
   return {
+    importance: "required",
     name,
     requested,
     requestedAmount: amount,

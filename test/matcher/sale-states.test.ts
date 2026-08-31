@@ -27,6 +27,7 @@ function target(
     throw new Error("dose scale failed");
   }
   return {
+    importance: "required",
     name,
     requested,
     requestedAmount: amount,

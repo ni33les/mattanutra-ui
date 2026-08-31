@@ -1,12 +1,16 @@
 import { createHash } from "node:crypto";
+
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
+import type { SafetyCeiling } from "@/lib/matcher/types";
+
 import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
 
-export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
+export function valueCatalogueFingerprint(
+  snapshot: CatalogueSnapshot,
+  ceilings: readonly SafetyCeiling[] = []
+) {
   const hash = createHash("sha256");
   hash.update(snapshot.catalogueVersion);
-  hash.update("\0");
-  hash.update(snapshot.availabilityAsOf);
   hash.update("\0");
 
   for (const product of [...snapshot.products].sort((left, right) =>
@@ -27,6 +31,8 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
     hash.update(String(product.dailyPills));
     hash.update(":");
     hash.update(String(servingsPerPackFromProduct(product) ?? ""));
+    hash.update(":");
+    hash.update(product.contributionSupplementIds.slice().sort().join(","));
     hash.update("\n");
 
     for (const fact of [...product.candidate.facts].sort((left, right) =>
@@ -41,20 +47,36 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
       hash.update(fact.unit ?? "");
       hash.update(":");
       hash.update(fact.supplementId ?? "");
+      hash.update(":");
+      hash.update(fact.servingLabel ?? "");
       hash.update("\n");
     }
   }
 
-  return `snap_${hash.digest("hex").slice(0, 16)}`;
+  for (const ceiling of [...ceilings].sort((left, right) =>
+    `${left.subjectId}:${left.lifeStage}:${left.bandVersion}`.localeCompare(
+      `${right.subjectId}:${right.lifeStage}:${right.bandVersion}`
+    )
+  )) {
+    hash.update(ceiling.subjectId);
+    hash.update(":");
+    hash.update(String(ceiling.maxAmount));
+    hash.update(":");
+    hash.update(ceiling.maxUnit);
+    hash.update(":");
+    hash.update(ceiling.lifeStage ?? "");
+    hash.update(":");
+    hash.update(String(ceiling.bandVersion ?? ""));
+    hash.update(":");
+    hash.update(ceiling.sourceScope ?? "");
+    hash.update("\n");
+  }
+
+  return `valsnap_${hash.digest("hex").slice(0, 24)}`;
 }
 
-export function freezeCatalogueSnapshot(
-  snapshot: CatalogueSnapshot
-): CatalogueSnapshot {
-  return Object.freeze({
-    availabilityAsOf: snapshot.availabilityAsOf,
-    catalogueVersion: snapshot.catalogueVersion,
-    products: Object.freeze([...snapshot.products]),
-    supplements: Object.freeze([...snapshot.supplements])
-  });
+export function candidateSetHash(productIds: readonly string[]) {
+  const hash = createHash("sha256");
+  hash.update([...productIds].sort().join("\n"));
+  return `cand_${hash.digest("hex").slice(0, 16)}`;
 }

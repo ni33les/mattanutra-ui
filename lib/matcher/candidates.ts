@@ -54,6 +54,13 @@ export function remainingRequestedUnits(
     return BigInt(0);
   }
 
+  if (
+    target.importance === "conditional" &&
+    target.prerequisite?.status !== "satisfied"
+  ) {
+    return BigInt(0);
+  }
+
   const current = request.currentSupplements
     .filter((item) => item.subjectId === subjectId)
     .reduce((sum, item) => sum + item.daily.units, BigInt(0));

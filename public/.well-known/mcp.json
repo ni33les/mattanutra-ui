@@ -17,7 +17,7 @@
       "name": "info"
     },
     {
-      "description": "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. Send profile.ageYears (not profile.age), profile.sex (female or male; omit the field if unknown), and profile.lifeStage. Send medications as request.medicationCodes and conditions as request.conditionCodes — not profile.medications, profile.conditions, medications, or conditions. Exclusions are request.requirements.excludeSupplementIds. request.optimization is one of balanced, best_coverage, lowest_cost, fewest_pills (a string, not an object). Target objects are name, amount, unit only. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
+      "description": "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. Send profile.ageYears (not profile.age), profile.sex (female or male; omit the field if unknown), and profile.lifeStage. Send medications as request.medicationCodes and conditions as request.conditionCodes — not profile.medications, profile.conditions, medications, or conditions. Exclusions are request.requirements.excludeSupplementIds. request.optimization is one of balanced, best_coverage, lowest_cost, fewest_pills (a string, not an object). Target objects are name, amount, unit, and optional importance (core, optional, conditional, required; omitted importance stays required), acceptableRange, and prerequisite. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -107,7 +107,15 @@
                       "exclusiveMinimum": 0,
                       "type": "number"
                     },
+                    "daysRemaining": {
+                      "minimum": 0,
+                      "type": "number"
+                    },
                     "name": {
+                      "type": "string"
+                    },
+                    "productId": {
+                      "pattern": "^prd_",
                       "type": "string"
                     },
                     "supplementId": {
@@ -136,6 +144,56 @@
                 },
                 "maxItems": 50,
                 "type": "array"
+              },
+              "costHorizonsDays": {
+                "items": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "baseline": {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "daysRemaining": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "productId": {
+                          "pattern": "^prd_",
+                          "type": "string"
+                        },
+                        "quantity": {
+                          "exclusiveMinimum": 0,
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "productId",
+                        "quantity"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "type": {
+                    "enum": [
+                      "current_basket",
+                      "separate_direct_products"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
               },
               "destinationCountry": {
                 "description": "ISO 3166-1 alpha-2 destination. Call info for supportedCountries. If MattaNutra does not deliver there yet, plan returns unsupported_country with a polite cannot-deliver message.",
@@ -308,17 +366,82 @@
                 "type": "object"
               },
               "targets": {
-                "description": "Agreed nutrient targets. Each item is name, amount, and unit only.",
+                "description": "Agreed nutrient targets. Each item has name, amount, and unit. Optional importance, acceptableRange, and prerequisite preserve core/optional/conditional intent. A target without importance remains required.",
                 "items": {
                   "additionalProperties": false,
                   "properties": {
+                    "acceptableRange": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "maximum": {
+                          "exclusiveMinimum": 0,
+                          "type": "number"
+                        },
+                        "minimum": {
+                          "exclusiveMinimum": 0,
+                          "type": "number"
+                        },
+                        "unit": {
+                          "enum": [
+                            "mcg",
+                            "mg",
+                            "g",
+                            "IU",
+                            "CFU",
+                            "ml",
+                            "serving"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "minimum",
+                        "maximum",
+                        "unit"
+                      ],
+                      "type": "object"
+                    },
                     "amount": {
                       "exclusiveMinimum": 0,
                       "type": "number"
                     },
+                    "importance": {
+                      "enum": [
+                        "core",
+                        "optional",
+                        "conditional",
+                        "required"
+                      ],
+                      "type": "string"
+                    },
                     "name": {
                       "minLength": 1,
                       "type": "string"
+                    },
+                    "prerequisite": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "nextAction": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "reasonCode": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "status": {
+                          "enum": [
+                            "satisfied",
+                            "unsatisfied",
+                            "unknown"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
                     },
                     "supplementId": {
                       "pattern": "^sup_",

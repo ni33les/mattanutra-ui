@@ -419,8 +419,11 @@ export async function normalizePlanRequest(input: Readonly<{
     }
 
     targets.push({
+      ...(target.acceptableRange ? { acceptableRange: target.acceptableRange } : {}),
       amount: target.amount,
+      importance: target.importance ?? "required",
       name: supplement.name,
+      ...(target.prerequisite ? { prerequisite: target.prerequisite } : {}),
       requestedName: target.name,
       supplementId: supplement.supplementId,
       unit: target.unit
@@ -463,7 +466,9 @@ export async function normalizePlanRequest(input: Readonly<{
 
     currentSupplements.push({
       dailyAmount: item.dailyAmount,
+      ...(item.daysRemaining != null ? { daysRemaining: item.daysRemaining } : {}),
       name: supplement.name,
+      ...(item.productId ? { productId: item.productId } : {}),
       supplementId: supplement.supplementId,
       unit: item.unit
     });

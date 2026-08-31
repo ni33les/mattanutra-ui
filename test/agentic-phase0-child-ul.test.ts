@@ -170,6 +170,7 @@ describe("Phase 0 child and life-stage upper limits", () => {
         safetyCeilings: [calciumAdmin],
         targets: [
           {
+            importance: "required",
             name: "Calcium",
             requested: calcium,
             requestedAmount: 1000,

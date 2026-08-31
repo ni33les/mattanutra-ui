@@ -47,7 +47,7 @@ export type PlanRevisionRecord = Readonly<{
   requestSnapshot: unknown;
   result: unknown;
   revision: number;
-  status: "blocked" | "needs_input" | "processing" | "ready";
+  status: "blocked" | "needs_input" | "no_purchase" | "processing" | "ready";
 }>;
 
 export type OrderRecord = Readonly<{
