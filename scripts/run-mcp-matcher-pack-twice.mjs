@@ -48,6 +48,7 @@ if (!process.execArgv.includes(strip)) {
             boundary: a.boundary.passedCases,
             evidence: a.evidence.passedCases,
             commercial: a.commercial.passedCases,
+            valueRemediation: a.valueRemediation.passedCases,
             matcher: a.matcher.scores
           },
           b: {
@@ -60,6 +61,7 @@ if (!process.execArgv.includes(strip)) {
             boundary: b.boundary.passedCases,
             evidence: b.evidence.passedCases,
             commercial: b.commercial.passedCases,
+            valueRemediation: b.valueRemediation.passedCases,
             matcher: b.matcher.scores
           }
         },

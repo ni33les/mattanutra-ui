@@ -161,6 +161,7 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
     assert.equal("matcherTelemetry" in payload, false);
     assert.equal(JSON.stringify(payload).includes("ackMs"), false);
     assert.equal(JSON.stringify(payload).includes("matchMs"), false);
-    assert.equal(JSON.stringify(payload).toLowerCase().includes("snapshot"), false);
+    assert.equal(JSON.stringify(payload).includes("matcherTelemetry"), false);
+    assert.equal(typeof (payload as { canonical?: { snapshotId?: string } }).canonical?.snapshotId, "string");
   });
 });

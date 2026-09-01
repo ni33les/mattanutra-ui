@@ -429,6 +429,21 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "สูตรพร้อมซื้อแล้ว โปรดยืนยันกับผู้ใช้ก่อน",
     "zh-CN": "可购买组合已就绪。请先与当事人确认。"
   },
+  "plan.question.unknown_prerequisite": {
+    en: "Should {name} be treated as confirmed, or left unsatisfied?",
+    th: "ต้องการยืนยัน {name} หรือปล่อยให้ยังไม่ครบเงื่อนไข",
+    "zh-CN": "应将 {name} 视为已确认，还是保持未满足？"
+  },
+  "plan.question.satisfy_prerequisite": {
+    en: "Mark the prerequisite satisfied",
+    th: "ยืนยันว่าเงื่อนไขครบแล้ว",
+    "zh-CN": "将前提标为已满足"
+  },
+  "plan.question.leave_prerequisite": {
+    en: "Leave the prerequisite unsatisfied",
+    th: "ปล่อยให้เงื่อนไขยังไม่ครบ",
+    "zh-CN": "保持前提未满足"
+  },
   "plan.question.unassessed_medical_context": {
     en: "This medication or condition is outside the codes MattaNutra can assess. Continue without that assessment?",
     th: "รายการนี้ไม่อยู่ในรหัสที่ประเมินได้ ต้องการไปต่อโดยไม่ประเมินหรือไม่",

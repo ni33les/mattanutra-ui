@@ -26,6 +26,8 @@ export const PUBLIC_INFO_ALLOW_LIST = [
   "ok",
   "serviceName",
   "contractVersion",
+  "schemaChecksum",
+  "buildId",
   "supportedCountries",
   "supportedLocales",
   "medicationCodes",
@@ -43,12 +45,14 @@ export type PublicInfoCountry = Readonly<{
 }>;
 
 export type PublicInfo = Readonly<{
+  buildId?: string;
   conditionCodes: readonly string[];
   continuation: "polling_only";
   contractVersion: string;
   medicationCodes: readonly string[];
   ok: true;
   pollAfterSeconds: number;
+  schemaChecksum?: string;
   serviceName: string;
   supportAvailable: true;
   supportedCountries: readonly PublicInfoCountry[];
@@ -98,6 +102,7 @@ async function recognisedNamesForMarkets(input: Readonly<{
 }
 
 function publicCapabilityInfo(input: Readonly<{
+  buildId?: string;
   conditionCodes: readonly string[];
   medicationCodes: readonly string[];
   supportedCountries: readonly PublicInfoCountry[];
@@ -106,6 +111,8 @@ function publicCapabilityInfo(input: Readonly<{
     ok: true,
     serviceName: AGENTIC_SERVICE_NAME,
     contractVersion: AGENTIC_CONTRACT_VERSION,
+    schemaChecksum: AGENTIC_SCHEMA_CHECKSUM,
+    ...(input.buildId ? { buildId: input.buildId } : {}),
     supportedCountries: input.supportedCountries.map((item) => ({
       countryCode: item.countryCode,
       countryName: item.countryName,
@@ -189,6 +196,7 @@ export async function infoTool(input: Readonly<{
 
   if (input.isolatedInfo) {
     return publicCapabilityInfo({
+      buildId: input.config.buildId,
       conditionCodes: input.isolatedInfo.conditionCodes,
       medicationCodes: input.isolatedInfo.medicationCodes,
       supportedCountries: input.isolatedInfo.supportedCountries
@@ -202,6 +210,7 @@ export async function infoTool(input: Readonly<{
   }
 
   const value = publicCapabilityInfo({
+    buildId: input.config.buildId,
     conditionCodes: RECOGNISED_CONDITION_CODES,
     medicationCodes: RECOGNISED_MEDICATION_CODES,
     supportedCountries

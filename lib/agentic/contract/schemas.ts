@@ -340,23 +340,7 @@ export const PLAN_INPUT_SCHEMA: JsonSchema = {
   ]
 };
 
-export const PLAN_ADVERTISED_SCHEMA: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    answers: PLAN_ANSWERS,
-    expectedRevision: { minimum: 1, type: "integer" },
-    idempotencyKey: IDEMPOTENCY_KEY,
-    operation: {
-      enum: ["answer", "create", "get", "revise", "select"],
-      type: "string"
-    },
-    optionId: { minLength: 8, type: "string" },
-    planHandle: HANDLE,
-    request: PLAN_REQUEST,
-    safetyAcknowledgement: PLAN_SAFETY_ACK
-  },
-  type: "object"
-};
+export const PLAN_ADVERTISED_SCHEMA: JsonSchema = PLAN_INPUT_SCHEMA;
 
 export const EXECUTE_INPUT_SCHEMA: JsonSchema = {
   additionalProperties: false,

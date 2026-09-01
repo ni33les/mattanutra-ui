@@ -6,7 +6,7 @@ import type { AgenticRuntime } from "@/lib/agentic/runtime";
 export const QA_AUDIENCE = "mattanutra-dev-qa";
 
 export function qaToken() {
-  return process.env.MCP_QA_TOKEN ?? "dev-mcp-qa-token";
+  return process.env.MCP_QA_TOKEN?.trim() ?? "";
 }
 
 export function authorizeQaRequest(request: Request) {

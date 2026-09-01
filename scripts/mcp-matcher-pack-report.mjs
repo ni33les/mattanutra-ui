@@ -14,6 +14,7 @@ import { canonicalAeC6Report, runAeC6Pack } from "../test/agentic-ae-c6-pack.tes
 import { canonicalAeC7Report, runAeC7Pack } from "../test/agentic-ae-c7-pack.test.ts";
 import { canonicalAeC8Report, runAeC8Pack } from "../test/agentic-ae-c8-pack.test.ts";
 import { canonicalComReport, runComPack } from "../test/agentic-com-pack.test.ts";
+import { canonicalCvFixReport, runCvFixPack } from "../test/agentic-cv-fix-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -458,6 +459,51 @@ const ROWS = [
     purpose: "Complete agentic and matcher regression gates remain deterministic"
   },
   {
+    category: "Customer value remediation",
+    id: "FIX-01",
+    purpose: "Optional and deferred targets do not block a valid core option"
+  },
+  {
+    category: "Customer value remediation",
+    id: "FIX-02",
+    purpose: "Conditional-only requests have a coherent state and continuation"
+  },
+  {
+    category: "Customer value remediation",
+    id: "FIX-03",
+    purpose: "One current supplement produces one safety contributor"
+  },
+  {
+    category: "Customer value remediation",
+    id: "FIX-04",
+    purpose: "Pack facts produce real 30/90-day economics"
+  },
+  {
+    category: "Customer value remediation",
+    id: "FIX-05",
+    purpose: "Baseline and savings are comparable and reproducible"
+  },
+  {
+    category: "Customer value remediation",
+    id: "FIX-06",
+    purpose: "Direct endpoint and installed connector advertise the same schema"
+  },
+  {
+    category: "Customer value remediation",
+    id: "FIX-07",
+    purpose: "Public MCP metadata exposes no QA credential or driver instructions"
+  },
+  {
+    category: "Customer value remediation",
+    id: "FIX-08",
+    purpose: "DEV safety values match the pinned rule ledger"
+  },
+  {
+    category: "Customer value remediation",
+    id: "FIX-09",
+    purpose: "Complete remediation pack is deterministic"
+  },
+  {
     category: "MCP commercial",
     id: "COM-01",
     purpose: "A ready plan creates one open unpaid v1 order and checkout"
@@ -721,6 +767,7 @@ export function canonicalPack(run) {
     boundary: JSON.parse(canonicalAeC7Report(run.boundary)),
     evidence: JSON.parse(canonicalAeC8Report(run.evidence)),
     commercial: JSON.parse(canonicalComReport(run.commercial)),
+    valueRemediation: JSON.parse(canonicalCvFixReport(run.valueRemediation)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -757,6 +804,9 @@ export function snapshotFromRun(run) {
   const commercial = Object.fromEntries(
     run.commercial.cases.map((item) => [item.id, item.result])
   );
+  const valueRemediation = Object.fromEntries(
+    run.valueRemediation.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
@@ -767,6 +817,7 @@ export function snapshotFromRun(run) {
     boundary,
     evidence,
     commercial,
+    valueRemediation,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -802,7 +853,9 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("COM-")
+  const section = id.startsWith("FIX-")
+    ? "valueRemediation"
+    : id.startsWith("COM-")
     ? "commercial"
     : id.startsWith("AX8-")
     ? "evidence"
@@ -844,6 +897,8 @@ export function sectionTotals(run) {
   const boundaryPass = run.boundary.passedCases === run.boundary.totalCases;
   const evidencePass = run.evidence.passedCases === run.evidence.totalCases;
   const commercialPass = run.commercial.passedCases === run.commercial.totalCases;
+  const valueRemediationPass =
+    run.valueRemediation.passedCases === run.valueRemediation.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -881,6 +936,10 @@ export function sectionTotals(run) {
       passed: commercialPass,
       text: `${run.commercial.passedCases}/${run.commercial.totalCases}`
     },
+    valueRemediation: {
+      passed: valueRemediationPass,
+      text: `${run.valueRemediation.passedCases}/${run.valueRemediation.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
@@ -895,7 +954,8 @@ export function sectionTotals(run) {
       statePass &&
       boundaryPass &&
       evidencePass &&
-      commercialPass
+      commercialPass &&
+      valueRemediationPass
   };
 }
 
@@ -924,6 +984,9 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.commercial.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.valueRemediation.cases) {
     byId.set(item.id, item);
   }
 
@@ -989,6 +1052,9 @@ export function printTable(run) {
   console.log(
     `MCP commercial: ${totals.commercial.text} — ${totals.commercial.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `Customer value remediation: ${totals.valueRemediation.text} — ${totals.valueRemediation.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -1023,6 +1089,8 @@ export async function runPackOnce() {
   const evidence = await runAeC8Pack();
   await resetAfterMatcher();
   const commercial = await runComPack();
+  await resetAfterMatcher();
+  const valueRemediation = await runCvFixPack();
   return {
     contract,
     honesty,
@@ -1033,6 +1101,7 @@ export async function runPackOnce() {
     boundary,
     evidence,
     commercial,
+    valueRemediation,
     matcher
   };
 }

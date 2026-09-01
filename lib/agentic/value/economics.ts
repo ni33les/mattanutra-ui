@@ -246,8 +246,16 @@ export function buildEconomics(input: Readonly<{
   });
   const recommended = input.recommendedItems?.map(enrichBasketPackFacts) ?? items;
   const recommendedCoverage = input.recommendedCoverage ?? input.coverage;
-  const savingClaim =
-    equivalent && savings90DayMinor > 0 ? "positive" : savings90DayMinor < 0 ? "loss" : "none";
+  const complete = items.every(
+    (item) => item.servingsPerPack != null && item.servingsPerPack > 0
+  );
+  const savingClaim = !complete
+    ? "none"
+    : equivalent && savings90DayMinor > 0
+      ? "positive"
+      : savings90DayMinor < 0
+        ? "loss"
+        : "none";
 
   return {
     baseline: {
@@ -258,6 +266,7 @@ export function buildEconomics(input: Readonly<{
     cash30DayMinor,
     cash90DayMinor,
     cashTotalMinor: items.length > 0 ? payable.totalPriceMinor : 0,
+    complete,
     consumption30DayMinor,
     consumption90DayMinor,
     deltas: {

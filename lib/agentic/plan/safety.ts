@@ -67,13 +67,26 @@ function exposureContributors(
     contributors?: CoverageRow["contributors"];
   }
 ): CoverageContributor[] {
-  return [
+  const rows = [
     ...currentContributors(row),
     ...(row.contributors ?? []).map((item) => ({
       ...item,
       source: item.source ?? ("selected" as const)
     }))
   ];
+  const seen = new Set<string>();
+  const unique: CoverageContributor[] = [];
+
+  for (const item of rows) {
+    const key = `${item.source ?? ""}:${item.productId ?? item.productName}:${item.amount}:${item.unit}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(item);
+  }
+
+  return unique;
 }
 
 function guidance(input: Readonly<{
@@ -535,8 +548,15 @@ export function evaluateSafety(input: Readonly<{
     }
 
     const overlap =
-      rowContributors.length >= 2 ||
-      (row.currentAmount > 0 && row.deliveredAmount > 0);
+      row.status !== "already_covered" &&
+      row.status !== "optional_omitted" &&
+      row.status !== "conditional_deferred" &&
+      (new Set(
+        rowContributors.map(
+          (item) => `${item.source ?? ""}:${item.productId ?? item.productName}`
+        )
+      ).size >= 2 ||
+        (row.currentAmount > 0 && row.deliveredAmount > 0));
 
     if (overlap) {
       const harmful =
@@ -686,6 +706,35 @@ export function safetyQuestions(input: Readonly<{
   const unassessedConditions = input.state.conditionCodes.filter(
     (code) => !CONDITION_ALIASES[code] && !acknowledgedConditions.has(code)
   );
+
+  const unknownConditionals = input.state.targets.filter(
+    (target) =>
+      target.importance === "conditional" && target.prerequisite?.status === "unknown"
+  );
+
+  for (const target of unknownConditionals) {
+    questions.push({
+      choices: [
+        {
+          choice: `satisfy_prerequisite:${target.supplementId}`,
+          effect: `prerequisite.satisfied=${target.supplementId}`,
+          label: agenticMessage(input.locale, "plan.question.satisfy_prerequisite"),
+          labelKey: "plan.question.satisfy_prerequisite"
+        },
+        {
+          choice: `leave_prerequisite:${target.supplementId}`,
+          effect: `prerequisite.unsatisfied=${target.supplementId}`,
+          label: agenticMessage(input.locale, "plan.question.leave_prerequisite"),
+          labelKey: "plan.question.leave_prerequisite"
+        }
+      ],
+      prompt: agenticMessage(input.locale, "plan.question.unknown_prerequisite", {
+        name: target.name
+      }),
+      promptKey: "plan.question.unknown_prerequisite",
+      questionId: `q_prerequisite_${target.supplementId}`
+    });
+  }
 
   if (unassessedMeds.length > 0 || unassessedConditions.length > 0) {
     questions.push({
@@ -936,10 +985,15 @@ export function planStatus(input: Readonly<{
   }
 
   const coverage = input.selected?.coverage ?? [];
-  const missingPrerequisite = input.state.targets.some(
+  const unknownPrerequisite = input.state.targets.some(
     (target) =>
       target.importance === "conditional" &&
-      target.prerequisite?.status !== "satisfied"
+      target.prerequisite?.status === "unknown"
+  );
+  const unsatisfiedPrerequisite = input.state.targets.some(
+    (target) =>
+      target.importance === "conditional" &&
+      target.prerequisite?.status === "unsatisfied"
   );
   const coreOrRequired = coverage.filter((row) => {
     const target = input.state.targets.find((item) => item.supplementId === row.supplementId);
@@ -965,8 +1019,12 @@ export function planStatus(input: Readonly<{
   }
 
   if (basketEmpty) {
-    if (missingPrerequisite && !coreUnresolved) {
+    if (unknownPrerequisite && !coreUnresolved) {
       return "needs_input";
+    }
+
+    if (unsatisfiedPrerequisite && !coreUnresolved) {
+      return "no_purchase";
     }
 
     if (!coreUnresolved) {
@@ -1035,6 +1093,13 @@ function unresolvedGapReview(
     if (remainingGap <= 0 || !leftover.unit) {
       continue;
     }
+    if (
+      coverage?.status === "optional_omitted" ||
+      coverage?.status === "conditional_deferred" ||
+      coverage?.status === "already_covered"
+    ) {
+      continue;
+    }
     push({
       decisions: ["accept_gap", "remove_target"],
       deliveredAmount,
@@ -1055,6 +1120,9 @@ function unresolvedGapReview(
       row.remainingGap <= 0 ||
       row.status === "covered" ||
       row.status === "partial" ||
+      row.status === "optional_omitted" ||
+      row.status === "conditional_deferred" ||
+      row.status === "already_covered" ||
       accepted.has(row.supplementId) ||
       !requestedIds.has(row.supplementId)
     ) {

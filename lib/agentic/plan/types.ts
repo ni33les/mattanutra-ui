@@ -445,6 +445,7 @@ export type EconomicsLedger = Readonly<{
   cash30DayMinor: number;
   cash90DayMinor: number;
   cashTotalMinor: number;
+  complete: boolean;
   consumption30DayMinor: number;
   consumption90DayMinor: number;
   deltas: Readonly<{

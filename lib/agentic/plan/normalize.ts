@@ -266,6 +266,42 @@ export function applyPlanAnswers(
       };
     }
 
+    if (answer.choice.startsWith("satisfy_prerequisite:")) {
+      const supplementId = answer.choice.slice("satisfy_prerequisite:".length);
+      next = {
+        ...next,
+        targets: next.targets.map((item) =>
+          item.supplementId === supplementId
+            ? {
+                ...item,
+                prerequisite: {
+                  ...(item.prerequisite ?? { status: "satisfied" as const }),
+                  status: "satisfied"
+                }
+              }
+            : item
+        )
+      };
+    }
+
+    if (answer.choice.startsWith("leave_prerequisite:")) {
+      const supplementId = answer.choice.slice("leave_prerequisite:".length);
+      next = {
+        ...next,
+        targets: next.targets.map((item) =>
+          item.supplementId === supplementId
+            ? {
+                ...item,
+                prerequisite: {
+                  ...(item.prerequisite ?? { status: "unsatisfied" as const }),
+                  status: "unsatisfied"
+                }
+              }
+            : item
+        )
+      };
+    }
+
     if (answer.choice.startsWith("accept_gap:")) {
       acceptedGaps.push({
         revision: 0,

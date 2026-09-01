@@ -450,10 +450,9 @@ describe("Official MattaNutra Agentic QA Pack", () => {
   });
 
   it("T3 initialize instructions require host feedback", () => {
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /HARD RULE 6 — HOST FEEDBACK/);
     assert.match(AGENTIC_SERVER_INSTRUCTIONS, /after 3 plan calls/);
     assert.match(AGENTIC_SERVER_INSTRUCTIONS, /plan_feedback/);
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /A1–A13 = 13\/13/);
+    assert.equal(/A1–A13 = 13\/13/.test(AGENTIC_SERVER_INSTRUCTIONS), false);
     const schema = readFileSync(
       new URL("../scripts/apply-agentic-commerce-schema.ts", import.meta.url),
       "utf8"

@@ -40,8 +40,7 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("intersex"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes("unspecified"), false);
     assert.match(JSON.stringify(PLAN_INPUT_SCHEMA), /"sex"/);
-    assert.equal(/"oneOf"/.test(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan)), false);
-    assert.equal(/\$defs/.test(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan)), false);
+    assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan), JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan));
     assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 6);
     const planRequest = JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan);
     assert.match(planRequest, /info\.medicationCodes/);
@@ -89,50 +88,11 @@ describe("agentic MCP contract 3.0.0", () => {
 
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_SERVER_INSTRUCTIONS);
-    assert.match(
-      String(result.instructions),
-      /HARD RULE 1 — OFFICIAL PACK SCORING/
-    );
-    assert.match(String(result.instructions), /D1-01 through D10-10/);
-    assert.match(String(result.instructions), /12-row happy-path/);
-    assert.match(String(result.instructions), /first reply/);
-    assert.match(String(result.instructions), /100 minus FAIL count/);
-    assert.match(String(result.instructions), /Zero FAIL means 100\/100/);
-    assert.match(String(result.instructions), /STOP\. FIRST REPLY RULE/);
-    assert.match(String(result.instructions), /line 1 of your FIRST reply MUST be exactly: Official MattaNutra DEV QA Pack/);
-    assert.match(String(result.instructions), /Do not mark D1-09, D5-07, D5-09, D7-09, D7-10, or D10-10 as NOT TESTED/);
-    assert.match(String(result.instructions), /medicationCodes=\["apixaban"\]/);
-    assert.match(String(result.instructions), /conditionCodes=\["ckd"\]/);
-    assert.match(String(result.instructions), /You MUST call D5-07 and D5-09/);
-    assert.match(String(result.instructions), /info\.schemaChecksum/);
-    assert.match(String(result.instructions), /scenario=refund/);
-    assert.match(String(result.instructions), /two different idempotencyKeys/);
-    assert.match(String(result.instructions), /HARD RULE 5 — DEV INTERNAL EVIDENCE/);
-    assert.match(String(result.instructions), /\/api\/mcp\/qa/);
-    assert.match(String(result.instructions), /never raw order IDs/);
-    assert.match(String(result.instructions), /info\.latency is present on every DEV info response/);
-    assert.match(String(result.instructions), /HARD RULE 2 — DEV CHECKOUT FORM POST/);
-    assert.match(String(result.instructions), /unpaid order is not complete/);
+    assert.match(String(result.instructions), /plan, then execute/);
     assert.match(String(result.instructions), /Never prefix mattanutra_dev/);
-    assert.match(String(result.instructions), /mattanutra_dev\.mattanutra_dev\.\*/);
-    assert.match(String(result.instructions), /application\/x-www-form-urlencoded/);
-    assert.match(String(result.instructions), /customerName, phone, customerEmail, addressLine1/);
-    assert.match(String(result.instructions), /scenario=decline_insufficient_funds/);
-    assert.match(String(result.instructions), /scenario=success/);
-    assert.match(String(result.instructions), /HARD RULE 4 — REMAINING PACK CASES/);
-    assert.match(String(result.instructions), /lifeStage=pregnant/);
-    assert.match(String(result.instructions), /Folate/);
-    assert.match(String(result.instructions), /planHandle stays valid 7 days/);
-    assert.match(String(result.instructions), /scenario=expire/);
-    assert.match(String(result.instructions), /scenario=three_ds_cancelled/);
-    assert.match(String(result.instructions), /acknowledge_safety/);
-    assert.match(String(result.instructions), /revision_conflict/);
-    assert.match(String(result.instructions), /HARD RULE 6 — HOST FEEDBACK/);
-    assert.match(String(result.instructions), /plan_feedback/);
-    assert.match(String(result.instructions), /Official MattaNutra Agentic QA Pack/);
-    assert.match(String(result.instructions), /A1–A13 = 13\/13/);
-    assert.match(String(result.instructions), /A9 is GET-only/);
-    assert.match(String(result.instructions), /leftover not_in_catalogue/);
+    assert.equal(/D1-01 through D10-10/.test(String(result.instructions)), false);
+    assert.equal(/\/api\/mcp\/qa/.test(String(result.instructions)), false);
+    assert.equal(/dev-mcp-qa-token/.test(String(result.instructions)), false);
     assert.equal(
       (result.serverInfo as { version: string }).version,
       "3.0.0"
@@ -249,6 +209,10 @@ describe("agentic MCP contract 3.0.0", () => {
     for (const tool of tools) {
       const schema = JSON.stringify(tool.inputSchema);
       assert.match(schema, /"additionalProperties":false/);
+      if (tool.name === "plan") {
+        assert.match(schema, /"oneOf"/);
+        continue;
+      }
       assert.equal(/"oneOf"/.test(schema), false);
       assert.equal(/\$defs/.test(schema), false);
     }

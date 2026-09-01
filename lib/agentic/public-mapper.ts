@@ -1032,7 +1032,10 @@ export function publicPlanFields(result: Pick<
       matcherVersion: selected?.matcherVersion ?? MATCHER_VERSION,
       options: advertisedOptions,
       safetyGuidance: result.safetyGuidance,
-      snapshotId: selected?.snapshotId ?? "",
+      snapshotId:
+        selected?.snapshotId ??
+        result.matcherTelemetry?.snapshotId ??
+        "",
       status: result.status
     }),
     ...(result.status === "processing"
