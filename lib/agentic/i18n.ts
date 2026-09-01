@@ -494,6 +494,21 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ไม่มีตัวเลือกอื่นที่ต่างอย่างมีนัย",
     "zh-CN": "没有实质不同的备选方案"
   },
+  "plan.explanation.conditional_next_action": {
+    en: "Confirm the remaining prerequisite before buying that nutrient.",
+    th: "ยืนยันเงื่อนไขที่ยังค้างก่อนซื้อสารอาหารนั้น",
+    "zh-CN": "购买该营养素前请先确认剩余前提。"
+  },
+  "plan.explanation.answer_questions": {
+    en: "Answer the remaining questions to continue.",
+    th: "ตอบคำถามที่เหลือเพื่อดำเนินการต่อ",
+    "zh-CN": "请回答剩余问题后再继续。"
+  },
+  "plan.explanation.confirm_with_user": {
+    en: "Confirm this option with the user before execute.",
+    th: "ยืนยันตัวเลือกนี้กับผู้ใช้ก่อน execute",
+    "zh-CN": "执行前请与用户确认此方案。"
+  },
   "plan.selection.dedicated_unavailable": {
     en: "A dedicated product was not available, so this covering product is used instead.",
     th: "ไม่มีสินค้าเฉพาะทางที่ใช้ได้ จึงใช้สินค้าที่ครอบคลุมเป้าหมายนี้แทน",

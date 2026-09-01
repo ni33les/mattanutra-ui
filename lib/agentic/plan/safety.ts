@@ -15,6 +15,7 @@ import type {
   CoverageContributor,
   CoverageRow,
   GapReviewTarget,
+  OptionSafety,
   PlanQuestion,
   SafetyGuidance,
   StackOption
@@ -217,6 +218,41 @@ function zincExposure(
     totalExposureAmount: currentAmount,
     unit,
     upperLimitAmount: null
+  };
+}
+
+export function assessedSafetyCodes(state: CanonicalPlanState) {
+  return {
+    assessedConditionCodes: [
+      ...new Set(
+        state.conditionCodes
+          .map((code) => CONDITION_ALIASES[code])
+          .filter((code): code is string => Boolean(code))
+      )
+    ],
+    assessedMedicationCodes: [
+      ...new Set(
+        state.medicationCodes
+          .map((code) => MEDICATION_ALIASES[code])
+          .filter((code): code is string => Boolean(code))
+      )
+    ]
+  };
+}
+
+export function optionSafety(input: Readonly<{
+  locale: Locale;
+  selected: StackOption;
+  state: CanonicalPlanState;
+}>): OptionSafety {
+  return {
+    ...assessedSafetyCodes(input.state),
+    guidance: evaluateSafety({
+      coverage: input.selected.coverage,
+      locale: input.locale,
+      selected: input.selected,
+      state: input.state
+    })
   };
 }
 

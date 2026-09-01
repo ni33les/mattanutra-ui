@@ -37,6 +37,7 @@ import {
   safetyCeilingFor
 } from "@/lib/matcher/safety-ceilings";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
+import { optionSafety } from "@/lib/agentic/plan/safety";
 import type {
   BasketItem,
   CanonicalPlanState,
@@ -1003,11 +1004,19 @@ export function matchPlan(input: Readonly<{
     catalogueVersion: snapshot.catalogueVersion,
     products: snapshot.products.map(toMatcherProduct)
   });
+  const withSafety = (option: StackOption): StackOption => ({
+    ...option,
+    safety: optionSafety({
+      locale: negotiateLocale(input.state.locale),
+      selected: option,
+      state: input.state
+    })
+  });
   const selectedRaw = result.selected
-    ? toStackOption(input.state, snapshot, result.selected, result.selected)
+    ? withSafety(toStackOption(input.state, snapshot, result.selected, result.selected))
     : null;
   const alternatives = result.alternatives.map((item) =>
-    toStackOption(input.state, snapshot, item, result.selected)
+    withSafety(toStackOption(input.state, snapshot, item, result.selected))
   );
   const selected =
     selectedRaw && alternatives.length === 0

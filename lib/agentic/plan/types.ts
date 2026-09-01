@@ -476,6 +476,52 @@ export type RetainedCurrent = Readonly<{
   supplementId: string;
 }>;
 
+export type OptionSafety = Readonly<{
+  assessedConditionCodes: readonly string[];
+  assessedMedicationCodes: readonly string[];
+  guidance: readonly SafetyGuidance[];
+}>;
+
+export type PlanExplanation = Readonly<{
+  administrations: number;
+  cash30DayMinor: number | null;
+  cash90DayMinor: number | null;
+  conditionalDeferrals: readonly Readonly<{
+    nextAction: string | null;
+    reasonCode: string | null;
+    status: string;
+    supplementId: string;
+  }>[];
+  firstOrderCashMinor: number | null;
+  nextAction: string;
+  nextActionKey: string;
+  optionalOmissions: readonly Readonly<{
+    status: string;
+    supplementId: string;
+  }>[];
+  pills: number;
+  productCount: number;
+  purchases: readonly Readonly<{
+    lineTotalMinor: number;
+    productId: string;
+    productName: string;
+    quantity: number;
+  }>[];
+  recommendedOptionId: string;
+  retainedCurrent: readonly RetainedCurrent[];
+  safetyState: string;
+  savings90DayMinor: number | null;
+}>;
+
+export type CanonicalPlanStamp = Readonly<{
+  buildId: string;
+  contractVersion: string;
+  hash: string;
+  matcherVersion: string;
+  packVersion: string;
+  snapshotId: string;
+}>;
+
 export type StackOption = Readonly<{
   basket: readonly BasketItem[];
   burden?: BurdenLedger;
@@ -494,6 +540,7 @@ export type StackOption = Readonly<{
   recommended?: boolean;
   retainedCurrent?: readonly RetainedCurrent[];
   role?: ValueOptionRole;
+  safety?: OptionSafety;
   snapshotId: string;
   totalPriceMinor: number;
   tradeOff?: OptionTradeOff;

@@ -1,6 +1,9 @@
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { payableSnapshot } from "@/lib/agentic/money";
+import { MATCHER_VERSION } from "@/lib/matcher/config";
+import { buildCanonicalPlanStamp } from "@/lib/agentic/value/canonical-plan";
+import { buildExplanation } from "@/lib/agentic/value/explanation";
 import {
   CONDITION_ALIASES,
   MEDICATION_ALIASES
@@ -676,6 +679,18 @@ export function publicOption(
     ...(option.retainedCurrent ? { retainedCurrent: option.retainedCurrent } : {}),
     ...(option.economics ? { economics: option.economics } : {}),
     ...(option.burden ? { burden: option.burden } : {}),
+    ...(option.coverage.length > 0 ? { coverage: option.coverage.map(publicCoverage) } : {}),
+    ...(option.safety
+      ? {
+          safety: {
+            assessedConditionCodes: option.safety.assessedConditionCodes,
+            assessedMedicationCodes: option.safety.assessedMedicationCodes,
+            guidance: option.safety.guidance.map((item) =>
+              publicSafetyGuidance(item, "not_required")
+            )
+          }
+        }
+      : {}),
     productIds: option.basket.map((item) => item.productId)
   };
 }
@@ -1000,6 +1015,26 @@ export function publicPlanFields(result: Pick<
           )
         }
       : {}),
+    ...(selected
+      ? {
+          explanation: buildExplanation({
+            acknowledgementStatus,
+            coverage: result.coverage,
+            locale,
+            nextActions,
+            option: selected,
+            status: result.status
+          })
+        }
+      : {}),
+    canonical: buildCanonicalPlanStamp({
+      leftovers: result.leftovers ?? [],
+      matcherVersion: selected?.matcherVersion ?? MATCHER_VERSION,
+      options: advertisedOptions,
+      safetyGuidance: result.safetyGuidance,
+      snapshotId: selected?.snapshotId ?? "",
+      status: result.status
+    }),
     ...(result.status === "processing"
       ? { pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS }
       : {})
