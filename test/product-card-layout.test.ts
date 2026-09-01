@@ -220,6 +220,14 @@ describe("product admin card layout", () => {
       detailReadPath,
       /Math\.max\(INTERACTIVE_STATEMENT_TIMEOUT_MS, 15_000\)/
     );
+    const loadRows = readModel.slice(
+      readModel.indexOf("export async function loadProductRows"),
+      readModel.indexOf("export async function getAdminProductListData")
+    );
+    assert.match(
+      loadRows,
+      /targeted[\s\S]*Math\.max\(INTERACTIVE_STATEMENT_TIMEOUT_MS, 15_000\)/
+    );
   });
 
   it("shows an unavailable state when the product list cannot load", async () => {

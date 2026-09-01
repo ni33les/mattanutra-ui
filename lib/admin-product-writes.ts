@@ -474,7 +474,7 @@ export async function refreshAndPersistProductValidation(
   sql: NonNullable<ReturnType<typeof getSql>>,
   productId: string
 ) {
-  const rows = await loadProductRows(productId);
+  const rows = await loadProductRows(productId, { sql });
   const sourceRow = rows?.[0];
 
   if (!sourceRow) {
@@ -1675,7 +1675,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     throw new Error("Product not found");
   }
 
-  const row = await loadAdminProductRow(input.id);
+  const row = await loadAdminProductRow(input.id, sql);
 
   if (!row) {
     throw new Error("Product not found after update");

@@ -45,9 +45,15 @@ export async function loadProductRows(
       return null;
     }
 
+    const targeted =
+      Boolean(productId) ||
+      Boolean(options.brandId) ||
+      (options.productIds != null && options.productIds.length > 0);
     return withLocalStatementTimeout(
       pool,
-      INTERACTIVE_STATEMENT_TIMEOUT_MS,
+      targeted
+        ? Math.max(INTERACTIVE_STATEMENT_TIMEOUT_MS, 15_000)
+        : INTERACTIVE_STATEMENT_TIMEOUT_MS,
       (txn) => loadProductRows(productId, { ...options, sql: txn })
     );
   }
@@ -859,8 +865,11 @@ export async function getAdminProductListData(
   }
 }
 
-export async function loadAdminProductRow(productId: string) {
-  const rows = await loadProductRows(productId);
+export async function loadAdminProductRow(
+  productId: string,
+  sql?: postgres.Sql | postgres.TransactionSql | null
+) {
+  const rows = await loadProductRows(productId, sql ? { sql } : {});
   return rows?.[0] ? rowFromDb(rows[0]) : null;
 }
 
