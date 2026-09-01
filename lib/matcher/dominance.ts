@@ -2,6 +2,13 @@ import { COVERAGE_SCALE } from "@/lib/matcher/config";
 import { minUnits } from "@/lib/matcher/dose";
 import type { CanonicalRequest, SearchState } from "@/lib/matcher/types";
 
+function isDeferredConditional(target: CanonicalRequest["targets"][number]) {
+  return (
+    target.importance === "conditional" &&
+    target.prerequisite?.status !== "satisfied"
+  );
+}
+
 export function cappedDelivered(
   delivered: bigint,
   requested: bigint
@@ -25,20 +32,22 @@ export function aggregateCoverage(
   request: CanonicalRequest,
   delivered: ReadonlyMap<string, bigint>
 ) {
-  if (request.targets.length < 1) {
+  const targets = request.targets.filter((target) => !isDeferredConditional(target));
+
+  if (targets.length < 1) {
     return 0;
   }
 
   let total = 0;
 
-  for (const target of request.targets) {
+  for (const target of targets) {
     total += coverageUnits(
       delivered.get(target.subjectId) ?? BigInt(0),
       target.requested.units
     );
   }
 
-  return Math.round(total / request.targets.length);
+  return Math.round(total / targets.length);
 }
 
 export function oversupplyScore(

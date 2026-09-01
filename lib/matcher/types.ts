@@ -248,6 +248,8 @@ export type SearchState = Readonly<{
   selectedVariantIds: readonly string[];
 }>;
 
+export type ValueOptionRole = "best_value" | "complete" | "minimum_core";
+
 export type ScoredBasket = Readonly<{
   aggregateCoverage: number;
   coverageBySubject: ReadonlyMap<string, number>;
@@ -256,10 +258,12 @@ export type ScoredBasket = Readonly<{
   dedicatedPartialCount: number;
   exposure: Exposure;
   incidentalCount: number;
+  optionRole?: ValueOptionRole;
   oversupplyScore: number;
   priceMinor: number;
   productCount: number;
   productIds: readonly string[];
+  recommended?: boolean;
   reason: string;
   requestedLabelCount: number;
   titleExactCount: number;

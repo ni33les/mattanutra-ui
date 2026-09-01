@@ -315,6 +315,7 @@ export type BasketItem = Readonly<{
   incompleteCommercialFacts: boolean;
   lineTotalMinor: number;
   pillsPerServing: number;
+  servingsPerPack?: number | null;
   productId: string;
   productName: string;
   quantity: number;
@@ -409,16 +410,40 @@ export type PlanQuestion = Readonly<{
   targets?: readonly GapReviewTarget[];
 }>;
 
+export type ValueOptionRole = "best_value" | "complete" | "minimum_core";
+
+export type OptionTradeOff = Readonly<{
+  cash90DayDeltaMinor: number;
+  coverageDelta: number;
+  dailyPillsDelta: number;
+}>;
+
+export type RetainedCurrent = Readonly<{
+  avoidedPurchase: true;
+  daysRemaining?: number;
+  name: string;
+  productId?: string;
+  supplementId: string;
+}>;
+
 export type StackOption = Readonly<{
   basket: readonly BasketItem[];
+  cash90DayMinor?: number;
   coverage: readonly CoverageRow[];
   coveragePercent: number;
   dailyPills: number;
+  deferredTargetIds?: readonly string[];
+  includedTargetIds?: readonly string[];
   matcherVersion: string;
+  omittedTargetIds?: readonly string[];
   optionId: string;
   reason: string;
+  recommended?: boolean;
+  retainedCurrent?: readonly RetainedCurrent[];
+  role?: ValueOptionRole;
   snapshotId: string;
   totalPriceMinor: number;
+  tradeOff?: OptionTradeOff;
 }>;
 
 export type PlanBreadth = Readonly<{

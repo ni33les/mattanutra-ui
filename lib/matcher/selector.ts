@@ -498,12 +498,172 @@ function selectedReason(request: CanonicalRequest) {
   return "Highest-coverage feasible stack";
 }
 
+function currentUnitsFor(request: CanonicalRequest, subjectId: string) {
+  return request.currentSupplements
+    .filter((item) => item.subjectId === subjectId)
+    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
+}
+
+export function requestWithoutOptionalPurchases(request: CanonicalRequest): CanonicalRequest {
+  return {
+    ...request,
+    targets: request.targets.map((target) => {
+      if (target.importance !== "optional") {
+        return target;
+      }
+
+      const current = currentUnitsFor(request, target.subjectId);
+      return {
+        ...target,
+        requested: { ...target.requested, units: current }
+      };
+    })
+  };
+}
+
+function purchasableTargets(request: CanonicalRequest) {
+  return request.targets.filter(
+    (target) =>
+      target.importance !== "conditional" ||
+      target.prerequisite?.status === "satisfied"
+  );
+}
+
+function coversSubjects(
+  basket: ScoredBasket,
+  subjectIds: readonly string[]
+) {
+  const floor = COVERED_THRESHOLD * 100;
+  return subjectIds.every((id) => (basket.coverageBySubject.get(id) ?? 0) >= floor);
+}
+
+function signatureOf(basket: ScoredBasket) {
+  return basket.productIds.join("|");
+}
+
+function labelAgenticOptions(
+  baskets: readonly ScoredBasket[],
+  request: CanonicalRequest,
+  config: MatcherConfig
+) {
+  const unique = new Map<string, ScoredBasket>();
+
+  for (const basket of baskets) {
+    const key = signatureOf(basket);
+    const previous = unique.get(key);
+
+    if (!previous || compareBaskets(basket, previous, request, config) < 0) {
+      unique.set(key, basket);
+    }
+  }
+
+  const distinct = [...unique.values()];
+  const purchasable = purchasableTargets(request);
+  const coreIds = purchasable
+    .filter((item) => item.importance === "core" || item.importance === "required")
+    .map((item) => item.subjectId);
+  const optionalIds = purchasable
+    .filter((item) => item.importance === "optional")
+    .map((item) => item.subjectId);
+  const coreEligible =
+    coreIds.length > 0
+      ? distinct.filter((item) => coversSubjects(item, coreIds))
+      : distinct;
+
+  const rankedCore = [...coreEligible].sort((left, right) =>
+    left.priceMinor - right.priceMinor ||
+    left.dailyPills - right.dailyPills ||
+    left.productCount - right.productCount ||
+    left.incidentalCount - right.incidentalCount ||
+    left.oversupplyScore - right.oversupplyScore ||
+    signatureOf(left).localeCompare(signatureOf(right))
+  );
+  const minimumCore = rankedCore[0] ?? null;
+  const completePool =
+    optionalIds.length > 0
+      ? rankedCore.filter((item) => coversSubjects(item, optionalIds))
+      : [];
+  const complete =
+    completePool.find((item) => signatureOf(item) !== (minimumCore ? signatureOf(minimumCore) : "")) ??
+    null;
+  const bestValue =
+    optionalIds.length > 0 && minimumCore && complete
+      ? rankedCore.find(
+          (item) =>
+            signatureOf(item) !== signatureOf(minimumCore) &&
+            signatureOf(item) !== signatureOf(complete) &&
+            item.priceMinor > minimumCore.priceMinor &&
+            item.priceMinor < complete.priceMinor &&
+            optionalIds.some((id) => (item.coverageBySubject.get(id) ?? 0) >= COVERED_THRESHOLD * 100)
+        ) ?? null
+      : null;
+
+  const labelled: ScoredBasket[] = [];
+
+  if (minimumCore) {
+    labelled.push({
+      ...minimumCore,
+      optionRole: "minimum_core",
+      reason: selectedReason(request),
+      recommended: request.optimization === "lowest_cost"
+    });
+  }
+
+  if (bestValue) {
+    labelled.push({
+      ...bestValue,
+      optionRole: "best_value",
+      reason: "Adds accepted optional coverage at a disclosed extra cost",
+      recommended: false
+    });
+  }
+
+  if (complete) {
+    labelled.push({
+      ...complete,
+      optionRole: "complete",
+      reason: "Covers feasible optional targets",
+      recommended: request.optimization !== "lowest_cost" && !minimumCore
+    });
+  }
+
+  if (labelled.length === 1) {
+    labelled[0] = {
+      ...labelled[0]!,
+      reason: labelled[0]!.reason,
+      recommended: true
+    };
+  }
+
+  const recommended =
+    labelled.find((item) => item.recommended) ?? labelled[0] ?? null;
+  const alternatives = labelled.filter(
+    (item) => recommended && signatureOf(item) !== signatureOf(recommended)
+  );
+
+  return {
+    alternatives,
+    selected: recommended
+      ? { ...recommended, recommended: true }
+      : null
+  };
+}
+
 export function selectOptions(input: Readonly<{
   baskets: readonly ScoredBasket[];
   config?: MatcherConfig;
   request: CanonicalRequest;
 }>) {
   const config = input.config ?? DEFAULT_MATCHER_CONFIG;
+
+  if (input.request.selectorMode !== "web_single") {
+    const labelled = labelAgenticOptions(input.baskets, input.request, config);
+
+    if (labelled.selected) {
+      return labelled;
+    }
+  }
+
   const ranked = [...input.baskets].sort((left, right) =>
     compareBaskets(left, right, input.request, config)
   );
@@ -515,7 +675,8 @@ export function selectOptions(input: Readonly<{
 
   const selected: ScoredBasket = {
     ...best,
-    reason: selectedReason(input.request)
+    reason: selectedReason(input.request),
+    recommended: true
   };
 
   if (

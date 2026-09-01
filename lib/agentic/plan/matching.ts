@@ -42,8 +42,11 @@ import type {
   MatcherTelemetry,
   PlanLeftover,
   RejectedCandidate,
+  RetainedCurrent,
   StackOption
 } from "@/lib/agentic/plan/types";
+import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
+import { cashCostForHorizon } from "@/lib/agentic/value/horizon-cash";
 
 export { toMatcherProduct };
 
@@ -135,7 +138,7 @@ export function coverageFor(
     const current = state.currentSupplements.filter(
       (item) => item.supplementId === target.supplementId
     );
-    const currentAmount = current.reduce((sum, item) => {
+    const currentContributors = current.flatMap((item) => {
       const converted = convertAmount({
         amount: item.dailyAmount,
         fromUnit: item.unit,
@@ -143,8 +146,22 @@ export function coverageFor(
         subjectName: target.name,
         toUnit: target.unit
       });
-      return sum + (converted ?? 0);
-    }, 0);
+
+      if (converted == null || converted <= 0) {
+        return [];
+      }
+
+      return [
+        {
+          amount: converted,
+          productId: item.productId,
+          productName: item.name,
+          source: "current" as const,
+          unit: target.unit
+        }
+      ];
+    });
+    const currentAmount = currentContributors.reduce((sum, item) => sum + item.amount, 0);
     const ceilings = matcherSafetyCeilings();
     const ceiling = safetyCeilingFor(ceilings, {
       conditionCodes: state.conditionCodes,
@@ -206,7 +223,10 @@ export function coverageFor(
         ? 0
         : deliveredFromFacts
       : Math.max(0, (deliveredTotal ?? 0) - currentAmount);
-    const publishedContributors = ignoreIncidentalFacts ? [] : contributors;
+    const publishedContributors = [
+      ...currentContributors,
+      ...(ignoreIncidentalFacts ? [] : contributors)
+    ];
     const totalExposureAmount = currentAmount + deliveredAmount;
     const coveragePercent =
       target.amount > 0
@@ -569,6 +589,7 @@ function basketFromIds(
         sellerId: product.sellerId,
         sellerName: product.sellerName,
         servingsPerDay: quantity,
+        servingsPerPack: servingsPerPackFromProduct(product),
         source: product.source,
         stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
         unitPriceMinor: product.unitPriceMinor
@@ -579,19 +600,60 @@ function basketFromIds(
 function toStackOption(
   state: CanonicalPlanState,
   snapshot: CatalogueSnapshot,
-  basket: ScoredBasket
+  basket: ScoredBasket,
+  recommendedBasket?: ScoredBasket | null
 ): StackOption {
   const items = basketFromIds(state, snapshot, basket);
+  const coverage = coverageFor(state, basket, items);
+  const includedTargetIds = coverage
+    .filter((row) => row.status === "covered" || row.status === "already_covered" || row.status === "over_target")
+    .map((row) => row.supplementId);
+  const omittedTargetIds = coverage
+    .filter((row) => row.status === "optional_omitted")
+    .map((row) => row.supplementId);
+  const deferredTargetIds = coverage
+    .filter((row) => row.status === "conditional_deferred")
+    .map((row) => row.supplementId);
+  const cash90DayMinor = cashCostForHorizon(items, 90);
+  const recommendedCash = recommendedBasket
+    ? cashCostForHorizon(basketFromIds(state, snapshot, recommendedBasket), 90)
+    : cash90DayMinor;
+  const retainedCurrent: RetainedCurrent[] = state.currentSupplements
+    .filter((item) =>
+      coverage.some(
+        (row) => row.supplementId === item.supplementId && row.status === "already_covered"
+      )
+    )
+    .map((item) => ({
+      avoidedPurchase: true as const,
+      ...(item.daysRemaining != null ? { daysRemaining: item.daysRemaining } : {}),
+      name: item.name,
+      ...(item.productId ? { productId: item.productId } : {}),
+      supplementId: item.supplementId
+    }));
+
   return {
     basket: items,
-    coverage: coverageFor(state, basket, items),
+    cash90DayMinor,
+    coverage,
     coveragePercent: publicCoveragePercent(basket),
     dailyPills: basket.dailyPills,
+    deferredTargetIds,
+    includedTargetIds,
     matcherVersion: MATCHER_VERSION,
+    omittedTargetIds,
     optionId: optionIdFor(basket.productIds),
     reason: basket.reason,
+    recommended: Boolean(basket.recommended) || basket === recommendedBasket,
+    ...(retainedCurrent.length > 0 ? { retainedCurrent } : {}),
+    ...(basket.optionRole ? { role: basket.optionRole } : {}),
     snapshotId: catalogueSnapshotId(snapshot),
-    totalPriceMinor: basket.priceMinor
+    totalPriceMinor: basket.priceMinor,
+    tradeOff: {
+      cash90DayDeltaMinor: cash90DayMinor - recommendedCash,
+      coverageDelta: basket.aggregateCoverage - (recommendedBasket?.aggregateCoverage ?? basket.aggregateCoverage),
+      dailyPillsDelta: basket.dailyPills - (recommendedBasket?.dailyPills ?? basket.dailyPills)
+    }
   };
 }
 
@@ -855,10 +917,10 @@ export function matchPlan(input: Readonly<{
     products: snapshot.products.map(toMatcherProduct)
   });
   const selected = result.selected
-    ? toStackOption(input.state, snapshot, result.selected)
+    ? toStackOption(input.state, snapshot, result.selected, result.selected)
     : null;
   const alternatives = result.alternatives.map((item) =>
-    toStackOption(input.state, snapshot, item)
+    toStackOption(input.state, snapshot, item, result.selected)
   );
   const leftovers = [...leftoversFor(input.state, selected, alternatives[0] ?? null)];
   const seen = new Set(leftovers.map((item) => `${item.reason}:${item.name}`));

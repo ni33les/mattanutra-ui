@@ -9,6 +9,7 @@ import {
   coveringVariantForMostFloors,
   coveringVariantForTarget,
   groupsBySeller,
+  isDeferredConditional,
   variantIncidentalUlBlocked
 } from "@/lib/matcher/candidates";
 import { coverageUnits } from "@/lib/matcher/dominance";
@@ -21,6 +22,7 @@ import { safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
 import { reconstructVariants, searchGroups, seedState, tryAddVariant } from "@/lib/matcher/search";
 import {
   compareBaskets,
+  requestWithoutOptionalPurchases,
   salvagePartialBasket,
   scoreState,
   selectOptions
@@ -69,6 +71,10 @@ function productMaterialForRequest(
   }
 
   for (const target of request.targets) {
+    if (isDeferredConditional(target)) {
+      continue;
+    }
+
     if (contributionFor(group.product, target.name, target.subjectId).length < 1) {
       continue;
     }
@@ -435,6 +441,10 @@ function coveringWinnersBasket(input: Readonly<{
   }
 
   for (const target of input.request.targets) {
+    if (isDeferredConditional(target)) {
+      continue;
+    }
+
     const winner = bestCompactCoveringGroup(
       input.groups,
       input.request,
@@ -538,8 +548,9 @@ function absorbStandaloneWinners(input: Readonly<{
 }>): ScoredBasket {
   const uncovered = input.request.targets.filter(
     (target) =>
+      !isDeferredConditional(target) &&
       (input.selected.coverageBySubject.get(target.subjectId) ?? 0) <
-      COVERED_THRESHOLD * 100
+        COVERED_THRESHOLD * 100
   );
 
   if (uncovered.length < 1) {
@@ -563,6 +574,10 @@ function absorbStandaloneWinners(input: Readonly<{
   const maxSteps = Math.max(4, input.groups.length + 2);
 
   for (const target of input.request.targets) {
+    if (isDeferredConditional(target)) {
+      continue;
+    }
+
     for (let step = 0; step < maxSteps; step += 1) {
       const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
 
@@ -859,37 +874,48 @@ export function match(
   const scored: ScoredBasket[] = [];
   let mode: "bounded" | "exact" = "exact";
   let trimmed = false;
+  const searchRequests =
+    request.selectorMode === "web_single"
+      ? [request]
+      : [
+          request,
+          ...(request.targets.some((item) => item.importance === "optional")
+            ? [requestWithoutOptionalPurchases(request)]
+            : [])
+        ];
 
   for (const seller of sellers) {
-    const remaining = Math.max(0, deadlineAt - Date.now());
-    const run = searchGroups(seller.groups, request, {
-      ...config,
-      searchDeadlineMs: remaining
-    });
-    mode = run.mode === "bounded" ? "bounded" : mode;
-    trimmed = trimmed || run.trimmed;
+    for (const searchRequest of searchRequests) {
+      const remaining = Math.max(0, deadlineAt - Date.now());
+      const run = searchGroups(seller.groups, searchRequest, {
+        ...config,
+        searchDeadlineMs: remaining
+      });
+      mode = run.mode === "bounded" ? "bounded" : mode;
+      trimmed = trimmed || run.trimmed;
 
-    for (const state of run.complete) {
-      const basket = scoreState({
+      for (const state of run.complete) {
+        const basket = scoreState({
+          groups: seller.groups,
+          request,
+          sellerId: seller.sellerId,
+          state
+        });
+
+        if (basket) {
+          scored.push(basket);
+        }
+      }
+
+      const salvaged = salvagePartialBasket({
         groups: seller.groups,
-        request,
-        sellerId: seller.sellerId,
-        state
+        request: searchRequest,
+        sellerId: seller.sellerId
       });
 
-      if (basket) {
-        scored.push(basket);
+      if (salvaged) {
+        scored.push(salvaged);
       }
-    }
-
-    const salvaged = salvagePartialBasket({
-      groups: seller.groups,
-      request,
-      sellerId: seller.sellerId
-    });
-
-    if (salvaged) {
-      scored.push(salvaged);
     }
   }
 
@@ -928,25 +954,37 @@ export function match(
       (item) =>
         !winner.selected?.sellerId || item.sellerId === winner.selected.sellerId
     );
+    const compactRequest =
+      winner.selected.optionRole === "minimum_core"
+        ? requestWithoutOptionalPurchases(request)
+        : request;
     const compact = dropRedundantProducts({
       groups: sellerGroups,
-      request,
+      request: compactRequest,
       selected: winner.selected
     });
     const pruned = rescoreKeptProducts({
       groups: sellerGroups,
-      request,
+      request: compactRequest,
       selected: compact
     });
     const next = pruned ?? compact;
+    const compacted = absorbStandaloneWinners({
+      config,
+      groups: sellerGroups,
+      request: compactRequest,
+      selected: next
+    });
     winner = {
       alternatives: winner.alternatives,
-      selected: absorbStandaloneWinners({
-        config,
-        groups: sellerGroups,
-        request,
-        selected: next
-      })
+      selected: compacted
+        ? {
+            ...compacted,
+            optionRole: winner.selected.optionRole ?? compacted.optionRole,
+            recommended: winner.selected.recommended ?? true,
+            reason: winner.selected.reason
+          }
+        : compacted
     };
   }
 

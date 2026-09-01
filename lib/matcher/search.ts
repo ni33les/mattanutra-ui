@@ -1,3 +1,4 @@
+import { isDeferredConditional, remainingRequestedUnits } from "@/lib/matcher/candidates";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import {
   aggregateCoverage,
@@ -74,6 +75,22 @@ export function tryAddVariant(
   request: CanonicalRequest
 ): SearchState | null {
   if (pediatricBlocked(request, variant)) {
+    return null;
+  }
+
+  const helpsPurchasableTarget = request.targets.some((target) => {
+    if (isDeferredConditional(target)) {
+      return false;
+    }
+
+    if (remainingRequestedUnits(request, target.subjectId) <= BigInt(0)) {
+      return false;
+    }
+
+    return variant.contributions.has(target.subjectId);
+  });
+
+  if (!helpsPurchasableTarget && !request.retainProductIds.includes(group.productId)) {
     return null;
   }
 

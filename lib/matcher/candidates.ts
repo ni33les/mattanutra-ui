@@ -44,20 +44,20 @@ export function variantPillBurden(
   return product.dailyPillsPerServing * dailyUnits;
 }
 
+export function isDeferredConditional(target: CanonicalRequest["targets"][number]) {
+  return (
+    target.importance === "conditional" &&
+    target.prerequisite?.status !== "satisfied"
+  );
+}
+
 export function remainingRequestedUnits(
   request: CanonicalRequest,
   subjectId: string
 ) {
   const target = request.targets.find((item) => item.subjectId === subjectId);
 
-  if (!target) {
-    return BigInt(0);
-  }
-
-  if (
-    target.importance === "conditional" &&
-    target.prerequisite?.status !== "satisfied"
-  ) {
+  if (!target || isDeferredConditional(target)) {
     return BigInt(0);
   }
 

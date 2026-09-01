@@ -642,9 +642,18 @@ export function publicOption(
     reason: reason.message,
     reasonCode: reason.code,
     reasonKey: reason.key,
+    recommended: Boolean(option.recommended || (selected && option.optionId === selected.optionId)),
     selected: Boolean(selected && option.optionId === selected.optionId),
     stackSummary: stackSummaryFor(option.basket, currency),
-    tradeOffs: publicTradeOffs(option, selected, locale)
+    tradeOffs: publicTradeOffs(option, selected, locale),
+    ...(option.role ? { role: option.role } : {}),
+    ...(option.cash90DayMinor != null ? { cash90DayMinor: option.cash90DayMinor } : {}),
+    ...(option.tradeOff ? { tradeOff: option.tradeOff } : {}),
+    ...(option.includedTargetIds ? { includedTargetIds: option.includedTargetIds } : {}),
+    ...(option.omittedTargetIds ? { omittedTargetIds: option.omittedTargetIds } : {}),
+    ...(option.deferredTargetIds ? { deferredTargetIds: option.deferredTargetIds } : {}),
+    ...(option.retainedCurrent ? { retainedCurrent: option.retainedCurrent } : {}),
+    productIds: option.basket.map((item) => item.productId)
   };
 }
 
