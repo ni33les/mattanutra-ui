@@ -3,6 +3,8 @@ import type { CatalogueProduct } from "@/lib/agentic/catalogue/types";
 const PACK_COUNT_PATTERN =
   /(?:per|x)\s*(\d{2,4})\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets|serving|servings)\b|\b(\d{2,4})\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets|serving|servings)\s*(?:per|\/)\s*(?:bottle|pack|container|tub)\b/i;
 const TITLE_PACK_PATTERN = /(?:^|\s)(\d{2,4})\s*'[SsCc]\b/;
+const PACK_COUNT_STRIP_PATTERN =
+  /(?:;\s*)?(?:per|x)\s*\d{2,4}\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets|serving|servings)\b|(?:;\s*)?\b\d{2,4}\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets|serving|servings)\s*(?:per|\/)\s*(?:bottle|pack|container|tub)\b/gi;
 
 export type PackFactNames =
   | "servingsPerPack"
@@ -18,7 +20,7 @@ export type ProductPackFacts = Readonly<{
   unitsPerServing: number | null;
 }>;
 
-function countFromText(value: string | null | undefined) {
+export function parsePackCountFromText(value: string | null | undefined) {
   const text = value?.trim();
   if (!text) {
     return null;
@@ -34,6 +36,38 @@ function countFromText(value: string | null | undefined) {
   if (titled) {
     const count = Number(titled[1]);
     if (Number.isInteger(count) && count >= 20 && count <= 400) {
+      return count;
+    }
+  }
+  return null;
+}
+
+function countFromText(value: string | null | undefined) {
+  return parsePackCountFromText(value);
+}
+
+export function servingLabelWithPackCount(
+  label: string | null | undefined,
+  count: number | null
+) {
+  const stripped = String(label ?? "")
+    .replace(PACK_COUNT_STRIP_PATTERN, "")
+    .replace(/\s*;\s*;/g, ";")
+    .replace(/^[\s;]+|[\s;]+$/g, "")
+    .trim();
+  if (count == null || !Number.isInteger(count) || count <= 12 || count > 1000) {
+    return stripped || null;
+  }
+  const encoded = `${count} servings per container`;
+  return stripped ? `${stripped}; ${encoded}` : encoded;
+}
+
+export function packCountFromFacts(
+  facts: readonly Readonly<{ servingLabel?: string | null }>[]
+) {
+  for (const fact of facts) {
+    const count = parsePackCountFromText(fact.servingLabel);
+    if (count != null) {
       return count;
     }
   }
@@ -93,7 +127,8 @@ export function cataloguePackValidation(product: CatalogueProduct) {
     complete: facts.complete,
     incompleteCommercialFacts: !facts.complete,
     missingFactNames: facts.missingFactNames,
-    productId: product.productId
+    productId: product.productId,
+    reasonCode: facts.complete ? null : ("catalogue_data_incomplete" as const)
   };
 }
 

@@ -41,6 +41,7 @@ import {
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
+import { buildHorizonPlan, ordersInHorizon } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import type {
@@ -66,6 +67,7 @@ export type PlanToolInput = Readonly<{
   expectedRevision?: number;
   idempotencyKey?: string;
   operation?: "answer" | "create" | "get" | "revise" | "select";
+  optionId?: string;
   planHandle?: string;
   request?: unknown;
   safetyAcknowledgement?: unknown;
@@ -218,9 +220,19 @@ function composeResult(input: Readonly<{
         state: workState,
         unmetRequirements: [...input.unmetRequirements]
       });
+  const horizon = tooBroad
+    ? undefined
+    : buildHorizonPlan({
+        items: input.selected?.basket ?? [],
+        snapshot: input.snapshot,
+        state: workState
+      });
+  const laterOrders = horizon ? ordersInHorizon(horizon.orders, 90).filter((item) => item.day > 0) : [];
   const summary = tooBroad
     ? agenticMessage(input.locale, "plan.summary.request_too_broad")
-    : agenticMessage(input.locale, `plan.summary.${status}`);
+    : horizon?.reasonCode === "current_inventory_covers_now" && laterOrders.length > 0
+      ? agenticMessage(input.locale, "plan.summary.current_inventory_covers_now")
+      : agenticMessage(input.locale, `plan.summary.${status}`);
   const split = tooBroad ? targetNameGroups(input.state.targets, 10) : undefined;
   const suggestedGroups = split?.groups;
   const changeSummary: string[] = [];
@@ -258,6 +270,7 @@ function composeResult(input: Readonly<{
     coverage,
     guidanceRulesVersion: input.snapshot.catalogueVersion,
     leftovers: tooBroad ? [] : input.leftovers,
+    ...(horizon ? { horizon } : {}),
     matcherTelemetry: matcherTelemetryFor({
       ackMs: input.ackMs,
       catalogueMs: input.catalogueMs,
@@ -893,7 +906,7 @@ export async function planTool(input: Readonly<{
     const answers = incomingAnswers(payload);
     const ack = incomingAck(payload);
     const selectOptionId =
-      payload.selectOptionId ?? selectFromAnswers(answers);
+      payload.selectOptionId ?? payload.optionId ?? selectFromAnswers(answers);
 
     let planHandle = payload.planHandle;
     let planId: string;

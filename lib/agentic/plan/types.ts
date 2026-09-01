@@ -534,8 +534,29 @@ export type PlanExplanation = Readonly<{
   savings90DayMinor: number | null;
 }>;
 
+export type HorizonOrder = Readonly<{
+  day: number;
+  inventoryAfter: number;
+  inventoryBefore: number;
+  otherCustomerCostMinor: number;
+  productIds: readonly string[];
+  quantities: readonly number[];
+  shippingMinor: number;
+  subtotalMinor: number;
+  totalMinor: number;
+}>;
+
+export type HorizonPlan = Readonly<{
+  nextReplenishmentDay: number | null;
+  orders: readonly HorizonOrder[];
+  purchaseRequiredNow: boolean;
+  reasonCode: "current_inventory_covers_now" | "purchase_now" | null;
+  snapshotId: string;
+}>;
+
 export type CanonicalPlanStamp = Readonly<{
   buildId: string;
+  canonicalVersion?: string;
   contractVersion: string;
   hash: string;
   matcherVersion: string;
@@ -600,6 +621,7 @@ export type PlanResult = Readonly<{
   changeSummary: readonly string[];
   coverage: readonly CoverageRow[];
   guidanceRulesVersion: string;
+  horizon?: HorizonPlan;
   leftovers: readonly PlanLeftover[];
   matcherTelemetry: MatcherTelemetry;
   optimizationEvidence: Readonly<{

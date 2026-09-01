@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useId,
   useRef,
   useState,
@@ -51,6 +52,10 @@ import {
   type ProductViewLabels,
 } from "@/components/admin/product-view-helpers";
 import { AdminModal } from "@/components/admin/ui";
+import {
+  packCountFromFacts,
+  servingLabelWithPackCount
+} from "@/lib/agentic/value/pack-facts";
 
 function regulatoryApprovalSummary(
   approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = [],
@@ -1587,6 +1592,46 @@ export function ProductFactsEditor({
 }>) {
   type ProductFact = AdminProductDetailRow["facts"][number];
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
+  const derivedPackCount = packCountFromFacts(draft.facts);
+  const [packDraft, setPackDraft] = useState(
+    derivedPackCount != null ? String(derivedPackCount) : "",
+  );
+
+  useEffect(() => {
+    const next = packCountFromFacts(draft.facts);
+    setPackDraft(next != null ? String(next) : "");
+  }, [draft.id]);
+
+  function parsedPackCount(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    if (!/^\d+$/.test(trimmed)) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed) || parsed <= 12 || parsed > 1000) {
+      return undefined;
+    }
+    return parsed;
+  }
+
+  function applyPackCountToFacts(count: number | null) {
+    if (draft.facts.length < 1) {
+      return;
+    }
+    setDraft({
+      ...draft,
+      facts: draft.facts.map((fact, index) => ({
+        ...fact,
+        servingLabel: servingLabelWithPackCount(
+          fact.servingLabel,
+          index === 0 ? count : null,
+        ),
+      })),
+    });
+  }
 
   function amountInputValue(fact: ProductFact) {
     return amountDrafts[fact.id] ?? (fact.amount ?? "");
@@ -1625,6 +1670,8 @@ export function ProductFactsEditor({
   }
 
   function addFact() {
+    const count = parsedPackCount(packDraft);
+    const isFirst = draft.facts.length < 1;
     setDraft({
       ...draft,
       facts: [
@@ -1640,6 +1687,10 @@ export function ProductFactsEditor({
           name: "",
           normalizedName: "",
           safetyFlags: [],
+          servingLabel:
+            isFirst && count != null
+              ? servingLabelWithPackCount(null, count)
+              : null,
           source: "admin",
           sourceText: null,
           sourceUrl: null,
@@ -1664,6 +1715,36 @@ export function ProductFactsEditor({
           {viewLabels.addFact}
         </button>
       </div>
+      <label className="mt-3 block max-w-xs text-sm font-medium text-gray-700">
+        {viewLabels.servingsPerPack}
+        <input
+          className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+          inputMode="numeric"
+          onBlur={() => {
+            const parsed = parsedPackCount(packDraft);
+            if (parsed === undefined) {
+              const next = packCountFromFacts(draft.facts);
+              setPackDraft(next != null ? String(next) : "");
+              return;
+            }
+            applyPackCountToFacts(parsed);
+          }}
+          onChange={(event) => {
+            const value = event.target.value;
+            setPackDraft(value);
+            const parsed = parsedPackCount(value);
+            if (parsed !== undefined) {
+              applyPackCountToFacts(parsed);
+            }
+          }}
+          placeholder={viewLabels.missing}
+          type="text"
+          value={packDraft}
+        />
+        <span className="mt-1 block text-xs font-normal text-gray-500">
+          {viewLabels.servingsPerPackHint}
+        </span>
+      </label>
       <div className="mt-2 space-y-2">
         {draft.facts.length > 0 ? (
           draft.facts.map((fact, index) => {

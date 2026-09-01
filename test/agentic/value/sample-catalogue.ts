@@ -95,7 +95,7 @@ export function sampleValueSnapshot(): CatalogueSnapshot {
         form: "powder",
         id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
         name: "Creatine",
-        servingLabel: "1 scoop",
+        servingLabel: "1 scoop; 90 servings per container",
         supplementId: creatine.supplementId,
         title: "Creatine Monohydrate",
         unit: "g",

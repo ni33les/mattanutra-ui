@@ -849,7 +849,7 @@ export function publicPlanFields(result: Pick<
   | "summary"
   | "unmetRequirements"
 > &
-  Partial<Pick<PlanResult, "breadth" | "gapReview" | "leftovers" | "matcherTelemetry">>) {
+  Partial<Pick<PlanResult, "breadth" | "gapReview" | "horizon" | "leftovers" | "matcherTelemetry">>) {
   const selected = result.selected;
   const guidanceIds = result.safetyGuidance.map((item) => item.guidanceId);
   const snapshot =
@@ -920,7 +920,9 @@ export function publicPlanFields(result: Pick<
           : result.status === "ready"
             ? ["confirm_with_user"]
             : result.status === "no_purchase"
-              ? []
+              ? result.horizon?.orders.some((item) => item.day > 0 && item.day < 90)
+                ? ["replenish_later"]
+                : []
               : ["change_request"];
   const currency = result.basket[0]?.currency ?? "THB";
   const subtotalMinor =
@@ -947,6 +949,34 @@ export function publicPlanFields(result: Pick<
       : {}),
     status: result.status,
     summary: result.summary,
+    ...(snapshot?.currentSupplements
+      ? {
+          comparisonBasis: {
+            currentInventory: snapshot.currentSupplements.map((item) => ({
+              daysRemaining: item.daysRemaining ?? null,
+              productId: item.productId ?? null,
+              supplementId: item.supplementId
+            }))
+          }
+        }
+      : {}),
+    ...(result.horizon
+      ? {
+          nextReplenishmentDay: result.horizon.nextReplenishmentDay,
+          orderSchedule: {
+            "30": result.horizon.orders.filter((item) => item.day < 30),
+            "90": result.horizon.orders.filter((item) => item.day < 90)
+          },
+          purchaseRequiredNow: result.horizon.purchaseRequiredNow,
+          ...(result.horizon.reasonCode ? { reasonCode: result.horizon.reasonCode } : {}),
+          cash30DayMinor: result.horizon.orders
+            .filter((item) => item.day < 30)
+            .reduce((sum, item) => sum + item.totalMinor, 0),
+          cash90DayMinor: result.horizon.orders
+            .filter((item) => item.day < 90)
+            .reduce((sum, item) => sum + item.totalMinor, 0)
+        }
+      : {}),
     summaryKey: tooBroad ? "plan.summary.request_too_broad" : `plan.summary.${result.status}`,
     locale,
     nextActions,
@@ -1034,13 +1064,22 @@ export function publicPlanFields(result: Pick<
         }
       : {}),
     canonical: buildCanonicalPlanStamp({
+      inventoryDays: (snapshot?.currentSupplements ?? [])
+        .map((item) => item.daysRemaining)
+        .filter((item): item is number => item != null),
       leftovers: result.leftovers ?? [],
       matcherVersion: selected?.matcherVersion ?? MATCHER_VERSION,
+      nextReplenishmentDay: result.horizon?.nextReplenishmentDay ?? null,
+      orders: result.horizon?.orders ?? [],
       options: advertisedOptions,
+      questions: result.questions ?? [],
+      reasonCode: result.horizon?.reasonCode ?? (tooBroad ? "request_too_broad" : null),
       safetyGuidance: result.safetyGuidance,
+      selectedOptionId: selected?.optionId ?? null,
       snapshotId:
         selected?.snapshotId ??
         result.matcherTelemetry?.snapshotId ??
+        result.horizon?.snapshotId ??
         (result as { snapshotId?: string }).snapshotId ??
         "",
       status: result.status

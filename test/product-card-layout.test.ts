@@ -497,6 +497,8 @@ describe("product admin card layout", () => {
     assert.match(factsEditor, /if \(parsed !== undefined\)/);
     assert.match(factsEditor, /\\d\*\\\.\\d\+/);
     assert.match(factsEditor, /confidence: "high"/);
+    assert.match(factsEditor, /viewLabels.servingsPerPack/);
+    assert.match(factsEditor, /applyPackCountToFacts/);
     assert.doesNotMatch(factsEditor, /confidence: "moderate"/);
     assert.doesNotMatch(factsEditor, /Number\(event\.target\.value\)/);
   });

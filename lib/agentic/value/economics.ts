@@ -1,4 +1,3 @@
-import { payableSnapshot } from "@/lib/agentic/money";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type {
@@ -13,9 +12,13 @@ import { productIsDedicatedForTarget } from "@/lib/matcher/candidates";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import { packsForHorizon } from "@/lib/agentic/value/horizon-cash";
 import { actualDaysSupplied, servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
+import {
+  buildHorizonPlan,
+  cashInHorizon,
+  type HorizonOrder
+} from "@/lib/agentic/value/inventory-ledger";
 
 const DEFAULT_HORIZONS = [30, 90] as const;
-const HORIZON_90 = 90;
 
 export function packsThroughHorizon(input: Readonly<{
   dailyServings: number;
@@ -74,18 +77,6 @@ export function enrichBasketPackFacts(item: BasketItem): BasketItem {
   };
 }
 
-function lineCash(item: BasketItem, horizonDays: number) {
-  const packs = packsThroughHorizon({
-    dailyServings: item.servingsPerDay,
-    horizonDays,
-    servingsPerPack: item.servingsPerPack
-  });
-  if (packs == null) {
-    return null;
-  }
-  return item.unitPriceMinor * packs;
-}
-
 function lineConsumption(item: BasketItem, horizonDays: number) {
   if (item.servingsPerPack == null || item.servingsPerPack <= 0 || item.servingsPerDay <= 0) {
     return null;
@@ -109,31 +100,11 @@ function administrationCount(items: readonly BasketItem[]) {
   return items.filter((item) => /powder|liquid|sachet/i.test(item.form)).length;
 }
 
-function baselineLineForProduct(
-  product: CatalogueProduct,
-  dailyServings: number
-): EconomicsBaselineLine {
-  const servingsPerPack = servingsPerPackFromProduct(product);
-  const quantity =
-    packsThroughHorizon({
-      dailyServings,
-      horizonDays: 90,
-      servingsPerPack
-    }) ?? 1;
-
-  return {
-    lineTotalMinor: product.unitPriceMinor * quantity,
-    productId: product.productId,
-    quantity,
-    unitPriceMinor: product.unitPriceMinor
-  };
-}
-
-function dedicatedLine(
+function dedicatedProduct(
   snapshot: CatalogueSnapshot,
   state: CanonicalPlanState,
   coverage: CoverageRow
-): EconomicsLedger["baseline"]["lines"][number] | null {
+): CatalogueProduct | null {
   const target = state.targets.find((item) => item.supplementId === coverage.supplementId);
 
   if (!target) {
@@ -152,40 +123,15 @@ function dedicatedLine(
     requestedUnit: target.unit,
     subjectId: target.supplementId
   };
-  const dedicated = snapshot.products
-    .filter(
-      (product) =>
-        product.source !== "fixture" &&
-        product.orderable &&
-        product.contributionSupplementIds.includes(target.supplementId) &&
-        productIsDedicatedForTarget(toMatcherProduct(product), matcherTarget)
-    )
-    .sort((left, right) => left.unitPriceMinor - right.unitPriceMinor || left.productId.localeCompare(right.productId))[0];
-
-  if (!dedicated) {
-    return null;
-  }
-
-  return baselineLineForProduct(dedicated, 1);
-}
-
-function productForCurrent(
-  snapshot: CatalogueSnapshot,
-  current: CanonicalPlanState["currentSupplements"][number]
-) {
-  if (current.productId) {
-    const exact = snapshot.products.find((item) => item.productId === current.productId);
-    if (exact) {
-      return exact;
-    }
-  }
   return (
     snapshot.products
       .filter(
         (product) =>
           product.source !== "fixture" &&
           product.orderable &&
-          product.contributionSupplementIds.includes(current.supplementId)
+          !product.incompleteCommercialFacts &&
+          product.contributionSupplementIds.includes(target.supplementId) &&
+          productIsDedicatedForTarget(toMatcherProduct(product), matcherTarget)
       )
       .sort(
         (left, right) =>
@@ -194,43 +140,105 @@ function productForCurrent(
   );
 }
 
-function replenishmentLines(
+function syntheticBasketItem(
+  product: CatalogueProduct,
   snapshot: CatalogueSnapshot,
   state: CanonicalPlanState,
-  horizonDays: number
-): EconomicsBaselineLine[] {
-  const lines: EconomicsBaselineLine[] = [];
+  dailyServings = 1,
+  quantity = 1
+): BasketItem {
+  return enrichBasketPackFacts({
+    availabilityAsOf: snapshot.availabilityAsOf,
+    contributionSupplementIds: product.contributionSupplementIds,
+    currency: product.candidate.currency || state.currency,
+    dailyPills: product.dailyPills,
+    deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
+    fixture: product.source === "fixture",
+    form: product.form,
+    imageUrl: product.candidate.imageUrl?.trim() || null,
+    incidentalNutrientNames: [],
+    incidentalNutrients: [],
+    incompleteCommercialFacts: product.incompleteCommercialFacts,
+    lineTotalMinor: product.unitPriceMinor * quantity,
+    pillsPerServing: product.dailyPills,
+    productId: product.productId,
+    productName: product.candidate.title,
+    quantity,
+    requestedNutrientNames: [],
+    retailerSku: product.retailerSku,
+    sellerId: product.sellerId,
+    sellerName: product.sellerName,
+    servingsPerDay: Math.max(1, dailyServings),
+    servingsPerPack: servingsPerPackFromProduct(product),
+    source: product.source,
+    stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
+    unitPriceMinor: product.unitPriceMinor
+  });
+}
 
-  for (const current of state.currentSupplements) {
-    if (current.daysRemaining == null || current.daysRemaining >= horizonDays) {
-      continue;
-    }
-    const remainingDays = horizonDays - current.daysRemaining;
-    if (remainingDays <= 0) {
-      continue;
-    }
-    const product = productForCurrent(snapshot, current);
-    if (!product) {
-      continue;
-    }
-    const servingsPerPack = servingsPerPackFromProduct(product);
-    const quantity = packsThroughHorizon({
-      dailyServings: 1,
-      horizonDays: remainingDays,
-      servingsPerPack
-    });
-    if (quantity == null) {
-      continue;
-    }
-    lines.push({
-      lineTotalMinor: product.unitPriceMinor * quantity,
-      productId: product.productId,
-      quantity,
-      unitPriceMinor: product.unitPriceMinor
-    });
+function baselineBasketItems(input: Readonly<{
+  coverage: readonly CoverageRow[];
+  items: readonly BasketItem[];
+  snapshot: CatalogueSnapshot;
+  state: CanonicalPlanState;
+}>): BasketItem[] {
+  if (input.state.baseline?.type === "current_basket" && input.state.baseline.items?.length) {
+    return input.state.baseline.items
+      .map((item) => {
+        const product = input.snapshot.products.find((row) => row.productId === item.productId);
+        if (!product) {
+          return null;
+        }
+        const quantity = Math.max(1, Math.ceil(item.quantity));
+        const fromOption = input.items.find((row) => row.productId === product.productId);
+        if (fromOption) {
+          return enrichBasketPackFacts({ ...fromOption, quantity });
+        }
+        return syntheticBasketItem(product, input.snapshot, input.state, 1, quantity);
+      })
+      .filter((item): item is BasketItem => Boolean(item));
   }
 
-  return lines;
+  const seen = new Set<string>();
+  const items: BasketItem[] = [];
+  for (const row of input.coverage) {
+    if (row.status !== "covered" && row.status !== "over_target") {
+      continue;
+    }
+    const product = dedicatedProduct(input.snapshot, input.state, row);
+    if (!product || seen.has(product.productId)) {
+      continue;
+    }
+    seen.add(product.productId);
+    const fromOption = input.items.find((item) => item.productId === product.productId);
+    items.push(fromOption ?? syntheticBasketItem(product, input.snapshot, input.state));
+  }
+  return items;
+}
+
+function linesFromOrders(
+  orders: readonly HorizonOrder[],
+  snapshot: CatalogueSnapshot
+): EconomicsBaselineLine[] {
+  const totals = new Map<string, { quantity: number; unitPriceMinor: number }>();
+  for (const order of orders) {
+    order.productIds.forEach((productId, index) => {
+      const quantity = order.quantities[index] ?? 1;
+      const product = snapshot.products.find((item) => item.productId === productId);
+      const unitPriceMinor = product?.unitPriceMinor ?? 0;
+      const previous = totals.get(productId);
+      totals.set(productId, {
+        quantity: (previous?.quantity ?? 0) + quantity,
+        unitPriceMinor: previous?.unitPriceMinor ?? unitPriceMinor
+      });
+    });
+  }
+  return [...totals.entries()].map(([productId, row]) => ({
+    lineTotalMinor: row.unitPriceMinor * row.quantity,
+    productId,
+    quantity: row.quantity,
+    unitPriceMinor: row.unitPriceMinor
+  }));
 }
 
 function comparisonBasisFor(
@@ -253,35 +261,6 @@ function comparisonBasisFor(
   };
 }
 
-function baselineFromRequest(
-  snapshot: CatalogueSnapshot,
-  state: CanonicalPlanState
-): EconomicsBaselineLine[] | null {
-  if (state.baseline?.type !== "current_basket" || !state.baseline.items?.length) {
-    return null;
-  }
-
-  const lines = state.baseline.items
-    .map((item) => {
-      const product = snapshot.products.find((row) => row.productId === item.productId);
-
-      if (!product) {
-        return null;
-      }
-
-      const quantity = Math.max(1, Math.ceil(item.quantity));
-      return {
-        lineTotalMinor: product.unitPriceMinor * quantity,
-        productId: product.productId,
-        quantity,
-        unitPriceMinor: product.unitPriceMinor
-      };
-    })
-    .filter((item): item is EconomicsBaselineLine => Boolean(item));
-
-  return lines.length > 0 ? lines : null;
-}
-
 export function buildEconomics(input: Readonly<{
   coverage: readonly CoverageRow[];
   items: readonly BasketItem[];
@@ -291,48 +270,40 @@ export function buildEconomics(input: Readonly<{
   state: CanonicalPlanState;
 }>): EconomicsLedger {
   const items = input.items.map(enrichBasketPackFacts);
-  const firstOrderSubtotalMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
-  const payable = payableSnapshot({ subtotalMinor: firstOrderSubtotalMinor });
-  const shippingMinor = items.length > 0 ? payable.shippingMinor : 0;
-  const otherCustomerCostMinor = items.length > 0 ? payable.taxMinor : 0;
-  const cash30Parts = items.map((item) => lineCash(item, 30));
-  const cash90Parts = items.map((item) => lineCash(item, 90));
   const consumption30Parts = items.map((item) => lineConsumption(item, 30));
   const consumption90Parts = items.map((item) => lineConsumption(item, 90));
-  const productCash30 = cash30Parts.every((item) => item != null)
-    ? cash30Parts.reduce((sum, item) => sum + (item ?? 0), 0)
-    : null;
-  const productCash90 = cash90Parts.every((item) => item != null)
-    ? cash90Parts.reduce((sum, item) => sum + (item ?? 0), 0)
-    : null;
   const consumption30DayMinor = consumption30Parts.every((item) => item != null)
     ? consumption30Parts.reduce((sum, item) => sum + (item ?? 0), 0)
     : null;
   const consumption90DayMinor = consumption90Parts.every((item) => item != null)
     ? consumption90Parts.reduce((sum, item) => sum + (item ?? 0), 0)
     : null;
-  const addOn = items.length > 0 ? shippingMinor + otherCustomerCostMinor : 0;
-  const cash30DayMinor = productCash30 == null ? null : productCash30 + addOn;
-  const cash90DayMinor = productCash90 == null ? null : productCash90 + addOn;
-  const replenishment = replenishmentLines(input.snapshot, input.state, HORIZON_90);
-  const replenishmentCash = replenishment.reduce((sum, item) => sum + item.lineTotalMinor, 0);
-  const purchasedBaseline =
-    baselineFromRequest(input.snapshot, input.state) ??
-    input.coverage
-      .filter((row) => row.status === "covered" || row.status === "over_target")
-      .map((row) => dedicatedLine(input.snapshot, input.state, row))
-      .filter((item): item is EconomicsBaselineLine => Boolean(item));
-  const baselineLines = [...purchasedBaseline, ...replenishment];
-  const baselineSubtotal = purchasedBaseline.reduce((sum, item) => sum + item.lineTotalMinor, 0);
-  const baselinePayable = payableSnapshot({ subtotalMinor: baselineSubtotal });
-  const baselineCash90 =
-    purchasedBaseline.length > 0 || replenishment.length > 0
-      ? baselinePayable.totalPriceMinor + replenishmentCash
-      : 0;
-  const optionCash90 =
-    cash90DayMinor == null ? null : cash90DayMinor + replenishmentCash;
-  const savings90DayMinor =
-    optionCash90 == null ? null : baselineCash90 - optionCash90;
+  const horizon = buildHorizonPlan({
+    items,
+    snapshot: input.snapshot,
+    state: input.state
+  });
+  const cash30DayMinor = cashInHorizon(horizon.orders, 30);
+  const cash90DayMinor = cashInHorizon(horizon.orders, 90);
+  const day0 = horizon.orders.find((item) => item.day === 0);
+  const firstOrderSubtotalMinor =
+    day0?.subtotalMinor ?? items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
+  const shippingMinor = day0?.shippingMinor ?? 0;
+  const otherCustomerCostMinor = day0?.otherCustomerCostMinor ?? 0;
+  const baselineItems = baselineBasketItems({
+    coverage: input.coverage,
+    items,
+    snapshot: input.snapshot,
+    state: input.state
+  });
+  const baselineHorizon = buildHorizonPlan({
+    items: baselineItems,
+    snapshot: input.snapshot,
+    state: input.state
+  });
+  const baselineCash90 = cashInHorizon(baselineHorizon.orders, 90);
+  const baselineLines = linesFromOrders(baselineHorizon.orders, input.snapshot);
+  const savings90DayMinor = baselineCash90 - cash90DayMinor;
   const equivalent = input.coverage.every((row) => {
     const target = input.state.targets.find((item) => item.supplementId === row.supplementId);
     const importance = target?.importance ?? "required";
@@ -373,8 +344,8 @@ export function buildEconomics(input: Readonly<{
     },
     comparisonBasis: comparisonBasisFor(input.snapshot, input.state),
     cash30DayMinor,
-    cash90DayMinor: optionCash90,
-    cashTotalMinor: items.length > 0 ? payable.totalPriceMinor : 0,
+    cash90DayMinor,
+    cashTotalMinor: day0?.totalMinor ?? 0,
     complete,
     consumption30DayMinor,
     consumption90DayMinor,

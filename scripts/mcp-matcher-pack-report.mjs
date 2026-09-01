@@ -16,6 +16,7 @@ import { canonicalAeC8Report, runAeC8Pack } from "../test/agentic-ae-c8-pack.tes
 import { canonicalComReport, runComPack } from "../test/agentic-com-pack.test.ts";
 import { canonicalCvFixReport, runCvFixPack } from "../test/agentic-cv-fix-pack.test.ts";
 import { canonicalCvImplReport, runCvImplPack } from "../test/agentic-cv-impl-pack.test.ts";
+import { canonicalR2Report, runCvR2Pack } from "../test/agentic-cv-r2-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -955,6 +956,7 @@ export function canonicalPack(run) {
     commercial: JSON.parse(canonicalComReport(run.commercial)),
     valueRemediation: JSON.parse(canonicalCvFixReport(run.valueRemediation)),
     valueImplementation: JSON.parse(canonicalCvImplReport(run.valueImplementation)),
+    valueR2: JSON.parse(canonicalR2Report(run.valueR2)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -997,6 +999,9 @@ export function snapshotFromRun(run) {
   const valueImplementation = Object.fromEntries(
     run.valueImplementation.cases.map((item) => [item.id, item.result])
   );
+  const valueR2 = Object.fromEntries(
+    run.valueR2.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
@@ -1009,6 +1014,7 @@ export function snapshotFromRun(run) {
     commercial,
     valueRemediation,
     valueImplementation,
+    valueR2,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -1044,7 +1050,9 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("REG-CV-") || id.startsWith("DEV-")
+  const section = id.startsWith("R2-")
+    ? "valueR2"
+    : id.startsWith("REG-CV-") || id.startsWith("DEV-")
     ? "valueImplementation"
     : id.startsWith("FIX-")
     ? "valueRemediation"
@@ -1094,6 +1102,7 @@ export function sectionTotals(run) {
     run.valueRemediation.passedCases === run.valueRemediation.totalCases;
   const valueImplementationPass =
     run.valueImplementation.passedCases === run.valueImplementation.totalCases;
+  const valueR2Pass = run.valueR2.passedCases === run.valueR2.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -1139,6 +1148,10 @@ export function sectionTotals(run) {
       passed: valueImplementationPass,
       text: `${run.valueImplementation.passedCases}/${run.valueImplementation.totalCases}`
     },
+    valueR2: {
+      passed: valueR2Pass,
+      text: `${run.valueR2.passedCases}/${run.valueR2.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
@@ -1155,7 +1168,8 @@ export function sectionTotals(run) {
       evidencePass &&
       commercialPass &&
       valueRemediationPass &&
-      valueImplementationPass
+      valueImplementationPass &&
+      valueR2Pass
   };
 }
 
@@ -1190,6 +1204,9 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.valueImplementation.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.valueR2.cases) {
     byId.set(item.id, item);
   }
 
@@ -1261,6 +1278,9 @@ export function printTable(run) {
   console.log(
     `Customer value implementation v1.1: ${totals.valueImplementation.text} — ${totals.valueImplementation.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `Customer value implementation v1.2: ${totals.valueR2.text} — ${totals.valueR2.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -1299,6 +1319,8 @@ export async function runPackOnce() {
   const valueRemediation = await runCvFixPack();
   await resetAfterMatcher();
   const valueImplementation = await runCvImplPack(1);
+  await resetAfterMatcher();
+  const valueR2 = await runCvR2Pack(1);
   return {
     contract,
     honesty,
@@ -1311,6 +1333,7 @@ export async function runPackOnce() {
     commercial,
     valueRemediation,
     valueImplementation,
+    valueR2,
     matcher
   };
 }

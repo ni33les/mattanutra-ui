@@ -424,6 +424,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "เป้าหมายที่ยอมรับแล้วไม่ต้องซื้อเพิ่ม โปรดยืนยันผลนี้กับผู้ใช้",
     "zh-CN": "已接受的目标无需再买。请先与当事人确认该结果。"
   },
+  "plan.summary.current_inventory_covers_now": {
+    en: "Nothing needs to be bought now. Current stock covers today; replenish later in the requested horizon.",
+    th: "ตอนนี้ยังไม่ต้องซื้อ สต็อกปัจจุบันครอบคลุมวันนี้ และต้องเติมภายหลังในช่วงเวลาที่ขอ",
+    "zh-CN": "现在不必购买。当前库存覆盖今天；请在所请求的周期内再补货。"
+  },
   "plan.summary.ready": {
     en: "A purchasable stack is ready. Confirm with the person first.",
     th: "สูตรพร้อมซื้อแล้ว โปรดยืนยันกับผู้ใช้ก่อน",
