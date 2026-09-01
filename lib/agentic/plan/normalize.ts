@@ -497,6 +497,7 @@ export async function normalizePlanRequest(input: Readonly<{
   const acceptedGaps: AcceptedGap[] = [];
   let state: CanonicalPlanState = {
     acceptedGaps,
+    ...(request.baseline ? { baseline: request.baseline } : {}),
     conditionCodes: [...new Set((request.conditionCodes ?? []).map((item) =>
       normalizeCode(item, CONDITION_ALIASES)
     ))],

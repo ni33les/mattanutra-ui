@@ -574,6 +574,7 @@ function successFromResult(input: Readonly<{
 
 function requestFromState(state: CanonicalPlanState): PlanRequest {
   return {
+    ...(state.baseline ? { baseline: state.baseline } : {}),
     ...(state.conditionCodes.length > 0 ? { conditionCodes: state.conditionCodes } : {}),
     ...(state.currentSupplements.length > 0
       ? { currentSupplements: state.currentSupplements }
@@ -601,11 +602,14 @@ function draftStateFromPayload(input: Readonly<{
     return applyPlanAnswers(
       {
         acceptedGaps: [],
+        ...(request.baseline ? { baseline: request.baseline } : {}),
         conditionCodes: [...new Set(request.conditionCodes ?? [])],
         currency: "THB",
         currentSupplements: (request.currentSupplements ?? []).map((item) => ({
           dailyAmount: item.dailyAmount,
+          ...(item.daysRemaining != null ? { daysRemaining: item.daysRemaining } : {}),
           name: item.name,
+          ...(item.productId ? { productId: item.productId } : {}),
           supplementId: item.supplementId ?? item.name,
           unit: item.unit
         })),
@@ -620,7 +624,9 @@ function draftStateFromPayload(input: Readonly<{
         safetyAcknowledgement: request.safetyAcknowledgement ?? null,
         targets: request.targets.map((item) => ({
           amount: item.amount,
+          ...(item.importance ? { importance: item.importance } : {}),
           name: item.name,
+          ...(item.prerequisite ? { prerequisite: item.prerequisite } : {}),
           supplementId: item.supplementId ?? item.name,
           unit: item.unit
         }))

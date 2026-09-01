@@ -45,8 +45,9 @@ import type {
   RetainedCurrent,
   StackOption
 } from "@/lib/agentic/plan/types";
-import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
+import { buildEconomics, enrichBasketPackFacts } from "@/lib/agentic/value/economics";
 import { cashCostForHorizon } from "@/lib/agentic/value/horizon-cash";
+import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
 
 export { toMatcherProduct };
 
@@ -556,11 +557,14 @@ function basketFromIds(
     )
     .filter((item): item is CatalogueProduct => Boolean(item))
     .map((product) => {
-      const dailyUnits = dailyUnitsForProduct(product.productId, basket.variantIds);
-      const quantity = Math.max(1, dailyUnits);
-      const nutrients = nutrientSplit(product, state, quantity);
+      const servingsPerDay = Math.max(
+        1,
+        dailyUnitsForProduct(product.productId, basket.variantIds)
+      );
+      const purchasedQuantity = 1;
+      const nutrients = nutrientSplit(product, state, servingsPerDay);
 
-      return {
+      return enrichBasketPackFacts({
         availabilityAsOf: snapshot.availabilityAsOf,
         contributionSupplementIds: product.contributionSupplementIds,
         currency: product.candidate.currency || state.currency,
@@ -569,7 +573,7 @@ function basketFromIds(
             dailyPillsPerServing: product.dailyPills,
             form: product.form
           },
-          quantity
+          servingsPerDay
         ),
         deliveryWindow: product.stockStatus === "backorder" ? "backorder" : "3-5 days",
         fixture: product.source === "fixture",
@@ -578,22 +582,22 @@ function basketFromIds(
         incidentalNutrientNames: nutrients.incidentalNutrientNames,
         incidentalNutrients: nutrients.incidentalNutrients,
         incompleteCommercialFacts: product.incompleteCommercialFacts,
-        lineTotalMinor: product.unitPriceMinor * quantity,
+        lineTotalMinor: product.unitPriceMinor * purchasedQuantity,
         pillsPerServing: product.dailyPills,
         productId: product.productId,
         productName: product.candidate.title,
-        quantity,
+        quantity: purchasedQuantity,
         requestedNutrientNames: nutrients.requestedNutrientNames,
         requestedNutrients: nutrients.requestedNutrients,
         retailerSku: product.retailerSku,
         sellerId: product.sellerId,
         sellerName: product.sellerName,
-        servingsPerDay: quantity,
+        servingsPerDay,
         servingsPerPack: servingsPerPackFromProduct(product),
         source: product.source,
         stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
         unitPriceMinor: product.unitPriceMinor
-      };
+      });
     });
 }
 
@@ -614,10 +618,27 @@ function toStackOption(
   const deferredTargetIds = coverage
     .filter((row) => row.status === "conditional_deferred")
     .map((row) => row.supplementId);
-  const cash90DayMinor = cashCostForHorizon(items, 90);
-  const recommendedCash = recommendedBasket
-    ? cashCostForHorizon(basketFromIds(state, snapshot, recommendedBasket), 90)
-    : cash90DayMinor;
+  const recommendedItems =
+    recommendedBasket && recommendedBasket !== basket
+      ? basketFromIds(state, snapshot, recommendedBasket)
+      : items;
+  const recommendedCoverage =
+    recommendedBasket && recommendedBasket !== basket
+      ? coverageFor(state, recommendedBasket, recommendedItems)
+      : coverage;
+  const economics = buildEconomics({
+    coverage,
+    items,
+    recommendedCoverage,
+    recommendedItems,
+    snapshot,
+    state
+  });
+  const cash90DayMinor = economics.cash90DayMinor;
+  const recommendedCash =
+    recommendedBasket && recommendedBasket !== basket
+      ? cashCostForHorizon(recommendedItems, 90)
+      : cash90DayMinor;
   const retainedCurrent: RetainedCurrent[] = state.currentSupplements
     .filter((item) =>
       coverage.some(
@@ -639,6 +660,7 @@ function toStackOption(
     coveragePercent: publicCoveragePercent(basket),
     dailyPills: basket.dailyPills,
     deferredTargetIds,
+    economics,
     includedTargetIds,
     matcherVersion: MATCHER_VERSION,
     omittedTargetIds,

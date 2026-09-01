@@ -25,6 +25,7 @@ export type PublicBasketNutrient = Readonly<{
 }>;
 
 export type PublicBasketItem = Readonly<{
+  availableServings?: number | null;
   currency: string;
   dailyPills: number;
   daysOfSupply?: number | null;
@@ -33,15 +34,19 @@ export type PublicBasketItem = Readonly<{
   imageUrl?: string;
   incidentalNutrientNames?: readonly string[];
   incidentalNutrients?: readonly PublicBasketNutrient[];
+  leftoverServings30?: number | null;
+  leftoverServings90?: number | null;
   lineTotalMinor: number;
   pillsPerServing: number;
   productId: string;
   productName: string;
   quantity: number;
+  replenishmentDay?: number | null;
   requestedNutrientNames?: readonly string[];
   requestedNutrients?: readonly PublicBasketNutrient[];
   selectionReason?: SelectionReason;
   servingsPerDay: number;
+  servingsPerPack?: number | null;
   source?: "fixture" | "retail";
   unitPriceMinor: number;
 }>;
@@ -401,7 +406,7 @@ export function publicBasketItem(
   coverage: readonly CoverageRow[] = []
 ): PublicBasketItem {
   const imageUrl = item.imageUrl?.trim() || null;
-  const daysOfSupply = item.daysOfSupply ?? 30;
+  const daysOfSupply = item.daysOfSupply ?? null;
   const incidentalSourceNames =
     item.incidentalNutrientNames && item.incidentalNutrientNames.length > 0
       ? item.incidentalNutrientNames
@@ -452,7 +457,12 @@ export function publicBasketItem(
     ...(imageUrl ? { imageUrl } : {}),
     ...(item.fixture || item.source === "fixture"
       ? { fixture: true as const, source: "fixture" as const }
-      : {})
+      : {}),
+    ...(item.servingsPerPack != null ? { servingsPerPack: item.servingsPerPack } : {}),
+    ...(item.availableServings != null ? { availableServings: item.availableServings } : {}),
+    ...(item.leftoverServings30 != null ? { leftoverServings30: item.leftoverServings30 } : {}),
+    ...(item.leftoverServings90 != null ? { leftoverServings90: item.leftoverServings90 } : {}),
+    ...(item.replenishmentDay != null ? { replenishmentDay: item.replenishmentDay } : {})
   };
 }
 
@@ -461,8 +471,11 @@ export function stackSummaryFor(basket: readonly BasketItem[], currency: string)
   const totalDailyPills = basket.reduce((sum, item) => sum + (Number(item.dailyPills) || 0), 0);
   const totalPriceMinor = basket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
   const supplyDays = basket.reduce((min, item) => {
-    const days = Number(item.daysOfSupply ?? 30);
-    return days > 0 && days < min ? days : min;
+    const days = item.daysOfSupply;
+    if (days == null || !Number.isFinite(days) || days <= 0) {
+      return min;
+    }
+    return days < min ? days : min;
   }, Number.POSITIVE_INFINITY);
   const safeSupply = Number.isFinite(supplyDays) && supplyDays > 0 ? supplyDays : 0;
   const dailyCostMinor =
@@ -653,6 +666,7 @@ export function publicOption(
     ...(option.omittedTargetIds ? { omittedTargetIds: option.omittedTargetIds } : {}),
     ...(option.deferredTargetIds ? { deferredTargetIds: option.deferredTargetIds } : {}),
     ...(option.retainedCurrent ? { retainedCurrent: option.retainedCurrent } : {}),
+    ...(option.economics ? { economics: option.economics } : {}),
     productIds: option.basket.map((item) => item.productId)
   };
 }

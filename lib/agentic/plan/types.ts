@@ -149,6 +149,7 @@ export type CanonicalPlanState = Readonly<{
   acceptedGaps: readonly AcceptedGap[];
   acknowledgedUnassessedConditionCodes?: readonly string[];
   acknowledgedUnassessedMedicationCodes?: readonly string[];
+  baseline?: PlanBaseline;
   conditionCodes: readonly string[];
   currency: string;
   currentSupplements: readonly CurrentSupplement[];
@@ -302,6 +303,7 @@ export type SelectionReason = Readonly<{
 
 export type BasketItem = Readonly<{
   availabilityAsOf: string;
+  availableServings?: number | null;
   contributionSupplementIds: readonly string[];
   currency: string;
   dailyPills: number;
@@ -313,12 +315,15 @@ export type BasketItem = Readonly<{
   incidentalNutrientNames: readonly string[];
   incidentalNutrients: readonly BasketNutrient[];
   incompleteCommercialFacts: boolean;
+  leftoverServings30?: number | null;
+  leftoverServings90?: number | null;
   lineTotalMinor: number;
   pillsPerServing: number;
   servingsPerPack?: number | null;
   productId: string;
   productName: string;
   quantity: number;
+  replenishmentDay?: number | null;
   requestedNutrientNames: readonly string[];
   requestedNutrients?: readonly BasketNutrient[];
   retailerSku: string;
@@ -412,6 +417,39 @@ export type PlanQuestion = Readonly<{
 
 export type ValueOptionRole = "best_value" | "complete" | "minimum_core";
 
+export type EconomicsBaselineLine = Readonly<{
+  lineTotalMinor: number;
+  productId: string;
+  quantity: number;
+  unitPriceMinor: number;
+}>;
+
+export type EconomicsLedger = Readonly<{
+  baseline: Readonly<{
+    cash90DayMinor: number;
+    lines: readonly EconomicsBaselineLine[];
+    type: PlanBaseline["type"];
+  }>;
+  cash30DayMinor: number;
+  cash90DayMinor: number;
+  cashTotalMinor: number;
+  consumption30DayMinor: number;
+  consumption90DayMinor: number;
+  deltas: Readonly<{
+    administrations: number;
+    coverage: number;
+    pills: number;
+    products: number;
+  }>;
+  equivalent: boolean;
+  firstOrderSubtotalMinor: number;
+  otherCustomerCostMinor: number;
+  savingClaim: "loss" | "none" | "positive";
+  savings90DayMinor: number;
+  savings90DayPercent: number | null;
+  shippingMinor: number;
+}>;
+
 export type OptionTradeOff = Readonly<{
   cash90DayDeltaMinor: number;
   coverageDelta: number;
@@ -433,6 +471,7 @@ export type StackOption = Readonly<{
   coveragePercent: number;
   dailyPills: number;
   deferredTargetIds?: readonly string[];
+  economics?: EconomicsLedger;
   includedTargetIds?: readonly string[];
   matcherVersion: string;
   omittedTargetIds?: readonly string[];
