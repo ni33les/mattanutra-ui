@@ -57,8 +57,41 @@ import { buildBurden } from "@/lib/agentic/value/burden";
 import { buildEconomics, enrichBasketPackFacts } from "@/lib/agentic/value/economics";
 import { cashCostForHorizon } from "@/lib/agentic/value/horizon-cash";
 import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
+import { planRematchFingerprint } from "@/lib/agentic/plan/normalize";
 
 export { toMatcherProduct };
+
+const MATCH_PLAN_CACHE_LIMIT = 64;
+const matchPlanCache = new Map<string, ReturnType<typeof computeMatchPlan>>();
+
+export function resetMatchPlanCache() {
+  matchPlanCache.clear();
+}
+
+function matchPlanCacheKey(
+  state: CanonicalPlanState,
+  snapshot: CatalogueSnapshot
+) {
+  const hash = createHash("sha256");
+  hash.update(planRematchFingerprint(state));
+  hash.update("\0");
+  hash.update(catalogueSnapshotId(snapshot));
+  hash.update("\0");
+  hash.update(GUIDANCE_RULES_VERSION);
+  hash.update("\0");
+  hash.update(JSON.stringify(state.acceptedGaps));
+  hash.update("\0");
+  hash.update(JSON.stringify(state.leftovers));
+  hash.update("\0");
+  hash.update(state.locale);
+  hash.update("\0");
+  for (const ceiling of matcherSafetyCeilings()) {
+    hash.update(
+      `${ceiling.subjectId}:${ceiling.maxAmount}:${ceiling.maxUnit}:${ceiling.lifeStage ?? ""}:${ceiling.bandId ?? ""}\n`
+    );
+  }
+  return hash.digest("hex");
+}
 
 export function toCanonicalRequest(
   state: CanonicalPlanState
@@ -1000,6 +1033,29 @@ export function matchPlan(input: Readonly<{
   targetFrontiers?: NonNullable<MatcherTelemetry["targetFrontiers"]>;
   unmetRequirements: string[];
 } {
+  const cacheKey = matchPlanCacheKey(input.state, input.snapshot);
+  const cached = matchPlanCache.get(cacheKey);
+  if (cached) {
+    matchPlanCache.delete(cacheKey);
+    matchPlanCache.set(cacheKey, cached);
+    return structuredClone(cached);
+  }
+
+  const computed = computeMatchPlan(input);
+  matchPlanCache.set(cacheKey, computed);
+  if (matchPlanCache.size > MATCH_PLAN_CACHE_LIMIT) {
+    const oldest = matchPlanCache.keys().next().value;
+    if (oldest) {
+      matchPlanCache.delete(oldest);
+    }
+  }
+  return structuredClone(computed);
+}
+
+function computeMatchPlan(input: Readonly<{
+  snapshot: CatalogueSnapshot;
+  state: CanonicalPlanState;
+}>): ReturnType<typeof matchPlan> {
   const request = toCanonicalRequest(input.state);
 
   if ("error" in request) {

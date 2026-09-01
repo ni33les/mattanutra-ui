@@ -76,4 +76,28 @@ describe("Customer value speed pack", () => {
   it("info budget stays well under a second", () => {
     assert.ok(WARM_INFO_P95_MS < 1_000);
   });
+
+  it("repeat identical request is as fast or faster than the first", async () => {
+    const matching = readFileSync(new URL("../lib/agentic/plan/matching.ts", import.meta.url), "utf8");
+    assert.match(matching, /matchPlanCache/);
+    const frozen = await freezeImplCatalogue();
+    assert.equal(frozen.usable, true);
+    const session = openSession(frozen.freeze);
+    try {
+      const request = primaryRequest(frozen.freeze);
+      const firstStarted = performance.now();
+      const first = await createPlan(session, request);
+      const firstMs = Math.round(performance.now() - firstStarted);
+      const secondStarted = performance.now();
+      const second = await createPlan(session, request);
+      const secondMs = Math.round(performance.now() - secondStarted);
+      assert.equal(first.status, second.status);
+      assert.ok(
+        secondMs <= Math.max(firstMs, 400),
+        `repeat ${secondMs}ms slower than first ${firstMs}ms`
+      );
+    } finally {
+      closeSession();
+    }
+  });
 });

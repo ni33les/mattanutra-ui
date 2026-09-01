@@ -6,6 +6,7 @@ import {
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
+import { resetMatchPlanCache } from "@/lib/agentic/plan/matching";
 
 const cachedByCountry = new Map<string, CatalogueSnapshot>();
 let lastSnapshot: CatalogueSnapshot | null = null;
@@ -14,6 +15,7 @@ let installedSnapshot: CatalogueSnapshot | null = null;
 export function resetCatalogueSnapshotCache() {
   cachedByCountry.clear();
   lastSnapshot = null;
+  resetMatchPlanCache();
 }
 
 function usesLiveCatalogue(environment?: AgenticEnvironment) {
@@ -170,6 +172,7 @@ export async function warmCatalogueSnapshot(
 }
 
 export function replaceCatalogueSnapshot(snapshot: CatalogueSnapshot | null) {
+  resetMatchPlanCache();
   cachedByCountry.clear();
   lastSnapshot = snapshot;
   installedSnapshot = snapshot;
