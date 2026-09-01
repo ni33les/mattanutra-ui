@@ -12,7 +12,7 @@ export function packsForHorizon(input: Readonly<{
     input.dailyServings <= 0 ||
     input.horizonDays <= 0
   ) {
-    return 1;
+    return null;
   }
 
   return Math.max(1, Math.ceil((input.horizonDays * input.dailyServings) / input.servingsPerPack));
@@ -28,6 +28,9 @@ export function cashCostForHorizon(
       horizonDays,
       servingsPerPack: item.servingsPerPack
     });
+    if (packs == null) {
+      return sum;
+    }
     return sum + item.unitPriceMinor * packs;
   }, 0);
 

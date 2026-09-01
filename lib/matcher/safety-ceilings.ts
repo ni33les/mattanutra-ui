@@ -105,6 +105,7 @@ function bandKey(
 }
 
 type CeilingIndex = {
+  ambiguous: Set<string>;
   byBand: Map<string, SafetyCeiling>;
   subjectIds: Set<string>;
   names: Set<string>;
@@ -128,8 +129,22 @@ function indexCeilings(ceilings: readonly SafetyCeiling[]): CeilingIndex {
   }
 
   const byBand = new Map<string, SafetyCeiling>();
+  const ambiguous = new Set<string>();
   const subjectIds = new Set<string>();
   const names = new Set<string>();
+
+  const remember = (key: string, item: SafetyCeiling) => {
+    const previous = byBand.get(key);
+    if (
+      previous &&
+      (previous.bandId !== item.bandId ||
+        previous.maxAmount !== item.maxAmount ||
+        previous.maxUnit !== item.maxUnit)
+    ) {
+      ambiguous.add(key);
+    }
+    byBand.set(key, item);
+  };
 
   for (const item of ceilings) {
     const lifeStage = resolvedLifeStage(item);
@@ -138,16 +153,16 @@ function indexCeilings(ceilings: readonly SafetyCeiling[]): CeilingIndex {
 
     for (const id of identityKeys(item.subjectId)) {
       subjectIds.add(id);
-      byBand.set(bandKey(id, lifeStage, sourceScope), item);
+      remember(bandKey(id, lifeStage, sourceScope), item);
     }
 
     if (name) {
       names.add(name);
-      byBand.set(bandKey(`name:${name}`, lifeStage, sourceScope), item);
+      remember(bandKey(`name:${name}`, lifeStage, sourceScope), item);
     }
   }
 
-  const index = { byBand, names, subjectIds };
+  const index = { ambiguous, byBand, names, subjectIds };
   ceilingIndexCache.set(ceilings as object, index);
   return index;
 }
@@ -214,7 +229,11 @@ function catalogCeilingFor(
   const index = indexCeilings(ceilings);
 
   for (const id of identityKeys(input.subjectId)) {
-    const found = index.byBand.get(bandKey(id, lifeStage, sourceScope));
+    const key = bandKey(id, lifeStage, sourceScope);
+    if (index.ambiguous.has(key)) {
+      return null;
+    }
+    const found = index.byBand.get(key);
 
     if (found) {
       return found;
@@ -222,9 +241,14 @@ function catalogCeilingFor(
   }
 
   const name = normalizeName(input.name ?? "");
-  return name
-    ? index.byBand.get(bandKey(`name:${name}`, lifeStage, sourceScope)) ?? null
-    : null;
+  if (!name) {
+    return null;
+  }
+  const nameKey = bandKey(`name:${name}`, lifeStage, sourceScope);
+  if (index.ambiguous.has(nameKey)) {
+    return null;
+  }
+  return index.byBand.get(nameKey) ?? null;
 }
 
 export function catalogSubjectHasCeiling(

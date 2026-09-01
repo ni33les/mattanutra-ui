@@ -15,6 +15,7 @@ import { canonicalAeC7Report, runAeC7Pack } from "../test/agentic-ae-c7-pack.tes
 import { canonicalAeC8Report, runAeC8Pack } from "../test/agentic-ae-c8-pack.test.ts";
 import { canonicalComReport, runComPack } from "../test/agentic-com-pack.test.ts";
 import { canonicalCvFixReport, runCvFixPack } from "../test/agentic-cv-fix-pack.test.ts";
+import { canonicalCvImplReport, runCvImplPack } from "../test/agentic-cv-impl-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -504,6 +505,191 @@ const ROWS = [
     purpose: "Complete remediation pack is deterministic"
   },
   {
+    category: "Customer value implementation v1.1",
+    id: "REG-CV-01",
+    purpose: "Ready core with optional omission and conditional deferral"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "REG-CV-02",
+    purpose: "Conditional state machine stays coherent"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "REG-CV-03",
+    purpose: "Current-intake deduplication and positive overlap"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "REG-CV-04",
+    purpose: "Public-surface isolation"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "REG-CV-05",
+    purpose: "Exact same-key replay of the primary case"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-STATE-01",
+    purpose: "Answer inherits the frozen plan snapshot"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-STATE-02",
+    purpose: "Every plan transition retains canonical identity"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-STATE-03",
+    purpose: "Pinned snapshot does not silently refresh mid-plan"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-PACK-01",
+    purpose: "Selected line exposes authoritative pack facts"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-PACK-02",
+    purpose: "Missing pack data fails closed"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-ECON-01",
+    purpose: "Long-lived pack supply and horizon economics reproduce"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAVE-01",
+    purpose: "Self-equivalent baseline has exact zero saving"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAVE-02",
+    purpose: "Current inventory covering the horizon is not a mag saving"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAVE-03",
+    purpose: "In-horizon stock exhaustion buys only required replenishment"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAVE-04",
+    purpose: "Cheaper non-equivalent baskets cannot claim equivalent saving"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAVE-05",
+    purpose: "Incomplete economics suppress every numeric saving"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAVE-06",
+    purpose: "First-order cash is not 30-day consumption"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-CONTRACT-01",
+    purpose: "Direct plan schema remains explicit"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-CONTRACT-02",
+    purpose: "Fresh session schema hash matches info.schemaChecksum"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-CONTRACT-03",
+    purpose: "Advertised plan is not a catch-all object"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-CONTRACT-04",
+    purpose: "Snapshot, well-known, and adapters share one checksum"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAFETY-01",
+    purpose: "Every upper limit resolves to one pinned rule"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAFETY-02",
+    purpose: "Coverage and guidance share rule identity"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAFETY-03",
+    purpose: "Boundary behaviour derives from the ledger"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAFETY-04",
+    purpose: "Missing or ambiguous rules fail closed"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAFETY-05",
+    purpose: "D3 owner attestation references the DEV ledger"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SAFETY-06",
+    purpose: "Deduplication does not weaken safety contributors"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SEC-01",
+    purpose: "Public surfaces remain clean with scanner controls"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SEC-02",
+    purpose: "Previously exposed QA credential is invalid"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SEC-03",
+    purpose: "Replacement QA authorization stays off the public MCP"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-SEC-04",
+    purpose: "Logs and errors do not disclose secrets"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-DET-01",
+    purpose: "Whole pack twice-identical on one freeze"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-DET-02",
+    purpose: "Same-key replay is byte-identical"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-DET-03",
+    purpose: "Fresh-key equivalence of material fields"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-DET-04",
+    purpose: "Hidden order permutations do not change selection"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-DET-05",
+    purpose: "Existing matcher and safety packs remain green"
+  },
+  {
+    category: "Customer value implementation v1.1",
+    id: "DEV-DET-06",
+    purpose: "Canonical compare fails when material fields change"
+  },
+  {
     category: "MCP commercial",
     id: "COM-01",
     purpose: "A ready plan creates one open unpaid v1 order and checkout"
@@ -768,6 +954,7 @@ export function canonicalPack(run) {
     evidence: JSON.parse(canonicalAeC8Report(run.evidence)),
     commercial: JSON.parse(canonicalComReport(run.commercial)),
     valueRemediation: JSON.parse(canonicalCvFixReport(run.valueRemediation)),
+    valueImplementation: JSON.parse(canonicalCvImplReport(run.valueImplementation)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -807,6 +994,9 @@ export function snapshotFromRun(run) {
   const valueRemediation = Object.fromEntries(
     run.valueRemediation.cases.map((item) => [item.id, item.result])
   );
+  const valueImplementation = Object.fromEntries(
+    run.valueImplementation.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
@@ -818,6 +1008,7 @@ export function snapshotFromRun(run) {
     evidence,
     commercial,
     valueRemediation,
+    valueImplementation,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -853,7 +1044,9 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("FIX-")
+  const section = id.startsWith("REG-CV-") || id.startsWith("DEV-")
+    ? "valueImplementation"
+    : id.startsWith("FIX-")
     ? "valueRemediation"
     : id.startsWith("COM-")
     ? "commercial"
@@ -899,6 +1092,8 @@ export function sectionTotals(run) {
   const commercialPass = run.commercial.passedCases === run.commercial.totalCases;
   const valueRemediationPass =
     run.valueRemediation.passedCases === run.valueRemediation.totalCases;
+  const valueImplementationPass =
+    run.valueImplementation.passedCases === run.valueImplementation.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -940,6 +1135,10 @@ export function sectionTotals(run) {
       passed: valueRemediationPass,
       text: `${run.valueRemediation.passedCases}/${run.valueRemediation.totalCases}`
     },
+    valueImplementation: {
+      passed: valueImplementationPass,
+      text: `${run.valueImplementation.passedCases}/${run.valueImplementation.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
@@ -955,7 +1154,8 @@ export function sectionTotals(run) {
       boundaryPass &&
       evidencePass &&
       commercialPass &&
-      valueRemediationPass
+      valueRemediationPass &&
+      valueImplementationPass
   };
 }
 
@@ -987,6 +1187,9 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.valueRemediation.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.valueImplementation.cases) {
     byId.set(item.id, item);
   }
 
@@ -1055,6 +1258,9 @@ export function printTable(run) {
   console.log(
     `Customer value remediation: ${totals.valueRemediation.text} — ${totals.valueRemediation.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `Customer value implementation v1.1: ${totals.valueImplementation.text} — ${totals.valueImplementation.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -1091,6 +1297,8 @@ export async function runPackOnce() {
   const commercial = await runComPack();
   await resetAfterMatcher();
   const valueRemediation = await runCvFixPack();
+  await resetAfterMatcher();
+  const valueImplementation = await runCvImplPack(1);
   return {
     contract,
     honesty,
@@ -1102,6 +1310,7 @@ export async function runPackOnce() {
     evidence,
     commercial,
     valueRemediation,
+    valueImplementation,
     matcher
   };
 }

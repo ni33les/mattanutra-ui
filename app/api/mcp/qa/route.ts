@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { handleQaJsonRpc } from "@/lib/agentic/mcp/qa-dispatcher";
+import { authorizeQaRequest } from "@/lib/agentic/qa/auth";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import { isPaymentScenario, simulatePayment } from "@/lib/agentic/qa/simulate";
 import { nowIso } from "@/lib/agentic/runtime";
@@ -13,12 +14,6 @@ export const dynamic = "force-dynamic";
 
 const log = createLogger("api.mcp.qa");
 
-function authorized(request: Request) {
-  const expected = process.env.MCP_QA_TOKEN ?? "dev-mcp-qa-token";
-  const header = request.headers.get("authorization") ?? "";
-  return header === `Bearer ${expected}`;
-}
-
 export async function POST(request: Request) {
   const runtime = getLiveAgenticRuntime(request);
 
@@ -26,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Not found." }, { status: 404 });
   }
 
-  if (!authorized(request)) {
+  if (!authorizeQaRequest(request)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 

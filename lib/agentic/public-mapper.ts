@@ -529,7 +529,13 @@ export function publicCoverage(row: CoverageRow) {
             ? { percentOfUpperLimit: publicAmount(row.percentOfUpperLimit) }
             : {}),
           ...(row.sourceScope ? { sourceScope: row.sourceScope } : {}),
-          ...(row.authorityUrl ? { authorityUrl: row.authorityUrl } : {})
+          ...(row.authorityUrl ? { authorityUrl: row.authorityUrl } : {}),
+          ...(row.ruleId ? { ruleId: row.ruleId } : {}),
+          ...(row.rulesVersion ? { rulesVersion: row.rulesVersion } : {}),
+          ...(row.populationScope ? { populationScope: row.populationScope } : {}),
+          ...(row.safetyLedgerVersion
+            ? { safetyLedgerVersion: row.safetyLedgerVersion }
+            : {})
         }
       : {})
   };
@@ -1035,6 +1041,7 @@ export function publicPlanFields(result: Pick<
       snapshotId:
         selected?.snapshotId ??
         result.matcherTelemetry?.snapshotId ??
+        (result as { snapshotId?: string }).snapshotId ??
         "",
       status: result.status
     }),

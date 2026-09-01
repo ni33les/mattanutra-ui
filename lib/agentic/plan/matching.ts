@@ -32,7 +32,10 @@ import type {
   ScoredBasket
 } from "@/lib/matcher/types";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
+import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import {
+  catalogBandRuleId,
+  catalogBandRulesVersion,
   matcherSafetyCeilings,
   safetyCeilingFor
 } from "@/lib/matcher/safety-ceilings";
@@ -289,6 +292,14 @@ export function coverageFor(
           : null,
       remainingGap: Math.max(0, target.amount - totalExposureAmount),
       requestedAmount: target.amount,
+      ...(ceiling
+        ? {
+            populationScope: ceiling.lifeStage ?? null,
+            ruleId: catalogBandRuleId(ceiling),
+            rulesVersion: catalogBandRulesVersion(ceiling),
+            safetyLedgerVersion: GUIDANCE_RULES_VERSION
+          }
+        : {}),
       sourceScope: ceiling?.sourceScope ?? null,
       status,
       supplementId: target.supplementId,
@@ -721,7 +732,7 @@ function toStackOption(
   return {
     basket: items,
     burden,
-    cash90DayMinor,
+    ...(cash90DayMinor != null ? { cash90DayMinor } : {}),
     coverage,
     coveragePercent: publicCoveragePercent(basket),
     dailyPills: basket.dailyPills,
@@ -738,7 +749,10 @@ function toStackOption(
     snapshotId: catalogueSnapshotId(snapshot),
     totalPriceMinor: basket.priceMinor,
     tradeOff: {
-      cash90DayDeltaMinor: cash90DayMinor - recommendedCash,
+      cash90DayDeltaMinor:
+        cash90DayMinor != null && recommendedCash != null
+          ? cash90DayMinor - recommendedCash
+          : 0,
       coverageDelta: basket.aggregateCoverage - (recommendedBasket?.aggregateCoverage ?? basket.aggregateCoverage),
       dailyPillsDelta: basket.dailyPills - (recommendedBasket?.dailyPills ?? basket.dailyPills)
     }
@@ -896,7 +910,7 @@ export function matcherTelemetryFor(input: Readonly<{
     ...(() => {
       const snapshotId =
         input.selected?.snapshotId ??
-        (input.snapshot && input.snapshot.products.length > 0
+        (input.snapshot
           ? catalogueSnapshotId(input.snapshot)
           : undefined);
 

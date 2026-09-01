@@ -347,6 +347,10 @@ export type CoverageRow = Readonly<{
   percentOfUpperLimit: number | null;
   remainingGap: number;
   requestedAmount: number;
+  ruleId?: string | null;
+  rulesVersion?: string | null;
+  populationScope?: string | null;
+  safetyLedgerVersion?: string | null;
   sourceScope?: "supplemental" | "total" | null;
   importance?: TargetImportance;
   nextAction?: string;
@@ -436,18 +440,34 @@ export type EconomicsBaselineLine = Readonly<{
   unitPriceMinor: number;
 }>;
 
+export type EconomicsComparisonBasis = Readonly<{
+  baselineType: PlanBaseline["type"];
+  catalogueSnapshotId: string;
+  costHorizonsDays: readonly number[];
+  currency: string;
+  currentInventory: readonly Readonly<{
+    daysRemaining: number | null;
+    productId: string | null;
+    supplementId: string;
+  }>[];
+  destinationCountry: string;
+  orderBoundary: "order_at_H_excluded";
+  rounding: "minor_unit_once";
+}>;
+
 export type EconomicsLedger = Readonly<{
   baseline: Readonly<{
     cash90DayMinor: number;
     lines: readonly EconomicsBaselineLine[];
     type: PlanBaseline["type"];
   }>;
-  cash30DayMinor: number;
-  cash90DayMinor: number;
+  comparisonBasis?: EconomicsComparisonBasis;
+  cash30DayMinor: number | null;
+  cash90DayMinor: number | null;
   cashTotalMinor: number;
   complete: boolean;
-  consumption30DayMinor: number;
-  consumption90DayMinor: number;
+  consumption30DayMinor: number | null;
+  consumption90DayMinor: number | null;
   deltas: Readonly<{
     administrations: number;
     coverage: number;
@@ -458,7 +478,7 @@ export type EconomicsLedger = Readonly<{
   firstOrderSubtotalMinor: number;
   otherCustomerCostMinor: number;
   savingClaim: "loss" | "none" | "positive";
-  savings90DayMinor: number;
+  savings90DayMinor: number | null;
   savings90DayPercent: number | null;
   shippingMinor: number;
 }>;

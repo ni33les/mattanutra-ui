@@ -55,6 +55,9 @@ export function buildExplanation(input: Readonly<{
     recommendedOptionId: input.option.optionId,
     retainedCurrent: input.option.retainedCurrent ?? [],
     safetyState: input.acknowledgementStatus || input.status,
-    savings90DayMinor: input.option.economics?.savings90DayMinor ?? null
+    savings90DayMinor:
+      input.option.economics?.savingClaim === "none"
+        ? null
+        : input.option.economics?.savings90DayMinor ?? null
   };
 }

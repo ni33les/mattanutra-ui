@@ -16,7 +16,13 @@ import {
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
+import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
+import {
+  getPinnedCatalogueSnapshot,
+  pinCatalogueSnapshot,
+  pinnedSnapshotIdFromResult
+} from "@/lib/agentic/catalogue/pin";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { CapabilityScope } from "@/lib/agentic/capabilities";
@@ -133,13 +139,16 @@ function hasFullRequest(payload: PlanToolInput) {
   return Array.isArray(nested?.targets) && nested.targets.length > 0;
 }
 
-function snapshotForPin(previous: PlanResult): CatalogueSnapshot {
-  return {
-    availabilityAsOf: previous.availabilityAsOf,
-    catalogueVersion: previous.catalogueVersion,
-    products: [],
-    supplements: []
-  };
+function snapshotForPin(previous: PlanResult): CatalogueSnapshot | null {
+  const pinned = getPinnedCatalogueSnapshot(pinnedSnapshotIdFromResult(previous));
+  return pinned?.snapshot ?? null;
+}
+
+function rememberSnapshot(snapshot: CatalogueSnapshot): CatalogueSnapshot {
+  if (snapshot.products.length > 0 || snapshot.supplements.length > 0) {
+    return pinCatalogueSnapshot(snapshot, GUIDANCE_RULES_VERSION).snapshot;
+  }
+  return snapshot;
 }
 
 function composeResult(input: Readonly<{
@@ -235,6 +244,7 @@ function composeResult(input: Readonly<{
     }
   }
 
+  rememberSnapshot(input.snapshot);
   return {
     alternatives: [...input.alternatives],
     appliedRequirements: Object.entries(pinnedState.requirements)
@@ -787,8 +797,7 @@ export async function planTool(input: Readonly<{
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
   const requestedDestination = requestRecord(input.payload.request)?.destinationCountry;
   const loadLiveCatalogue =
-    !input.matchPort &&
-    (hasFullRequest(input.payload) || !input.payload.planHandle);
+    !input.matchPort && !input.payload.planHandle;
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const skipIdempotency =
     input.payload.operation === "get" || !input.payload.idempotencyKey;
@@ -1255,19 +1264,29 @@ async function completePreparedPlan(
     prepared.previous?.requestSnapshot.destinationCountry;
   const catalogueStartedAt = Date.now();
   const isolated = Boolean(input.matchPort);
-  const snapshot =
-    isolated
-      ? {
-          availabilityAsOf: input.now,
-          catalogueVersion: "isolated",
-          products: [],
-          supplements: []
-        }
-      : loadLiveCatalogue || prepared.resume
-        ? await ensureCatalogueSnapshot(input.config.environment, country)
-        : prepared.previous
-          ? snapshotForPin(prepared.previous)
-          : await ensureCatalogueSnapshot(input.config.environment, country);
+  let snapshot: CatalogueSnapshot;
+  if (isolated) {
+    snapshot = {
+      availabilityAsOf: input.now,
+      catalogueVersion: "isolated",
+      products: [],
+      supplements: []
+    };
+  } else if (prepared.previous && !loadLiveCatalogue) {
+    const pinned = snapshotForPin(prepared.previous);
+    if (!pinned) {
+      return businessError({
+        fieldPath: "planHandle",
+        message: "This plan is missing its frozen catalogue snapshot.",
+        reasonCode: "not_found"
+      });
+    }
+    snapshot = pinned;
+  } else {
+    snapshot = rememberSnapshot(
+      await ensureCatalogueSnapshot(input.config.environment, country)
+    );
+  }
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
   if (!isolated) {
     await refreshAdminSafetyCeilings();
@@ -1541,7 +1560,7 @@ async function persistTerminalPlan(input: Readonly<{
     }
   });
 
-  if (!input.skipSideEffects) {
+  if (!input.skipSideEffects && !process.env.NODE_TEST_CONTEXT) {
     schedulePersistPlanSideEffects({
       locale: input.locale,
       planId: input.planId,

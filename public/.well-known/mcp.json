@@ -1,6 +1,7 @@
 {
   "contractVersion": "3.0.0",
   "name": "mattanutra_dev",
+  "schemaChecksum": "e9d4ef92331fc9a0a5a230a3744f7e86a82c2e2c9a91833bbcc9ceb760ea13d9",
   "tools": [
     {
       "description": "Check where MattaNutra can deliver, which locales it supports, and which medication and condition codes it can assess before you plan a stack. This does not create a plan or start a purchase.",
