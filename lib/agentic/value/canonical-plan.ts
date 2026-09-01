@@ -6,7 +6,7 @@ import type { CanonicalPlanStamp, StackOption } from "@/lib/agentic/plan/types";
 import { canonicalHash, canonicalJson } from "@/lib/agentic/value/canonical";
 
 export const CUSTOMER_VALUE_PACK_VERSION = "dev-customer-value-v1.0";
-export const CANONICAL_PLAN_VERSION = "cv-1.2";
+export const CANONICAL_PLAN_VERSION = "cv-1.3";
 
 function canonicalOptionValue(option: StackOption) {
   return {
@@ -17,6 +17,9 @@ function canonicalOptionValue(option: StackOption) {
     },
     cash30DayMinor: option.economics?.cash30DayMinor ?? null,
     cash90DayMinor: option.economics?.cash90DayMinor ?? option.cash90DayMinor ?? null,
+    cashComplete: option.economics?.cashComplete ?? null,
+    comparisonComplete: option.economics?.comparisonComplete ?? null,
+    consumptionComplete: option.economics?.consumptionComplete ?? null,
     consumption90DayMinor: option.economics?.consumption90DayMinor ?? null,
     coverage: [...option.coverage]
       .map((row) => ({
@@ -60,10 +63,17 @@ export function canonicalPlanValue(input: Readonly<{
   nextReplenishmentDay?: number | null;
   orders?: readonly Readonly<{
     day: number;
+    lines?: readonly Readonly<{
+      productId: string;
+      quantity: number;
+      unitPriceMinor: number;
+    }>[];
     productIds: readonly string[];
     quantities: readonly number[];
     shippingMinor?: number;
+    shippingRuleId?: string;
     totalMinor?: number;
+    type?: string;
   }>[];
   options: readonly StackOption[];
   questions?: readonly Readonly<{ questionId: string }>[];
@@ -86,10 +96,19 @@ export function canonicalPlanValue(input: Readonly<{
     orders: [...(input.orders ?? [])]
       .map((item) => ({
         day: item.day,
+        lines: [...(item.lines ?? [])]
+          .map((line) => ({
+            productId: line.productId,
+            quantity: line.quantity,
+            unitPriceMinor: line.unitPriceMinor
+          }))
+          .sort((left, right) => left.productId.localeCompare(right.productId)),
         productIds: [...item.productIds].slice().sort(),
         quantities: [...item.quantities],
         shippingMinor: item.shippingMinor ?? null,
-        totalMinor: item.totalMinor ?? null
+        shippingRuleId: item.shippingRuleId ?? null,
+        totalMinor: item.totalMinor ?? null,
+        type: item.type ?? null
       }))
       .sort((left, right) => left.day - right.day || left.productIds.join().localeCompare(right.productIds.join())),
     questions: [...(input.questions ?? [])].map((item) => item.questionId).slice().sort(),
@@ -114,10 +133,17 @@ export function buildCanonicalPlanStamp(input: Readonly<{
   nextReplenishmentDay?: number | null;
   orders?: readonly Readonly<{
     day: number;
+    lines?: readonly Readonly<{
+      productId: string;
+      quantity: number;
+      unitPriceMinor: number;
+    }>[];
     productIds: readonly string[];
     quantities: readonly number[];
     shippingMinor?: number;
+    shippingRuleId?: string;
     totalMinor?: number;
+    type?: string;
   }>[];
   options: readonly StackOption[];
   questions?: readonly Readonly<{ questionId: string }>[];

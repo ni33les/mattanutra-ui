@@ -455,19 +455,31 @@ export type EconomicsComparisonBasis = Readonly<{
   rounding: "minor_unit_once";
 }>;
 
+export type EconomicsUnavailableReason = Readonly<{
+  dependentCapabilities: readonly string[];
+  dimension: "cash" | "comparison" | "consumption" | "shipping";
+  missingFieldNames: readonly string[];
+  reasonCode: string;
+}>;
+
 export type EconomicsLedger = Readonly<{
   baseline: Readonly<{
     cash90DayMinor: number;
     lines: readonly EconomicsBaselineLine[];
     type: PlanBaseline["type"];
   }>;
+  cashComplete: boolean;
   comparisonBasis?: EconomicsComparisonBasis;
+  comparisonComplete: boolean;
   cash30DayMinor: number | null;
   cash90DayMinor: number | null;
   cashTotalMinor: number;
   complete: boolean;
+  consumptionComplete: boolean;
+  consumptionScope: "full_horizon" | "newly_purchased";
   consumption30DayMinor: number | null;
   consumption90DayMinor: number | null;
+  unavailableReasons: readonly EconomicsUnavailableReason[];
   deltas: Readonly<{
     administrations: number;
     coverage: number;
@@ -534,16 +546,28 @@ export type PlanExplanation = Readonly<{
   savings90DayMinor: number | null;
 }>;
 
+export type HorizonOrderLine = Readonly<{
+  lineTotalMinor: number;
+  productId: string;
+  quantity: number;
+  unitPriceMinor: number;
+}>;
+
 export type HorizonOrder = Readonly<{
   day: number;
   inventoryAfter: number;
   inventoryBefore: number;
+  lines: readonly HorizonOrderLine[];
+  nextReplenishmentDay: number | null;
   otherCustomerCostMinor: number;
   productIds: readonly string[];
   quantities: readonly number[];
   shippingMinor: number;
+  shippingRuleId: string;
+  shippingRuleVersion: string;
   subtotalMinor: number;
   totalMinor: number;
+  type: "immediate" | "replenishment";
 }>;
 
 export type HorizonPlan = Readonly<{

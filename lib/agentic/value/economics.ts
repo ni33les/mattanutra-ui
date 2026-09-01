@@ -272,12 +272,23 @@ export function buildEconomics(input: Readonly<{
   const items = input.items.map(enrichBasketPackFacts);
   const consumption30Parts = items.map((item) => lineConsumption(item, 30));
   const consumption90Parts = items.map((item) => lineConsumption(item, 90));
-  const consumption30DayMinor = consumption30Parts.every((item) => item != null)
-    ? consumption30Parts.reduce((sum, item) => sum + (item ?? 0), 0)
-    : null;
-  const consumption90DayMinor = consumption90Parts.every((item) => item != null)
-    ? consumption90Parts.reduce((sum, item) => sum + (item ?? 0), 0)
-    : null;
+  const hasCurrent = input.state.currentSupplements.length > 0;
+  const consumption30DayMinor =
+    items.length < 1
+      ? hasCurrent
+        ? null
+        : 0
+      : consumption30Parts.every((item) => item != null)
+        ? consumption30Parts.reduce((sum, item) => sum + (item ?? 0), 0)
+        : null;
+  const consumption90DayMinor =
+    items.length < 1
+      ? hasCurrent
+        ? null
+        : 0
+      : consumption90Parts.every((item) => item != null)
+        ? consumption90Parts.reduce((sum, item) => sum + (item ?? 0), 0)
+        : null;
   const horizon = buildHorizonPlan({
     items,
     snapshot: input.snapshot,
@@ -320,14 +331,45 @@ export function buildEconomics(input: Readonly<{
   });
   const recommended = input.recommendedItems?.map(enrichBasketPackFacts) ?? items;
   const recommendedCoverage = input.recommendedCoverage ?? input.coverage;
+  const pricedOrders = [...horizon.orders, ...baselineHorizon.orders].every((order) =>
+    order.lines.every((line) => line.unitPriceMinor > 0)
+  );
+  const currentNeedsRestock = input.state.currentSupplements.some(
+    (item) => item.daysRemaining != null && item.daysRemaining < 90
+  );
+  const restockPresent =
+    !currentNeedsRestock || horizon.orders.some((item) => item.type === "replenishment");
+  const cashComplete = pricedOrders && restockPresent;
+  const consumptionComplete = consumption30DayMinor != null && consumption90DayMinor != null;
+  const comparisonComplete = cashComplete && equivalent;
+  const unavailableReasons = [
+    ...(!consumptionComplete && hasCurrent
+      ? [
+          {
+            dependentCapabilities: ["full_horizon_consumption"],
+            dimension: "consumption" as const,
+            missingFieldNames: ["acquisitionCost"],
+            reasonCode: "current_inventory_acquisition_cost_unknown"
+          }
+        ]
+      : []),
+    ...(!cashComplete
+      ? [
+          {
+            dependentCapabilities: ["delivered_cash", "savings", "cost_ranking"],
+            dimension: "cash" as const,
+            missingFieldNames: pricedOrders ? ["servingsPerPack"] : ["unitPriceMinor"],
+            reasonCode: pricedOrders ? "pack_duration_unknown" : "price_unavailable"
+          }
+        ]
+      : [])
+  ];
   const complete =
-    items.length > 0 &&
-    items.every((item) => item.servingsPerPack != null && item.servingsPerPack > 0) &&
-    cash30DayMinor != null &&
-    cash90DayMinor != null &&
-    consumption30DayMinor != null &&
-    consumption90DayMinor != null;
-  const eligibleSaving = complete && equivalent && savings90DayMinor != null;
+    cashComplete &&
+    consumptionComplete &&
+    (items.length === 0 ||
+      items.every((item) => item.servingsPerPack != null && item.servingsPerPack > 0));
+  const eligibleSaving = comparisonComplete && savings90DayMinor != null;
   const savingClaim = !eligibleSaving
     ? "none"
     : savings90DayMinor > 0
@@ -342,13 +384,18 @@ export function buildEconomics(input: Readonly<{
       lines: baselineLines,
       type: input.state.baseline?.type ?? "separate_direct_products"
     },
+    cashComplete,
     comparisonBasis: comparisonBasisFor(input.snapshot, input.state),
+    comparisonComplete,
     cash30DayMinor,
     cash90DayMinor,
     cashTotalMinor: day0?.totalMinor ?? 0,
     complete,
+    consumptionComplete,
+    consumptionScope: "newly_purchased",
     consumption30DayMinor,
     consumption90DayMinor,
+    unavailableReasons,
     deltas: {
       administrations: administrationCount(items) - administrationCount(recommended),
       coverage: coveredCount(input.coverage) - coveredCount(recommendedCoverage),

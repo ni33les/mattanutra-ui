@@ -1,20 +1,10 @@
 import { payableSnapshot } from "@/lib/agentic/money";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
-import type { BasketItem, CanonicalPlanState } from "@/lib/agentic/plan/types";
+import type { BasketItem, CanonicalPlanState, HorizonOrder } from "@/lib/agentic/plan/types";
 import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
 
-export type HorizonOrder = Readonly<{
-  day: number;
-  inventoryAfter: number;
-  inventoryBefore: number;
-  otherCustomerCostMinor: number;
-  productIds: readonly string[];
-  quantities: readonly number[];
-  shippingMinor: number;
-  subtotalMinor: number;
-  totalMinor: number;
-}>;
+export type { HorizonOrder };
 
 export type HorizonPlan = Readonly<{
   nextReplenishmentDay: number | null;
@@ -74,16 +64,26 @@ function consolidateOrders(orders: readonly HorizonOrder[]): HorizonOrder[] {
       }
       const subtotalMinor = group.reduce((sum, item) => sum + item.subtotalMinor, 0);
       const payable = payableSnapshot({ subtotalMinor });
+      const type = group.some((item) => item.type === "immediate") ? "immediate" : "replenishment";
+      const nextReplenishmentDay = group
+        .map((item) => item.nextReplenishmentDay)
+        .filter((item): item is number => item != null)
+        .sort((left, right) => left - right)[0] ?? null;
       return {
         day: group[0]!.day,
         inventoryAfter: group.reduce((sum, item) => sum + item.inventoryAfter, 0),
         inventoryBefore: group.reduce((sum, item) => sum + item.inventoryBefore, 0),
+        lines: group.flatMap((item) => [...item.lines]),
+        nextReplenishmentDay,
         otherCustomerCostMinor: payable.taxMinor,
         productIds: group.flatMap((item) => [...item.productIds]),
         quantities: group.flatMap((item) => [...item.quantities]),
         shippingMinor: payable.shippingMinor,
+        shippingRuleId: payable.shippingRuleId,
+        shippingRuleVersion: payable.shippingRuleVersion,
         subtotalMinor,
-        totalMinor: payable.totalPriceMinor
+        totalMinor: payable.totalPriceMinor,
+        type
       };
     });
 }
@@ -92,22 +92,36 @@ function orderFor(input: Readonly<{
   day: number;
   inventoryAfter: number;
   inventoryBefore: number;
+  nextReplenishmentDay: number | null;
   productId: string;
   quantity: number;
+  type: HorizonOrder["type"];
   unitPriceMinor: number;
 }>): HorizonOrder {
-  const subtotalMinor = input.unitPriceMinor * input.quantity;
-  const payable = payableSnapshot({ subtotalMinor });
+  const lineTotalMinor = input.unitPriceMinor * input.quantity;
+  const payable = payableSnapshot({ subtotalMinor: lineTotalMinor });
   return {
     day: input.day,
     inventoryAfter: input.inventoryAfter,
     inventoryBefore: input.inventoryBefore,
+    lines: [
+      {
+        lineTotalMinor,
+        productId: input.productId,
+        quantity: input.quantity,
+        unitPriceMinor: input.unitPriceMinor
+      }
+    ],
+    nextReplenishmentDay: input.nextReplenishmentDay,
     otherCustomerCostMinor: payable.taxMinor,
     productIds: [input.productId],
     quantities: [input.quantity],
     shippingMinor: payable.shippingMinor,
-    subtotalMinor,
-    totalMinor: payable.totalPriceMinor
+    shippingRuleId: payable.shippingRuleId,
+    shippingRuleVersion: payable.shippingRuleVersion,
+    subtotalMinor: lineTotalMinor,
+    totalMinor: payable.totalPriceMinor,
+    type: input.type
   };
 }
 
@@ -134,32 +148,38 @@ export function buildHorizonPlan(input: Readonly<{
     const daily = item.servingsPerDay > 0 ? item.servingsPerDay : 1;
     const before = 0;
     const after = spp != null ? spp * quantity : quantity;
-    orders.push(
-      orderFor({
-        day: 0,
-        inventoryAfter: after,
-        inventoryBefore: before,
-        productId: item.productId,
-        quantity,
-        unitPriceMinor: item.unitPriceMinor
-      })
-    );
     const depletion = spp != null && daily > 0 ? (spp * quantity) / daily : null;
     if (depletion != null) {
       nextReplenishmentDay =
         nextReplenishmentDay == null ? depletion : Math.min(nextReplenishmentDay, depletion);
     }
+    orders.push(
+      orderFor({
+        day: 0,
+        inventoryAfter: after,
+        inventoryBefore: before,
+        nextReplenishmentDay: depletion,
+        productId: item.productId,
+        quantity,
+        type: "immediate",
+        unitPriceMinor: item.unitPriceMinor
+      })
+    );
     if (depletion != null && depletion < 90) {
       const remaining = 90 - depletion;
       const restock = packsForDays(spp, remaining, daily);
       if (restock != null) {
+        const restockDays = spp != null && daily > 0 ? (restock * spp) / daily : null;
         orders.push(
           orderFor({
             day: depletion,
             inventoryAfter: restock * (spp ?? 1),
             inventoryBefore: 0,
+            nextReplenishmentDay:
+              restockDays != null ? depletion + restockDays : null,
             productId: item.productId,
             quantity: restock,
+            type: "replenishment",
             unitPriceMinor: item.unitPriceMinor
           })
         );
@@ -194,13 +214,17 @@ export function buildHorizonPlan(input: Readonly<{
     if (quantity == null) {
       continue;
     }
+    const restockDays = spp != null ? quantity * spp : null;
     orders.push(
       orderFor({
         day: current.daysRemaining,
         inventoryAfter: quantity * (spp ?? 1),
         inventoryBefore: 0,
+        nextReplenishmentDay:
+          restockDays != null ? current.daysRemaining + restockDays : null,
         productId: product.productId,
         quantity,
+        type: "replenishment",
         unitPriceMinor: product.unitPriceMinor
       })
     );

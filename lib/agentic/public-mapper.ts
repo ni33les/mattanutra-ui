@@ -974,7 +974,10 @@ export function publicPlanFields(result: Pick<
             .reduce((sum, item) => sum + item.totalMinor, 0),
           cash90DayMinor: result.horizon.orders
             .filter((item) => item.day < 90)
-            .reduce((sum, item) => sum + item.totalMinor, 0)
+            .reduce((sum, item) => sum + item.totalMinor, 0),
+          cashComplete: selected?.economics?.cashComplete ?? true,
+          consumptionComplete: selected?.economics?.consumptionComplete ?? false,
+          comparisonComplete: selected?.economics?.comparisonComplete ?? false
         }
       : {}),
     summaryKey: tooBroad ? "plan.summary.request_too_broad" : `plan.summary.${result.status}`,

@@ -19,6 +19,8 @@ export const DEFAULT_SHIPPING_MINOR = envMinor(
   5000
 );
 export const DEFAULT_TAX_MINOR = envMinor("AGENTIC_DEFAULT_TAX_MINOR", 0);
+export const DEFAULT_SHIPPING_RULE_ID = "default_flat_shipping";
+export const DEFAULT_SHIPPING_RULE_VERSION = "v1";
 
 export function asMinor(value: unknown): number {
   if (typeof value === "bigint") {
@@ -83,6 +85,8 @@ export function payableSnapshot(input: Readonly<{
 
   return {
     shippingMinor,
+    shippingRuleId: DEFAULT_SHIPPING_RULE_ID,
+    shippingRuleVersion: DEFAULT_SHIPPING_RULE_VERSION,
     subtotalMinor,
     taxMinor,
     totalPriceMinor: addMinor(subtotalMinor, shippingMinor, taxMinor)

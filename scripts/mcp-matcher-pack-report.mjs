@@ -17,6 +17,7 @@ import { canonicalComReport, runComPack } from "../test/agentic-com-pack.test.ts
 import { canonicalCvFixReport, runCvFixPack } from "../test/agentic-cv-fix-pack.test.ts";
 import { canonicalCvImplReport, runCvImplPack } from "../test/agentic-cv-impl-pack.test.ts";
 import { canonicalR2Report, runCvR2Pack } from "../test/agentic-cv-r2-pack.test.ts";
+import { canonicalR3Report, runCvR3Pack } from "../test/agentic-cv-r3-pack.test.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
@@ -957,6 +958,7 @@ export function canonicalPack(run) {
     valueRemediation: JSON.parse(canonicalCvFixReport(run.valueRemediation)),
     valueImplementation: JSON.parse(canonicalCvImplReport(run.valueImplementation)),
     valueR2: JSON.parse(canonicalR2Report(run.valueR2)),
+    valueR3: JSON.parse(canonicalR3Report(run.valueR3)),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -1002,6 +1004,9 @@ export function snapshotFromRun(run) {
   const valueR2 = Object.fromEntries(
     run.valueR2.cases.map((item) => [item.id, item.result])
   );
+  const valueR3 = Object.fromEntries(
+    run.valueR3.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
@@ -1015,6 +1020,7 @@ export function snapshotFromRun(run) {
     valueRemediation,
     valueImplementation,
     valueR2,
+    valueR3,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -1103,6 +1109,7 @@ export function sectionTotals(run) {
   const valueImplementationPass =
     run.valueImplementation.passedCases === run.valueImplementation.totalCases;
   const valueR2Pass = run.valueR2.passedCases === run.valueR2.totalCases;
+  const valueR3Pass = run.valueR3.passedCases === run.valueR3.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -1152,6 +1159,10 @@ export function sectionTotals(run) {
       passed: valueR2Pass,
       text: `${run.valueR2.passedCases}/${run.valueR2.totalCases}`
     },
+    valueR3: {
+      passed: valueR3Pass,
+      text: `${run.valueR3.passedCases}/${run.valueR3.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
@@ -1169,7 +1180,8 @@ export function sectionTotals(run) {
       commercialPass &&
       valueRemediationPass &&
       valueImplementationPass &&
-      valueR2Pass
+      valueR2Pass &&
+      valueR3Pass
   };
 }
 
@@ -1207,6 +1219,9 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.valueR2.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.valueR3.cases) {
     byId.set(item.id, item);
   }
 
@@ -1281,6 +1296,9 @@ export function printTable(run) {
   console.log(
     `Customer value implementation v1.2: ${totals.valueR2.text} — ${totals.valueR2.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `Customer value implementation v1.3: ${totals.valueR3.text} — ${totals.valueR3.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -1321,6 +1339,8 @@ export async function runPackOnce() {
   const valueImplementation = await runCvImplPack(1);
   await resetAfterMatcher();
   const valueR2 = await runCvR2Pack(1);
+  await resetAfterMatcher();
+  const valueR3 = await runCvR3Pack(1);
   return {
     contract,
     honesty,
@@ -1334,6 +1354,7 @@ export async function runPackOnce() {
     valueRemediation,
     valueImplementation,
     valueR2,
+    valueR3,
     matcher
   };
 }
