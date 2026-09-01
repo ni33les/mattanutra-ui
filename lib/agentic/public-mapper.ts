@@ -962,25 +962,71 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(result.horizon
       ? {
-          nextReplenishmentDay: result.horizon.nextReplenishmentDay,
-          orderSchedule: {
-            "30": result.horizon.orders.filter((item) => item.day < 30),
-            "90": result.horizon.orders.filter((item) => item.day < 90)
-          },
+          nextReplenishmentDay: result.horizon.durationUnknown
+            ? null
+            : result.horizon.nextReplenishmentDay,
+          orderSchedule: result.horizon.durationUnknown
+            ? {
+                "30": {
+                  available: false,
+                  reasonCode: "current_inventory_duration_unknown"
+                },
+                "90": {
+                  available: false,
+                  reasonCode: "current_inventory_duration_unknown"
+                }
+              }
+            : {
+                "30": result.horizon.orders.filter((item) => item.day < 30),
+                "90": result.horizon.orders.filter((item) => item.day < 90)
+              },
           purchaseRequiredNow: result.horizon.purchaseRequiredNow,
           ...(result.horizon.reasonCode ? { reasonCode: result.horizon.reasonCode } : {}),
-          cash30DayMinor: result.horizon.orders
-            .filter((item) => item.day < 30)
-            .reduce((sum, item) => sum + item.totalMinor, 0),
-          cash90DayMinor: result.horizon.orders
-            .filter((item) => item.day < 90)
-            .reduce((sum, item) => sum + item.totalMinor, 0),
-          cashComplete: selected?.economics?.cashComplete ?? true,
+          cash30DayMinor: result.horizon.durationUnknown
+            ? null
+            : result.horizon.orders
+                .filter((item) => item.day < 30)
+                .reduce((sum, item) => sum + item.totalMinor, 0),
+          cash90DayMinor: result.horizon.durationUnknown
+            ? null
+            : result.horizon.orders
+                .filter((item) => item.day < 90)
+                .reduce((sum, item) => sum + item.totalMinor, 0),
+          cashComplete: result.horizon.durationUnknown
+            ? false
+            : (selected?.economics?.cashComplete ?? true),
           consumptionComplete: selected?.economics?.consumptionComplete ?? false,
-          comparisonComplete: selected?.economics?.comparisonComplete ?? false
+          comparisonComplete: result.horizon.durationUnknown
+            ? false
+            : (selected?.economics?.comparisonComplete ?? false),
+          ...(result.horizon.durationUnknown ||
+          (selected?.economics?.unavailableReasons?.length ?? 0) > 0
+            ? {
+                unavailableReasons:
+                  selected?.economics?.unavailableReasons ??
+                  [
+                    {
+                      dependentCapabilities: [
+                        "inventory_depletion_date",
+                        "future_order_schedule",
+                        "delivered_cash",
+                        "savings",
+                        "comparison"
+                      ],
+                      dimension: "schedule",
+                      missingFieldNames: ["daysRemaining"],
+                      reasonCode: "current_inventory_duration_unknown"
+                    }
+                  ]
+              }
+            : {})
         }
       : {}),
-    summaryKey: tooBroad ? "plan.summary.request_too_broad" : `plan.summary.${result.status}`,
+    summaryKey: tooBroad
+      ? "plan.summary.request_too_broad"
+      : result.horizon?.durationUnknown
+        ? "plan.summary.current_inventory_duration_unknown"
+        : `plan.summary.${result.status}`,
     locale,
     nextActions,
     ...(tooBroad

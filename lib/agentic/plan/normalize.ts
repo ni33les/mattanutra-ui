@@ -339,6 +339,37 @@ export function applyPlanAnswers(
         }
       };
     }
+
+    if (answer.questionId.startsWith("q_inventory_duration_")) {
+      const supplementId = answer.questionId.slice("q_inventory_duration_".length);
+      const daysMatch = /^days:(\d+)$/.exec(answer.choice) ?? /^(\d+)$/.exec(answer.choice);
+      if (answer.choice === "unknown" || answer.choice === "duration_unknown") {
+        next = {
+          ...next,
+          currentSupplements: next.currentSupplements.map((item) => {
+            if (item.supplementId !== supplementId) {
+              return item;
+            }
+            const { daysRemaining: _ignored, ...rest } = item;
+            return { ...rest, durationUnknown: true };
+          })
+        };
+      } else if (daysMatch) {
+        const days = Number(daysMatch[1]);
+        if (Number.isFinite(days) && days >= 0) {
+          next = {
+            ...next,
+            currentSupplements: next.currentSupplements.map((item) => {
+              if (item.supplementId !== supplementId) {
+                return item;
+              }
+              const { durationUnknown: _ignored, ...rest } = item;
+              return { ...rest, daysRemaining: days };
+            })
+          };
+        }
+      }
+    }
   }
 
   const remainingIds = new Set(next.targets.map((item) => item.supplementId));

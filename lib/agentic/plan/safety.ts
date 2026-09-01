@@ -964,7 +964,47 @@ export function safetyQuestions(input: Readonly<{
     });
   }
 
-  return questions;
+  const durationQuestions: PlanQuestion[] = [];
+  for (const current of input.state.currentSupplements) {
+    if (current.daysRemaining != null || current.durationUnknown) {
+      continue;
+    }
+    const row = input.selected?.coverage.find((item) => item.supplementId === current.supplementId);
+    const covers = row
+      ? row.status === "already_covered" ||
+        row.status === "over_target" ||
+        (row.currentAmount >= row.requestedAmount && row.deliveredAmount <= 0)
+      : input.state.targets.some(
+          (target) =>
+            target.supplementId === current.supplementId && current.dailyAmount >= target.amount
+        );
+    if (!covers) {
+      continue;
+    }
+    durationQuestions.push({
+      choices: [
+        ...[7, 14, 30, 60, 90].map((days) => ({
+          choice: `days:${days}`,
+          effect: `currentSupplements.daysRemaining=${days}`,
+          label: agenticMessage(input.locale, "plan.question.inventory_duration_days", { days }),
+          labelKey: "plan.question.inventory_duration_days"
+        })),
+        {
+          choice: "unknown",
+          effect: "currentSupplements.durationUnknown=true",
+          label: agenticMessage(input.locale, "plan.question.inventory_duration_unknown"),
+          labelKey: "plan.question.inventory_duration_unknown"
+        }
+      ],
+      prompt: agenticMessage(input.locale, "plan.question.inventory_duration", {
+        name: current.name
+      }),
+      promptKey: "plan.question.inventory_duration",
+      questionId: `q_inventory_duration_${current.supplementId}`
+    });
+  }
+
+  return [...durationQuestions, ...questions];
 }
 
 export function planStatus(input: Readonly<{

@@ -230,9 +230,11 @@ function composeResult(input: Readonly<{
   const laterOrders = horizon ? ordersInHorizon(horizon.orders, 90).filter((item) => item.day > 0) : [];
   const summary = tooBroad
     ? agenticMessage(input.locale, "plan.summary.request_too_broad")
-    : horizon?.reasonCode === "current_inventory_covers_now" && laterOrders.length > 0
-      ? agenticMessage(input.locale, "plan.summary.current_inventory_covers_now")
-      : agenticMessage(input.locale, `plan.summary.${status}`);
+    : horizon?.durationUnknown
+      ? agenticMessage(input.locale, "plan.summary.current_inventory_duration_unknown")
+      : horizon?.reasonCode === "current_inventory_covers_now" && laterOrders.length > 0
+        ? agenticMessage(input.locale, "plan.summary.current_inventory_covers_now")
+        : agenticMessage(input.locale, `plan.summary.${status}`);
   const split = tooBroad ? targetNameGroups(input.state.targets, 10) : undefined;
   const suggestedGroups = split?.groups;
   const changeSummary: string[] = [];
@@ -1432,8 +1434,17 @@ async function completePreparedPlan(
 
     state = applyPlanAnswers(normalized.state, { answers });
   } else if (previous) {
-    pinPrevious = true;
-    state = applyPlanAnswers(previous.requestSnapshot, { answers });
+    const merged = applyPlanAnswers(previous.requestSnapshot, { answers });
+    pinPrevious =
+      planRematchFingerprint(previous.requestSnapshot) ===
+      planRematchFingerprint(merged);
+    state = pinPrevious
+      ? {
+          ...merged,
+          leftovers: previous.requestSnapshot.leftovers,
+          pinnedOptionId: previous.selected?.optionId ?? null
+        }
+      : merged;
   } else {
     return businessError({
       fieldPath: "request",

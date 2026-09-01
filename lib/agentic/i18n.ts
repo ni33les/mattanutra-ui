@@ -459,6 +459,26 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ไปต่อโดยไม่ประเมิน",
     "zh-CN": "不评估并继续"
   },
+  "plan.question.inventory_duration": {
+    en: "How many days of {name} do you have left?",
+    th: "คุณมี {name} เหลืออีกกี่วัน",
+    "zh-CN": "你的 {name} 还剩多少天？"
+  },
+  "plan.question.inventory_duration_days": {
+    en: "{days} days",
+    th: "{days} วัน",
+    "zh-CN": "{days} 天"
+  },
+  "plan.question.inventory_duration_unknown": {
+    en: "I don't know",
+    th: "ฉันไม่ทราบ",
+    "zh-CN": "我不知道"
+  },
+  "plan.summary.current_inventory_duration_unknown": {
+    en: "Current coverage is known, but future purchase timing cannot yet be calculated.",
+    th: "ทราบความครอบคลุมปัจจุบันแล้ว แต่ยังคำนวณจังหวะการซื้อในอนาคตไม่ได้",
+    "zh-CN": "当前覆盖已知，但尚无法计算未来购买时间。"
+  },
   "plan.selection.covers_target": {
     en: "This product covers {name} at {amount} {unit} per day.",
     th: "สินค้านี้ให้ {name} {amount} {unit} ต่อวัน",

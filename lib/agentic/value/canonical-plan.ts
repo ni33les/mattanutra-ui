@@ -6,7 +6,104 @@ import type { CanonicalPlanStamp, StackOption } from "@/lib/agentic/plan/types";
 import { canonicalHash, canonicalJson } from "@/lib/agentic/value/canonical";
 
 export const CUSTOMER_VALUE_PACK_VERSION = "dev-customer-value-v1.0";
-export const CANONICAL_PLAN_VERSION = "cv-1.3";
+export const CANONICAL_PLAN_VERSION = "cv-1.4";
+
+function canonicalContributors(
+  items: readonly Readonly<{
+    amount?: number | null;
+    productId?: string | null;
+    productName?: string | null;
+    source?: string | null;
+    unit?: string | null;
+  }>[]
+) {
+  return [...items]
+    .map((item) => ({
+      amount: item.amount ?? null,
+      productId: item.productId ?? null,
+      productName: item.productName ?? null,
+      source: item.source ?? null,
+      unit: item.unit ?? null
+    }))
+    .sort(
+      (left, right) =>
+        String(left.source).localeCompare(String(right.source)) ||
+        String(left.productId).localeCompare(String(right.productId)) ||
+        String(left.productName).localeCompare(String(right.productName)) ||
+        Number(left.amount) - Number(right.amount)
+    );
+}
+
+function canonicalComparator(row: Readonly<{
+  action?: string | null;
+  comparator?: string | null;
+}>) {
+  if (typeof row.comparator === "string" && row.comparator.length > 0) {
+    return row.comparator;
+  }
+  if (row.action === "block") {
+    return "gt";
+  }
+  if (row.action === "acknowledge") {
+    return "gte";
+  }
+  return "lt";
+}
+
+function canonicalCoverageRow(row: StackOption["coverage"][number]) {
+  return {
+    contributors: canonicalContributors(row.contributors ?? []),
+    currentAmount: row.currentAmount ?? null,
+    population: row.populationScope ?? null,
+    requestedAmount: row.requestedAmount ?? null,
+    ruleId: row.ruleId ?? null,
+    rulesVersion: row.rulesVersion ?? null,
+    status: row.status,
+    supplementId: row.supplementId,
+    threshold: row.upperLimitAmount ?? null,
+    totalExposureAmount: row.totalExposureAmount ?? null,
+    unit: row.unit ?? null
+  };
+}
+
+function canonicalSafetyRow(row: Readonly<{
+  action: string;
+  code: string;
+  comparator?: string | null;
+  contributors?: readonly Readonly<{
+    amount?: number | null;
+    productId?: string | null;
+    productName?: string | null;
+    source?: string | null;
+    unit?: string | null;
+  }>[];
+  exposure?: number | null;
+  nutrientName?: string | null;
+  population?: string | null;
+  populationScope?: string | null;
+  ruleId?: string | null;
+  rulesVersion?: string | null;
+  severity?: string | null;
+  supplementIds?: readonly string[];
+  threshold?: number | null;
+  unit?: string | null;
+}>) {
+  return {
+    action: row.action,
+    code: row.code,
+    comparator: canonicalComparator(row),
+    contributors: canonicalContributors(row.contributors ?? []),
+    exposure: row.exposure ?? null,
+    nutrientName: row.nutrientName ?? null,
+    population: row.population ?? row.populationScope ?? null,
+    ruleId: row.ruleId ?? null,
+    rulesVersion: row.rulesVersion ?? null,
+    severity: row.severity ?? null,
+    supplementIds: [...(row.supplementIds ?? [])].slice().sort(),
+    threshold: row.threshold ?? null,
+    unit: row.unit ?? null
+  };
+}
 
 function canonicalOptionValue(option: StackOption) {
   return {
@@ -22,18 +119,7 @@ function canonicalOptionValue(option: StackOption) {
     consumptionComplete: option.economics?.consumptionComplete ?? null,
     consumption90DayMinor: option.economics?.consumption90DayMinor ?? null,
     coverage: [...option.coverage]
-      .map((row) => ({
-        contributors: [...(row.contributors ?? [])]
-          .map((item) => ({
-            productId: item.productId ?? null,
-            source: item.source ?? null
-          }))
-          .sort((left, right) =>
-            String(left.productId).localeCompare(String(right.productId))
-          ),
-        status: row.status,
-        supplementId: row.supplementId
-      }))
+      .map(canonicalCoverageRow)
       .sort((left, right) => left.supplementId.localeCompare(right.supplementId)),
     equivalent: option.economics?.equivalent ?? null,
     optionId: option.optionId,
@@ -47,6 +133,14 @@ function canonicalOptionValue(option: StackOption) {
       .sort((left, right) => left.productId.localeCompare(right.productId)),
     recommended: Boolean(option.recommended),
     role: option.role ?? null,
+    safety: [...(option.safety?.guidance ?? [])]
+      .map(canonicalSafetyRow)
+      .sort(
+        (left, right) =>
+          String(left.ruleId).localeCompare(String(right.ruleId)) ||
+          left.code.localeCompare(right.code) ||
+          left.action.localeCompare(right.action)
+      ),
     safetyCodes: [...(option.safety?.guidance ?? [])]
       .map((row) => row.code)
       .slice()
@@ -78,7 +172,28 @@ export function canonicalPlanValue(input: Readonly<{
   options: readonly StackOption[];
   questions?: readonly Readonly<{ questionId: string }>[];
   reasonCode?: string | null;
-  safetyGuidance: readonly Readonly<{ action: string; code: string }>[];
+  safetyGuidance: readonly Readonly<{
+    action: string;
+    code: string;
+    comparator?: string | null;
+    contributors?: readonly Readonly<{
+      amount?: number | null;
+      productId?: string | null;
+      productName?: string | null;
+      source?: string | null;
+      unit?: string | null;
+    }>[];
+    exposure?: number | null;
+    nutrientName?: string | null;
+    population?: string | null;
+    populationScope?: string | null;
+    ruleId?: string | null;
+    rulesVersion?: string | null;
+    severity?: string | null;
+    supplementIds?: readonly string[];
+    threshold?: number | null;
+    unit?: string | null;
+  }>[];
   selectedOptionId?: string | null;
   snapshotId?: string;
   status: string;
@@ -117,10 +232,12 @@ export function canonicalPlanValue(input: Readonly<{
     selectedOptionId: input.selectedOptionId ?? selected?.optionId ?? null,
     snapshotId: input.snapshotId ?? "",
     safety: [...input.safetyGuidance]
-      .map((row) => ({ action: row.action, code: row.code }))
+      .map(canonicalSafetyRow)
       .sort(
         (left, right) =>
-          left.code.localeCompare(right.code) || left.action.localeCompare(right.action)
+          String(left.ruleId).localeCompare(String(right.ruleId)) ||
+          left.code.localeCompare(right.code) ||
+          left.action.localeCompare(right.action)
       ),
     status: input.status
   };

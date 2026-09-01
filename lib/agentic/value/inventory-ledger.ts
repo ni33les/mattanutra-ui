@@ -7,12 +7,28 @@ import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
 export type { HorizonOrder };
 
 export type HorizonPlan = Readonly<{
+  durationUnknown: boolean;
   nextReplenishmentDay: number | null;
   orders: readonly HorizonOrder[];
   purchaseRequiredNow: boolean;
-  reasonCode: "current_inventory_covers_now" | "purchase_now" | null;
+  reasonCode:
+    | "current_inventory_covers_now"
+    | "current_inventory_duration_unknown"
+    | "purchase_now"
+    | null;
   snapshotId: string;
 }>;
+
+export function coveringInventoryDurationUnknown(state: CanonicalPlanState) {
+  return state.currentSupplements.some((item) => {
+    if (item.daysRemaining != null) {
+      return false;
+    }
+    return state.targets.some(
+      (target) => target.supplementId === item.supplementId && item.dailyAmount >= target.amount
+    );
+  });
+}
 
 function productForCurrent(
   snapshot: CatalogueSnapshot,
@@ -188,13 +204,13 @@ export function buildHorizonPlan(input: Readonly<{
   }
 
   for (const current of input.state.currentSupplements) {
-    if (current.daysRemaining == null) {
-      continue;
-    }
     const covers = input.state.targets.some(
       (target) => target.supplementId === current.supplementId && current.dailyAmount >= target.amount
     );
     if (!covers && items.length > 0) {
+      continue;
+    }
+    if (current.daysRemaining == null) {
       continue;
     }
     nextReplenishmentDay =
@@ -231,15 +247,19 @@ export function buildHorizonPlan(input: Readonly<{
   }
 
   const purchaseRequiredNow = items.length > 0;
+  const durationUnknown = coveringInventoryDurationUnknown(input.state);
   return {
-    nextReplenishmentDay,
+    durationUnknown,
+    nextReplenishmentDay: durationUnknown ? null : nextReplenishmentDay,
     orders: consolidateOrders(orders),
     purchaseRequiredNow,
     reasonCode: purchaseRequiredNow
       ? "purchase_now"
-      : nextReplenishmentDay != null
-        ? "current_inventory_covers_now"
-        : null,
+      : durationUnknown
+        ? "current_inventory_duration_unknown"
+        : nextReplenishmentDay != null
+          ? "current_inventory_covers_now"
+          : null,
     snapshotId: catalogueSnapshotId(input.snapshot)
   };
 }

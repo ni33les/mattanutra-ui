@@ -15,6 +15,7 @@ import { actualDaysSupplied, servingsPerPackFromProduct } from "@/lib/agentic/va
 import {
   buildHorizonPlan,
   cashInHorizon,
+  coveringInventoryDurationUnknown,
   type HorizonOrder
 } from "@/lib/agentic/value/inventory-ledger";
 
@@ -294,8 +295,9 @@ export function buildEconomics(input: Readonly<{
     snapshot: input.snapshot,
     state: input.state
   });
-  const cash30DayMinor = cashInHorizon(horizon.orders, 30);
-  const cash90DayMinor = cashInHorizon(horizon.orders, 90);
+  const durationUnknown = coveringInventoryDurationUnknown(input.state);
+  const cash30DayMinor = durationUnknown ? null : cashInHorizon(horizon.orders, 30);
+  const cash90DayMinor = durationUnknown ? null : cashInHorizon(horizon.orders, 90);
   const day0 = horizon.orders.find((item) => item.day === 0);
   const firstOrderSubtotalMinor =
     day0?.subtotalMinor ?? items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
@@ -312,9 +314,10 @@ export function buildEconomics(input: Readonly<{
     snapshot: input.snapshot,
     state: input.state
   });
-  const baselineCash90 = cashInHorizon(baselineHorizon.orders, 90);
+  const baselineCash90 = durationUnknown ? null : cashInHorizon(baselineHorizon.orders, 90);
   const baselineLines = linesFromOrders(baselineHorizon.orders, input.snapshot);
-  const savings90DayMinor = baselineCash90 - cash90DayMinor;
+  const savings90DayMinor =
+    baselineCash90 == null || cash90DayMinor == null ? null : baselineCash90 - cash90DayMinor;
   const equivalent = input.coverage.every((row) => {
     const target = input.state.targets.find((item) => item.supplementId === row.supplementId);
     const importance = target?.importance ?? "required";
@@ -339,7 +342,7 @@ export function buildEconomics(input: Readonly<{
   );
   const restockPresent =
     !currentNeedsRestock || horizon.orders.some((item) => item.type === "replenishment");
-  const cashComplete = pricedOrders && restockPresent;
+  const cashComplete = !durationUnknown && pricedOrders && restockPresent;
   const consumptionComplete = consumption30DayMinor != null && consumption90DayMinor != null;
   const comparisonComplete = cashComplete && equivalent;
   const unavailableReasons = [
@@ -353,16 +356,31 @@ export function buildEconomics(input: Readonly<{
           }
         ]
       : []),
-    ...(!cashComplete
+    ...(durationUnknown
       ? [
           {
-            dependentCapabilities: ["delivered_cash", "savings", "cost_ranking"],
-            dimension: "cash" as const,
-            missingFieldNames: pricedOrders ? ["servingsPerPack"] : ["unitPriceMinor"],
-            reasonCode: pricedOrders ? "pack_duration_unknown" : "price_unavailable"
+            dependentCapabilities: [
+              "inventory_depletion_date",
+              "future_order_schedule",
+              "delivered_cash",
+              "savings",
+              "comparison"
+            ],
+            dimension: "schedule" as const,
+            missingFieldNames: ["daysRemaining"],
+            reasonCode: "current_inventory_duration_unknown"
           }
         ]
-      : [])
+      : !cashComplete
+        ? [
+            {
+              dependentCapabilities: ["delivered_cash", "savings", "cost_ranking"],
+              dimension: "cash" as const,
+              missingFieldNames: pricedOrders ? ["servingsPerPack"] : ["unitPriceMinor"],
+              reasonCode: pricedOrders ? "pack_duration_unknown" : "price_unavailable"
+            }
+          ]
+        : [])
   ];
   const complete =
     cashComplete &&
@@ -392,7 +410,7 @@ export function buildEconomics(input: Readonly<{
     cashTotalMinor: day0?.totalMinor ?? 0,
     complete,
     consumptionComplete,
-    consumptionScope: "newly_purchased",
+    consumptionScope: "full_horizon",
     consumption30DayMinor,
     consumption90DayMinor,
     unavailableReasons,
@@ -410,7 +428,7 @@ export function buildEconomics(input: Readonly<{
     savingClaim,
     savings90DayMinor: eligibleSaving ? savings90DayMinor : null,
     savings90DayPercent:
-      !eligibleSaving || baselineCash90 === 0 || savings90DayMinor == null
+      !eligibleSaving || baselineCash90 == null || baselineCash90 === 0 || savings90DayMinor == null
         ? null
         : savings90DayMinor / baselineCash90,
     shippingMinor

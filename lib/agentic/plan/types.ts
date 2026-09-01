@@ -43,6 +43,7 @@ export type PlanTarget = Readonly<{
 export type CurrentSupplement = Readonly<{
   dailyAmount: number;
   daysRemaining?: number;
+  durationUnknown?: boolean;
   name: string;
   productId?: string;
   supplementId: string;
@@ -457,14 +458,14 @@ export type EconomicsComparisonBasis = Readonly<{
 
 export type EconomicsUnavailableReason = Readonly<{
   dependentCapabilities: readonly string[];
-  dimension: "cash" | "comparison" | "consumption" | "shipping";
+  dimension: "cash" | "comparison" | "consumption" | "schedule" | "shipping";
   missingFieldNames: readonly string[];
   reasonCode: string;
 }>;
 
 export type EconomicsLedger = Readonly<{
   baseline: Readonly<{
-    cash90DayMinor: number;
+    cash90DayMinor: number | null;
     lines: readonly EconomicsBaselineLine[];
     type: PlanBaseline["type"];
   }>;
@@ -571,10 +572,15 @@ export type HorizonOrder = Readonly<{
 }>;
 
 export type HorizonPlan = Readonly<{
+  durationUnknown?: boolean;
   nextReplenishmentDay: number | null;
   orders: readonly HorizonOrder[];
   purchaseRequiredNow: boolean;
-  reasonCode: "current_inventory_covers_now" | "purchase_now" | null;
+  reasonCode:
+    | "current_inventory_covers_now"
+    | "current_inventory_duration_unknown"
+    | "purchase_now"
+    | null;
   snapshotId: string;
 }>;
 
