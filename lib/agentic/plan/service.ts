@@ -56,6 +56,7 @@ import type {
 
 export const PLAN_FEEDBACK_AFTER_REVISIONS = 3;
 export const PLAN_MATCH_RETURN_BUDGET_MS = 3_000;
+export const PLAN_PROCESSING_POLL_AFTER_SECONDS = 1;
 
 const inflightPlanMatches = new Map<
   string,
@@ -550,12 +551,6 @@ function matchInflightKey(planId: string, revision: number) {
   return `${planId}:${revision}`;
 }
 
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function isTerminalPlanStatus(
   status: PlanResult["status"]
 ): status is "blocked" | "needs_input" | "no_purchase" | "ready" {
@@ -581,7 +576,7 @@ function successFromResult(input: Readonly<{
       nextActions: ["poll_plan"],
       ok: true as const,
       planHandle: input.planHandle,
-      pollAfterSeconds: 3,
+      pollAfterSeconds: PLAN_PROCESSING_POLL_AFTER_SECONDS,
       revision: input.revision,
       status: "processing",
       summary: fields.summary,
@@ -1203,30 +1198,7 @@ export async function planTool(input: Readonly<{
     return result;
   }
 
-  const work = runPlanMatch(prepared, input, loadLiveCatalogue, matchStartedAt);
-  const raced = await Promise.race([
-    work.then((result) => ({ done: true as const, result })),
-    sleep(PLAN_MATCH_RETURN_BUDGET_MS).then(() => ({ done: false as const }))
-  ]);
-
-  if (raced.done) {
-    return raced.result;
-  }
-
-  const ackMs = Math.max(0, Date.now() - matchStartedAt);
-  return successFromResult({
-    locale: prepared.locale,
-    planHandle: prepared.planHandle,
-    result: {
-      ...prepared.processing,
-      matcherTelemetry: {
-        ...prepared.processing.matcherTelemetry,
-        ackMs,
-        searchDeadlineMs: DEFAULT_MATCHER_CONFIG.searchDeadlineMs
-      }
-    },
-    revision: prepared.revision
-  });
+  return runPlanMatch(prepared, input, loadLiveCatalogue, matchStartedAt);
 }
 
 function runPlanMatch(

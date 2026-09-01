@@ -885,8 +885,15 @@ export function match(
         ];
 
   for (const seller of sellers) {
+    let sellerComplete = false;
     for (const searchRequest of searchRequests) {
+      if (sellerComplete && searchRequest !== request) {
+        continue;
+      }
       const remaining = Math.max(0, deadlineAt - Date.now());
+      if (remaining <= 0 && scored.length > 0) {
+        continue;
+      }
       const run = searchGroups(seller.groups, searchRequest, {
         ...config,
         searchDeadlineMs: remaining
@@ -904,6 +911,7 @@ export function match(
 
         if (basket) {
           scored.push(basket);
+          sellerComplete = true;
         }
       }
 

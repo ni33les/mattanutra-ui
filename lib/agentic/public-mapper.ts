@@ -1134,7 +1134,7 @@ export function publicPlanFields(result: Pick<
       status: result.status
     }),
     ...(result.status === "processing"
-      ? { pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS }
+      ? { pollAfterSeconds: 1 }
       : {})
   };
 }

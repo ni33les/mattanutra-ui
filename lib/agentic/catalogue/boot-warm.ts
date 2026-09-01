@@ -2,7 +2,7 @@ import { loadAgenticConfig } from "@/lib/agentic/config";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { warmAgenticCatalogue } from "@/lib/agentic/catalogue/warm";
 
-const BOOT_WARM_DELAY_MS = 2_000;
+const BOOT_WARM_DELAY_MS = 0;
 
 export function startCatalogueBootWarm() {
   setTimeout(() => {

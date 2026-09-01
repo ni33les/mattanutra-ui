@@ -30,7 +30,6 @@ import type {
 } from "@/lib/product-recommendation-types";
 
 const LIVE_TTL_MS = 10 * 60_000;
-const LIVE_LOAD_WAIT_MS = 8_000;
 const WARM_FAILURE_BACKOFF_MS = 5 * 60_000;
 
 let lastWarmFailureAt = 0;
@@ -663,12 +662,7 @@ export async function cachedLiveRetailSnapshot(
     return hit.snapshot;
   }
 
-  return Promise.race([
-    inflight,
-    new Promise<CatalogueSnapshot>((resolve) => {
-      setTimeout(() => resolve(loadingSnapshot(code)), LIVE_LOAD_WAIT_MS);
-    })
-  ]);
+  return inflight;
 }
 
 export async function warmLiveRetailSnapshot(
