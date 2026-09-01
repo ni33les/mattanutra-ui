@@ -489,6 +489,16 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ตัวเลือกที่ใช้ได้ดีที่สุด",
     "zh-CN": "当前最佳可得方案"
   },
+  "plan.option.no_distinct_alternative": {
+    en: "No distinct alternative",
+    th: "ไม่มีตัวเลือกอื่นที่ต่างอย่างมีนัย",
+    "zh-CN": "没有实质不同的备选方案"
+  },
+  "plan.selection.dedicated_unavailable": {
+    en: "A dedicated product was not available, so this covering product is used instead.",
+    th: "ไม่มีสินค้าเฉพาะทางที่ใช้ได้ จึงใช้สินค้าที่ครอบคลุมเป้าหมายนี้แทน",
+    "zh-CN": "没有可用的专用产品，因此改用这款覆盖产品。"
+  },
   "plan.tradeoff.selected": {
     en: "Selected option",
     th: "ตัวเลือกที่เลือก",

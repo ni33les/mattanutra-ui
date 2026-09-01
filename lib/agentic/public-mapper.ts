@@ -122,7 +122,8 @@ const OPTION_REASON_CODES = [
   "best_available",
   "fewest_pills",
   "highest_coverage",
-  "lowest_cost"
+  "lowest_cost",
+  "no_distinct_alternative"
 ] as const;
 
 type RequestedTargets = Readonly<{
@@ -382,6 +383,13 @@ function optionReasonFields(
 ) {
   const negotiated = negotiateLocale(locale);
   const group = advertised.length > 0 ? advertised : [option];
+  if (option.noDistinctAlternative) {
+    return {
+      code: "no_distinct_alternative" as const,
+      key: "plan.option.no_distinct_alternative",
+      message: agenticMessage(negotiated, "plan.option.no_distinct_alternative")
+    };
+  }
   if (group.length < 2) {
     return {
       code: "best_available" as const,
@@ -442,7 +450,7 @@ export function publicBasketItem(
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
-    selectionReason: defaultSelectionReason(contributions, locale),
+    selectionReason: item.selectionReason ?? defaultSelectionReason(contributions, locale),
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(incidentalNutrientNames.length > 0 ? { incidentalNutrientNames } : {}),
@@ -667,6 +675,7 @@ export function publicOption(
     ...(option.deferredTargetIds ? { deferredTargetIds: option.deferredTargetIds } : {}),
     ...(option.retainedCurrent ? { retainedCurrent: option.retainedCurrent } : {}),
     ...(option.economics ? { economics: option.economics } : {}),
+    ...(option.burden ? { burden: option.burden } : {}),
     productIds: option.basket.map((item) => item.productId)
   };
 }

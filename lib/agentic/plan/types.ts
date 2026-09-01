@@ -292,6 +292,7 @@ export type SelectionReason = Readonly<{
     | "best_available_dose"
     | "consolidates_targets"
     | "covers_target"
+    | "dedicated_unavailable"
     | "reduces_cost"
     | "reduces_pills"
     | "retained_by_user";
@@ -417,6 +418,17 @@ export type PlanQuestion = Readonly<{
 
 export type ValueOptionRole = "best_value" | "complete" | "minimum_core";
 
+export type BurdenLedger = Readonly<{
+  administrationEvents: number;
+  administrations: number;
+  gummies: number;
+  nonPillTotal: number;
+  pills: number;
+  productCount: number;
+  softgels: number;
+  tablets: number;
+}>;
+
 export type EconomicsBaselineLine = Readonly<{
   lineTotalMinor: number;
   productId: string;
@@ -466,6 +478,7 @@ export type RetainedCurrent = Readonly<{
 
 export type StackOption = Readonly<{
   basket: readonly BasketItem[];
+  burden?: BurdenLedger;
   cash90DayMinor?: number;
   coverage: readonly CoverageRow[];
   coveragePercent: number;
@@ -474,6 +487,7 @@ export type StackOption = Readonly<{
   economics?: EconomicsLedger;
   includedTargetIds?: readonly string[];
   matcherVersion: string;
+  noDistinctAlternative?: boolean;
   omittedTargetIds?: readonly string[];
   optionId: string;
   reason: string;

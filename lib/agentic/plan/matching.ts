@@ -14,6 +14,7 @@ import {
 } from "@/lib/matcher";
 import {
   contributionFor,
+  productIsDedicatedForTarget,
   variantPillBurden
 } from "@/lib/matcher/candidates";
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
@@ -26,6 +27,7 @@ import {
 import { normalizeProductKey, productKeysMatch } from "@/lib/product-key-matching";
 import type {
   CanonicalRequest,
+  CanonicalTarget,
   MatcherUnit,
   ScoredBasket
 } from "@/lib/matcher/types";
@@ -34,6 +36,7 @@ import {
   matcherSafetyCeilings,
   safetyCeilingFor
 } from "@/lib/matcher/safety-ceilings";
+import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import type {
   BasketItem,
   CanonicalPlanState,
@@ -43,8 +46,10 @@ import type {
   PlanLeftover,
   RejectedCandidate,
   RetainedCurrent,
+  SelectionReason,
   StackOption
 } from "@/lib/agentic/plan/types";
+import { buildBurden } from "@/lib/agentic/value/burden";
 import { buildEconomics, enrichBasketPackFacts } from "@/lib/agentic/value/economics";
 import { cashCostForHorizon } from "@/lib/agentic/value/horizon-cash";
 import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
@@ -530,6 +535,62 @@ function nutrientSplit(
   };
 }
 
+function asMatcherTarget(
+  target: CanonicalPlanState["targets"][number]
+): CanonicalTarget {
+  return {
+    importance: target.importance ?? "required",
+    name: target.name,
+    requested: {
+      dim: "mass_ng",
+      subjectId: target.supplementId,
+      units: BigInt(0)
+    },
+    requestedAmount: target.amount,
+    requestedUnit: target.unit,
+    subjectId: target.supplementId,
+    ...(target.prerequisite ? { prerequisite: target.prerequisite } : {})
+  };
+}
+
+function selectionReasonFor(
+  state: CanonicalPlanState,
+  product: CatalogueProduct
+): SelectionReason | undefined {
+  const matcherProduct = toMatcherProduct(product);
+  const served = state.targets.filter((target) => {
+    const deferred =
+      target.importance === "conditional" && target.prerequisite?.status !== "satisfied";
+
+    if (deferred) {
+      return false;
+    }
+
+    return contributionFor(matcherProduct, target.name, target.supplementId).length > 0;
+  });
+
+  if (served.length < 1) {
+    return undefined;
+  }
+
+  const usesCollateral = served.some(
+    (target) => !productIsDedicatedForTarget(matcherProduct, asMatcherTarget(target))
+  );
+
+  if (!usesCollateral) {
+    return undefined;
+  }
+
+  const locale = negotiateLocale(state.locale);
+  return {
+    code: "dedicated_unavailable",
+    message: agenticMessage(locale, "plan.selection.dedicated_unavailable"),
+    messageKey: "plan.selection.dedicated_unavailable",
+    requestedNames: served.map((item) => item.name),
+    requestedSupplementIds: served.map((item) => item.supplementId)
+  };
+}
+
 function dailyUnitsForProduct(
   productId: string,
   variantIds: readonly string[]
@@ -563,6 +624,7 @@ function basketFromIds(
       );
       const purchasedQuantity = 1;
       const nutrients = nutrientSplit(product, state, servingsPerDay);
+      const selectionReason = selectionReasonFor(state, product);
 
       return enrichBasketPackFacts({
         availabilityAsOf: snapshot.availabilityAsOf,
@@ -587,6 +649,7 @@ function basketFromIds(
         productId: product.productId,
         productName: product.candidate.title,
         quantity: purchasedQuantity,
+        ...(selectionReason ? { selectionReason } : {}),
         requestedNutrientNames: nutrients.requestedNutrientNames,
         requestedNutrients: nutrients.requestedNutrients,
         retailerSku: product.retailerSku,
@@ -652,9 +715,11 @@ function toStackOption(
       ...(item.productId ? { productId: item.productId } : {}),
       supplementId: item.supplementId
     }));
+  const burden = buildBurden({ items, retainedCurrent });
 
   return {
     basket: items,
+    burden,
     cash90DayMinor,
     coverage,
     coveragePercent: publicCoveragePercent(basket),
@@ -938,12 +1003,16 @@ export function matchPlan(input: Readonly<{
     catalogueVersion: snapshot.catalogueVersion,
     products: snapshot.products.map(toMatcherProduct)
   });
-  const selected = result.selected
+  const selectedRaw = result.selected
     ? toStackOption(input.state, snapshot, result.selected, result.selected)
     : null;
   const alternatives = result.alternatives.map((item) =>
     toStackOption(input.state, snapshot, item, result.selected)
   );
+  const selected =
+    selectedRaw && alternatives.length === 0
+      ? { ...selectedRaw, noDistinctAlternative: true }
+      : selectedRaw;
   const leftovers = [...leftoversFor(input.state, selected, alternatives[0] ?? null)];
   const seen = new Set(leftovers.map((item) => `${item.reason}:${item.name}`));
   for (const item of request.leftovers) {
