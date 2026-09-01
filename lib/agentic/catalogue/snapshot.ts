@@ -5,6 +5,7 @@ import {
 } from "@/lib/agentic/catalogue/live";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
+import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 
 const cachedByCountry = new Map<string, CatalogueSnapshot>();
 let lastSnapshot: CatalogueSnapshot | null = null;
@@ -126,7 +127,9 @@ export async function ensureCatalogueSnapshot(
       if (liveReady) {
         cachedByCountry.set(code, live);
         lastSnapshot = live;
-        await refreshAdminSafetyCeilings();
+        if (matcherSafetyCeilings().length < 1) {
+          await refreshAdminSafetyCeilings();
+        }
         return live;
       }
     } catch (error) {

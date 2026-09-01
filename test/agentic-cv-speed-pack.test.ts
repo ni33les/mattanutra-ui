@@ -69,6 +69,8 @@ describe("Customer value speed pack", () => {
     assert.match(source, /PLAN_MATCH_RETURN_BUDGET_MS = 3_000/);
     assert.equal(source.includes("sleep(PLAN_MATCH_RETURN_BUDGET_MS)"), false);
     assert.match(source, /PLAN_PROCESSING_POLL_AFTER_SECONDS = 1/);
+    assert.match(source, /writeProcessingRevision/);
+    assert.match(source, /inflightPlanIdempotency/);
   });
 
   it("info budget stays well under a second", () => {

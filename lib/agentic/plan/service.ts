@@ -16,6 +16,7 @@ import {
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
+import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
@@ -59,6 +60,10 @@ export const PLAN_MATCH_RETURN_BUDGET_MS = 3_000;
 export const PLAN_PROCESSING_POLL_AFTER_SECONDS = 1;
 
 const inflightPlanMatches = new Map<
+  string,
+  Promise<PlanToolSuccess | AgenticErrorResult>
+>();
+const inflightPlanIdempotency = new Map<
   string,
   Promise<PlanToolSuccess | AgenticErrorResult>
 >();
@@ -805,6 +810,39 @@ export async function planTool(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
+  const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
+  const inflightKey =
+    input.payload.operation === "get" || !input.payload.idempotencyKey
+      ? null
+      : `${ownerScope}\0${input.payload.idempotencyKey}`;
+  if (inflightKey) {
+    const existing = inflightPlanIdempotency.get(inflightKey);
+    if (existing) {
+      return existing;
+    }
+  }
+
+  const work = executePlanTool(input);
+  if (inflightKey) {
+    inflightPlanIdempotency.set(inflightKey, work);
+    void work.finally(() => {
+      if (inflightPlanIdempotency.get(inflightKey) === work) {
+        inflightPlanIdempotency.delete(inflightKey);
+      }
+    });
+  }
+  return work;
+}
+
+async function executePlanTool(input: Readonly<{
+  config: AgenticConfig;
+  deferProcessing?: boolean;
+  matchPort?: PlanMatchPort;
+  now: string;
+  payload: PlanToolInput;
+  scope: CapabilityScope;
+  store: AgenticStore;
+}>): Promise<PlanToolSuccess | AgenticErrorResult> {
   const requestedDestination = requestRecord(input.payload.request)?.destinationCountry;
   const loadLiveCatalogue =
     !input.matchPort && !input.payload.planHandle;
@@ -1095,28 +1133,32 @@ export async function planTool(input: Readonly<{
       });
     }
 
-    await store.insertPlanRevision(
-      revisionRecord(planId, revision, processing, input.now)
-    );
+    const writeProcessingRevision =
+      Boolean(input.deferProcessing) || Boolean(input.matchPort);
+    if (writeProcessingRevision) {
+      await store.insertPlanRevision(
+        revisionRecord(planId, revision, processing, input.now)
+      );
 
-    const processingResponse = successFromResult({
-      locale,
-      planHandle: planHandle!,
-      result: processing,
-      revision
-    });
-
-    if (input.payload.idempotencyKey) {
-      await commitIdempotency({
-        key: input.payload.idempotencyKey,
-        now: input.now,
-        operation: "plan",
-        ownerScope,
-        payload: input.payload,
-        resourceIds: { planId },
-        response: processingResponse,
-        store
+      const processingResponse = successFromResult({
+        locale,
+        planHandle: planHandle!,
+        result: processing,
+        revision
       });
+
+      if (input.payload.idempotencyKey) {
+        await commitIdempotency({
+          key: input.payload.idempotencyKey,
+          now: input.now,
+          operation: "plan",
+          ownerScope,
+          payload: input.payload,
+          resourceIds: { planId },
+          response: processingResponse,
+          store
+        });
+      }
     }
 
     return {
@@ -1275,7 +1317,7 @@ async function completePreparedPlan(
     );
   }
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
-  if (!isolated) {
+  if (!isolated && matcherSafetyCeilings().length < 1) {
     await refreshAdminSafetyCeilings();
   }
 

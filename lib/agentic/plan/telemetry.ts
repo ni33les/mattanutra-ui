@@ -95,6 +95,13 @@ export async function persistMatcherTelemetry(input: Readonly<{
       )
     `;
   } catch (error) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+    if (code === "23503") {
+      return;
+    }
     console.warn("Unable to persist MCP matcher telemetry", {
       error,
       planId: input.planId
