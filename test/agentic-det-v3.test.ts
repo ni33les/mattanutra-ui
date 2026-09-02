@@ -29,6 +29,10 @@ import {
   planCompactApplicable,
   planRespectsCompactContract
 } from "../lib/agentic/contract/plan-result.ts";
+import {
+  SUPPORT_RESPONSE_CONTRACT,
+  supportRespectsContract
+} from "../lib/agentic/contract/support-result.ts";
 import { publicPlanFields } from "../lib/agentic/public-mapper.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { EVIDENCE_INPUT_SCHEMA } from "../lib/agentic/contract/schemas.ts";
@@ -1101,6 +1105,48 @@ describe("Slice E support", () => {
     assert.equal((replied.thread as unknown[]).length, 2);
     assert.equal(canonicalJson(replied), canonicalJson(replay));
     assert.equal((replied.orderContext as { timeline?: string }).timeline, "dispatched");
+  });
+
+  it("E-CONTRACT-01 support response has thread, messages, and bounded order context", async () => {
+    assert.deepEqual([...SUPPORT_RESPONSE_CONTRACT.required], [
+      "ok",
+      "supportHandle",
+      "thread",
+      "orderContext",
+      "messageId"
+    ]);
+    const runtime = createComRuntime();
+    const seeded = await seedPlanA(runtime);
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: seeded.revision,
+      idempotencyKey: key("E-CONTRACT-01"),
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: seeded.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const orderHandle = (executed as { orderHandle: string }).orderHandle;
+    const created = await comCall(runtime, "support", {
+      idempotencyKey: key("E-CONTRACT-01-a"),
+      message: "Where is my order?",
+      orderHandle
+    });
+    const replay = await comCall(runtime, "support", {
+      idempotencyKey: key("E-CONTRACT-01-a"),
+      message: "Where is my order?",
+      orderHandle
+    });
+    assert.equal(supportRespectsContract(created), true);
+    assert.equal(supportRespectsContract(replay), true);
+    assert.equal(canonicalJson(created), canonicalJson(replay));
+    const context = created.orderContext as Record<string, unknown>;
+    assert.deepEqual(Object.keys(context).sort(), [...SUPPORT_RESPONSE_CONTRACT.orderContextKeys].sort());
+    assert.equal(typeof created.supportHandle, "string");
+    assert.ok(Array.isArray(created.thread));
+    assert.equal((created.thread as unknown[]).length, 1);
+    assert.equal(/address|checkoutToken|health|sk_live/i.test(canonicalJson(context)), false);
   });
 
   it("E-UNIT-01 thread sort is sequence then id", async () => {

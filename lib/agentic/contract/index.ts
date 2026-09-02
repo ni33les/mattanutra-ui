@@ -21,6 +21,12 @@ export {
   type AgenticPublicToolName
 } from "@/lib/agentic/contract/instructions";
 export {
+  SUPPORT_ORDER_CONTEXT_KEYS,
+  SUPPORT_RESPONSE_CONTRACT,
+  SUPPORT_THREAD_ITEM_KEYS,
+  supportRespectsContract
+} from "@/lib/agentic/contract/support-result";
+export {
   PLAN_COMPACT_APPLICABLE_STATUSES,
   PLAN_COMPACT_CONTRACT,
   planCompactApplicable,
