@@ -856,7 +856,19 @@ export function publicPlanFields(result: Pick<
   | "summary"
   | "unmetRequirements"
 > &
-  Partial<Pick<PlanResult, "breadth" | "gapReview" | "horizon" | "leftovers" | "matcherTelemetry">>) {
+  Partial<
+    Pick<
+      PlanResult,
+      | "breadth"
+      | "claimIds"
+      | "evidenceHandle"
+      | "gapReview"
+      | "horizon"
+      | "leftovers"
+      | "matcherTelemetry"
+      | "researchVersion"
+    >
+  >) {
   const selected = result.selected;
   const guidanceIds = result.safetyGuidance.map((item) => item.guidanceId);
   const snapshot =
