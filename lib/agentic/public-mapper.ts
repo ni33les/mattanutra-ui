@@ -10,6 +10,7 @@ import {
   planResearchVersion
 } from "@/lib/agentic/value/compact-decision";
 import { mergeBySemanticKey } from "@/lib/agentic/plan/merge";
+import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import {
   CONDITION_ALIASES,
   MEDICATION_ALIASES
@@ -947,8 +948,7 @@ export function publicPlanFields(result: Pick<
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
     .slice(0, 3);
 
-  const compactApplicable =
-    result.status === "ready" || result.status === "no_purchase";
+  const compactApplicable = planCompactApplicable(result.status);
   const compactDecision = compactApplicable ? buildCompactDecision(result) : null;
   const claimIds = compactApplicable ? planClaimIds(result) : [];
 

@@ -43,6 +43,7 @@ import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
+import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
 import { buildHorizonPlan, ordersInHorizon } from "@/lib/agentic/value/inventory-ledger";
@@ -1558,10 +1559,7 @@ async function persistTerminalPlan(input: Readonly<{
   skipSideEffects?: boolean;
 }>): Promise<PlanToolSuccess> {
   let result = input.result;
-  if (
-    (result.status === "ready" || result.status === "no_purchase") &&
-    !result.evidenceHandle
-  ) {
+  if (planCompactApplicable(result.status) && !result.evidenceHandle) {
     const evidenceHandle = await issueEvidenceCapability({
       config: input.input.config,
       now: input.input.now,

@@ -21,6 +21,12 @@ export {
   type AgenticPublicToolName
 } from "@/lib/agentic/contract/instructions";
 export {
+  PLAN_COMPACT_APPLICABLE_STATUSES,
+  PLAN_COMPACT_CONTRACT,
+  planCompactApplicable,
+  planRespectsCompactContract
+} from "@/lib/agentic/contract/plan-result";
+export {
   AGENTIC_INPUT_SCHEMAS,
   AGENTIC_TOOL_SCHEMAS,
   EVIDENCE_ADVERTISED_SCHEMA,

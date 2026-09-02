@@ -24,6 +24,12 @@ import {
   compactDecisionBytes
 } from "../lib/agentic/value/compact-decision.ts";
 import { AGENTIC_PUBLIC_TOOLS } from "../lib/agentic/contract/instructions.ts";
+import {
+  PLAN_COMPACT_CONTRACT,
+  planCompactApplicable,
+  planRespectsCompactContract
+} from "../lib/agentic/contract/plan-result.ts";
+import { publicPlanFields } from "../lib/agentic/public-mapper.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { EVIDENCE_INPUT_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import { queryCount, resetQueryBudget } from "../lib/agentic/plan/query-budget.ts";
@@ -290,6 +296,58 @@ describe("Slice B compact decision and evidence", () => {
     });
     assert.equal(evidence.ok, true);
     assert.equal((again as { revision: number }).revision, revision);
+  });
+
+  it("B-CONTRACT-01 compact decision is required only where applicable", () => {
+    assert.deepEqual([...PLAN_COMPACT_CONTRACT.applicableStatuses], ["no_purchase", "ready"]);
+    assert.equal(planCompactApplicable("ready"), true);
+    assert.equal(planCompactApplicable("no_purchase"), true);
+    assert.equal(planCompactApplicable("needs_input"), false);
+    assert.equal(planCompactApplicable("blocked"), false);
+    assert.equal(planCompactApplicable("processing"), false);
+
+    const base = {
+      alternatives: [],
+      basket: [],
+      changeSummary: [],
+      coverage: [],
+      questions: [],
+      safetyGuidance: [],
+      selected: null,
+      summary: "stub",
+      unmetRequirements: []
+    } as const;
+
+    const ready = publicPlanFields({
+      ...base,
+      coverage: magView("ready").coverage as never,
+      selected: magView("ready").selected as never,
+      status: "ready"
+    });
+    const none = publicPlanFields({
+      ...base,
+      horizon: { durationUnknown: false, purchaseRequiredNow: false, orders: [] } as never,
+      requestSnapshot: {
+        currentSupplements: [{ dailyAmount: 300, daysRemaining: 90, name: "Magnesium", unit: "mg" }]
+      } as never,
+      status: "no_purchase"
+    });
+    const needs = publicPlanFields({ ...base, status: "needs_input" });
+    const blocked = publicPlanFields({ ...base, status: "blocked" });
+    const processing = publicPlanFields({ ...base, status: "processing" });
+
+    assert.equal(planRespectsCompactContract(ready as never), true);
+    assert.equal(planRespectsCompactContract(none as never), true);
+    assert.equal(planRespectsCompactContract(needs as never), true);
+    assert.equal(planRespectsCompactContract(blocked as never), true);
+    assert.equal(planRespectsCompactContract(processing as never), true);
+    assert.ok("compactDecision" in ready);
+    assert.ok("researchVersion" in ready);
+    assert.ok("compactDecision" in none);
+    assert.equal("compactDecision" in needs, false);
+    assert.equal("evidenceHandle" in needs, false);
+    assert.equal("compactDecision" in blocked, false);
+    assert.equal("compactDecision" in processing, false);
   });
 
   it("B-CONTRACT-02 evidence schema rejects open queries", () => {
