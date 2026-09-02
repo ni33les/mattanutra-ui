@@ -7,6 +7,7 @@ import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { resetMatchPlanCache } from "@/lib/agentic/plan/matching";
+import { countQuery } from "@/lib/agentic/plan/query-budget";
 
 const cachedByCountry = new Map<string, CatalogueSnapshot>();
 let lastSnapshot: CatalogueSnapshot | null = null;
@@ -98,6 +99,7 @@ export async function ensureCatalogueSnapshot(
   environment?: AgenticEnvironment,
   countryCode?: string
 ): Promise<CatalogueSnapshot> {
+  countQuery(`catalogue.snapshot.${countryKey(countryCode)}`);
   const code = countryKey(countryCode);
 
   if (allowInstalledSnapshot(environment) && installedSnapshot) {

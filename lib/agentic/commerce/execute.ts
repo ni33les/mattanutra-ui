@@ -14,9 +14,9 @@ import type { PaymentPort } from "@/lib/agentic/commerce/payment";
 import type { AgenticStore, OrderRecord } from "@/lib/agentic/store/types";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
-import { expireCheckoutIfDue } from "@/lib/agentic/commerce/state";
+
 import { publicFrozenItems } from "@/lib/agentic/public-mapper";
-import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
+
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
@@ -29,6 +29,7 @@ import {
   DEFAULT_TAX_MINOR,
   payableSnapshot
 } from "@/lib/agentic/money";
+import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
 
 const executeLocks = new WeakMap<AgenticStore, Map<string, Promise<unknown>>>();
 
@@ -101,71 +102,6 @@ export type ExecuteSuccess = Readonly<{
   successUrl?: string;
 }>;
 
-async function withLiveOrderState(input: Readonly<{
-  config: AgenticConfig;
-  now: string;
-  scope: CapabilityScope;
-  store: AgenticStore;
-  stored: ExecuteSuccess;
-}>): Promise<ExecuteSuccess> {
-  const capability = await resolveCapability({
-    action: "order.read",
-    config: input.config,
-    handle: input.stored.orderHandle,
-    now: input.now,
-    resourceType: "order",
-    scope: input.scope,
-    store: input.store
-  });
-
-  if (!capability) {
-    return input.stored;
-  }
-
-  const loaded = await input.store.getOrder(capability.resourceId);
-
-  if (!loaded) {
-    return input.stored;
-  }
-
-  const order =
-    (await expireCheckoutIfDue({
-      now: input.now,
-      order: loaded,
-      store: input.store
-    })) ?? loaded;
-
-  const live: ExecuteSuccess = {
-    ...input.stored,
-    checkoutExpiresAt: order.checkoutExpiresAt ?? input.stored.checkoutExpiresAt,
-    checkoutUrl: order.checkoutUrl ?? input.stored.checkoutUrl,
-    orderStatus: order.orderStatus,
-    paymentStatus: order.paymentStatus,
-    stateVersion: order.stateVersion
-  };
-
-  if (order.paymentStatus === "paid") {
-    const retail = await getRetailOrderByAgenticOrderId(order.id);
-    const orderNumber = retail?.orderNumber?.trim();
-    if (orderNumber) {
-      const locale = negotiateLocale(
-        typeof order.frozenPlan === "object" &&
-          order.frozenPlan &&
-          "locale" in order.frozenPlan
-          ? String((order.frozenPlan as { locale?: unknown }).locale ?? "en")
-          : "en"
-      );
-      return {
-        ...live,
-        successUrl: `${input.config.siteUrl}/${locale}/order/track/${encodeURIComponent(orderNumber)}`
-      };
-    }
-  }
-
-  const { successUrl: _omitBareSuccessUrl, ...withoutSuccessUrl } = live;
-  return withoutSuccessUrl;
-}
-
 export async function executeTool(input: Readonly<{
   config: AgenticConfig;
   expectedRevision: number;
@@ -195,13 +131,7 @@ export async function executeTool(input: Readonly<{
   }
 
   if (replay.kind === "replay") {
-    return withLiveOrderState({
-      config: input.config,
-      now: input.now,
-      scope: input.scope,
-      store: input.store,
-      stored: replay.response
-    });
+    return replay.response;
   }
 
   return enqueueExecute(
@@ -324,14 +254,6 @@ async function executeFresh(
       if (!isExecuteSuccess(stored)) {
         return executeError(locale, "not_found");
       }
-      const recovered = await withLiveOrderState({
-        config: input.config,
-        now: input.now,
-        scope: input.scope,
-        store,
-        stored
-      });
-
       await commitIdempotency({
         key: input.idempotencyKey,
         now: input.now,
@@ -339,10 +261,10 @@ async function executeFresh(
         ownerScope,
         payload,
         resourceIds: { orderId: existingOrder.id },
-        response: recovered,
+        response: stored,
         store
       });
-      return recovered;
+      return stored;
     }
 
     const payable = payableSnapshot({
@@ -492,6 +414,21 @@ async function executeFresh(
       resourceIds: { orderId },
       response,
       store
+    });
+
+    recordFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: orderId,
+      createdAt: input.now,
+      eventId: `execute:${orderId}`,
+      eventType: "execute_created"
+    });
+    recordFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: orderId,
+      createdAt: input.now,
+      eventId: `checkout:${orderId}`,
+      eventType: "checkout_opened"
     });
 
     return response;

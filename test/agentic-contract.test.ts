@@ -26,22 +26,23 @@ function rpcResult(response: JsonRpcResponse | null) {
 }
 
 describe("agentic MCP contract 3.0.0", () => {
-  it("exposes exactly six public tools", () => {
+  it("exposes the public tools including evidence", () => {
     assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], [
       "info",
       "plan",
       "execute",
       "order",
       "support",
-      "feedback"
+      "feedback",
+      "evidence"
     ]);
-    assert.equal(Object.keys(AGENTIC_TOOL_SCHEMAS).length, 6);
+    assert.equal(Object.keys(AGENTIC_TOOL_SCHEMAS).length, 7);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("sexAtBirth"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("intersex"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes("unspecified"), false);
     assert.match(JSON.stringify(PLAN_INPUT_SCHEMA), /"sex"/);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan), JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan));
-    assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 6);
+    assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 7);
     const planRequest = JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan);
     assert.match(planRequest, /info\.medicationCodes/);
     assert.match(planRequest, /info\.conditionCodes/);

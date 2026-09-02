@@ -97,8 +97,8 @@ export function advertisedPublicToolNames(environment: AgenticEnvironment) {
   return AGENTIC_PUBLIC_TOOLS.map((name) => advertisedPublicToolName(environment, name));
 }
 
-export function toolList(environment: AgenticEnvironment = "dev") {
-  const descriptions = agenticToolDescriptions(environment);
+export function toolList(environment: AgenticEnvironment = "dev", locale?: string) {
+  const descriptions = agenticToolDescriptions(environment, locale);
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: descriptions[name],
     inputSchema: AGENTIC_TOOL_SCHEMAS[name],
@@ -229,7 +229,7 @@ export async function handleLightweightJsonRpc(
           name: mcpServerInfoName(config.environment),
           version: AGENTIC_SERVICE_VERSION
         },
-        tools: toolList(config.environment)
+        tools: toolList(config.environment, typeof params.locale === "string" ? params.locale : undefined)
       }
     };
   }
@@ -246,7 +246,12 @@ export async function handleLightweightJsonRpc(
     return {
       id,
       jsonrpc: "2.0",
-      result: { tools: toolList(config.environment) }
+      result: {
+        tools: toolList(
+          config.environment,
+          typeof params.locale === "string" ? params.locale : undefined
+        )
+      }
     };
   }
 

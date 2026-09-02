@@ -5,6 +5,11 @@ import { MATCHER_VERSION } from "@/lib/matcher/config";
 import { buildCanonicalPlanStamp } from "@/lib/agentic/value/canonical-plan";
 import { buildExplanation } from "@/lib/agentic/value/explanation";
 import {
+  buildCompactDecision,
+  planClaimIds,
+  planResearchVersion
+} from "@/lib/agentic/value/compact-decision";
+import {
   CONDITION_ALIASES,
   MEDICATION_ALIASES
 } from "@/lib/agentic/catalogue/names";
@@ -936,7 +941,20 @@ export function publicPlanFields(result: Pick<
     )
     .slice(0, 3);
 
+  const compactApplicable =
+    result.status === "ready" || result.status === "no_purchase";
+  const compactDecision = compactApplicable ? buildCompactDecision(result) : null;
+  const claimIds = compactApplicable ? planClaimIds(result) : [];
+
   return {
+    ...(compactDecision
+      ? {
+          compactDecision,
+          claimIds,
+          researchVersion: result.researchVersion ?? planResearchVersion(),
+          ...(result.evidenceHandle ? { evidenceHandle: result.evidenceHandle } : {})
+        }
+      : {}),
     ...(result.basket.length > 0
       ? {
           basket: result.basket.map((item) =>

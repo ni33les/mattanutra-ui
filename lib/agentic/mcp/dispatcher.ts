@@ -13,6 +13,7 @@ import { executeTool } from "@/lib/agentic/commerce/execute";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { supportTool } from "@/lib/agentic/support";
 import { feedbackTool } from "@/lib/agentic/feedback";
+import { evidenceTool } from "@/lib/agentic/evidence/tool";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import {
   canonicalPublicToolName,
@@ -222,6 +223,20 @@ async function callTool(
           store: runtime.store,
           supportHandle:
             typeof params.supportHandle === "string" ? params.supportHandle : undefined
+        });
+        break;
+      case "evidence":
+        value = await evidenceTool({
+          claimIds: Array.isArray(params.claimIds)
+            ? params.claimIds.filter((item): item is string => typeof item === "string")
+            : undefined,
+          config: runtime.config,
+          evidenceHandle: String(params.evidenceHandle),
+          locale: typeof params.locale === "string" ? params.locale : undefined,
+          mode: typeof params.mode === "string" ? params.mode : undefined,
+          now,
+          scope: runtime.scope,
+          store: runtime.store
         });
         break;
       case "feedback":

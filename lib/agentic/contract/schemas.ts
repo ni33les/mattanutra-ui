@@ -270,6 +270,24 @@ export const INFO_INPUT_SCHEMA: JsonSchema = {
   type: "object"
 };
 
+export const EVIDENCE_INPUT_SCHEMA: JsonSchema = {
+  additionalProperties: false,
+  properties: {
+    claimIds: {
+      items: { type: "string" },
+      type: "array",
+      uniqueItems: true
+    },
+    evidenceHandle: { minLength: 32, type: "string" },
+    locale: { type: "string" },
+    mode: { enum: ["summary", "sources"], type: "string" }
+  },
+  required: ["evidenceHandle"],
+  type: "object"
+};
+
+export const EVIDENCE_ADVERTISED_SCHEMA = EVIDENCE_INPUT_SCHEMA;
+
 export const PLAN_INPUT_SCHEMA: JsonSchema = {
   $defs: {
     PlanRequest: PLAN_REQUEST
@@ -406,6 +424,7 @@ export const SUPPORT_ADVERTISED_SCHEMA = SUPPORT_INPUT_SCHEMA;
 export const FEEDBACK_ADVERTISED_SCHEMA = FEEDBACK_INPUT_SCHEMA;
 
 export const AGENTIC_INPUT_SCHEMAS = {
+  evidence: EVIDENCE_INPUT_SCHEMA,
   execute: EXECUTE_INPUT_SCHEMA,
   feedback: FEEDBACK_INPUT_SCHEMA,
   info: INFO_INPUT_SCHEMA,
@@ -415,6 +434,7 @@ export const AGENTIC_INPUT_SCHEMAS = {
 } as const;
 
 export const AGENTIC_TOOL_SCHEMAS = {
+  evidence: EVIDENCE_ADVERTISED_SCHEMA,
   execute: EXECUTE_ADVERTISED_SCHEMA,
   feedback: FEEDBACK_ADVERTISED_SCHEMA,
   info: INFO_INPUT_SCHEMA,

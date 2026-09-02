@@ -10,6 +10,7 @@ import {
 } from "@/lib/agentic/capabilities";
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import type { AgenticStore } from "@/lib/agentic/store/types";
+import { commerceTimelineStatus } from "@/lib/agentic/commerce/timeline";
 
 export type SupportSuccess = Readonly<{
   caseReference: string;
@@ -17,6 +18,14 @@ export type SupportSuccess = Readonly<{
   feedbackInvitation: Readonly<{ prompt: string; promptKey: string }>;
   messageId: string;
   ok: true;
+  orderContext: Readonly<{
+    fulfilmentStatus: string;
+    nextAction: string;
+    orderStatus: string;
+    paymentStatus: string;
+    stateVersion: number;
+    timeline: string;
+  }> | null;
   responseExpectation: string;
   responseExpectationKey: "support.acknowledgement";
   retailCustomerOrder?: Readonly<{
@@ -27,6 +36,13 @@ export type SupportSuccess = Readonly<{
   }>;
   status: "open";
   supportHandle: string;
+  thread: readonly Readonly<{
+    author: "client" | "system";
+    body: string;
+    createdAt: string;
+    id: string;
+    sequence: number;
+  }>[];
 }>;
 
 export async function supportTool(input: Readonly<{
@@ -145,12 +161,15 @@ export async function supportTool(input: Readonly<{
   }
 
   const messageId = randomUUID();
+  const prior = await input.store.getSupportMessages(caseId);
+  const sequence = prior.length + 1;
   await input.store.insertSupportMessage({
     author: "client",
     body: input.message,
     caseId,
     createdAt: input.now,
-    id: messageId
+    id: messageId,
+    sequence
   });
 
   const supportCase = await input.store.getSupportCase(caseId);
@@ -158,6 +177,14 @@ export async function supportTool(input: Readonly<{
     "@/lib/retail-product-checkout"
   );
   const retail = await getRetailOrderByAgenticOrderId(orderCapability.resourceId);
+  const order = await input.store.getOrder(orderCapability.resourceId);
+  const messages = [...(await input.store.getSupportMessages(caseId))].sort((left, right) => {
+    if (left.sequence !== right.sequence) {
+      return left.sequence - right.sequence;
+    }
+    return left.id.localeCompare(right.id);
+  });
+  const timeline = order ? commerceTimelineStatus(order) : "open";
 
   const response: SupportSuccess = {
     caseReference: supportCase?.caseReference ?? humanCaseReference(caseId),
@@ -168,6 +195,16 @@ export async function supportTool(input: Readonly<{
     },
     messageId,
     ok: true,
+    orderContext: order
+      ? {
+          fulfilmentStatus: order.fulfilmentStatus,
+          nextAction: timeline === "delivered" ? "none" : "poll",
+          orderStatus: order.orderStatus,
+          paymentStatus: order.paymentStatus,
+          stateVersion: order.stateVersion,
+          timeline
+        }
+      : null,
     responseExpectation: agenticMessage(locale, "support.acknowledgement"),
     responseExpectationKey: "support.acknowledgement",
     ...(retail
@@ -181,7 +218,14 @@ export async function supportTool(input: Readonly<{
         }
       : {}),
     status: "open",
-    supportHandle: supportHandle!
+    supportHandle: supportHandle!,
+    thread: messages.map((item) => ({
+      author: item.author,
+      body: item.body,
+      createdAt: item.createdAt,
+      id: item.id,
+      sequence: item.sequence
+    }))
   };
 
   await commitIdempotency({

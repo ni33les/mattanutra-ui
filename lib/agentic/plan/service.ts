@@ -42,6 +42,9 @@ import {
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
+import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
+import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
+import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
 import { buildHorizonPlan, ordersInHorizon } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -1543,6 +1546,7 @@ async function persistTerminalPlan(input: Readonly<{
     config: AgenticConfig;
     now: string;
     payload: PlanToolInput;
+    scope: CapabilityScope;
     store: AgenticStore;
   }>;
   locale: Locale;
@@ -1553,10 +1557,38 @@ async function persistTerminalPlan(input: Readonly<{
   revision: number;
   skipSideEffects?: boolean;
 }>): Promise<PlanToolSuccess> {
+  let result = input.result;
+  if (
+    (result.status === "ready" || result.status === "no_purchase") &&
+    !result.evidenceHandle
+  ) {
+    const evidenceHandle = await issueEvidenceCapability({
+      config: input.input.config,
+      now: input.input.now,
+      planId: input.planId,
+      revision: input.revision,
+      scope: input.input.scope,
+      store: input.input.store
+    });
+    result = {
+      ...result,
+      claimIds: planClaimIds(result),
+      evidenceHandle,
+      researchVersion: planResearchVersion()
+    };
+    recordFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: input.planId,
+      createdAt: input.input.now,
+      eventId: `plan:${input.planId}:${input.revision}:${result.status}`,
+      eventType: result.status === "ready" ? "plan_ready" : "plan_created"
+    });
+  }
+
   const response = successFromResult({
     locale: input.locale,
     planHandle: input.planHandle,
-    result: input.result,
+    result,
     revision: input.revision
   });
 
@@ -1575,7 +1607,7 @@ async function persistTerminalPlan(input: Readonly<{
     const record = revisionRecord(
       input.planId,
       input.revision,
-      input.result,
+      result,
       current?.createdAt ?? input.input.now
     );
 

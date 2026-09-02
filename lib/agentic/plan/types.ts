@@ -649,7 +649,9 @@ export type PlanResult = Readonly<{
   breadth?: PlanBreadth;
   catalogueVersion: string;
   changeSummary: readonly string[];
+  claimIds?: readonly string[];
   coverage: readonly CoverageRow[];
+  evidenceHandle?: string;
   guidanceRulesVersion: string;
   horizon?: HorizonPlan;
   leftovers: readonly PlanLeftover[];
@@ -659,6 +661,7 @@ export type PlanResult = Readonly<{
     tieBreak: readonly string[];
   }>;
   questions: readonly PlanQuestion[];
+  researchVersion?: string;
   requestSnapshot: CanonicalPlanState;
   safetyGuidance: readonly SafetyGuidance[];
   selected: StackOption | null;

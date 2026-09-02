@@ -1,6 +1,6 @@
 import type { AgenticEnvironment } from "@/lib/agentic/config";
 
-export type ResourceType = "plan" | "order" | "support" | "checkout" | "feedback";
+export type ResourceType = "plan" | "order" | "support" | "checkout" | "feedback" | "evidence";
 
 export type CapabilityRecord = Readonly<{
   allowedActions: readonly string[];
@@ -183,6 +183,7 @@ export type SupportMessageRecord = Readonly<{
   caseId: string;
   createdAt: string;
   id: string;
+  sequence: number;
 }>;
 
 export type FeedbackRecord = Readonly<{

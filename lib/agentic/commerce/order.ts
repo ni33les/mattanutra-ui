@@ -4,6 +4,13 @@ import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { expireCheckoutIfDue, orderPollView } from "@/lib/agentic/commerce/state";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
+import {
+  commerceTimelineStatus,
+  orderedEventLedger
+} from "@/lib/agentic/commerce/timeline";
+import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
+import { contributionMinor } from "@/lib/agentic/funnel/events";
+import { funnelAttribution, listFunnelEvents } from "@/lib/agentic/funnel/ledger";
 
 export async function orderTool(input: Readonly<{
   config: AgenticConfig;
@@ -49,8 +56,34 @@ export async function orderTool(input: Readonly<{
   const fulfilmentEvents = order
     ? await input.store.listFulfilmentEvents(order.id)
     : [];
+  const paymentAttempts = order
+    ? await input.store.listPaymentAttempts(order.id)
+    : [];
+  const items = order ? await input.store.getOrderItems(order.id) : [];
+  const events = order
+    ? orderedEventLedger({
+        fulfilment: fulfilmentEvents,
+        order,
+        paymentAttempts
+      })
+    : [];
+  const timeline = order ? commerceTimelineStatus(order) : null;
+  const attribution = order ? funnelAttribution(order.id) : "unattributed";
+  const funnel = order ? listFunnelEvents(order.id) : [];
+  void funnel;
+  const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
+  const contribution =
+    order && order.paymentStatus === "paid"
+      ? contributionMinor({
+          acquisitionMinor: attribution === "unattributed" ? 0 : 0,
+          paymentFeeMinor: 0,
+          paymentMinor: order.totalPriceMinor,
+          productCostMinor,
+          shippingSubsidyMinor: 0
+        })
+      : null;
 
-  return orderPollView({
+  const view = orderPollView({
     checkoutUrl: order?.checkoutUrl ?? null,
     found: Boolean(order),
     fulfilmentEvents,
@@ -66,4 +99,26 @@ export async function orderTool(input: Readonly<{
         }
       : null
   });
+
+  if (!order || !("ok" in view) || view.ok !== true) {
+    return view;
+  }
+
+  return {
+    ...view,
+    attribution,
+    contributionMinor: contribution,
+    events,
+    money: {
+      currency: order.currency,
+      items: items.map((item) => ({
+        lineTotalMinor: item.lineTotalMinor,
+        productId: item.productId,
+        quantity: item.quantity
+      })),
+      totalPriceMinor: order.totalPriceMinor
+    },
+    responsibility: responsibilitySnapshot(locale),
+    timeline
+  };
 }

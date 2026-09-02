@@ -18,10 +18,13 @@ export const AGENTIC_REASON_CODES = [
   "required",
   "unsupported_country",
   "unsupported_currency",
+  "unreferenced_claim",
   "unexpected_property",
+  "wrong_purpose",
   "revision_conflict",
   "idempotency_conflict",
   "not_found",
+  "open_query",
   "plan_not_ready",
   "availability_changed",
   "checkout_expired",
@@ -72,6 +75,7 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
   invalid_request: "INVALID_ARGUMENT",
   legacy_id: "INVALID_ARGUMENT",
   not_found: "NOT_FOUND",
+  open_query: "INVALID_ARGUMENT",
   unknown_supplement: "INVALID_ARGUMENT",
   plan_not_ready: "FAILED_PRECONDITION",
   positive_number_required: "INVALID_ARGUMENT",
@@ -87,7 +91,9 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
   unsafe_content: "INVALID_ARGUMENT",
   unsupported_country: "INVALID_ARGUMENT",
   unsupported_currency: "INVALID_ARGUMENT",
-  unsupported_unit: "INVALID_ARGUMENT"
+  unsupported_unit: "INVALID_ARGUMENT",
+  unreferenced_claim: "INVALID_ARGUMENT",
+  wrong_purpose: "INVALID_ARGUMENT"
 };
 
 const RETRYABLE: ReadonlySet<AgenticReasonCode> = new Set([

@@ -248,13 +248,20 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
       const rows = await sql`
         select * from public.agentic_support_messages where case_id = ${caseId}::uuid
       `;
-      return rows.map((row) => ({
-        author: row.author,
-        body: row.body,
-        caseId: row.case_id,
-        createdAt: toIso(row.created_at),
-        id: row.id
-      }));
+      return rows
+        .map((row) => ({
+          author: row.author,
+          body: row.body,
+          caseId: row.case_id,
+          createdAt: toIso(row.created_at),
+          id: row.id,
+          sequence: 0
+        }))
+        .sort((left, right) => {
+          const byTime = left.createdAt.localeCompare(right.createdAt);
+          return byTime !== 0 ? byTime : left.id.localeCompare(right.id);
+        })
+        .map((row, index) => ({ ...row, sequence: index + 1 }));
     },
     async insertCapability(record) {
       await sql`

@@ -17,6 +17,14 @@ import {
   RECOGNISED_MEDICATION_CODES
 } from "@/lib/agentic/catalogue/names";
 import { listCatalogueGaps } from "@/lib/agentic/plan/telemetry";
+import { connectorCopy } from "@/lib/agentic/discovery/content";
+import {
+  RESEARCH_VERSION,
+  RESPONSIBILITY_VERSION,
+  VALUE_PROPOSITION_ID,
+  WELLNESS_BOUNDARY_ID
+} from "@/lib/agentic/discovery/versions";
+import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
 
 export const AGENTIC_SCHEMA_CHECKSUM = createHash("sha256")
   .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
@@ -35,7 +43,12 @@ export const PUBLIC_INFO_ALLOW_LIST = [
   "userAccountRequired",
   "continuation",
   "pollAfterSeconds",
-  "supportAvailable"
+  "supportAvailable",
+  "description",
+  "valuePropositionId",
+  "wellnessBoundary",
+  "researchVersion",
+  "responsibilityVersion"
 ] as const;
 
 export type PublicInfoCountry = Readonly<{
@@ -49,15 +62,20 @@ export type PublicInfo = Readonly<{
   conditionCodes: readonly string[];
   continuation: "polling_only";
   contractVersion: string;
+  description: string;
   medicationCodes: readonly string[];
   ok: true;
   pollAfterSeconds: number;
+  researchVersion: string;
+  responsibilityVersion: string;
   schemaChecksum?: string;
   serviceName: string;
   supportAvailable: true;
   supportedCountries: readonly PublicInfoCountry[];
   supportedLocales: readonly string[];
   userAccountRequired: false;
+  valuePropositionId: string;
+  wellnessBoundary: string;
 }>;
 
 let infoCache: {
@@ -104,6 +122,7 @@ async function recognisedNamesForMarkets(input: Readonly<{
 function publicCapabilityInfo(input: Readonly<{
   buildId?: string;
   conditionCodes: readonly string[];
+  locale?: string;
   medicationCodes: readonly string[];
   supportedCountries: readonly PublicInfoCountry[];
 }>): PublicInfo {
@@ -124,7 +143,12 @@ function publicCapabilityInfo(input: Readonly<{
     userAccountRequired: false,
     continuation: "polling_only",
     pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
-    supportAvailable: true
+    supportAvailable: true,
+    description: connectorCopy(input.locale),
+    valuePropositionId: VALUE_PROPOSITION_ID,
+    wellnessBoundary: WELLNESS_BOUNDARY_ID,
+    researchVersion: RESEARCH_VERSION,
+    responsibilityVersion: RESPONSIBILITY_VERSION
   };
 }
 
@@ -192,19 +216,24 @@ export async function infoTool(input: Readonly<{
   };
   locale?: string;
 }>): Promise<PublicInfo> {
-  void negotiateLocale(input.locale);
+  const locale = negotiateLocale(input.locale);
 
   if (input.isolatedInfo) {
     return publicCapabilityInfo({
       buildId: input.config.buildId,
       conditionCodes: input.isolatedInfo.conditionCodes,
+      locale,
       medicationCodes: input.isolatedInfo.medicationCodes,
       supportedCountries: input.isolatedInfo.supportedCountries
     });
   }
 
   const supportedCountries = await supportedCountriesFor(input.config);
-  const key = supportedCountries.map((item) => item.countryCode).join(",");
+  const key = [
+    input.config.buildId,
+    locale,
+    supportedCountries.map((item) => item.countryCode).join(",")
+  ].join(":");
   if (infoCache?.key === key) {
     return infoCache.value;
   }
@@ -212,9 +241,17 @@ export async function infoTool(input: Readonly<{
   const value = publicCapabilityInfo({
     buildId: input.config.buildId,
     conditionCodes: RECOGNISED_CONDITION_CODES,
+    locale,
     medicationCodes: RECOGNISED_MEDICATION_CODES,
     supportedCountries
   });
   infoCache = { key, value };
+  recordFunnelEvent({
+    attribution: "agent_connector",
+    correlationId: `info:${input.config.buildId}:${locale}`,
+    createdAt: new Date(0).toISOString(),
+    eventId: `info:${key}`,
+    eventType: "info_shown"
+  });
   return value;
 }

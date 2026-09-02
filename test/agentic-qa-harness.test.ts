@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe("DEV internal QA harness", () => {
-  it("keeps public tools/list at the six bare names", async () => {
+  it("keeps public tools/list at the advertised bare names", async () => {
     const runtime = runtimeFor();
     const listed = await handleJsonRpc(runtime, { id: 1, method: "tools/list" });
     const names = ((listed?.result?.tools as Array<{ name: string }>) ?? []).map(

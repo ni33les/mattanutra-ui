@@ -1054,7 +1054,7 @@ async function runContract01(session: PlanSession, runIndex: number): Promise<R2
   const names = toolList("dev").map((item) => item.name);
   const blob = planSchemaBlob();
   const assertions = [
-    assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback", names.join()),
+    assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback,evidence", names.join()),
     assertTrue("CONTRACT-01.ops", /"create"/.test(blob) && /"revise"/.test(blob) && /"answer"/.test(blob) && /"select"/.test(blob) && /"get"/.test(blob)),
     assertTrue("CONTRACT-01.importance", blob.includes('"importance"')),
     assertTrue("CONTRACT-01.range", blob.includes('"acceptableRange"')),

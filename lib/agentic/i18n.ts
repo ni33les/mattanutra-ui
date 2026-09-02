@@ -199,6 +199,21 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ไม่พบรายการ",
     "zh-CN": "未找到。"
   },
+  "mcp.errors.open_query": {
+    en: "Evidence does not accept an open query.",
+    th: "หลักฐานไม่รับคำค้นแบบเปิด",
+    "zh-CN": "证据工具不接受开放查询。"
+  },
+  "mcp.errors.unreferenced_claim": {
+    en: "That claim is not attached to this plan.",
+    th: "ข้อกล่าวอ้างนี้ไม่ได้ผูกกับแผนนี้",
+    "zh-CN": "该声明未附加到此方案。"
+  },
+  "mcp.errors.wrong_purpose": {
+    en: "This handle cannot be used for that action.",
+    th: "รหัสนี้ใช้กับการกระทำนั้นไม่ได้",
+    "zh-CN": "此句柄不能用于该操作。"
+  },
   "mcp.errors.plan_not_ready": {
     en: "This plan is not ready to execute.",
     th: "แผนนี้ยังไม่พร้อมสร้างคำสั่งซื้อ",

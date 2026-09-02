@@ -1,6 +1,7 @@
 import { nextTestUuid } from "@/lib/agentic/capabilities";
 import type { RetailerAdapterId } from "@/lib/agentic/config";
 import type { AgenticStore, OrderRecord } from "@/lib/agentic/store/types";
+import { nextStateVersion, commerceTimelineStatus } from "@/lib/agentic/commerce/timeline";
 
 export type FulfilmentAdvanceStatus =
   | "cancelled"
@@ -106,11 +107,15 @@ export async function applyFulfilmentEvent(input: Readonly<{
 
   const nextStatus =
     input.status === "exception" ? "exception" : input.status;
-  const next: OrderRecord = {
+  const projected: OrderRecord = {
     ...order,
     fulfilmentStatus: nextStatus,
     orderStatus: input.status === "cancelled" ? "cancelled" : order.orderStatus,
     updatedAt: input.now
+  };
+  const next: OrderRecord = {
+    ...projected,
+    stateVersion: nextStateVersion(order, commerceTimelineStatus(projected))
   };
   await input.store.updateOrder(next);
   await input.store.insertFulfilmentEvent({

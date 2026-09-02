@@ -516,7 +516,7 @@ async function main() {
   record(
     "A13",
     exactToolNames(listedNames),
-    "tools/list is exactly info,plan,execute,order,support,feedback"
+    "tools/list is exactly info,plan,execute,order,support,feedback,evidence"
   );
 
   const algaePlan = await call("plan", {
