@@ -215,7 +215,7 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
   };
 
   if (name === "preflight") {
-    return { result: toolResult(qaPreflight(typeof params.namespace === "string" ? params.namespace : undefined)) };
+    return { result: toolResult(await qaPreflight(typeof params.namespace === "string" ? params.namespace : undefined)) };
   }
 
   if (name === "beginRun") {
@@ -226,7 +226,7 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
         clock: begun.now,
         namespace: begun.namespace,
         principalScope: begun.principalScope,
-        preflight: qaPreflight(begun.namespace)
+        preflight: await qaPreflight(begun.namespace)
       })
     };
   }
@@ -395,7 +395,7 @@ export async function handleQaJsonRpc(
         capabilities: { tools: { listChanged: false } },
         instructions:
           "DEV-only MattaNutra QA harness. Public customer tools live on the public MCP endpoint. Call preflight first. beginRun/reset isolate Run A and Run B with a settable clock. simulate drives payment. simulateFulfilment drives preparing, dispatched, and delivered through real handlers. observe is the funnel, query, and contribution observer. setChannel is reporting-only.",
-        preflight: qaPreflight(),
+        preflight: await qaPreflight(),
         protocolVersion: "2025-03-26",
         serverInfo: {
           name: `${AGENTIC_SERVICE_NAME} QA`,

@@ -4,7 +4,7 @@ import { CONNECTOR_COPY } from "@/lib/agentic/discovery/content";
 import { DISCOVERY_CONTENT_VERSION } from "@/lib/agentic/discovery/versions";
 import { agenticMessageKeys } from "@/lib/agentic/i18n";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
-import { getCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
+import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import { QA_PACK_CLOCK, qaSession } from "@/lib/agentic/qa/session";
 
 export const QA_PACK_VERSION = "3.0.0";
@@ -62,8 +62,8 @@ export function localeBundleChecksum() {
     .digest("hex");
 }
 
-export function qaPreflight(namespace?: string) {
-  const snapshot = getCatalogueSnapshot("TH");
+export async function qaPreflight(namespace?: string) {
+  const snapshot = await ensureCatalogueSnapshot("dev", "TH");
   const session = qaSession(namespace);
   return {
     ok: true as const,

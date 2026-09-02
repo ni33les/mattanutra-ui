@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     if (typeof rest.runId === "string" && !("orderHandle" in rest)) {
       const begun = beginQaRun(rest.runId);
       return NextResponse.json(
-        { ok: true, clock: begun.now, namespace: begun.namespace, principalScope: begun.principalScope, preflight: qaPreflight(begun.namespace) },
+        { ok: true, clock: begun.now, namespace: begun.namespace, principalScope: begun.principalScope, preflight: await qaPreflight(begun.namespace) },
         { headers: { "Cache-Control": "no-store" } }
       );
     }
@@ -219,7 +219,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json(
     {
-      preflight: qaPreflight(),
+      preflight: await qaPreflight(),
       tools: [
         "preflight",
         "beginRun",
