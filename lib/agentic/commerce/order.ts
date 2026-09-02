@@ -71,14 +71,17 @@ export async function orderTool(input: Readonly<{
   void funnel;
   const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
   const cost = order ? channelCost(order.planId) : { acquisitionMinor: 0, attribution };
+  const paymentFeeMinor = 0;
+  const shippingSubsidyMinor = 0;
+  const paymentMinor = order?.totalPriceMinor ?? 0;
   const contribution =
     order && order.paymentStatus === "paid"
       ? contributionMinor({
           acquisitionMinor: cost.acquisitionMinor,
-          paymentFeeMinor: 0,
-          paymentMinor: order.totalPriceMinor,
+          paymentFeeMinor,
+          paymentMinor,
           productCostMinor,
-          shippingSubsidyMinor: 0
+          shippingSubsidyMinor
         })
       : null;
 
@@ -105,11 +108,16 @@ export async function orderTool(input: Readonly<{
 
   return {
     ...view,
+    acquisitionMinor: cost.acquisitionMinor,
     attribution: cost.attribution === "unattributed" ? attribution : cost.attribution,
     contributionMinor: contribution,
     events: projection.events,
     money: projection.money,
+    paymentFeeMinor,
+    paymentMinor,
+    productCostMinor,
     responsibility: responsibilitySnapshot(locale),
+    shippingSubsidyMinor,
     timeline: projection.timeline
   };
 }

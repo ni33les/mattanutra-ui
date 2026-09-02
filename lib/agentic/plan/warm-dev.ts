@@ -27,7 +27,7 @@ function livePlanInFlight() {
   return isLivePlanInFlight();
 }
 
-function eightTargetRequest() {
+export function eightTargetRequest() {
   return {
     destinationCountry: "TH",
     locale: "en",

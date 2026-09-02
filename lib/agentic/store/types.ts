@@ -178,7 +178,7 @@ export type SupportCaseRecord = Readonly<{
 }>;
 
 export type SupportMessageRecord = Readonly<{
-  author: "client" | "system";
+  author: "client" | "support" | "system";
   body: string;
   caseId: string;
   createdAt: string;

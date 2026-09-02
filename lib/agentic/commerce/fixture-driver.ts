@@ -60,7 +60,7 @@ export async function drivePaymentFixture(input: Readonly<{
   });
 
   const correlationId = input.correlationId ?? order.planId;
-  if (applied?.order.paymentStatus === "paid") {
+  if (applied?.applied && applied.order.paymentStatus === "paid") {
     await processOmsOutbox({ now: input.now, store: input.store });
     recordFunnelEvent({
       correlationId,
@@ -69,7 +69,7 @@ export async function drivePaymentFixture(input: Readonly<{
       eventType: "payment_succeeded",
       payload: { locale: "en" }
     });
-  } else if (applied?.order.latestPaymentAttempt === "declined") {
+  } else if (applied?.applied && applied.order.latestPaymentAttempt === "declined") {
     recordFunnelEvent({
       correlationId,
       createdAt: input.now,

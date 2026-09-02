@@ -8,6 +8,7 @@ import type {
 } from "@/lib/agentic/store/types";
 import type { VerifiedPaymentEvent } from "@/lib/agentic/commerce/payment";
 import { publicFrozenOrder } from "@/lib/agentic/public-mapper";
+import { publicFulfilmentStatus } from "@/lib/agentic/commerce/timeline";
 
 export type PaymentApplyResult = Readonly<{
   applied: boolean;
@@ -385,7 +386,7 @@ export function orderPollView(input: Readonly<{
     fulfilment: {
       deliveryWindow: null,
       reasonCode,
-      status: order.fulfilmentStatus,
+      status: publicFulfilmentStatus(order.fulfilmentStatus),
       tracking: fulfilmentTracking(input.retail, events)
     },
     latestPaymentAttempt: order.latestPaymentAttempt,

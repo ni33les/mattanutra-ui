@@ -58,6 +58,7 @@ import { buildEconomics, enrichBasketPackFacts } from "@/lib/agentic/value/econo
 import { cashCostForHorizon } from "@/lib/agentic/value/horizon-cash";
 import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
 import { planRematchFingerprint } from "@/lib/agentic/plan/normalize";
+import { countQuery } from "@/lib/agentic/plan/query-budget";
 
 export { toMatcherProduct };
 
@@ -105,7 +106,9 @@ function matchPlanCacheKey(
   const hash = createHash("sha256");
   hash.update(planRematchFingerprint(state));
   hash.update("\0");
-  hash.update(snapshotIdCached(snapshot));
+  hash.update(snapshot.catalogueVersion);
+  hash.update("\0");
+  hash.update(String(snapshot.products.length));
   hash.update("\0");
   hash.update(GUIDANCE_RULES_VERSION);
   hash.update("\0");
@@ -659,10 +662,9 @@ function selectionReasonFor(
     return undefined;
   }
 
-  const locale = negotiateLocale(state.locale);
   return {
     code: "dedicated_unavailable",
-    message: agenticMessage(locale, "plan.selection.dedicated_unavailable"),
+    message: agenticMessage("en", "plan.selection.dedicated_unavailable"),
     messageKey: "plan.selection.dedicated_unavailable",
     requestedNames: served.map((item) => item.name),
     requestedSupplementIds: served.map((item) => item.supplementId)
@@ -1069,11 +1071,15 @@ export function matchPlan(input: Readonly<{
   const cacheKey = matchPlanCacheKey(input.state, input.snapshot);
   const cached = matchPlanCache.get(cacheKey);
   if (cached) {
+    countQuery("plan.match");
+    countQuery("plan.match.hit");
     matchPlanCache.delete(cacheKey);
     matchPlanCache.set(cacheKey, cached);
     return structuredClone(cached);
   }
 
+  countQuery("plan.match");
+  countQuery("plan.match.miss");
   const computed = computeMatchPlan(input);
   matchPlanCache.set(cacheKey, computed);
   if (matchPlanCache.size > MATCH_PLAN_CACHE_LIMIT) {

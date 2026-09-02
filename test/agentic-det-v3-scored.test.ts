@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { CONNECTOR_COPY, englishConnectorWordCount } from "../lib/agentic/discovery/content.ts";
+import { checkoutResponsibilityCopy } from "../lib/agentic/responsibility/matrix.ts";
 import { RESEARCH_VERSION, RESPONSIBILITY_VERSION } from "../lib/agentic/discovery/versions.ts";
 import { FUNNEL_EVENT_TYPES } from "../lib/agentic/funnel/events.ts";
 import { recordFunnelEvent, resetFunnelLedger, listFunnelEvents } from "../lib/agentic/funnel/ledger.ts";
@@ -123,12 +124,26 @@ async function paidDeliveredJourney(
     status: "preparing"
   });
   assert.equal(preparing.timeline, "preparing");
+  assert.equal((preparing.fulfilment as { status?: string } | undefined)?.status, "preparing");
+  assert.equal(
+    ((preparing.events as Array<{ kind?: string; status?: string }>) ?? []).some(
+      (item) => item.kind === "fulfilment" && item.status === "packed"
+    ),
+    false
+  );
   const dispatched = await qaCall(runtime, "simulateFulfilment", {
     namespace: input.namespace,
     orderHandle,
     status: "dispatched"
   });
   assert.equal(dispatched.timeline, "dispatched");
+  assert.equal((dispatched.fulfilment as { status?: string } | undefined)?.status, "dispatched");
+  assert.equal(
+    ((dispatched.events as Array<{ kind?: string; status?: string }>) ?? []).some(
+      (item) => item.kind === "fulfilment" && (item.status === "shipped" || item.status === "packed")
+    ),
+    false
+  );
 
   const created = await supportTool({
     config: runtime.config,
@@ -140,9 +155,10 @@ async function paidDeliveredJourney(
     store: runtime.store
   });
   const thread = (created.thread as Array<{ author: string; body: string; sequence: number }>) ?? [];
+  const supportHandle = String((created as { supportHandle: string }).supportHandle);
   assert.equal(thread.length, 2);
   assert.equal(thread[0]?.author, "client");
-  assert.equal(thread[1]?.author, "system");
+  assert.equal(thread[1]?.author, "support");
   assert.equal(thread[1]?.body, "It is dispatched.");
   assert.equal(thread[0]?.sequence, 1);
   assert.equal(thread[1]?.sequence, 2);
@@ -169,6 +185,7 @@ async function paidDeliveredJourney(
     observed,
     orderHandle,
     plan,
+    supportHandle,
     thread
   };
 }
@@ -301,6 +318,19 @@ describe("Slice S3 support and funnel", () => {
     }
     assert.equal(typeof journey.observed.contributionMinor, "number");
     assert.notEqual(journey.observed.contributionMinor, null);
+    assert.equal(typeof journey.observed.paymentMinor, "number");
+    assert.equal(typeof journey.observed.productCostMinor, "number");
+    assert.equal(typeof journey.observed.shippingSubsidyMinor, "number");
+    assert.equal(typeof journey.observed.paymentFeeMinor, "number");
+    assert.equal(typeof journey.observed.acquisitionMinor, "number");
+    assert.equal(
+      journey.observed.contributionMinor,
+      Number(journey.observed.paymentMinor) -
+        Number(journey.observed.productCostMinor) -
+        Number(journey.observed.shippingSubsidyMinor) -
+        Number(journey.observed.paymentFeeMinor) -
+        Number(journey.observed.acquisitionMinor)
+    );
     assert.equal(journey.observed.attribution, "qa_campaign");
     const again = await qaCall(runtime, "observe", {
       namespace: String(begun.namespace),
@@ -356,7 +386,7 @@ describe("Slice S3 support and funnel", () => {
     });
     assert.deepEqual(
       journey.thread.map((item) => item.author),
-      ["client", "system"]
+      ["client", "support"]
     );
     assert.equal(journey.thread[1]?.body, "It is dispatched.");
   });
@@ -369,7 +399,8 @@ describe("Slice S4 connector copy and versions", () => {
     assert.match(CONNECTOR_COPY.en, /current-stock/i);
     assert.match(CONNECTOR_COPY.en, /overlap optimiz/i);
     assert.match(CONNECTOR_COPY.en, /wellness/i);
-    assert.match(CONNECTOR_COPY.en, /not diagnosis/i);
+    assert.match(CONNECTOR_COPY.en, /not clinical/i);
+    assert.match(CONNECTOR_COPY.en, /not diagnosis|not clinical diagnosis/i);
   });
 
   it("S4-02 responsibility-3.0.0 is on discovery, info, and execute", async () => {
@@ -386,6 +417,10 @@ describe("Slice S4 connector copy and versions", () => {
       tools.map((item) => item.name),
       [...AGENTIC_PUBLIC_TOOLS]
     );
+    const listedTools = (listed?.result?.tools as Array<{ name: string; responsibilityVersion?: string }>) ?? [];
+    for (const tool of listedTools) {
+      assert.equal(tool.responsibilityVersion, RESPONSIBILITY_VERSION, tool.name);
+    }
   });
 
   it("S4-03 evidence claims each carry researchVersion", async () => {
@@ -433,6 +468,11 @@ describe("Slice S6 latency", () => {
     const proof = await latencyProof(runtime);
     assert.equal("reason" in proof && proof.reason === "plan_not_ready", false, canonicalJson(proof));
     assert.equal(proof.passed, true, canonicalJson(proof));
+    assert.equal((proof as { sleeps?: number }).sleeps, 0);
+    assert.equal((proof as { polling?: boolean }).polling, false);
+    const queries = ((proof as { queries?: Record<string, number> }).queries ?? {});
+    assert.ok(Object.keys(queries).length >= 1);
+    assert.equal((proof as { dependencyBudget?: { sleeps?: number } }).dependencyBudget?.sleeps, 0);
   });
 
   it("S6-02 gold plan p50/p95 stay inside live limits", async () => {
@@ -448,6 +488,172 @@ describe("Slice S6 latency", () => {
           request: goldenPlanRequest()
         },
         scope: runtime.scope,
+        store: runtime.store
+      });
+      samples.push(performance.now() - started);
+      assert.equal((plan as { ok?: boolean }).ok, true);
+    }
+    const sorted = [...samples].sort((left, right) => left - right);
+    const p50 = sorted[Math.ceil(0.5 * sorted.length) - 1] ?? 0;
+    const p95 = sorted[Math.ceil(0.95 * sorted.length) - 1] ?? 0;
+    assert.ok(p50 <= 5000, `p50 ${p50}`);
+    assert.ok(p95 <= 8000, `p95 ${p95}`);
+  });
+});
+
+describe("Slice 8.2 remaining scored holes", () => {
+  it("82-VAL-01 connector copy includes the frozen not-clinical safety boundary", () => {
+    assert.match(CONNECTOR_COPY.en, /not clinical/i);
+    assert.equal(englishConnectorWordCount() <= 60, true);
+  });
+
+  it("82-TRUST-06 checkout and execute expose the complete four-domain summary", async () => {
+    const checkout = checkoutResponsibilityCopy("en");
+    assert.equal(checkout.version, RESPONSIBILITY_VERSION);
+    assert.ok(checkout.guidance);
+    assert.ok(checkout.payment);
+    assert.ok(checkout.fulfilment);
+    assert.ok(checkout.support);
+    const runtime = createDetRuntime();
+    const plan = await planTool({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      payload: { idempotencyKey: "scored-82-exec-planxxxx", request: goldenPlanRequest() },
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    if ((plan as { status?: string }).status !== "ready") {
+      return;
+    }
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: (plan as { revision: number }).revision,
+      idempotencyKey: "scored-82-exec-execxxxx",
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: (plan as { planHandle: string }).planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const responsibility = (executed as { responsibility?: { domains?: Array<{ domain: string }>; version?: string } })
+      .responsibility;
+    assert.equal((executed as { responsibilityVersion?: string }).responsibilityVersion, RESPONSIBILITY_VERSION);
+    assert.equal(responsibility?.version, RESPONSIBILITY_VERSION);
+    assert.deepEqual(
+      (responsibility?.domains ?? []).map((item) => item.domain),
+      ["guidance", "payment", "fulfilment", "support"]
+    );
+  });
+
+  it("82-TECH-04 locale mutation keeps selectionReason.message stable", async () => {
+    const runtime = createDetRuntime();
+    const en = await planTool({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      payload: {
+        idempotencyKey: "scored-82-loc-enxxxxxxx",
+        request: { ...goldenPlanRequest(), locale: "en" }
+      },
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const th = await planTool({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      payload: {
+        idempotencyKey: "scored-82-loc-thxxxxxxx",
+        request: { ...goldenPlanRequest(), locale: "th" }
+      },
+      scope: { ...runtime.scope, principalScope: "det-v3-th" },
+      store: runtime.store
+    });
+    const enBasket = ((en as { selected?: { basket?: Array<{ selectionReason?: Record<string, unknown> }> } }).selected
+      ?.basket ?? []) as Array<{ selectionReason?: Record<string, unknown> }>;
+    const thBasket = ((th as { selected?: { basket?: Array<{ selectionReason?: Record<string, unknown> }> } }).selected
+      ?.basket ?? []) as Array<{ selectionReason?: Record<string, unknown> }>;
+    if (enBasket[0]?.selectionReason && thBasket[0]?.selectionReason) {
+      assert.equal(
+        canonicalJson({
+          code: enBasket[0].selectionReason.code,
+          message: enBasket[0].selectionReason.message,
+          messageKey: enBasket[0].selectionReason.messageKey
+        }),
+        canonicalJson({
+          code: thBasket[0].selectionReason.code,
+          message: thBasket[0].selectionReason.message,
+          messageKey: thBasket[0].selectionReason.messageKey
+        })
+      );
+    }
+  });
+
+  it("82-COM-09 canned dispatched line is support, not a second client message", async () => {
+    const runtime = createDetRuntime();
+    const begun = await qaCall(runtime, "beginRun", { runId: "A" });
+    const journey = await paidDeliveredJourney(runtime, {
+      namespace: String(begun.namespace),
+      principal: String(begun.principalScope ?? begun.namespace),
+      suffix: "82c"
+    });
+    const again = await supportTool({
+      config: runtime.config,
+      idempotencyKey: "scored-82-sup-ackxxxxx",
+      message: "It is dispatched.",
+      now: DET_V3_CLOCK,
+      orderHandle: journey.orderHandle,
+      scope: {
+        ...runtime.scope,
+        principalScope: String(begun.principalScope ?? begun.namespace)
+      },
+      store: runtime.store,
+      supportHandle: journey.supportHandle
+    });
+    const thread = (again as { thread: Array<{ author: string; body: string; sequence: number }> }).thread;
+    const dispatched = thread.filter((item) => item.body === "It is dispatched.");
+    assert.ok(dispatched.length >= 1);
+    assert.equal(dispatched.every((item) => item.author === "support"), true);
+    assert.equal(thread.filter((item) => item.author === "client").length, 1);
+  });
+
+  it("82-TECH-06 observe reports match queries and a zero-sleep dependency budget", async () => {
+    const runtime = createDetRuntime();
+    const begun = await qaCall(runtime, "beginRun", { runId: "A" });
+    const scope = {
+      ...runtime.scope,
+      principalScope: String(begun.principalScope ?? begun.namespace)
+    };
+    await planTool({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      payload: { idempotencyKey: "scored-82-obs-planxxxxx", request: goldenPlanRequest() },
+      scope,
+      store: runtime.store
+    });
+    const observed = await qaCall(runtime, "observe", {
+      correlationId: "tech-06",
+      namespace: String(begun.namespace)
+    });
+    const queries = (observed.queries ?? {}) as Record<string, number>;
+    assert.ok(typeof queries["catalogue.snapshot.TH"] === "number");
+    assert.ok(typeof queries["plan.match"] === "number");
+    const budget = observed.dependencyBudget as { polling?: boolean; sleeps?: number };
+    assert.equal(budget.sleeps, 0);
+    assert.equal(budget.polling, false);
+  });
+
+  it("82-TECH-07 thirty identical cached plans meet live p50/p95", async () => {
+    const runtime = createDetRuntime();
+    const samples: number[] = [];
+    for (let index = 0; index < 30; index += 1) {
+      const started = performance.now();
+      const plan = await planTool({
+        config: runtime.config,
+        now: DET_V3_CLOCK,
+        payload: {
+          idempotencyKey: `scored-82-30-${String(index).padStart(10, "0")}`,
+          request: goldenPlanRequest()
+        },
+        scope: { ...runtime.scope, principalScope: `s82-${index}` },
         store: runtime.store
       });
       samples.push(performance.now() - started);

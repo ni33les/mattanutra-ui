@@ -205,6 +205,7 @@ describe("Slice A discovery", () => {
     assert.match(CONNECTOR_COPY.en, /match/i);
     assert.match(CONNECTOR_COPY.en, /optimiz/i);
     assert.match(CONNECTOR_COPY.en, /wellness/i);
+    assert.match(CONNECTOR_COPY.en, /not clinical/i);
     assert.equal(/availibility|optimiseing|diagnosiss/i.test(CONNECTOR_COPY.en), false);
     for (const locale of DET_V3_LOCALES) {
       assert.ok(connectorCopy(locale).length > 20);
@@ -1242,12 +1243,12 @@ describe("Slice E support", () => {
       orderHandle,
       supportHandle: created.supportHandle
     });
-    assert.equal((replied.thread as unknown[]).length, 4);
+    assert.equal((replied.thread as unknown[]).length, 3);
     assert.equal(canonicalJson(replied), canonicalJson(replay));
     const threadAuthors = (replied.thread as Array<{ author: string; body: string }>).map(
       (item) => item.author
     );
-    assert.deepEqual(threadAuthors, ["client", "system", "client", "system"]);
+    assert.deepEqual(threadAuthors, ["client", "support", "client"]);
     assert.equal(
       (replied.thread as Array<{ body: string }>)[1]?.body,
       "It is dispatched."
@@ -1295,7 +1296,7 @@ describe("Slice E support", () => {
     assert.ok(Array.isArray(created.thread));
     assert.equal((created.thread as unknown[]).length, 2);
     assert.equal((created.thread as Array<{ author: string }>)[0]?.author, "client");
-    assert.equal((created.thread as Array<{ author: string }>)[1]?.author, "system");
+    assert.equal((created.thread as Array<{ author: string }>)[1]?.author, "support");
     assert.equal(/address|checkoutToken|health|sk_live/i.test(canonicalJson(context)), false);
   });
 

@@ -1,6 +1,7 @@
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { RESPONSIBILITY_VERSION } from "@/lib/agentic/discovery/versions";
+import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { humanOrderReference } from "@/lib/agentic/contract/ids";
 import {
@@ -99,6 +100,7 @@ export type ExecuteSuccess = Readonly<{
   orderStatus: OrderRecord["orderStatus"];
   paymentStatus: OrderRecord["paymentStatus"];
   pollAfterSeconds: number;
+  responsibility: ReturnType<typeof responsibilitySnapshot>;
   responsibilityVersion: string;
   stateVersion: number;
   successUrl?: string;
@@ -404,6 +406,7 @@ async function executeFresh(
       orderStatus: "open",
       paymentStatus: "unpaid",
       pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
+      responsibility: responsibilitySnapshot(locale),
       responsibilityVersion: RESPONSIBILITY_VERSION,
       stateVersion: 1
     };

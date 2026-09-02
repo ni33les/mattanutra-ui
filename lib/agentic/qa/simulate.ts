@@ -18,7 +18,7 @@ import {
   listFunnelEvents,
   loadPersistedFunnelEvents
 } from "@/lib/agentic/funnel/ledger";
-import { queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
+import { dependencyBudget, queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
 import { bindQaChannel, channelCost, qaSession } from "@/lib/agentic/qa/session";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
@@ -207,23 +207,33 @@ export async function observeQaJourney(input: Readonly<{
   const attribution = cost.attribution === "unattributed" ? funnelAttribution(correlationId) : cost.attribution;
   const items = order ? await input.store.getOrderItems(order.id) : [];
   const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
+  const paymentMinor = order?.totalPriceMinor ?? 0;
+  const paymentFeeMinor = 0;
+  const shippingSubsidyMinor = 0;
   const contribution =
     order && order.paymentStatus === "paid"
       ? contributionMinor({
           acquisitionMinor: cost.acquisitionMinor,
-          paymentFeeMinor: 0,
-          paymentMinor: order.totalPriceMinor,
+          paymentFeeMinor,
+          paymentMinor,
           productCostMinor,
-          shippingSubsidyMinor: 0
+          shippingSubsidyMinor
         })
       : null;
+  const queryNs = input.namespace ?? session?.namespace;
 
   return {
     ok: true as const,
+    acquisitionMinor: cost.acquisitionMinor,
     attribution,
     clock: session?.now ?? input.now,
     contributionMinor: contribution,
     correlationId,
+    dependencyBudget: dependencyBudget(queryNs),
+    paymentFeeMinor,
+    paymentMinor: order ? paymentMinor : null,
+    productCostMinor: order ? productCostMinor : null,
+    shippingSubsidyMinor,
     events: events.map((event) => ({
       anonymousCorrelation: event.payload.anonymousCorrelation,
       attribution: event.attribution,
@@ -233,7 +243,7 @@ export async function observeQaJourney(input: Readonly<{
       locale: event.payload.locale,
       sequence: event.sequence
     })),
-    namespace: input.namespace ?? session?.namespace ?? null,
-    queries: queryBudgetSnapshot(input.namespace ?? session?.namespace)
+    namespace: queryNs ?? null,
+    queries: queryBudgetSnapshot(queryNs)
   };
 }

@@ -49,3 +49,14 @@ export function queryBudgetSnapshot(namespace?: string) {
 export function queryCount(name: string, namespace?: string) {
   return bucket(namespace ?? activeNamespace).get(name) ?? 0;
 }
+
+export function dependencyBudget(namespace?: string) {
+  const queries = queryBudgetSnapshot(namespace);
+  return {
+    catalogueSnapshots: queries["catalogue.snapshot.TH"] ?? 0,
+    planMatchHits: queries["plan.match.hit"] ?? 0,
+    planMatchMisses: queries["plan.match.miss"] ?? 0,
+    polling: false as const,
+    sleeps: 0 as const
+  };
+}

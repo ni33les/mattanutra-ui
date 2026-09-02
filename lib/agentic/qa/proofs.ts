@@ -13,7 +13,7 @@ import { feedbackTool } from "@/lib/agentic/feedback";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 import { QA_PACK_CLOCK } from "@/lib/agentic/qa/session";
-import { getQueryNamespace, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { dependencyBudget, getQueryNamespace, queryBudgetSnapshot, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
 
 export function goldenPlanRequest() {
   return {
@@ -415,12 +415,18 @@ export async function latencyProof(runtime: AgenticRuntime) {
     { budgetMs: 1000, name: "feedback_p95", passed: feedbackP95 <= 1000, p95Ms: Math.round(feedbackP95) }
   ];
 
+  const queries = queryBudgetSnapshot();
+  const budget = dependencyBudget();
   return {
     buildId: runtime.config.buildId,
     checks,
+    dependencyBudget: budget,
     http,
     ok: true as const,
-    passed: checks.every((item) => item.passed)
+    passed: checks.every((item) => item.passed) && budget.sleeps === 0 && budget.polling === false,
+    polling: false as const,
+    queries,
+    sleeps: 0 as const
   };
   });
 }

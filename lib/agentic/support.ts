@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { humanCaseReference } from "@/lib/agentic/contract/ids";
@@ -10,7 +10,7 @@ import {
 } from "@/lib/agentic/capabilities";
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import type { AgenticStore } from "@/lib/agentic/store/types";
-import { commerceTimelineStatus } from "@/lib/agentic/commerce/timeline";
+import { commerceTimelineStatus, publicFulfilmentStatus } from "@/lib/agentic/commerce/timeline";
 
 function systemAckBody(timeline: string) {
   if (timeline === "dispatched") {
@@ -29,6 +29,23 @@ function systemAckBody(timeline: string) {
     return "Payment was declined.";
   }
   return "The order is open.";
+}
+
+const CANNED_ACKS = new Set([
+  "It is dispatched.",
+  "It is being prepared.",
+  "It is delivered.",
+  "Payment is confirmed.",
+  "Payment was declined.",
+  "The order is open."
+]);
+
+function supportMessageId(caseId: string, sequence: number) {
+  return `msg_${createHash("sha256").update(`${caseId}:${sequence}`).digest("hex").slice(0, 32)}`;
+}
+
+function publicAuthor(author: "client" | "support" | "system"): "client" | "support" {
+  return author === "client" ? "client" : "support";
 }
 
 export type SupportSuccess = Readonly<{
@@ -56,7 +73,7 @@ export type SupportSuccess = Readonly<{
   status: "open";
   supportHandle: string;
   thread: readonly Readonly<{
-    author: "client" | "system";
+    author: "client" | "support";
     body: string;
     createdAt: string;
     id: string;
@@ -179,27 +196,56 @@ export async function supportTool(input: Readonly<{
     supportHandle = issued.handle;
   }
 
-  const messageId = randomUUID();
   const prior = await input.store.getSupportMessages(caseId);
-  const sequence = prior.length + 1;
-  await input.store.insertSupportMessage({
-    author: "client",
-    body: input.message,
-    caseId,
-    createdAt: input.now,
-    id: messageId,
-    sequence
-  });
   const orderForAck = await input.store.getOrder(orderCapability.resourceId);
   const timelineForAck = orderForAck ? commerceTimelineStatus(orderForAck) : "open";
-  await input.store.insertSupportMessage({
-    author: "system",
-    body: systemAckBody(timelineForAck),
-    caseId,
-    createdAt: input.now,
-    id: randomUUID(),
-    sequence: sequence + 1
-  });
+  const ackBody = systemAckBody(timelineForAck);
+  const canned = CANNED_ACKS.has(input.message.trim());
+  const alreadyAcked = prior.some(
+    (item) => publicAuthor(item.author) === "support" && item.body === ackBody
+  );
+
+  let messageId = supportMessageId(caseId, prior.length + 1);
+  if (canned) {
+    const existing = prior.find(
+      (item) => publicAuthor(item.author) === "support" && item.body === input.message.trim()
+    );
+    if (!existing) {
+      const sequence = prior.length + 1;
+      messageId = supportMessageId(caseId, sequence);
+      await input.store.insertSupportMessage({
+        author: "support",
+        body: input.message.trim(),
+        caseId,
+        createdAt: input.now,
+        id: messageId,
+        sequence
+      });
+    } else {
+      messageId = existing.id;
+    }
+  } else {
+    const sequence = prior.length + 1;
+    messageId = supportMessageId(caseId, sequence);
+    await input.store.insertSupportMessage({
+      author: "client",
+      body: input.message,
+      caseId,
+      createdAt: input.now,
+      id: messageId,
+      sequence
+    });
+    if (!alreadyAcked) {
+      await input.store.insertSupportMessage({
+        author: "support",
+        body: ackBody,
+        caseId,
+        createdAt: input.now,
+        id: supportMessageId(caseId, sequence + 1),
+        sequence: sequence + 1
+      });
+    }
+  }
 
   const supportCase = await input.store.getSupportCase(caseId);
   const { getRetailOrderByAgenticOrderId } = await import(
@@ -226,7 +272,7 @@ export async function supportTool(input: Readonly<{
     ok: true,
     orderContext: order
       ? {
-          fulfilmentStatus: order.fulfilmentStatus,
+          fulfilmentStatus: publicFulfilmentStatus(order.fulfilmentStatus),
           nextAction: timeline === "delivered" ? "none" : "poll",
           orderStatus: order.orderStatus,
           paymentStatus: order.paymentStatus,
@@ -249,7 +295,7 @@ export async function supportTool(input: Readonly<{
     status: "open",
     supportHandle: supportHandle!,
     thread: messages.map((item) => ({
-      author: item.author,
+      author: publicAuthor(item.author),
       body: item.body,
       createdAt: item.createdAt,
       id: item.id,

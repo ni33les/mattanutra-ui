@@ -4,6 +4,7 @@ import { resolveCapability } from "@/lib/agentic/capabilities";
 import { type AgenticRuntime } from "@/lib/agentic/runtime";
 import { getQueryNamespace, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
 import { planTool } from "@/lib/agentic/plan/service";
+import { eightTargetRequest } from "@/lib/agentic/plan/warm-dev";
 import {
   isFulfilmentStatus,
   isPaymentScenario,
@@ -40,6 +41,7 @@ async function warmPackPlanCache(runtime: AgenticRuntime) {
   const previous = getQueryNamespace();
   setQueryNamespace("qa-warm");
   try {
+    const principal = `qa-warm:${Date.now().toString(36)}`;
     await planTool({
       config: runtime.config,
       now: QA_PACK_CLOCK,
@@ -49,7 +51,20 @@ async function warmPackPlanCache(runtime: AgenticRuntime) {
       },
       scope: {
         ...runtime.scope,
-        principalScope: `qa-warm:${Date.now().toString(36)}`
+        principalScope: principal
+      },
+      store: runtime.store
+    });
+    await planTool({
+      config: runtime.config,
+      now: QA_PACK_CLOCK,
+      payload: {
+        idempotencyKey: `warm8-${Date.now().toString(36)}planx`,
+        request: eightTargetRequest()
+      },
+      scope: {
+        ...runtime.scope,
+        principalScope: `${principal}-8`
       },
       store: runtime.store
     });

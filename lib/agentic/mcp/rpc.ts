@@ -103,7 +103,8 @@ export function toolList(environment: AgenticEnvironment = "dev", locale?: strin
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: descriptions[name],
     inputSchema: AGENTIC_TOOL_SCHEMAS[name],
-    name
+    name,
+    responsibilityVersion: RESPONSIBILITY_VERSION
   }));
 }
 

@@ -76,6 +76,7 @@ export function checkoutResponsibilityCopy(locale?: string) {
     fulfilment: responsibilityStatement("fulfilment", locale),
     guidance: responsibilityStatement("guidance", locale),
     payment: responsibilityStatement("payment", locale),
+    support: responsibilityStatement("support", locale),
     version: RESPONSIBILITY_VERSION
   };
 }

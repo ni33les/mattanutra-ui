@@ -304,14 +304,14 @@ function defaultSelectionReason(
   const requestedSupplementIds = contributions
     .map((item) => item.supplementId)
     .filter(Boolean);
-  const negotiated = negotiateLocale(locale);
+  void locale;
   const first = contributions[0];
   const gap = contributions.find((item) => item.remainingGap > 0) ?? null;
 
   if (contributions.length === 0) {
     return {
       code: "best_available",
-      message: agenticMessage(negotiated, "plan.selection.in_selected_stack"),
+      message: agenticMessage("en", "plan.selection.in_selected_stack"),
       messageKey: "plan.selection.in_selected_stack",
       requestedNames: [],
       requestedSupplementIds: []
@@ -321,8 +321,8 @@ function defaultSelectionReason(
   if (contributions.length >= 2) {
     return {
       code: "consolidates_targets",
-      message: agenticMessage(negotiated, "plan.selection.consolidates_targets", {
-        names: joinNames(requestedNames, negotiated)
+      message: agenticMessage("en", "plan.selection.consolidates_targets", {
+        names: joinNames(requestedNames, "en")
       }),
       messageKey: "plan.selection.consolidates_targets",
       requestedNames,
@@ -333,7 +333,7 @@ function defaultSelectionReason(
   if (gap) {
     return {
       code: "best_available_dose",
-      message: agenticMessage(negotiated, "plan.selection.best_available_dose", {
+      message: agenticMessage("en", "plan.selection.best_available_dose", {
         gap: formatDose(gap.remainingGap),
         name: first.name,
         unit: gap.unit
@@ -346,7 +346,7 @@ function defaultSelectionReason(
 
   return {
     code: "covers_target",
-    message: agenticMessage(negotiated, "plan.selection.covers_target", {
+    message: agenticMessage("en", "plan.selection.covers_target", {
       amount: formatDose(first.amount),
       name: first.name,
       unit: first.unit

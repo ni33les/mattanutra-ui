@@ -25,6 +25,16 @@ const RANK: Record<CommerceTimelineStatus, number> = {
   delivered: 5
 };
 
+export function publicFulfilmentStatus(status: string) {
+  if (status === "packed" || status === "processing") {
+    return "preparing";
+  }
+  if (status === "shipped") {
+    return "dispatched";
+  }
+  return status;
+}
+
 export function commerceTimelineStatus(order: OrderRecord): CommerceTimelineStatus {
   if (order.fulfilmentStatus === "delivered") {
     return "delivered";
@@ -93,16 +103,36 @@ export function orderedEventLedger(input: Readonly<{
       createdAt: item.createdAt,
       id: `fulfilment:${item.id}`,
       kind: "fulfilment" as const,
-      status: item.status
+      status: publicFulfilmentStatus(item.status)
     }))
   ];
+
+  const kindRank = { order: 0, payment: 1, fulfilment: 2 } as const;
+  const statusRank: Record<string, number> = {
+    open: 0,
+    declined: 1,
+    processing: 2,
+    succeeded: 3,
+    paid: 4,
+    preparing: 5,
+    dispatched: 6,
+    delivered: 7
+  };
 
   return rows.sort((left, right) => {
     const byTime = left.createdAt.localeCompare(right.createdAt);
     if (byTime !== 0) {
       return byTime;
     }
-    return left.id.localeCompare(right.id);
+    const byKind = kindRank[left.kind] - kindRank[right.kind];
+    if (byKind !== 0) {
+      return byKind;
+    }
+    const byStatus = (statusRank[left.status] ?? 50) - (statusRank[right.status] ?? 50);
+    if (byStatus !== 0) {
+      return byStatus;
+    }
+    return left.status.localeCompare(right.status);
   });
 }
 
