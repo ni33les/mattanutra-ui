@@ -1,4 +1,9 @@
-import type { FulfilmentEventRecord, OrderRecord } from "@/lib/agentic/store/types";
+import type {
+  FulfilmentEventRecord,
+  OrderItemRecord,
+  OrderRecord,
+  PaymentAttemptRecord
+} from "@/lib/agentic/store/types";
 
 export const COMMERCE_TIMELINE = [
   "open",
@@ -99,4 +104,30 @@ export function orderedEventLedger(input: Readonly<{
     }
     return left.id.localeCompare(right.id);
   });
+}
+
+export function buildOrderProjection(input: Readonly<{
+  fulfilment: readonly FulfilmentEventRecord[];
+  items: readonly OrderItemRecord[];
+  order: OrderRecord;
+  paymentAttempts: readonly PaymentAttemptRecord[];
+}>) {
+  return {
+    events: orderedEventLedger({
+      fulfilment: input.fulfilment,
+      order: input.order,
+      paymentAttempts: input.paymentAttempts
+    }),
+    money: {
+      currency: input.order.currency,
+      items: input.items.map((item) => ({
+        lineTotalMinor: item.lineTotalMinor,
+        productId: item.productId,
+        quantity: item.quantity
+      })),
+      totalPriceMinor: input.order.totalPriceMinor
+    },
+    stateVersion: input.order.stateVersion,
+    timeline: commerceTimelineStatus(input.order)
+  };
 }

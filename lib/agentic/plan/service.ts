@@ -1580,9 +1580,18 @@ async function persistTerminalPlan(input: Readonly<{
       attribution: "agent_connector",
       correlationId: input.planId,
       createdAt: input.input.now,
-      eventId: `plan:${input.planId}:${input.revision}:${result.status}`,
-      eventType: result.status === "ready" ? "plan_ready" : "plan_created"
+      eventId: `plan-created:${input.planId}:${input.revision}`,
+      eventType: "plan_created"
     });
+    if (result.status === "ready") {
+      recordFunnelEvent({
+        attribution: "agent_connector",
+        correlationId: input.planId,
+        createdAt: input.input.now,
+        eventId: `plan-ready:${input.planId}:${input.revision}`,
+        eventType: "plan_ready"
+      });
+    }
   }
 
   const response = successFromResult({

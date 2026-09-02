@@ -59,19 +59,18 @@ export async function drivePaymentFixture(input: Readonly<{
     store: input.store
   });
 
+  const correlationId = input.correlationId ?? order.planId;
   if (applied?.order.paymentStatus === "paid") {
     await processOmsOutbox({ now: input.now, store: input.store });
-    if (input.correlationId) {
-      recordFunnelEvent({
-        correlationId: input.correlationId,
-        createdAt: input.now,
-        eventId: `pay-ok:${event.providerEventId}`,
-        eventType: "payment_succeeded"
-      });
-    }
-  } else if (applied?.order.latestPaymentAttempt === "declined" && input.correlationId) {
     recordFunnelEvent({
-      correlationId: input.correlationId,
+      correlationId,
+      createdAt: input.now,
+      eventId: `pay-ok:${event.providerEventId}`,
+      eventType: "payment_succeeded"
+    });
+  } else if (applied?.order.latestPaymentAttempt === "declined") {
+    recordFunnelEvent({
+      correlationId,
       createdAt: input.now,
       eventId: `pay-no:${event.providerEventId}`,
       eventType: "payment_declined"
@@ -111,6 +110,8 @@ export async function driveFulfilmentFixture(input: Readonly<{
     return businessError({ message: "Not found.", reasonCode: "not_found" });
   }
 
+  const order = await input.store.getOrder(capability.resourceId);
+  const correlationId = input.correlationId ?? order?.planId;
   const updated = await applyFulfilmentEvent({
     now: input.now,
     orderId: capability.resourceId,
@@ -118,18 +119,18 @@ export async function driveFulfilmentFixture(input: Readonly<{
     store: input.store
   });
 
-  if (input.correlationId && input.status === "shipped") {
+  if (correlationId && input.status === "shipped") {
     recordFunnelEvent({
-      correlationId: input.correlationId,
+      correlationId,
       createdAt: input.now,
       eventId: `ship:${capability.resourceId}:${input.now}`,
       eventType: "fulfilment_dispatched"
     });
   }
 
-  if (input.correlationId && input.status === "delivered") {
+  if (correlationId && input.status === "delivered") {
     recordFunnelEvent({
-      correlationId: input.correlationId,
+      correlationId,
       createdAt: input.now,
       eventId: `dlv:${capability.resourceId}:${input.now}`,
       eventType: "order_delivered"

@@ -4,10 +4,7 @@ import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { expireCheckoutIfDue, orderPollView } from "@/lib/agentic/commerce/state";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
-import {
-  commerceTimelineStatus,
-  orderedEventLedger
-} from "@/lib/agentic/commerce/timeline";
+import { buildOrderProjection } from "@/lib/agentic/commerce/timeline";
 import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
 import { contributionMinor } from "@/lib/agentic/funnel/events";
 import { funnelAttribution, listFunnelEvents } from "@/lib/agentic/funnel/ledger";
@@ -60,16 +57,16 @@ export async function orderTool(input: Readonly<{
     ? await input.store.listPaymentAttempts(order.id)
     : [];
   const items = order ? await input.store.getOrderItems(order.id) : [];
-  const events = order
-    ? orderedEventLedger({
+  const projection = order
+    ? buildOrderProjection({
         fulfilment: fulfilmentEvents,
+        items,
         order,
         paymentAttempts
       })
-    : [];
-  const timeline = order ? commerceTimelineStatus(order) : null;
-  const attribution = order ? funnelAttribution(order.id) : "unattributed";
-  const funnel = order ? listFunnelEvents(order.id) : [];
+    : null;
+  const attribution = order ? funnelAttribution(order.planId) : "unattributed";
+  const funnel = order ? listFunnelEvents(order.planId) : [];
   void funnel;
   const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
   const contribution =
@@ -100,7 +97,7 @@ export async function orderTool(input: Readonly<{
       : null
   });
 
-  if (!order || !("ok" in view) || view.ok !== true) {
+  if (!order || !projection || !("ok" in view) || view.ok !== true) {
     return view;
   }
 
@@ -108,17 +105,9 @@ export async function orderTool(input: Readonly<{
     ...view,
     attribution,
     contributionMinor: contribution,
-    events,
-    money: {
-      currency: order.currency,
-      items: items.map((item) => ({
-        lineTotalMinor: item.lineTotalMinor,
-        productId: item.productId,
-        quantity: item.quantity
-      })),
-      totalPriceMinor: order.totalPriceMinor
-    },
+    events: projection.events,
+    money: projection.money,
     responsibility: responsibilitySnapshot(locale),
-    timeline
+    timeline: projection.timeline
   };
 }

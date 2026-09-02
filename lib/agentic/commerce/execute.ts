@@ -418,14 +418,14 @@ async function executeFresh(
 
     recordFunnelEvent({
       attribution: "agent_connector",
-      correlationId: orderId,
+      correlationId: plan.id,
       createdAt: input.now,
       eventId: `execute:${orderId}`,
       eventType: "execute_created"
     });
     recordFunnelEvent({
       attribution: "agent_connector",
-      correlationId: orderId,
+      correlationId: plan.id,
       createdAt: input.now,
       eventId: `checkout:${orderId}`,
       eventType: "checkout_opened"

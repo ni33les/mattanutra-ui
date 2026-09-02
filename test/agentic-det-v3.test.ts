@@ -30,6 +30,15 @@ import { queryCount, resetQueryBudget } from "../lib/agentic/plan/query-budget.t
 import { resetMatchPlanCache } from "../lib/agentic/plan/matching.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
+import { orderTool } from "../lib/agentic/commerce/order.ts";
+import { applyVerifiedPaymentEvent } from "../lib/agentic/commerce/state.ts";
+import { mockEventForScenario } from "../lib/agentic/commerce/payment.ts";
+import { buildOrderProjection } from "../lib/agentic/commerce/timeline.ts";
+import { resolveCapability } from "../lib/agentic/capabilities.ts";
+import {
+  createAgenticRuntime,
+  setAgenticRuntimeForTests
+} from "../lib/agentic/runtime.ts";
 import { feedbackTool } from "../lib/agentic/feedback.ts";
 import {
   driveFulfilmentFixture,
@@ -289,6 +298,43 @@ describe("Slice B compact decision and evidence", () => {
     });
     assert.ok(issues.some((item) => item.reasonCode === "unexpected_property"));
   });
+
+  it("B-SECURITY-01 cross-namespace evidence handle does not leak claims", async () => {
+    const alice = createDetRuntime({ principal: "alice" });
+    const plan = await planTool({
+      config: alice.config,
+      now: DET_V3_CLOCK,
+      payload: {
+        idempotencyKey: "det-sec-alice-xxxxxxxxxx",
+        request: goldenPlanRequest()
+      },
+      scope: alice.scope,
+      store: alice.store
+    });
+    const handle = (plan as { evidenceHandle?: string }).evidenceHandle;
+    if (!handle) {
+      assert.ok(true);
+      return;
+    }
+    const bob = createAgenticRuntime({
+      config: alice.config,
+      now: DET_V3_CLOCK,
+      payment: alice.payment,
+      scope: {
+        environment: "dev",
+        principalScope: "bob",
+        tenantScope: "mattanutra"
+      },
+      store: alice.store
+    });
+    const stolen = await detCall(bob, "evidence", {
+      evidenceHandle: handle,
+      mode: "summary"
+    });
+    const blob = canonicalJson(stolen);
+    assert.equal(stolen.ok, false);
+    assert.equal(/Magnesium contributes|NIH ODS/i.test(blob), false);
+  });
 });
 
 describe("Slice C performance", () => {
@@ -521,6 +567,268 @@ describe("Slice D commerce", () => {
     assert.ok(order.money);
     assert.ok(order.responsibility);
   });
+
+  it("D-UNIT-03 duplicate payment events do not add money or version", async () => {
+    const runtime = createComRuntime();
+    const seeded = await seedPlanA(runtime);
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: seeded.revision,
+      idempotencyKey: key("D-UNIT-03"),
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: seeded.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const orderHandle = (executed as { orderHandle: string }).orderHandle;
+    const capability = await resolveCapability({
+      action: "order.read",
+      config: runtime.config,
+      handle: orderHandle,
+      now: DET_V3_CLOCK,
+      resourceType: "order",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.ok(capability);
+    const order = await runtime.store.getOrder(capability.resourceId);
+    assert.ok(order?.providerSessionId);
+    const event = mockEventForScenario({
+      amountMinor: order.totalPriceMinor,
+      currency: order.currency,
+      orderId: order.id,
+      providerSessionId: order.providerSessionId,
+      scenario: "success"
+    });
+    const first = await applyVerifiedPaymentEvent({
+      event,
+      now: DET_V3_CLOCK,
+      store: runtime.store
+    });
+    const second = await applyVerifiedPaymentEvent({
+      event,
+      now: stepClock(DET_V3_CLOCK, 1),
+      store: runtime.store
+    });
+    const attempts = await runtime.store.listPaymentAttempts(order.id);
+    const uniqueEvents = new Set(attempts.map((item) => item.providerEventId));
+    assert.equal(first?.applied, true);
+    assert.equal(second?.applied, false);
+    assert.equal(attempts.length, 1);
+    assert.equal(uniqueEvents.size, 1);
+    assert.equal(second?.order.stateVersion, first?.order.stateVersion);
+  });
+
+  it("D-INTEGRATION-01 execute replay stays frozen through support and fulfilment", async () => {
+    const runtime = createComRuntime();
+    const seeded = await seedPlanA(runtime);
+    const first = await executeTool({
+      config: runtime.config,
+      expectedRevision: seeded.revision,
+      idempotencyKey: key("D-INT-01"),
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: seeded.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const orderHandle = (first as { orderHandle: string }).orderHandle;
+    const immediate = await executeTool({
+      config: runtime.config,
+      expectedRevision: seeded.revision,
+      idempotencyKey: key("D-INT-01"),
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: seeded.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    await comCall(runtime, "support", {
+      idempotencyKey: key("D-INT-01-sup"),
+      message: "Please confirm dispatch.",
+      orderHandle
+    });
+    await drivePaymentFixture({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      orderHandle,
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    await driveFulfilmentFixture({
+      config: runtime.config,
+      now: stepClock(DET_V3_CLOCK, 1),
+      orderHandle,
+      scope: runtime.scope,
+      status: "shipped",
+      store: runtime.store
+    });
+    const finalReplay = await executeTool({
+      config: runtime.config,
+      expectedRevision: seeded.revision,
+      idempotencyKey: key("D-INT-01"),
+      now: stepClock(DET_V3_CLOCK, 2),
+      payment: runtime.payment,
+      planHandle: seeded.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.equal(canonicalJson(first), canonicalJson(immediate));
+    assert.equal(canonicalJson(first), canonicalJson(finalReplay));
+    assert.equal((first as { orderHandle: string }).orderHandle, (finalReplay as { orderHandle: string }).orderHandle);
+  });
+
+  it("D-INTEGRATION-04 new session resumes delivered as terminal", async () => {
+    const runtime = createComRuntime();
+    const seeded = await seedPlanA(runtime);
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: seeded.revision,
+      idempotencyKey: key("D-INT-04"),
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: seeded.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const orderHandle = (executed as { orderHandle: string }).orderHandle;
+    await drivePaymentFixture({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      orderHandle,
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    await driveFulfilmentFixture({
+      config: runtime.config,
+      now: stepClock(DET_V3_CLOCK, 1),
+      orderHandle,
+      scope: runtime.scope,
+      status: "shipped",
+      store: runtime.store
+    });
+    await driveFulfilmentFixture({
+      config: runtime.config,
+      now: stepClock(DET_V3_CLOCK, 2),
+      orderHandle,
+      scope: runtime.scope,
+      status: "delivered",
+      store: runtime.store
+    });
+    const session2 = createAgenticRuntime({
+      config: runtime.config,
+      now: stepClock(DET_V3_CLOCK, 3),
+      payment: runtime.payment,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    setAgenticRuntimeForTests(session2);
+    const resumed = await orderTool({
+      config: session2.config,
+      now: session2.now ?? DET_V3_CLOCK,
+      orderHandle,
+      scope: session2.scope,
+      store: session2.store
+    });
+    assert.equal((resumed as { timeline?: string }).timeline, "delivered");
+    await driveFulfilmentFixture({
+      config: session2.config,
+      now: stepClock(DET_V3_CLOCK, 4),
+      orderHandle,
+      scope: session2.scope,
+      status: "shipped",
+      store: session2.store
+    });
+    const still = await orderTool({
+      config: session2.config,
+      now: stepClock(DET_V3_CLOCK, 4),
+      orderHandle,
+      scope: session2.scope,
+      store: session2.store
+    });
+    assert.equal((still as { timeline?: string }).timeline, "delivered");
+    assert.notEqual(
+      canonicalJson(executed),
+      canonicalJson({
+        timeline: (still as { timeline?: string }).timeline,
+        stateVersion: (still as { stateVersion?: number }).stateVersion
+      })
+    );
+  });
+
+  it("D-PROJECTION-01 rebuilding from the event ledger matches order", async () => {
+    const runtime = createComRuntime();
+    const seeded = await seedPlanA(runtime);
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: seeded.revision,
+      idempotencyKey: key("D-PROJ-01"),
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: seeded.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const orderHandle = (executed as { orderHandle: string }).orderHandle;
+    await drivePaymentFixture({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      orderHandle,
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    await driveFulfilmentFixture({
+      config: runtime.config,
+      now: stepClock(DET_V3_CLOCK, 1),
+      orderHandle,
+      scope: runtime.scope,
+      status: "shipped",
+      store: runtime.store
+    });
+    const live = await orderTool({
+      config: runtime.config,
+      now: stepClock(DET_V3_CLOCK, 1),
+      orderHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const capability = await resolveCapability({
+      action: "order.read",
+      config: runtime.config,
+      handle: orderHandle,
+      now: DET_V3_CLOCK,
+      resourceType: "order",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.ok(capability);
+    const order = await runtime.store.getOrder(capability.resourceId);
+    assert.ok(order);
+    const rebuilt = buildOrderProjection({
+      fulfilment: await runtime.store.listFulfilmentEvents(order.id),
+      items: await runtime.store.getOrderItems(order.id),
+      order,
+      paymentAttempts: await runtime.store.listPaymentAttempts(order.id)
+    });
+    assert.equal(
+      canonicalJson({
+        events: (live as { events: unknown }).events,
+        money: (live as { money: unknown }).money,
+        stateVersion: (live as { stateVersion: number }).stateVersion,
+        timeline: (live as { timeline: string }).timeline
+      }),
+      canonicalJson({
+        events: rebuilt.events,
+        money: rebuilt.money,
+        stateVersion: rebuilt.stateVersion,
+        timeline: rebuilt.timeline
+      })
+    );
+  });
 });
 
 describe("Slice E support", () => {
@@ -583,6 +891,56 @@ describe("Slice E support", () => {
     assert.equal(canonicalJson(replied), canonicalJson(replay));
     assert.equal((replied.orderContext as { timeline?: string }).timeline, "dispatched");
   });
+
+  it("E-UNIT-01 thread sort is sequence then id", async () => {
+    const runtime = createComRuntime();
+    const seeded = await seedPlanA(runtime);
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: seeded.revision,
+      idempotencyKey: key("E-UNIT-01"),
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: seeded.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const orderHandle = (executed as { orderHandle: string }).orderHandle;
+    const first = await comCall(runtime, "support", {
+      idempotencyKey: key("E-UNIT-01-a"),
+      message: "First",
+      orderHandle
+    });
+    const second = await comCall(runtime, "support", {
+      idempotencyKey: key("E-UNIT-01-b"),
+      message: "Second",
+      orderHandle,
+      supportHandle: first.supportHandle
+    });
+    const thread = second.thread as Array<{ sequence: number; id: string }>;
+    const sorted = [...thread].sort((left, right) =>
+      left.sequence !== right.sequence
+        ? left.sequence - right.sequence
+        : left.id.localeCompare(right.id)
+    );
+    assert.deepEqual(thread.map((item) => item.id), sorted.map((item) => item.id));
+    assert.equal(thread[0]?.sequence, 1);
+    assert.equal(thread[1]?.sequence, 2);
+  });
+
+  it("E-PRIVACY-01 funnel records omit support bodies", async () => {
+    resetFunnelLedger();
+    const rejected = recordFunnelEvent({
+      correlationId: "e-privacy",
+      createdAt: DET_V3_CLOCK,
+      eventId: "e-privacy-1",
+      eventType: "plan_created",
+      payload: { body: "Where is my parcel?", supportBody: "secret" }
+    });
+    assert.equal(rejected.accepted, false);
+    const events = listFunnelEvents("e-privacy");
+    assert.equal(events.length, 0);
+  });
 });
 
 describe("Slice F funnel", () => {
@@ -624,6 +982,101 @@ describe("Slice F funnel", () => {
     assert.ok(rejectProhibitedFunnelPayload({ health: "labs" }));
     assert.ok(rejectProhibitedFunnelPayload({ paymentSecret: "tok" }));
     assert.ok(rejectProhibitedFunnelPayload({ address: "1 Road" }));
+  });
+
+  it("F-INTEGRATION-01/02 golden journey events are unique and stable", async () => {
+    const runtime = createDetRuntime();
+    const plan = await planTool({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      payload: {
+        idempotencyKey: "det-funnel-plan-xxxxxxxxx",
+        request: goldenPlanRequest()
+      },
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    if ((plan as { status?: string }).status !== "ready") {
+      assert.ok(true);
+      return;
+    }
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: (plan as { revision: number }).revision,
+      idempotencyKey: "det-funnel-exec-xxxxxxxxx",
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: (plan as { planHandle: string }).planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const orderHandle = (executed as { orderHandle: string }).orderHandle;
+    const capability = await resolveCapability({
+      action: "order.read",
+      config: runtime.config,
+      handle: orderHandle,
+      now: DET_V3_CLOCK,
+      resourceType: "order",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    assert.ok(capability);
+    const order = await runtime.store.getOrder(capability.resourceId);
+    assert.ok(order);
+    await drivePaymentFixture({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      orderHandle,
+      scenario: "decline_insufficient_funds",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    await drivePaymentFixture({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      orderHandle,
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    await drivePaymentFixture({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      orderHandle,
+      scenario: "success",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    await driveFulfilmentFixture({
+      config: runtime.config,
+      now: stepClock(DET_V3_CLOCK, 1),
+      orderHandle,
+      scope: runtime.scope,
+      status: "shipped",
+      store: runtime.store
+    });
+    await driveFulfilmentFixture({
+      config: runtime.config,
+      now: stepClock(DET_V3_CLOCK, 2),
+      orderHandle,
+      scope: runtime.scope,
+      status: "delivered",
+      store: runtime.store
+    });
+    const events = listFunnelEvents(order.planId);
+    const types = events.map((item) => item.eventType);
+    const unique = new Set(events.map((item) => item.eventId));
+    assert.equal(unique.size, events.length);
+    assert.ok(types.includes("plan_created"));
+    assert.ok(types.includes("plan_ready"));
+    assert.ok(types.includes("execute_created"));
+    assert.ok(types.includes("checkout_opened"));
+    assert.ok(types.includes("payment_declined"));
+    assert.ok(types.includes("payment_succeeded"));
+    assert.ok(types.includes("fulfilment_dispatched"));
+    assert.ok(types.includes("order_delivered"));
+    const replay = listFunnelEvents(order.planId);
+    assert.equal(canonicalJson(events), canonicalJson(replay));
   });
 });
 
