@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { handleQaJsonRpc } from "@/lib/agentic/mcp/qa-dispatcher";
-import { authorizeQaRequest } from "@/lib/agentic/qa/auth";
+import { authorizeQaRequest } from "@/lib/agentic/qa/authorize";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import {
   isFulfilmentStatus,
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Not found." }, { status: 404 });
   }
 
-  if (!authorizeQaRequest(request)) {
+  if (!authorizeQaRequest(request, runtime.config.environment)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 

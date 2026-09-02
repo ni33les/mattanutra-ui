@@ -203,7 +203,6 @@ export async function engineeringInfo(input: Readonly<{
           qaHarness: {
             audience: "mattanutra-dev-qa",
             audienceHeader: "x-mattanutra-qa-audience",
-            authorization: "Bearer MCP_QA_TOKEN",
             path: "/api/mcp/qa",
             tools: [
               "preflight",

@@ -2,17 +2,12 @@ import { NextResponse } from "next/server";
 import { assertInternalQaHarness } from "@/lib/agentic/config";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
+import { authorizeQaRequest as authorizeQaWrite } from "@/lib/agentic/qa/authorize";
 
-export const QA_AUDIENCE = "mattanutra-dev-qa";
+export { QA_AUDIENCE, authorizeQaRequest } from "@/lib/agentic/qa/authorize";
 
 export function qaToken() {
   return process.env.MCP_QA_TOKEN?.trim() ?? "";
-}
-
-export function authorizeQaRequest(request: Request) {
-  const header = request.headers.get("authorization") ?? "";
-  const audience = request.headers.get("x-mattanutra-qa-audience") ?? "";
-  return header === `Bearer ${qaToken()}` && audience === QA_AUDIENCE;
 }
 
 export function qaRuntimeOrDeny(request: Request):
@@ -54,7 +49,7 @@ export function qaRuntimeOrDeny(request: Request):
     };
   }
 
-  if (!authorizeQaRequest(request)) {
+  if (!authorizeQaWrite(request, runtime.config.environment)) {
     return {
       ok: false,
       response: NextResponse.json({ message: "Unauthorized" }, { status: 401 })

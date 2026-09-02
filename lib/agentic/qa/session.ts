@@ -3,6 +3,7 @@ import { resetFunnelLedger } from "@/lib/agentic/funnel/ledger";
 import { attributionOf, type FunnelAttribution } from "@/lib/agentic/funnel/events";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
+import { authorizeQaRequest } from "@/lib/agentic/qa/authorize";
 
 export const QA_PACK_CLOCK = "2026-09-02T00:00:00.000Z";
 export const QA_NAMESPACE_PREFIX = "qa-v3:";
@@ -34,12 +35,7 @@ export function qaSession(namespace: string | undefined | null) {
 }
 
 export function bindQaRuntime(runtime: AgenticRuntime, request: Request): AgenticRuntime {
-  const token = process.env.MCP_QA_TOKEN?.trim() ?? "";
-  const authorized =
-    Boolean(token) &&
-    request.headers.get("authorization") === `Bearer ${token}` &&
-    request.headers.get("x-mattanutra-qa-audience") === "mattanutra-dev-qa";
-  if (!authorized) {
+  if (!authorizeQaRequest(request, runtime.config.environment)) {
     return runtime;
   }
   const session = qaSession(request.headers.get("x-mattanutra-qa-namespace"));

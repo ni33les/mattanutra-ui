@@ -3,9 +3,9 @@
 Authenticated, DEV-only fixture and observer for the v3.0 deterministic pack. Ordinary users and the public connector never see these tools.
 
 - URL: `https://dev.mattanutra.com/api/mcp/qa`
-- Auth: `Authorization: Bearer $MCP_QA_TOKEN`
-- Audience: `x-mattanutra-qa-audience: mattanutra-dev-qa`
-- Optional on public `/api/mcp` only: the same auth plus `x-mattanutra-qa-namespace` to bind clock and principal. Public `tools/list` stays seven names.
+- DEV writes: `x-mattanutra-qa-audience: mattanutra-dev-qa` (no bearer). Missing audience is 401.
+- UAT/PRD: bearer token and audience; empty token is not an open door.
+- Optional on public `/api/mcp` only: the same DEV audience header plus `x-mattanutra-qa-namespace` to bind clock and principal. Public `tools/list` stays seven names.
 
 Public `tools/list` stays `info`, `plan`, `execute`, `order`, `support`, `feedback`, `evidence`.
 
