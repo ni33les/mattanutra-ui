@@ -34,24 +34,40 @@ describe("DEV QA audience-only auth", () => {
     assert.equal(allowed, true);
   });
 
-  it("AUTH-02 DEV missing audience is denied even with a bearer", () => {
+  it("AUTH-07 DEV empty headers are allowed (ChatGPT cannot send custom headers)", () => {
+    delete process.env.MCP_QA_TOKEN;
+    assert.equal(authorizeQaRequest(requestWith({}), "dev"), true);
+  });
+
+  it("AUTH-02 DEV still allows a bearer; UAT does not treat empty headers as open", () => {
     process.env.MCP_QA_TOKEN = "not-for-chatgpt";
-    assert.equal(authorizeQaRequest(requestWith({}), "dev"), false);
     assert.equal(
       authorizeQaRequest(
         requestWith({ authorization: "Bearer not-for-chatgpt" }),
         "dev"
       ),
-      false
+      true
     );
+    assert.equal(authorizeQaRequest(requestWith({}), "uat"), false);
   });
 
-  it("AUTH-03 DEV wrong audience is denied", () => {
+  it("AUTH-03 DEV ignores a wrong audience; UAT still requires the real audience", () => {
     delete process.env.MCP_QA_TOKEN;
     assert.equal(
       authorizeQaRequest(
         requestWith({ "x-mattanutra-qa-audience": "mattanutra-uat-qa" }),
         "dev"
+      ),
+      true
+    );
+    process.env.MCP_QA_TOKEN = "uat-secret";
+    assert.equal(
+      authorizeQaRequest(
+        requestWith({
+          authorization: "Bearer uat-secret",
+          "x-mattanutra-qa-audience": "mattanutra-uat-qa"
+        }),
+        "uat"
       ),
       false
     );

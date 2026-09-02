@@ -8,13 +8,13 @@ export function authorizeQaRequest(
   request: Request,
   environment: "dev" | "prd" | "uat" = "dev"
 ) {
+  if (environment === "dev") {
+    return true;
+  }
+
   const audience = request.headers.get("x-mattanutra-qa-audience") ?? "";
   if (audience !== QA_AUDIENCE) {
     return false;
-  }
-
-  if (environment === "dev") {
-    return true;
   }
 
   const token = qaToken();
