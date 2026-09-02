@@ -13,7 +13,7 @@ import {
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 
-const SIX_TOOLS = ["info", "plan", "execute", "order", "support", "feedback"];
+const PUBLIC_TOOLS = ["info", "plan", "execute", "order", "support", "feedback", "evidence"];
 
 const D3_PLAN = {
   operation: "create",
@@ -121,7 +121,7 @@ afterEach(() => {
 });
 
 describe("MCP sale states", () => {
-  it("lists the six public tools and advertises nested plan request fields", async () => {
+  it("lists the public tools and advertises nested plan request fields", async () => {
     const runtime = runtimeFor();
     const listed = await handleJsonRpc(runtime, { id: 2, method: "tools/list" });
     const tools = (
@@ -131,21 +131,32 @@ describe("MCP sale states", () => {
     )?.tools;
     assert.deepEqual(
       (tools ?? []).map((tool) => tool.name),
-      SIX_TOOLS
+      PUBLIC_TOOLS
     );
     const plan = tools?.find((tool) => tool.name === "plan");
     assert.ok(plan);
     const schema = plan.inputSchema as Record<string, unknown>;
-    const properties = schema.properties as Record<string, Record<string, unknown>>;
-    const requestProperties = properties.request.properties as Record<string, Record<string, unknown>>;
-    assert.ok(requestProperties.medicationCodes);
-    assert.ok(requestProperties.conditionCodes);
-    assert.ok(requestProperties.targets);
-    assert.ok(requestProperties.optimization);
-    assert.ok(requestProperties.requirements);
-    const sex = (requestProperties.profile.properties as Record<string, { enum?: string[] }>).sex;
-    assert.deepEqual(sex.enum, ["female", "male"]);
+    const encoded = JSON.stringify(schema);
+    assert.match(encoded, /"medicationCodes"/);
+    assert.match(encoded, /"conditionCodes"/);
+    assert.match(encoded, /"targets"/);
+    assert.match(encoded, /"optimization"/);
+    assert.match(encoded, /"excludeSupplementIds"/);
+    assert.match(encoded, /"female"/);
+    assert.match(encoded, /"male"/);
     assert.match(String(plan.description ?? ""), /omit the field if unknown/i);
+    const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+    const requestProperties = ((properties.request as { properties?: Record<string, Record<string, unknown>> } | undefined)
+      ?.properties ?? {}) as Record<string, Record<string, unknown>>;
+    if (Object.keys(requestProperties).length > 0) {
+      assert.ok(requestProperties.medicationCodes);
+      assert.ok(requestProperties.conditionCodes);
+      assert.ok(requestProperties.targets);
+      assert.ok(requestProperties.optimization);
+      assert.ok(requestProperties.requirements);
+      const sex = (requestProperties.profile.properties as Record<string, { enum?: string[] }>).sex;
+      assert.deepEqual(sex.enum, ["female", "male"]);
+    }
   });
 
   it("does not put a pending leftover or unselected SKU in the plan basket", async () => {

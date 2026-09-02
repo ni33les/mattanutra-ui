@@ -198,7 +198,25 @@ export async function engineeringInfo(input: Readonly<{
     userAccountRequired: false as const,
     ...(catalogueGaps.length > 0 ? { catalogueGaps } : {}),
     ...(input.config.environment === "dev"
-      ? { latency: mcpLatencySnapshot(input.config.buildId) }
+      ? {
+          latency: mcpLatencySnapshot(input.config.buildId),
+          qaHarness: {
+            audience: "mattanutra-dev-qa",
+            audienceHeader: "x-mattanutra-qa-audience",
+            authorization: "Bearer MCP_QA_TOKEN",
+            path: "/api/mcp/qa",
+            tools: [
+              "simulate",
+              "simulateFulfilment",
+              "observe",
+              "evidence",
+              "isolationProof",
+              "checkoutContinuityProof",
+              "latencyProof",
+              "packProof"
+            ]
+          }
+        }
       : {})
   };
 }

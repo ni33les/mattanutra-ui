@@ -988,7 +988,7 @@ async function com28() {
       return schema.additionalProperties === false && !("oneOf" in schema) && !("$defs" in schema);
     });
     const qaListed = tools.some((tool) =>
-      ["simulate", "evidence", "packProof", "isolationProof"].includes(String(tool.name))
+      ["simulate", "simulateFulfilment", "observe", "packProof", "isolationProof"].includes(String(tool.name))
     );
     const seeded = await seedPlanA(runtime);
     const executed = await executeReady(runtime, seeded, key("28-exec"));
@@ -1005,7 +1005,7 @@ async function com28() {
       advertisedLeaks.length === 0 &&
       leaks.length === 0 &&
       JSON.stringify(publicNames) ===
-        JSON.stringify(["execute", "feedback", "info", "order", "plan", "support"]);
+        JSON.stringify(["evidence", "execute", "feedback", "info", "order", "plan", "support"]);
     return verdict("COM-28", ok, {
       advertisedLeaks,
       leaks,

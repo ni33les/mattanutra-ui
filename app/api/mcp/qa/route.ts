@@ -153,6 +153,8 @@ export async function GET(request: Request) {
     {
       tools: [
         "simulate",
+        "simulateFulfilment",
+        "observe",
         "evidence",
         "isolationProof",
         "checkoutContinuityProof",

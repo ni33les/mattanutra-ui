@@ -55,6 +55,7 @@ export type EvidenceSuccess = Readonly<{
   claims: readonly Readonly<{
     claimId: string;
     limitation: string;
+    reviewDate: string;
     source: string;
     statement: string;
     strength: string;
@@ -143,6 +144,7 @@ export async function evidenceTool(input: Readonly<{
           {
             claimId: claim.claimId,
             limitation: claim.limitation,
+            reviewDate: claim.reviewDate,
             source: claim.source,
             statement: claim.statement,
             strength: claim.strength

@@ -634,6 +634,56 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "สินค้าน้อยกว่า {count} รายการ",
     "zh-CN": "少 {count} 件商品"
   },
+  "plan.compact.when.unknown": {
+    en: "current stock duration unknown; do not invent a depletion date",
+    th: "ไม่ทราบระยะเวลาสต็อกปัจจุบัน ห้ามสมมติวันหมด",
+    "zh-CN": "当前库存天数未知，请勿臆造耗尽日期"
+  },
+  "plan.compact.when.buy_now": {
+    en: "buy the day-zero basket now",
+    th: "ซื้อตะกร้าวันที่ศูนย์ตอนนี้",
+    "zh-CN": "现在购买首日购物篮"
+  },
+  "plan.compact.when.no_purchase": {
+    en: "no purchase required now",
+    th: "ยังไม่ต้องซื้อตอนนี้",
+    "zh-CN": "现在无需购买"
+  },
+  "plan.compact.when.follow_schedule": {
+    en: "follow the selected option schedule",
+    th: "ทำตามตารางของตัวเลือกที่เลือก",
+    "zh-CN": "按所选方案的时间表执行"
+  },
+  "plan.compact.why.no_purchase": {
+    en: "Keep current {name}; no purchase is required now.",
+    th: "คง {name} ที่มีอยู่ ไม่ต้องซื้อตอนนี้",
+    "zh-CN": "保留现有{name}；现在无需购买。"
+  },
+  "plan.compact.why.duration_unknown": {
+    en: "Current stock is present but days remaining were not given, so depletion and future cash stay unknown.",
+    th: "มีสต็อกปัจจุบันแต่ไม่ได้ระบุวันที่เหลือ จึงยังไม่ทราบวันหมดและเงินในอนาคต",
+    "zh-CN": "已有当前库存但未给出剩余天数，因此耗尽日期和未来现金仍未知。"
+  },
+  "plan.compact.why.minimum_core": {
+    en: "Cover the core targets with {count} product(s).",
+    th: "ครอบคลุมเป้าหมายหลักด้วย {count} รายการ",
+    "zh-CN": "用 {count} 件产品覆盖核心目标。"
+  },
+  "plan.compact.why.selected": {
+    en: "Selected {optionId} covers {names}.",
+    th: "เลือก {optionId} เพื่อครอบคลุม {names}",
+    "zh-CN": "已选 {optionId}，覆盖 {names}。"
+  },
+  "plan.compact.why.status": {
+    en: "Plan status is {status}.",
+    th: "สถานะแผนคือ {status}",
+    "zh-CN": "方案状态为 {status}。"
+  },
+  "plan.compact.what.dose": {
+    en: "{name} {amount} {unit}/day, delivered {delivered} {unit}",
+    th: "{name} {amount} {unit}/วัน ส่งมอบ {delivered} {unit}",
+    "zh-CN": "{name} {amount} {unit}/日，送达 {delivered} {unit}"
+  },
   "mcp.errors.invalid_request": {
     en: "The request is not valid.",
     th: "คำขอไม่ถูกต้อง",

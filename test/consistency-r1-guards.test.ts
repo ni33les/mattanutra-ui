@@ -54,14 +54,15 @@ const NETWORK_IN_TXN =
   /\b(?:fetch|axios|got|node-fetch|undici)\s*\(|new\s+Stripe\b|from\s+["']stripe["']|sendEmail|nodemailer|@sendgrid|resend\(|openai|createCompletion|chat\.completions/i;
 
 describe("consistency r1 regression guards", () => {
-  it("keeps the six MCP tools unchanged", () => {
+  it("keeps the public MCP tools including evidence", () => {
     assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], [
       "info",
       "plan",
       "execute",
       "order",
       "support",
-      "feedback"
+      "feedback",
+      "evidence"
     ]);
   });
 

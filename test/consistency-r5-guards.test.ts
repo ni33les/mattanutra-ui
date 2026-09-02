@@ -4,14 +4,15 @@ import { describe, it } from "node:test";
 import { AGENTIC_PUBLIC_TOOLS } from "../lib/agentic/contract/index.ts";
 
 describe("consistency r5 regression guards", () => {
-  it("keeps the six MCP tools unchanged", () => {
+  it("keeps the public MCP tools including evidence", () => {
     assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], [
       "info",
       "plan",
       "execute",
       "order",
       "support",
-      "feedback"
+      "feedback",
+      "evidence"
     ]);
   });
 

@@ -1,4 +1,4 @@
-import { businessError } from "@/lib/agentic/contract/errors";
+import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import {
@@ -7,7 +7,17 @@ import {
 } from "@/lib/agentic/commerce/payment";
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
+import {
+  driveFulfilmentFixture,
+  drivePaymentFixture
+} from "@/lib/agentic/commerce/fixture-driver";
 import { orderTool } from "@/lib/agentic/commerce/order";
+import { contributionMinor } from "@/lib/agentic/funnel/events";
+import {
+  funnelAttribution,
+  listFunnelEvents,
+  loadPersistedFunnelEvents
+} from "@/lib/agentic/funnel/ledger";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
 const SCENARIOS: readonly PaymentEventScenario[] = [
@@ -40,6 +50,19 @@ export function scenarioSubmitsOms(scenario: PaymentEventScenario) {
   );
 }
 
+export const FULFILMENT_STATUSES = [
+  "processing",
+  "packed",
+  "shipped",
+  "delivered"
+] as const;
+
+export type FulfilmentFixtureStatus = (typeof FULFILMENT_STATUSES)[number];
+
+export function isFulfilmentStatus(value: unknown): value is FulfilmentFixtureStatus {
+  return typeof value === "string" && (FULFILMENT_STATUSES as readonly string[]).includes(value);
+}
+
 export async function simulatePayment(input: Readonly<{
   config: AgenticConfig;
   now: string;
@@ -48,57 +71,36 @@ export async function simulatePayment(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>) {
-  const devHarness =
-    input.config.internalQaHarness && input.config.environment === "dev";
-
-  if (!devHarness) {
-    return businessError({
-      message: "Not found.",
-      reasonCode: "not_found"
-    });
+  const driven = await drivePaymentFixture(input);
+  if (isAgenticErrorResult(driven)) {
+    return driven;
   }
-
-  const capability = await resolveCapability({
-    action: "order.read",
-    config: input.config,
-    handle: input.orderHandle,
-    now: input.now,
-    resourceType: "order",
-    scope: input.scope,
-    store: input.store
-  });
-
-  if (!capability) {
-    return businessError({ message: "Not found.", reasonCode: "not_found" });
-  }
-
-  const order = await input.store.getOrder(capability.resourceId);
-
-  if (!order?.providerSessionId) {
-    return businessError({ message: "Not found.", reasonCode: "not_found" });
-  }
-
-  const event = mockEventForScenario({
-    amountMinor: order.totalPriceMinor,
-    currency: order.currency,
-    orderId: order.id,
-    providerSessionId: order.providerSessionId,
-    scenario: input.scenario
-  });
 
   if (input.scenario === "processing_then_success") {
-    await applyVerifiedPaymentEvent({ event, now: input.now, store: input.store });
-    await applyVerifiedPaymentEvent({
-      event: {
-        ...event,
-        providerEventId: `${event.providerEventId}_success`,
-        status: "succeeded"
-      },
+    const capability = await resolveCapability({
+      action: "order.read",
+      config: input.config,
+      handle: input.orderHandle,
       now: input.now,
+      resourceType: "order",
+      scope: input.scope,
       store: input.store
     });
-  } else {
-    await applyVerifiedPaymentEvent({ event, now: input.now, store: input.store });
+    const order = capability ? await input.store.getOrder(capability.resourceId) : null;
+    if (order?.providerSessionId) {
+      const event = mockEventForScenario({
+        amountMinor: order.totalPriceMinor,
+        currency: order.currency,
+        orderId: order.id,
+        providerSessionId: order.providerSessionId,
+        scenario: "success"
+      });
+      await applyVerifiedPaymentEvent({
+        event: { ...event, providerEventId: `${event.providerEventId}_success` },
+        now: input.now,
+        store: input.store
+      });
+    }
   }
 
   if (scenarioSubmitsOms(input.scenario)) {
@@ -112,4 +114,99 @@ export async function simulatePayment(input: Readonly<{
     scope: input.scope,
     store: input.store
   });
+}
+
+export async function simulateFulfilment(input: Readonly<{
+  config: AgenticConfig;
+  now: string;
+  orderHandle: string;
+  scope: CapabilityScope;
+  status: FulfilmentFixtureStatus;
+  store: AgenticStore;
+}>) {
+  const driven = await driveFulfilmentFixture(input);
+  if (isAgenticErrorResult(driven)) {
+    return driven;
+  }
+
+  return orderTool({
+    config: input.config,
+    now: input.now,
+    orderHandle: input.orderHandle,
+    scope: input.scope,
+    store: input.store
+  });
+}
+
+export async function observeQaJourney(input: Readonly<{
+  config: AgenticConfig;
+  correlationId?: string;
+  now: string;
+  orderHandle?: string;
+  scope: CapabilityScope;
+  store: AgenticStore;
+}>) {
+  const devHarness =
+    input.config.internalQaHarness && input.config.environment === "dev";
+  if (!devHarness) {
+    return businessError({ message: "Not found.", reasonCode: "not_found" });
+  }
+
+  let correlationId = input.correlationId ?? "";
+  let order = null as Awaited<ReturnType<AgenticStore["getOrder"]>>;
+
+  if (input.orderHandle) {
+    const capability = await resolveCapability({
+      action: "order.read",
+      config: input.config,
+      handle: input.orderHandle,
+      now: input.now,
+      resourceType: "order",
+      scope: input.scope,
+      store: input.store
+    });
+    if (!capability) {
+      return businessError({ message: "Not found.", reasonCode: "not_found" });
+    }
+    order = await input.store.getOrder(capability.resourceId);
+    correlationId = correlationId || order?.planId || "";
+  }
+
+  if (!correlationId) {
+    return businessError({
+      fieldPath: "orderHandle",
+      message: "orderHandle is required.",
+      reasonCode: "required"
+    });
+  }
+
+  await loadPersistedFunnelEvents(correlationId);
+  const events = listFunnelEvents(correlationId);
+  const attribution = funnelAttribution(correlationId);
+  const items = order ? await input.store.getOrderItems(order.id) : [];
+  const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
+  const contribution =
+    order && order.paymentStatus === "paid"
+      ? contributionMinor({
+          acquisitionMinor: 0,
+          paymentFeeMinor: 0,
+          paymentMinor: order.totalPriceMinor,
+          productCostMinor,
+          shippingSubsidyMinor: 0
+        })
+      : null;
+
+  return {
+    ok: true as const,
+    attribution,
+    contributionMinor: contribution,
+    correlationId,
+    events: events.map((event) => ({
+      attribution: event.attribution,
+      createdAt: event.createdAt,
+      eventId: event.eventId,
+      eventType: event.eventType,
+      sequence: event.sequence
+    }))
+  };
 }

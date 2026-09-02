@@ -701,7 +701,7 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
           .update(JSON.stringify(AGENTIC_INPUT_SCHEMAS))
           .digest("hex");
         const failed: string[] = [];
-        if (names.join() !== "info,plan,execute,order,support,feedback") {
+        if (names.join() !== "info,plan,execute,order,support,feedback,evidence") {
           failed.push("FIX-06.A1");
         }
         if (

@@ -9,6 +9,7 @@ import {
   planClaimIds,
   planResearchVersion
 } from "@/lib/agentic/value/compact-decision";
+import { selectCoverageClaimIds } from "@/lib/agentic/claims/select";
 import { mergeBySemanticKey } from "@/lib/agentic/plan/merge";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import {
@@ -510,6 +511,7 @@ export function stackSummaryFor(basket: readonly BasketItem[], currency: string)
 }
 
 export function publicCoverage(row: CoverageRow) {
+  const claimIds = row.claimIds ?? selectCoverageClaimIds({ name: row.name });
   return {
     coveragePercent: publicAmount(row.coveragePercent),
     currentAmount: publicAmount(row.currentAmount),
@@ -521,6 +523,7 @@ export function publicCoverage(row: CoverageRow) {
     supplementId: row.supplementId,
     totalExposureAmount: publicAmount(row.totalExposureAmount),
     unit: row.unit,
+    ...(claimIds.length > 0 ? { claimIds } : {}),
     ...(row.importance ? { importance: row.importance } : {}),
     ...(row.reasonCode ? { reasonCode: row.reasonCode } : {}),
     ...(row.nextAction ? { nextAction: row.nextAction } : {}),
@@ -944,9 +947,15 @@ export function publicPlanFields(result: Pick<
                 : []
               : ["change_request"];
   const currency = result.basket[0]?.currency ?? "THB";
+  const quoteBasket =
+    result.status === "no_purchase" || result.status === "processing"
+      ? []
+      : (selected?.basket ?? result.basket);
   const subtotalMinor =
-    selected?.totalPriceMinor ??
-    result.basket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
+    result.status === "no_purchase" || result.status === "processing"
+      ? 0
+      : selected?.totalPriceMinor ??
+        quoteBasket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
   const payable = payableSnapshot({ subtotalMinor });
   const uniqueAlternatives = mergeBySemanticKey(
     alternatives.filter(
@@ -1099,7 +1108,10 @@ export function publicPlanFields(result: Pick<
         }
       : {}),
     acknowledgementStatus,
-    ...(result.status !== "processing" && (selected || result.basket.length > 0)
+    ...(result.status !== "no_purchase" &&
+    result.status !== "processing" &&
+    quoteBasket.length > 0 &&
+    subtotalMinor > 0
       ? {
           shippingMinor: payable.shippingMinor,
           estimatedOrderTotalMinor: payable.totalPriceMinor

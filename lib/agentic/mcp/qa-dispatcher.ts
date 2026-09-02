@@ -2,7 +2,13 @@ import { AGENTIC_SERVICE_NAME, AGENTIC_SERVICE_VERSION } from "@/lib/agentic/con
 import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability } from "@/lib/agentic/capabilities";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
-import { isPaymentScenario, simulatePayment } from "@/lib/agentic/qa/simulate";
+import {
+  isFulfilmentStatus,
+  isPaymentScenario,
+  observeQaJourney,
+  simulateFulfilment,
+  simulatePayment
+} from "@/lib/agentic/qa/simulate";
 import {
   checkoutContinuityProof,
   isolationProof,
@@ -14,6 +20,8 @@ import type { JsonRpcRequest, JsonRpcResponse } from "@/lib/agentic/mcp/dispatch
 
 const QA_TOOLS = [
   "simulate",
+  "simulateFulfilment",
+  "observe",
   "evidence",
   "isolationProof",
   "checkoutContinuityProof",
@@ -67,6 +75,34 @@ function toolList() {
         type: "object"
       },
       name: "simulate"
+    },
+    {
+      description: "Drive a DEV fulfilment fixture through processing, packed, shipped, or delivered.",
+      inputSchema: {
+        additionalProperties: false,
+        properties: {
+          orderHandle: { minLength: 32, type: "string" },
+          status: {
+            enum: ["processing", "packed", "shipped", "delivered"],
+            type: "string"
+          }
+        },
+        required: ["orderHandle", "status"],
+        type: "object"
+      },
+      name: "simulateFulfilment"
+    },
+    {
+      description: "Read funnel events, attribution, and contribution for one orderHandle.",
+      inputSchema: {
+        additionalProperties: false,
+        properties: {
+          correlationId: { type: "string" },
+          orderHandle: { minLength: 32, type: "string" }
+        },
+        type: "object"
+      },
+      name: "observe"
     },
     {
       description: "Read payment-confirm and OMS evidence for one orderHandle.",
@@ -123,6 +159,42 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
       now,
       orderHandle: params.orderHandle,
       scenario: params.scenario,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    return { result: toolResult(value, isAgenticErrorResult(value)) };
+  }
+
+  if (name === "simulateFulfilment") {
+    if (typeof params.orderHandle !== "string" || !isFulfilmentStatus(params.status)) {
+      return {
+        result: toolResult({ ok: false, error: { reasonCode: "required", message: "orderHandle and status are required." } }, true)
+      };
+    }
+
+    const value = await simulateFulfilment({
+      config: runtime.config,
+      now,
+      orderHandle: params.orderHandle,
+      scope: runtime.scope,
+      status: params.status,
+      store: runtime.store
+    });
+    return { result: toolResult(value, isAgenticErrorResult(value)) };
+  }
+
+  if (name === "observe") {
+    if (typeof params.orderHandle !== "string" && typeof params.correlationId !== "string") {
+      return {
+        result: toolResult({ ok: false, error: { reasonCode: "required", message: "orderHandle or correlationId is required." } }, true)
+      };
+    }
+
+    const value = await observeQaJourney({
+      config: runtime.config,
+      correlationId: typeof params.correlationId === "string" ? params.correlationId : undefined,
+      now,
+      orderHandle: typeof params.orderHandle === "string" ? params.orderHandle : undefined,
       scope: runtime.scope,
       store: runtime.store
     });
@@ -191,7 +263,7 @@ export async function handleQaJsonRpc(
       result: {
         capabilities: { tools: { listChanged: false } },
         instructions:
-          "DEV-only MattaNutra QA harness. Public customer tools live on /api/mcp. Use packProof for the authorized evidence bundle covering previously untested pack IDs.",
+          "DEV-only MattaNutra QA harness. Public customer tools live on the public MCP endpoint. Use simulate and simulateFulfilment to drive payment and fulfilment through real handlers. Use observe to read funnel events and contribution. Use packProof for the authorized evidence bundle covering previously untested pack IDs.",
         protocolVersion: "2025-03-26",
         serverInfo: {
           name: `${AGENTIC_SERVICE_NAME} QA`,

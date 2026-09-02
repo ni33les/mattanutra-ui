@@ -1,10 +1,10 @@
 {
   "contractVersion": "3.0.0",
   "name": "mattanutra_dev",
-  "schemaChecksum": "e9d4ef92331fc9a0a5a230a3744f7e86a82c2e2c9a91833bbcc9ceb760ea13d9",
+  "schemaChecksum": "62e3b7f87626adb28003ec04aa02bbcbd3af9b5edd45f4756e0d377ec273ae4a",
   "tools": [
     {
-      "description": "Check where MattaNutra can deliver, which locales it supports, and which medication and condition codes it can assess before you plan a stack. This does not create a plan or start a purchase.",
+      "description": "MattaNutra matches a personal supplement stack to agreed nutrient targets, then optimizes for coverage, cost, or pill burden. It is wellness guidance only, not diagnosis or a pharmacy, and does not replace clinical advice.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1574,6 +1574,40 @@
         "type": "object"
       },
       "name": "feedback"
+    },
+    {
+      "description": "Read approved, plan-linked research claims for one evidence handle. Send only that handle, optional attached claim IDs, locale, and summary or sources. This never changes a plan.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "claimIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "evidenceHandle": {
+            "minLength": 32,
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "summary",
+              "sources"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidenceHandle"
+        ],
+        "type": "object"
+      },
+      "name": "evidence"
     }
   ],
   "transport": "streamable-http",

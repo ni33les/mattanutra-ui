@@ -293,8 +293,9 @@ export async function packProof(runtime: AgenticRuntime) {
   checks.push(
     check(
       "D4-01",
-      toolNames.length === 6 &&
+      toolNames.length === 7 &&
         toolNames[0] === "info" &&
+        toolNames.includes("evidence") &&
         !("supplements" in info) &&
         info.continuation === "polling_only"
     )
@@ -701,7 +702,7 @@ export async function packProof(runtime: AgenticRuntime) {
   checks.push(
     check(
       "D9-10",
-      toolNames.join(",") === "info,plan,execute,order,support,feedback"
+      toolNames.join(",") === "info,plan,execute,order,support,feedback,evidence"
     )
   );
 

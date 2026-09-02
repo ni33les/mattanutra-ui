@@ -80,7 +80,12 @@ export function payableSnapshot(input: Readonly<{
   taxMinor?: unknown;
 }>) {
   const subtotalMinor = asMinor(input.subtotalMinor);
-  const shippingMinor = asMinorOr(input.shippingMinor, DEFAULT_SHIPPING_MINOR);
+  const shippingMinor =
+    input.shippingMinor != null
+      ? asMinor(input.shippingMinor)
+      : subtotalMinor > 0
+        ? DEFAULT_SHIPPING_MINOR
+        : 0;
   const taxMinor = asMinorOr(input.taxMinor, DEFAULT_TAX_MINOR);
 
   return {

@@ -1012,7 +1012,7 @@ async function runDevContract01(session: PlanSession, runIndex: number): Promise
   const names = listed.map((item) => item.name);
   const blob = planSchemaBlob();
   const assertions = [
-    assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback", names.join()),
+    assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback,evidence", names.join()),
     assertTrue("CONTRACT-01.ops", /"create"/.test(blob) && /"revise"/.test(blob) && /"answer"/.test(blob) && /"select"/.test(blob) && /"get"/.test(blob)),
     assertTrue("CONTRACT-01.importance", blob.includes('"importance"')),
     assertTrue("CONTRACT-01.range", blob.includes('"acceptableRange"')),
@@ -1087,7 +1087,7 @@ async function runDevContract04(session: PlanSession, runIndex: number): Promise
       "CONTRACT-04.adapters",
       adapters.every(
         (item) =>
-          (item.tools ?? []).join() === "info,plan,execute,order,support,feedback" &&
+          (item.tools ?? []).join() === "info,plan,execute,order,support,feedback,evidence" &&
           item.schemaChecksum === AGENTIC_SCHEMA_CHECKSUM &&
           (item.description ?? "").length > 40
       )

@@ -202,6 +202,19 @@ create table if not exists public.agentic_feedback (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.agentic_funnel_events (
+  event_id text primary key,
+  correlation_id text not null,
+  event_type text not null,
+  attribution text not null,
+  payload jsonb not null default '{}'::jsonb,
+  sequence integer not null,
+  created_at timestamptz not null
+);
+
+create index if not exists agentic_funnel_events_correlation_idx
+  on public.agentic_funnel_events (correlation_id, sequence);
+
 create table if not exists public.agentic_matcher_events (
   id uuid primary key,
   plan_id uuid not null references public.agentic_plans(id) on delete restrict,

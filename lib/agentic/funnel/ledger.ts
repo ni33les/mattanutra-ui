@@ -76,11 +76,100 @@ export function recordFunnelEvent(input: Readonly<{
   list.push(event);
   ledgers.set(input.correlationId, list);
   seenEventIds.add(input.eventId);
+  void persistFunnelEvent(event);
   return { accepted: true as const, event };
 }
 
 export function listFunnelEvents(correlationId: string) {
   return [...(ledgers.get(correlationId) ?? [])];
+}
+
+async function persistFunnelEvent(event: FunnelEvent) {
+  if (process.env.NODE_TEST_CONTEXT) {
+    return;
+  }
+
+  try {
+    const { getSql } = await import("@/lib/db");
+    const sql = getSql();
+    if (!sql) {
+      return;
+    }
+    await sql`
+      insert into public.agentic_funnel_events (
+        event_id, correlation_id, event_type, attribution, payload, sequence, created_at
+      ) values (
+        ${event.eventId},
+        ${event.correlationId},
+        ${event.eventType},
+        ${event.attribution},
+        ${JSON.stringify(event.payload)}::jsonb,
+        ${event.sequence},
+        ${event.createdAt}::timestamptz
+      )
+      on conflict (event_id) do nothing
+    `;
+  } catch {
+    // Persistence is best-effort; the in-memory ledger remains authoritative in-process.
+  }
+}
+
+export async function loadPersistedFunnelEvents(correlationId: string) {
+  if (ledgers.has(correlationId) && (ledgers.get(correlationId)?.length ?? 0) > 0) {
+    return listFunnelEvents(correlationId);
+  }
+
+  if (process.env.NODE_TEST_CONTEXT) {
+    return listFunnelEvents(correlationId);
+  }
+
+  try {
+    const { getSql } = await import("@/lib/db");
+    const sql = getSql();
+    if (!sql) {
+      return listFunnelEvents(correlationId);
+    }
+    const rows = await sql`
+      select event_id, correlation_id, event_type, attribution, sequence, created_at
+      from public.agentic_funnel_events
+      where correlation_id = ${correlationId}
+      order by sequence asc
+    `;
+    const restored: FunnelEvent[] = [];
+    for (const row of rows as Array<Record<string, unknown>>) {
+      const eventId = String(row.event_id ?? "");
+      if (!eventId || seenEventIds.has(eventId)) {
+        continue;
+      }
+      const event: FunnelEvent = {
+        attribution: attributionOf(row.attribution),
+        correlationId: String(row.correlation_id ?? correlationId),
+        createdAt:
+          row.created_at instanceof Date
+            ? row.created_at.toISOString()
+            : String(row.created_at ?? ""),
+        eventId,
+        eventType: String(row.event_type ?? "") as FunnelEvent["eventType"],
+        payload: {},
+        sequence: Number(row.sequence ?? restored.length + 1)
+      };
+      if (!isFunnelEventType(event.eventType)) {
+        continue;
+      }
+      restored.push(event);
+      seenEventIds.add(eventId);
+    }
+    if (restored.length > 0) {
+      ledgers.set(correlationId, restored);
+      if (!attributionByCorrelation.has(correlationId) && restored[0]) {
+        attributionByCorrelation.set(correlationId, restored[0].attribution);
+      }
+    }
+  } catch {
+    // Fall back to whatever is already in memory.
+  }
+
+  return listFunnelEvents(correlationId);
 }
 
 export function funnelAttribution(correlationId: string): FunnelAttribution {

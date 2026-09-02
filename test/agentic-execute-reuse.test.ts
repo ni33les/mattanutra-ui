@@ -123,9 +123,11 @@ describe("execute key reuses one unpaid order", () => {
     });
     assert.equal(replay.ok, true);
     assert.equal(replay.orderHandle, first.orderHandle);
-    assert.equal(replay.paymentStatus, "paid");
-    assert.equal(replay.orderStatus, "completed");
-    assert.ok(Number(replay.stateVersion) >= 2);
+    assert.equal(replay.paymentStatus, first.paymentStatus);
+    const polled = await call(runtime, "order", { orderHandle: first.orderHandle });
+    assert.equal(polled.paymentStatus, "paid");
+    assert.equal(polled.orderStatus, "completed");
+    assert.ok(Number(polled.stateVersion) >= 2);
   });
 
   it("does not mint a second chargeable order after pay", async () => {
@@ -165,9 +167,8 @@ describe("execute key reuses one unpaid order", () => {
       second.ok === false &&
       (second.error as { reasonCode?: string } | undefined)?.reasonCode === "revision_conflict";
     assert.ok(secondOk || secondConflict);
-    if (secondOk) {
-      assert.equal(second.paymentStatus, "paid");
-      assert.equal(second.orderStatus, "completed");
-    }
+    const polled = await call(runtime, "order", { orderHandle: first.orderHandle });
+    assert.equal(polled.paymentStatus, "paid");
+    assert.equal(polled.orderStatus, "completed");
   });
 });

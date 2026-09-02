@@ -47,6 +47,20 @@ export const APPROVED_CLAIMS: readonly ApprovedClaim[] = [
     strength: "established"
   },
   {
+    claimId: "clm_creatine_performance_v1",
+    limitation: "Not a treatment for muscle disease; training and total diet also matter.",
+    prohibitedWording: ["cure", "treat disease", "steroid"],
+    relevance: {
+      statuses: ["ready", "no_purchase"],
+      supplementNames: ["Creatine"]
+    },
+    researchVersion: RESEARCH_VERSION,
+    reviewDate: "2026-08-01",
+    source: "ISSN exercise & sports nutrition review: creatine supplementation",
+    statement: "Creatine monohydrate supports high-intensity exercise performance when the agreed daily amount is met.",
+    strength: "established"
+  },
+  {
     claimId: "clm_omega3_intake_v1",
     limitation: "Algae or fish source must match the plan constraint; not a heart-disease treatment.",
     prohibitedWording: ["cure", "prevent heart attack", "treat CVD"],

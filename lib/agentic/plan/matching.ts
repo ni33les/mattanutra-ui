@@ -63,9 +63,39 @@ export { toMatcherProduct };
 
 const MATCH_PLAN_CACHE_LIMIT = 64;
 const matchPlanCache = new Map<string, ReturnType<typeof computeMatchPlan>>();
+const matcherProductCache = new Map<string, ReturnType<typeof toMatcherProduct>[]>();
+const snapshotIdCache = new WeakMap<CatalogueSnapshot, string>();
 
 export function resetMatchPlanCache() {
   matchPlanCache.clear();
+  matcherProductCache.clear();
+}
+
+function snapshotIdCached(snapshot: CatalogueSnapshot) {
+  const hit = snapshotIdCache.get(snapshot);
+  if (hit) {
+    return hit;
+  }
+  const id = catalogueSnapshotId(snapshot);
+  snapshotIdCache.set(snapshot, id);
+  return id;
+}
+
+function matcherProductsFor(snapshot: CatalogueSnapshot) {
+  const id = snapshotIdCached(snapshot);
+  const hit = matcherProductCache.get(id);
+  if (hit) {
+    return hit;
+  }
+  const products = snapshot.products.map(toMatcherProduct);
+  matcherProductCache.set(id, products);
+  if (matcherProductCache.size > 8) {
+    const oldest = matcherProductCache.keys().next().value;
+    if (oldest) {
+      matcherProductCache.delete(oldest);
+    }
+  }
+  return products;
 }
 
 function matchPlanCacheKey(
@@ -75,7 +105,7 @@ function matchPlanCacheKey(
   const hash = createHash("sha256");
   hash.update(planRematchFingerprint(state));
   hash.update("\0");
-  hash.update(catalogueSnapshotId(snapshot));
+  hash.update(snapshotIdCached(snapshot));
   hash.update("\0");
   hash.update(GUIDANCE_RULES_VERSION);
   hash.update("\0");
@@ -316,9 +346,12 @@ export function coverageFor(
       ...(deferredConditional
         ? {
             nextAction: target.prerequisite?.nextAction,
-            reasonCode: target.prerequisite?.reasonCode
+            reasonCode:
+              target.prerequisite?.reasonCode ?? "conditional_prerequisite_unsatisfied"
           }
-        : {}),
+        : status === "optional_omitted"
+          ? { reasonCode: "optional_omitted" }
+          : {}),
       percentOfUpperLimit:
         limit != null && limit > 0
           ? Math.round((totalExposureAmount / limit) * 100)
@@ -1072,7 +1105,7 @@ function computeMatchPlan(input: Readonly<{
   const result = match(request, {
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
-    products: snapshot.products.map(toMatcherProduct)
+    products: matcherProductsFor(input.snapshot)
   });
   const withSafety = (option: StackOption): StackOption => ({
     ...option,

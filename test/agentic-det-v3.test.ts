@@ -36,7 +36,8 @@ import {
   SUPPORT_RESPONSE_CONTRACT,
   supportRespectsContract
 } from "../lib/agentic/contract/support-result.ts";
-import { publicPlanFields } from "../lib/agentic/public-mapper.ts";
+import { publicCoverage, publicPlanFields } from "../lib/agentic/public-mapper.ts";
+import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { EVIDENCE_INPUT_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import { queryCount, resetQueryBudget } from "../lib/agentic/plan/query-budget.ts";
@@ -105,7 +106,15 @@ import { withNow } from "./helpers/com-fixtures.ts";
 
 function magView(status: "ready" | "no_purchase", extra: Record<string, unknown> = {}) {
   return {
-    coverage: [{ name: "Magnesium", status: "covered" }],
+    coverage: [
+      {
+        deliveredAmount: 300,
+        name: "Magnesium",
+        requestedAmount: 300,
+        status: "covered",
+        unit: "mg"
+      }
+    ],
     selected:
       status === "ready"
         ? {
@@ -124,7 +133,15 @@ function magView(status: "ready" | "no_purchase", extra: Record<string, unknown>
                 unitPriceMinor: 39000
               }
             ],
-            coverage: [{ name: "Magnesium", status: "covered" }],
+            coverage: [
+              {
+                deliveredAmount: 300,
+                name: "Magnesium",
+                requestedAmount: 300,
+                status: "covered",
+                unit: "mg"
+              }
+            ],
             coveragePercent: 100,
             dailyPills: 1,
             economics: {
@@ -229,6 +246,30 @@ describe("Slice A discovery", () => {
     assert.equal(a.buildId, b.buildId);
     assert.equal(a.valuePropositionId, b.valuePropositionId);
   });
+
+  it("A-CONTRACT-03 advertised discovery includes evidence and bans welness", async () => {
+    const runtime = createDetRuntime();
+    const listed = await runTwice(async () => detListTools(runtime, "en"));
+    assert.deepEqual(
+      listed.map((item) => item.name),
+      [...AGENTIC_PUBLIC_TOOLS]
+    );
+    for (const tool of listed) {
+      assert.doesNotMatch(tool.description ?? "", /welness/i);
+    }
+    const info = listed.find((item) => item.name === "info");
+    assert.equal(info?.description, CONNECTOR_COPY.en);
+    const init = await handleJsonRpc(runtime, {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "initialize",
+      params: { protocolVersion: "2025-03-26" }
+    });
+    const instructions = String(init?.result?.instructions ?? "");
+    assert.match(instructions, /evidence/);
+    assert.doesNotMatch(instructions, /welness/i);
+    assert.match(instructions, /info, plan, execute, order, support, feedback, evidence/);
+  });
 });
 
 describe("Slice B compact decision and evidence", () => {
@@ -258,6 +299,19 @@ describe("Slice B compact decision and evidence", () => {
     }
     assert.match(missing.when, /unknown/);
     assert.match(have90.when, /no purchase/i);
+    assert.match(ready.what.join(" "), /300/);
+    assert.match(ready.what.join(" "), /mg/);
+    const thai = buildCompactDecision(
+      magView("ready", { requestSnapshot: { locale: "th" } }) as never
+    );
+    const chinese = buildCompactDecision(
+      magView("ready", { requestSnapshot: { locale: "zh-CN" } }) as never
+    );
+    assert.notEqual(thai.when, ready.when);
+    assert.notEqual(thai.why, ready.why);
+    assert.notEqual(chinese.when, ready.when);
+    assert.match(thai.when, /[\u0E00-\u0E7F]/);
+    assert.match(chinese.when, /[\u4e00-\u9fff]/);
   });
 
   it("B-UNIT-02/03 claim selector and record shape", () => {
@@ -265,6 +319,8 @@ describe("Slice B compact decision and evidence", () => {
     const b = selectApplicableClaims({ status: "ready", supplementNames: ["magnesium"] });
     assert.deepEqual(a, b);
     assert.ok(a.includes("clm_mg_muscle_relaxation_v1"));
+    const creatine = selectApplicableClaims({ status: "ready", supplementNames: ["Creatine"] });
+    assert.ok(creatine.includes("clm_creatine_performance_v1"));
     for (const claim of APPROVED_CLAIMS) {
       assert.ok(claim.statement);
       assert.ok(claim.relevance);
@@ -310,6 +366,11 @@ describe("Slice B compact decision and evidence", () => {
     });
     assert.equal(evidence.ok, true);
     assert.equal((again as { revision: number }).revision, revision);
+    const claims = (evidence.claims as Array<{ reviewDate?: string; source?: string }>) ?? [];
+    if (claims.length > 0) {
+      assert.ok(claims[0]?.source);
+      assert.ok(claims[0]?.reviewDate);
+    }
   });
 
   it("B-CONTRACT-01 compact decision is required only where applicable", () => {
@@ -362,6 +423,69 @@ describe("Slice B compact decision and evidence", () => {
     assert.equal("evidenceHandle" in needs, false);
     assert.equal("compactDecision" in blocked, false);
     assert.equal("compactDecision" in processing, false);
+    assert.equal(none.estimatedOrderTotalMinor, undefined);
+    assert.equal(none.shippingMinor, undefined);
+  });
+
+  it("B-CONTRACT-03 target claim links and deferred reason codes", () => {
+    const deferred = publicCoverage({
+      coveragePercent: 0,
+      currentAmount: 0,
+      deliveredAmount: 0,
+      importance: "conditional",
+      name: "Vitamin D3",
+      percentOfUpperLimit: null,
+      reasonCode: "conditional_prerequisite_unsatisfied",
+      remainingGap: 2000,
+      requestedAmount: 2000,
+      status: "conditional_deferred",
+      supplementId: "sup_d3",
+      totalExposureAmount: 0,
+      unit: "IU",
+      upperLimitAmount: null
+    });
+    const omitted = publicCoverage({
+      coveragePercent: 0,
+      currentAmount: 0,
+      deliveredAmount: 0,
+      importance: "optional",
+      name: "Magnesium",
+      percentOfUpperLimit: null,
+      reasonCode: "optional_omitted",
+      remainingGap: 300,
+      requestedAmount: 300,
+      status: "optional_omitted",
+      supplementId: "sup_mg",
+      totalExposureAmount: 0,
+      unit: "mg",
+      upperLimitAmount: null
+    });
+    const creatine = publicCoverage({
+      coveragePercent: 100,
+      currentAmount: 0,
+      deliveredAmount: 3000,
+      importance: "core",
+      name: "Creatine",
+      percentOfUpperLimit: null,
+      remainingGap: 0,
+      requestedAmount: 3000,
+      status: "covered",
+      supplementId: "sup_creatine",
+      totalExposureAmount: 3000,
+      unit: "mg",
+      upperLimitAmount: null
+    });
+    assert.equal(deferred.reasonCode, "conditional_prerequisite_unsatisfied");
+    assert.ok((deferred.claimIds as string[]).includes("clm_d3_bone_v1"));
+    assert.equal(omitted.reasonCode, "optional_omitted");
+    assert.ok((omitted.claimIds as string[]).includes("clm_mg_muscle_relaxation_v1"));
+    assert.ok((creatine.claimIds as string[]).includes("clm_creatine_performance_v1"));
+    const mixedPlanClaims = selectApplicableClaims({
+      status: "ready",
+      supplementNames: ["Creatine"]
+    });
+    assert.ok(mixedPlanClaims.includes("clm_creatine_performance_v1"));
+    assert.equal(mixedPlanClaims.includes("clm_mg_muscle_relaxation_v1"), false);
   });
 
   it("B-CONTRACT-02 evidence schema rejects open queries", () => {
@@ -548,6 +672,9 @@ describe("Slice C performance", () => {
     assert.ok(evidence.S349.status);
     assert.ok(evidence.S350.status);
     assert.ok(evidence.S351.status);
+    assert.notEqual(evidence.F_HAVE_90.economics.estimatedOrderTotalMinor, 5000);
+    assert.equal(evidence.F_HAVE_90.economics.estimatedOrderTotalMinor, null);
+    assert.match(JSON.stringify(evidence.F_READY_MAG.compactDecision ?? {}), /300/);
   });
 
   it("C-STRUCT-01 one plan does not repeat identical snapshot queries", async () => {

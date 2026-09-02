@@ -54,6 +54,20 @@ describe("DEV internal QA harness", () => {
       (item) => item.name
     );
     assert.deepEqual(names, [...AGENTIC_PUBLIC_TOOLS]);
+    assert.equal(names.includes("simulate"), false);
+    assert.equal(names.includes("observe"), false);
+  });
+
+  it("lists authenticated fixture and observer tools on the QA dispatcher", async () => {
+    const runtime = runtimeFor();
+    const listed = await handleQaJsonRpc(runtime, { id: 1, method: "tools/list" });
+    const names = ((listed?.result?.tools as Array<{ name: string }>) ?? []).map(
+      (item) => item.name
+    );
+    assert.ok(names.includes("simulate"));
+    assert.ok(names.includes("simulateFulfilment"));
+    assert.ok(names.includes("observe"));
+    assert.equal(names.includes("plan"), false);
   });
 
   it("fails closed when the harness is paired with a real payment adapter", () => {

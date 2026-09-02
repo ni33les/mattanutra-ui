@@ -340,6 +340,7 @@ export type BasketItem = Readonly<{
 
 export type CoverageRow = Readonly<{
   authorityUrl?: string | null;
+  claimIds?: readonly string[];
   contributors?: readonly CoverageContributor[];
   coveragePercent: number;
   currentAmount: number;
