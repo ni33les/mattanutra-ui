@@ -49,6 +49,71 @@ export function createMemoryStore(): AgenticStore {
   }
 
   const store: AgenticStore = {
+    async deletePrincipalScope(principalScope) {
+      const planIds = [...plans.values()]
+        .filter((record) => record.principalScope === principalScope)
+        .map((record) => record.id);
+      const orderIds = [...orders.values()]
+        .filter(
+          (record) =>
+            record.principalScope === principalScope || planIds.includes(record.planId)
+        )
+        .map((record) => record.id);
+      const caseIds = [...supportCases.values()]
+        .filter((record) => orderIds.includes(record.orderId))
+        .map((record) => record.id);
+
+      for (const [hash, record] of [...capabilities.entries()]) {
+        if (record.principalScope === principalScope || planIds.includes(record.resourceId) || orderIds.includes(record.resourceId)) {
+          capabilities.delete(hash);
+        }
+      }
+      for (const [id, record] of [...checkouts.entries()]) {
+        if (orderIds.includes(record.orderId)) {
+          checkouts.delete(id);
+        }
+      }
+      for (const [id, record] of [...feedback.entries()]) {
+        if (planIds.includes(record.planId)) {
+          feedback.delete(id);
+        }
+      }
+      for (const orderId of orderIds) {
+        fulfilment.delete(orderId);
+        orderItems.delete(orderId);
+        paymentAttempts.delete(orderId);
+        paymentAudits.delete(orderId);
+        retailLinks.delete(orderId);
+        orders.delete(orderId);
+      }
+      for (const [id, record] of [...outbox.entries()]) {
+        if (record.orderId && orderIds.includes(record.orderId)) {
+          outbox.delete(id);
+        }
+      }
+      for (const [key, record] of [...idempotency.entries()]) {
+        if (record.ownerScope.includes(principalScope)) {
+          idempotency.delete(key);
+        }
+      }
+      for (const [key, record] of [...revisions.entries()]) {
+        if (planIds.includes(record.planId)) {
+          revisions.delete(key);
+        }
+      }
+      for (const planId of planIds) {
+        plans.delete(planId);
+      }
+      for (const caseId of caseIds) {
+        supportCases.delete(caseId);
+        supportMessages.delete(caseId);
+      }
+    },
+    async listPlanIdsByPrincipal(principalScope) {
+      return [...plans.values()]
+        .filter((record) => record.principalScope === principalScope)
+        .map((record) => record.id);
+    },
     async deleteAll() {
       capabilities.clear();
       checkouts.clear();

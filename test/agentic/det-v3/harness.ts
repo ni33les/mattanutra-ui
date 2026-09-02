@@ -14,6 +14,7 @@ import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "../../helpers/gold-catalogue.ts";
 import { resetFunnelLedger } from "../../../lib/agentic/funnel/ledger.ts";
+import { resetQaSessions } from "../../../lib/agentic/qa/session.ts";
 import { resetQueryBudget } from "../../../lib/agentic/plan/query-budget.ts";
 import { resetInfoCache } from "../../../lib/agentic/info.ts";
 import { DET_V3_BUILD_ID, DET_V3_CLOCK } from "./manifest.ts";
@@ -79,6 +80,7 @@ export function beginDetRun(runId: string) {
   beginDeterministicIdsForTests();
   installGoldCatalogue();
   resetFunnelLedger();
+  resetQaSessions();
   resetQueryBudget();
   resetInfoCache();
   return runId;
@@ -89,6 +91,7 @@ export function endDetRun() {
   uninstallGoldCatalogue();
   endDeterministicIdsForTests();
   resetFunnelLedger();
+  resetQaSessions();
   resetQueryBudget();
   resetInfoCache();
 }

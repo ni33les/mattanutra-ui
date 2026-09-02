@@ -1578,6 +1578,13 @@ async function persistTerminalPlan(input: Readonly<{
       attribution: "agent_connector",
       correlationId: input.planId,
       createdAt: input.input.now,
+      eventId: `info:${input.planId}`,
+      eventType: "info_shown"
+    });
+    recordFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: input.planId,
+      createdAt: input.input.now,
       eventId: `plan-created:${input.planId}:${input.revision}`,
       eventType: "plan_created"
     });

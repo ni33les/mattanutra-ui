@@ -128,7 +128,8 @@ export async function POST(request: Request) {
       import("@/lib/agentic/live-runtime"),
       import("@/lib/agentic/mcp/dispatcher")
     ]);
-    const runtime = getLiveAgenticRuntime(request);
+    const { bindQaRuntime } = await import("@/lib/agentic/qa/session");
+    const runtime = bindQaRuntime(getLiveAgenticRuntime(request), request);
 
     if (Array.isArray(body)) {
       const responses = [];

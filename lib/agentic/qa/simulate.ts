@@ -18,6 +18,8 @@ import {
   listFunnelEvents,
   loadPersistedFunnelEvents
 } from "@/lib/agentic/funnel/ledger";
+import { queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
+import { bindQaChannel, channelCost, qaSession } from "@/lib/agentic/qa/session";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
 const SCENARIOS: readonly PaymentEventScenario[] = [
@@ -54,13 +56,27 @@ export const FULFILMENT_STATUSES = [
   "processing",
   "packed",
   "shipped",
-  "delivered"
+  "delivered",
+  "preparing",
+  "dispatched"
 ] as const;
 
 export type FulfilmentFixtureStatus = (typeof FULFILMENT_STATUSES)[number];
 
 export function isFulfilmentStatus(value: unknown): value is FulfilmentFixtureStatus {
   return typeof value === "string" && (FULFILMENT_STATUSES as readonly string[]).includes(value);
+}
+
+export function omsFulfilmentStatus(
+  status: FulfilmentFixtureStatus
+): "processing" | "packed" | "shipped" | "delivered" {
+  if (status === "preparing") {
+    return "packed";
+  }
+  if (status === "dispatched") {
+    return "shipped";
+  }
+  return status;
 }
 
 export async function simulatePayment(input: Readonly<{
@@ -124,7 +140,10 @@ export async function simulateFulfilment(input: Readonly<{
   status: FulfilmentFixtureStatus;
   store: AgenticStore;
 }>) {
-  const driven = await driveFulfilmentFixture(input);
+  const driven = await driveFulfilmentFixture({
+    ...input,
+    status: omsFulfilmentStatus(input.status)
+  });
   if (isAgenticErrorResult(driven)) {
     return driven;
   }
@@ -141,6 +160,7 @@ export async function simulateFulfilment(input: Readonly<{
 export async function observeQaJourney(input: Readonly<{
   config: AgenticConfig;
   correlationId?: string;
+  namespace?: string;
   now: string;
   orderHandle?: string;
   scope: CapabilityScope;
@@ -181,14 +201,19 @@ export async function observeQaJourney(input: Readonly<{
   }
 
   await loadPersistedFunnelEvents(correlationId);
+  const session = qaSession(input.namespace);
+  if (session && correlationId) {
+    bindQaChannel(correlationId, session);
+  }
   const events = listFunnelEvents(correlationId);
-  const attribution = funnelAttribution(correlationId);
+  const cost = channelCost(correlationId, input.namespace);
+  const attribution = cost.attribution === "unattributed" ? funnelAttribution(correlationId) : cost.attribution;
   const items = order ? await input.store.getOrderItems(order.id) : [];
   const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
   const contribution =
     order && order.paymentStatus === "paid"
       ? contributionMinor({
-          acquisitionMinor: 0,
+          acquisitionMinor: cost.acquisitionMinor,
           paymentFeeMinor: 0,
           paymentMinor: order.totalPriceMinor,
           productCostMinor,
@@ -199,6 +224,7 @@ export async function observeQaJourney(input: Readonly<{
   return {
     ok: true as const,
     attribution,
+    clock: session?.now ?? input.now,
     contributionMinor: contribution,
     correlationId,
     events: events.map((event) => ({
@@ -207,6 +233,8 @@ export async function observeQaJourney(input: Readonly<{
       eventId: event.eventId,
       eventType: event.eventType,
       sequence: event.sequence
-    }))
+    })),
+    namespace: input.namespace ?? session?.namespace ?? null,
+    queries: queryBudgetSnapshot()
   };
 }

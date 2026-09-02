@@ -4,7 +4,15 @@ import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { handleQaJsonRpc } from "@/lib/agentic/mcp/qa-dispatcher";
 import { authorizeQaRequest } from "@/lib/agentic/qa/auth";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
-import { isPaymentScenario, simulatePayment } from "@/lib/agentic/qa/simulate";
+import {
+  isFulfilmentStatus,
+  isPaymentScenario,
+  observeQaJourney,
+  simulateFulfilment,
+  simulatePayment
+} from "@/lib/agentic/qa/simulate";
+import { qaPreflight } from "@/lib/agentic/qa/preflight";
+import { beginQaRun, resetQaRun, setQaChannel, setQaClock } from "@/lib/agentic/qa/session";
 import { nowIso } from "@/lib/agentic/runtime";
 import { isOpaqueCapabilityHandle, resolveCapability } from "@/lib/agentic/capabilities";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
@@ -49,6 +57,39 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    const rest = body as {
+      acquisitionMinor?: unknown;
+      attribution?: unknown;
+      fulfilment?: unknown;
+      namespace?: unknown;
+      now?: unknown;
+      observe?: unknown;
+      reset?: unknown;
+      runId?: unknown;
+    };
+    if (typeof rest.runId === "string" && !("orderHandle" in rest)) {
+      const begun = beginQaRun(rest.runId);
+      return NextResponse.json(
+        { ok: true, clock: begun.now, namespace: begun.namespace, principalScope: begun.principalScope, preflight: qaPreflight(begun.namespace) },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+    if (rest.reset === true && typeof rest.namespace === "string") {
+      return NextResponse.json(await resetQaRun({ namespace: rest.namespace, store: runtime.store }), {
+        headers: { "Cache-Control": "no-store" }
+      });
+    }
+    if (typeof rest.now === "string" && typeof rest.namespace === "string" && !("orderHandle" in rest)) {
+      const next = setQaClock(rest.namespace, rest.now);
+      return NextResponse.json(next ?? { ok: false }, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (typeof rest.namespace === "string" && (rest.attribution != null || rest.acquisitionMinor != null) && !("orderHandle" in rest)) {
+      const next = setQaChannel(rest.namespace, {
+        acquisitionMinor: typeof rest.acquisitionMinor === "number" ? rest.acquisitionMinor : undefined,
+        attribution: rest.attribution
+      });
+      return NextResponse.json(next ?? { ok: false }, { headers: { "Cache-Control": "no-store" } });
+    }
   }
 
   if (
@@ -64,6 +105,33 @@ export async function POST(request: Request) {
 
     if (!isOpaqueCapabilityHandle(orderHandle)) {
       return NextResponse.json({ message: "Not found." }, { status: 404 });
+    }
+
+    const fulfilment = (body as { fulfilment?: unknown }).fulfilment;
+    if (typeof fulfilment === "string") {
+      if (!isFulfilmentStatus(fulfilment)) {
+        return NextResponse.json({ message: "Unknown fulfilment." }, { status: 400 });
+      }
+      const driven = await simulateFulfilment({
+        config: runtime.config,
+        now,
+        orderHandle,
+        scope: runtime.scope,
+        status: fulfilment,
+        store: runtime.store
+      });
+      return NextResponse.json(driven, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    if ((body as { observe?: unknown }).observe === true) {
+      const observed = await observeQaJourney({
+        config: runtime.config,
+        now,
+        orderHandle,
+        scope: runtime.scope,
+        store: runtime.store
+      });
+      return NextResponse.json(observed, { headers: { "Cache-Control": "no-store" } });
     }
 
     if (typeof scenario === "string") {
@@ -151,9 +219,15 @@ export async function GET(request: Request) {
 
   return NextResponse.json(
     {
+      preflight: qaPreflight(),
       tools: [
+        "preflight",
+        "beginRun",
+        "reset",
+        "setClock",
         "simulate",
         "simulateFulfilment",
+        "setChannel",
         "observe",
         "evidence",
         "isolationProof",

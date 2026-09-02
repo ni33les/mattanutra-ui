@@ -16,6 +16,81 @@ function asJson(value: unknown) {
 export function createPostgresStore(inputSql: Sql): AgenticStore {
   const sql = inputSql as unknown as AnySql;
   const store = {
+    async listPlanIdsByPrincipal(principalScope) {
+      const rows = await sql`
+        select id from public.agentic_plans where principal_scope = ${principalScope}
+      `;
+      return rows.map((row) => String(row.id));
+    },
+    async deletePrincipalScope(principalScope) {
+      if (!String(principalScope).startsWith("qa-v3:")) {
+        return;
+      }
+      await sql`
+        delete from public.agentic_support_messages
+        where case_id in (
+          select c.id from public.agentic_support_cases c
+          join public.agentic_orders o on o.id = c.order_id
+          where o.principal_scope = ${principalScope}
+        )
+      `;
+      await sql`
+        delete from public.agentic_support_cases
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_fulfilment_events
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_order_items
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_checkout_sessions
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_payment_attempts
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_payment_audits
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_provider_events
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_outbox_events
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_retail_order_links
+        where order_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_feedback
+        where plan_id in (select id from public.agentic_plans where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_capabilities
+        where principal_scope = ${principalScope}
+           or resource_id in (select id from public.agentic_orders where principal_scope = ${principalScope})
+           or resource_id in (select id from public.agentic_plans where principal_scope = ${principalScope})
+      `;
+      await sql`
+        delete from public.agentic_idempotency_records
+        where owner_scope like ${"%" + principalScope + "%"}
+      `;
+      await sql`delete from public.agentic_orders where principal_scope = ${principalScope}`;
+      await sql`
+        delete from public.agentic_plan_revisions
+        where plan_id in (select id from public.agentic_plans where principal_scope = ${principalScope})
+      `;
+      await sql`delete from public.agentic_plans where principal_scope = ${principalScope}`;
+    },
     async deleteAll() {
       await sql`truncate table
         public.agentic_funnel_events,

@@ -206,8 +206,13 @@ export async function engineeringInfo(input: Readonly<{
             authorization: "Bearer MCP_QA_TOKEN",
             path: "/api/mcp/qa",
             tools: [
+              "preflight",
+              "beginRun",
+              "reset",
+              "setClock",
               "simulate",
               "simulateFulfilment",
+              "setChannel",
               "observe",
               "evidence",
               "isolationProof",

@@ -8,6 +8,7 @@ import { buildOrderProjection } from "@/lib/agentic/commerce/timeline";
 import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
 import { contributionMinor } from "@/lib/agentic/funnel/events";
 import { funnelAttribution, listFunnelEvents } from "@/lib/agentic/funnel/ledger";
+import { channelCost } from "@/lib/agentic/qa/session";
 
 export async function orderTool(input: Readonly<{
   config: AgenticConfig;
@@ -69,10 +70,11 @@ export async function orderTool(input: Readonly<{
   const funnel = order ? listFunnelEvents(order.planId) : [];
   void funnel;
   const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
+  const cost = order ? channelCost(order.planId) : { acquisitionMinor: 0, attribution };
   const contribution =
     order && order.paymentStatus === "paid"
       ? contributionMinor({
-          acquisitionMinor: attribution === "unattributed" ? 0 : 0,
+          acquisitionMinor: cost.acquisitionMinor,
           paymentFeeMinor: 0,
           paymentMinor: order.totalPriceMinor,
           productCostMinor,
@@ -103,7 +105,7 @@ export async function orderTool(input: Readonly<{
 
   return {
     ...view,
-    attribution,
+    attribution: cost.attribution === "unattributed" ? attribution : cost.attribution,
     contributionMinor: contribution,
     events: projection.events,
     money: projection.money,

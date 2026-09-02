@@ -200,6 +200,8 @@ export type FeedbackRecord = Readonly<{
 
 export type AgenticStore = {
   deleteAll(): Promise<void>;
+  deletePrincipalScope(principalScope: string): Promise<void>;
+  listPlanIdsByPrincipal(principalScope: string): Promise<readonly string[]>;
   getCapabilityByHash(hash: string): Promise<CapabilityRecord | null>;
   getCheckoutByAccessHash(hash: string): Promise<CheckoutSessionRecord | null>;
   getCheckoutByOrderId(orderId: string): Promise<CheckoutSessionRecord | null>;
