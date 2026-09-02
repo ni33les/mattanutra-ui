@@ -9,6 +9,7 @@ import {
   planClaimIds,
   planResearchVersion
 } from "@/lib/agentic/value/compact-decision";
+import { mergeBySemanticKey } from "@/lib/agentic/plan/merge";
 import {
   CONDITION_ALIASES,
   MEDICATION_ALIASES
@@ -934,11 +935,16 @@ export function publicPlanFields(result: Pick<
     selected?.totalPriceMinor ??
     result.basket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
   const payable = payableSnapshot({ subtotalMinor });
-  const advertisedOptions = [selected, ...alternatives]
+  const uniqueAlternatives = mergeBySemanticKey(
+    alternatives.filter(
+      (item, index, list) =>
+        item.optionId !== selected?.optionId &&
+        list.findIndex((row) => row.optionId === item.optionId) === index
+    ),
+    (item) => item.optionId
+  );
+  const advertisedOptions = [selected, ...uniqueAlternatives]
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .filter(
-      (item, index, list) => list.findIndex((row) => row.optionId === item.optionId) === index
-    )
     .slice(0, 3);
 
   const compactApplicable =

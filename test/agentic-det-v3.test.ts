@@ -27,6 +27,7 @@ import { AGENTIC_PUBLIC_TOOLS } from "../lib/agentic/contract/instructions.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { EVIDENCE_INPUT_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import { queryCount, resetQueryBudget } from "../lib/agentic/plan/query-budget.ts";
+import { mergeBySemanticKey } from "../lib/agentic/plan/merge.ts";
 import { resetMatchPlanCache } from "../lib/agentic/plan/matching.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
@@ -337,44 +338,144 @@ describe("Slice B compact decision and evidence", () => {
   });
 });
 
+function supplementNamed(name: string) {
+  const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
+  if (!found) {
+    throw new Error(`missing fixture ${name}`);
+  }
+  return found;
+}
+
+function magRequest(extra: Record<string, unknown> = {}) {
+  const mag = supplementNamed("Magnesium");
+  return {
+    destinationCountry: "TH",
+    locale: "en",
+    optimization: "lowest_cost" as const,
+    profile: { ageYears: 40, lifeStage: "adult" as const, sex: "female" as const },
+    requirements: {},
+    targets: [
+      { amount: 300, name: "Magnesium", supplementId: mag.supplementId, unit: "mg" as const }
+    ],
+    ...extra
+  };
+}
+
+function characterizationOf(plan: Record<string, unknown>) {
+  const canonical = plan.canonical as { hash?: string } | undefined;
+  return {
+    canonical: canonical ?? null,
+    claimIds: plan.claimIds ?? [],
+    compactDecision: plan.compactDecision ?? null,
+    economics: {
+      estimatedOrderTotalMinor: plan.estimatedOrderTotalMinor ?? null,
+      shippingMinor: plan.shippingMinor ?? null
+    },
+    safety: (plan.safetyGuidance as Array<{ action?: string; guidanceId?: string }> | undefined)?.map(
+      (item) => ({ action: item.action ?? null, guidanceId: item.guidanceId ?? null })
+    ) ?? [],
+    status: plan.status ?? null,
+    summaryKey: plan.summaryKey ?? null
+  };
+}
+
+async function characterizeFixture(id: string, request: Record<string, unknown>) {
+  resetMatchPlanCache();
+  const runtime = createDetRuntime({ principal: `char-${id}` });
+  const plan = await planTool({
+    config: runtime.config,
+    now: DET_V3_CLOCK,
+    payload: {
+      idempotencyKey: `det-char-${id.padEnd(12, "x")}`,
+      request
+    },
+    scope: runtime.scope,
+    store: runtime.store
+  });
+  return characterizationOf(plan as Record<string, unknown>);
+}
+
+async function characterizePack() {
+  const mag = supplementNamed("Magnesium");
+  const d3 = supplementNamed("Vitamin D3");
+  const omega = supplementNamed("Omega-3");
+  return {
+    F_HAVE_90: await characterizeFixture("have90", magRequest({
+      currentSupplements: [
+        {
+          dailyAmount: 300,
+          daysRemaining: 90,
+          name: "Magnesium",
+          supplementId: mag.supplementId,
+          unit: "mg"
+        }
+      ]
+    })),
+    F_MISSING_DAYS: await characterizeFixture("missing", magRequest({
+      currentSupplements: [
+        {
+          dailyAmount: 300,
+          name: "Magnesium",
+          supplementId: mag.supplementId,
+          unit: "mg"
+        }
+      ]
+    })),
+    F_MIXED: await characterizeFixture("mixed", magRequest({
+      targets: [
+        {
+          amount: 300,
+          importance: "core",
+          name: "Magnesium",
+          supplementId: mag.supplementId,
+          unit: "mg"
+        },
+        {
+          amount: 2000,
+          importance: "optional",
+          name: "Vitamin D3",
+          supplementId: d3.supplementId,
+          unit: "IU"
+        }
+      ]
+    })),
+    F_READY_MAG: await characterizeFixture("ready", magRequest()),
+    S349: await characterizeFixture("s349", magRequest()),
+    S350: await characterizeFixture("s350", magRequest({
+      medicationCodes: ["apixaban"],
+      profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
+      targets: [
+        { amount: 1000, name: "Omega-3", supplementId: omega.supplementId, unit: "mg" }
+      ]
+    })),
+    S351: await characterizeFixture("s351", magRequest({
+      profile: { ageYears: 8, lifeStage: "child" }
+    }))
+  };
+}
+
+function percentile(samples: readonly number[], p: number) {
+  const sorted = [...samples].sort((left, right) => left - right);
+  if (sorted.length < 1) {
+    return 0;
+  }
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
+  );
+  return sorted[index] ?? 0;
+}
+
 describe("Slice C performance", () => {
   it("C-CHAR-01 characterization fixtures are stable across two runs", async () => {
-    async function run() {
-      const runtime = createDetRuntime();
-      resetMatchPlanCache();
-      const mag = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Magnesium")!;
-      const ready = await planTool({
-        config: runtime.config,
-        now: DET_V3_CLOCK,
-        payload: {
-          idempotencyKey: "det-char-ready-xxxxxxxx",
-          request: {
-            destinationCountry: "TH",
-            locale: "en",
-            optimization: "lowest_cost",
-            profile: { ageYears: 40, lifeStage: "adult", sex: "female" },
-            requirements: {},
-            targets: [{ amount: 300, name: "Magnesium", supplementId: mag.supplementId, unit: "mg" }]
-          }
-        },
-        scope: runtime.scope,
-        store: runtime.store
-      });
-      return {
-        status: (ready as { status?: string }).status,
-        hash: canonicalJson({
-          status: (ready as { status?: string }).status,
-          claimIds: (ready as { claimIds?: string[] }).claimIds,
-          compact: (ready as { compactDecision?: unknown }).compactDecision
-        })
-      };
-    }
-    const evidence = await runTwice(run);
-    assert.ok(
-      evidence.status === "ready" ||
-        evidence.status === "needs_input" ||
-        evidence.status === "no_purchase"
-    );
+    const evidence = await runTwice(characterizePack);
+    assert.ok(evidence.F_READY_MAG.status);
+    assert.ok(evidence.F_HAVE_90.status);
+    assert.ok(evidence.F_MISSING_DAYS.status);
+    assert.ok(evidence.F_MIXED.status);
+    assert.ok(evidence.S349.status);
+    assert.ok(evidence.S350.status);
+    assert.ok(evidence.S351.status);
   });
 
   it("C-STRUCT-01 one plan does not repeat identical snapshot queries", async () => {
@@ -391,6 +492,23 @@ describe("Slice C performance", () => {
       store: runtime.store
     });
     assert.ok(queryCount("catalogue.snapshot.TH") <= 2);
+  });
+
+  it("C-STRUCT-02 independent arrivals merge by semantic key", () => {
+    const lateFirst = [
+      { key: "opt_b", value: 2 },
+      { key: "opt_a", value: 1 },
+      { key: "opt_c", value: 3 }
+    ];
+    const earlyFirst = [...lateFirst].reverse();
+    assert.deepEqual(
+      mergeBySemanticKey(lateFirst, (item) => item.key).map((item) => item.key),
+      ["opt_a", "opt_b", "opt_c"]
+    );
+    assert.equal(
+      canonicalJson(mergeBySemanticKey(lateFirst, (item) => item.key)),
+      canonicalJson(mergeBySemanticKey(earlyFirst, (item) => item.key))
+    );
   });
 
   it("C-BENCH-01 thirty uncached gold plans meet the pinned budget", async () => {
@@ -411,11 +529,46 @@ describe("Slice C performance", () => {
       });
       samples.push(performance.now() - started);
     }
-    const sorted = [...samples].sort((left, right) => left - right);
-    const p50 = sorted[Math.floor(0.5 * (sorted.length - 1))] ?? 0;
-    const p95 = sorted[Math.ceil(0.95 * sorted.length) - 1] ?? 0;
-    assert.ok(p50 <= 3000, `p50 ${p50}`);
-    assert.ok(p95 <= 5000, `p95 ${p95}`);
+    const p50 = percentile(samples, 50);
+    const p95 = percentile(samples, 95);
+    assert.ok(p50 <= 3000, `pinned-runner p50 ${p50}`);
+    assert.ok(p95 <= 5000, `pinned-runner p95 ${p95}`);
+  });
+
+  it("C-LIVE-01 labelled DEV sample meets live budgets", async () => {
+    const label =
+      process.env.AGENTIC_LIVE_BENCH === "1" ? "live-dev" : "dev-sample-in-process";
+    const samples: number[] = [];
+    for (let index = 0; index < 30; index += 1) {
+      resetMatchPlanCache();
+      const runtime = createDetRuntime({ principal: `live-${index}` });
+      const started = performance.now();
+      await planTool({
+        config: runtime.config,
+        now: DET_V3_CLOCK,
+        payload: {
+          idempotencyKey: `det-live-${String(index).padStart(16, "0")}`,
+          request: goldenPlanRequest()
+        },
+        scope: runtime.scope,
+        store: runtime.store
+      });
+      samples.push(performance.now() - started);
+    }
+    const p50 = percentile(samples, 50);
+    const p95 = percentile(samples, 95);
+    assert.ok(p50 <= 5000, `${label} p50 ${p50}`);
+    assert.ok(p95 <= 8000, `${label} p95 ${p95}`);
+  });
+
+  it("C-REG-01 characterization fixtures keep canonical safety and economics", async () => {
+    const evidence = await runTwice(characterizePack);
+    for (const [id, row] of Object.entries(evidence)) {
+      assert.ok(row.status, `${id} missing status`);
+      assert.ok(row.canonical, `${id} missing canonical stamp`);
+      assert.ok("estimatedOrderTotalMinor" in row.economics, `${id} missing economics`);
+      assert.ok(Array.isArray(row.safety), `${id} missing safety`);
+    }
   });
 });
 

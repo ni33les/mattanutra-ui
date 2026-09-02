@@ -1,5 +1,6 @@
 import { RESEARCH_VERSION } from "@/lib/agentic/discovery/versions";
 import { selectApplicableClaims } from "@/lib/agentic/claims/select";
+import { mergeBySemanticKey } from "@/lib/agentic/plan/merge";
 import type { PlanResult, StackOption } from "@/lib/agentic/plan/types";
 
 const COMPACT_LIMIT_BYTES = 4 * 1024;
@@ -47,9 +48,12 @@ export function buildCompactDecision(result: CompactPlanView): CompactDecision {
     ...(selected?.coverage ?? result.coverage ?? []).map((row) => row.name),
     ...(result.requestSnapshot?.currentSupplements ?? []).map((item) => item.name)
   ];
-  const what = selected
-    ? selected.basket.map((item) => `${item.quantity}× ${item.productName}`)
-    : (result.requestSnapshot?.currentSupplements ?? []).map((item) => item.name);
+  const what = mergeBySemanticKey(
+    selected
+      ? selected.basket.map((item) => `${item.quantity}× ${item.productName}`)
+      : (result.requestSnapshot?.currentSupplements ?? []).map((item) => item.name),
+    (item) => item
+  );
 
   return {
     cost: {
