@@ -1,4 +1,3 @@
-import { FIXTURE_SUPPLEMENTS } from "@/lib/agentic/catalogue/fixtures";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 import { catalogueVersion } from "@/lib/agentic/catalogue/snapshot";
 import { planTool } from "@/lib/agentic/plan/service";
@@ -6,21 +5,15 @@ import { executeTool } from "@/lib/agentic/commerce/execute";
 import { simulatePayment } from "@/lib/agentic/qa/simulate";
 import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
-import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
+import { type AgenticRuntime } from "@/lib/agentic/runtime";
 import { addMinor, asMinor, asMinorOr, formatMinor, DEFAULT_TAX_MINOR } from "@/lib/agentic/money";
 import { infoTool } from "@/lib/agentic/info";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { feedbackTool } from "@/lib/agentic/feedback";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
-
-function supplementId(name: string) {
-  const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
-  if (!found) {
-    throw new Error(`Missing fixture supplement ${name}`);
-  }
-  return found.supplementId;
-}
+import { QA_PACK_CLOCK } from "@/lib/agentic/qa/session";
+import { getQueryNamespace, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
 
 export function goldenPlanRequest() {
   return {
@@ -34,13 +27,27 @@ export function goldenPlanRequest() {
     },
     requirements: {},
     targets: [
-      { amount: 2000, name: "Vitamin D3", supplementId: supplementId("Vitamin D3"), unit: "IU" as const },
-      { amount: 1000, name: "Omega-3", supplementId: supplementId("Omega-3"), unit: "mg" as const },
-      { amount: 300, name: "Magnesium", supplementId: supplementId("Magnesium"), unit: "mg" as const },
-      { amount: 1000, name: "Vitamin B12", supplementId: supplementId("Vitamin B12"), unit: "mcg" as const },
-      { amount: 1000, name: "Vitamin C", supplementId: supplementId("Vitamin C"), unit: "mg" as const }
+      { amount: 2000, name: "Vitamin D3", unit: "IU" as const },
+      { amount: 1000, name: "Omega-3", unit: "mg" as const },
+      { amount: 300, name: "Magnesium", unit: "mg" as const },
+      { amount: 1000, name: "Vitamin B12", unit: "mcg" as const },
+      { amount: 1000, name: "Vitamin C", unit: "mg" as const }
     ]
   };
+}
+
+function proofNow(runtime: AgenticRuntime) {
+  return runtime.now ?? QA_PACK_CLOCK;
+}
+
+async function withProofQueries<T>(name: string, work: () => Promise<T>) {
+  const previous = getQueryNamespace();
+  setQueryNamespace(`proof:${name}`);
+  try {
+    return await work();
+  } finally {
+    setQueryNamespace(previous === "global" ? undefined : previous);
+  }
 }
 
 function scopeWithPrincipal(base: CapabilityScope, principal: string): CapabilityScope {
@@ -55,10 +62,11 @@ export async function orderEvidence(input: Readonly<{
 }
 
 export async function isolationProof(runtime: AgenticRuntime) {
+  return withProofQueries("isolation", async () => {
   const stamp = `${Date.now()}`;
   const aliceScope = scopeWithPrincipal(runtime.scope, `qa-alice-${stamp}`);
   const bobScope = scopeWithPrincipal(runtime.scope, `qa-bob-${stamp}`);
-  const now = nowIso();
+  const now = proofNow(runtime);
   const created = await planTool({
     config: runtime.config,
     now,
@@ -105,11 +113,13 @@ export async function isolationProof(runtime: AgenticRuntime) {
     ok: true as const,
     passed
   };
+  });
 }
 
 export async function checkoutContinuityProof(runtime: AgenticRuntime) {
+  return withProofQueries("checkout", async () => {
   const stamp = `${Date.now()}`;
-  const now = nowIso();
+  const now = proofNow(runtime);
   const created = await planTool({
     config: runtime.config,
     now,
@@ -283,6 +293,7 @@ export async function checkoutContinuityProof(runtime: AgenticRuntime) {
     ok: true as const,
     passed: checks.every((item) => item.passed)
   };
+  });
 }
 
 function percentile(samples: readonly number[], p: number) {
@@ -299,7 +310,8 @@ function percentile(samples: readonly number[], p: number) {
 }
 
 export async function latencyProof(runtime: AgenticRuntime) {
-  const now = nowIso();
+  return withProofQueries("latency", async () => {
+  const now = proofNow(runtime);
   const stamp = `${Date.now()}`;
   const created = await planTool({
     config: runtime.config,
@@ -410,4 +422,5 @@ export async function latencyProof(runtime: AgenticRuntime) {
     ok: true as const,
     passed: checks.every((item) => item.passed)
   };
+  });
 }

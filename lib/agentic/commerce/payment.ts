@@ -103,6 +103,13 @@ export function mockEventForScenario(input: Readonly<{
     case "partial_refund":
       return { ...base, reason: null, scenario: input.scenario, status: "partially_refunded" };
     case "duplicate_success":
+      return {
+        ...base,
+        providerEventId: `mock_evt_success_${input.orderId.replace(/-/g, "").slice(0, 12)}`,
+        reason: null,
+        scenario: input.scenario,
+        status: "succeeded"
+      };
     case "success":
     case "three_ds_succeeded":
     default:

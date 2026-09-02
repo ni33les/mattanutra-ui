@@ -6,15 +6,39 @@ import {
   type FunnelEventType
 } from "@/lib/agentic/funnel/events";
 
+export type FunnelEventPayload = Readonly<{
+  anonymousCorrelation: string;
+  locale: string;
+}>;
+
 export type FunnelEvent = Readonly<{
   attribution: FunnelAttribution;
   correlationId: string;
   createdAt: string;
   eventId: string;
   eventType: FunnelEventType;
-  payload: Readonly<Record<string, never>>;
+  payload: FunnelEventPayload;
   sequence: number;
 }>;
+
+function publicFunnelPayload(
+  correlationId: string,
+  payload: unknown
+): FunnelEventPayload {
+  const raw =
+    payload && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
+  const locale = typeof raw.locale === "string" && raw.locale.trim() ? raw.locale.trim() : "en";
+  const anonymous =
+    typeof raw.anonymousCorrelation === "string" && raw.anonymousCorrelation.trim()
+      ? raw.anonymousCorrelation.trim()
+      : correlationId;
+  return {
+    anonymousCorrelation: anonymous,
+    locale
+  };
+}
 
 const ledgers = new Map<string, FunnelEvent[]>();
 const seenEventIds = new Set<string>();
@@ -70,7 +94,7 @@ export function recordFunnelEvent(input: Readonly<{
     createdAt: input.createdAt,
     eventId: input.eventId,
     eventType: input.eventType,
-    payload: {},
+    payload: publicFunnelPayload(input.correlationId, input.payload),
     sequence: list.length + 1
   };
   list.push(event);
@@ -130,7 +154,7 @@ export async function loadPersistedFunnelEvents(correlationId: string) {
       return listFunnelEvents(correlationId);
     }
     const rows = await sql`
-      select event_id, correlation_id, event_type, attribution, sequence, created_at
+      select event_id, correlation_id, event_type, attribution, payload, sequence, created_at
       from public.agentic_funnel_events
       where correlation_id = ${correlationId}
       order by sequence asc
@@ -150,7 +174,7 @@ export async function loadPersistedFunnelEvents(correlationId: string) {
             : String(row.created_at ?? ""),
         eventId,
         eventType: String(row.event_type ?? "") as FunnelEvent["eventType"],
-        payload: {},
+        payload: publicFunnelPayload(String(row.correlation_id ?? correlationId), row.payload),
         sequence: Number(row.sequence ?? restored.length + 1)
       };
       if (!isFunnelEventType(event.eventType)) {

@@ -32,6 +32,17 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     return null;
   }
 
+  const closedAlready =
+    order.paymentStatus === "paid" ||
+    order.orderStatus === "expired" ||
+    order.orderStatus === "cancelled";
+  if (
+    closedAlready &&
+    (input.event.status === "succeeded" || input.event.status === "processing")
+  ) {
+    return { applied: false, order };
+  }
+
   await input.store.insertProviderEvent({
     createdAt: input.now,
     id: nextTestUuid(),
@@ -328,8 +339,9 @@ export function orderPollView(input: Readonly<{
   const refunded =
     order.paymentStatus === "refunded" || order.paymentStatus === "partially_refunded";
   const exception = order.fulfilmentStatus === "exception";
+  const delivered = order.fulfilmentStatus === "delivered";
   const reasonCode = fulfilmentReason(events);
-  const terminal = paid || expired || refunded || cancelled;
+  const terminal = delivered || expired || refunded || cancelled;
   const messageKey = cancelled
     ? "order.cancelled"
     : expired
@@ -399,7 +411,9 @@ export function orderPollView(input: Readonly<{
       : {}),
     orderStatus: order.orderStatus,
     paymentStatus: order.paymentStatus,
-    pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
+    ...(terminal
+      ? { pollAfterSeconds: 0, terminal: true as const }
+      : { pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS, terminal: false as const }),
     receipt: paid
       ? {
           currency: order.currency,

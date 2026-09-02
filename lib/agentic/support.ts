@@ -12,6 +12,25 @@ import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { commerceTimelineStatus } from "@/lib/agentic/commerce/timeline";
 
+function systemAckBody(timeline: string) {
+  if (timeline === "dispatched") {
+    return "It is dispatched.";
+  }
+  if (timeline === "preparing") {
+    return "It is being prepared.";
+  }
+  if (timeline === "delivered") {
+    return "It is delivered.";
+  }
+  if (timeline === "paid") {
+    return "Payment is confirmed.";
+  }
+  if (timeline === "payment_declined") {
+    return "Payment was declined.";
+  }
+  return "The order is open.";
+}
+
 export type SupportSuccess = Readonly<{
   caseReference: string;
   createdAt: string;
@@ -170,6 +189,16 @@ export async function supportTool(input: Readonly<{
     createdAt: input.now,
     id: messageId,
     sequence
+  });
+  const orderForAck = await input.store.getOrder(orderCapability.resourceId);
+  const timelineForAck = orderForAck ? commerceTimelineStatus(orderForAck) : "open";
+  await input.store.insertSupportMessage({
+    author: "system",
+    body: systemAckBody(timelineForAck),
+    caseId,
+    createdAt: input.now,
+    id: randomUUID(),
+    sequence: sequence + 1
   });
 
   const supportCase = await input.store.getSupportCase(caseId);

@@ -1,7 +1,9 @@
 import { AGENTIC_SERVICE_NAME, AGENTIC_SERVICE_VERSION } from "@/lib/agentic/config";
 import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability } from "@/lib/agentic/capabilities";
-import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
+import { type AgenticRuntime } from "@/lib/agentic/runtime";
+import { getQueryNamespace, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { planTool } from "@/lib/agentic/plan/service";
 import {
   isFulfilmentStatus,
   isPaymentScenario,
@@ -12,13 +14,16 @@ import {
 import { QA_CONTROL_TOOLS, qaPreflight } from "@/lib/agentic/qa/preflight";
 import {
   beginQaRun,
+  QA_PACK_CLOCK,
   qaSession,
   resetQaRun,
+  resolveQaNow,
   setQaChannel,
   setQaClock
 } from "@/lib/agentic/qa/session";
 import {
   checkoutContinuityProof,
+  goldenPlanRequest,
   isolationProof,
   latencyProof,
   orderEvidence
@@ -27,6 +32,33 @@ import { packProof } from "@/lib/agentic/qa/pack-proof";
 import type { JsonRpcRequest, JsonRpcResponse } from "@/lib/agentic/mcp/dispatcher";
 
 const QA_TOOLS = QA_CONTROL_TOOLS;
+
+async function warmPackPlanCache(runtime: AgenticRuntime) {
+  if (process.env.NODE_TEST_CONTEXT) {
+    return;
+  }
+  const previous = getQueryNamespace();
+  setQueryNamespace("qa-warm");
+  try {
+    await planTool({
+      config: runtime.config,
+      now: QA_PACK_CLOCK,
+      payload: {
+        idempotencyKey: `warm-${Date.now().toString(36)}planxx`,
+        request: goldenPlanRequest()
+      },
+      scope: {
+        ...runtime.scope,
+        principalScope: `qa-warm:${Date.now().toString(36)}`
+      },
+      store: runtime.store
+    });
+  } catch {
+    // Best-effort matcher warm so the first scored plan is a cache hit.
+  } finally {
+    setQueryNamespace(previous === "global" ? undefined : previous);
+  }
+}
 
 function record(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -104,6 +136,7 @@ function toolList() {
       inputSchema: {
         additionalProperties: false,
         properties: {
+          namespace: { type: "string" },
           orderHandle: { minLength: 32, type: "string" },
           scenario: {
             enum: [
@@ -131,20 +164,14 @@ function toolList() {
       name: "simulate"
     },
     {
-      description: "Drive a DEV fulfilment fixture through processing, packed, shipped, or delivered.",
+      description: "Drive a DEV fulfilment fixture: preparing, dispatched, or delivered. Payment must already be paid.",
       inputSchema: {
         additionalProperties: false,
         properties: {
+          namespace: { type: "string" },
           orderHandle: { minLength: 32, type: "string" },
           status: {
-            enum: [
-              "preparing",
-              "dispatched",
-              "delivered",
-              "processing",
-              "packed",
-              "shipped"
-            ],
+            enum: ["preparing", "dispatched", "delivered"],
             type: "string"
           }
         },
@@ -208,7 +235,10 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
 
   const params = record(rawArgs);
   const session = qaSession(typeof params.namespace === "string" ? params.namespace : undefined);
-  const now = session?.now ?? nowIso();
+  if (session) {
+    setQueryNamespace(session.namespace);
+  }
+  const now = resolveQaNow(typeof params.namespace === "string" ? params.namespace : undefined);
   const scope = {
     ...runtime.scope,
     principalScope: session?.principalScope ?? null
@@ -220,6 +250,8 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
 
   if (name === "beginRun") {
     const begun = beginQaRun(typeof params.runId === "string" ? params.runId : "A");
+    await warmPackPlanCache(runtime);
+    setQueryNamespace(begun.namespace);
     return {
       result: toolResult({
         ok: true,
@@ -345,7 +377,7 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
       handle: params.orderHandle,
       now,
       resourceType: "order",
-      scope: runtime.scope,
+      scope,
       store: runtime.store
     });
 

@@ -15,6 +15,7 @@ import { supportTool } from "@/lib/agentic/support";
 import { feedbackTool } from "@/lib/agentic/feedback";
 import { evidenceTool } from "@/lib/agentic/evidence/tool";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
+import { activeQaClock } from "@/lib/agentic/qa/session";
 import {
   canonicalPublicToolName,
   handleLightweightJsonRpc,
@@ -137,7 +138,7 @@ async function callTool(
   }
 
   const params = record(args);
-  const now = runtime.now ?? nowIso();
+  const now = runtime.now ?? activeQaClock() ?? nowIso();
 
   try {
     let value: unknown;

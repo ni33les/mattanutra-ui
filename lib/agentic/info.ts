@@ -273,7 +273,8 @@ export async function infoTool(input: Readonly<{
     correlationId: `info:${input.config.buildId}:${locale}`,
     createdAt: new Date(0).toISOString(),
     eventId: `info:${key}`,
-    eventType: "info_shown"
+    eventType: "info_shown",
+    payload: { locale }
   });
   return value;
 }

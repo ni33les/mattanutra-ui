@@ -12,8 +12,7 @@ import {
   simulatePayment
 } from "@/lib/agentic/qa/simulate";
 import { qaPreflight } from "@/lib/agentic/qa/preflight";
-import { beginQaRun, resetQaRun, setQaChannel, setQaClock } from "@/lib/agentic/qa/session";
-import { nowIso } from "@/lib/agentic/runtime";
+import { beginQaRun, resetQaRun, resolveQaNow, setQaChannel, setQaClock } from "@/lib/agentic/qa/session";
 import { isOpaqueCapabilityHandle, resolveCapability } from "@/lib/agentic/capabilities";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 
@@ -101,7 +100,11 @@ export async function POST(request: Request) {
   ) {
     const orderHandle = String((body as { orderHandle?: unknown }).orderHandle ?? "");
     const scenario = (body as { scenario?: unknown }).scenario;
-    const now = nowIso();
+    const namespace =
+      typeof (body as { namespace?: unknown }).namespace === "string"
+        ? String((body as { namespace?: unknown }).namespace)
+        : undefined;
+    const now = resolveQaNow(namespace);
 
     if (!isOpaqueCapabilityHandle(orderHandle)) {
       return NextResponse.json({ message: "Not found." }, { status: 404 });
@@ -127,6 +130,7 @@ export async function POST(request: Request) {
       const observed = await observeQaJourney({
         config: runtime.config,
         now,
+        namespace,
         orderHandle,
         scope: runtime.scope,
         store: runtime.store

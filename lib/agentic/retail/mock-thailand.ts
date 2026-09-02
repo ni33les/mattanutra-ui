@@ -90,6 +90,10 @@ export async function applyFulfilmentEvent(input: Readonly<{
     return null;
   }
 
+  if (order.paymentStatus !== "paid" && input.status !== "cancelled") {
+    return order;
+  }
+
   const current = order.fulfilmentStatus;
   const terminal = current === "delivered" || current === "cancelled";
 

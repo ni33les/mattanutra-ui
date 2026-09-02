@@ -66,14 +66,16 @@ export async function drivePaymentFixture(input: Readonly<{
       correlationId,
       createdAt: input.now,
       eventId: `pay-ok:${event.providerEventId}`,
-      eventType: "payment_succeeded"
+      eventType: "payment_succeeded",
+      payload: { locale: "en" }
     });
   } else if (applied?.order.latestPaymentAttempt === "declined") {
     recordFunnelEvent({
       correlationId,
       createdAt: input.now,
       eventId: `pay-no:${event.providerEventId}`,
-      eventType: "payment_declined"
+      eventType: "payment_declined",
+      payload: { locale: "en" }
     });
   }
 
@@ -111,6 +113,13 @@ export async function driveFulfilmentFixture(input: Readonly<{
   }
 
   const order = await input.store.getOrder(capability.resourceId);
+  if (order && order.paymentStatus !== "paid") {
+    return businessError({
+      fieldPath: "status",
+      message: "Payment is not paid.",
+      reasonCode: "invalid_request"
+    });
+  }
   const correlationId = input.correlationId ?? order?.planId;
   const updated = await applyFulfilmentEvent({
     now: input.now,
@@ -124,7 +133,8 @@ export async function driveFulfilmentFixture(input: Readonly<{
       correlationId,
       createdAt: input.now,
       eventId: `ship:${capability.resourceId}:${input.now}`,
-      eventType: "fulfilment_dispatched"
+      eventType: "fulfilment_dispatched",
+      payload: { locale: "en" }
     });
   }
 
@@ -133,7 +143,8 @@ export async function driveFulfilmentFixture(input: Readonly<{
       correlationId,
       createdAt: input.now,
       eventId: `dlv:${capability.resourceId}:${input.now}`,
-      eventType: "order_delivered"
+      eventType: "order_delivered",
+      payload: { locale: "en" }
     });
   }
 

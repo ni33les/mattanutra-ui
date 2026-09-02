@@ -199,6 +199,9 @@ describe("DET-v3 harness", () => {
 describe("Slice A discovery", () => {
   it("A-UNIT-01 approved connector copy", () => {
     assert.equal(englishConnectorWordCount() <= 45, true);
+    assert.match(CONNECTOR_COPY.en, /real-product matching/i);
+    assert.match(CONNECTOR_COPY.en, /current-stock/i);
+    assert.match(CONNECTOR_COPY.en, /overlap/i);
     assert.match(CONNECTOR_COPY.en, /match/i);
     assert.match(CONNECTOR_COPY.en, /optimiz/i);
     assert.match(CONNECTOR_COPY.en, /wellness/i);
@@ -1239,8 +1242,16 @@ describe("Slice E support", () => {
       orderHandle,
       supportHandle: created.supportHandle
     });
-    assert.equal((replied.thread as unknown[]).length, 2);
+    assert.equal((replied.thread as unknown[]).length, 4);
     assert.equal(canonicalJson(replied), canonicalJson(replay));
+    const threadAuthors = (replied.thread as Array<{ author: string; body: string }>).map(
+      (item) => item.author
+    );
+    assert.deepEqual(threadAuthors, ["client", "system", "client", "system"]);
+    assert.equal(
+      (replied.thread as Array<{ body: string }>)[1]?.body,
+      "It is dispatched."
+    );
     assert.equal((replied.orderContext as { timeline?: string }).timeline, "dispatched");
   });
 
@@ -1282,7 +1293,9 @@ describe("Slice E support", () => {
     assert.deepEqual(Object.keys(context).sort(), [...SUPPORT_RESPONSE_CONTRACT.orderContextKeys].sort());
     assert.equal(typeof created.supportHandle, "string");
     assert.ok(Array.isArray(created.thread));
-    assert.equal((created.thread as unknown[]).length, 1);
+    assert.equal((created.thread as unknown[]).length, 2);
+    assert.equal((created.thread as Array<{ author: string }>)[0]?.author, "client");
+    assert.equal((created.thread as Array<{ author: string }>)[1]?.author, "system");
     assert.equal(/address|checkoutToken|health|sk_live/i.test(canonicalJson(context)), false);
   });
 

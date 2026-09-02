@@ -14,6 +14,7 @@ import {
   type AgenticPublicToolName
 } from "@/lib/agentic/contract";
 import { infoTool } from "@/lib/agentic/info";
+import { RESPONSIBILITY_VERSION } from "@/lib/agentic/discovery/versions";
 import type { IsolatedInfoCatalog } from "@/lib/agentic/runtime";
 
 export type JsonRpcRequest = Readonly<{
@@ -225,6 +226,7 @@ export async function handleLightweightJsonRpc(
         },
         instructions: agenticServerInstructions(config.environment),
         protocolVersion: "2025-03-26",
+        responsibilityVersion: RESPONSIBILITY_VERSION,
         serverInfo: {
           name: mcpServerInfoName(config.environment),
           version: AGENTIC_SERVICE_VERSION
@@ -247,6 +249,7 @@ export async function handleLightweightJsonRpc(
       id,
       jsonrpc: "2.0",
       result: {
+        responsibilityVersion: RESPONSIBILITY_VERSION,
         tools: toolList(
           config.environment,
           typeof params.locale === "string" ? params.locale : undefined

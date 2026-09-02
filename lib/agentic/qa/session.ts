@@ -1,4 +1,4 @@
-import { resetQueryBudget } from "@/lib/agentic/plan/query-budget";
+import { resetQueryBudget, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
 import { resetFunnelLedger } from "@/lib/agentic/funnel/ledger";
 import { attributionOf, type FunnelAttribution } from "@/lib/agentic/funnel/events";
 import type { AgenticStore } from "@/lib/agentic/store/types";
@@ -34,14 +34,37 @@ export function qaSession(namespace: string | undefined | null) {
   return sessions.get(namespace) ?? null;
 }
 
+export function activeQaClock(): string | null {
+  if (sessions.size === 0) {
+    return null;
+  }
+  const clocks = [...new Set([...sessions.values()].map((item) => item.now))];
+  if (clocks.length === 1 && clocks[0]) {
+    return clocks[0];
+  }
+  return QA_PACK_CLOCK;
+}
+
+export function resolveQaNow(namespace?: string) {
+  return qaSession(namespace)?.now ?? activeQaClock() ?? QA_PACK_CLOCK;
+}
+
 export function bindQaRuntime(runtime: AgenticRuntime, request: Request): AgenticRuntime {
   if (!authorizeQaRequest(request, runtime.config.environment)) {
     return runtime;
   }
   const session = qaSession(request.headers.get("x-mattanutra-qa-namespace"));
   if (!session) {
-    return runtime;
+    const clock = activeQaClock();
+    if (!clock) {
+      return runtime;
+    }
+    return {
+      ...runtime,
+      now: clock
+    };
   }
+  setQueryNamespace(session.namespace);
   return {
     ...runtime,
     now: session.now,
@@ -63,6 +86,7 @@ export function beginQaRun(runId = "A"): QaSession {
     principalScope: namespace
   };
   sessions.set(namespace, session);
+  setQueryNamespace(namespace);
   return session;
 }
 
@@ -137,6 +161,6 @@ export async function resetQaRun(input: Readonly<{
   }
   await input.store.deletePrincipalScope(session.principalScope);
   sessions.delete(input.namespace);
-  resetQueryBudget();
+  resetQueryBudget(input.namespace);
   return { ok: true as const, namespace: input.namespace };
 }

@@ -13,9 +13,9 @@ export const CONNECTOR_PROPOSITION_SEMANTIC_ID = "disc.proposition.match_optimiz
 export const CONNECTOR_SAFETY_SEMANTIC_ID = "disc.safety.wellness_not_clinical";
 
 export const CONNECTOR_COPY: Readonly<Record<Locale, string>> = {
-  en: "MattaNutra matches a personal supplement stack to agreed nutrient targets, then optimizes for coverage, cost, or pill burden. It is wellness guidance only, not diagnosis or a pharmacy, and does not replace clinical advice.",
-  th: "MattaNutra จับคู่วิตามินส่วนบุคคลกับเป้าหมายสารอาหารที่ตกลงแล้ว แล้วปรับให้เหมาะด้านความครอบคลุม ต้นทุน หรือจำนวนเม็ด เป็นคำแนะนำด้านสุขภาพ ไม่ใช่การวินิจฉัยหรือร้านยา และไม่ทดแทนคำแนะนำทางคลินิก",
-  "zh-CN": "MattaNutra 按已约定的营养目标匹配个人补充剂组合，并按覆盖、成本或片数优化。这是健康指导，不是诊断或药房，也不能替代临床建议。"
+  en: "MattaNutra does real-product matching with current-stock and overlap optimization to agreed nutrient targets. It is wellness guidance only, not diagnosis or a pharmacy, and does not replace clinical advice.",
+  th: "MattaNutra จับคู่ผลิตภัณฑ์จริงกับสต็อกปัจจุบันและปรับทับซ้อนของสารอาหารตามเป้าหมายที่ตกลงแล้ว เป็นคำแนะนำด้านสุขภาพ ไม่ใช่การวินิจฉัยหรือร้านยา และไม่ทดแทนคำแนะนำทางคลินิก",
+  "zh-CN": "MattaNutra 按现货与重叠优化对约定营养目标做真实产品匹配。这是健康指导，不是诊断或药房，也不能替代临床建议。"
 };
 
 export const CONNECTOR_INFO_BLURB: Readonly<Record<Locale, string>> = {

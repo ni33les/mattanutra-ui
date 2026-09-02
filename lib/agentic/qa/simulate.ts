@@ -53,12 +53,9 @@ export function scenarioSubmitsOms(scenario: PaymentEventScenario) {
 }
 
 export const FULFILMENT_STATUSES = [
-  "processing",
-  "packed",
-  "shipped",
-  "delivered",
   "preparing",
-  "dispatched"
+  "dispatched",
+  "delivered"
 ] as const;
 
 export type FulfilmentFixtureStatus = (typeof FULFILMENT_STATUSES)[number];
@@ -69,14 +66,14 @@ export function isFulfilmentStatus(value: unknown): value is FulfilmentFixtureSt
 
 export function omsFulfilmentStatus(
   status: FulfilmentFixtureStatus
-): "processing" | "packed" | "shipped" | "delivered" {
+): "packed" | "shipped" | "delivered" {
   if (status === "preparing") {
     return "packed";
   }
   if (status === "dispatched") {
     return "shipped";
   }
-  return status;
+  return "delivered";
 }
 
 export async function simulatePayment(input: Readonly<{
@@ -228,13 +225,15 @@ export async function observeQaJourney(input: Readonly<{
     contributionMinor: contribution,
     correlationId,
     events: events.map((event) => ({
+      anonymousCorrelation: event.payload.anonymousCorrelation,
       attribution: event.attribution,
       createdAt: event.createdAt,
       eventId: event.eventId,
       eventType: event.eventType,
+      locale: event.payload.locale,
       sequence: event.sequence
     })),
     namespace: input.namespace ?? session?.namespace ?? null,
-    queries: queryBudgetSnapshot()
+    queries: queryBudgetSnapshot(input.namespace ?? session?.namespace)
   };
 }
