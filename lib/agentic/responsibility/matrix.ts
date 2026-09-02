@@ -71,6 +71,15 @@ export function responsibilityStatement(
   return row.text[negotiateLocale(locale)];
 }
 
+export function checkoutResponsibilityCopy(locale?: string) {
+  return {
+    fulfilment: responsibilityStatement("fulfilment", locale),
+    guidance: responsibilityStatement("guidance", locale),
+    payment: responsibilityStatement("payment", locale),
+    version: RESPONSIBILITY_VERSION
+  };
+}
+
 export function responsibilitySnapshot(locale?: string) {
   const resolved = negotiateLocale(locale);
   return {

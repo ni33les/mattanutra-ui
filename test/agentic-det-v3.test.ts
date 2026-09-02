@@ -15,8 +15,11 @@ import {
 } from "../lib/agentic/discovery/versions.ts";
 import {
   RESPONSIBILITY_DOMAINS,
-  responsibilitySnapshot
+  checkoutResponsibilityCopy,
+  responsibilitySnapshot,
+  responsibilityStatement
 } from "../lib/agentic/responsibility/matrix.ts";
+import { publicErrorSafe } from "../lib/agentic/contract/public-error.ts";
 import { APPROVED_CLAIMS } from "../lib/agentic/claims/corpus.ts";
 import { selectApplicableClaims } from "../lib/agentic/claims/select.ts";
 import {
@@ -1440,10 +1443,78 @@ describe("Slice G responsibility and trust", () => {
     assert.match(snap.domains[2]!.text, /retailer/i);
   });
 
-  it("G-SNAPSHOT-01 info uses the matrix version", async () => {
+  it("G-SNAPSHOT-01 info, checkout, and order use the same matrix", async () => {
     const runtime = createDetRuntime();
     const info = await detCall(runtime, "info", { locale: "en" });
+    const checkout = checkoutResponsibilityCopy("en");
     assert.equal(info.responsibilityVersion, responsibilitySnapshot("en").version);
+    assert.equal(checkout.version, responsibilitySnapshot("en").version);
+    assert.equal(checkout.payment, responsibilityStatement("payment", "en"));
+    assert.equal(checkout.fulfilment, responsibilityStatement("fulfilment", "en"));
+    assert.match(checkout.fulfilment, /retailer/i);
+    assert.equal(/pharmacy confirmation/i.test(checkout.fulfilment), false);
+    const plan = await planTool({
+      config: runtime.config,
+      now: DET_V3_CLOCK,
+      payload: {
+        idempotencyKey: "det-snap-plan-xxxxxxxxxxxx",
+        request: goldenPlanRequest()
+      },
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    if ((plan as { status?: string }).status !== "ready") {
+      return;
+    }
+    const executed = await executeTool({
+      config: runtime.config,
+      expectedRevision: (plan as { revision: number }).revision,
+      idempotencyKey: "det-snap-exec-xxxxxxxxxxxx",
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: (plan as { planHandle: string }).planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const order = await detCall(runtime, "order", {
+      orderHandle: (executed as { orderHandle: string }).orderHandle
+    });
+    assert.equal(
+      (order.responsibility as { version?: string } | undefined)?.version,
+      checkout.version
+    );
+  });
+
+  it("G-ERROR-01 negative cases expose stable public codes without leaks", async () => {
+    const runtime = createDetRuntime();
+    const missing = await detCall(runtime, "plan", {
+      operation: "get",
+      planHandle: "cap_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    });
+    const evidence = await detCall(runtime, "evidence", {
+      evidenceHandle: "cap_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    });
+    const feedback = await detCall(runtime, "feedback", {
+      consentConfirmed: false,
+      expectedRevision: 1,
+      idempotencyKey: "det-err-fb-xxxxxxxxxxxxxx",
+      planHandle: "cap_cccccccccccccccccccccccccccccc"
+    });
+    const unexpected = await detCall(runtime, "info", { sandboxProof: true });
+    const executeMissing = await executeTool({
+      config: runtime.config,
+      expectedRevision: 1,
+      idempotencyKey: "det-err-exec-xxxxxxxxxxxxx",
+      now: DET_V3_CLOCK,
+      payment: runtime.payment,
+      planHandle: "cap_dddddddddddddddddddddddddddddd",
+      scope: runtime.scope,
+      store: runtime.store
+    });
+    const cases = [missing, evidence, feedback, unexpected, executeMissing as Record<string, unknown>];
+    for (const item of cases) {
+      assert.equal(publicErrorSafe(item), true, canonicalJson(item));
+    }
   });
 
   it("G-SAFETY-01 349/350/351 characterization", async () => {

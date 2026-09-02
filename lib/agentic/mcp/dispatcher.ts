@@ -258,7 +258,10 @@ async function callTool(
         });
         break;
       default:
-        value = { error: { message: "Unknown tool" }, ok: false };
+        value = businessError({
+          message: "Not found.",
+          reasonCode: "not_found"
+        });
     }
 
     return {

@@ -14,6 +14,13 @@ import { trackBpmEvent } from "@/lib/bpm-client";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import type { Locale } from "@/lib/i18n";
 import { displayCountryName, productCountryOptions } from "@/lib/product-countries";
+import { checkoutResponsibilityCopy } from "@/lib/agentic/responsibility/matrix";
+
+const checkoutResponsibility = {
+  en: checkoutResponsibilityCopy("en"),
+  th: checkoutResponsibilityCopy("th"),
+  "zh-CN": checkoutResponsibilityCopy("zh-CN")
+} as const;
 
 const CHECKOUT_SESSION_TIMEOUT_MS = 15_000;
 
@@ -95,7 +102,8 @@ const copy = {
     country: "Country",
     creating: "Securing your order...",
     delivery: "Delivery address",
-    deliveryPromise: "Pharmacy confirmation pending",
+    deliveryPromise: checkoutResponsibility.en.fulfilment,
+    paymentNote: checkoutResponsibility.en.payment,
     email: "Email",
     error: "We could not open checkout at this time. Please check the basket.",
     free: "Free",
@@ -147,7 +155,8 @@ const copy = {
     country: "ประเทศ",
     creating: "กำลังยืนยันคำสั่งซื้อ...",
     delivery: "ที่อยู่จัดส่ง",
-    deliveryPromise: "รอร้านขายยายืนยัน",
+    deliveryPromise: checkoutResponsibility.th.fulfilment,
+    paymentNote: checkoutResponsibility.th.payment,
     email: "อีเมล",
     error: "ไม่สามารถเปิดหน้าชำระเงินได้ในขณะนี้ โปรดตรวจสอบตะกร้า",
     free: "ฟรี",
@@ -199,7 +208,8 @@ const copy = {
     country: "国家",
     creating: "正在确认订单...",
     delivery: "配送地址",
-    deliveryPromise: "等待药房确认",
+    deliveryPromise: checkoutResponsibility["zh-CN"].fulfilment,
+    paymentNote: checkoutResponsibility["zh-CN"].payment,
     email: "邮箱",
     error: "目前无法打开结账。请检查购物篮。",
     free: "免费",
@@ -1059,6 +1069,7 @@ export function ProductBasketCheckoutPanel({
             >
               {labels.payment}
             </h3>
+            <p className="mt-2 text-sm text-[var(--mn-ink-soft)]">{labels.paymentNote}</p>
             <label className="mt-4 flex items-start gap-3 rounded-xl bg-white p-3 text-sm font-semibold text-[var(--mn-ink)] ring-1 ring-[var(--mn-line)]">
               <input
                 checked={checkout.billingSameAsShipping}

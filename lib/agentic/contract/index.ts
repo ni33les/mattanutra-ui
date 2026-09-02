@@ -21,6 +21,10 @@ export {
   type AgenticPublicToolName
 } from "@/lib/agentic/contract/instructions";
 export {
+  PUBLIC_ERROR_LEAK_NEEDLES,
+  publicErrorSafe
+} from "@/lib/agentic/contract/public-error";
+export {
   SUPPORT_ORDER_CONTEXT_KEYS,
   SUPPORT_RESPONSE_CONTRACT,
   SUPPORT_THREAD_ITEM_KEYS,
