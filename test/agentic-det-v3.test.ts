@@ -63,8 +63,15 @@ import {
 import {
   listFunnelEvents,
   recordFunnelEvent,
-  resetFunnelLedger
+  resetFunnelLedger,
+  funnelAttribution
 } from "../lib/agentic/funnel/ledger.ts";
+import {
+  PLAN_REPORTING_FIELDS,
+  planBusinessView,
+  reportingIsolatedFromPlan
+} from "../lib/agentic/funnel/invariant.ts";
+import { PLAN_INPUT_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import {
   COMMERCE_TIMELINE,
   canAdvanceTimeline
@@ -1232,6 +1239,93 @@ describe("Slice F funnel", () => {
         shippingSubsidyMinor: 20
       }),
       430
+    );
+  });
+
+  it("F-INVARIANT-01 channel and campaign do not change the plan", async () => {
+    const request = goldenPlanRequest();
+    const withChannel = validateToolIssues(PLAN_INPUT_SCHEMA, {
+      idempotencyKey: "det-inv-channel-xxxxxxxx",
+      operation: "create",
+      request: { ...request, channel: "facebook", campaign: "qa_campaign" }
+    });
+    assert.ok(
+      withChannel.some(
+        (item) =>
+          item.reasonCode === "unexpected_property" &&
+          /channel|campaign/.test(item.fieldPath)
+      )
+    );
+    assert.deepEqual([...PLAN_REPORTING_FIELDS].sort(), ["attribution", "campaign", "channel"]);
+
+    const runtimeA = createDetRuntime({ principal: "attr-a" });
+    const runtimeB = createDetRuntime({ principal: "attr-b" });
+    const planA = (await planTool({
+      config: runtimeA.config,
+      now: DET_V3_CLOCK,
+      payload: {
+        idempotencyKey: "det-inv-plan-a-xxxxxxxxx",
+        request
+      },
+      scope: runtimeA.scope,
+      store: runtimeA.store
+    })) as Record<string, unknown>;
+    const planB = (await planTool({
+      config: runtimeB.config,
+      now: DET_V3_CLOCK,
+      payload: {
+        idempotencyKey: "det-inv-plan-b-xxxxxxxxx",
+        request
+      },
+      scope: runtimeB.scope,
+      store: runtimeB.store
+    })) as Record<string, unknown>;
+
+    resetFunnelLedger();
+    recordFunnelEvent({
+      attribution: "qa_campaign",
+      correlationId: "inv-a",
+      createdAt: DET_V3_CLOCK,
+      eventId: "inv-a-1",
+      eventType: "plan_created"
+    });
+    recordFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: "inv-b",
+      createdAt: DET_V3_CLOCK,
+      eventId: "inv-b-1",
+      eventType: "plan_created"
+    });
+
+    assert.equal(
+      reportingIsolatedFromPlan({
+        planA,
+        planB,
+        reportA: { attribution: funnelAttribution("inv-a") },
+        reportB: { attribution: funnelAttribution("inv-b") }
+      }),
+      true
+    );
+    assert.equal(
+      canonicalJson(planBusinessView(planA)),
+      canonicalJson(planBusinessView(planB))
+    );
+    assert.notEqual(funnelAttribution("inv-a"), funnelAttribution("inv-b"));
+    assert.notEqual(
+      contributionMinor({
+        acquisitionMinor: 200,
+        paymentFeeMinor: 0,
+        paymentMinor: 1000,
+        productCostMinor: 400,
+        shippingSubsidyMinor: 0
+      }),
+      contributionMinor({
+        acquisitionMinor: 0,
+        paymentFeeMinor: 0,
+        paymentMinor: 1000,
+        productCostMinor: 400,
+        shippingSubsidyMinor: 0
+      })
     );
   });
 
