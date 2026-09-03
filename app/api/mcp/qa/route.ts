@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
-import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { handleQaJsonRpc } from "@/lib/agentic/mcp/qa-dispatcher";
 import { authorizeQaRequest } from "@/lib/agentic/qa/authorize";
+import { enforceMcpOrQaRateLimit } from "@/lib/agentic/qa/rate-limit";
 import { qaHarnessAvailable } from "@/lib/agentic/config";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import {
@@ -19,7 +19,19 @@ import {
   simulatePayment
 } from "@/lib/agentic/qa/simulate";
 import { qaPreflight } from "@/lib/agentic/qa/preflight";
-import { beginQaRun, resetQaRun, resolveQaNow, setQaChannel, setQaClock } from "@/lib/agentic/qa/session";
+import { getRequestClientIp } from "@/lib/request-client-ip";
+import {
+  beginQaRun,
+  frozenSnapshotMissingResult,
+  qaNamespaceFromRequest,
+  QaRunInvalidError,
+  resetQaRun,
+  resolveQaNow,
+  resolveQaSession,
+  setQaChannel,
+  setQaClock,
+  withQaSessionSnapshot
+} from "@/lib/agentic/qa/session";
 import { isOpaqueCapabilityHandle, resolveCapability } from "@/lib/agentic/capabilities";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 
@@ -49,7 +61,7 @@ export async function POST(request: Request) {
     return qaJson({ message: "Unauthorized" }, 401);
   }
 
-  const limited = enforceRateLimit(request, publicRateLimits.mcp);
+  const limited = await enforceMcpOrQaRateLimit(request, runtime.config.environment);
 
   if (limited) {
     return limited;
@@ -78,7 +90,11 @@ export async function POST(request: Request) {
       runId?: unknown;
     };
     if (typeof rest.runId === "string" && !("orderHandle" in rest)) {
-      const begun = beginQaRun(rest.runId);
+      const begun = await beginQaRun(rest.runId, {
+        buildId: runtime.config.buildId,
+        clientKey: getRequestClientIp(request) ?? "",
+        environment: runtime.config.environment
+      });
       return qaJson({
         ok: true,
         clock: begun.now,
@@ -91,11 +107,11 @@ export async function POST(request: Request) {
       return qaJson(await resetQaRun({ namespace: rest.namespace, store: runtime.store }));
     }
     if (typeof rest.now === "string" && typeof rest.namespace === "string" && !("orderHandle" in rest)) {
-      const next = setQaClock(rest.namespace, rest.now);
+      const next = await setQaClock(rest.namespace, rest.now);
       return qaJson(next ?? { ok: false });
     }
     if (typeof rest.namespace === "string" && (rest.attribution != null || rest.acquisitionMinor != null) && !("orderHandle" in rest)) {
-      const next = setQaChannel(rest.namespace, {
+      const next = await setQaChannel(rest.namespace, {
         acquisitionMinor: typeof rest.acquisitionMinor === "number" ? rest.acquisitionMinor : undefined,
         attribution: rest.attribution
       });
@@ -116,6 +132,9 @@ export async function POST(request: Request) {
       typeof (body as { namespace?: unknown }).namespace === "string"
         ? String((body as { namespace?: unknown }).namespace)
         : undefined;
+    if (namespace) {
+      await resolveQaSession(namespace);
+    }
     const now = resolveQaNow(namespace);
 
     if (!isOpaqueCapabilityHandle(orderHandle)) {
@@ -202,7 +221,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await handleQaJsonRpc(runtime, body as { method?: string });
+    const qaNamespace = qaNamespaceFromRequest(request, body) || undefined;
+    if (qaNamespace) {
+      await resolveQaSession(qaNamespace);
+    }
+    const result = await withQaSessionSnapshot(qaNamespace, () =>
+      handleQaJsonRpc(runtime, body as { method?: string }, request)
+    );
 
     if (!result) {
       return new NextResponse(null, { headers: { Connection: "close" }, status: 202 });
@@ -210,6 +235,22 @@ export async function POST(request: Request) {
 
     return qaRpc(request, result);
   } catch (error) {
+    if (error instanceof QaRunInvalidError) {
+      const id =
+        body && typeof body === "object" && !Array.isArray(body)
+          ? ((body as { id?: unknown }).id ?? null)
+          : null;
+      return qaRpc(request, {
+        id,
+        jsonrpc: "2.0",
+        result: {
+          content: [{ text: JSON.stringify(frozenSnapshotMissingResult(), null, 2), type: "text" }],
+          isError: true,
+          structuredContent: frozenSnapshotMissingResult()
+        }
+      });
+    }
+
     log.error("mcp.qa.dispatch_failed", {
       message: error instanceof Error ? error.message : "unknown"
     });

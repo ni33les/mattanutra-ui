@@ -16,6 +16,7 @@ import {
   replaceCatalogueSnapshot,
   resetCatalogueSnapshotCache
 } from "../../../lib/agentic/catalogue/snapshot.ts";
+import { resetQaPersistForTests } from "../../../lib/agentic/qa/persist.ts";
 import { pinCatalogueSnapshot, resetCataloguePins } from "../../../lib/agentic/catalogue/pin.ts";
 import { catalogueSnapshotId } from "../../../lib/agentic/catalogue/freeze.ts";
 import {
@@ -279,6 +280,7 @@ export function closeSession() {
   setAgenticRuntimeForTests(null);
   replaceCatalogueSnapshot(null);
   resetCatalogueSnapshotCache();
+  resetQaPersistForTests();
   resetCataloguePins();
 }
 

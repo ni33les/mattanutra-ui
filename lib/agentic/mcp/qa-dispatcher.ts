@@ -13,12 +13,13 @@ import {
   simulatePayment
 } from "@/lib/agentic/qa/simulate";
 import { QA_CONTROL_TOOLS, qaPreflight } from "@/lib/agentic/qa/preflight";
+import { getRequestClientIp } from "@/lib/request-client-ip";
 import {
   beginQaRun,
   QA_PACK_CLOCK,
-  qaSession,
   resetQaRun,
   resolveQaNow,
+  resolveQaSession,
   setQaChannel,
   setQaClock
 } from "@/lib/agentic/qa/session";
@@ -243,13 +244,20 @@ function toolList() {
   ];
 }
 
-async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown) {
+async function callTool(
+  runtime: AgenticRuntime,
+  name: string,
+  rawArgs: unknown,
+  request?: Request
+) {
   if (!QA_TOOLS.includes(name as (typeof QA_TOOLS)[number])) {
     return { error: { code: -32601, message: `Unknown tool: ${name}` } };
   }
 
   const params = record(rawArgs);
-  const session = qaSession(typeof params.namespace === "string" ? params.namespace : undefined);
+  const session = await resolveQaSession(
+    typeof params.namespace === "string" ? params.namespace : undefined
+  );
   if (session) {
     setQueryNamespace(session.namespace);
   }
@@ -264,7 +272,11 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
   }
 
   if (name === "beginRun") {
-    const begun = beginQaRun(typeof params.runId === "string" ? params.runId : "A");
+    const begun = await beginQaRun(typeof params.runId === "string" ? params.runId : "A", {
+      buildId: runtime.config.buildId,
+      clientKey: request ? getRequestClientIp(request) ?? "" : "",
+      environment: runtime.config.environment
+    });
     await warmPackPlanCache(runtime);
     setQueryNamespace(begun.namespace);
     return {
@@ -294,7 +306,7 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
         result: toolResult({ ok: false, error: { reasonCode: "required", message: "namespace and now are required." } }, true)
       };
     }
-    const next = setQaClock(params.namespace, params.now);
+    const next = await setQaClock(params.namespace, params.now);
     if (!next) {
       return { result: toolResult({ ok: false, error: { reasonCode: "not_found", message: "Not found." } }, true) };
     }
@@ -307,7 +319,7 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
         result: toolResult({ ok: false, error: { reasonCode: "required", message: "namespace is required." } }, true)
       };
     }
-    const next = setQaChannel(params.namespace, {
+    const next = await setQaChannel(params.namespace, {
       acquisitionMinor: typeof params.acquisitionMinor === "number" ? params.acquisitionMinor : undefined,
       attribution: params.attribution
     });
@@ -428,7 +440,8 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
 
 export async function handleQaJsonRpc(
   runtime: AgenticRuntime,
-  body: JsonRpcRequest
+  body: JsonRpcRequest,
+  request?: Request
 ): Promise<JsonRpcResponse | null> {
   const id = body.id ?? null;
   const method = body.method ?? "";
@@ -462,7 +475,7 @@ export async function handleQaJsonRpc(
 
   if (method === "tools/call") {
     const name = typeof params.name === "string" ? params.name : "";
-    const called = await callTool(runtime, name, params.arguments);
+    const called = await callTool(runtime, name, params.arguments, request);
     return { id, jsonrpc: "2.0", ...called };
   }
 

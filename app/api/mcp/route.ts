@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { requestCorrelationId } from "@/lib/request-correlation";
-import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { loadAgenticConfig } from "@/lib/agentic/config";
 import { agenticServerInstructions } from "@/lib/agentic/contract";
 import {
@@ -9,9 +8,18 @@ import {
   handleLightweightJsonRpc,
   mcpCallNeedsStore,
   toolList,
+  toolResult,
   type JsonRpcRequest
 } from "@/lib/agentic/mcp/rpc";
 import { recordMcpTiming } from "@/lib/agentic/metrics";
+import { enforceMcpOrQaRateLimit } from "@/lib/agentic/qa/rate-limit";
+import {
+  frozenSnapshotMissingResult,
+  hydrateQaRequest,
+  QaRunInvalidError,
+  QA_PACK_CLOCK,
+  withQaSessionSnapshot
+} from "@/lib/agentic/qa/session";
 import {
   mcpGetSseNotSupported,
   mcpOneShotResponse,
@@ -99,7 +107,11 @@ export async function POST(request: Request) {
   }
 
   if (mcpNeedsRateLimit(body)) {
-    const limited = enforceRateLimit(request, publicRateLimits.mcp);
+    const limited = await enforceMcpOrQaRateLimit(
+      request,
+      loadAgenticConfig(request).environment,
+      body
+    );
 
     if (limited) {
       return limited;
@@ -140,13 +152,19 @@ export async function POST(request: Request) {
       import("@/lib/agentic/mcp/dispatcher")
     ]);
     const { bindQaRuntime } = await import("@/lib/agentic/qa/session");
-    const runtime = bindQaRuntime(getLiveAgenticRuntime(request), request);
+    const qaNamespace = await hydrateQaRequest(request, body);
+    let runtime = bindQaRuntime(getLiveAgenticRuntime(request), request);
+    if (qaNamespace === "") {
+      runtime = { ...runtime, now: runtime.now ?? QA_PACK_CLOCK };
+    }
 
     if (Array.isArray(body)) {
       const responses = [];
 
       for (const item of body) {
-        const result = await handleJsonRpc(runtime, item);
+        const result = await withQaSessionSnapshot(qaNamespace || undefined, () =>
+          handleJsonRpc(runtime, item)
+        );
         if (result) {
           responses.push(result);
         }
@@ -164,7 +182,9 @@ export async function POST(request: Request) {
       return mcpReply(request, responses, 200, { "x-mcp-handler-ms": String(durationMs) });
     }
 
-    const result = await handleJsonRpc(runtime, body as JsonRpcRequest);
+    const result = await withQaSessionSnapshot(qaNamespace || undefined, () =>
+      handleJsonRpc(runtime, body as JsonRpcRequest)
+    );
 
     if (!result) {
       return new NextResponse(null, { headers: { Connection: "close" }, status: 202 });
@@ -181,6 +201,22 @@ export async function POST(request: Request) {
     });
     return mcpReply(request, result, 200, { "x-mcp-handler-ms": String(durationMs) });
   } catch (error) {
+    if (error instanceof QaRunInvalidError) {
+      const id =
+        body && typeof body === "object" && !Array.isArray(body)
+          ? ((body as { id?: unknown }).id ?? null)
+          : null;
+      return mcpReply(
+        request,
+        {
+          id,
+          jsonrpc: "2.0",
+          result: toolResult(frozenSnapshotMissingResult(), true)
+        },
+        200
+      );
+    }
+
     log.error("mcp.dispatch_failed", {
       correlationId,
       durationMs: Math.round(performance.now() - started),

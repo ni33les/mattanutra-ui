@@ -1,22 +1,50 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { AgenticEnvironment } from "@/lib/agentic/config";
 import {
   cachedLiveRetailSnapshot,
   warmLiveRetailSnapshot
 } from "@/lib/agentic/catalogue/live";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
+import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { resetMatchPlanCache } from "@/lib/agentic/plan/matching";
 import { countQuery } from "@/lib/agentic/plan/query-budget";
+import {
+  firstWriterPublish,
+  loadPublishedCatalogue,
+  loadPublishedCatalogueSync,
+  persistPublishedCatalogue,
+  replacePublishedCatalogue
+} from "@/lib/agentic/qa/persist";
 
 const cachedByCountry = new Map<string, CatalogueSnapshot>();
 let lastSnapshot: CatalogueSnapshot | null = null;
 let installedSnapshot: CatalogueSnapshot | null = null;
+let publishedSnapshot: CatalogueSnapshot | null = null;
+const requestSnapshot = new AsyncLocalStorage<CatalogueSnapshot>();
 
 export function resetCatalogueSnapshotCache() {
   cachedByCountry.clear();
   lastSnapshot = null;
+  publishedSnapshot = null;
   resetMatchPlanCache();
+}
+
+export function publishQaCatalogue(snapshot: CatalogueSnapshot) {
+  publishedSnapshot = freezeCatalogueSnapshot(snapshot);
+  const snapshotId = catalogueSnapshotId(publishedSnapshot);
+  replacePublishedCatalogue(snapshotId, publishedSnapshot);
+  void persistPublishedCatalogue(snapshotId, publishedSnapshot, "replace");
+  return publishedSnapshot;
+}
+
+export function publishedQaCatalogue() {
+  return publishedSnapshot;
+}
+
+export function runWithCatalogueSnapshot<T>(snapshot: CatalogueSnapshot, work: () => T) {
+  return requestSnapshot.run(freezeCatalogueSnapshot(snapshot), work);
 }
 
 function usesLiveCatalogue(environment?: AgenticEnvironment) {
@@ -81,6 +109,16 @@ function snapshotOrEmpty(
 }
 
 export function getCatalogueSnapshot(countryCode?: string): CatalogueSnapshot {
+  const scoped = requestSnapshot.getStore();
+  if (scoped) {
+    return scoped;
+  }
+
+  const published = publishedSnapshot ?? loadPublishedCatalogueSync();
+  if (published) {
+    return published;
+  }
+
   if (countryCode) {
     const code = countryKey(countryCode);
     return snapshotOrEmpty(
@@ -101,12 +139,33 @@ export async function ensureCatalogueSnapshot(
 ): Promise<CatalogueSnapshot> {
   countQuery(`catalogue.snapshot.${countryKey(countryCode)}`);
   const code = countryKey(countryCode);
+  const scoped = requestSnapshot.getStore();
+  if (scoped) {
+    return scoped;
+  }
+  if (publishedSnapshot) {
+    return publishedSnapshot;
+  }
+
+  const persisted = loadPublishedCatalogueSync() ?? (await loadPublishedCatalogue());
+  if (persisted) {
+    publishedSnapshot = freezeCatalogueSnapshot(persisted);
+    cachedByCountry.set(countryFromSnapshot(publishedSnapshot), publishedSnapshot);
+    lastSnapshot = publishedSnapshot;
+    return publishedSnapshot;
+  }
 
   if (allowInstalledSnapshot(environment) && installedSnapshot) {
-    return snapshotOrEmpty(
+    const installed = snapshotOrEmpty(
       cachedByCountry.get(code) ?? installedSnapshot,
       code
     );
+    const frozen = freezeCatalogueSnapshot(installed);
+    const snapshotId = catalogueSnapshotId(frozen);
+    publishedSnapshot =
+      (await persistPublishedCatalogue(snapshotId, frozen, "first-writer")) ??
+      firstWriterPublish(snapshotId, frozen);
+    return publishedSnapshot;
   }
 
   if (usesLiveCatalogue(environment)) {
@@ -131,10 +190,15 @@ export async function ensureCatalogueSnapshot(
       if (liveReady) {
         cachedByCountry.set(code, live);
         lastSnapshot = live;
+        const frozen = freezeCatalogueSnapshot(live);
+        const snapshotId = catalogueSnapshotId(frozen);
+        publishedSnapshot =
+          (await persistPublishedCatalogue(snapshotId, frozen, "first-writer")) ??
+          firstWriterPublish(snapshotId, frozen);
         if (matcherSafetyCeilings().length < 1) {
           await refreshAdminSafetyCeilings();
         }
-        return live;
+        return publishedSnapshot;
       }
     } catch (error) {
       console.warn("Unable to load live retail catalogue for MCP", {

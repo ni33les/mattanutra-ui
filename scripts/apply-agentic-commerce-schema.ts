@@ -262,6 +262,38 @@ cross join lateral jsonb_array_elements(
 ) as leftover
 group by 1, 2, 3;
 
+create table if not exists public.agentic_qa_catalogues (
+  snapshot_id text primary key,
+  catalogue_version text not null,
+  snapshot_json jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.agentic_qa_published (
+  id text primary key,
+  snapshot_id text not null
+);
+
+create table if not exists public.agentic_qa_namespaces (
+  namespace text primary key,
+  run_id text not null,
+  now_clock text not null,
+  principal_scope text not null,
+  build_id text not null,
+  snapshot_id text not null,
+  acquisition_minor integer not null default 0,
+  attribution text not null,
+  client_key text,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+
+alter table public.agentic_qa_namespaces
+  add column if not exists client_key text;
+
+create index if not exists agentic_qa_namespaces_client_key_idx
+  on public.agentic_qa_namespaces (client_key, expires_at);
+
 create table if not exists public.agentic_qa_scenario_runs (
   id uuid primary key,
   handle_hash text not null unique,

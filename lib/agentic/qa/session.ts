@@ -4,6 +4,26 @@ import { attributionOf, type FunnelAttribution } from "@/lib/agentic/funnel/even
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
 import { authorizeQaRequest } from "@/lib/agentic/qa/authorize";
+import type { AgenticEnvironment } from "@/lib/agentic/config";
+import { AGENTIC_SCHEMA_CHECKSUM } from "@/lib/agentic/info";
+import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
+import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
+import {
+  ensureCatalogueSnapshot,
+  publishQaCatalogue,
+  runWithCatalogueSnapshot
+} from "@/lib/agentic/catalogue/snapshot";
+import { getRequestClientIp } from "@/lib/request-client-ip";
+import {
+  deletePersistedQaNamespace,
+  dropCatalogueBodyForTests,
+  hasActiveQaPackClient,
+  loadPublishedCatalogue,
+  loadQaNamespace,
+  persistQaNamespace,
+  persistQaNamespaceChannel,
+  persistQaNamespaceClock
+} from "@/lib/agentic/qa/persist";
 
 export const QA_PACK_CLOCK = "2026-09-02T00:00:00.000Z";
 export const QA_NAMESPACE_PREFIX = "qa-v3:";
@@ -11,9 +31,14 @@ export const QA_NAMESPACE_PREFIX = "qa-v3:";
 export type QaSession = Readonly<{
   acquisitionMinor: number;
   attribution: FunnelAttribution;
+  buildId: string;
+  catalogueChecksum: string;
+  catalogueVersion: string;
+  frozenSnapshot: CatalogueSnapshot | null;
   namespace: string;
   now: string;
   principalScope: string;
+  schemaChecksum: string;
 }>;
 
 const sessions = new Map<string, QaSession>();
@@ -22,6 +47,15 @@ const costByCorrelation = new Map<
   string,
   Readonly<{ acquisitionMinor: number; attribution: FunnelAttribution }>
 >();
+
+export class QaRunInvalidError extends Error {
+  readonly reasonCode = "run_invalid" as const;
+
+  constructor(message = "Frozen catalogue snapshot is missing.") {
+    super(message);
+    this.name = "QaRunInvalidError";
+  }
+}
 
 export function resetQaSessions() {
   sessions.clear();
@@ -34,6 +68,54 @@ export function qaSession(namespace: string | undefined | null) {
     return null;
   }
   return sessions.get(namespace) ?? null;
+}
+
+function rememberSession(session: QaSession) {
+  sessions.set(session.namespace, session);
+  return session;
+}
+
+export async function resolveQaSession(namespace?: string | null) {
+  if (!namespace) {
+    return null;
+  }
+
+  const local = sessions.get(namespace);
+  if (local?.frozenSnapshot) {
+    return local;
+  }
+
+  const loaded = await loadQaNamespace(namespace);
+  if (!loaded) {
+    return local ?? null;
+  }
+
+  const session: QaSession = {
+    acquisitionMinor: loaded.acquisitionMinor,
+    attribution: attributionOf(loaded.attribution),
+    buildId: loaded.buildId,
+    catalogueChecksum: loaded.snapshotId,
+    catalogueVersion: loaded.frozenSnapshot?.catalogueVersion ?? "",
+    frozenSnapshot: loaded.frozenSnapshot,
+    namespace: loaded.namespace,
+    now: loaded.now,
+    principalScope: loaded.principalScope,
+    schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
+  };
+  rememberSession(session);
+  if (!activeNamespace) {
+    activeNamespace = session.namespace;
+  }
+  return session;
+}
+
+export function forgetFrozenSnapshotForTests(namespace: string) {
+  const current = sessions.get(namespace);
+  if (!current) {
+    return;
+  }
+  rememberSession({ ...current, frozenSnapshot: null });
+  dropCatalogueBodyForTests(current.catalogueChecksum);
 }
 
 export function activeQaClock(): string | null {
@@ -55,7 +137,7 @@ export function bindQaRuntime(runtime: AgenticRuntime, request: Request): Agenti
   if (!authorizeQaRequest(request, runtime.config.environment)) {
     return runtime;
   }
-  const session = qaSession(request.headers.get("x-mattanutra-qa-namespace"));
+  const session = qaSession(qaNamespaceFromHeaders(request));
   if (!session) {
     const clock = activeQaClock();
     if (!clock) {
@@ -77,37 +159,159 @@ export function bindQaRuntime(runtime: AgenticRuntime, request: Request): Agenti
   };
 }
 
-export function beginQaRun(runId = "A"): QaSession {
+export function qaNamespaceFromHeaders(request: Request) {
+  return request.headers.get("x-mattanutra-qa-namespace")?.trim() || "";
+}
+
+export function qaNamespaceFromRpc(body: unknown): string {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return "";
+  }
+
+  const root = body as Record<string, unknown>;
+  if (typeof root.namespace === "string" && root.namespace.trim()) {
+    return root.namespace.trim();
+  }
+
+  const params = root.params;
+  if (!params || typeof params !== "object" || Array.isArray(params)) {
+    return "";
+  }
+
+  const record = params as Record<string, unknown>;
+  if (typeof record.namespace === "string" && record.namespace.trim()) {
+    return record.namespace.trim();
+  }
+
+  const meta = record._meta;
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const namespace = (meta as { namespace?: unknown }).namespace;
+    if (typeof namespace === "string" && namespace.trim()) {
+      return namespace.trim();
+    }
+  }
+
+  const args = record.arguments;
+  if (args && typeof args === "object" && !Array.isArray(args)) {
+    const namespace = (args as { namespace?: unknown }).namespace;
+    if (typeof namespace === "string" && namespace.trim()) {
+      return namespace.trim();
+    }
+  }
+
+  return "";
+}
+
+export function qaNamespaceFromRequest(request: Request, body?: unknown) {
+  return qaNamespaceFromHeaders(request) || qaNamespaceFromRpc(body);
+}
+
+export async function hydrateQaRequest(request: Request, body?: unknown) {
+  const namespace = qaNamespaceFromRequest(request, body);
+  if (namespace) {
+    await resolveQaSession(namespace);
+    return namespace;
+  }
+
+  const clientKey = getRequestClientIp(request);
+  if (clientKey && (await hasActiveQaPackClient(clientKey))) {
+    await loadPublishedCatalogue();
+    return "";
+  }
+
+  return null;
+}
+
+export async function beginQaRun(
+  runId = "A",
+  input: Readonly<{
+    buildId?: string;
+    clientKey?: string;
+    environment?: AgenticEnvironment;
+  }> = {}
+): Promise<QaSession> {
+  const environment = input.environment ?? "dev";
   const nonce = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const namespace = `${QA_NAMESPACE_PREFIX}${runId}:${nonce}`;
+  setQueryNamespace(namespace);
+  const live = await ensureCatalogueSnapshot(environment, "TH");
+  const frozenSnapshot = freezeCatalogueSnapshot(live);
+  publishQaCatalogue(frozenSnapshot);
   const session: QaSession = {
     acquisitionMinor: 0,
     attribution: "agent_connector",
+    buildId: input.buildId ?? "",
+    catalogueChecksum: catalogueSnapshotId(frozenSnapshot),
+    catalogueVersion: frozenSnapshot.catalogueVersion,
+    frozenSnapshot,
     namespace,
     now: QA_PACK_CLOCK,
-    principalScope: namespace
+    principalScope: namespace,
+    schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
   };
-  sessions.set(namespace, session);
-  setQueryNamespace(namespace);
+  rememberSession(session);
   activeNamespace = namespace;
+  try {
+    await persistQaNamespace(session, runId, input.clientKey ?? "");
+  } catch {
+    /* Tests and local memory-only runs still freeze in-process. */
+  }
   return session;
 }
 
-export function setQaClock(namespace: string, now: string) {
-  const current = sessions.get(namespace);
+export function missingFrozenSnapshotError(session: QaSession | null) {
+  if (session?.frozenSnapshot) {
+    return null;
+  }
+  return {
+    message: "Frozen catalogue snapshot is missing.",
+    reasonCode: "run_invalid" as const
+  };
+}
+
+export function frozenSnapshotMissingResult() {
+  return {
+    error: missingFrozenSnapshotError(null)!,
+    ok: false as const
+  };
+}
+
+export async function withQaSessionSnapshot<T>(
+  namespace: string | undefined,
+  work: () => T | Promise<T>
+): Promise<T> {
+  if (!namespace) {
+    return await work();
+  }
+
+  if (!namespace.startsWith(QA_NAMESPACE_PREFIX)) {
+    return await work();
+  }
+
+  const session = await resolveQaSession(namespace);
+  if (!session?.frozenSnapshot) {
+    throw new QaRunInvalidError();
+  }
+
+  return await runWithCatalogueSnapshot(session.frozenSnapshot, work);
+}
+
+export async function setQaClock(namespace: string, now: string) {
+  const current = (await resolveQaSession(namespace)) ?? sessions.get(namespace);
   if (!current) {
     return null;
   }
   const next = { ...current, now };
-  sessions.set(namespace, next);
+  rememberSession(next);
+  await persistQaNamespaceClock(namespace, now);
   return next;
 }
 
-export function setQaChannel(
+export async function setQaChannel(
   namespace: string,
   input: Readonly<{ acquisitionMinor?: number; attribution?: unknown }>
 ) {
-  const current = sessions.get(namespace);
+  const current = (await resolveQaSession(namespace)) ?? sessions.get(namespace);
   if (!current) {
     return null;
   }
@@ -119,7 +323,11 @@ export function setQaChannel(
         : current.acquisitionMinor,
     attribution: attributionOf(input.attribution)
   };
-  sessions.set(namespace, next);
+  rememberSession(next);
+  await persistQaNamespaceChannel(namespace, {
+    acquisitionMinor: next.acquisitionMinor,
+    attribution: next.attribution
+  });
   return next;
 }
 
@@ -180,7 +388,7 @@ export async function resetQaRun(input: Readonly<{
   namespace: string;
   store: AgenticStore;
 }>) {
-  const session = sessions.get(input.namespace);
+  const session = (await resolveQaSession(input.namespace)) ?? sessions.get(input.namespace);
   if (!session) {
     return { ok: true as const, namespace: input.namespace };
   }
@@ -198,5 +406,6 @@ export async function resetQaRun(input: Readonly<{
     activeNamespace = null;
   }
   resetQueryBudget(input.namespace);
+  await deletePersistedQaNamespace(input.namespace);
   return { ok: true as const, namespace: input.namespace };
 }

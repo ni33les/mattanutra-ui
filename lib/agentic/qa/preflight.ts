@@ -6,7 +6,7 @@ import { DISCOVERY_CONTENT_VERSION } from "@/lib/agentic/discovery/versions";
 import { agenticMessageKeys } from "@/lib/agentic/i18n";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
-import { QA_PACK_CLOCK, qaSession } from "@/lib/agentic/qa/session";
+import { QA_PACK_CLOCK, resolveQaSession } from "@/lib/agentic/qa/session";
 
 export const QA_PACK_VERSION = "3.0.0";
 export const QA_FULFILMENT_DRIVE = ["preparing", "dispatched", "delivered"] as const;
@@ -64,8 +64,8 @@ export function localeBundleChecksum() {
 }
 
 export async function qaPreflight(namespace?: string, environment: AgenticEnvironment = "dev") {
-  const snapshot = await ensureCatalogueSnapshot(environment, "TH");
-  const session = qaSession(namespace);
+  const session = namespace ? await resolveQaSession(namespace) : null;
+  const snapshot = session?.frozenSnapshot ?? (await ensureCatalogueSnapshot(environment, "TH"));
   return {
     ok: true as const,
     packVersion: QA_PACK_VERSION,

@@ -4,6 +4,7 @@ import {
   replaceCatalogueSnapshot,
   resetCatalogueSnapshotCache
 } from "../../lib/agentic/catalogue/snapshot.ts";
+import { resetQaPersistForTests } from "../../lib/agentic/qa/persist.ts";
 import { resetInfoCache } from "../../lib/agentic/info.ts";
 import {
   resetMatcherSafetyCeilings,
@@ -11,6 +12,7 @@ import {
 } from "../../lib/matcher/safety-ceilings.ts";
 
 export function installGoldCatalogue() {
+  resetQaPersistForTests();
   replaceCatalogueSnapshot(fixtureSnapshot());
   setMatcherSafetyCeilings(
     ceilingsForSubjects(
@@ -26,6 +28,7 @@ export function installGoldCatalogue() {
 export function uninstallGoldCatalogue() {
   replaceCatalogueSnapshot(null);
   resetCatalogueSnapshotCache();
+  resetQaPersistForTests();
   resetMatcherSafetyCeilings();
   resetInfoCache();
 }

@@ -6,6 +6,7 @@ import {
   replaceCatalogueSnapshot,
   resetCatalogueSnapshotCache
 } from "../lib/agentic/catalogue/snapshot.ts";
+import { resetQaPersistForTests } from "../lib/agentic/qa/persist.ts";
 import { engineeringInfo, resetInfoCache } from "../lib/agentic/info.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 
@@ -28,6 +29,7 @@ function withoutTestContext<T>(work: () => T | Promise<T>) {
 afterEach(() => {
   replaceCatalogueSnapshot(null);
   resetCatalogueSnapshotCache();
+  resetQaPersistForTests();
   resetInfoCache();
 });
 

@@ -329,5 +329,10 @@ export const publicRateLimits = {
     name: "mcp",
     limit: 60,
     windowMs: 60_000
+  },
+  mcpQaPack: {
+    name: "mcp-qa-pack",
+    limit: 2_000,
+    windowMs: 10 * 60_000
   }
 } as const satisfies Record<string, RateLimitConfig>;
