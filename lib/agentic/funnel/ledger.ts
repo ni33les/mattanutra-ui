@@ -1,7 +1,7 @@
 import {
   attributionOf,
-  isFunnelEventType,
   rejectProhibitedFunnelPayload,
+  toPublicFunnelEventType,
   type FunnelAttribution,
   type FunnelEventType
 } from "@/lib/agentic/funnel/events";
@@ -73,7 +73,8 @@ export function recordFunnelEvent(input: Readonly<{
     return { accepted: false as const, reasonCode: "unsafe_content" as const, field: prohibited };
   }
 
-  if (!isFunnelEventType(input.eventType)) {
+  const eventType = toPublicFunnelEventType(input.eventType);
+  if (!eventType) {
     return { accepted: false as const, reasonCode: "invalid_request" as const, field: "eventType" };
   }
 
@@ -93,7 +94,7 @@ export function recordFunnelEvent(input: Readonly<{
     correlationId: input.correlationId,
     createdAt: input.createdAt,
     eventId: input.eventId,
-    eventType: input.eventType,
+    eventType,
     payload: publicFunnelPayload(input.correlationId, input.payload),
     sequence: list.length + 1
   };
@@ -173,11 +174,12 @@ export async function loadPersistedFunnelEvents(correlationId: string) {
             ? row.created_at.toISOString()
             : String(row.created_at ?? ""),
         eventId,
-        eventType: String(row.event_type ?? "") as FunnelEvent["eventType"],
+        eventType: (toPublicFunnelEventType(String(row.event_type ?? "")) ??
+          String(row.event_type ?? "")) as FunnelEvent["eventType"],
         payload: publicFunnelPayload(String(row.correlation_id ?? correlationId), row.payload),
         sequence: Number(row.sequence ?? restored.length + 1)
       };
-      if (!isFunnelEventType(event.eventType)) {
+      if (!toPublicFunnelEventType(event.eventType)) {
         continue;
       }
       restored.push(event);

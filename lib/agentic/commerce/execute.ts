@@ -32,6 +32,8 @@ import {
   payableSnapshot
 } from "@/lib/agentic/money";
 import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
+import { freezeContributionInputs } from "@/lib/agentic/funnel/events";
+import { bindQaChannel, channelForScope } from "@/lib/agentic/qa/session";
 
 const executeLocks = new WeakMap<AgenticStore, Map<string, Promise<unknown>>>();
 
@@ -276,6 +278,17 @@ async function executeFresh(
       subtotalMinor: selected.totalPriceMinor,
       taxMinor: DEFAULT_TAX_MINOR
     });
+    const channel = channelForScope(input.scope);
+    bindQaChannel(plan.id, channel);
+    const contribution = freezeContributionInputs({
+      acquisitionMinor: channel.acquisitionMinor,
+      attribution: channel.attribution,
+      currency: result.requestSnapshot.currency,
+      paymentFeeMinor: 0,
+      paymentMinor: payable.totalPriceMinor,
+      productCostMinor: selected.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0),
+      shippingSubsidyMinor: 0
+    });
     const orderId = nextTestUuid();
     const reference = humanOrderReference(orderId);
     const checkoutIssued = await issueCapability({
@@ -319,7 +332,8 @@ async function executeFresh(
         snapshotId: selected.snapshotId,
         subtotalMinor: payable.subtotalMinor,
         taxMinor: payable.taxMinor,
-        totalPriceMinor: payable.totalPriceMinor
+        totalPriceMinor: payable.totalPriceMinor,
+        contribution
       },
       fulfilmentStatus: "not_started" as const,
       id: orderId,

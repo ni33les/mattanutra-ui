@@ -6,9 +6,8 @@ import type { AgenticStore } from "@/lib/agentic/store/types";
 import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
 import { buildOrderProjection } from "@/lib/agentic/commerce/timeline";
 import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
-import { contributionMinor } from "@/lib/agentic/funnel/events";
+import { contributionFromFrozen } from "@/lib/agentic/funnel/events";
 import { funnelAttribution, listFunnelEvents } from "@/lib/agentic/funnel/ledger";
-import { channelCost } from "@/lib/agentic/qa/session";
 
 export async function orderTool(input: Readonly<{
   config: AgenticConfig;
@@ -69,21 +68,16 @@ export async function orderTool(input: Readonly<{
   const attribution = order ? funnelAttribution(order.planId) : "unattributed";
   const funnel = order ? listFunnelEvents(order.planId) : [];
   void funnel;
-  const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
-  const cost = order ? channelCost(order.planId) : { acquisitionMinor: 0, attribution };
-  const paymentFeeMinor = 0;
-  const shippingSubsidyMinor = 0;
-  const paymentMinor = order?.totalPriceMinor ?? 0;
-  const contribution =
-    order && order.paymentStatus === "paid"
-      ? contributionMinor({
-          acquisitionMinor: cost.acquisitionMinor,
-          paymentFeeMinor,
-          paymentMinor,
-          productCostMinor,
-          shippingSubsidyMinor
-        })
-      : null;
+  const paid = Boolean(order && order.paymentStatus === "paid");
+  const frozen = order
+    ? contributionFromFrozen({ frozen: order.frozenPlan, paid })
+    : null;
+  const productCostMinor = frozen?.productCostMinor ?? items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
+  const paymentFeeMinor = frozen?.paymentFeeMinor ?? 0;
+  const shippingSubsidyMinor = frozen?.shippingSubsidyMinor ?? 0;
+  const paymentMinor = frozen?.paymentMinor ?? order?.totalPriceMinor ?? 0;
+  const acquisitionMinor = frozen?.acquisitionMinor ?? 0;
+  const contribution = frozen?.contributionMinor ?? null;
 
   const view = orderPollView({
     checkoutUrl: order?.checkoutUrl ?? null,
@@ -108,8 +102,8 @@ export async function orderTool(input: Readonly<{
 
   return {
     ...view,
-    acquisitionMinor: cost.acquisitionMinor,
-    attribution: cost.attribution === "unattributed" ? attribution : cost.attribution,
+    acquisitionMinor,
+    attribution: frozen?.attribution ?? attribution,
     contributionMinor: contribution,
     events: projection.events,
     money: projection.money,

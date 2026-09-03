@@ -17,6 +17,7 @@ export type QaSession = Readonly<{
 }>;
 
 const sessions = new Map<string, QaSession>();
+let activeNamespace: string | null = null;
 const costByCorrelation = new Map<
   string,
   Readonly<{ acquisitionMinor: number; attribution: FunnelAttribution }>
@@ -25,6 +26,7 @@ const costByCorrelation = new Map<
 export function resetQaSessions() {
   sessions.clear();
   costByCorrelation.clear();
+  activeNamespace = null;
 }
 
 export function qaSession(namespace: string | undefined | null) {
@@ -87,6 +89,7 @@ export function beginQaRun(runId = "A"): QaSession {
   };
   sessions.set(namespace, session);
   setQueryNamespace(namespace);
+  activeNamespace = namespace;
   return session;
 }
 
@@ -120,7 +123,37 @@ export function setQaChannel(
   return next;
 }
 
-export function bindQaChannel(correlationId: string, session: QaSession) {
+export function activeQaSession() {
+  return activeNamespace ? sessions.get(activeNamespace) ?? null : null;
+}
+
+export function channelForScope(scope: Readonly<{ principalScope?: string | null }>) {
+  if (scope.principalScope) {
+    const byPrincipal = sessions.get(scope.principalScope);
+    if (byPrincipal) {
+      return {
+        acquisitionMinor: byPrincipal.acquisitionMinor,
+        attribution: byPrincipal.attribution
+      };
+    }
+  }
+  const active = activeQaSession();
+  if (active) {
+    return {
+      acquisitionMinor: active.acquisitionMinor,
+      attribution: active.attribution
+    };
+  }
+  return {
+    acquisitionMinor: 0,
+    attribution: "unattributed" as const
+  };
+}
+
+export function bindQaChannel(
+  correlationId: string,
+  session: Readonly<{ acquisitionMinor: number; attribution: FunnelAttribution }>
+) {
   costByCorrelation.set(correlationId, {
     acquisitionMinor: session.acquisitionMinor,
     attribution: session.attribution
@@ -161,6 +194,9 @@ export async function resetQaRun(input: Readonly<{
   }
   await input.store.deletePrincipalScope(session.principalScope);
   sessions.delete(input.namespace);
+  if (activeNamespace === input.namespace) {
+    activeNamespace = null;
+  }
   resetQueryBudget(input.namespace);
   return { ok: true as const, namespace: input.namespace };
 }

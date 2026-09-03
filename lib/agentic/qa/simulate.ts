@@ -12,7 +12,7 @@ import {
   drivePaymentFixture
 } from "@/lib/agentic/commerce/fixture-driver";
 import { orderTool } from "@/lib/agentic/commerce/order";
-import { contributionMinor } from "@/lib/agentic/funnel/events";
+import { contributionFromFrozen } from "@/lib/agentic/funnel/events";
 import {
   funnelAttribution,
   listFunnelEvents,
@@ -199,36 +199,33 @@ export async function observeQaJourney(input: Readonly<{
 
   await loadPersistedFunnelEvents(correlationId);
   const session = qaSession(input.namespace);
-  if (session && correlationId) {
+  if (session && correlationId && !order) {
     bindQaChannel(correlationId, session);
   }
   const events = listFunnelEvents(correlationId);
-  const cost = channelCost(correlationId, input.namespace);
-  const attribution = cost.attribution === "unattributed" ? funnelAttribution(correlationId) : cost.attribution;
+  const paid = Boolean(order && order.paymentStatus === "paid");
+  const frozen = order ? contributionFromFrozen({ frozen: order.frozenPlan, paid }) : null;
+  const cost = channelCost(correlationId, order ? undefined : input.namespace);
+  const attribution =
+    frozen?.attribution ??
+    (cost.attribution === "unattributed" ? funnelAttribution(correlationId) : cost.attribution);
   const items = order ? await input.store.getOrderItems(order.id) : [];
-  const productCostMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
-  const paymentMinor = order?.totalPriceMinor ?? 0;
-  const paymentFeeMinor = 0;
-  const shippingSubsidyMinor = 0;
-  const contribution =
-    order && order.paymentStatus === "paid"
-      ? contributionMinor({
-          acquisitionMinor: cost.acquisitionMinor,
-          paymentFeeMinor,
-          paymentMinor,
-          productCostMinor,
-          shippingSubsidyMinor
-        })
-      : null;
+  const productCostMinor = frozen?.productCostMinor ?? items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
+  const paymentMinor = frozen?.paymentMinor ?? order?.totalPriceMinor ?? 0;
+  const paymentFeeMinor = frozen?.paymentFeeMinor ?? 0;
+  const shippingSubsidyMinor = frozen?.shippingSubsidyMinor ?? 0;
+  const acquisitionMinor = frozen?.acquisitionMinor ?? cost.acquisitionMinor;
+  const contribution = frozen?.contributionMinor ?? null;
   const queryNs = input.namespace ?? session?.namespace;
 
   return {
     ok: true as const,
-    acquisitionMinor: cost.acquisitionMinor,
+    acquisitionMinor,
     attribution,
     clock: session?.now ?? input.now,
     contributionMinor: contribution,
     correlationId,
+    currency: frozen?.currency ?? order?.currency ?? null,
     dependencyBudget: dependencyBudget(queryNs),
     paymentFeeMinor,
     paymentMinor: order ? paymentMinor : null,

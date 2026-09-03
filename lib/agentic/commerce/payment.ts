@@ -72,10 +72,11 @@ export function mockEventForScenario(input: Readonly<{
   providerSessionId: string;
   scenario: PaymentEventScenario;
 }>): VerifiedPaymentEvent {
+  const compactOrderId = input.orderId.replace(/-/g, "");
   const base = {
     amountMinor: input.amountMinor,
     currency: input.currency,
-    providerEventId: `mock_evt_${input.scenario}_${input.orderId.replace(/-/g, "").slice(0, 12)}`,
+    providerEventId: `mock_evt_${input.scenario}_${compactOrderId}`,
     providerSessionId: input.providerSessionId
   };
 
@@ -105,7 +106,7 @@ export function mockEventForScenario(input: Readonly<{
     case "duplicate_success":
       return {
         ...base,
-        providerEventId: `mock_evt_success_${input.orderId.replace(/-/g, "").slice(0, 12)}`,
+        providerEventId: `mock_evt_success_${compactOrderId}`,
         reason: null,
         scenario: input.scenario,
         status: "succeeded"
