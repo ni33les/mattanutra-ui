@@ -12,15 +12,29 @@ import {
   type JsonRpcRequest
 } from "@/lib/agentic/mcp/rpc";
 import { recordMcpTiming } from "@/lib/agentic/metrics";
+import {
+  mcpGetSseNotSupported,
+  mcpOneShotResponse,
+  wantsMcpSse
+} from "@/lib/agentic/mcp/transport";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const log = createLogger("api.mcp");
-const MCP_HEADERS = {
-  "Cache-Control": "no-store",
-  Connection: "keep-alive"
-};
+
+function mcpReply(
+  request: Request,
+  payload: unknown,
+  status = 200,
+  extraHeaders?: Record<string, string>
+) {
+  const accept = request.headers.get("accept");
+  return mcpOneShotResponse(accept, payload, status, {
+    "x-request-id": requestCorrelationId(request),
+    ...extraHeaders
+  });
+}
 
 function mcpNeedsRateLimit(body: unknown) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -50,10 +64,6 @@ function mcpNeedsRateLimit(body: unknown) {
   return true;
 }
 
-function jsonRpc(body: unknown, status = 200) {
-  return NextResponse.json(body, { headers: MCP_HEADERS, status });
-}
-
 function timedToolName(body: unknown) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return null;
@@ -78,7 +88,8 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return jsonRpc(
+    return mcpReply(
+      request,
       {
         error: { code: -32700, message: "Parse error" },
         jsonrpc: "2.0"
@@ -107,7 +118,7 @@ export async function POST(request: Request) {
       );
 
       if (light === null) {
-        return new NextResponse(null, { status: 202 });
+        return new NextResponse(null, { headers: { Connection: "close" }, status: 202 });
       }
 
       if (light) {
@@ -120,7 +131,7 @@ export async function POST(request: Request) {
           durationMs,
           tool: timed ?? "other"
         });
-        return jsonRpc(light);
+        return mcpReply(request, light, 200, { "x-mcp-handler-ms": String(durationMs) });
       }
     }
 
@@ -150,13 +161,13 @@ export async function POST(request: Request) {
         durationMs,
         tool: timed ?? "batch"
       });
-      return jsonRpc(responses);
+      return mcpReply(request, responses, 200, { "x-mcp-handler-ms": String(durationMs) });
     }
 
     const result = await handleJsonRpc(runtime, body as JsonRpcRequest);
 
     if (!result) {
-      return new NextResponse(null, { status: 202 });
+      return new NextResponse(null, { headers: { Connection: "close" }, status: 202 });
     }
 
     const durationMs = Math.round(performance.now() - started);
@@ -168,7 +179,7 @@ export async function POST(request: Request) {
       durationMs,
       tool: timed ?? "other"
     });
-    return jsonRpc(result);
+    return mcpReply(request, result, 200, { "x-mcp-handler-ms": String(durationMs) });
   } catch (error) {
     log.error("mcp.dispatch_failed", {
       correlationId,
@@ -177,7 +188,8 @@ export async function POST(request: Request) {
       tool: timed ?? "unknown"
     });
 
-    return jsonRpc(
+    return mcpReply(
+      request,
       {
         error: { code: -32603, message: "Internal error" },
         jsonrpc: "2.0"
@@ -192,14 +204,15 @@ export async function GET(request: Request) {
     .then((mod) => mod.keepDatabaseWarm())
     .catch(() => null);
 
+  if (wantsMcpSse(request.headers.get("accept"))) {
+    return mcpGetSseNotSupported();
+  }
+
   const config = loadAgenticConfig(request);
-  return NextResponse.json(
-    {
-      contractVersion: "3.0.0",
-      instructions: agenticServerInstructions(config.environment),
-      tools: toolList(config.environment),
-      transport: "streamable-http"
-    },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  return mcpReply(request, {
+    contractVersion: "3.0.0",
+    instructions: agenticServerInstructions(config.environment),
+    tools: toolList(config.environment),
+    transport: "streamable-http"
+  });
 }

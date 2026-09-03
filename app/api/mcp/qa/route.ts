@@ -5,6 +5,12 @@ import { handleQaJsonRpc } from "@/lib/agentic/mcp/qa-dispatcher";
 import { authorizeQaRequest } from "@/lib/agentic/qa/authorize";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import {
+  jsonCloseResponse,
+  mcpGetSseNotSupported,
+  mcpOneShotResponse,
+  wantsMcpSse
+} from "@/lib/agentic/mcp/transport";
+import {
   isFulfilmentStatus,
   isPaymentScenario,
   observeQaJourney,
@@ -21,15 +27,25 @@ export const dynamic = "force-dynamic";
 
 const log = createLogger("api.mcp.qa");
 
+function qaJson(payload: unknown, status = 200) {
+  return jsonCloseResponse(payload, status, { "Cache-Control": "no-store" });
+}
+
+function qaRpc(request: Request, payload: unknown, status = 200) {
+  return mcpOneShotResponse(request.headers.get("accept"), payload, status, {
+    "Cache-Control": "no-store"
+  });
+}
+
 export async function POST(request: Request) {
   const runtime = getLiveAgenticRuntime(request);
 
   if (!runtime.config.internalQaHarness || runtime.config.environment !== "dev") {
-    return NextResponse.json({ message: "Not found." }, { status: 404 });
+    return qaJson({ message: "Not found." }, 404);
   }
 
   if (!authorizeQaRequest(request, runtime.config.environment)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return qaJson({ message: "Unauthorized" }, 401);
   }
 
   const limited = enforceRateLimit(request, publicRateLimits.mcp);
@@ -43,18 +59,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { error: { code: -32700, message: "Parse error" }, jsonrpc: "2.0" },
-      { status: 400 }
-    );
+    return qaRpc(request, { error: { code: -32700, message: "Parse error" }, jsonrpc: "2.0" }, 400);
   }
 
   if (body && typeof body === "object" && !Array.isArray(body) && !("method" in body)) {
     if ("orderId" in body && !("orderHandle" in body)) {
-      return NextResponse.json(
-        { message: "Use orderHandle only. Never send raw order IDs." },
-        { status: 400 }
-      );
+      return qaJson({ message: "Use orderHandle only. Never send raw order IDs." }, 400);
     }
     const rest = body as {
       acquisitionMinor?: unknown;
@@ -68,26 +78,27 @@ export async function POST(request: Request) {
     };
     if (typeof rest.runId === "string" && !("orderHandle" in rest)) {
       const begun = beginQaRun(rest.runId);
-      return NextResponse.json(
-        { ok: true, clock: begun.now, namespace: begun.namespace, principalScope: begun.principalScope, preflight: await qaPreflight(begun.namespace) },
-        { headers: { "Cache-Control": "no-store" } }
-      );
+      return qaJson({
+        ok: true,
+        clock: begun.now,
+        namespace: begun.namespace,
+        principalScope: begun.principalScope,
+        preflight: await qaPreflight(begun.namespace)
+      });
     }
     if (rest.reset === true && typeof rest.namespace === "string") {
-      return NextResponse.json(await resetQaRun({ namespace: rest.namespace, store: runtime.store }), {
-        headers: { "Cache-Control": "no-store" }
-      });
+      return qaJson(await resetQaRun({ namespace: rest.namespace, store: runtime.store }));
     }
     if (typeof rest.now === "string" && typeof rest.namespace === "string" && !("orderHandle" in rest)) {
       const next = setQaClock(rest.namespace, rest.now);
-      return NextResponse.json(next ?? { ok: false }, { headers: { "Cache-Control": "no-store" } });
+      return qaJson(next ?? { ok: false });
     }
     if (typeof rest.namespace === "string" && (rest.attribution != null || rest.acquisitionMinor != null) && !("orderHandle" in rest)) {
       const next = setQaChannel(rest.namespace, {
         acquisitionMinor: typeof rest.acquisitionMinor === "number" ? rest.acquisitionMinor : undefined,
         attribution: rest.attribution
       });
-      return NextResponse.json(next ?? { ok: false }, { headers: { "Cache-Control": "no-store" } });
+      return qaJson(next ?? { ok: false });
     }
   }
 
@@ -107,13 +118,13 @@ export async function POST(request: Request) {
     const now = resolveQaNow(namespace);
 
     if (!isOpaqueCapabilityHandle(orderHandle)) {
-      return NextResponse.json({ message: "Not found." }, { status: 404 });
+      return qaJson({ message: "Not found." }, 404);
     }
 
     const fulfilment = (body as { fulfilment?: unknown }).fulfilment;
     if (typeof fulfilment === "string") {
       if (!isFulfilmentStatus(fulfilment)) {
-        return NextResponse.json({ message: "Unknown fulfilment." }, { status: 400 });
+        return qaJson({ message: "Unknown fulfilment." }, 400);
       }
       const driven = await simulateFulfilment({
         config: runtime.config,
@@ -123,7 +134,7 @@ export async function POST(request: Request) {
         status: fulfilment,
         store: runtime.store
       });
-      return NextResponse.json(driven, { headers: { "Cache-Control": "no-store" } });
+      return qaJson(driven);
     }
 
     if ((body as { observe?: unknown }).observe === true) {
@@ -135,12 +146,12 @@ export async function POST(request: Request) {
         scope: runtime.scope,
         store: runtime.store
       });
-      return NextResponse.json(observed, { headers: { "Cache-Control": "no-store" } });
+      return qaJson(observed);
     }
 
     if (typeof scenario === "string") {
       if (!isPaymentScenario(scenario)) {
-        return NextResponse.json({ message: "Unknown scenario." }, { status: 400 });
+        return qaJson({ message: "Unknown scenario." }, 400);
       }
 
       await simulatePayment({
@@ -162,14 +173,11 @@ export async function POST(request: Request) {
       });
 
       if (!capability) {
-        return NextResponse.json({ message: "Not found." }, { status: 404 });
+        return qaJson({ message: "Not found." }, 404);
       }
 
       const counts = await redactedOrderCounts({ orderId: capability.resourceId, runtime });
-      return NextResponse.json(
-        { ok: true, scenario, ...counts },
-        { headers: { "Cache-Control": "no-store" } }
-      );
+      return qaJson({ ok: true, scenario, ...counts });
     }
 
     const capability = await resolveCapability({
@@ -183,33 +191,31 @@ export async function POST(request: Request) {
     });
 
     if (!capability) {
-      return NextResponse.json({ message: "Not found." }, { status: 404 });
+      return qaJson({ message: "Not found." }, 404);
     }
 
-    return NextResponse.json(
-      {
-        ok: true,
-        ...(await redactedOrderCounts({ orderId: capability.resourceId, runtime }))
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
+    return qaJson({
+      ok: true,
+      ...(await redactedOrderCounts({ orderId: capability.resourceId, runtime }))
+    });
   }
 
   try {
     const result = await handleQaJsonRpc(runtime, body as { method?: string });
 
     if (!result) {
-      return new NextResponse(null, { status: 202 });
+      return new NextResponse(null, { headers: { Connection: "close" }, status: 202 });
     }
 
-    return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+    return qaRpc(request, result);
   } catch (error) {
     log.error("mcp.qa.dispatch_failed", {
       message: error instanceof Error ? error.message : "unknown"
     });
-    return NextResponse.json(
+    return qaRpc(
+      request,
       { error: { code: -32603, message: "Internal error" }, jsonrpc: "2.0" },
-      { status: 500 }
+      500
     );
   }
 }
@@ -218,29 +224,30 @@ export async function GET(request: Request) {
   const runtime = getLiveAgenticRuntime(request);
 
   if (!runtime.config.internalQaHarness || runtime.config.environment !== "dev") {
-    return NextResponse.json({ message: "Not found." }, { status: 404 });
+    return qaJson({ message: "Not found." }, 404);
   }
 
-  return NextResponse.json(
-    {
-      preflight: await qaPreflight(),
-      tools: [
-        "preflight",
-        "beginRun",
-        "reset",
-        "setClock",
-        "simulate",
-        "simulateFulfilment",
-        "setChannel",
-        "observe",
-        "evidence",
-        "isolationProof",
-        "checkoutContinuityProof",
-        "latencyProof",
-        "packProof"
-      ],
-      transport: "streamable-http"
-    },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  if (wantsMcpSse(request.headers.get("accept"))) {
+    return mcpGetSseNotSupported();
+  }
+
+  return qaJson({
+    preflight: await qaPreflight(),
+    tools: [
+      "preflight",
+      "beginRun",
+      "reset",
+      "setClock",
+      "simulate",
+      "simulateFulfilment",
+      "setChannel",
+      "observe",
+      "evidence",
+      "isolationProof",
+      "checkoutContinuityProof",
+      "latencyProof",
+      "packProof"
+    ],
+    transport: "streamable-http"
+  });
 }

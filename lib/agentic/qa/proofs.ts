@@ -11,6 +11,11 @@ import { infoTool } from "@/lib/agentic/info";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { feedbackTool } from "@/lib/agentic/feedback";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
+import {
+  LATENCY_PERCENTILE_ALGORITHM,
+  TECH07_FIXED_BUDGET,
+  TECH07_LIVE_BUDGET
+} from "@/lib/agentic/qa/latency-score";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 import { QA_PACK_CLOCK } from "@/lib/agentic/qa/session";
 import { dependencyBudget, getQueryNamespace, queryBudgetSnapshot, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
@@ -313,6 +318,7 @@ export async function latencyProof(runtime: AgenticRuntime) {
   return withProofQueries("latency", async () => {
   const now = proofNow(runtime);
   const stamp = `${Date.now()}`;
+  const planStarted = performance.now();
   const created = await planTool({
     config: runtime.config,
     now,
@@ -323,6 +329,7 @@ export async function latencyProof(runtime: AgenticRuntime) {
     scope: runtime.scope,
     store: runtime.store
   });
+  const planMs = performance.now() - planStarted;
 
   if (isAgenticErrorResult(created) || created.status !== "ready") {
     return {
@@ -408,11 +415,13 @@ export async function latencyProof(runtime: AgenticRuntime) {
   const executeP95 = percentile(executeSamples, 95);
   const feedbackP95 = percentile(feedbackSamples, 95);
   const http = mcpLatencySnapshot(runtime.config.buildId);
+  const planP95 = http.plan.n > 0 ? http.plan.p95Ms : Math.round(planMs);
   const checks = [
     { budgetMs: 300, name: "info_p95", passed: infoP95 <= 300, p95Ms: Math.round(infoP95) },
     { budgetMs: 1500, name: "execute_p95", passed: executeP95 <= 1500, p95Ms: Math.round(executeP95) },
     { budgetMs: 500, name: "order_p95", passed: orderP95 <= 500, p95Ms: Math.round(orderP95) },
-    { budgetMs: 1000, name: "feedback_p95", passed: feedbackP95 <= 1000, p95Ms: Math.round(feedbackP95) }
+    { budgetMs: 1000, name: "feedback_p95", passed: feedbackP95 <= 1000, p95Ms: Math.round(feedbackP95) },
+    { budgetMs: 3000, name: "plan_p95", passed: planP95 <= 3000, p95Ms: Math.round(planP95) }
   ];
 
   const queries = queryBudgetSnapshot();
@@ -422,11 +431,32 @@ export async function latencyProof(runtime: AgenticRuntime) {
     checks,
     dependencyBudget: budget,
     http,
+    kind: "handler" as const,
     ok: true as const,
     passed: checks.every((item) => item.passed) && budget.sleeps === 0 && budget.polling === false,
     polling: false as const,
     queries,
-    sleeps: 0 as const
+    sleeps: 0 as const,
+    tech07: {
+      fixed: {
+        benchmarkId: "tech-07-fixed-uncached-plan",
+        cacheMode: TECH07_FIXED_BUDGET.cacheMode,
+        concurrency: TECH07_FIXED_BUDGET.concurrency,
+        n: TECH07_FIXED_BUDGET.n,
+        p50BudgetMs: TECH07_FIXED_BUDGET.p50BudgetMs,
+        p95BudgetMs: TECH07_FIXED_BUDGET.p95BudgetMs,
+        percentileAlgorithm: LATENCY_PERCENTILE_ALGORITHM
+      },
+      live: {
+        benchmarkId: "tech-07-live-uncached-plan",
+        cacheMode: TECH07_LIVE_BUDGET.cacheMode,
+        concurrency: TECH07_LIVE_BUDGET.concurrency,
+        n: TECH07_LIVE_BUDGET.n,
+        p50BudgetMs: TECH07_LIVE_BUDGET.p50BudgetMs,
+        p95BudgetMs: TECH07_LIVE_BUDGET.p95BudgetMs,
+        percentileAlgorithm: LATENCY_PERCENTILE_ALGORITHM
+      }
+    }
   };
   });
 }
