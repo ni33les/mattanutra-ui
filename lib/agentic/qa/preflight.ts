@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { AgenticEnvironment } from "@/lib/agentic/config";
 import { AGENTIC_SCHEMA_CHECKSUM } from "@/lib/agentic/info";
 import { CONNECTOR_COPY } from "@/lib/agentic/discovery/content";
 import { DISCOVERY_CONTENT_VERSION } from "@/lib/agentic/discovery/versions";
@@ -62,8 +63,8 @@ export function localeBundleChecksum() {
     .digest("hex");
 }
 
-export async function qaPreflight(namespace?: string) {
-  const snapshot = await ensureCatalogueSnapshot("dev", "TH");
+export async function qaPreflight(namespace?: string, environment: AgenticEnvironment = "dev") {
+  const snapshot = await ensureCatalogueSnapshot(environment, "TH");
   const session = qaSession(namespace);
   return {
     ok: true as const,

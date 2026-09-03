@@ -107,15 +107,21 @@ function retailerAdapterForEnv(environment: AgenticEnvironment): RetailerAdapter
   return environment === "dev" ? "mock_thailand" : "thailand_uat";
 }
 
+export function qaHarnessAvailable(config: AgenticConfig) {
+  return config.internalQaHarness && config.environment !== "prd";
+}
+
 export function assertInternalQaHarness(config: AgenticConfig) {
-  if (!config.internalQaHarness || config.environment !== "dev") {
+  if (!qaHarnessAvailable(config)) {
     throw Object.assign(new Error("Not found."), { reasonCode: "not_found" as const });
   }
 
-  if (config.paymentProvider !== "mock" || config.thailandRetailerAdapter !== "mock_thailand") {
-    throw Object.assign(new Error("Adapter mismatch."), {
-      reasonCode: "adapter_mismatch" as const
-    });
+  if (config.environment === "dev") {
+    if (config.paymentProvider !== "mock" || config.thailandRetailerAdapter !== "mock_thailand") {
+      throw Object.assign(new Error("Adapter mismatch."), {
+        reasonCode: "adapter_mismatch" as const
+      });
+    }
   }
 
   if (config.continuation !== "polling_only") {
@@ -129,9 +135,10 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
   const environment = resolveAgenticEnvironment(request);
   const paymentProvider = paymentProviderForEnv(environment);
   const thailandRetailerAdapter = retailerAdapterForEnv(environment);
-  const internalQaHarness =
+  const harnessRequested =
     process.env.INTERNAL_QA_HARNESS === "true" ||
     (environment === "dev" && process.env.INTERNAL_QA_HARNESS !== "false");
+  const internalQaHarness = environment === "prd" ? false : harnessRequested;
   const capabilitySecret =
     process.env.AGENTIC_CAPABILITY_KEY?.trim() ||
     process.env.MCP_V2_ORDER_HANDLE_SECRET?.trim() ||
@@ -149,11 +156,11 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
     throw new Error("Live Stripe is not allowed in DEV or UAT");
   }
 
-  if (internalQaHarness) {
-    if (environment !== "dev") {
-      throw new Error("Internal QA harness is only allowed in DEV");
-    }
+  if (internalQaHarness && environment !== "dev" && !process.env.MCP_QA_TOKEN?.trim()) {
+    throw new Error("MCP_QA_TOKEN is required to enable the QA harness outside DEV");
+  }
 
+  if (internalQaHarness && environment === "dev") {
     if (paymentProvider !== "mock") {
       throw new Error("Internal QA harness requires MockPaymentAdapter");
     }

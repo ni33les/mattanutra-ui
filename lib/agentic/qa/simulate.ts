@@ -163,9 +163,9 @@ export async function observeQaJourney(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>) {
-  const devHarness =
-    input.config.internalQaHarness && input.config.environment === "dev";
-  if (!devHarness) {
+  const harnessOn =
+    input.config.internalQaHarness && input.config.environment !== "prd";
+  if (!harnessOn) {
     return businessError({ message: "Not found.", reasonCode: "not_found" });
   }
 

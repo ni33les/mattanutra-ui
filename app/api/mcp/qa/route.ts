@@ -3,6 +3,7 @@ import { createLogger } from "@/lib/logger";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { handleQaJsonRpc } from "@/lib/agentic/mcp/qa-dispatcher";
 import { authorizeQaRequest } from "@/lib/agentic/qa/authorize";
+import { qaHarnessAvailable } from "@/lib/agentic/config";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import {
   jsonCloseResponse,
@@ -40,7 +41,7 @@ function qaRpc(request: Request, payload: unknown, status = 200) {
 export async function POST(request: Request) {
   const runtime = getLiveAgenticRuntime(request);
 
-  if (!runtime.config.internalQaHarness || runtime.config.environment !== "dev") {
+  if (!qaHarnessAvailable(runtime.config)) {
     return qaJson({ message: "Not found." }, 404);
   }
 
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
         clock: begun.now,
         namespace: begun.namespace,
         principalScope: begun.principalScope,
-        preflight: await qaPreflight(begun.namespace)
+        preflight: await qaPreflight(begun.namespace, runtime.config.environment)
       });
     }
     if (rest.reset === true && typeof rest.namespace === "string") {
@@ -223,8 +224,12 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const runtime = getLiveAgenticRuntime(request);
 
-  if (!runtime.config.internalQaHarness || runtime.config.environment !== "dev") {
+  if (!qaHarnessAvailable(runtime.config)) {
     return qaJson({ message: "Not found." }, 404);
+  }
+
+  if (!authorizeQaRequest(request, runtime.config.environment)) {
+    return qaJson({ message: "Unauthorized" }, 401);
   }
 
   if (wantsMcpSse(request.headers.get("accept"))) {
@@ -232,7 +237,7 @@ export async function GET(request: Request) {
   }
 
   return qaJson({
-    preflight: await qaPreflight(),
+    preflight: await qaPreflight(undefined, runtime.config.environment),
     tools: [
       "preflight",
       "beginRun",

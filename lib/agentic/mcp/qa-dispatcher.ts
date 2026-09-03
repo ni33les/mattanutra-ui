@@ -260,7 +260,7 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
   };
 
   if (name === "preflight") {
-    return { result: toolResult(await qaPreflight(typeof params.namespace === "string" ? params.namespace : undefined)) };
+    return { result: toolResult(await qaPreflight(typeof params.namespace === "string" ? params.namespace : undefined, runtime.config.environment)) };
   }
 
   if (name === "beginRun") {
@@ -273,7 +273,7 @@ async function callTool(runtime: AgenticRuntime, name: string, rawArgs: unknown)
         clock: begun.now,
         namespace: begun.namespace,
         principalScope: begun.principalScope,
-        preflight: await qaPreflight(begun.namespace)
+        preflight: await qaPreflight(begun.namespace, runtime.config.environment)
       })
     };
   }
@@ -441,8 +441,8 @@ export async function handleQaJsonRpc(
       result: {
         capabilities: { tools: { listChanged: false } },
         instructions:
-          "DEV-only MattaNutra QA harness. Public customer tools live on the public MCP endpoint. Call preflight first. beginRun/reset isolate Run A and Run B with a settable clock. simulate drives payment. simulateFulfilment drives preparing, dispatched, and delivered through real handlers. observe is the funnel, query, and contribution observer. setChannel is reporting-only.",
-        preflight: await qaPreflight(),
+          "Authenticated MattaNutra QA harness. Public customer tools live on the public MCP endpoint. Call preflight first. beginRun/reset isolate Run A and Run B with a settable clock. simulate drives payment. simulateFulfilment drives preparing, dispatched, and delivered through real handlers. observe is the funnel, query, and contribution observer. setChannel is reporting-only.",
+        preflight: await qaPreflight(undefined, runtime.config.environment),
         protocolVersion: "2025-03-26",
         serverInfo: {
           name: `${AGENTIC_SERVICE_NAME} QA`,

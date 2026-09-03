@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { AGENTIC_PUBLIC_TOOLS } from "../lib/agentic/contract/instructions.ts";
 import { authorizeQaRequest, QA_AUDIENCE } from "../lib/agentic/qa/authorize.ts";
+import { assertInternalQaHarness, loadAgenticConfig } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { infoTool } from "../lib/agentic/info.ts";
 import { AGENTIC_SERVER_INSTRUCTIONS } from "../lib/agentic/contract/instructions.ts";
@@ -9,7 +10,6 @@ import {
   createAgenticRuntime,
   setAgenticRuntimeForTests
 } from "../lib/agentic/runtime.ts";
-import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 
 function requestWith(headers: Record<string, string>) {
@@ -22,6 +22,11 @@ function requestWith(headers: Record<string, string>) {
 afterEach(() => {
   setAgenticRuntimeForTests(null);
   delete process.env.MCP_QA_TOKEN;
+  delete process.env.INTERNAL_QA_HARNESS;
+  delete process.env.MATTANUTRA_ENV;
+  delete process.env.AGENTIC_PAYMENT_PROVIDER;
+  delete process.env.TH_RETAILER_ADAPTER;
+  delete process.env.AGENTIC_CAPABILITY_KEY;
 });
 
 describe("DEV QA audience-only auth", () => {
@@ -116,6 +121,42 @@ describe("DEV QA audience-only auth", () => {
     for (const banned of ["beginRun", "simulate", "observe", "preflight", "setClock", "reset"]) {
       assert.equal(names.includes(banned), false, banned);
     }
+  });
+
+  it("AUTH-08 UAT harness is explicit, token-gated, and does not require mock adapters", () => {
+    process.env.MATTANUTRA_ENV = "uat";
+    process.env.AGENTIC_PAYMENT_PROVIDER = "stripe_test";
+    process.env.TH_RETAILER_ADAPTER = "thailand_uat";
+    process.env.AGENTIC_CAPABILITY_KEY = "uat-test-capability-key-not-for-dev";
+    delete process.env.INTERNAL_QA_HARNESS;
+    delete process.env.MCP_QA_TOKEN;
+
+    const off = loadAgenticConfig();
+    assert.equal(off.environment, "uat");
+    assert.equal(off.internalQaHarness, false);
+
+    process.env.INTERNAL_QA_HARNESS = "true";
+    assert.throws(() => loadAgenticConfig());
+
+    process.env.MCP_QA_TOKEN = "uat-secret";
+    const on = loadAgenticConfig();
+    assert.equal(on.internalQaHarness, true);
+    assert.equal(on.paymentProvider, "stripe_test");
+    assert.equal(on.thailandRetailerAdapter, "thailand_uat");
+    assert.equal(assertInternalQaHarness(on), undefined);
+  });
+
+  it("AUTH-09 PRD never enables the QA harness", () => {
+    process.env.MATTANUTRA_ENV = "prd";
+    process.env.INTERNAL_QA_HARNESS = "true";
+    process.env.MCP_QA_TOKEN = "prd-secret";
+    process.env.AGENTIC_PAYMENT_PROVIDER = "stripe_live";
+    process.env.TH_RETAILER_ADAPTER = "thailand_live";
+    process.env.AGENTIC_CAPABILITY_KEY = "prd-test-capability-key-not-for-dev";
+    const config = loadAgenticConfig();
+    assert.equal(config.environment, "prd");
+    assert.equal(config.internalQaHarness, false);
+    assert.throws(() => assertInternalQaHarness(config));
   });
 
   it("AUTH-06 public info and initialize copy do not mention MCP_QA_TOKEN", async () => {

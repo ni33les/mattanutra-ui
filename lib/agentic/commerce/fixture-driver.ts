@@ -1,4 +1,4 @@
-import type { AgenticConfig } from "@/lib/agentic/config";
+import { qaHarnessAvailable, type AgenticConfig } from "@/lib/agentic/config";
 import { businessError } from "@/lib/agentic/contract/errors";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import {
@@ -19,7 +19,7 @@ export async function drivePaymentFixture(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>) {
-  if (!input.config.internalQaHarness || input.config.environment !== "dev") {
+  if (!qaHarnessAvailable(input.config)) {
     return businessError({
       message: "Not found.",
       reasonCode: "not_found"
@@ -91,7 +91,7 @@ export async function driveFulfilmentFixture(input: Readonly<{
   status: "processing" | "packed" | "shipped" | "delivered";
   store: AgenticStore;
 }>) {
-  if (!input.config.internalQaHarness || input.config.environment !== "dev") {
+  if (!qaHarnessAvailable(input.config)) {
     return businessError({
       message: "Not found.",
       reasonCode: "not_found"
