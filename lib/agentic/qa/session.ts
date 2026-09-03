@@ -4,7 +4,7 @@ import { attributionOf, type FunnelAttribution } from "@/lib/agentic/funnel/even
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
 import { authorizeQaRequest } from "@/lib/agentic/qa/authorize";
-import type { AgenticEnvironment } from "@/lib/agentic/config";
+import type { AgenticConfig, AgenticEnvironment } from "@/lib/agentic/config";
 import { AGENTIC_SCHEMA_CHECKSUM } from "@/lib/agentic/info";
 import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
@@ -15,8 +15,6 @@ import {
 } from "@/lib/agentic/catalogue/snapshot";
 import { getRequestClientIp } from "@/lib/request-client-ip";
 import { hashCapability } from "@/lib/agentic/capabilities";
-import type { AgenticConfig } from "@/lib/agentic/config";
-import type { AgenticStore } from "@/lib/agentic/store/types";
 import {
   deletePersistedQaNamespace,
   dropCatalogueBodyForTests,
