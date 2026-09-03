@@ -1,0 +1,28 @@
+{
+  "buildId": "a486d4eb8a4d8bf10905afca443b12acd1cbe3a2",
+  "source": "MattaNutra DEV Pre-Header Latency Red-First TDD Development Report v1.1",
+  "snapshotId": "snap_ba9c871d1d1e665a",
+  "vantage": "agent_route",
+  "runA": {
+    "infoP50Ms": 17670,
+    "infoP95Ms": 17980,
+    "infoPreHeaderP95Ms": 17970,
+    "listP50Ms": 17420,
+    "listP95Ms": 17810,
+    "listPreHeaderP95Ms": 17790,
+    "planP50Ms": 17890,
+    "planP95Ms": 19470,
+    "planPreHeaderP95Ms": 19450
+  },
+  "runB": {
+    "infoP50Ms": 15620,
+    "infoP95Ms": 16020,
+    "infoPreHeaderP95Ms": 16020,
+    "listP50Ms": 16450,
+    "listP95Ms": 16790,
+    "listPreHeaderP95Ms": 16770,
+    "planP50Ms": 15760,
+    "planP95Ms": 16260,
+    "planPreHeaderP95Ms": 16250
+  }
+}
