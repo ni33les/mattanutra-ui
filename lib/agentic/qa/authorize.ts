@@ -13,7 +13,7 @@ export function authorizeQaRequest(
   request: Request,
   environment: "dev" | "prd" | "uat" = "dev"
 ) {
-  if (environment === "dev") {
+  if (environment === "dev" || environment === "uat") {
     return true;
   }
 

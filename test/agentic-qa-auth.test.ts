@@ -39,12 +39,13 @@ describe("DEV QA audience-only auth", () => {
     assert.equal(allowed, true);
   });
 
-  it("AUTH-07 DEV empty headers are allowed (ChatGPT cannot send custom headers)", () => {
+  it("AUTH-07 DEV and UAT empty headers are allowed (ChatGPT cannot send custom headers)", () => {
     delete process.env.MCP_QA_TOKEN;
     assert.equal(authorizeQaRequest(requestWith({}), "dev"), true);
+    assert.equal(authorizeQaRequest(requestWith({}), "uat"), true);
   });
 
-  it("AUTH-02 DEV still allows a bearer; UAT does not treat empty headers as open", () => {
+  it("AUTH-02 DEV and UAT still allow a bearer", () => {
     process.env.MCP_QA_TOKEN = "not-for-chatgpt";
     assert.equal(
       authorizeQaRequest(
@@ -53,10 +54,10 @@ describe("DEV QA audience-only auth", () => {
       ),
       true
     );
-    assert.equal(authorizeQaRequest(requestWith({}), "uat"), false);
+    assert.equal(authorizeQaRequest(requestWith({}), "uat"), true);
   });
 
-  it("AUTH-03 DEV ignores a wrong audience; UAT still requires the real audience", () => {
+  it("AUTH-03 DEV and UAT ignore a wrong audience", () => {
     delete process.env.MCP_QA_TOKEN;
     assert.equal(
       authorizeQaRequest(
@@ -65,41 +66,27 @@ describe("DEV QA audience-only auth", () => {
       ),
       true
     );
-    process.env.MCP_QA_TOKEN = "uat-secret";
     assert.equal(
       authorizeQaRequest(
-        requestWith({
-          authorization: "Bearer uat-secret",
-          "x-mattanutra-qa-audience": "mattanutra-uat-qa"
-        }),
-        "uat"
-      ),
-      false
-    );
-  });
-
-  it("AUTH-04 UAT/PRD stay fail-closed without a non-empty token", () => {
-    delete process.env.MCP_QA_TOKEN;
-    const audienceOnly = requestWith({ "x-mattanutra-qa-audience": QA_AUDIENCE });
-    assert.equal(authorizeQaRequest(audienceOnly, "uat"), false);
-    assert.equal(authorizeQaRequest(audienceOnly, "prd"), false);
-
-    process.env.MCP_QA_TOKEN = "uat-secret";
-    assert.equal(authorizeQaRequest(audienceOnly, "uat"), false);
-    assert.equal(
-      authorizeQaRequest(
-        requestWith({
-          authorization: "Bearer uat-secret",
-          "x-mattanutra-qa-audience": QA_AUDIENCE
-        }),
+        requestWith({ "x-mattanutra-qa-audience": "mattanutra-uat-qa" }),
         "uat"
       ),
       true
     );
+  });
+
+  it("AUTH-04 PRD stays fail-closed without a non-empty token", () => {
+    delete process.env.MCP_QA_TOKEN;
+    const audienceOnly = requestWith({ "x-mattanutra-qa-audience": QA_AUDIENCE });
+    assert.equal(authorizeQaRequest(audienceOnly, "prd"), false);
+    assert.equal(authorizeQaRequest(requestWith({}), "prd"), false);
+
+    process.env.MCP_QA_TOKEN = "prd-secret";
+    assert.equal(authorizeQaRequest(audienceOnly, "prd"), false);
     assert.equal(
       authorizeQaRequest(
         requestWith({
-          authorization: "Bearer uat-secret",
+          authorization: "Bearer prd-secret",
           "x-mattanutra-qa-audience": QA_AUDIENCE
         }),
         "prd"
@@ -123,7 +110,7 @@ describe("DEV QA audience-only auth", () => {
     }
   });
 
-  it("AUTH-08 UAT harness is on by default, token-gated, and does not require mock adapters", () => {
+  it("AUTH-08 UAT harness is on by default and open without headers", () => {
     process.env.MATTANUTRA_ENV = "uat";
     process.env.AGENTIC_PAYMENT_PROVIDER = "stripe_test";
     process.env.TH_RETAILER_ADAPTER = "thailand_uat";
@@ -137,16 +124,7 @@ describe("DEV QA audience-only auth", () => {
     assert.equal(on.paymentProvider, "stripe_test");
     assert.equal(on.thailandRetailerAdapter, "thailand_uat");
     assert.equal(assertInternalQaHarness(on), undefined);
-    assert.equal(
-      authorizeQaRequest(
-        requestWith({
-          authorization: "Bearer uat-test-capability-key-not-for-dev",
-          "x-mattanutra-qa-audience": QA_AUDIENCE
-        }),
-        "uat"
-      ),
-      true
-    );
+    assert.equal(authorizeQaRequest(requestWith({}), "uat"), true);
 
     process.env.INTERNAL_QA_HARNESS = "false";
     const off = loadAgenticConfig();
