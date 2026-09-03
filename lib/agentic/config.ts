@@ -137,7 +137,7 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
   const thailandRetailerAdapter = retailerAdapterForEnv(environment);
   const harnessRequested =
     process.env.INTERNAL_QA_HARNESS === "true" ||
-    (environment === "dev" && process.env.INTERNAL_QA_HARNESS !== "false");
+    (environment !== "prd" && process.env.INTERNAL_QA_HARNESS !== "false");
   const internalQaHarness = environment === "prd" ? false : harnessRequested;
   const capabilitySecret =
     process.env.AGENTIC_CAPABILITY_KEY?.trim() ||
@@ -156,7 +156,12 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
     throw new Error("Live Stripe is not allowed in DEV or UAT");
   }
 
-  if (internalQaHarness && environment !== "dev" && !process.env.MCP_QA_TOKEN?.trim()) {
+  if (
+    internalQaHarness &&
+    environment !== "dev" &&
+    !process.env.MCP_QA_TOKEN?.trim() &&
+    !capabilitySecret
+  ) {
     throw new Error("MCP_QA_TOKEN is required to enable the QA harness outside DEV");
   }
 

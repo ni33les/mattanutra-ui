@@ -1,7 +1,12 @@
 export const QA_AUDIENCE = "mattanutra-dev-qa";
 
 export function qaToken() {
-  return process.env.MCP_QA_TOKEN?.trim() ?? "";
+  return (
+    process.env.MCP_QA_TOKEN?.trim() ||
+    process.env.AGENTIC_CAPABILITY_KEY?.trim() ||
+    process.env.MCP_V2_ORDER_HANDLE_SECRET?.trim() ||
+    ""
+  );
 }
 
 export function authorizeQaRequest(

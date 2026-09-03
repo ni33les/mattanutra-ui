@@ -123,7 +123,7 @@ describe("DEV QA audience-only auth", () => {
     }
   });
 
-  it("AUTH-08 UAT harness is explicit, token-gated, and does not require mock adapters", () => {
+  it("AUTH-08 UAT harness is on by default, token-gated, and does not require mock adapters", () => {
     process.env.MATTANUTRA_ENV = "uat";
     process.env.AGENTIC_PAYMENT_PROVIDER = "stripe_test";
     process.env.TH_RETAILER_ADAPTER = "thailand_uat";
@@ -131,19 +131,26 @@ describe("DEV QA audience-only auth", () => {
     delete process.env.INTERNAL_QA_HARNESS;
     delete process.env.MCP_QA_TOKEN;
 
-    const off = loadAgenticConfig();
-    assert.equal(off.environment, "uat");
-    assert.equal(off.internalQaHarness, false);
-
-    process.env.INTERNAL_QA_HARNESS = "true";
-    assert.throws(() => loadAgenticConfig());
-
-    process.env.MCP_QA_TOKEN = "uat-secret";
     const on = loadAgenticConfig();
+    assert.equal(on.environment, "uat");
     assert.equal(on.internalQaHarness, true);
     assert.equal(on.paymentProvider, "stripe_test");
     assert.equal(on.thailandRetailerAdapter, "thailand_uat");
     assert.equal(assertInternalQaHarness(on), undefined);
+    assert.equal(
+      authorizeQaRequest(
+        requestWith({
+          authorization: "Bearer uat-test-capability-key-not-for-dev",
+          "x-mattanutra-qa-audience": QA_AUDIENCE
+        }),
+        "uat"
+      ),
+      true
+    );
+
+    process.env.INTERNAL_QA_HARNESS = "false";
+    const off = loadAgenticConfig();
+    assert.equal(off.internalQaHarness, false);
   });
 
   it("AUTH-09 PRD never enables the QA harness", () => {
