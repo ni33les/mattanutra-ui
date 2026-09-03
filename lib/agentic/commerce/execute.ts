@@ -250,6 +250,15 @@ async function executeFresh(
       return executeError(locale, "availability_changed");
     }
 
+    if (selected.basket.length === 0) {
+      return businessError({
+        message:
+          "Nothing needs to be bought now. Current stock covers today; replenish later in the requested horizon.",
+        nextAction: "none",
+        reasonCode: "invalid_request"
+      });
+    }
+
     const existingOrder = await store.getActiveOrderForPlanRevision(
       plan.id,
       plan.currentRevision

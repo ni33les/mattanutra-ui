@@ -221,21 +221,22 @@ function composeResult(input: Readonly<{
     questionId: "q_request_too_broad"
   };
   const questions = tooBroad ? [splitQuestion] : safetyQs;
-  const status = tooBroad
-    ? "needs_input"
-    : planStatus({
-        guidance: safety,
-        questions,
-        selected: input.selected,
-        state: workState,
-        unmetRequirements: [...input.unmetRequirements]
-      });
   const horizon = tooBroad
     ? undefined
     : buildHorizonPlan({
         items: input.selected?.basket ?? [],
         snapshot: input.snapshot,
         state: workState
+      });
+  const status = tooBroad
+    ? "needs_input"
+    : planStatus({
+        guidance: safety,
+        horizon,
+        questions,
+        selected: input.selected,
+        state: workState,
+        unmetRequirements: [...input.unmetRequirements]
       });
   const laterOrders = horizon ? ordersInHorizon(horizon.orders, 90).filter((item) => item.day > 0) : [];
   const summary = tooBroad

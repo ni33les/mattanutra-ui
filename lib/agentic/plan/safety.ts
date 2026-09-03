@@ -1009,6 +1009,12 @@ export function safetyQuestions(input: Readonly<{
 
 export function planStatus(input: Readonly<{
   guidance: readonly SafetyGuidance[];
+  horizon?: Readonly<{
+    nextReplenishmentDay?: number | null;
+    orders: readonly Readonly<{ type: string; day: number }>[];
+    purchaseRequiredNow: boolean;
+    reasonCode?: string | null;
+  }> | null;
   questions: readonly PlanQuestion[];
   selected: StackOption | null;
   state: CanonicalPlanState;
@@ -1068,7 +1074,16 @@ export function planStatus(input: Readonly<{
     }
 
     if (!coreUnresolved) {
-      return "no_purchase";
+      const replenishDay = input.horizon?.nextReplenishmentDay;
+      const replenishesLater = Boolean(
+        input.horizon &&
+          !input.horizon.purchaseRequiredNow &&
+          ((typeof replenishDay === "number" && replenishDay > 0 && replenishDay < 90) ||
+            input.horizon.orders.some(
+              (item) => item.type === "replenishment" && item.day > 0 && item.day < 90
+            ))
+      );
+      return replenishesLater ? "ready" : "no_purchase";
     }
 
     return "blocked";

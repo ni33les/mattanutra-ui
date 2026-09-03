@@ -14,10 +14,14 @@ import {
   runWithCatalogueSnapshot
 } from "@/lib/agentic/catalogue/snapshot";
 import { getRequestClientIp } from "@/lib/request-client-ip";
+import { hashCapability } from "@/lib/agentic/capabilities";
+import type { AgenticConfig } from "@/lib/agentic/config";
+import type { AgenticStore } from "@/lib/agentic/store/types";
 import {
   deletePersistedQaNamespace,
   dropCatalogueBodyForTests,
   hasActiveQaPackClient,
+  listQaNamespacesForClient,
   loadPublishedCatalogue,
   loadQaNamespace,
   persistQaNamespace,
@@ -126,18 +130,22 @@ export function activeQaClock(): string | null {
   if (clocks.length === 1 && clocks[0]) {
     return clocks[0];
   }
-  return QA_PACK_CLOCK;
+  return null;
 }
 
 export function resolveQaNow(namespace?: string) {
   return qaSession(namespace)?.now ?? activeQaClock() ?? QA_PACK_CLOCK;
 }
 
-export function bindQaRuntime(runtime: AgenticRuntime, request: Request): AgenticRuntime {
+export function bindQaRuntime(
+  runtime: AgenticRuntime,
+  request: Request,
+  namespace?: string | null
+): AgenticRuntime {
   if (!authorizeQaRequest(request, runtime.config.environment)) {
     return runtime;
   }
-  const session = qaSession(qaNamespaceFromHeaders(request));
+  const session = qaSession(namespace || qaNamespaceFromHeaders(request));
   if (!session) {
     const clock = activeQaClock();
     if (!clock) {
@@ -206,8 +214,45 @@ export function qaNamespaceFromRequest(request: Request, body?: unknown) {
   return qaNamespaceFromHeaders(request) || qaNamespaceFromRpc(body);
 }
 
-export async function hydrateQaRequest(request: Request, body?: unknown) {
-  const namespace = qaNamespaceFromRequest(request, body);
+function handleFromRpc(body: unknown) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return "";
+  }
+  const params = (body as { params?: unknown }).params;
+  const args =
+    params && typeof params === "object" && !Array.isArray(params)
+      ? ((params as { arguments?: unknown }).arguments ?? params)
+      : body;
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    return "";
+  }
+  const record = args as Record<string, unknown>;
+  for (const key of ["planHandle", "orderHandle", "supportHandle"]) {
+    if (typeof record[key] === "string" && record[key].trim()) {
+      return record[key].trim();
+    }
+  }
+  return "";
+}
+
+export async function hydrateQaRequest(
+  request: Request,
+  body?: unknown,
+  store?: AgenticStore | null,
+  config?: AgenticConfig | null
+) {
+  let namespace = qaNamespaceFromRequest(request, body);
+  if (!namespace && store && config) {
+    const handle = handleFromRpc(body);
+    if (handle.length >= 32) {
+      const record = await store.getCapabilityByHash(
+        hashCapability(config.capabilitySecret, handle)
+      );
+      if (record?.principalScope?.startsWith(QA_NAMESPACE_PREFIX)) {
+        namespace = record.principalScope;
+      }
+    }
+  }
   if (namespace) {
     await resolveQaSession(namespace);
     return namespace;
@@ -216,6 +261,10 @@ export async function hydrateQaRequest(request: Request, body?: unknown) {
   const clientKey = getRequestClientIp(request);
   if (clientKey && (await hasActiveQaPackClient(clientKey))) {
     await loadPublishedCatalogue();
+    const packed = await listQaNamespacesForClient(clientKey);
+    for (const item of packed) {
+      await resolveQaSession(item.namespace);
+    }
     return "";
   }
 

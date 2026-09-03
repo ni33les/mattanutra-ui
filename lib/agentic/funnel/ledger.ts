@@ -44,6 +44,60 @@ const ledgers = new Map<string, FunnelEvent[]>();
 const seenEventIds = new Set<string>();
 const attributionByCorrelation = new Map<string, FunnelAttribution>();
 
+const globalFunnel = globalThis as typeof globalThis & {
+  mattanutraSharedFunnel?: {
+    attribution: Map<string, FunnelAttribution>;
+    ledgers: Map<string, FunnelEvent[]>;
+    seen: Set<string>;
+  };
+};
+
+function sharedFunnel() {
+  globalFunnel.mattanutraSharedFunnel ??= {
+    attribution: new Map(),
+    ledgers: new Map(),
+    seen: new Set()
+  };
+  return globalFunnel.mattanutraSharedFunnel;
+}
+
+function rememberShared(event: FunnelEvent) {
+  const shared = sharedFunnel();
+  const list = shared.ledgers.get(event.correlationId) ?? [];
+  if (list.some((item) => item.eventId === event.eventId)) {
+    return;
+  }
+  shared.ledgers.set(event.correlationId, [...list, event]);
+  shared.seen.add(event.eventId);
+  if (!shared.attribution.has(event.correlationId)) {
+    shared.attribution.set(event.correlationId, event.attribution);
+  }
+}
+
+function hydrateFromShared(correlationId: string) {
+  if ((ledgers.get(correlationId)?.length ?? 0) > 0) {
+    return;
+  }
+  const shared = sharedFunnel().ledgers.get(correlationId);
+  if (!shared?.length) {
+    return;
+  }
+  ledgers.set(correlationId, [...shared]);
+  for (const event of shared) {
+    seenEventIds.add(event.eventId);
+  }
+  const attribution = sharedFunnel().attribution.get(correlationId);
+  if (attribution) {
+    attributionByCorrelation.set(correlationId, attribution);
+  }
+}
+
+export function flushFunnelProcessCache() {
+  ledgers.clear();
+  seenEventIds.clear();
+  attributionByCorrelation.clear();
+}
+
 export function resetFunnelLedger(correlationId?: string) {
   if (correlationId) {
     const existing = ledgers.get(correlationId) ?? [];
@@ -52,12 +106,22 @@ export function resetFunnelLedger(correlationId?: string) {
     }
     ledgers.delete(correlationId);
     attributionByCorrelation.delete(correlationId);
+    const shared = sharedFunnel();
+    const sharedExisting = shared.ledgers.get(correlationId) ?? [];
+    for (const event of sharedExisting) {
+      shared.seen.delete(event.eventId);
+    }
+    shared.ledgers.delete(correlationId);
+    shared.attribution.delete(correlationId);
     return;
   }
 
   ledgers.clear();
   seenEventIds.clear();
   attributionByCorrelation.clear();
+  sharedFunnel().ledgers.clear();
+  sharedFunnel().seen.clear();
+  sharedFunnel().attribution.clear();
 }
 
 export function recordFunnelEvent(input: Readonly<{
@@ -78,6 +142,7 @@ export function recordFunnelEvent(input: Readonly<{
     return { accepted: false as const, reasonCode: "invalid_request" as const, field: "eventType" };
   }
 
+  hydrateFromShared(input.correlationId);
   if (seenEventIds.has(input.eventId)) {
     return { accepted: false as const, reasonCode: "duplicate" as const, field: "eventId" };
   }
@@ -101,11 +166,13 @@ export function recordFunnelEvent(input: Readonly<{
   list.push(event);
   ledgers.set(input.correlationId, list);
   seenEventIds.add(input.eventId);
+  rememberShared(event);
   void persistFunnelEvent(event);
   return { accepted: true as const, event };
 }
 
 export function listFunnelEvents(correlationId: string) {
+  hydrateFromShared(correlationId);
   return [...(ledgers.get(correlationId) ?? [])];
 }
 
@@ -140,6 +207,7 @@ async function persistFunnelEvent(event: FunnelEvent) {
 }
 
 export async function loadPersistedFunnelEvents(correlationId: string) {
+  hydrateFromShared(correlationId);
   if (ledgers.has(correlationId) && (ledgers.get(correlationId)?.length ?? 0) > 0) {
     return listFunnelEvents(correlationId);
   }

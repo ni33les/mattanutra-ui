@@ -432,6 +432,44 @@ export async function loadQaNamespace(namespace: string): Promise<PersistedQaNam
   }
 }
 
+export async function listQaNamespacesForClient(clientKey: string) {
+  if (!clientKey) {
+    return [] as PersistedQaNamespace[];
+  }
+
+  const now = Date.now();
+  const local = [...memoryNamespaces.values()]
+    .filter((record) => record.clientKey === clientKey && record.expiresAtMs > now)
+    .map((record) => hydrateRecord(record, memoryCatalogues.get(record.snapshotId) ?? null));
+  if (local.length > 0 || process.env.NODE_TEST_CONTEXT) {
+    return local;
+  }
+
+  const db = sql();
+  if (!db) {
+    return local;
+  }
+
+  try {
+    const rows = await db<{ namespace: string }[]>`
+      select namespace
+      from public.agentic_qa_namespaces
+      where client_key = ${clientKey}
+        and expires_at > now()
+    `;
+    const loaded: PersistedQaNamespace[] = [];
+    for (const row of rows) {
+      const item = await loadQaNamespace(row.namespace);
+      if (item) {
+        loaded.push(item);
+      }
+    }
+    return loaded;
+  } catch {
+    return local;
+  }
+}
+
 export async function hasActiveQaPackClient(clientKey: string) {
   if (!clientKey) {
     return false;

@@ -171,7 +171,7 @@ describe("agentic DEV flow", () => {
     assert.equal((paid as { paymentStatus: string }).paymentStatus, "paid");
     assert.equal((paid as { stateVersion: number }).stateVersion, 2);
     assert.equal((paid as { orderStatus: string }).orderStatus, "completed");
-    assert.equal((paid as { fulfilment: { status: string } }).fulfilment.status, "processing");
+    assert.equal((paid as { fulfilment: { status: string } }).fulfilment.status, "preparing");
 
     const duplicate = await simulatePayment({
       config: runtime.config,
@@ -185,7 +185,7 @@ describe("agentic DEV flow", () => {
 
     const polled = await call(runtime, "order", { orderHandle: executed.orderHandle });
     assert.equal(polled.paymentStatus, "paid");
-    assert.equal(polled.nextAction, "none");
+    assert.equal(polled.nextAction, "poll");
 
     const support = await call(runtime, "support", {
       idempotencyKey: "support-j1-00000001",

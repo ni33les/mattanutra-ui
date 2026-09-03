@@ -17,7 +17,6 @@ import {
   frozenSnapshotMissingResult,
   hydrateQaRequest,
   QaRunInvalidError,
-  QA_PACK_CLOCK,
   withQaSessionSnapshot
 } from "@/lib/agentic/qa/session";
 import {
@@ -151,12 +150,15 @@ export async function POST(request: Request) {
       import("@/lib/agentic/live-runtime"),
       import("@/lib/agentic/mcp/dispatcher")
     ]);
+    const live = getLiveAgenticRuntime(request);
     const { bindQaRuntime } = await import("@/lib/agentic/qa/session");
-    const qaNamespace = await hydrateQaRequest(request, body);
-    let runtime = bindQaRuntime(getLiveAgenticRuntime(request), request);
-    if (qaNamespace === "") {
-      runtime = { ...runtime, now: runtime.now ?? QA_PACK_CLOCK };
-    }
+    const qaNamespace = await hydrateQaRequest(
+      request,
+      body,
+      live.store,
+      live.config
+    );
+    const runtime = bindQaRuntime(live, request, qaNamespace);
 
     if (Array.isArray(body)) {
       const responses = [];

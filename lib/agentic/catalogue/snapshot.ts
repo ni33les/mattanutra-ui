@@ -137,12 +137,12 @@ export async function ensureCatalogueSnapshot(
   environment?: AgenticEnvironment,
   countryCode?: string
 ): Promise<CatalogueSnapshot> {
-  countQuery(`catalogue.snapshot.${countryKey(countryCode)}`);
   const code = countryKey(countryCode);
   const scoped = requestSnapshot.getStore();
   if (scoped) {
     return scoped;
   }
+  countQuery(`catalogue.snapshot.${code}`);
   if (publishedSnapshot) {
     return publishedSnapshot;
   }

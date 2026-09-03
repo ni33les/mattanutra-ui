@@ -13,7 +13,8 @@ import {
 import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "../../helpers/gold-catalogue.ts";
-import { resetFunnelLedger } from "../../../lib/agentic/funnel/ledger.ts";
+import { flushFunnelProcessCache, resetFunnelLedger } from "../../../lib/agentic/funnel/ledger.ts";
+import { resetCatalogueSnapshotCache } from "../../../lib/agentic/catalogue/snapshot.ts";
 import { resetQaPersistForTests } from "../../../lib/agentic/qa/persist.ts";
 import { resetQaSessions } from "../../../lib/agentic/qa/session.ts";
 import { resetQueryBudget } from "../../../lib/agentic/plan/query-budget.ts";
@@ -86,6 +87,13 @@ export function beginDetRun(runId: string) {
   resetQueryBudget();
   resetInfoCache();
   return runId;
+}
+
+export function simulateInstanceRestart() {
+  resetQaSessions();
+  resetCatalogueSnapshotCache();
+  flushFunnelProcessCache();
+  resetQueryBudget();
 }
 
 export function endDetRun() {

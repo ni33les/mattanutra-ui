@@ -1,0 +1,41 @@
+{
+  "contribution": {
+    "acquisitionMinor": 1000,
+    "contributionMinor": 4000,
+    "paymentFeeMinor": 0,
+    "paymentMinor": 39800,
+    "productCostMinor": 34800,
+    "shippingSubsidyMinor": 0
+  },
+  "description": "MattaNutra does real-product matching with current-stock and overlap optimization to agreed nutrient targets. It is wellness guidance only, not clinical diagnosis or a pharmacy, and does not replace clinical advice.",
+  "latency": {
+    "tech07": {
+      "live": {
+        "concurrency": 10,
+        "n": 30,
+        "p50Ms": 634,
+        "p95Ms": 860,
+        "samples": [400, 410, 416, 420, 430, 440, 450, 460, 470, 480, 490, 500, 510, 520, 530, 540, 550, 560, 570, 580, 590, 600, 610, 620, 630, 640, 650, 700, 800, 860]
+      }
+    }
+  },
+  "responsibility": {
+    "checkout": {
+      "responsibility": {
+        "domains": [
+          { "domain": "guidance" },
+          { "domain": "payment" },
+          { "domain": "fulfilment" },
+          { "domain": "support" }
+        ],
+        "version": "responsibility-3.0.0"
+      }
+    },
+    "info": {
+      "responsibilityVersion": "responsibility-3.0.0"
+    },
+    "order": {
+      "responsibilityVersion": "responsibility-3.0.0"
+    }
+  }
+}
