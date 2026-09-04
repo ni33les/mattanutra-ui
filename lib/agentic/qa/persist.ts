@@ -59,6 +59,19 @@ export function resetQaPersistForTests() {
   memoryCatalogues.clear();
   memoryPublished.clear();
   memoryNamespaces.clear();
+  persistCommitGate = null;
+}
+
+let persistCommitGate: Promise<void> | null = null;
+
+export function setPersistCommitGateForTests(gate: Promise<void> | null) {
+  persistCommitGate = gate;
+}
+
+async function awaitPersistCommitGate() {
+  if (persistCommitGate) {
+    await persistCommitGate;
+  }
 }
 
 export function rememberCatalogue(snapshotId: string, snapshot: CatalogueSnapshot) {
@@ -284,6 +297,7 @@ export async function persistQaNamespace(
 }
 
 export async function persistQaNamespaceClock(namespace: string, now: string) {
+  await awaitPersistCommitGate();
   const current = memoryNamespaces.get(namespace);
   if (current) {
     memoryNamespaces.set(namespace, { ...current, now });
@@ -309,6 +323,7 @@ export async function persistQaNamespaceChannel(
   namespace: string,
   input: Readonly<{ acquisitionMinor: number; attribution: string }>
 ) {
+  await awaitPersistCommitGate();
   const current = memoryNamespaces.get(namespace);
   if (current) {
     memoryNamespaces.set(namespace, {

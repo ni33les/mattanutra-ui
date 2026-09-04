@@ -22,6 +22,23 @@ export function getQueryNamespace() {
   return activeNamespace;
 }
 
+export function captureQueryBudgetState() {
+  return {
+    activeNamespace,
+    byNamespace: new Map(
+      [...byNamespace.entries()].map(([key, counts]) => [key, new Map(counts)])
+    )
+  };
+}
+
+export function restoreQueryBudgetState(snapshot: ReturnType<typeof captureQueryBudgetState>) {
+  byNamespace.clear();
+  for (const [key, counts] of snapshot.byNamespace) {
+    byNamespace.set(key, new Map(counts));
+  }
+  activeNamespace = snapshot.activeNamespace;
+}
+
 export function resetQueryBudget(namespace?: string) {
   if (namespace) {
     byNamespace.delete(namespace);

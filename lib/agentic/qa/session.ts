@@ -66,6 +66,26 @@ export function resetQaSessions() {
   activeNamespace = null;
 }
 
+export function captureQaLocalState() {
+  return {
+    activeNamespace,
+    costByCorrelation: new Map(costByCorrelation),
+    sessions: new Map(sessions)
+  };
+}
+
+export function restoreQaLocalState(snapshot: ReturnType<typeof captureQaLocalState>) {
+  sessions.clear();
+  costByCorrelation.clear();
+  for (const [key, value] of snapshot.sessions) {
+    sessions.set(key, value);
+  }
+  for (const [key, value] of snapshot.costByCorrelation) {
+    costByCorrelation.set(key, value);
+  }
+  activeNamespace = snapshot.activeNamespace;
+}
+
 export function putQaSessionForTests(session: QaSession) {
   rememberSession(session);
 }
