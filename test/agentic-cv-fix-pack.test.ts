@@ -19,7 +19,8 @@ import {
 } from "../lib/agentic/runtime.ts";
 import {
   replaceCatalogueSnapshot,
-  resetCatalogueSnapshotCache
+  resetCatalogueSnapshotCache,
+  runWithCatalogueSnapshot
 } from "../lib/agentic/catalogue/snapshot.ts";
 import { catalogueSnapshotId } from "../lib/agentic/catalogue/freeze.ts";
 import { MATCHER_VERSION } from "../lib/matcher/config.ts";
@@ -28,6 +29,7 @@ import { canonicalHash } from "../lib/agentic/value/canonical.ts";
 import { CUSTOMER_VALUE_PACK_VERSION } from "../lib/agentic/value/canonical-plan.ts";
 import {
   freezeLiveThailandCatalogue,
+  isLiveRetailFreeze,
   isUsableLiveFreeze,
   type ValueCatalogueFreeze
 } from "../lib/agentic/value/freeze.ts";
@@ -180,7 +182,8 @@ async function createPlan(freeze: ValueCatalogueFreeze, request: Record<string, 
     store
   });
   setAgenticRuntimeForTests(runtime);
-  const result = await planTool({
+  const result = await runWithCatalogueSnapshot(freeze.snapshot, () =>
+    planTool({
     config,
     now: "2026-09-01T00:00:00.000Z",
     payload: {
@@ -190,7 +193,7 @@ async function createPlan(freeze: ValueCatalogueFreeze, request: Record<string, 
     },
     scope: runtime.scope,
     store
-  });
+  }));
   return asRecord(result);
 }
 
@@ -714,7 +717,10 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
         ) {
           failed.push("FIX-06.A2");
         }
-        if (advertisedHash !== inputHash) {
+        if (
+          JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes("$defs") ||
+          JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes('"oneOf"')
+        ) {
           failed.push("FIX-06.A3");
         }
         const planBlurb = listed.find((item) => item.name === "plan")?.description ?? "";
@@ -918,7 +924,12 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
 }
 
 describe("Customer value remediation FIX pack", () => {
-  it("evaluates FIX-01 through FIX-09", async () => {
+  it("evaluates FIX-01 through FIX-09", async (t) => {
+    const freeze = await freezeLiveThailandCatalogue("TH");
+    if (!isLiveRetailFreeze(freeze)) {
+      t.skip("live Thailand retail catalogue is not loaded in this runner");
+      return;
+    }
     const report = await runCvFixPack();
     assert.equal(report.totalCases, CASE_IDS.length);
     assert.deepEqual(

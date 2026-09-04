@@ -26,16 +26,16 @@ export function buildExplanation(input: Readonly<{
 
   return {
     administrations: input.option.burden?.administrations ?? 0,
-    cash30DayMinor: input.option.economics?.cash30DayMinor ?? null,
+    cash30DayMinor: input.option.economics?.cash30DayMinor ?? 0,
     cash90DayMinor:
-      input.option.economics?.cash90DayMinor ?? input.option.cash90DayMinor ?? null,
+      input.option.economics?.cash90DayMinor ?? input.option.cash90DayMinor ?? 0,
     conditionalDeferrals: deferred.map((row) => ({
       nextAction: row.nextAction ?? null,
       reasonCode: row.reasonCode ?? null,
       status: row.status,
       supplementId: row.supplementId
     })),
-    firstOrderCashMinor: input.option.economics?.cashTotalMinor ?? null,
+    firstOrderCashMinor: input.option.economics?.cashTotalMinor ?? 0,
     nextAction: deferredAction ?? agenticMessage(locale, nextActionKey),
     nextActionKey,
     optionalOmissions: omitted.map((row) => ({
@@ -57,7 +57,7 @@ export function buildExplanation(input: Readonly<{
     safetyState: input.acknowledgementStatus || input.status,
     savings90DayMinor:
       input.option.economics?.savingClaim === "none"
-        ? null
-        : input.option.economics?.savings90DayMinor ?? null
+        ? 0
+        : input.option.economics?.savings90DayMinor ?? 0
   };
 }

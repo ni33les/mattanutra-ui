@@ -830,11 +830,13 @@ export async function planTool(input: Readonly<{
   const work = executePlanTool(input);
   if (inflightKey) {
     inflightPlanIdempotency.set(inflightKey, work);
-    void work.finally(() => {
-      if (inflightPlanIdempotency.get(inflightKey) === work) {
-        inflightPlanIdempotency.delete(inflightKey);
-      }
-    });
+    void work
+      .finally(() => {
+        if (inflightPlanIdempotency.get(inflightKey) === work) {
+          inflightPlanIdempotency.delete(inflightKey);
+        }
+      })
+      .catch(() => undefined);
   }
   return work;
 }

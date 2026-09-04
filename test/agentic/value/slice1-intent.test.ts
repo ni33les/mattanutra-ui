@@ -60,12 +60,12 @@ describe("Slice 1 target intent and conditional no-sale", () => {
   });
 
   it("VAL-01 and VAL-03 preserve intent on a retail-shaped snapshot", async () => {
-    const { freezeLiveThailandCatalogue, isUsableLiveFreeze } = await import(
+    const { freezeLiveThailandCatalogue, isLiveRetailFreeze } = await import(
       "../../../lib/agentic/value/freeze.ts"
     );
     const freeze = await freezeLiveThailandCatalogue("TH");
 
-    if (!isUsableLiveFreeze(freeze)) {
+    if (!isLiveRetailFreeze(freeze)) {
       return;
     }
 

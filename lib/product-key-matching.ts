@@ -97,13 +97,23 @@ const MATCH_TOKEN_STOP_WORDS = new Set([
 ]);
 
 export function normalizeProductKey(value: string) {
-  return value
+  const normalized = value
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+  if (
+    normalized === "folic_acid" ||
+    normalized === "vitamin_b9" ||
+    normalized === "folacin" ||
+    normalized === "methylfolate" ||
+    normalized === "b9"
+  ) {
+    return "folate";
+  }
+  return normalized;
 }
 
 function factTextForParsing(value: string) {

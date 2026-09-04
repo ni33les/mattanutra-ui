@@ -106,9 +106,7 @@ function matchPlanCacheKey(
   const hash = createHash("sha256");
   hash.update(planRematchFingerprint(state));
   hash.update("\0");
-  hash.update(snapshot.catalogueVersion);
-  hash.update("\0");
-  hash.update(String(snapshot.products.length));
+  hash.update(snapshotIdCached(snapshot));
   hash.update("\0");
   hash.update(GUIDANCE_RULES_VERSION);
   hash.update("\0");
@@ -331,7 +329,7 @@ export function coverageFor(
     } else if (coveragePercent > 0 && contributors.length > 0) {
       status = "partial";
     } else if (importance === "core" || importance === "required") {
-      status = "gap";
+      status = coveragePercent > 0 ? "gap" : "uncovered";
     }
 
     if (limit != null && totalExposureAmount >= limit && !deferredConditional) {
@@ -443,10 +441,11 @@ export function factLedgerHash(rows: readonly FactLedgerRow[]): string {
           amount: row.amount,
           canonicalSupplementId: row.canonicalSupplementId,
           catalogueId: row.catalogueId,
-          normalizationRuleId: row.normalizationRuleId,
-          productFactId: row.productFactId,
+          normalizationRuleId: normalizeProductKey(row.normalizationRuleId),
           productId: row.productId,
-          unit: row.unit
+          unit: row.unit === "g" ? "mg" : row.unit,
+          amountMg:
+            row.unit === "g" ? row.amount * 1000 : row.unit === "mcg" ? row.amount / 1000 : row.amount
         }))
       )
     )

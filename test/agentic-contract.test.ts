@@ -41,7 +41,9 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("intersex"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes("unspecified"), false);
     assert.match(JSON.stringify(PLAN_INPUT_SCHEMA), /"sex"/);
-    assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan), JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan));
+    assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes('"oneOf"'), false);
+    assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes('"$defs"'), false);
+    assert.equal(JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan).includes('"oneOf"'), true);
     assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 7);
     const planRequest = JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan);
     assert.match(planRequest, /info\.medicationCodes/);
@@ -211,7 +213,8 @@ describe("agentic MCP contract 3.0.0", () => {
       const schema = JSON.stringify(tool.inputSchema);
       assert.match(schema, /"additionalProperties":false/);
       if (tool.name === "plan") {
-        assert.match(schema, /"oneOf"/);
+        assert.equal(/"oneOf"/.test(schema), false);
+        assert.equal(/\$defs/.test(schema), false);
         continue;
       }
       assert.equal(/"oneOf"/.test(schema), false);

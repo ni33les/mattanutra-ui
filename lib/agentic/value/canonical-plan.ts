@@ -4,6 +4,8 @@ import {
 } from "@/lib/agentic/config";
 import type { CanonicalPlanStamp, StackOption } from "@/lib/agentic/plan/types";
 import { canonicalHash, canonicalJson } from "@/lib/agentic/value/canonical";
+import { amountFromScaled, scaleAmount } from "@/lib/matcher/dose";
+import type { MatcherUnit } from "@/lib/matcher/types";
 
 export const CUSTOMER_VALUE_PACK_VERSION = "dev-customer-value-v1.0";
 export const CANONICAL_PLAN_VERSION = "cv-1.4";
@@ -50,19 +52,77 @@ function canonicalComparator(row: Readonly<{
   return "lt";
 }
 
-function canonicalCoverageRow(row: StackOption["coverage"][number]) {
+function canonicalMassUnit(unit: string | null | undefined): MatcherUnit | null {
+  if (unit === "g" || unit === "mg" || unit === "mcg") {
+    return "mg";
+  }
+  return (unit as MatcherUnit | undefined) ?? null;
+}
+
+function canonicalAmount(
+  amount: number | null | undefined,
+  unit: string | null | undefined,
+  name: string,
+  supplementId: string
+) {
+  if (amount == null || !unit) {
+    return { amount: amount ?? null, unit: unit ?? null };
+  }
+  const targetUnit = canonicalMassUnit(unit) ?? (unit as MatcherUnit);
+  const scaled = scaleAmount({
+    amount,
+    subjectId: supplementId,
+    subjectName: name,
+    unit: unit as MatcherUnit
+  });
+  if ("reason" in scaled) {
+    return { amount, unit };
+  }
   return {
-    contributors: canonicalContributors(row.contributors ?? []),
-    currentAmount: row.currentAmount ?? null,
+    amount: amountFromScaled(scaled, targetUnit, name) ?? amount,
+    unit: targetUnit
+  };
+}
+
+function canonicalCoverageRow(row: StackOption["coverage"][number]) {
+  const requested = canonicalAmount(
+    row.requestedAmount,
+    row.unit,
+    row.name,
+    row.supplementId
+  );
+  const current = canonicalAmount(
+    row.currentAmount,
+    row.unit,
+    row.name,
+    row.supplementId
+  );
+  const exposure = canonicalAmount(
+    row.totalExposureAmount,
+    row.unit,
+    row.name,
+    row.supplementId
+  );
+  return {
+    contributors: canonicalContributors(row.contributors ?? []).map((item) => {
+      const dose = canonicalAmount(
+        item.amount,
+        item.unit,
+        row.name,
+        row.supplementId
+      );
+      return { ...item, amount: dose.amount, unit: dose.unit };
+    }),
+    currentAmount: current.amount,
     population: row.populationScope ?? null,
-    requestedAmount: row.requestedAmount ?? null,
+    requestedAmount: requested.amount,
     ruleId: row.ruleId ?? null,
     rulesVersion: row.rulesVersion ?? null,
     status: row.status,
     supplementId: row.supplementId,
     threshold: row.upperLimitAmount ?? null,
-    totalExposureAmount: row.totalExposureAmount ?? null,
-    unit: row.unit ?? null
+    totalExposureAmount: exposure.amount,
+    unit: requested.unit
   };
 }
 

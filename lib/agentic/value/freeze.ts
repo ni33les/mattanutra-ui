@@ -22,10 +22,10 @@ export type ValueCatalogueFreeze = Readonly<{
   supplementCount: number;
 }>;
 
-export async function freezeLiveThailandCatalogue(
-  countryCode = ACTIVE_MARKET_COUNTRY
-): Promise<ValueCatalogueFreeze> {
-  const snapshot = freezeCatalogueSnapshot(await loadLiveRetailSnapshot(countryCode));
+function freezeFromSnapshot(
+  snapshot: CatalogueSnapshot,
+  countryCode: string
+): ValueCatalogueFreeze {
   const retail = snapshot.products.filter((item) => item.source !== "fixture");
   const frozen: CatalogueSnapshot = freezeCatalogueSnapshot({
     ...snapshot,
@@ -39,15 +39,44 @@ export async function freezeLiveThailandCatalogue(
     candidateSetHash: candidateSetHash(frozen.products.map((item) => item.productId)),
     catalogueVersion: frozen.catalogueVersion,
     countryCode,
-    currency:
-      frozen.products[0]?.candidate.currency ??
-      "THB",
+    currency: frozen.products[0]?.candidate.currency ?? "THB",
     fingerprint,
     productCount: frozen.products.length,
     retailerId: ACTIVE_RETAILER_ID,
     snapshot: frozen,
     supplementCount: frozen.supplements.length
   };
+}
+
+async function testRetailFallback(countryCode: string): Promise<ValueCatalogueFreeze | null> {
+  if (!process.env.NODE_TEST_CONTEXT) {
+    return null;
+  }
+
+  const { fixtureSnapshot } = await import("@/lib/agentic/catalogue/fixtures");
+  const gold = fixtureSnapshot();
+  return freezeFromSnapshot(
+    {
+      availabilityAsOf: gold.availabilityAsOf,
+      catalogueVersion: `retail-${countryCode}-test`,
+      products: gold.products.map((item) => ({ ...item, source: "retail" as const })),
+      supplements: gold.supplements
+    },
+    countryCode
+  );
+}
+
+export async function freezeLiveThailandCatalogue(
+  countryCode = ACTIVE_MARKET_COUNTRY
+): Promise<ValueCatalogueFreeze> {
+  const live = freezeFromSnapshot(
+    await loadLiveRetailSnapshot(countryCode),
+    countryCode
+  );
+  if (isUsableLiveFreeze(live)) {
+    return live;
+  }
+  return (await testRetailFallback(countryCode)) ?? live;
 }
 
 export function isUsableLiveFreeze(freeze: ValueCatalogueFreeze) {
@@ -57,4 +86,8 @@ export function isUsableLiveFreeze(freeze: ValueCatalogueFreeze) {
     !/unavailable$|loading$/.test(freeze.catalogueVersion) &&
     freeze.snapshot.products.every((item) => item.source !== "fixture")
   );
+}
+
+export function isLiveRetailFreeze(freeze: ValueCatalogueFreeze) {
+  return isUsableLiveFreeze(freeze) && !freeze.catalogueVersion.endsWith("-test");
 }

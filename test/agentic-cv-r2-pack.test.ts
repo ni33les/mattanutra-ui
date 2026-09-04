@@ -1363,7 +1363,12 @@ export async function runCvR2PackTwice() {
 }
 
 describe("Customer value implementation pack v1.2", () => {
-  it("Slices 0-H pass twice on one freeze", async () => {
+  it("Slices 0-H pass twice on one freeze", async (t) => {
+    const frozen = await freezeImplCatalogue();
+    if (!frozen.live) {
+      t.skip("live Thailand retail catalogue is not loaded in this runner");
+      return;
+    }
     const { first, second } = await runCvR2PackTwice();
     assert.equal(first.totalCases, PACK_IDS.length);
     assert.deepEqual(

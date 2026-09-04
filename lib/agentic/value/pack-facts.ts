@@ -2,7 +2,7 @@ import type { CatalogueProduct } from "@/lib/agentic/catalogue/types";
 
 const PACK_COUNT_PATTERN =
   /(?:per|x)\s*(\d{2,4})\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets|serving|servings)\b|\b(\d{2,4})\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets|serving|servings)\s*(?:per|\/)\s*(?:bottle|pack|container|tub)\b/i;
-const TITLE_PACK_PATTERN = /(?:^|\s)(\d{2,4})\s*'[SsCc]\b/;
+const TITLE_PACK_PATTERN = /(?:^|\s)(\d{2,4})\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets)\b/i;
 const PACK_COUNT_STRIP_PATTERN =
   /(?:;\s*)?(?:per|x)\s*\d{2,4}\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets|serving|servings)\b|(?:;\s*)?\b\d{2,4}\s*(?:cap|caps|capsule|capsules|softgel|softgels|tablet|tablets|sachet|sachets|serving|servings)\s*(?:per|\/)\s*(?:bottle|pack|container|tub)\b/gi;
 

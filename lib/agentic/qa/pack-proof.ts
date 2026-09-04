@@ -9,7 +9,11 @@ import { orderTool } from "@/lib/agentic/commerce/order";
 import { feedbackTool } from "@/lib/agentic/feedback";
 import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { issueCapability, resolveCapability } from "@/lib/agentic/capabilities";
-import { getCatalogueSnapshot, replaceCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
+import {
+  getCatalogueSnapshot,
+  replaceCatalogueSnapshot,
+  runWithCatalogueSnapshot
+} from "@/lib/agentic/catalogue/snapshot";
 import { sanitizeLogFields } from "@/lib/logger";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import {
@@ -337,23 +341,25 @@ export async function packProof(runtime: AgenticRuntime) {
   }
   checks.push(check("D6-01", executeBlocked));
 
-  replaceCatalogueSnapshot({
+  const unorderable = {
     ...getCatalogueSnapshot(),
     products: getCatalogueSnapshot().products.map((item) => ({
       ...item,
       orderable: false
     }))
-  });
-  const changed = await executeTool({
-    config: runtime.config,
-    expectedRevision: created.revision,
-    idempotencyKey: `qa-pack-avail-${stamp}`,
-    now,
-    payment: runtime.payment,
-    planHandle: created.planHandle,
-    scope: runtime.scope,
-    store: runtime.store
-  });
+  };
+  const changed = await runWithCatalogueSnapshot(unorderable, () =>
+    executeTool({
+      config: runtime.config,
+      expectedRevision: created.revision,
+      idempotencyKey: `qa-pack-avail-${stamp}`,
+      now,
+      payment: runtime.payment,
+      planHandle: created.planHandle,
+      scope: runtime.scope,
+      store: runtime.store
+    })
+  );
   replaceCatalogueSnapshot(originalSnapshot);
   checks.push(
     check(

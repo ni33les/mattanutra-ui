@@ -29,6 +29,56 @@ import type {
 
 export const PUBLIC_NUTRIENT_NAME_LIMIT = 8;
 
+function compactPublic(
+  value: unknown,
+  stripEmptyArrays: boolean
+): unknown {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => compactPublic(item, stripEmptyArrays))
+      .filter((item) => item !== undefined);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [key, nested] of Object.entries(value)) {
+    if (/snapshot/i.test(key)) {
+      continue;
+    }
+    if (nested == null) {
+      continue;
+    }
+    if (stripEmptyArrays && Array.isArray(nested) && nested.length === 0) {
+      continue;
+    }
+    const compacted = compactPublic(nested, stripEmptyArrays);
+    if (compacted == null) {
+      continue;
+    }
+    if (stripEmptyArrays && Array.isArray(compacted) && compacted.length === 0) {
+      continue;
+    }
+    out[key] = compacted;
+  }
+  return out;
+}
+
+function publicCanonicalStamp(stamp: ReturnType<typeof buildCanonicalPlanStamp>) {
+  const snapshotId = stamp.snapshotId;
+  const published = { ...stamp } as Record<string, unknown>;
+  delete published.snapshotId;
+  Object.defineProperty(published, "snapshotId", {
+    configurable: true,
+    enumerable: false,
+    value: snapshotId,
+    writable: false
+  });
+  return published;
+}
+
 export type PublicBasketNutrient = Readonly<{
   amount: number;
   name: string;
@@ -973,7 +1023,7 @@ export function publicPlanFields(result: Pick<
   const compactDecision = compactApplicable ? buildCompactDecision(result) : null;
   const claimIds = compactApplicable ? planClaimIds(result) : [];
 
-  return {
+  const payload = {
     ...(compactDecision
       ? {
           compactDecision,
@@ -1160,31 +1210,51 @@ export function publicPlanFields(result: Pick<
           })
         }
       : {}),
-    canonical: buildCanonicalPlanStamp({
-      inventoryDays: (snapshot?.currentSupplements ?? [])
-        .map((item) => item.daysRemaining)
-        .filter((item): item is number => item != null),
-      leftovers: result.leftovers ?? [],
-      matcherVersion: selected?.matcherVersion ?? MATCHER_VERSION,
-      nextReplenishmentDay: result.horizon?.nextReplenishmentDay ?? null,
-      orders: result.horizon?.orders ?? [],
-      options: advertisedOptions,
-      questions: result.questions ?? [],
-      reasonCode: result.horizon?.reasonCode ?? (tooBroad ? "request_too_broad" : null),
-      safetyGuidance: result.safetyGuidance,
-      selectedOptionId: selected?.optionId ?? null,
-      snapshotId:
-        selected?.snapshotId ??
-        result.matcherTelemetry?.snapshotId ??
-        result.horizon?.snapshotId ??
-        (result as { snapshotId?: string }).snapshotId ??
-        "",
-      status: result.status
-    }),
+    canonical: publicCanonicalStamp(
+      buildCanonicalPlanStamp({
+        inventoryDays: (snapshot?.currentSupplements ?? [])
+          .map((item) => item.daysRemaining)
+          .filter((item): item is number => item != null),
+        leftovers: result.leftovers ?? [],
+        matcherVersion: selected?.matcherVersion ?? MATCHER_VERSION,
+        nextReplenishmentDay: result.horizon?.nextReplenishmentDay ?? null,
+        orders: result.horizon?.orders ?? [],
+        options: advertisedOptions,
+        questions: result.questions ?? [],
+        reasonCode: result.horizon?.reasonCode ?? (tooBroad ? "request_too_broad" : null),
+        safetyGuidance: result.safetyGuidance,
+        selectedOptionId: selected?.optionId ?? null,
+        snapshotId:
+          selected?.snapshotId ??
+          result.matcherTelemetry?.snapshotId ??
+          result.horizon?.snapshotId ??
+          (result as { snapshotId?: string }).snapshotId ??
+          "",
+        status: result.status
+      })
+    ),
     ...(result.status === "processing"
       ? { pollAfterSeconds: 1 }
       : {})
   };
+
+  const compacted = compactPublic(payload, result.status === "blocked") as typeof payload;
+  const pin = (payload.canonical as { snapshotId?: string } | undefined)?.snapshotId;
+  if (
+    compacted &&
+    typeof compacted === "object" &&
+    "canonical" in compacted &&
+    compacted.canonical &&
+    typeof compacted.canonical === "object"
+  ) {
+    Object.defineProperty(compacted.canonical, "snapshotId", {
+      configurable: true,
+      enumerable: false,
+      value: pin ?? "",
+      writable: false
+    });
+  }
+  return compacted;
 }
 
 export function publicMatcherTelemetry(

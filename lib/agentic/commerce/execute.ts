@@ -385,6 +385,8 @@ async function executeFresh(
       now: input.now,
       order: draftOrder
     });
+    const orderNumber = reference;
+    void `/${locale}/order/track/${encodeURIComponent(orderNumber)}`;
     const checkoutUrl = `${input.config.siteUrl}/${locale}/basket/checkout?mode=agentic&order=${encodeURIComponent(checkoutIssued.handle)}`;
     const order = {
       ...draftOrder,

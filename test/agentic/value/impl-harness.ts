@@ -14,13 +14,15 @@ import {
 } from "../../../lib/agentic/runtime.ts";
 import {
   replaceCatalogueSnapshot,
-  resetCatalogueSnapshotCache
+  resetCatalogueSnapshotCache,
+  runWithCatalogueSnapshot
 } from "../../../lib/agentic/catalogue/snapshot.ts";
 import { resetQaPersistForTests } from "../../../lib/agentic/qa/persist.ts";
 import { pinCatalogueSnapshot, resetCataloguePins } from "../../../lib/agentic/catalogue/pin.ts";
 import { catalogueSnapshotId } from "../../../lib/agentic/catalogue/freeze.ts";
 import {
   freezeLiveThailandCatalogue,
+  isLiveRetailFreeze,
   isUsableLiveFreeze,
   type ValueCatalogueFreeze
 } from "../../../lib/agentic/value/freeze.ts";
@@ -157,6 +159,7 @@ export async function freezeImplCatalogue() {
   const freeze = await freezeLiveThailandCatalogue("TH");
   return {
     freeze,
+    live: isLiveRetailFreeze(freeze),
     snapshotId: isUsableLiveFreeze(freeze) ? catalogueSnapshotId(freeze.snapshot) : "",
     usable: isUsableLiveFreeze(freeze)
   };
@@ -191,13 +194,15 @@ export async function callPlan(
   session: PlanSession,
   payload: Record<string, unknown>
 ) {
-  const result = await planTool({
-    config: session.config,
-    now: "2026-09-01T00:00:00.000Z",
-    payload: payload as Parameters<typeof planTool>[0]["payload"],
-    scope: session.runtime.scope,
-    store: session.store
-  });
+  const result = await runWithCatalogueSnapshot(session.freeze.snapshot, () =>
+    planTool({
+      config: session.config,
+      now: "2026-09-01T00:00:00.000Z",
+      payload: payload as Parameters<typeof planTool>[0]["payload"],
+      scope: session.runtime.scope,
+      store: session.store
+    })
+  );
   return asRecord(result);
 }
 

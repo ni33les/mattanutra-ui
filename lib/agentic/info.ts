@@ -34,8 +34,6 @@ export const PUBLIC_INFO_ALLOW_LIST = [
   "ok",
   "serviceName",
   "contractVersion",
-  "schemaChecksum",
-  "buildId",
   "supportedCountries",
   "supportedLocales",
   "medicationCodes",
@@ -126,12 +124,11 @@ function publicCapabilityInfo(input: Readonly<{
   medicationCodes: readonly string[];
   supportedCountries: readonly PublicInfoCountry[];
 }>): PublicInfo {
+  void input.buildId;
   return {
     ok: true,
     serviceName: AGENTIC_SERVICE_NAME,
     contractVersion: AGENTIC_CONTRACT_VERSION,
-    schemaChecksum: AGENTIC_SCHEMA_CHECKSUM,
-    ...(input.buildId ? { buildId: input.buildId } : {}),
     supportedCountries: input.supportedCountries.map((item) => ({
       countryCode: item.countryCode,
       countryName: item.countryName,
