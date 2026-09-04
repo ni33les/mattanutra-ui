@@ -243,7 +243,7 @@ describe("RB-CTX first divergence", () => {
     const executed = await executeOn(cluster, "B", { ...ready, suffix: "05" });
     const error = asRecord(executed.error);
     assert.equal(executed.ok, false);
-    assert.equal(error.reasonCode, "run_invalid");
+    assert.equal(error.reasonCode, "not_found");
     assert.equal(executed.checkoutExpiresAt, undefined);
     assert.equal(contributionOf(executed).acquisitionMinor, null);
   });

@@ -212,13 +212,10 @@ async function executeFresh(
   if (namespace) {
     const session = await resolveQaSession(namespace);
     if (!session) {
-      return {
-        error: {
-          message: "QA namespace context is missing.",
-          reasonCode: "run_invalid" as const
-        },
-        ok: false as const
-      };
+      return businessError({
+        message: "QA namespace context is missing.",
+        reasonCode: "not_found"
+      });
     }
     now = session.now;
     channel = {
