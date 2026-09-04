@@ -1,0 +1,79 @@
+{
+  "pack": "MattaNutra DEV TDD Pack v1.2",
+  "baselineBuild": "3a5ab999fec9c8d3a81418cb388e06855dc54d1e",
+  "ctxNormalizedTapSha256": "c13b17b6f5732489e91cdb092d7f83f9ed3824b567b9255cbc762c8091745451",
+  "ctxRunsIdentical": true,
+  "firstFailures": {
+    "CTX-RED-01": {
+      "path": "execute.frozenPlan.contribution.acquisitionMinor",
+      "actual": 0,
+      "expected": 1000,
+      "checkoutExpiresAt": "2026-09-02T09:15:00.000Z"
+    },
+    "CTX-RED-02": {
+      "path": "order.acquisitionMinor",
+      "actual": 0,
+      "expected": 1000
+    },
+    "CTX-RED-03": {
+      "path": "frozenPlan.contribution.acquisitionMinor",
+      "actual": 0,
+      "expected": 1000
+    },
+    "CTX-RED-04": {
+      "path": "execute.ok",
+      "actual": false,
+      "expected": true,
+      "reasonCode": "not_found"
+    },
+    "CTX-RED-05": {
+      "status": "already_closed",
+      "reasonCode": "not_found"
+    },
+    "CTX-RED-06": {
+      "path": "N1.acquisitionMinor",
+      "actual": 0,
+      "expected": 1000
+    },
+    "CTX-RED-07": {
+      "path": "observe.clock",
+      "actual": "2026-09-02T00:00:00.000Z",
+      "expected": "2026-09-02T09:40:00.000Z"
+    },
+    "SEQ-RED-01": {
+      "path": "events.eventType",
+      "actual": [
+        "connector_viewed",
+        "confirmed",
+        "connected",
+        "checkout_created",
+        "plan_ready",
+        "payment_declined",
+        "paid",
+        "dispatched",
+        "delivered"
+      ],
+      "expected": [
+        "connector_viewed",
+        "connected",
+        "plan_ready",
+        "confirmed",
+        "checkout_created",
+        "payment_declined",
+        "paid",
+        "dispatched",
+        "delivered"
+      ]
+    },
+    "OBS-RED-01": {
+      "path": "queries.plan.match",
+      "actual": null,
+      "expected": 1
+    },
+    "OBS-RED-03": {
+      "path": "dependencyBudget.planMatchHits",
+      "actual": 0,
+      "expected": 1
+    }
+  }
+}

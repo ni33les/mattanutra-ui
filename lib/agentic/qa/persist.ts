@@ -25,7 +25,9 @@ type MemoryNamespace = Omit<PersistedQaNamespace, "frozenSnapshot">;
 const memoryCatalogues = new Map<string, CatalogueSnapshot>();
 const memoryPublished = new Map<string, string>();
 const memoryNamespaces = new Map<string, MemoryNamespace>();
+const durableNamespaces = new Map<string, MemoryNamespace>();
 const queryCountsByNamespace = new Map<string, Record<string, number>>();
+const durableQueryCounts = new Map<string, Record<string, number>>();
 
 function sql() {
   if (process.env.NODE_TEST_CONTEXT) {
@@ -60,14 +62,90 @@ export function resetQaPersistForTests() {
   memoryCatalogues.clear();
   memoryPublished.clear();
   memoryNamespaces.clear();
+  durableNamespaces.clear();
   queryCountsByNamespace.clear();
+  durableQueryCounts.clear();
   persistCommitGate = null;
+  queryBudgetCommitGate = null;
+  queryBudgetPersistEntered = null;
+}
+
+function cloneNamespace(record: MemoryNamespace): MemoryNamespace {
+  return { ...record, queryCounts: { ...record.queryCounts } };
+}
+
+export function captureQaPersistLocal() {
+  return {
+    memoryNamespaces: new Map(
+      [...memoryNamespaces.entries()].map(([key, value]) => [key, cloneNamespace(value)])
+    ),
+    queryCountsByNamespace: new Map(
+      [...queryCountsByNamespace.entries()].map(([key, value]) => [key, { ...value }])
+    )
+  };
+}
+
+export function restoreQaPersistLocal(snapshot: ReturnType<typeof captureQaPersistLocal>) {
+  memoryNamespaces.clear();
+  queryCountsByNamespace.clear();
+  for (const [key, value] of snapshot.memoryNamespaces) {
+    memoryNamespaces.set(key, cloneNamespace(value));
+  }
+  for (const [key, value] of snapshot.queryCountsByNamespace) {
+    queryCountsByNamespace.set(key, { ...value });
+  }
+}
+
+export function primeLocalNamespaceFromDurable(namespace: string) {
+  const durable = durableNamespaces.get(namespace);
+  if (!durable) {
+    return;
+  }
+  memoryNamespaces.set(namespace, cloneNamespace(durable));
+  const counts = durableQueryCounts.get(namespace) ?? durable.queryCounts;
+  queryCountsByNamespace.set(namespace, { ...counts });
+}
+
+function rememberDurable(record: MemoryNamespace) {
+  durableNamespaces.set(record.namespace, cloneNamespace(record));
+}
+
+export function emptyQaPersistLocal() {
+  return {
+    memoryNamespaces: new Map<string, MemoryNamespace>(),
+    queryCountsByNamespace: new Map<string, Record<string, number>>()
+  };
+}
+
+export function snapshotQaPersistDurable() {
+  return {
+    durableNamespaces: [...durableNamespaces.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([namespace, record]) => [namespace, cloneNamespace(record)] as const),
+    durableQueryCounts: [...durableQueryCounts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([namespace, counts]) => [namespace, { ...counts }] as const)
+  };
+}
+
+export function durableQueryCountsOf(namespace: string) {
+  return { ...(durableQueryCounts.get(namespace) ?? {}) };
 }
 
 let persistCommitGate: Promise<void> | null = null;
+let queryBudgetCommitGate: Promise<void> | null = null;
+let queryBudgetPersistEntered: (() => void) | null = null;
 
 export function setPersistCommitGateForTests(gate: Promise<void> | null) {
   persistCommitGate = gate;
+}
+
+export function setQueryBudgetCommitGateForTests(gate: Promise<void> | null) {
+  queryBudgetCommitGate = gate;
+}
+
+export function setQueryBudgetPersistEnteredForTests(notify: (() => void) | null) {
+  queryBudgetPersistEntered = notify;
 }
 
 async function awaitPersistCommitGate() {
@@ -259,6 +337,7 @@ export async function persistQaNamespace(
     snapshotId: session.catalogueChecksum
   };
   memoryNamespaces.set(session.namespace, record);
+  rememberDurable(record);
 
   if (session.frozenSnapshot) {
     await persistPublishedCatalogue(session.catalogueChecksum, session.frozenSnapshot, "first-writer");
@@ -304,6 +383,10 @@ export async function persistQaNamespaceClock(namespace: string, now: string) {
   if (current) {
     memoryNamespaces.set(namespace, { ...current, now });
   }
+  const durable = durableNamespaces.get(namespace);
+  if (durable) {
+    rememberDurable({ ...durable, now });
+  }
 
   const db = sql();
   if (!db) {
@@ -334,6 +417,14 @@ export async function persistQaNamespaceChannel(
       attribution: input.attribution
     });
   }
+  const durable = durableNamespaces.get(namespace);
+  if (durable) {
+    rememberDurable({
+      ...durable,
+      acquisitionMinor: input.acquisitionMinor,
+      attribution: input.attribution
+    });
+  }
 
   const db = sql();
   if (!db) {
@@ -353,12 +444,27 @@ export async function persistQaNamespaceChannel(
   }
 }
 
-export function persistQueryBudget(namespace: string, counts: Record<string, number>) {
+function persistQueryBudgetNow(namespace: string, counts: Record<string, number>) {
   queryCountsByNamespace.set(namespace, { ...counts });
+  durableQueryCounts.set(namespace, { ...counts });
   const current = memoryNamespaces.get(namespace);
   if (current) {
     memoryNamespaces.set(namespace, { ...current, queryCounts: { ...counts } });
   }
+  const durable = durableNamespaces.get(namespace);
+  if (durable) {
+    rememberDurable({ ...durable, queryCounts: { ...counts } });
+  }
+}
+
+export function persistQueryBudget(namespace: string, counts: Record<string, number>) {
+  queryBudgetPersistEntered?.();
+  if (queryBudgetCommitGate) {
+    const deferred = { ...counts };
+    void queryBudgetCommitGate.then(() => persistQueryBudgetNow(namespace, deferred));
+    return;
+  }
+  persistQueryBudgetNow(namespace, counts);
 }
 
 export function persistedQueryCounts(namespace: string) {
@@ -373,6 +479,9 @@ export function hasPersistedQueryCounts(namespace: string) {
 
 export async function deletePersistedQaNamespace(namespace: string) {
   memoryNamespaces.delete(namespace);
+  durableNamespaces.delete(namespace);
+  queryCountsByNamespace.delete(namespace);
+  durableQueryCounts.delete(namespace);
 
   const db = sql();
   if (!db) {

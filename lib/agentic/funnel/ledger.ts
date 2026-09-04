@@ -44,6 +44,8 @@ const ledgers = new Map<string, FunnelEvent[]>();
 const seenEventIds = new Set<string>();
 const attributionByCorrelation = new Map<string, FunnelAttribution>();
 const durableLedgers = new Map<string, FunnelEvent[]>();
+const committedFunnelRows = new Map<string, FunnelEvent[]>();
+let funnelAppendBarrier: Promise<void> | null = null;
 
 const globalFunnel = globalThis as typeof globalThis & {
   mattanutraSharedFunnel?: {
@@ -91,6 +93,37 @@ function hydrateFromShared(correlationId: string) {
   if (attribution) {
     attributionByCorrelation.set(correlationId, attribution);
   }
+}
+
+export function captureDurableFunnelState() {
+  return new Map(
+    [...durableLedgers.entries()].map(([key, list]) => [key, [...list]])
+  );
+}
+
+export function restoreDurableFunnelState(snapshot: Map<string, FunnelEvent[]>) {
+  durableLedgers.clear();
+  for (const [key, list] of snapshot) {
+    durableLedgers.set(key, [...list]);
+  }
+}
+
+export function emptyDurableFunnelState() {
+  return new Map<string, FunnelEvent[]>();
+}
+
+export function snapshotCommittedFunnelRows() {
+  return [...committedFunnelRows.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([correlationId, list]) => [correlationId, list.map((event) => ({ ...event }))] as const);
+}
+
+export function listCommittedFunnelEvents(correlationId: string) {
+  return [...(committedFunnelRows.get(correlationId) ?? [])];
+}
+
+export function setFunnelAppendBarrierForTests(gate: Promise<void> | null) {
+  funnelAppendBarrier = gate;
 }
 
 export function flushFunnelProcessCache() {
@@ -141,15 +174,14 @@ export function restoreFunnelProcessState(
   }
 }
 
-function hydrateFromDurable(correlationId: string) {
-  const durable = durableLedgers.get(correlationId);
-  if (!durable?.length) {
+function mergeFunnelRows(correlationId: string, incoming: readonly FunnelEvent[] | undefined) {
+  if (!incoming?.length) {
     return;
   }
   const existing = ledgers.get(correlationId) ?? [];
   const seen = new Set(existing.map((item) => item.eventId));
   const merged = [...existing];
-  for (const event of durable) {
+  for (const event of incoming) {
     if (seen.has(event.eventId)) {
       continue;
     }
@@ -168,6 +200,22 @@ function hydrateFromDurable(correlationId: string) {
       attributionByCorrelation.set(correlationId, merged[0].attribution);
     }
   }
+}
+
+function hydrateFromDurable(correlationId: string) {
+  mergeFunnelRows(correlationId, durableLedgers.get(correlationId));
+}
+
+function hydrateFromCommitted(correlationId: string) {
+  mergeFunnelRows(correlationId, committedFunnelRows.get(correlationId));
+}
+
+function rememberCommitted(event: FunnelEvent) {
+  const list = committedFunnelRows.get(event.correlationId) ?? [];
+  if (list.some((item) => item.eventId === event.eventId)) {
+    return;
+  }
+  committedFunnelRows.set(event.correlationId, [...list, event]);
 }
 
 export function resetFunnelLedger(correlationId?: string) {
@@ -195,6 +243,8 @@ export function resetFunnelLedger(correlationId?: string) {
   sharedFunnel().seen.clear();
   sharedFunnel().attribution.clear();
   durableLedgers.clear();
+  committedFunnelRows.clear();
+  funnelAppendBarrier = null;
 }
 
 export function recordFunnelEvent(input: Readonly<{
@@ -255,6 +305,9 @@ export async function commitFunnelEvent(input: Readonly<{
   payload?: unknown;
 }>) {
   await loadPersistedFunnelEvents(input.correlationId);
+  if (funnelAppendBarrier) {
+    await funnelAppendBarrier;
+  }
   const recorded = recordFunnelEvent(input);
   if (recorded.accepted) {
     await recorded.persisted;
@@ -272,6 +325,7 @@ async function persistFunnelEvent(event: FunnelEvent) {
   if (!durable.some((item) => item.eventId === event.eventId)) {
     durableLedgers.set(event.correlationId, [...durable, event]);
   }
+  rememberCommitted(event);
   if (process.env.NODE_TEST_CONTEXT) {
     return;
   }
@@ -304,6 +358,7 @@ async function persistFunnelEvent(event: FunnelEvent) {
 export async function loadPersistedFunnelEvents(correlationId: string) {
   hydrateFromShared(correlationId);
   hydrateFromDurable(correlationId);
+  hydrateFromCommitted(correlationId);
 
   if (process.env.NODE_TEST_CONTEXT) {
     return listFunnelEvents(correlationId);

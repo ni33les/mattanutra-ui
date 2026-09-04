@@ -1,0 +1,267 @@
+TAP version 13
+# Subtest: v1.2 SEQ one causal funnel ledger
+    # Subtest: SEQ-RED-01 full ledger is the nine named events with sequences 1..9
+    not ok 1 - SEQ-RED-01 full ledger is the nine named events with sequences 1..9
+      ---
+      duration_ms: 173.115642
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:55:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly deep-equal:
+        + actual - expected
+        
+          [
+            'connector_viewed',
+        +   'confirmed',
+            'connected',
+        +   'checkout_created',
+            'plan_ready',
+        -   'confirmed',
+        -   'checkout_created',
+            'payment_declined',
+            'paid',
+            'dispatched',
+            'delivered'
+          ]
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'connector_viewed'
+        1: 'connected'
+        2: 'plan_ready'
+        3: 'confirmed'
+        4: 'checkout_created'
+        5: 'payment_declined'
+        6: 'paid'
+        7: 'dispatched'
+        8: 'delivered'
+      actual:
+        0: 'connector_viewed'
+        1: 'confirmed'
+        2: 'connected'
+        3: 'checkout_created'
+        4: 'plan_ready'
+        5: 'payment_declined'
+        6: 'paid'
+        7: 'dispatched'
+        8: 'delivered'
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:78:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1442:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+      ...
+    # Subtest: SEQ-RED-02 plan sequences 1..3 then execute continues at 4 and 5
+    not ok 2 - SEQ-RED-02 plan sequences 1..3 then execute continues at 4 and 5
+      ---
+      duration_ms: 44.72555
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:83:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly deep-equal:
+        + actual - expected
+        
+          [
+            'connector_viewed',
+        +   'confirmed',
+            'connected',
+        +   'checkout_created',
+            'plan_ready',
+        -   'confirmed',
+        -   'checkout_created'
+          ]
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'connector_viewed'
+        1: 'connected'
+        2: 'plan_ready'
+        3: 'confirmed'
+        4: 'checkout_created'
+      actual:
+        0: 'connector_viewed'
+        1: 'confirmed'
+        2: 'connected'
+        3: 'checkout_created'
+        4: 'plan_ready'
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:108:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: SEQ-RED-03 decline success dispatched delivered are 6..9 on the same correlation
+    not ok 3 - SEQ-RED-03 decline success dispatched delivered are 6..9 on the same correlation
+      ---
+      duration_ms: 49.483694
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:114:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly deep-equal:
+        + actual - expected
+        
+          [
+            'connector_viewed',
+        +   'confirmed',
+            'connected',
+        +   'checkout_created',
+            'plan_ready',
+        -   'confirmed',
+        -   'checkout_created',
+            'payment_declined',
+            'paid',
+            'dispatched',
+            'delivered'
+          ]
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'connector_viewed'
+        1: 'connected'
+        2: 'plan_ready'
+        3: 'confirmed'
+        4: 'checkout_created'
+        5: 'payment_declined'
+        6: 'paid'
+        7: 'dispatched'
+        8: 'delivered'
+      actual:
+        0: 'connector_viewed'
+        1: 'confirmed'
+        2: 'connected'
+        3: 'checkout_created'
+        4: 'plan_ready'
+        5: 'payment_declined'
+        6: 'paid'
+        7: 'dispatched'
+        8: 'delivered'
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:141:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: SEQ-RED-04 replays stay exactly-once with sequences 1..9
+    not ok 4 - SEQ-RED-04 replays stay exactly-once with sequences 1..9
+      ---
+      duration_ms: 59.175435
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:154:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly deep-equal:
+        + actual - expected
+        
+          [
+            'connector_viewed',
+        +   'confirmed',
+            'connected',
+        +   'checkout_created',
+            'plan_ready',
+        -   'confirmed',
+        -   'checkout_created',
+            'payment_declined',
+            'paid',
+            'dispatched',
+            'delivered'
+          ]
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'connector_viewed'
+        1: 'connected'
+        2: 'plan_ready'
+        3: 'confirmed'
+        4: 'checkout_created'
+        5: 'payment_declined'
+        6: 'paid'
+        7: 'dispatched'
+        8: 'delivered'
+      actual:
+        0: 'connector_viewed'
+        1: 'confirmed'
+        2: 'connected'
+        3: 'checkout_created'
+        4: 'plan_ready'
+        5: 'payment_declined'
+        6: 'paid'
+        7: 'dispatched'
+        8: 'delivered'
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:201:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: SEQ-RED-05 concurrent appenders behind a barrier stay linearizable
+    not ok 5 - SEQ-RED-05 concurrent appenders behind a barrier stay linearizable
+      ---
+      duration_ms: 39.181412
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:211:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        5 !== 7
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 7
+      actual: 5
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:255:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: SEQ-RED-06 every worker and one restart see identical ordered ledger bytes
+    not ok 6 - SEQ-RED-06 every worker and one restart see identical ordered ledger bytes
+      ---
+      duration_ms: 41.035638
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:263:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        [{"sequences":[1,1,2,2,3,4,5,6,7],"types":["connector_viewed","confirmed","connected","checkout_created","plan_ready","payment_declined","paid","dispatched","delivered"]},{"sequences":[1,1,2,2,3,4,5,6,7],"types":["confirmed","connector_viewed","checkout_created","connected","plan_ready","payment_declined","paid","dispatched","delivered"]},{"sequences":[1,1,2,2,3,4,5,6,7],"types":["connector_viewed","confirmed","connected","checkout_created","plan_ready","payment_declined","paid","dispatched","delivered"]},{"sequences":[1,1,2,2,3,4,5,6,7],"types":["connector_viewed","confirmed","connected","checkout_created","plan_ready","payment_declined","paid","dispatched","delivered"]},{"sequences":[1,1,2,2,3,4,5,6,7],"types":["connector_viewed","confirmed","connected","checkout_created","plan_ready","payment_declined","paid","dispatched","delivered"]}]
+        
+        2 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 2
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:287:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    1..6
+not ok 1 - v1.2 SEQ one causal funnel ledger
+  ---
+  duration_ms: 409.502421
+  type: 'suite'
+  location: '/root/grok/mattanutra-ui/test/agentic-v12-seq.test.ts:46:1'
+  failureType: 'subtestsFailed'
+  error: '6 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 6
+# suites 1
+# pass 0
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2640.823994

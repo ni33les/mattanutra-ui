@@ -1,0 +1,164 @@
+TAP version 13
+# Subtest: v1.2 CTX execute inherits authoritative context
+    # Subtest: CTX-RED-01 execute.frozenPlan.contribution.acquisitionMinor is 1000 after B is primed pre-channel
+    not ok 1 - CTX-RED-01 execute.frozenPlan.contribution.acquisitionMinor is 1000 after B is primed pre-channel
+      ---
+      duration_ms: 228.492897
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:63:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        0 !== 1000
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1000
+      actual: 0
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:70:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1442:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+      ...
+    # Subtest: CTX-RED-02 order read on D with empty cache keeps acquisition, attribution and namespace
+    not ok 2 - CTX-RED-02 order read on D with empty cache keeps acquisition, attribution and namespace
+      ---
+      duration_ms: 71.081235
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:74:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        0 !== 1000
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1000
+      actual: 0
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:84:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: CTX-RED-03 paid contribution uses payment, product, zero subsidies/fee and acquisition 1000
+    not ok 3 - CTX-RED-03 paid contribution uses payment, product, zero subsidies/fee and acquisition 1000
+      ---
+      duration_ms: 63.682932
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:97:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        0 !== 1000
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1000
+      actual: 0
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:111:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: CTX-RED-04 restart after setChannel cannot change frozen context
+    not ok 4 - CTX-RED-04 restart after setChannel cannot change frozen context
+      ---
+      duration_ms: 43.080951
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:127:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        {"error":{"category":"NOT_FOUND","error_code":"NOT_FOUND","errorCode":"NOT_FOUND","fieldPath":null,"message":"QA namespace context is missing.","messageKey":"mcp.errors.not_found","reasonCode":"not_found","retryable":false},"ok":false}
+        
+        false !== true
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: true
+      actual: false
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:133:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: CTX-RED-05 missing plan-to-namespace association fails closed with no writes
+    ok 5 - CTX-RED-05 missing plan-to-namespace association fails closed with no writes
+      ---
+      duration_ms: 55.575397
+      type: 'test'
+      ...
+    # Subtest: CTX-RED-06 two namespaces freeze only their own acquisition
+    not ok 6 - CTX-RED-06 two namespaces freeze only their own acquisition
+      ---
+      duration_ms: 81.346151
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:181:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        0 !== 1000
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1000
+      actual: 0
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:198:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: CTX-RED-07 observe by order handle on a new worker uses namespace clock 09:40 not 00:00
+    not ok 7 - CTX-RED-07 observe by order handle on a new worker uses namespace clock 09:40 not 00:00
+      ---
+      duration_ms: 46.481633
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:204:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        + actual - expected
+        
+        + '2026-09-02T00:00:00.000Z'
+        - '2026-09-02T09:40:00.000Z'
+                       ^
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: '2026-09-02T09:40:00.000Z'
+      actual: '2026-09-02T00:00:00.000Z'
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:212:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    1..7
+not ok 1 - v1.2 CTX execute inherits authoritative context
+  ---
+  duration_ms: 592.889404
+  type: 'suite'
+  location: '/root/grok/mattanutra-ui/test/agentic-v12-ctx.test.ts:55:1'
+  failureType: 'subtestsFailed'
+  error: '6 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 7
+# suites 1
+# pass 1
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3454.443064
