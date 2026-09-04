@@ -65,6 +65,10 @@ export function resetQaSessions() {
   activeNamespace = null;
 }
 
+export function putQaSessionForTests(session: QaSession) {
+  rememberSession(session);
+}
+
 export function qaSession(namespace: string | undefined | null) {
   if (!namespace) {
     return null;
@@ -145,14 +149,7 @@ export function bindQaRuntime(
   }
   const session = qaSession(namespace || qaNamespaceFromHeaders(request));
   if (!session) {
-    const clock = activeQaClock();
-    if (!clock) {
-      return runtime;
-    }
-    return {
-      ...runtime,
-      now: clock
-    };
+    return runtime;
   }
   setQueryNamespace(session.namespace);
   return {

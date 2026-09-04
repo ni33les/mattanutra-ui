@@ -54,6 +54,12 @@ describe("live DEV commercial end to end", () => {
     assert.equal(executed.structured.ok, true);
     assert.equal(typeof executed.structured.orderHandle, "string");
     assert.equal(typeof executed.structured.checkoutUrl, "string");
+    const checkoutExpiresAt = Date.parse(String(executed.structured.checkoutExpiresAt));
+    assert.ok(
+      Number.isFinite(checkoutExpiresAt) && checkoutExpiresAt > Date.now() + 60_000,
+      `checkoutExpiresAt ${String(executed.structured.checkoutExpiresAt)}`
+    );
+    assert.notEqual(executed.structured.checkoutExpiresAt, "2026-09-02T00:15:00.000Z");
     const checkoutUrl = String(executed.structured.checkoutUrl);
     const checkoutAccess = new URL(checkoutUrl).searchParams.get("order");
     assert.ok(checkoutAccess && checkoutAccess.length > 8);
