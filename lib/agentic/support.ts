@@ -1,7 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
-import { humanCaseReference } from "@/lib/agentic/contract/ids";
+import { humanCaseReference, supportMessageId } from "@/lib/agentic/contract/ids";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import {
   issueCapability,
@@ -39,10 +39,6 @@ const CANNED_ACKS = new Set([
   "Payment was declined.",
   "The order is open."
 ]);
-
-function supportMessageId(caseId: string, sequence: number) {
-  return `msg_${createHash("sha256").update(`${caseId}:${sequence}`).digest("hex").slice(0, 32)}`;
-}
 
 function publicAuthor(author: "client" | "support" | "system"): "client" | "support" {
   return author === "client" ? "client" : "support";

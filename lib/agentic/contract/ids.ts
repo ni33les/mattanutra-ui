@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 const UUID_HEX = /^[0-9a-f]{32}$/i;
 const UUID_DASHED =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -55,4 +57,13 @@ export function humanOrderReference(orderId: string) {
 
 export function humanCaseReference(caseId: string) {
   return `tkt_${stripDashes(caseId).slice(0, 12)}`;
+}
+
+export function supportMessageId(caseId: string, sequence: number) {
+  return dashedUuid(
+    createHash("sha256")
+      .update(`agentic.support:${caseId}:${sequence}`)
+      .digest("hex")
+      .slice(0, 32)
+  );
 }

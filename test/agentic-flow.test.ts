@@ -195,6 +195,11 @@ describe("agentic DEV flow", () => {
     assert.equal(support.ok, true);
     assert.equal(support.status, "open");
     assert.match(String(support.caseReference), /^tkt_/);
+    assert.match(
+      String(support.messageId),
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      "support messageId must persist as a UUID on Postgres"
+    );
 
     const feedback = await call(runtime, "feedback", {
       consentConfirmed: true,
