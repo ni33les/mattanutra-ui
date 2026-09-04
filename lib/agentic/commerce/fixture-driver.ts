@@ -8,7 +8,6 @@ import {
 import { applyVerifiedPaymentEvent } from "@/lib/agentic/commerce/state";
 import { applyFulfilmentEvent, processOmsOutbox } from "@/lib/agentic/retail/mock-thailand";
 import type { AgenticStore } from "@/lib/agentic/store/types";
-import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
 
 export async function drivePaymentFixture(input: Readonly<{
   config: AgenticConfig;
@@ -59,24 +58,8 @@ export async function drivePaymentFixture(input: Readonly<{
     store: input.store
   });
 
-  const correlationId = input.correlationId ?? order.planId;
   if (applied?.applied && applied.order.paymentStatus === "paid") {
     await processOmsOutbox({ now: input.now, store: input.store });
-    recordFunnelEvent({
-      correlationId,
-      createdAt: input.now,
-      eventId: `pay-ok:${event.providerEventId}`,
-      eventType: "payment_succeeded",
-      payload: { locale: "en" }
-    });
-  } else if (applied?.applied && applied.order.latestPaymentAttempt === "declined") {
-    recordFunnelEvent({
-      correlationId,
-      createdAt: input.now,
-      eventId: `pay-no:${event.providerEventId}`,
-      eventType: "payment_declined",
-      payload: { locale: "en" }
-    });
   }
 
   return applied;
@@ -120,33 +103,12 @@ export async function driveFulfilmentFixture(input: Readonly<{
       reasonCode: "invalid_request"
     });
   }
-  const correlationId = input.correlationId ?? order?.planId;
   const updated = await applyFulfilmentEvent({
     now: input.now,
     orderId: capability.resourceId,
     status: input.status,
     store: input.store
   });
-
-  if (correlationId && input.status === "shipped") {
-    recordFunnelEvent({
-      correlationId,
-      createdAt: input.now,
-      eventId: `ship:${capability.resourceId}:${input.now}`,
-      eventType: "fulfilment_dispatched",
-      payload: { locale: "en" }
-    });
-  }
-
-  if (correlationId && input.status === "delivered") {
-    recordFunnelEvent({
-      correlationId,
-      createdAt: input.now,
-      eventId: `dlv:${capability.resourceId}:${input.now}`,
-      eventType: "order_delivered",
-      payload: { locale: "en" }
-    });
-  }
 
   return updated;
 }

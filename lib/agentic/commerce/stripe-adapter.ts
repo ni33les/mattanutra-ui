@@ -131,6 +131,11 @@ export async function applyPaidAgenticStripeSession(input: Readonly<{
   }
 
   if (input.order.paymentStatus === "paid") {
+    await processOmsOutbox({
+      adapter: input.runtime.config.thailandRetailerAdapter,
+      now: nowIso(),
+      store: input.runtime.store
+    });
     return input.order;
   }
 
@@ -145,6 +150,7 @@ export async function applyPaidAgenticStripeSession(input: Readonly<{
     await input.runtime.store.updateOrder(order);
   }
 
+  const now = nowIso();
   const applied = await applyVerifiedPaymentEvent({
     event: {
       amountMinor: asMinor(session.amount_total ?? order.totalPriceMinor),
@@ -155,11 +161,19 @@ export async function applyPaidAgenticStripeSession(input: Readonly<{
       scenario: "success",
       status: "succeeded"
     },
-    now: nowIso(),
+    now,
     store: input.runtime.store
   });
+  const next = applied?.order ?? order;
+  if (next.paymentStatus === "paid") {
+    await processOmsOutbox({
+      adapter: input.runtime.config.thailandRetailerAdapter,
+      now,
+      store: input.runtime.store
+    });
+  }
 
-  return applied?.order ?? order;
+  return next;
 }
 
 function metadataRecord(value: unknown): Record<string, string> {

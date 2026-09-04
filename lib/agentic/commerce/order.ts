@@ -7,7 +7,11 @@ import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
 import { buildOrderProjection } from "@/lib/agentic/commerce/timeline";
 import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
 import { contributionFromFrozen } from "@/lib/agentic/funnel/events";
-import { funnelAttribution, listFunnelEvents } from "@/lib/agentic/funnel/ledger";
+import {
+  funnelAttribution,
+  listFunnelEvents,
+  loadPersistedFunnelEvents
+} from "@/lib/agentic/funnel/ledger";
 
 export async function orderTool(input: Readonly<{
   config: AgenticConfig;
@@ -65,6 +69,9 @@ export async function orderTool(input: Readonly<{
         paymentAttempts
       })
     : null;
+  if (order) {
+    await loadPersistedFunnelEvents(order.planId);
+  }
   const attribution = order ? funnelAttribution(order.planId) : "unattributed";
   const funnel = order ? listFunnelEvents(order.planId) : [];
   void funnel;

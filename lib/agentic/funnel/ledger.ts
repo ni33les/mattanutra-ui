@@ -161,14 +161,31 @@ export function recordFunnelEvent(input: Readonly<{
     eventId: input.eventId,
     eventType,
     payload: publicFunnelPayload(input.correlationId, input.payload),
-    sequence: list.length + 1
+    sequence: list.reduce((max, item) => Math.max(max, item.sequence), 0) + 1
   };
   list.push(event);
   ledgers.set(input.correlationId, list);
   seenEventIds.add(input.eventId);
   rememberShared(event);
-  void persistFunnelEvent(event);
-  return { accepted: true as const, event };
+  const persisted = persistFunnelEvent(event);
+  void persisted;
+  return { accepted: true as const, event, persisted };
+}
+
+export async function commitFunnelEvent(input: Readonly<{
+  attribution?: unknown;
+  correlationId: string;
+  createdAt: string;
+  eventId: string;
+  eventType: string;
+  payload?: unknown;
+}>) {
+  await loadPersistedFunnelEvents(input.correlationId);
+  const recorded = recordFunnelEvent(input);
+  if (recorded.accepted) {
+    await recorded.persisted;
+  }
+  return recorded;
 }
 
 export function listFunnelEvents(correlationId: string) {
@@ -208,9 +225,6 @@ async function persistFunnelEvent(event: FunnelEvent) {
 
 export async function loadPersistedFunnelEvents(correlationId: string) {
   hydrateFromShared(correlationId);
-  if (ledgers.has(correlationId) && (ledgers.get(correlationId)?.length ?? 0) > 0) {
-    return listFunnelEvents(correlationId);
-  }
 
   if (process.env.NODE_TEST_CONTEXT) {
     return listFunnelEvents(correlationId);
@@ -226,7 +240,7 @@ export async function loadPersistedFunnelEvents(correlationId: string) {
       select event_id, correlation_id, event_type, attribution, payload, sequence, created_at
       from public.agentic_funnel_events
       where correlation_id = ${correlationId}
-      order by sequence asc
+      order by sequence asc, created_at asc
     `;
     const restored: FunnelEvent[] = [];
     for (const row of rows as Array<Record<string, unknown>>) {
@@ -252,11 +266,18 @@ export async function loadPersistedFunnelEvents(correlationId: string) {
       }
       restored.push(event);
       seenEventIds.add(eventId);
+      rememberShared(event);
     }
     if (restored.length > 0) {
-      ledgers.set(correlationId, restored);
-      if (!attributionByCorrelation.has(correlationId) && restored[0]) {
-        attributionByCorrelation.set(correlationId, restored[0].attribution);
+      const existing = ledgers.get(correlationId) ?? [];
+      const merged = [...existing, ...restored].sort((left, right) =>
+        left.sequence === right.sequence
+          ? left.createdAt.localeCompare(right.createdAt)
+          : left.sequence - right.sequence
+      );
+      ledgers.set(correlationId, merged);
+      if (!attributionByCorrelation.has(correlationId) && merged[0]) {
+        attributionByCorrelation.set(correlationId, merged[0].attribution);
       }
     }
   } catch {

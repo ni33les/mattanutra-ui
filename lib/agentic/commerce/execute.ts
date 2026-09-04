@@ -447,7 +447,7 @@ async function executeFresh(
       store
     });
 
-    recordFunnelEvent({
+    const executeCreated = recordFunnelEvent({
       attribution: "agent_connector",
       correlationId: plan.id,
       createdAt: input.now,
@@ -455,7 +455,7 @@ async function executeFresh(
       eventType: "execute_created",
       payload: { locale }
     });
-    recordFunnelEvent({
+    const checkoutOpened = recordFunnelEvent({
       attribution: "agent_connector",
       correlationId: plan.id,
       createdAt: input.now,
@@ -463,6 +463,12 @@ async function executeFresh(
       eventType: "checkout_opened",
       payload: { locale }
     });
+    if (executeCreated.accepted) {
+      await executeCreated.persisted;
+    }
+    if (checkoutOpened.accepted) {
+      await checkoutOpened.persisted;
+    }
 
     return response;
   });

@@ -1581,7 +1581,7 @@ async function persistTerminalPlan(input: Readonly<{
       evidenceHandle,
       researchVersion: planResearchVersion()
     };
-    recordFunnelEvent({
+    const infoShown = recordFunnelEvent({
       attribution: "agent_connector",
       correlationId: input.planId,
       createdAt: input.input.now,
@@ -1589,7 +1589,7 @@ async function persistTerminalPlan(input: Readonly<{
       eventType: "info_shown",
       payload: { locale: input.locale }
     });
-    recordFunnelEvent({
+    const planCreated = recordFunnelEvent({
       attribution: "agent_connector",
       correlationId: input.planId,
       createdAt: input.input.now,
@@ -1597,15 +1597,25 @@ async function persistTerminalPlan(input: Readonly<{
       eventType: "plan_created",
       payload: { locale: input.locale }
     });
-    if (result.status === "ready") {
-      recordFunnelEvent({
-        attribution: "agent_connector",
-        correlationId: input.planId,
-        createdAt: input.input.now,
-        eventId: `plan-ready:${input.planId}:${input.revision}`,
-        eventType: "plan_ready",
-        payload: { locale: input.locale }
-      });
+    const planReady =
+      result.status === "ready"
+        ? recordFunnelEvent({
+            attribution: "agent_connector",
+            correlationId: input.planId,
+            createdAt: input.input.now,
+            eventId: `plan-ready:${input.planId}:${input.revision}`,
+            eventType: "plan_ready",
+            payload: { locale: input.locale }
+          })
+        : null;
+    if (infoShown.accepted) {
+      await infoShown.persisted;
+    }
+    if (planCreated.accepted) {
+      await planCreated.persisted;
+    }
+    if (planReady?.accepted) {
+      await planReady.persisted;
     }
   }
 

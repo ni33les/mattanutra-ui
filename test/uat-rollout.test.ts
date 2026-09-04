@@ -167,7 +167,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
       new URL("../lib/agentic/commerce/checkout-return.ts", import.meta.url),
       "utf8",
     );
-    assert.match(mockOms, /adapter !== "mock_thailand"/);
+    assert.match(mockOms, /adapter === "thailand_live"/);
     assert.match(stripeAdapter, /thailandRetailerAdapter/);
     assert.match(checkoutReturn, /applyPaidAgenticStripeSession/);
     assert.match(uatRebuildScript, /scripts\/reset-dev-db\.mjs/);

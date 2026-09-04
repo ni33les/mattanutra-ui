@@ -2,6 +2,7 @@ import { nextTestUuid } from "@/lib/agentic/capabilities";
 import type { RetailerAdapterId } from "@/lib/agentic/config";
 import type { AgenticStore, OrderRecord } from "@/lib/agentic/store/types";
 import { nextStateVersion, commerceTimelineStatus } from "@/lib/agentic/commerce/timeline";
+import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
 
 export type FulfilmentAdvanceStatus =
   | "cancelled"
@@ -40,7 +41,7 @@ export async function processOmsOutbox(input: Readonly<{
   now: string;
   store: AgenticStore;
 }>) {
-  if (input.adapter && input.adapter !== "mock_thailand") {
+  if (input.adapter === "thailand_live") {
     return;
   }
 
@@ -138,6 +139,27 @@ export async function applyFulfilmentEvent(input: Readonly<{
           : { status: input.status },
     status: input.status
   });
+
+  if (nextStatus === "shipped") {
+    await commitFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: order.planId,
+      createdAt: input.now,
+      eventId: `ship:${order.id}`,
+      eventType: "fulfilment_dispatched",
+      payload: { locale: "en" }
+    });
+  }
+  if (nextStatus === "delivered") {
+    await commitFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: order.planId,
+      createdAt: input.now,
+      eventId: `dlv:${order.id}`,
+      eventType: "order_delivered",
+      payload: { locale: "en" }
+    });
+  }
 
   return input.store.getOrder(input.orderId);
 }

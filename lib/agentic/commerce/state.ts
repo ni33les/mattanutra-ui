@@ -9,18 +9,80 @@ import type {
 import type { VerifiedPaymentEvent } from "@/lib/agentic/commerce/payment";
 import { publicFrozenOrder } from "@/lib/agentic/public-mapper";
 import { publicFulfilmentStatus } from "@/lib/agentic/commerce/timeline";
+import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
 
 export type PaymentApplyResult = Readonly<{
   applied: boolean;
   order: OrderRecord;
 }>;
 
+export function paymentApplyKey(event: VerifiedPaymentEvent) {
+  const family =
+    event.status === "succeeded"
+      ? "succeeded"
+      : event.status === "declined" || event.status === "unavailable"
+        ? "declined"
+        : event.status;
+  return `${event.providerSessionId}:${family}`;
+}
+
+function paymentProviderOf(event: VerifiedPaymentEvent) {
+  if (
+    event.providerSessionId.startsWith("cs_") ||
+    event.providerEventId.startsWith("return:") ||
+    event.providerEventId.startsWith("evt_")
+  ) {
+    return "stripe" as const;
+  }
+  return "mock" as const;
+}
+
+function isDuplicateProviderEvent(error: unknown) {
+  const record = error as { code?: unknown; constraint?: unknown; message?: unknown };
+  if (record.code === "23505") {
+    return true;
+  }
+  return /provider_event_duplicate|agentic_provider_events/i.test(
+    `${record.constraint ?? ""} ${record.message ?? error}`
+  );
+}
+
+async function existingProviderEvent(
+  store: AgenticStore,
+  event: VerifiedPaymentEvent,
+  applyKey: string
+) {
+  return (
+    (await store.getProviderEvent("mock", applyKey)) ??
+    (await store.getProviderEvent("mock", event.providerEventId)) ??
+    (await store.getProviderEvent("stripe", applyKey)) ??
+    (await store.getProviderEvent("stripe", event.providerEventId))
+  );
+}
+
+async function recordPaymentFunnel(input: Readonly<{
+  eventId: string;
+  eventType: "payment_declined" | "payment_succeeded";
+  now: string;
+  planId: string;
+}>) {
+  await commitFunnelEvent({
+    attribution: "agent_connector",
+    correlationId: input.planId,
+    createdAt: input.now,
+    eventId: input.eventId,
+    eventType: input.eventType,
+    payload: { locale: "en" }
+  });
+}
+
 export async function applyVerifiedPaymentEvent(input: Readonly<{
   event: VerifiedPaymentEvent;
   now: string;
   store: AgenticStore;
 }>): Promise<PaymentApplyResult | null> {
-  const existing = await input.store.getProviderEvent("mock", input.event.providerEventId);
+  const applyKey = paymentApplyKey(input.event);
+  const existing = await existingProviderEvent(input.store, input.event, applyKey);
 
   if (existing) {
     const order = await input.store.getOrder(existing.orderId);
@@ -33,25 +95,37 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     return null;
   }
 
-  const closedAlready =
+  const terminal =
     order.paymentStatus === "paid" ||
     order.orderStatus === "expired" ||
     order.orderStatus === "cancelled";
   if (
-    closedAlready &&
-    (input.event.status === "succeeded" || input.event.status === "processing")
+    terminal &&
+    input.event.status !== "refunded" &&
+    input.event.status !== "partially_refunded"
   ) {
     return { applied: false, order };
   }
 
-  await input.store.insertProviderEvent({
-    createdAt: input.now,
-    id: nextTestUuid(),
-    orderId: order.id,
-    payload: input.event,
-    provider: "mock",
-    providerEventId: input.event.providerEventId
-  });
+  try {
+    await input.store.insertProviderEvent({
+      createdAt: input.now,
+      id: nextTestUuid(),
+      orderId: order.id,
+      payload: input.event,
+      provider: paymentProviderOf(input.event),
+      providerEventId: applyKey
+    });
+  } catch (error) {
+    if (!isDuplicateProviderEvent(error)) {
+      throw error;
+    }
+    const raced = await existingProviderEvent(input.store, input.event, applyKey);
+    const latest =
+      (raced ? await input.store.getOrder(raced.orderId) : null) ??
+      (await input.store.getOrder(order.id));
+    return latest ? { applied: false, order: latest } : null;
+  }
 
   await input.store.insertPaymentAttempt({
     createdAt: input.now,
@@ -76,19 +150,6 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     };
     await input.store.updateOrder(next);
     return { applied: false, order: next };
-  }
-
-  const closed =
-    order.paymentStatus === "paid" ||
-    order.orderStatus === "expired" ||
-    order.orderStatus === "cancelled";
-
-  if (
-    closed &&
-    input.event.status !== "refunded" &&
-    input.event.status !== "partially_refunded"
-  ) {
-    return { applied: false, order };
   }
 
   if (input.event.status === "declined" && input.event.reason === "three_ds_cancelled") {
@@ -126,6 +187,12 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
       id: nextTestUuid(),
       orderId: order.id,
       type: input.event.status === "unavailable" ? "payment_unavailable" : "payment_declined"
+    });
+    await recordPaymentFunnel({
+      eventId: `pay-no:${order.id}`,
+      eventType: "payment_declined",
+      now: input.now,
+      planId: order.planId
     });
     return { applied: true, order: next };
   }
@@ -211,6 +278,12 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     payload: { orderId: order.id },
     processedAt: null,
     type: "OMS_SUBMIT"
+  });
+  await recordPaymentFunnel({
+    eventId: `pay-ok:${order.id}`,
+    eventType: "payment_succeeded",
+    now: input.now,
+    planId: order.planId
   });
 
   return { applied: true, order: next };
