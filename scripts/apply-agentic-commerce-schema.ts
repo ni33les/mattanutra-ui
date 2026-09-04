@@ -299,6 +299,12 @@ create table if not exists public.agentic_qa_namespaces (
 alter table public.agentic_qa_namespaces
   add column if not exists client_key text;
 
+alter table public.agentic_qa_namespaces
+  add column if not exists query_counts jsonb not null default '{}'::jsonb;
+
+alter table public.agentic_qa_namespaces
+  add column if not exists context_version integer not null default 1;
+
 create index if not exists agentic_qa_namespaces_client_key_idx
   on public.agentic_qa_namespaces (client_key, expires_at);
 

@@ -472,9 +472,10 @@ export async function persistQaNamespaceClock(namespace: string, now: string) {
   }
 
   try {
+    const version = committedNamespaces.get(namespace)?.contextVersion ?? 1;
     await db`
       update public.agentic_qa_namespaces
-      set now_clock = ${now}
+      set now_clock = ${now}, context_version = ${version}
       where namespace = ${namespace}
     `;
   } catch {
@@ -521,11 +522,13 @@ export async function persistQaNamespaceChannel(
   }
 
   try {
+    const version = committedNamespaces.get(namespace)?.contextVersion ?? 1;
     await db`
       update public.agentic_qa_namespaces
       set
         acquisition_minor = ${input.acquisitionMinor},
-        attribution = ${input.attribution}
+        attribution = ${input.attribution},
+        context_version = ${version}
       where namespace = ${namespace}
     `;
   } catch {
@@ -557,13 +560,27 @@ export async function persistQueryBudget(namespace: string, counts: Record<strin
     await queryBudgetCommitGate;
   }
   persistQueryBudgetNow(namespace, counts);
+  const db = sql();
+  if (!db) {
+    return;
+  }
+  try {
+    await db`
+      update public.agentic_qa_namespaces
+      set query_counts = ${JSON.stringify(counts)}::jsonb
+      where namespace = ${namespace}
+    `;
+  } catch {
+    /* Committed in-process counts remain authoritative for this instance. */
+  }
 }
 
 export function persistedQueryCounts(namespace: string) {
   return {
     ...(queryCountsByNamespace.get(namespace) ?? {}),
     ...(memoryNamespaces.get(namespace)?.queryCounts ?? {}),
-    ...(durableQueryCounts.get(namespace) ?? {})
+    ...(durableQueryCounts.get(namespace) ?? {}),
+    ...(committedQueryCounts.get(namespace) ?? {})
   };
 }
 
@@ -571,7 +588,9 @@ export function hasPersistedQueryCounts(namespace: string) {
   return (
     queryCountsByNamespace.has(namespace) ||
     durableQueryCounts.has(namespace) ||
-    Object.keys(memoryNamespaces.get(namespace)?.queryCounts ?? {}).length > 0
+    committedQueryCounts.has(namespace) ||
+    Object.keys(memoryNamespaces.get(namespace)?.queryCounts ?? {}).length > 0 ||
+    Object.keys(committedNamespaces.get(namespace)?.queryCounts ?? {}).length > 0
   );
 }
 
@@ -613,7 +632,9 @@ function activateNamespace(record: MemoryNamespace): PersistedQaNamespace | null
     return null;
   }
   const counts = {
-    ...(durableQueryCounts.get(record.namespace) ?? record.queryCounts)
+    ...(durableQueryCounts.get(record.namespace) ?? {}),
+    ...(record.queryCounts ?? {}),
+    ...(committedQueryCounts.get(record.namespace) ?? {})
   };
   const next = cloneNamespace({ ...record, queryCounts: counts });
   memoryNamespaces.set(next.namespace, next);
@@ -624,20 +645,26 @@ function activateNamespace(record: MemoryNamespace): PersistedQaNamespace | null
   return hydrateRecord(next, memoryCatalogues.get(next.snapshotId) ?? null);
 }
 
-export async function loadQaNamespace(namespace: string): Promise<PersistedQaNamespace | null> {
+function loadCommittedNamespace(namespace: string): PersistedQaNamespace | null {
+  const committed = committedNamespaces.get(namespace);
+  if (committed) {
+    return activateNamespace(committed);
+  }
   const durable = durableNamespaces.get(namespace);
   if (durable) {
     return activateNamespace(durable);
   }
-
   const local = memoryNamespaces.get(namespace);
   if (local) {
     return activateNamespace(local);
   }
+  return null;
+}
 
+export async function loadQaNamespace(namespace: string): Promise<PersistedQaNamespace | null> {
   const db = sql();
   if (!db) {
-    return null;
+    return loadCommittedNamespace(namespace);
   }
 
   try {
@@ -647,8 +674,10 @@ export async function loadQaNamespace(namespace: string): Promise<PersistedQaNam
         attribution: string;
         build_id: string;
         client_key: string | null;
+        context_version: number | null;
         now_clock: string;
         principal_scope: string;
+        query_counts: unknown;
         run_id: string;
         snapshot_id: string;
         snapshot_json: unknown;
@@ -663,6 +692,8 @@ export async function loadQaNamespace(namespace: string): Promise<PersistedQaNam
         namespaces.acquisition_minor,
         namespaces.attribution,
         namespaces.client_key,
+        namespaces.context_version,
+        namespaces.query_counts,
         catalogues.snapshot_json
       from public.agentic_qa_namespaces as namespaces
       left join public.agentic_qa_catalogues as catalogues
@@ -677,22 +708,32 @@ export async function loadQaNamespace(namespace: string): Promise<PersistedQaNam
     }
 
     const snapshot = asSnapshot(row.snapshot_json);
+    const queryCounts =
+      row.query_counts && typeof row.query_counts === "object" && !Array.isArray(row.query_counts)
+        ? Object.fromEntries(
+            Object.entries(row.query_counts as Record<string, unknown>).map(([key, value]) => [
+              key,
+              Number(value) || 0
+            ])
+          )
+        : {};
     const record: MemoryNamespace = {
       acquisitionMinor: row.acquisition_minor,
       attribution: row.attribution,
       buildId: row.build_id,
       clientKey: row.client_key ?? "",
-      contextVersion: 1,
+      contextVersion: Number(row.context_version ?? 1) || 1,
       expiresAtMs: Date.now() + NAMESPACE_TTL_MS,
       namespace,
       now: row.now_clock,
       principalScope: row.principal_scope,
-      queryCounts: {},
+      queryCounts,
       runId: row.run_id,
       snapshotId: row.snapshot_id
     };
     memoryNamespaces.set(namespace, record);
     rememberDurable(record);
+    rememberCommitted(record);
     if (snapshot) {
       rememberCatalogue(row.snapshot_id, snapshot);
     }
