@@ -280,19 +280,17 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
     assert.equal(fixed?.p50BudgetMs, 3000);
     assert.equal(fixed?.p95BudgetMs, 5000);
     assert.equal(
-      (proof as { http?: { plan?: { p95Ms?: number } } }).http?.plan?.p95Ms != null,
-      true
+      typeof (proof as { plan?: { p95Ms?: number } }).plan?.p95Ms,
+      "number"
     );
   });
 
   it("LAT-033 handler proof stays inside current budgets", async () => {
     const proof = await latencyProof(createDetRuntime());
     assert.equal(proof.passed, true);
-    const planCheck = (
-      proof as { checks?: Array<{ name?: string; p95Ms?: number; passed?: boolean }> }
-    ).checks?.find((item) => item.name === "plan_p95");
-    assert.equal(planCheck?.passed, true);
-    assert.ok((planCheck?.p95Ms ?? 9999) <= 3000);
+    const planP95 = (proof as { plan?: { p95Ms?: number } }).plan?.p95Ms;
+    assert.equal(typeof planP95, "number");
+    assert.ok((planP95 ?? 9999) <= 3000);
   });
 
   it("LAT-034 scorer reads tech07.fixed, not http.plan", async () => {

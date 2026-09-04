@@ -12,14 +12,15 @@ import {
   drivePaymentFixture
 } from "@/lib/agentic/commerce/fixture-driver";
 import { orderTool } from "@/lib/agentic/commerce/order";
-import { contributionFromFrozen } from "@/lib/agentic/funnel/events";
+import { contributionFromFrozen, publicContribution } from "@/lib/agentic/funnel/events";
 import {
   funnelAttribution,
   listFunnelEvents,
   loadPersistedFunnelEvents
 } from "@/lib/agentic/funnel/ledger";
 import { dependencyBudget, queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
-import { bindQaChannel, channelCost, qaSession } from "@/lib/agentic/qa/session";
+import { persistQueryBudget } from "@/lib/agentic/qa/persist";
+import { bindQaChannel, channelCost, qaSession, resolveQaSession } from "@/lib/agentic/qa/session";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
 const SCENARIOS: readonly PaymentEventScenario[] = [
@@ -38,6 +39,14 @@ const SCENARIOS: readonly PaymentEventScenario[] = [
   "refund",
   "partial_refund"
 ];
+
+function persistObservedQueries(namespace?: string | null) {
+  const queries = queryBudgetSnapshot(namespace ?? undefined);
+  if (namespace) {
+    persistQueryBudget(namespace, queries);
+  }
+  return queries;
+}
 
 export function isPaymentScenario(value: unknown): value is PaymentEventScenario {
   return typeof value === "string" && SCENARIOS.includes(value as PaymentEventScenario);
@@ -169,6 +178,10 @@ export async function observeQaJourney(input: Readonly<{
     return businessError({ message: "Not found.", reasonCode: "not_found" });
   }
 
+  if (input.namespace) {
+    await resolveQaSession(input.namespace);
+  }
+
   let correlationId = input.correlationId ?? "";
   let order = null as Awaited<ReturnType<AgenticStore["getOrder"]>>;
 
@@ -223,6 +236,14 @@ export async function observeQaJourney(input: Readonly<{
     acquisitionMinor,
     attribution,
     clock: session?.now ?? input.now,
+    contribution: publicContribution({
+      acquisitionMinor,
+      contributionMinor: contribution,
+      paymentFeeMinor,
+      paymentMinor: order ? paymentMinor : null,
+      productCostMinor: order ? productCostMinor : null,
+      shippingSubsidyMinor
+    }),
     contributionMinor: contribution,
     correlationId,
     currency: frozen?.currency ?? order?.currency ?? null,
@@ -241,6 +262,6 @@ export async function observeQaJourney(input: Readonly<{
       sequence: event.sequence
     })),
     namespace: queryNs ?? null,
-    queries: queryBudgetSnapshot(queryNs)
+    queries: persistObservedQueries(queryNs)
   };
 }

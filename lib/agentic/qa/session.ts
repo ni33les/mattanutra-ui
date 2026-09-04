@@ -1,4 +1,5 @@
 import { resetQueryBudget, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { resetMatchPlanCache } from "@/lib/agentic/plan/matching";
 import { resetFunnelLedger } from "@/lib/agentic/funnel/ledger";
 import { attributionOf, type FunnelAttribution } from "@/lib/agentic/funnel/events";
 import type { AgenticStore } from "@/lib/agentic/store/types";
@@ -109,6 +110,10 @@ export async function resolveQaSession(namespace?: string | null) {
     schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
   };
   rememberSession(session);
+  if (loaded.queryCounts && Object.keys(loaded.queryCounts).length > 0) {
+    const { replaceQueryBudget } = await import("@/lib/agentic/plan/query-budget");
+    replaceQueryBudget(session.namespace, loaded.queryCounts);
+  }
   if (!activeNamespace) {
     activeNamespace = session.namespace;
   }
@@ -295,6 +300,9 @@ export async function beginQaRun(
   };
   rememberSession(session);
   activeNamespace = namespace;
+  resetQueryBudget(namespace);
+  resetMatchPlanCache();
+  setQueryNamespace(namespace);
   try {
     await persistQaNamespace(session, runId, input.clientKey ?? "");
   } catch {

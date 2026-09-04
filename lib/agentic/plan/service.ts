@@ -46,6 +46,7 @@ import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
+import { setQueryNamespace } from "@/lib/agentic/plan/query-budget";
 import { buildHorizonPlan, ordersInHorizon } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -815,6 +816,9 @@ export async function planTool(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
+  if (input.scope.principalScope?.startsWith("qa-v3:")) {
+    setQueryNamespace(input.scope.principalScope);
+  }
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const inflightKey =
     input.payload.operation === "get" || !input.payload.idempotencyKey

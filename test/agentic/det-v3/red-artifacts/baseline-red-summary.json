@@ -1,0 +1,18 @@
+{
+  "against": "a228ea31b4f6f0ca63e6dd9e9fd0a8bab489ae26",
+  "tests": 40,
+  "pass": 20,
+  "fail": 20,
+  "requiredReds": [
+    "COPY-RED-01",
+    "COPY-RED-02",
+    "AX-RED-01",
+    "AX-RED-02",
+    "AX-RED-03",
+    "AX-RED-05",
+    "CONTRIB-RED-01",
+    "EVENT-RED-01",
+    "SUPPORT-RED-01",
+    "SUPPORT-RED-07"
+  ]
+}

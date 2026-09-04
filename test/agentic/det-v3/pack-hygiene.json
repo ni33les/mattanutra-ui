@@ -1,0 +1,16 @@
+{
+  "packName": "Deterministic QA Test Pack v3.0",
+  "checksPerRun": 54,
+  "journeysPerRun": 7,
+  "clock": "2026-09-02T00:00:00.000Z",
+  "endpoints": {
+    "public": "https://dev.mattanutra.com/api/mcp",
+    "qa": "https://dev.mattanutra.com/api/mcp/qa"
+  },
+  "retryPolicy": "none",
+  "hashes": {
+    "qaPackV3": "76e7b2763f75a9c1418fe8651b26ad81bc71d1de9fd4c2a6b6f6800d4435b2f8",
+    "acceptanceRunner": "4e88c9bef7c80ea9e9bd38599c9eb4d90367659b185526d54b03689ee14a1320",
+    "lockEntry": "d8d0ad9f2e0d3ad64176a52041ec9671f4c341cfdf49180ad3da8f6292f92eee"
+  }
+}

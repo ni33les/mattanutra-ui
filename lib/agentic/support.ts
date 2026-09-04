@@ -202,46 +202,48 @@ export async function supportTool(input: Readonly<{
   );
 
   let messageId = supportMessageId(caseId, prior.length + 1);
-  if (canned) {
-    const existing = prior.find(
-      (item) => publicAuthor(item.author) === "support" && item.body === input.message.trim()
-    );
-    if (!existing) {
+  await input.store.transaction(async (store) => {
+    if (canned) {
+      const existing = prior.find(
+        (item) => publicAuthor(item.author) === "support" && item.body === input.message.trim()
+      );
+      if (!existing) {
+        const sequence = prior.length + 1;
+        messageId = supportMessageId(caseId, sequence);
+        await store.insertSupportMessage({
+          author: "support",
+          body: input.message.trim(),
+          caseId,
+          createdAt: input.now,
+          id: messageId,
+          sequence
+        });
+      } else {
+        messageId = existing.id;
+      }
+    } else {
       const sequence = prior.length + 1;
       messageId = supportMessageId(caseId, sequence);
-      await input.store.insertSupportMessage({
-        author: "support",
-        body: input.message.trim(),
+      await store.insertSupportMessage({
+        author: "client",
+        body: input.message,
         caseId,
         createdAt: input.now,
         id: messageId,
         sequence
       });
-    } else {
-      messageId = existing.id;
+      if (!alreadyAcked) {
+        await store.insertSupportMessage({
+          author: "support",
+          body: ackBody,
+          caseId,
+          createdAt: input.now,
+          id: supportMessageId(caseId, sequence + 1),
+          sequence: sequence + 1
+        });
+      }
     }
-  } else {
-    const sequence = prior.length + 1;
-    messageId = supportMessageId(caseId, sequence);
-    await input.store.insertSupportMessage({
-      author: "client",
-      body: input.message,
-      caseId,
-      createdAt: input.now,
-      id: messageId,
-      sequence
-    });
-    if (!alreadyAcked) {
-      await input.store.insertSupportMessage({
-        author: "support",
-        body: ackBody,
-        caseId,
-        createdAt: input.now,
-        id: supportMessageId(caseId, sequence + 1),
-        sequence: sequence + 1
-      });
-    }
-  }
+  });
 
   const supportCase = await input.store.getSupportCase(caseId);
   const { getRetailOrderByAgenticOrderId } = await import(

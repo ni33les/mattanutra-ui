@@ -15,6 +15,7 @@ export type PersistedQaNamespace = Readonly<{
   namespace: string;
   now: string;
   principalScope: string;
+  queryCounts: Record<string, number>;
   runId: string;
   snapshotId: string;
 }>;
@@ -238,6 +239,7 @@ export async function persistQaNamespace(
     namespace: session.namespace,
     now: session.now,
     principalScope: session.principalScope,
+    queryCounts: {},
     runId,
     snapshotId: session.catalogueChecksum
   };
@@ -334,6 +336,13 @@ export async function persistQaNamespaceChannel(
   }
 }
 
+export function persistQueryBudget(namespace: string, counts: Record<string, number>) {
+  const current = memoryNamespaces.get(namespace);
+  if (current) {
+    memoryNamespaces.set(namespace, { ...current, queryCounts: { ...counts } });
+  }
+}
+
 export async function deletePersistedQaNamespace(namespace: string) {
   memoryNamespaces.delete(namespace);
 
@@ -419,6 +428,7 @@ export async function loadQaNamespace(namespace: string): Promise<PersistedQaNam
       namespace,
       now: row.now_clock,
       principalScope: row.principal_scope,
+      queryCounts: {},
       runId: row.run_id,
       snapshotId: row.snapshot_id
     };

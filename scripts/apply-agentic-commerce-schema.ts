@@ -187,8 +187,16 @@ create table if not exists public.agentic_support_messages (
   case_id uuid not null references public.agentic_support_cases(id) on delete restrict,
   author text not null,
   body text not null,
+  sequence integer not null default 0,
   created_at timestamptz not null default now()
 );
+
+alter table public.agentic_support_messages
+  add column if not exists sequence integer;
+
+update public.agentic_support_messages
+  set sequence = 0
+  where sequence is null;
 
 create table if not exists public.agentic_feedback (
   id uuid primary key,

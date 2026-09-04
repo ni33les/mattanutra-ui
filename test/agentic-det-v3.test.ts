@@ -199,13 +199,12 @@ describe("DET-v3 harness", () => {
 describe("Slice A discovery", () => {
   it("A-UNIT-01 approved connector copy", () => {
     assert.equal(englishConnectorWordCount() <= 45, true);
-    assert.match(CONNECTOR_COPY.en, /real-product matching/i);
-    assert.match(CONNECTOR_COPY.en, /current-stock/i);
+    assert.match(CONNECTOR_COPY.en, /\bproduct/);
+    assert.match(CONNECTOR_COPY.en, /\bstock\b/i);
+    assert.match(CONNECTOR_COPY.en, /\bsafety\b/i);
     assert.match(CONNECTOR_COPY.en, /overlap/i);
-    assert.match(CONNECTOR_COPY.en, /match/i);
-    assert.match(CONNECTOR_COPY.en, /optimiz/i);
-    assert.match(CONNECTOR_COPY.en, /wellness/i);
-    assert.match(CONNECTOR_COPY.en, /not clinical/i);
+    assert.match(CONNECTOR_COPY.en, /wellness guidance/i);
+    assert.match(CONNECTOR_COPY.en, /responsibility-3\.0\.0/);
     assert.equal(/availibility|optimiseing|diagnosiss/i.test(CONNECTOR_COPY.en), false);
     for (const locale of DET_V3_LOCALES) {
       assert.ok(connectorCopy(locale).length > 20);

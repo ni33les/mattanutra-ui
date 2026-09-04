@@ -7,7 +7,7 @@
     "productCostMinor": 34800,
     "shippingSubsidyMinor": 0
   },
-  "description": "MattaNutra does real-product matching with current-stock and overlap optimization to agreed nutrient targets. It is wellness guidance only, not clinical diagnosis or a pharmacy, and does not replace clinical advice.",
+  "description": "MattaNutra matches real products to agreed nutrient targets, optimising overlap, current stock and cost. Safety checks follow responsibility-3.0.0 boundaries; it provides wellness guidance, not diagnosis, pharmacy services or clinical advice.",
   "latency": {
     "tech07": {
       "live": {

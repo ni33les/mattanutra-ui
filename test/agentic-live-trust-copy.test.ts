@@ -13,12 +13,13 @@ describe("live connector and Terms consistency", () => {
     const words = description.trim().split(/\s+/).filter(Boolean);
     assert.equal(info.structured.ok, true);
     assert.ok(words.length >= 30, description);
-    assert.match(description, /real-?product matching/i);
+    assert.match(description, /\bproduct/);
     assert.match(description, /stock/i);
     assert.match(description, /overlap/i);
-    assert.match(description, /wellness/i);
-    assert.match(description, /not clinical/i);
+    assert.match(description, /safety/i);
+    assert.match(description, /wellness guidance/i);
     assert.match(description, /pharmacy/i);
+    assert.match(description, /responsibility-3\.0\.0/);
     assert.equal(description, CONNECTOR_COPY.en);
   });
 
@@ -31,7 +32,7 @@ describe("live connector and Terms consistency", () => {
       ?.text.en
       .toLowerCase();
     assert.match(termsBlob, /do not manufacture, sell, dispense, or control/);
-    assert.match(connector, /not clinical diagnosis or a pharmacy/);
+    assert.match(connector, /not diagnosis, pharmacy services or clinical advice/);
     assert.match(String(fulfilment), /does not warehouse or deliver/);
     assert.equal(/matta.?nutra (is|operates) a pharmacy/i.test(connector), false);
     assert.equal(/we dispense/i.test(connector), false);

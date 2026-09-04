@@ -69,6 +69,8 @@ export function rejectProhibitedFunnelPayload(payload: unknown) {
   return hit ?? null;
 }
 
+export const CONTRIBUTION_FORMULA_ID = "contrib.payment_minus_costs_v1";
+
 export function contributionMinor(input: Readonly<{
   acquisitionMinor: number;
   paymentFeeMinor: number;
@@ -143,5 +145,26 @@ export function contributionFromFrozen(input: Readonly<{
   return {
     ...snapshot,
     contributionMinor: input.paid ? contributionMinor(snapshot) : null
+  };
+}
+
+export function publicContribution(input: Readonly<{
+  acquisitionMinor: number;
+  contributionMinor: number | null;
+  paymentFeeMinor: number;
+  paymentMinor: number | null;
+  productCostMinor: number | null;
+  shippingSubsidyMinor: number;
+}>) {
+  return {
+    contributionMinor: input.contributionMinor,
+    formulaId: CONTRIBUTION_FORMULA_ID,
+    inputs: {
+      acquisitionCostMinor: input.acquisitionMinor,
+      customerPaymentMinor: input.paymentMinor,
+      paymentFeeMinor: input.paymentFeeMinor,
+      productCostMinor: input.productCostMinor,
+      shippingSubsidyMinor: input.shippingSubsidyMinor
+    }
   };
 }

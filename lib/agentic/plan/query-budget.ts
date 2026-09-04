@@ -46,6 +46,13 @@ export function queryBudgetSnapshot(namespace?: string) {
   );
 }
 
+export function replaceQueryBudget(namespace: string, counts: Record<string, number>) {
+  byNamespace.set(
+    namespace,
+    new Map(Object.entries(counts).map(([key, value]) => [key, Number(value) || 0]))
+  );
+}
+
 export function queryCount(name: string, namespace?: string) {
   return bucket(namespace ?? activeNamespace).get(name) ?? 0;
 }

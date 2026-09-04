@@ -322,22 +322,18 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
     },
     async getSupportMessages(caseId) {
       const rows = await sql`
-        select * from public.agentic_support_messages where case_id = ${caseId}::uuid
+        select * from public.agentic_support_messages
+        where case_id = ${caseId}::uuid
+        order by sequence asc, id asc
       `;
-      return rows
-        .map((row) => ({
-          author: row.author,
-          body: row.body,
-          caseId: row.case_id,
-          createdAt: toIso(row.created_at),
-          id: row.id,
-          sequence: 0
-        }))
-        .sort((left, right) => {
-          const byTime = left.createdAt.localeCompare(right.createdAt);
-          return byTime !== 0 ? byTime : left.id.localeCompare(right.id);
-        })
-        .map((row, index) => ({ ...row, sequence: index + 1 }));
+      return rows.map((row) => ({
+        author: row.author,
+        body: row.body,
+        caseId: row.case_id,
+        createdAt: toIso(row.created_at),
+        id: row.id,
+        sequence: Number(row.sequence ?? 0)
+      }));
     },
     async insertCapability(record) {
       await sql`
@@ -520,8 +516,11 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
     },
     async insertSupportMessage(record) {
       await sql`
-        insert into public.agentic_support_messages (id, case_id, author, body, created_at)
-        values (${record.id}::uuid, ${record.caseId}::uuid, ${record.author}, ${record.body}, ${record.createdAt}::timestamptz)
+        insert into public.agentic_support_messages (id, case_id, author, body, created_at, sequence)
+        values (
+          ${record.id}::uuid, ${record.caseId}::uuid, ${record.author}, ${record.body},
+          ${record.createdAt}::timestamptz, ${record.sequence}
+        )
       `;
     },
     async listPaymentAudits(orderId) {

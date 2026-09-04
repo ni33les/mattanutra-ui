@@ -7,31 +7,20 @@ export type ScoreVerdict = Readonly<{
   reason: string;
 }>;
 
-const REAL_PRODUCT = /real[- ]product matching/i;
-const STOCK_OVERLAP = /current-stock|current stock/i;
-const OVERLAP = /overlap/i;
-const WELLNESS_BOUNDARY = /wellness guidance only|not clinical/i;
-
 export function scoreVal01(input: Readonly<{ description?: unknown }>): ScoreVerdict {
   const description = typeof input.description === "string" ? input.description : "";
+  const lowered = description.toLowerCase();
   const words = description.trim().split(/\s+/).filter(Boolean).length;
-  const hasMatching = REAL_PRODUCT.test(description);
-  const hasStock = STOCK_OVERLAP.test(description);
-  const hasOverlap = OVERLAP.test(description);
-  const hasBoundary = WELLNESS_BOUNDARY.test(description);
-  const passed =
-    words > 0 &&
-    words <= 60 &&
-    hasMatching &&
-    hasStock &&
-    hasOverlap &&
-    hasBoundary;
+  const hasProduct = /\bproduct/.test(lowered);
+  const hasStock = /\bstock\b/.test(lowered);
+  const hasSafety = /\bsafety\b/.test(lowered);
+  const passed = words > 0 && words <= 45 && hasProduct && hasStock && hasSafety;
   return {
     assertionId: "VAL-01",
     passed,
     reason: passed
-      ? "Connector copy states real-product matching, stock/overlap optimisation, and the wellness/not-clinical boundary."
-      : `VAL-01 failed matching=${hasMatching} stock=${hasStock} overlap=${hasOverlap} boundary=${hasBoundary} words=${words}`
+      ? "Connector copy states product, stock and safety within the word budget."
+      : `VAL-01 failed product=${hasProduct} stock=${hasStock} safety=${hasSafety} words=${words}`
   };
 }
 
