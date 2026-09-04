@@ -1,0 +1,16 @@
+{
+  "pack": "MattaNutra DEV TDD Pack v1.3",
+  "baselineBuild": "8b0bd20929f732147836dd3f696713aef2fb6b40",
+  "ctxRuns": 2,
+  "ctxFailingIdsIdentical": true,
+  "firstFailure": {
+    "id": "CTX-RED-01",
+    "path": "execute.checkoutExpiresAt",
+    "actual": "2026-09-02T00:15:00.000Z",
+    "expected": "2026-09-02T09:15:00.000Z"
+  },
+  "CTX-RED-05": {
+    "committed": { "now": "2026-09-02T09:00:00.000Z", "acquisitionMinor": 1000, "contextVersion": 3 },
+    "execute": { "checkoutExpiresAt": "2026-09-02T00:15:00.000Z", "acquisitionMinor": 0 }
+  }
+}

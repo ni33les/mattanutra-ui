@@ -10,6 +10,7 @@ export type PersistedQaNamespace = Readonly<{
   attribution: string;
   buildId: string;
   clientKey: string;
+  contextVersion: number;
   expiresAtMs: number;
   frozenSnapshot: CatalogueSnapshot | null;
   namespace: string;
@@ -26,8 +27,10 @@ const memoryCatalogues = new Map<string, CatalogueSnapshot>();
 const memoryPublished = new Map<string, string>();
 const memoryNamespaces = new Map<string, MemoryNamespace>();
 const durableNamespaces = new Map<string, MemoryNamespace>();
+const committedNamespaces = new Map<string, MemoryNamespace>();
 const queryCountsByNamespace = new Map<string, Record<string, number>>();
 const durableQueryCounts = new Map<string, Record<string, number>>();
+const committedQueryCounts = new Map<string, Record<string, number>>();
 
 function sql() {
   if (process.env.NODE_TEST_CONTEXT) {
@@ -63,15 +66,21 @@ export function resetQaPersistForTests() {
   memoryPublished.clear();
   memoryNamespaces.clear();
   durableNamespaces.clear();
+  committedNamespaces.clear();
   queryCountsByNamespace.clear();
   durableQueryCounts.clear();
+  committedQueryCounts.clear();
   persistCommitGate = null;
   queryBudgetCommitGate = null;
   queryBudgetPersistEntered = null;
 }
 
 function cloneNamespace(record: MemoryNamespace): MemoryNamespace {
-  return { ...record, queryCounts: { ...record.queryCounts } };
+  return {
+    ...record,
+    contextVersion: record.contextVersion ?? 1,
+    queryCounts: { ...record.queryCounts }
+  };
 }
 
 export function captureQaPersistLocal() {
@@ -108,6 +117,57 @@ export function primeLocalNamespaceFromDurable(namespace: string) {
 
 function rememberDurable(record: MemoryNamespace) {
   durableNamespaces.set(record.namespace, cloneNamespace(record));
+}
+
+function rememberCommitted(record: MemoryNamespace) {
+  committedNamespaces.set(record.namespace, cloneNamespace(record));
+}
+
+export function captureQaReplicaDurable() {
+  return {
+    durableNamespaces: new Map(
+      [...durableNamespaces.entries()].map(([key, value]) => [key, cloneNamespace(value)])
+    ),
+    durableQueryCounts: new Map(
+      [...durableQueryCounts.entries()].map(([key, value]) => [key, { ...value }])
+    )
+  };
+}
+
+export function restoreQaReplicaDurable(snapshot: ReturnType<typeof captureQaReplicaDurable>) {
+  durableNamespaces.clear();
+  durableQueryCounts.clear();
+  for (const [key, value] of snapshot.durableNamespaces) {
+    durableNamespaces.set(key, cloneNamespace(value));
+  }
+  for (const [key, value] of snapshot.durableQueryCounts) {
+    durableQueryCounts.set(key, { ...value });
+  }
+}
+
+export function emptyQaReplicaDurable() {
+  return {
+    durableNamespaces: new Map<string, MemoryNamespace>(),
+    durableQueryCounts: new Map<string, Record<string, number>>()
+  };
+}
+
+export function primeReplicaFromCommitted(namespace: string) {
+  const committed = committedNamespaces.get(namespace);
+  if (!committed) {
+    return;
+  }
+  const next = cloneNamespace(committed);
+  durableNamespaces.set(namespace, next);
+  memoryNamespaces.set(namespace, cloneNamespace(next));
+  const counts = committedQueryCounts.get(namespace) ?? next.queryCounts;
+  durableQueryCounts.set(namespace, { ...counts });
+  queryCountsByNamespace.set(namespace, { ...counts });
+}
+
+export function committedNamespaceOf(namespace: string) {
+  const record = committedNamespaces.get(namespace);
+  return record ? cloneNamespace(record) : null;
 }
 
 export function emptyQaPersistLocal() {
@@ -328,6 +388,7 @@ export async function persistQaNamespace(
     attribution: session.attribution,
     buildId: session.buildId,
     clientKey,
+    contextVersion: 1,
     expiresAtMs: Date.now() + NAMESPACE_TTL_MS,
     namespace: session.namespace,
     now: session.now,
@@ -338,6 +399,7 @@ export async function persistQaNamespace(
   };
   memoryNamespaces.set(session.namespace, record);
   rememberDurable(record);
+  rememberCommitted(record);
 
   if (session.frozenSnapshot) {
     await persistPublishedCatalogue(session.catalogueChecksum, session.frozenSnapshot, "first-writer");
@@ -381,11 +443,27 @@ export async function persistQaNamespaceClock(namespace: string, now: string) {
   await awaitPersistCommitGate();
   const current = memoryNamespaces.get(namespace);
   if (current) {
-    memoryNamespaces.set(namespace, { ...current, now });
+    memoryNamespaces.set(namespace, {
+      ...current,
+      contextVersion: (current.contextVersion ?? 1) + 1,
+      now
+    });
   }
   const durable = durableNamespaces.get(namespace);
   if (durable) {
-    rememberDurable({ ...durable, now });
+    rememberDurable({
+      ...durable,
+      contextVersion: (durable.contextVersion ?? 1) + 1,
+      now
+    });
+  }
+  const committed = committedNamespaces.get(namespace);
+  if (committed) {
+    rememberCommitted({
+      ...committed,
+      contextVersion: (committed.contextVersion ?? 1) + 1,
+      now
+    });
   }
 
   const db = sql();
@@ -414,7 +492,8 @@ export async function persistQaNamespaceChannel(
     memoryNamespaces.set(namespace, {
       ...current,
       acquisitionMinor: input.acquisitionMinor,
-      attribution: input.attribution
+      attribution: input.attribution,
+      contextVersion: (current.contextVersion ?? 1) + 1
     });
   }
   const durable = durableNamespaces.get(namespace);
@@ -422,7 +501,17 @@ export async function persistQaNamespaceChannel(
     rememberDurable({
       ...durable,
       acquisitionMinor: input.acquisitionMinor,
-      attribution: input.attribution
+      attribution: input.attribution,
+      contextVersion: (durable.contextVersion ?? 1) + 1
+    });
+  }
+  const committed = committedNamespaces.get(namespace);
+  if (committed) {
+    rememberCommitted({
+      ...committed,
+      acquisitionMinor: input.acquisitionMinor,
+      attribution: input.attribution,
+      contextVersion: (committed.contextVersion ?? 1) + 1
     });
   }
 
@@ -447,6 +536,7 @@ export async function persistQaNamespaceChannel(
 function persistQueryBudgetNow(namespace: string, counts: Record<string, number>) {
   queryCountsByNamespace.set(namespace, { ...counts });
   durableQueryCounts.set(namespace, { ...counts });
+  committedQueryCounts.set(namespace, { ...counts });
   const current = memoryNamespaces.get(namespace);
   if (current) {
     memoryNamespaces.set(namespace, { ...current, queryCounts: { ...counts } });
@@ -454,6 +544,10 @@ function persistQueryBudgetNow(namespace: string, counts: Record<string, number>
   const durable = durableNamespaces.get(namespace);
   if (durable) {
     rememberDurable({ ...durable, queryCounts: { ...counts } });
+  }
+  const committed = committedNamespaces.get(namespace);
+  if (committed) {
+    rememberCommitted({ ...committed, queryCounts: { ...counts } });
   }
 }
 
@@ -484,8 +578,10 @@ export function hasPersistedQueryCounts(namespace: string) {
 export async function deletePersistedQaNamespace(namespace: string) {
   memoryNamespaces.delete(namespace);
   durableNamespaces.delete(namespace);
+  committedNamespaces.delete(namespace);
   queryCountsByNamespace.delete(namespace);
   durableQueryCounts.delete(namespace);
+  committedQueryCounts.delete(namespace);
 
   const db = sql();
   if (!db) {
@@ -586,6 +682,7 @@ export async function loadQaNamespace(namespace: string): Promise<PersistedQaNam
       attribution: row.attribution,
       buildId: row.build_id,
       clientKey: row.client_key ?? "",
+      contextVersion: 1,
       expiresAtMs: Date.now() + NAMESPACE_TTL_MS,
       namespace,
       now: row.now_clock,
