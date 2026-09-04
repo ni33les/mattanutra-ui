@@ -24,6 +24,7 @@ import {
   mcpOneShotResponse,
   wantsMcpSse
 } from "@/lib/agentic/mcp/transport";
+import { assertReleaseManifestReady } from "@/lib/agentic/release-manifest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,8 +38,11 @@ function mcpReply(
   extraHeaders?: Record<string, string>
 ) {
   const accept = request.headers.get("accept");
+  const identity = assertReleaseManifestReady();
   return mcpOneShotResponse(accept, payload, status, {
     "x-request-id": requestCorrelationId(request),
+    "x-agentic-build-id": identity.buildId,
+    "x-agentic-schema-checksum": identity.schemaChecksum,
     ...extraHeaders
   });
 }
@@ -90,6 +94,7 @@ function timedToolName(body: unknown) {
 }
 
 export async function POST(request: Request) {
+  assertReleaseManifestReady();
   let body: unknown;
 
   try {

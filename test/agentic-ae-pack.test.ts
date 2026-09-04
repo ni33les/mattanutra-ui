@@ -773,7 +773,10 @@ export async function runAePack(): Promise<AePackReport> {
           conditions.includes("ckd") &&
           !keys.includes("recognisedNames") &&
           !keys.includes("latency") &&
-          !keys.includes("schemaChecksum") &&
+          keys.includes("schemaChecksum") &&
+          String(info.schemaChecksum).length === 64 &&
+          keys.includes("buildId") &&
+          String(info.buildId).length === 40 &&
           !keys.includes("migrationVersion") &&
           !keys.includes("checkoutBuild");
         return ok

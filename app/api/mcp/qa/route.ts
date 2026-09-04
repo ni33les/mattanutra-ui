@@ -19,6 +19,7 @@ import {
   simulatePayment
 } from "@/lib/agentic/qa/simulate";
 import { qaPreflight } from "@/lib/agentic/qa/preflight";
+import { assertReleaseManifestReady } from "@/lib/agentic/release-manifest";
 import { getRequestClientIp } from "@/lib/request-client-ip";
 import {
   beginQaRun,
@@ -41,16 +42,25 @@ export const dynamic = "force-dynamic";
 const log = createLogger("api.mcp.qa");
 
 function qaJson(payload: unknown, status = 200) {
-  return jsonCloseResponse(payload, status, { "Cache-Control": "no-store" });
+  const identity = assertReleaseManifestReady();
+  return jsonCloseResponse(payload, status, {
+    "Cache-Control": "no-store",
+    "x-agentic-build-id": identity.buildId,
+    "x-agentic-schema-checksum": identity.schemaChecksum
+  });
 }
 
 function qaRpc(request: Request, payload: unknown, status = 200) {
+  const identity = assertReleaseManifestReady();
   return mcpOneShotResponse(request.headers.get("accept"), payload, status, {
-    "Cache-Control": "no-store"
+    "Cache-Control": "no-store",
+    "x-agentic-build-id": identity.buildId,
+    "x-agentic-schema-checksum": identity.schemaChecksum
   });
 }
 
 export async function POST(request: Request) {
+  assertReleaseManifestReady();
   const runtime = getLiveAgenticRuntime(request);
 
   if (!qaHarnessAvailable(runtime.config)) {

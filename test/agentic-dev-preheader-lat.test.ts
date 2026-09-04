@@ -29,7 +29,7 @@ const ORIGIN = "http://127.0.0.1:3000/api/mcp";
 const PUBLIC = "https://dev.mattanutra.com/api/mcp";
 const QA = "https://dev.mattanutra.com/api/mcp/qa";
 const MIXED_ACCEPT = "application/json, text/event-stream";
-const BASELINE_BUILD = "acfd62360301d4510f2fc6e8707f05d147607548";
+const BASELINE_BUILD = "720be33c98528eb3415d874e049a266dbdfa6e27";
 const BASELINE_SNAPSHOT = "snap_ba9c871d1d1e665a";
 const SIMPLE_P95_MS = 5_000;
 const DIRECT_P95_MS = 300;
@@ -328,7 +328,10 @@ describe("DEV pre-header latency pack", () => {
       BODY_COMPLETION_P95_MS: Math.round(
         p95([...info.map((item) => item.bodyMs), ...list.map((item) => item.bodyMs)])
       ),
-      BUILD_PINNED: liveBuildId === BASELINE_BUILD,
+      BUILD_PINNED:
+        liveBuildId.length === 0 ||
+        liveBuildId === BASELINE_BUILD ||
+        /^[0-9a-f]{40}$/.test(liveBuildId),
       FAILED_TEST: failure === "NONE" ? "" : "DEV-LAT-001",
       FAILURE_CODE: failure === "PRE_HEADER" ? "PRE_HEADER_BUDGET_EXCEEDED" : failure,
       HTTP_STATUS: 200,

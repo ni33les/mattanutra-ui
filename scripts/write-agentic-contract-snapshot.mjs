@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import {
   AGENTIC_PUBLIC_TOOLS,
@@ -7,6 +6,7 @@ import {
   AGENTIC_TOOL_SCHEMAS
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
+import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
 
 const snapshot = {
   contractVersion: AGENTIC_CONTRACT_VERSION,
@@ -18,9 +18,7 @@ const snapshot = {
   }))
 };
 
-const schemaChecksum = createHash("sha256")
-  .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
-  .digest("hex");
+const schemaChecksum = computeSchemaChecksum();
 
 writeFileSync(
   new URL("../contract/mcp/3.0.0/tools.json", import.meta.url),

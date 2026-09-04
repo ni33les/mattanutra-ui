@@ -131,6 +131,21 @@ export function assertInternalQaHarness(config: AgenticConfig) {
   }
 }
 
+function pipelineBuildIdFromEnv() {
+  const injected =
+    process.env.AGENTIC_BUILD_ID?.trim() ||
+    process.env.COMMIT_SHA?.trim() ||
+    process.env.COMMIT_HASH?.trim() ||
+    "";
+  if (injected) {
+    return injected.toLowerCase();
+  }
+  if (process.env.NODE_TEST_CONTEXT) {
+    return "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  }
+  return "";
+}
+
 export function loadAgenticConfig(request?: Request): AgenticConfig {
   const environment = resolveAgenticEnvironment(request);
   const paymentProvider = paymentProviderForEnv(environment);
@@ -179,13 +194,14 @@ export function loadAgenticConfig(request?: Request): AgenticConfig {
     throw new Error("Mock Thailand retailer is only allowed in DEV");
   }
 
+  const buildId = pipelineBuildIdFromEnv();
+  if (!/^[0-9a-f]{40}$/.test(buildId)) {
+    throw new Error("AGENTIC_BUILD_ID must be a 40-character git SHA");
+  }
+
   return {
     activeMarkets: ["TH"],
-    buildId:
-      process.env.AGENTIC_BUILD_ID?.trim() ||
-      process.env.COMMIT_SHA?.trim() ||
-      process.env.COMMIT_HASH?.trim() ||
-      `local-${AGENTIC_SERVICE_VERSION}`,
+    buildId,
     capabilitySecret,
     checkoutTtlMs: AGENTIC_CHECKOUT_TTL_MS,
     continuation: "polling_only",

@@ -1070,7 +1070,10 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           stringList(info.conditionCodes).includes("ckd") &&
           !keys.includes("recognisedNames") &&
           !keys.includes("latency") &&
-          !keys.includes("schemaChecksum") &&
+          keys.includes("schemaChecksum") &&
+          String(info.schemaChecksum).length === 64 &&
+          keys.includes("buildId") &&
+          String(info.buildId).length === 40 &&
           !keys.includes("migrationVersion") &&
           !keys.includes("checkoutBuild") &&
           bannedDiagnosticHits(info).length === 0;
@@ -1472,6 +1475,8 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           "ok",
           "serviceName",
           "contractVersion",
+          "schemaChecksum",
+          "buildId",
           "supportedCountries",
           "supportedLocales",
           "medicationCodes",
@@ -1479,7 +1484,12 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           "userAccountRequired",
           "continuation",
           "pollAfterSeconds",
-          "supportAvailable"
+          "supportAvailable",
+          "description",
+          "valuePropositionId",
+          "wellnessBoundary",
+          "researchVersion",
+          "responsibilityVersion"
         ];
         const extra = keys.filter((key) => !allowed.includes(key));
         const missing = allowed.filter((key) => !keys.includes(key));
@@ -1508,9 +1518,13 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           stringList(first.supportedLocales).includes("en") &&
           stringList(first.medicationCodes).includes("apixaban") &&
           stringList(first.conditionCodes).includes("ckd") &&
-          !/recognisedNames|catalogueGaps|latency|schemaChecksum|migrationVersion|environment|buildId|checkoutBuild|matcherTelemetry|catalogueVersion/i.test(
+          !/recognisedNames|catalogueGaps|latency|migrationVersion|environment|checkoutBuild|matcherTelemetry|catalogueVersion/i.test(
             blob
           ) &&
+          typeof first.buildId === "string" &&
+          String(first.buildId).length === 40 &&
+          typeof first.schemaChecksum === "string" &&
+          String(first.schemaChecksum).length === 64 &&
           bannedDiagnosticHits(first).length === 0;
         return ok
           ? pass("AX2-13", { bytes: jsonSize(first), keys })

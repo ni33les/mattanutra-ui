@@ -616,9 +616,11 @@ describe("agentic P1 pack fixes", () => {
     assert.equal("supplements" in info, false);
     assert.equal("catalogueVersion" in info, false);
     assert.equal("recognisedNames" in info, false);
-    assert.equal("schemaChecksum" in info, false);
+    assert.equal(typeof info.schemaChecksum, "string");
+    assert.equal(String(info.schemaChecksum).length, 64);
     assert.equal("migrationVersion" in info, false);
-    assert.equal("buildId" in info, false);
+    assert.equal(typeof info.buildId, "string");
+    assert.equal(String(info.buildId).length, 40);
     assert.equal(info.serviceName, "MattaNutra");
     assert.equal(info.contractVersion, "3.0.0");
     assert.ok(Array.isArray(info.supportedCountries));

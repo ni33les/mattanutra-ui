@@ -1,0 +1,39 @@
+{
+  "httpStatus": 200,
+  "structuredContent": {
+    "ok": true,
+    "serviceName": "MattaNutra",
+    "contractVersion": "3.0.0",
+    "supportedCountries": [
+      {
+        "countryCode": "TH",
+        "countryName": "Thailand",
+        "currency": "THB"
+      }
+    ],
+    "supportedLocales": [
+      "en",
+      "th",
+      "zh-CN"
+    ],
+    "medicationCodes": [
+      "apixaban",
+      "eliquis"
+    ],
+    "conditionCodes": [
+      "af",
+      "atrial_fibrillation",
+      "ckd",
+      "chronic_kidney_disease"
+    ],
+    "userAccountRequired": false,
+    "continuation": "polling_only",
+    "pollAfterSeconds": 3,
+    "supportAvailable": true,
+    "description": "MattaNutra does real-product matching with current-stock and overlap optimization to agreed nutrient targets. It is wellness guidance only, not clinical diagnosis or a pharmacy, and does not replace clinical advice.",
+    "valuePropositionId": "vp_match_optimize_boundary_v1",
+    "wellnessBoundary": "wb_guidance_not_clinical_v1",
+    "researchVersion": "research-3.0.0",
+    "responsibilityVersion": "responsibility-3.0.0"
+  }
+}

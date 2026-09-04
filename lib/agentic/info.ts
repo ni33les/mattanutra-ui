@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import {
   AGENTIC_CONTRACT_VERSION,
@@ -7,7 +6,7 @@ import {
   AGENTIC_SERVICE_NAME,
   AGENTIC_SERVICE_VERSION
 } from "@/lib/agentic/config";
-import { AGENTIC_TOOL_SCHEMAS } from "@/lib/agentic/contract";
+
 import { listDeliverableMarkets } from "@/lib/agentic/catalogue/market";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
@@ -25,15 +24,19 @@ import {
   WELLNESS_BOUNDARY_ID
 } from "@/lib/agentic/discovery/versions";
 import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
+import {
+  computeSchemaChecksum,
+  releaseManifest
+} from "@/lib/agentic/release-manifest";
 
-export const AGENTIC_SCHEMA_CHECKSUM = createHash("sha256")
-  .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
-  .digest("hex");
+export const AGENTIC_SCHEMA_CHECKSUM = computeSchemaChecksum();
 
 export const PUBLIC_INFO_ALLOW_LIST = [
   "ok",
   "serviceName",
   "contractVersion",
+  "schemaChecksum",
+  "buildId",
   "supportedCountries",
   "supportedLocales",
   "medicationCodes",
@@ -124,11 +127,14 @@ function publicCapabilityInfo(input: Readonly<{
   medicationCodes: readonly string[];
   supportedCountries: readonly PublicInfoCountry[];
 }>): PublicInfo {
+  const identity = releaseManifest();
   void input.buildId;
   return {
     ok: true,
     serviceName: AGENTIC_SERVICE_NAME,
-    contractVersion: AGENTIC_CONTRACT_VERSION,
+    contractVersion: identity.contractVersion,
+    schemaChecksum: identity.schemaChecksum,
+    buildId: identity.buildId,
     supportedCountries: input.supportedCountries.map((item) => ({
       countryCode: item.countryCode,
       countryName: item.countryName,
@@ -144,8 +150,8 @@ function publicCapabilityInfo(input: Readonly<{
     description: connectorCopy(input.locale),
     valuePropositionId: VALUE_PROPOSITION_ID,
     wellnessBoundary: WELLNESS_BOUNDARY_ID,
-    researchVersion: RESEARCH_VERSION,
-    responsibilityVersion: RESPONSIBILITY_VERSION
+    researchVersion: identity.researchVersion,
+    responsibilityVersion: identity.responsibilityVersion
   };
 }
 

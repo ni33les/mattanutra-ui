@@ -1,7 +1,7 @@
 {
   "contractVersion": "3.0.0",
   "name": "mattanutra_dev",
-  "schemaChecksum": "f654293f7d678bfc49e92ff2cafb3e07a4344ef9c90823d373f56dbd059ef2a9",
+  "schemaChecksum": "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6",
   "tools": [
     {
       "description": "MattaNutra does real-product matching with current-stock and overlap optimization to agreed nutrient targets. It is wellness guidance only, not clinical diagnosis or a pharmacy, and does not replace clinical advice.",

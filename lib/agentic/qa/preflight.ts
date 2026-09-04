@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { AgenticEnvironment } from "@/lib/agentic/config";
-import { AGENTIC_SCHEMA_CHECKSUM } from "@/lib/agentic/info";
+import { releaseManifest } from "@/lib/agentic/release-manifest";
 import { CONNECTOR_COPY } from "@/lib/agentic/discovery/content";
 import { DISCOVERY_CONTENT_VERSION } from "@/lib/agentic/discovery/versions";
 import { agenticMessageKeys } from "@/lib/agentic/i18n";
@@ -82,7 +82,7 @@ export async function qaPreflight(namespace?: string, environment: AgenticEnviro
       fixtures: QA_FIXTURE_RECIPES,
       localeBundle: localeBundleChecksum(),
       locales: ["en", "th", "zh-CN"],
-      schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
+      schemaChecksum: releaseManifest().schemaChecksum
     }
   };
 }

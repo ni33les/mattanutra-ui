@@ -1,0 +1,144 @@
+{
+  "httpStatus": 200,
+  "structuredContent": {
+    "ok": true,
+    "packVersion": "3.0.0",
+    "clock": {
+      "now": "2026-09-02T00:00:00.000Z",
+      "settable": true
+    },
+    "namespaces": {
+      "begin": true,
+      "reset": true
+    },
+    "fulfilment": [
+      "preparing",
+      "dispatched",
+      "delivered"
+    ],
+    "observer": [
+      "funnel",
+      "queries",
+      "contribution"
+    ],
+    "manifest": {
+      "catalogueChecksum": "snap_4de5c9f934f92dec",
+      "catalogueVersion": "retail-TH-156",
+      "fixtures": {
+        "F_HAVE_90": {
+          "currentSupplements": [
+            {
+              "dailyAmount": 300,
+              "daysRemaining": 90,
+              "name": "Magnesium",
+              "unit": "mg"
+            }
+          ],
+          "targets": [
+            {
+              "amount": 300,
+              "name": "Magnesium",
+              "unit": "mg"
+            }
+          ]
+        },
+        "F_MISSING_DAYS": {
+          "currentSupplements": [
+            {
+              "dailyAmount": 300,
+              "name": "Magnesium",
+              "unit": "mg"
+            }
+          ],
+          "targets": [
+            {
+              "amount": 300,
+              "name": "Magnesium",
+              "unit": "mg"
+            }
+          ]
+        },
+        "F_MIXED": {
+          "targets": [
+            {
+              "amount": 3000,
+              "importance": "core",
+              "name": "Creatine",
+              "unit": "mg"
+            },
+            {
+              "amount": 300,
+              "importance": "optional",
+              "name": "Magnesium",
+              "unit": "mg"
+            },
+            {
+              "amount": 2000,
+              "importance": "conditional",
+              "name": "Vitamin D3",
+              "prerequisite": {
+                "status": "unsatisfied"
+              },
+              "unit": "IU"
+            }
+          ]
+        },
+        "F_READY_MAG": {
+          "targets": [
+            {
+              "amount": 300,
+              "name": "Magnesium",
+              "unit": "mg"
+            }
+          ]
+        },
+        "S349": {
+          "targets": [
+            {
+              "amount": 300,
+              "name": "Magnesium",
+              "unit": "mg"
+            }
+          ]
+        },
+        "S350": {
+          "medicationCodes": [
+            "apixaban"
+          ],
+          "profile": {
+            "ageYears": 52,
+            "lifeStage": "adult",
+            "sex": "male"
+          },
+          "targets": [
+            {
+              "amount": 1000,
+              "name": "Omega-3",
+              "unit": "mg"
+            }
+          ]
+        },
+        "S351": {
+          "profile": {
+            "ageYears": 8,
+            "lifeStage": "child"
+          },
+          "targets": [
+            {
+              "amount": 300,
+              "name": "Magnesium",
+              "unit": "mg"
+            }
+          ]
+        }
+      },
+      "localeBundle": "2a1300ad8cbaa1df4274b90fafc462914467e056769e8bcbe4bf69ee0e1c7dbf",
+      "locales": [
+        "en",
+        "th",
+        "zh-CN"
+      ],
+      "schemaChecksum": "f654293f7d678bfc49e92ff2cafb3e07a4344ef9c90823d373f56dbd059ef2a9"
+    }
+  }
+}
