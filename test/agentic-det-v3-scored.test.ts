@@ -237,8 +237,10 @@ describe("Slice S1 clock and query isolation", () => {
       correlationId: "ns-a",
       namespace: String(runA.namespace)
     });
-    const countA = Number((observeA1.queries as Record<string, number> | undefined)?.["catalogue.snapshot.TH"] ?? 0);
+    const queriesA1 = (observeA1.queries as Record<string, number> | undefined) ?? {};
+    const countA = Number(queriesA1["plan.match"] ?? 0);
     assert.ok(countA >= 1);
+    assert.equal(queriesA1["catalogue.snapshot.TH"], undefined);
 
     const runB = await qaCall(runtime, "beginRun", { runId: "B" });
     const scopeB = {
@@ -260,13 +262,12 @@ describe("Slice S1 clock and query isolation", () => {
       correlationId: "ns-a",
       namespace: String(runA.namespace)
     });
-    assert.equal(
-      Number((observeA2.queries as Record<string, number> | undefined)?.["catalogue.snapshot.TH"] ?? 0),
-      countA
-    );
-    assert.ok(
-      Number((observeB.queries as Record<string, number> | undefined)?.["catalogue.snapshot.TH"] ?? 0) >= 1
-    );
+    const queriesA2 = (observeA2.queries as Record<string, number> | undefined) ?? {};
+    const queriesB = (observeB.queries as Record<string, number> | undefined) ?? {};
+    assert.equal(Number(queriesA2["plan.match"] ?? 0), countA);
+    assert.ok(Number(queriesB["plan.match"] ?? 0) >= 1);
+    assert.equal(queriesA2["catalogue.snapshot.TH"], undefined);
+    assert.equal(queriesB["catalogue.snapshot.TH"], undefined);
     assert.notEqual(queryBudgetSnapshot(String(runA.namespace)), queryBudgetSnapshot(String(runB.namespace)));
   });
 });
@@ -635,9 +636,14 @@ describe("Slice 8.2 remaining scored holes", () => {
       namespace: String(begun.namespace)
     });
     const queries = (observed.queries ?? {}) as Record<string, number>;
-    assert.ok(typeof queries["catalogue.snapshot.TH"] === "number");
+    assert.equal(queries["catalogue.snapshot.TH"], undefined);
     assert.ok(typeof queries["plan.match"] === "number");
-    const budget = observed.dependencyBudget as { polling?: boolean; sleeps?: number };
+    const budget = observed.dependencyBudget as {
+      catalogueSnapshots?: number;
+      polling?: boolean;
+      sleeps?: number;
+    };
+    assert.equal(budget.catalogueSnapshots, 0);
     assert.equal(budget.sleeps, 0);
     assert.equal(budget.polling, false);
   });
