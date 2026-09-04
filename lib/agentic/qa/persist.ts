@@ -457,24 +457,28 @@ function persistQueryBudgetNow(namespace: string, counts: Record<string, number>
   }
 }
 
-export function persistQueryBudget(namespace: string, counts: Record<string, number>) {
+export async function persistQueryBudget(namespace: string, counts: Record<string, number>) {
   queryBudgetPersistEntered?.();
   if (queryBudgetCommitGate) {
-    const deferred = { ...counts };
-    void queryBudgetCommitGate.then(() => persistQueryBudgetNow(namespace, deferred));
-    return;
+    await queryBudgetCommitGate;
   }
   persistQueryBudgetNow(namespace, counts);
 }
 
 export function persistedQueryCounts(namespace: string) {
   return {
-    ...(queryCountsByNamespace.get(namespace) ?? memoryNamespaces.get(namespace)?.queryCounts ?? {})
+    ...(queryCountsByNamespace.get(namespace) ?? {}),
+    ...(memoryNamespaces.get(namespace)?.queryCounts ?? {}),
+    ...(durableQueryCounts.get(namespace) ?? {})
   };
 }
 
 export function hasPersistedQueryCounts(namespace: string) {
-  return queryCountsByNamespace.has(namespace);
+  return (
+    queryCountsByNamespace.has(namespace) ||
+    durableQueryCounts.has(namespace) ||
+    Object.keys(memoryNamespaces.get(namespace)?.queryCounts ?? {}).length > 0
+  );
 }
 
 export async function deletePersistedQaNamespace(namespace: string) {
@@ -504,14 +508,35 @@ function hydrateRecord(
   return { ...record, frozenSnapshot };
 }
 
+function activateNamespace(record: MemoryNamespace): PersistedQaNamespace | null {
+  if (record.expiresAtMs <= Date.now()) {
+    memoryNamespaces.delete(record.namespace);
+    durableNamespaces.delete(record.namespace);
+    queryCountsByNamespace.delete(record.namespace);
+    durableQueryCounts.delete(record.namespace);
+    return null;
+  }
+  const counts = {
+    ...(durableQueryCounts.get(record.namespace) ?? record.queryCounts)
+  };
+  const next = cloneNamespace({ ...record, queryCounts: counts });
+  memoryNamespaces.set(next.namespace, next);
+  rememberDurable(next);
+  if (Object.keys(counts).length > 0) {
+    queryCountsByNamespace.set(next.namespace, { ...counts });
+  }
+  return hydrateRecord(next, memoryCatalogues.get(next.snapshotId) ?? null);
+}
+
 export async function loadQaNamespace(namespace: string): Promise<PersistedQaNamespace | null> {
+  const durable = durableNamespaces.get(namespace);
+  if (durable) {
+    return activateNamespace(durable);
+  }
+
   const local = memoryNamespaces.get(namespace);
   if (local) {
-    if (local.expiresAtMs <= Date.now()) {
-      memoryNamespaces.delete(namespace);
-      return null;
-    }
-    return hydrateRecord(local, memoryCatalogues.get(local.snapshotId) ?? null);
+    return activateNamespace(local);
   }
 
   const db = sql();
@@ -570,10 +595,11 @@ export async function loadQaNamespace(namespace: string): Promise<PersistedQaNam
       snapshotId: row.snapshot_id
     };
     memoryNamespaces.set(namespace, record);
+    rememberDurable(record);
     if (snapshot) {
       rememberCatalogue(row.snapshot_id, snapshot);
     }
-    return hydrateRecord(record, snapshot);
+    return activateNamespace(record);
   } catch {
     return null;
   }

@@ -21,10 +21,15 @@ import {
 import { queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
 import {
   hasPersistedQueryCounts,
-  persistQueryBudget,
   persistedQueryCounts
 } from "@/lib/agentic/qa/persist";
-import { bindQaChannel, channelCost, qaSession, resolveQaSession } from "@/lib/agentic/qa/session";
+import {
+  bindQaChannel,
+  channelCost,
+  QA_NAMESPACE_PREFIX,
+  qaSession,
+  resolveQaSession
+} from "@/lib/agentic/qa/session";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
 const SCENARIOS: readonly PaymentEventScenario[] = [
@@ -44,14 +49,12 @@ const SCENARIOS: readonly PaymentEventScenario[] = [
   "partial_refund"
 ];
 
-function persistObservedQueries(namespace?: string | null) {
+function readObservedQueries(namespace?: string | null) {
   if (namespace) {
     if (hasPersistedQueryCounts(namespace)) {
       return persistedQueryCounts(namespace);
     }
-    const queries = queryBudgetSnapshot(namespace);
-    persistQueryBudget(namespace, queries);
-    return queries;
+    return queryBudgetSnapshot(namespace);
   }
   return queryBudgetSnapshot(namespace ?? undefined);
 }
@@ -196,10 +199,6 @@ export async function observeQaJourney(input: Readonly<{
     return businessError({ message: "Not found.", reasonCode: "not_found" });
   }
 
-  if (input.namespace) {
-    await resolveQaSession(input.namespace);
-  }
-
   let correlationId = input.correlationId ?? "";
   let order = null as Awaited<ReturnType<AgenticStore["getOrder"]>>;
 
@@ -220,6 +219,13 @@ export async function observeQaJourney(input: Readonly<{
     correlationId = correlationId || order?.planId || "";
   }
 
+  const namespace =
+    input.namespace ||
+    (order?.principalScope?.startsWith(QA_NAMESPACE_PREFIX) ? order.principalScope : undefined);
+  if (namespace) {
+    await resolveQaSession(namespace);
+  }
+
   if (!correlationId) {
     return businessError({
       fieldPath: "orderHandle",
@@ -229,7 +235,7 @@ export async function observeQaJourney(input: Readonly<{
   }
 
   await loadPersistedFunnelEvents(correlationId);
-  const session = qaSession(input.namespace);
+  const session = qaSession(namespace) ?? qaSession(input.namespace);
   if (session && correlationId && !order) {
     bindQaChannel(correlationId, session);
   }
@@ -247,8 +253,8 @@ export async function observeQaJourney(input: Readonly<{
   const shippingSubsidyMinor = frozen?.shippingSubsidyMinor ?? 0;
   const acquisitionMinor = frozen?.acquisitionMinor ?? cost.acquisitionMinor;
   const contribution = frozen?.contributionMinor ?? null;
-  const queryNs = input.namespace ?? session?.namespace;
-  const queries = persistObservedQueries(queryNs);
+  const queryNs = namespace ?? input.namespace ?? session?.namespace;
+  const queries = readObservedQueries(queryNs);
 
   return {
     ok: true as const,

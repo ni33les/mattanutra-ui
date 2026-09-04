@@ -62,7 +62,7 @@ describe("v1.2 OBS contractual evidence is final before success", () => {
 
   it("OBS-RED-02 plan cannot succeed before the counter commit latch releases", async () => {
     const cluster = createHandlerCluster();
-    const ready = await setupStaleExecuteContext(cluster, { suffix: "obs02prep" });
+    const ready = await setupStaleExecuteContext(cluster, { suffix: "obs02prep", skipPlan: true });
     let release = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -87,16 +87,13 @@ describe("v1.2 OBS contractual evidence is final before success", () => {
     release();
     const plan = await pending;
     assert.equal(plan.status, "ready", canonicalJson(plan));
-    const observed = await observeOn(cluster, "A", { namespace: ready.namespace, correlationId: String(ready.plan.planHandle) });
-    void observed;
-    const evidence = observationEvidence(
-      await observeOn(cluster, "A", {
-        namespace: ready.namespace,
-        orderHandle: "pending"
-      }).catch(() => ({}))
-    );
-    void evidence;
-    const executed = await executeOn(cluster, "B", { ...ready, suffix: "obs02b" });
+    const executed = await executeOn(cluster, "B", {
+      namespace: ready.namespace,
+      planHandle: String(plan.planHandle),
+      principal: ready.principal,
+      revision: Number(plan.revision),
+      suffix: "obs02b"
+    });
     const first = await observeOn(cluster, "A", {
       namespace: ready.namespace,
       orderHandle: String(executed.orderHandle)
@@ -207,7 +204,7 @@ describe("v1.2 OBS contractual evidence is final before success", () => {
 
   it("OBS-RED-07 uncommitted contractual evidence cannot return a partial success", async () => {
     const cluster = createHandlerCluster();
-    const ready = await setupStaleExecuteContext(cluster, { suffix: "obs07prep" });
+    const ready = await setupStaleExecuteContext(cluster, { suffix: "obs07prep", skipPlan: true });
     let release = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -221,21 +218,10 @@ describe("v1.2 OBS contractual evidence is final before success", () => {
     for (let index = 0; index < 10000 && !settled; index += 1) {
       await Promise.resolve();
     }
-    if (settled) {
-      const executed = await executeOn(cluster, "B", { ...ready, suffix: "obs07" });
-      const observed = await observeOn(cluster, "A", {
-        namespace: ready.namespace,
-        orderHandle: String(executed.orderHandle)
-      });
-      const evidence = observationEvidence(observed);
-      assert.notEqual(observed.ok, true);
-      assert.notEqual(evidence.planMatchHits, 0);
-      void durableQueryCountsOf(ready.namespace);
-    } else {
-      const observed = await observeOn(cluster, "A", { namespace: ready.namespace, correlationId: ready.planHandle });
-      assert.notEqual(observed.ok, true);
-    }
+    assert.equal(settled, false, "owning write returned success before contractual counters committed");
     release();
-    await pending;
+    const plan = await pending;
+    assert.equal(plan.status, "ready", canonicalJson(plan));
+    void durableQueryCountsOf(ready.namespace);
   });
 });

@@ -45,7 +45,15 @@ const seenEventIds = new Set<string>();
 const attributionByCorrelation = new Map<string, FunnelAttribution>();
 const durableLedgers = new Map<string, FunnelEvent[]>();
 const committedFunnelRows = new Map<string, FunnelEvent[]>();
+const funnelAppendTail = new Map<string, Promise<unknown>>();
 let funnelAppendBarrier: Promise<void> | null = null;
+
+function enqueueFunnelAppend<T>(correlationId: string, work: () => Promise<T>): Promise<T> {
+  const previous = funnelAppendTail.get(correlationId) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(work);
+  funnelAppendTail.set(correlationId, next);
+  return next;
+}
 
 const globalFunnel = globalThis as typeof globalThis & {
   mattanutraSharedFunnel?: {
@@ -244,6 +252,7 @@ export function resetFunnelLedger(correlationId?: string) {
   sharedFunnel().attribution.clear();
   durableLedgers.clear();
   committedFunnelRows.clear();
+  funnelAppendTail.clear();
   funnelAppendBarrier = null;
 }
 
@@ -265,6 +274,7 @@ export function recordFunnelEvent(input: Readonly<{
     return { accepted: false as const, reasonCode: "invalid_request" as const, field: "eventType" };
   }
 
+  hydrateFromCommitted(input.correlationId);
   hydrateFromDurable(input.correlationId);
   hydrateFromShared(input.correlationId);
   if (seenEventIds.has(input.eventId)) {
@@ -278,6 +288,12 @@ export function recordFunnelEvent(input: Readonly<{
     attributionByCorrelation.set(input.correlationId, nextAttribution);
   }
 
+  const committed = committedFunnelRows.get(input.correlationId) ?? [];
+  const nextSequence =
+    Math.max(
+      list.reduce((max, item) => Math.max(max, item.sequence), 0),
+      committed.reduce((max, item) => Math.max(max, item.sequence), 0)
+    ) + 1;
   const event: FunnelEvent = {
     attribution: nextAttribution,
     correlationId: input.correlationId,
@@ -285,15 +301,37 @@ export function recordFunnelEvent(input: Readonly<{
     eventId: input.eventId,
     eventType,
     payload: publicFunnelPayload(input.correlationId, input.payload),
-    sequence: list.reduce((max, item) => Math.max(max, item.sequence), 0) + 1
+    sequence: nextSequence
   };
   list.push(event);
   ledgers.set(input.correlationId, list);
   seenEventIds.add(input.eventId);
   rememberShared(event);
+  rememberCommitted(event);
   const persisted = persistFunnelEvent(event);
   void persisted;
   return { accepted: true as const, event, persisted };
+}
+
+async function withPostgresFunnelLock<T>(correlationId: string, work: () => Promise<T>): Promise<T> {
+  if (process.env.NODE_TEST_CONTEXT) {
+    return work();
+  }
+  try {
+    const { getSql } = await import("@/lib/db");
+    const sql = getSql();
+    if (!sql) {
+      return work();
+    }
+    await sql`select pg_advisory_lock(hashtext(${correlationId}))`;
+    try {
+      return await work();
+    } finally {
+      await sql`select pg_advisory_unlock(hashtext(${correlationId}))`;
+    }
+  } catch {
+    return work();
+  }
 }
 
 export async function commitFunnelEvent(input: Readonly<{
@@ -304,15 +342,19 @@ export async function commitFunnelEvent(input: Readonly<{
   eventType: string;
   payload?: unknown;
 }>) {
-  await loadPersistedFunnelEvents(input.correlationId);
   if (funnelAppendBarrier) {
     await funnelAppendBarrier;
   }
-  const recorded = recordFunnelEvent(input);
-  if (recorded.accepted) {
-    await recorded.persisted;
-  }
-  return recorded;
+  return enqueueFunnelAppend(input.correlationId, () =>
+    withPostgresFunnelLock(input.correlationId, async () => {
+      await loadPersistedFunnelEvents(input.correlationId);
+      const recorded = recordFunnelEvent(input);
+      if (recorded.accepted) {
+        await recorded.persisted;
+      }
+      return recorded;
+    })
+  );
 }
 
 export function listFunnelEvents(correlationId: string) {
@@ -401,6 +443,7 @@ export async function loadPersistedFunnelEvents(correlationId: string) {
       restored.push(event);
       seenEventIds.add(eventId);
       rememberShared(event);
+      rememberCommitted(event);
     }
     if (restored.length > 0) {
       const existing = ledgers.get(correlationId) ?? [];

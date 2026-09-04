@@ -45,7 +45,7 @@ import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
-import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
+import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
 import { queryBudgetSnapshot, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
 import { persistQueryBudget } from "@/lib/agentic/qa/persist";
 import { QA_NAMESPACE_PREFIX } from "@/lib/agentic/qa/session";
@@ -833,11 +833,11 @@ export async function planTool(input: Readonly<{
     }
   }
 
-  const work = executePlanTool(input).then((result) => {
+  const work = executePlanTool(input).then(async (result) => {
     const namespace = input.scope.principalScope;
     if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
       setQueryNamespace(namespace);
-      persistQueryBudget(
+      await persistQueryBudget(
         namespace,
         Object.fromEntries(
           Object.entries({
@@ -1599,7 +1599,7 @@ async function persistTerminalPlan(input: Readonly<{
       evidenceHandle,
       researchVersion: planResearchVersion()
     };
-    const infoShown = recordFunnelEvent({
+    await commitFunnelEvent({
       attribution: "agent_connector",
       correlationId: input.planId,
       createdAt: input.input.now,
@@ -1607,7 +1607,7 @@ async function persistTerminalPlan(input: Readonly<{
       eventType: "info_shown",
       payload: { locale: input.locale }
     });
-    const planCreated = recordFunnelEvent({
+    await commitFunnelEvent({
       attribution: "agent_connector",
       correlationId: input.planId,
       createdAt: input.input.now,
@@ -1615,30 +1615,20 @@ async function persistTerminalPlan(input: Readonly<{
       eventType: "plan_created",
       payload: { locale: input.locale }
     });
-    const planReady =
-      result.status === "ready"
-        ? recordFunnelEvent({
-            attribution: "agent_connector",
-            correlationId: input.planId,
-            createdAt: input.input.now,
-            eventId: `plan-ready:${input.planId}:${input.revision}`,
-            eventType: "plan_ready",
-            payload: { locale: input.locale }
-          })
-        : null;
-    if (infoShown.accepted) {
-      await infoShown.persisted;
-    }
-    if (planCreated.accepted) {
-      await planCreated.persisted;
-    }
-    if (planReady?.accepted) {
-      await planReady.persisted;
+    if (result.status === "ready") {
+      await commitFunnelEvent({
+        attribution: "agent_connector",
+        correlationId: input.planId,
+        createdAt: input.input.now,
+        eventId: `plan-ready:${input.planId}:${input.revision}`,
+        eventType: "plan_ready",
+        payload: { locale: input.locale }
+      });
     }
     const namespace = input.input.scope.principalScope;
     if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
       setQueryNamespace(namespace);
-      persistQueryBudget(
+      await persistQueryBudget(
         namespace,
         Object.fromEntries(
           Object.entries({

@@ -31,7 +31,7 @@ import {
   DEFAULT_TAX_MINOR,
   payableSnapshot
 } from "@/lib/agentic/money";
-import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
+import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
 import { freezeContributionInputs } from "@/lib/agentic/funnel/events";
 import {
   bindQaChannel,
@@ -476,7 +476,7 @@ async function executeFresh(
       store
     });
 
-    const executeCreated = recordFunnelEvent({
+    await commitFunnelEvent({
       attribution: "agent_connector",
       correlationId: plan.id,
       createdAt: now,
@@ -484,7 +484,7 @@ async function executeFresh(
       eventType: "execute_created",
       payload: { locale }
     });
-    const checkoutOpened = recordFunnelEvent({
+    await commitFunnelEvent({
       attribution: "agent_connector",
       correlationId: plan.id,
       createdAt: now,
@@ -492,12 +492,6 @@ async function executeFresh(
       eventType: "checkout_opened",
       payload: { locale }
     });
-    if (executeCreated.accepted) {
-      await executeCreated.persisted;
-    }
-    if (checkoutOpened.accepted) {
-      await checkoutOpened.persisted;
-    }
 
     return response;
   });

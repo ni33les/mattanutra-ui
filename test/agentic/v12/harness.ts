@@ -577,6 +577,7 @@ export async function setupStaleExecuteContext(
     plan?: HandlerId;
     runId?: string;
     acquisitionMinor?: number;
+    skipPlan?: boolean;
   }>
 ): Promise<ReadyPlan> {
   const setup = input.setup ?? "A";
@@ -590,6 +591,15 @@ export async function setupStaleExecuteContext(
     await cluster.primeFromDurable(planner, begun.namespace);
   }
   await warmMatchCache(cluster, planner, input.suffix);
+  if (input.skipPlan) {
+    return {
+      namespace: begun.namespace,
+      plan: {},
+      planHandle: "",
+      principal: begun.principal,
+      revision: 0
+    };
+  }
   const plan = await planOn(cluster, planner, { ...begun, suffix: input.suffix });
   return {
     namespace: begun.namespace,
