@@ -713,8 +713,8 @@ export async function packProof(runtime: AgenticRuntime) {
   );
 
   const latency = await latencyProof(runtime);
-  checks.push(check("D10-02", latency.passed, latency.checks));
-  checks.push(check("D10-05", latency.passed, latency.checks));
+  checks.push(check("D10-02", latency.passed, latency.plan));
+  checks.push(check("D10-05", latency.passed, latency.plan));
   checks.push(check("D10-06", info.pollAfterSeconds >= 3, { pollAfterSeconds: info.pollAfterSeconds }));
   const reread = await orderTool({
     config: runtime.config,
