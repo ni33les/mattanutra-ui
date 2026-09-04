@@ -18,8 +18,12 @@ import {
   listFunnelEvents,
   loadPersistedFunnelEvents
 } from "@/lib/agentic/funnel/ledger";
-import { dependencyBudget, queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
-import { persistQueryBudget } from "@/lib/agentic/qa/persist";
+import { queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
+import {
+  hasPersistedQueryCounts,
+  persistQueryBudget,
+  persistedQueryCounts
+} from "@/lib/agentic/qa/persist";
 import { bindQaChannel, channelCost, qaSession, resolveQaSession } from "@/lib/agentic/qa/session";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
@@ -41,11 +45,25 @@ const SCENARIOS: readonly PaymentEventScenario[] = [
 ];
 
 function persistObservedQueries(namespace?: string | null) {
-  const queries = queryBudgetSnapshot(namespace ?? undefined);
   if (namespace) {
+    if (hasPersistedQueryCounts(namespace)) {
+      return persistedQueryCounts(namespace);
+    }
+    const queries = queryBudgetSnapshot(namespace);
     persistQueryBudget(namespace, queries);
+    return queries;
   }
-  return queries;
+  return queryBudgetSnapshot(namespace ?? undefined);
+}
+
+function frozenDependencyBudget(queries: Record<string, number>) {
+  return {
+    catalogueSnapshots: queries["catalogue.snapshot.TH"] ?? 0,
+    planMatchHits: queries["plan.match.hit"] ?? 0,
+    planMatchMisses: queries["plan.match.miss"] ?? 0,
+    polling: false as const,
+    sleeps: 0 as const
+  };
 }
 
 export function isPaymentScenario(value: unknown): value is PaymentEventScenario {
@@ -230,6 +248,7 @@ export async function observeQaJourney(input: Readonly<{
   const acquisitionMinor = frozen?.acquisitionMinor ?? cost.acquisitionMinor;
   const contribution = frozen?.contributionMinor ?? null;
   const queryNs = input.namespace ?? session?.namespace;
+  const queries = persistObservedQueries(queryNs);
 
   return {
     ok: true as const,
@@ -247,7 +266,7 @@ export async function observeQaJourney(input: Readonly<{
     contributionMinor: contribution,
     correlationId,
     currency: frozen?.currency ?? order?.currency ?? null,
-    dependencyBudget: dependencyBudget(queryNs),
+    dependencyBudget: frozenDependencyBudget(queries),
     paymentFeeMinor,
     paymentMinor: order ? paymentMinor : null,
     productCostMinor: order ? productCostMinor : null,
@@ -262,6 +281,6 @@ export async function observeQaJourney(input: Readonly<{
       sequence: event.sequence
     })),
     namespace: queryNs ?? null,
-    queries: persistObservedQueries(queryNs)
+    queries
   };
 }

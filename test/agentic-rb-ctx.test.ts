@@ -11,7 +11,6 @@ import {
   contributionOf,
   createHandlerCluster,
   endRbRun,
-  publicCall,
   qaCall
 } from "./agentic/rb-v1/harness.ts";
 import {
@@ -181,6 +180,13 @@ describe("RB-CTX first divergence", () => {
       )
     );
     assert.equal(plan.status, "ready", canonicalJson(plan));
+    await cluster.asHandler("A", (runtime) =>
+      qaCall(runtime, "setChannel", {
+        acquisitionMinor: RB_V1_ACQUISITION,
+        attribution: "agent_connector",
+        namespace
+      })
+    );
 
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
@@ -203,11 +209,25 @@ describe("RB-CTX first divergence", () => {
     assert.equal(setter.clock, RB_V1_CLOCK_09);
     setPersistCommitGateForTests(null);
     cluster.clearHandler("B");
+    const laterPlan = asRecord(
+      await cluster.asHandler("A", (runtime) =>
+        planTool({
+          config: runtime.config,
+          now: RB_V1_CLOCK_09,
+          payload: { idempotencyKey: "rb-plan-04bxxxxxxxxx", request: goldenPlanRequest() },
+          scope: {
+            ...runtime.scope,
+            principalScope: String(begun.principalScope ?? namespace)
+          },
+          store: runtime.store
+        })
+      )
+    );
     const committed = await executeOn(cluster, "B", {
       namespace,
-      planHandle: String(plan.planHandle),
+      planHandle: String(laterPlan.planHandle),
       principal: String(begun.principalScope ?? namespace),
-      revision: Number(plan.revision),
+      revision: Number(laterPlan.revision),
       suffix: "04b"
     });
     assert.equal(contributionOf(committed).checkoutExpiresAt, RB_V1_EXPIRY_09_15);
@@ -221,8 +241,9 @@ describe("RB-CTX first divergence", () => {
     cluster.clearHandler("A");
     cluster.clearHandler("B");
     const executed = await executeOn(cluster, "B", { ...ready, suffix: "05" });
+    const error = asRecord(executed.error);
     assert.equal(executed.ok, false);
-    assert.equal(executed.reasonCode, "run_invalid");
+    assert.equal(error.reasonCode, "run_invalid");
     assert.equal(executed.checkoutExpiresAt, undefined);
     assert.equal(contributionOf(executed).acquisitionMinor, null);
   });

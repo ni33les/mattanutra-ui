@@ -15,7 +15,12 @@ import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
 import type { AgenticStore } from "../../../lib/agentic/store/types.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "../../helpers/gold-catalogue.ts";
-import { flushFunnelProcessCache, resetFunnelLedger } from "../../../lib/agentic/funnel/ledger.ts";
+import {
+  captureFunnelProcessState,
+  flushFunnelProcessCache,
+  resetFunnelLedger,
+  restoreFunnelProcessState
+} from "../../../lib/agentic/funnel/ledger.ts";
 import { resetCatalogueSnapshotCache } from "../../../lib/agentic/catalogue/snapshot.ts";
 import { resetQaPersistForTests } from "../../../lib/agentic/qa/persist.ts";
 import {
@@ -36,7 +41,7 @@ import { RB_V1_CLOCK_00 } from "./manifest.ts";
 export type HandlerId = "A" | "B" | "C";
 
 type HandlerLocal = {
-  persistQuery?: ReturnType<typeof captureQueryBudgetState>;
+  funnel: ReturnType<typeof captureFunnelProcessState>;
   qa: ReturnType<typeof captureQaLocalState>;
   query: ReturnType<typeof captureQueryBudgetState>;
 };
@@ -65,6 +70,14 @@ export function canonicalHash(value: unknown) {
 
 function emptyHandlerLocal(): HandlerLocal {
   return {
+    funnel: {
+      attribution: new Map(),
+      ledgers: new Map(),
+      seen: new Set(),
+      sharedAttribution: new Map(),
+      sharedLedgers: new Map(),
+      sharedSeen: new Set()
+    },
     qa: {
       activeNamespace: null,
       costByCorrelation: new Map(),
@@ -138,18 +151,22 @@ export function createHandlerCluster() {
   async function asHandler<T>(id: HandlerId, work: (runtime: AgenticRuntime) => Promise<T> | T) {
     const previousQa = captureQaLocalState();
     const previousQuery = captureQueryBudgetState();
+    const previousFunnel = captureFunnelProcessState();
     restoreQaLocalState(locals[id].qa);
     restoreQueryBudgetState(locals[id].query);
+    restoreFunnelProcessState(locals[id].funnel);
     setAgenticRuntimeForTests(runtimes[id]);
     try {
       return await work(runtimes[id]);
     } finally {
       locals[id] = {
+        funnel: captureFunnelProcessState(),
         qa: captureQaLocalState(),
         query: captureQueryBudgetState()
       };
       restoreQaLocalState(previousQa);
       restoreQueryBudgetState(previousQuery);
+      restoreFunnelProcessState(previousFunnel);
     }
   }
 

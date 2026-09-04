@@ -25,6 +25,7 @@ type MemoryNamespace = Omit<PersistedQaNamespace, "frozenSnapshot">;
 const memoryCatalogues = new Map<string, CatalogueSnapshot>();
 const memoryPublished = new Map<string, string>();
 const memoryNamespaces = new Map<string, MemoryNamespace>();
+const queryCountsByNamespace = new Map<string, Record<string, number>>();
 
 function sql() {
   if (process.env.NODE_TEST_CONTEXT) {
@@ -59,6 +60,7 @@ export function resetQaPersistForTests() {
   memoryCatalogues.clear();
   memoryPublished.clear();
   memoryNamespaces.clear();
+  queryCountsByNamespace.clear();
   persistCommitGate = null;
 }
 
@@ -352,10 +354,21 @@ export async function persistQaNamespaceChannel(
 }
 
 export function persistQueryBudget(namespace: string, counts: Record<string, number>) {
+  queryCountsByNamespace.set(namespace, { ...counts });
   const current = memoryNamespaces.get(namespace);
   if (current) {
     memoryNamespaces.set(namespace, { ...current, queryCounts: { ...counts } });
   }
+}
+
+export function persistedQueryCounts(namespace: string) {
+  return {
+    ...(queryCountsByNamespace.get(namespace) ?? memoryNamespaces.get(namespace)?.queryCounts ?? {})
+  };
+}
+
+export function hasPersistedQueryCounts(namespace: string) {
+  return queryCountsByNamespace.has(namespace);
 }
 
 export async function deletePersistedQaNamespace(namespace: string) {

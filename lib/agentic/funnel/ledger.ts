@@ -43,6 +43,7 @@ function publicFunnelPayload(
 const ledgers = new Map<string, FunnelEvent[]>();
 const seenEventIds = new Set<string>();
 const attributionByCorrelation = new Map<string, FunnelAttribution>();
+const durableLedgers = new Map<string, FunnelEvent[]>();
 
 const globalFunnel = globalThis as typeof globalThis & {
   mattanutraSharedFunnel?: {
@@ -98,6 +99,77 @@ export function flushFunnelProcessCache() {
   attributionByCorrelation.clear();
 }
 
+export function captureFunnelProcessState() {
+  const shared = sharedFunnel();
+  return {
+    attribution: new Map(attributionByCorrelation),
+    ledgers: new Map([...ledgers.entries()].map(([key, list]) => [key, [...list]])),
+    seen: new Set(seenEventIds),
+    sharedAttribution: new Map(shared.attribution),
+    sharedLedgers: new Map([...shared.ledgers.entries()].map(([key, list]) => [key, [...list]])),
+    sharedSeen: new Set(shared.seen)
+  };
+}
+
+export function restoreFunnelProcessState(
+  snapshot: ReturnType<typeof captureFunnelProcessState>
+) {
+  ledgers.clear();
+  seenEventIds.clear();
+  attributionByCorrelation.clear();
+  for (const [key, list] of snapshot.ledgers) {
+    ledgers.set(key, [...list]);
+  }
+  for (const id of snapshot.seen) {
+    seenEventIds.add(id);
+  }
+  for (const [key, value] of snapshot.attribution) {
+    attributionByCorrelation.set(key, value);
+  }
+  const shared = sharedFunnel();
+  shared.ledgers.clear();
+  shared.seen.clear();
+  shared.attribution.clear();
+  for (const [key, list] of snapshot.sharedLedgers) {
+    shared.ledgers.set(key, [...list]);
+  }
+  for (const id of snapshot.sharedSeen) {
+    shared.seen.add(id);
+  }
+  for (const [key, value] of snapshot.sharedAttribution) {
+    shared.attribution.set(key, value);
+  }
+}
+
+function hydrateFromDurable(correlationId: string) {
+  const durable = durableLedgers.get(correlationId);
+  if (!durable?.length) {
+    return;
+  }
+  const existing = ledgers.get(correlationId) ?? [];
+  const seen = new Set(existing.map((item) => item.eventId));
+  const merged = [...existing];
+  for (const event of durable) {
+    if (seen.has(event.eventId)) {
+      continue;
+    }
+    merged.push(event);
+    seenEventIds.add(event.eventId);
+    rememberShared(event);
+  }
+  merged.sort((left, right) =>
+    left.sequence === right.sequence
+      ? left.createdAt.localeCompare(right.createdAt)
+      : left.sequence - right.sequence
+  );
+  if (merged.length > 0) {
+    ledgers.set(correlationId, merged);
+    if (!attributionByCorrelation.has(correlationId) && merged[0]) {
+      attributionByCorrelation.set(correlationId, merged[0].attribution);
+    }
+  }
+}
+
 export function resetFunnelLedger(correlationId?: string) {
   if (correlationId) {
     const existing = ledgers.get(correlationId) ?? [];
@@ -122,6 +194,7 @@ export function resetFunnelLedger(correlationId?: string) {
   sharedFunnel().ledgers.clear();
   sharedFunnel().seen.clear();
   sharedFunnel().attribution.clear();
+  durableLedgers.clear();
 }
 
 export function recordFunnelEvent(input: Readonly<{
@@ -142,6 +215,7 @@ export function recordFunnelEvent(input: Readonly<{
     return { accepted: false as const, reasonCode: "invalid_request" as const, field: "eventType" };
   }
 
+  hydrateFromDurable(input.correlationId);
   hydrateFromShared(input.correlationId);
   if (seenEventIds.has(input.eventId)) {
     return { accepted: false as const, reasonCode: "duplicate" as const, field: "eventId" };
@@ -194,6 +268,10 @@ export function listFunnelEvents(correlationId: string) {
 }
 
 async function persistFunnelEvent(event: FunnelEvent) {
+  const durable = durableLedgers.get(event.correlationId) ?? [];
+  if (!durable.some((item) => item.eventId === event.eventId)) {
+    durableLedgers.set(event.correlationId, [...durable, event]);
+  }
   if (process.env.NODE_TEST_CONTEXT) {
     return;
   }
@@ -225,6 +303,7 @@ async function persistFunnelEvent(event: FunnelEvent) {
 
 export async function loadPersistedFunnelEvents(correlationId: string) {
   hydrateFromShared(correlationId);
+  hydrateFromDurable(correlationId);
 
   if (process.env.NODE_TEST_CONTEXT) {
     return listFunnelEvents(correlationId);

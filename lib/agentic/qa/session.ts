@@ -108,22 +108,20 @@ export async function resolveQaSession(namespace?: string | null) {
   }
 
   const local = sessions.get(namespace);
-  if (local?.frozenSnapshot) {
-    return local;
-  }
-
   const loaded = await loadQaNamespace(namespace);
   if (!loaded) {
     return local ?? null;
   }
 
+  const frozenSnapshot = loaded.frozenSnapshot ?? local?.frozenSnapshot ?? null;
   const session: QaSession = {
     acquisitionMinor: loaded.acquisitionMinor,
     attribution: attributionOf(loaded.attribution),
     buildId: loaded.buildId,
     catalogueChecksum: loaded.snapshotId,
-    catalogueVersion: loaded.frozenSnapshot?.catalogueVersion ?? "",
-    frozenSnapshot: loaded.frozenSnapshot,
+    catalogueVersion:
+      frozenSnapshot?.catalogueVersion ?? local?.catalogueVersion ?? "",
+    frozenSnapshot,
     namespace: loaded.namespace,
     now: loaded.now,
     principalScope: loaded.principalScope,

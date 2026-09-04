@@ -33,7 +33,12 @@ import {
 } from "@/lib/agentic/money";
 import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
 import { freezeContributionInputs } from "@/lib/agentic/funnel/events";
-import { bindQaChannel, channelForScope } from "@/lib/agentic/qa/session";
+import {
+  bindQaChannel,
+  channelForScope,
+  QA_NAMESPACE_PREFIX,
+  resolveQaSession
+} from "@/lib/agentic/qa/session";
 
 const executeLocks = new WeakMap<AgenticStore, Map<string, Promise<unknown>>>();
 
@@ -194,6 +199,34 @@ async function executeFresh(
     return executeError("en", "plan_not_ready");
   }
 
+  const namespace =
+    peekedPlan.principalScope?.startsWith(QA_NAMESPACE_PREFIX)
+      ? peekedPlan.principalScope
+      : input.scope.principalScope?.startsWith(QA_NAMESPACE_PREFIX)
+        ? input.scope.principalScope
+        : null;
+  let now = input.now;
+  let channel = channelForScope({
+    principalScope: namespace ?? input.scope.principalScope
+  });
+  if (namespace) {
+    const session = await resolveQaSession(namespace);
+    if (!session) {
+      return {
+        error: {
+          message: "QA namespace context is missing.",
+          reasonCode: "run_invalid" as const
+        },
+        ok: false as const
+      };
+    }
+    now = session.now;
+    channel = {
+      acquisitionMinor: session.acquisitionMinor,
+      attribution: session.attribution
+    };
+  }
+
   const peekedResult = peekedRevision.result as PlanResult;
   const snapshot = await ensureCatalogueSnapshot(
     input.config.environment,
@@ -205,7 +238,7 @@ async function executeFresh(
       action: "plan.execute",
       config: input.config,
       handle: input.planHandle,
-      now: input.now,
+      now,
       resourceType: "plan",
       scope: input.scope,
       store
@@ -271,7 +304,7 @@ async function executeFresh(
       }
       await commitIdempotency({
         key: input.idempotencyKey,
-        now: input.now,
+        now,
         operation: "execute",
         ownerScope,
         payload,
@@ -287,7 +320,6 @@ async function executeFresh(
       subtotalMinor: selected.totalPriceMinor,
       taxMinor: DEFAULT_TAX_MINOR
     });
-    const channel = channelForScope(input.scope);
     bindQaChannel(plan.id, channel);
     const contribution = freezeContributionInputs({
       acquisitionMinor: channel.acquisitionMinor,
@@ -303,8 +335,8 @@ async function executeFresh(
     const checkoutIssued = await issueCapability({
       allowedActions: ["checkout.pay"],
       config: input.config,
-      expiresAt: new Date(Date.parse(input.now) + input.config.checkoutTtlMs).toISOString(),
-      now: input.now,
+      expiresAt: new Date(Date.parse(now) + input.config.checkoutTtlMs).toISOString(),
+      now,
       resourceId: orderId,
       resourceType: "checkout",
       scope: input.scope,
@@ -316,7 +348,7 @@ async function executeFresh(
       checkoutExpiresAt: checkoutIssued.record.expiresAt,
       checkoutUrl: null,
       completedAt: null,
-      createdAt: input.now,
+      createdAt: now,
       currency: result.requestSnapshot.currency,
       destinationCountry: result.requestSnapshot.destinationCountry,
       environment: input.scope.environment,
@@ -352,13 +384,13 @@ async function executeFresh(
       paymentStatus: "unpaid" as const,
       planId: plan.id,
       planRevision: plan.currentRevision,
-      principalScope: input.scope.principalScope,
+      principalScope: namespace ?? input.scope.principalScope,
       providerSessionId: null,
       reference,
       stateVersion: 1,
       tenantScope: input.scope.tenantScope,
       totalPriceMinor: payable.totalPriceMinor,
-      updatedAt: input.now
+      updatedAt: now
     };
 
     await store.insertOrder(draftOrder);
@@ -382,7 +414,7 @@ async function executeFresh(
 
     const session = await input.payment.createCheckoutSession({
       config: input.config,
-      now: input.now,
+      now,
       order: draftOrder
     });
     const orderNumber = reference;
@@ -397,7 +429,7 @@ async function executeFresh(
     await store.updateOrder(order);
     await store.insertCheckout({
       accessHash: order.checkoutAccessHash!,
-      createdAt: input.now,
+      createdAt: now,
       encryptedAddress: null,
       expiresAt: session.expiresAt,
       id: nextTestUuid(),
@@ -410,7 +442,7 @@ async function executeFresh(
     const orderCapability = await issueCapability({
       allowedActions: ["order.read", "support.create"],
       config: input.config,
-      now: input.now,
+      now,
       resourceId: orderId,
       resourceType: "order",
       scope: input.scope,
@@ -438,7 +470,7 @@ async function executeFresh(
 
     await commitIdempotency({
       key: input.idempotencyKey,
-      now: input.now,
+      now,
       operation: "execute",
       ownerScope,
       payload,
@@ -450,7 +482,7 @@ async function executeFresh(
     const executeCreated = recordFunnelEvent({
       attribution: "agent_connector",
       correlationId: plan.id,
-      createdAt: input.now,
+      createdAt: now,
       eventId: `execute:${orderId}`,
       eventType: "execute_created",
       payload: { locale }
@@ -458,7 +490,7 @@ async function executeFresh(
     const checkoutOpened = recordFunnelEvent({
       attribution: "agent_connector",
       correlationId: plan.id,
-      createdAt: input.now,
+      createdAt: now,
       eventId: `checkout:${orderId}`,
       eventType: "checkout_opened",
       payload: { locale }

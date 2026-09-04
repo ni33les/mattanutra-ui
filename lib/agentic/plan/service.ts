@@ -46,7 +46,9 @@ import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { recordFunnelEvent } from "@/lib/agentic/funnel/ledger";
-import { setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { queryBudgetSnapshot, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { persistQueryBudget } from "@/lib/agentic/qa/persist";
+import { QA_NAMESPACE_PREFIX } from "@/lib/agentic/qa/session";
 import { buildHorizonPlan, ordersInHorizon } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -831,7 +833,23 @@ export async function planTool(input: Readonly<{
     }
   }
 
-  const work = executePlanTool(input);
+  const work = executePlanTool(input).then((result) => {
+    const namespace = input.scope.principalScope;
+    if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
+      setQueryNamespace(namespace);
+      persistQueryBudget(
+        namespace,
+        Object.fromEntries(
+          Object.entries({
+            ...queryBudgetSnapshot("global"),
+            ...queryBudgetSnapshot(namespace),
+            ...queryBudgetSnapshot()
+          }).filter(([key]) => !key.startsWith("catalogue.snapshot."))
+        )
+      );
+    }
+    return result;
+  });
   if (inflightKey) {
     inflightPlanIdempotency.set(inflightKey, work);
     void work
@@ -1616,6 +1634,20 @@ async function persistTerminalPlan(input: Readonly<{
     }
     if (planReady?.accepted) {
       await planReady.persisted;
+    }
+    const namespace = input.input.scope.principalScope;
+    if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
+      setQueryNamespace(namespace);
+      persistQueryBudget(
+        namespace,
+        Object.fromEntries(
+          Object.entries({
+            ...queryBudgetSnapshot("global"),
+            ...queryBudgetSnapshot(namespace),
+            ...queryBudgetSnapshot()
+          }).filter(([key]) => !key.startsWith("catalogue.snapshot."))
+        )
+      );
     }
   }
 
