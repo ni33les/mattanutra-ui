@@ -849,16 +849,17 @@ export async function planTool(input: Readonly<{
     const namespace = input.scope.principalScope;
     if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
       setQueryNamespace(namespace);
-      await persistQueryBudget(
-        namespace,
-        Object.fromEntries(
-          Object.entries({
-            ...queryBudgetSnapshot("global"),
-            ...queryBudgetSnapshot(namespace),
-            ...queryBudgetSnapshot()
-          }).filter(([key]) => !key.startsWith("catalogue.snapshot."))
-        )
+      const next = Object.fromEntries(
+        Object.entries({
+          ...queryBudgetSnapshot("global"),
+          ...queryBudgetSnapshot(namespace),
+          ...queryBudgetSnapshot()
+        }).filter(([key]) => !key.startsWith("catalogue.snapshot."))
       );
+      const hasCounts = Object.values(next).some((value) => Number(value) > 0);
+      if (hasCounts) {
+        await persistQueryBudget(namespace, next);
+      }
     }
     return result;
   });

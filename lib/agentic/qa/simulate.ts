@@ -106,6 +106,48 @@ export function omsFulfilmentStatus(
   return "delivered";
 }
 
+async function commitNowForOrder(input: Readonly<{
+  config: AgenticConfig;
+  now: string;
+  orderHandle: string;
+  scope: CapabilityScope;
+  store: AgenticStore;
+}>) {
+  const capability = await resolveCapability({
+    action: "order.read",
+    config: input.config,
+    handle: input.orderHandle,
+    now: input.now,
+    resourceType: "order",
+    scope: input.scope,
+    store: input.store
+  });
+  if (!capability) {
+    return businessError({ message: "Not found.", reasonCode: "not_found" });
+  }
+  const order = await input.store.getOrder(capability.resourceId);
+  if (!order) {
+    return businessError({ message: "Not found.", reasonCode: "not_found" });
+  }
+  const namespace = order.principalScope?.startsWith(QA_NAMESPACE_PREFIX)
+    ? order.principalScope
+    : null;
+  if (!namespace) {
+    return businessError({
+      message: "QA namespace context is missing.",
+      reasonCode: "not_found"
+    });
+  }
+  const session = await resolveQaSession(namespace);
+  if (!session) {
+    return businessError({
+      message: "QA namespace context is missing.",
+      reasonCode: "not_found"
+    });
+  }
+  return { now: session.now, namespace };
+}
+
 export async function simulatePayment(input: Readonly<{
   config: AgenticConfig;
   now: string;
@@ -114,7 +156,11 @@ export async function simulatePayment(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>) {
-  const driven = await drivePaymentFixture(input);
+  const clock = await commitNowForOrder(input);
+  if (isAgenticErrorResult(clock)) {
+    return clock;
+  }
+  const driven = await drivePaymentFixture({ ...input, now: clock.now });
   if (isAgenticErrorResult(driven)) {
     return driven;
   }
@@ -140,19 +186,19 @@ export async function simulatePayment(input: Readonly<{
       });
       await applyVerifiedPaymentEvent({
         event: { ...event, providerEventId: `${event.providerEventId}_success` },
-        now: input.now,
+        now: clock.now,
         store: input.store
       });
     }
   }
 
   if (scenarioSubmitsOms(input.scenario)) {
-    await processOmsOutbox({ now: input.now, store: input.store });
+    await processOmsOutbox({ now: clock.now, store: input.store });
   }
 
   return orderTool({
     config: input.config,
-    now: input.now,
+    now: clock.now,
     orderHandle: input.orderHandle,
     scope: input.scope,
     store: input.store
@@ -167,8 +213,13 @@ export async function simulateFulfilment(input: Readonly<{
   status: FulfilmentFixtureStatus;
   store: AgenticStore;
 }>) {
+  const clock = await commitNowForOrder(input);
+  if (isAgenticErrorResult(clock)) {
+    return clock;
+  }
   const driven = await driveFulfilmentFixture({
     ...input,
+    now: clock.now,
     status: omsFulfilmentStatus(input.status)
   });
   if (isAgenticErrorResult(driven)) {
@@ -177,7 +228,7 @@ export async function simulateFulfilment(input: Readonly<{
 
   return orderTool({
     config: input.config,
-    now: input.now,
+    now: clock.now,
     orderHandle: input.orderHandle,
     scope: input.scope,
     store: input.store

@@ -123,20 +123,24 @@ export async function applyFulfilmentEvent(input: Readonly<{
     stateVersion: nextStateVersion(order, commerceTimelineStatus(projected))
   };
   await input.store.updateOrder(next);
+  const prior = await input.store.listFulfilmentEvents(order.id);
+  const payments = await input.store.listPaymentAttempts(order.id);
+  const sequence = 1 + payments.length + prior.length;
+  const basePayload =
+    input.status === "shipped"
+      ? shippedPayload()
+      : input.status === "exception"
+        ? {
+            nextAction: "contact_support",
+            reasonCode: input.reasonCode ?? "delivery_exception",
+            status: "exception"
+          }
+        : { status: input.status };
   await input.store.insertFulfilmentEvent({
     createdAt: input.now,
     id: nextTestUuid(),
     orderId: order.id,
-    payload:
-      input.status === "shipped"
-        ? shippedPayload()
-        : input.status === "exception"
-          ? {
-              nextAction: "contact_support",
-              reasonCode: input.reasonCode ?? "delivery_exception",
-              status: "exception"
-            }
-          : { status: input.status },
+    payload: { ...basePayload, sequence },
     status: input.status
   });
 

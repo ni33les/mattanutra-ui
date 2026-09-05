@@ -54,18 +54,17 @@ describe("v1.5 deterministic event ordering", () => {
   });
 
   it("EVENT-RED-02 shuffled physical fulfilment order cannot change public order", async () => {
+    const cluster = createHandlerCluster();
+    const ready = await setupDefaultExecuteContext(cluster, { suffix: "ev02" });
+    const executed = await executeOn(cluster, "A", { ...ready, suffix: "ev02" });
+    const handle = String(executed.orderHandle);
+    await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_10);
+    await simulateHandleOnly(cluster, "A", { orderHandle: handle, scenario: "success" });
+    await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_10);
+    await fulfilHandleOnly(cluster, "A", { orderHandle: handle, status: "preparing" });
+    const original = cluster.store.listFulfilmentEvents.bind(cluster.store);
     const hashes = [];
     for (const mode of ["forward", "reverse", "shuffle"] as const) {
-      beginV15Run();
-      const cluster = createHandlerCluster();
-      const ready = await setupDefaultExecuteContext(cluster, { suffix: `ev02${mode}` });
-      const executed = await executeOn(cluster, "A", { ...ready, suffix: `ev02${mode}` });
-      const handle = String(executed.orderHandle);
-      await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_10);
-      await simulateHandleOnly(cluster, "A", { orderHandle: handle, scenario: "success" });
-      await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_10);
-      await fulfilHandleOnly(cluster, "A", { orderHandle: handle, status: "preparing" });
-      const original = cluster.store.listFulfilmentEvents.bind(cluster.store);
       cluster.store.listFulfilmentEvents = async (orderId: string) => {
         const rows = [...(await original(orderId))];
         if (mode === "reverse") {
@@ -76,9 +75,8 @@ describe("v1.5 deterministic event ordering", () => {
         }
         return rows;
       };
-      const viewed = eventLedger(await orderOn(cluster, "B", { orderHandle: handle }));
-      hashes.push(canonicalHash(viewed.map((item) => item.status)));
-      endV15Run();
+      const viewed = await orderOn(cluster, "B", { orderHandle: handle });
+      hashes.push(canonicalHash((viewed.events as unknown[]) ?? []));
     }
     assert.equal(new Set(hashes).size, 1, canonicalJson(hashes));
   });

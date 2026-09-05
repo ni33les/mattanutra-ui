@@ -85,24 +85,28 @@ export function orderedEventLedger(input: Readonly<{
     createdAt: string;
     id: string;
     kind: "fulfilment" | "order" | "payment";
+    sequence?: number;
     status: string;
   }>> = [
     {
       createdAt: input.order.createdAt,
       id: `order:${input.order.id}`,
       kind: "order",
+      sequence: 0,
       status: "open"
     },
-    ...input.paymentAttempts.map((item) => ({
+    ...input.paymentAttempts.map((item, index) => ({
       createdAt: item.createdAt,
       id: `payment:${item.id}`,
       kind: "payment" as const,
+      sequence: index + 1,
       status: item.status
     })),
     ...input.fulfilment.map((item) => ({
       createdAt: item.createdAt,
       id: `fulfilment:${item.id}`,
       kind: "fulfilment" as const,
+      sequence: sequenceOf(item.payload),
       status: publicFulfilmentStatus(item.status)
     }))
   ];
@@ -120,20 +124,28 @@ export function orderedEventLedger(input: Readonly<{
   };
 
   return rows.sort((left, right) => {
-    const byTime = left.createdAt.localeCompare(right.createdAt);
-    if (byTime !== 0) {
-      return byTime;
+    const byStatus = (statusRank[left.status] ?? 50) - (statusRank[right.status] ?? 50);
+    if (byStatus !== 0) {
+      return byStatus;
+    }
+    const bySequence = (left.sequence ?? 0) - (right.sequence ?? 0);
+    if (bySequence !== 0) {
+      return bySequence;
     }
     const byKind = kindRank[left.kind] - kindRank[right.kind];
     if (byKind !== 0) {
       return byKind;
     }
-    const byStatus = (statusRank[left.status] ?? 50) - (statusRank[right.status] ?? 50);
-    if (byStatus !== 0) {
-      return byStatus;
-    }
-    return left.status.localeCompare(right.status);
+    return left.createdAt.localeCompare(right.createdAt);
   });
+}
+
+function sequenceOf(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return 0;
+  }
+  const value = (payload as { sequence?: unknown }).sequence;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 export function buildOrderProjection(input: Readonly<{
