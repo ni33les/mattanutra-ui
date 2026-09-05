@@ -447,7 +447,16 @@ export async function loadPersistedFunnelEvents(correlationId: string) {
     }
     if (restored.length > 0) {
       const existing = ledgers.get(correlationId) ?? [];
-      const merged = [...existing, ...restored].sort((left, right) =>
+      const seen = new Set(existing.map((item) => item.eventId));
+      const merged = [...existing];
+      for (const event of restored) {
+        if (seen.has(event.eventId)) {
+          continue;
+        }
+        merged.push(event);
+        seen.add(event.eventId);
+      }
+      merged.sort((left, right) =>
         left.sequence === right.sequence
           ? left.createdAt.localeCompare(right.createdAt)
           : left.sequence - right.sequence

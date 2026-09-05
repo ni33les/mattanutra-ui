@@ -850,11 +850,9 @@ export async function planTool(input: Readonly<{
     if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
       setQueryNamespace(namespace);
       const next = Object.fromEntries(
-        Object.entries({
-          ...queryBudgetSnapshot("global"),
-          ...queryBudgetSnapshot(namespace),
-          ...queryBudgetSnapshot()
-        }).filter(([key]) => !key.startsWith("catalogue.snapshot."))
+        Object.entries(queryBudgetSnapshot(namespace)).filter(
+          ([key]) => !key.startsWith("catalogue.snapshot.")
+        )
       );
       const hasCounts = Object.values(next).some((value) => Number(value) > 0);
       if (hasCounts) {
@@ -1651,16 +1649,14 @@ async function persistTerminalPlan(input: Readonly<{
     const namespace = input.input.scope.principalScope;
     if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
       setQueryNamespace(namespace);
-      await persistQueryBudget(
-        namespace,
-        Object.fromEntries(
-          Object.entries({
-            ...queryBudgetSnapshot("global"),
-            ...queryBudgetSnapshot(namespace),
-            ...queryBudgetSnapshot()
-          }).filter(([key]) => !key.startsWith("catalogue.snapshot."))
+      const next = Object.fromEntries(
+        Object.entries(queryBudgetSnapshot(namespace)).filter(
+          ([key]) => !key.startsWith("catalogue.snapshot.")
         )
       );
+      if (Object.values(next).some((value) => Number(value) > 0)) {
+        await persistQueryBudget(namespace, next);
+      }
     }
   }
 

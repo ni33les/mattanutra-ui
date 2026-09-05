@@ -274,7 +274,7 @@ export async function observeQaJourney(input: Readonly<{
     input.namespace ||
     (order?.principalScope?.startsWith(QA_NAMESPACE_PREFIX) ? order.principalScope : undefined);
   if (namespace) {
-    await resolveQaSession(namespace);
+    await resolveQaSession(namespace, { readOnly: true });
   }
 
   if (!correlationId) {

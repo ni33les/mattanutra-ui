@@ -263,7 +263,8 @@ async function callTool(
 
   const params = record(rawArgs);
   const session = await resolveQaSession(
-    typeof params.namespace === "string" ? params.namespace : undefined
+    typeof params.namespace === "string" ? params.namespace : undefined,
+    name === "observe" ? { readOnly: true } : undefined
   );
   if (session) {
     setQueryNamespace(session.namespace);

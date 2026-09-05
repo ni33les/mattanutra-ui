@@ -150,4 +150,36 @@ describe("v1.5 deterministic event ordering", () => {
     void LIFECYCLE;
     void stripOpaque;
   });
+
+  it("EVENT-RED-05 restart between order polls cannot reorder omit or duplicate", async () => {
+    const cluster = createHandlerCluster();
+    const ready = await setupDefaultExecuteContext(cluster, { suffix: "ev05" });
+    const executed = await executeOn(cluster, "A", { ...ready, suffix: "ev05" });
+    const handle = String(executed.orderHandle);
+    await simulateHandleOnly(cluster, "A", { orderHandle: handle, scenario: "decline_insufficient_funds" });
+    const first = eventLedger(await orderOn(cluster, "A", { orderHandle: handle }));
+    cluster.restartHandler("B");
+    const second = eventLedger(await orderOn(cluster, "B", { orderHandle: handle }));
+    cluster.restartHandler("C");
+    const third = eventLedger(await orderOn(cluster, "C", { orderHandle: handle }));
+    assert.deepEqual(second, first, canonicalJson({ first, second }));
+    assert.deepEqual(third, first, canonicalJson({ first, third }));
+  });
+
+  it("EVENT-RED-08 complete journey twice is byte-identical after opaque canonicalization", async () => {
+    const hashes = [];
+    for (const pass of [1, 2]) {
+      beginV15Run();
+      const cluster = createHandlerCluster();
+      const ready = await setupDefaultExecuteContext(cluster, { suffix: `ev08${pass}` });
+      const executed = await executeOn(cluster, "A", { ...ready, suffix: `ev08${pass}` });
+      const handle = String(executed.orderHandle);
+      await simulateHandleOnly(cluster, "A", { orderHandle: handle, scenario: "decline_insufficient_funds" });
+      await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_10);
+      await simulateHandleOnly(cluster, "A", { orderHandle: handle, scenario: "success" });
+      hashes.push(canonicalHash(stripOpaque(eventLedger(await orderOn(cluster, "B", { orderHandle: handle })))));
+      endV15Run();
+    }
+    assert.equal(hashes[0], hashes[1], canonicalJson(hashes));
+  });
 });

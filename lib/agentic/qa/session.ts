@@ -103,7 +103,10 @@ function rememberSession(session: QaSession) {
   return session;
 }
 
-export async function resolveQaSession(namespace?: string | null) {
+export async function resolveQaSession(
+  namespace?: string | null,
+  input?: Readonly<{ readOnly?: boolean }>
+) {
   if (!namespace) {
     return null;
   }
@@ -129,7 +132,7 @@ export async function resolveQaSession(namespace?: string | null) {
     schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
   };
   rememberSession(session);
-  if (loaded.queryCounts && Object.keys(loaded.queryCounts).length > 0) {
+  if (!input?.readOnly && loaded.queryCounts && Object.keys(loaded.queryCounts).length > 0) {
     const { replaceQueryBudget } = await import("@/lib/agentic/plan/query-budget");
     replaceQueryBudget(session.namespace, loaded.queryCounts);
   }

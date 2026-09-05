@@ -128,3 +128,57 @@ export const CLOCK_STEPS = {
   dispatched: V15_CLOCK_30,
   delivered: V15_CLOCK_40
 } as const;
+
+export async function completeSection4Journey(
+  cluster: HandlerCluster,
+  suffix: string
+) {
+  const ready = await setupDefaultExecuteContext(cluster, { suffix });
+  const executed = await executeOn(cluster, "A", { ...ready, suffix });
+  const handle = String(executed.orderHandle);
+  await simulateHandleOnly(cluster, "A", {
+    orderHandle: handle,
+    scenario: "decline_insufficient_funds"
+  });
+  await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_10);
+  await simulateHandleOnly(cluster, "A", { orderHandle: handle, scenario: "success" });
+  await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_20);
+  await fulfilHandleOnly(cluster, "A", { orderHandle: handle, status: "preparing" });
+  await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_30);
+  await fulfilHandleOnly(cluster, "A", { orderHandle: handle, status: "dispatched" });
+  await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_40);
+  await fulfilHandleOnly(cluster, "A", { orderHandle: handle, status: "delivered" });
+  return { ...ready, orderHandle: handle };
+}
+
+export async function observeOn(
+  cluster: HandlerCluster,
+  handler: HandlerId,
+  args: Record<string, unknown>
+) {
+  return cluster.asHandler(handler, (runtime) => qaCall(runtime, "observe", args));
+}
+
+export function observeEvidence(observed: Record<string, unknown>) {
+  const queries = asRecord(observed.queries);
+  const budget = asRecord(observed.dependencyBudget);
+  const events = Array.isArray(observed.events) ? observed.events : [];
+  return stripOpaque({
+    acquisitionMinor: observed.acquisitionMinor ?? null,
+    attribution: observed.attribution ?? null,
+    clock: observed.clock ?? null,
+    contributionMinor: observed.contributionMinor ?? null,
+    events: events.map((item) => {
+      const row = asRecord(item);
+      return {
+        createdAt: row.createdAt ?? null,
+        eventType: row.eventType ?? null,
+        sequence: row.sequence ?? null
+      };
+    }),
+    planMatch: queries["plan.match"] ?? null,
+    planMatchHit: queries["plan.match.hit"] ?? null,
+    planMatchHits: budget.planMatchHits ?? null,
+    planMatchMisses: budget.planMatchMisses ?? null
+  });
+}
