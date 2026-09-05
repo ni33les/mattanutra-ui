@@ -1,0 +1,173 @@
+TAP version 13
+# Subtest: v1.4 ATTR request-stage attribution
+    # Subtest: ATTR-RED-01 beginRun records ordered unique request stages once
+    not ok 1 - ATTR-RED-01 beginRun records ordered unique request stages once
+      ---
+      duration_ms: 30.784923
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v14-attr.test.ts:25:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly deep-equal:
+        + actual - expected
+        
+        + []
+        - [
+        -   'ingress_accepted',
+        -   'handler_admitted',
+        -   'durable_started',
+        -   'durable_committed',
+        -   'serialization_completed',
+        -   'response_handed_to_transport',
+        -   'request_released'
+        - ]
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'ingress_accepted'
+        1: 'handler_admitted'
+        2: 'durable_started'
+        3: 'durable_committed'
+        4: 'serialization_completed'
+        5: 'response_handed_to_transport'
+        6: 'request_released'
+      actual:
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v14-attr.test.ts:30:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1442:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+      ...
+    # Subtest: ATTR-RED-04 public beginRun hash is identical with attribution disabled
+    ok 2 - ATTR-RED-04 public beginRun hash is identical with attribution disabled
+      ---
+      duration_ms: 12.108416
+      type: 'test'
+      ...
+    1..2
+not ok 1 - v1.4 ATTR request-stage attribution
+  ---
+  duration_ms: 44.147035
+  type: 'suite'
+  location: '/root/grok/mattanutra-ui/test/agentic-v14-attr.test.ts:16:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: v1.4 duplicate execute completion
+    # Subtest: EXEC-RC-RED-01 execute_1 commits one order before success returns
+    ok 1 - EXEC-RC-RED-01 execute_1 commits one order before success returns
+      ---
+      duration_ms: 167.927701
+      type: 'test'
+      ...
+    # Subtest: EXEC-RC-RED-02 concurrent execute_2 and execute_3 replay the same order
+    not ok 2 - EXEC-RC-RED-02 concurrent execute_2 and execute_3 replay the same order
+      ---
+      duration_ms: 80.604329
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v14-exec-rc.test.ts:55:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        duplicate execute must complete from durable state while the first worker is still serializing
+        
+        false !== true
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: true
+      actual: false
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v14-exec-rc.test.ts:84:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: EXEC-RC-RED-05 restart then duplicate fan-out still returns the original order
+    ok 3 - EXEC-RC-RED-05 restart then duplicate fan-out still returns the original order
+      ---
+      duration_ms: 52.470878
+      type: 'test'
+      ...
+    1..3
+not ok 2 - v1.4 duplicate execute completion
+  ---
+  duration_ms: 303.00995
+  type: 'suite'
+  location: '/root/grok/mattanutra-ui/test/agentic-v14-exec-rc.test.ts:20:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: v1.4 QA beginRun completion
+    # Subtest: QA-RC-RED-01 eight concurrent beginRuns all complete with unique namespaces
+    ok 1 - QA-RC-RED-01 eight concurrent beginRuns all complete with unique namespaces
+      ---
+      duration_ms: 36.013043
+      type: 'test'
+      ...
+    # Subtest: QA-RC-RED-02 eleven beginRun then setClock each to 09:00
+    ok 2 - QA-RC-RED-02 eleven beginRun then setClock each to 09:00
+      ---
+      duration_ms: 19.936463
+      type: 'test'
+      ...
+    # Subtest: QA-RC-RED-03 info probes complete while beginRun runs
+    ok 3 - QA-RC-RED-03 info probes complete while beginRun runs
+      ---
+      duration_ms: 13.662138
+      type: 'test'
+      ...
+    # Subtest: QA-RC-RED-04 replay beginRun with the same runId returns one namespace
+    not ok 4 - QA-RC-RED-04 replay beginRun with the same runId returns one namespace
+      ---
+      duration_ms: 5.727704
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v14-qa-rc.test.ts:64:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        {"first":{"clock":"2026-09-02T00:00:00.000Z","namespace":"qa-v3:A:mtnnb38lctlcqz","ok":true,"preflight":{"clock":{"now":"2026-09-02T00:00:00.000Z","settable":true},"fulfilment":["preparing","dispatched","delivered"],"manifest":{"catalogueChecksum":"snap_66053b9a546e2ccf","catalogueVersion":"dev-3.0.0","fixtures":{"F_HAVE_90":{"currentSupplements":[{"dailyAmount":300,"daysRemaining":90,"name":"Magnesium","unit":"mg"}],"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]},"F_MISSING_DAYS":{"currentSupplements":[{"dailyAmount":300,"name":"Magnesium","unit":"mg"}],"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]},"F_MIXED":{"targets":[{"amount":3000,"importance":"core","name":"Creatine","unit":"mg"},{"amount":300,"importance":"optional","name":"Magnesium","unit":"mg"},{"amount":2000,"importance":"conditional","name":"Vitamin D3","prerequisite":{"status":"unsatisfied"},"unit":"IU"}]},"F_READY_MAG":{"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]},"S349":{"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]},"S350":{"medicationCodes":["apixaban"],"profile":{"ageYears":52,"lifeStage":"adult","sex":"male"},"targets":[{"amount":1000,"name":"Omega-3","unit":"mg"}]},"S351":{"profile":{"ageYears":8,"lifeStage":"child"},"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]}},"localeBundle":"0db3fb6f3182bf51fe8bcb38598b0ea01a27bbaea4aacb8c4de75104561c12f5","locales":["en","th","zh-CN"],"schemaChecksum":"5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"},"namespaces":{"begin":true,"reset":true},"observer":["funnel","queries","contribution"],"ok":true,"packVersion":"3.0.0"},"principalScope":"qa-v3:A:mtnnb38lctlcqz"},"replay":{"clock":"2026-09-02T00:00:00.000Z","namespace":"qa-v3:A:mtnnb38mkb3ftz","ok":true,"preflight":{"clock":{"now":"2026-09-02T00:00:00.000Z","settable":true},"fulfilment":["preparing","dispatched","delivered"],"manifest":{"catalogueChecksum":"snap_66053b9a546e2ccf","catalogueVersion":"dev-3.0.0","fixtures":{"F_HAVE_90":{"currentSupplements":[{"dailyAmount":300,"daysRemaining":90,"name":"Magnesium","unit":"mg"}],"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]},"F_MISSING_DAYS":{"currentSupplements":[{"dailyAmount":300,"name":"Magnesium","unit":"mg"}],"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]},"F_MIXED":{"targets":[{"amount":3000,"importance":"core","name":"Creatine","unit":"mg"},{"amount":300,"importance":"optional","name":"Magnesium","unit":"mg"},{"amount":2000,"importance":"conditional","name":"Vitamin D3","prerequisite":{"status":"unsatisfied"},"unit":"IU"}]},"F_READY_MAG":{"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]},"S349":{"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]},"S350":{"medicationCodes":["apixaban"],"profile":{"ageYears":52,"lifeStage":"adult","sex":"male"},"targets":[{"amount":1000,"name":"Omega-3","unit":"mg"}]},"S351":{"profile":{"ageYears":8,"lifeStage":"child"},"targets":[{"amount":300,"name":"Magnesium","unit":"mg"}]}},"localeBundle":"0db3fb6f3182bf51fe8bcb38598b0ea01a27bbaea4aacb8c4de75104561c12f5","locales":["en","th","zh-CN"],"schemaChecksum":"5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"},"namespaces":{"begin":true,"reset":true},"observer":["funnel","queries","contribution"],"ok":true,"packVersion":"3.0.0"},"principalScope":"qa-v3:A:mtnnb38mkb3ftz"}}
+        + actual - expected
+        
+        + 'qa-v3:A:mtnnb38mkb3ftz'
+        - 'qa-v3:A:mtnnb38lctlcqz'
+                          ^
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 'qa-v3:A:mtnnb38lctlcqz'
+      actual: 'qa-v3:A:mtnnb38mkb3ftz'
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v14-qa-rc.test.ts:70:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: QA-RC-RED-05 restarted worker still completes beginRun
+    ok 5 - QA-RC-RED-05 restarted worker still completes beginRun
+      ---
+      duration_ms: 3.841595
+      type: 'test'
+      ...
+    1..5
+not ok 3 - v1.4 QA beginRun completion
+  ---
+  duration_ms: 80.679422
+  type: 'suite'
+  location: '/root/grok/mattanutra-ui/test/agentic-v14-qa-rc.test.ts:14:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..3
+# tests 10
+# suites 3
+# pass 7
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5314.607535

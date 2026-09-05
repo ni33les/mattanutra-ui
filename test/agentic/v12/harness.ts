@@ -56,6 +56,8 @@ import {
 import { resetMatchPlanCache } from "../../../lib/agentic/plan/matching.ts";
 import { resetInfoCache } from "../../../lib/agentic/info.ts";
 import { DET_V3_BUILD_ID } from "../det-v3/manifest.ts";
+import { resetExecuteLockState } from "../../../lib/agentic/commerce/execute.ts";
+import { resetRequestTraces } from "../../../lib/agentic/qa/request-trace.ts";
 import {
   V12_ACQUISITION,
   V12_CLOCK_00,
@@ -233,6 +235,8 @@ export function beginV12Run() {
   resetMatchPlanCache();
   resetInfoCache();
   resetCatalogueSnapshotCache();
+  resetExecuteLockState();
+  resetRequestTraces();
 }
 
 export function endV12Run() {

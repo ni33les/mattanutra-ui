@@ -40,18 +40,55 @@ import {
   resolveQaSession
 } from "@/lib/agentic/qa/session";
 
-const executeLocks = new WeakMap<AgenticStore, Map<string, Promise<unknown>>>();
+const executeLockChains = new Map<string, Promise<unknown>>();
+
+export function captureExecuteLockState() {
+  return new Map(executeLockChains);
+}
+
+export function restoreExecuteLockState(snapshot: Map<string, Promise<unknown>>) {
+  executeLockChains.clear();
+  for (const [key, value] of snapshot) {
+    executeLockChains.set(key, value);
+  }
+}
+
+export function emptyExecuteLockState() {
+  return new Map<string, Promise<unknown>>();
+}
+
+export function resetExecuteLockState() {
+  executeLockChains.clear();
+  executeFreshGate = null;
+  executeFreshEntered = null;
+  executeSerializeGate = null;
+}
+
+let executeFreshGate: Promise<void> | null = null;
+let executeFreshEntered: (() => void) | null = null;
+let executeSerializeGate: Promise<void> | null = null;
+
+export function setExecuteFreshGateForTests(gate: Promise<void> | null) {
+  executeFreshGate = gate;
+}
+
+export function setExecuteFreshEnteredForTests(notify: (() => void) | null) {
+  executeFreshEntered = notify;
+}
+
+export function setExecuteSerializeGateForTests(gate: Promise<void> | null) {
+  executeSerializeGate = gate;
+}
 
 function enqueueExecute<T>(
   store: AgenticStore,
   key: string,
   work: () => Promise<T>
 ): Promise<T> {
-  const locks = executeLocks.get(store) ?? new Map<string, Promise<unknown>>();
-  executeLocks.set(store, locks);
-  const previous = locks.get(key) ?? Promise.resolve();
+  void store;
+  const previous = executeLockChains.get(key) ?? Promise.resolve();
   const next = previous.catch(() => undefined).then(() => work());
-  locks.set(key, next);
+  executeLockChains.set(key, next);
   return next;
 }
 
@@ -166,6 +203,10 @@ async function executeFresh(
   ownerScope: string,
   payload: Readonly<{ expectedRevision: number; planHandle: string }>
 ) {
+  executeFreshEntered?.();
+  if (executeFreshGate) {
+    await executeFreshGate;
+  }
   const peeked = await resolveCapability({
     action: "plan.execute",
     config: input.config,
@@ -475,6 +516,9 @@ async function executeFresh(
       response,
       store
     });
+    if (executeSerializeGate) {
+      await executeSerializeGate;
+    }
 
     await commitFunnelEvent({
       attribution: "agent_connector",

@@ -1,0 +1,9 @@
+{
+  "pack": "MattaNutra DEV TDD Pack v1.4",
+  "baselineBuild": "bbddca1559c7a19cf431954bb4ff55393fda9340",
+  "red": {
+    "ATTR-RED-01": "requestTrace.stages empty vs ordered unique stages",
+    "QA-RC-RED-04": "replay beginRun(runId=A) minted a second namespace",
+    "EXEC-RC-RED-02": "duplicate execute stayed queued on process-local executeFresh lock while first worker held serialize latch"
+  }
+}
