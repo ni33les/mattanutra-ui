@@ -1,0 +1,48 @@
+TAP version 13
+# {"level":"info","message":"pool_initialized","scope":"db.pool","ts":"2026-09-05T06:44:36.062Z","applicationName":"mattanutra-web","idleInTxnTimeoutMs":10000,"lockTimeoutMs":2000,"poolMax":6,"statementTimeoutMs":15000}
+# [catalogue:snapshot] { countryCode: 'TH', ms: 171, products: 156, skus: 158 }
+# Subtest: v1.6 TECH-02 plan(create) completion
+    # Subtest: L2-PLAN-RED-07 controlled dependency deadline
+    not ok 1 - L2-PLAN-RED-07 controlled dependency deadline
+      ---
+      duration_ms: 34.287871
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v16-plan90.test.ts:271:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        public plan hung past the 60s success deadline
+        
+        false !== true
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: true
+      actual: false
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v16-plan90.test.ts:286:12)
+        process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Promise.all (index 9)
+        async Suite.run (node:internal/test_runner/test:1442:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+      ...
+    1..1
+not ok 1 - v1.6 TECH-02 plan(create) completion
+  ---
+  duration_ms: 228.554685
+  type: 'suite'
+  location: '/root/grok/mattanutra-ui/test/agentic-v16-plan90.test.ts:90:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 1
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2017.076028

@@ -1,0 +1,15 @@
+{
+  "pack": "MattaNutra DEV TDD Implementation Brief v1.6",
+  "baselineBuild": "6c5d20ef477cf53644bed4b10f6b3e0e8e7e8268",
+  "primaryRed": "L2-PLAN-RED-07",
+  "path": "public plan(create) terminal response at 60s success deadline",
+  "expected": true,
+  "actual": false,
+  "message": "public plan hung past the 60s success deadline",
+  "catalogue": {
+    "catalogueVersion": "retail-TH-156",
+    "snapshotId": "snap_4e92ebf68429603d",
+    "products": 156,
+    "source": "retail"
+  }
+}

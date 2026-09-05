@@ -78,6 +78,32 @@ export function setMatcherEnteredForTests(notify: (() => void) | null) {
   matcherEntered = notify;
 }
 
+const planClaimLatches = new Map<string, Promise<void>>();
+const planClaimEntered = new Map<string, () => void>();
+
+export function setPlanClaimLatchForTests(
+  key: string,
+  gate: Promise<void> | null,
+  entered: (() => void) | null = null
+) {
+  if (!gate) {
+    planClaimLatches.delete(key);
+    planClaimEntered.delete(key);
+    return;
+  }
+  planClaimLatches.set(key, gate);
+  if (entered) {
+    planClaimEntered.set(key, entered);
+  }
+}
+
+export function snapshotPlanInflightForTests() {
+  return {
+    idempotency: inflightPlanIdempotency.size,
+    matches: inflightPlanMatches.size
+  };
+}
+
 const inflightPlanMatches = new Map<
   string,
   Promise<PlanToolSuccess | AgenticErrorResult>
@@ -902,6 +928,15 @@ async function executePlanTool(input: Readonly<{
 
   if (replay.kind === "conflict") {
     return replay.error;
+  }
+
+  const claimKey = input.payload.idempotencyKey;
+  if (claimKey) {
+    planClaimEntered.get(claimKey)?.();
+    const claimGate = planClaimLatches.get(claimKey);
+    if (claimGate) {
+      await claimGate;
+    }
   }
 
   let payload = input.payload;
