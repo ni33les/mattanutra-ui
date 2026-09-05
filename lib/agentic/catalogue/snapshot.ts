@@ -286,6 +286,10 @@ export function replaceCatalogueSnapshot(snapshot: CatalogueSnapshot | null) {
   }
 }
 
+export function installedCatalogueSnapshot() {
+  return lastSnapshot ?? installedSnapshot;
+}
+
 export function catalogueVersion() {
   return getCatalogueSnapshot().catalogueVersion;
 }

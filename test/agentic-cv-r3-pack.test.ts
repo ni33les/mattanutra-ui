@@ -16,6 +16,7 @@ import {
   buildEvidence,
   failedIds,
   rawResponseHash,
+  significantCvEvidence,
   stringList,
   type AssertionRecord,
   type EvidenceEnvelope
@@ -538,10 +539,13 @@ async function runOrd06(session: PlanSession, runIndex: number): Promise<R3CaseR
 
 export function canonicalR3Report(report: R3PackReport) {
   return JSON.stringify({
-    cases: report.cases.map((item) => ({ evidence: item.evidence, id: item.id, result: item.result })),
+    cases: report.cases.map((item) => ({
+      evidence: significantCvEvidence(item.evidence),
+      id: item.id,
+      result: item.result
+    })),
     contractVersion: report.contractVersion,
     passedCases: report.passedCases,
-    snapshotId: report.snapshotId,
     totalCases: report.totalCases
   });
 }

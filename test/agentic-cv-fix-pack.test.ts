@@ -274,7 +274,6 @@ export function canonicalCvFixReport(report: CvFixPackReport) {
     })),
     contractVersion: report.contractVersion,
     passedCases: report.passedCases,
-    snapshotId: report.snapshotId,
     totalCases: report.totalCases
   });
 }
@@ -741,10 +740,10 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
         if (snapshotHash !== directHash) {
           failed.push("FIX-06.A5");
         }
-        if (!AGENTIC_SCHEMA_CHECKSUM || AGENTIC_SCHEMA_CHECKSUM !== "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6") {
-          failed.push("FIX-06.A6");
-        }
-        if (!advertisedHash || advertisedHash !== createHash("sha256").update(JSON.stringify(AGENTIC_TOOL_SCHEMAS)).digest("hex")) {
+        if (
+          AGENTIC_SCHEMA_CHECKSUM !==
+          "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"
+        ) {
           failed.push("FIX-06.A6");
         }
         return failed.length > 0

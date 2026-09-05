@@ -71,6 +71,21 @@ export function failedIds(assertions: readonly AssertionRecord[]): string[] {
   return assertions.filter((item) => !item.pass).map((item) => item.id);
 }
 
+export function significantCvEvidence(evidence: unknown) {
+  const record = asRecord(evidence);
+  const assertions = Array.isArray(record.assertions)
+    ? record.assertions.map((item) => {
+        const row = asRecord(item);
+        return { id: row.id ?? null, pass: row.pass === true };
+      })
+    : undefined;
+  return {
+    ...(Array.isArray(record.failed) ? { failed: record.failed } : {}),
+    ...(typeof record.reason === "string" ? { reason: record.reason } : {}),
+    ...(assertions ? { assertions } : {})
+  };
+}
+
 export function requestHash(request: unknown): string {
   return canonicalHash(request);
 }
@@ -112,14 +127,20 @@ export function buildEvidence(input: Readonly<{
   return {
     assertions: input.assertions,
     buildId: input.buildId,
-    canonicalResponseHash: canonicalHash(input.response),
+    canonicalResponseHash:
+      input.idempotencyMode === "fresh-key"
+        ? freshKeyHash(input.response)
+        : canonicalHash(input.response),
     contractVersion: AGENTIC_CONTRACT_VERSION,
     endpoint: CV_IMPL_ENDPOINT,
     environment: CV_IMPL_ENVIRONMENT,
     idempotencyMode: input.idempotencyMode,
     matcherVersion: MATCHER_VERSION,
     packVersion: CUSTOMER_VALUE_PACK_VERSION,
-    rawResponseHash: rawResponseHash(input.response),
+    rawResponseHash:
+      input.idempotencyMode === "fresh-key"
+        ? freshKeyHash(input.response)
+        : rawResponseHash(input.response),
     requestHash: requestHash(input.request),
     runIndex: input.runIndex,
     safetyLedgerVersion: input.safetyLedgerVersion,

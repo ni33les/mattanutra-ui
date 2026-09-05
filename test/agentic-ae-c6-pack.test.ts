@@ -161,7 +161,21 @@ const COMPLETED_KEYS = new Set([
   "summaryKey",
   "tradeOffs",
   "unassessedConditionCodes",
-  "unassessedMedicationCodes"
+  "unassessedMedicationCodes",
+  "canonical",
+  "cash30DayMinor",
+  "cash90DayMinor",
+  "cashComplete",
+  "claimIds",
+  "compactDecision",
+  "comparisonBasis",
+  "comparisonComplete",
+  "consumptionComplete",
+  "evidenceHandle",
+  "explanation",
+  "orderSchedule",
+  "purchaseRequiredNow",
+  "researchVersion"
 ]);
 
 const DOSE_GAP_KEYS = new Set([

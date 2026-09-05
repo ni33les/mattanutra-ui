@@ -931,6 +931,24 @@ async function executePlanTool(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
+  if (
+    input.payload.operation === "answer" &&
+    (!input.payload.answers || input.payload.answers.length === 0) &&
+    !input.payload.safetyAcknowledgement
+  ) {
+    return businessError({
+      fieldPath: "answers",
+      issues: [
+        {
+          fieldPath: "answers",
+          messageKey: "mcp.errors.required",
+          reasonCode: "required"
+        }
+      ],
+      message: "answers is required.",
+      reasonCode: "invalid_request"
+    });
+  }
   const requestedDestination = requestRecord(input.payload.request)?.destinationCountry;
   const loadLiveCatalogue =
     !input.matchPort && !input.payload.planHandle;
@@ -1697,42 +1715,44 @@ async function persistTerminalPlan(input: Readonly<{
       evidenceHandle,
       researchVersion: planResearchVersion()
     };
-    await commitFunnelEvent({
-      attribution: "agent_connector",
-      correlationId: input.planId,
-      createdAt: input.input.now,
-      eventId: `info:${input.planId}`,
-      eventType: "info_shown",
-      payload: { locale: input.locale }
-    });
-    await commitFunnelEvent({
-      attribution: "agent_connector",
-      correlationId: input.planId,
-      createdAt: input.input.now,
-      eventId: `plan-created:${input.planId}:${input.revision}`,
-      eventType: "plan_created",
-      payload: { locale: input.locale }
-    });
-    if (result.status === "ready") {
+    if (!input.skipSideEffects) {
       await commitFunnelEvent({
         attribution: "agent_connector",
         correlationId: input.planId,
         createdAt: input.input.now,
-        eventId: `plan-ready:${input.planId}:${input.revision}`,
-        eventType: "plan_ready",
+        eventId: `info:${input.planId}`,
+        eventType: "info_shown",
         payload: { locale: input.locale }
       });
-    }
-    const namespace = input.input.scope.principalScope;
-    if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
-      setQueryNamespace(namespace);
-      const next = Object.fromEntries(
-        Object.entries(queryBudgetSnapshot(namespace)).filter(
-          ([key]) => !key.startsWith("catalogue.snapshot.")
-        )
-      );
-      if (Object.values(next).some((value) => Number(value) > 0)) {
-        await persistQueryBudget(namespace, next);
+      await commitFunnelEvent({
+        attribution: "agent_connector",
+        correlationId: input.planId,
+        createdAt: input.input.now,
+        eventId: `plan-created:${input.planId}:${input.revision}`,
+        eventType: "plan_created",
+        payload: { locale: input.locale }
+      });
+      if (result.status === "ready") {
+        await commitFunnelEvent({
+          attribution: "agent_connector",
+          correlationId: input.planId,
+          createdAt: input.input.now,
+          eventId: `plan-ready:${input.planId}:${input.revision}`,
+          eventType: "plan_ready",
+          payload: { locale: input.locale }
+        });
+      }
+      const namespace = input.input.scope.principalScope;
+      if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
+        setQueryNamespace(namespace);
+        const next = Object.fromEntries(
+          Object.entries(queryBudgetSnapshot(namespace)).filter(
+            ([key]) => !key.startsWith("catalogue.snapshot.")
+          )
+        );
+        if (Object.values(next).some((value) => Number(value) > 0)) {
+          await persistQueryBudget(namespace, next);
+        }
       }
     }
   }

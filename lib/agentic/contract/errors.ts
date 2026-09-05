@@ -127,9 +127,11 @@ export function businessError(input: Readonly<{
   const category = CATEGORY_BY_REASON[input.reasonCode];
   const messageKey = input.messageKey ?? `mcp.errors.${input.reasonCode}`;
   const errorCode =
-    input.reasonCode === "invalid_request" || input.reasonCode === "stale_revision"
+    input.reasonCode === "stale_revision"
       ? input.reasonCode
-      : category;
+      : category === "INVALID_ARGUMENT"
+        ? "invalid_request"
+        : category;
   const issues = input.issues
     ? [...input.issues].sort((left, right) => left.fieldPath.localeCompare(right.fieldPath))
     : undefined;

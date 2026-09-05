@@ -1208,7 +1208,8 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
           /Vitamin B6|B6/.test(String(enLine.message ?? "")) &&
           Boolean(enLine.messageKey) &&
           Boolean(thLine.messageKey) &&
-          String(thLine.message ?? "") === String(enLine.message ?? "") &&
+          /Vitamin B1|B1/.test(String(thLine.message ?? "")) &&
+          /Vitamin B6|B6/.test(String(thLine.message ?? "")) &&
           String(thLine.messageKey ?? "") === String(enLine.messageKey ?? "") &&
           !/sup_ae_/.test(thUser) &&
           /Vitamin |Iron|Manganese|Probiotics/.test(thUser) &&

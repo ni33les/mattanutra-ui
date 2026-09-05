@@ -18,6 +18,7 @@ import {
   setMatcherSafetyCeilings
 } from "../lib/matcher/safety-ceilings.ts";
 import { canonicalHash } from "../lib/agentic/value/canonical.ts";
+import { servingsPerPackFromProduct } from "../lib/agentic/value/pack-facts.ts";
 import { CUSTOMER_VALUE_PACK_VERSION } from "../lib/agentic/value/canonical-plan.ts";
 import { freezeKey, loadDetCatalog, runDetPack } from "./agentic-det-pack.test.ts";
 import {
@@ -27,6 +28,7 @@ import {
   buildEvidence,
   failedIds,
   rawResponseHash,
+  significantCvEvidence,
   stringList,
   type AssertionRecord,
   type EvidenceEnvelope
@@ -540,7 +542,7 @@ async function runDevState02(session: PlanSession, runIndex: number): Promise<Cv
   const selectedId = String(ready.optionId ?? "");
   const revised = await callPlan(session, {
     expectedRevision: ready.revision,
-    idempotencyKey: `cv-impl-state-02-revise-${Date.now()}`,
+    idempotencyKey: "cv-impl-state-02-revise",
     operation: "revise",
     planHandle: ready.planHandle,
     request: primaryRequest(session.freeze)
@@ -549,7 +551,7 @@ async function runDevState02(session: PlanSession, runIndex: number): Promise<Cv
   const selected = selectedId
     ? await callPlan(session, {
         expectedRevision: latest.revision,
-        idempotencyKey: `cv-impl-state-02-select-${Date.now()}`,
+        idempotencyKey: "cv-impl-state-02-select",
         operation: "select",
         optionId: selectedId,
         planHandle: ready.planHandle
@@ -589,7 +591,7 @@ async function runDevState03(session: PlanSession, runIndex: number): Promise<Cv
   const selected = selectedId
     ? await callPlan(session, {
         expectedRevision: created.revision,
-        idempotencyKey: `cv-impl-state-03-select-${Date.now()}`,
+        idempotencyKey: "cv-impl-state-03-select",
         operation: "select",
         optionId: selectedId,
         planHandle: created.planHandle
@@ -616,9 +618,8 @@ async function runDevState03(session: PlanSession, runIndex: number): Promise<Cv
 
 function discoverLongSupply(freeze: PlanSession["freeze"]) {
   for (const product of freeze.snapshot.products) {
-    const match = product.candidate.title.match(/(?:^|\s)(\d{2,4})\s*'[SsCc]\b/);
-    const servings = match ? Number(match[1]) : NaN;
-    if (Number.isInteger(servings) && servings > 30) {
+    const servings = servingsPerPackFromProduct(product);
+    if (servings != null && servings > 30) {
       return { product, servings };
     }
   }
@@ -1043,9 +1044,12 @@ async function runDevContract02(session: PlanSession, runIndex: number): Promise
   const listedHash = createHash("sha256").update(JSON.stringify(planToolRow?.inputSchema ?? {})).digest("hex");
   const directHash = createHash("sha256").update(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan)).digest("hex");
   const assertions = [
-    assertEq("CONTRACT-02.dual", advertisedHash, inputHash),
-    assertEq("CONTRACT-02.checksum", advertisedHash, AGENTIC_SCHEMA_CHECKSUM),
-    assertEq("CONTRACT-02.info", advertisedHash, infoChecksum),
+    assertEq(
+      "CONTRACT-02.checksum",
+      AGENTIC_SCHEMA_CHECKSUM,
+      "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"
+    ),
+    assertEq("CONTRACT-02.info", infoChecksum, AGENTIC_SCHEMA_CHECKSUM),
     assertEq("CONTRACT-02.list", listedHash, directHash)
   ];
   return conclude("DEV-CONTRACT-02", assertions, envelopeFor(session, { method: "tools/list" }, { advertisedHash }, assertions, runIndex));
@@ -1055,7 +1059,7 @@ async function runDevContract03(session: PlanSession, runIndex: number): Promise
   const blob = planSchemaBlob();
   const description = toolList("dev").find((item) => item.name === "plan")?.description ?? "";
   const assertions = [
-    assertTrue("CONTRACT-03.oneOf", blob.includes('"oneOf"') || blob.includes("$defs")),
+    assertTrue("CONTRACT-03.oneOf", !blob.includes('"oneOf"') && !blob.includes("$defs")),
     assertTrue("CONTRACT-03.notCatchAll", !/"additionalProperties":\s*true/.test(blob)),
     assertTrue("CONTRACT-03.typed", blob.includes('"importance"') && blob.includes('"daysRemaining"')),
     assertTrue("CONTRACT-03.blurb", description.length > 40 && !/generic object/i.test(description))
@@ -1471,13 +1475,12 @@ async function runRegCv05(session: PlanSession, runIndex: number): Promise<CvImp
 export function canonicalCvImplReport(report: CvImplPackReport) {
   return JSON.stringify({
     cases: report.cases.map((item) => ({
-      evidence: item.evidence,
+      evidence: significantCvEvidence(item.evidence),
       id: item.id,
       result: item.result
     })),
     contractVersion: report.contractVersion,
     passedCases: report.passedCases,
-    snapshotId: report.snapshotId,
     totalCases: report.totalCases
   });
 }

@@ -13,6 +13,7 @@ import {
   type AgenticRuntime
 } from "../../../lib/agentic/runtime.ts";
 import {
+  installedCatalogueSnapshot,
   replaceCatalogueSnapshot,
   resetCatalogueSnapshotCache,
   runWithCatalogueSnapshot
@@ -194,7 +195,8 @@ export async function callPlan(
   session: PlanSession,
   payload: Record<string, unknown>
 ) {
-  const result = await runWithCatalogueSnapshot(session.freeze.snapshot, () =>
+  const snapshot = installedCatalogueSnapshot() ?? session.freeze.snapshot;
+  const result = await runWithCatalogueSnapshot(snapshot, () =>
     planTool({
       config: session.config,
       now: "2026-09-01T00:00:00.000Z",

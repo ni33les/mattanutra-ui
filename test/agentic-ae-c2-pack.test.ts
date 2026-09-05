@@ -151,7 +151,9 @@ const OPTION_ONLY_KEYS = new Set([
   "selected",
   "stackSummary",
   "tradeOff",
-  "tradeOffs"
+  "tradeOffs",
+  "economics",
+  "retainedCurrent"
 ]);
 const BANNED_EN =
   /\backnowledge\b|\bcontinue\b|\bexecute\b|\bcheckout\b|\bpayment\b|\border\b|\bfreeze\b|\bclient\b|\bmatcher\b|\boptionId\b|\bplanHandle\b|\brevision\b|\btelemetry\b/i;

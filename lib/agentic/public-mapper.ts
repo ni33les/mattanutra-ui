@@ -45,7 +45,7 @@ function compactPublic(
 
   const out: Record<string, unknown> = {};
   for (const [key, nested] of Object.entries(value)) {
-    if (/snapshot/i.test(key)) {
+    if (key === "snapshotId") {
       continue;
     }
     if (nested == null) {
@@ -354,14 +354,14 @@ function defaultSelectionReason(
   const requestedSupplementIds = contributions
     .map((item) => item.supplementId)
     .filter(Boolean);
-  void locale;
+  const negotiated = negotiateLocale(locale);
   const first = contributions[0];
   const gap = contributions.find((item) => item.remainingGap > 0) ?? null;
 
   if (contributions.length === 0) {
     return {
       code: "best_available",
-      message: agenticMessage("en", "plan.selection.in_selected_stack"),
+      message: agenticMessage(negotiated, "plan.selection.in_selected_stack"),
       messageKey: "plan.selection.in_selected_stack",
       requestedNames: [],
       requestedSupplementIds: []
@@ -371,8 +371,8 @@ function defaultSelectionReason(
   if (contributions.length >= 2) {
     return {
       code: "consolidates_targets",
-      message: agenticMessage("en", "plan.selection.consolidates_targets", {
-        names: joinNames(requestedNames, "en")
+      message: agenticMessage(negotiated, "plan.selection.consolidates_targets", {
+        names: joinNames(requestedNames, negotiated)
       }),
       messageKey: "plan.selection.consolidates_targets",
       requestedNames,
@@ -383,7 +383,8 @@ function defaultSelectionReason(
   if (gap) {
     return {
       code: "best_available_dose",
-      message: agenticMessage("en", "plan.selection.best_available_dose", {
+      message: agenticMessage(negotiated, "plan.selection.best_available_dose", {
+        amount: formatDose(first.amount),
         gap: formatDose(gap.remainingGap),
         name: first.name,
         unit: gap.unit
@@ -396,7 +397,7 @@ function defaultSelectionReason(
 
   return {
     code: "covers_target",
-    message: agenticMessage("en", "plan.selection.covers_target", {
+    message: agenticMessage(negotiated, "plan.selection.covers_target", {
       amount: formatDose(first.amount),
       name: first.name,
       unit: first.unit
@@ -500,6 +501,23 @@ export function publicBasketItem(
       : Array.isArray(item.requestedNutrientNames)
         ? [...item.requestedNutrientNames]
         : [];
+  const generatedReason = defaultSelectionReason(contributions, locale);
+  const existingReason = item.selectionReason;
+  const requestedNames =
+    generatedReason.requestedNames.length > 0
+      ? generatedReason.requestedNames
+      : requestedNutrientNames;
+  const requestedSupplementIds =
+    generatedReason.requestedSupplementIds.length > 0
+      ? generatedReason.requestedSupplementIds
+      : existingReason?.requestedSupplementIds ?? [];
+  const selectionReason: SelectionReason = {
+    code: generatedReason.code,
+    message: generatedReason.message,
+    messageKey: generatedReason.messageKey,
+    requestedNames,
+    requestedSupplementIds
+  };
 
   return {
     currency: item.currency,
@@ -511,7 +529,7 @@ export function publicBasketItem(
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
-    selectionReason: item.selectionReason ?? defaultSelectionReason(contributions, locale),
+    selectionReason,
     servingsPerDay: item.servingsPerDay,
     unitPriceMinor: item.unitPriceMinor,
     ...(incidentalNutrientNames.length > 0 ? { incidentalNutrientNames } : {}),
@@ -743,21 +761,7 @@ export function publicOption(
     ...(option.omittedTargetIds ? { omittedTargetIds: option.omittedTargetIds } : {}),
     ...(option.deferredTargetIds ? { deferredTargetIds: option.deferredTargetIds } : {}),
     ...(option.retainedCurrent ? { retainedCurrent: option.retainedCurrent } : {}),
-    ...(option.economics ? { economics: option.economics } : {}),
-    ...(option.burden ? { burden: option.burden } : {}),
-    ...(option.coverage.length > 0 ? { coverage: option.coverage.map(publicCoverage) } : {}),
-    ...(option.safety
-      ? {
-          safety: {
-            assessedConditionCodes: option.safety.assessedConditionCodes,
-            assessedMedicationCodes: option.safety.assessedMedicationCodes,
-            guidance: option.safety.guidance.map((item) =>
-              publicSafetyGuidance(item, "not_required")
-            )
-          }
-        }
-      : {}),
-    productIds: option.basket.map((item) => item.productId)
+    ...(option.economics ? { economics: option.economics } : {})
   };
 }
 
@@ -982,6 +986,17 @@ export function publicPlanFields(result: Pick<
       ? "partial"
       : "complete";
   const tooBroad = result.breadth?.reasonCode === "request_too_broad";
+  const currency = result.basket[0]?.currency ?? "THB";
+  const quoteBasket =
+    result.status === "no_purchase" || result.status === "processing"
+      ? []
+      : (selected?.basket ?? result.basket);
+  const replenishesLater = Boolean(
+    result.horizon?.orders.some((item) => item.day > 0 && item.day < 90) ||
+      (typeof result.horizon?.nextReplenishmentDay === "number" &&
+        result.horizon.nextReplenishmentDay > 0 &&
+        result.horizon.nextReplenishmentDay < 90)
+  );
   const nextActions =
     result.status === "processing"
       ? ["poll_plan"]
@@ -990,17 +1005,14 @@ export function publicPlanFields(result: Pick<
         : result.status === "needs_input"
           ? ["answer_questions"]
           : result.status === "ready"
-            ? ["confirm_with_user"]
+            ? quoteBasket.length === 0 && replenishesLater
+              ? ["replenish_later"]
+              : ["confirm_with_user"]
             : result.status === "no_purchase"
-              ? result.horizon?.orders.some((item) => item.day > 0 && item.day < 90)
+              ? replenishesLater
                 ? ["replenish_later"]
                 : []
               : ["change_request"];
-  const currency = result.basket[0]?.currency ?? "THB";
-  const quoteBasket =
-    result.status === "no_purchase" || result.status === "processing"
-      ? []
-      : (selected?.basket ?? result.basket);
   const subtotalMinor =
     result.status === "no_purchase" || result.status === "processing"
       ? 0

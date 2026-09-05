@@ -700,7 +700,7 @@ async function com20() {
       receipt.currency === "THB" &&
       typeof receipt.totalPriceMinor === "number" &&
       order.retryable === false &&
-      (order.nextAction === "none" || order.nextAction === "poll") &&
+      order.nextAction === "none" &&
       frozenOf(order.fulfilment).status != null;
     return verdict("COM-20", ok, {
       fulfilment: frozenOf(order.fulfilment).status ?? null,
