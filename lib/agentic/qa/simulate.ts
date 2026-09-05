@@ -32,6 +32,17 @@ import {
 } from "@/lib/agentic/qa/session";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 
+let commitNowGate: Promise<void> | null = null;
+let commitNowEntered: (() => void) | null = null;
+
+export function setCommitNowLatchForTests(
+  gate: Promise<void> | null,
+  entered: (() => void) | null = null
+) {
+  commitNowGate = gate;
+  commitNowEntered = entered;
+}
+
 const SCENARIOS: readonly PaymentEventScenario[] = [
   "success",
   "decline_insufficient_funds",
@@ -113,6 +124,10 @@ async function commitNowForOrder(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>) {
+  commitNowEntered?.();
+  if (commitNowGate) {
+    await commitNowGate;
+  }
   const capability = await resolveCapability({
     action: "order.read",
     config: input.config,

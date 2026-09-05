@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
+import { setCommitNowLatchForTests } from "../lib/agentic/qa/simulate.ts";
 import {
   beginV15Run,
+  canonicalHash,
   canonicalJson,
+  completeSection4Journey,
   createHandlerCluster,
+  deferred,
   endV15Run,
+  eventLedger,
   eventOf,
   executeOn,
   fulfilHandleOnly,
@@ -12,7 +17,8 @@ import {
   qaCall,
   setClockOn,
   setupDefaultExecuteContext,
-  simulateHandleOnly
+  simulateHandleOnly,
+  stripOpaque
 } from "./agentic/v15/harness.ts";
 import {
   V15_CLOCK_00,
@@ -28,6 +34,7 @@ describe("v1.5 authoritative clock resolution", () => {
     beginV15Run();
   });
   afterEach(() => {
+    setCommitNowLatchForTests(null);
     endV15Run();
   });
 
@@ -150,23 +157,37 @@ describe("v1.5 authoritative clock resolution", () => {
     assert.deepEqual(eventOf(after, "declined"), eventOf(before, "declined"));
   });
 
+  it("CLOCK-RED-07 commit-time clock is read after admission latch", async () => {
+    const cluster = createHandlerCluster();
+    const ready = await setupDefaultExecuteContext(cluster, { suffix: "clk07" });
+    const executed = await executeOn(cluster, "A", { ...ready, suffix: "clk07" });
+    const handle = String(executed.orderHandle);
+    const hold = deferred();
+    const admitted = deferred();
+    setCommitNowLatchForTests(hold.promise, () => admitted.resolve());
+    const pending = simulateHandleOnly(cluster, "B", {
+      orderHandle: handle,
+      scenario: "decline_insufficient_funds"
+    });
+    await admitted.promise;
+    await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_10);
+    hold.resolve();
+    const declined = await pending;
+    setCommitNowLatchForTests(null);
+    const stamps = eventOf(declined, "declined").map((item) => item.createdAt);
+    assert.deepEqual(stamps, [V15_CLOCK_10], canonicalJson({ stamps, declined }));
+    assert.equal(stamps.includes(V15_CLOCK_00), false);
+    assert.equal(stamps.includes(V15_CLOCK_09), false);
+  });
+
   it("CLOCK-RED-08 complete clock matrix is byte-identical twice", async () => {
     const hashes = [];
     for (const pass of [1, 2]) {
       beginV15Run();
       const cluster = createHandlerCluster();
-      const ready = await setupDefaultExecuteContext(cluster, { suffix: `clk08${pass}` });
-      const executed = await executeOn(cluster, "A", { ...ready, suffix: `clk08${pass}` });
-      const handle = String(executed.orderHandle);
-      const declined = await simulateHandleOnly(cluster, "B", {
-        orderHandle: handle,
-        scenario: "decline_insufficient_funds"
-      });
-      hashes.push(
-        canonicalJson({
-          declined: eventOf(declined, "declined").map((item) => item.createdAt)
-        })
-      );
+      const ready = await completeSection4Journey(cluster, `clk08${pass}`);
+      const ledger = eventLedger(await orderOn(cluster, "B", { orderHandle: ready.orderHandle }));
+      hashes.push(canonicalHash(stripOpaque(ledger)));
       endV15Run();
     }
     assert.equal(hashes[0], hashes[1], hashes.join("\n"));

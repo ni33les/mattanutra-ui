@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import {
   snapshotCommittedFunnelRows
 } from "../lib/agentic/funnel/ledger.ts";
+import { resetQueryBudget } from "../lib/agentic/plan/query-budget.ts";
 import {
+  emptyQaPersistLocal,
+  restoreQaPersistLocal,
   setQueryBudgetCommitGateForTests,
   setQueryBudgetPersistEnteredForTests,
   snapshotQaPersistDurable
@@ -14,6 +17,7 @@ import {
   canonicalJson,
   completeSection4Journey,
   createHandlerCluster,
+  deferred,
   endV15Run,
   executeOn,
   firstDiff,
@@ -113,8 +117,12 @@ describe("v1.5 exactly-once match counters", () => {
   it("COUNT-RED-03 drop after counter commit then replay keeps 1/1", async () => {
     const cluster = createHandlerCluster();
     const ready = await setupDefaultExecuteContext(cluster, { suffix: "ct03", skipPlan: true });
-    const first = await planOn(cluster, "C", { ...ready, suffix: "ct03" });
+    const entered = deferred();
+    setQueryBudgetPersistEnteredForTests(() => entered.resolve());
+    const dropped = planOn(cluster, "C", { ...ready, suffix: "ct03" });
+    await entered.promise;
     const replay = await planOn(cluster, "D", { ...ready, suffix: "ct03" });
+    const first = await dropped;
     assert.equal(replay.planHandle, first.planHandle);
     const executed = await executeOn(cluster, "A", {
       ...ready,
@@ -124,6 +132,7 @@ describe("v1.5 exactly-once match counters", () => {
     });
     const counts = await observeCounts(cluster, ready.namespace, String(executed.orderHandle));
     assert.deepEqual(counts, { hit: 1, match: 1, miss: 0, planMatchHits: 1 }, canonicalJson(counts));
+    setQueryBudgetPersistEnteredForTests(null);
   });
 
   it("COUNT-RED-06 observe twice is a pure read of the full evidence object", async () => {
@@ -159,6 +168,10 @@ describe("v1.5 exactly-once match counters", () => {
       orderHandle: ready.orderHandle
     });
     cluster.restartHandler("B");
+    await cluster.asHandler("B", async () => {
+      restoreQaPersistLocal(emptyQaPersistLocal());
+      resetQueryBudget();
+    });
     const second = await observeOn(cluster, "B", {
       orderHandle: ready.orderHandle
     });

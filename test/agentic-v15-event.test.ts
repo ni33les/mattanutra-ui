@@ -4,6 +4,7 @@ import {
   beginV15Run,
   canonicalHash,
   canonicalJson,
+  completeSection4Journey,
   createHandlerCluster,
   endV15Run,
   eventLedger,
@@ -171,13 +172,12 @@ describe("v1.5 deterministic event ordering", () => {
     for (const pass of [1, 2]) {
       beginV15Run();
       const cluster = createHandlerCluster();
-      const ready = await setupDefaultExecuteContext(cluster, { suffix: `ev08${pass}` });
-      const executed = await executeOn(cluster, "A", { ...ready, suffix: `ev08${pass}` });
-      const handle = String(executed.orderHandle);
-      await simulateHandleOnly(cluster, "A", { orderHandle: handle, scenario: "decline_insufficient_funds" });
-      await setClockOn(cluster, "A", ready.namespace, V15_CLOCK_10);
-      await simulateHandleOnly(cluster, "A", { orderHandle: handle, scenario: "success" });
-      hashes.push(canonicalHash(stripOpaque(eventLedger(await orderOn(cluster, "B", { orderHandle: handle })))));
+      const ready = await completeSection4Journey(cluster, `ev08${pass}`);
+      hashes.push(
+        canonicalHash(
+          stripOpaque(eventLedger(await orderOn(cluster, "B", { orderHandle: ready.orderHandle })))
+        )
+      );
       endV15Run();
     }
     assert.equal(hashes[0], hashes[1], canonicalJson(hashes));
