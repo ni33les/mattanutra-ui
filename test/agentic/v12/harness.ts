@@ -58,6 +58,13 @@ import { resetInfoCache } from "../../../lib/agentic/info.ts";
 import { DET_V3_BUILD_ID } from "../det-v3/manifest.ts";
 import { resetExecuteLockState } from "../../../lib/agentic/commerce/execute.ts";
 import { resetRequestTraces } from "../../../lib/agentic/qa/request-trace.ts";
+import { resetResourcePermits } from "../../../lib/agentic/qa/resource-permits.ts";
+import { resetServiceClock, useInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
+import { setMatcherEnteredForTests, setMatcherGateForTests } from "../../../lib/agentic/plan/service.ts";
+import {
+  setCatalogueInitEnteredForTests,
+  setCatalogueInitGateForTests
+} from "../../../lib/agentic/catalogue/snapshot.ts";
 import {
   V12_ACQUISITION,
   V12_CLOCK_00,
@@ -237,6 +244,13 @@ export function beginV12Run() {
   resetCatalogueSnapshotCache();
   resetExecuteLockState();
   resetRequestTraces();
+  resetResourcePermits();
+  resetServiceClock();
+  useInjectedServiceClock();
+  setMatcherGateForTests(null);
+  setMatcherEnteredForTests(null);
+  setCatalogueInitGateForTests(null);
+  setCatalogueInitEnteredForTests(null);
 }
 
 export function endV12Run() {

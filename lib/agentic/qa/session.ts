@@ -296,9 +296,13 @@ export async function beginQaRun(
     buildId?: string;
     clientKey?: string;
     environment?: AgenticEnvironment;
+    signal?: AbortSignal;
   }> = {}
 ): Promise<QaSession> {
   const environment = input.environment ?? "dev";
+  if (input.signal?.aborted) {
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
   const existing = findCommittedQaNamespaceByRunId(runId, input.clientKey ?? "");
   if (existing) {
     const session: QaSession = {
@@ -334,6 +338,9 @@ export async function beginQaRun(
     principalScope: namespace,
     schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
   };
+  if (input.signal?.aborted) {
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
   rememberSession(session);
   activeNamespace = namespace;
   resetQueryBudget(namespace);

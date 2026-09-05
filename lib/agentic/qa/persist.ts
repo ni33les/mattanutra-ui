@@ -180,6 +180,12 @@ export function findCommittedQaNamespaceByRunId(runId: string, clientKey = "") {
   return matches[0] ? cloneNamespace(matches[0]) : null;
 }
 
+export function listCommittedQaNamespaces() {
+  return [...committedNamespaces.values()]
+    .map((record) => cloneNamespace(record))
+    .sort((left, right) => left.namespace.localeCompare(right.namespace));
+}
+
 export function emptyQaPersistLocal() {
   return {
     memoryNamespaces: new Map<string, MemoryNamespace>(),

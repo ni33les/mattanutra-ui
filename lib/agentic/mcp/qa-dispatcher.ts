@@ -32,7 +32,13 @@ import {
 } from "@/lib/agentic/qa/proofs";
 import { packProof } from "@/lib/agentic/qa/pack-proof";
 import type { JsonRpcRequest, JsonRpcResponse } from "@/lib/agentic/mcp/dispatcher";
-import { recordRequestStage } from "@/lib/agentic/qa/request-trace";
+import {
+  recordRequestStage,
+  requestAbortSignal,
+  runObservedRequest,
+  setCommitBoundary,
+  throwIfAborted
+} from "@/lib/agentic/qa/request-trace";
 
 const QA_TOOLS = QA_CONTROL_TOOLS;
 
@@ -274,35 +280,48 @@ async function callTool(
 
   if (name === "beginRun") {
     const runId = typeof params.runId === "string" ? params.runId : "A";
-    const correlation = `beginRun:${runId}`;
-    await recordRequestStage(correlation, "ingress_accepted");
-    await recordRequestStage(correlation, "handler_admitted");
-    await recordRequestStage(correlation, "durable_started");
-    const begun = await beginQaRun(runId, {
-      buildId: runtime.config.buildId,
-      clientKey:
-        (typeof params.clientKey === "string" && params.clientKey.trim()) ||
-        (request ? getRequestClientIp(request) ?? "" : ""),
-      environment: runtime.config.environment
-    });
-    await recordRequestStage(begun.namespace, "ingress_accepted");
-    await recordRequestStage(begun.namespace, "handler_admitted");
-    await recordRequestStage(begun.namespace, "durable_started");
-    await recordRequestStage(begun.namespace, "durable_committed");
-    await warmPackPlanCache(runtime);
-    setQueryNamespace(begun.namespace);
-    await recordRequestStage(begun.namespace, "serialization_completed");
-    await recordRequestStage(begun.namespace, "response_handed_to_transport");
-    await recordRequestStage(begun.namespace, "request_released");
-    return {
-      result: toolResult({
+    const clientKey =
+      (typeof params.clientKey === "string" && params.clientKey.trim()) ||
+      (request ? getRequestClientIp(request) ?? "" : "");
+    const correlation = `beginRun:${runId}:${clientKey || "anon"}`;
+    const observed = await runObservedRequest(correlation, async () => {
+      await recordRequestStage(correlation, "ingress_accepted");
+      await recordRequestStage(correlation, "handler_admitted");
+      await recordRequestStage(correlation, "durable_started");
+      throwIfAborted(correlation);
+      const begun = await beginQaRun(runId, {
+        buildId: runtime.config.buildId,
+        clientKey,
+        environment: runtime.config.environment,
+        signal: requestAbortSignal(correlation)
+      });
+      setCommitBoundary(correlation, "after_commit", "reuse");
+      setCommitBoundary(begun.namespace, "after_commit", "reuse");
+      await recordRequestStage(correlation, "durable_committed");
+      await recordRequestStage(begun.namespace, "ingress_accepted");
+      await recordRequestStage(begun.namespace, "handler_admitted");
+      await recordRequestStage(begun.namespace, "durable_started");
+      await recordRequestStage(begun.namespace, "durable_committed");
+      setQueryNamespace(begun.namespace);
+      await recordRequestStage(correlation, "serialization_completed");
+      await recordRequestStage(begun.namespace, "serialization_completed");
+      await recordRequestStage(correlation, "response_handed_to_transport");
+      await recordRequestStage(begun.namespace, "response_handed_to_transport");
+      await recordRequestStage(correlation, "request_released");
+      await recordRequestStage(begun.namespace, "request_released");
+      void warmPackPlanCache(runtime);
+      return {
         ok: true,
         clock: begun.now,
         namespace: begun.namespace,
         principalScope: begun.principalScope,
         preflight: await qaPreflight(begun.namespace, runtime.config.environment)
-      })
-    };
+      };
+    });
+    if (isAgenticErrorResult(observed)) {
+      return { result: toolResult(observed, true) };
+    }
+    return { result: toolResult(observed) };
   }
 
   if (name === "reset") {

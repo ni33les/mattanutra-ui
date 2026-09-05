@@ -47,6 +47,7 @@ import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
 import { queryBudgetSnapshot, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
 import { persistQueryBudget } from "@/lib/agentic/qa/persist";
 import { QA_NAMESPACE_PREFIX } from "@/lib/agentic/qa/session";
 import { buildHorizonPlan, ordersInHorizon } from "@/lib/agentic/value/inventory-ledger";
@@ -65,6 +66,17 @@ import type {
 export const PLAN_FEEDBACK_AFTER_REVISIONS = 3;
 export const PLAN_MATCH_RETURN_BUDGET_MS = 3_000;
 export const PLAN_PROCESSING_POLL_AFTER_SECONDS = 1;
+
+let matcherGate: Promise<void> | null = null;
+let matcherEntered: (() => void) | null = null;
+
+export function setMatcherGateForTests(gate: Promise<void> | null) {
+  matcherGate = gate;
+}
+
+export function setMatcherEnteredForTests(notify: (() => void) | null) {
+  matcherEntered = notify;
+}
 
 const inflightPlanMatches = new Map<
   string,
@@ -1341,9 +1353,19 @@ async function completePreparedPlan(
     }
     snapshot = pinned;
   } else {
-    snapshot = rememberSnapshot(
-      await ensureCatalogueSnapshot(input.config.environment, country)
-    );
+    const permitId = `plan:${prepared.planId}:${prepared.revision}`;
+    acquirePermit(permitId, "database");
+    try {
+      snapshot = rememberSnapshot(
+        await ensureCatalogueSnapshot(input.config.environment, country)
+      );
+    } finally {
+      releasePermit(permitId, "database");
+    }
+  }
+  matcherEntered?.();
+  if (matcherGate) {
+    await matcherGate;
   }
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
   if (!isolated && matcherSafetyCeilings().length < 1) {

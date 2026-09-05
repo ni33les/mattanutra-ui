@@ -33,4 +33,47 @@ export const V14_EXEC_IDS = [
   "EXEC-RC-RED-07"
 ] as const;
 
-export const V14_TEST_IDS = [...V14_ATTR_IDS, ...V14_QA_IDS, ...V14_EXEC_IDS] as const;
+export const V14_CAP_IDS = [
+  "CAP-RC-RED-01",
+  "CAP-RC-RED-02",
+  "CAP-RC-RED-03",
+  "CAP-RC-RED-04",
+  "CAP-RC-RED-05",
+  "CAP-RC-RED-06"
+] as const;
+
+export const V14_DEADLINE_IDS = [
+  "DEADLINE-RED-01",
+  "DEADLINE-RED-02",
+  "DEADLINE-RED-03",
+  "DEADLINE-RED-04",
+  "DEADLINE-RED-05"
+] as const;
+
+export const V14_EDGE_IDS = [
+  "EDGE-RC-RED-01",
+  "EDGE-RC-RED-02",
+  "EDGE-RC-RED-03",
+  "EDGE-RC-RED-04"
+] as const;
+
+export const V14_JOIN_IDS = [
+  "JOIN-RC-01",
+  "JOIN-RC-02",
+  "JOIN-RC-03",
+  "JOIN-RC-04",
+  "JOIN-RC-05",
+  "JOIN-RC-06",
+  "JOIN-RC-07",
+  "JOIN-RC-08"
+] as const;
+
+export const V14_TEST_IDS = [
+  ...V14_ATTR_IDS,
+  ...V14_QA_IDS,
+  ...V14_EXEC_IDS,
+  ...V14_CAP_IDS,
+  ...V14_DEADLINE_IDS,
+  ...V14_EDGE_IDS,
+  ...V14_JOIN_IDS
+] as const;

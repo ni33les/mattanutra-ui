@@ -2,7 +2,7 @@ import type { AgenticConfig } from "@/lib/agentic/config";
 import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { RESPONSIBILITY_VERSION } from "@/lib/agentic/discovery/versions";
 import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
-import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
+import { businessError, isAgenticErrorResult, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { humanOrderReference } from "@/lib/agentic/contract/ids";
 import {
   hashCapability,
@@ -39,6 +39,8 @@ import {
   QA_NAMESPACE_PREFIX,
   resolveQaSession
 } from "@/lib/agentic/qa/session";
+import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
+import { recordRequestStage, runObservedRequest } from "@/lib/agentic/qa/request-trace";
 
 const executeLockChains = new Map<string, Promise<unknown>>();
 const executeCommitSignals = new Map<string, Promise<void>>();
@@ -71,12 +73,14 @@ export function resetExecuteLockState() {
   executeFreshEntered = null;
   executeSerializeGate = null;
   executeSerializeEntered = null;
+  executeFailAt = null;
 }
 
 let executeFreshGate: Promise<void> | null = null;
 let executeFreshEntered: (() => void) | null = null;
 let executeSerializeGate: Promise<void> | null = null;
 let executeSerializeEntered: (() => void) | null = null;
+let executeFailAt: "before_commit" | "at_commit" | "after_commit" | null = null;
 
 export function setExecuteFreshGateForTests(gate: Promise<void> | null) {
   executeFreshGate = gate;
@@ -92,6 +96,12 @@ export function setExecuteSerializeGateForTests(gate: Promise<void> | null) {
 
 export function setExecuteSerializeEnteredForTests(notify: (() => void) | null) {
   executeSerializeEntered = notify;
+}
+
+export function setExecuteFailAtForTests(
+  at: "before_commit" | "at_commit" | "after_commit" | null
+) {
+  executeFailAt = at;
 }
 
 function enqueueExecute<T>(
@@ -174,6 +184,26 @@ export async function executeTool(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<ExecuteSuccess | AgenticErrorResult> {
+  const correlation = `execute:${input.idempotencyKey}`;
+  const observed = await runObservedRequest(correlation, () => executeToolBody(input, correlation));
+  return observed as ExecuteSuccess | AgenticErrorResult;
+}
+
+async function executeToolBody(
+  input: Readonly<{
+    config: AgenticConfig;
+    expectedRevision: number;
+    idempotencyKey: string;
+    now: string;
+    payment: PaymentPort;
+    planHandle: string;
+    scope: CapabilityScope;
+    store: AgenticStore;
+  }>,
+  correlation: string
+): Promise<ExecuteSuccess | AgenticErrorResult> {
+  await recordRequestStage(correlation, "ingress_accepted");
+  await recordRequestStage(correlation, "handler_admitted");
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const payload = {
     expectedRevision: input.expectedRevision,
@@ -201,6 +231,10 @@ export async function executeTool(input: Readonly<{
       store: input.store
     });
     if (committed.kind === "replay") {
+      await recordRequestStage(correlation, "durable_committed");
+      await recordRequestStage(correlation, "serialization_completed");
+      await recordRequestStage(correlation, "response_handed_to_transport");
+      await recordRequestStage(correlation, "request_released");
       return committed.response;
     }
     if (committed.kind === "conflict") {
@@ -223,14 +257,41 @@ export async function executeTool(input: Readonly<{
 
   if (replay.kind === "replay") {
     signalExecuteCommitted(inflightKey);
+    await recordRequestStage(correlation, "durable_committed");
+    await recordRequestStage(correlation, "serialization_completed");
+    await recordRequestStage(correlation, "response_handed_to_transport");
+    await recordRequestStage(correlation, "request_released");
     return replay.response;
   }
 
-  return enqueueExecute(
-    input.store,
-    `${ownerScope}:${input.planHandle}:${input.expectedRevision}`,
-    () => executeFresh(input, ownerScope, payload, inflightKey)
-  );
+  await recordRequestStage(correlation, "durable_started");
+  try {
+    const value = await enqueueExecute(
+      input.store,
+      `${ownerScope}:${input.planHandle}:${input.expectedRevision}`,
+      () => executeFresh(input, ownerScope, payload, inflightKey, correlation)
+    );
+    if (isAgenticErrorResult(value)) {
+      signalExecuteCommitted(inflightKey);
+    } else {
+      await recordRequestStage(correlation, "durable_committed");
+      await recordRequestStage(correlation, "serialization_completed");
+      await recordRequestStage(correlation, "response_handed_to_transport");
+      await recordRequestStage(correlation, "request_released");
+    }
+    return value;
+  } catch (error) {
+    signalExecuteCommitted(inflightKey);
+    if (error instanceof Error && error.message.startsWith("execute_fail_")) {
+      return businessError({
+        correlationId: correlation,
+        message: agenticMessage("en", "mcp.errors.temporarily_unavailable"),
+        reasonCode: "temporarily_unavailable",
+        retryable: true
+      });
+    }
+    throw error;
+  }
 }
 
 async function executeFresh(
@@ -246,7 +307,8 @@ async function executeFresh(
   }>,
   ownerScope: string,
   payload: Readonly<{ expectedRevision: number; planHandle: string }>,
-  inflightKey?: string
+  inflightKey?: string,
+  correlation = `execute:${input.idempotencyKey}`
 ) {
   executeFreshEntered?.();
   if (executeFreshGate) {
@@ -476,6 +538,12 @@ async function executeFresh(
       updatedAt: now
     };
 
+    if (executeFailAt === "before_commit") {
+      throw new Error("execute_fail_before_commit");
+    }
+    acquirePermit(correlation, "database");
+    let response: ExecuteSuccess | undefined;
+    try {
     await store.insertOrder(draftOrder);
     await store.insertOrderItems(
       selected.basket.map((item) => ({
@@ -532,7 +600,7 @@ async function executeFresh(
       store
     });
 
-    const response: ExecuteSuccess = {
+    response = {
       checkoutExpiresAt: session.expiresAt,
       checkoutUrl,
       feedbackInvitation: {
@@ -564,6 +632,15 @@ async function executeFresh(
     if (inflightKey) {
       signalExecuteCommitted(inflightKey);
     }
+    if (executeFailAt === "at_commit") {
+      throw new Error("execute_fail_at_commit");
+    }
+    } finally {
+      releasePermit(correlation, "database");
+    }
+    if (!response) {
+      throw new Error("execute_fail_at_commit");
+    }
     executeSerializeEntered?.();
     if (executeSerializeGate) {
       await executeSerializeGate;
@@ -585,6 +662,9 @@ async function executeFresh(
       eventType: "checkout_opened",
       payload: { locale }
     });
+    if (executeFailAt === "after_commit") {
+      throw new Error("execute_fail_after_commit");
+    }
 
     return response;
   });

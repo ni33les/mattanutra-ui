@@ -238,8 +238,8 @@ describe("UAT QA infrastructure Slice B rate allowance", () => {
     for (let index = 0; index < 11; index += 1) {
       const limited = await enforceMcpOrQaRateLimit(qaRequest(), "uat");
       assert.equal(limited, null);
-      const runA = await beginQaRun("A", { clientKey: PACK_IP, environment: "uat", buildId: "build-a" });
-      const runB = await beginQaRun("B", { clientKey: PACK_IP, environment: "uat", buildId: "build-a" });
+      const runA = await beginQaRun(`A${index}`, { clientKey: PACK_IP, environment: "uat", buildId: "build-a" });
+      const runB = await beginQaRun(`B${index}`, { clientKey: PACK_IP, environment: "uat", buildId: "build-a" });
       assert.ok(await setQaClock(runA.namespace, "2026-09-02T00:00:00.000Z"));
       assert.ok(await setQaClock(runB.namespace, "2026-09-02T00:00:00.000Z"));
       namespaces.add(runA.namespace);

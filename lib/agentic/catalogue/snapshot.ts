@@ -23,6 +23,17 @@ let lastSnapshot: CatalogueSnapshot | null = null;
 let installedSnapshot: CatalogueSnapshot | null = null;
 let publishedSnapshot: CatalogueSnapshot | null = null;
 const requestSnapshot = new AsyncLocalStorage<CatalogueSnapshot>();
+const inflightEnsure = new Map<string, Promise<CatalogueSnapshot>>();
+let catalogueInitGate: Promise<void> | null = null;
+let catalogueInitEntered: (() => void) | null = null;
+
+export function setCatalogueInitGateForTests(gate: Promise<void> | null) {
+  catalogueInitGate = gate;
+}
+
+export function setCatalogueInitEnteredForTests(notify: (() => void) | null) {
+  catalogueInitEntered = notify;
+}
 
 export function resetCatalogueSnapshotCache() {
   cachedByCountry.clear();
@@ -141,6 +152,33 @@ export async function ensureCatalogueSnapshot(
   const scoped = requestSnapshot.getStore();
   if (scoped) {
     return scoped;
+  }
+  const existing = inflightEnsure.get(code);
+  if (existing) {
+    return existing;
+  }
+  let resolve!: (value: CatalogueSnapshot) => void;
+  let reject!: (reason?: unknown) => void;
+  const work = new Promise<CatalogueSnapshot>((next, fail) => {
+    resolve = next;
+    reject = fail;
+  });
+  inflightEnsure.set(code, work);
+  loadCatalogueSnapshot(environment, code).then(resolve, reject);
+  try {
+    return await work;
+  } finally {
+    inflightEnsure.delete(code);
+  }
+}
+
+async function loadCatalogueSnapshot(
+  environment: AgenticEnvironment | undefined,
+  code: string
+): Promise<CatalogueSnapshot> {
+  catalogueInitEntered?.();
+  if (catalogueInitGate) {
+    await catalogueInitGate;
   }
   countQuery(`catalogue.snapshot.${code}`);
   if (publishedSnapshot) {

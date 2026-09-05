@@ -1,10 +1,19 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { infoTool } from "../lib/agentic/info.ts";
+import { listCommittedQaNamespaces } from "../lib/agentic/qa/persist.ts";
+import { snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+import {
+  cancelRequest,
+  onRequestStageEntered,
+  setRequestStageLatch
+} from "../lib/agentic/qa/request-trace.ts";
 import {
   beginV14Run,
+  canonicalHash,
   canonicalJson,
   createHandlerCluster,
+  deferred,
   endV14Run,
   qaCall,
   type HandlerId
@@ -22,9 +31,22 @@ describe("v1.4 QA beginRun completion", () => {
   it("QA-RC-RED-01 eight concurrent beginRuns all complete with unique namespaces", async () => {
     const cluster = createHandlerCluster();
     const workers: HandlerId[] = ["A", "B", "C", "D", "A", "B", "C", "D"];
+    const latch = deferred();
+    const admitted = deferred();
+    let count = 0;
+    setRequestStageLatch("handler_admitted", latch.promise);
+    onRequestStageEntered("handler_admitted", () => {
+      count += 1;
+      if (count === V14_BEGIN_RUN_WAVE) {
+        admitted.resolve();
+      }
+    });
     const pending = workers.map((worker, index) =>
       cluster.asHandler(worker, (runtime) => qaCall(runtime, "beginRun", { runId: `G${index}` }))
     );
+    await admitted.promise;
+    assert.equal(count, V14_BEGIN_RUN_WAVE);
+    latch.resolve();
     const results = await Promise.all(pending);
     assert.equal(results.length, V14_BEGIN_RUN_WAVE);
     const namespaces = results.map((item) => String(item.namespace));
@@ -35,15 +57,23 @@ describe("v1.4 QA beginRun completion", () => {
   it("QA-RC-RED-02 eleven beginRun then setClock each to 09:00", async () => {
     const cluster = createHandlerCluster();
     const workers: HandlerId[] = ["A", "B", "C", "D"];
-    const begun = [];
-    for (let index = 0; index < V14_BEGIN_RUN_GROUPS; index += 1) {
-      begun.push(
-        await cluster.asHandler(workers[index % 4]!, (runtime) =>
-          qaCall(runtime, "beginRun", { runId: `N${index}` })
-        )
-      );
-    }
+    const wave = async (offset: number, count: number) => {
+      const pending = [];
+      for (let index = 0; index < count; index += 1) {
+        const runIndex = offset + index;
+        pending.push(
+          cluster.asHandler(workers[runIndex % 4]!, (runtime) =>
+            qaCall(runtime, "beginRun", { runId: `N${runIndex}` })
+          )
+        );
+      }
+      return Promise.all(pending);
+    };
+    const first = await wave(0, V14_BEGIN_RUN_WAVE);
+    const second = await wave(V14_BEGIN_RUN_WAVE, V14_BEGIN_RUN_GROUPS - V14_BEGIN_RUN_WAVE);
+    const begun = [...first, ...second];
     assert.equal(begun.length, 11);
+    assert.equal(new Set(begun.map((item) => String(item.namespace))).size, 11);
     for (const item of begun) {
       const setter = await cluster.asHandler("A", (runtime) =>
         qaCall(runtime, "setClock", { namespace: item.namespace, now: V14_CLOCK_09 })
@@ -82,5 +112,86 @@ describe("v1.4 QA beginRun completion", () => {
     assert.equal(first.ok, true);
     assert.equal(second.ok, true);
     assert.notEqual(second.namespace, first.namespace);
+  });
+
+  it("QA-RC-RED-06 cancel before commit writes nothing; after commit replays", async () => {
+    const cluster = createHandlerCluster();
+    const latch = deferred();
+    const entered = deferred();
+    setRequestStageLatch("durable_started", latch.promise);
+    onRequestStageEntered("durable_started", entered.resolve);
+    const pending = cluster.asHandler("A", (runtime) =>
+      qaCall(runtime, "beginRun", { clientKey: "runner-1", runId: "cancel-pre" })
+    );
+    await entered.promise;
+    cancelRequest("beginRun:cancel-pre:runner-1");
+    latch.resolve();
+    const cancelled = await pending;
+    assert.equal(cancelled.ok, false);
+    assert.equal(listCommittedQaNamespaces().filter((item) => item.runId === "cancel-pre").length, 0);
+
+    const latchAfter = deferred();
+    const enteredAfter = deferred();
+    setRequestStageLatch("serialization_completed", latchAfter.promise);
+    onRequestStageEntered("serialization_completed", enteredAfter.resolve);
+    const firstPost = cluster.asHandler("B", (runtime) =>
+      qaCall(runtime, "beginRun", { clientKey: "runner-1", runId: "cancel-post" })
+    );
+    await enteredAfter.promise;
+    cancelRequest("beginRun:cancel-post:runner-1");
+    latchAfter.resolve();
+    const cancelledPost = await firstPost;
+    assert.equal(cancelledPost.ok, false);
+    setRequestStageLatch("serialization_completed", Promise.resolve());
+    const replayed = await cluster.asHandler("C", (runtime) =>
+      qaCall(runtime, "beginRun", { clientKey: "runner-1", runId: "cancel-post" })
+    );
+    assert.equal(replayed.ok, true);
+    assert.equal(listCommittedQaNamespaces().filter((item) => item.runId === "cancel-post").length, 1);
+    assert.deepEqual(snapshotResourcePermits(), {
+      admission: 0,
+      connection: 0,
+      database: 0,
+      lock: 0,
+      worker: 0
+    });
+  });
+
+  it("QA-RC-RED-07 three fresh 11-group cycles share one evidence hash", async () => {
+    const hashes = [];
+    for (const cycle of [1, 2, 3]) {
+      beginV14Run();
+      const cluster = createHandlerCluster();
+      const workers: HandlerId[] = ["A", "B", "C", "D"];
+      const begun = [];
+      for (let index = 0; index < V14_BEGIN_RUN_GROUPS; index += 1) {
+        begun.push(
+          await cluster.asHandler(workers[index % 4]!, (runtime) =>
+            qaCall(runtime, "beginRun", { clientKey: "runner-1", runId: `C${cycle}N${index}` })
+          )
+        );
+      }
+      for (const item of begun) {
+        await cluster.asHandler("A", (runtime) =>
+          qaCall(runtime, "setClock", { namespace: item.namespace, now: V14_CLOCK_09 })
+        );
+      }
+      hashes.push(
+        canonicalHash({
+          clocks: begun.length,
+          namespaces: 11,
+          permits: snapshotResourcePermits()
+        })
+      );
+      assert.deepEqual(snapshotResourcePermits(), {
+        admission: 0,
+        connection: 0,
+        database: 0,
+        lock: 0,
+        worker: 0
+      });
+      endV14Run();
+    }
+    assert.equal(new Set(hashes).size, 1, canonicalJson(hashes));
   });
 });

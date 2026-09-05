@@ -30,6 +30,7 @@ export const AGENTIC_REASON_CODES = [
   "checkout_expired",
   "rate_limited",
   "temporarily_unavailable",
+  "SERVICE_DEADLINE_EXCEEDED",
   "consent_required",
   "stale_safety_acknowledgement",
   "stale_revision",
@@ -43,6 +44,7 @@ export type AgenticReasonCode = (typeof AGENTIC_REASON_CODES)[number];
 
 export type AgenticBusinessError = Readonly<{
   category: AgenticErrorCategory;
+  correlationId?: string;
   currentRevision?: number;
   errorCode: AgenticErrorCategory | AgenticReasonCode;
   error_code: AgenticErrorCategory | AgenticReasonCode;
@@ -84,6 +86,7 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
   required: "INVALID_ARGUMENT",
   revision_conflict: "ABORTED",
   stale_revision: "ABORTED",
+  SERVICE_DEADLINE_EXCEEDED: "UNAVAILABLE",
   stale_safety_acknowledgement: "ABORTED",
   temporarily_unavailable: "UNAVAILABLE",
   too_short: "INVALID_ARGUMENT",
@@ -97,6 +100,7 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
 };
 
 const RETRYABLE: ReadonlySet<AgenticReasonCode> = new Set([
+  "SERVICE_DEADLINE_EXCEEDED",
   "rate_limited",
   "revision_conflict",
   "stale_revision",
@@ -104,6 +108,7 @@ const RETRYABLE: ReadonlySet<AgenticReasonCode> = new Set([
 ]);
 
 export function businessError(input: Readonly<{
+  correlationId?: string;
   currentRevision?: number;
   fieldPath?: string | null;
   issues?: readonly Readonly<{
@@ -139,6 +144,7 @@ export function businessError(input: Readonly<{
       messageKey,
       reasonCode: input.reasonCode,
       retryable: input.retryable ?? RETRYABLE.has(input.reasonCode),
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
       ...(input.currentRevision != null ? { currentRevision: input.currentRevision } : {}),
       ...(input.requestedRevision != null ? { requestedRevision: input.requestedRevision } : {}),
       ...(issues ? { issues } : {}),

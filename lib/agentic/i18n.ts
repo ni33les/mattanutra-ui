@@ -249,6 +249,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "บริการไม่พร้อมชั่วคราว",
     "zh-CN": "服务暂时不可用。"
   },
+  "mcp.errors.SERVICE_DEADLINE_EXCEEDED": {
+    en: "The service deadline was exceeded before a terminal response.",
+    th: "บริการหมดเวลาภายในก่อนส่งผลลัพธ์สุดท้าย",
+    "zh-CN": "服务在返回最终响应前已超过内部截止时间。"
+  },
   "mcp.errors.unexpected_property": {
     en: "Unexpected property.",
     th: "มีฟิลด์ที่ไม่รองรับ",
