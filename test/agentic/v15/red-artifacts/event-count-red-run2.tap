@@ -1,0 +1,183 @@
+TAP version 13
+# Subtest: v1.5 exactly-once match counters
+    # Subtest: COUNT-RED-01 one golden cached plan records 1/1/1/0
+    ok 1 - COUNT-RED-01 one golden cached plan records 1/1/1/0
+      ---
+      duration_ms: 182.694638
+      type: 'test'
+      ...
+    # Subtest: COUNT-RED-02 plan idempotency replay does not increment counters
+    not ok 2 - COUNT-RED-02 plan idempotency replay does not increment counters
+      ---
+      duration_ms: 60.862458
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v15-count.test.ts:52:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        {"hit":0,"match":0,"miss":0,"planMatchHits":0}
+        + actual - expected
+        
+          {
+        +   hit: 0,
+        +   match: 0,
+        -   hit: 1,
+        -   match: 1,
+            miss: 0,
+        +   planMatchHits: 0
+        -   planMatchHits: 1
+          }
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        hit: 1
+        match: 1
+        miss: 0
+        planMatchHits: 1
+      actual:
+        hit: 0
+        match: 0
+        miss: 0
+        planMatchHits: 0
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v15-count.test.ts:65:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: COUNT-RED-04 duplicate execute does not change plan-match counters
+    ok 3 - COUNT-RED-04 duplicate execute does not change plan-match counters
+      ---
+      duration_ms: 58.736694
+      type: 'test'
+      ...
+    # Subtest: COUNT-RED-05 payment and fulfilment do not increment plan-match counters
+    ok 4 - COUNT-RED-05 payment and fulfilment do not increment plan-match counters
+      ---
+      duration_ms: 113.320015
+      type: 'test'
+      ...
+    # Subtest: COUNT-RED-06 observe twice is a pure read
+    ok 5 - COUNT-RED-06 observe twice is a pure read
+      ---
+      duration_ms: 57.885012
+      type: 'test'
+      ...
+    1..5
+not ok 1 - v1.5 exactly-once match counters
+  ---
+  duration_ms: 476.285878
+  type: 'suite'
+  location: '/root/grok/mattanutra-ui/test/agentic-v15-count.test.ts:36:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: v1.5 deterministic event ordering
+    # Subtest: EVENT-RED-01 each mutation appends the lifecycle prefix in commit order
+    not ok 1 - EVENT-RED-01 each mutation appends the lifecycle prefix in commit order
+      ---
+      duration_ms: 187.735013
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v15-event.test.ts:39:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        [{"createdAt":"2026-09-02T00:00:00.000Z","status":"declined"},{"createdAt":"2026-09-02T09:00:00.000Z","status":"open"}]
+        + actual - expected
+        
+          [
+        +   'declined',
+            'open',
+        -   'declined'
+          ]
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'open'
+        1: 'declined'
+      actual:
+        0: 'declined'
+        1: 'open'
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v15-event.test.ts:49:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1442:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+      ...
+    # Subtest: EVENT-RED-02 shuffled physical fulfilment order cannot change public order
+    ok 2 - EVENT-RED-02 shuffled physical fulfilment order cannot change public order
+      ---
+      duration_ms: 251.444829
+      type: 'test'
+      ...
+    # Subtest: EVENT-RED-03 equal timestamps follow durable lifecycle not physical order
+    not ok 3 - EVENT-RED-03 equal timestamps follow durable lifecycle not physical order
+      ---
+      duration_ms: 57.847652
+      type: 'test'
+      location: '/root/grok/mattanutra-ui/test/agentic-v15-event.test.ts:86:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        [{"createdAt":"2026-09-02T00:00:00.000Z","status":"declined"},{"createdAt":"2026-09-02T09:00:00.000Z","status":"open"}]
+        + actual - expected
+        
+          [
+        +   'declined',
+            'open',
+        -   'declined'
+          ]
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'open'
+        1: 'declined'
+      actual:
+        0: 'declined'
+        1: 'open'
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///root/grok/mattanutra-ui/test/agentic-v15-event.test.ts:94:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: EVENT-RED-04 workers A/B/C return the same ordered event hash
+    ok 4 - EVENT-RED-04 workers A/B/C return the same ordered event hash
+      ---
+      duration_ms: 58.749932
+      type: 'test'
+      ...
+    # Subtest: EVENT-RED-06 replay does not duplicate or move events
+    ok 5 - EVENT-RED-06 replay does not duplicate or move events
+      ---
+      duration_ms: 40.323847
+      type: 'test'
+      ...
+    # Subtest: EVENT-RED-07 funnel remains nine events 1..9
+    ok 6 - EVENT-RED-07 funnel remains nine events 1..9
+      ---
+      duration_ms: 61.771461
+      type: 'test'
+      ...
+    1..6
+not ok 2 - v1.5 deterministic event ordering
+  ---
+  duration_ms: 661.769067
+  type: 'suite'
+  location: '/root/grok/mattanutra-ui/test/agentic-v15-event.test.ts:31:1'
+  failureType: 'subtestsFailed'
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..2
+# tests 11
+# suites 2
+# pass 8
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5908.039814

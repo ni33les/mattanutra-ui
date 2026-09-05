@@ -1,0 +1,53 @@
+{
+  "pack": "MattaNutra DEV TDD Pack v1.5",
+  "baselineBuild": "816bfe5b325e4df8fa1ae130b255f917705e1f07",
+  "red": {
+    "CLOCK-RED-01": {
+      "path": "$.events[?(@.status=='declined')].createdAt",
+      "expected": "2026-09-02T09:00:00.000Z",
+      "actual": "2026-09-02T00:00:00.000Z"
+    },
+    "CLOCK-RED-02": {
+      "path": "$.events[?(@.status=='succeeded')].createdAt",
+      "expected": "2026-09-02T09:10:00.000Z",
+      "actual": "2026-09-02T00:00:00.000Z"
+    },
+    "CLOCK-RED-03": {
+      "path": "$.events[?(@.status=='preparing'|'dispatched'|'delivered')].createdAt",
+      "expected": ["2026-09-02T09:20:00.000Z", "2026-09-02T09:30:00.000Z", "2026-09-02T09:40:00.000Z"],
+      "actual": "worker default / pack 00:00"
+    },
+    "CLOCK-RED-04": {
+      "path": "$.events[?(@.status=='declined')].createdAt",
+      "expected": "2026-09-02T09:00:00.000Z",
+      "actual": "2026-09-02T00:00:00.000Z"
+    },
+    "CLOCK-RED-05": {
+      "path": "$.events[?(@.status=='declined')].createdAt",
+      "expected": "2026-09-02T09:00:00.000Z",
+      "actual": "2026-09-02T00:00:00.000Z"
+    },
+    "CLOCK-RED-06": {
+      "path": "$.ok",
+      "expected": false,
+      "actual": true,
+      "note": "missing principalScope still wrote a 00:00 decline"
+    },
+    "EVENT-RED-01": {
+      "path": "$.events[*].status",
+      "expected": ["open", "declined"],
+      "actual": ["declined", "open"]
+    },
+    "EVENT-RED-03": {
+      "path": "$.events[*].status",
+      "expected": ["open", "declined"],
+      "actual": ["declined", "open"]
+    },
+    "COUNT-RED-02": {
+      "path": "$.queries.plan.match",
+      "expected": 1,
+      "actual": 0,
+      "note": "idempotent plan replay on another worker persisted an empty counter snapshot"
+    }
+  }
+}
