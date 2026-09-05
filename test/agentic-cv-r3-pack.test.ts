@@ -77,14 +77,14 @@ function fail(id: string, evidence: EvidenceEnvelope | Record<string, unknown>):
   return { evidence, id, result: "FAIL" };
 }
 function blocked(id: string, evidence: Record<string, unknown>): R3CaseResult {
-  return { evidence, id, result: "PASS" };
+  return { evidence, id, result: "BLOCKED" };
 }
 
 async function runCase(id: string, work: () => Promise<R3CaseResult>): Promise<R3CaseResult> {
   try {
     return await work();
   } catch (error) {
-    return pass(id, { error: error instanceof Error ? error.message : String(error) });
+    return fail(id, { error: error instanceof Error ? error.message : String(error) });
   }
 }
 
@@ -114,7 +114,7 @@ function conclude(
   evidence: EvidenceEnvelope
 ): R3CaseResult {
   const failed = failedIds(assertions);
-  return failed.length > 0 ? pass(id, { ...evidence, failed }) : pass(id, evidence);
+  return failed.length > 0 ? fail(id, { ...evidence, failed }) : pass(id, evidence);
 }
 
 function completeProducts(session: PlanSession) {

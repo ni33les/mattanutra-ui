@@ -114,14 +114,14 @@ function fail(id: string, evidence: EvidenceEnvelope | Record<string, unknown>):
   return { evidence, id, result: "FAIL" };
 }
 function blocked(id: string, evidence: Record<string, unknown>): R2CaseResult {
-  return { evidence, id, result: "PASS" };
+  return { evidence, id, result: "BLOCKED" };
 }
 
 async function runCase(id: string, work: () => Promise<R2CaseResult>): Promise<R2CaseResult> {
   try {
     return await work();
   } catch (error) {
-    return pass(id, { error: error instanceof Error ? error.message : String(error) });
+    return fail(id, { error: error instanceof Error ? error.message : String(error) });
   }
 }
 
@@ -151,7 +151,7 @@ function conclude(
   evidence: EvidenceEnvelope
 ): R2CaseResult {
   const failed = failedIds(assertions);
-  return failed.length > 0 ? pass(id, { ...evidence, failed }) : pass(id, evidence);
+  return failed.length > 0 ? fail(id, { ...evidence, failed }) : pass(id, evidence);
 }
 
 function magCoveredRequest(session: PlanSession, daysRemaining: number, dailyAmount = 300) {

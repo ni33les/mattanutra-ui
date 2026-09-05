@@ -159,20 +159,6 @@ const COMPLETED_KEYS = new Set([
   "status",
   "summary",
   "summaryKey",
-  "canonical",
-  "cash30DayMinor",
-  "cash90DayMinor",
-  "cashComplete",
-  "claimIds",
-  "compactDecision",
-  "comparisonBasis",
-  "comparisonComplete",
-  "consumptionComplete",
-  "evidenceHandle",
-  "explanation",
-  "orderSchedule",
-  "purchaseRequiredNow",
-  "researchVersion",
   "tradeOffs",
   "unassessedConditionCodes",
   "unassessedMedicationCodes"
@@ -1016,7 +1002,7 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
         const countsOk =
           selected.planHandle === four.planHandle &&
           processingHarness.port.getCallCount() === 1;
-        return created.ok === true && gotten.ok === true
+        return dirty.length === 0 && countsOk
           ? pass("AX6-01", { operations: payloads.map((item) => item.name) })
           : fail("AX6-01", { dirty, rematch: processingHarness.port.getCallCount() });
       })
@@ -1144,10 +1130,13 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
             (item) =>
               item.action === "block" && item.acknowledgementStatus === "not_applicable"
           ) &&
+          selectedIds.join() === [OPT_A, OPT_B, OPT_C].sort().join() &&
           optionsOf(selected).filter((item) => item.selected === true).length === 1 &&
-          (processing.status === "processing" || processing.status === "ready") &&
-          (polled.status === "ready" || polled.status === "processing");
-        return ready.ok === true && omegaAck.ok === true
+          processing.status === "processing" &&
+          extraProcessingKeys(processing).length === 0 &&
+          polled.status === "ready" &&
+          processingHarness.port.getCallCount() === 1;
+        return ok
           ? pass("AX6-03", { missingReady, priceOk })
           : fail("AX6-03", {
               missingReady,

@@ -958,10 +958,12 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
           nextActionsOf(blocked).join() === "change_request" &&
           beforeIds.join() === afterIds.join() &&
           optionsOf(selected).filter((item) => item.selected === true).length === 1 &&
-          (processing.status === "processing" || processing.status === "ready") &&
-          (gotten.status === "ready" || gotten.status === "processing") &&
+          processing.status === "processing" &&
+          Object.keys(processing).every((key) => PROCESSING_KEYS.has(key)) &&
+          gotten.status === "ready" &&
+          processingHarness.port.getCallCount() === beforeGet &&
           diagnostics.length === 0;
-        return ready.ok === true && omegaAck.ok === true
+        return ok
           ? pass("AX5-03", { selected: selected.optionId })
           : fail("AX5-03", {
               afterIds,
@@ -1037,7 +1039,7 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
           /150\s*mcg/i.test(String(doseReason.message ?? "")) &&
           String(doseReason.message ?? "").length <= 140 &&
           stringList(doseReason.requestedNames).join() === "Vitamin B12";
-        return Boolean(exactReason.code) && Boolean(multiReason.code) && Boolean(doseReason.code)
+        return exactOk && multiOk && doseOk
           ? pass("AX5-04", {
               dose: doseReason.code,
               exact: exactReason.code,

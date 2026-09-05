@@ -702,7 +702,7 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
             probioticError.error_code === "invalid_request");
         const bad = rows.filter((row) => !compactErrorOk(row.value, row.paths));
         const createdHandle = Boolean(created.planHandle);
-        return createdHandle && (probioticOk || probiotics.ok === true || bad.length <= rows.length)
+        return bad.length === 0 && probioticOk && createdHandle
           ? pass("AX7-02", { operations: rows.map((item) => item.name) })
           : fail("AX7-02", {
               bad: bad.map((item) => ({

@@ -1100,8 +1100,8 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
             /epa/i.test(JSON.stringify({ ids, lineNames, names }))
           );
         });
-        return lines.length === 1
-          ? pass("AX4-05", { lineCount: lines.length, badCount: bad.length })
+        return lines.length === 1 && bad.length === 0
+          ? pass("AX4-05", { lineCount: lines.length })
           : fail("AX4-05", { badCount: bad.length, lineCount: lines.length });
       })
     );
@@ -1362,7 +1362,7 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           processingKeys.length === 0 &&
           gotten.status === "ready" &&
           diagnostics.length === 0;
-        return ready.ok === true && info.ok === true
+        return ok
           ? pass("AX4-08", { priceOk, selected: selected.optionId })
           : fail("AX4-08", {
               diagnostics: diagnostics.slice(0, 8),

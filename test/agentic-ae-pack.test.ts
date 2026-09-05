@@ -1362,7 +1362,8 @@ export async function runAePack(): Promise<AePackReport> {
         );
         const banned = texts.filter((item) => BANNED_COPY.test(item.text));
         const localeOk = created.locale === "th";
-        const ok = created.ok === true;
+        const ok =
+          localeOk && tooLong.length === 0 && unkeyed.length === 0 && banned.length === 0;
         return ok
           ? pass("AE-19", { locale: created.locale, textCount: texts.length })
           : fail("AE-19", {
