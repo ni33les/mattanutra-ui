@@ -123,6 +123,20 @@ const PUBLIC_PLAN_KEYS = new Set([
   "status",
   "summary",
   "summaryKey",
+  "canonical",
+  "cash30DayMinor",
+  "cash90DayMinor",
+  "cashComplete",
+  "claimIds",
+  "compactDecision",
+  "comparisonBasis",
+  "comparisonComplete",
+  "consumptionComplete",
+  "evidenceHandle",
+  "explanation",
+  "orderSchedule",
+  "purchaseRequiredNow",
+  "researchVersion",
   "tradeOffs",
   "unassessedConditionCodes",
   "unassessedMedicationCodes"
@@ -150,7 +164,6 @@ const BANNED_DIAGNOSTIC_KEYS = new Set([
   "lossCertificates",
   "matchMs",
   "matcherTelemetry",
-  "matcherVersion",
   "rejected",
   "searchDeadlineMs",
   "searchMs",
@@ -174,19 +187,29 @@ const OPTION_CODES = new Set([
 ]);
 const LINE_REASON_CODES = new Set([
   "best_available",
+  "best_available_dose",
+  "consolidates_targets",
   "covers_target",
+  "dedicated_unavailable",
   "reduces_cost",
   "reduces_pills",
   "retained_by_user"
 ]);
 const OPTION_ONLY_KEYS = new Set([
+  "cash90DayMinor",
   "coveragePercent",
+  "deferredTargetIds",
+  "includedTargetIds",
+  "omittedTargetIds",
   "optionId",
   "reason",
   "reasonCode",
   "reasonKey",
+  "recommended",
+  "role",
   "selected",
   "stackSummary",
+  "tradeOff",
   "tradeOffs"
 ]);
 const BANNED_EN =

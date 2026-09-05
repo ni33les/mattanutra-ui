@@ -144,23 +144,24 @@ async function commitNowForOrder(input: Readonly<{
   if (!order) {
     return businessError({ message: "Not found.", reasonCode: "not_found" });
   }
-  const namespace = order.principalScope?.startsWith(QA_NAMESPACE_PREFIX)
-    ? order.principalScope
-    : null;
-  if (!namespace) {
+  const orderNamespace = order.principalScope?.trim() ?? "";
+  if (orderNamespace.startsWith(QA_NAMESPACE_PREFIX)) {
+    const session = await resolveQaSession(orderNamespace);
+    if (!session) {
+      return businessError({
+        message: "QA namespace context is missing.",
+        reasonCode: "not_found"
+      });
+    }
+    return { now: session.now, namespace: orderNamespace };
+  }
+  if (!orderNamespace) {
     return businessError({
       message: "QA namespace context is missing.",
       reasonCode: "not_found"
     });
   }
-  const session = await resolveQaSession(namespace);
-  if (!session) {
-    return businessError({
-      message: "QA namespace context is missing.",
-      reasonCode: "not_found"
-    });
-  }
-  return { now: session.now, namespace };
+  return { now: input.now, namespace: orderNamespace };
 }
 
 export async function simulatePayment(input: Readonly<{

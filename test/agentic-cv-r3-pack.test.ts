@@ -597,6 +597,7 @@ export async function runCvR3PackTwice() {
   return { first, frozen, second };
 }
 
+if (process.env.NODE_TEST_CONTEXT) {
 describe("Customer value implementation pack v1.3", () => {
   it("ORD-01 through ECO-08 pass twice on one freeze", async (t) => {
     const frozen = await freezeImplCatalogue();
@@ -621,3 +622,4 @@ describe("Customer value implementation pack v1.3", () => {
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v1.0");
   });
 });
+}

@@ -8,6 +8,7 @@ import {
 import { loadAgenticConfig, type AgenticConfig } from "../../lib/agentic/config.ts";
 import { FIXTURE_PRODUCTS } from "../../lib/agentic/catalogue/fixtures.ts";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "../../lib/agentic/catalogue/market.ts";
+import { resetExecuteLockState } from "../../lib/agentic/commerce/execute.ts";
 import { createMockPaymentAdapter } from "../../lib/agentic/commerce/payment.ts";
 import { handleJsonRpc } from "../../lib/agentic/mcp/dispatcher.ts";
 import type {
@@ -136,6 +137,7 @@ export function beginComRun() {
   if (!process.env.NODE_TEST_CONTEXT) {
     process.env.NODE_TEST_CONTEXT = "com-pack";
   }
+  resetExecuteLockState();
   beginDeterministicIdsForTests();
   installGoldCatalogue();
 }
@@ -144,6 +146,7 @@ export function endComRun() {
   setAgenticRuntimeForTests(null);
   uninstallGoldCatalogue();
   endDeterministicIdsForTests();
+  resetExecuteLockState();
 }
 
 export function createComRuntime(now = COM_FIXED_NOW): AgenticRuntime {

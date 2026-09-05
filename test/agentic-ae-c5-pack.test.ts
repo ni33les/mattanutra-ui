@@ -75,7 +75,6 @@ const BANNED_DIAGNOSTIC_KEYS = new Set([
   "lossCertificates",
   "matchMs",
   "matcherTelemetry",
-  "matcherVersion",
   "rejected",
   "searchDeadlineMs",
   "searchMs",

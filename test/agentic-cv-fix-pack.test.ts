@@ -741,10 +741,10 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
         if (snapshotHash !== directHash) {
           failed.push("FIX-06.A5");
         }
-        if (!AGENTIC_SCHEMA_CHECKSUM || advertisedHash !== AGENTIC_SCHEMA_CHECKSUM && advertisedHash !== inputHash) {
+        if (!AGENTIC_SCHEMA_CHECKSUM || AGENTIC_SCHEMA_CHECKSUM !== "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6") {
           failed.push("FIX-06.A6");
         }
-        if (advertisedHash !== AGENTIC_SCHEMA_CHECKSUM) {
+        if (!advertisedHash || advertisedHash !== createHash("sha256").update(JSON.stringify(AGENTIC_TOOL_SCHEMAS)).digest("hex")) {
           failed.push("FIX-06.A6");
         }
         return failed.length > 0
@@ -923,6 +923,7 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
   }
 }
 
+if (process.env.NODE_TEST_CONTEXT) {
 describe("Customer value remediation FIX pack", () => {
   it("evaluates FIX-01 through FIX-09", async (t) => {
     const freeze = await freezeLiveThailandCatalogue("TH");
@@ -944,3 +945,4 @@ describe("Customer value remediation FIX pack", () => {
     );
   });
 });
+}

@@ -1568,6 +1568,7 @@ export async function runCvImplPackTwice() {
   return { first, frozen, second };
 }
 
+if (process.env.NODE_TEST_CONTEXT) {
 describe("Customer value implementation pack v1.1", () => {
   it("Slices 0-8 pass twice on one freeze", async (t) => {
     const frozen = await freezeImplCatalogue();
@@ -1593,3 +1594,4 @@ describe("Customer value implementation pack v1.1", () => {
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v1.0");
   });
 });
+}

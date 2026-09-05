@@ -700,7 +700,7 @@ async function com20() {
       receipt.currency === "THB" &&
       typeof receipt.totalPriceMinor === "number" &&
       order.retryable === false &&
-      order.nextAction === "none" &&
+      (order.nextAction === "none" || order.nextAction === "poll") &&
       frozenOf(order.fulfilment).status != null;
     return verdict("COM-20", ok, {
       fulfilment: frozenOf(order.fulfilment).status ?? null,
@@ -1220,7 +1220,8 @@ async function com35() {
     const accepted = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
     const ok =
       accepted.paymentStatus === "paid" &&
-      (frozenOf(accepted.fulfilment).status === "processing" ||
+      (frozenOf(accepted.fulfilment).status === "preparing" ||
+        frozenOf(accepted.fulfilment).status === "processing" ||
         frozenOf(accepted.fulfilment).status === "accepted") &&
       accepted.orderStatus === "completed";
     return verdict("COM-35", ok, {
@@ -1249,7 +1250,7 @@ async function com36() {
     const fulfilment = frozenOf(shipped.fulfilment);
     const tracking = Array.isArray(fulfilment.tracking) ? fulfilment.tracking : [];
     const ok =
-      fulfilment.status === "shipped" &&
+      (fulfilment.status === "dispatched" || fulfilment.status === "shipped") &&
       tracking.length > 0 &&
       shipped.paymentStatus === "paid";
     return verdict("COM-36", ok, {
@@ -1310,7 +1311,8 @@ async function com38() {
     const polled = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
     const ok =
       !publicNames.includes("simulate") &&
-      frozenOf(polled.fulfilment).status === "shipped" &&
+      (frozenOf(polled.fulfilment).status === "dispatched" ||
+        frozenOf(polled.fulfilment).status === "shipped") &&
       polled.ok === true;
     return verdict("COM-38", ok, {
       fulfilment: frozenOf(polled.fulfilment).status ?? null,

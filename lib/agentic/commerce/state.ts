@@ -81,18 +81,30 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
   now: string;
   store: AgenticStore;
 }>): Promise<PaymentApplyResult | null> {
-  const applyKey = paymentApplyKey(input.event);
-  const existing = await existingProviderEvent(input.store, input.event, applyKey);
-
-  if (existing) {
-    const order = await input.store.getOrder(existing.orderId);
-    return order ? { applied: false, order } : null;
-  }
-
   const order = await input.store.getOrderByProviderSessionId(input.event.providerSessionId);
 
   if (!order) {
+    const applyKey = paymentApplyKey(input.event);
+    const existing = await existingProviderEvent(input.store, input.event, applyKey);
+    if (existing) {
+      const found = await input.store.getOrder(existing.orderId);
+      return found ? { applied: false, order: found } : null;
+    }
     return null;
+  }
+
+  const mismatchPreview =
+    input.event.status === "succeeded" &&
+    (input.event.amountMinor !== order.totalPriceMinor ||
+      input.event.currency !== order.currency);
+  const applyKey = mismatchPreview
+    ? `${input.event.providerSessionId}:mismatch`
+    : paymentApplyKey(input.event);
+  const existing = await existingProviderEvent(input.store, input.event, applyKey);
+
+  if (existing && !mismatchPreview) {
+    const found = await input.store.getOrder(existing.orderId);
+    return found ? { applied: false, order: found } : null;
   }
 
   const terminal =
@@ -101,6 +113,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     order.orderStatus === "cancelled";
   if (
     terminal &&
+    !mismatchPreview &&
     input.event.status !== "refunded" &&
     input.event.status !== "partially_refunded"
   ) {
@@ -495,7 +508,12 @@ export function orderPollView(input: Readonly<{
           totalPriceMinor: order.totalPriceMinor
         }
       : null,
-    retryable: !terminal && !processing,
+    retryable:
+      !terminal &&
+      !processing &&
+      order.paymentStatus !== "paid" &&
+      order.paymentStatus !== "refunded" &&
+      order.paymentStatus !== "partially_refunded",
     stateVersion: order.stateVersion
   };
 }
