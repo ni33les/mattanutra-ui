@@ -54,6 +54,8 @@ describe("v1.5 exactly-once match counters", () => {
     beginV15Run();
   });
   afterEach(() => {
+    setQueryBudgetCommitGateForTests(null);
+    setQueryBudgetPersistEnteredForTests(null);
     endV15Run();
   });
 
@@ -201,32 +203,23 @@ describe("v1.5 exactly-once match counters", () => {
   it("COUNT-RED-09 plan success waits for counter commit latch", async () => {
     const cluster = createHandlerCluster();
     const ready = await setupDefaultExecuteContext(cluster, { suffix: "ct09prep", skipPlan: true });
-    let release = () => undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let entered = false;
-    setQueryBudgetPersistEnteredForTests(() => {
-      entered = true;
-    });
-    setQueryBudgetCommitGateForTests(gate);
+    const hold = deferred();
+    const entered = deferred();
+    setQueryBudgetPersistEnteredForTests(() => entered.resolve());
+    setQueryBudgetCommitGateForTests(hold.promise);
     let settled = false;
     const pending = planOn(cluster, "C", { ...ready, suffix: "ct09" }).then((result) => {
       settled = true;
       return result;
     });
-    while (!entered && !settled) {
-      await Promise.resolve();
-    }
+    await entered.promise;
     for (let index = 0; index < 10000 && !settled; index += 1) {
       await Promise.resolve();
     }
     assert.equal(settled, false, "plan returned before the counter commit latch released");
-    release();
+    hold.resolve();
     const plan = await pending;
     assert.equal(plan.status, "ready", canonicalJson(plan));
-    setQueryBudgetCommitGateForTests(null);
-    setQueryBudgetPersistEnteredForTests(null);
   });
 
   it("COUNT-RED-10 complete counter matrix is byte-identical twice", async () => {
