@@ -15,7 +15,6 @@ import {
   executeOn,
   firstDiff,
   planOn,
-  qaCall,
   setupDefaultExecuteContext,
   stripOpaque,
   type HandlerCluster as V13Cluster,
@@ -31,10 +30,32 @@ export {
   executeOn,
   firstDiff,
   planOn,
-  qaCall,
   setupDefaultExecuteContext,
   stripOpaque
 };
+
+export async function qaCall(
+  runtime: Parameters<typeof import("../v12/harness.ts").qaCall>[0],
+  name: string,
+  args: Record<string, unknown> = {}
+) {
+  const { handleQaJsonRpc } = await import("../../../lib/agentic/mcp/qa-dispatcher.ts");
+  const { structured } = await import("../v12/harness.ts");
+  return structured(
+    await handleQaJsonRpc(
+      runtime,
+      {
+        id: 1,
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { arguments: args, name }
+      },
+      new Request("https://dev.mattanutra.com/api/mcp/qa", {
+        headers: { "x-forwarded-for": "203.0.113.10" }
+      })
+    )
+  );
+}
 export type { HandlerId, ReadyPlan };
 
 export function beginV14Run() {

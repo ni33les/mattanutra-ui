@@ -41,6 +41,12 @@ import {
 } from "@/lib/agentic/qa/session";
 
 const executeLockChains = new Map<string, Promise<unknown>>();
+const executeCommitSignals = new Map<string, Promise<void>>();
+const executeCommitResolvers = new Map<string, () => void>();
+
+function signalExecuteCommitted(key: string) {
+  executeCommitResolvers.get(key)?.();
+}
 
 export function captureExecuteLockState() {
   return new Map(executeLockChains);
@@ -59,14 +65,18 @@ export function emptyExecuteLockState() {
 
 export function resetExecuteLockState() {
   executeLockChains.clear();
+  executeCommitSignals.clear();
+  executeCommitResolvers.clear();
   executeFreshGate = null;
   executeFreshEntered = null;
   executeSerializeGate = null;
+  executeSerializeEntered = null;
 }
 
 let executeFreshGate: Promise<void> | null = null;
 let executeFreshEntered: (() => void) | null = null;
 let executeSerializeGate: Promise<void> | null = null;
+let executeSerializeEntered: (() => void) | null = null;
 
 export function setExecuteFreshGateForTests(gate: Promise<void> | null) {
   executeFreshGate = gate;
@@ -78,6 +88,10 @@ export function setExecuteFreshEnteredForTests(notify: (() => void) | null) {
 
 export function setExecuteSerializeGateForTests(gate: Promise<void> | null) {
   executeSerializeGate = gate;
+}
+
+export function setExecuteSerializeEnteredForTests(notify: (() => void) | null) {
+  executeSerializeEntered = notify;
 }
 
 function enqueueExecute<T>(
@@ -165,6 +179,35 @@ export async function executeTool(input: Readonly<{
     expectedRevision: input.expectedRevision,
     planHandle: input.planHandle
   };
+  const inflightKey = `${ownerScope}:${input.idempotencyKey}`;
+  let leader = false;
+  if (!executeCommitSignals.has(inflightKey)) {
+    leader = true;
+    executeCommitSignals.set(
+      inflightKey,
+      new Promise<void>((resolve) => {
+        executeCommitResolvers.set(inflightKey, resolve);
+      })
+    );
+  }
+  if (!leader) {
+    await executeCommitSignals.get(inflightKey);
+    const committed = await beginIdempotency<ExecuteSuccess>({
+      key: input.idempotencyKey,
+      now: input.now,
+      operation: "execute",
+      ownerScope,
+      payload,
+      store: input.store
+    });
+    if (committed.kind === "replay") {
+      return committed.response;
+    }
+    if (committed.kind === "conflict") {
+      return committed.error;
+    }
+  }
+
   const replay = await beginIdempotency<ExecuteSuccess>({
     key: input.idempotencyKey,
     now: input.now,
@@ -179,13 +222,14 @@ export async function executeTool(input: Readonly<{
   }
 
   if (replay.kind === "replay") {
+    signalExecuteCommitted(inflightKey);
     return replay.response;
   }
 
   return enqueueExecute(
     input.store,
     `${ownerScope}:${input.planHandle}:${input.expectedRevision}`,
-    () => executeFresh(input, ownerScope, payload)
+    () => executeFresh(input, ownerScope, payload, inflightKey)
   );
 }
 
@@ -201,7 +245,8 @@ async function executeFresh(
     store: AgenticStore;
   }>,
   ownerScope: string,
-  payload: Readonly<{ expectedRevision: number; planHandle: string }>
+  payload: Readonly<{ expectedRevision: number; planHandle: string }>,
+  inflightKey?: string
 ) {
   executeFreshEntered?.();
   if (executeFreshGate) {
@@ -516,6 +561,10 @@ async function executeFresh(
       response,
       store
     });
+    if (inflightKey) {
+      signalExecuteCommitted(inflightKey);
+    }
+    executeSerializeEntered?.();
     if (executeSerializeGate) {
       await executeSerializeGate;
     }

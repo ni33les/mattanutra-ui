@@ -25,7 +25,8 @@ import {
   loadQaNamespace,
   persistQaNamespace,
   persistQaNamespaceChannel,
-  persistQaNamespaceClock
+  persistQaNamespaceClock,
+  findCommittedQaNamespaceByRunId
 } from "@/lib/agentic/qa/persist";
 
 export const QA_PACK_CLOCK = "2026-09-02T00:00:00.000Z";
@@ -298,6 +299,23 @@ export async function beginQaRun(
   }> = {}
 ): Promise<QaSession> {
   const environment = input.environment ?? "dev";
+  const existing = findCommittedQaNamespaceByRunId(runId, input.clientKey ?? "");
+  if (existing) {
+    const session: QaSession = {
+      acquisitionMinor: existing.acquisitionMinor,
+      attribution: attributionOf(existing.attribution),
+      buildId: existing.buildId,
+      catalogueChecksum: existing.snapshotId,
+      catalogueVersion: "",
+      frozenSnapshot: null,
+      namespace: existing.namespace,
+      now: existing.now,
+      principalScope: existing.principalScope,
+      schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
+    };
+    const loaded = await resolveQaSession(existing.namespace);
+    return loaded ?? session;
+  }
   const nonce = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const namespace = `${QA_NAMESPACE_PREFIX}${runId}:${nonce}`;
   setQueryNamespace(namespace);

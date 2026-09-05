@@ -63,8 +63,12 @@ describe("v1.4 QA beginRun completion", () => {
 
   it("QA-RC-RED-04 replay beginRun with the same runId returns one namespace", async () => {
     const cluster = createHandlerCluster();
-    const first = await cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "A" }));
-    const replay = await cluster.asHandler("B", (runtime) => qaCall(runtime, "beginRun", { runId: "A" }));
+    const first = await cluster.asHandler("A", (runtime) =>
+      qaCall(runtime, "beginRun", { clientKey: "runner-1", runId: "A" })
+    );
+    const replay = await cluster.asHandler("B", (runtime) =>
+      qaCall(runtime, "beginRun", { clientKey: "runner-1", runId: "A" })
+    );
     assert.equal(first.ok, true);
     assert.equal(replay.ok, true);
     assert.equal(replay.namespace, first.namespace, canonicalJson({ first, replay }));

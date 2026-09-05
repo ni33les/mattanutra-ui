@@ -170,6 +170,16 @@ export function committedNamespaceOf(namespace: string) {
   return record ? cloneNamespace(record) : null;
 }
 
+export function findCommittedQaNamespaceByRunId(runId: string, clientKey = "") {
+  if (!clientKey) {
+    return null;
+  }
+  const matches = [...committedNamespaces.values()].filter(
+    (record) => record.runId === runId && record.clientKey === clientKey
+  );
+  return matches[0] ? cloneNamespace(matches[0]) : null;
+}
+
 export function emptyQaPersistLocal() {
   return {
     memoryNamespaces: new Map<string, MemoryNamespace>(),

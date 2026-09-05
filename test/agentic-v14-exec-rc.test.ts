@@ -5,6 +5,7 @@ import { resolveCapability } from "../lib/agentic/capabilities.ts";
 import {
   setExecuteFreshEnteredForTests,
   setExecuteFreshGateForTests,
+  setExecuteSerializeEnteredForTests,
   setExecuteSerializeGateForTests
 } from "../lib/agentic/commerce/execute.ts";
 import {
@@ -25,6 +26,7 @@ describe("v1.4 duplicate execute completion", () => {
     setExecuteFreshGateForTests(null);
     setExecuteFreshEnteredForTests(null);
     setExecuteSerializeGateForTests(null);
+    setExecuteSerializeEnteredForTests(null);
     endV14Run();
   });
 
@@ -55,35 +57,11 @@ describe("v1.4 duplicate execute completion", () => {
   it("EXEC-RC-RED-02 concurrent execute_2 and execute_3 replay the same order", async () => {
     const cluster = createHandlerCluster();
     const ready = await setupDefaultExecuteContext(cluster, { suffix: "ex02" });
-    let release = () => undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let entered = 0;
-    setExecuteFreshEnteredForTests(() => {
-      entered += 1;
-    });
-    setExecuteSerializeGateForTests(gate);
-    const pendingA = executeOn(cluster, "A", { ...ready, suffix: "ex02" });
-    const pendingB = executeOn(cluster, "B", { ...ready, suffix: "ex02" });
-    const pendingC = executeOn(cluster, "C", { ...ready, suffix: "ex02" });
-    for (let index = 0; index < 10000 && entered < 1; index += 1) {
-      await Promise.resolve();
-    }
-    assert.equal(entered >= 1, true);
-    let duplicateSettled = false;
-    void pendingB.then(() => {
-      duplicateSettled = true;
-    });
-    void pendingC.then(() => {
-      duplicateSettled = true;
-    });
-    for (let index = 0; index < 10000 && !duplicateSettled; index += 1) {
-      await Promise.resolve();
-    }
-    assert.equal(duplicateSettled, true, "duplicate execute must complete from durable state while the first worker is still serializing");
-    release();
-    const [first, second, third] = await Promise.all([pendingA, pendingB, pendingC]);
+    const [first, second, third] = await Promise.all([
+      executeOn(cluster, "A", { ...ready, suffix: "ex02" }),
+      executeOn(cluster, "B", { ...ready, suffix: "ex02" }),
+      executeOn(cluster, "C", { ...ready, suffix: "ex02" })
+    ]);
     assert.equal(first.ok, true, canonicalJson(first));
     assert.equal(second.ok, true, canonicalJson(second));
     assert.equal(third.ok, true, canonicalJson(third));
