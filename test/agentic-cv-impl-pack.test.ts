@@ -5,11 +5,11 @@ import { describe, it } from "node:test";
 
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import {
-  AGENTIC_INPUT_SCHEMAS,
   AGENTIC_TOOL_SCHEMAS,
   agenticServerInstructions
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_SCHEMA_CHECKSUM } from "../lib/agentic/info.ts";
+import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
 import { toolList } from "../lib/agentic/mcp/rpc.ts";
 import { MATCHER_VERSION } from "../lib/matcher/config.ts";
 import {
@@ -1033,8 +1033,7 @@ async function runDevContract02(session: PlanSession, runIndex: number): Promise
     method: "tools/call",
     params: { name: "info", arguments: {} }
   });
-  const advertisedHash = createHash("sha256").update(JSON.stringify(AGENTIC_TOOL_SCHEMAS)).digest("hex");
-  const inputHash = createHash("sha256").update(JSON.stringify(AGENTIC_INPUT_SCHEMAS)).digest("hex");
+  const officialChecksum = computeSchemaChecksum();
   const infoPayload = asRecord(asRecord(info?.result).structuredContent ?? asRecord(info?.result));
   const infoChecksum = String(infoPayload.schemaChecksum ?? asRecord(info?.result).schemaChecksum ?? AGENTIC_SCHEMA_CHECKSUM);
   const listedTools = Array.isArray(asRecord(listed?.result).tools)
@@ -1046,13 +1045,14 @@ async function runDevContract02(session: PlanSession, runIndex: number): Promise
   const assertions = [
     assertEq(
       "CONTRACT-02.checksum",
-      AGENTIC_SCHEMA_CHECKSUM,
+      officialChecksum,
       "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"
     ),
-    assertEq("CONTRACT-02.info", infoChecksum, AGENTIC_SCHEMA_CHECKSUM),
-    assertEq("CONTRACT-02.list", listedHash, directHash)
+    assertEq("CONTRACT-02.info", infoChecksum, officialChecksum),
+    assertEq("CONTRACT-02.list", listedHash, directHash),
+    assertEq("CONTRACT-02.names", 7, listedTools.length)
   ];
-  return conclude("DEV-CONTRACT-02", assertions, envelopeFor(session, { method: "tools/list" }, { advertisedHash }, assertions, runIndex));
+  return conclude("DEV-CONTRACT-02", assertions, envelopeFor(session, { method: "tools/list" }, { officialChecksum }, assertions, runIndex));
 }
 
 async function runDevContract03(session: PlanSession, runIndex: number): Promise<CvImplCaseResult> {

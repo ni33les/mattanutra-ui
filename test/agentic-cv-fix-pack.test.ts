@@ -4,11 +4,11 @@ import { describe, it } from "node:test";
 
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../lib/agentic/config.ts";
 import {
-  AGENTIC_INPUT_SCHEMAS,
   AGENTIC_TOOL_SCHEMAS,
   agenticServerInstructions
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_SCHEMA_CHECKSUM } from "../lib/agentic/info.ts";
+import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { toolList } from "../lib/agentic/mcp/rpc.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
@@ -696,12 +696,7 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
           listed.find((item) => item.name === "plan")?.inputSchema as Record<string, unknown>
         );
         const intent = schemaHasIntent(planSchema);
-        const advertisedHash = createHash("sha256")
-          .update(JSON.stringify(AGENTIC_TOOL_SCHEMAS))
-          .digest("hex");
-        const inputHash = createHash("sha256")
-          .update(JSON.stringify(AGENTIC_INPUT_SCHEMAS))
-          .digest("hex");
+        const officialChecksum = computeSchemaChecksum();
         const failed: string[] = [];
         if (names.join() !== "info,plan,execute,order,support,feedback,evidence") {
           failed.push("FIX-06.A1");
@@ -741,16 +736,17 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
           failed.push("FIX-06.A5");
         }
         if (
-          AGENTIC_SCHEMA_CHECKSUM !==
-          "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"
+          officialChecksum !==
+            "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6" ||
+          AGENTIC_SCHEMA_CHECKSUM !== officialChecksum
         ) {
           failed.push("FIX-06.A6");
         }
         return failed.length > 0
           ? fail("FIX-06", {
-              advertisedHash,
               failed,
-              inputHash
+              officialChecksum,
+              schemaChecksum: AGENTIC_SCHEMA_CHECKSUM
             })
           : pass("FIX-06", { schemaChecksum: AGENTIC_SCHEMA_CHECKSUM });
       })
