@@ -944,21 +944,29 @@ function matcherResult(score) {
   };
 }
 
+function caseResults(report) {
+  return {
+    passedCases: report.passedCases,
+    totalCases: report.totalCases,
+    results: (report.cases ?? []).map((item) => ({ id: item.id, result: item.result }))
+  };
+}
+
 export function canonicalPack(run) {
   return JSON.stringify({
-    contract: JSON.parse(canonicalAeReport(run.contract)),
-    honesty: JSON.parse(canonicalAeC2Report(run.honesty)),
-    planning: JSON.parse(canonicalAeC3Report(run.planning)),
-    explanations: JSON.parse(canonicalAeC4Report(run.explanations)),
-    copy: JSON.parse(canonicalAeC5Report(run.copy)),
-    state: JSON.parse(canonicalAeC6Report(run.state)),
-    boundary: JSON.parse(canonicalAeC7Report(run.boundary)),
-    evidence: JSON.parse(canonicalAeC8Report(run.evidence)),
-    commercial: JSON.parse(canonicalComReport(run.commercial)),
-    valueRemediation: JSON.parse(canonicalCvFixReport(run.valueRemediation)),
-    valueImplementation: JSON.parse(canonicalCvImplReport(run.valueImplementation)),
-    valueR2: JSON.parse(canonicalR2Report(run.valueR2)),
-    valueR3: JSON.parse(canonicalR3Report(run.valueR3)),
+    contract: caseResults(run.contract),
+    honesty: caseResults(run.honesty),
+    planning: caseResults(run.planning),
+    explanations: caseResults(run.explanations),
+    copy: caseResults(run.copy),
+    state: caseResults(run.state),
+    boundary: caseResults(run.boundary),
+    evidence: caseResults(run.evidence),
+    commercial: caseResults(run.commercial),
+    valueRemediation: caseResults(run.valueRemediation),
+    valueImplementation: caseResults(run.valueImplementation),
+    valueR2: caseResults(run.valueR2),
+    valueR3: caseResults(run.valueR3),
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,

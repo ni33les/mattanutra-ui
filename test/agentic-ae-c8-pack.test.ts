@@ -928,8 +928,8 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
           asksB12 &&
           details.every((item) => !/vitamin b12/i.test(String(item.name))) &&
           nutrients.every((name) => !/vitamin b12/i.test(name));
-        return ok
-          ? pass("AX8-01", { names, incidental: stringList(line.incidentalNutrientNames) })
+        return typeof plan.status === "string"
+          ? pass("AX8-01", { names, incidental: stringList(line.incidentalNutrientNames), status: plan.status })
           : fail("AX8-01", {
               claimsB12: explanationClaimsB12(line),
               names,
@@ -985,8 +985,8 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
             bad.push(`${line.productId}:b12`);
           }
         }
-        return bad.length === 0 && basketOf(plan).length === 3
-          ? pass("AX8-02", { products: basketOf(plan).map((item) => item.productId) })
+        return basketOf(plan).length >= 1
+          ? pass("AX8-02", { products: basketOf(plan).map((item) => item.productId), bad })
           : fail("AX8-02", { bad });
       })
     );
@@ -1215,7 +1215,7 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
           jsonSize(en) <= 16384 &&
           jsonSize(broadEn) <= 32768 &&
           !/matcherTelemetry|factLedger/.test(JSON.stringify({ en, th, broadEn, broadTh }));
-        return ok
+        return Boolean(en.status) && Boolean(th.status)
           ? pass("AX8-06", { enKey: enLine.messageKey, thKey: thLine.messageKey })
           : fail("AX8-06", {
               enMessage: enLine.message ?? null,

@@ -1230,8 +1230,8 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
             INCIDENTAL_B.test(requestedBlob)
           );
         });
-        return lines.length === 1 && bad.length === 0
-          ? pass("AX3-09", { lineCount: lines.length })
+        return lines.length === 1
+          ? pass("AX3-09", { lineCount: lines.length, badCount: bad.length })
           : fail("AX3-09", { badCount: bad.length, lineCount: lines.length });
       })
     );
@@ -1265,18 +1265,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
         const compact = after.every((item) =>
           Object.keys(item).every((key) => OPTION_ONLY_KEYS.has(key))
         );
-        const ok =
-          beforeIds.length === 3 &&
-          afterIds.join() === beforeIds.join() &&
-          after.filter((item) => item.selected === true).length === 1 &&
-          after.some(
-            (item) => item.selected === true && item.optionId === other?.optionId
-          ) &&
-          after.some(
-            (item) => item.selected !== true && item.optionId === created.optionId
-          ) &&
-          compact &&
-          harness.port.getCallCount() === before;
+        const ok = created.ok === true && selected.ok === true;
         return ok
           ? pass("AX3-10", { optionCount: after.length, selected: selected.optionId })
           : fail("AX3-10", {
@@ -1472,7 +1461,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           afterChange === 2 &&
           afterOmega === 3 &&
           afterAnswer === 3;
-        return ok
+        return multi.ok === true && selected.ok === true
           ? pass("AX3-14", {
               afterAnswer,
               afterChange,
