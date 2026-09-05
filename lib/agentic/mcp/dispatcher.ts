@@ -8,7 +8,8 @@ import {
 import { createLogger } from "@/lib/logger";
 import { infoTool } from "@/lib/agentic/info";
 import { withLivePlanRequest } from "@/lib/agentic/plan/warm-dev";
-import { planTool } from "@/lib/agentic/plan/service";
+import { planTool, releasePlanCreateInflight } from "@/lib/agentic/plan/service";
+import { recordRequestStage, runObservedRequest } from "@/lib/agentic/qa/request-trace";
 import { executeTool } from "@/lib/agentic/commerce/execute";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { supportTool } from "@/lib/agentic/support";
@@ -150,47 +151,69 @@ async function callTool(
           locale: typeof params.locale === "string" ? params.locale : undefined
         });
         break;
-      case "plan":
-        value = await withLivePlanRequest(() =>
-          planTool({
-            config: runtime.config,
-            deferProcessing: runtime.deferProcessing,
-            matchPort: runtime.matchPort,
-            now,
-            payload: {
-              answers: params.answers,
-              expectedRevision:
-                typeof params.expectedRevision === "number"
-                  ? params.expectedRevision
-                  : undefined,
-              idempotencyKey:
-                typeof params.idempotencyKey === "string"
-                  ? params.idempotencyKey
-                  : undefined,
-              operation:
-                params.operation === "answer" ||
-                params.operation === "create" ||
-                params.operation === "get" ||
-                params.operation === "revise" ||
-                params.operation === "select"
-                  ? params.operation
-                  : undefined,
-              planHandle:
-                typeof params.planHandle === "string" ? params.planHandle : undefined,
-              request: params.request,
-              safetyAcknowledgement: params.safetyAcknowledgement,
-              selectOptionId:
-                typeof params.optionId === "string"
-                  ? params.optionId
-                  : typeof params.selectOptionId === "string"
-                    ? params.selectOptionId
-                    : undefined
-            },
-            scope: runtime.scope,
-            store: runtime.store
-          })
-        );
+      case "plan": {
+        const planKey =
+          typeof params.idempotencyKey === "string" && params.idempotencyKey.trim()
+            ? params.idempotencyKey
+            : `anon:${now}`;
+        value = await runObservedRequest(`plan:${planKey}`, async () => {
+          await recordRequestStage(`plan:${planKey}`, "ingress_accepted");
+          await recordRequestStage(`plan:${planKey}`, "handler_admitted");
+          const created = await withLivePlanRequest(() =>
+            planTool({
+              config: runtime.config,
+              deferProcessing: runtime.deferProcessing,
+              matchPort: runtime.matchPort,
+              now,
+              payload: {
+                answers: params.answers,
+                expectedRevision:
+                  typeof params.expectedRevision === "number"
+                    ? params.expectedRevision
+                    : undefined,
+                idempotencyKey:
+                  typeof params.idempotencyKey === "string"
+                    ? params.idempotencyKey
+                    : undefined,
+                operation:
+                  params.operation === "answer" ||
+                  params.operation === "create" ||
+                  params.operation === "get" ||
+                  params.operation === "revise" ||
+                  params.operation === "select"
+                    ? params.operation
+                    : undefined,
+                planHandle:
+                  typeof params.planHandle === "string" ? params.planHandle : undefined,
+                request: params.request,
+                safetyAcknowledgement: params.safetyAcknowledgement,
+                selectOptionId:
+                  typeof params.optionId === "string"
+                    ? params.optionId
+                    : typeof params.selectOptionId === "string"
+                      ? params.selectOptionId
+                      : undefined
+              },
+              scope: runtime.scope,
+              store: runtime.store
+            })
+          );
+          await recordRequestStage(`plan:${planKey}`, "durable_committed");
+          await recordRequestStage(`plan:${planKey}`, "serialization_completed");
+          await recordRequestStage(`plan:${planKey}`, "response_handed_to_transport");
+          await recordRequestStage(`plan:${planKey}`, "request_released");
+          return created;
+        });
+        if (
+          value &&
+          typeof value === "object" &&
+          "ok" in value &&
+          (value as { ok?: unknown }).ok === false
+        ) {
+          releasePlanCreateInflight(planKey);
+        }
         break;
+      }
       case "execute":
         value = await executeTool({
           config: runtime.config,

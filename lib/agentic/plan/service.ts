@@ -104,6 +104,19 @@ export function snapshotPlanInflightForTests() {
   };
 }
 
+export function releasePlanCreateInflight(idempotencyKey: string) {
+  for (const key of inflightPlanIdempotency.keys()) {
+    if (key.endsWith(`\0${idempotencyKey}`)) {
+      inflightPlanIdempotency.delete(key);
+    }
+  }
+}
+
+export function resetPlanCreateInflightForTests() {
+  inflightPlanIdempotency.clear();
+  inflightPlanMatches.clear();
+}
+
 const inflightPlanMatches = new Map<
   string,
   Promise<PlanToolSuccess | AgenticErrorResult>
@@ -866,7 +879,16 @@ export async function planTool(input: Readonly<{
       : `${ownerScope}\0${input.payload.idempotencyKey}`;
   if (inflightKey) {
     const existing = inflightPlanIdempotency.get(inflightKey);
-    if (existing) {
+    const planCorrelation =
+      input.payload.idempotencyKey && `plan:${input.payload.idempotencyKey}`;
+    if (existing && planCorrelation) {
+      const { deadlineExceeded } = await import("@/lib/agentic/qa/service-clock");
+      if (deadlineExceeded(planCorrelation)) {
+        inflightPlanIdempotency.delete(inflightKey);
+      } else {
+        return existing;
+      }
+    } else if (existing) {
       return existing;
     }
   }
@@ -1398,8 +1420,28 @@ async function completePreparedPlan(
     }
   }
   matcherEntered?.();
+  const planCorrelation =
+    typeof input.payload.idempotencyKey === "string" && input.payload.idempotencyKey
+      ? `plan:${input.payload.idempotencyKey}`
+      : "";
+  const {
+    deadlineExceeded,
+    serviceDeadlineError,
+    waitUntilDeadline
+  } = await import("@/lib/agentic/qa/service-clock");
   if (matcherGate) {
-    await matcherGate;
+    await Promise.race([
+      matcherGate,
+      planCorrelation ? waitUntilDeadline(planCorrelation) : matcherGate
+    ]);
+  }
+  if (planCorrelation && deadlineExceeded(planCorrelation)) {
+    const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
+    if (input.payload.idempotencyKey) {
+      inflightPlanIdempotency.delete(`${ownerScope}\0${input.payload.idempotencyKey}`);
+    }
+    inflightPlanMatches.delete(matchInflightKey(prepared.planId, prepared.revision));
+    return serviceDeadlineError(planCorrelation);
   }
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
   if (!isolated && matcherSafetyCeilings().length < 1) {
