@@ -503,10 +503,9 @@ export function publicBasketItem(
         : [];
   const generatedReason = defaultSelectionReason(contributions, locale);
   const existingReason = item.selectionReason;
+  const generatedNames = generatedReason.requestedNames ?? [];
   const requestedNames =
-    generatedReason.requestedNames.length > 0
-      ? generatedReason.requestedNames
-      : requestedNutrientNames;
+    generatedNames.length > 0 ? generatedNames : requestedNutrientNames;
   const requestedSupplementIds =
     generatedReason.requestedSupplementIds.length > 0
       ? generatedReason.requestedSupplementIds

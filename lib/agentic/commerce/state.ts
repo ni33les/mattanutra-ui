@@ -508,12 +508,7 @@ export function orderPollView(input: Readonly<{
           totalPriceMinor: order.totalPriceMinor
         }
       : null,
-    retryable:
-      !terminal &&
-      !processing &&
-      order.paymentStatus !== "paid" &&
-      order.paymentStatus !== "refunded" &&
-      order.paymentStatus !== "partially_refunded",
+    retryable: !terminal && !processing && !paid,
     stateVersion: order.stateVersion
   };
 }

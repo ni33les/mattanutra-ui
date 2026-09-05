@@ -931,9 +931,10 @@ async function executePlanTool(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
+  const answerRows = Array.isArray(input.payload.answers) ? input.payload.answers : [];
   if (
     input.payload.operation === "answer" &&
-    (!input.payload.answers || input.payload.answers.length === 0) &&
+    answerRows.length === 0 &&
     !input.payload.safetyAcknowledgement
   ) {
     return businessError({
