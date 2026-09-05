@@ -49,6 +49,7 @@ export const EXISTING_PRESENTATION_ROOTS = [
   "/summary",
   "/reason",
   "/reasonKey",
+  "/tradeOffs",
   "/explanation",
   "/questions",
   "/safetyGuidance",

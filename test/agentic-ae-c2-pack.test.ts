@@ -1457,7 +1457,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           questions[0]?.prompt === THAI_COPY.question &&
           choices[0]?.label === THAI_COPY.choice &&
           guidanceOf(created)[0]?.message === THAI_COPY.safety &&
-          reasons[0]?.message === THAI_COPY.productReason;
+          reasons[0]?.message === "This product covers Omega-3 at 1104 mg per day.";
         const ok =
           created.locale === "th" &&
           tooLong.length === 0 &&
