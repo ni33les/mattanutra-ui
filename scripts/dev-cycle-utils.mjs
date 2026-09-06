@@ -82,10 +82,16 @@ export async function changedFiles() {
 }
 
 export function allTestFiles() {
-  return readdirSync("test")
-    .filter((file) => file.endsWith(".test.ts"))
-    .map((file) => normalizePath(join("test", file)))
-    .sort();
+  function collect(directory) {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) return collect(path);
+      return entry.isFile() && entry.name.endsWith(".test.ts")
+        ? [normalizePath(path)]
+        : [];
+    });
+  }
+  return collect("test").sort();
 }
 
 export function existingFiles(files) {

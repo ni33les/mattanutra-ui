@@ -27,11 +27,11 @@ for (const scenario of ["verified", "missing", "hash_mismatch", "invalid_archive
       const name = scenario === "invalid_archive" || scenario === "ambiguous_artifacts" ? "evidence.zip" : "runner.py";
       const kind = name.endsWith(".zip") ? "evidence" : "file";
       if (scenario === "ambiguous_artifacts") {
-        execFileSync("python3", ["-c", "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr('a/artifacts.json',sys.argv[2]); z.writestr('b/artifacts.json',sys.argv[2]); z.close()", join(directory, name), fixture]);
+        execFileSync("python3", ["-B", "-c", "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr('a/artifacts.json',sys.argv[2]); z.writestr('b/artifacts.json',sys.argv[2]); z.close()", join(directory, name), fixture]);
       } else if (scenario !== "missing") {
         writeFileSync(join(directory, name), scenario === "hash_mismatch" ? "changed" : fixture);
       }
-      const report = JSON.parse(execFileSync("python3", ["-c", invoke, script], {
+      const report = JSON.parse(execFileSync("python3", ["-B", "-c", invoke, script], {
         input: JSON.stringify({ directory, manifest: { assets: [{ name, kind, sha256: digest }] } }),
         encoding: "utf8"
       }));
@@ -49,8 +49,8 @@ for (const scenario of ["verified", "missing", "hash_mismatch", "invalid_archive
 it("PREP-ASSET-zip_member hashes the inner artifacts.json rather than the ZIP container", () => {
   const directory = mkdtempSync(join(tmpdir(), "mcp-assets-"));
   try {
-    execFileSync("python3", ["-c", "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr('run/artifacts.json',sys.argv[2]); z.writestr('README.md','extra file'); z.close()", join(directory, "evidence.zip"), fixture]);
-    const report = JSON.parse(execFileSync("python3", ["-c", invoke, script], {
+    execFileSync("python3", ["-B", "-c", "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr('run/artifacts.json',sys.argv[2]); z.writestr('README.md','extra file'); z.close()", join(directory, "evidence.zip"), fixture]);
+    const report = JSON.parse(execFileSync("python3", ["-B", "-c", invoke, script], {
       input: JSON.stringify({ directory, manifest: { assets: [{ name: "evidence.zip", kind: "evidence", sha256: digest }] } }),
       encoding: "utf8"
     }));
@@ -65,7 +65,7 @@ it("PREP-ASSET-zip_member hashes the inner artifacts.json rather than the ZIP co
 it("PREP-ASSET-cli refuses absent official assets with a nonzero status and all six omissions", () => {
   const directory = mkdtempSync(join(tmpdir(), "mcp-assets-"));
   try {
-    const result = spawnSync("python3", [script, "--assets-dir", directory, "--evidence-dir", directory], { encoding: "utf8" });
+    const result = spawnSync("python3", ["-B", script, "--assets-dir", directory, "--evidence-dir", directory], { encoding: "utf8" });
     assert.equal(result.status, 2);
     const report = JSON.parse(result.stdout);
     assert.equal(report.ok, false);

@@ -1,0 +1,35 @@
+{
+  "version": "observation-event-consistency-v1.1",
+  "assets": [
+    {
+      "kind": "file",
+      "name": "MattaNutra_DEV_Deterministic_QA_Test_Pack_v3.0_2026-09-02.md",
+      "sha256": "76e7b2763f75a9c1418fe8651b26ad81bc71d1de9fd4c2a6b6f6800d4435b2f8"
+    },
+    {
+      "kind": "file",
+      "name": "qa_v3_runner.py",
+      "sha256": "4e88c9bef7c80ea9e9bd38599c9eb4d90367659b185526d54b03689ee14a1320"
+    },
+    {
+      "kind": "file",
+      "name": "qa_v3_locked_entry.py",
+      "sha256": "d8d0ad9f2e0d3ad64176a52041ec9671f4c341cfdf49180ad3da8f6292f92eee"
+    },
+    {
+      "kind": "file",
+      "name": "qa_v3_strict_pin_monitor.py",
+      "sha256": "690f6a2ecc3466108f8eab8c155704536413821e93f16ca7b4122c6a4e9df1d6"
+    },
+    {
+      "kind": "evidence",
+      "name": "MattaNutra_UAT_QA_v3_Evidence_c4a48054_2026-09-06_081215.zip",
+      "sha256": "f18133da601491ed59055113250f3ca1c1310d2a564f50265f4a2300d0bbd530"
+    },
+    {
+      "kind": "evidence",
+      "name": "MattaNutra_UAT_QA_v3_Evidence_c4a48054_2026-09-06.zip",
+      "sha256": "0446f0e4e2e268945ffcfd682334cd1e9308b47da25b7c563477a484838ce7b6"
+    }
+  ]
+}
