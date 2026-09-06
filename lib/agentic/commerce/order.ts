@@ -12,8 +12,23 @@ import {
   listFunnelEvents,
   loadPersistedFunnelEvents
 } from "@/lib/agentic/funnel/ledger";
+import { runObservedRequest } from "@/lib/agentic/qa/request-trace";
+
+let orderRequestSeq = 0;
 
 export async function orderTool(input: Readonly<{
+  config: AgenticConfig;
+  locale?: string;
+  now: string;
+  orderHandle: string;
+  scope: CapabilityScope;
+  store: AgenticStore;
+}>) {
+  const correlation = `order:${input.orderHandle}:${++orderRequestSeq}`;
+  return runObservedRequest(correlation, () => orderToolBody(input));
+}
+
+async function orderToolBody(input: Readonly<{
   config: AgenticConfig;
   locale?: string;
   now: string;

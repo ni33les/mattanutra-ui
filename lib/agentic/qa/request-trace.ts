@@ -4,11 +4,11 @@ import {
   releaseAllPermits
 } from "@/lib/agentic/qa/resource-permits";
 import {
-  clearDeadlineWatch,
   deadlineExceeded,
   markRequestStart,
   serviceDeadlineError,
-  waitUntilDeadline
+  waitUntilDeadline,
+  type DeadlineWait
 } from "@/lib/agentic/qa/service-clock";
 
 export const REQUEST_STAGES = [
@@ -208,13 +208,15 @@ export async function runObservedRequest<T>(
   await acquirePermitWhenAvailable(correlationId, "admission");
   await acquirePermitWhenAvailable(correlationId, "worker");
   await acquirePermitWhenAvailable(correlationId, "connection");
+  let deadline: DeadlineWait | undefined;
   try {
     const running = work()
       .then((value) => ({ kind: "ok" as const, value }))
       .catch((error: unknown) => ({ kind: "err" as const, error }));
+    deadline = waitUntilDeadline(correlationId);
     const outcome = await Promise.race([
       running,
-      waitUntilDeadline(correlationId).then(() => ({ kind: "deadline" as const }))
+      deadline.then(() => ({ kind: "deadline" as const }))
     ]);
     if (outcome.kind === "deadline" || deadlineExceeded(correlationId)) {
       cancelRequest(correlationId);
@@ -255,7 +257,7 @@ export async function runObservedRequest<T>(
     }
     throw error;
   } finally {
-    clearDeadlineWatch(correlationId);
+    deadline?.cancel();
     releaseAllPermits(correlationId);
   }
 }

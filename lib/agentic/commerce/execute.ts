@@ -40,11 +40,22 @@ import {
   resolveQaSession
 } from "@/lib/agentic/qa/session";
 import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
-import { recordRequestStage, runObservedRequest } from "@/lib/agentic/qa/request-trace";
+import {
+  recordRequestStage,
+  runObservedRequest,
+  throwIfAborted,
+  waitUntilCancelled
+} from "@/lib/agentic/qa/request-trace";
+import {
+  deadlineExceeded,
+  serviceDeadlineError,
+  waitUntilDeadline
+} from "@/lib/agentic/qa/service-clock";
 
 const executeLockChains = new Map<string, Promise<unknown>>();
 const executeCommitSignals = new Map<string, Promise<void>>();
 const executeCommitResolvers = new Map<string, () => void>();
+let executeRequestSeq = 0;
 
 function signalExecuteCommitted(key: string) {
   executeCommitResolvers.get(key)?.();
@@ -71,13 +82,16 @@ export function resetExecuteLockState() {
   executeCommitResolvers.clear();
   executeFreshGate = null;
   executeFreshEntered = null;
+  executeFollowerEntered = null;
   executeSerializeGate = null;
   executeSerializeEntered = null;
   executeFailAt = null;
+  executeRequestSeq = 0;
 }
 
 let executeFreshGate: Promise<void> | null = null;
 let executeFreshEntered: (() => void) | null = null;
+let executeFollowerEntered: (() => void) | null = null;
 let executeSerializeGate: Promise<void> | null = null;
 let executeSerializeEntered: (() => void) | null = null;
 let executeFailAt: "before_commit" | "at_commit" | "after_commit" | null = null;
@@ -88,6 +102,10 @@ export function setExecuteFreshGateForTests(gate: Promise<void> | null) {
 
 export function setExecuteFreshEnteredForTests(notify: (() => void) | null) {
   executeFreshEntered = notify;
+}
+
+export function setExecuteFollowerEnteredForTests(notify: (() => void) | null) {
+  executeFollowerEntered = notify;
 }
 
 export function setExecuteSerializeGateForTests(gate: Promise<void> | null) {
@@ -184,7 +202,7 @@ export async function executeTool(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<ExecuteSuccess | AgenticErrorResult> {
-  const correlation = `execute:${input.idempotencyKey}`;
+  const correlation = `execute:${input.idempotencyKey}:${++executeRequestSeq}`;
   const observed = await runObservedRequest(correlation, () => executeToolBody(input, correlation));
   return observed as ExecuteSuccess | AgenticErrorResult;
 }
@@ -221,7 +239,23 @@ async function executeToolBody(
     );
   }
   if (!leader) {
-    await executeCommitSignals.get(inflightKey);
+    executeFollowerEntered?.();
+    const committedSignal = executeCommitSignals.get(inflightKey);
+    if (committedSignal) {
+      await Promise.race([
+        committedSignal,
+        waitUntilDeadline(correlation),
+        waitUntilCancelled(correlation)
+      ]);
+    }
+    try {
+      throwIfAborted(correlation);
+    } catch {
+      return serviceDeadlineError(correlation);
+    }
+    if (deadlineExceeded(correlation)) {
+      return serviceDeadlineError(correlation);
+    }
     const committed = await beginIdempotency<ExecuteSuccess>({
       key: input.idempotencyKey,
       now: input.now,

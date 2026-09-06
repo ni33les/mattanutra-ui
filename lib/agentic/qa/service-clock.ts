@@ -10,15 +10,19 @@ let clockMode: ClockMode = process.env.NODE_TEST_CONTEXT ? "injected" : "live";
 let nowMs = 0;
 const startedAt = new Map<string, number>();
 const watchers = new Set<() => void>();
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
+const timers = new Map<string, Set<ReturnType<typeof setTimeout>>>();
+
+export type DeadlineWait = Promise<void> & { cancel(): void };
 
 export function resetServiceClock() {
   clockMode = process.env.NODE_TEST_CONTEXT ? "injected" : "live";
   nowMs = 0;
   startedAt.clear();
   watchers.clear();
-  for (const timer of timers.values()) {
-    clearTimeout(timer);
+  for (const set of timers.values()) {
+    for (const timer of set) {
+      clearTimeout(timer);
+    }
   }
   timers.clear();
 }
@@ -26,6 +30,10 @@ export function resetServiceClock() {
 export function useInjectedServiceClock() {
   clockMode = "injected";
   nowMs = 0;
+}
+
+export function useLiveServiceClock() {
+  clockMode = "live";
 }
 
 export function serviceClockMs() {
@@ -55,23 +63,37 @@ export function deadlineExceeded(correlationId: string) {
 }
 
 export function clearDeadlineWatch(correlationId: string) {
-  const timer = timers.get(correlationId);
-  if (timer) {
+  const set = timers.get(correlationId);
+  if (!set) {
+    return;
+  }
+  for (const timer of set) {
     clearTimeout(timer);
   }
   timers.delete(correlationId);
 }
 
-export function waitUntilDeadline(correlationId: string) {
-  return new Promise<void>((resolve) => {
+export function waitUntilDeadline(correlationId: string): DeadlineWait {
+  let cancel = () => {};
+  const promise = new Promise<void>((resolve) => {
     let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = () => {
       if (settled) {
         return;
       }
       settled = true;
       watchers.delete(check);
-      clearDeadlineWatch(correlationId);
+      if (timer !== undefined) {
+        const set = timers.get(correlationId);
+        if (set) {
+          clearTimeout(timer);
+          set.delete(timer);
+          if (set.size === 0) {
+            timers.delete(correlationId);
+          }
+        }
+      }
       resolve();
     };
     const check = () => {
@@ -79,13 +101,21 @@ export function waitUntilDeadline(correlationId: string) {
         finish();
       }
     };
+    cancel = finish;
     if (clockMode === "live") {
       const remaining = SERVICE_INTERNAL_DEADLINE_MS - requestElapsedMs(correlationId);
-      timers.set(correlationId, setTimeout(finish, Math.max(0, remaining)));
+      timer = setTimeout(finish, Math.max(0, remaining));
+      const set = timers.get(correlationId) ?? new Set();
+      set.add(timer);
+      timers.set(correlationId, set);
     }
     watchers.add(check);
     check();
-  });
+  }) as DeadlineWait;
+  promise.cancel = () => {
+    cancel();
+  };
+  return promise;
 }
 
 export function serviceDeadlineError(correlationId: string): AgenticErrorResult {
