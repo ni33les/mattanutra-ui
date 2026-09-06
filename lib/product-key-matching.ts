@@ -1,3 +1,4 @@
+import { BoundedLru } from "@/lib/bounded-lru";
 const PRODUCT_FACT_DOSE_UNIT_PATTERN = "(?:mcg|µg|ug|mg|g|iu)";
 const PRODUCT_FACT_PER_UNIT_PATTERN =
   "(?:mcg|µg|ug|mg|g|kg|ml|l)";
@@ -259,7 +260,7 @@ export function canonicalNutrientKey(value: string) {
   return aliases[0] ?? normalizeProductKey(value);
 }
 
-const productKeysMatchMemo = new Map<string, boolean>();
+const productKeysMatchMemo = new BoundedLru<string, boolean>(20_000);
 
 export function productKeysMatch(
   left: string,

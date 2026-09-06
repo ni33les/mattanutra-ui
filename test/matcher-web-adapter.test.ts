@@ -1177,3 +1177,31 @@ describe("matcher web adapter coverage mapping", () => {
   });
 });
 
+
+
+describe("web compilation cache isolation", () => {
+  it("recompiles eligibility when a shared catalogue is used with a different profile", () => {
+    setMatcherSafetyCeilings([]);
+    const candidates = [candidate({id: "female-only-d3", title: "Vitamin D3 1000 IU", productAudience: "female", facts: [{amount: 1000, name: "Vitamin D3", normalizedName: "vitamin_d3", unit: "IU"}]})];
+    const needs = [dosedNeed({amount: 25, displayName: "Vitamin D3", id: "d3", normalizedName: "vitamin_d3", unit: "mcg"})];
+    const input = {candidates, needs, countryCode: "TH", maxProducts: 3, stackPreference: "balanced" as const};
+    assert.equal(recommendWithMatcher({...input, clientSex: "female"}).recommendations.length, 1);
+    const reused = recommendWithMatcher({...input, clientSex: "male"});
+    const fresh = recommendWithMatcher({...input, candidates: [...candidates], clientSex: "male"});
+    assert.deepEqual(reused.recommendations, fresh.recommendations);
+    assert.equal(reused.recommendations.length, 0);
+  });
+
+  it("matches fresh compilation when dose and stack preference change", () => {
+    setMatcherSafetyCeilings([]);
+    const candidates = [candidate({id: "d3", title: "Vitamin D3 1000 IU", facts: [{amount: 1000, name: "Vitamin D3", normalizedName: "vitamin_d3", unit: "IU"}]})];
+    for (const stackPreference of ["compact", "balanced"] as const) {
+      for (const amount of [25, 50, 10]) {
+        const input = {candidates, countryCode: "TH", maxProducts: 3, stackPreference, needs: [dosedNeed({amount, displayName: "Vitamin D3", id: "d3", normalizedName: "vitamin_d3", unit: "mcg"})]};
+        const reused = recommendWithMatcher(input);
+        const fresh = recommendWithMatcher({...input, candidates: [...candidates]});
+        assert.deepEqual(reused.recommendations, fresh.recommendations);
+      }
+    }
+  });
+});

@@ -66,7 +66,7 @@ function unitFromNeed(unit: string | null | undefined): MatcherUnit {
 const matcherProductByCandidate = new WeakMap<ProductCandidate, MatcherProduct>();
 const compiledGroupsByCandidates = new WeakMap<
   readonly ProductCandidate[],
-  { catalog: CatalogSnapshot; groups: ProductGroup[] }
+  { catalog: CatalogSnapshot; groups: ProductGroup[]; requestKey: string }
 >();
 
 function labelledSubjectId(fact: ProductCandidate["facts"][number]) {
@@ -428,17 +428,23 @@ export function recommendWithMatcher(
     targets: targets.targets
   } as const;
   const compileStartedAt = Date.now();
+  // Eligibility and variants depend on the full request, including safety ceilings.
+  // Retain only the most recent compilation per weakly held candidate array.
+  const requestKey = JSON.stringify(request, (_key, value: unknown) =>
+    typeof value === "bigint" ? { matcherInteger: value.toString() } : value
+  );
   let compiled = compiledGroupsByCandidates.get(input.candidates);
 
-  if (!compiled) {
-    const catalog = {
+  if (!compiled || compiled.requestKey !== requestKey) {
+    const catalog = compiled?.catalog ?? {
       availabilityAsOf: new Date(0).toISOString(),
       catalogueVersion: "web",
       products: input.candidates.map(toMatcherProduct)
     };
     compiled = {
       catalog,
-      groups: compileGroups(request, catalog)
+      groups: compileGroups(request, catalog),
+      requestKey
     };
     compiledGroupsByCandidates.set(input.candidates, compiled);
   }
