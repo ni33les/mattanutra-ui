@@ -1,5 +1,4 @@
-import { resolve } from "node:path";
-import { Worker } from "node:worker_threads";
+import type { Worker } from "node:worker_threads";
 
 export type ThreadReply<Result> = {result: Result; error?: never} | {error: string; result?: never};
 
@@ -19,13 +18,13 @@ export class ThreadPool<Input, Result> {
   private slots = new Set<Slot<Input, Result>>();
   private queue: Job<Input, Result>[] = [];
   private closed = false;
-  private readonly workerPath: string;
+  private readonly createWorker: () => Worker;
   private readonly terminating = new WeakSet<Slot<Input, Result>>();
   private readonly capacity: number;
   private readonly queueLimit: number;
-  constructor(workerPath: string, capacity = 2, queueLimit = 16) {
+  constructor(createWorker: () => Worker, capacity = 2, queueLimit = 16) {
     if (!Number.isInteger(capacity) || capacity < 1 || !Number.isInteger(queueLimit) || queueLimit < 1) throw new Error("Invalid thread pool capacity");
-    this.workerPath = workerPath;
+    this.createWorker = createWorker;
     this.capacity = capacity;
     this.queueLimit = queueLimit;
   }
@@ -90,9 +89,7 @@ export class ThreadPool<Input, Result> {
   }
 
   private spawn(): Slot<Input, Result> {
-    const worker = new Worker(resolve(process.cwd(), this.workerPath), {
-      execArgv: ["--experimental-strip-types", "--import", resolve(process.cwd(), "scripts/register-ts-path-loader.mjs")]
-    });
+    const worker = this.createWorker();
     const slot: Slot<Input, Result> = { worker };
     this.slots.add(slot);
     worker.on("message", (reply: ThreadReply<Result>) => {

@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+import { Worker } from "node:worker_threads";
 import { ThreadPool } from "@/lib/thread-pool";
 import type { matchPlan } from "@/lib/agentic/plan/matching";
 import { matcherSafetyCeilings, matcherSafetyCeilingsUnavailable } from "@/lib/matcher/safety-ceilings";
@@ -15,7 +17,10 @@ export { ThreadPoolUnavailableError as MatcherUnavailableError } from "@/lib/thr
 
 export class MatchWorkerPool extends ThreadPool<MatchJob, MatchResult> {
   constructor(capacity = 2, queueLimit = 16) {
-    super("workers/mcp-matcher.ts", capacity, queueLimit);
+    // Keep the path explicit so Next.js can trace the worker entry point.
+    super(() => new Worker(resolve(process.cwd(), "workers/mcp-matcher.ts"), {
+      execArgv: ["--experimental-strip-types", "--import", resolve(process.cwd(), "scripts/register-ts-path-loader.mjs")]
+    }), capacity, queueLimit);
   }
 
   run(input: MatchInput, signal?: AbortSignal, timeoutMs = 15_000) {
