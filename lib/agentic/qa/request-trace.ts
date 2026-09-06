@@ -129,6 +129,10 @@ export function cancelRequest(correlationId: string) {
   aborts.get(correlationId)?.abort();
 }
 
+export function waitUntilCancelled(correlationId: string) {
+  return abortPromise(correlationId);
+}
+
 export function throwIfAborted(correlationId: string) {
   if (aborts.get(correlationId)?.signal.aborted) {
     throw new DOMException("The operation was aborted.", "AbortError");

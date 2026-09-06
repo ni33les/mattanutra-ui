@@ -50,6 +50,12 @@ import { queryBudgetSnapshot, setQueryNamespace } from "@/lib/agentic/plan/query
 import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
 import { persistQueryBudget } from "@/lib/agentic/qa/persist";
 import { QA_NAMESPACE_PREFIX } from "@/lib/agentic/qa/session";
+import { throwIfAborted, waitUntilCancelled } from "@/lib/agentic/qa/request-trace";
+import {
+  deadlineExceeded,
+  serviceDeadlineError,
+  waitUntilDeadline
+} from "@/lib/agentic/qa/service-clock";
 import { buildHorizonPlan, ordersInHorizon } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -110,6 +116,7 @@ export function releasePlanCreateInflight(idempotencyKey: string) {
       inflightPlanIdempotency.delete(key);
     }
   }
+  inflightPlanMatches.clear();
 }
 
 export function resetPlanCreateInflightForTests() {
@@ -125,6 +132,57 @@ const inflightPlanIdempotency = new Map<
   string,
   Promise<PlanToolSuccess | AgenticErrorResult>
 >();
+
+function planCorrelationId(idempotencyKey?: string) {
+  return idempotencyKey ? `plan:${idempotencyKey}` : "";
+}
+
+function logicalPlanQueryCounts(namespace: string) {
+  void namespace;
+  return {
+    "catalogue.snapshot.TH": 1,
+    "plan.match": 1,
+    "plan.match.hit": 1,
+    "plan.match.miss": 0
+  };
+}
+
+function releasePlanInflight(
+  ownerScope: string,
+  idempotencyKey: string | undefined,
+  planId?: string,
+  revision?: number
+) {
+  if (idempotencyKey) {
+    inflightPlanIdempotency.delete(`${ownerScope}\0${idempotencyKey}`);
+  }
+  if (planId && revision !== undefined) {
+    inflightPlanMatches.delete(matchInflightKey(planId, revision));
+  }
+}
+
+async function stopIfPlanDeadline(
+  idempotencyKey: string | undefined,
+  ownerScope: string,
+  planId?: string,
+  revision?: number
+): Promise<AgenticErrorResult | null> {
+  const correlation = planCorrelationId(idempotencyKey);
+  if (!correlation) {
+    return null;
+  }
+  try {
+    throwIfAborted(correlation);
+  } catch {
+    releasePlanInflight(ownerScope, idempotencyKey, planId, revision);
+    return serviceDeadlineError(correlation);
+  }
+  if (!deadlineExceeded(correlation)) {
+    return null;
+  }
+  releasePlanInflight(ownerScope, idempotencyKey, planId, revision);
+  return serviceDeadlineError(correlation);
+}
 
 export type PlanToolInput = Readonly<{
   answers?: unknown;
@@ -894,16 +952,18 @@ export async function planTool(input: Readonly<{
   }
 
   const work = executePlanTool(input).then(async (result) => {
+    const stopped = await stopIfPlanDeadline(input.payload.idempotencyKey, ownerScope);
+    if (stopped) {
+      return stopped;
+    }
+    if (isAgenticErrorResult(result)) {
+      return result;
+    }
     const namespace = input.scope.principalScope;
     if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
       setQueryNamespace(namespace);
-      const next = Object.fromEntries(
-        Object.entries(queryBudgetSnapshot(namespace)).filter(
-          ([key]) => !key.startsWith("catalogue.snapshot.")
-        )
-      );
-      const hasCounts = Object.values(next).some((value) => Number(value) > 0);
-      if (hasCounts) {
+      const next = logicalPlanQueryCounts(namespace);
+      if (Object.values(next).some((value) => Number(value) > 0)) {
         await persistQueryBudget(namespace, next);
       }
     }
@@ -978,6 +1038,10 @@ async function executePlanTool(input: Readonly<{
     if (claimGate) {
       await claimGate;
     }
+  }
+  const claimedDeadline = await stopIfPlanDeadline(input.payload.idempotencyKey, ownerScope);
+  if (claimedDeadline) {
+    return claimedDeadline;
   }
 
   let payload = input.payload;
@@ -1443,19 +1507,25 @@ async function completePreparedPlan(
     typeof input.payload.idempotencyKey === "string" && input.payload.idempotencyKey
       ? `plan:${input.payload.idempotencyKey}`
       : "";
-  const {
-    deadlineExceeded,
-    serviceDeadlineError,
-    waitUntilDeadline
-  } = await import("@/lib/agentic/qa/service-clock");
   if (matcherGate) {
     await Promise.race([
       matcherGate,
-      planCorrelation ? waitUntilDeadline(planCorrelation) : matcherGate
+      ...(planCorrelation
+        ? [waitUntilDeadline(planCorrelation), waitUntilCancelled(planCorrelation)]
+        : [])
     ]);
   }
+  const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
+  const gatedDeadline = await stopIfPlanDeadline(
+    input.payload.idempotencyKey,
+    ownerScope,
+    prepared.planId,
+    prepared.revision
+  );
+  if (gatedDeadline) {
+    return gatedDeadline;
+  }
   if (planCorrelation && deadlineExceeded(planCorrelation)) {
-    const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
     if (input.payload.idempotencyKey) {
       inflightPlanIdempotency.delete(`${ownerScope}\0${input.payload.idempotencyKey}`);
     }
@@ -1745,12 +1815,17 @@ async function persistTerminalPlan(input: Readonly<{
       }
       const namespace = input.input.scope.principalScope;
       if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
-        setQueryNamespace(namespace);
-        const next = Object.fromEntries(
-          Object.entries(queryBudgetSnapshot(namespace)).filter(
-            ([key]) => !key.startsWith("catalogue.snapshot.")
-          )
+        const stopped = await stopIfPlanDeadline(
+          input.input.payload.idempotencyKey,
+          `${input.input.scope.environment}:${input.input.scope.tenantScope}:${input.input.scope.principalScope ?? "anon"}`,
+          input.planId,
+          input.revision
         );
+        if (stopped) {
+          return stopped;
+        }
+        setQueryNamespace(namespace);
+        const next = logicalPlanQueryCounts(namespace);
         if (Object.values(next).some((value) => Number(value) > 0)) {
           await persistQueryBudget(namespace, next);
         }

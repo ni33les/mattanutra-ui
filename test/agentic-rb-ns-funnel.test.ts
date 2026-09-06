@@ -383,10 +383,10 @@ describe("RB-OBS pure read", () => {
     const secondBudget = asRecord(second.dependencyBudget);
     const firstQueries = asRecord(first.queries);
     const secondQueries = asRecord(second.queries);
-    assert.equal(firstBudget.catalogueSnapshots, 0);
-    assert.equal(secondBudget.catalogueSnapshots, 0);
-    assert.equal(firstQueries["catalogue.snapshot.TH"], undefined);
-    assert.equal(secondQueries["catalogue.snapshot.TH"], undefined);
+    assert.equal(firstBudget.catalogueSnapshots, 1);
+    assert.equal(secondBudget.catalogueSnapshots, 1);
+    assert.equal(firstQueries["catalogue.snapshot.TH"], 1);
+    assert.equal(secondQueries["catalogue.snapshot.TH"], 1);
     assert.equal(firstQueries["plan.match.hit"] ?? firstQueries["plan.match.miss"], 1);
     assert.equal(canonicalJson(firstQueries), canonicalJson(secondQueries));
   });

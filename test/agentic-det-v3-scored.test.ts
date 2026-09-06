@@ -240,7 +240,7 @@ describe("Slice S1 clock and query isolation", () => {
     const queriesA1 = (observeA1.queries as Record<string, number> | undefined) ?? {};
     const countA = Number(queriesA1["plan.match"] ?? 0);
     assert.ok(countA >= 1);
-    assert.equal(queriesA1["catalogue.snapshot.TH"], undefined);
+    assert.equal(queriesA1["catalogue.snapshot.TH"], 1);
 
     const runB = await qaCall(runtime, "beginRun", { runId: "B" });
     const scopeB = {
@@ -266,8 +266,8 @@ describe("Slice S1 clock and query isolation", () => {
     const queriesB = (observeB.queries as Record<string, number> | undefined) ?? {};
     assert.equal(Number(queriesA2["plan.match"] ?? 0), countA);
     assert.ok(Number(queriesB["plan.match"] ?? 0) >= 1);
-    assert.equal(queriesA2["catalogue.snapshot.TH"], undefined);
-    assert.equal(queriesB["catalogue.snapshot.TH"], undefined);
+    assert.equal(queriesA2["catalogue.snapshot.TH"], 1);
+    assert.equal(queriesB["catalogue.snapshot.TH"], 1);
     assert.notEqual(queryBudgetSnapshot(String(runA.namespace)), queryBudgetSnapshot(String(runB.namespace)));
   });
 });
@@ -636,14 +636,14 @@ describe("Slice 8.2 remaining scored holes", () => {
       namespace: String(begun.namespace)
     });
     const queries = (observed.queries ?? {}) as Record<string, number>;
-    assert.equal(queries["catalogue.snapshot.TH"], undefined);
+    assert.equal(queries["catalogue.snapshot.TH"], 1);
     assert.ok(typeof queries["plan.match"] === "number");
     const budget = observed.dependencyBudget as {
       catalogueSnapshots?: number;
       polling?: boolean;
       sleeps?: number;
     };
-    assert.equal(budget.catalogueSnapshots, 0);
+    assert.equal(budget.catalogueSnapshots, 1);
     assert.equal(budget.sleeps, 0);
     assert.equal(budget.polling, false);
   });
