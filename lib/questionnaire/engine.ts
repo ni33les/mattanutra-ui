@@ -1393,7 +1393,15 @@ export function deserializeState(raw: string): QuestionnaireState | null {
   try {
     const parsed = JSON.parse(raw) as QuestionnaireState;
 
-    if (!parsed || typeof parsed !== "object" || !parsed.sessionId) {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)
+      || typeof parsed.sessionId !== "string" || !parsed.sessionId || parsed.sessionId.length > 200
+      || parsed.version !== "v6-conversational" || !["en", "th", "zh-CN"].includes(parsed.locale)
+      || !["intro", "active", "resume_prompt", "complete", "completing", "failed"].includes(parsed.phase)
+      || !parsed.answers || typeof parsed.answers !== "object" || Array.isArray(parsed.answers)
+      || !Array.isArray(parsed.log) || parsed.log.length > 1000
+      || !Number.isInteger(parsed.turnIndex)
+      || !parsed.earned || typeof parsed.earned !== "object"
+      || !parsed.fired || typeof parsed.fired !== "object") {
       return null;
     }
 

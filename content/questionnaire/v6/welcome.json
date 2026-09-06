@@ -88,7 +88,13 @@
     "progressRemainingOne": " · 1 question remains in this section",
     "progressRemainingMany": " · {n} questions remain in this section",
     "privacyFooter": "Private · encrypted ·",
-    "privacyFooterLink": "Privacy policy"
+    "privacyFooterLink": "Privacy policy",
+    "calcEmailRequested": "Delivery requested. We’ll email you when your complete HealthScore is ready.",
+    "calcEmailSent": "Your HealthScore email has been sent.",
+    "calcEmailFailed": "We could not request delivery. Check the email address and try again.",
+    "calcEmailUnknown": "Email delivery could not be confirmed. Please check your inbox or contact support.",
+    "calcRetryCapture": "Retry saving my answers",
+    "calcRetryAnalysis": "Retry HealthScore analysis"
   },
   "th": {
     "badge": "HealthScore ส่วนบุคคลฟรีของคุณ",
@@ -179,7 +185,13 @@
     "progressRemainingOne": " · เหลือ 1 คำถามในส่วนนี้",
     "progressRemainingMany": " · เหลือ {n} คำถามในส่วนนี้",
     "privacyFooter": "เป็นส่วนตัว · เข้ารหัส ·",
-    "privacyFooterLink": "นโยบายความเป็นส่วนตัว"
+    "privacyFooterLink": "นโยบายความเป็นส่วนตัว",
+    "calcEmailRequested": "บันทึกคำขอแล้ว เราจะส่งอีเมลเมื่อ HealthScore ฉบับสมบูรณ์พร้อม",
+    "calcEmailSent": "ส่งอีเมล HealthScore แล้ว",
+    "calcEmailFailed": "ส่งคำขอไม่สำเร็จ โปรดตรวจสอบอีเมลแล้วลองอีกครั้ง",
+    "calcEmailUnknown": "ยังยืนยันการส่งอีเมลไม่ได้ โปรดตรวจสอบกล่องจดหมายหรือติดต่อทีมงาน",
+    "calcRetryCapture": "ลองบันทึกคำตอบอีกครั้ง",
+    "calcRetryAnalysis": "ลองวิเคราะห์ HealthScore อีกครั้ง"
   },
   "zh": {
     "badge": "您的免费个人 HealthScore",
@@ -214,22 +226,22 @@
     "reviewEdit": "Edit",
     "reviewClose": "Close",
     "reviewEmpty": "No answers yet.",
-    "calcKicker": "Thank you",
-    "calcTitle": "Your HealthScore is being calculated",
-    "calcCopy": "MattaNutra AI is carefully analysing your answers and preparing your personalised HealthScore. This normally takes several seconds.",
-    "calcBuilding": "Building your HealthScore…",
-    "calcReady": "Your HealthScore is ready",
-    "calcSee": "See your HealthScore →",
-    "calcKeepOpen": "Please keep this page open.",
+    "calcKicker": "你的个人健康分析",
+    "calcTitle": "正在准备你的 HealthScore",
+    "calcCopy": "我们正在根据你的答案生成完整建议。",
+    "calcBuilding": "正在完成分析…",
+    "calcReady": "你的 HealthScore 已准备好",
+    "calcSee": "查看我的 HealthScore",
+    "calcKeepOpen": "请保持此页面打开。",
     "calcLonger": "This is taking a little longer than usual. Your answers are safely saved.",
-    "calcSavedNote": "Your answers are saved; you will not need to complete them again.",
-    "calcReadyNote": "Your personalised results are ready to view.",
+    "calcSavedNote": "分析需要更多时间。你可以重试或申请电子邮件通知。",
+    "calcReadyNote": "完整建议现已可供查看。",
     "calcRetry": "Try again",
-    "calcLine": "Contact MattaNutra on LINE",
+    "calcLine": "正在将你的答案整理成清晰的建议。",
     "calcSend": "Send when ready",
-    "calcEmailPlaceholder": "Email",
-    "calcEmailThanks": "Email saved ✓ — we'll send your HealthScore when ready.",
-    "calcDisclaimer": "This assessment supports general wellness. It is not a diagnosis, treatment, or advice to start or stop any medication. Please consult a doctor or pharmacist before changing your medicines or supplements.",
+    "calcEmailPlaceholder": "你的电子邮箱",
+    "calcEmailThanks": "发送请求已保存",
+    "calcDisclaimer": "健康建议不能代替专业医疗意见。",
     "calcError": "The HealthScore is taking longer than expected, but your answers are safely saved.",
     "trust": [
       {
@@ -259,7 +271,7 @@
         "body": "如您愿意，可获得您的个性化 Right Formula。"
       }
     ],
-    "calcSendWhenReady": "Send when ready",
+    "calcSendWhenReady": "准备好后发送",
     "calcThanks": "Thank you",
     "brandsub": "Building your free HealthScore",
     "progressPart": "Part {n} of 6 · {pct}%",
@@ -270,6 +282,12 @@
     "progressRemainingOne": " · 1 question remains in this section",
     "progressRemainingMany": " · {n} questions remain in this section",
     "privacyFooter": "Private · encrypted ·",
-    "privacyFooterLink": "Privacy policy"
+    "privacyFooterLink": "Privacy policy",
+    "calcEmailRequested": "已保存发送请求。完整 HealthScore 准备好后，我们会发送电子邮件。",
+    "calcEmailSent": "HealthScore 电子邮件已发送。",
+    "calcEmailFailed": "无法保存发送请求。请检查邮箱地址后重试。",
+    "calcEmailUnknown": "无法确认电子邮件是否送达。请查看收件箱或联系支持。",
+    "calcRetryCapture": "重新保存我的答案",
+    "calcRetryAnalysis": "重新分析 HealthScore"
   }
 }

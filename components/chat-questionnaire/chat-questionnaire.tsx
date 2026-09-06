@@ -4,9 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   applyAnswer,
-  computePrecision,
   createInitialState,
-  deserializeState,
   fastForwardQuestionnaire,
   getDefinition,
   getNextPrompt,
@@ -17,7 +15,8 @@ import {
   startQuestionnaire,
   summarizeAnswer
 } from "@/lib/questionnaire/engine";
-import { finalizeAssessmentCapture } from "@/lib/questionnaire/agents/capture-agent";
+import { chatDraftStorageKey, parseChatDraft, resolveChatDraft, updateChatDraft, type ChatDraft, type ServerChatDraft } from "@/lib/questionnaire/browser-draft";
+import { useQuestionnaireCapture } from "@/components/chat-questionnaire/use-questionnaire-capture";
 import { emitQuestionnaireEvents } from "@/lib/questionnaire/agents/progress-agent";
 import { NongPoseImage } from "@/components/chat-questionnaire/nong-pose-image";
 import type {
@@ -37,17 +36,10 @@ import {
   QuestionnaireWelcome
 } from "@/components/chat-questionnaire/questionnaire-welcome";
 import {
-  QuestionnaireCalculating,
-  type CalculatingStatus
+  QuestionnaireCalculating
 } from "@/components/chat-questionnaire/questionnaire-calculating";
-import {
-  fetchHealthScoreCopyStatus,
-  HEALTHSCORE_COPY_POLL_INTERVAL_MS,
-  HEALTHSCORE_COPY_WAIT_MS
-} from "@/lib/healthscore-copy-client";
+import { requestHealthScoreEmail } from "@/lib/healthscore-copy-client";
 import "./chat-questionnaire.css";
-
-const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
  * Section / finish stage overlay timing.
@@ -57,7 +49,6 @@ const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const STAGE_MS = 1800;
 const STAGE_FADE_OUT_MS = 280;
 const UX_VERSION = "v14-landing";
-const DELIVERY_EMAIL_KEY = "mn_healthscore_delivery_email";
 
 function prefersReducedMotion() {
   if (typeof window === "undefined" || !window.matchMedia) {
@@ -86,6 +77,8 @@ function runLeafBurst(count = 8) {
 
 type ChatQuestionnaireProps = Readonly<{
   locale: Locale;
+  sessionId?: string;
+  serverDraft?: ServerChatDraft | null;
   paymentId?: string;
   pharmacyId?: string;
   returningPlanId?: string;
@@ -95,85 +88,6 @@ type ChatQuestionnaireProps = Readonly<{
 }>;
 
 type UiScreen = "welcome" | "chat" | "calculating";
-
-function storageKey(locale: string) {
-  return `mn_state_v6_${locale}`;
-}
-
-function loadLocalState(locale: string): QuestionnaireState | null {
-  try {
-    const raw = window.localStorage.getItem(storageKey(locale));
-    return raw ? deserializeState(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLocalState(locale: string, state: QuestionnaireState) {
-  try {
-    window.localStorage.setItem(storageKey(locale), serializeState(state));
-  } catch {
-    /* ignore */
-  }
-}
-
-function clearLocalState(locale: string) {
-  try {
-    window.localStorage.removeItem(storageKey(locale));
-  } catch {
-    /* ignore */
-  }
-}
-
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(
-    () => controller.abort(),
-    ASSESSMENT_REQUEST_TIMEOUT_MS
-  );
-
-  try {
-    return await fetch(input, { ...init, signal: controller.signal });
-  } finally {
-    window.clearTimeout(timeout);
-  }
-}
-
-/** True when the API payload has a usable score (analysis may still be enriching). */
-function hasUsableHealthScore(payload: {
-  status?: string;
-  healthScore?: unknown;
-  planId?: string;
-}): boolean {
-  if (!payload.planId && payload.status === "failed") {
-    return false;
-  }
-
-  const hs = payload.healthScore;
-  if (!hs || typeof hs !== "object") {
-    return false;
-  }
-
-  const score = (hs as { score?: unknown }).score;
-  if (typeof score !== "number" || Number.isNaN(score)) {
-    return false;
-  }
-
-  // Full analysis ready, or base score available while content prepares
-  if (payload.status === "ready" || payload.status === "captured") {
-    return true;
-  }
-
-  if (
-    payload.status === "preparing" ||
-    payload.status === "queued" ||
-    payload.status === undefined
-  ) {
-    return true;
-  }
-
-  return false;
-}
 
 function resultsPath(
   locale: Locale,
@@ -188,6 +102,8 @@ function resultsPath(
 
 export function ChatQuestionnaire({
   locale,
+  sessionId,
+  serverDraft,
   paymentId,
   pharmacyId,
   returningPlanId,
@@ -201,11 +117,8 @@ export function ChatQuestionnaire({
   const logScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
   const finalizing = useRef(false);
-  const fallbackTimer = useRef<number | null>(null);
-  const readyPlanId = useRef<string | null>(null);
 
   const [uiScreen, setUiScreen] = useState<UiScreen>("welcome");
-  const [resultPlanId, setResultPlanId] = useState<string | null>(null);
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -219,8 +132,27 @@ export function ChatQuestionnaire({
   const [labValues, setLabValues] = useState<Record<string, string>>({});
   const [labUnits, setLabUnits] = useState<Record<string, string>>({});
   const [processingError, setProcessingError] = useState("");
-  const [calcStatus, setCalcStatus] = useState<CalculatingStatus>("building");
   const [reviewOpen, setReviewOpen] = useState(false);
+  const draftRef = useRef<ChatDraft | null>(null);
+  const sessionRef = useRef(sessionId || returningPlanId || paymentId || crypto.randomUUID());
+  const saveDraft = useCallback((draft: ChatDraft) => {
+    draftRef.current = draft;
+    try { window.localStorage.setItem(chatDraftStorageKey(draft.state.sessionId), JSON.stringify(draft)); } catch { /* HTTP capture remains recoverable through its stable request key. */ }
+  }, []);
+  const saveLocalState = useCallback((_locale: string, next: QuestionnaireState) => {
+    const previous = draftRef.current ?? resolveChatDraft({ locale, sessionId: next.sessionId });
+    saveDraft(updateChatDraft(previous, next));
+  }, [locale, saveDraft]);
+  function clearLocalState() {
+    const draft = draftRef.current;
+    if (draft) { try { window.localStorage.removeItem(chatDraftStorageKey(draft.state.sessionId)); } catch { /* ignore */ } }
+    draftRef.current = null;
+  }
+  const capture = useQuestionnaireCapture({ locale, paymentId, pharmacyId, resumeToken, returningPlanId, skipHealthScore: skipHealthScoreStep,
+    draft: draftRef, save: saveDraft, onReady: id => router.replace(resultsPath(locale, id, paymentId || draftRef.current?.paymentId || undefined, skipHealthScoreStep)) });
+  const calcStatus = capture.status;
+  const runCapture = capture.run;
+
 
   const [stageFlash, setStageFlash] = useState<null | {
     pose: string;
@@ -229,14 +161,13 @@ export function ChatQuestionnaire({
     /** show = visible; exit = opacity fade only (no scale morph) */
     phase: "show" | "exit";
   }>(null);
-  const pendingEmail = useRef<string | null>(null);
   const stageTimers = useRef<number[]>([]);
   /** Bumps when a new stage starts so stale timeouts cannot clear a newer overlay. */
   const stageGeneration = useRef(0);
 
 
   const chrome = useMemo(
-    () => getWelcomeCopy(locale === "zh-CN" ? "en" : locale),
+    () => getWelcomeCopy(locale),
     [locale]
   );
 
@@ -246,7 +177,6 @@ export function ChatQuestionnaire({
   );
   const ui = definition.ui;
   const prompt = state ? getNextPrompt(state) : null;
-  const precision = state ? computePrecision(definition, state) : 8;
   const currentTurn: TurnDef | null = prompt?.turn ?? null;
 
   /** Premium progress meter (v14 HTML): Part N of 6 · % + encouragement + remaining. */
@@ -364,50 +294,24 @@ export function ChatQuestionnaire({
         }
       }
     },
-    [locale, returningPlanId]
+    [locale, returningPlanId, saveLocalState]
   );
 
-  // Boot: welcome gate unless in-progress resume
   useEffect(() => {
-    const saved = loadLocalState(locale);
-    trackBpmEvent("chat_view", {
-      eventType: "funnel",
-      locale,
-      properties: {
-        channel: "web",
-        questionnaireVersion: "v6-conversational",
-        uxVersion: UX_VERSION
-      }
-    });
-
-    if (
-      saved &&
-      saved.version === "v6-conversational" &&
-      Object.keys(saved.answers).length > 0 &&
-      saved.phase !== "complete" &&
-      saved.phase !== "completing"
-    ) {
-      setState({
-        ...saved,
-        phase: "resume_prompt",
-        locale: locale as typeof saved.locale,
-        autoFilled: saved.autoFilled ?? [],
-        halfwayDone: saved.halfwayDone ?? false,
-        sinceAck: saved.sinceAck ?? 0
-      });
-      setUiScreen("chat");
-      return;
-    }
-
-    setState(
-      createInitialState({
-        locale,
-        channel: "web",
-        planId: returningPlanId ?? null
-      })
-    );
-    setUiScreen("welcome");
-  }, [locale, returningPlanId]);
+    const base = resolveChatDraft({ locale, sessionId: sessionRef.current, server: serverDraft });
+    let local: ChatDraft | null = null;
+    try { local = parseChatDraft(window.localStorage.getItem(chatDraftStorageKey(base.state.sessionId))); } catch { /* ignore */ }
+    const draft = resolveChatDraft({ locale, sessionId: sessionRef.current, server: serverDraft, local });
+    saveDraft(draft);
+    const saved = draft.state;
+    setState(saved);
+    if (["complete", "completing", "failed"].includes(saved.phase)) {
+      setUiScreen("calculating"); finalizing.current = true; void runCapture(saved);
+    } else if (Object.keys(saved.answers).length) {
+      setState({ ...saved, phase: "resume_prompt" }); setUiScreen("chat");
+    } else setUiScreen("welcome");
+    trackBpmEvent("chat_view", { eventType: "funnel", locale, properties: { channel: "web", questionnaireVersion: "v6-conversational", uxVersion: UX_VERSION } });
+  }, [locale, serverDraft, saveDraft, runCapture]);
 
   useEffect(() => {
     if (uiScreen !== "chat") {
@@ -428,6 +332,8 @@ export function ChatQuestionnaire({
       return;
     }
 
+    // Reset the composer when the headless engine advances to a different turn.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setComposerError("");
     setMultiSel([]);
     setTextValue("");
@@ -481,26 +387,6 @@ export function ChatQuestionnaire({
     state?.phase,
     uiScreen
   ]);
-
-  useEffect(() => {
-    return () => {
-      if (fallbackTimer.current) {
-        window.clearTimeout(fallbackTimer.current);
-      }
-    };
-  }, []);
-
-  const armCalcFallback = useCallback(() => {
-    if (fallbackTimer.current) {
-      window.clearTimeout(fallbackTimer.current);
-    }
-
-    fallbackTimer.current = window.setTimeout(() => {
-      setCalcStatus((prev) =>
-        prev === "ready" || prev === "sent" ? prev : "error"
-      );
-    }, HEALTHSCORE_COPY_WAIT_MS);
-  }, []);
 
   const clearStageTimers = useCallback(() => {
     for (const id of stageTimers.current) {
@@ -581,163 +467,11 @@ export function ChatQuestionnaire({
     });
   }, [locale, showStageOverlay, state]);
 
-  const finalize = useCallback(
-    async (completed: QuestionnaireState) => {
-      runLeafBurst(10);
-      setUiScreen("calculating");
-      setCalcStatus("building");
-      setProcessingError("");
-      armCalcFallback();
-
-      let queuedEmail = pendingEmail.current;
-      if (!queuedEmail) {
-        try {
-          queuedEmail = window.localStorage.getItem(DELIVERY_EMAIL_KEY);
-        } catch {
-          queuedEmail = null;
-        }
-      }
-
-      trackBpmEvent("assessment_submitted", {
-        eventType: "funnel",
-        locale,
-        properties: {
-          channel: "web",
-          questionnaireVersion: "v6-conversational",
-          uxVersion: UX_VERSION,
-          precision: computePrecision(getDefinition(completed), completed),
-          sessionId: completed.sessionId
-        }
-      });
-
-      try {
-        const captured = await finalizeAssessmentCapture({
-          state: { ...completed, phase: "completing" },
-          planId: returningPlanId || completed.planId,
-          paymentId,
-          pharmacyId,
-          resumeToken,
-          contactEmail: queuedEmail,
-          bpm: getBpmPayload(),
-          fetchImpl: fetchWithTimeout as typeof fetch
-        });
-
-        if (!captured.ok || !captured.planId) {
-          throw new Error(captured.error || "Capture failed");
-        }
-
-        readyPlanId.current = captured.planId;
-        setResultPlanId(captured.planId);
-        if (queuedEmail) {
-          void persistDeliveryEmail(queuedEmail, captured.planId);
-        }
-
-        const capturedOk = skipHealthScoreStep
-          ? Boolean(captured.planId)
-          : hasUsableHealthScore({
-              status: captured.status,
-              healthScore: captured.healthScore,
-              planId: captured.planId
-            });
-
-        if (!capturedOk) {
-          setCalcStatus("error");
-          return;
-        }
-
-        if (skipHealthScoreStep) {
-          if (fallbackTimer.current) {
-            window.clearTimeout(fallbackTimer.current);
-          }
-          clearLocalState(locale);
-          trackBpmEvent("assessment_captured", {
-            email: queuedEmail || undefined,
-            eventType: "funnel",
-            locale,
-            planId: captured.planId,
-            properties: {
-              channel: "web",
-              questionnaireVersion: "v6-conversational",
-              uxVersion: UX_VERSION,
-              skipHealthScore: true
-            }
-          });
-          setCalcStatus("ready");
-          router.replace(
-            resultsPath(locale, captured.planId, paymentId, true)
-          );
-          return;
-        }
-
-        const copyDeadline = Date.now() + HEALTHSCORE_COPY_WAIT_MS;
-        let copyReady = false;
-        let copyFailed = false;
-
-        while (Date.now() < copyDeadline) {
-          try {
-            const copyStatus = await fetchHealthScoreCopyStatus(
-              captured.planId,
-              fetchWithTimeout as typeof fetch
-            );
-            copyReady = copyStatus.copyReady;
-            copyFailed = copyStatus.copyFailed;
-          } catch {
-            copyFailed = true;
-          }
-
-          if (copyReady || copyFailed) {
-            break;
-          }
-
-          await new Promise((resolve) => {
-            window.setTimeout(resolve, HEALTHSCORE_COPY_POLL_INTERVAL_MS);
-          });
-        }
-
-        if (!copyReady) {
-          setCalcStatus("error");
-          return;
-        }
-
-        if (fallbackTimer.current) {
-          window.clearTimeout(fallbackTimer.current);
-        }
-
-        clearLocalState(locale);
-        trackBpmEvent("healthscore_ready", {
-          email: queuedEmail || undefined,
-          eventType: "funnel",
-          locale,
-          planId: captured.planId,
-          properties: {
-            channel: "web",
-            questionnaireVersion: "v6-conversational",
-            uxVersion: UX_VERSION,
-            skipHealthScore: false
-          }
-        });
-        setCalcStatus("ready");
-        router.replace(
-          resultsPath(locale, captured.planId, paymentId, skipHealthScoreStep)
-        );
-      } catch {
-        finalizing.current = false;
-        setCalcStatus("error");
-        setProcessingError(ui.processingError || "Something went wrong");
-        setState((prev) => (prev ? { ...prev, phase: "complete" } : prev));
-      }
-    },
-    [
-      armCalcFallback,
-      locale,
-      paymentId,
-      pharmacyId,
-      resumeToken,
-      returningPlanId,
-      skipHealthScoreStep,
-      ui.processingError
-    ]
-  );
+  const finalize = useCallback(async (completed: QuestionnaireState) => {
+    runLeafBurst(10); setUiScreen("calculating"); setProcessingError("");
+    saveLocalState(locale, completed);
+    await runCapture(completed);
+  }, [runCapture, locale, saveLocalState]);
 
   const commitState = useCallback(
     async (
@@ -775,7 +509,6 @@ export function ChatQuestionnaire({
       persistCheckpoint,
       showFinishStage,
       showStageFlash,
-      state?.log.length,
       track
     ]
   );
@@ -870,25 +603,27 @@ export function ChatQuestionnaire({
   }
 
   function resumeRestart() {
-    clearLocalState(locale);
+    clearLocalState();
     finalizing.current = false;
-    readyPlanId.current = null;
-    setCalcStatus("building");
+    capture.reset();
     setState(
       createInitialState({
         locale,
         channel: "web",
-        planId: returningPlanId ?? null
+        planId: returningPlanId ?? null,
+        sessionId: sessionRef.current
       })
     );
     setUiScreen("welcome");
   }
 
-  function onReviewEdit(turnKey: string) {
+  function onReviewEdit(event: React.MouseEvent<HTMLButtonElement>) {
+    const turnKey = event.currentTarget.dataset.turnKey;
     if (!state) {
       return;
     }
 
+    if (!turnKey) return;
     const result = reopenTurn(state, turnKey);
     if (!result.ok) {
       setComposerError(result.error);
@@ -933,51 +668,13 @@ export function ChatQuestionnaire({
     return items;
   }, [state]);
 
-  async function persistDeliveryEmail(email: string, planId?: string | null) {
-    const trimmed = email.trim();
-    if (!trimmed) {
-      return;
-    }
-    pendingEmail.current = trimmed;
-    try {
-      window.localStorage.setItem(DELIVERY_EMAIL_KEY, trimmed);
-    } catch {
-      /* ignore */
-    }
-    trackBpmEvent("email_capture", {
-      eventType: "funnel",
-      locale,
-      planId: planId || readyPlanId.current || returningPlanId || undefined,
-      properties: {
-        channel: "web",
-        questionnaireVersion: "v6-conversational",
-        uxVersion: UX_VERSION,
-        source: "calc_emailbox"
-      }
-    });
-    const id = planId || readyPlanId.current || returningPlanId || state?.planId;
-    if (!id) {
-      return;
-    }
-    try {
-      await fetchWithTimeout(`/api/assessment/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          contactEmail: trimmed,
-          intent: "capture",
-          locale
-        }),
-        cache: "no-store",
-        keepalive: true
-      });
-    } catch {
-      /* non-blocking */
-    }
-  }
-
   async function onFallbackEmail(email: string) {
-    await persistDeliveryEmail(email);
+    const draft = draftRef.current;
+    const id = draft?.captured?.planId;
+    if (!id) throw new Error(chrome.calcRetryCapture);
+    const receipt = await requestHealthScoreEmail(id, locale, email);
+    if (draft) saveDraft({ ...draft, contactEmail: email, updatedAt: Date.now() });
+    return receipt;
   }
 
   function avatarClass(pose?: string) {
@@ -1679,7 +1376,7 @@ export function ChatQuestionnaire({
         status={calcStatus}
         canOpenResults={calcStatus === "ready"}
         onSeeResults={() => {
-          const planId = readyPlanId.current || resultPlanId;
+          const planId = capture.planId || draftRef.current?.captured?.planId;
           if (!planId || calcStatus !== "ready") {
             return;
           }
@@ -1689,12 +1386,8 @@ export function ChatQuestionnaire({
           );
         }}
         onEmailSubmit={onFallbackEmail}
-        onEmailComplete={() => {
-          if (fallbackTimer.current) {
-            window.clearTimeout(fallbackTimer.current);
-          }
-          setCalcStatus("sent");
-        }}
+        onRetryCapture={!capture.planId && state ? () => { finalizing.current = true; void finalize(state); } : undefined}
+        onRetryAnalysis={capture.planId && state ? () => { void capture.run(state, true); } : undefined}
       />
     );
   }
@@ -1818,7 +1511,8 @@ export function ChatQuestionnaire({
                     <button
                       type="button"
                       className="mn-chat-q__review-edit"
-                      onClick={() => onReviewEdit(item.key)}
+                      data-turn-key={item.key}
+                      onClick={onReviewEdit}
                     >
                       {chrome.reviewEdit}
                     </button>

@@ -80,6 +80,7 @@ export async function finalizeAssessmentCapture(
 
   const body = {
     answers: payload.answers,
+    sessionId: input.state.sessionId,
     questionnaireState: input.state,
     expectedRevision: input.expectedRevision,
     contactEmail: input.contactEmail || undefined,

@@ -1,3 +1,4 @@
+import { isLocale } from "@/lib/i18n";
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import {
@@ -29,10 +30,13 @@ export async function GET(
     );
   }
 
-  const copyView = new URL(request.url).searchParams.get("view") === "copy";
+  const query = new URL(request.url).searchParams;
+  const requestedLocale = query.get("locale");
+  const locale = isLocale(requestedLocale) ? requestedLocale : undefined;
+  const copyView = query.get("view") === "copy";
   const snapshot = copyView
-    ? await getHealthScoreCopySnapshot(planId)
-    : await getNutritionJourneySnapshot(planId);
+    ? await getHealthScoreCopySnapshot(planId, locale)
+    : await getNutritionJourneySnapshot(planId, locale);
 
   if (!snapshot) {
     return NextResponse.json(

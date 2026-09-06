@@ -1,5 +1,7 @@
 "use client";
 
+import { retryHealthScoreCopy, waitForHealthScoreCopy } from "@/lib/healthscore-copy-client";
+import { fetchWithBodyDeadline } from "@/lib/funnel-polling";
 import { funnelRequestKey } from "@/lib/funnel-request-key";
 
 import { useEffect, useRef, useState } from "react";
@@ -70,6 +72,9 @@ const buildTimeDevShortcutEnabled =
 type AssessmentFlowProps = Readonly<{
   initialStage?: "healthscore" | "quiz";
   initialSectionIndex?: number;
+  sessionId?: string;
+  assessmentRevision?: number;
+  serverUpdatedAt?: string;
   locale: Locale;
   paymentId?: string;
   pharmacyId?: string;
@@ -114,25 +119,7 @@ type ProcessingStatus = Readonly<{
   >;
 }>;
 
-const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
-
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), ASSESSMENT_REQUEST_TIMEOUT_MS);
-
-  try {
-    return await fetch(input, {
-      ...init,
-      signal: controller.signal
-    });
-  } finally {
-    window.clearTimeout(timeout);
-  }
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
+const fetchWithTimeout = (input: RequestInfo | URL, init: RequestInit = {}) => fetchWithBodyDeadline(input, init, 30_000);
 
 function buildReturningScoreGateStatus(planId: string, healthScore: HealthScoreResult): ProcessingStatus {
   return {
@@ -167,6 +154,9 @@ function healthScoreBpmFields(healthScore: HealthScoreResult | null | undefined)
 export function AssessmentFlow({
   initialStage = "quiz",
   initialSectionIndex,
+  sessionId,
+  assessmentRevision = 0,
+  serverUpdatedAt,
   locale,
   paymentId,
   pharmacyId,
@@ -194,7 +184,7 @@ export function AssessmentFlow({
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
   const [capturedStatus, setCapturedStatus] = useState<ProcessingStatus | null>(returningScoreStatus);
-  const [showHealthScore, setShowHealthScore] = useState(Boolean(returningScoreStatus || initialStage === "healthscore"));
+  const [showHealthScore, setShowHealthScore] = useState(Boolean(initialStage === "healthscore"));
   const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(returningHealthScore ?? null);
   const captureInFlight = useRef<Promise<ProcessingStatus | null> | null>(null);
   const assessmentStartedTracked = useRef(false);
@@ -207,6 +197,36 @@ export function AssessmentFlow({
   const normalizedContactEmail = normalizeAssessmentContactEmail(contactEmail);
   const contactEmailInvalid = assessmentContactEmailError(contactEmail) !== null;
   const effectiveReturningPlanId = resumePlanId || returningPlanId;
+  const capturedAnswers = useRef(JSON.stringify(buildInitialAnswers(prefillAnswers)));
+  const flowController = useRef<AbortController | null>(null);
+  const [browserSession] = useState(() => sessionId || returningPlanId || paymentId || crypto.randomUUID());
+  const [draftReady, setDraftReady] = useState(false);
+  const classicDraftKey = `mn-classic:v1:${browserSession}`;
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(classicDraftKey);
+      const saved = raw ? JSON.parse(raw) : null;
+      if (saved?.version === 1 && saved.revision === assessmentRevision
+        && (!serverUpdatedAt || saved.updatedAt > Date.parse(serverUpdatedAt))) {
+        // Browser storage is available only after hydration; restore the scoped external draft once.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setAnswers(buildInitialAnswers(saved.answers)); setContactEmail(saved.contactEmail || "");
+        setSectionIndex(saved.sectionIndex || 0); setResumePlanId(saved.planId || returningPlanId || "");
+        if (saved.receipt) { capturedAnswers.current = JSON.stringify(buildInitialAnswers(saved.answers)); setCapturedStatus(saved.receipt); }
+        if (saved.processing && saved.receipt?.planId) router.replace(nutritionHealthScorePath(locale, saved.receipt.planId));
+      }
+    } catch { /* Ignore drafts from another format. */ }
+    setDraftReady(true);
+    return () => flowController.current?.abort();
+  }, [assessmentRevision, classicDraftKey, locale, returningPlanId, router, serverUpdatedAt]);
+  useEffect(() => {
+    if (!draftReady) return;
+    const matchingReceipt = capturedAnswers.current === JSON.stringify(answers) ? capturedStatus : null;
+    try { window.localStorage.setItem(classicDraftKey, JSON.stringify({ version: 1, revision: assessmentRevision,
+      answers, contactEmail, sectionIndex, receipt: matchingReceipt, planId: effectiveReturningPlanId,
+      processing: Boolean(processingStatus), updatedAt: Date.now() })); } catch { /* Capture still has a stable request key. */ }
+  }, [answers, assessmentRevision, capturedStatus, classicDraftKey, contactEmail, draftReady, effectiveReturningPlanId, processingStatus, sectionIndex]);
+
 
   function clearProcessingStatus() {
     setProcessingStatus(null);
@@ -1165,7 +1185,9 @@ export function AssessmentFlow({
     });
 
     try {
-      const captured = await captureAssessment(true, answerPayload);
+      flowController.current?.abort();
+      flowController.current = new AbortController();
+      const captured = await captureAssessment(false, answerPayload);
 
       if (!captured?.planId) {
         throw new Error("Unable to capture assessment");
@@ -1173,12 +1195,9 @@ export function AssessmentFlow({
 
       let readyStatus = captured;
 
-      if (
-        !skipHealthScoreStep &&
-        readyStatus.status !== "ready" &&
-        typeof readyStatus.healthScore?.score !== "number"
-      ) {
+      if (!skipHealthScoreStep) {
         setProcessingStatus(readyStatus);
+        await retryHealthScoreCopy(readyStatus.planId, locale, flowController.current.signal);
         readyStatus = await waitForHealthScoreAnalysis(readyStatus.planId);
       }
 
@@ -1204,37 +1223,16 @@ export function AssessmentFlow({
   }
 
   async function waitForHealthScoreAnalysis(planId: string) {
-    let latestStatus: ProcessingStatus | null = null;
-
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      const response = await fetchWithTimeout(
-        `/api/assessment/${encodeURIComponent(planId)}?view=healthscore&locale=${encodeURIComponent(locale)}`,
-        { cache: "no-store" }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to load HealthScore analysis status");
-      }
-
-      latestStatus = (await response.json()) as ProcessingStatus;
-      setProcessingStatus(latestStatus);
-
-      if (latestStatus.status === "ready") {
-        return latestStatus;
-      }
-
-      if (latestStatus.status === "failed") {
-        throw new Error("HealthScore analysis failed");
-      }
-
-      await sleep(1500);
-    }
-
-    throw new Error("HealthScore analysis timed out");
+    const signal = flowController.current?.signal ?? new AbortController().signal;
+    const outcome = await waitForHealthScoreCopy(planId, locale, signal);
+    if (outcome.status !== "ready") throw new Error("HealthScore advice is not ready");
+    const response = await fetchWithTimeout(`/api/assessment/${encodeURIComponent(planId)}?view=healthscore&locale=${locale}`, { signal });
+    if (!response.ok) throw new Error("Unable to load complete HealthScore advice");
+    return await response.json() as ProcessingStatus;
   }
 
   async function captureAssessment(force = false, answerPayload = answers) {
-    if (!force && capturedStatus?.planId) {
+    if (!force && capturedStatus?.planId && capturedAnswers.current === JSON.stringify(answerPayload)) {
       return capturedStatus;
     }
 
@@ -1244,8 +1242,9 @@ export function AssessmentFlow({
 
     captureInFlight.current = (async () => {
       try {
-        const sessionStorageKey = `mn-classic-capture-session:${resumeToken || effectiveReturningPlanId || paymentId || "new"}`;
-        const sessionId = window.sessionStorage.getItem(sessionStorageKey) || crypto.randomUUID();
+        const urlSession = new URL(window.location.href).searchParams.get("session");
+        const sessionStorageKey = `mn-classic-capture-session:${urlSession || resumeToken || effectiveReturningPlanId || paymentId || "new"}`;
+        const sessionId = window.sessionStorage.getItem(sessionStorageKey) || browserSession;
         window.sessionStorage.setItem(sessionStorageKey, sessionId);
         const requestKey = await funnelRequestKey("capture", sessionId, { answers: answerPayload, locale, contactEmail: normalizedContactEmail, paymentId, pharmacyId, resumeToken });
         const response = effectiveReturningPlanId
@@ -1253,6 +1252,7 @@ export function AssessmentFlow({
               `/api/assessment/${encodeURIComponent(effectiveReturningPlanId)}`,
               {
                 body: JSON.stringify({
+                  sessionId,
                   answers: answerPayload,
                   bpm: getBpmPayload(),
                   contactEmail: normalizedContactEmail,
@@ -1262,16 +1262,18 @@ export function AssessmentFlow({
                   pharmacyId,
                   resumeToken
                 }),
+                signal: flowController.current?.signal,
                 cache: "no-store",
                 headers: {
                   "Idempotency-Key": requestKey,
-                  "content-type": "application/json"
+                "content-type": "application/json"
                 },
                 method: "PATCH"
               }
             )
           : await fetchWithTimeout("/api/assessment", {
               body: JSON.stringify({
+                sessionId,
                 answers: answerPayload,
                 bpm: getBpmPayload(),
                 contactEmail: normalizedContactEmail,
@@ -1281,10 +1283,11 @@ export function AssessmentFlow({
                 pharmacyId,
                 resumeToken
               }),
+              signal: flowController.current?.signal,
               cache: "no-store",
               headers: {
                 "Idempotency-Key": requestKey,
-                  "content-type": "application/json"
+                "content-type": "application/json"
               },
               method: "POST"
             });
@@ -1294,7 +1297,9 @@ export function AssessmentFlow({
         }
 
         const status = (await response.json()) as ProcessingStatus;
+        capturedAnswers.current = JSON.stringify(answerPayload);
         setCapturedStatus(status);
+        setResumePlanId(status.planId);
         return status;
       } catch {
         return null;

@@ -9,7 +9,7 @@ export async function claimFunnelRequest(
   scope: string,
   key: string,
   input: unknown,
-  resourceId = randomUUID()
+  resourceId: string = randomUUID()
 ) {
   if (!key || key.length > 200 || !/^[\x21-\x7e]+$/.test(key)) {
     throw new FunnelError("A valid Idempotency-Key is required", 400, "invalid_idempotency_key");

@@ -16,6 +16,8 @@ describe("shared assessment capture on PostgreSQL", { skip: !databaseUrl }, () =
     const url = new URL(databaseUrl!);
     assert.equal(url.hostname, "127.0.0.1"); assert.match(url.pathname, /^\/mattanutra_lock_review/);
     process.env.DB_URL = databaseUrl;
+    for (const locale of ["en", "th", "zh-CN"]) await getSql()!`insert into public.site_locales (code, label, native_label, html_lang)
+      values (${locale}, ${locale}, ${locale}, ${locale}) on conflict (code) do nothing`;
     await getSql()!`insert into public.organisations (slug, name, organisation_type) values ('mattanutra', 'MattaNutra', 'platform') on conflict do nothing`;
   });
   after(async () => {
@@ -80,6 +82,14 @@ describe("shared assessment capture on PostgreSQL", { skip: !databaseUrl }, () =
     await assert.rejects(captureAssessment({ ...body, paymentId }, request()), { code: "reservation_conflict" });
     assert.equal((await getSql()!`select count(*)::int as n from public.assessments`)[0].n, count.n, "failed binding rolls capture back");
   });
+  it("keeps a single assessment if language changes before the capture receipt arrives", async () => {
+    const sessionId = randomUUID();
+    const a = await captureAssessment({ ...body, sessionId }, request()); plans.push(a.planId);
+    const b = await captureAssessment({ ...body, locale: "th", sessionId }, request());
+    assert.equal(a.planId, b.planId); assert.equal(a.revision, b.revision);
+    await getSql()!`delete from public.funnel_requests where scope = 'assessment-session' and request_key = ${sessionId}`;
+  });
+
   it("server coordinator finalizes without any relative server fetch", async () => {
     const state = fastForwardQuestionnaire(createInitialState({ locale: "en", channel: "agent" })).state;
     const coordinator = createServerQuestionnaireCoordinator({ locale: "en", channel: "agent" }, serializeState(state));

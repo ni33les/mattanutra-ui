@@ -1,3 +1,5 @@
+import { assessmentInputHash } from "@/lib/assessment-revisions";
+import { toAssessmentAnswers } from "@/lib/questionnaire/normalize";
 import { deserializeState } from "@/lib/questionnaire/engine";
 import { buildInitialAnswers } from "@/components/assessment-flow-state";
 import { createAssessmentSnapshot, DEFAULT_ASSESSMENT_PLAN, type AssessmentSnapshot } from "@/lib/assessment-snapshot";
@@ -11,7 +13,7 @@ import { FunnelError } from "@/lib/funnel-errors";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { computeHealthScore } from "@/lib/health-score";
 import { isLocale } from "@/lib/i18n";
-import { mergeInStorePharmacyAnswers, resolveCapturePharmacy } from "@/lib/pharmacy-in-store";
+import { IN_STORE_PHARMACY_ANSWERS_KEY, mergeInStorePharmacyAnswers, resolveCapturePharmacy } from "@/lib/pharmacy-in-store";
 import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
 import { enqueueAssessmentPregenerationTasks, enqueueHealthScoreAnalysisTask, enqueueNutritionPlanTasks, scheduleReassessmentAction } from "@/lib/task-worker";
 import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
@@ -61,7 +63,9 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   if (resume && requestedPlanId !== resume.planId) throw new FunnelError("Resume link belongs to another assessment", 409, "resume_conflict");
   const paymentId = body.paymentId || resume?.paymentId || null;
   if (paymentId && (typeof paymentId !== "string" || !isUuid(paymentId))) throw new FunnelError("Invalid payment reservation", 400, "invalid_payment");
-  const rawAnswers = validateCaptureAnswers(body.answers);
+  const answerInput = { ...record(body.answers) };
+  delete answerInput[IN_STORE_PHARMACY_ANSWERS_KEY];
+  const rawAnswers = validateCaptureAnswers(answerInput);
   const existing = requestedPlanId ? await getStoredAssessmentPrefill(requestedPlanId) : null;
   const { invalidRequested, pharmacy } = await resolveCapturePharmacy(body.pharmacyId, existing?.answers);
   if (invalidRequested) throw new FunnelError("Pharmacy not found", 404, "pharmacy_not_found");
@@ -69,12 +73,16 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   const skipHealthScore = Boolean(pharmacy);
   const sql = getSql();
   if (!sql) throw new Error("Database is not configured");
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId : null;
+  if (sessionId && !isUuid(sessionId)) throw new FunnelError("Invalid questionnaire session", 400, "invalid_session");
   const result = await withDatabaseTransaction(sql, async tx => {
+    const session = sessionId ? await claimFunnelRequest(tx, "assessment-session", sessionId, {}, requestedPlanId ?? undefined) : null;
     const claimed = await claimFunnelRequest(tx, "assessment-capture", options.idempotencyKey, {
-      planId: requestedPlanId, answers, locale, contactEmail, paymentId, expectedRevision: body.expectedRevision ?? null
+      planId: requestedPlanId, sessionId, answers, locale, contactEmail, paymentId, expectedRevision: body.expectedRevision ?? null
     });
     if (claimed.response) return claimed.response as CaptureReceipt;
-    const planId = requestedPlanId ?? claimed.resourceId;
+    const planId = requestedPlanId ?? session?.resourceId ?? claimed.resourceId;
+    await tx`update public.funnel_requests set resource_id = ${planId}::uuid where scope = 'assessment-capture' and request_key = ${options.idempotencyKey}`;
     const [current] = await tx`select selected_plan, input_revision from public.assessments where plan_id = ${planId}::uuid for update`;
     if (requestedPlanId && !current && resume?.planId !== planId) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
     if (current && body.expectedRevision !== undefined && Number(body.expectedRevision) !== Number(current.input_revision)) {
@@ -86,7 +94,7 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     const identity = await persistAssessmentSubmission({ answers, contactEmail, locale, selectedPlan, skipHealthScore, snapshot, status: "captured" });
     if (body.questionnaireState !== undefined) {
       const state = deserializeState(JSON.stringify(body.questionnaireState));
-      if (!state) throw new FunnelError("Invalid questionnaire state", 400, "invalid_questionnaire_state");
+      if (!state || state.locale !== locale || assessmentInputHash(validateCaptureAnswers(toAssessmentAnswers(state.answers))) !== assessmentInputHash(rawAnswers)) throw new FunnelError("Invalid questionnaire state", 400, "invalid_questionnaire_state");
       await tx`update public.assessments set questionnaire_state = ${tx.json(toJsonValue({ ...state, planId, assessmentRevision: identity.revision }))}
         where plan_id = ${planId}::uuid`;
     } else {

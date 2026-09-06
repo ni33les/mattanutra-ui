@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { randomUUID } from "node:crypto";
+import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { AssessmentFlow } from "@/components/assessment-flow";
 import { ChatQuestionnaire } from "@/components/chat-questionnaire/chat-questionnaire";
@@ -37,6 +38,9 @@ type NutritionQuizPageProps = Readonly<{
     locale: string;
   }>;
   searchParams?: Promise<{
+    session?: string;
+    source?: string;
+    selectedPlan?: string;
     payment?: string;
     plan?: string;
     resume?: string;
@@ -100,7 +104,7 @@ export default async function NutritionQuizPage({
     typeof query.payment === "string" && isUuid(query.payment)
       ? query.payment
       : "";
-  const currentPath = nutritionQuizPath(locale, returningPlanId);
+  const currentPath = nutritionQuizPath(locale, returningPlanId, { payment: paymentId, resume: resumeToken, session: query.session, source: query.source, selectedPlan: query.selectedPlan });
   const requestHeaders = await headers();
   const showDevShortcut = devShortcutsEnabledForHost(
     requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
@@ -125,10 +129,19 @@ export default async function NutritionQuizPage({
     ? await getAssessmentResumeDraft(resumeToken)
     : null;
   const effectivePlanId = returningPlanId || resumeDraft?.planId || "";
-  const prefill = effectivePlanId && !resumeDraft
+  const prefill = effectivePlanId
     ? await getStoredAssessmentPrefill(effectivePlanId)
     : null;
 
+  if (resumeToken && !resumeDraft) notFound();
+  if (returningPlanId && !prefill && !resumeDraft) notFound();
+  if (resumeDraft && returningPlanId && resumeDraft.planId !== returningPlanId) notFound();
+  if (!query.session && !effectivePlanId && !resumeDraft) {
+    redirect(nutritionQuizPath(locale, undefined, { ...query, session: randomUUID() }));
+  }
+  const effectivePaymentId = paymentId || resumeDraft?.paymentId || "";
+  const serverDraft = prefill ? { ...prefill, captured: true, paymentId: effectivePaymentId }
+    : resumeDraft ? { ...resumeDraft, revision: 0, captured: false } : null;
   const useChat = chatQuestionnaireEnabled(locale);
 
   // Quiz-focused shell (v14 HTML parity): compact titlebar (logo + site locale
@@ -144,7 +157,9 @@ export default async function NutritionQuizPage({
       {useChat ? (
         <ChatQuestionnaire
           locale={locale}
-          paymentId={paymentId || undefined}
+          sessionId={query.session || resumeDraft?.draftId || effectivePlanId || undefined}
+          serverDraft={serverDraft}
+          paymentId={effectivePaymentId || undefined}
           returningPlanId={
             resumeDraft?.planId ?? prefill?.planId ?? (returningPlanId || undefined)
           }
@@ -153,12 +168,15 @@ export default async function NutritionQuizPage({
         />
       ) : (
         <AssessmentFlow
+          sessionId={query.session || resumeDraft?.draftId || undefined}
+          assessmentRevision={prefill?.revision ?? 0}
+          serverUpdatedAt={prefill?.updatedAt ?? resumeDraft?.updatedAt}
           initialStage="quiz"
           initialSectionIndex={resumeDraft?.sectionIndex}
           locale={locale}
-          paymentId={paymentId || undefined}
-          prefillAnswers={resumeDraft?.answers ?? prefill?.answers ?? null}
-          prefillContactEmail={resumeDraft?.contactEmail ?? prefill?.contactEmail ?? null}
+          paymentId={effectivePaymentId || undefined}
+          prefillAnswers={prefill?.answers ?? resumeDraft?.answers ?? null}
+          prefillContactEmail={prefill?.contactEmail ?? resumeDraft?.contactEmail ?? null}
           returningHealthScore={prefill?.healthScore ?? null}
           returningPlanId={resumeDraft?.planId ?? prefill?.planId ?? undefined}
           resumeToken={resumeToken || undefined}
