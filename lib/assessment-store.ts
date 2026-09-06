@@ -1665,6 +1665,8 @@ export async function getStoredAssessmentPrefill(planId: string) {
       input_hash,
       answers,
       contact_email,
+      questionnaire_state,
+      updated_at,
       health_score,
       locale,
       selected_plan::text
@@ -1681,6 +1683,8 @@ export async function getStoredAssessmentPrefill(planId: string) {
   const healthScore = asRecord(row.health_score);
 
   return {
+    questionnaireState: row.questionnaire_state,
+    updatedAt: new Date(row.updated_at).toISOString(),
     revision: Number(row.input_revision),
     inputHash: row.input_hash as string | null,
     answers: asRecord(row.answers),

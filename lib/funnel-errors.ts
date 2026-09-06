@@ -10,6 +10,7 @@ export class FunnelError extends Error {
 }
 
 export function funnelErrorResponse(error: unknown) {
+  if (error instanceof SyntaxError) error = new FunnelError("Invalid JSON request", 400, "invalid_json");
   if (!(error instanceof FunnelError)) console.error("[web-funnel] request failed", error);
   return Response.json({
     message: error instanceof FunnelError ? error.message : "Unable to complete this request. Please retry.",

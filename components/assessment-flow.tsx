@@ -1,5 +1,7 @@
 "use client";
 
+import { funnelRequestKey } from "@/lib/funnel-request-key";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1242,6 +1244,10 @@ export function AssessmentFlow({
 
     captureInFlight.current = (async () => {
       try {
+        const sessionStorageKey = `mn-classic-capture-session:${resumeToken || effectiveReturningPlanId || paymentId || "new"}`;
+        const sessionId = window.sessionStorage.getItem(sessionStorageKey) || crypto.randomUUID();
+        window.sessionStorage.setItem(sessionStorageKey, sessionId);
+        const requestKey = await funnelRequestKey("capture", sessionId, { answers: answerPayload, locale, contactEmail: normalizedContactEmail, paymentId, pharmacyId, resumeToken });
         const response = effectiveReturningPlanId
           ? await fetchWithTimeout(
               `/api/assessment/${encodeURIComponent(effectiveReturningPlanId)}`,
@@ -1258,6 +1264,7 @@ export function AssessmentFlow({
                 }),
                 cache: "no-store",
                 headers: {
+                  "Idempotency-Key": requestKey,
                   "content-type": "application/json"
                 },
                 method: "PATCH"
@@ -1276,7 +1283,8 @@ export function AssessmentFlow({
               }),
               cache: "no-store",
               headers: {
-                "content-type": "application/json"
+                "Idempotency-Key": requestKey,
+                  "content-type": "application/json"
               },
               method: "POST"
             });

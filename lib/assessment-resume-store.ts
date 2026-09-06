@@ -16,6 +16,7 @@ const REQUIRED_RESUME_DRAFT_COLUMNS = [
   "email_hash",
   "token_hash",
   "payment_id",
+  "questionnaire_state",
   "expires_at",
   "last_opened_at",
   "finalized_at",
@@ -106,6 +107,9 @@ export type AssessmentResumeDraft = Readonly<{
   answers: Record<string, unknown>;
   contactEmail: string;
   draftId: string;
+  paymentId: string | null;
+  questionnaireState: unknown;
+  updatedAt: string;
   locale: Locale;
   planId: string;
   sectionIndex: number;
@@ -118,6 +122,7 @@ export async function createAssessmentResumeDraft(input: Readonly<{
   paymentId?: unknown;
   planId?: unknown;
   sectionIndex?: unknown;
+  questionnaireState?: unknown;
 }>) {
   const sql = getSql();
 
@@ -156,6 +161,7 @@ export async function createAssessmentResumeDraft(input: Readonly<{
       email_hash,
       token_hash,
       payment_id,
+      questionnaire_state,
       expires_at,
       created_at,
       updated_at
@@ -170,6 +176,7 @@ export async function createAssessmentResumeDraft(input: Readonly<{
       ${emailHash(contactEmail)},
       ${tokenHash(token)},
       ${paymentId ? sql`${paymentId}::uuid` : null},
+      ${sql.json(toJsonValue(input.questionnaireState ?? null))},
       now() + (${RESUME_TTL_DAYS}::text || ' days')::interval,
       now(),
       now()
@@ -201,21 +208,22 @@ export async function getAssessmentResumeDraft(token: string): Promise<Assessmen
     locale: string;
     plan_id: string;
     section_index: number | string;
+    payment_id: string | null;
+    questionnaire_state: unknown;
+    updated_at: Date;
   }>>`
     update public.assessment_resume_drafts
     set
-      last_opened_at = now(),
-      updated_at = now()
+      last_opened_at = now()
     where token_hash = ${tokenHash(token)}
       and expires_at > now()
-      and finalized_at is null
     returning
       id::text,
       plan_id::text,
       locale,
       answers,
       section_index,
-      contact_email
+      contact_email, payment_id, questionnaire_state, updated_at
   `;
   const row = rows[0];
 
@@ -230,6 +238,9 @@ export async function getAssessmentResumeDraft(token: string): Promise<Assessmen
         : {},
     contactEmail: row.contact_email,
     draftId: row.id,
+    paymentId: row.payment_id,
+    questionnaireState: row.questionnaire_state,
+    updatedAt: new Date(row.updated_at).toISOString(),
     locale: row.locale,
     planId: row.plan_id,
     sectionIndex: normalizedSectionIndex(row.section_index)

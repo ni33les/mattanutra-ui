@@ -74,3 +74,5 @@ begin
       public.healthscore_delivery_requests to mn;
   end if;
 end $$;
+
+alter table public.assessments add column if not exists questionnaire_state jsonb;

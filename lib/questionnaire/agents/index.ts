@@ -22,7 +22,8 @@ import {
   CAPTURE_AGENT_CAPABILITIES,
   CAPTURE_AGENT_ID,
   captureToolSpecs,
-  runCaptureTool
+  runCaptureTool,
+  type CaptureFinalizeInput
 } from "@/lib/questionnaire/agents/capture-agent";
 import {
   PROGRESS_AGENT_CAPABILITIES,
@@ -81,13 +82,7 @@ export type CoordinatorOptions = Readonly<{
   sessionId?: string;
   planId?: string | null;
   trackBpm?: BpmTrackFn;
-  capture?: {
-    contactEmail?: string | null;
-    paymentId?: string | null;
-    resumeToken?: string | null;
-    fetchImpl?: typeof fetch;
-    bpm?: Record<string, unknown>;
-  };
+  capture?: Omit<CaptureFinalizeInput, "state">;
 }>;
 
 export class QuestionnaireAgentCoordinator {

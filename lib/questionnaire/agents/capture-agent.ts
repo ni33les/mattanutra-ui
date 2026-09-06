@@ -1,3 +1,4 @@
+import { funnelRequestKey } from "@/lib/funnel-request-key";
 /**
  * Capture agent — normalizes chat answers and persists via /api/assessment.
  * Channel-agnostic: web UI, LINE, or AI chat all call finalize the same way.
@@ -30,6 +31,8 @@ export type CaptureFinalizeInput = Readonly<{
   assessmentUrl?: string;
   bpm?: Record<string, unknown>;
   fetchImpl?: typeof fetch;
+  captureImpl?: (body: unknown, options: { planId?: string | null; idempotencyKey: string }) => Promise<{ planId: string; healthScore?: unknown; status?: string; revision?: number; inputHash?: string }>;
+  expectedRevision?: number;
 }>;
 
 export type CaptureFinalizeResult = Readonly<{
@@ -37,6 +40,8 @@ export type CaptureFinalizeResult = Readonly<{
   planId?: string;
   healthScore?: unknown;
   status?: string;
+  revision?: number;
+  inputHash?: string;
   answers?: Answers;
   error?: string;
   events: readonly QuestionnaireEvent[];
@@ -63,7 +68,7 @@ export function buildCapturePayload(state: QuestionnaireState) {
 
 /**
  * Finalize: normalize + POST/PATCH assessment capture.
- * Uses fetch so it works from browser or server (pass fetchImpl on server if needed).
+ * Browser transport uses HTTP; server coordinators inject the shared capture service.
  */
 export async function finalizeAssessmentCapture(
   input: CaptureFinalizeInput
@@ -75,6 +80,8 @@ export async function finalizeAssessmentCapture(
 
   const body = {
     answers: payload.answers,
+    questionnaireState: input.state,
+    expectedRevision: input.expectedRevision,
     contactEmail: input.contactEmail || undefined,
     intent: "capture" as const,
     locale: input.state.locale === "zh-CN" ? "zh-CN" : input.state.locale,
@@ -95,40 +102,29 @@ export async function finalizeAssessmentCapture(
   };
 
   try {
-    const url = planId
-      ? `/api/assessment/${encodeURIComponent(planId)}`
-      : "/api/assessment";
-    const method = planId ? "PATCH" : "POST";
-
-    const response = await fetchFn(url, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store"
-    });
-
-    if (!response.ok) {
-      const message = `Assessment capture failed (${response.status})`;
-      events.push({ type: "chat_capture_failed", message });
-      return {
-        ok: false,
-        error: message,
-        answers: payload.answers,
-        events
-      };
+    const idempotencyKey = await funnelRequestKey("capture", input.state.sessionId, { ...body, bpm: undefined, questionnaireState: undefined });
+    let status: { planId?: string; status?: string; healthScore?: unknown; revision?: number; inputHash?: string };
+    if (input.captureImpl) {
+      status = await input.captureImpl(body, { planId, idempotencyKey });
+    } else {
+      const base = input.assessmentUrl ?? "/api/assessment";
+      const url = planId ? `${base}/${encodeURIComponent(planId)}` : base;
+      const response = await fetchFn(url, {
+        method: planId ? "PATCH" : "POST", headers: { "content-type": "application/json", "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(body), cache: "no-store"
+      });
+      const responseBody = await response.json();
+      if (!response.ok) throw new Error(responseBody.message || `Assessment capture failed (${response.status})`);
+      status = responseBody;
     }
-
-    const status = (await response.json()) as {
-      planId?: string;
-      status?: string;
-      healthScore?: unknown;
-    };
 
     return {
       ok: true,
       planId: status.planId,
       healthScore: status.healthScore,
       status: status.status,
+      revision: status.revision,
+      inputHash: status.inputHash,
       answers: payload.answers,
       events
     };
@@ -194,7 +190,9 @@ export async function runCaptureTool(
     resumeToken:
       typeof args.resumeToken === "string" ? args.resumeToken : options?.resumeToken,
     bpm: options?.bpm,
-    fetchImpl: options?.fetchImpl
+    fetchImpl: options?.fetchImpl,
+    captureImpl: options?.captureImpl,
+    expectedRevision: options?.expectedRevision
   });
 
   if (!captured.ok) {

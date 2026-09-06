@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     paymentId?: unknown;
     planId?: unknown;
     sectionIndex?: unknown;
+    questionnaireState?: unknown;
   } = {};
 
   try {
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
       locale,
       paymentId: body.paymentId,
       planId: body.planId,
+      questionnaireState: body.questionnaireState,
       sectionIndex: body.sectionIndex
     });
     const resumeUrl = buildAssessmentResumeUrl(locale, draft.token);

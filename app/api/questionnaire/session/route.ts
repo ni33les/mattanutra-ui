@@ -7,7 +7,7 @@ import {
   serializeState,
   startQuestionnaire
 } from "@/lib/questionnaire/engine";
-import { QuestionnaireAgentCoordinator } from "@/lib/questionnaire/agents";
+import { createServerQuestionnaireCoordinator } from "@/lib/questionnaire/server";
 import { isLocale } from "@/lib/i18n";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import {
@@ -148,28 +148,8 @@ export async function POST(request: Request) {
         );
       }
 
-      let coordinator: QuestionnaireAgentCoordinator | null = null;
-
-      if (typeof body.state === "string") {
-        coordinator = QuestionnaireAgentCoordinator.fromSerialized(body.state, {
-          locale,
-          channel,
-          planId: body.planId
-        });
-      } else if (body.state && typeof body.state === "object") {
-        coordinator = QuestionnaireAgentCoordinator.fromSerialized(
-          JSON.stringify(body.state),
-          { locale, channel, planId: body.planId }
-        );
-      }
-
-      if (!coordinator) {
-        coordinator = new QuestionnaireAgentCoordinator({
-          locale,
-          channel,
-          planId: body.planId
-        });
-      }
+      const serialized = typeof body.state === "string" ? body.state : body.state ? JSON.stringify(body.state) : undefined;
+      const coordinator = createServerQuestionnaireCoordinator({ locale, channel, planId: body.planId }, serialized);
 
       const result = await coordinator.invoke({
         name: tool as "start_session",
