@@ -1821,13 +1821,12 @@ async function persistTerminalPlan(input: Readonly<{
           input.planId,
           input.revision
         );
-        if (stopped) {
-          return stopped;
-        }
-        setQueryNamespace(namespace);
-        const next = logicalPlanQueryCounts(namespace);
-        if (Object.values(next).some((value) => Number(value) > 0)) {
-          await persistQueryBudget(namespace, next);
+        if (!stopped) {
+          setQueryNamespace(namespace);
+          const next = logicalPlanQueryCounts(namespace);
+          if (Object.values(next).some((value) => Number(value) > 0)) {
+            await persistQueryBudget(namespace, next);
+          }
         }
       }
     }
