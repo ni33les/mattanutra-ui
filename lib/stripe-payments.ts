@@ -7,7 +7,7 @@ import {
   queuePlatformAdminCommunication,
   upsertCommunicationChannel
 } from "@/lib/communications";
-import { getSql } from "@/lib/db";
+import { getSql, withDatabaseTransaction } from "@/lib/db";
 import {
   FINANCE_ACCOUNT_IDS,
   recordFinanceTransaction
@@ -129,13 +129,6 @@ async function sqlOrThrow() {
   }
 
   return sql;
-}
-
-function isPaymentVersionRace(error: unknown) {
-  return typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "23505";
 }
 
 function mapPayment(row: PaymentRow) {
@@ -282,87 +275,105 @@ async function fulfillMockCheckoutSession(
   };
 }
 
-async function updatePaymentState(
-  sql: Db,
-  input: PaymentStatePatch
-) {
-  const metadata = input.metadata ?? {};
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const rows = await sql<PaymentRow[]>`
-        with updated_payment as (
-          update public.payments
-          set
-            plan_id = coalesce(${input.planId ?? null}::uuid, plan_id),
-            status = coalesce(${input.status ?? null}, status),
-            stripe_checkout_session_id = coalesce(${input.stripeCheckoutSessionId ?? null}, stripe_checkout_session_id),
-            stripe_payment_intent_id = coalesce(${input.stripePaymentIntentId ?? null}, stripe_payment_intent_id),
-            stripe_customer_id = coalesce(${input.stripeCustomerId ?? null}, stripe_customer_id),
-            stripe_price_id = coalesce(${input.stripePriceId ?? null}, stripe_price_id),
-            customer_email = coalesce(${input.customerEmail ?? null}, customer_email),
-            metadata = metadata || ${sql.json(toJsonValue(metadata))}::jsonb,
-            paid_at = case
-              when ${input.status ?? null} = 'paid' then coalesce(paid_at, now())
-              else paid_at
-            end,
-            bound_at = case
-              when ${input.status ?? null} = 'bound' then coalesce(bound_at, now())
-              else bound_at
-            end,
-            updated_at = now()
-          where id = ${input.paymentId}::uuid
-            and (
-              ${input.expectedStatuses ? input.expectedStatuses.length : 0}::int = 0
-              or status = any(${textArray(sql, input.expectedStatuses ?? [])}::text[])
-            )
-          returning *
-        ),
-        appended_version as (
-          insert into public.payment_versions (
-            payment_id,
-            version,
-            action,
-            actor,
-            reason,
-            source,
-            plan_id,
-            snapshot,
-            metadata,
-            created_at
+/** Serializes payment state and its append-only audit under the payment row lock. */
+export async function updatePaymentState(sql: Db, input: PaymentStatePatch) {
+  return withDatabaseTransaction(sql, async sql => {
+    const [current] = await sql<PaymentRow[]>`
+      select * from public.payments where id = ${input.paymentId}::uuid for update
+    `;
+    if (!current) return null;
+    if (input.expectedStatuses?.length && !input.expectedStatuses.includes(current.status)) return null;
+    if (input.planId && current.plan_id && input.planId !== current.plan_id) return null;
+    const confirmed = current.status === "paid" || current.status === "bound" || Boolean(current.paid_at);
+    if (confirmed && input.status && input.status !== "paid" && input.status !== "bound") return null;
+    if (current.status === "bound" && input.status === "paid") return current;
+    const metadata = input.metadata ?? {};
+    const rows = await sql<PaymentRow[]>`
+      with updated_payment as (
+        update public.payments
+        set
+          plan_id = coalesce(${input.planId ?? null}::uuid, plan_id),
+          status = coalesce(${input.status ?? null}, status),
+          stripe_checkout_session_id = coalesce(${input.stripeCheckoutSessionId ?? null}, stripe_checkout_session_id),
+          stripe_payment_intent_id = coalesce(${input.stripePaymentIntentId ?? null}, stripe_payment_intent_id),
+          stripe_customer_id = coalesce(${input.stripeCustomerId ?? null}, stripe_customer_id),
+          stripe_price_id = coalesce(${input.stripePriceId ?? null}, stripe_price_id),
+          customer_email = coalesce(${input.customerEmail ?? null}, customer_email),
+          metadata = metadata || ${sql.json(toJsonValue(metadata))}::jsonb,
+          paid_at = case
+            when ${input.status ?? null} = 'paid' then coalesce(paid_at, now())
+            else paid_at
+          end,
+          bound_at = case
+            when ${input.status ?? null} = 'bound' then coalesce(bound_at, now())
+            else bound_at
+          end,
+          updated_at = now()
+        where id = ${input.paymentId}::uuid
+          and (
+            ${input.expectedStatuses ? input.expectedStatuses.length : 0}::int = 0
+            or status = any(${textArray(sql, input.expectedStatuses ?? [])}::text[])
           )
-          select
-            updated_payment.id,
-            coalesce((
-              select max(payment_versions.version)
-              from public.payment_versions
-              where payment_versions.payment_id = updated_payment.id
-            ), 0) + 1,
-            ${input.action},
-            ${input.actor ?? "system"},
-            ${input.reason},
-            'stripe_payments',
-            updated_payment.plan_id,
-            to_jsonb(updated_payment.*),
-            ${sql.json(toJsonValue(metadata))}::jsonb,
-            now()
-          from updated_payment
-          returning payment_id
+        returning *
+      ),
+      appended_version as (
+        insert into public.payment_versions (
+          payment_id,
+          version,
+          action,
+          actor,
+          reason,
+          source,
+          plan_id,
+          snapshot,
+          metadata,
+          created_at
         )
-        select updated_payment.*
+        select
+          updated_payment.id,
+          coalesce((
+            select max(payment_versions.version)
+            from public.payment_versions
+            where payment_versions.payment_id = updated_payment.id
+          ), 0) + 1,
+          ${input.action},
+          ${input.actor ?? "system"},
+          ${input.reason},
+          'stripe_payments',
+          updated_payment.plan_id,
+          to_jsonb(updated_payment.*),
+          ${sql.json(toJsonValue(metadata))}::jsonb,
+          now()
         from updated_payment
-        join appended_version on appended_version.payment_id = updated_payment.id
-      `;
+        returning payment_id
+      )
+      select updated_payment.*
+      from updated_payment
+      join appended_version on appended_version.payment_id = updated_payment.id
+    `;
 
-      return rows[0] ?? null;
-    } catch (error) {
-      if (!isPaymentVersionRace(error) || attempt > 0) {
-        throw error;
-      }
+    return rows[0] ?? null;
+  });
+}
+
+/** Claims a reservation without performing external I/O; joins a caller transaction. */
+export async function claimPaidReservation(sql: Db, paymentId: string, planId: string) {
+  return withDatabaseTransaction(sql, async tx => {
+    const [payment] = await tx<PaymentRow[]>`
+      select * from public.payments where id = ${paymentId}::uuid for update
+    `;
+    if (!payment) return null;
+    if (payment.plan_id === planId && (payment.status === "bound" || payment.status === "paid")) {
+      return { payment, replayed: true };
     }
-  }
-
-  return null;
+    if (payment.plan_id || payment.status !== "paid") return null;
+    const bound = await updatePaymentState(tx, {
+      paymentId, planId, status: "bound", expectedStatuses: ["paid"],
+      action: "payment_reservation_bound", actor: "system", reason: "paid_reservation_bound_to_assessment",
+      metadata: { source: "assessment_capture" }
+    });
+    return bound ? { payment: bound, replayed: false } : null;
+  });
 }
 
 async function insertPayment(
@@ -1311,27 +1322,21 @@ export async function markPaymentCancelled(input: Readonly<{
 
   await assertPaymentSchema(sql);
 
-  const payment = await getPaymentRowById(sql, input.paymentId);
-
-  if (!payment) {
-    return null;
+  const updated = await withDatabaseTransaction(sql, async tx => {
+    const payment = await updatePaymentState(tx, {
+      action: "payment_cancelled", actor: "visitor", paymentId: input.paymentId,
+      reason: "visitor_cancelled_checkout", status: "cancelled",
+      expectedStatuses: ["created", "checkout_session_created", "checkout_opened", "processing", "failed", "expired"],
+      metadata: { source: "checkout_cancel_action" }
+    });
+    if (payment) await removeStripePaymentRevenue(tx, payment);
+    return payment;
+  });
+  if (!updated) {
+    const current = await getPaymentRowById(sql, input.paymentId);
+    return current ? mapPayment(current) : null;
   }
-
-  const updated =
-    payment.status === "paid" || payment.status === "bound"
-      ? payment
-      : await updatePaymentState(sql, {
-          action: "payment_cancelled",
-          actor: "visitor",
-          metadata: {
-            source: "checkout_cancel_action"
-          },
-          paymentId: input.paymentId,
-          reason: "visitor_cancelled_checkout",
-          status: "cancelled"
-        });
-  // Abandoned checkout: remove any prior revenue row (do not reclassify as other).
-  await removeStripePaymentRevenue(sql, updated ?? payment);
+  const payment = updated;
 
   await writePaymentBpmEvent({
     actorType: "visitor",
@@ -2238,53 +2243,19 @@ export async function bindPaidReservationToAssessment(input: Readonly<{
 
   await assertPaymentSchema(sql);
 
-  const payment = await getPaymentRowById(sql, input.paymentId);
-
-  if (!payment || payment.plan_id || payment.locale !== input.locale) {
+  const claim = await claimPaidReservation(sql, input.paymentId, input.planId);
+  if (!claim) {
     await writePaymentBpmEvent({
-      actorType: "system",
-      errorCode: "payment_reservation_bind_failed",
-      errorMessage: "Paid reservation could not be bound to assessment",
-      eventName: "payment_reservation_bind_failed",
-      eventStatus: "failed",
-      locale: input.locale,
-      paymentId: input.paymentId,
-      planId: input.planId,
-      severity: "high",
-      sql
+      actorType: "system", eventName: "payment_reservation_bind_failed",
+      eventStatus: "failed", errorCode: "payment_reservation_bind_failed",
+      errorMessage: "Reservation is unpaid or belongs to another assessment",
+      paymentId: input.paymentId, planId: input.planId, locale: input.locale, sql
     });
     return null;
   }
-
-  if (payment.status !== "paid") {
-    await writePaymentBpmEvent({
-      actorType: "system",
-      errorCode: "payment_reservation_not_paid",
-      errorMessage: "Payment reservation is not paid",
-      eventName: "payment_reservation_bind_failed",
-      eventStatus: "failed",
-      locale: input.locale,
-      paymentId: input.paymentId,
-      planId: input.planId,
-      selectedPlan: payment.selected_plan,
-      severity: "high",
-      sql
-    });
-    return null;
-  }
-
-  const bound = await updatePaymentState(sql, {
-    action: "payment_reservation_bound",
-    actor: "system",
-    metadata: {
-      source: "assessment_capture"
-    },
-    paymentId: input.paymentId,
-    planId: input.planId,
-    reason: "paid_reservation_bound_to_assessment",
-    status: "bound"
-  });
-  const nextPayment = bound ?? payment;
+  const payment = claim.payment;
+  const nextPayment = payment;
+  if (claim.replayed) return mapPayment(payment);
 
   // Reservation binding is post-payment bookkeeping only — revenue was
   // already booked at payment confirmation as nominal sales recognition.
@@ -2367,8 +2338,10 @@ export async function markStripePaymentFailure(input: Readonly<{
     reason: input.reason,
     status: input.eventStatus
   });
-  // Expired/failed checkouts are not ledgered — delete any stray revenue row.
-  await removeStripePaymentRevenue(sql, updated ?? payment);
+  if (!updated) {
+    const current = await getPaymentRowById(sql, payment.id);
+    return current ? mapPayment(current) : null;
+  }
 
   await writePaymentBpmEvent({
     actorType: "system",
