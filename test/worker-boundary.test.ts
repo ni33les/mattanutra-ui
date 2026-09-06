@@ -582,11 +582,15 @@ describe("external worker boundaries", () => {
       /void warmSupplementEffectiveAvailability\(catalogueCountry\)/,
       "assessment capture should warm supplement availability so matching does not scan supplements",
     );
-    assert.match(
-      taskWorkerSource,
-      /activeTaskRows[\s\S]*task_type = 'analyze_healthscore'[\s\S]*status in \([\s\S]*'queued'[\s\S]*'reserved'[\s\S]*'waiting_approval'[\s\S]*if \(activeTaskRows\[0\]\) \{[\s\S]*return null;/,
-      "HealthScore status polling must not enqueue a second HealthScore while the first AI copy task is still active",
+    const healthScoreEnqueue = taskWorkerSource.slice(
+      taskWorkerSource.indexOf("export async function enqueueHealthScoreAnalysisTask"),
+      taskWorkerSource.indexOf("async function activePlanTaskId")
     );
+    assert.match(healthScoreEnqueue, /idempotencyKey: `healthscore-analysis:\$\{planId\}:\$\{inputHash\}`/);
+    assert.match(healthScoreEnqueue, /idempotencyScope: "active"/);
+    assert.match(taskWorkerSource, /const generationKey = generation \? `:\$\{generation\.revision\}:\$\{generation\.locale\}:\$\{generation\.generatorVersion\}`/);
+    assert.match(serviceSource, /on conflict do nothing[\s\S]*where idempotency_scope_key = \$\{idempotencyScopeKey\}[\s\S]*idempotency_key = \$\{idempotencyKey\}/,
+      "active HealthScore tasks are reused through the shared atomic task creator");
     assert.equal(
       /taskType: "generate_food_guidance"/.test(assessmentPregenerationSource),
       false,
@@ -735,24 +739,20 @@ describe("external worker boundaries", () => {
     );
   });
 
-  it("refreshes paid nutrition readiness after overlapping completion transactions commit", async () => {
+  it("fences completion by assessment revision and reads readiness inside the shared transaction", async () => {
     const source = await readFile("lib/task-result-applier.ts", "utf8");
+    const database = await readFile("lib/db.ts", "utf8");
+    const service = await readFile("lib/task-service.ts", "utf8");
 
     assert.match(
       source,
-      /refreshPaidNutritionReadinessAfterCommit/,
-      "paid supplement completion must re-check readiness after commit",
+      /export async function applyTaskCompletionResult[\s\S]*for no key update[\s\S]*current\.input_revision[\s\S]*taskCompletionResultHandlers\[task\.taskType\]/,
+      "same-assessment completion must lock and reject stale input before applying results",
     );
-    assert.match(
-      source,
-      /post_commit_readiness_refresh/,
-      "post-commit readiness repair should be visible in task events",
-    );
-    assert.match(
-      source,
-      /formulation_completion[\s\S]*queueProductRecommendationsForReadyPlan/,
-      "product recommendations should be queued immediately once paid supplement guidance is ready",
-    );
+    assert.match(database, /export function getSql\(\)[\s\S]*transactionScope\.getStore\(\)[\s\S]*if \(transaction\) return transaction/);
+    assert.match(service, /withTaskRowLock\(sql, uuidOrNull\(input\.taskId\), async tx =>[\s\S]*input\.applyResult[\s\S]*sql: tx/);
+    assert.match(source, /eventType: "assessment_status_projection_update"/);
+    assert.match(source, /queueProductRecommendationsForReadyPlan\(\{[\s\S]*source: "formulation_completion"/);
   });
 
   it("keeps public healthscore subtraction in ingredient mode", async () => {

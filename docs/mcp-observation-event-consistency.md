@@ -42,10 +42,10 @@ The newly discovered six agentic value suites were also executed once against un
 - `SAFE-01.D deferred and omitted targets add zero proposed exposure`
 - `DET-01.A two canonical runs are byte-identical and keep prices products roles savings and safety`
 
-These baseline failures remain attached to this preparation attempt. They have not been suppressed, reclassified or treated as product RED for OBS/EVT. No assertion or fixture was changed to make them pass.
+These baseline failures remain attached to the original preparation attempt. A subsequent user-requested full-suite run and test triage are documented in [DEV MCP failure triage](mcp-failure-triage.md), including contract-based adaptations and the product defects that remain. None of those tests is treated as product RED for OBS/EVT.
 
 ## Remaining mandatory work
 
 Obtain and verify the six assets, freeze the real catalogue and exact F_READY_MAG fixture, resolve the unavailable-error oracle and actual runtime case inventory, and implement every OBS-01–08, EVT-01–04 and HY-01–05 parameterized case. Product corrections must follow genuine controlled RED twice with two processes sharing PostgreSQL. The protected inventory and artifact-aware release gate remain to be implemented. A read-only GitHub check found no current protection rule on `dev`; local scripts alone cannot establish a required remote status check.
 
-Then execute the complete MCP suite and unchanged official A/B pack for the exact candidate, preserving the sole TECH-07 exception and separate official/policy results. The present preparatory checks are not a successful development cycle or release sign-off. The complete MCP gate, production build and official A/B acceptance have not run for these preparation commits. No application/worker deployment, UAT change or observation/event product correction has been made.
+Then execute the complete MCP suite and unchanged official A/B pack for the exact candidate, preserving the sole TECH-07 exception and separate official/policy results. The present preparatory checks are not a successful development cycle or release sign-off. Subsequent repository MCP runs are recorded in the linked triage; they do not constitute the missing official A/B acceptance. No application/worker deployment, UAT change or observation/event product correction has been made as part of this preparation or triage.

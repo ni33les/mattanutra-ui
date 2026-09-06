@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import {
   createAgenticRuntime,
@@ -12,6 +14,7 @@ import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { engineeringInfo } from "../lib/agentic/info.ts";
 import { AGENTIC_SERVER_INSTRUCTIONS } from "../lib/agentic/contract/instructions.ts";
+import { mcpTestBatches, mcpTestFiles } from "../scripts/agentic-qa-pack.mjs";
 import {
   everyLineHasHttpImage,
   exactToolNames,
@@ -85,7 +88,7 @@ afterEach(() => {
   setAgenticRuntimeForTests(null);
 });
 
-describe("Official MattaNutra Agentic QA Pack", () => {
+describe("Repository MattaNutra Agentic QA coverage", () => {
   it("A1 info lists names and codes; Algae omega-3 does not 400", async () => {
     const runtime = runtimeFor();
     const info = await call(runtime, "info", { locale: "en" });
@@ -431,7 +434,7 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     );
   });
 
-  it("A13 tools/list is exactly the six names", async () => {
+  it("A13 tools/list is exactly the seven public tools", async () => {
     const runtime = runtimeFor();
     const listed = await handleJsonRpc(runtime, { id: 3, method: "tools/list" });
     const names = ((listed?.result?.tools as Array<{ name: string }>) ?? []).map(
@@ -440,13 +443,48 @@ describe("Official MattaNutra Agentic QA Pack", () => {
     assert.equal(exactToolNames(names), true);
   });
 
-  it("A2 pack gate is 8s on every environment", () => {
-    const pack = readFileSync(
-      new URL("../scripts/agentic-qa-pack.mjs", import.meta.url),
-      "utf8"
-    );
-    assert.match(pack, /createdMs < 8000 && patchedMs < 8000/);
-    assert.equal(/uat \? 20_000/.test(pack), false);
+  it("A2 repository entrypoint includes live timing, commerce, and nested value coverage", () => {
+    const files = mcpTestFiles();
+    for (const file of [
+      "test/agentic-dev-preheader-lat.test.ts", "test/agentic-v13-lat.test.ts",
+      "test/agentic-v16-plan90.test.ts", "test/agentic-live-com-e2e.test.ts",
+      "test/agentic-live-r4-regression.test.ts", "test/commerce-transactions.integration.test.ts",
+      "test/agentic/value/slice5-agent.test.ts", "test/matcher/qa-safety.test.ts",
+      "test/admin-product-facts.test.ts", "test/assessment-revisions.integration.test.ts",
+      "test/funnel-readiness.integration.test.ts"
+    ]) assert.ok(files.includes(file), file);
+    assert.equal(new Set(files).size, files.length);
+    const [remote, local] = mcpTestBatches({
+      DB_URL: "postgresql://catalogue/dev",
+      TEST_DB_URL: "postgresql://127.0.0.1/mattanutra_lock_review_qa"
+    });
+    assert.deepEqual([...remote.files, ...local.files].sort(), files);
+    assert.equal(remote.env.DB_URL, "postgresql://catalogue/dev");
+    assert.equal(remote.env.DB_POOL_MAX, "1");
+    assert.equal(remote.env.DB_WORKER_POOL_MAX, "1");
+    assert.equal(local.env.DB_URL, "postgresql://127.0.0.1/mattanutra_lock_review_qa");
+    assert.equal(local.env.DB_POOL_MAX, "6");
+    assert.equal(local.env.DB_WORKER_POOL_MAX, "6");
+    assert.ok(local.files.includes("test/commerce-transactions.integration.test.ts"));
+    assert.ok(local.files.every(file => file.endsWith(".integration.test.ts")));
+  });
+
+  it("repository entrypoint lists coverage without credentials and rejects incomplete or unsafe setup", () => {
+    const script = fileURLToPath(new URL("../scripts/agentic-qa-pack.mjs", import.meta.url));
+    const run = (args: string[], env: NodeJS.ProcessEnv = {}) =>
+      spawnSync(process.execPath, [script, ...args], { env, encoding: "utf8" });
+    const listed = run(["--list"]);
+    assert.equal(listed.status, 0, listed.stderr);
+    assert.deepEqual(listed.stdout.trim().split("\n"), mcpTestFiles());
+    const missing = run([]);
+    assert.equal(missing.status, 2);
+    assert.match(missing.stderr, /requires DB_URL/);
+    const unsafe = run([], { DB_URL: "postgresql://localhost/catalogue", TEST_DB_URL: "postgresql://remote/uat" });
+    assert.equal(unsafe.status, 2);
+    assert.match(unsafe.stderr, /isolated localhost/);
+    const uat = run([], { MATTANUTRA_ENV: "uat" });
+    assert.equal(uat.status, 2);
+    assert.match(uat.stderr, /targets DEV/);
   });
 
   it("T3 initialize instructions invite consented feedback", () => {

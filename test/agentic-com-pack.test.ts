@@ -700,7 +700,9 @@ async function com20() {
       receipt.currency === "THB" &&
       typeof receipt.totalPriceMinor === "number" &&
       order.retryable === false &&
-      order.nextAction === "none" &&
+      order.nextAction === "poll" &&
+      order.terminal === false &&
+      Number(order.pollAfterSeconds) > 0 &&
       frozenOf(order.fulfilment).status != null;
     return verdict("COM-20", ok, {
       fulfilment: frozenOf(order.fulfilment).status ?? null,
@@ -1751,12 +1753,10 @@ if (process.env.NODE_TEST_CONTEXT) {
         report.cases.map((item) => item.id),
         [...COM_CASE_IDS]
       );
-      const defects = report.cases.filter((item) =>
-        ["COM-47", "COM-48", "COM-49", "COM-50"].includes(item.id)
-      );
+      const defects = report.cases.filter((item) => item.result !== "PASS");
       assert.equal(
-        defects.every((item) => item.result === "PASS"),
-        true,
+        defects.length,
+        0,
         JSON.stringify(defects, null, 2)
       );
     });

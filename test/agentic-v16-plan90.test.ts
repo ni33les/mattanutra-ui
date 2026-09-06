@@ -329,7 +329,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     assert.equal(first.ok, false);
     assert.equal(first.planHandle, undefined);
     const replay = await publicPlanCreate(runtime, key);
-    assert.equal(replay.ok, true);
+    assert.equal(replay.ok, true, JSON.stringify(replay));
     assert.equal(replay.status, "ready");
     void store;
   });

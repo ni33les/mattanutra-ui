@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { beginDeterministicIdsForTests, endDeterministicIdsForTests } from "../lib/agentic/capabilities.ts";
 import { describe, it } from "node:test";
 
 import { MATCHER_VERSION } from "../lib/matcher/config.ts";
@@ -130,7 +131,8 @@ function envelopeFor(
       safetyLedgerVersion: IMPL_SAFETY_LEDGER_VERSION,
       snapshotId: session.snapshotId
     }),
-    freshKeyHash: freshKeyHash(response)
+    freshKeyHash: freshKeyHash(response),
+    response
   };
 }
 
@@ -1214,6 +1216,9 @@ export async function runCvR4Pack(
       totalCases: PACK_IDS.length
     };
   }
+  // This is a repeatable fixture run, including plan/evidence capability identity.
+  // Keep the response hash strict; do not drop the newer evidenceHandle field.
+  beginDeterministicIdsForTests();
   const session = openSession(frozen.freeze);
   const commerce = installCommerceGuard(session);
   try {
@@ -1244,6 +1249,7 @@ export async function runCvR4Pack(
     };
   } finally {
     closeSession();
+    endDeterministicIdsForTests();
   }
 }
 
@@ -1268,6 +1274,9 @@ describe("Customer value implementation pack v1.4", () => {
       [...PACK_IDS]
     );
     assert.equal(first.snapshotId, second.snapshotId);
+    if (canonicalR4Report(first) !== canonicalR4Report(second)) {
+      t.diagnostic(JSON.stringify({ first, second }));
+    }
     assert.equal(canonicalR4Report(first), canonicalR4Report(second), "v1.4 runs diverged");
     assert.equal(MATCHER_VERSION, "pareto-hybrid-1");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v1.0");

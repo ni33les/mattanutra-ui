@@ -245,7 +245,7 @@ describe("Slice 0 value harness", () => {
     );
   });
 
-  it("does not invent pack servings from a product title", () => {
+  it("recognizes explicit single-capsule pack counts without treating strength or duration as a pack count", () => {
     const snapshot = sampleSnapshot();
     const titled = retailProduct({
       amount: 150,
@@ -259,7 +259,13 @@ describe("Slice 0 value harness", () => {
       unitPriceMinor: 10000
     });
 
-    assert.equal(servingsPerPackFromProduct(titled), null);
+    // Explicit quantity notation was added in b16d54cb. This fixture serves one capsule.
+    assert.equal(servingsPerPackFromProduct(titled), 90);
+    for (const title of ["Magnesium 90 mg", "Magnesium 90 day support", "Magnesium"]) {
+      assert.equal(servingsPerPackFromProduct({
+        ...titled, candidate: { ...titled.candidate, title }
+      }), null, title);
+    }
     assert.equal(servingsPerPackFromProduct(snapshot.products[1]), 90);
   });
 

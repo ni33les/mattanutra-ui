@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, it } from "node:test";
+import { setImmediate as nextTurn } from "node:timers/promises";
+import { hashCapability } from "../lib/agentic/capabilities.ts";
 import { AGENTIC_SCHEMA_CHECKSUM } from "../lib/agentic/info.ts";
 import {
   setExecuteFailAtForTests,
@@ -138,7 +140,6 @@ describe("UAT execute/order request-completion", () => {
     await followerEntered.promise;
     advanceServiceClock(UAT_EXEC_SUCCESS_DEADLINE_MS);
     const [first, second] = await withHangBudget(Promise.all([leader, follower]), "stalled execute_2");
-    latch.resolve();
     assert.equal(first.ok, false, canonicalJson(first));
     assert.equal(second.ok, false, canonicalJson(second));
     assert.equal(reasonCodeOf(first), "SERVICE_DEADLINE_EXCEEDED");
@@ -151,6 +152,16 @@ describe("UAT execute/order request-completion", () => {
       "same-key execute replays must not share a request clock"
     );
     assert.equal(UAT_EXEC_SUCCESS_DEADLINE_MS < UAT_EXEC_CLIENT_DEADLINE_MS, true);
+    // Capacity must remain occupied while the deliberately uncancellable dependency
+    // is held. Releasing a Promise does not synchronously finish its continuations.
+    assert.deepEqual(snapshotResourcePermits(), {
+      admission: 1, connection: 1, database: 0, lock: 0, worker: 1
+    });
+    latch.resolve();
+    await withHangBudget((async () => {
+      const deadline = Date.now() + 1000;
+      while (Object.values(snapshotResourcePermits()).some(count => count > 0) && Date.now() < deadline) await nextTurn();
+    })(), "cancelled execute resource cleanup");
     assert.deepEqual(snapshotResourcePermits(), {
       admission: 0,
       connection: 0,
@@ -158,6 +169,12 @@ describe("UAT execute/order request-completion", () => {
       lock: 0,
       worker: 0
     });
+    const capability = await cluster.store.getCapabilityByHash(
+      hashCapability(cluster.runtimes.A.config.capabilitySecret, ready.planHandle)
+    );
+    assert.ok(capability);
+    assert.equal(await cluster.store.getActiveOrderForPlanRevision(capability.resourceId, ready.revision), null,
+      "cancelled execution must not create an order after its dependency unblocks");
   });
 
   it("UAT-EXEC-RED-03 live waiters on one key keep independent timers", async () => {

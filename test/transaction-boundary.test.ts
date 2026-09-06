@@ -206,7 +206,7 @@ describe("database transaction boundaries", () => {
     );
   });
 
-  it("keeps row locks limited to short atomic claim paths", async () => {
+  it("keeps row locks limited to reviewed claim and revision-fencing paths", async () => {
     const allowedRowLocks = new Map<string, readonly string[]>([
       [
         "lib/task-service.ts",
@@ -219,6 +219,21 @@ describe("database transaction boundaries", () => {
       ],
       ["lib/task-worker.ts", ["claimDueCronActions"]],
       ["lib/task-service-agents.ts", ["releaseOfflineWorkerReservations"]],
+      // The funnel now commits request receipts, payment transitions and generation
+      // results atomically. Keep exact call-site counts, including NO KEY UPDATE.
+      ["lib/funnel-idempotency.ts", ["claimFunnelRequest"]],
+      ["lib/assessment-capture.ts", ["captureAssessment", "retryAssessmentHealthScore"]],
+      ["lib/funnel-recovery.ts", ["recoverFunnelWork", "recoverFunnelWork"]],
+      ["lib/healthscore-delivery.ts", [
+        "enqueueReadyHealthScoreDeliveries", "requestHealthScoreDelivery",
+        "deliverHealthScore", "deliverHealthScore"
+      ]],
+      ["lib/stripe-payments.ts", [
+        "updatePaymentState", "claimPaidReservation", "createStripeCheckoutSession",
+        "completeMockPayment", "fulfillCheckoutSession"
+      ]],
+      ["lib/web-payment-fulfillment.ts", ["fulfillWebPayment", "fulfillWebPayment"]],
+      ["lib/task-result-applier.ts", ["applyTaskCompletionResult", "applyTaskFailureResult"]],
       [
         "lib/agentic/store/postgres.ts",
         [
@@ -239,7 +254,7 @@ describe("database transaction boundaries", () => {
     for (const file of files) {
       const source = await readFile(file, "utf8");
       const actual = [
-        ...source.matchAll(/\bfor\s+update(?:\s+skip\s+locked)?\b/gi)
+        ...source.matchAll(/\bfor\s+(?:no\s+key\s+)?update\b/gi)
       ].map((match) => enclosingFunctionName(source, match.index ?? 0));
       const allowed = [...(allowedRowLocks.get(file) ?? [])];
 

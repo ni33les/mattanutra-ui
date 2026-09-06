@@ -3,6 +3,7 @@
 import { canonicalHash } from "../../../lib/agentic/value/canonical.ts";
 
 export type OraclePublishedOption = Readonly<{
+  stackSummary?: Readonly<{ totalDailyPills: number; productCount: number; totalPriceMinor: number }>;
   burden?: Readonly<{
     administrationEvents?: number;
     administrations?: number;
@@ -47,6 +48,12 @@ export type OraclePublishedOption = Readonly<{
 }>;
 
 export type OraclePublishedPlan = Readonly<{
+  basket?: readonly Readonly<{
+    productId: string;
+    quantity: number;
+    unitPriceMinor: number;
+    lineTotalMinor: number;
+  }>[];
   acknowledgementStatus?: string;
   assessedConditionCodes?: readonly string[];
   assessedMedicationCodes?: readonly string[];
@@ -74,6 +81,7 @@ export type OraclePublishedPlan = Readonly<{
 }>;
 
 export function oracleExplanation(input: Readonly<{
+  basket: OraclePublishedPlan["basket"];
   coverage: OraclePublishedPlan["coverage"];
   nextActions: readonly string[];
   option: OraclePublishedOption;
@@ -102,9 +110,9 @@ export function oracleExplanation(input: Readonly<{
       status: row.status,
       supplementId: row.supplementId
     })),
-    pills: input.option.burden?.pills ?? 0,
-    productCount: input.option.burden?.productCount ?? input.option.productIds?.length ?? 0,
-    purchases: (input.option.productIds ?? []).map((productId) => ({ productId })),
+    pills: input.option.stackSummary?.totalDailyPills ?? 0,
+    productCount: input.option.stackSummary?.productCount ?? input.basket?.length ?? 0,
+    purchases: (input.basket ?? []).map(({ productId }) => ({ productId })),
     recommendedOptionId: input.option.optionId,
     retainedCurrent: input.option.retainedCurrent ?? [],
     safetyState: input.safetyState,
@@ -115,31 +123,25 @@ export function oracleExplanation(input: Readonly<{
 export function oracleCanonicalValue(published: OraclePublishedPlan) {
   const options = [...(published.options ?? [])]
     .map((option) => ({
-      burden: {
-        administrations: option.burden?.administrations ?? 0,
-        pills: option.burden?.pills ?? 0,
-        productCount: option.burden?.productCount ?? 0
-      },
+      stackSummary: option.stackSummary ?? null,
       cash90DayMinor: option.economics?.cash90DayMinor ?? option.cash90DayMinor ?? null,
-      coverage: [...(option.coverage ?? [])]
-        .map((row) => ({
-          status: row.status,
-          supplementId: row.supplementId
-        }))
-        .sort((left, right) => left.supplementId.localeCompare(right.supplementId)),
       optionId: option.optionId,
-      productIds: [...(option.productIds ?? [])].sort(),
       recommended: Boolean(option.recommended),
       role: option.role ?? null,
-      safetyCodes: [...(option.safety?.guidance ?? [])]
-        .map((row) => row.code)
-        .slice()
-        .sort(),
+      deferredTargetIds: [...(option.deferredTargetIds ?? [])].sort(),
+      omittedTargetIds: [...(option.omittedTargetIds ?? [])].sort(),
       savings90DayMinor: option.economics?.savings90DayMinor ?? null
     }))
     .sort((left, right) => left.optionId.localeCompare(right.optionId));
 
   return {
+    basket: [...(published.basket ?? [])].map((line) => ({
+      productId: line.productId,
+      quantity: line.quantity,
+      unitPriceMinor: line.unitPriceMinor,
+      lineTotalMinor: line.lineTotalMinor
+    })).sort((a, b) => a.productId.localeCompare(b.productId)),
+    coverage: published.coverage ?? [],
     leftovers: published.leftovers ?? [],
     options,
     safety: [...(published.safetyGuidance ?? [])]

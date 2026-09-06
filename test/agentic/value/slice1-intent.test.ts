@@ -8,6 +8,7 @@ import { publicCoverage } from "../../../lib/agentic/public-mapper.ts";
 import type { CanonicalPlanState } from "../../../lib/agentic/plan/types.ts";
 import { VALUE_ROLE_REQUEST } from "./pack-scenario.ts";
 import { canonicalHash } from "../../../lib/agentic/value/canonical.ts";
+import { sampleValueSnapshot } from "./sample-catalogue.ts";
 
 function intentPlanArgs() {
   return {
@@ -59,15 +60,9 @@ describe("Slice 1 target intent and conditional no-sale", () => {
     assert.equal(issue, null);
   });
 
-  it("VAL-01 and VAL-03 preserve intent on a retail-shaped snapshot", async () => {
-    const { freezeLiveThailandCatalogue, isLiveRetailFreeze } = await import(
-      "../../../lib/agentic/value/freeze.ts"
-    );
-    const freeze = await freezeLiveThailandCatalogue("TH");
-
-    if (!isLiveRetailFreeze(freeze)) {
-      return;
-    }
+  it("VAL-01 and VAL-03 keep core purchases ready while excluding an unsatisfied conditional target", () => {
+    // Intent is a unit contract; live catalogue coverage belongs to the CV packs.
+    const freeze = { snapshot: sampleValueSnapshot() };
 
     const creatine = freeze.snapshot.supplements.find(
       (item) => item.name.toLowerCase() === "creatine"
@@ -79,9 +74,7 @@ describe("Slice 1 target intent and conditional no-sale", () => {
       item.name.toLowerCase().includes("vitamin d")
     );
 
-    if (!creatine || !magnesium || !d3) {
-      return;
-    }
+    assert.ok(creatine && magnesium && d3, "the intent fixture must contain all three targets");
 
     const state: CanonicalPlanState = {
       acceptedGaps: [],
@@ -156,7 +149,8 @@ describe("Slice 1 target intent and conditional no-sale", () => {
       ),
       false
     );
-    assert.notEqual(status, "ready");
+    assert.ok((first.selected?.basket.length ?? 0) > 0);
+    assert.equal(status, "ready");
     assert.equal(canonicalHash(coverage), canonicalHash(
       (second.selected?.coverage ?? second.leftovers)
     ));
@@ -174,7 +168,6 @@ describe("Slice 1 target intent and conditional no-sale", () => {
       unmetRequirements: deferredOnly.unmetRequirements
     });
     assert.equal((deferredOnly.selected?.basket ?? []).length, 0);
-    assert.ok(deferredStatus === "needs_input" || deferredStatus === "no_purchase");
-    assert.notEqual(deferredStatus, "ready");
+    assert.equal(deferredStatus, "no_purchase");
   });
 });

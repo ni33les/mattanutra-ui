@@ -434,10 +434,7 @@ describe("Slice S4 connector copy and versions", () => {
       store: runtime.store
     });
     const handle = (plan as { evidenceHandle?: string }).evidenceHandle;
-    if (!handle) {
-      assert.ok((plan as { status?: string }).status !== "ready");
-      return;
-    }
+    assert.ok(handle, "research version coverage requires an evidence handle");
     const evidence = await detCall(runtime, "evidence", { evidenceHandle: handle, mode: "summary" });
     assert.equal(evidence.researchVersion, RESEARCH_VERSION);
     const claims = (evidence.claims as Array<{ researchVersion?: string }>) ?? [];
@@ -524,9 +521,7 @@ describe("Slice 8.2 remaining scored holes", () => {
       scope: runtime.scope,
       store: runtime.store
     });
-    if ((plan as { status?: string }).status !== "ready") {
-      return;
-    }
+    assert.equal((plan as { status?: string }).status, "ready", "responsibility coverage requires an executable fixture");
     const executed = await executeTool({
       config: runtime.config,
       expectedRevision: (plan as { revision: number }).revision,

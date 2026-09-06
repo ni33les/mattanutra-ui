@@ -349,13 +349,7 @@ describe("Slice B compact decision and evidence", () => {
     });
     const handle = (plan as { evidenceHandle?: string }).evidenceHandle;
     const revision = (plan as { revision: number }).revision;
-    if (!handle) {
-      assert.ok(
-        (plan as { status?: string }).status !== "ready" &&
-          (plan as { status?: string }).status !== "no_purchase"
-      );
-      return;
-    }
+    assert.ok(handle, "revision stability coverage requires an evidence handle");
     const evidence = await detCall(runtime, "evidence", {
       evidenceHandle: handle,
       mode: "summary"
@@ -1490,10 +1484,7 @@ describe("Slice F funnel", () => {
       scope: runtime.scope,
       store: runtime.store
     });
-    if ((plan as { status?: string }).status !== "ready") {
-      assert.ok(true);
-      return;
-    }
+    assert.equal((plan as { status?: string }).status, "ready", "journey event coverage requires an executable fixture");
     const executed = await executeTool({
       config: runtime.config,
       expectedRevision: (plan as { revision: number }).revision,
@@ -1603,9 +1594,7 @@ describe("Slice G responsibility and trust", () => {
       scope: runtime.scope,
       store: runtime.store
     });
-    if ((plan as { status?: string }).status !== "ready") {
-      return;
-    }
+    assert.equal((plan as { status?: string }).status, "ready", "responsibility coverage requires an executable fixture");
     const executed = await executeTool({
       config: runtime.config,
       expectedRevision: (plan as { revision: number }).revision,

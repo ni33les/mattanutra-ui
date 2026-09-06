@@ -149,6 +149,10 @@ function publishPlan(snapshot: ReturnType<typeof sampleValueSnapshot>, state: Ca
   return { matched, options, published, result };
 }
 
+function publishSelection(result: PlanResult, selected: StackOption) {
+  return publicPlanFields({ ...result, selected, basket: selected.basket, coverage: selected.coverage });
+}
+
 function withOmega(snapshot: ReturnType<typeof sampleValueSnapshot>) {
   const omega = {
     acceptedUnits: ["mg", "g"] as const,
@@ -238,7 +242,8 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     const recommended = (published.options ?? []).find((item) => item.recommended);
     assert.ok(recommended);
     const expected = oracleExplanation({
-      coverage: recommended.coverage ?? published.coverage,
+      basket: published.basket,
+      coverage: published.coverage,
       nextActions: published.nextActions ?? [],
       option: recommended,
       safetyState: published.acknowledgementStatus ?? published.status ?? ""
@@ -246,6 +251,10 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     assert.equal(explanation.recommendedOptionId, expected.recommendedOptionId);
     assert.ok(Array.isArray(explanation.purchases));
     assert.ok((explanation.purchases as unknown[]).length >= 1);
+    assert.deepEqual(
+      (explanation.purchases as { productId: string }[]).map((item) => item.productId).sort(),
+      expected.purchases.map((item) => item.productId).sort()
+    );
     assert.ok(Array.isArray(explanation.retainedCurrent));
     assert.ok((explanation.retainedCurrent as unknown[]).length >= 1);
     assert.ok(Array.isArray(explanation.optionalOmissions));
@@ -264,35 +273,40 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     assert.ok((published.nextActions ?? []).length > 0);
 
     for (const option of published.options ?? []) {
-      assert.ok(Array.isArray(option.coverage));
       assert.ok(option.economics);
-      assert.ok(option.burden);
-      assert.ok(option.safety);
-      assert.ok(Array.isArray(option.productIds));
+      assert.ok(option.stackSummary);
+      // AX2-08 deliberately puts details on the selected plan, not each compact option.
+      for (const field of ["coverage", "burden", "safety", "productIds", "basket"]) {
+        assert.equal(field in option, false, field);
+      }
     }
+    assert.ok((published.coverage?.length ?? 0) > 0);
+    assert.ok((published.basket?.length ?? 0) > 0);
   });
 
   it("SAFE-01.A atrial fibrillation and apixaban are assessed on every option", () => {
     const snapshot = sampleValueSnapshot();
-    const { published } = publishPlan(snapshot, {
+    const { published, options, result } = publishPlan(snapshot, {
       ...intentState(snapshot),
       conditionCodes: ["atrial_fibrillation"],
       medicationCodes: ["apixaban"]
     });
     assert.ok((published.assessedMedicationCodes ?? []).includes("apixaban"));
     assert.ok((published.assessedConditionCodes ?? []).includes("atrial_fibrillation"));
-    const options = published.options ?? [];
     assert.ok(options.length >= 1);
     for (const option of options) {
       assert.ok((option.safety?.assessedMedicationCodes ?? []).includes("apixaban"));
       assert.ok((option.safety?.assessedConditionCodes ?? []).includes("atrial_fibrillation"));
+      const selected = publishSelection(result, option);
+      assert.ok(selected.assessedMedicationCodes?.includes("apixaban"));
+      assert.ok(selected.assessedConditionCodes?.includes("atrial_fibrillation"));
     }
   });
 
   it("SAFE-01.B apixaban plus omega-3 is a frozen acknowledgement on every option, never a cheaper hard block", () => {
     const snapshot = withOmega(sampleValueSnapshot());
     const omega = snapshot.supplements.find((item) => item.name === "Omega-3")!;
-    const { published, options } = publishPlan(snapshot, {
+    const { published, options, result } = publishPlan(snapshot, {
       ...intentState(snapshot),
       conditionCodes: ["atrial_fibrillation"],
       medicationCodes: ["apixaban"],
@@ -307,8 +321,8 @@ describe("Slice 5 agent explanation safety and determinism", () => {
         }
       ]
     });
-    const coveringOmega = (published.options ?? []).filter((option) =>
-      (option.coverage ?? []).some(
+    const coveringOmega = options.filter((option) =>
+      option.coverage.some(
         (row) => row.supplementId === omega.supplementId && row.status === "covered"
       )
     );
@@ -322,6 +336,10 @@ describe("Slice 5 agent explanation safety and determinism", () => {
       assert.notEqual(interaction.action, "block");
       assert.ok(String(interaction.ruleId ?? "").length > 0);
       assert.ok(String(interaction.rulesVersion ?? "").length > 0);
+      const selected = publishSelection(result, option);
+      assert.ok(selected.coverage?.some((row) => row.supplementId === omega.supplementId && row.status === "covered"));
+      assert.ok(selected.safetyGuidance?.some((row) => row.code === "medication_interaction" && row.action === "acknowledge"));
+      assert.equal(selected.acknowledgementStatus, "pending");
     }
     assert.equal(
       options.some((option) => option.economics?.savingClaim === "positive" && option.recommended &&
@@ -334,7 +352,7 @@ describe("Slice 5 agent explanation safety and determinism", () => {
   it("SAFE-01.C a cheaper over-UL magnesium is never returned in an option", () => {
     const snapshot = withCheapMegaMag(sampleValueSnapshot());
     const megaId = publicProductId(MEGA_MAG_UUID);
-    const { options, published } = publishPlan(snapshot, intentState(snapshot));
+    const { options, result } = publishPlan(snapshot, intentState(snapshot));
     assert.ok(options.length >= 1);
     for (const option of options) {
       assert.equal(
@@ -342,8 +360,10 @@ describe("Slice 5 agent explanation safety and determinism", () => {
         false
       );
     }
-    for (const option of published.options ?? []) {
-      assert.equal((option.productIds ?? []).includes(megaId), false);
+    for (const option of options) {
+      const selected = publishSelection(result, option);
+      assert.ok(selected.basket?.length);
+      assert.equal(selected.basket.some((item) => item.productId === megaId), false);
     }
   });
 
@@ -354,13 +374,13 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     const { published, options } = publishPlan(snapshot, intentState(snapshot));
     const recommended = (published.options ?? []).find((item) => item.recommended);
     assert.ok(recommended);
-    const d3Row = (recommended.coverage ?? published.coverage ?? []).find(
+    const d3Row = (published.coverage ?? []).find(
       (row) => row.supplementId === d3.supplementId
     );
     assert.equal(d3Row?.status, "conditional_deferred");
     assert.equal(d3Row?.deliveredAmount ?? 0, 0);
     assert.equal(
-      recommended.productIds?.some((id) =>
+      published.basket?.some(({ productId: id }) =>
         snapshot.products.some(
           (product) =>
             product.productId === id && product.contributionSupplementIds.includes(d3.supplementId)
@@ -368,10 +388,10 @@ describe("Slice 5 agent explanation safety and determinism", () => {
       ),
       false
     );
-    const magRow = (recommended.coverage ?? []).find((row) => row.supplementId === mag.supplementId);
+    const magRow = (published.coverage ?? []).find((row) => row.supplementId === mag.supplementId);
     if (magRow?.status === "optional_omitted") {
       assert.equal(
-        recommended.productIds?.includes(snapshot.products[1]!.productId),
+        published.basket?.some((item) => item.productId === snapshot.products[1]!.productId),
         false
       );
     }
@@ -466,7 +486,7 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     const option = (first.published.options ?? [])[0];
     assert.ok(option);
     assert.equal(typeof option.economics?.cash90DayMinor, "number");
-    assert.ok((option.productIds ?? []).length >= 1);
+    assert.ok((first.published.basket?.length ?? 0) >= 1);
     assert.ok(option.role);
   });
 
@@ -497,8 +517,8 @@ describe("Slice 5 agent explanation safety and determinism", () => {
       )
     });
     assert.deepEqual(
-      (grams.published.options ?? []).map((item) => item.productIds),
-      (milligrams.published.options ?? []).map((item) => item.productIds)
+      grams.options.map((item) => item.basket.map((line) => line.productId)),
+      milligrams.options.map((item) => item.basket.map((line) => line.productId))
     );
     assert.deepEqual(
       (grams.published.options ?? []).map((item) => item.role),
@@ -523,45 +543,23 @@ describe("Slice 5 agent explanation safety and determinism", () => {
   it("DET-01.E compare fails when price product quantity role savings leftover or safety changes", () => {
     const snapshot = sampleValueSnapshot();
     const published = publishPlan(snapshot, intentState(snapshot)).published;
-    const base = oracleCanonicalValue(published);
-    const mutated = {
-      ...base,
-      options: base.options.map((item, index) =>
-        index === 0 ? { ...item, cash90DayMinor: (item.cash90DayMinor ?? 0) + 1 } : item
-      )
-    };
-    assert.notEqual(canonicalHash(base), canonicalHash(mutated));
-    assert.notEqual(
-      canonicalHash(base),
-      canonicalHash({
-        ...base,
-        options: base.options.map((item, index) =>
-          index === 0 ? { ...item, productIds: [...item.productIds, "prd_mutated"] } : item
-        )
-      })
-    );
-    assert.notEqual(
-      canonicalHash(base),
-      canonicalHash({
-        ...base,
-        options: base.options.map((item, index) =>
-          index === 0 ? { ...item, role: "mutated-role" } : item
-        )
-      })
-    );
-    assert.notEqual(
-      canonicalHash(base),
-      canonicalHash({
-        ...base,
-        leftovers: [...base.leftovers, { name: "mutated" }]
-      })
-    );
-    assert.notEqual(
-      canonicalHash(base),
-      canonicalHash({
-        ...base,
-        safety: [...base.safety, { action: "block", code: "mutated" }]
-      })
-    );
+    const baseline = oracleCanonicalHash(published);
+    assert.ok(published.basket?.length);
+    assert.ok(published.options?.length);
+    const differs = (changed: OraclePublishedPlan) => assert.notEqual(oracleCanonicalHash(changed), baseline);
+    for (const field of ["quantity", "unitPriceMinor", "lineTotalMinor"] as const) {
+      differs({ ...published, basket: published.basket.map((line, index) =>
+        index === 0 ? { ...line, [field]: line[field] + 1 } : line) });
+    }
+    differs({ ...published, basket: published.basket.map((line, index) =>
+      index === 0 ? { ...line, productId: "prd_mutated" } : line) });
+    differs({ ...published, options: published.options.map((option, index) =>
+      index === 0 ? { ...option, role: "mutated-role" } : option) });
+    for (const field of ["cash90DayMinor", "savings90DayMinor"] as const) {
+      differs({ ...published, options: published.options.map((option, index) =>
+        index === 0 ? { ...option, economics: { ...option.economics, [field]: (option.economics?.[field] ?? 0) + 1 } } : option) });
+    }
+    differs({ ...published, leftovers: [...(published.leftovers ?? []), { name: "mutated" }] });
+    differs({ ...published, safetyGuidance: [...(published.safetyGuidance ?? []), { action: "block", code: "mutated" }] });
   });
 });

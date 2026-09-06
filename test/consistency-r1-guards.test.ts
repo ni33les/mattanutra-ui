@@ -170,8 +170,9 @@ describe("consistency r1 regression guards", () => {
 
     assert.match(
       planService,
-      /hasFullRequest\(input\.payload\) \|\| !input\.payload\.planHandle/
+      /const loadLiveCatalogue\s*=\s*!input\.matchPort && !input\.payload\.planHandle/
     );
+    assert.match(planService, /restoreCataloguePin\(\s*pinnedSnapshotIdFromResult\(prepared\.previous\)/);
     assert.match(planService, /ensureCatalogueSnapshot\(/);
     assert.doesNotMatch(planService, /fixtureSnapshot\(/);
     assert.doesNotMatch(planService, /FIXTURE_SUPPLEMENTS/);
