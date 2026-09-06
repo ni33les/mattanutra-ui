@@ -1,0 +1,178 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
+import { expect, test, type Page } from "@playwright/test";
+const execute = promisify(execFile);
+const databaseUrl = process.env.TEST_DB_URL;
+test.skip(!databaseUrl, "Requires the isolated PostgreSQL funnel fixture database and matching app server");
+test.setTimeout(90_000);
+async function fixture(input: Record<string, unknown>) {
+  const { stdout } = await execute(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./test/helpers/offline-network.mjs", "test/helpers/web-funnel-fixture.ts", JSON.stringify(input)], {
+    env: { ...process.env, TEST_DB_URL: databaseUrl }, maxBuffer: 1024 * 1024
+  });
+  return JSON.parse(stdout.split("\n").find(line => line.startsWith("FIXTURE:"))!.slice(8));
+}
+async function fill(page: Page) {
+  await expect(page.getByTestId("questionnaire-welcome")).toBeVisible();
+  const captured = page.waitForResponse(r => /\/api\/assessment$/.test(r.url()) && r.request().method() === "POST");
+  await page.getByTestId("dev-fill-questionnaire").click();
+  const response = await captured;
+  expect(response.status()).toBe(200);
+  return response.json();
+}
+test.beforeEach(async ({ context, baseURL }) => {
+  expect(new URL(baseURL!).hostname).toBe("127.0.0.1");
+  // Block all external browser traffic, including third-party payments and analytics.
+  await context.route("**/*", route => {
+    const url = new URL(route.request().url());
+    return ["127.0.0.1", "localhost"].includes(url.hostname) ? route.continue() : route.abort();
+  });
+});
+
+test("fresh browser resumes server answers; unrelated drafts and previous contact are ignored", async ({ page }) => {
+  const resumed = await fixture({ action: "resume" });
+  await page.addInitScript(() => {
+    localStorage.setItem("mn_healthscore_delivery_email", "previous@funnel-fixture.test");
+    localStorage.setItem("mn_state_v6_en", JSON.stringify({ answers: { firstName: "Wrong Visitor" } }));
+    localStorage.setItem("mn-questionnaire:v1:unrelated", JSON.stringify({ answers: { firstName: "Wrong Visitor" } }));
+  });
+  await page.goto(`/en/nutrition/quiz?resume=${resumed.token}&source=fixture&selectedPlan=precision`);
+  await expect(page.getByTestId("chat-questionnaire")).toBeVisible();
+  const drafts = await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("mn-questionnaire:v1:")).map(k => JSON.parse(localStorage.getItem(k)!)));
+  const current = drafts.find(d => d.state?.answers?.firstName === "Resume Fixture");
+  expect(current.contactEmail).toBe("resume@funnel-fixture.test");
+  expect(current.state.planId).toBe(resumed.planId);
+  const zhLink = page.locator('.mn-language-switcher a[href^="/zh-CN/"]');
+  expect(await zhLink.getAttribute("href")).toContain(`resume=${resumed.token}`);
+  expect(await zhLink.getAttribute("href")).toContain("selectedPlan=precision");
+  await zhLink.click();
+  await expect(page.getByTestId("chat-questionnaire")).toBeVisible();
+  await page.goto("/en/nutrition/quiz");
+  const captured = await fill(page);
+  const stored = await fixture({ action: "state", planId: captured.planId });
+  expect(stored.contact_email).toBeNull();
+  expect(stored.answers.firstName).not.toBe("Wrong Visitor");
+});
+
+test("capture failure, persistence failure, reload and analysis retry remain separate", async ({ page }) => {
+  let captures = 0;
+  await page.route("**/api/assessment", route => {
+    if (route.request().method() !== "POST") return route.continue();
+    captures += 1;
+    return captures === 1 ? route.fulfill({ status: 500, json: { message: "fixture capture interruption" } }) : route.continue();
+  });
+  await page.goto("/en/nutrition/quiz");
+  await page.getByTestId("dev-fill-questionnaire").click();
+  await expect(page.getByTestId("retry-capture")).toBeVisible();
+  await expect(page.getByTestId("retry-analysis")).toHaveCount(0);
+  await page.locator('[data-testid="calc-emailbox"] input').fill("sink@funnel-fixture.test");
+  await page.locator('[data-testid="calc-emailbox"] button').click();
+  await expect(page.getByTestId("calc-fallback").getByRole("alert")).toBeVisible();
+  const capturedResponse = page.waitForResponse(r => /\/api\/assessment$/.test(r.url()) && r.status() === 200);
+  await page.getByTestId("retry-capture").click();
+  const captured = await (await capturedResponse).json();
+  // Reload after the successful receipt, before AI advice is ready: no new capture request.
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(k => k.startsWith("mn-questionnaire:v1:") && JSON.parse(localStorage.getItem(k)!).captured))).toBe(true);
+  await page.reload();
+  await expect(page.getByTestId("questionnaire-calculating")).toBeVisible();
+  await page.route("**/journey?view=copy*", route => route.fulfill({ json: { copyReady: false, copyFailed: true } }));
+  await expect(page.getByTestId("retry-analysis")).toBeVisible();
+  await expect(page.getByTestId("retry-capture")).toHaveCount(0);
+  expect(captures).toBe(2);
+  await page.route("**/healthscore-delivery", route => route.fulfill({ status: 500, json: { message: "fixture delivery persistence failure" } }));
+  await page.locator('[data-testid="calc-emailbox"] input').fill("sink@funnel-fixture.test");
+  await page.locator('[data-testid="calc-emailbox"] button').click();
+  await expect(page.getByTestId("calc-fallback").getByRole("alert")).toContainText("fixture delivery persistence failure");
+  await page.unroute("**/healthscore-delivery");
+  await page.locator('[data-testid="calc-emailbox"] button').click();
+  await expect(page.getByTestId("calc-emailbox")).toHaveCount(0);
+  await fixture({ action: "copy", planId: captured.planId });
+  await page.unroute("**/journey?view=copy*");
+  await page.getByTestId("retry-analysis").click();
+  expect(captures).toBe(2);
+  await expect(page).toHaveURL(new RegExp(`healthscore\\?plan=${captured.planId}`));
+  await expect(page.getByTestId("reveal-hero-name")).toBeVisible();
+});
+
+for (const locale of ["en", "th", "zh-CN"]) {
+  test(`ordinary checkout and pending reveal recover in ${locale}`, async ({ page }) => {
+    await page.goto(`/${locale}/nutrition/quiz`);
+    const capture = await fill(page);
+    await fixture({ action: "copy", locale, planId: capture.planId });
+    await expect(page).toHaveURL(new RegExp(`healthscore\\?plan=${capture.planId}`), { timeout: 15_000 });
+    await expect(page.getByTestId("reveal-hero-name")).toBeVisible();
+    await page.goto(`/${locale}/nutrition/payment/checkout?plan=precision&planId=${capture.planId}&source=healthscore`);
+    const switchHref = await page.locator('.mn-language-switcher a[href^="/th/"]').getAttribute("href");
+    expect(switchHref).toContain(`planId=${capture.planId}`);
+    expect(switchHref).toContain("plan=precision");
+    await page.locator('form[action="/api/payments/mock-pay"] button').click();
+    await expect(page).toHaveURL(/nutrition\/progress/);
+    await page.goto(`/${locale}/nutrition/reveal?plan=${capture.planId}`);
+    await expect(page).toHaveURL(/nutrition\/progress/);
+    const responses = await Promise.all([0, 1].map(products => page.request.get(`/api/assessment/${capture.planId}/formulation?locale=${locale}&products=${products}`)));
+    expect(responses.map(r => r.status())).toEqual([202, 202]);
+    await fixture({ action: "fulfill", planId: capture.planId });
+    await fixture({ action: "ready", locale, planId: capture.planId });
+    await expect(page.locator(".mn-reveal-final")).toBeVisible({ timeout: 30_000 });
+    const persisted = await fixture({ action: "state", planId: capture.planId });
+    expect(persisted.payments).toBe(1); expect(persisted.revenues).toBe(1);
+  });
+  test(`prepaid reservation survives resume and language context in ${locale}`, async ({ page }) => {
+    const paymentResponse = await page.request.post("/api/payments/mock-pay", { data: { locale, plan: "precision", sourceSurface: "landing", attemptId: randomUUID() } });
+    expect(paymentResponse.ok()).toBe(true);
+    const payment = await paymentResponse.json();
+    const paymentId = payment.payment.id;
+    const resume = await fixture({ action: "resume", locale, paymentId });
+    await page.goto(`/${locale}/nutrition/quiz?resume=${resume.token}&payment=${paymentId}&source=landing&selectedPlan=precision`);
+    const href = await page.locator('.mn-language-switcher a[href^="/en/"]').getAttribute("href");
+    expect(href).toContain(`payment=${paymentId}`); expect(href).toContain(`resume=${resume.token}`);
+    // Resume state arrives in a new browser, then the DEV fixture CTA completes the real capture transport.
+    const captureResponse = page.waitForResponse(r => r.url().includes(`/api/assessment/${resume.planId}`) && r.request().method() === "PATCH");
+    await page.getByTestId("dev-fill-questionnaire").click();
+    expect((await captureResponse).status()).toBe(200);
+    expect((await fixture({ action: "state", planId: resume.planId })).payments).toBe(1);
+    await fixture({ action: "copy", locale, planId: resume.planId });
+    await fixture({ action: "fulfill", paymentId });
+    await fixture({ action: "ready", locale, planId: resume.planId });
+    await page.goto(`/${locale}/nutrition/reveal?plan=${resume.planId}`);
+    await expect(page.locator(".mn-reveal-final")).toBeVisible({ timeout: 30_000 });
+    const email = await fixture({ action: "email", locale, planId: resume.planId });
+    expect(email.sink).toHaveLength(1);
+    expect(JSON.stringify(email.sink)).not.toContain("Resume Fixture");
+  });
+}
+
+test("progress and reveal expose working recovery actions without another capture or charge", async ({ page }) => {
+  const capture = await fixture({ action: "capture" });
+  await fixture({ action: "copy", planId: capture.planId });
+  const payment = await page.request.post("/api/payments/mock-pay", { data: { locale: "en", plan: "precision", planId: capture.planId, sourceSurface: "healthscore", attemptId: randomUUID() } });
+  expect(payment.ok()).toBe(true);
+  await fixture({ action: "fulfill", planId: capture.planId });
+  let journeyFailed = true, fullFailed = true, recoveries = 0, refreshes = 0;
+  page.on("request", request => {
+    if (request.url().endsWith("/journey/retry")) recoveries += 1;
+    if (request.url().endsWith("/formulation/refresh")) refreshes += 1;
+  });
+  await page.route("**/journey?locale=*", async route => {
+    const response = await route.fetch(); const state = await response.json();
+    await route.fulfill({ json: journeyFailed ? { ...state, failed: true, readyForReveal: false } : state });
+  });
+  await page.route("**/formulation?locale=*&products=1", route => fullFailed
+    ? route.fulfill({ status: 404, json: { message: "fixture reveal read failure" } }) : route.continue());
+  await page.goto(`/en/nutrition/reveal?plan=${capture.planId}`);
+  await expect(page.getByTestId("journey-progress-retry")).toBeVisible();
+  await page.getByTestId("journey-progress-retry").click();
+  await expect.poll(() => recoveries).toBe(2);
+  await fixture({ action: "ready", planId: capture.planId });
+  journeyFailed = false;
+  await page.getByTestId("journey-progress-retry").click();
+  await expect(page.getByTestId("formulation-retry")).toBeVisible({ timeout: 15_000 });
+  fullFailed = false;
+  await page.getByTestId("formulation-retry").click();
+  await expect(page.locator(".mn-reveal-final")).toBeVisible();
+  expect(refreshes).toBeGreaterThanOrEqual(2);
+  const stored = await fixture({ action: "state", planId: capture.planId });
+  expect(stored.payments).toBe(1); expect(stored.revenues).toBe(1); expect(Number(stored.input_revision)).toBe(1);
+  await page.goto(`/en/nutrition/quiz?plan=${capture.planId}&reassessment=1`);
+  await expect(page.locator(".mn-chat-q__review-edit").first()).toBeVisible();
+});
