@@ -662,6 +662,12 @@ export type PlanResult = Readonly<{
     tieBreak: readonly string[];
   }>;
   questions: readonly PlanQuestion[];
+  /** Original, unnormalized input retained only while a new plan is processing. */
+  pendingInput?: Readonly<{
+    request: PlanRequest;
+    answers: readonly PlanAnswer[];
+    safetyAcknowledgement: SafetyAcknowledgement | null;
+  }>;
   researchVersion?: string;
   requestSnapshot: CanonicalPlanState;
   safetyGuidance: readonly SafetyGuidance[];

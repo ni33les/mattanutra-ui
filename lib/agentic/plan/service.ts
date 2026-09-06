@@ -1,4 +1,5 @@
 import { requestLifetime } from "@/lib/request-lifetime";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { Locale } from "@/lib/i18n";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import {
@@ -13,8 +14,7 @@ import {
   beginIdempotency,
   canonicalRequestHash,
   commitIdempotency,
-  isIdempotencyRace,
-  overwriteIdempotency
+  isIdempotencyRace
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
@@ -114,27 +114,45 @@ export function snapshotPlanInflightForTests() {
   };
 }
 
-export function releasePlanCreateInflight(idempotencyKey: string) {
-  for (const key of inflightPlanIdempotency.keys()) {
-    if (key.endsWith(`\0${idempotencyKey}`)) {
-      inflightPlanIdempotency.delete(key);
-    }
-  }
-}
-
 export function resetPlanCreateInflightForTests() {
   inflightPlanIdempotency.clear();
   inflightPlanMatches.clear();
 }
 
-const inflightPlanMatches = new Map<
-  string,
-  Promise<PlanToolSuccess | AgenticErrorResult>
->();
-const inflightPlanIdempotency = new Map<
-  string,
-  { hash: string; work: Promise<PlanToolSuccess | AgenticErrorResult> }
->();
+type PlanAttempt = Readonly<{
+  correlationId: string;
+  signal?: AbortSignal;
+  releases: Set<() => void>;
+}>;
+type PlanWork = Readonly<{
+  attempt: PlanAttempt;
+  work: Promise<PlanToolSuccess | AgenticErrorResult>;
+}>;
+const planAttempts = new AsyncLocalStorage<PlanAttempt>();
+const inflightPlanMatches = new Map<string, PlanWork>();
+const inflightPlanIdempotency = new Map<string, PlanWork & { hash: string }>();
+
+function attemptStopped(attempt: PlanAttempt) {
+  return attempt.signal ? attempt.signal.aborted : Boolean(attempt.correlationId && deadlineExceeded(attempt.correlationId));
+}
+
+function releaseAttempt(attempt: PlanAttempt | undefined) {
+  for (const release of attempt?.releases ?? []) release();
+}
+
+function trackPlanWork<T extends PlanWork>(map: Map<string, T>, key: string, entry: T) {
+  const release = () => {
+    // A cancelled attempt may finish after its replacement has already started.
+    if (map.get(key) === entry) map.delete(key);
+  };
+  map.set(key, entry);
+  entry.attempt.releases.add(release);
+  if (attemptStopped(entry.attempt)) release();
+  void entry.work.finally(() => {
+    release();
+    entry.attempt.releases.delete(release);
+  }).catch(() => undefined);
+}
 
 function planCorrelationId(idempotencyKey?: string) {
   return requestLifetime()?.correlationId ?? (idempotencyKey ? `plan:${idempotencyKey}` : "");
@@ -150,40 +168,24 @@ function logicalPlanQueryCounts(namespace: string) {
   };
 }
 
-function releasePlanInflight(
-  ownerScope: string,
-  idempotencyKey: string | undefined,
-  planId?: string,
-  revision?: number
-) {
-  if (idempotencyKey) {
-    inflightPlanIdempotency.delete(`${ownerScope}\0${idempotencyKey}`);
-  }
-  if (planId && revision !== undefined) {
-    inflightPlanMatches.delete(matchInflightKey(planId, revision));
-  }
-}
-
 async function stopIfPlanDeadline(
-  idempotencyKey: string | undefined,
-  ownerScope: string,
-  planId?: string,
-  revision?: number
+  idempotencyKey: string | undefined
 ): Promise<AgenticErrorResult | null> {
   const correlation = planCorrelationId(idempotencyKey);
   if (!correlation) {
     return null;
   }
   try {
+    planAttempts.getStore()?.signal?.throwIfAborted();
     throwIfAborted(correlation);
   } catch {
-    releasePlanInflight(ownerScope, idempotencyKey, planId, revision);
+    releaseAttempt(planAttempts.getStore());
     return serviceDeadlineError(correlation);
   }
   if (!deadlineExceeded(correlation)) {
     return null;
   }
-  releasePlanInflight(ownerScope, idempotencyKey, planId, revision);
+  releaseAttempt(planAttempts.getStore());
   return serviceDeadlineError(correlation);
 }
 
@@ -781,6 +783,7 @@ function draftStateFromPayload(input: Readonly<{
 
 function processingResult(input: Readonly<{
   locale: Locale;
+  pendingInput?: PlanResult["pendingInput"];
   previous: PlanResult | null;
   state: CanonicalPlanState;
 }>): PlanResult {
@@ -824,6 +827,7 @@ function processingResult(input: Readonly<{
       ]
     },
     questions: input.previous?.questions ?? [],
+    ...(input.pendingInput ? { pendingInput: input.pendingInput } : {}),
     requestSnapshot: pinnedState,
     safetyGuidance: input.previous?.safetyGuidance ?? [],
     selected,
@@ -868,15 +872,12 @@ async function commitTerminalIdempotency(input: Readonly<{
   );
 
   if (existing) {
-    await overwriteIdempotency({
-      key: input.key,
-      now: input.now,
-      operation: "plan",
-      ownerScope: input.ownerScope,
-      payload: input.payload,
+    // A handle poll may complete a create. Keep the original request identity so
+    // replaying that create after completion still resolves to the same resource.
+    await input.store.updateIdempotency({
+      ...existing,
       resourceIds: { planId: input.planId },
-      response: input.response,
-      store: input.store
+      responseJson: JSON.stringify(input.response)
     });
     return;
   }
@@ -933,21 +934,21 @@ export async function planTool(input: Readonly<{
     if (existing && existing.hash !== canonicalRequestHash(input.payload)) {
       return businessError({ fieldPath: "idempotencyKey", message: "This key is in use with a different payload.", reasonCode: "idempotency_conflict" });
     }
-    const planCorrelation = planCorrelationId(input.payload.idempotencyKey);
-    if (existing && planCorrelation) {
-      const { deadlineExceeded } = await import("@/lib/agentic/qa/service-clock");
-      if (deadlineExceeded(planCorrelation)) {
-        inflightPlanIdempotency.delete(inflightKey);
-      } else {
-        return existing.work;
-      }
-    } else if (existing) {
-      return existing.work;
+    if (existing) {
+      if (!attemptStopped(existing.attempt)) return existing.work;
+      releaseAttempt(existing.attempt);
     }
   }
 
-  const work = executePlanTool(input).then(async (result) => {
-    const stopped = await stopIfPlanDeadline(input.payload.idempotencyKey, ownerScope);
+  const attempt: PlanAttempt = {
+    correlationId: planCorrelationId(input.payload.idempotencyKey),
+    signal: requestLifetime()?.signal,
+    releases: new Set()
+  };
+  const release = () => releaseAttempt(attempt);
+  attempt.signal?.addEventListener("abort", release, { once: true });
+  const work = planAttempts.run(attempt, () => executePlanTool(input).then(async (result) => {
+    const stopped = await stopIfPlanDeadline(input.payload.idempotencyKey);
     if (stopped) {
       return stopped;
     }
@@ -963,16 +964,12 @@ export async function planTool(input: Readonly<{
       }
     }
     return result;
-  });
+  }).finally(() => {
+    release();
+    attempt.signal?.removeEventListener("abort", release);
+  }));
   if (inflightKey) {
-    inflightPlanIdempotency.set(inflightKey, { hash: canonicalRequestHash(input.payload), work });
-    void work
-      .finally(() => {
-        if (inflightPlanIdempotency.get(inflightKey)?.work === work) {
-          inflightPlanIdempotency.delete(inflightKey);
-        }
-      })
-      .catch(() => undefined);
+    trackPlanWork(inflightPlanIdempotency, inflightKey, { hash: canonicalRequestHash(input.payload), attempt, work });
   }
   return work;
 }
@@ -1034,7 +1031,7 @@ async function executePlanTool(input: Readonly<{
       await claimGate;
     }
   }
-  const claimedDeadline = await stopIfPlanDeadline(input.payload.idempotencyKey, ownerScope);
+  const claimedDeadline = await stopIfPlanDeadline(input.payload.idempotencyKey);
   if (claimedDeadline) {
     return claimedDeadline;
   }
@@ -1248,7 +1245,10 @@ async function executePlanTool(input: Readonly<{
         ...(selectOptionId ? { pinnedOptionId: selectOptionId } : {})
       }
     });
-    const processing = processingResult({ locale, previous, state });
+    const pendingInput = hasFullRequest(payload)
+      ? { request: structuredClone(payload.request as PlanRequest), answers, safetyAcknowledgement: ack }
+      : previous?.pendingInput;
+    const processing = processingResult({ locale, previous, state, pendingInput });
 
     const persistProcessing = !resume && !(
       !hasFullRequest(payload) &&
@@ -1430,7 +1430,8 @@ function runPlanMatch(
   const existing = inflightPlanMatches.get(key);
 
   if (existing) {
-    return existing;
+    if (!attemptStopped(existing.attempt)) return existing.work;
+    releaseAttempt(existing.attempt);
   }
 
   const work = completePreparedPlan(
@@ -1438,10 +1439,8 @@ function runPlanMatch(
     input,
     loadLiveCatalogue,
     matchStartedAt
-  ).finally(() => {
-    inflightPlanMatches.delete(key);
-  });
-  inflightPlanMatches.set(key, work);
+  );
+  trackPlanWork(inflightPlanMatches, key, { attempt: planAttempts.getStore()!, work });
   return work;
 }
 
@@ -1506,30 +1505,27 @@ async function completePreparedPlan(
         : [])
     ]);
   }
-  const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
-  const gatedDeadline = await stopIfPlanDeadline(
-    input.payload.idempotencyKey,
-    ownerScope,
-    prepared.planId,
-    prepared.revision
-  );
+  const gatedDeadline = await stopIfPlanDeadline(input.payload.idempotencyKey);
   if (gatedDeadline) {
     return gatedDeadline;
-  }
-  if (planCorrelation && deadlineExceeded(planCorrelation)) {
-    if (input.payload.idempotencyKey) {
-      inflightPlanIdempotency.delete(`${ownerScope}\0${input.payload.idempotencyKey}`);
-    }
-    inflightPlanMatches.delete(matchInflightKey(prepared.planId, prepared.revision));
-    return serviceDeadlineError(planCorrelation);
   }
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
   if (!isolated && matcherSafetyCeilings().length < 1) {
     await refreshAdminSafetyCeilings();
   }
 
-  const answers = prepared.answers;
-  const ack = prepared.ack;
+  const pendingInput = prepared.resume ? prepared.processing.pendingInput : undefined;
+  const replacingPendingRequest = prepared.resume && Boolean(input.payload.planHandle) && hasFullRequest(input.payload);
+  const verifiedLegacyRequest = prepared.resume && !pendingInput && hasFullRequest(input.payload) &&
+    input.payload.idempotencyKey && !input.payload.planHandle
+    ? input.payload.request as PlanRequest
+    : undefined;
+  const answers = [
+    ...(replacingPendingRequest ? [] : pendingInput?.answers ?? (verifiedLegacyRequest ? incomingAnswers(input.payload) : [])),
+    ...prepared.answers
+  ];
+  const ack = prepared.ack ?? pendingInput?.safetyAcknowledgement ??
+    (verifiedLegacyRequest ? incomingAck(input.payload) : null);
   const selectOptionId = prepared.selectOptionId;
   const previous = prepared.previous;
   const revision = prepared.revision;
@@ -1643,9 +1639,19 @@ async function completePreparedPlan(
         }
       : merged;
   } else if (prepared.resume || hasFullRequest(input.payload)) {
+    // Legacy processing rows lack pendingInput. Only a create whose original
+    // payload passed the durable idempotency check can supply that missing input.
+    // A name-as-ID placeholder is ambiguous and must never become a trusted ID.
+    if (prepared.resume && !pendingInput && !verifiedLegacyRequest &&
+      [...prepared.state.targets, ...prepared.state.currentSupplements].some(item => item.supplementId === item.name)) {
+      return businessError({
+        message: "Retry this unfinished plan with the original request and idempotency key.",
+        reasonCode: "temporarily_unavailable", retryable: true
+      });
+    }
     const normalized = await normalizePlanRequest({
       config: input.config,
-      request: requestFromState(prepared.state),
+      request: pendingInput?.request ?? verifiedLegacyRequest ?? requestFromState(prepared.state),
       snapshot
     });
 
@@ -1796,6 +1802,7 @@ async function persistTerminalPlan(input: Readonly<{
         nextActions: ["reload_plan"], reasonCode: "stale_revision"
       });
     }
+    planAttempts.getStore()?.signal?.throwIfAborted();
     throwIfAborted(planCorrelationId(key));
     let result = input.result;
     if (planCompactApplicable(result.status) && !result.evidenceHandle) {
@@ -1818,6 +1825,7 @@ async function persistTerminalPlan(input: Readonly<{
         payload: input.input.payload, planId: input.planId, response: success, store
       });
     }
+    planAttempts.getStore()?.signal?.throwIfAborted();
     throwIfAborted(planCorrelationId(key));
     committedResult = result;
     return success;

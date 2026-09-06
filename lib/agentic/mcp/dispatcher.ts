@@ -8,7 +8,7 @@ import {
 import { createLogger } from "@/lib/logger";
 import { infoTool } from "@/lib/agentic/info";
 import { withLivePlanRequest } from "@/lib/agentic/plan/warm-dev";
-import { planTool, releasePlanCreateInflight } from "@/lib/agentic/plan/service";
+import { planTool } from "@/lib/agentic/plan/service";
 import { recordRequestStage, runObservedRequest } from "@/lib/agentic/qa/request-trace";
 import { executeTool } from "@/lib/agentic/commerce/execute";
 import { orderTool } from "@/lib/agentic/commerce/order";
@@ -204,14 +204,6 @@ async function callTool(
           await recordRequestStage(`plan:${planKey}`, "request_released");
           return created;
         });
-        if (
-          value &&
-          typeof value === "object" &&
-          "ok" in value &&
-          (value as { ok?: unknown }).ok === false
-        ) {
-          releasePlanCreateInflight(planKey);
-        }
         break;
       }
       case "execute":
