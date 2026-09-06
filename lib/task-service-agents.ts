@@ -522,6 +522,9 @@ async function releaseOfflineWorkerReservations(
         and (${input.agentId}::uuid is null or task_reservations.agent_id = ${input.agentId}::uuid)
         and (${input.membershipId}::uuid is null or task_reservations.membership_id = ${input.membershipId}::uuid)
         and tasks.status in ('reserved', 'running')
+      order by tasks.id
+      limit 100
+      for update of tasks skip locked
     ),
     released_reservations as (
       update public.task_reservations set

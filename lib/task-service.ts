@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { toJsonValue } from "@/lib/assessment-store";
-import { getSql, getWorkerSql } from "@/lib/db";
+import { getSql, getWorkerSql, withDatabaseTransaction } from "@/lib/db";
 import {
   buildTaskSequenceDependencyPlan,
   normalizeCapabilities,
@@ -126,16 +126,6 @@ const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT = 50;
 const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT_MAX = 100;
 const DEPENDENCY_BOOTSTRAP_DELAY_MS = 60_000;
 const RESERVE_CLAIM_ATTEMPTS = 3;
-let claimQueuedTaskTail: Promise<unknown> = Promise.resolve();
-
-function withSingleQueuedTaskClaim<T>(work: () => Promise<T>) {
-  const run = claimQueuedTaskTail.then(work, work);
-  claimQueuedTaskTail = run.then(
-    () => undefined,
-    () => undefined
-  );
-  return run;
-}
 
 type Db = TaskServiceDb;
 type ActiveReservationRow = {
@@ -1140,6 +1130,25 @@ export async function assertActiveTaskReservation(
   return getActiveReservation(sql, input);
 }
 
+async function recoverOrphanedTaskClaims(sql: Db, batchLimit: number) {
+  const rows = await sql<Array<{id: string}>>`
+    with orphaned as (
+      select tasks.id from public.tasks
+      where tasks.status in ('reserved', 'running')
+        and (tasks.lease_until is null or tasks.lease_until < now())
+        and not exists (select 1 from public.task_reservations r where r.task_id = tasks.id and r.status = 'active')
+      order by tasks.id limit ${batchLimit} for update of tasks skip locked
+    )
+    update public.tasks set
+      status = case when attempts < max_attempts then 'queued' else 'needs_review' end,
+      reserved_by_agent_id = null, lease_until = null, updated_at = now(),
+      error_message = 'Recovered an expired task claim without an active reservation.'
+    from orphaned where tasks.id = orphaned.id returning tasks.id
+  `;
+  if (rows.length) notifyTaskQueueChanged();
+  return rows.length;
+}
+
 export async function releaseExpiredReservations(
   input: ReleaseExpiredReservationsInput = {}
 ) {
@@ -1147,6 +1156,7 @@ export async function releaseExpiredReservations(
   const afterCommitEffects: TaskAfterCommitEffect[] = [];
   const batchLimit = normalizeExpiredReservationSweepLimit(input.batchLimit);
 
+  const recoveredOrphans = await recoverOrphanedTaskClaims(sql, batchLimit);
   const released = await claimExpiredReservationsBatch(sql, batchLimit);
 
   const releasedWorkerSessionIds = uniqueUuids(
@@ -1197,7 +1207,7 @@ export async function releaseExpiredReservations(
     taskId: null
   });
 
-  return released.length;
+  return released.length + recoveredOrphans;
 }
 
 async function claimExpiredReservationsBatch(
@@ -1238,7 +1248,7 @@ async function claimExpiredReservationsBatch(
 	        )
 	      order by task_reservations.lease_until asc
 	      limit ${batchLimit}
-	      for update of task_reservations skip locked
+	      for update of tasks skip locked
 	    ),
     released as (
       update public.task_reservations set
@@ -2089,67 +2099,26 @@ export async function reserveNextTask(
   let reserved: { reservationId: string; task: TaskRecord } | null = null;
   const requestedTaskId = uuidOrNull(input.taskId);
 
-  for (let attempt = 0; attempt < RESERVE_CLAIM_ATTEMPTS; attempt += 1) {
-    const claimed = requestedTaskId
-      ? await claimQueuedTaskById(sql, {
-          accessScope,
-          leaseSeconds,
-          taskId: requestedTaskId,
-          taskTypes
-        })
-      : await withSingleQueuedTaskClaim(() =>
-          claimQueuedTaskRow(sql, {
-            accessScope,
-            leaseSeconds,
-            mustRequireCapability,
-            reserveCapabilities,
-            skipTaskIds,
-            taskTypes
-          })
-        );
-
-    if (!claimed) {
-      break;
-    }
-
-    if (await claimedTaskIsBlocked(sql, claimed.id)) {
-      await releaseUncommittedClaim(sql, claimed.id);
-
-      if (requestedTaskId) {
-        break;
-      }
-
-      skipTaskIds.push(claimed.id);
-      continue;
-    }
-
-    const reservationId = randomUUID();
-
+  for (let attempt = 0; attempt < RESERVE_CLAIM_ATTEMPTS; attempt++) {
     try {
-      await confirmTaskReservation(sql, {
-        accessScope,
-        leaseSeconds,
-        registeredTaskTypes,
-        requestedTaskTypes,
-        reserveCapabilities,
-        reservationId,
-        task: claimed,
-        workerSessionId
+      reserved = await withDatabaseTransaction(sql, async tx => {
+        const claimed = requestedTaskId
+          ? await claimQueuedTaskById(tx, {accessScope, leaseSeconds, taskId: requestedTaskId, taskTypes})
+          : await claimQueuedTaskRow(tx, {accessScope, leaseSeconds, mustRequireCapability, reserveCapabilities, skipTaskIds, taskTypes});
+        if (!claimed) return null;
+        if (await claimedTaskIsBlocked(tx, claimed.id)) {
+          await releaseUncommittedClaim(tx, claimed.id);
+          skipTaskIds.push(claimed.id);
+          return null;
+        }
+        const reservationId = randomUUID();
+        await confirmTaskReservation(tx, {accessScope, leaseSeconds, registeredTaskTypes, requestedTaskTypes, reserveCapabilities, reservationId, task: claimed, workerSessionId});
+        return {reservationId, task: claimed};
       });
-      reserved = { reservationId, task: claimed };
-      break;
+      if (reserved || requestedTaskId) break;
     } catch (error) {
-      await releaseUncommittedClaim(sql, claimed.id);
-      skipTaskIds.push(claimed.id);
-
-      const code =
-        error && typeof error === "object" && "code" in error
-          ? String(error.code)
-          : "";
-
-      if (code !== "23505") {
-        throw error;
-      }
+      const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+      if (code !== "23505" && code !== "40P01") throw error;
     }
   }
 
@@ -2185,6 +2154,14 @@ export async function reserveNextTask(
   };
 }
 
+async function withTaskRowLock<T>(sql: postgres.Sql, taskId: string | null, work: (tx: postgres.Sql) => Promise<T>) {
+  if (!taskId) throw new Error("Task operation requires a valid taskId");
+  return withDatabaseTransaction(sql, async tx => {
+    await tx`select id from public.tasks where id = ${taskId}::uuid for update`;
+    return work(tx);
+  });
+}
+
 async function claimTaskCompletionApplication(
   sql: postgres.Sql,
   input: CompleteTaskInput
@@ -2212,7 +2189,7 @@ async function claimTaskCompletionApplication(
   }
 
   const requiresReservation = Boolean(reservationId || agentId || workerSessionId);
-  const rows = await sql<TaskReservationResultRow[]>`
+  const rows = await withTaskRowLock(sql, taskId, tx => tx<TaskReservationResultRow[]>`
     with active_reservation as (
       select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
@@ -2302,7 +2279,7 @@ async function claimTaskCompletionApplication(
     )
     select *
     from updated_task
-  `;
+  `);
   const row = rows[0];
 
   if (!row) {
@@ -2353,7 +2330,7 @@ async function finalizeTaskCompletion(
     throw new Error("Task completion requires a valid taskId");
   }
 
-  const rows = await sql<TaskReservationResultRow[]>`
+  const rows = await withTaskRowLock(sql, taskId, tx => tx<TaskReservationResultRow[]>`
     with active_reservation as (
       select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
@@ -2433,7 +2410,7 @@ async function finalizeTaskCompletion(
     )
     select *
     from updated_task
-  `;
+  `);
   const row = rows[0];
 
   if (!row) {
@@ -2456,58 +2433,55 @@ async function finalizeTaskCompletion(
 }
 
 export async function completeTask(input: CompleteTaskInput) {
+  for (const [name, value] of Object.entries({reservationId: input.reservationId, agentId: input.agentId, workerSessionId: input.workerSessionId})) {
+    if (value && !uuidOrNull(value)) throw new Error(`Task completion requires a valid ${name}`);
+  }
   const sql = getRequiredSql();
   const afterCommitEffects: TaskAfterCommitEffect[] = [];
-
   await ensureWorkerSessionSchema(sql);
 
-  const claim = await claimTaskCompletionApplication(sql, input);
-  let resultPayload: Record<string, unknown>;
-
+  let task: TaskRecord;
   try {
-    resultPayload = payloadRecord(
-      input.applyResult
+    task = await withTaskRowLock(sql, uuidOrNull(input.taskId), async tx => {
+      // A completed reservation is the durable replay marker. Check ownership
+      // before returning it, and never rerun the applier on a lost-response retry.
+      const completed = await tx<TaskRow[]>`
+        select tasks.* from public.tasks
+        where tasks.id = ${input.taskId}::uuid and tasks.status = 'completed'
+          and (
+            ${!(input.reservationId || scopeAgentId(input) || input.workerSessionId)}
+            or exists (
+              select 1 from public.task_reservations r where r.task_id = tasks.id and r.status = 'completed'
+                and (${uuidOrNull(input.reservationId)}::uuid is null or r.id = ${uuidOrNull(input.reservationId)}::uuid)
+                and (${scopeAgentId(input)}::uuid is null or r.agent_id = ${scopeAgentId(input)}::uuid)
+                and (${scopeMembershipId(input)}::uuid is null or r.membership_id = ${scopeMembershipId(input)}::uuid)
+                and (${uuidOrNull(input.workerSessionId)}::uuid is null or r.worker_session_id = ${uuidOrNull(input.workerSessionId)}::uuid)
+            )
+          )
+      `;
+      if (completed[0]) return mapTask(completed[0]);
+      const claim = await claimTaskCompletionApplication(tx, input);
+      // Appliers persist results/queue work here; external effects are deferred.
+      const resultPayload = payloadRecord(input.applyResult
         ? await input.applyResult({
-            afterCommit: (effect) => afterCommitEffects.push(effect),
+            afterCommit: effect => afterCommitEffects.push(effect),
             agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
             reservationId: claim.activeReservation?.id ?? input.reservationId,
-            resultPayload: input.resultPayload ?? {},
-            sql,
-            task: claim.task
+            resultPayload: input.resultPayload ?? {}, sql: tx, task: claim.task
           })
-        : (input.resultPayload ?? {})
-    );
+        : (input.resultPayload ?? {}));
+      return finalizeTaskCompletion(tx, {claim, completionInput: input, resultPayload});
+    });
   } catch (error) {
     await addTaskEvent({
-      agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
-      eventPayload: {
-        error: errorMessage(error, "Task completion side effect failed."),
-        reservationId: claim.activeReservation?.id,
-        stage: "completion_result_application"
-      },
-      eventStatus: "failed",
-      eventType: "task_completion_result_apply_failed",
-      severity: "high",
-      taskId: claim.task.id
-    });
-    notifyTaskQueueChanged();
+      agentId: input.accessScope?.agentId ?? input.agentId,
+      eventPayload: {error: errorMessage(error, "Task completion failed."), reservationId: input.reservationId, stage: "completion_result_application"},
+      eventStatus: "failed", eventType: "task_completion_result_apply_failed", severity: "high", taskId: input.taskId
+    }).catch(() => undefined);
     throw error;
   }
-
-  const task = await finalizeTaskCompletion(sql, {
-    claim,
-    completionInput: input,
-    resultPayload
-  });
-
   notifyTaskQueueChanged();
-
-  await runTaskAfterCommitEffects({
-    agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
-    effects: afterCommitEffects,
-    taskId: task.id
-  });
-
+  await runTaskAfterCommitEffects({agentId: input.accessScope?.agentId ?? input.agentId, effects: afterCommitEffects, taskId: task.id});
   return task;
 }
 
@@ -2524,7 +2498,7 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
   }
 
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
-  const rows = await sql<TaskReservationResultRow[]>`
+  const rows = await withTaskRowLock(sql, taskId, tx => tx<TaskReservationResultRow[]>`
     with active_reservation as (
       select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
@@ -2576,7 +2550,7 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
     )
     select *
     from updated_task
-  `;
+  `);
   const row = rows[0];
 
   if (!row) {
@@ -2603,7 +2577,7 @@ export async function reportTaskProgress(input: ProgressTaskInput) {
 
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
   const resultPayload = payloadRecord(input.resultPayload ?? {});
-  const rows = await sql<TaskReservationResultRow[]>`
+  const rows = await withTaskRowLock(sql, taskId, tx => tx<TaskReservationResultRow[]>`
     with active_reservation as (
       select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
@@ -2657,7 +2631,7 @@ export async function reportTaskProgress(input: ProgressTaskInput) {
     )
     select *
     from updated_task
-  `;
+  `);
   const row = rows[0];
 
   if (!row) {
@@ -2697,7 +2671,7 @@ async function claimTaskFailureApplication(
   }
 
   const requiresReservation = Boolean(reservationId || agentId || workerSessionId);
-  const rows = await sql<TaskReservationResultRow[]>`
+  const rows = await withTaskRowLock(sql, taskId, tx => tx<TaskReservationResultRow[]>`
     with active_reservation as (
       select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
@@ -2787,7 +2761,7 @@ async function claimTaskFailureApplication(
     )
     select *
     from updated_task
-  `;
+  `);
   const row = rows[0];
 
   if (!row) {
@@ -2838,7 +2812,7 @@ async function finalizeTaskFailure(
     throw new Error("Task failure requires a valid taskId");
   }
 
-  const rows = await sql<TaskReservationResultRow[]>`
+  const rows = await withTaskRowLock(sql, taskId, tx => tx<TaskReservationResultRow[]>`
     with active_reservation as (
       select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
@@ -2921,7 +2895,7 @@ async function finalizeTaskFailure(
     )
     select *
     from updated_task
-  `;
+  `);
   const row = rows[0];
 
   if (!row) {
@@ -2949,50 +2923,20 @@ export async function failTask(input: FailTaskInput) {
 
   await ensureWorkerSessionSchema(sql);
 
-  const claim = await claimTaskFailureApplication(sql, input);
-  const retryWillBeScheduled = taskRetryWillBeScheduled(claim.task);
-  let resultPayload: Record<string, unknown>;
-
-  try {
-    resultPayload = payloadRecord(
-      input.applyFailure
-	        ? await input.applyFailure({
-            afterCommit: (effect) => afterCommitEffects.push(effect),
-            agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
-            errorMessage: input.errorMessage,
-            reservationId: claim.activeReservation?.id ?? input.reservationId,
-            resultPayload: input.resultPayload ?? {},
-            retryWillBeScheduled,
-            sql,
-            task: claim.task
-          })
-        : (input.resultPayload ?? {})
-    );
-  } catch (error) {
-    const message = errorMessage(error, "Task failure side effect failed.");
-
-    resultPayload = {
-      ...payloadRecord(input.resultPayload ?? {}),
-      failureApplicationError: message
-    };
-    await addTaskEvent({
-      agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
-      eventPayload: {
-        error: message,
-        reservationId: claim.activeReservation?.id,
-        stage: "failure_result_application"
-      },
-      eventStatus: "failed",
-      eventType: "task_failure_result_apply_failed",
-      severity: "high",
-      taskId: claim.task.id
-    });
-  }
-
-  const task = await finalizeTaskFailure(sql, {
-    claim,
-    failureInput: input,
-    resultPayload
+  const {claim, resultPayload, task} = await withTaskRowLock(sql, uuidOrNull(input.taskId), async tx => {
+    const claim = await claimTaskFailureApplication(tx, input);
+    const retryWillBeScheduled = taskRetryWillBeScheduled(claim.task);
+    const resultPayload = payloadRecord(input.applyFailure
+      ? await input.applyFailure({
+          afterCommit: effect => afterCommitEffects.push(effect),
+          agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
+          errorMessage: input.errorMessage,
+          reservationId: claim.activeReservation?.id ?? input.reservationId,
+          resultPayload: input.resultPayload ?? {}, retryWillBeScheduled, sql: tx, task: claim.task
+        })
+      : (input.resultPayload ?? {}));
+    const task = await finalizeTaskFailure(tx, {claim, failureInput: input, resultPayload});
+    return {claim, resultPayload, task};
   });
 
   await scheduleRetryForFailedTask(sql, {
@@ -3027,7 +2971,7 @@ export async function releaseReservedTaskToQueue(input: Readonly<{
     throw new Error("Releasing a reserved task requires reservationId and taskId");
   }
 
-  await sql`
+  await withTaskRowLock(sql, taskId, tx => tx`
     with released as (
       update public.task_reservations set
         status = 'released',
@@ -3050,7 +2994,7 @@ export async function releaseReservedTaskToQueue(input: Readonly<{
     from released
     where public.tasks.id = released.task_id
       and public.tasks.status in ('reserved', 'running')
-  `;
+  `);
 
   notifyTaskQueueChanged();
 }

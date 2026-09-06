@@ -91,7 +91,7 @@ describe("database transaction boundaries", () => {
     }
   });
 
-  it("keeps task result appliers outside task finalization transactions", async () => {
+  it("keeps result persistence within bounded phases and external effects after commit", async () => {
     const source = await readFile("lib/task-service.ts", "utf8");
 
     for (const functionName of [
@@ -125,12 +125,12 @@ describe("database transaction boundaries", () => {
     assert.match(
       functionBody(source, "completeTask"),
       /claimTaskCompletionApplication[\s\S]*input\.applyResult[\s\S]*finalizeTaskCompletion/,
-      "completion side effects must run between the short claim and finalization transactions"
+      "result persistence must run between claim and finalization within the bounded database phase"
     );
     assert.match(
       functionBody(source, "failTask"),
       /claimTaskFailureApplication[\s\S]*input\.applyFailure[\s\S]*finalizeTaskFailure[\s\S]*scheduleRetryForFailedTask/,
-      "failure side effects and retry scheduling must run outside the task-lock transaction"
+      "failure persistence precedes finalization and retry scheduling follows it"
     );
     assert.match(
       functionBody(source, "releaseExpiredReservations"),
@@ -145,8 +145,8 @@ describe("database transaction boundaries", () => {
 
     assert.match(
       claimBody,
-      /limit\s+\$\{batchLimit\}[\s\S]*for\s+update\s+of\s+task_reservations\s+skip\s+locked/i,
-      "expired reservation release must claim a bounded batch while holding row locks only on reservations"
+      /limit\s+\$\{batchLimit\}[\s\S]*for\s+update\s+of\s+tasks\s+skip\s+locked/i,
+      "expired reservation release must claim a bounded batch while locking tasks before reservations"
     );
     assert.match(
       claimBody,
@@ -212,10 +212,13 @@ describe("database transaction boundaries", () => {
         "lib/task-service.ts",
         [
           "claimExpiredReservationsBatch",
-          "claimQueuedTaskRow"
+          "claimQueuedTaskRow",
+          "recoverOrphanedTaskClaims",
+          "withTaskRowLock"
         ]
       ],
       ["lib/task-worker.ts", ["claimDueCronActions"]],
+      ["lib/task-service-agents.ts", ["releaseOfflineWorkerReservations"]],
       [
         "lib/agentic/store/postgres.ts",
         [
