@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   objectValue,
   openClawJson,
@@ -22,7 +23,7 @@ function sessionStatus(value: unknown): WorkerSessionStatus {
     : "idle";
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const access = await requireWorkerAccess(request);
   const unauthorized = access.unauthorized;
 
@@ -55,3 +56,5 @@ export async function POST(request: Request) {
     return taskApiError(error, "Unable to record worker heartbeat");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);

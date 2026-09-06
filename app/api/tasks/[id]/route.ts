@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   openClawJson,
   requireOpenClawAccess,
@@ -13,7 +14,7 @@ type TaskRouteProps = Readonly<{
   }>;
 }>;
 
-export async function GET(request: Request, { params }: TaskRouteProps) {
+async function handleGET(request: Request, { params }: TaskRouteProps) {
   const { scope, unauthorized } = await requireOpenClawAccess(request, "tasks.read");
 
   if (unauthorized) {
@@ -28,3 +29,5 @@ export async function GET(request: Request, { params }: TaskRouteProps) {
     return taskApiError(error, "Unable to load task");
   }
 }
+
+export const GET = withRequestDeadline(handleGET);

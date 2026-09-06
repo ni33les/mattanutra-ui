@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   objectValue,
   openClawJson,
@@ -30,7 +31,7 @@ function textArray(value: unknown) {
     : [];
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const startedAt = Date.now();
   const access = await requireWorkerAccess(request);
   const unauthorized = access.unauthorized;
@@ -125,3 +126,5 @@ export async function POST(request: Request) {
     return taskApiError(error, "Unable to reserve task");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);

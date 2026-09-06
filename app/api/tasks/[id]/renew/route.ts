@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   openClawJson,
   readJsonObject,
@@ -15,7 +16,7 @@ type RenewTaskRouteProps = Readonly<{
   }>;
 }>;
 
-export async function POST(request: Request, { params }: RenewTaskRouteProps) {
+async function handlePOST(request: Request, { params }: RenewTaskRouteProps) {
   const startedAt = Date.now();
   const access = await requireWorkerAccess(request);
   const authDurationMs = Date.now() - startedAt;
@@ -79,3 +80,5 @@ export async function POST(request: Request, { params }: RenewTaskRouteProps) {
     return taskApiError(error, "Unable to renew task lease");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);

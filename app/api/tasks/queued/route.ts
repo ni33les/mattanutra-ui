@@ -1,10 +1,11 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import { openClawJson, taskApiError } from "@/lib/openclaw-api";
 import { listQueuedTaskHeads } from "@/lib/task-service";
 import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const access = await requireWorkerAccess(request);
   const unauthorized = access.unauthorized;
 
@@ -23,3 +24,5 @@ export async function GET(request: Request) {
     return taskApiError(error, "Unable to list queued tasks");
   }
 }
+
+export const GET = withRequestDeadline(handleGET);

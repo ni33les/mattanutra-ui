@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   openClawJson,
   textValue
@@ -22,7 +23,7 @@ type WorkItemRouteProps = Readonly<{
   }>;
 }>;
 
-export async function GET(request: Request, { params }: WorkItemRouteProps) {
+async function handleGET(request: Request, { params }: WorkItemRouteProps) {
   const access = await requireWorkerAccess(request);
   const unauthorized = access.unauthorized;
 
@@ -121,3 +122,5 @@ export async function GET(request: Request, { params }: WorkItemRouteProps) {
     );
   }
 }
+
+export const GET = withRequestDeadline(handleGET);

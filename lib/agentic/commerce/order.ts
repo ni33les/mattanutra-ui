@@ -55,11 +55,13 @@ async function orderToolBody(input: Readonly<{
     });
   }
 
-  const loaded = await input.store.getOrder(capability.resourceId);
-  const order = await expireCheckoutIfDue({
-    now: input.now,
-    order: loaded,
-    store: input.store
+  const {order, fulfilmentEvents, paymentAttempts, items} = await input.store.transaction(async store => {
+    const loaded = await store.getOrder(capability.resourceId);
+    const order = await expireCheckoutIfDue({now: input.now, order: loaded, store});
+    const [fulfilmentEvents, paymentAttempts, items] = order ? await Promise.all([
+      store.listFulfilmentEvents(order.id), store.listPaymentAttempts(order.id), store.getOrderItems(order.id)
+    ]) : [[], [], []];
+    return {order, fulfilmentEvents, paymentAttempts, items};
   });
   const locale = negotiateLocale(input.locale);
   const settlement =
@@ -69,13 +71,6 @@ async function orderToolBody(input: Readonly<{
       order.paymentStatus === "partially_refunded")
       ? await getRetailOrderByAgenticOrderId(order.id)
       : null;
-  const fulfilmentEvents = order
-    ? await input.store.listFulfilmentEvents(order.id)
-    : [];
-  const paymentAttempts = order
-    ? await input.store.listPaymentAttempts(order.id)
-    : [];
-  const items = order ? await input.store.getOrderItems(order.id) : [];
   const projection = order
     ? buildOrderProjection({
         fulfilment: fulfilmentEvents,

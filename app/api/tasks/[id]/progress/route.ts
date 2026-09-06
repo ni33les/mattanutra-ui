@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   objectValue,
   openClawJson,
@@ -16,7 +17,7 @@ type ProgressTaskRouteProps = Readonly<{
   }>;
 }>;
 
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: ProgressTaskRouteProps
 ) {
@@ -86,3 +87,5 @@ export async function POST(
     return taskApiError(error, "Unable to report task progress");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);

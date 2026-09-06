@@ -1,4 +1,5 @@
-import { requestLifetime } from "@/lib/request-lifetime";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
 import postgres from "postgres";
 import { createLogger } from "@/lib/logger";
 
@@ -32,6 +33,49 @@ const poolInitLogged = {
 };
 
 type PoolKind = "interactive" | "worker";
+const transactionScope = new AsyncLocalStorage<postgres.Sql>();
+const commitEffects = new AsyncLocalStorage<Array<() => void>>();
+
+export function deferUntilDatabaseCommit(effect: () => void) {
+  const effects = commitEffects.getStore();
+  if (!effects) return false;
+  effects.push(effect);
+  return true;
+}
+
+/** A bounded database-only phase. Helpers using either pool join this transaction.
+ * External I/O must run after this function resolves, outside its row locks. */
+export async function withDatabaseTransaction<T>(
+  sql: postgres.Sql,
+  work: (tx: postgres.Sql) => Promise<T>,
+  timeoutMs = dbStatementTimeoutMs()
+): Promise<T> {
+  const existing = transactionScope.getStore();
+  if (existing) return work(existing);
+  const parent = requestLifetime();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("Database phase deadline exceeded")), timeoutMs);
+  const signal = parent ? AbortSignal.any([parent.signal, controller.signal]) : controller.signal;
+  const effects: Array<() => void> = [];
+  try {
+    const result = await withRequestLifetime({...parent, signal}, () => sql.begin(async tx => {
+      signal.throwIfAborted();
+      const result = await transactionScope.run(tx as unknown as postgres.Sql, () =>
+        commitEffects.run(effects, () => work(tx as unknown as postgres.Sql))
+      );
+      signal.throwIfAborted();
+      return result;
+    })) as T;
+    for (const effect of effects) {
+      try { effect(); } catch (error) {
+        dbLog.warn("database_commit_effect_failed", {message: error instanceof Error ? error.message : "unknown"});
+      }
+    }
+    return result;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function assertManagedDatabaseEndpoint(connection: string) {
   try {
@@ -295,10 +339,10 @@ function instrumentSql(
     ...args: unknown[]
   ) {
     const lifetime = requestLifetime();
-    if (!inTransaction && lifetime && isTaggedTemplate(args[0]) && isExecutableTaggedQuery(args[0])) {
-      lifetime.signal.throwIfAborted();
-      return (tagged as unknown as postgres.Sql).begin(async tx => {
-        lifetime.signal.throwIfAborted();
+    if (!inTransaction && isTaggedTemplate(args[0]) && isExecutableTaggedQuery(args[0])) {
+      lifetime?.signal.throwIfAborted();
+      return withDatabaseTransaction(tagged as unknown as postgres.Sql, async tx => {
+        requestLifetime()?.signal.throwIfAborted();
         return (tx as unknown as (...args: unknown[]) => Promise<unknown>)(...args);
       });
     }
@@ -476,6 +520,8 @@ function getOrCreateSqlPool(kind: PoolKind) {
 }
 
 export function getSql() {
+  const transaction = transactionScope.getStore();
+  if (transaction) return transaction;
   if (process.env.DB_POOL_ROLE === "worker") {
     return getOrCreateSqlPool("worker");
   }
@@ -484,6 +530,8 @@ export function getSql() {
 }
 
 export function getWorkerSql() {
+  const transaction = transactionScope.getStore();
+  if (transaction) return transaction;
   return getOrCreateSqlPool("worker");
 }
 

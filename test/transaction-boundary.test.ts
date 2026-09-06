@@ -68,7 +68,8 @@ describe("database transaction boundaries", () => {
   it("keeps runtime code free of explicit app-level transactions", async () => {
     const allowedBegins = new Map<string, readonly string[]>([
       ["lib/agentic/store/postgres.ts", ["transaction"]],
-      ["lib/db.ts", ["withLocalStatementTimeout"]]
+      ["lib/prd-live-catalogue-sync.ts", ["runPrdLiveCatalogueSync"]],
+      ["lib/db.ts", ["withLocalStatementTimeout", "withDatabaseTransaction"]]
     ]);
     const files = [
       ...(await filesUnder("app")),

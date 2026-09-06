@@ -1,6 +1,7 @@
 import type postgres from "postgres";
 import { createLogger } from "@/lib/logger";
 import {
+  deferUntilDatabaseCommit,
   getListenSql,
   getSql,
   getWorkerSql,
@@ -31,6 +32,7 @@ export function notifyTaskQueueChanged(
   sql?: postgres.Sql | postgres.TransactionSql,
   taskId?: string
 ) {
+  if (deferUntilDatabaseCommit(() => notifyTaskQueueChanged(taskType, undefined, taskId))) return;
   const payloadType = typeof taskType === "string" ? taskType.trim() : "";
   const payloadId = typeof taskId === "string" ? taskId.trim() : "";
   signalTaskQueue({

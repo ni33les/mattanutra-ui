@@ -57,7 +57,8 @@ describe("request-path lock bounds", () => {
     for (const file of files) {
       const source = await readFile(file, "utf8");
       if (ALLOWED_TRY_LOCK.has(file)) {
-        assert.match(source, /pg_try_advisory_lock/);
+        assert.match(source, /pg_try_advisory_xact_lock/);
+        assert.doesNotMatch(source, /pg_try_advisory_lock|pg_advisory_unlock/);
         assert.equal(/\bpg_advisory_lock\s*\(/i.test(source), false, file);
         continue;
       }

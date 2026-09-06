@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   objectValue,
   openClawJson,
@@ -19,7 +20,7 @@ type CompleteTaskRouteProps = Readonly<{
   }>;
 }>;
 
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: CompleteTaskRouteProps
 ) {
@@ -97,3 +98,5 @@ export async function POST(
     return taskApiError(error, "Unable to complete task");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);

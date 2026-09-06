@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   objectValue,
   openClawJson,
@@ -19,7 +20,7 @@ type FailTaskRouteProps = Readonly<{
   }>;
 }>;
 
-export async function POST(request: Request, { params }: FailTaskRouteProps) {
+async function handlePOST(request: Request, { params }: FailTaskRouteProps) {
   const access = await requireWorkerAccess(request);
   const unauthorized = access.unauthorized;
 
@@ -99,3 +100,5 @@ export async function POST(request: Request, { params }: FailTaskRouteProps) {
     return taskApiError(error, "Unable to fail task");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);

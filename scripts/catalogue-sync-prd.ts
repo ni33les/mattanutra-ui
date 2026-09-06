@@ -70,14 +70,7 @@ async function main() {
       hasArg("strict-master-data") ||
       process.env.MATTANUTRA_STRICT_MASTER_SNAPSHOT === "true"
   };
-  const summary = apply
-    ? await sql.begin((transaction) =>
-        runPrdLiveCatalogueSync({
-          ...syncInput,
-          sql: transaction as unknown as typeof sql
-        })
-      )
-    : await runPrdLiveCatalogueSync(syncInput);
+  const summary = await runPrdLiveCatalogueSync(syncInput);
 
   console.log(JSON.stringify(summary, null, 2));
 }

@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   objectValue,
   openClawJson,
@@ -49,7 +50,7 @@ function authorType(value: unknown) {
     : "system";
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: TaskCommentRouteProps
 ) {
@@ -106,3 +107,5 @@ export async function POST(
     return taskApiError(error, "Unable to add task comment");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);

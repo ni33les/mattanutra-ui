@@ -624,16 +624,12 @@ async function writeReports(input: Readonly<{
 
 async function acquireSyncLock(sql: Db) {
   const rows = await sql<Array<{ locked: boolean }>>`
-    select pg_try_advisory_lock(hashtext('mattanutra-prd-live-catalogue-sync')) as locked
+    select pg_try_advisory_xact_lock(hashtext('mattanutra-prd-live-catalogue-sync')) as locked
   `;
 
   if (!rows[0]?.locked) {
     throw new Error("Another PRD catalogue sync appears to be running.");
   }
-}
-
-async function releaseSyncLock(sql: Db) {
-  await sql`select pg_advisory_unlock(hashtext('mattanutra-prd-live-catalogue-sync'))`;
 }
 
 async function applyTables(
@@ -715,26 +711,29 @@ export async function runPrdLiveCatalogueSync(
     }
   }
 
-  await acquireSyncLock(input.sql);
-
+  let report: Parameters<typeof writeReports>[0] | undefined;
+  let summary: PrdLiveCatalogueSyncSummary;
   try {
-    const conflicts = await findNaturalKeyConflicts(input.sql, tables);
-    const beforeProtected = await captureProtectedDataSnapshot(input.sql);
+    summary = await input.sql.begin(async transaction => {
+      const sql = transaction as unknown as Db;
+      await acquireSyncLock(sql);
+    const conflicts = await findNaturalKeyConflicts(sql, tables);
+    const beforeProtected = await captureProtectedDataSnapshot(sql);
     let afterProtected: ProtectedDataSnapshot | null = null;
     let protectedDataIssues: ProtectedDataVerificationIssue[] = [];
     let tableReports: Record<string, PrdCatalogueTableReport>;
 
     if (conflicts.length > 0) {
-      tableReports = await applyTables(input.sql, tables, false);
+      tableReports = await applyTables(sql, tables, false);
     } else if (input.apply) {
-      tableReports = await applyTables(input.sql, tables, true);
-      afterProtected = await captureProtectedDataSnapshot(input.sql);
+      tableReports = await applyTables(sql, tables, true);
+      afterProtected = await captureProtectedDataSnapshot(sql);
       protectedDataIssues = compareProtectedDataSnapshots(
         beforeProtected,
         afterProtected
       ).issues;
     } else {
-      tableReports = await applyTables(input.sql, tables, false);
+      tableReports = await applyTables(sql, tables, false);
     }
 
     const summary: PrdLiveCatalogueSyncSummary = {
@@ -749,24 +748,15 @@ export async function runPrdLiveCatalogueSync(
       tables: tableReports
     };
 
-    await writeReports({
-      afterProtected,
-      beforeProtected,
-      conflicts,
-      outputDir,
-      summary
-    });
-
+    report = {afterProtected, beforeProtected, conflicts, outputDir, summary};
     if (protectedDataIssues.length > 0) {
-      throw new Error(
-        `Protected PRD data verification failed; report written to ${outputDir}: ${protectedDataIssues
-          .map((issue) => `${issue.table}:${issue.issue}`)
-          .join(", ")}`
-      );
+      throw new Error(`Protected PRD data verification failed; report directory: ${outputDir}`);
     }
-
     return summary;
+    }) as PrdLiveCatalogueSyncSummary;
   } finally {
-    await releaseSyncLock(input.sql);
+    // File I/O runs after commit/rollback, after transaction locks are released.
+    if (report) await writeReports(report);
   }
+  return summary;
 }

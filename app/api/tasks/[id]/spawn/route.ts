@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   objectValue,
   openClawJson,
@@ -65,7 +66,7 @@ function dependencies(value: unknown) {
     .filter((item) => item.taskId);
 }
 
-export async function POST(request: Request, { params }: SpawnTaskRouteProps) {
+async function handlePOST(request: Request, { params }: SpawnTaskRouteProps) {
   const access = await requireWorkerAccess(request);
   const unauthorized = access.unauthorized;
 
@@ -135,3 +136,5 @@ export async function POST(request: Request, { params }: SpawnTaskRouteProps) {
     return taskApiError(error, "Unable to spawn child task");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);

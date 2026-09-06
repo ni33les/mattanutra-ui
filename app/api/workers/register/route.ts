@@ -1,3 +1,4 @@
+import { withRequestDeadline } from "@/lib/request-lifetime";
 import {
   objectValue,
   openClawJson,
@@ -21,7 +22,7 @@ function agentType(value: unknown): AgentType {
     : "external";
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const access = await requireWorkerAccess(request);
   const unauthorized = access.unauthorized;
 
@@ -66,3 +67,5 @@ export async function POST(request: Request) {
     return taskApiError(error, "Unable to register worker");
   }
 }
+
+export const POST = withRequestDeadline(handlePOST);
