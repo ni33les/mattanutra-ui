@@ -208,6 +208,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         where plan_id = ${planId}::uuid
           and plan_revision = ${planRevision}
           and order_status = 'open'
+          and checkout_reuse_eligible
           and payment_status = 'unpaid'
           and cancelled_at is null
           and expired_at is null
@@ -223,6 +224,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         where plan_id = ${planId}::uuid
           and plan_revision = ${planRevision}
           and order_status not in ('expired', 'cancelled')
+          and checkout_reuse_eligible
           and cancelled_at is null
           and expired_at is null
         order by created_at asc

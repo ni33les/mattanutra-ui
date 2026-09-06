@@ -169,9 +169,27 @@ create table if not exists public.agentic_fulfilment_events (
   created_at timestamptz not null default now()
 );
 
+-- Preserve historical duplicates and their payment/fulfilment records. Only
+-- one order per revision is eligible for future execute reuse. Prefer paid
+-- orders so a retry does not invite a second payment.
+alter table public.agentic_orders add column if not exists checkout_reuse_eligible boolean not null default true;
+lock table public.agentic_orders in share row exclusive mode;
+with ranked as (
+  select id, row_number() over (
+    partition by plan_id, plan_revision
+    order by (payment_status = 'paid') desc, created_at asc, id asc
+  ) as ordinal
+  from public.agentic_orders
+  where checkout_reuse_eligible
+    and order_status not in ('expired', 'cancelled')
+    and cancelled_at is null and expired_at is null
+)
+update public.agentic_orders o set checkout_reuse_eligible = false
+from ranked r where r.id = o.id and r.ordinal > 1;
+
 create unique index if not exists agentic_orders_active_plan_revision_idx
   on public.agentic_orders (plan_id, plan_revision)
-  where order_status not in ('expired', 'cancelled')
+  where checkout_reuse_eligible and order_status not in ('expired', 'cancelled')
     and cancelled_at is null and expired_at is null;
 
 create index if not exists agentic_orders_plan_revision_idx
@@ -380,13 +398,17 @@ const sql = postgres(connection, {
   ...(shouldUseSsl(connection) ? { ssl: "require" } : {})
 });
 
-await sql.unsafe(schemaSql);
+await sql.begin(async tx => {
+  await tx`set local lock_timeout = '5s'`;
+  await tx.unsafe(schemaSql);
+});
 
 await sql.unsafe(`
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'mn') then
     grant select, insert, update, delete on
+      public.agentic_catalogue_snapshots,
       public.agentic_plans,
       public.agentic_plan_revisions,
       public.agentic_capabilities,
