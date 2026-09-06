@@ -412,7 +412,8 @@ async function executeFresh(
     peekedResult.requestSnapshot.destinationCountry
   );
 
-  return input.store.transaction(async (store) => {
+  const created: Array<{ locale: Locale; orderId: string; planId: string }> = [];
+  const outcome = await input.store.transaction(async (store) => {
     const capability = await resolveCapability({
       action: "plan.execute",
       config: input.config,
@@ -675,31 +676,41 @@ async function executeFresh(
     if (!response) {
       throw new Error("execute_fail_at_commit");
     }
-    executeSerializeEntered?.();
-    if (executeSerializeGate) {
-      await executeSerializeGate;
-    }
-
-    await commitFunnelEvent({
-      attribution: "agent_connector",
-      correlationId: plan.id,
-      createdAt: now,
-      eventId: `execute:${orderId}`,
-      eventType: "execute_created",
-      payload: { locale }
-    });
-    await commitFunnelEvent({
-      attribution: "agent_connector",
-      correlationId: plan.id,
-      createdAt: now,
-      eventId: `checkout:${orderId}`,
-      eventType: "checkout_opened",
-      payload: { locale }
-    });
-    if (executeFailAt === "after_commit") {
-      throw new Error("execute_fail_after_commit");
-    }
-
+    created.push({ locale, orderId, planId: plan.id });
     return response;
   });
+
+  if (!isExecuteSuccess(outcome)) {
+    return outcome;
+  }
+
+  executeSerializeEntered?.();
+  if (executeSerializeGate) {
+    await executeSerializeGate;
+  }
+
+  const funnel = created[0];
+  if (funnel) {
+    await commitFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: funnel.planId,
+      createdAt: now,
+      eventId: `execute:${funnel.orderId}`,
+      eventType: "execute_created",
+      payload: { locale: funnel.locale }
+    });
+    await commitFunnelEvent({
+      attribution: "agent_connector",
+      correlationId: funnel.planId,
+      createdAt: now,
+      eventId: `checkout:${funnel.orderId}`,
+      eventType: "checkout_opened",
+      payload: { locale: funnel.locale }
+    });
+  }
+  if (executeFailAt === "after_commit") {
+    throw new Error("execute_fail_after_commit");
+  }
+
+  return outcome;
 }

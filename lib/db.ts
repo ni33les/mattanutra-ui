@@ -22,8 +22,7 @@ const DEFAULT_DB_STATEMENT_TIMEOUT_MS = 15_000;
 const DEFAULT_DB_LOCK_TIMEOUT_MS = 2_000;
 const DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS = 10_000;
 const DEFAULT_INTERACTIVE_STATEMENT_TIMEOUT_MS = 500;
-const SLOW_QUERY_LOG_MS = 100;
-const SLOW_QUERY_SIBLING_MS = 500;
+const SLOW_QUERY_LOG_MS = 1_000;
 const dbLog = createLogger("db.pool");
 const poolInitLogged = {
   interactive: false,
@@ -219,14 +218,17 @@ function dbIdleInTxnTimeoutMs() {
 }
 
 function postgresConnectionSettings(applicationName: string) {
+  const statementTimeoutMs = dbStatementTimeoutMs();
+  const lockTimeoutMs = dbLockTimeoutMs();
+  const idleInTxnTimeoutMs = dbIdleInTxnTimeoutMs();
   return {
     applicationName,
     connection: {
       application_name: applicationName
     },
-    idleInTxnTimeoutMs: dbIdleInTxnTimeoutMs(),
-    lockTimeoutMs: dbLockTimeoutMs(),
-    statementTimeoutMs: dbStatementTimeoutMs()
+    idleInTxnTimeoutMs,
+    lockTimeoutMs,
+    statementTimeoutMs
   };
 }
 
@@ -249,8 +251,6 @@ function handleDatabaseNotice(notice: { code?: string }) {
   if (notice.code && BENIGN_SCHEMA_NOTICE_CODES.has(notice.code)) {
     return;
   }
-
-  console.info("Database notice", notice);
 }
 
 export const INTERACTIVE_STATEMENT_TIMEOUT_MS =
@@ -272,72 +272,6 @@ function sqlPreview(strings: unknown) {
   return "";
 }
 
-let siblingDumpInflight = false;
-
-async function dumpSlowQuerySiblings(triggerMs: number) {
-  if (siblingDumpInflight || process.env.NODE_TEST_CONTEXT) {
-    return;
-  }
-
-  siblingDumpInflight = true;
-
-  try {
-    const listen = globalDb.mattanutraListenSql;
-
-    if (!listen) {
-      console.info("[db:slow-siblings]", {
-        reason: "listen_not_open",
-        triggerMs
-      });
-      return;
-    }
-
-    const siblings = await listen<
-      Array<{
-        application_name: string | null;
-        query: string | null;
-        query_ms: number | string | null;
-        state: string | null;
-        wait_event: string | null;
-        wait_event_type: string | null;
-      }>
-    >`
-      select
-        application_name,
-        state,
-        wait_event_type,
-        wait_event,
-        left(query, 180) as query,
-        extract(epoch from (now() - query_start)) * 1000 as query_ms
-      from pg_stat_activity
-      where datname = current_database()
-        and pid <> pg_backend_pid()
-        and state is not null
-        and state <> 'idle'
-      order by query_start nulls last
-      limit 12
-    `;
-
-    console.info("[db:slow-siblings]", {
-      siblings: siblings.map((row) => ({
-        applicationName: row.application_name,
-        ms: Number(row.query_ms) || 0,
-        query: row.query,
-        state: row.state,
-        wait: [row.wait_event_type, row.wait_event].filter(Boolean).join(":")
-      })),
-      triggerMs
-    });
-  } catch (error) {
-    console.info("[db:slow-siblings]", {
-      reason: error instanceof Error ? error.message : "dump_failed",
-      triggerMs
-    });
-  } finally {
-    siblingDumpInflight = false;
-  }
-}
-
 function noteQuery(kind: PoolKind, startedAt: number, strings: unknown) {
   const ms = Date.now() - startedAt;
 
@@ -352,10 +286,6 @@ function noteQuery(kind: PoolKind, startedAt: number, strings: unknown) {
     pool: poolLabel(kind),
     sqlPreview: sqlPreview(strings)
   });
-
-  if (ms >= SLOW_QUERY_SIBLING_MS) {
-    void dumpSlowQuerySiblings(ms);
-  }
 }
 
 function isTaggedTemplate(strings: unknown): strings is TemplateStringsArray {
@@ -421,14 +351,19 @@ function instrumentSql(
     (tagged as postgres.Sql).begin = ((
       fn: (txn: postgres.TransactionSql) => unknown
     ) =>
-      originalBegin(async (txn) =>
-        fn(
-          instrumentSql(
-            txn as unknown as postgres.Sql,
-            kind
-          ) as unknown as postgres.TransactionSql
-        )
-      )) as postgres.Sql["begin"];
+      originalBegin(async (txn) => {
+        const instrumented = instrumentSql(
+          txn as unknown as postgres.Sql,
+          kind
+        ) as unknown as postgres.TransactionSql;
+        await instrumented`
+          select
+            set_config('statement_timeout', ${String(dbStatementTimeoutMs())}, true),
+            set_config('lock_timeout', ${String(dbLockTimeoutMs())}, true),
+            set_config('idle_in_transaction_session_timeout', ${String(dbIdleInTxnTimeoutMs())}, true)
+        `;
+        return fn(instrumented);
+      })) as postgres.Sql["begin"];
   }
 
   return tagged as unknown as postgres.Sql;

@@ -313,27 +313,6 @@ export function recordFunnelEvent(input: Readonly<{
   return { accepted: true as const, event, persisted };
 }
 
-async function withPostgresFunnelLock<T>(correlationId: string, work: () => Promise<T>): Promise<T> {
-  if (process.env.NODE_TEST_CONTEXT) {
-    return work();
-  }
-  try {
-    const { getSql } = await import("@/lib/db");
-    const sql = getSql();
-    if (!sql) {
-      return work();
-    }
-    await sql`select pg_advisory_lock(hashtext(${correlationId}))`;
-    try {
-      return await work();
-    } finally {
-      await sql`select pg_advisory_unlock(hashtext(${correlationId}))`;
-    }
-  } catch {
-    return work();
-  }
-}
-
 export async function commitFunnelEvent(input: Readonly<{
   attribution?: unknown;
   correlationId: string;
@@ -345,16 +324,14 @@ export async function commitFunnelEvent(input: Readonly<{
   if (funnelAppendBarrier) {
     await funnelAppendBarrier;
   }
-  return enqueueFunnelAppend(input.correlationId, () =>
-    withPostgresFunnelLock(input.correlationId, async () => {
-      await loadPersistedFunnelEvents(input.correlationId);
-      const recorded = recordFunnelEvent(input);
-      if (recorded.accepted) {
-        await recorded.persisted;
-      }
-      return recorded;
-    })
-  );
+  return enqueueFunnelAppend(input.correlationId, async () => {
+    await loadPersistedFunnelEvents(input.correlationId);
+    const recorded = recordFunnelEvent(input);
+    if (recorded.accepted) {
+      await recorded.persisted;
+    }
+    return recorded;
+  });
 }
 
 export function listFunnelEvents(correlationId: string) {
