@@ -9,6 +9,10 @@ import { catalogueSnapshotId } from "../lib/agentic/catalogue/freeze.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { normalizePlanRequest, planRematchFingerprint } from "../lib/agentic/plan/normalize.ts";
+import { createAgenticRuntime, type AgenticRuntime } from "../lib/agentic/runtime.ts";
+import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { resetPlanCreateInflightForTests, setPlanClaimLatchForTests, setMatcherGateForTests, setMatcherEnteredForTests } from "../lib/agentic/plan/service.ts";
+import { resetExecuteLockState } from "../lib/agentic/commerce/execute.ts";
 
 const request = {
   destinationCountry: "TH", locale: "en", optimization: "balanced",
@@ -16,8 +20,19 @@ const request = {
   targets: [{ name: "Vitamin D3", amount: 1000, unit: "IU" }]
 };
 
-beforeEach(() => installGoldCatalogue());
-afterEach(() => { uninstallGoldCatalogue(); resetCataloguePins(); });
+beforeEach(() => { installGoldCatalogue(); resetPlanCreateInflightForTests(); resetExecuteLockState(); });
+afterEach(() => { uninstallGoldCatalogue(); resetCataloguePins(); setMatcherGateForTests(null); setMatcherEnteredForTests(null); });
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => { resolve = done; });
+  return { promise, resolve };
+}
+let rpcId = 0;
+async function call(runtime: AgenticRuntime, args: Record<string, unknown>) {
+  const response = await handleJsonRpc(runtime, { id: ++rpcId, method: "tools/call", params: { name: "plan", arguments: args } });
+  return response!.result!.structuredContent as Record<string, any>;
+}
 
 describe("MCP reliability: catalogue persistence and cache isolation", () => {
   it("keeps a QA publication frozen while refreshing live customer snapshots", async () => {
@@ -54,5 +69,81 @@ describe("MCP reliability: catalogue persistence and cache isolation", () => {
         ...normalized.state, requirements: { ...normalized.state.requirements, ...requirements }
       }));
     }
+  });
+});
+
+describe("MCP reliability: atomic plan and checkout commands", () => {
+  it("keeps the previous revision readable after an invalid edit", async () => {
+    const runtime = createAgenticRuntime();
+    const created = await call(runtime, { operation: "create", idempotencyKey: "review-invalid-create", request });
+    assert.equal(created.status, "ready");
+    const invalid = await call(runtime, { operation: "revise", idempotencyKey: "review-invalid-revise", planHandle: created.planHandle,
+      expectedRevision: created.revision, request: { ...request, targets: [{ name: "Magnesium", amount: 100, unit: "IU" }] } });
+    assert.equal(invalid.error.reasonCode, "unsupported_unit");
+    const read = await call(runtime, { operation: "get", planHandle: created.planHandle });
+    assert.equal(read.ok, true);
+    assert.equal(read.revision, created.revision);
+    assert.equal(read.status, "ready");
+  });
+
+  it("can edit a stored plan after losing all process-local pins", async () => {
+    const runtime = createAgenticRuntime();
+    const created = await call(runtime, { operation: "create", idempotencyKey: "review-restart-create", request });
+    resetCataloguePins();
+    const revised = await call(runtime, { operation: "revise", idempotencyKey: "review-restart-revise", planHandle: created.planHandle,
+      expectedRevision: created.revision, request: { ...request, targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU" }] } });
+    assert.equal(revised.ok, true, JSON.stringify(revised));
+    assert.equal(revised.revision, 2);
+  });
+
+  it("rejects different concurrent payloads with the same idempotency key", async () => {
+    const runtime = createAgenticRuntime();
+    const gate = deferred(), entered = deferred();
+    const key = "review-payload-conflict";
+    setPlanClaimLatchForTests(key, gate.promise, entered.resolve);
+    const first = call(runtime, { operation: "create", idempotencyKey: key, request });
+    await entered.promise;
+    const second = await call(runtime, { operation: "create", idempotencyKey: key, request: { ...request, targets: [{ name: "Magnesium", amount: 100, unit: "mg" }] } });
+    gate.resolve();
+    setPlanClaimLatchForTests(key, null);
+    assert.equal((await first).ok, true);
+    assert.equal(second.error.reasonCode, "idempotency_conflict");
+  });
+
+  it("publishes only one of two concurrent edits to the same revision", async () => {
+    const runtime = createAgenticRuntime();
+    const created = await call(runtime, { operation: "create", idempotencyKey: "review-race-create", request });
+    const gate = deferred(), entered = deferred();
+    let count = 0;
+    setMatcherGateForTests(gate.promise);
+    setMatcherEnteredForTests(() => { if (++count === 2) entered.resolve(); });
+    const edit = (amount: number) => call(runtime, { operation: "revise", idempotencyKey: "review-race-edit-" + amount,
+      planHandle: created.planHandle, expectedRevision: 1, request: { ...request, targets: [{ name: "Vitamin D3", amount, unit: "IU" }] } });
+    const pending = [edit(1500), edit(2000)];
+    await entered.promise;
+    const reading = await call(runtime, { operation: "get", planHandle: created.planHandle });
+    assert.equal(reading.revision, 1);
+    gate.resolve();
+    const results = await Promise.all(pending);
+    assert.equal(results.filter(r => r.ok).length, 1, JSON.stringify(results));
+    assert.equal(results.find(r => !r.ok)?.error.reasonCode, "stale_revision");
+  });
+
+  it("reuses one order across independent executor instances", async () => {
+    const runtime = createAgenticRuntime();
+    let orders = 0;
+    const insert = runtime.store.insertOrder;
+    runtime.store.insertOrder = async order => { orders++; await insert(order); };
+    const plan = await call(runtime, { operation: "create", idempotencyKey: "review-orders-create", request });
+    const [a, b] = await Promise.all([1, 2].map(n => import(new URL("../lib/agentic/commerce/execute.ts?replica=" + n, import.meta.url).href)));
+    const input = { ...runtime, now: new Date().toISOString(), planHandle: plan.planHandle, expectedRevision: plan.revision };
+    const results = await Promise.all([
+      a.executeTool({ ...input, idempotencyKey: "review-orders-first" }),
+      b.executeTool({ ...input, idempotencyKey: "review-orders-second" })
+    ]);
+    assert.equal(results[0].ok, true);
+    assert.equal(results[1].ok, true);
+    assert.equal(results[0].orderHandle, results[1].orderHandle);
+    assert.equal(orders, 1);
   });
 });

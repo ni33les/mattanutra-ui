@@ -428,7 +428,7 @@ async function executeFresh(
       return executeError("en", "not_found");
     }
 
-    const plan = await store.getPlan(capability.resourceId);
+    const plan = await store.getPlanForUpdate(capability.resourceId);
 
     if (!plan) {
       return executeError("en", "not_found");
@@ -471,6 +471,12 @@ async function executeFresh(
         reasonCode: "invalid_request"
       });
     }
+
+    const raced = await beginIdempotency<ExecuteSuccess>({
+      key: input.idempotencyKey, now, operation: "execute", ownerScope, payload, store
+    });
+    if (raced.kind === "replay") return raced.response;
+    if (raced.kind === "conflict") return raced.error;
 
     const existingOrder = await store.getActiveOrderForPlanRevision(
       plan.id,

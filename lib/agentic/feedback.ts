@@ -125,38 +125,36 @@ export async function feedbackTool(input: Readonly<{
     });
   }
 
-  await input.store.insertFeedback({
-    consentConfirmed: true,
-    createdAt: input.now,
-    id: randomUUID(),
-    optionId,
-    planId: plan.id,
-    points: input.points ?? [],
-    rating: input.rating ?? null,
-    revision: input.expectedRevision,
-    summary: input.summary ?? null
+  let inserted = false;
+  const response = await input.store.transaction(async (store) => {
+    const locked = await store.getPlanForUpdate(plan.id);
+    if (!locked || locked.currentRevision !== input.expectedRevision) {
+      return businessError({ message: "This plan changed. Reload the plan.", reasonCode: "stale_revision" });
+    }
+    const claimed = await beginIdempotency<FeedbackSuccess>({
+      key: input.idempotencyKey, now: input.now, operation: "feedback", ownerScope, payload, store
+    });
+    if (claimed.kind === "conflict") return claimed.error;
+    if (claimed.kind === "replay") return claimed.response;
+    await store.insertFeedback({
+      consentConfirmed: true, createdAt: input.now, id: randomUUID(), optionId,
+      planId: plan.id, points: input.points ?? [], rating: input.rating ?? null,
+      revision: input.expectedRevision, summary: input.summary ?? null
+    });
+    const success: FeedbackSuccess = { accepted: true, ok: true };
+    await commitIdempotency({
+      key: input.idempotencyKey, now: input.now, operation: "feedback", ownerScope,
+      payload, resourceIds: { planId: plan.id }, response: success, store
+    });
+    inserted = true;
+    return success;
   });
-
-  await persistMcpPlanFeedback({
-    optionId,
-    planId: plan.id,
-    rating: input.rating ?? null,
-    revision: input.expectedRevision,
-    summary: input.summary ?? null
-  });
-
-  const response: FeedbackSuccess = { accepted: true, ok: true };
-
-  await commitIdempotency({
-    key: input.idempotencyKey,
-    now: input.now,
-    operation: "feedback",
-    ownerScope,
-    payload,
-    resourceIds: { planId: plan.id },
-    response,
-    store: input.store
-  });
+  if (inserted) {
+    await persistMcpPlanFeedback({
+      optionId, planId: plan.id, rating: input.rating ?? null,
+      revision: input.expectedRevision, summary: input.summary ?? null
+    });
+  }
 
   return response;
 }

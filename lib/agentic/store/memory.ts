@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type {
   AgenticStore,
   CapabilityRecord,
@@ -48,6 +49,10 @@ export function createMemoryStore(): AgenticStore {
   function revisionKey(planId: string, revision: number) {
     return `${planId}:${revision}`;
   }
+
+  const transactions = new AsyncLocalStorage<boolean>();
+  let tail: Promise<unknown> = Promise.resolve();
+  const maps = [catalogues, capabilities, checkouts, feedback, fulfilment, idempotency, orderItems, orders, outbox, paymentAttempts, paymentAudits, plans, providerEvents, retailLinks, revisions, supportCases, supportMessages] as Map<string, unknown>[];
 
   const store: AgenticStore = {
     async getCatalogueSnapshot(id) { return catalogues.get(id) ?? null; },
@@ -232,6 +237,10 @@ export function createMemoryStore(): AgenticStore {
         .filter((item) => !item.processedAt)
         .map((item) => clone(item));
     },
+    async getPlanForUpdate(id) {
+      if (!transactions.getStore()) throw new Error("Plan locks require a transaction");
+      return store.getPlan(id);
+    },
     async getPlan(id) {
       return plans.get(id) ? clone(plans.get(id)!) : null;
     },
@@ -355,7 +364,16 @@ export function createMemoryStore(): AgenticStore {
       }
     },
     async transaction(work) {
-      return work(store);
+      if (transactions.getStore()) return work(store);
+      const pending = tail.catch(() => undefined).then(() => transactions.run(true, async () => {
+        const before = maps.map(map => new Map(map));
+        try { return await work(store); } catch (error) {
+          maps.forEach((map, index) => { map.clear(); for (const [key, value] of before[index]) map.set(key, value); });
+          throw error;
+        }
+      }));
+      tail = pending.then(() => undefined, () => undefined);
+      return pending;
     },
     async updateCheckout(record) {
       checkouts.set(record.id, clone(record));

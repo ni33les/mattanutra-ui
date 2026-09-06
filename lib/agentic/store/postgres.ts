@@ -13,7 +13,7 @@ function asJson(value: unknown) {
   return JSON.parse(JSON.stringify(value ?? null)) as unknown;
 }
 
-export function createPostgresStore(inputSql: Sql): AgenticStore {
+export function createPostgresStore(inputSql: Sql, inTransaction = false): AgenticStore {
   const sql = inputSql as unknown as AnySql;
   const store = {
     async getCatalogueSnapshot(id) {
@@ -266,6 +266,11 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
         select * from public.agentic_outbox_events where processed_at is null
       `;
       return rows.map(mapOutbox);
+    },
+    async getPlanForUpdate(id) {
+      if (!inTransaction) throw new Error("Plan locks require a transaction");
+      await sql`select id from public.agentic_plans where id = ${id}::uuid for update`;
+      return store.getPlan(id);
     },
     async getPlan(id) {
       const [row] = await sql`select * from public.agentic_plans where id = ${id}::uuid`;
@@ -568,7 +573,7 @@ export function createPostgresStore(inputSql: Sql): AgenticStore {
       `;
     },
     async transaction<T>(work: (store: AgenticStore) => Promise<T>) {
-      return sql.begin((tx) => work(createPostgresStore(tx as unknown as Sql))) as Promise<T>;
+      return sql.begin((tx) => work(createPostgresStore(tx as unknown as Sql, true))) as Promise<T>;
     },
     async updateCheckout(record) {
       await sql`
@@ -733,7 +738,10 @@ export function createRuntimeStore() {
   const sql = getSql();
 
   if (!sql) {
-    return createMemoryStore();
+    if (process.env.NODE_TEST_CONTEXT || (
+      process.env.AGENTIC_ALLOW_MEMORY_STORE === "true" && process.env.NODE_ENV !== "production"
+    )) return createMemoryStore();
+    throw new Error("DB_URL is required for the MCP runtime");
   }
 
   void keepDatabaseWarm();

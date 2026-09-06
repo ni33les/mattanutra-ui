@@ -227,6 +227,7 @@ export type AgenticStore = {
   getOrderItems(orderId: string): Promise<readonly OrderItemRecord[]>;
   getOutboxPending(): Promise<readonly OutboxEventRecord[]>;
   getPlan(id: string): Promise<PlanRecord | null>;
+  getPlanForUpdate(id: string): Promise<PlanRecord | null>;
   getPlanRevision(
     planId: string,
     revision: number

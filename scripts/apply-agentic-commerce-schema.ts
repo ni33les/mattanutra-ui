@@ -169,6 +169,11 @@ create table if not exists public.agentic_fulfilment_events (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists agentic_orders_active_plan_revision_idx
+  on public.agentic_orders (plan_id, plan_revision)
+  where order_status not in ('expired', 'cancelled')
+    and cancelled_at is null and expired_at is null;
+
 create index if not exists agentic_orders_plan_revision_idx
   on public.agentic_orders (plan_id, plan_revision);
 

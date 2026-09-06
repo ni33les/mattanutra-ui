@@ -10,6 +10,7 @@ import { issueCapability, nextTestUuid, resolveCapability } from "@/lib/agentic/
 import type { PlanMatchPort } from "@/lib/agentic/plan/match-port";
 import {
   beginIdempotency,
+  canonicalRequestHash,
   commitIdempotency,
   isIdempotencyRace,
   overwriteIdempotency
@@ -117,7 +118,6 @@ export function releasePlanCreateInflight(idempotencyKey: string) {
       inflightPlanIdempotency.delete(key);
     }
   }
-  inflightPlanMatches.clear();
 }
 
 export function resetPlanCreateInflightForTests() {
@@ -131,7 +131,7 @@ const inflightPlanMatches = new Map<
 >();
 const inflightPlanIdempotency = new Map<
   string,
-  Promise<PlanToolSuccess | AgenticErrorResult>
+  { hash: string; work: Promise<PlanToolSuccess | AgenticErrorResult> }
 >();
 
 function planCorrelationId(idempotencyKey?: string) {
@@ -926,6 +926,9 @@ export async function planTool(input: Readonly<{
       : `${ownerScope}\0${input.payload.idempotencyKey}`;
   if (inflightKey) {
     const existing = inflightPlanIdempotency.get(inflightKey);
+    if (existing && existing.hash !== canonicalRequestHash(input.payload)) {
+      return businessError({ fieldPath: "idempotencyKey", message: "This key is in use with a different payload.", reasonCode: "idempotency_conflict" });
+    }
     const planCorrelation =
       input.payload.idempotencyKey && `plan:${input.payload.idempotencyKey}`;
     if (existing && planCorrelation) {
@@ -933,10 +936,10 @@ export async function planTool(input: Readonly<{
       if (deadlineExceeded(planCorrelation)) {
         inflightPlanIdempotency.delete(inflightKey);
       } else {
-        return existing;
+        return existing.work;
       }
     } else if (existing) {
-      return existing;
+      return existing.work;
     }
   }
 
@@ -959,10 +962,10 @@ export async function planTool(input: Readonly<{
     return result;
   });
   if (inflightKey) {
-    inflightPlanIdempotency.set(inflightKey, work);
+    inflightPlanIdempotency.set(inflightKey, { hash: canonicalRequestHash(input.payload), work });
     void work
       .finally(() => {
-        if (inflightPlanIdempotency.get(inflightKey) === work) {
+        if (inflightPlanIdempotency.get(inflightKey)?.work === work) {
           inflightPlanIdempotency.delete(inflightKey);
         }
       })
@@ -1041,7 +1044,7 @@ async function executePlanTool(input: Readonly<{
     }
 
     payload = {
-      ...input.payload,
+      operation: "get",
       expectedRevision: replay.response.revision,
       planHandle: replay.response.planHandle
     };
@@ -1098,7 +1101,7 @@ async function executePlanTool(input: Readonly<{
     }
 
     payload = {
-      ...input.payload,
+      operation: "get",
       expectedRevision: raced.response.revision,
       planHandle: raced.response.planHandle
     };
@@ -1294,16 +1297,11 @@ async function executePlanTool(input: Readonly<{
         store
       });
       planHandle = issued.handle;
-    } else {
-      await store.updatePlan({
-        ...existingPlan,
-        currentRevision: revision,
-        updatedAt: input.now
-      });
     }
 
-    const writeProcessingRevision =
-      Boolean(input.deferProcessing) || Boolean(input.matchPort);
+    // Claim new creates durably. Edits retain the current usable revision until
+    // their fully validated result can be published under the plan row lock.
+    const writeProcessingRevision = !existingPlan;
     if (writeProcessingRevision) {
       await store.insertPlanRevision(
         revisionRecord(planId, revision, processing, input.now)
@@ -1425,7 +1423,7 @@ function runPlanMatch(
   loadLiveCatalogue: boolean,
   matchStartedAt: number
 ) {
-  const key = matchInflightKey(prepared.planId, prepared.revision);
+  const key = `${matchInflightKey(prepared.planId, prepared.revision)}:${canonicalRequestHash(input.payload)}`;
   const existing = inflightPlanMatches.get(key);
 
   if (existing) {
@@ -1470,7 +1468,8 @@ async function completePreparedPlan(
       products: [],
       supplements: []
     };
-  } else if (prepared.previous && !loadLiveCatalogue) {
+  } else if (prepared.previous && prepared.previous.status !== "processing" && !loadLiveCatalogue &&
+    prepared.previous.requestSnapshot.destinationCountry === country) {
     const pinned = await restoreCataloguePin(
       pinnedSnapshotIdFromResult(prepared.previous), GUIDANCE_RULES_VERSION, input.store
     );
@@ -1761,121 +1760,77 @@ async function persistTerminalPlan(input: Readonly<{
   result: PlanResult;
   revision: number;
   skipSideEffects?: boolean;
-}>): Promise<PlanToolSuccess> {
-  let result = input.result;
-  if (planCompactApplicable(result.status) && !result.evidenceHandle) {
-    const evidenceHandle = await issueEvidenceCapability({
-      config: input.input.config,
-      now: input.input.now,
-      planId: input.planId,
-      revision: input.revision,
-      scope: input.input.scope,
-      store: input.input.store
-    });
-    result = {
-      ...result,
-      claimIds: planClaimIds(result),
-      evidenceHandle,
-      researchVersion: planResearchVersion()
-    };
-    if (!input.skipSideEffects) {
-      await commitFunnelEvent({
-        attribution: "agent_connector",
-        correlationId: input.planId,
-        createdAt: input.input.now,
-        eventId: `info:${input.planId}`,
-        eventType: "info_shown",
-        payload: { locale: input.locale }
-      });
-      await commitFunnelEvent({
-        attribution: "agent_connector",
-        correlationId: input.planId,
-        createdAt: input.input.now,
-        eventId: `plan-created:${input.planId}:${input.revision}`,
-        eventType: "plan_created",
-        payload: { locale: input.locale }
-      });
-      if (result.status === "ready") {
-        await commitFunnelEvent({
-          attribution: "agent_connector",
-          correlationId: input.planId,
-          createdAt: input.input.now,
-          eventId: `plan-ready:${input.planId}:${input.revision}`,
-          eventType: "plan_ready",
-          payload: { locale: input.locale }
-        });
-      }
-      const namespace = input.input.scope.principalScope;
-      if (namespace?.startsWith(QA_NAMESPACE_PREFIX)) {
-        const stopped = await stopIfPlanDeadline(
-          input.input.payload.idempotencyKey,
-          `${input.input.scope.environment}:${input.input.scope.tenantScope}:${input.input.scope.principalScope ?? "anon"}`,
-          input.planId,
-          input.revision
-        );
-        if (!stopped) {
-          setQueryNamespace(namespace);
-          const next = logicalPlanQueryCounts(namespace);
-          if (Object.values(next).some((value) => Number(value) > 0)) {
-            await persistQueryBudget(namespace, next);
-          }
-        }
-      }
-    }
-  }
+}>): Promise<PlanToolSuccess | AgenticErrorResult> {
+  let committedResult: PlanResult | null = null;
+  const response = await input.input.store.transaction(async (store) => {
+    const plan = await store.getPlanForUpdate(input.planId);
+    if (!plan) return businessError({ message: "Not found.", reasonCode: "not_found" });
 
-  const response = successFromResult({
-    locale: input.locale,
-    planHandle: input.planHandle,
-    result,
-    revision: input.revision
-  });
-
-  await input.input.store.transaction(async (store) => {
-    const plan = await store.getPlan(input.planId);
-
-    if (plan) {
-      await store.updatePlan({
-        ...plan,
-        currentRevision: input.revision,
-        updatedAt: input.input.now
+    const key = input.input.payload.idempotencyKey;
+    if (key) {
+      const replay = await beginIdempotency<PlanToolSuccess>({
+        key, now: input.input.now, operation: "plan", ownerScope: input.ownerScope,
+        payload: input.input.payload, store
       });
+      if (replay.kind === "conflict") return replay.error;
+      if (replay.kind === "replay" && replay.response.status !== "processing") return replay.response;
     }
 
     const current = await store.getPlanRevision(input.planId, input.revision);
-    const record = revisionRecord(
-      input.planId,
-      input.revision,
-      result,
-      current?.createdAt ?? input.input.now
-    );
-
-    if (current) {
-      await store.updatePlanRevision(record);
-    } else {
-      await store.insertPlanRevision(record);
-    }
-
-    if (input.input.payload.idempotencyKey) {
-      await commitTerminalIdempotency({
-        key: input.input.payload.idempotencyKey,
-        now: input.input.now,
-        ownerScope: input.ownerScope,
-        payload: input.input.payload,
-        planId: input.planId,
-        response,
-        store
+    const baseRevision = input.input.payload.expectedRevision ?? input.revision;
+    if (plan.currentRevision !== baseRevision || (current && current.status !== "processing")) {
+      return businessError({
+        currentRevision: plan.currentRevision, fieldPath: "expectedRevision",
+        message: "This plan changed. Reload the current plan and retry.",
+        nextActions: ["reload_plan"], reasonCode: "stale_revision"
       });
     }
+    throwIfAborted(planCorrelationId(key));
+    let result = input.result;
+    if (planCompactApplicable(result.status) && !result.evidenceHandle) {
+      const evidenceHandle = await issueEvidenceCapability({
+        config: input.input.config, now: input.input.now, planId: input.planId,
+        revision: input.revision, scope: input.input.scope, store
+      });
+      result = { ...result, claimIds: planClaimIds(result), evidenceHandle, researchVersion: planResearchVersion() };
+    }
+    const success = successFromResult({
+      locale: input.locale, planHandle: input.planHandle, result, revision: input.revision
+    });
+    const record = revisionRecord(input.planId, input.revision, result, current?.createdAt ?? input.input.now);
+    if (current) await store.updatePlanRevision(record);
+    else await store.insertPlanRevision(record);
+    await store.updatePlan({ ...plan, currentRevision: input.revision, updatedAt: input.input.now });
+    if (key) {
+      await commitTerminalIdempotency({
+        key, now: input.input.now, ownerScope: input.ownerScope,
+        payload: input.input.payload, planId: input.planId, response: success, store
+      });
+    }
+    throwIfAborted(planCorrelationId(key));
+    committedResult = result;
+    return success;
   });
 
-  if (!input.skipSideEffects && !process.env.NODE_TEST_CONTEXT) {
-    schedulePersistPlanSideEffects({
-      locale: input.locale,
-      planId: input.planId,
-      result: input.result,
-      revision: input.revision
-    });
+  if (!isAgenticErrorResult(response) && committedResult && !input.skipSideEffects) {
+    if (planCompactApplicable(response.status)) {
+      const events = [
+        ["info:" + input.planId, "info_shown"],
+        ["plan-created:" + input.planId + ":" + input.revision, "plan_created"],
+        ...(response.status === "ready" ? [["plan-ready:" + input.planId + ":" + input.revision, "plan_ready"]] : [])
+      ];
+      for (const [eventId, eventType] of events) {
+        await commitFunnelEvent({
+          attribution: "agent_connector", correlationId: input.planId, createdAt: input.input.now,
+          eventId, eventType, payload: { locale: input.locale }
+        });
+      }
+    }
+    if (!process.env.NODE_TEST_CONTEXT) {
+      schedulePersistPlanSideEffects({
+        locale: input.locale, planId: input.planId, result: committedResult, revision: input.revision
+      });
+    }
   }
   return response;
 }

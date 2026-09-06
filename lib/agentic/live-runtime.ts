@@ -1,7 +1,6 @@
 import { loadAgenticConfig } from "@/lib/agentic/config";
 import {
   createAgenticRuntime,
-  getAgenticRuntime,
   type AgenticRuntime
 } from "@/lib/agentic/runtime";
 import { createRuntimeStore } from "@/lib/agentic/store/postgres";
@@ -15,13 +14,9 @@ export function getLiveAgenticRuntime(request?: Request): AgenticRuntime {
     return globalLive.mattanutraLiveAgenticRuntime;
   }
 
-  try {
-    globalLive.mattanutraLiveAgenticRuntime = createAgenticRuntime({
-      config: loadAgenticConfig(request),
-      store: createRuntimeStore()
-    });
-    return globalLive.mattanutraLiveAgenticRuntime;
-  } catch {
-    return getAgenticRuntime(request);
-  }
+  globalLive.mattanutraLiveAgenticRuntime = createAgenticRuntime({
+    config: loadAgenticConfig(request),
+    store: createRuntimeStore()
+  });
+  return globalLive.mattanutraLiveAgenticRuntime;
 }
