@@ -48,7 +48,7 @@ export async function fulfillWebPayment(paymentId: string, dependencies: Fulfill
     const session = await (dependencies.session ?? retrievePaidPaymentSession)(payment);
     const fx = await (dependencies.rate ?? resolveUsdRateForCurrency)(payment.currency);
     const fulfilled = await withDatabaseTransaction(sql, async tx => {
-      if (payment.plan_id) await tx`select plan_id from public.assessments where plan_id = ${payment.plan_id}::uuid for update`;
+      const [assessment] = payment.plan_id ? await tx`select locale from public.assessments where plan_id = ${payment.plan_id}::uuid for no key update` : [];
       const [current] = await tx<PaymentRow[]>`select * from public.payments where id = ${paymentId}::uuid for update`;
       if (current.fulfillment_status === "complete") return false;
       if (current.plan_id !== payment.plan_id) throw new Error("Payment binding changed; retry fulfillment");
@@ -56,7 +56,7 @@ export async function fulfillWebPayment(paymentId: string, dependencies: Fulfill
       await recordStripePaymentAccounting(tx, current, session, fx);
       await storeStripeEmail(tx, current, current.customer_email);
       if (current.plan_id) {
-        await startPaidAssessmentPlan({ sql: tx, locale: current.locale, paymentId, planId: current.plan_id, selectedPlan: current.selected_plan });
+        await startPaidAssessmentPlan({ sql: tx, locale: assessment?.locale ?? current.locale, paymentId, planId: current.plan_id, selectedPlan: current.selected_plan });
       }
       await tx`update public.payments set fulfillment_status = 'complete', fulfillment_completed_at = now(),
         fulfillment_error = null, updated_at = now() where id = ${paymentId}::uuid`;

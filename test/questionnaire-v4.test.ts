@@ -17,8 +17,8 @@ const assessmentState = readFileSync(new URL("../components/assessment-flow-stat
 const assessmentStore = readFileSync(new URL("../lib/assessment-store.ts", import.meta.url), "utf8");
 const assessmentResumeStore = readFileSync(new URL("../lib/assessment-resume-store.ts", import.meta.url), "utf8");
 const assessmentResumeRoute = readFileSync(new URL("../app/api/assessment/resume-link/route.ts", import.meta.url), "utf8");
-const assessmentRoute = readFileSync(new URL("../app/api/assessment/route.ts", import.meta.url), "utf8");
-const assessmentPlanRoute = readFileSync(new URL("../app/api/assessment/[planId]/route.ts", import.meta.url), "utf8");
+const assessmentRoute = readFileSync(new URL("../lib/assessment-capture.ts", import.meta.url), "utf8");
+const assessmentPlanRoute = readFileSync(new URL("../lib/assessment-capture.ts", import.meta.url), "utf8");
 const adminQueryData = readFileSync(new URL("../lib/admin-query-data.ts", import.meta.url), "utf8");
 const schema = readFileSync(new URL("../db-schema.sql", import.meta.url), "utf8");
 const packageJson = readFileSync(new URL("../package.json", import.meta.url), "utf8");
@@ -67,7 +67,7 @@ describe("questionnaire V4 first name capture", () => {
     assert.match(assessmentFlow, /\bconst \[contactEmail, setContactEmail\]/);
     assert.match(assessmentFlow, /id: "firstName"[\s\S]*id: "resume-email"[\s\S]*id: "sex"/);
     assert.match(assessmentFlow, /contactEmail:\s*normalizedContactEmail/);
-    assert.match(assessmentRoute, /contactEmail\?: unknown/);
+    assert.match(assessmentRoute, /normalizeAssessmentContactEmail\(body\.contactEmail\)/);
     assert.match(assessmentStore, /\bcontact_email\b/);
     assert.match(assessmentStore, /normalizeAssessmentContactEmail\(contactEmail\)/);
   });
@@ -174,8 +174,8 @@ describe("questionnaire V4 first name capture", () => {
     assert.match(assessmentResumeStore, /RESUME_TTL_DAYS\s*=\s*14/);
     assert.match(assessmentResumeStore, /finalized_at is null/);
     assert.match(assessmentResumeStore, /finalizeAssessmentResumeDraftForContact/);
-    assert.match(assessmentRoute, /finalizeAssessmentResumeDraftForContact/);
-    assert.match(assessmentPlanRoute, /finalizeAssessmentResumeDraftForContact/);
+    assert.match(assessmentRoute, /finalizeAssessmentResumeDraft/);
+    assert.match(assessmentPlanRoute, /finalizeAssessmentResumeDraft/);
     assert.match(assessmentResumeRoute, /assessment_resume_schema_missing/);
     assert.match(assessmentResumeRoute, /status:\s*schemaMissing \? 503 : 400/);
     assert.match(assessmentResumeRoute, /We could not send the private link at this time\./);

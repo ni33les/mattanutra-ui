@@ -1,3 +1,4 @@
+import { loadGenerationInput, type GenerationInput } from "@/lib/assessment-revisions";
 import type postgres from "postgres";
 import { toJsonValue } from "@/lib/assessment-store";
 
@@ -9,9 +10,11 @@ export async function insertFormulationVersion(
     formulation: Record<string, unknown>;
     includeEmptyRecommendations?: boolean;
     modelVersion: string;
+    generation?: GenerationInput | null;
     planId: string;
   }>
 ) {
+  const generation = input.generation ?? await loadGenerationInput(db, input.planId);
   const rows = input.includeEmptyRecommendations
     ? await db<{ version: number | string }[]>`
         with bumped as (
@@ -29,7 +32,7 @@ export async function insertFormulationVersion(
         ),
         inserted_formulation as (
           insert into public.formulations (
-            assessment_revision,
+            generation_locale, generator_version, assessment_revision,
             plan_id,
             version,
             formulation,
@@ -38,7 +41,8 @@ export async function insertFormulationVersion(
             updated_at
           )
           select
-            (select input_revision from public.assessments where plan_id = bumped.plan_id),
+            ${generation?.locale ?? null}, ${generation?.generatorVersion ?? null},
+            ${generation?.revision ?? null},
             bumped.plan_id,
             bumped.version,
             ${db.json(toJsonValue(input.formulation))},
@@ -50,7 +54,7 @@ export async function insertFormulationVersion(
         ),
         inserted_recommendations as (
           insert into public.recommendations (
-            assessment_revision,
+            generation_locale, generator_version, assessment_revision,
             plan_id,
             version,
             recommendations,
@@ -58,7 +62,8 @@ export async function insertFormulationVersion(
             updated_at
           )
           select
-            (select input_revision from public.assessments where plan_id = bumped.plan_id),
+            ${generation?.locale ?? null}, ${generation?.generatorVersion ?? null},
+            ${generation?.revision ?? null},
             bumped.plan_id,
             bumped.version,
             ${db.json(toJsonValue([]))},
@@ -86,7 +91,7 @@ export async function insertFormulationVersion(
           returning counters.plan_id, counters.current_formulation_version as version
         )
         insert into public.formulations (
-          assessment_revision,
+          generation_locale, generator_version, assessment_revision,
           plan_id,
           version,
           formulation,
@@ -95,7 +100,8 @@ export async function insertFormulationVersion(
           updated_at
         )
         select
-          (select input_revision from public.assessments where plan_id = bumped.plan_id),
+          ${generation?.locale ?? null}, ${generation?.generatorVersion ?? null},
+            ${generation?.revision ?? null},
           bumped.plan_id,
           bumped.version,
           ${db.json(toJsonValue(input.formulation))},
@@ -114,9 +120,11 @@ export async function insertFoodGuidanceVersion(
   input: Readonly<{
     foodGuidance: Record<string, unknown>;
     modelVersion: string;
+    generation?: GenerationInput | null;
     planId: string;
   }>
 ) {
+  const generation = input.generation ?? await loadGenerationInput(db, input.planId);
   const rows = await db<{ version: number | string }[]>`
     with bumped as (
       insert into public.assessment_version_counters as counters (
@@ -132,7 +140,7 @@ export async function insertFoodGuidanceVersion(
       returning counters.plan_id, counters.current_food_guidance_version as version
     )
     insert into public.food_guidance (
-      assessment_revision,
+      generation_locale, generator_version, assessment_revision,
       plan_id,
       version,
       guidance,
@@ -141,7 +149,8 @@ export async function insertFoodGuidanceVersion(
       updated_at
     )
     select
-      (select input_revision from public.assessments where plan_id = bumped.plan_id),
+      ${generation?.locale ?? null}, ${generation?.generatorVersion ?? null},
+            ${generation?.revision ?? null},
       bumped.plan_id,
       bumped.version,
       ${db.json(toJsonValue(input.foodGuidance))},

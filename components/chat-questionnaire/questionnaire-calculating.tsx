@@ -28,7 +28,7 @@ export function QuestionnaireCalculating({ locale, status, onSeeResults, canOpen
   const sent = delivery?.status === "sent";
   const isReady = status === "ready", isBuilding = status === "building";
   const statusLabel = sent ? copy.calcEmailSent : requested ? copy.calcEmailRequested
-    : isReady ? copy.calcReady : isBuilding ? copy.calcBuilding : copy.calcSavedNote;
+    : isReady ? copy.calcReady : isBuilding ? copy.calcBuilding : onRetryCapture ? copy.calcCaptureFailed : copy.calcSavedNote;
 
   async function submitEmail() {
     if (emailBusy) return;

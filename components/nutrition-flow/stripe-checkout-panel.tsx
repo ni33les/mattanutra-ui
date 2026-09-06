@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchWithBodyDeadline } from "@/lib/funnel-polling";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
@@ -90,18 +91,13 @@ export function StripeCheckoutPanel({
         : Promise.resolve(null),
     [hasValidStripePublishableKey, trimmedPublishableKey]
   );
-  const requestCheckoutSession = useCallback(async () => {
+  const requestCheckoutSession = useCallback(async (signal?: AbortSignal) => {
     setError("");
 
-    const controller = new AbortController();
-    const timeout = window.setTimeout(
-      () => controller.abort(),
-      CHECKOUT_SESSION_TIMEOUT_MS
-    );
     let response: Response;
 
     try {
-      response = await fetch("/api/payments/checkout-session", {
+      response = await fetchWithBodyDeadline("/api/payments/checkout-session", {
         body: JSON.stringify({
           locale,
           plan,
@@ -114,16 +110,14 @@ export function StripeCheckoutPanel({
           "content-type": "application/json"
         },
         method: "POST",
-        signal: controller.signal
-      });
+        signal
+      }, CHECKOUT_SESSION_TIMEOUT_MS);
     } catch (caught) {
       if (caught instanceof Error && caught.name === "AbortError") {
         throw new Error(labels.unable);
       }
 
       throw caught;
-    } finally {
-      window.clearTimeout(timeout);
     }
 
     if (!response.ok) {
@@ -269,18 +263,20 @@ export function StripeCheckoutPanel({
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     const sessionTimer = window.setTimeout(() => {
       if (cancelled) {
         return;
       }
 
       setIsLoadingSession(true);
-      void requestCheckoutSession()
+      void requestCheckoutSession(controller.signal)
         .then((session) => {
           if (cancelled) {
             return;
           }
 
+          if (session.redirectUrl) return;
           if (session.mock && session.paymentId) {
             scheduleMockCheckoutCompletion(session.paymentId);
             return;
@@ -306,6 +302,7 @@ export function StripeCheckoutPanel({
 
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearTimeout(sessionTimer);
     };
   }, [

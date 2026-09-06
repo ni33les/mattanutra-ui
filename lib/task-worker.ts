@@ -1,4 +1,4 @@
-import { ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
+import { generationLocale, ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { deferUntilDatabaseCommit } from "@/lib/db";
 import type postgres from "postgres";
 import {
@@ -141,6 +141,7 @@ async function createWorkTask(input: Readonly<{
 
   const generation = input.planId && ASSESSMENT_GENERATION_TASKS.has(input.taskType)
     ? await loadGenerationInput(sql, input.planId, input.payload?.locale) : null;
+  if (input.planId && ASSESSMENT_GENERATION_TASKS.has(input.taskType) && !generation) throw new Error("Assessment inputs changed before task scheduling");
   const payload = { ...input.payload, ...(generation ? { generation } : {}) };
   const generationKey = generation ? `:${generation.revision}:${generation.locale}:${generation.generatorVersion}` : "";
   const maxAttempts = input.maxAttempts ?? 3;
@@ -157,7 +158,7 @@ async function createWorkTask(input: Readonly<{
     dependencies: input.dependencies,
     description: input.description,
     idempotencyKey: `${input.idempotencyKey}${generationKey}`,
-    idempotencyScope: input.idempotencyScope,
+    idempotencyScope: generation ? "active" : input.idempotencyScope,
     idempotencyScopeKey:
       input.idempotencyScopeKey ??
       (input.planId ? `${input.taskType}:${input.planId}` : input.taskType),
@@ -333,7 +334,7 @@ export async function enqueueHealthScoreAnalysisTask({
     const [ready] = await sql`select result from public.assessment_healthscore_results
       where plan_id = ${planId}::uuid and revision = ${generation.revision}
         and locale = ${generation.locale} and generator_version = ${FUNNEL_GENERATOR_VERSION}`;
-    if (ready && hasHealthScoreAiCopy(ready.result)) return null;
+    if (ready && hasHealthScoreAiCopy(ready.result, generation.locale)) return null;
   }
   const inputHash = generation.inputHash;
   return createWorkTask({
@@ -375,6 +376,9 @@ async function activePlanTaskId(
     select id::text
     from public.tasks
     where plan_id = ${planId}::uuid
+      and payload #>> '{generation,revision}' = (select input_revision::text from public.assessments where plan_id = ${planId}::uuid)
+      and payload #>> '{generation,locale}' = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+      and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
       and task_type = ${taskType}
       and status not in ('completed', 'failed', 'cancelled', 'skipped')
       and (
@@ -410,6 +414,9 @@ async function nutritionOutputReadiness(
         select 1
         from public.formulations
         where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
           and (
             model_version is null
             or model_version not like '%:example'
@@ -1036,6 +1043,9 @@ async function nutritionPlanRevisionContext(sql: postgres.Sql, planId: string) {
         select coalesce(max(version), 0)
         from public.formulations
         where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
           and (
             model_version is null
             or model_version not like '%:example'
@@ -1045,6 +1055,9 @@ async function nutritionPlanRevisionContext(sql: postgres.Sql, planId: string) {
         select coalesce(max(version), 0)
         from public.food_guidance
         where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
           and (
             model_version is null
             or model_version not like '%:example'
@@ -1095,6 +1108,9 @@ async function activeNutritionPlanRefinementTaskId(
     select id::text
     from public.tasks
     where plan_id = ${planId}::uuid
+      and payload #>> '{generation,revision}' = (select input_revision::text from public.assessments where plan_id = ${planId}::uuid)
+      and payload #>> '{generation,locale}' = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+      and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
       and context ->> 'source' = 'plan_refinement'
       and task_type in (
         'refine_nutrition_plan',
@@ -1121,6 +1137,9 @@ async function freshNutritionReportTaskId(sql: postgres.Sql, planId: string) {
           select max(updated_at)
           from public.formulations
           where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
             and (
               model_version is null
               or model_version not like '%:example'
@@ -1130,6 +1149,9 @@ async function freshNutritionReportTaskId(sql: postgres.Sql, planId: string) {
           select max(updated_at)
           from public.food_guidance
           where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
             and (
               model_version is null
               or model_version not like '%:example'
@@ -1153,6 +1175,9 @@ async function freshNutritionReportTaskId(sql: postgres.Sql, planId: string) {
       select task_id::text, generated_at
       from public.nutrition_reports
       where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
       order by version desc, generated_at desc
       limit 1
     )
@@ -1170,6 +1195,9 @@ async function activeNutritionReportTaskId(sql: postgres.Sql, planId: string) {
     select id::text
     from public.tasks
     where plan_id = ${planId}::uuid
+      and payload #>> '{generation,revision}' = (select input_revision::text from public.assessments where plan_id = ${planId}::uuid)
+      and payload #>> '{generation,locale}' = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+      and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
       and task_type = 'generate_nutrition_report'
       and status not in ('completed', 'failed', 'cancelled', 'skipped')
     order by business_value desc, scheduled_for asc, created_at asc
@@ -1403,6 +1431,9 @@ export async function enqueueProductRecommendationsTask({
       from public.tasks
       where plan_id = ${planId}::uuid
         and task_type = 'generate_product_recommendations'
+        and payload #>> '{generation,revision}' = (select input_revision::text from public.assessments where plan_id = ${planId}::uuid)
+        and payload #>> '{generation,locale}' = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
         and payload ->> 'matcherAlgorithmVersion' = ${matcherAlgorithmVersion}
         and payload ->> 'matcherImplementationVersion' = ${matcherImplementationVersion}
         and payload ->> 'stackPreference' = ${normalizedStackPreference}
@@ -1544,6 +1575,9 @@ export async function enqueueFoodGapSupportTask({
         select max(version)
         from public.formulations
         where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
           and (
             model_version is null
             or model_version not like '%:example'
@@ -1553,6 +1587,9 @@ export async function enqueueFoodGapSupportTask({
         select max(version)
         from public.food_guidance
         where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
           and (
             model_version is null
             or model_version not like '%:example'
@@ -1576,6 +1613,9 @@ export async function enqueueFoodGapSupportTask({
             status
           from public.product_recommendation_runs
           where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
             and status in ('completed', 'partial')
             and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
           order by
@@ -1587,6 +1627,9 @@ export async function enqueueFoodGapSupportTask({
         select count(*)
         from public.product_recommendation_runs
         where plan_id = ${planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
           and status in ('completed', 'partial')
       ), 0)::int as product_run_count,
       coalesce((
@@ -1692,6 +1735,9 @@ export async function enqueueMissingProductRecommendationsForReadyPlans({
         select 1
         from public.formulations
         where formulations.plan_id = assessments.plan_id
+        and formulations.assessment_revision = assessments.input_revision
+        and formulations.generation_locale = assessments.locale
+        and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}
           and (
             formulations.model_version is null
             or formulations.model_version not like '%:example'

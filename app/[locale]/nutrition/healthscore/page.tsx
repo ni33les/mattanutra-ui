@@ -1,3 +1,4 @@
+import { getRevisionHealthScore } from "@/lib/assessment-revisions";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { PublicNutritionShell } from "@/components/nutrition-flow/public-nutrition-shell";
@@ -120,11 +121,12 @@ export default async function NutritionHealthScorePage({
     redirect(nutritionRevealPath(locale, planId));
   }
 
-  if (!prefill?.healthScore) {
+  if (!prefill) {
     redirect(nutritionQuizPath(locale, planId));
   }
 
-  if (!hasHealthScoreAiCopy(prefill.healthScore)) {
+  const currentHealthScore = await getRevisionHealthScore(planId, locale);
+  if (!hasHealthScoreAiCopy(currentHealthScore, locale)) {
     return (
       <main className="mn-customer-shell flex min-h-screen flex-col bg-[var(--mn-cream)] text-[var(--mn-ink)]">
         <TitleBar
@@ -142,8 +144,8 @@ export default async function NutritionHealthScorePage({
     prefill.answers ?? null,
     cachedEvaluatedIngredientCatalogueCount(),
     locale,
-    prefill.healthScore,
-    prefill.locale
+    currentHealthScore,
+    locale
   );
   const firstName = firstNameFromAssessmentAnswers(prefill.answers);
 

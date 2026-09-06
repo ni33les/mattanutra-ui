@@ -187,7 +187,7 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.doesNotMatch(chat, /phase:\s*\"prep\"|phase:\s*\"hold\"/);
     assert.match(chat, /showFinishStage/);
     assert.match(chat, /pose:\s*\"wai\"/);
-    assert.match(chat, /hasUsableHealthScore/);
+    assert.match(chat, /calcStatus === "ready"/);
     assert.match(css, /mn-quiz-stage-fade-in/);
     assert.match(css, /mn-quiz-stage-pop/);
     assert.match(css, /mn-quiz-stage-card-in/);
@@ -231,18 +231,19 @@ describe("questionnaire v14 UX on v6 schema", () => {
       join(root, "components/chat-questionnaire/calculating-wait.tsx"),
       "utf8"
     );
-    assert.match(calc, /showEmailEscape/);
+    assert.match(calc, /status === "error"/);
     assert.match(calc, /calc-emailbox|email-stack/);
     assert.match(wait, /pose="wai"/);
     assert.match(calc, /CalculatingWait/);
-    // No retry button in fallback UI
-    assert.doesNotMatch(calc, /calcRetry/);
+    // Recovery keeps capture and analysis retries separate.
+    assert.match(calc, /calcRetryCapture/);
+    assert.match(calc, /calcRetryAnalysis/);
     assert.doesNotMatch(calc, /onClick=\{onRetry\}/);
     assert.match(calc, /email-stack|email-submit/);
     // Email only inside the failure branch (not always-on)
     assert.match(
       calc,
-      /showEmailEscape \? \([\s\S]*email/
+      /status === "error" \? [\s\S]*email/
     );
     const css = readFileSync(
       join(root, "components/chat-questionnaire/chat-questionnaire.css"),

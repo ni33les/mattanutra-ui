@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import type postgres from "postgres";
 import { getSql } from "@/lib/db";
@@ -12,10 +13,19 @@ export type GenerationInput = Readonly<{
   locale: Locale;
   generatorVersion: string;
 }>;
+
+const generationScope = new AsyncLocalStorage<{ planId: string; input: GenerationInput }>();
+export function withGenerationInput<T>(planId: string, input: GenerationInput, work: () => T): T {
+  return generationScope.run({ planId, input }, work);
+}
+export function generationLocale(planId: string | null | undefined) {
+  const scope = generationScope.getStore();
+  return scope && scope.planId === planId ? scope.input.locale : null;
+}
 export const ASSESSMENT_GENERATION_TASKS = new Set([
   "analyze_healthscore", "generate_supplement_guidance", "generate_example_supplement_guidance",
   "generate_food_guidance", "generate_food_gap_guidance", "generate_product_recommendations",
-  "generate_nutrition_report", "refine_nutrition_plan"
+  "generate_nutrition_report", "refine_nutrition_plan", "nutrition_plan_chat_reply"
 ]);
 
 function canonical(value: unknown): unknown {
@@ -39,6 +49,11 @@ export function generationInput(payload: unknown): GenerationInput | null {
 export async function loadGenerationInput(sql: postgres.Sql | postgres.TransactionSql, planId: string, locale?: unknown): Promise<GenerationInput | null> {
   const [row] = await sql`select answers, input_revision, input_hash, locale from public.assessments where plan_id = ${planId}::uuid`;
   if (!row) return null;
+  const scope = generationScope.getStore();
+  if (scope?.planId === planId) {
+    if (scope.input.revision !== Number(row.input_revision) || (row.input_hash && scope.input.inputHash !== row.input_hash)) return null;
+    return scope.input;
+  }
   return {
     answers: row.answers, revision: Number(row.input_revision), inputHash: row.input_hash ?? assessmentInputHash(row.answers),
     locale: isLocale(locale) ? locale : isLocale(row.locale) ? row.locale : "en", generatorVersion: FUNNEL_GENERATOR_VERSION

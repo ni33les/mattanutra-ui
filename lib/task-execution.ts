@@ -1,3 +1,4 @@
+import { hasHealthScoreAiCopy } from "@/lib/assessment-store";
 import { validateLeadEmail } from "@/lib/email-validation";
 import { analyzeFoodGapSupportDeterministically } from "@/lib/food-gap-support";
 import { analyzeFoodGuidanceWithGrok } from "@/lib/food-guidance-analysis";
@@ -50,26 +51,6 @@ function throwIfTaskExecutionAborted(runtime: TaskExecutionRuntime) {
   if (runtime.signal?.aborted) {
     throw new Error("Task execution aborted");
   }
-}
-
-function hasHealthScoreAdvice(value: unknown) {
-  const record =
-    value !== null && typeof value === "object"
-      ? (value as HealthScoreResult)
-      : null;
-  const heroBody = record?.pageContent?.aiCopy?.heroBody;
-
-  if (typeof heroBody === "string") {
-    return heroBody.trim().length > 0;
-  }
-
-  if (heroBody && typeof heroBody === "object") {
-    return Object.values(heroBody).some(
-      (item) => typeof item === "string" && item.trim().length > 0
-    );
-  }
-
-  return false;
 }
 
 async function configuredSql() {
@@ -375,7 +356,7 @@ export async function executeTaskWorkItem(
   }
 
   if (workItem.taskType === "analyze_healthscore") {
-    if (hasHealthScoreAdvice(workItem.healthScore)) {
+    if (hasHealthScoreAiCopy(workItem.healthScore, workItem.locale)) {
       return {
         cachedOrExisting: true,
         healthScore: workItem.healthScore

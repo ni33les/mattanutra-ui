@@ -1,127 +1,40 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-
-const captureRoute = readFileSync(
-  new URL("../app/api/assessment/route.ts", import.meta.url),
-  "utf8"
-);
-const planRoute = readFileSync(
-  new URL("../app/api/assessment/[planId]/route.ts", import.meta.url),
-  "utf8"
-);
-const panel = readFileSync(
-  new URL("../components/nutrition-flow/healthscore-panel.tsx", import.meta.url),
-  "utf8"
-);
-const reveal = readFileSync(
-  new URL("../components/reveal-final-results.tsx", import.meta.url),
-  "utf8"
-);
-const chat = readFileSync(
-  new URL("../components/chat-questionnaire/chat-questionnaire.tsx", import.meta.url),
-  "utf8"
-);
-
-describe("assessment capture stays off the pregeneration wait path", () => {
-  it("returns the captured plan before waiting on pregeneration or analysis", () => {
-    assert.match(captureRoute, /await persistAssessmentSubmission/);
-    assert.match(captureRoute, /void \(async \(\) => \{/);
-    assert.match(
-      captureRoute,
-      /void \(async \(\) => \{[\s\S]*enqueueAssessmentPregenerationTasks/
-    );
-    assert.ok(
-      captureRoute.indexOf("await persistAssessmentSubmission") <
-        captureRoute.indexOf("void (async () => {")
-    );
-    assert.ok(
-      captureRoute.lastIndexOf("return NextResponse.json") >
-        captureRoute.indexOf("void (async () => {")
-    );
-    assert.match(
-      captureRoute,
-      /void \(async \(\) => \{[\s\S]*\}\)\(\);\s*return NextResponse\.json/
-    );
-    assert.doesNotMatch(captureRoute, /getStoredHealthScoreAnalysisSnapshot/);
-    assert.match(captureRoute, /firstNameFromAssessmentAnswers\(body\.answers\)/);
+const source = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+// Transaction rollback, idempotency, contact isolation and stale writes are exercised against
+// PostgreSQL in assessment-capture.integration and assessment-revisions.integration.
+describe("capture boundary wiring", () => {
+  it("uses the same server capture service in both HTTP routes and the coordinator", () => {
+    for (const file of ["app/api/assessment/route.ts", "app/api/assessment/[planId]/route.ts", "lib/questionnaire/server.ts"]) {
+      assert.match(source(file), /captureAssessment/);
+      assert.doesNotMatch(source(file), /void \(async/);
+    }
   });
-
-  it("does not block healthscore GET on analysis enqueue", () => {
-    assert.doesNotMatch(planRoute, /enqueueHealthScoreAnalysisTask/);
-    assert.match(planRoute, /getStoredHealthScoreAnalysisSnapshot\(planId\)/);
-    assert.doesNotMatch(
-      planRoute,
-      /await getStoredHealthScoreAnalysisSnapshot\(snapshot\.planId\)/
-    );
-    assert.match(planRoute, /cachedEvaluatedIngredientCatalogueCount\(\)/);
-    assert.match(planRoute, /if \(!healthScoreView\) \{\s*void enqueueDueScheduledActions\(\)/);
-    assert.match(
-      planRoute,
-      /void \(async \(\) => \{[\s\S]*enqueueAssessmentPregenerationTasks/
-    );
-    assert.ok(
-      planRoute.indexOf("await persistAssessmentSubmission") <
-        planRoute.indexOf("void (async () => {")
-    );
-    assert.ok(
-      planRoute.lastIndexOf("return NextResponse.json") >
-        planRoute.indexOf("void (async () => {")
-    );
+  it("keeps HealthScore reads free of generation mutations", () => {
+    const route = source("app/api/assessment/[planId]/route.ts");
+    assert.doesNotMatch(route, /enqueueHealthScoreAnalysisTask/);
+    assert.match(route, /getStoredHealthScoreAnalysisSnapshot\(planId, url\.searchParams\.get\("locale"\)\)/);
   });
-
-  it("persists capture as one upsert and does not inspect schema first", () => {
-    const store = readFileSync(
-      new URL("../lib/assessment-store.ts", import.meta.url),
-      "utf8"
-    );
-    const persistStart = store.indexOf(
-      "export async function persistAssessmentSubmission"
-    );
-    const persistEnd = store.indexOf(
-      "export async function getStoredAssessmentSnapshot"
-    );
-    const persist = store.slice(persistStart, persistEnd);
-
-    assert.match(persist, /insert into assessments \(/);
-    assert.doesNotMatch(persist, /ensureAssessmentSchema/);
-    assert.doesNotMatch(persist, /to_jsonb\(assessments\.\*\)/);
-    assert.match(persist, /void appendAssessmentVersion/);
-    assert.match(persist, /void upsertAssessmentEmailChannel/);
+  it("checks current revision advice before rendering HealthScore", () => {
+    const page = source("app/[locale]/nutrition/healthscore/page.tsx");
+    assert.match(page, /getRevisionHealthScore\(planId, locale\)/);
+    assert.match(page, /hasHealthScoreAiCopy\(currentHealthScore, locale\)/);
+    assert.match(page, /HealthScoreCopyGate/);
   });
-
-  it("treats a stored HealthScore number as ready without scanning tasks", () => {
-    const store = readFileSync(
-      new URL("../lib/assessment-store.ts", import.meta.url),
-      "utf8"
-    );
-    const snapshotStart = store.indexOf(
-      "export async function getStoredHealthScoreAnalysisSnapshot"
-    );
-    const snapshotEnd = store.indexOf(
-      "export async function getStoredAssessmentPrefill"
-    );
-    const snapshot = store.slice(snapshotStart, snapshotEnd);
-
-    assert.doesNotMatch(snapshot, /from public\.tasks/);
-    assert.doesNotMatch(snapshot, /healthScoreAnalysisStatusFromTaskStatuses/);
-    assert.match(snapshot, /status: "ready"/);
+  it("exposes separate capture and saved-analysis recovery", () => {
+    const capture = source("components/chat-questionnaire/use-questionnaire-capture.ts");
+    assert.match(capture, /waitForHealthScoreCopy/);
+    assert.match(capture, /draft\.captured/);
+    assert.match(capture, /retryHealthScoreCopy/);
+    const calc = source("components/chat-questionnaire/questionnaire-calculating.tsx");
+    assert.match(calc, /data-testid="retry-capture"/);
+    assert.match(calc, /data-testid="retry-analysis"/);
+    assert.doesNotMatch(calc, /onEmailComplete/);
   });
-
-  it("waits for stored AI copy on the calculating splash before HealthScore", () => {
-    assert.doesNotMatch(chat, /pollHealthScore/);
-    assert.match(chat, /fetchHealthScoreCopyStatus/);
-    assert.match(chat, /HEALTHSCORE_COPY_POLL_INTERVAL_MS/);
-    assert.match(chat, /hasUsableHealthScore/);
-    assert.match(chat, /copyReady/);
-    assert.match(chat, /setCalcStatus\("sent"\)/);
-    assert.match(chat, /if \(!copyReady\) \{\s*setCalcStatus\("error"\)/);
-  });
-
-  it("puts the submitted first name on the existing healthscore and reveal heroes", () => {
-    assert.match(panel, /data-testid="reveal-hero-name"/);
-    assert.match(panel, /firstName \? `\$\{firstName\}, ` : null/);
-    assert.match(reveal, /data-testid="reveal-hero-name"/);
-    assert.match(reveal, /export function revealHeroFirstName/);
+  it("keeps the submitted name on both existing result heroes", () => {
+    for (const file of ["components/nutrition-flow/healthscore-panel.tsx", "components/reveal-final-results.tsx"]) {
+      assert.match(source(file), /data-testid="reveal-hero-name"/);
+    }
   });
 });

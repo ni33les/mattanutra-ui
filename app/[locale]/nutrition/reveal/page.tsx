@@ -13,10 +13,11 @@ import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import {
   nutritionHealthScorePath,
+  nutritionProgressPath,
   nutritionRevealPath
 } from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
-import { ensureFreshProductRecommendationsForReveal } from "@/lib/task-worker";
+import { getFunnelReadiness } from "@/lib/funnel-readiness";
 
 type NutritionRevealPageProps = Readonly<{
   params: Promise<{
@@ -105,21 +106,12 @@ export default async function NutritionRevealPage({
     notFound();
   }
 
-  if (!assessment.plan) {
+  const readiness = await getFunnelReadiness(planId, locale);
+  if (!assessment.plan && !readiness?.hasPaidPlan) {
     redirect(nutritionHealthScorePath(locale, planId));
   }
 
-  setTimeout(() => {
-    void ensureFreshProductRecommendationsForReveal(
-      planId,
-      initialStackPreference
-    ).catch((error) => {
-      console.warn("Unable to ensure fresh reveal product recommendations", {
-        error: error instanceof Error ? error.message : String(error),
-        planId
-      });
-    });
-  }, 0);
+  if (!readiness?.readyForReveal) redirect(nutritionProgressPath(locale, planId));
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">

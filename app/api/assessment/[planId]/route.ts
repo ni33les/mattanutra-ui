@@ -15,7 +15,7 @@ export async function GET(
   const healthScoreView = url.searchParams.get("view") === "healthscore";
 
   const snapshot = healthScoreView
-    ? await getStoredHealthScoreAnalysisSnapshot(planId)
+    ? await getStoredHealthScoreAnalysisSnapshot(planId, url.searchParams.get("locale"))
     : await getStoredAssessmentSnapshot(planId);
 
   if (!snapshot) {

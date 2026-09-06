@@ -76,3 +76,21 @@ begin
 end $$;
 
 alter table public.assessments add column if not exists questionnaire_state jsonb;
+
+-- Bind localized generated outputs to the exact generator identity.
+alter table public.formulations add column if not exists generation_locale text;
+alter table public.formulations add column if not exists generator_version text;
+alter table public.food_guidance add column if not exists generation_locale text;
+alter table public.food_guidance add column if not exists generator_version text;
+alter table public.recommendations add column if not exists generation_locale text;
+alter table public.recommendations add column if not exists generator_version text;
+alter table public.product_recommendation_runs add column if not exists generation_locale text;
+alter table public.product_recommendation_runs add column if not exists generator_version text;
+alter table public.nutrition_reports add column if not exists generation_locale text;
+alter table public.nutrition_reports add column if not exists generator_version text;
+
+-- Supports bounded, current-generation journey polling without scanning historical jobs.
+create index if not exists tasks_funnel_generation_idx on public.tasks
+  (plan_id, (payload #>> '{generation,revision}'), (payload #>> '{generation,locale}'),
+   (payload #>> '{generation,generatorVersion}'), task_type, created_at desc)
+  where task_type in ('analyze_healthscore', 'generate_supplement_guidance', 'generate_product_recommendations');

@@ -34,7 +34,8 @@ type TriggerRow = Readonly<{
 }>;
 
 const requiredTables = [
-  "assessment_inputs", "assessment_healthscore_results", "funnel_requests", "healthscore_delivery_requests",
+  "assessments", "formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs",
+  "assessment_inputs", "assessment_healthscore_results", "assessment_resume_drafts", "funnel_requests", "healthscore_delivery_requests", "tasks",
   "admin_product_coverage_demand_profile_cache",
   "payment_versions",
   "payments",
@@ -254,6 +255,22 @@ try {
     }
     requireReadWritePrivilege(privilegeMap, tableName);
   }
+
+  requireColumn(columnMap, "assessments", "input_revision", { dataType: "bigint", notNull: true });
+  requireColumn(columnMap, "assessments", "input_hash");
+  requireColumn(columnMap, "assessments", "questionnaire_state", { dataType: "jsonb" });
+  requireColumn(columnMap, "assessment_resume_drafts", "questionnaire_state", { dataType: "jsonb" });
+  requireIndex(indexMap, "tasks", "tasks_funnel_generation_idx", ["plan_id", "generation", "revision", "locale", "generatorVersion"]);
+  requireColumn(columnMap, "payments", "fulfillment_status", { notNull: true });
+  requireColumn(columnMap, "payments", "fulfillment_error");
+  requireColumn(columnMap, "payments", "fulfillment_completed_at");
+  for (const table of ["formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs"]) {
+    requireColumn(columnMap, table, "assessment_revision", { dataType: "bigint" });
+    requireColumn(columnMap, table, "generation_locale");
+    requireColumn(columnMap, table, "generator_version");
+  }
+  for (const column of ["revision", "locale", "generator_version", "result"]) requireColumn(columnMap, "assessment_healthscore_results", column, { notNull: true });
+  for (const column of ["revision", "locale", "email", "status", "attempts"]) requireColumn(columnMap, "healthscore_delivery_requests", column, { notNull: true });
 
   for (const columnName of [
     "supplement_id",

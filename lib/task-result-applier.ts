@@ -1,5 +1,5 @@
 import { enqueueReadyHealthScoreDeliveries } from "@/lib/healthscore-delivery";
-import { ASSESSMENT_GENERATION_TASKS, generationInput } from "@/lib/assessment-revisions";
+import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { hasHealthScoreAiCopy, isUuid, toJsonValue } from "@/lib/assessment-store";
 import { updateBlogPost, updateTestimonial } from "@/lib/blog";
 import { writeBpmEvent } from "@/lib/bpm";
@@ -113,6 +113,9 @@ async function updateAssessmentReadyIfNutritionReady(
         select 1
         from public.formulations
         where plan_id = ${planId}::uuid
+          and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+          and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+          and generator_version = ${FUNNEL_GENERATOR_VERSION}
           and (
             model_version is null
             or model_version not like '%:example'
@@ -122,6 +125,9 @@ async function updateAssessmentReadyIfNutritionReady(
         select 1
         from public.food_guidance
         where plan_id = ${planId}::uuid
+          and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+          and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+          and generator_version = ${FUNNEL_GENERATOR_VERSION}
           and (
             model_version is null
             or model_version not like '%:example'
@@ -163,7 +169,7 @@ async function updateAssessmentReadyIfNutritionReady(
   return ready;
 }
 
-async function refreshAssessmentReadyIfNutritionReady(planId: string) {
+async function refreshAssessmentNutritionReadiness(planId: string) {
   const sql = getSql();
 
   if (!sql) {
@@ -186,7 +192,6 @@ async function queueProductRecommendationsForReadyPlan({
   source: string;
   task: TaskRecord;
 }>) {
-  try {
     const productRecommendationTaskId = await enqueueProductRecommendationsTask({
       parentTaskId: task.id,
       paymentId,
@@ -207,33 +212,23 @@ async function queueProductRecommendationsForReadyPlan({
     }
 
     return productRecommendationTaskId;
-  } catch (error) {
-    console.error("Unable to queue product recommendations", error);
-    await addWorkEvent(task, "product_recommendations_queue_failed", "medium", {
-      errorMessage:
-        error instanceof Error ? error.message : "Unknown product queue error",
-      source
-    });
-
-    return null;
-  }
 }
 
-async function refreshPaidNutritionReadinessAfterCommit(
+async function refreshPaidNutritionReadiness(
   task: TaskRecord,
   planId: string,
   initiallyReady: boolean
 ) {
-  const ready = await refreshAssessmentReadyIfNutritionReady(planId);
+  const ready = await refreshAssessmentNutritionReadiness(planId);
 
   if (ready && !initiallyReady) {
     await addWorkEvent(task, "nutrition_plan_ready", "medium", {
-      source: "post_commit_readiness_refresh"
+      source: "completion_readiness"
     });
 
     await queueProductRecommendationsForReadyPlan({
       planId,
-      source: "post_commit_readiness_refresh",
+      source: "completion_readiness",
       task
     });
   }
@@ -371,7 +366,7 @@ async function applyHealthScoreResult(
     where plan_id = ${task.planId}::uuid
     limit 1
   `;
-  const locale: Locale = isLocale(rows[0]?.locale) ? rows[0].locale : "en";
+  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(rows[0]?.locale) ? rows[0].locale : "en");
 
   await appendAssessmentVersion(sql, {
     actor: task.reservedByAgentId,
@@ -393,7 +388,7 @@ async function applyHealthScoreResult(
   });
 
   if (!fallbackUsed) {
-    if (!hasHealthScoreAiCopy(healthScore)) throw new Error("HealthScore AI advice is incomplete");
+    if (!hasHealthScoreAiCopy(healthScore, locale)) throw new Error("HealthScore AI advice is incomplete");
     const generation = generationInput(task.payload);
     if (!generation) return;
     await sql`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result, task_id)
@@ -462,7 +457,7 @@ async function applyPaidFormulationResult(
     throw new Error("Assessment submission not found");
   }
 
-  const locale: Locale = isLocale(row.locale) ? row.locale : "en";
+  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(row.locale) ? row.locale : "en");
   const taskPayload = objectValue(task.payload);
   const taskContext = objectValue(task.context);
   const taskSource =
@@ -505,6 +500,7 @@ async function applyPaidFormulationResult(
   });
 
   const version = await insertFormulationVersion(sql, {
+    generation: generationInput(task.payload),
     formulation: safeFormulation,
     includeEmptyRecommendations: false,
     modelVersion: modelVersion(analysis),
@@ -531,9 +527,7 @@ async function applyPaidFormulationResult(
     if (paidSelectionReady) {
       const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
 
-      await eventually(afterCommit, async () => {
-        await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
-      });
+      await refreshPaidNutritionReadiness(task, planId, nutritionReady);
     }
 
     if (isCheckoutPregeneration) {
@@ -587,14 +581,12 @@ async function applyPaidFormulationResult(
   }
 
   const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
-  const productRecommendationsQueued = Boolean(
-    await queueProductRecommendationsForReadyPlan({
+  await queueProductRecommendationsForReadyPlan({
       plan: plan === "pro" ? "pro" : "precision",
       planId,
       source: "formulation_completion",
       task
-    })
-  );
+    });
 
   await eventually(afterCommit, async () => {
     await addWorkEvent(task, "formulation_version_written", "medium", {
@@ -608,16 +600,8 @@ async function applyPaidFormulationResult(
       version
     });
   });
-  await eventually(afterCommit, async () => {
-    await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
-    if (!productRecommendationsQueued) {
-      await queueProductRecommendationsForReadyPlan({
-        planId,
-        source: "formulation_completion_recovery",
-        task
-      });
-    }
-  });
+  await refreshPaidNutritionReadiness(task, planId, nutritionReady);
+
   await eventually(afterCommit, async () => {
     await writeBpmEvent({
       actorType: "worker",
@@ -667,7 +651,7 @@ async function applyFoodGuidanceResult(
     throw new Error("Assessment submission not found");
   }
 
-  const locale: Locale = isLocale(row.locale) ? row.locale : "en";
+  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(row.locale) ? row.locale : "en");
   const taskPayload = objectValue(task.payload);
   const taskContext = objectValue(task.context);
   const taskSource =
@@ -701,6 +685,7 @@ async function applyFoodGuidanceResult(
     taskId: task.id
   });
   const version = await insertFoodGuidanceVersion(sql, {
+    generation: generationInput(task.payload),
     foodGuidance: safeFoodGuidance,
     modelVersion: modelVersion(analysis),
     planId
@@ -711,9 +696,7 @@ async function applyFoodGuidanceResult(
     : false;
 
   if (paidSelectionReady) {
-    await eventually(afterCommit, async () => {
-      await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
-    });
+    await refreshPaidNutritionReadiness(task, planId, nutritionReady);
   }
 
   if (isCheckoutPregeneration) {
@@ -799,6 +782,9 @@ async function applyFoodGapSupportResult(
       select guidance
       from public.food_guidance
       where food_guidance.plan_id = assessments.plan_id
+        and food_guidance.assessment_revision = assessments.input_revision
+        and food_guidance.generation_locale = coalesce(${generationLocale(task.planId)}, assessments.locale)
+        and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (
           model_version is null
           or model_version not like '%:example'
@@ -815,11 +801,12 @@ async function applyFoodGapSupportResult(
     foodGapSupport
   } satisfies FoodGuidanceBlueprint;
   const version = await insertFoodGuidanceVersion(sql, {
+    generation: generationInput(task.payload),
     foodGuidance: nextFoodGuidance,
     modelVersion: modelVersion(analysis, ":food-gap"),
     planId
   });
-  const locale: Locale = isLocale(rows[0]?.locale) ? rows[0].locale : "en";
+  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(rows[0]?.locale) ? rows[0].locale : "en");
 
   await eventually(afterCommit, async () => {
     await recordTaskXaiUsageCost({
@@ -888,7 +875,7 @@ async function applyExampleFormulationResult(
     throw new Error("Example request not found");
   }
 
-  const locale: Locale = isLocale(row.locale) ? row.locale : "en";
+  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(row.locale) ? row.locale : "en");
   const plan = textValue(row.selected_plan) === "pro" ? "pro" : "precision";
   const analysis = analysisPayload(resultPayload);
   await eventually(afterCommit, async () => {
@@ -921,6 +908,7 @@ async function applyExampleFormulationResult(
   });
 
   const version = await insertFormulationVersion(sql, {
+    generation: generationInput(task.payload),
     formulation: safeFormulation,
     modelVersion: modelVersion(analysis, ":example"),
     planId
@@ -945,9 +933,7 @@ async function applyExampleFormulationResult(
       version
     });
   });
-  await eventually(afterCommit, async () => {
-    await enqueueExampleEmailIfPreviewReady(planId, requestId);
-  });
+  await enqueueExampleEmailIfPreviewReady(planId, requestId);
   await eventually(afterCommit, async () => {
     await writeBpmEvent({
       actorType: "worker",
@@ -1374,6 +1360,9 @@ async function applyNutritionPlanChatResult(
       select formulation
       from public.formulations
       where formulations.plan_id = user_message.plan_id
+        and formulations.assessment_revision = (select input_revision from public.assessments where plan_id = user_message.plan_id)
+        and formulations.generation_locale = (select locale from public.assessments where plan_id = user_message.plan_id)
+        and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (
           model_version is null
           or model_version not like '%:example'
@@ -1385,6 +1374,9 @@ async function applyNutritionPlanChatResult(
       select guidance
       from public.food_guidance
       where food_guidance.plan_id = user_message.plan_id
+        and food_guidance.assessment_revision = (select input_revision from public.assessments where plan_id = user_message.plan_id)
+        and food_guidance.generation_locale = (select locale from public.assessments where plan_id = user_message.plan_id)
+        and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (
           model_version is null
           or model_version not like '%:example'
@@ -1789,7 +1781,7 @@ async function applyNutritionReportResult(
 
   await sql`
     insert into public.nutrition_reports (
-      assessment_revision,
+      generation_locale, generator_version, assessment_revision,
       plan_id,
       version,
       task_id,
@@ -1799,7 +1791,8 @@ async function applyNutritionReportResult(
       updated_at
     )
     values (
-      (select input_revision from public.assessments where plan_id = ${task.planId}::uuid),
+      ${generationInput(task.payload)?.locale ?? null}, ${generationInput(task.payload)?.generatorVersion ?? null},
+      ${generationInput(task.payload)?.revision ?? null},
       ${task.planId}::uuid,
       coalesce((
         select max(version) + 1
@@ -2120,7 +2113,7 @@ async function insertProductRecommendationResult({
   };
   const runRows = await sql<Array<{ id: string }>>`
     insert into public.product_recommendation_runs (
-      assessment_revision,
+      generation_locale, generator_version, assessment_revision,
       plan_id,
       task_id,
       ray_id,
@@ -2138,7 +2131,8 @@ async function insertProductRecommendationResult({
       created_at
     )
     values (
-      (select input_revision from public.assessments where plan_id = ${task.planId}::uuid),
+      ${generationInput(task.payload)?.locale ?? null}, ${generationInput(task.payload)?.generatorVersion ?? null},
+      ${generationInput(task.payload)?.revision ?? null},
       ${task.planId}::uuid,
       ${task.id}::uuid,
       ${task.rayId ?? null}::uuid,
@@ -2231,7 +2225,7 @@ async function applyProductRecommendationsResult(
     where plan_id = ${task.planId}::uuid
     limit 1
   `;
-  const locale: Locale = isLocale(localeRow?.locale) ? localeRow.locale : "en";
+  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(localeRow?.locale) ? localeRow.locale : "en");
   const countryCode = await loadProductRecommendationCountryCode(sql, task.planId);
   const stackPreference = normalizeProductStackPreference(
     initialResult.diagnostics?.stackPreference ??
@@ -2306,7 +2300,7 @@ async function applyProductRecommendationsResult(
 
   await sql`
     insert into public.recommendations (
-      assessment_revision,
+      generation_locale, generator_version, assessment_revision,
       plan_id,
       version,
       recommendations,
@@ -2314,7 +2308,8 @@ async function applyProductRecommendationsResult(
       updated_at
     )
     select
-      (select input_revision from public.assessments where plan_id = ${task.planId}::uuid),
+      ${generationInput(task.payload)?.locale ?? null}, ${generationInput(task.payload)?.generatorVersion ?? null},
+      ${generationInput(task.payload)?.revision ?? null},
       ${task.planId}::uuid,
       coalesce(max(version), 0) + 1,
       ${sql.json(toJsonValue(legacyRecommendations))}::jsonb,
@@ -2324,14 +2319,12 @@ async function applyProductRecommendationsResult(
     where plan_id = ${task.planId}::uuid
   `;
 
-  await eventually(afterCommit, async () => {
     await enqueueFoodGapSupportTask({
       parentTaskId: task.id,
       planId: task.planId as string,
       source: "product_recommendations_ready",
       taskGroupId: task.taskGroupId
     });
-  });
 
   await eventually(afterCommit, async () => {
     await writeBpmEvent({
@@ -2361,8 +2354,9 @@ async function applyProductRecommendationsResult(
       supplementProductCoveragePercent: result.supplementProductCoveragePercent,
       totalPlanCoveragePercent: result.totalPlanCoveragePercent
     });
-    await queueUnknownProductReviewTasks(task, runId, result);
   });
+
+  await queueUnknownProductReviewTasks(task, runId, result);
 
   if (
     textValue(objectValue(task.payload).source) ===
@@ -2460,8 +2454,8 @@ export async function applyTaskCompletionResult({
     const db = sql ?? getSql();
     if (!db) throw new Error("Database is not configured");
     const generation = generationInput(task.payload);
-    const [current] = await db`select input_revision, input_hash from public.assessments where plan_id = ${task.planId}::uuid for update`;
-    if (!generation || !current || Number(current.input_revision) !== generation.revision ||
+    const [current] = await db`select input_revision, input_hash from public.assessments where plan_id = ${task.planId}::uuid for no key update`;
+    if (!generation || !current || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(current.input_revision) !== generation.revision ||
         (current.input_hash && current.input_hash !== generation.inputHash)) {
       return { superseded: true, message: "Assessment inputs changed; old result was not applied" };
     }
@@ -2469,6 +2463,12 @@ export async function applyTaskCompletionResult({
   const handler = taskCompletionResultHandlers[task.taskType];
 
   if (handler) {
+    const generation = generationInput(task.payload);
+    if (task.planId && generation) {
+      const planId = task.planId;
+      const schedule = afterCommit ? (effect: () => Promise<void>) => afterCommit(() => withGenerationInput(planId, generation, effect)) : undefined;
+      return withGenerationInput(planId, generation, () => handler(task, resultPayload, sql, schedule));
+    }
     return handler(task, resultPayload, sql, afterCommit);
   }
 
@@ -2510,8 +2510,8 @@ export async function applyTaskFailureResult({
 
   if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {
     const generation = generationInput(task.payload);
-    const [current] = await sql`select input_revision from public.assessments where plan_id = ${task.planId}::uuid for update`;
-    if (!generation || !current || Number(current.input_revision) !== generation.revision) {
+    const [current] = await sql`select input_revision from public.assessments where plan_id = ${task.planId}::uuid for no key update`;
+    if (!generation || !current || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(current.input_revision) !== generation.revision) {
       return { superseded: true };
     }
   }

@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getStoredFormulationRead } from "@/lib/assessment-store";
 import { buildAssessmentSteps } from "@/lib/assessment-snapshot";
 
@@ -13,7 +12,7 @@ function jsonNoStore(body: unknown, init: ResponseInit = {}) {
 
   headers.set("Cache-Control", "no-store, max-age=0");
 
-  return NextResponse.json(body, {
+  return Response.json(body, {
     ...init,
     headers
   });
@@ -45,8 +44,13 @@ export async function GET(request: Request, { params }: FormulationRouteProps) {
 
   const storedResult = stored.result;
 
+  if (stored.readiness?.formulationStatus === "pending") {
+    return jsonNoStore({ message: "Formulation is still being prepared", status: "preparing",
+      revision: stored.readiness.revision, resultVersion: stored.readiness.resultVersion, generationStatus: "pending" }, { status: 202 });
+  }
   if (storedResult.supplementBreakdown.length > 0) {
-    return jsonNoStore(storedResult);
+    return jsonNoStore({ ...storedResult, revision: stored.readiness?.revision, resultVersion: stored.readiness?.resultVersion,
+      generationStatus: "ready", fulfillmentStatus: stored.readiness?.fulfillmentStatus });
   }
 
   const steps = buildAssessmentSteps(stored.status);

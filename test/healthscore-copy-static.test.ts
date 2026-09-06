@@ -1,77 +1,34 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-
-const execution = readFileSync(
-  new URL("../lib/task-execution.ts", import.meta.url),
-  "utf8"
-);
-const applier = readFileSync(
-  new URL("../lib/task-result-applier.ts", import.meta.url),
-  "utf8"
-);
-const store = readFileSync(
-  new URL("../lib/assessment-store.ts", import.meta.url),
-  "utf8"
-);
-const page = readFileSync(
-  new URL("../app/[locale]/nutrition/healthscore/page.tsx", import.meta.url),
-  "utf8"
-);
-const calculating = readFileSync(
-  new URL("../components/chat-questionnaire/questionnaire-calculating.tsx", import.meta.url),
-  "utf8"
-);
-const journeyRead = readFileSync(
-  new URL("../lib/nutrition-journey-read.ts", import.meta.url),
-  "utf8"
-);
-const copyClient = readFileSync(
-  new URL("../lib/healthscore-copy-client.ts", import.meta.url),
-  "utf8"
-);
-const gate = readFileSync(
-  new URL("../components/nutrition-flow/healthscore-copy-gate.tsx", import.meta.url),
-  "utf8"
-);
-
-describe("HealthScore page waits for real AI copy", () => {
-  it("does not write seed templates into aiCopy when Grok fails", () => {
-    assert.doesNotMatch(execution, /deterministicHealthScorePageCopy/);
-    assert.doesNotMatch(execution, /withDeterministicHealthScoreFallback/);
-    assert.match(execution, /fallbackUsed: true,\s*healthScore: workItem\.healthScore/);
-    assert.match(applier, /if \(!fallbackUsed\) \{[\s\S]*health_score = \$\{sql\.json\(toJsonValue\(healthScore\)\)\}/);
+import { hasHealthScoreAiCopy } from "../lib/assessment-store.ts";
+import { completeHealthScoreFixture } from "./fixtures/healthscore.ts";
+const source = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+describe("HealthScore requires complete localized AI advice", () => {
+  it("requires every overlay field and card in the requested locale", () => {
+    for (const locale of ["en", "th", "zh-CN"] as const) {
+      const complete = completeHealthScoreFixture(locale);
+      assert.equal(hasHealthScoreAiCopy(complete, locale), true);
+      assert.equal(hasHealthScoreAiCopy(complete, locale === "en" ? "th" : "en"), false);
+      for (const key of Object.keys(complete.pageContent.aiCopy)) {
+        const partial = structuredClone(complete);
+        Reflect.deleteProperty(partial.pageContent.aiCopy, key);
+        assert.equal(hasHealthScoreAiCopy(partial, locale), false, `Missing ${key}`);
+      }
+      assert.equal(hasHealthScoreAiCopy({ score: 75 }, locale), false);
+    }
   });
-
-  it("treats AI copy as ready only when the full overlay exists", () => {
-    assert.match(store, /export function hasHealthScoreAiCopy/);
-    assert.match(store, /HEALTHSCORE_AI_TEXT_KEYS/);
-    assert.match(store, /heroTitle/);
-    assert.match(store, /methodCards\.length === 3/);
-    assert.match(store, /export function hasHealthScoreAdvice\(value: unknown\) \{\s*return hasHealthScoreAiCopy\(value\);/);
-    assert.match(journeyRead, /copyReady/);
-    assert.match(journeyRead, /analyze_healthscore/);
-    assert.match(journeyRead, /export async function getHealthScoreCopySnapshot/);
-    assert.doesNotMatch(
-      journeyRead.slice(
-        journeyRead.indexOf("export async function getHealthScoreCopySnapshot"),
-        journeyRead.indexOf("export async function getNutritionJourneySnapshot")
-      ),
-      /product_recommendation_runs|formulations/
-    );
-    assert.match(copyClient, /journey\?view=copy/);
-    assert.match(journeyRead, /hasHealthScoreAiCopy\(row\.health_score\)/);
-    assert.doesNotMatch(journeyRead, /ai_hero_body/);
+  it("does not mark an AI failure successful with seed prose", () => {
+    const execution = source("lib/task-execution.ts");
+    assert.doesNotMatch(execution, /deterministicHealthScorePageCopy|withDeterministicHealthScoreFallback/);
+    assert.match(execution, /throw new Error\(`HealthScore advice failed:/);
+    assert.match(source("lib/task-result-applier.ts"), /hasHealthScoreAiCopy\(healthScore, locale\)/);
   });
-
-  it("keeps HealthScore HTML off seed prose until copy exists", () => {
-    assert.match(page, /hasHealthScoreAiCopy\(prefill\.healthScore\)/);
-    assert.match(page, /HealthScoreCopyGate/);
-    assert.match(calculating, /"sent"/);
-    assert.match(calculating, /onEmailComplete/);
-    assert.doesNotMatch(calculating, /mn-quiz-calc__vial|barPct/);
-    assert.doesNotMatch(calculating, /calcLonger/);
-    assert.match(calculating, /showEmailEscape/);
-    assert.match(gate, /canOpenResults=\{false\}/);
+  it("keeps the public gate closed and reflects durable email acknowledgement", () => {
+    assert.match(source("components/nutrition-flow/healthscore-copy-gate.tsx"), /canOpenResults=\{false\}/);
+    const calculating = source("components/chat-questionnaire/questionnaire-calculating.tsx");
+    assert.match(calculating, /delivery\?\.status === "sent"/);
+    assert.match(calculating, /calcEmailRequested/);
+    assert.doesNotMatch(calculating, /onEmailComplete|calcLonger|mn-quiz-calc__vial/);
   });
 });

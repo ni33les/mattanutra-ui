@@ -1,3 +1,4 @@
+import { trackBpmEvent } from "@/lib/bpm-client";
 export const FUNNEL_FOREGROUND_WAIT_MS = 90_000;
 export class PollHttpError extends Error {
   readonly status: number;
@@ -67,6 +68,11 @@ export async function pollFunnelStatus<T>(options: {
   visibility?.addEventListener("visibilitychange", changed);
   const foregroundElapsed = () => elapsed + (hidden ? 0 : Date.now() - activeSince);
   let value: T | null = null;
+  let transientReported = false;
+  const report = (outcome: string, httpStatus?: number) => {
+    // Operational signals contain no questionnaire answers, recipient addresses or response bodies.
+    if (typeof window !== "undefined") trackBpmEvent("funnel_poll_recovery", { eventType: "funnel", properties: { outcome, httpStatus } });
+  };
   try {
     while (foregroundElapsed() < budget) {
       options.signal.throwIfAborted();
@@ -77,16 +83,19 @@ export async function pollFunnelStatus<T>(options: {
         options.signal.throwIfAborted();
         options.onValue?.(value);
         if (options.ready(value)) return { status: "ready" as const, value };
-        if (options.failed?.(value)) return { status: "failed" as const, value };
+        if (options.failed?.(value)) { report("work_failed"); return { status: "failed" as const, value }; }
       } catch (error) {
         options.signal.throwIfAborted();
         if (error instanceof PollHttpError && error.status >= 400 && error.status < 500 && ![408, 429].includes(error.status)) {
+          report("request_failed", error.status);
           return { status: "failed" as const, value, error };
         }
+        if (!transientReported) { report("transient_error", error instanceof PollHttpError ? error.status : undefined); transientReported = true; }
         // Transport errors, deadline expiry, 429 and server errors retry within the foreground budget.
       }
       await sleep(Math.min(interval, Math.max(1, budget - foregroundElapsed())), options.signal);
     }
+    report("foreground_timeout");
     return { status: "timeout" as const, value };
   } finally { visibility?.removeEventListener("visibilitychange", changed); }
 }

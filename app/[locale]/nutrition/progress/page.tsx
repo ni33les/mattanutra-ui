@@ -63,7 +63,7 @@ export default async function NutritionProgressPage({
     redirect(nutritionQuizPath(locale));
   }
 
-  const snapshot = await getNutritionJourneySnapshot(planId);
+  const snapshot = await getNutritionJourneySnapshot(planId, locale);
 
   if (!snapshot) {
     redirect(nutritionQuizPath(locale));

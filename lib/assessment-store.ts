@@ -1,10 +1,11 @@
-import { assessmentInputHash } from "@/lib/assessment-revisions";
+import { getFunnelReadiness } from "@/lib/funnel-readiness";
+import { assessmentInputHash, FUNNEL_GENERATOR_VERSION, getRevisionHealthScore } from "@/lib/assessment-revisions";
 import { withDatabaseTransaction, deferUntilDatabaseCommit } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import {
+  createAssessmentSnapshot,
   buildAssessmentSteps,
-  createHealthScoreAnalysisSnapshot,
   normalizeAssessmentPlan,
   type AssessmentPlan,
   type AssessmentSnapshot
@@ -206,6 +207,7 @@ async function loadStoredRecommendationProductPayloads(
     from product_recommendation_runs
     where plan_id = ${planId}::uuid
       and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+      and generation_locale = ${locale} and generator_version = ${FUNNEL_GENERATOR_VERSION}
       and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
     order by
       coalesce(diagnostics ->> 'stackPreference', 'balanced'),
@@ -343,12 +345,13 @@ const HEALTHSCORE_AI_TEXT_KEYS = [
   "subtractionBody"
 ] as const;
 
-function localizedHealthScoreTextPresent(value: unknown) {
+function localizedHealthScoreTextPresent(value: unknown, locale?: Locale) {
   if (typeof value === "string") {
     return value.trim().length > 0;
   }
 
   if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (locale) return typeof (value as Record<string, unknown>)[locale] === "string" && String((value as Record<string, unknown>)[locale]).trim().length > 0;
     return Object.values(value as Record<string, unknown>).some(
       (item) => typeof item === "string" && item.trim().length > 0
     );
@@ -357,22 +360,22 @@ function localizedHealthScoreTextPresent(value: unknown) {
   return false;
 }
 
-function healthScoreAiCardPresent(value: unknown) {
+function healthScoreAiCardPresent(value: unknown, locale?: Locale) {
   const card = asRecord(value);
 
   return (
-    localizedHealthScoreTextPresent(card.body) &&
-    (localizedHealthScoreTextPresent(card.headline) ||
-      localizedHealthScoreTextPresent(card.title))
+    localizedHealthScoreTextPresent(card.body, locale) &&
+    (localizedHealthScoreTextPresent(card.headline, locale) ||
+      localizedHealthScoreTextPresent(card.title, locale))
   );
 }
 
-export function hasHealthScoreAiCopy(value: unknown) {
+export function hasHealthScoreAiCopy(value: unknown, locale?: Locale) {
   const aiCopy = asRecord(asRecord(asRecord(value).pageContent).aiCopy);
 
   if (
     !HEALTHSCORE_AI_TEXT_KEYS.every((key) =>
-      localizedHealthScoreTextPresent(aiCopy[key])
+      localizedHealthScoreTextPresent(aiCopy[key], locale)
     )
   ) {
     return false;
@@ -384,11 +387,11 @@ export function hasHealthScoreAiCopy(value: unknown) {
 
   return (
     gaps.length > 0 &&
-    gaps.every(healthScoreAiCardPresent) &&
+    gaps.every(card => healthScoreAiCardPresent(card, locale)) &&
     findings.length > 0 &&
-    findings.every(healthScoreAiCardPresent) &&
+    findings.every(card => healthScoreAiCardPresent(card, locale)) &&
     methodCards.length === 3 &&
-    methodCards.every(healthScoreAiCardPresent)
+    methodCards.every(card => healthScoreAiCardPresent(card, locale))
   );
 }
 
@@ -1616,40 +1619,13 @@ export async function getStoredAssessmentSnapshot(planId: string) {
   } satisfies AssessmentSnapshot;
 }
 
-export async function getStoredHealthScoreAnalysisSnapshot(planId: string) {
-  const sql = getSql();
-
-  if (!sql || !isUuid(planId)) {
-    return null;
-  }
-
-  const rows = await sql`
-    select
-      plan_id::text,
-      selected_plan::text,
-      health_score
-    from assessments
-    where plan_id = ${planId}::uuid
-    limit 1
-  `;
-  const row = rows[0];
-
-  if (!row) {
-    return null;
-  }
-
-  const healthScore = asRecord(row.health_score);
-
-  if (typeof healthScore.score !== "number") {
-    return null;
-  }
-
-  return createHealthScoreAnalysisSnapshot({
-    healthScore: healthScore as NonNullable<AssessmentSnapshot["healthScore"]>,
-    plan: row.selected_plan,
-    planId: row.plan_id,
-    status: "ready"
-  });
+export async function getStoredHealthScoreAnalysisSnapshot(planId: string, localeOption?: string | null) {
+  const readiness = await getFunnelReadiness(planId, localeOption);
+  if (!readiness) return null;
+  const score = await getRevisionHealthScore(planId, readiness.locale);
+  const status = readiness.copyReady ? "ready" : readiness.copyFailed ? "failed" : "preparing";
+  return { ...createAssessmentSnapshot({ planId, status, healthScore: score ?? undefined }),
+    revision: readiness.revision, generationStatus: status, resultVersion: readiness.resultVersion };
 }
 
 export async function getStoredAssessmentPrefill(planId: string) {
@@ -1701,6 +1677,7 @@ export async function getStoredAssessmentPrefill(planId: string) {
 }
 
 type StoredFormulationRead = Readonly<{
+  readiness?: NonNullable<Awaited<ReturnType<typeof getFunnelReadiness>>>;
   result: FormulationResult;
   status: AssessmentSnapshot["status"];
 }>;
@@ -1817,6 +1794,7 @@ async function loadStoredFormulationFormulaRead(
       from formulations
       where formulations.plan_id = assessments.plan_id
         and formulations.assessment_revision = assessments.input_revision
+        and formulations.generation_locale = ${resultLocale} and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (
           case
             when assessments.selected_plan is not null then
@@ -1836,6 +1814,7 @@ async function loadStoredFormulationFormulaRead(
       from food_guidance
       where food_guidance.plan_id = assessments.plan_id
         and food_guidance.assessment_revision = assessments.input_revision
+        and food_guidance.generation_locale = ${resultLocale} and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (
           case
             when assessments.selected_plan is not null then
@@ -1867,33 +1846,20 @@ async function loadStoredFormulationFormulaRead(
 
 export async function getStoredFormulationRead(
   planId: string,
-  options: Readonly<{
-    includeProducts?: boolean;
-    locale?: string | null;
-  }> = {}
+  options: Readonly<{ includeProducts?: boolean; locale?: string | null }> = {}
 ): Promise<StoredFormulationRead | null> {
-  if (options.includeProducts) {
-    const result =
-      (await getStoredFormulationResult(planId, {
-        locale: options.locale,
-        mode: "full"
-      })) ??
-      (await getStoredFormulationResult(planId, {
-        locale: options.locale,
-        mode: "preview"
-      }));
-
-    if (!result) {
-      return null;
-    }
-
-    return {
-      result,
-      status: "ready"
-    };
+  const readiness = await getFunnelReadiness(planId, options.locale);
+  if (!readiness) return null;
+  const status = readiness.formulationStatus === "ready" || readiness.formulationStatus === "inconsistent" ? "ready"
+    : readiness.formulationStatus === "failed" ? "failed" : "preparing";
+  // Pending reads stay small and avoid loading catalogue/product payloads on every poll.
+  if (!options.includeProducts || readiness.formulationStatus !== "ready") {
+    const slim = await loadStoredFormulationFormulaRead(planId, readiness.locale);
+    return slim ? { ...slim, status, readiness } : null;
   }
-
-  return loadStoredFormulationFormulaRead(planId, options.locale);
+  const result = (await getStoredFormulationResult(planId, { locale: readiness.locale, mode: "full" }))
+    ?? await getStoredFormulationResult(planId, { locale: readiness.locale, mode: "preview" });
+  return result ? { result, status, readiness } : null;
 }
 
 export async function getStoredFormulationResult(
@@ -1975,6 +1941,7 @@ export async function getStoredFormulationResult(
       from formulations
       where formulations.plan_id = assessments.plan_id
         and formulations.assessment_revision = assessments.input_revision
+        and formulations.generation_locale = ${resultLocale} and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}
         ${formulationModeFilter}
       order by version desc, generated_at desc
       limit 1
@@ -1984,6 +1951,7 @@ export async function getStoredFormulationResult(
       from food_guidance
       where food_guidance.plan_id = assessments.plan_id
         and food_guidance.assessment_revision = assessments.input_revision
+        and food_guidance.generation_locale = ${resultLocale} and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}
         ${foodGuidanceModeFilter}
       order by version desc, generated_at desc
       limit 1
@@ -1993,6 +1961,7 @@ export async function getStoredFormulationResult(
       from nutrition_reports
       where nutrition_reports.plan_id = assessments.plan_id
         and nutrition_reports.assessment_revision = assessments.input_revision
+        and nutrition_reports.generation_locale = ${resultLocale} and nutrition_reports.generator_version = ${FUNNEL_GENERATOR_VERSION}
       order by version desc, generated_at desc
       limit 1
     ) nutrition_reports on true
@@ -2001,6 +1970,9 @@ export async function getStoredFormulationResult(
       from tasks
       where tasks.plan_id = assessments.plan_id
         and task_type = 'generate_nutrition_report'
+        and tasks.payload #>> '{generation,revision}' = assessments.input_revision::text
+        and tasks.payload #>> '{generation,locale}' = ${resultLocale}
+        and tasks.payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
       order by created_at desc
       limit 1
     ) report_task on true
@@ -2014,6 +1986,9 @@ export async function getStoredFormulationResult(
           'generate_nutrition_report'
         )
         and context ->> 'source' = 'plan_refinement'
+        and tasks.payload #>> '{generation,revision}' = assessments.input_revision::text
+        and tasks.payload #>> '{generation,locale}' = ${resultLocale}
+        and tasks.payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
         and status in ('queued', 'reserved', 'running', 'needs_review', 'waiting_approval')
       order by created_at desc
       limit 1
@@ -2023,6 +1998,7 @@ export async function getStoredFormulationResult(
       from recommendations
       where recommendations.plan_id = assessments.plan_id
         and recommendations.assessment_revision = assessments.input_revision
+        and recommendations.generation_locale = ${resultLocale} and recommendations.generator_version = ${FUNNEL_GENERATOR_VERSION}
       order by version desc, generated_at desc
       limit 1
     ) recommendations on true
@@ -2039,6 +2015,7 @@ export async function getStoredFormulationResult(
       from product_recommendation_runs
       where product_recommendation_runs.plan_id = assessments.plan_id
         and product_recommendation_runs.assessment_revision = assessments.input_revision
+        and product_recommendation_runs.generation_locale = ${resultLocale} and product_recommendation_runs.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
       order by
         case coalesce(diagnostics ->> 'stackPreference', 'balanced')
@@ -2060,6 +2037,9 @@ export async function getStoredFormulationResult(
       from tasks
       where tasks.plan_id = assessments.plan_id
         and task_type = 'generate_product_recommendations'
+        and tasks.payload #>> '{generation,revision}' = assessments.input_revision::text
+        and tasks.payload #>> '{generation,locale}' = ${resultLocale}
+        and tasks.payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
       order by
         case
           when status in ('queued', 'reserved', 'running', 'needs_review', 'waiting_approval')
@@ -2074,6 +2054,9 @@ export async function getStoredFormulationResult(
       from tasks
       where tasks.plan_id = assessments.plan_id
         and task_type = 'generate_food_gap_guidance'
+        and tasks.payload #>> '{generation,revision}' = assessments.input_revision::text
+        and tasks.payload #>> '{generation,locale}' = ${resultLocale}
+        and tasks.payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
       order by created_at desc
       limit 1
     ) food_gap_support_task on true
@@ -2097,7 +2080,7 @@ export async function getStoredFormulationResult(
     ? await loadStoredRecommendationProductPayloads(sql, planId, resultLocale)
     : { items: [], options: [] };
 
-  if (mode === "preview" && (!row.formulation || !row.food_guidance)) {
+  if (mode === "preview" && !row.formulation) {
     return null;
   }
 

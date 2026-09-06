@@ -39,6 +39,8 @@ type NutritionQuizPageProps = Readonly<{
   }>;
   searchParams?: Promise<{
     session?: string;
+    reassessment?: string;
+    edit?: string;
     source?: string;
     selectedPlan?: string;
     payment?: string;
@@ -104,7 +106,7 @@ export default async function NutritionQuizPage({
     typeof query.payment === "string" && isUuid(query.payment)
       ? query.payment
       : "";
-  const currentPath = nutritionQuizPath(locale, returningPlanId, { payment: paymentId, resume: resumeToken, session: query.session, source: query.source, selectedPlan: query.selectedPlan });
+  const currentPath = nutritionQuizPath(locale, returningPlanId, { payment: paymentId, resume: resumeToken, session: query.session, reassessment: query.reassessment, edit: query.edit, source: query.source, selectedPlan: query.selectedPlan });
   const requestHeaders = await headers();
   const showDevShortcut = devShortcutsEnabledForHost(
     requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
@@ -159,6 +161,7 @@ export default async function NutritionQuizPage({
           locale={locale}
           sessionId={query.session || resumeDraft?.draftId || effectivePlanId || undefined}
           serverDraft={serverDraft}
+          reviewRequested={query.reassessment === "1" || query.edit === "1"}
           paymentId={effectivePaymentId || undefined}
           returningPlanId={
             resumeDraft?.planId ?? prefill?.planId ?? (returningPlanId || undefined)

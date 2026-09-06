@@ -7,6 +7,8 @@ import {
   useState,
 } from "react";
 import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
+import { getWelcomeCopy } from "@/components/chat-questionnaire/questionnaire-welcome";
+import { useFormulationPolling } from "@/components/nutrition-flow/use-formulation-polling";
 import { formulationResultsCopy } from "@/components/formulation-results-copy";
 import {
   NutritionGuidancePreparingPanel,
@@ -32,29 +34,6 @@ type FormulationResultsProps = Readonly<{
   planId: string;
 }>;
 
-type LoadState = "loading" | "ready" | "error";
-
-const MAX_MISSING_FORMULA_POLLS = 30;
-const MISSING_FORMULA_POLL_INTERVAL_MS = 3_000;
-
-function hasRenderableFormula(result: FormulationResult | null) {
-  return Boolean(result && result.supplementBreakdown.length > 0);
-}
-
-function formulationUrl(
-  planId: string,
-  locale: Locale,
-  includeProducts = false,
-) {
-  const params = new URLSearchParams({ locale });
-
-  if (includeProducts) {
-    params.set("products", "1");
-  }
-
-  return `/api/assessment/${encodeURIComponent(planId)}/formulation?${params}`;
-}
-
 export function FormulationResults({
   initialStackPreference = null,
   initialResult = null,
@@ -63,10 +42,6 @@ export function FormulationResults({
 }: FormulationResultsProps) {
   const labels = formulationResultsCopy[locale];
   const effectivePlanId = planId;
-  const [loadState, setLoadState] = useState<LoadState>(
-    initialResult ? "ready" : "loading",
-  );
-  const [result, setResult] = useState<FormulationResult | null>(initialResult);
   const [selectedProductStackPreference, setSelectedProductStackPreference] =
     useState<ProductStackPreference | null>(() =>
       initialStackPreference ??
@@ -77,122 +52,14 @@ export function FormulationResults({
   const [productPollingPreference, setProductPollingPreference] =
     useState<ProductStackPreference | null>(null);
 
-  const refreshFormulationResult = useCallback(async () => {
-    const response = await fetch(
-      formulationUrl(effectivePlanId, locale, true),
-      { cache: "no-store" },
-    );
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const payload = (await response.json()) as FormulationResult;
-
-    setResult(payload);
-    setLoadState("ready");
-
-    return true;
-  }, [effectivePlanId, locale]);
-
-  const startProductStackPolling = useCallback(
-    (preference: ProductStackPreference) => {
-      setProductPollingPreference(preference);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    let retryTimer: number | undefined;
-    let inFlight = false;
-    let missingAttempts = 0;
-
-    async function fetchFormulation(mode: "until-formula" | "once") {
-      if (cancelled || inFlight) {
-        return;
-      }
-
-      inFlight = true;
-
-      try {
-        const response = await fetch(
-          formulationUrl(effectivePlanId, locale, true),
-          { cache: "no-store" },
-        );
-
-        if (cancelled) {
-          return;
-        }
-
-        if (response.status === 202) {
-          if (
-            mode === "until-formula" &&
-            missingAttempts < MAX_MISSING_FORMULA_POLLS
-          ) {
-            missingAttempts += 1;
-            retryTimer = window.setTimeout(() => {
-              void fetchFormulation(mode);
-            }, MISSING_FORMULA_POLL_INTERVAL_MS);
-          }
-          return;
-        }
-
-        if (!response.ok) {
-          if (!hasRenderableFormula(initialResult)) {
-            setLoadState("error");
-          }
-          return;
-        }
-
-        const payload = (await response.json()) as FormulationResult;
-
-        setResult(payload);
-        setLoadState("ready");
-
-        const waitingForProducts =
-          hasRenderableFormula(payload) &&
-          !resultHasProductStackRows(payload, "balanced") &&
-          resultHasPendingProductRecommendations(payload);
-        const waitingForFormula = !hasRenderableFormula(payload);
-
-        if (
-          mode === "until-formula" &&
-          (waitingForFormula || waitingForProducts) &&
-          missingAttempts < MAX_MISSING_FORMULA_POLLS
-        ) {
-          missingAttempts += 1;
-          retryTimer = window.setTimeout(() => {
-            void fetchFormulation(mode);
-          }, MISSING_FORMULA_POLL_INTERVAL_MS);
-        }
-      } catch {
-        if (!cancelled && !hasRenderableFormula(initialResult)) {
-          setLoadState("error");
-        }
-      } finally {
-        inFlight = false;
-
-        if (productPollingPreference) {
-          setProductPollingPreference(null);
-        }
-      }
-    }
-
-    if (!hasRenderableFormula(initialResult)) {
-      void fetchFormulation("until-formula");
-    } else if (productPollingPreference) {
-      void fetchFormulation("once");
-    }
-
-    return () => {
-      cancelled = true;
-
-      if (retryTimer) {
-        window.clearTimeout(retryTimer);
-      }
-    };
-  }, [effectivePlanId, initialResult, locale, productPollingPreference]);
+  const pollingComplete = useCallback(() => setProductPollingPreference(null), []);
+  const { result, loadState, failed, retry, refresh: refreshFormulationResult } = useFormulationPolling(
+    effectivePlanId, locale, initialResult, productPollingPreference, pollingComplete);
+  const startProductStackPolling = useCallback((preference: ProductStackPreference) => {
+    setProductPollingPreference(preference);
+  }, []);
+  const recovery = <button type="button" className="mt-4 rounded-lg px-5 py-3 ring-1 ring-foreground/20"
+    data-testid="formulation-retry" onClick={retry}>{getWelcomeCopy(locale).formulaProgress.retry}</button>;
 
   useEffect(() => {
     if (!result) {
@@ -228,6 +95,7 @@ export function FormulationResults({
           <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-muted-foreground">
             {labels.error}
           </p>
+          {recovery}
         </div>
       </section>
     );
@@ -286,6 +154,8 @@ export function FormulationResults({
   }
 
   return (
+    <>
+    {failed ? <div role="status" className="mx-auto max-w-6xl px-6">{labels.error} {recovery}</div> : null}
     <RevealFinalResultsPage
       activeProductRecommendations={activeProductRecommendations}
       formattedDate={formattedDate}
@@ -309,6 +179,7 @@ export function FormulationResults({
       }
       unlockHref={unlockHref}
     />
+    </>
   );
 }
 

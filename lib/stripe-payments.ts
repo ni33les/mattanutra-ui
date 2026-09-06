@@ -1025,7 +1025,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     const replay = await getPaymentRowById(tx, paymentId);
     if (replay) return replay;
     if (input.planId) {
-      await tx`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for update`;
+      await tx`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for no key update`;
       const [existing] = await tx<PaymentRow[]>`select * from public.payments where plan_id = ${input.planId}::uuid
         and stripe_mode = ${config.mode} and (
           paid_at is not null or status in ('paid', 'bound') or (selected_plan = ${input.selectedPlan} and status in ('created', 'checkout_session_created', 'checkout_opened', 'processing'))
@@ -1094,7 +1094,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
   if (config.mode === "mock") {
     const mockSessionId = `mock_cs_${paymentId}`;
 
-    await updatePaymentState(sql, {
+    const created = await updatePaymentState(sql, {
       action: "mock_checkout_session_created",
       expectedStatuses: ["created"],
       actor: "system",
@@ -1108,6 +1108,11 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
       stripeCheckoutSessionId: mockSessionId,
       stripePriceId: config.priceIds[input.selectedPlan]
     });
+
+    if (!created) {
+      const current = await getPaymentRowById(sql, paymentId);
+      if (current?.stripe_checkout_session_id !== mockSessionId) throw new FunnelError("This checkout attempt has ended. Start a new attempt.", 409, "checkout_expired");
+    }
 
     void Promise.all([
       writePaymentBpmEvent(checkoutRequestedEvent),
@@ -2103,6 +2108,13 @@ export async function handleStripeWebhookPayload(input: Readonly<{
   });
 
   if (!isFresh) {
+    // A processed event may predate durable fulfillment, or a later repair may be unfinished.
+    if (session && ["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type)) {
+      const payment = await getPaymentRowBySessionId(sql, session.id);
+      if (payment && payment.fulfillment_status !== "complete") {
+        await fulfillCheckoutSession(session.id, { request: input.request, source: "webhook", stripeEventId: event.id });
+      }
+    }
     return { duplicate: true, ok: true };
   }
 

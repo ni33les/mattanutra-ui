@@ -78,6 +78,7 @@ function runLeafBurst(count = 8) {
 type ChatQuestionnaireProps = Readonly<{
   locale: Locale;
   sessionId?: string;
+  reviewRequested?: boolean;
   serverDraft?: ServerChatDraft | null;
   paymentId?: string;
   pharmacyId?: string;
@@ -103,6 +104,7 @@ function resultsPath(
 export function ChatQuestionnaire({
   locale,
   sessionId,
+  reviewRequested = false,
   serverDraft,
   paymentId,
   pharmacyId,
@@ -305,13 +307,15 @@ export function ChatQuestionnaire({
     saveDraft(draft);
     const saved = draft.state;
     setState(saved);
-    if (["complete", "completing", "failed"].includes(saved.phase)) {
+    if (reviewRequested) {
+      setState({ ...saved, phase: "active", turnIndex: 0 }); setUiScreen("chat"); setReviewOpen(true);
+    } else if (["complete", "completing", "failed"].includes(saved.phase)) {
       setUiScreen("calculating"); finalizing.current = true; void runCapture(saved);
     } else if (Object.keys(saved.answers).length) {
       setState({ ...saved, phase: "resume_prompt" }); setUiScreen("chat");
     } else setUiScreen("welcome");
     trackBpmEvent("chat_view", { eventType: "funnel", locale, properties: { channel: "web", questionnaireVersion: "v6-conversational", uxVersion: UX_VERSION } });
-  }, [locale, serverDraft, saveDraft, runCapture]);
+  }, [locale, serverDraft, saveDraft, runCapture, reviewRequested]);
 
   useEffect(() => {
     if (uiScreen !== "chat") {
@@ -606,6 +610,7 @@ export function ChatQuestionnaire({
     clearLocalState();
     finalizing.current = false;
     capture.reset();
+    if (draftRef.current) saveDraft({ ...draftRef.current, captured: null, contactEmail: null, updatedAt: Date.now() });
     setState(
       createInitialState({
         locale,

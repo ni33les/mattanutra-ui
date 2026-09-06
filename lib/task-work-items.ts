@@ -1,4 +1,4 @@
-import { ASSESSMENT_GENERATION_TASKS, generationInput } from "@/lib/assessment-revisions";
+import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { computeHealthScore } from "@/lib/health-score";
 import { normalizeAssessmentPlan, type AssessmentPlan } from "@/lib/assessment-snapshot";
 import {
@@ -666,7 +666,7 @@ async function buildHealthScoreWorkItem(task: TaskRecord) {
   const row = rows[0];
   const healthScore = payloadRecord(row?.health_score);
 
-  if (!row || typeof healthScore.score !== "number") {
+  if (!row) {
     throw new Error("Assessment is missing a backend HealthScore");
   }
 
@@ -944,6 +944,9 @@ async function loadFoodGapProductVariants(
       ) as recommendation_count
     from public.product_recommendation_runs
     where product_recommendation_runs.plan_id = ${planId}::uuid
+      and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+      and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+      and generator_version = ${FUNNEL_GENERATOR_VERSION}
       and product_recommendation_runs.status in ('completed', 'partial')
       and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
     order by
@@ -1598,6 +1601,9 @@ async function loadPlanGenerationContext(
       select formulation
       from public.formulations
       where formulations.plan_id = assessments.plan_id
+        and formulations.assessment_revision = assessments.input_revision
+        and formulations.generation_locale = coalesce(${generationLocale(planId)}, assessments.locale)
+        and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (
           model_version is null
           or model_version not like '%:example'
@@ -1609,6 +1615,9 @@ async function loadPlanGenerationContext(
       select guidance
       from public.food_guidance
       where food_guidance.plan_id = assessments.plan_id
+        and food_guidance.assessment_revision = assessments.input_revision
+        and food_guidance.generation_locale = coalesce(${generationLocale(planId)}, assessments.locale)
+        and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (
           model_version is null
           or model_version not like '%:example'
@@ -1943,6 +1952,9 @@ async function loadMatchingPlanContext(planId: string) {
           select formulation
           from public.formulations
           where formulations.plan_id = assessments.plan_id
+        and formulations.assessment_revision = assessments.input_revision
+        and formulations.generation_locale = coalesce(${generationLocale(planId)}, assessments.locale)
+        and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}
             and (
               model_version is null
               or model_version not like '%:example'
@@ -2319,14 +2331,14 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     const sql = getSql();
     if (!sql) throw new Error("Database is not configured");
     const [row] = await sql`select input_revision from public.assessments where plan_id = ${task.planId}::uuid`;
-    if (!generation || !row || Number(row.input_revision) !== generation.revision) {
+    if (!generation || !row || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(row.input_revision) !== generation.revision) {
       return { taskId: task.id, taskType: "superseded_generation" };
     }
   }
   const handler = taskWorkItemHandlers[task.taskType];
 
   if (handler) {
-    const item = await handler(task);
+    const item = await (generation && task.planId ? withGenerationInput(task.planId, generation, () => handler(task)) : handler(task));
     if (generation && "answers" in item) {
       return { ...item, answers: generation.answers, locale: generation.locale,
         ...(item.taskType === "analyze_healthscore" ? { healthScore: computeHealthScore(generation.answers, generation.locale) } : {}) } as TaskWorkItem;

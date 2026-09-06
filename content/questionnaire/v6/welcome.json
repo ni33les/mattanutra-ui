@@ -94,7 +94,17 @@
     "calcEmailFailed": "We could not request delivery. Check the email address and try again.",
     "calcEmailUnknown": "Email delivery could not be confirmed. Please check your inbox or contact support.",
     "calcRetryCapture": "Retry saving my answers",
-    "calcRetryAnalysis": "Retry HealthScore analysis"
+    "calcRetryAnalysis": "Retry HealthScore analysis",
+    "formulaProgress": {
+      "kicker": "Thank you",
+      "title": "Your formula is being prepared",
+      "body": "MattaNutra is building your personalised formula and matching the right products. This normally takes several seconds.",
+      "building": "Preparing your formula…",
+      "note": "Please keep this page open.",
+      "error": "We could not finish this step. Your completed work is saved.",
+      "retry": "Try again"
+    },
+    "calcCaptureFailed": "We could not save your assessment. Please retry."
   },
   "th": {
     "badge": "HealthScore ส่วนบุคคลฟรีของคุณ",
@@ -191,7 +201,17 @@
     "calcEmailFailed": "ส่งคำขอไม่สำเร็จ โปรดตรวจสอบอีเมลแล้วลองอีกครั้ง",
     "calcEmailUnknown": "ยังยืนยันการส่งอีเมลไม่ได้ โปรดตรวจสอบกล่องจดหมายหรือติดต่อทีมงาน",
     "calcRetryCapture": "ลองบันทึกคำตอบอีกครั้ง",
-    "calcRetryAnalysis": "ลองวิเคราะห์ HealthScore อีกครั้ง"
+    "calcRetryAnalysis": "ลองวิเคราะห์ HealthScore อีกครั้ง",
+    "formulaProgress": {
+      "kicker": "ขอบคุณค่ะ",
+      "title": "กำลังจัดสูตรของคุณ",
+      "body": "MattaNutra กำลังจัดทำสูตรเฉพาะบุคคลและจับคู่สินค้าที่เหมาะกับคุณ โดยปกติใช้เวลาเพียงไม่กี่วินาทีค่ะ",
+      "building": "กำลังจัดสูตรของคุณ…",
+      "note": "กรุณาเปิดหน้านี้ไว้นะคะ",
+      "error": "ขั้นตอนนี้ยังทำไม่สำเร็จ งานที่เสร็จแล้วถูกบันทึกไว้",
+      "retry": "ลองอีกครั้ง"
+    },
+    "calcCaptureFailed": "ยังบันทึกแบบประเมินของคุณไม่สำเร็จ กรุณาลองอีกครั้ง"
   },
   "zh": {
     "badge": "您的免费个人 HealthScore",
@@ -288,6 +308,16 @@
     "calcEmailFailed": "无法保存发送请求。请检查邮箱地址后重试。",
     "calcEmailUnknown": "无法确认电子邮件是否送达。请查看收件箱或联系支持。",
     "calcRetryCapture": "重新保存我的答案",
-    "calcRetryAnalysis": "重新分析 HealthScore"
+    "calcRetryAnalysis": "重新分析 HealthScore",
+    "formulaProgress": {
+      "kicker": "谢谢",
+      "title": "正在准备你的配方",
+      "body": "MattaNutra 正在为你制定个性化配方并匹配产品，通常只需几秒钟。",
+      "building": "正在准备你的配方…",
+      "note": "请保持此页面打开。",
+      "error": "这一步没能完成。已完成的部分已保存。",
+      "retry": "再试一次"
+    },
+    "calcCaptureFailed": "未能保存你的评估，请重试。"
   }
 }

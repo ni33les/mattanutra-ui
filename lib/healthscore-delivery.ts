@@ -25,7 +25,7 @@ async function adviceReady(sql: Db, planId: string, revision: number, locale: Lo
     join public.assessments a on a.plan_id = r.plan_id and a.input_revision = r.revision
     where r.plan_id = ${planId}::uuid and r.revision = ${revision} and r.locale = ${locale}
       and r.generator_version = ${FUNNEL_GENERATOR_VERSION}`;
-  return hasHealthScoreAiCopy(row?.result);
+  return hasHealthScoreAiCopy(row?.result, locale);
 }
 
 /** Called inside capture/completion/request transactions; never sends email here. */
@@ -51,7 +51,7 @@ export async function requestHealthScoreDelivery(planId: string, input: { locale
   const locale = input.locale;
   const sql = getSql(); if (!sql) throw new Error("Database is not configured");
   return withDatabaseTransaction(sql, async tx => {
-    const [assessment] = await tx`select input_revision from public.assessments where plan_id = ${planId}::uuid for update`;
+    const [assessment] = await tx`select input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`;
     if (!assessment) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
     const revision = Number(assessment.input_revision);
     await tx`insert into public.healthscore_delivery_requests (id, plan_id, revision, locale, email)
@@ -79,7 +79,7 @@ export async function deliverHealthScore(requestId: string, send: SendEmail = se
   const [initial] = await sql<DeliveryRow[]>`select * from public.healthscore_delivery_requests where id = ${requestId}::uuid`;
   if (!initial) throw new Error("Delivery request not found");
   const prepared = await withDatabaseTransaction(sql, async tx => {
-    const [assessment] = await tx`select input_revision from public.assessments where plan_id = ${initial.plan_id}::uuid for update`;
+    const [assessment] = await tx`select input_revision from public.assessments where plan_id = ${initial.plan_id}::uuid for no key update`;
     const [row] = await tx<DeliveryRow[]>`select * from public.healthscore_delivery_requests where id = ${requestId}::uuid for update`;
     if (["sent", "unknown", "superseded"].includes(row.status)) return { row, send: false };
     if (row.status === "sending") {

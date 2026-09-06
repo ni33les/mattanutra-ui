@@ -1,3 +1,4 @@
+import { generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import type postgres from "postgres";
 import type {
   ProductRecommendationRefreshReason,
@@ -161,6 +162,9 @@ export async function loadProductRecommendationFreshnessSnapshot(
         max(generated_at) as formulation_generated_at
       from public.formulations
       where plan_id = ${input.planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${input.planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(input.planId)}, (select locale from public.assessments where plan_id = ${input.planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (
           model_version is null
           or model_version not like '%:example'
@@ -170,6 +174,9 @@ export async function loadProductRecommendationFreshnessSnapshot(
       select max(version) as report_version
       from public.nutrition_reports
       where plan_id = ${input.planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${input.planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(input.planId)}, (select locale from public.assessments where plan_id = ${input.planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
     ) report_state on true
     left join lateral (
       select
@@ -258,6 +265,9 @@ export async function loadProductRecommendationFreshnessSnapshot(
       select id, status, generated_at
       from public.product_recommendation_runs
       where plan_id = ${input.planId}::uuid
+        and assessment_revision = (select input_revision from public.assessments where plan_id = ${input.planId}::uuid)
+        and generation_locale = coalesce(${generationLocale(input.planId)}, (select locale from public.assessments where plan_id = ${input.planId}::uuid))
+        and generator_version = ${FUNNEL_GENERATOR_VERSION}
         and status in ('completed', 'partial')
         and coalesce(diagnostics ->> 'stackPreference', 'balanced') = ${input.stackPreference}
         and coalesce(diagnostics ->> 'algorithmVersion', '') = ${input.algorithmVersion}

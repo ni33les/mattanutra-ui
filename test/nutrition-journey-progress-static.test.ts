@@ -19,7 +19,7 @@ const journeyRoute = readFileSync(
   "utf8"
 );
 const journeyRead = readFileSync(
-  new URL("../lib/nutrition-journey-read.ts", import.meta.url),
+  new URL("../lib/funnel-readiness.ts", import.meta.url),
   "utf8"
 );
 const returnPage = readFileSync(
@@ -27,7 +27,7 @@ const returnPage = readFileSync(
   "utf8"
 );
 const chat = readFileSync(
-  new URL("../components/chat-questionnaire/chat-questionnaire.tsx", import.meta.url),
+  new URL("../components/chat-questionnaire/use-questionnaire-capture.ts", import.meta.url),
   "utf8"
 );
 const formulationResults = readFileSync(
@@ -54,12 +54,12 @@ describe("after-pay journey progress stays truthful", () => {
 
   it("does not put a HealthScore calculating poll back on capture", () => {
     assert.doesNotMatch(chat, /pollHealthScore/);
-    assert.match(chat, /fetchHealthScoreCopyStatus/);
+    assert.match(chat, /waitForHealthScoreCopy/);
   });
 
   it("reads one journey snapshot and does not enqueue work", () => {
-    assert.match(journeyRoute, /getNutritionJourneySnapshot\(planId\)/);
-    assert.match(journeyRoute, /getHealthScoreCopySnapshot\(planId\)/);
+    assert.match(journeyRoute, /getNutritionJourneySnapshot\(planId, locale\)/);
+    assert.match(journeyRoute, /getHealthScoreCopySnapshot\(planId, locale\)/);
     assert.match(journeyRoute, /get\("view"\) === "copy"/);
     assert.doesNotMatch(journeyRoute, /enqueue|getWorkerSql|ensureAssessmentSchema/);
     assert.match(journeyRead, /from public\.assessments/);
@@ -72,20 +72,21 @@ describe("after-pay journey progress stays truthful", () => {
     assert.match(progressUi, /CalculatingWait/);
     assert.match(progressUi, /mn-quiz-calc__ready-btn/);
     assert.match(calculatingWait, /mn-quiz-calc__spinner/);
-    assert.match(progressUi, /Your formula is being prepared/);
+    const progressCopy = readFileSync(new URL("../content/questionnaire/v6/welcome.json", import.meta.url), "utf8");
+    assert.match(progressCopy, /Your formula is being prepared/);
     assert.match(
-      progressUi,
+      progressCopy,
       /MattaNutra is building your personalised formula and matching the right products/
     );
-    assert.match(progressUi, /Preparing your formula…/);
-    assert.match(progressUi, /กำลังจัดสูตรของคุณ/);
+    assert.match(progressCopy, /Preparing your formula…/);
+    assert.match(progressCopy, /กำลังจัดสูตรของคุณ/);
     assert.match(
-      progressUi,
+      progressCopy,
       /MattaNutra กำลังจัดทำสูตรเฉพาะบุคคลและจับคู่สินค้าที่เหมาะกับคุณ/
     );
-    assert.match(progressUi, /正在准备你的配方/);
+    assert.match(progressCopy, /正在准备你的配方/);
     assert.match(
-      progressUi,
+      progressCopy,
       /MattaNutra 正在为你制定个性化配方并匹配产品，通常只需几秒钟。/
     );
     assert.doesNotMatch(progressUi, /Thai pharmac/i);
@@ -95,7 +96,7 @@ describe("after-pay journey progress stays truthful", () => {
     assert.doesNotMatch(progressUi, /Creating your formulation/);
     assert.doesNotMatch(progressUi, /Matching your products/);
     assert.doesNotMatch(progressUi, /STAGE_ORDER/);
-    assert.match(progressUi, /POLL_INTERVAL_MS/);
+    assert.match(progressUi, /pollFunnelStatus/);
     assert.doesNotMatch(progressUi, /setTimeline\([\s\S]*setTimeout/);
     assert.match(progressUi, /router\.replace\(\s*nutritionRevealPath/);
     assert.match(progressPage, /snapshot\.readyForReveal/);

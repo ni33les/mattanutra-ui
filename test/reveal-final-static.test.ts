@@ -126,7 +126,7 @@ describe("final reveal UX", () => {
       "const assessment = await getStoredAssessmentPrefill(planId);",
     );
     const refreshStart = route.indexOf(
-      "void ensureFreshProductRecommendationsForReveal",
+      "if (!readiness?.readyForReveal)",
     );
     const gate = route.slice(gateStart, refreshStart);
 
@@ -140,7 +140,7 @@ describe("final reveal UX", () => {
     assert.match(gate, /if \(!assessment\) \{[\s\S]*notFound\(\);[\s\S]*\}/);
     assert.match(
       gate,
-      /if \(!assessment\.plan\) \{[\s\S]*redirect\(nutritionHealthScorePath\(locale, planId\)\);[\s\S]*\}/,
+      /if \(!assessment\.plan && !readiness\?\.hasPaidPlan\) \{[\s\S]*redirect\(nutritionHealthScorePath\(locale, planId\)\);[\s\S]*\}/,
     );
   });
 
