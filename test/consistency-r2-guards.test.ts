@@ -75,8 +75,10 @@ describe("consistency r2 regression guards", () => {
 
     assert.match(source, /PLAN_MATCH_RETURN_BUDGET_MS = 3_000/);
     assert.match(source, /Promise\.race/);
-    assert.match(source, /overwriteIdempotency/);
     assert.match(source, /status: "processing"/);
+    // Completion must preserve the original receipt's request identity. Handle
+    // polling and subsequent create replay are tested in agentic-plan-recovery;
+    // requiring a particular persistence helper here would not prove that.
   });
 
   it("forbids catalogue load inside executeTool transactions", async () => {
