@@ -1,3 +1,4 @@
+import { requestLifetime } from "@/lib/request-lifetime";
 import postgres from "postgres";
 import { createLogger } from "@/lib/logger";
 
@@ -232,21 +233,6 @@ function postgresConnectionSettings(applicationName: string) {
   };
 }
 
-async function applyInteractiveTimeouts(
-  sql: NonNullable<ReturnType<typeof getSql>>
-) {
-  const statementTimeoutMs = dbStatementTimeoutMs();
-  const lockTimeoutMs = dbLockTimeoutMs();
-  const idleInTxnTimeoutMs = dbIdleInTxnTimeoutMs();
-
-  await sql`
-    select
-      set_config('statement_timeout', ${String(statementTimeoutMs)}, false),
-      set_config('lock_timeout', ${String(lockTimeoutMs)}, false),
-      set_config('idle_in_transaction_session_timeout', ${String(idleInTxnTimeoutMs)}, false)
-  `;
-}
-
 function handleDatabaseNotice(notice: { code?: string }) {
   if (notice.code && BENIGN_SCHEMA_NOTICE_CODES.has(notice.code)) {
     return;
@@ -301,12 +287,21 @@ function isExecutableTaggedQuery(strings: TemplateStringsArray) {
 
 function instrumentSql(
   sql: postgres.Sql,
-  kind: PoolKind
+  kind: PoolKind,
+  inTransaction = false
 ): postgres.Sql {
   const tagged = function instrumentedSql(
     this: unknown,
     ...args: unknown[]
   ) {
+    const lifetime = requestLifetime();
+    if (!inTransaction && lifetime && isTaggedTemplate(args[0]) && isExecutableTaggedQuery(args[0])) {
+      lifetime.signal.throwIfAborted();
+      return (tagged as unknown as postgres.Sql).begin(async tx => {
+        lifetime.signal.throwIfAborted();
+        return (tx as unknown as (...args: unknown[]) => Promise<unknown>)(...args);
+      });
+    }
     const startedAt = Date.now();
     const result = (
       sql as unknown as (...inner: unknown[]) => unknown
@@ -320,22 +315,30 @@ function instrumentSql(
     ) {
       const pending = result as Promise<unknown> & {
         then: Promise<unknown>["then"];
+        cancel?: () => void;
       };
+      const signal = lifetime?.signal;
+      const cancel = () => pending.cancel?.();
       const originalThen = pending.then.bind(pending);
-      pending.then = ((onFulfilled, onRejected) =>
-        originalThen(
+      pending.then = ((onFulfilled, onRejected) => {
+        signal?.addEventListener("abort", cancel, { once: true });
+        if (signal?.aborted) cancel();
+        return originalThen(
           (value) => {
+            signal?.removeEventListener("abort", cancel);
             noteQuery(kind, startedAt, args[0]);
             return typeof onFulfilled === "function" ? onFulfilled(value) : value;
           },
           (error) => {
+            signal?.removeEventListener("abort", cancel);
             noteQuery(kind, startedAt, args[0]);
             if (typeof onRejected === "function") {
               return onRejected(error);
             }
             throw error;
           }
-        )) as Promise<unknown>["then"];
+        );
+      }) as Promise<unknown>["then"];
     }
 
     return result;
@@ -352,9 +355,11 @@ function instrumentSql(
       fn: (txn: postgres.TransactionSql) => unknown
     ) =>
       originalBegin(async (txn) => {
+        requestLifetime()?.signal.throwIfAborted();
         const instrumented = instrumentSql(
           txn as unknown as postgres.Sql,
-          kind
+          kind,
+          true
         ) as unknown as postgres.TransactionSql;
         await instrumented`
           select
@@ -464,12 +469,7 @@ function getOrCreateSqlPool(kind: PoolKind) {
         statementTimeoutMs: timeouts.statementTimeoutMs
       }
     );
-    void applyInteractiveTimeouts(sql).catch((error) => {
-      dbLog.warn("unable_to_apply_interactive_timeouts", {
-        kind,
-        message: error instanceof Error ? error.message : "unknown"
-      });
-    });
+
   }
 
   return sql;

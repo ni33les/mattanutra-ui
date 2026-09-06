@@ -52,6 +52,10 @@ function enqueueFunnelAppend<T>(correlationId: string, work: () => Promise<T>): 
   const previous = funnelAppendTail.get(correlationId) ?? Promise.resolve();
   const next = previous.catch(() => undefined).then(work);
   funnelAppendTail.set(correlationId, next);
+  void next.finally(() => {
+    if (funnelAppendTail.get(correlationId) === next) funnelAppendTail.delete(correlationId);
+    pruneFunnelCaches();
+  }).catch(() => undefined);
   return next;
 }
 
@@ -309,6 +313,7 @@ export function recordFunnelEvent(input: Readonly<{
   rememberShared(event);
   rememberCommitted(event);
   const persisted = persistFunnelEvent(event);
+  pruneFunnelCaches();
   void persisted;
   return { accepted: true as const, event, persisted };
 }
@@ -452,4 +457,15 @@ export async function loadPersistedFunnelEvents(correlationId: string) {
 
 export function funnelAttribution(correlationId: string): FunnelAttribution {
   return attributionByCorrelation.get(correlationId) ?? "unattributed";
+}
+
+function pruneFunnelCaches() {
+  if (process.env.NODE_TEST_CONTEXT) return;
+  for (const id of ledgers.keys()) {
+    if (ledgers.size <= 256) break;
+    if (funnelAppendTail.has(id)) continue;
+    resetFunnelLedger(id);
+    durableLedgers.delete(id);
+    committedFunnelRows.delete(id);
+  }
 }

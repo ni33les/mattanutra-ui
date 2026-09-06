@@ -25,7 +25,8 @@ const capacities: Record<PermitKind, number> = {
   lock: 32,
   worker: 32
 };
-const waiters: Record<PermitKind, Array<() => void>> = {
+type Waiter = { requestId: string; resolve(): void; reject(error: Error): void; signal?: AbortSignal; abort(): void };
+const waiters: Record<PermitKind, Waiter[]> = {
   admission: [],
   connection: [],
   database: [],
@@ -73,18 +74,33 @@ export function acquirePermit(requestId: string, kind: PermitKind) {
   held.set(requestId, owned);
 }
 
-export async function acquirePermitWhenAvailable(requestId: string, kind: PermitKind) {
-  queueOrder.push(`${requestId}:${kind}`);
-  while (counts[kind] >= capacities[kind]) {
-    await new Promise<void>((resolve) => {
-      waiters[kind].push(resolve);
-    });
+export async function acquirePermitWhenAvailable(requestId: string, kind: PermitKind, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  if (counts[kind] < capacities[kind] && waiters[kind].length === 0) {
+    acquirePermit(requestId, kind);
+    return;
   }
-  const index = queueOrder.indexOf(`${requestId}:${kind}`);
-  if (index >= 0) {
-    queueOrder.splice(index, 1);
-  }
-  acquirePermit(requestId, kind);
+  if (waiters[kind].length >= 128) throw new Error("admission_queue_full");
+  await new Promise<void>((resolve, reject) => {
+    const waiter: Waiter = {
+      requestId, resolve, reject, signal,
+      abort() {
+        const index = waiters[kind].indexOf(waiter);
+        if (index >= 0) waiters[kind].splice(index, 1);
+        removeQueued(requestId, kind);
+        reject(new DOMException("The request was cancelled.", "AbortError"));
+      }
+    };
+    queueOrder.push(requestId + ":" + kind);
+    waiters[kind].push(waiter);
+    signal?.addEventListener("abort", waiter.abort, { once: true });
+    if (signal?.aborted) waiter.abort();
+  });
+}
+
+function removeQueued(id: string, kind: PermitKind) {
+  const index = queueOrder.indexOf(id + ":" + kind);
+  if (index >= 0) queueOrder.splice(index, 1);
 }
 
 export function queuedPermitOrder() {
@@ -127,6 +143,14 @@ export function heldPermitKinds(requestId: string) {
 
 function drain(kind: PermitKind) {
   while (counts[kind] < capacities[kind] && waiters[kind].length > 0) {
-    waiters[kind].shift()?.();
+    const waiter = waiters[kind].shift()!;
+    waiter.signal?.removeEventListener("abort", waiter.abort);
+    removeQueued(waiter.requestId, kind);
+    if (waiter.signal?.aborted) {
+      waiter.reject(new DOMException("The request was cancelled.", "AbortError"));
+    } else {
+      acquirePermit(waiter.requestId, kind);
+      waiter.resolve();
+    }
   }
 }

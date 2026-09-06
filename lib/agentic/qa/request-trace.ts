@@ -1,3 +1,4 @@
+import { actualRequestId, requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import {
   acquirePermitWhenAvailable,
@@ -5,10 +6,10 @@ import {
 } from "@/lib/agentic/qa/resource-permits";
 import {
   deadlineExceeded,
+  forgetRequestClock,
   markRequestStart,
   serviceDeadlineError,
   waitUntilDeadline,
-  type DeadlineWait
 } from "@/lib/agentic/qa/service-clock";
 
 export const REQUEST_STAGES = [
@@ -74,8 +75,12 @@ const entered = new Map<RequestStage, Array<() => void>>();
 const aborts = new Map<string, AbortController>();
 let dropAfter: RequestStage | null = null;
 let attributionEnabled = true;
+export const REQUEST_TRACE_LIMIT = 256;
+const completed = new Set<string>();
+let requestSequence = 0;
 
 export function resetRequestTraces() {
+  completed.clear();
   traces.clear();
   owners.clear();
   boundaries.clear();
@@ -115,6 +120,7 @@ export function requestAbortSignal(correlationId: string) {
 }
 
 function abortPromise(correlationId: string) {
+  correlationId = actualRequestId(correlationId);
   const signal = aborts.get(correlationId)?.signal;
   return new Promise<void>((resolve) => {
     if (!signal || signal.aborted) {
@@ -126,6 +132,7 @@ function abortPromise(correlationId: string) {
 }
 
 export function cancelRequest(correlationId: string) {
+  correlationId = actualRequestId(correlationId);
   aborts.get(correlationId)?.abort();
 }
 
@@ -134,6 +141,7 @@ export function waitUntilCancelled(correlationId: string) {
 }
 
 export function throwIfAborted(correlationId: string) {
+  correlationId = actualRequestId(correlationId);
   if (aborts.get(correlationId)?.signal.aborted) {
     throw new DOMException("The operation was aborted.", "AbortError");
   }
@@ -144,6 +152,7 @@ export async function recordRequestStage(
   stage: RequestStage,
   options: Readonly<{ skipLatch?: boolean }> = {}
 ) {
+  correlationId = actualRequestId(correlationId);
   if (!attributionEnabled) {
     return;
   }
@@ -171,6 +180,7 @@ export async function recordRequestStage(
 }
 
 export function setRequestTerminalOwner(correlationId: string, owner: TerminalOwner) {
+  correlationId = actualRequestId(correlationId);
   if (!owners.has(correlationId)) {
     owners.set(correlationId, owner);
   }
@@ -186,6 +196,7 @@ export function setCommitBoundary(
 }
 
 export function requestTrace(correlationId: string): RequestTrace {
+  correlationId = actualRequestId(correlationId);
   return {
     commitBoundary: boundaries.get(correlationId) ?? null,
     correlationId,
@@ -199,66 +210,83 @@ export function listRequestTraces() {
   return [...traces.keys()].map(requestTrace);
 }
 
+function finishRequest(correlationId: string) {
+  aborts.delete(correlationId);
+  completed.delete(correlationId);
+  completed.add(correlationId);
+  while (completed.size > REQUEST_TRACE_LIMIT) {
+    const oldest = completed.values().next().value!;
+    completed.delete(oldest);
+    traces.delete(oldest);
+    owners.delete(oldest);
+    boundaries.delete(oldest);
+    replays.delete(oldest);
+    forgetRequestClock(oldest);
+  }
+}
+
 export async function runObservedRequest<T>(
-  correlationId: string,
+  logicalId: string,
   work: () => Promise<T>
 ): Promise<T | AgenticErrorResult> {
+  // A retry has its own lifetime even when it shares an idempotency key.
+  const correlationId = aborts.has(logicalId) ? logicalId + ":request:" + (++requestSequence) : logicalId;
+  const parentSignal = requestLifetime()?.signal;
   markRequestStart(correlationId);
-  requestAbortSignal(correlationId);
-  await acquirePermitWhenAvailable(correlationId, "admission");
-  await acquirePermitWhenAvailable(correlationId, "worker");
-  await acquirePermitWhenAvailable(correlationId, "connection");
-  let deadline: DeadlineWait | undefined;
+  const signal = requestAbortSignal(correlationId);
+  const abort = () => cancelRequest(correlationId);
+  parentSignal?.addEventListener("abort", abort, { once: true });
+  if (parentSignal?.aborted) abort();
+  let finished = false;
+  const deadline = waitUntilDeadline(correlationId);
+  const expired = deadline.then(() => {
+    if (!finished) abort();
+    return { kind: "deadline" as const };
+  });
+  const running = withRequestLifetime({ signal, correlationId, logicalId }, async () => {
+    for (const kind of ["admission", "worker", "connection"] as const) {
+      await acquirePermitWhenAvailable(correlationId, kind, signal);
+    }
+    signal.throwIfAborted();
+    if (deadlineExceeded(correlationId)) throw new DOMException("Deadline exceeded", "AbortError");
+    return work();
+  }).then(value => ({ kind: "ok" as const, value }), error => ({ kind: "err" as const, error }));
+
   try {
-    const running = work()
-      .then((value) => ({ kind: "ok" as const, value }))
-      .catch((error: unknown) => ({ kind: "err" as const, error }));
-    deadline = waitUntilDeadline(correlationId);
     const outcome = await Promise.race([
-      running,
-      deadline.then(() => ({ kind: "deadline" as const }))
+      running, expired, abortPromise(correlationId).then(() => ({ kind: "aborted" as const }))
     ]);
     if (outcome.kind === "deadline" || deadlineExceeded(correlationId)) {
-      cancelRequest(correlationId);
-      if (!owners.has(correlationId)) {
-        setRequestTerminalOwner(correlationId, "dependency");
-      }
+      abort();
+      setRequestTerminalOwner(correlationId, "dependency");
       await recordRequestStage(correlationId, "request_released", { skipLatch: true });
       return serviceDeadlineError(correlationId);
     }
-    if (outcome.kind === "err") {
-      throw outcome.error;
-    }
-    if (!owners.has(correlationId)) {
-      setRequestTerminalOwner(correlationId, "transport");
-    }
+    if (outcome.kind === "aborted") throw new DOMException("The request was cancelled.", "AbortError");
+    if (outcome.kind === "err") throw outcome.error;
+    setRequestTerminalOwner(correlationId, "transport");
     return outcome.value;
   } catch (error) {
     if (error instanceof ConnectionDroppedError) {
-      cancelRequest(correlationId);
+      abort();
       await recordRequestStage(correlationId, "request_released", { skipLatch: true });
-      return businessError({
-        correlationId,
-        fieldPath: "transport",
-        message: "The client connection was dropped.",
-        reasonCode: "temporarily_unavailable",
-        retryable: true
-      });
+      return businessError({ correlationId, fieldPath: "transport", message: "The client connection was dropped.", reasonCode: "temporarily_unavailable", retryable: true });
     }
     if (error instanceof DOMException && error.name === "AbortError") {
-      await recordRequestStage(correlationId, "durable_rolled_back", { skipLatch: true });
       await recordRequestStage(correlationId, "request_released", { skipLatch: true });
-      return businessError({
-        correlationId,
-        message: "The request was cancelled.",
-        reasonCode: "temporarily_unavailable",
-        retryable: true
-      });
+      return businessError({ correlationId, message: "The request was cancelled.", reasonCode: "temporarily_unavailable", retryable: true });
+    }
+    if (error instanceof Error && error.message === "admission_queue_full") {
+      return businessError({ correlationId, message: "The service is busy. Retry shortly with the same idempotency key.", reasonCode: "temporarily_unavailable", retryable: true });
     }
     throw error;
   } finally {
-    deadline?.cancel();
+    finished = true;
+    deadline.cancel();
+    parentSignal?.removeEventListener("abort", abort);
     releaseAllPermits(correlationId);
+    // Keep the abort signal alive until remaining work observes cancellation.
+    void running.then(() => finishRequest(correlationId));
   }
 }
 

@@ -1,3 +1,4 @@
+import { withRequestLifetime } from "@/lib/request-lifetime";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { requestCorrelationId } from "@/lib/request-correlation";
@@ -93,7 +94,11 @@ function timedToolName(body: unknown) {
   return typeof name === "string" ? canonicalPublicToolName(name) : null;
 }
 
-export async function POST(request: Request) {
+export function POST(request: Request) {
+  return withRequestLifetime({ signal: request.signal }, () => handlePost(request));
+}
+
+async function handlePost(request: Request) {
   assertReleaseManifestReady();
   let body: unknown;
 

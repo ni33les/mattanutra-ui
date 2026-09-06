@@ -1,3 +1,4 @@
+import { requestLifetime } from "@/lib/request-lifetime";
 import type { Locale } from "@/lib/i18n";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import {
@@ -135,7 +136,7 @@ const inflightPlanIdempotency = new Map<
 >();
 
 function planCorrelationId(idempotencyKey?: string) {
-  return idempotencyKey ? `plan:${idempotencyKey}` : "";
+  return requestLifetime()?.correlationId ?? (idempotencyKey ? `plan:${idempotencyKey}` : "");
 }
 
 function logicalPlanQueryCounts(namespace: string) {
@@ -929,8 +930,7 @@ export async function planTool(input: Readonly<{
     if (existing && existing.hash !== canonicalRequestHash(input.payload)) {
       return businessError({ fieldPath: "idempotencyKey", message: "This key is in use with a different payload.", reasonCode: "idempotency_conflict" });
     }
-    const planCorrelation =
-      input.payload.idempotencyKey && `plan:${input.payload.idempotencyKey}`;
+    const planCorrelation = planCorrelationId(input.payload.idempotencyKey);
     if (existing && planCorrelation) {
       const { deadlineExceeded } = await import("@/lib/agentic/qa/service-clock");
       if (deadlineExceeded(planCorrelation)) {
@@ -1494,10 +1494,7 @@ async function completePreparedPlan(
     }
   }
   matcherEntered?.();
-  const planCorrelation =
-    typeof input.payload.idempotencyKey === "string" && input.payload.idempotencyKey
-      ? `plan:${input.payload.idempotencyKey}`
-      : "";
+  const planCorrelation = planCorrelationId(input.payload.idempotencyKey);
   if (matcherGate) {
     await Promise.race([
       matcherGate,

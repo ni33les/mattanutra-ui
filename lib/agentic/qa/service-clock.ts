@@ -1,3 +1,4 @@
+import { actualRequestId } from "@/lib/request-lifetime";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { agenticMessage } from "@/lib/agentic/i18n";
 
@@ -51,10 +52,12 @@ export function advanceServiceClock(deltaMs: number) {
 }
 
 export function markRequestStart(correlationId: string) {
+  correlationId = actualRequestId(correlationId);
   startedAt.set(correlationId, serviceClockMs());
 }
 
 export function requestElapsedMs(correlationId: string) {
+  correlationId = actualRequestId(correlationId);
   return serviceClockMs() - (startedAt.get(correlationId) ?? serviceClockMs());
 }
 
@@ -63,6 +66,7 @@ export function deadlineExceeded(correlationId: string) {
 }
 
 export function clearDeadlineWatch(correlationId: string) {
+  correlationId = actualRequestId(correlationId);
   const set = timers.get(correlationId);
   if (!set) {
     return;
@@ -74,6 +78,7 @@ export function clearDeadlineWatch(correlationId: string) {
 }
 
 export function waitUntilDeadline(correlationId: string): DeadlineWait {
+  correlationId = actualRequestId(correlationId);
   let cancel = () => {};
   const promise = new Promise<void>((resolve) => {
     let settled = false;
@@ -132,4 +137,9 @@ function notify() {
   for (const watcher of [...watchers]) {
     watcher();
   }
+}
+
+export function forgetRequestClock(correlationId: string) {
+  startedAt.delete(correlationId);
+  clearDeadlineWatch(correlationId);
 }

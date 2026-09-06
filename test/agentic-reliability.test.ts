@@ -13,6 +13,11 @@ import { createAgenticRuntime, type AgenticRuntime } from "../lib/agentic/runtim
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { resetPlanCreateInflightForTests, setPlanClaimLatchForTests, setMatcherGateForTests, setMatcherEnteredForTests } from "../lib/agentic/plan/service.ts";
 import { resetExecuteLockState } from "../lib/agentic/commerce/execute.ts";
+import { runObservedRequest, recordRequestStage, listRequestTraces, resetRequestTraces, REQUEST_TRACE_LIMIT } from "../lib/agentic/qa/request-trace.ts";
+import { resetServiceClock, advanceServiceClock } from "../lib/agentic/qa/service-clock.ts";
+import { resetResourcePermits, setPermitCapacity, queuedPermitOrder, snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+import { withRequestLifetime } from "../lib/request-lifetime.ts";
+import { feedbackTool } from "../lib/agentic/feedback.ts";
 
 const request = {
   destinationCountry: "TH", locale: "en", optimization: "balanced",
@@ -20,7 +25,10 @@ const request = {
   targets: [{ name: "Vitamin D3", amount: 1000, unit: "IU" }]
 };
 
-beforeEach(() => { installGoldCatalogue(); resetPlanCreateInflightForTests(); resetExecuteLockState(); });
+beforeEach(() => {
+  installGoldCatalogue(); resetPlanCreateInflightForTests(); resetExecuteLockState();
+  resetResourcePermits(); resetServiceClock(); resetRequestTraces();
+});
 afterEach(() => { uninstallGoldCatalogue(); resetCataloguePins(); setMatcherGateForTests(null); setMatcherEnteredForTests(null); });
 
 function deferred() {
@@ -145,5 +153,60 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
     assert.equal(results[1].ok, true);
     assert.equal(results[0].orderHandle, results[1].orderHandle);
     assert.equal(orders, 1);
+  });
+
+  it("rolls back feedback if its idempotency record cannot commit", async () => {
+    const runtime = createAgenticRuntime();
+    const plan = await call(runtime, { operation: "create", idempotencyKey: "review-feedback-create", request });
+    const ids: string[] = [];
+    const insertFeedback = runtime.store.insertFeedback;
+    const insertIdempotency = runtime.store.insertIdempotency;
+    runtime.store.insertFeedback = async row => { ids.push(row.id); await insertFeedback(row); };
+    runtime.store.insertIdempotency = async () => { throw new Error("test_commit_failure"); };
+    const input = { ...runtime, now: new Date().toISOString(), planHandle: plan.planHandle, expectedRevision: plan.revision,
+      consentConfirmed: true, rating: 4, summary: "Helpful options", idempotencyKey: "review-feedback-submit" };
+    await assert.rejects(feedbackTool(input), /test_commit_failure/);
+    assert.equal(await runtime.store.getFeedback(ids[0]), null);
+    runtime.store.insertIdempotency = insertIdempotency;
+    const results = await Promise.all([feedbackTool(input), feedbackTool(input)]);
+    assert.equal(results.every(r => r.ok), true);
+    assert.equal((await Promise.all(ids.map(id => runtime.store.getFeedback(id)))).filter(Boolean).length, 1);
+  });
+});
+
+describe("MCP reliability: bounded request lifetimes", () => {
+  it("expires a queued request without starting it or leaving a waiter", async () => {
+    setPermitCapacity("admission", 0);
+    let started = false;
+    const pending = runObservedRequest("review-queued", async () => { started = true; return { ok: true }; });
+    advanceServiceClock(60_001);
+    const result = await pending;
+    assert.ok("error" in result);
+    assert.equal(result.error.reasonCode, "SERVICE_DEADLINE_EXCEEDED");
+    assert.equal(started, false);
+    assert.deepEqual(queuedPermitOrder(), []);
+    assert.equal(Object.values(snapshotResourcePermits()).every(n => n === 0), true);
+    setPermitCapacity("admission", 32);
+    assert.equal(started, false);
+  });
+
+  it("cancels admission when the HTTP request aborts", async () => {
+    setPermitCapacity("admission", 0);
+    const controller = new AbortController();
+    let started = false;
+    const pending = withRequestLifetime({ signal: controller.signal }, () =>
+      runObservedRequest("review-http-abort", async () => { started = true; return { ok: true }; }));
+    controller.abort();
+    assert.equal((await pending).ok, false);
+    assert.equal(started, false);
+    assert.deepEqual(queuedPermitOrder(), []);
+  });
+
+  it("bounds diagnostic retention after requests finish", async () => {
+    for (let i = 0; i < REQUEST_TRACE_LIMIT + 10; i++) {
+      const id = "review-retention-" + i;
+      await runObservedRequest(id, () => recordRequestStage(id, "ingress_accepted"));
+    }
+    assert.ok(listRequestTraces().length <= REQUEST_TRACE_LIMIT);
   });
 });

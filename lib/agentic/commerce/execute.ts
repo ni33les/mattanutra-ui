@@ -55,6 +55,7 @@ import {
 const executeLockChains = new Map<string, Promise<unknown>>();
 const executeCommitSignals = new Map<string, Promise<void>>();
 const executeCommitResolvers = new Map<string, () => void>();
+const executeWaiters = new Map<string, number>();
 let executeRequestSeq = 0;
 
 function signalExecuteCommitted(key: string) {
@@ -80,6 +81,7 @@ export function resetExecuteLockState() {
   executeLockChains.clear();
   executeCommitSignals.clear();
   executeCommitResolvers.clear();
+  executeWaiters.clear();
   executeFreshGate = null;
   executeFreshEntered = null;
   executeFollowerEntered = null;
@@ -131,6 +133,9 @@ function enqueueExecute<T>(
   const previous = executeLockChains.get(key) ?? Promise.resolve();
   const next = previous.catch(() => undefined).then(() => work());
   executeLockChains.set(key, next);
+  void next.finally(() => {
+    if (executeLockChains.get(key) === next) executeLockChains.delete(key);
+  }).catch(() => undefined);
   return next;
 }
 
@@ -203,8 +208,21 @@ export async function executeTool(input: Readonly<{
   store: AgenticStore;
 }>): Promise<ExecuteSuccess | AgenticErrorResult> {
   const correlation = `execute:${input.idempotencyKey}:${++executeRequestSeq}`;
-  const observed = await runObservedRequest(correlation, () => executeToolBody(input, correlation));
-  return observed as ExecuteSuccess | AgenticErrorResult;
+  const owner = input.scope.environment + ":" + input.scope.tenantScope + ":" + (input.scope.principalScope ?? "anon");
+  const key = owner + ":" + input.idempotencyKey;
+  executeWaiters.set(key, (executeWaiters.get(key) ?? 0) + 1);
+  try {
+    const observed = await runObservedRequest(correlation, () => executeToolBody(input, correlation));
+    return observed as ExecuteSuccess | AgenticErrorResult;
+  } finally {
+    const remaining = (executeWaiters.get(key) ?? 1) - 1;
+    if (remaining === 0) {
+      signalExecuteCommitted(key);
+      executeWaiters.delete(key);
+      executeCommitSignals.delete(key);
+      executeCommitResolvers.delete(key);
+    } else executeWaiters.set(key, remaining);
+  }
 }
 
 async function executeToolBody(
@@ -242,11 +260,10 @@ async function executeToolBody(
     executeFollowerEntered?.();
     const committedSignal = executeCommitSignals.get(inflightKey);
     if (committedSignal) {
-      await Promise.race([
-        committedSignal,
-        waitUntilDeadline(correlation),
-        waitUntilCancelled(correlation)
-      ]);
+      const deadline = waitUntilDeadline(correlation);
+      try {
+        await Promise.race([committedSignal, deadline, waitUntilCancelled(correlation)]);
+      } finally { deadline.cancel(); }
     }
     try {
       throwIfAborted(correlation);
@@ -414,6 +431,7 @@ async function executeFresh(
 
   const created: Array<{ locale: Locale; orderId: string; planId: string }> = [];
   const outcome = await input.store.transaction(async (store) => {
+    throwIfAborted(correlation);
     const capability = await resolveCapability({
       action: "plan.execute",
       config: input.config,
@@ -682,6 +700,7 @@ async function executeFresh(
     if (!response) {
       throw new Error("execute_fail_at_commit");
     }
+    throwIfAborted(correlation);
     created.push({ locale, orderId, planId: plan.id });
     return response;
   });
