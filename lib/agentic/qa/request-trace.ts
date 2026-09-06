@@ -191,6 +191,7 @@ export function setCommitBoundary(
   boundary: NonNullable<RequestTrace["commitBoundary"]>,
   replayAction: NonNullable<RequestTrace["replayAction"]>
 ) {
+  correlationId = actualRequestId(correlationId);
   boundaries.set(correlationId, boundary);
   replays.set(correlationId, replayAction);
 }
@@ -250,7 +251,13 @@ export async function runObservedRequest<T>(
     signal.throwIfAborted();
     if (deadlineExceeded(correlationId)) throw new DOMException("Deadline exceeded", "AbortError");
     return work();
-  }).then(value => ({ kind: "ok" as const, value }), error => ({ kind: "err" as const, error }));
+  }).then(value => {
+    releaseAllPermits(correlationId);
+    return { kind: "ok" as const, value };
+  }, error => {
+    releaseAllPermits(correlationId);
+    return { kind: "err" as const, error };
+  });
 
   try {
     const outcome = await Promise.race([
@@ -284,8 +291,8 @@ export async function runObservedRequest<T>(
     finished = true;
     deadline.cancel();
     parentSignal?.removeEventListener("abort", abort);
-    releaseAllPermits(correlationId);
-    // Keep the abort signal alive until remaining work observes cancellation.
+    // Keep admission capacity and the abort signal until underlying work stops.
+    // Returning a deadline must not admit an unbounded stream of orphaned work.
     void running.then(() => finishRequest(correlationId));
   }
 }

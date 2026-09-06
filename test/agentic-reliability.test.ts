@@ -175,6 +175,22 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
 });
 
 describe("MCP reliability: bounded request lifetimes", () => {
+  it("holds admission capacity until a cancelled dependency actually stops", async () => {
+    const gate = deferred(), entered = deferred();
+    const pending = runObservedRequest("review-orphan", async () => {
+      entered.resolve();
+      await gate.promise;
+      return { ok: true };
+    });
+    await entered.promise;
+    advanceServiceClock(60_001);
+    assert.equal((await pending).ok, false);
+    assert.equal(snapshotResourcePermits().admission, 1);
+    gate.resolve();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(snapshotResourcePermits().admission, 0);
+  });
+
   it("expires a queued request without starting it or leaving a waiter", async () => {
     setPermitCapacity("admission", 0);
     let started = false;
