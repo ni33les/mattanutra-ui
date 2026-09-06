@@ -230,6 +230,7 @@ export async function executeTaskWorkItem(
   workItem: TaskWorkItem,
   runtime: TaskExecutionRuntime = {}
 ) {
+  if (workItem.taskType === "superseded_generation") return { superseded: true };
   if (workItem.taskType === "admin_catalogue_optimization_job") {
     const simulationData = workItem.simulationData;
     const totalSamples = simulationData.sampleTraces.length;
@@ -410,12 +411,7 @@ export async function executeTaskWorkItem(
         }
       };
     } catch (error) {
-      return {
-        cachedOrExisting: false,
-        errorMessage: analysisErrorMessage(error),
-        fallbackUsed: true,
-        healthScore: workItem.healthScore
-      };
+      throw new Error(`HealthScore advice failed: ${analysisErrorMessage(error)}`, { cause: error });
     }
   }
 

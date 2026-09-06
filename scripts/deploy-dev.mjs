@@ -9,6 +9,7 @@ const schemaScripts = [
   "products:v9:schema:apply",
   "product-coverage:demand-cache:schema:apply",
   "payments:schema:apply",
+  "web-funnel:schema:apply",
   "agentic:schema:apply"
 ];
 const smokeUrls = [

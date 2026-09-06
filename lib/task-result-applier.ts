@@ -1,4 +1,5 @@
-import { isUuid, toJsonValue } from "@/lib/assessment-store";
+import { ASSESSMENT_GENERATION_TASKS, generationInput } from "@/lib/assessment-revisions";
+import { hasHealthScoreAiCopy, isUuid, toJsonValue } from "@/lib/assessment-store";
 import { updateBlogPost, updateTestimonial } from "@/lib/blog";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
@@ -391,12 +392,14 @@ async function applyHealthScoreResult(
   });
 
   if (!fallbackUsed) {
-    await sql`
-      update public.assessments set
-        health_score = ${sql.json(toJsonValue(healthScore))},
-        updated_at = now()
-      where plan_id = ${task.planId}::uuid
-    `;
+    if (!hasHealthScoreAiCopy(healthScore)) throw new Error("HealthScore AI advice is incomplete");
+    const generation = generationInput(task.payload);
+    if (!generation) return;
+    await sql`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result, task_id)
+      values (${task.planId}::uuid, ${generation.revision}, ${generation.locale}, ${generation.generatorVersion}, ${sql.json(toJsonValue(healthScore))}, ${task.id}::uuid)
+      on conflict (plan_id, revision, locale, generator_version) do update set result = excluded.result, task_id = excluded.task_id, created_at = now()`;
+    await sql`update public.assessments set health_score = ${sql.json(toJsonValue(healthScore))}, updated_at = now()
+      where plan_id = ${task.planId}::uuid and input_revision = ${generation.revision} and locale = ${generation.locale}`;
   }
   await eventually(afterCommit, async () => {
     await recordTaskXaiUsageCost({
@@ -1784,6 +1787,7 @@ async function applyNutritionReportResult(
 
   await sql`
     insert into public.nutrition_reports (
+      assessment_revision,
       plan_id,
       version,
       task_id,
@@ -1793,6 +1797,7 @@ async function applyNutritionReportResult(
       updated_at
     )
     values (
+      (select input_revision from public.assessments where plan_id = ${task.planId}::uuid),
       ${task.planId}::uuid,
       coalesce((
         select max(version) + 1
@@ -2113,6 +2118,7 @@ async function insertProductRecommendationResult({
   };
   const runRows = await sql<Array<{ id: string }>>`
     insert into public.product_recommendation_runs (
+      assessment_revision,
       plan_id,
       task_id,
       ray_id,
@@ -2130,6 +2136,7 @@ async function insertProductRecommendationResult({
       created_at
     )
     values (
+      (select input_revision from public.assessments where plan_id = ${task.planId}::uuid),
       ${task.planId}::uuid,
       ${task.id}::uuid,
       ${task.rayId ?? null}::uuid,
@@ -2297,6 +2304,7 @@ async function applyProductRecommendationsResult(
 
   await sql`
     insert into public.recommendations (
+      assessment_revision,
       plan_id,
       version,
       recommendations,
@@ -2304,6 +2312,7 @@ async function applyProductRecommendationsResult(
       updated_at
     )
     select
+      (select input_revision from public.assessments where plan_id = ${task.planId}::uuid),
       ${task.planId}::uuid,
       coalesce(max(version), 0) + 1,
       ${sql.json(toJsonValue(legacyRecommendations))}::jsonb,
@@ -2445,6 +2454,16 @@ export async function applyTaskCompletionResult({
   taskId: string;
 }>) {
   const task = providedTask ?? (await getTaskBundle({ taskId })).task;
+  if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {
+    const db = sql ?? getSql();
+    if (!db) throw new Error("Database is not configured");
+    const generation = generationInput(task.payload);
+    const [current] = await db`select input_revision, input_hash from public.assessments where plan_id = ${task.planId}::uuid for update`;
+    if (!generation || !current || Number(current.input_revision) !== generation.revision ||
+        (current.input_hash && current.input_hash !== generation.inputHash)) {
+      return { superseded: true, message: "Assessment inputs changed; old result was not applied" };
+    }
+  }
   const handler = taskCompletionResultHandlers[task.taskType];
 
   if (handler) {
@@ -2485,6 +2504,14 @@ export async function applyTaskFailureResult({
 
   if (!sql) {
     return resultPayload;
+  }
+
+  if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {
+    const generation = generationInput(task.payload);
+    const [current] = await sql`select input_revision from public.assessments where plan_id = ${task.planId}::uuid for update`;
+    if (!generation || !current || Number(current.input_revision) !== generation.revision) {
+      return { superseded: true };
+    }
   }
 
   if (task.taskType === "admin_catalogue_optimization_job") {

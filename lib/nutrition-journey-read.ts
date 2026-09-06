@@ -1,3 +1,4 @@
+import { FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { hasHealthScoreAiCopy, isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import {
@@ -43,7 +44,7 @@ function copyFlagsFromRow(row: {
   return { copyFailed, copyReady };
 }
 
-export async function getHealthScoreCopySnapshot(planId: string) {
+export async function getHealthScoreCopySnapshot(planId: string, locale?: string) {
   const sql = getSql();
 
   if (!sql || !isUuid(planId)) {
@@ -57,14 +58,19 @@ export async function getHealthScoreCopySnapshot(planId: string) {
     }>
   >`
     select
-      assessments.health_score,
+      score.result as health_score,
       copy_task.status::text as copy_task_status
     from public.assessments
+    left join public.assessment_healthscore_results score on score.plan_id = assessments.plan_id
+      and score.revision = assessments.input_revision and score.locale = coalesce(${locale ?? null}, assessments.locale)
+      and score.generator_version = ${FUNNEL_GENERATOR_VERSION}
     left join lateral (
       select tasks.status
       from public.tasks
       where tasks.plan_id = assessments.plan_id
+        and tasks.payload #>> '{generation,revision}' = assessments.input_revision::text
         and tasks.task_type = 'analyze_healthscore'
+        and tasks.payload #>> '{generation,locale}' = coalesce(${locale ?? null}, assessments.locale)
       order by tasks.created_at desc
       limit 1
     ) copy_task on true
@@ -84,7 +90,8 @@ export async function getHealthScoreCopySnapshot(planId: string) {
 }
 
 export async function getNutritionJourneySnapshot(
-  planId: string
+  planId: string,
+  locale?: string
 ): Promise<NutritionJourneySnapshot | null> {
   const sql = getSql();
 
@@ -109,7 +116,7 @@ export async function getNutritionJourneySnapshot(
     select
       assessments.status::text as assessment_status,
       assessments.selected_plan is not null as has_paid_plan,
-      assessments.health_score,
+      score.result as health_score,
       assessments.health_score ->> 'score' as health_score_score,
       copy_task.status::text as copy_task_status,
       formulations.visible_supplement_count,
@@ -118,6 +125,9 @@ export async function getNutritionJourneySnapshot(
       recs.stack_coverage_percent,
       task_rollups.task_statuses
     from public.assessments
+    left join public.assessment_healthscore_results score on score.plan_id = assessments.plan_id
+      and score.revision = assessments.input_revision and score.locale = coalesce(${locale ?? null}, assessments.locale)
+      and score.generator_version = ${FUNNEL_GENERATOR_VERSION}
     left join lateral (
       select
         (
@@ -131,6 +141,7 @@ export async function getNutritionJourneySnapshot(
         latest.formulation #>> '{sectionStatuses,supplements}' as section_supplements
       from public.formulations latest
       where latest.plan_id = assessments.plan_id
+        and latest.assessment_revision = assessments.input_revision
         and (
           latest.model_version is null
           or latest.model_version not like '%:example'
@@ -147,10 +158,12 @@ export async function getNutritionJourneySnapshot(
         select recommendations
         from public.recommendations
         where recommendations.plan_id = assessments.plan_id
+        and recommendations.assessment_revision = assessments.input_revision
         order by version desc, generated_at desc
         limit 1
       ) rec on true
       where runs.plan_id = assessments.plan_id
+        and runs.assessment_revision = assessments.input_revision
       order by runs.generated_at desc
       limit 1
     ) recs on true
@@ -162,6 +175,7 @@ export async function getNutritionJourneySnapshot(
             select distinct on (tasks.task_type) tasks.status
             from public.tasks
             where tasks.plan_id = assessments.plan_id
+        and tasks.payload #>> '{generation,revision}' = assessments.input_revision::text
               and tasks.task_type in (
                 'generate_supplement_guidance',
                 'generate_product_recommendations'
@@ -176,7 +190,9 @@ export async function getNutritionJourneySnapshot(
       select tasks.status
       from public.tasks
       where tasks.plan_id = assessments.plan_id
+        and tasks.payload #>> '{generation,revision}' = assessments.input_revision::text
         and tasks.task_type = 'analyze_healthscore'
+        and tasks.payload #>> '{generation,locale}' = coalesce(${locale ?? null}, assessments.locale)
       order by tasks.created_at desc
       limit 1
     ) copy_task on true

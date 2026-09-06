@@ -29,6 +29,7 @@ export async function insertFormulationVersion(
         ),
         inserted_formulation as (
           insert into public.formulations (
+            assessment_revision,
             plan_id,
             version,
             formulation,
@@ -37,6 +38,7 @@ export async function insertFormulationVersion(
             updated_at
           )
           select
+            (select input_revision from public.assessments where plan_id = bumped.plan_id),
             bumped.plan_id,
             bumped.version,
             ${db.json(toJsonValue(input.formulation))},
@@ -48,6 +50,7 @@ export async function insertFormulationVersion(
         ),
         inserted_recommendations as (
           insert into public.recommendations (
+            assessment_revision,
             plan_id,
             version,
             recommendations,
@@ -55,6 +58,7 @@ export async function insertFormulationVersion(
             updated_at
           )
           select
+            (select input_revision from public.assessments where plan_id = bumped.plan_id),
             bumped.plan_id,
             bumped.version,
             ${db.json(toJsonValue([]))},
@@ -82,6 +86,7 @@ export async function insertFormulationVersion(
           returning counters.plan_id, counters.current_formulation_version as version
         )
         insert into public.formulations (
+          assessment_revision,
           plan_id,
           version,
           formulation,
@@ -90,6 +95,7 @@ export async function insertFormulationVersion(
           updated_at
         )
         select
+          (select input_revision from public.assessments where plan_id = bumped.plan_id),
           bumped.plan_id,
           bumped.version,
           ${db.json(toJsonValue(input.formulation))},
@@ -126,6 +132,7 @@ export async function insertFoodGuidanceVersion(
       returning counters.plan_id, counters.current_food_guidance_version as version
     )
     insert into public.food_guidance (
+      assessment_revision,
       plan_id,
       version,
       guidance,
@@ -134,6 +141,7 @@ export async function insertFoodGuidanceVersion(
       updated_at
     )
     select
+      (select input_revision from public.assessments where plan_id = bumped.plan_id),
       bumped.plan_id,
       bumped.version,
       ${db.json(toJsonValue(input.foodGuidance))},

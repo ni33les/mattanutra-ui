@@ -1,3 +1,5 @@
+import { assessmentInputHash } from "@/lib/assessment-revisions";
+import { withDatabaseTransaction, deferUntilDatabaseCommit } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import {
@@ -203,6 +205,7 @@ async function loadStoredRecommendationProductPayloads(
       generated_at
     from product_recommendation_runs
     where plan_id = ${planId}::uuid
+      and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
       and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
     order by
       coalesce(diagnostics ->> 'stackPreference', 'balanced'),
@@ -1162,7 +1165,7 @@ function buildAnswerSummary(answers: unknown) {
   };
 }
 
-function buildStoredAssessmentAnswers(answers: unknown) {
+export function buildStoredAssessmentAnswers(answers: unknown) {
   const record = toJsonRecord(answers);
   const firstName = firstNameFromAssessmentAnswers(record);
 
@@ -1397,109 +1400,126 @@ export async function persistAssessmentSubmission({
   const storedAnswerSummary = toJsonValue(buildAnswerSummary(storedAnswersRecord));
   const storedHealthScore = toJsonValue(snapshot.healthScore);
 
-  await sql`
-    insert into assessments (
-      plan_id,
-      locale,
-      selected_plan,
-      status,
-      answers,
-      answer_summary,
-      first_name,
-      contact_email,
-      contact_email_captured_at,
-      health_score,
-      queue_position,
-      plan_selected_at,
-      processing_started_at,
-      completed_at,
-      updated_at
-    )
-    values (
-      ${snapshot.planId}::uuid,
-      ${normalizedLocale},
-      ${storedPlan},
-      ${status},
-      ${sql.json(storedAnswers)},
-      ${sql.json(storedAnswerSummary)},
-      ${firstName},
-      ${normalizedContactEmail},
-      ${normalizedContactEmail ? sql`now()` : null},
-      ${sql.json(storedHealthScore)},
-      ${snapshot.queuePosition},
-      ${selectedPlan ? sql`now()` : null},
-      ${status === "queued" || status === "preparing" || status === "ready"
-        ? sql`now()`
-        : null},
-      ${status === "ready" ? sql`now()` : null},
-      now()
-    )
-    on conflict (plan_id) do update set
-      locale = excluded.locale,
-      selected_plan = excluded.selected_plan,
-      status = excluded.status,
-      answers = excluded.answers,
-      answer_summary = excluded.answer_summary,
-      first_name = excluded.first_name,
-      contact_email = coalesce(excluded.contact_email, assessments.contact_email),
-      contact_email_captured_at = case
-        when excluded.contact_email is not null
-        then coalesce(assessments.contact_email_captured_at, excluded.contact_email_captured_at)
-        else assessments.contact_email_captured_at
-      end,
-      health_score = excluded.health_score,
-      queue_position = excluded.queue_position,
-      error_message = case
-        when excluded.status in ('captured', 'queued', 'preparing', 'ready')
-        then null
-        else assessments.error_message
-      end,
-      plan_selected_at = coalesce(
-        assessments.plan_selected_at,
-        excluded.plan_selected_at
-      ),
-      processing_started_at = coalesce(
-        assessments.processing_started_at,
-        excluded.processing_started_at
-      ),
-      completed_at = coalesce(
-        assessments.completed_at,
-        excluded.completed_at
-      ),
-      updated_at = now()
-  `;
+  return withDatabaseTransaction(sql, async sql => {
+    const inputHash = assessmentInputHash(storedAnswers);
+    const rows = await sql`
+      insert into assessments (
+        plan_id,
+        input_revision,
+        input_hash,
+        locale,
+        selected_plan,
+        status,
+        answers,
+        answer_summary,
+        first_name,
+        contact_email,
+        contact_email_captured_at,
+        health_score,
+        queue_position,
+        plan_selected_at,
+        processing_started_at,
+        completed_at,
+        updated_at
+      )
+      values (
+        ${snapshot.planId}::uuid,
+        1,
+        ${inputHash},
+        ${normalizedLocale},
+        ${storedPlan},
+        ${status},
+        ${sql.json(storedAnswers)},
+        ${sql.json(storedAnswerSummary)},
+        ${firstName},
+        ${normalizedContactEmail},
+        ${normalizedContactEmail ? sql`now()` : null},
+        ${sql.json(storedHealthScore)},
+        ${snapshot.queuePosition},
+        ${selectedPlan ? sql`now()` : null},
+        ${status === "queued" || status === "preparing" || status === "ready"
+          ? sql`now()`
+          : null},
+        ${status === "ready" ? sql`now()` : null},
+        now()
+      )
+      on conflict (plan_id) do update set
+        input_revision = case when assessments.input_hash is distinct from excluded.input_hash
+          then assessments.input_revision + 1 else greatest(assessments.input_revision, 1) end,
+        input_hash = excluded.input_hash,
+        locale = excluded.locale,
+        selected_plan = excluded.selected_plan,
+        status = case when assessments.input_hash = excluded.input_hash then assessments.status else excluded.status end,
+        answers = excluded.answers,
+        answer_summary = excluded.answer_summary,
+        first_name = excluded.first_name,
+        contact_email = coalesce(excluded.contact_email, assessments.contact_email),
+        contact_email_captured_at = case
+          when excluded.contact_email is not null
+          then coalesce(assessments.contact_email_captured_at, excluded.contact_email_captured_at)
+          else assessments.contact_email_captured_at
+        end,
+        health_score = case when assessments.input_hash = excluded.input_hash and assessments.locale = excluded.locale
+          then assessments.health_score else excluded.health_score end,
+        queue_position = excluded.queue_position,
+        error_message = case
+          when excluded.status in ('captured', 'queued', 'preparing', 'ready')
+          then null
+          else assessments.error_message
+        end,
+        plan_selected_at = coalesce(
+          assessments.plan_selected_at,
+          excluded.plan_selected_at
+        ),
+        processing_started_at = coalesce(
+          assessments.processing_started_at,
+          excluded.processing_started_at
+        ),
+        completed_at = coalesce(
+          assessments.completed_at,
+          excluded.completed_at
+        ),
+        updated_at = now()
+      returning input_revision, input_hash
+    `;
+    const revision = Number(rows[0].input_revision);
+    await sql`insert into public.assessment_inputs (plan_id, revision, input_hash, answers)
+      values (${snapshot.planId}::uuid, ${revision}, ${inputHash}, ${sql.json(storedAnswers)})
+      on conflict (plan_id, revision) do nothing`;
+    await sql`update public.healthscore_delivery_requests set status = 'superseded', updated_at = now()
+      where plan_id = ${snapshot.planId}::uuid and revision <> ${revision} and status in ('waiting', 'queued')`;
 
-  void appendAssessmentVersion(sql, {
-    actor: "assessment_api",
-    afterPayload: {
-      answers: storedAnswers,
-      answerSummary: storedAnswerSummary,
-      firstName,
-      contactEmail: normalizedContactEmail,
-      healthScore: storedHealthScore,
-      locale: normalizedLocale,
-      queuePosition: snapshot.queuePosition,
-      selectedPlan,
-      status
-    },
-    changeReason: "assessment_submission",
-    eventPayload: {
-      beforePayload: {},
-      selectedPlan: storedPlan,
-      status
-    },
-    eventType: "assessment_submission_persisted",
-    planId: snapshot.planId,
-    source: "assessment_store"
-  }).catch(() => undefined);
+    await appendAssessmentVersion(sql, {
+      actor: "assessment_api",
+      afterPayload: {
+        answers: storedAnswers,
+        answerSummary: storedAnswerSummary,
+        firstName,
+        contactEmail: normalizedContactEmail,
+        healthScore: storedHealthScore,
+        locale: normalizedLocale,
+        queuePosition: snapshot.queuePosition,
+        selectedPlan,
+        status
+      },
+      changeReason: "assessment_submission",
+      eventPayload: {
+        beforePayload: {},
+        selectedPlan: storedPlan,
+        status
+      },
+      eventType: "assessment_submission_persisted",
+      planId: snapshot.planId,
+      source: "assessment_store"
+    });
 
-  if (normalizedContactEmail) {
-    void upsertAssessmentEmailChannel({
-      contactEmail: normalizedContactEmail,
-      displayName: firstName,
-      planId: snapshot.planId
-    }).catch(() => undefined);
-  }
+    if (normalizedContactEmail) {
+      deferUntilDatabaseCommit(() => {
+        void upsertAssessmentEmailChannel({ contactEmail: normalizedContactEmail, displayName: firstName, planId: snapshot.planId }).catch(() => undefined);
+      });
+    }
+    return { revision, inputHash };
+  });
 }
 
 export async function getStoredAssessmentSnapshot(planId: string) {
@@ -1641,6 +1661,8 @@ export async function getStoredAssessmentPrefill(planId: string) {
 
   const rows = await sql`
     select
+      input_revision,
+      input_hash,
       answers,
       contact_email,
       health_score,
@@ -1659,6 +1681,8 @@ export async function getStoredAssessmentPrefill(planId: string) {
   const healthScore = asRecord(row.health_score);
 
   return {
+    revision: Number(row.input_revision),
+    inputHash: row.input_hash as string | null,
     answers: asRecord(row.answers),
     contactEmail:
       typeof row.contact_email === "string" ? row.contact_email : null,
@@ -1788,6 +1812,7 @@ async function loadStoredFormulationFormulaRead(
       select formulation, generated_at, model_version
       from formulations
       where formulations.plan_id = assessments.plan_id
+        and formulations.assessment_revision = assessments.input_revision
         and (
           case
             when assessments.selected_plan is not null then
@@ -1806,6 +1831,7 @@ async function loadStoredFormulationFormulaRead(
       select guidance, generated_at, model_version
       from food_guidance
       where food_guidance.plan_id = assessments.plan_id
+        and food_guidance.assessment_revision = assessments.input_revision
         and (
           case
             when assessments.selected_plan is not null then
@@ -1944,6 +1970,7 @@ export async function getStoredFormulationResult(
       select formulation, generated_at, model_version
       from formulations
       where formulations.plan_id = assessments.plan_id
+        and formulations.assessment_revision = assessments.input_revision
         ${formulationModeFilter}
       order by version desc, generated_at desc
       limit 1
@@ -1952,6 +1979,7 @@ export async function getStoredFormulationResult(
       select guidance, generated_at, model_version
       from food_guidance
       where food_guidance.plan_id = assessments.plan_id
+        and food_guidance.assessment_revision = assessments.input_revision
         ${foodGuidanceModeFilter}
       order by version desc, generated_at desc
       limit 1
@@ -1960,6 +1988,7 @@ export async function getStoredFormulationResult(
       select report, version, generated_at
       from nutrition_reports
       where nutrition_reports.plan_id = assessments.plan_id
+        and nutrition_reports.assessment_revision = assessments.input_revision
       order by version desc, generated_at desc
       limit 1
     ) nutrition_reports on true
@@ -1989,6 +2018,7 @@ export async function getStoredFormulationResult(
       select recommendations
       from recommendations
       where recommendations.plan_id = assessments.plan_id
+        and recommendations.assessment_revision = assessments.input_revision
       order by version desc, generated_at desc
       limit 1
     ) recommendations on true
@@ -2004,6 +2034,7 @@ export async function getStoredFormulationResult(
         generated_at
       from product_recommendation_runs
       where product_recommendation_runs.plan_id = assessments.plan_id
+        and product_recommendation_runs.assessment_revision = assessments.input_revision
         and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
       order by
         case coalesce(diagnostics ->> 'stackPreference', 'balanced')

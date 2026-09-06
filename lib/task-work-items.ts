@@ -1,3 +1,5 @@
+import { ASSESSMENT_GENERATION_TASKS, generationInput } from "@/lib/assessment-revisions";
+import { computeHealthScore } from "@/lib/health-score";
 import { normalizeAssessmentPlan, type AssessmentPlan } from "@/lib/assessment-snapshot";
 import {
   isUuid,
@@ -411,6 +413,7 @@ export type RetailOperationsReviewWorkItem = Readonly<{
 }>;
 
 export type TaskWorkItem =
+  | Readonly<{ taskId: string; taskType: "superseded_generation" }>
   | AdminCatalogueOptimizationWorkItem
   | CarrierShipmentWorkItem
   | CommunicationFollowupWorkItem
@@ -2307,10 +2310,24 @@ const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
 };
 
 export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem> {
+  const generation = generationInput(task.payload);
+  if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {
+    const sql = getSql();
+    if (!sql) throw new Error("Database is not configured");
+    const [row] = await sql`select input_revision from public.assessments where plan_id = ${task.planId}::uuid`;
+    if (!generation || !row || Number(row.input_revision) !== generation.revision) {
+      return { taskId: task.id, taskType: "superseded_generation" };
+    }
+  }
   const handler = taskWorkItemHandlers[task.taskType];
 
   if (handler) {
-    return handler(task);
+    const item = await handler(task);
+    if (generation && "answers" in item) {
+      return { ...item, answers: generation.answers, locale: generation.locale,
+        ...(item.taskType === "analyze_healthscore" ? { healthScore: computeHealthScore(generation.answers, generation.locale) } : {}) } as TaskWorkItem;
+    }
+    return item;
   }
 
   if (task.taskType.startsWith("retail_")) {

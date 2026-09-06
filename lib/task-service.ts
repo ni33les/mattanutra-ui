@@ -1,3 +1,4 @@
+import { ASSESSMENT_GENERATION_TASKS, generationInput, loadGenerationInput } from "@/lib/assessment-revisions";
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { toJsonValue } from "@/lib/assessment-store";
@@ -810,10 +811,18 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
   return { created: true, task };
 }
 
-export async function createTask(input: CreateTaskInput) {
-  const sql = getRequiredSql();
-
-  return createTaskRecord(sql, input);
+export async function createTask(input: CreateTaskInput, sqlOverride?: Db) {
+  const create = async (tx: Db) => {
+    if (input.planId && ASSESSMENT_GENERATION_TASKS.has(input.taskType) && !generationInput(input.payload)) {
+      const generation = await loadGenerationInput(tx, input.planId, payloadRecord(input.payload).locale);
+      if (generation) return createTaskRecord(tx, { ...input,
+        payload: { ...payloadRecord(input.payload), generation },
+        idempotencyKey: input.idempotencyKey ? `${input.idempotencyKey}:${generation.revision}:${generation.locale}:${generation.generatorVersion}` : undefined
+      });
+    }
+    return createTaskRecord(tx, input);
+  };
+  return sqlOverride ? create(sqlOverride) : withDatabaseTransaction(getRequiredSql(), create);
 }
 
 export async function retryFailedTask(input: RetryFailedTaskInput) {

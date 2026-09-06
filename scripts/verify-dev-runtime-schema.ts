@@ -34,6 +34,7 @@ type TriggerRow = Readonly<{
 }>;
 
 const requiredTables = [
+  "assessment_inputs", "assessment_healthscore_results", "funnel_requests", "healthscore_delivery_requests",
   "admin_product_coverage_demand_profile_cache",
   "payment_versions",
   "payments",

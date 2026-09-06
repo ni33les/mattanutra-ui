@@ -1,10 +1,12 @@
+import { ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
+import { deferUntilDatabaseCommit } from "@/lib/db";
 import type postgres from "postgres";
 import {
   DEFAULT_ASSESSMENT_PLAN,
   type AssessmentPlan
 } from "@/lib/assessment-snapshot";
 import {
-  hasHealthScoreAdvice,
+  hasHealthScoreAiCopy,
   isUuid,
   toJsonValue
 } from "@/lib/assessment-store";
@@ -40,7 +42,6 @@ import { createTask, type TaskDependencyType } from "@/lib/task-service";
 import {
   deterministicUuid,
   fifteenMinuteBucket,
-  healthScoreInputForIdempotency,
   payloadRecord,
   stableHash
 } from "@/lib/task-enqueue-helpers";
@@ -138,6 +139,10 @@ async function createWorkTask(input: Readonly<{
     return null;
   }
 
+  const generation = input.planId && ASSESSMENT_GENERATION_TASKS.has(input.taskType)
+    ? await loadGenerationInput(sql, input.planId, input.payload?.locale) : null;
+  const payload = { ...input.payload, ...(generation ? { generation } : {}) };
+  const generationKey = generation ? `:${generation.revision}:${generation.locale}:${generation.generatorVersion}` : "";
   const maxAttempts = input.maxAttempts ?? 3;
   const { created, task } = await createTask({
     actorType: input.actorType,
@@ -145,13 +150,13 @@ async function createWorkTask(input: Readonly<{
     context: {
       source: input.source,
       taskType: input.taskType,
-      ...(input.payload ?? {})
+      ...payload
     },
     groupLabel: input.groupLabel,
-    id: input.id,
+    id: generation ? undefined : input.id,
     dependencies: input.dependencies,
     description: input.description,
-    idempotencyKey: input.idempotencyKey,
+    idempotencyKey: `${input.idempotencyKey}${generationKey}`,
     idempotencyScope: input.idempotencyScope,
     idempotencyScopeKey:
       input.idempotencyScopeKey ??
@@ -171,7 +176,7 @@ async function createWorkTask(input: Readonly<{
     payload: {
       planId: input.planId,
       source: input.source,
-      ...input.payload
+      ...payload
     },
     planId: input.planId,
     rayId: input.rayId,
@@ -191,28 +196,31 @@ async function createWorkTask(input: Readonly<{
     title: input.taskTitle
   });
 
-  await writeBpmEvent({
-    actorType: "system",
-    eventName: created ? "task_queued" : "task_duplicate_reused",
-    eventStatus: created ? "queued" : "duplicate_reused",
-    eventType: "system",
-    planId: input.planId,
-    properties: {
-      dependencyTaskIds: (input.dependencies ?? []).map((dependency) =>
-        dependency.taskId
-      ),
-      idempotencyKey: input.idempotencyKey,
-      idempotencyScopeKey:
-        input.idempotencyScopeKey ??
-        (input.planId ? `${input.taskType}:${input.planId}` : input.taskType),
-      reasoningEffort: input.reasoningEffort,
-      source: input.source,
-      taskGroupId: task.taskGroupId,
-      taskId: task.id,
-      taskType: input.taskType
-    },
-    severity: created ? "low" : "medium"
-  });
+  const emitCreated = () => {
+    void writeBpmEvent({
+      actorType: "system",
+      eventName: created ? "task_queued" : "task_duplicate_reused",
+      eventStatus: created ? "queued" : "duplicate_reused",
+      eventType: "system",
+      planId: input.planId,
+      properties: {
+        dependencyTaskIds: (input.dependencies ?? []).map((dependency) =>
+          dependency.taskId
+        ),
+        idempotencyKey: `${input.idempotencyKey}${generationKey}`,
+        idempotencyScopeKey:
+          input.idempotencyScopeKey ??
+          (input.planId ? `${input.taskType}:${input.planId}` : input.taskType),
+        reasoningEffort: input.reasoningEffort,
+        source: input.source,
+        taskGroupId: task.taskGroupId,
+        taskId: task.id,
+        taskType: input.taskType
+      },
+      severity: created ? "low" : "medium"
+    }).catch(() => undefined);
+  };
+  if (!deferUntilDatabaseCommit(emitCreated)) emitCreated();
 
   return task.id;
 }
@@ -288,10 +296,12 @@ export async function enqueueDigitalOceanBillingSyncTask(date = new Date()) {
 export async function enqueueHealthScoreAnalysisTask({
   force = false,
   source = "assessment",
+  locale,
   taskGroupId,
   planId
 }: Readonly<{
   force?: boolean;
+  locale?: unknown;
   source?: string;
   taskGroupId?: string | null;
   planId: string;
@@ -317,61 +327,26 @@ export async function enqueueHealthScoreAnalysisTask({
     return null;
   }
 
-  if (!force && hasHealthScoreAdvice(rows[0].health_score)) {
-    return null;
-  }
-
+  const generation = await loadGenerationInput(sql, planId, locale);
+  if (!generation) return null;
   if (!force) {
-    const activeTaskRows = await sql<Array<{ id: string }>>`
-      select id::text
-      from public.tasks
-      where plan_id = ${planId}::uuid
-        and task_type = 'analyze_healthscore'
-        and status in (
-          'queued',
-          'reserved',
-          'running',
-          'needs_review',
-          'waiting_approval'
-        )
-      limit 1
-    `;
-
-    if (activeTaskRows[0]) {
-      return null;
-    }
-
-    const terminalTaskRows = await sql<Array<{ id: string }>>`
-      select id::text
-      from public.tasks
-      where plan_id = ${planId}::uuid
-        and task_type = 'analyze_healthscore'
-        and status in ('completed', 'skipped', 'failed', 'cancelled')
-      limit 1
-    `;
-
-    if (terminalTaskRows[0]) {
-      return null;
-    }
+    const [ready] = await sql`select result from public.assessment_healthscore_results
+      where plan_id = ${planId}::uuid and revision = ${generation.revision}
+        and locale = ${generation.locale} and generator_version = ${FUNNEL_GENERATOR_VERSION}`;
+    if (ready && hasHealthScoreAiCopy(ready.result)) return null;
   }
-
-  const inputHash = stableHash(
-    healthScoreInputForIdempotency(rows[0].health_score)
-  );
-  const forceRunId = force ? crypto.randomUUID() : "";
-  const taskHash = forceRunId ? `${inputHash}:${forceRunId}` : inputHash;
-
+  const inputHash = generation.inputHash;
   return createWorkTask({
     actorType: "deterministic",
+    retryPolicy: { maxRetries: 2, initialDelaySeconds: 5, maxDelaySeconds: 30 },
     businessValue: TASK_BUSINESS_VALUES.healthScoreAnalysis,
     groupLabel: taskGroupId ? "Pre-generate nutrition guidance" : "Generate HealthScore",
-    id: deterministicUuid(`mattanutra:task:healthscore:${planId}:${taskHash}`),
-    idempotencyKey: `healthscore-analysis:${planId}:${taskHash}`,
-    idempotencyScope: forceRunId ? "active" : "successful",
+    idempotencyKey: `healthscore-analysis:${planId}:${inputHash}`,
+    idempotencyScope: "active",
     idempotencyScopeKey: `healthscore:${planId}`,
     payload: {
+      locale: generation.locale,
       copyRefresh: force,
-      ...(forceRunId ? { forceRunId } : {}),
       inputHash
     },
     planId,
@@ -394,7 +369,7 @@ async function activePlanTaskId(
     : inputHash
       ? [inputHash]
       : [];
-  const inputHashPatterns = inputHashes.map((hash) => `%:${hash}`);
+  const inputHashPatterns = inputHashes.flatMap((hash) => [`%:${hash}`, `%:${hash}:%`]);
 
   const rows = await sql<Array<{ id: string }>>`
     select id::text
@@ -424,7 +399,7 @@ async function nutritionOutputReadiness(
     : inputHash
       ? [inputHash]
       : [];
-  const inputHashPatterns = inputHashes.map((hash) => `%:${hash}`);
+  const inputHashPatterns = inputHashes.flatMap((hash) => [`%:${hash}`, `%:${hash}:%`]);
 
   const rows = await sql<Array<{
     food_guidance_ready: boolean;
@@ -498,12 +473,11 @@ export async function enqueueAssessmentPregenerationTasks({
       typeof answerRecord.country === "string" ? answerRecord.country : null
     ) ?? defaultProductCountryCode;
 
-  void warmLiveRetailSnapshot(catalogueCountry).catch(() => {
-    /* matching work-item retries if the cache is still empty */
-  });
-  void warmSupplementEffectiveAvailability(catalogueCountry).catch(() => {
-    /* matching work-item retries if the cache is still empty */
-  });
+  const warm = () => {
+    void warmLiveRetailSnapshot(catalogueCountry).catch(() => undefined);
+    void warmSupplementEffectiveAvailability(catalogueCountry).catch(() => undefined);
+  };
+  if (!deferUntilDatabaseCommit(warm)) warm();
 
   const plan = DEFAULT_ASSESSMENT_PLAN;
   const inputHash = stableHash({ answers, locale });
