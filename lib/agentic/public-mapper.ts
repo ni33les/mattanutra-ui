@@ -61,7 +61,7 @@ function compactPublic(
     if (stripEmptyArrays && Array.isArray(compacted) && compacted.length === 0) {
       continue;
     }
-    out[key] = compacted;
+    out[key === "catalogueSnapshotId" ? "catalogId" : key] = compacted;
   }
   return out;
 }

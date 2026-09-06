@@ -4,7 +4,7 @@
   "schemaChecksum": "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6",
   "tools": [
     {
-      "description": "MattaNutra does real-product matching with current-stock and overlap optimization to agreed nutrient targets. It is wellness guidance only, not clinical diagnosis or a pharmacy, and does not replace clinical advice.",
+      "description": "MattaNutra matches real products to agreed nutrient targets, optimising overlap, current stock and cost. Safety checks follow responsibility-3.0.0 boundaries; it provides wellness guidance, not diagnosis, pharmacy services or clinical advice.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -543,7 +543,7 @@
       "name": "execute"
     },
     {
-      "description": "Read payment and fulfilment for an existing checkout using only the order handle. Poll no faster than pollAfterSeconds until the order is completed, cancelled, or expired.",
+      "description": "Read payment and fulfilment for an existing checkout using only the order handle. Poll no faster than pollAfterSeconds while terminal is false, including after payment; stop when terminal is true.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {

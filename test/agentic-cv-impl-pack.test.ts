@@ -855,7 +855,7 @@ async function runDevSave01(session: PlanSession, runIndex: number): Promise<CvI
     assertEq("SAVE-01.claim", "none", economics.savingClaim),
     assertEq("SAVE-01.saving", 0, economics.savings90DayMinor),
     assertTrue("SAVE-01.sameProducts", optionIds.join("|") === baselineIds.join("|")),
-    assertTrue("SAVE-01.basis", Boolean(asRecord(economics.comparisonBasis).catalogueSnapshotId))
+    assertTrue("SAVE-01.basis", Boolean(asRecord(economics.comparisonBasis).catalogId))
   ];
   return conclude(
     "DEV-SAVE-01",

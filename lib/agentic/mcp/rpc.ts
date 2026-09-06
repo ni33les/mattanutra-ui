@@ -103,6 +103,13 @@ export function toolList(environment: AgenticEnvironment = "dev", locale?: strin
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: descriptions[name],
     inputSchema: AGENTIC_TOOL_SCHEMAS[name],
+    outputSchema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+    annotations: {
+      readOnlyHint: ["info", "order", "evidence"].includes(name),
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true
+    },
     name,
     responsibilityVersion: RESPONSIBILITY_VERSION
   }));
@@ -177,7 +184,8 @@ export function toolResult(value: unknown, isError = false) {
       {
         text: toolText(value),
         type: "text"
-      }
+      },
+      { type: "text", text: JSON.stringify(value) }
     ],
     isError,
     structuredContent: value
@@ -223,10 +231,10 @@ export async function handleLightweightJsonRpc(
       jsonrpc: "2.0",
       result: {
         capabilities: {
-          tools: { listChanged: true }
+          tools: { listChanged: false }
         },
         instructions: agenticServerInstructions(config.environment),
-        protocolVersion: "2025-03-26",
+        protocolVersion: params.protocolVersion === "2025-03-26" ? "2025-03-26" : "2025-06-18",
         responsibilityVersion: RESPONSIBILITY_VERSION,
         serverInfo: {
           name: mcpServerInfoName(config.environment),

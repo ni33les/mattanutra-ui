@@ -21,6 +21,10 @@ import {
   withQaSessionSnapshot
 } from "@/lib/agentic/qa/session";
 import {
+  McpBodyTooLargeError,
+  McpBodyTimeoutError,
+  McpInvalidRequestError,
+  readMcpRequest,
   mcpGetSseNotSupported,
   mcpOneShotResponse,
   wantsMcpSse
@@ -70,7 +74,7 @@ function mcpNeedsRateLimit(body: unknown) {
     }
 
     const suffix = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : name;
-    return suffix !== "info" && suffix !== "order";
+    return suffix !== "info";
   }
 
   return true;
@@ -103,11 +107,21 @@ async function handlePost(request: Request) {
   let body: unknown;
 
   try {
-    body = await request.json();
-  } catch {
+    body = await readMcpRequest(request);
+  } catch (error) {
+    if (error instanceof McpBodyTimeoutError || request.signal.aborted) {
+      return mcpReply(request, { id: null, jsonrpc: "2.0", error: { code: -32600, message: "Request body was not received in time." } }, 408);
+    }
+    if (error instanceof McpBodyTooLargeError) {
+      return mcpReply(request, { id: null, jsonrpc: "2.0", error: { code: -32600, message: error.message } }, 413);
+    }
+    if (error instanceof McpInvalidRequestError) {
+      return mcpReply(request, { id: null, jsonrpc: "2.0", error: { code: -32600, message: error.message } }, 400);
+    }
     return mcpReply(
       request,
       {
+        id: null,
         error: { code: -32700, message: "Parse error" },
         jsonrpc: "2.0"
       },
@@ -170,30 +184,6 @@ async function handlePost(request: Request) {
     );
     const runtime = bindQaRuntime(live, request, qaNamespace);
 
-    if (Array.isArray(body)) {
-      const responses = [];
-
-      for (const item of body) {
-        const result = await withQaSessionSnapshot(qaNamespace || undefined, () =>
-          handleJsonRpc(runtime, item)
-        );
-        if (result) {
-          responses.push(result);
-        }
-      }
-
-      const durationMs = Math.round(performance.now() - started);
-      if (timed) {
-        recordMcpTiming(timed, durationMs);
-      }
-      log.info("mcp.tool_completed", {
-        correlationId,
-        durationMs,
-        tool: timed ?? "batch"
-      });
-      return mcpReply(request, responses, 200, { "x-mcp-handler-ms": String(durationMs) });
-    }
-
     const result = await withQaSessionSnapshot(qaNamespace || undefined, () =>
       handleJsonRpc(runtime, body as JsonRpcRequest)
     );
@@ -239,6 +229,7 @@ async function handlePost(request: Request) {
     return mcpReply(
       request,
       {
+        id: (body as JsonRpcRequest)?.id ?? null,
         error: { code: -32603, message: "Internal error" },
         jsonrpc: "2.0"
       },

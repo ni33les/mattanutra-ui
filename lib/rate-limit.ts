@@ -325,6 +325,7 @@ export const publicRateLimits = {
     limit: 10,
     windowMs: 60_000
   },
+  mcpRead: { name: "mcp-read", limit: 300, windowMs: 60_000 },
   mcp: {
     name: "mcp",
     limit: 60,

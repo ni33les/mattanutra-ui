@@ -446,7 +446,7 @@ export function orderPollView(input: Readonly<{
                 : "order.open_unpaid";
   const nextAction = exception
     ? "contact_support"
-    : terminal || paid
+    : terminal
       ? "none"
       : declined || order.paymentStatus === "unpaid"
         ? "open_checkout"

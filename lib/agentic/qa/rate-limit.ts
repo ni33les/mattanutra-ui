@@ -49,5 +49,7 @@ export async function enforceMcpOrQaRateLimit(
   if (await qaPackRateLimitApplies(request, environment, body)) {
     return enforceRateLimit(request, publicRateLimits.mcpQaPack);
   }
-  return enforceRateLimit(request, publicRateLimits.mcp);
+  const params = body && typeof body === "object" ? (body as { params?: { name?: unknown } }).params : undefined;
+  const name = typeof params?.name === "string" ? params.name.split(".").pop() : "";
+  return enforceRateLimit(request, name === "order" ? publicRateLimits.mcpRead : publicRateLimits.mcp);
 }
