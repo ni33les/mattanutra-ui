@@ -42,7 +42,7 @@ The newly discovered six agentic value suites were also executed once against un
 - `SAFE-01.D deferred and omitted targets add zero proposed exposure`
 - `DET-01.A two canonical runs are byte-identical and keep prices products roles savings and safety`
 
-These baseline failures remain attached to the original preparation attempt. A subsequent user-requested full-suite run and test triage are documented in [DEV MCP failure triage](mcp-failure-triage.md), including contract-based adaptations and the product defects that remain. None of those tests is treated as product RED for OBS/EVT.
+These baseline failures remain attached to the original preparation attempt. The subsequent full-suite run, contract-based test adaptations, product fixes and validation results are documented in [DEV MCP failure triage](mcp-failure-triage.md). None of those tests is treated as product RED for OBS/EVT.
 
 ## Remaining mandatory work
 
