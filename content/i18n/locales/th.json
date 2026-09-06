@@ -1021,5 +1021,8 @@
   "seo.routes.privacy.description": "อ่านวิธีที่ MattaNutra จัดการคำตอบแบบประเมิน ข้อมูลบัญชี การสื่อสาร และคำขอด้านความเป็นส่วนตัว",
   "seo.routes.privacy.title": "นโยบายความเป็นส่วนตัว | MattaNutra",
   "seo.routes.terms.description": "อ่านเงื่อนไขการใช้บริการ MattaNutra สำหรับแบบประเมิน แผน คำแนะนำผลิตภัณฑ์ และบริการแพลตฟอร์ม",
-  "seo.routes.terms.title": "เงื่อนไขการใช้บริการ | MattaNutra"
+  "seo.routes.terms.title": "เงื่อนไขการใช้บริการ | MattaNutra",
+  "outbound.healthscoreReadyEmail.subject": "HealthScore ของคุณพร้อมแล้ว",
+  "outbound.healthscoreReadyEmail.body": "คำแนะนำ HealthScore ฉบับสมบูรณ์ของคุณพร้อมแล้ว เปิดผลส่วนตัวผ่านลิงก์ด้านล่าง",
+  "outbound.healthscoreReadyEmail.cta": "ดู HealthScore ของฉัน"
 }

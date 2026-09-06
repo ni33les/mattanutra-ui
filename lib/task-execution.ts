@@ -230,6 +230,10 @@ export async function executeTaskWorkItem(
   workItem: TaskWorkItem,
   runtime: TaskExecutionRuntime = {}
 ) {
+  if (workItem.taskType === "send_healthscore_email") {
+    const { deliverHealthScore } = await import("@/lib/healthscore-delivery");
+    return deliverHealthScore(workItem.deliveryRequestId);
+  }
   if (workItem.taskType === "fulfill_web_payment") {
     const { fulfillWebPayment } = await import("@/lib/web-payment-fulfillment");
     return fulfillWebPayment(workItem.paymentId);

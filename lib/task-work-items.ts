@@ -413,6 +413,7 @@ export type RetailOperationsReviewWorkItem = Readonly<{
 }>;
 
 export type TaskWorkItem =
+  | Readonly<{ taskId: string; taskType: "send_healthscore_email"; deliveryRequestId: string }>
   | Readonly<{ taskId: string; taskType: "fulfill_web_payment"; paymentId: string }>
   | Readonly<{ taskId: string; taskType: "superseded_generation" }>
   | AdminCatalogueOptimizationWorkItem
@@ -2311,6 +2312,7 @@ const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
 };
 
 export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem> {
+  if (task.taskType === "send_healthscore_email") return { taskId: task.id, taskType: "send_healthscore_email", deliveryRequestId: payloadText(task.payload, "deliveryRequestId") };
   if (task.taskType === "fulfill_web_payment") return { taskId: task.id, taskType: "fulfill_web_payment", paymentId: payloadText(task.payload, "paymentId") };
   const generation = generationInput(task.payload);
   if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {

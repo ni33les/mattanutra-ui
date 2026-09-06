@@ -8,12 +8,14 @@ export type TransactionalEmailAttachment = Readonly<{
 
 type SendTransactionalEmailInput = Readonly<{
   attachments?: readonly TransactionalEmailAttachment[];
+  messageId?: string;
   html: string;
   subject: string;
   to: string;
 }>;
 
 export type SendTransactionalEmailResult = Readonly<{
+  outcome?: "accepted" | "rejected" | "unknown";
   messageId?: string;
   reason?: string;
   sent: boolean;
@@ -54,12 +56,13 @@ export function isSmtpConfigured() {
 
 export async function sendTransactionalEmail({
   attachments,
+  messageId,
   html,
   subject,
   to
 }: SendTransactionalEmailInput): Promise<SendTransactionalEmailResult> {
   if (!isSmtpConfigured()) {
-    return { reason: "SMTP is not configured", sent: false };
+    return { reason: "SMTP is not configured", sent: false, outcome: "rejected" };
   }
 
   const port = envPort();
@@ -69,12 +72,17 @@ export async function sendTransactionalEmail({
       pass: envText("SMTP_PASSWORD"),
       user: envText("SMTP_USER")
     },
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 30_000,
     host: envText("SMTP_HOST"),
     port,
     requireTLS: !secure,
     secure
   });
+  try {
   const result = await transporter.sendMail({
+    messageId,
     attachments: attachments?.map((attachment) => ({
       content: attachment.content,
       contentType: attachment.contentType,
@@ -89,6 +97,13 @@ export async function sendTransactionalEmail({
 
   return {
     messageId: result.messageId,
-    sent: true
+    sent: Array.isArray(result.accepted) && result.accepted.length > 0,
+    outcome: Array.isArray(result.accepted) && result.accepted.length > 0 ? "accepted" : "rejected",
+    reason: result.rejected?.length ? "SMTP rejected the recipient" : undefined
   };
+  } catch (error) {
+    const e = error as { command?: string; responseCode?: number; message?: string };
+    const definite = (e.responseCode ?? 0) >= 400 || /^(CONN|AUTH|EHLO|HELO|MAIL FROM|RCPT TO)$/i.test(e.command ?? "");
+    return { sent: false, outcome: definite ? "rejected" : "unknown", reason: e.message ?? "SMTP delivery failed" };
+  } finally { transporter.close(); }
 }

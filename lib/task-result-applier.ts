@@ -1,3 +1,4 @@
+import { enqueueReadyHealthScoreDeliveries } from "@/lib/healthscore-delivery";
 import { ASSESSMENT_GENERATION_TASKS, generationInput } from "@/lib/assessment-revisions";
 import { hasHealthScoreAiCopy, isUuid, toJsonValue } from "@/lib/assessment-store";
 import { updateBlogPost, updateTestimonial } from "@/lib/blog";
@@ -400,6 +401,7 @@ async function applyHealthScoreResult(
       on conflict (plan_id, revision, locale, generator_version) do update set result = excluded.result, task_id = excluded.task_id, created_at = now()`;
     await sql`update public.assessments set health_score = ${sql.json(toJsonValue(healthScore))}, updated_at = now()
       where plan_id = ${task.planId}::uuid and input_revision = ${generation.revision} and locale = ${generation.locale}`;
+    await enqueueReadyHealthScoreDeliveries(sql, task.planId, generation.revision, generation.locale);
   }
   await eventually(afterCommit, async () => {
     await recordTaskXaiUsageCost({

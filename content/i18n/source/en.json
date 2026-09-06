@@ -9375,5 +9375,32 @@
     "surface": "seo",
     "translatable": true,
     "variables": []
+  },
+  "outbound.healthscoreReadyEmail.subject": {
+    "audience": "customer",
+    "defaultMessage": "Your MattaNutra HealthScore is ready",
+    "description": "Completed HealthScore notification.",
+    "namespace": "outbound.healthscoreReadyEmail",
+    "surface": "email",
+    "translatable": true,
+    "variables": []
+  },
+  "outbound.healthscoreReadyEmail.body": {
+    "audience": "customer",
+    "defaultMessage": "Your complete HealthScore advice is ready. Open your private results using the link below.",
+    "description": "Completed HealthScore notification.",
+    "namespace": "outbound.healthscoreReadyEmail",
+    "surface": "email",
+    "translatable": true,
+    "variables": []
+  },
+  "outbound.healthscoreReadyEmail.cta": {
+    "audience": "customer",
+    "defaultMessage": "View my HealthScore",
+    "description": "Completed HealthScore notification.",
+    "namespace": "outbound.healthscoreReadyEmail",
+    "surface": "email",
+    "translatable": true,
+    "variables": []
   }
 }

@@ -1021,5 +1021,8 @@
   "seo.routes.privacy.description": "了解 MattaNutra 如何处理评估答案、账户数据、通信记录与隐私请求。",
   "seo.routes.privacy.title": "隐私政策 | MattaNutra",
   "seo.routes.terms.description": "阅读 MattaNutra 服务条款，了解评估、方案、产品推荐与平台服务的使用规则。",
-  "seo.routes.terms.title": "服务条款 | MattaNutra"
+  "seo.routes.terms.title": "服务条款 | MattaNutra",
+  "outbound.healthscoreReadyEmail.subject": "你的 MattaNutra HealthScore 已准备好",
+  "outbound.healthscoreReadyEmail.body": "你的完整 HealthScore 建议已准备好。请通过以下私人链接查看结果。",
+  "outbound.healthscoreReadyEmail.cta": "查看我的 HealthScore"
 }
