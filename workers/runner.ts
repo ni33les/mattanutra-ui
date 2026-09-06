@@ -1,3 +1,5 @@
+import { ProductMatcherPool, type ProductMatchWorkItem } from "./product-matcher-pool.ts";
+import { createPeriodicTask } from "./periodic-task.ts";
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import nextEnv from "@next/env";
@@ -71,6 +73,7 @@ type WorkItemExecutionContext = Readonly<{
   workerSessionId: string;
 }>;
 
+const productMatcherPool = new ProductMatcherPool();
 const activeSessions = new Map<string, ActiveSession>();
 let fatalAuthProfileFailure = false;
 let shuttingDown = false;
@@ -293,6 +296,10 @@ async function executeWorkItem(
     return { communication };
   }
 
+  if (workItem.taskType === "generate_product_recommendations") {
+    return productMatcherPool.match(workItem as ProductMatchWorkItem, context.signal);
+  }
+
   return executeTaskWorkItem(workItem as never, {
     reportProgress: (resultPayload) =>
       client.progress({
@@ -361,8 +368,8 @@ async function runAgentLoop(
   let heartbeatStatus: WorkerHeartbeatStatus = "idle";
   let heartbeatTaskId: string | null = null;
   let staleHeartbeatError: Error | null = null;
-  const heartbeat = setInterval(() => {
-    void retryApiCall(
+  const heartbeat = createPeriodicTask(async () => {
+    await retryApiCall(
       `${agent.name} heartbeat`,
       () =>
         client.heartbeat({
@@ -383,20 +390,11 @@ async function runAgentLoop(
       console.error(
         `[agent] ${agent.name} heartbeat failed: ${errorMessage(error)}`,
       );
+      throw error;
     });
   }, heartbeatIntervalMs);
-  (
-    heartbeat as ReturnType<typeof setInterval> & { unref?: () => void }
-  ).unref?.();
-
   try {
-    await retryApiCall(`${agent.name} initial heartbeat`, () =>
-      client.heartbeat({
-        agentId: agent.id,
-        status: "idle",
-        workerSessionId,
-      }),
-    );
+    await heartbeat.run();
 
     console.log(
       `[agent] ${agent.name}${slotLabel} registered session ${workerSessionId} for ${agentConfig.taskTypes.join(", ")}`,
@@ -566,10 +564,10 @@ async function runAgentLoop(
           taskAbortController.abort();
         }
       };
-      const renew = setInterval(
-        () => {
+      const renew = createPeriodicTask(
+        async () => {
           const renewStartedAt = Date.now();
-          void retryApiCall(
+          await retryApiCall(
             `${agent.name} task lease renewal`,
             async () => {
               await client.renew({
@@ -600,13 +598,12 @@ async function runAgentLoop(
             if (willAbort) {
               abortTask(error);
             }
+            throw error;
           });
         },
         Math.max(30_000, Math.floor(leaseSeconds * 200)),
+        {backoff: false}
       );
-      (
-        renew as ReturnType<typeof setInterval> & { unref?: () => void }
-      ).unref?.();
 
       try {
         const resultPayload = await executeWorkItem(client, workItem, {
@@ -618,7 +615,7 @@ async function runAgentLoop(
           workerSessionId,
         });
 
-        clearInterval(renew);
+        renew.stop();
         if (taskAbortReason) {
           throw taskAbortReason;
         }
@@ -634,7 +631,7 @@ async function runAgentLoop(
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
       } catch (error) {
-        clearInterval(renew);
+        renew.stop();
         let staleSession = isStaleWorkerSessionError(error);
         const taskError = taskAbortReason ?? error;
 
@@ -667,7 +664,7 @@ async function runAgentLoop(
       }
     }
   } finally {
-    clearInterval(heartbeat);
+    heartbeat.stop();
 
     if (!shuttingDown && activeSessionKey && activeSession) {
       await markSessionOffline(activeSessionKey, activeSession);
@@ -775,25 +772,14 @@ async function peekQueuedWork(client: WorkerApiClient) {
       "[worker] queued peek failed",
       error instanceof Error ? error.message : error,
     );
+    throw error;
   }
 }
 
 function startQueuedPeekLoop(client: WorkerApiClient, waitSeconds: number) {
-  const intervalMs = Math.max(1, waitSeconds) * 1_000;
-  const timer = setInterval(() => {
-    if (!shuttingDown) {
-      void peekQueuedWork(client);
-    }
-  }, intervalMs);
-  (
-    timer as ReturnType<typeof setInterval> & { unref?: () => void }
-  ).unref?.();
-
-  void peekQueuedWork(client);
-
-  return () => {
-    clearInterval(timer);
-  };
+  const periodic = createPeriodicTask(() => peekQueuedWork(client), Math.max(1, waitSeconds) * 1_000);
+  void periodic.run().catch(() => undefined);
+  return () => periodic.stop();
 }
 
 async function shutdown() {
@@ -804,6 +790,7 @@ async function shutdown() {
   shuttingDown = true;
   stopQueuedPeek?.();
   stopWakeServer?.();
+  await productMatcherPool.close();
   await markSessionsOffline();
   process.exit(0);
 }
