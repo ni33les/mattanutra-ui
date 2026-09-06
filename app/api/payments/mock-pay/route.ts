@@ -1,3 +1,4 @@
+import { stripePaymentConfig } from "@/lib/stripe-payment-config";
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { isLocale } from "@/lib/i18n";
@@ -52,6 +53,7 @@ async function readFields(request: Request) {
     const form = await request.formData();
 
     return {
+      attemptId: form.get("attemptId"),
       locale: form.get("locale"),
       plan: form.get("plan"),
       planId: form.get("planId"),
@@ -69,6 +71,7 @@ async function readFields(request: Request) {
 function redirectToCheckout(
   request: Request,
   input: Readonly<{
+    attemptId?: string;
     locale: string;
     message: string;
     plan: string;
@@ -80,6 +83,7 @@ function redirectToCheckout(
   const selectedPlan = normalizePaymentPlan(input.plan) ?? "precision";
   const url = new URL(
     paymentCheckoutPath(locale, {
+      attemptId: input.attemptId,
       plan: selectedPlan,
       planId: input.planId && isUuid(input.planId) ? input.planId : null,
       sourceSurface: normalizePaymentSourceSurface(input.sourceSurface)
@@ -100,12 +104,14 @@ export async function POST(request: Request) {
   const localeValue = text(fields.locale);
   const planValue = text(fields.plan);
   const planId = text(fields.planId);
+  const attemptId = text(fields.attemptId);
   const sourceSurface = normalizePaymentSourceSurface(fields.sourceSurface);
   const formPost = isFormRequest(request);
 
   if (limited) {
     if (formPost) {
       return redirectToCheckout(request, {
+        attemptId,
         locale: localeValue,
         message: "We could not open checkout at this time.",
         plan: planValue,
@@ -123,6 +129,7 @@ export async function POST(request: Request) {
   if (!locale || !selectedPlan || (planId && !isUuid(planId))) {
     if (formPost) {
       return redirectToCheckout(request, {
+        attemptId,
         locale: localeValue,
         message: "Invalid checkout request",
         plan: planValue,
@@ -138,7 +145,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (stripePaymentConfig(request).mode !== "mock") throw new Error("Mock payment is disabled");
     const session = await createStripeCheckoutSession({
+      idempotencyKey: attemptId,
       locale,
       planId: planId || null,
       request,
@@ -177,6 +186,7 @@ export async function POST(request: Request) {
 
     if (formPost) {
       return redirectToCheckout(request, {
+        attemptId,
         locale,
         message,
         plan: selectedPlan,

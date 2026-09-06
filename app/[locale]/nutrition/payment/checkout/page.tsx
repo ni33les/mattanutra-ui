@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { paymentCheckoutPath } from "@/lib/payment-paths";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -24,6 +26,7 @@ type CheckoutPageProps = Readonly<{
     locale: string;
   }>;
   searchParams: Promise<{
+    attempt?: string;
     error?: string;
     plan?: string;
     planId?: string;
@@ -93,10 +96,14 @@ export default async function PaymentCheckoutPage({
     redirect(nutritionQuizPath(locale));
   }
 
+  if (!query.attempt || !isUuid(query.attempt)) {
+    redirect(paymentCheckoutPath(locale, { plan: selectedPlan, planId, sourceSurface, attemptId: randomUUID() }));
+  }
+  const attemptId = query.attempt;
   const dictionary = getDictionary(locale);
   const labels = getNamespace<PaymentCheckoutCopy>(locale, "customer.paymentCheckout");
   const plan = paymentPlan(selectedPlan as AssessmentPlan);
-  const currentPath = `/${locale}/nutrition/payment/checkout`;
+  const currentPath = paymentCheckoutPath(locale, { plan: selectedPlan, planId, sourceSurface, attemptId });
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -136,6 +143,7 @@ export default async function PaymentCheckoutPage({
         </div>
         {publishableKey ? (
           <StripeCheckoutPanel
+            attemptId={attemptId}
             locale={locale}
             plan={selectedPlan}
             planId={planId}
@@ -144,6 +152,7 @@ export default async function PaymentCheckoutPage({
           />
         ) : (
           <MockPaymentForm
+            attemptId={attemptId}
             error={mockError}
             locale={locale}
             plan={selectedPlan as AssessmentPlan}

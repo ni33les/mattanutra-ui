@@ -27,6 +27,7 @@ export type StripePaymentConfig = Readonly<{
 }>;
 
 export type CheckoutSessionInput = Readonly<{
+  idempotencyKey?: string;
   locale: Locale;
   planId?: string | null;
   request?: Request;

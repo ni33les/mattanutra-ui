@@ -3,6 +3,7 @@ import type { Locale } from "@/lib/i18n";
 import type { PaymentSourceSurface } from "@/lib/payment-paths";
 
 type MockPaymentFormProps = Readonly<{
+  attemptId: string;
   error?: string;
   locale: Locale;
   plan: AssessmentPlan;
@@ -28,6 +29,7 @@ const copy = {
 } as const;
 
 export function MockPaymentForm({
+  attemptId,
   error,
   locale,
   plan,
@@ -47,6 +49,7 @@ export function MockPaymentForm({
         </p>
       ) : null}
       <form action="/api/payments/mock-pay" method="post">
+        <input name="attemptId" type="hidden" value={attemptId} />
         <input name="locale" type="hidden" value={locale} />
         <input name="plan" type="hidden" value={plan} />
         <input name="sourceSurface" type="hidden" value={sourceSurface} />

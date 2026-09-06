@@ -1,3 +1,4 @@
+import { FunnelError, funnelErrorResponse } from "@/lib/funnel-errors";
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { queuePlatformAdminCommunication } from "@/lib/communications";
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
       }
     });
   } catch (error) {
+    if (error instanceof FunnelError) return funnelErrorResponse(error);
     log.error("Unable to create Stripe checkout session", { error });
     try {
       await queuePlatformAdminCommunication({

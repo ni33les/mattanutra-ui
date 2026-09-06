@@ -80,7 +80,8 @@ export const RUNTIME_WORKER_PROFILES: readonly RuntimeWorkerCredentialProfile[] 
     "analyze_healthscore"
   ]),
   profile("hosting", "scheduler", "WORKER_HOSTING_AGENT_API_KEY", "platform_agent", [
-    "sync_digitalocean_billing"
+    "sync_digitalocean_billing",
+    "fulfill_web_payment"
   ]),
   profile("panya", "panya", "WORKER_PANYA_AGENT_API_KEY", "platform_agent", [
     "customer_chat_reply"

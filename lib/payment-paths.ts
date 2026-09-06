@@ -16,6 +16,7 @@ export function paymentReturnPath(locale: Locale, sessionId?: string) {
 export function paymentCheckoutPath(
   locale: Locale,
   input: Readonly<{
+    attemptId?: string;
     plan: AssessmentPlan;
     planId?: string | null;
     sourceSurface?: PaymentSourceSurface;
@@ -25,6 +26,8 @@ export function paymentCheckoutPath(
     plan: input.plan,
     source: input.sourceSurface ?? "landing"
   });
+
+  if (input.attemptId) params.set("attempt", input.attemptId);
 
   if (input.planId) {
     params.set("planId", input.planId);

@@ -230,6 +230,10 @@ export async function executeTaskWorkItem(
   workItem: TaskWorkItem,
   runtime: TaskExecutionRuntime = {}
 ) {
+  if (workItem.taskType === "fulfill_web_payment") {
+    const { fulfillWebPayment } = await import("@/lib/web-payment-fulfillment");
+    return fulfillWebPayment(workItem.paymentId);
+  }
   if (workItem.taskType === "superseded_generation") return { superseded: true };
   if (workItem.taskType === "admin_catalogue_optimization_job") {
     const simulationData = workItem.simulationData;

@@ -11,6 +11,7 @@ const CHECKOUT_SESSION_TIMEOUT_MS = 15_000;
 const STRIPE_LOAD_TIMEOUT_MS = 15_000;
 
 type StripeCheckoutPanelProps = Readonly<{
+  attemptId: string;
   locale: Locale;
   plan: AssessmentPlan;
   planId?: string | null;
@@ -61,6 +62,7 @@ const copy = {
 };
 
 export function StripeCheckoutPanel({
+  attemptId,
   locale,
   plan,
   planId,
@@ -70,9 +72,9 @@ export function StripeCheckoutPanel({
   const labels = copy[locale];
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [attemptEnded, setAttemptEnded] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [checkoutAttempt, setCheckoutAttempt] = useState(0);
-  const [isCompletingMock, setIsCompletingMock] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [isMockCheckout, setIsMockCheckout] = useState(false);
   const [stripeReady, setStripeReady] = useState(false);
@@ -108,6 +110,7 @@ export function StripeCheckoutPanel({
         }),
         cache: "no-store",
         headers: {
+          "Idempotency-Key": attemptId,
           "content-type": "application/json"
         },
         method: "POST",
@@ -126,17 +129,24 @@ export function StripeCheckoutPanel({
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as {
         message?: string;
+        code?: string;
       };
+      setAttemptEnded(body.code === "checkout_expired");
 
       throw new Error(body.message || labels.unable);
     }
 
     const body = (await response.json()) as {
+      redirectUrl?: string;
       clientSecret?: string;
       mock?: boolean;
       paymentId?: string;
     };
 
+    if (body.redirectUrl) {
+      window.location.assign(body.redirectUrl);
+      return body;
+    }
     if (!body.paymentId || (!body.clientSecret && !body.mock)) {
       throw new Error(labels.unable);
     }
@@ -154,9 +164,8 @@ export function StripeCheckoutPanel({
     });
 
     return body;
-  }, [labels.unable, locale, plan, planId, sourceSurface]);
+  }, [attemptId, labels.unable, locale, plan, planId, sourceSurface]);
   const completeMockCheckout = useCallback(async (id: string) => {
-    setIsCompletingMock(true);
     setError("");
 
     try {
@@ -187,14 +196,18 @@ export function StripeCheckoutPanel({
       window.location.assign(body.destination);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : labels.unable);
-      setIsCompletingMock(false);
     }
   }, [labels.unable]);
   const scheduleMockCheckoutCompletion = useCallback((id: string) => {
     void completeMockCheckout(id);
   }, [completeMockCheckout]);
   const retryCheckout = useCallback(() => {
-    const stalePaymentId = paymentId;
+    if (attemptEnded) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("attempt", crypto.randomUUID());
+      window.location.assign(url.toString());
+      return;
+    }
 
     setError("");
     setClientSecret(null);
@@ -203,13 +216,7 @@ export function StripeCheckoutPanel({
     setStripeReady(false);
     setCheckoutAttempt((attempt) => attempt + 1);
 
-    if (stalePaymentId) {
-      void fetch(`/api/payments/${encodeURIComponent(stalePaymentId)}`, {
-        cache: "no-store",
-        method: "DELETE"
-      });
-    }
-  }, [paymentId]);
+  }, [attemptEnded]);
 
   useEffect(() => {
     if (!hasValidStripePublishableKey) {

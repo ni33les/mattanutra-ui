@@ -1,3 +1,4 @@
+import { funnelErrorResponse } from "@/lib/funnel-errors";
 import { NextResponse } from "next/server";
 import {
   getPayment,
@@ -70,7 +71,9 @@ export async function DELETE(
   { params }: PaymentRouteProps
 ) {
   const { paymentId } = await params;
-  const payment = await markPaymentCancelled({ paymentId, request });
+  let payment;
+  try { payment = await markPaymentCancelled({ paymentId, request }); }
+  catch (error) { return funnelErrorResponse(error); }
 
   if (!payment) {
     return NextResponse.json(

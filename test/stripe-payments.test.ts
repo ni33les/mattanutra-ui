@@ -251,7 +251,8 @@ describe("Stripe payment schema and lifecycle", () => {
     );
   });
 
-  it("keeps required payment BPM lifecycle events in one service", () => {
+  it("keeps payment and fulfillment lifecycle events observable", () => {
+    const fulfillmentService = readFileSync(new URL("../lib/web-payment-fulfillment.ts", import.meta.url), "utf8");
     for (const eventName of [
       "payment_checkout_requested",
       "payment_checkout_session_created",
@@ -274,11 +275,10 @@ describe("Stripe payment schema and lifecycle", () => {
       "payment_config_error",
       "payment_webhook_signature_failed",
       "payment_accounting_recorded",
-      "payment_accounting_failed",
       "payment_payout_recorded",
       "payment_payout_failed"
     ]) {
-      assert.match(paymentService, new RegExp(eventName));
+      assert.match(paymentService + fulfillmentService, new RegExp(eventName));
     }
   });
 
@@ -287,9 +287,10 @@ describe("Stripe payment schema and lifecycle", () => {
     assert.match(paymentService, /fulfillMockCheckoutSession/);
     assert.match(
       paymentService,
-      /const destination = paymentReturnPath\(\s*currentPayment\.locale/
+      /destination: paymentReturnPath\(\s*payment\.locale/
     );
-    assert.match(paymentService, /void finishMockPaymentSideEffects\(/);
+    assert.doesNotMatch(paymentService, /void finishMockPaymentSideEffects\(/);
+    assert.match(paymentService, /await enqueueWebPaymentFulfillment\(tx, row\)/);
     assert.match(
       paymentService,
       /returnUrl:\s*paymentReturnPath\(\s*input\.locale,\s*mockSessionId\s*\)/

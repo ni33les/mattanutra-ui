@@ -25,6 +25,7 @@ export const AGENT_CAPABILITIES = {
   freeExampleFormulation: "free_example_formulation",
   healthScoreAnalysis: "healthscore_analysis",
   hostingCostSync: "hosting_cost_sync",
+  webPaymentFulfillment: "web_payment_fulfillment",
   humanReview: "human_review",
   lineSend: "line_send",
   nutritionPlanChat: "nutrition_plan_chat",
@@ -304,6 +305,7 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
     capabilities: [
       AGENT_CAPABILITIES.communicationDispatch,
       AGENT_CAPABILITIES.hostingCostSync,
+      AGENT_CAPABILITIES.webPaymentFulfillment,
       AGENT_CAPABILITIES.scheduler
     ],
     id: "436cc481-6639-402e-b639-bf5737e3acd4",
@@ -324,6 +326,7 @@ export type WorkTaskRegistryEntry = Readonly<{
 }>;
 
 export const WORK_TASK_REGISTRY = {
+  fulfill_web_payment: { agentKey: "scheduler", requiredCapabilities: [AGENT_CAPABILITIES.webPaymentFulfillment] },
   admin_catalogue_optimization_job: {
     agentKey: "analytics",
     requiredCapabilities: [AGENT_CAPABILITIES.analyticsCatalogueOptimization]

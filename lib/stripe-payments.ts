@@ -1,3 +1,7 @@
+import { claimFunnelRequest } from "@/lib/funnel-idempotency";
+import { FunnelError } from "@/lib/funnel-errors";
+import { enqueueWebPaymentFulfillment } from "@/lib/web-payment-fulfillment";
+import { deferUntilDatabaseCommit } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
@@ -17,7 +21,7 @@ import {
   type ResolvedUsdRate
 } from "@/lib/finance-fx";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
+import { nutritionProgressPath, nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
 import { paymentReturnPath, type PaymentSourceSurface } from "@/lib/payment-paths";
 import { writePaymentBpmEvent } from "@/lib/payment-bpm";
 import { siteBaseUrl } from "@/lib/site-url";
@@ -69,7 +73,10 @@ export type PaymentStatus =
   | "paid"
   | "processing";
 
-type PaymentRow = Readonly<{
+export type PaymentRow = Readonly<{
+  fulfillment_status: "not_started" | "pending" | "complete" | "failed";
+  fulfillment_completed_at: Date | string | null;
+  fulfillment_error: string | null;
   amount: number;
   bound_at: Date | string | null;
   created_at: Date | string;
@@ -116,7 +123,7 @@ function stripeClientForConfig(config: StripePaymentConfig) {
   }
 
   stripeClientKey = config.secretKey;
-  stripeClient = new Stripe(config.secretKey);
+  stripeClient = new Stripe(config.secretKey, { timeout: 15_000, maxNetworkRetries: 1 });
 
   return stripeClient;
 }
@@ -133,6 +140,8 @@ async function sqlOrThrow() {
 
 function mapPayment(row: PaymentRow) {
   return {
+    fulfillmentStatus: row.fulfillment_status,
+    fulfillmentError: row.fulfillment_error,
     amount: Number(row.amount),
     boundAt: row.bound_at ? new Date(row.bound_at).toISOString() : null,
     createdAt: new Date(row.created_at).toISOString(),
@@ -267,8 +276,9 @@ async function fulfillMockCheckoutSession(
     };
   }
 
+  await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment));
   return {
-    payment: mapPayment(payment),
+    payment: mapPayment((await getPaymentRowById(sql, payment.id)) ?? payment),
     status: payment.plan_id
       ? ("paid_with_plan" as const)
       : ("paid_reservation" as const)
@@ -476,9 +486,10 @@ function paymentCustomerLedgerAccount(payment: PaymentRow) {
 async function recordStripePaymentCompletedRevenue(
   sql: Db,
   payment: PaymentRow,
-  metadata: Record<string, unknown> = {}
+  metadata: Record<string, unknown> = {},
+  fxOverride?: ResolvedUsdRate
 ) {
-  const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
+  const fx = fxOverride ?? await resolveUsdRateForCurrency(payment.currency, { sql });
 
   return recordFinanceTransaction({
     amount: payment.amount,
@@ -604,10 +615,11 @@ function priceIdFromSession(session: Stripe.Checkout.Session) {
   return price && typeof price === "object" ? price.id : null;
 }
 
-async function recordStripePaymentAccounting(
+export async function recordStripePaymentAccounting(
   sql: Db,
   payment: PaymentRow,
-  session: Stripe.Checkout.Session | null
+  session: Stripe.Checkout.Session | null,
+  fxOverride?: ResolvedUsdRate
 ) {
   const amountMicros =
     (session ? amountMicrosFromStripeAmount(session.amount_total) : null) ||
@@ -625,7 +637,7 @@ async function recordStripePaymentAccounting(
       stripeCheckoutSessionId: checkoutSessionId,
       stripeCustomerId: customerId,
       stripePaymentIntentId: paymentIntentId
-    });
+    }, fxOverride);
 
     const intent = session ? paymentIntentFromSession(session) as unknown as {
       latest_charge?: {
@@ -645,7 +657,7 @@ async function recordStripePaymentAccounting(
     const feeMicros = amountMicrosFromStripeAmount(balanceTransaction?.fee);
 
     if (balanceTransaction?.id && feeMicros) {
-      const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
+      const fx = fxOverride ?? await resolveUsdRateForCurrency(payment.currency, { sql });
 
       await recordFinanceTransaction({
         amount: feeMicros,
@@ -674,45 +686,13 @@ async function recordStripePaymentAccounting(
       });
     }
 
-    await writePaymentBpmEvent({
-      actorType: "system",
-      eventName: "payment_accounting_recorded",
-      eventStatus: "accounting_recorded",
-      locale: payment.locale,
-      paymentId: payment.id,
-      planId: payment.plan_id,
-      properties: {
-        amountMicros,
-        feeMicros,
-        sourceSurface: payment.source_surface
-      },
-      selectedPlan: payment.selected_plan,
-      sql,
-      stripeSessionId: checkoutSessionId,
-      valueAmount: amountMicros / AMOUNT_MICROS_PER_UNIT,
-      valueCurrency: payment.currency
+    deferUntilDatabaseCommit(() => {
+      void writePaymentBpmEvent({ eventName: "payment_accounting_recorded", eventStatus: "accounting_recorded", paymentId: payment.id,
+        planId: payment.plan_id, locale: payment.locale }).catch(() => undefined);
     });
   } catch (error) {
-    await writePaymentBpmEvent({
-      actorType: "system",
-      errorCode: "stripe_accounting_failed",
-      errorMessage:
-        error instanceof Error ? error.message : "Unable to record Stripe accounting",
-      eventName: "payment_accounting_failed",
-      eventStatus: "accounting_failed",
-      locale: payment.locale,
-      paymentId: payment.id,
-      planId: payment.plan_id,
-      properties: {
-        sourceSurface: payment.source_surface
-      },
-      selectedPlan: payment.selected_plan,
-      severity: "high",
-      sql,
-      stripeSessionId: checkoutSessionId,
-      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-      valueCurrency: payment.currency
-    });
+    // The durable fulfillment status records this failure even if telemetry is unavailable.
+    throw error;
   }
 }
 
@@ -755,7 +735,7 @@ async function recordStripePayoutAccounting(
   });
 }
 
-async function storeStripeEmail(
+export async function storeStripeEmail(
   sql: Db,
   payment: PaymentRow,
   email: string | null | undefined
@@ -802,7 +782,7 @@ async function storeStripeEmail(
   });
 }
 
-async function startPaidAssessmentPlan(input: Readonly<{
+export async function startPaidAssessmentPlan(input: Readonly<{
   locale: Locale;
   paymentId: string;
   planId: string;
@@ -821,19 +801,9 @@ async function startPaidAssessmentPlan(input: Readonly<{
     throw new Error("Assessment not found for paid plan");
   }
 
-  await writeBpmEvent({
-    actorType: "visitor",
-    emittedBy: "stripe_payment_flow",
-    eventName: "plan_selected",
-    eventType: "plan",
-    locale: input.locale,
-    planId: input.planId,
-    properties: {
-      paymentId: input.paymentId,
-      paymentRequired: true
-    },
-    selectedPlan: input.selectedPlan,
-    sql: input.sql
+  deferUntilDatabaseCommit(() => {
+    void writeBpmEvent({ actorType: "visitor", eventName: "plan_selected", eventType: "plan", locale: input.locale,
+      planId: input.planId, selectedPlan: input.selectedPlan, properties: { paymentId: input.paymentId } }).catch(() => undefined);
   });
 
   await enqueueNutritionPlanTasks({
@@ -993,7 +963,8 @@ function assertSessionMatchesPayment(
 
 export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
   const sql = await sqlOrThrow();
-  const paymentId = randomUUID();
+  let paymentId: string = randomUUID();
+  const requestKey = input.idempotencyKey ?? input.request?.headers.get("Idempotency-Key") ?? "";
 
   await assertPaymentSchema(sql);
 
@@ -1038,14 +1009,70 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     }
   }
 
-  const payment = await insertPayment(sql, {
-    config,
-    locale: input.locale,
-    paymentId,
-    planId: input.planId,
-    selectedPlan: input.selectedPlan,
-    sourceSurface: input.sourceSurface
+  const requestInput = { planId: input.planId ?? null, selectedPlan: input.selectedPlan, mode: config.mode };
+  const receipt = await withDatabaseTransaction(sql, tx => claimFunnelRequest(tx, `checkout:${config.env}`, requestKey, requestInput));
+  const original = await getPaymentRowById(sql, receipt.resourceId);
+  // Expire a deliberately superseded selection before acquiring database locks.
+  if (input.planId && !original) {
+    const superseded = await sql<Array<{ id: string }>>`select id from public.payments
+      where plan_id = ${input.planId}::uuid and selected_plan <> ${input.selectedPlan}
+        and status in ('created', 'checkout_session_created', 'checkout_opened', 'processing') and paid_at is null`;
+    for (const previous of superseded) await markPaymentCancelled({ paymentId: previous.id, request: input.request });
+  }
+  const payment = await withDatabaseTransaction(sql, async tx => {
+    const receipt = await claimFunnelRequest(tx, `checkout:${config.env}`, requestKey, requestInput);
+    paymentId = receipt.resourceId;
+    const replay = await getPaymentRowById(tx, paymentId);
+    if (replay) return replay;
+    if (input.planId) {
+      await tx`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for update`;
+      const [existing] = await tx<PaymentRow[]>`select * from public.payments where plan_id = ${input.planId}::uuid
+        and stripe_mode = ${config.mode} and (
+          paid_at is not null or status in ('paid', 'bound') or (selected_plan = ${input.selectedPlan} and status in ('created', 'checkout_session_created', 'checkout_opened', 'processing'))
+        ) order by (status in ('paid', 'bound')) desc, created_at desc limit 1`;
+      if (existing) {
+        paymentId = existing.id;
+        await tx`update public.funnel_requests set resource_id = ${paymentId}::uuid where scope = ${`checkout:${config.env}`} and request_key = ${requestKey}`;
+        return existing;
+      }
+      const [conflicting] = await tx`select id from public.payments where plan_id = ${input.planId}::uuid
+        and selected_plan <> ${input.selectedPlan} and status in ('created', 'checkout_session_created', 'checkout_opened', 'processing') limit 1`;
+      if (conflicting) throw new FunnelError("Another checkout selection is active. Please retry.", 409, "checkout_selection_conflict");
+    }
+    const existing = await getPaymentRowById(tx, paymentId);
+    if (existing) return existing;
+    return insertPayment(tx, { config, locale: input.locale, paymentId, planId: input.planId, selectedPlan: input.selectedPlan, sourceSurface: input.sourceSurface });
   });
+  if (payment.status === "fulfillment_failed" && payment.paid_at && payment.stripe_checkout_session_id) {
+    await fulfillCheckoutSession(payment.stripe_checkout_session_id, { source: "return_page", request: input.request });
+    return { paymentId, clientSecret: null, mock: config.mode === "mock", publishableKey: config.publishableKey,
+      redirectUrl: paymentReturnPath(input.locale, payment.stripe_checkout_session_id) };
+  }
+  if (payment.status === "paid" || payment.status === "bound") {
+    await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment));
+    return { paymentId, clientSecret: null, mock: config.mode === "mock", publishableKey: config.publishableKey,
+      redirectUrl: payment.plan_id ? nutritionProgressPath(input.locale, payment.plan_id) : nutritionQuizPath(input.locale, undefined, { payment: payment.id }) };
+  }
+  if (['cancelled', 'expired', 'failed'].includes(payment.status)) {
+    throw new FunnelError("This checkout attempt has ended. Start a new attempt.", 409, "checkout_expired");
+  }
+  if (payment.stripe_checkout_session_id && config.mode !== "mock") {
+    const existing = await stripeClientForConfig(config).checkout.sessions.retrieve(payment.stripe_checkout_session_id);
+    if (existing.payment_status === "paid") {
+      await fulfillCheckoutSession(existing.id, { source: "return_page", request: input.request });
+      return { paymentId, clientSecret: null, mock: false, publishableKey: config.publishableKey, redirectUrl: paymentReturnPath(input.locale, existing.id) };
+    }
+    if (existing.status === "complete") {
+      return { paymentId, clientSecret: null, mock: false, publishableKey: config.publishableKey,
+        redirectUrl: paymentReturnPath(input.locale, existing.id) };
+    }
+    if (existing.status !== "open" || !existing.client_secret) {
+      await updatePaymentState(sql, { paymentId, status: "expired", action: "checkout_expired", reason: "provider_session_expired",
+        expectedStatuses: ["created", "checkout_session_created", "checkout_opened", "processing"] });
+      throw new FunnelError("This checkout attempt has ended. Start a new attempt.", 409, "checkout_expired");
+    }
+    return { paymentId, clientSecret: existing.client_secret, mock: false, publishableKey: config.publishableKey };
+  }
   const checkoutRequestedEvent = {
     actorType: "visitor" as const,
     eventName: "payment_checkout_requested" as const,
@@ -1069,6 +1096,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
 
     await updatePaymentState(sql, {
       action: "mock_checkout_session_created",
+      expectedStatuses: ["created"],
       actor: "system",
       metadata: {
         mock: true,
@@ -1114,7 +1142,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     };
   }
 
-  await writePaymentBpmEvent(checkoutRequestedEvent);
+  void writePaymentBpmEvent(checkoutRequestedEvent).catch(() => undefined);
 
   const stripe = stripeClientForConfig(config);
   const plan = paymentPlan(input.selectedPlan);
@@ -1143,14 +1171,15 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     },
     return_url: `${siteBaseUrl()}${paymentReturnPath(input.locale)}?session_id={CHECKOUT_SESSION_ID}`,
     ui_mode: "embedded_page"
-  });
+  }, { idempotencyKey: `web-checkout:${config.env}:${paymentId}` });
 
   if (!session.client_secret) {
     throw new Error("Stripe did not return an embedded Checkout client secret");
   }
 
-  await updatePaymentState(sql, {
+  const created = await updatePaymentState(sql, {
     action: "checkout_session_created",
+    expectedStatuses: ["created"],
     actor: "system",
     metadata: {
       productDescription: plan.description[input.locale],
@@ -1164,7 +1193,19 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     stripePriceId: config.priceIds[input.selectedPlan]
   });
 
-  await writePaymentBpmEvent({
+  if (!created) {
+    const current = await getPaymentRowById(sql, paymentId);
+    if (current?.stripe_checkout_session_id !== session.id) {
+      await stripe.checkout.sessions.expire(session.id).catch(async error => {
+        const latest = await stripe.checkout.sessions.retrieve(session.id);
+        if (latest.payment_status === "paid") await fulfillCheckoutSession(session.id, { source: "return_page", request: input.request });
+        else if (latest.status !== "expired") throw error;
+      });
+      throw new FunnelError("This checkout attempt has ended. Start a new attempt.", 409, "checkout_expired");
+    }
+  }
+
+  void writePaymentBpmEvent({
     actorType: "system",
     eventName: "payment_checkout_session_created",
     eventStatus: "checkout_session_created",
@@ -1180,9 +1221,10 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     stripeSessionId: session.id,
     valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
     valueCurrency: payment.currency
-  });
+  }).catch(() => undefined);
 
   return {
+    mock: false,
     clientSecret: session.client_secret,
     paymentId,
     publishableKey: config.publishableKey
@@ -1322,6 +1364,23 @@ export async function markPaymentCancelled(input: Readonly<{
 
   await assertPaymentSchema(sql);
 
+  const before = await getPaymentRowById(sql, input.paymentId);
+  if (!before) return null;
+  if (before.status === "paid" || before.status === "bound" || before.paid_at) return mapPayment(before);
+  if (before.stripe_mode !== "mock" && before.stripe_checkout_session_id) {
+    const stripe = stripeClientForConfig(stripePaymentConfig(input.request));
+    let session = await stripe.checkout.sessions.retrieve(before.stripe_checkout_session_id);
+    if (session.payment_status === "paid") return (await fulfillCheckoutSession(session.id, { source: "return_page", request: input.request })).payment;
+    if (session.status === "open") {
+      try { session = await stripe.checkout.sessions.expire(session.id); }
+      catch (error) {
+        session = await stripe.checkout.sessions.retrieve(session.id);
+        if (session.payment_status === "paid") return (await fulfillCheckoutSession(session.id, { source: "return_page", request: input.request })).payment;
+        if (session.status !== "expired") throw error;
+      }
+    }
+    if (session.status !== "expired") throw new FunnelError("Payment is still processing", 409, "payment_processing");
+  }
   const updated = await withDatabaseTransaction(sql, async tx => {
     const payment = await updatePaymentState(tx, {
       action: "payment_cancelled", actor: "visitor", paymentId: input.paymentId,
@@ -1359,176 +1418,35 @@ export async function markPaymentCancelled(input: Readonly<{
   return mapPayment(updated ?? payment);
 }
 
-export async function completeMockPayment(input: Readonly<{
-  paymentId: string;
-  request?: Request;
-}>) {
-  if (!isUuid(input.paymentId)) {
-    return null;
-  }
-
+export async function completeMockPayment(input: Readonly<{ paymentId: string; request?: Request }>) {
+  if (!isUuid(input.paymentId)) return null;
   const sql = await sqlOrThrow();
-
   await assertPaymentSchema(sql);
-
-  const config = stripePaymentConfig(input.request);
-
-  if (config.mode !== "mock") {
-    throw new Error("Mock payment completion is only available in dev mock mode");
-  }
-
-  let currentPayment = await getPaymentRowById(sql, input.paymentId);
-
-  if (!currentPayment || currentPayment.stripe_mode !== "mock") {
-    return null;
-  }
-
-  if (currentPayment.status !== "paid" && currentPayment.status !== "bound") {
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      const paid = await updatePaymentState(sql, {
-        action: "mock_payment_paid",
-        actor: "system",
-        metadata: {
-          mock: true,
-          source: "local_dev"
-        },
-        paymentId: input.paymentId,
-        reason: "local_mock_payment_confirmed",
-        status: "paid",
-        stripeCustomerId: "mock_customer",
-        stripePaymentIntentId: `mock_pi_${input.paymentId}`
-      });
-
-      if (paid) {
-        currentPayment = paid;
-        break;
-      }
-
-      currentPayment =
-        (await getPaymentRowById(sql, input.paymentId)) ?? currentPayment;
-
-      if (
-        currentPayment.status === "paid" ||
-        currentPayment.status === "bound"
-      ) {
-        break;
-      }
-    }
-  }
-
-  if (
-    currentPayment.status !== "paid" &&
-    currentPayment.status !== "bound"
-  ) {
-    throw new Error("Unable to complete mock payment");
-  }
-
-  const destination = paymentReturnPath(
-    currentPayment.locale,
-    currentPayment.stripe_checkout_session_id ?? `mock_cs_${currentPayment.id}`
-  );
-  const followUpPayment = currentPayment;
-
-  setTimeout(() => {
-    void finishMockPaymentSideEffects({
-      config,
-      payment: followUpPayment,
-      sql
-    }).catch((error) => {
-      console.warn("Mock payment follow-up failed", error);
+  if (stripePaymentConfig(input.request).mode !== "mock") throw new Error("Mock payment completion is only available in dev mock mode");
+  const payment = await withDatabaseTransaction(sql, async tx => {
+    const [current] = await tx<PaymentRow[]>`select * from public.payments where id = ${input.paymentId}::uuid for update`;
+    if (!current || current.stripe_mode !== "mock") return null;
+    const paid = current.status === "paid" || current.status === "bound" ? current : await updatePaymentState(tx, {
+      paymentId: current.id, action: "mock_payment_paid", actor: "system", reason: "local_mock_payment_confirmed", status: "paid",
+      stripeCustomerId: "mock_customer", stripePaymentIntentId: `mock_pi_${current.id}`, metadata: { mock: true }
     });
-  }, 2_000);
-
-  return {
-    destination,
-    payment: mapPayment(currentPayment)
-  };
+    if (!paid) return null;
+    await enqueueWebPaymentFulfillment(tx, paid);
+    return (await getPaymentRowById(tx, paid.id))!;
+  });
+  return payment ? { payment: mapPayment(payment), destination: paymentReturnPath(payment.locale, payment.stripe_checkout_session_id ?? `mock_cs_${payment.id}`) } : null;
 }
 
-async function finishMockPaymentSideEffects(input: Readonly<{
-  config: StripePaymentConfig;
-  payment: PaymentRow;
-  request?: Request;
-  sql: Db;
-}>) {
-  const { config, payment, request, sql } = input;
-  const mockWebhook = await recordMockStripeWebhookLifecycle(sql, {
-    config,
-    payment,
-    request
-  });
-
-  await recordStripePaymentAccounting(sql, payment, null);
-
-  await writePaymentBpmEvent({
-    actorType: "system",
-    eventName: "payment_succeeded",
-    eventStatus: "paid",
-    locale: payment.locale,
-    paymentId: payment.id,
-    planId: payment.plan_id,
-    properties: {
-      mock: true,
-      source: "local_dev",
-      sourceSurface: payment.source_surface
-    },
-    request,
-    selectedPlan: payment.selected_plan,
-    sql,
-    stripeSessionId: payment.stripe_checkout_session_id,
-    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-    valueCurrency: payment.currency
-  });
-
-  await queuePlatformPaymentNotification({
-    eventKey: "platform_revenue_received",
-    metadata: {
-      mock: true,
-      source: "mock_payment_completion"
-    },
-    payment
-  });
-
-  if (payment.plan_id) {
-    await startPaidAssessmentPlan({
-      locale: payment.locale,
-      paymentId: payment.id,
-      planId: payment.plan_id,
-      selectedPlan: payment.selected_plan,
-      sql
-    });
+/** Optional notification/history work runs after durable fulfillment enables paid access. */
+export async function notifyWebPaymentFulfilled(payment: PaymentRow) {
+  await queuePlatformPaymentNotification({ eventKey: "platform_revenue_received", metadata: { source: "durable_payment_fulfillment" }, payment });
+  if (payment.stripe_mode === "mock") {
+    const sql = await sqlOrThrow();
+    const config = stripePaymentConfig();
+    const mockWebhook = await recordMockStripeWebhookLifecycle(sql, { config, payment });
+    await markWebhookEventStatus(sql, { paymentId: payment.id, sessionId: mockWebhook.sessionId, status: "processed", stripeEventId: mockWebhook.fatEventId });
+    await recordMockStripePayoutLifecycle(sql, { config, payment });
   }
-
-  await writePaymentBpmEvent({
-    actorType: "system",
-    eventName: "payment_fulfillment_succeeded",
-    eventStatus: "paid",
-    locale: payment.locale,
-    paymentId: payment.id,
-    planId: payment.plan_id,
-    properties: {
-      mock: true,
-      source: "local_dev",
-      sourceSurface: payment.source_surface
-    },
-    selectedPlan: payment.selected_plan,
-    sql,
-    stripeSessionId: payment.stripe_checkout_session_id,
-    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-    valueCurrency: payment.currency
-  });
-
-  await markWebhookEventStatus(sql, {
-    paymentId: payment.id,
-    sessionId: mockWebhook.sessionId,
-    status: "processed",
-    stripeEventId: mockWebhook.fatEventId
-  });
-  await recordMockStripePayoutLifecycle(sql, {
-    config,
-    payment,
-    request
-  });
 }
 
 async function recordMockStripeWebhookLifecycle(
@@ -1815,7 +1733,8 @@ async function insertMockStripeWebhookEvent(
       ${sql.json(toJsonValue(input.payload))}::jsonb,
       now()
     )
-    on conflict (stripe_event_id) do nothing
+    on conflict (stripe_event_id) do update set received_at = now()
+      where stripe_webhook_events.status in ('received', 'failed')
     returning id::text
   `;
 
@@ -1908,7 +1827,8 @@ export async function recordStripeWebhookEvent(
       ${sql.json(toJsonValue(input.event))}::jsonb,
       now()
     )
-    on conflict (stripe_event_id) do nothing
+    on conflict (stripe_event_id) do update set received_at = now()
+      where stripe_webhook_events.status in ('received', 'failed')
     returning id::text
   `;
 
@@ -1919,315 +1839,69 @@ function sessionFromEvent(event: Stripe.Event) {
   return event.data.object as Stripe.Checkout.Session;
 }
 
+export async function retrievePaidPaymentSession(payment: PaymentRow): Promise<Stripe.Checkout.Session | null> {
+  if (payment.stripe_mode === "mock") {
+    if (stripePaymentConfig().mode !== "mock") throw new Error("Mock fulfillment is disabled in this environment");
+    return null;
+  }
+  if (!payment.stripe_checkout_session_id) throw new Error("Payment checkout session is missing");
+  const config = stripePaymentConfig();
+  const session = await stripeClientForConfig(config).checkout.sessions.retrieve(payment.stripe_checkout_session_id, {
+    expand: ["line_items.data.price", "payment_intent.latest_charge.balance_transaction"]
+  });
+  assertSessionMatchesPayment(session, payment, config);
+  if (session.payment_status !== "paid") throw new Error("Stripe has not confirmed this payment");
+  return session;
+}
+
 export async function fulfillCheckoutSession(
   sessionId: string,
-  input: Readonly<{
-    request?: Request;
-    source: "return_page" | "webhook";
-    stripeEventId?: string | null;
-  }>
+  input: Readonly<{ request?: Request; source: "return_page" | "webhook"; stripeEventId?: string | null }>
 ) {
   const sql = await sqlOrThrow();
-
   await assertPaymentSchema(sql);
-
   const config = stripePaymentConfig(input.request);
-  if (sessionId.startsWith("mock_cs_")) {
-    return fulfillMockCheckoutSession(sql, sessionId, input);
-  }
-
-  const stripe = stripeClientForConfig(config);
-  const session = await stripe.checkout.sessions.retrieve(sessionId, {
-    expand: [
-      "line_items.data.price",
-      "payment_intent.latest_charge.balance_transaction"
-    ]
+  if (sessionId.startsWith("mock_cs_")) return fulfillMockCheckoutSession(sql, sessionId, input);
+  const session = await stripeClientForConfig(config).checkout.sessions.retrieve(sessionId, {
+    expand: ["line_items.data.price", "payment_intent.latest_charge.balance_transaction"]
   });
-  const payment =
-    (session.metadata?.paymentId && isUuid(session.metadata.paymentId)
-      ? await getPaymentRowById(sql, session.metadata.paymentId)
-      : null) ?? (await getPaymentRowBySessionId(sql, session.id));
-
-  if (!payment) {
-    throw new Error("Payment record not found for Stripe session");
+  const payment = (session.metadata?.paymentId && isUuid(session.metadata.paymentId)
+    ? await getPaymentRowById(sql, session.metadata.paymentId) : null) ?? await getPaymentRowBySessionId(sql, sessionId);
+  if (!payment) throw new Error("Payment record not found for Stripe session");
+  assertSessionMatchesPayment(session, payment, config);
+  if (input.source === "return_page") {
+    void writePaymentBpmEvent({ eventName: "payment_checkout_returned", eventStatus: "received", paymentId: payment.id,
+      planId: payment.plan_id, locale: payment.locale, stripeSessionId: session.id }).catch(() => undefined);
   }
-
-  try {
-    if (
-      input.source === "return_page" &&
-      !(await paymentBpmEventExists(sql, {
-        eventName: "payment_checkout_returned",
-        paymentId: payment.id,
-        stripeSessionId: session.id
-      }))
-    ) {
-      await writePaymentBpmEvent({
-        actorType: "visitor",
-        eventName: "payment_checkout_returned",
-        eventStatus: "received",
-        locale: payment.locale,
-        paymentId: payment.id,
-        planId: payment.plan_id,
-        properties: {
-          sourceSurface: payment.source_surface
-        },
-        request: input.request,
-        selectedPlan: payment.selected_plan,
-        sql,
-        stripeEventId: input.stripeEventId,
-        stripeSessionId: session.id,
-        valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-        valueCurrency: payment.currency
-      });
-    }
-
-    assertSessionMatchesPayment(session, payment, config);
-
-    const customerId = stringId(session.customer);
-    const paymentIntentId = stringId(session.payment_intent);
-    const email = sessionCustomerEmail(session);
-
-    if (session.status === "expired") {
-      if (payment.status === "expired") {
-        return {
-          payment: mapPayment(payment),
-          status: "expired" as const
-        };
+  const current = await withDatabaseTransaction(sql, async tx => {
+    let [row] = await tx<PaymentRow[]>`select * from public.payments where id = ${payment.id}::uuid for update`;
+    const confirmed = row.status === "paid" || row.status === "bound" || Boolean(row.paid_at);
+    if (session.payment_status === "paid") {
+      if (row.status !== "paid" && row.status !== "bound") {
+        row = await updatePaymentState(tx, {
+          paymentId: row.id, action: "payment_paid", actor: "stripe", reason: "stripe_payment_confirmed", status: "paid",
+          customerEmail: sessionCustomerEmail(session) || null, stripeCustomerId: stringId(session.customer),
+          stripePaymentIntentId: stringId(session.payment_intent), metadata: { source: input.source }
+        }) ?? row;
       }
-
-      const expired = await updatePaymentState(sql, {
-        action: "checkout_expired",
-        actor: "stripe",
-        metadata: {
-          source: input.source
-        },
-        paymentId: payment.id,
-        reason: "stripe_checkout_expired",
-        status: "expired",
-        stripeCustomerId: customerId,
-        stripePaymentIntentId: paymentIntentId
-      });
-
-      await writePaymentBpmEvent({
-        actorType: "system",
-        eventName: "payment_expired",
-        eventStatus: "expired",
-        locale: payment.locale,
-        paymentId: payment.id,
-        planId: payment.plan_id,
-        properties: {
-          source: input.source,
-          sourceSurface: payment.source_surface
-        },
-        selectedPlan: payment.selected_plan,
-        sql,
-        stripeEventId: input.stripeEventId,
-        stripeSessionId: session.id,
-        valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-        valueCurrency: payment.currency
-      });
-
-      return {
-        payment: expired ? mapPayment(expired) : mapPayment(payment),
-        status: "expired" as const
-      };
+      await enqueueWebPaymentFulfillment(tx, row);
+    } else if (!confirmed) {
+      const status = session.status === "expired" ? "expired" : "processing";
+      if (row.status !== status) row = await updatePaymentState(tx, {
+        paymentId: row.id, action: status === "expired" ? "checkout_expired" : "payment_processing",
+        actor: "stripe", reason: "stripe_checkout_status", status,
+        expectedStatuses: ["created", "checkout_session_created", "checkout_opened", "processing"]
+      }) ?? row;
     }
-
-    if (session.payment_status !== "paid") {
-      if (payment.status === "processing") {
-        return {
-          payment: mapPayment(payment),
-          status: "processing" as const
-        };
-      }
-
-      const processing = await updatePaymentState(sql, {
-        action: "payment_processing",
-        actor: "stripe",
-        metadata: {
-          paymentStatus: session.payment_status,
-          source: input.source
-        },
-        paymentId: payment.id,
-        reason: "stripe_checkout_not_paid",
-        status: "processing",
-        stripeCustomerId: customerId,
-        stripePaymentIntentId: paymentIntentId
-      });
-
-      await writePaymentBpmEvent({
-        actorType: "system",
-        eventName: "payment_processing",
-        eventStatus: "processing",
-        locale: payment.locale,
-        paymentId: payment.id,
-        planId: payment.plan_id,
-        properties: {
-          paymentStatus: session.payment_status,
-          source: input.source,
-          sourceSurface: payment.source_surface
-        },
-        selectedPlan: payment.selected_plan,
-        sql,
-        stripeEventId: input.stripeEventId,
-        stripeSessionId: session.id,
-        valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-        valueCurrency: payment.currency
-      });
-
-      return {
-        payment: processing ? mapPayment(processing) : mapPayment(payment),
-        status: "processing" as const
-      };
-    }
-
-    if (payment.status === "paid" || payment.status === "bound") {
-      return {
-        payment: mapPayment(payment),
-        status: payment.plan_id ? "paid_with_plan" as const : "paid_reservation" as const
-      };
-    }
-
-    await writePaymentBpmEvent({
-      actorType: "system",
-      eventName: "payment_fulfillment_started",
-      eventStatus: "fulfillment_started",
-      locale: payment.locale,
-      paymentId: payment.id,
-      planId: payment.plan_id,
-      properties: {
-        source: input.source,
-        sourceSurface: payment.source_surface
-      },
-      request: input.request,
-      selectedPlan: payment.selected_plan,
-      severity: "low",
-      sql,
-      stripeEventId: input.stripeEventId,
-      stripeSessionId: session.id,
-      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-      valueCurrency: payment.currency
-    });
-
-    const paid =
-      await updatePaymentState(sql, {
-        action: "payment_paid",
-        actor: "stripe",
-        customerEmail: email || null,
-        metadata: {
-          source: input.source,
-          stripePaymentStatus: session.payment_status
-        },
-        paymentId: payment.id,
-        reason: "stripe_payment_confirmed",
-        status: "paid",
-        stripeCustomerId: customerId,
-        stripePaymentIntentId: paymentIntentId
-      });
-    const currentPayment = paid ?? payment;
-
-    await storeStripeEmail(sql, currentPayment, email);
-    await recordStripePaymentAccounting(sql, currentPayment, session);
-
-    await writePaymentBpmEvent({
-      actorType: "system",
-      eventName: "payment_succeeded",
-      eventStatus: "paid",
-      locale: payment.locale,
-      paymentId: payment.id,
-      planId: payment.plan_id,
-      properties: {
-        source: input.source,
-        sourceSurface: payment.source_surface
-      },
-      selectedPlan: payment.selected_plan,
-      sql,
-      stripeEventId: input.stripeEventId,
-      stripeSessionId: session.id,
-      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-      valueCurrency: payment.currency
-    });
-
-    await queuePlatformPaymentNotification({
-      eventKey: "platform_revenue_received",
-      metadata: {
-        source: input.source,
-        stripeEventId: input.stripeEventId,
-        stripeSessionId: session.id
-      },
-      payment: currentPayment
-    });
-
-    if (currentPayment.plan_id && currentPayment.status !== "bound") {
-      await startPaidAssessmentPlan({
-        locale: currentPayment.locale,
-        paymentId: currentPayment.id,
-        planId: currentPayment.plan_id,
-        selectedPlan: currentPayment.selected_plan,
-        sql
-      });
-    }
-
-    await writePaymentBpmEvent({
-      actorType: "system",
-      eventName: "payment_fulfillment_succeeded",
-      eventStatus: "paid",
-      locale: payment.locale,
-      paymentId: payment.id,
-      planId: payment.plan_id,
-      properties: {
-        source: input.source,
-        sourceSurface: payment.source_surface
-      },
-      selectedPlan: payment.selected_plan,
-      sql,
-      stripeEventId: input.stripeEventId,
-      stripeSessionId: session.id,
-      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-      valueCurrency: payment.currency
-    });
-
-    return {
-      payment: mapPayment(currentPayment),
-      status: currentPayment.plan_id ? "paid_with_plan" as const : "paid_reservation" as const
-    };
-  } catch (error) {
-    await updatePaymentState(sql, {
-      action: "fulfillment_failed",
-      actor: "system",
-      metadata: {
-        errorMessage:
-          error instanceof Error ? error.message : "Payment fulfillment failed",
-        source: input.source
-      },
-      paymentId: payment.id,
-      reason: "fulfillment_failed",
-      status: "fulfillment_failed"
-    });
-    await writePaymentBpmEvent({
-      actorType: "system",
-      errorCode: "payment_fulfillment_failed",
-      errorMessage:
-        error instanceof Error ? error.message : "Payment fulfillment failed",
-      eventName: "payment_fulfillment_failed",
-      eventStatus: "fulfillment_failed",
-      locale: payment.locale,
-      paymentId: payment.id,
-      planId: payment.plan_id,
-      properties: {
-        source: input.source,
-        sourceSurface: payment.source_surface
-      },
-      selectedPlan: payment.selected_plan,
-      severity: "high",
-      sql,
-      stripeEventId: input.stripeEventId,
-      stripeSessionId: session.id,
-      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-      valueCurrency: payment.currency
-    });
-    throw error;
-  }
+    return (await getPaymentRowById(tx, row.id))!;
+  });
+  const paid = current.status === "paid" || current.status === "bound";
+  void writePaymentBpmEvent({ eventName: paid ? "payment_succeeded" : current.status === "expired" ? "payment_expired" : "payment_processing",
+    eventStatus: current.status, paymentId: current.id, planId: current.plan_id, locale: current.locale,
+    stripeSessionId: session.id, stripeEventId: input.stripeEventId }).catch(() => undefined);
+  return { payment: mapPayment(current), status: paid
+    ? current.plan_id ? "paid_with_plan" as const : "paid_reservation" as const
+    : current.status === "expired" ? "expired" as const : "processing" as const };
 }
 
 export async function bindPaidReservationToAssessment(input: Readonly<{
@@ -2243,46 +1917,22 @@ export async function bindPaidReservationToAssessment(input: Readonly<{
 
   await assertPaymentSchema(sql);
 
-  const claim = await claimPaidReservation(sql, input.paymentId, input.planId);
-  if (!claim) {
-    await writePaymentBpmEvent({
-      actorType: "system", eventName: "payment_reservation_bind_failed",
-      eventStatus: "failed", errorCode: "payment_reservation_bind_failed",
-      errorMessage: "Reservation is unpaid or belongs to another assessment",
-      paymentId: input.paymentId, planId: input.planId, locale: input.locale, sql
-    });
-    return null;
-  }
-  const payment = claim.payment;
-  const nextPayment = payment;
-  if (claim.replayed) return mapPayment(payment);
-
-  // Reservation binding is post-payment bookkeeping only — revenue was
-  // already booked at payment confirmation as nominal sales recognition.
-  await storeStripeEmail(sql, nextPayment, payment.customer_email);
-  await startPaidAssessmentPlan({
-    locale: input.locale,
-    paymentId: input.paymentId,
-    planId: input.planId,
-    selectedPlan: payment.selected_plan,
-    sql
+  return withDatabaseTransaction(sql, async tx => {
+    const claim = await claimPaidReservation(tx, input.paymentId!, input.planId);
+    if (!claim) {
+      deferUntilDatabaseCommit(() => {
+        void writePaymentBpmEvent({ eventName: "payment_reservation_bind_failed", eventStatus: "failed", paymentId: input.paymentId,
+          planId: input.planId, locale: input.locale }).catch(() => undefined);
+      });
+      return null;
+    }
+    if (!claim.replayed) {
+      await tx`update public.payments set fulfillment_status = 'pending', fulfillment_completed_at = null where id = ${input.paymentId!}::uuid`;
+    }
+    const payment = { ...claim.payment, ...(!claim.replayed ? { fulfillment_status: "pending" as const } : {}) };
+    await enqueueWebPaymentFulfillment(tx, payment);
+    return mapPayment(payment);
   });
-
-  await writePaymentBpmEvent({
-    actorType: "system",
-    eventName: "payment_reservation_bound",
-    eventStatus: "bound",
-    locale: input.locale,
-    paymentId: input.paymentId,
-    planId: input.planId,
-    selectedPlan: payment.selected_plan,
-    sql,
-    stripeSessionId: payment.stripe_checkout_session_id,
-    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
-    valueCurrency: payment.currency
-  });
-
-  return mapPayment(nextPayment);
 }
 
 export async function markStripePaymentFailure(input: Readonly<{
