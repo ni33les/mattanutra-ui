@@ -273,4 +273,29 @@ describe("Slice F deterministic support sequencing", () => {
     );
     assert.match(source, /agentic_support_messages[\s\S]*sequence/i);
   });
+  it("serializes distinct concurrent replies without losing messages", async () => {
+    const {runtime, scope, orderHandle} = await paidOrder("concurrent-write");
+    const inputs = Array.from({length: 12}, (_, i) => ({config: runtime.config, scope, orderHandle, store: runtime.store, now: DET_V3_CLOCK, idempotencyKey: `support-concurrent-write-${i}`, message: `Synthetic reply ${i}`}));
+    const results = await Promise.all(inputs.map(input => supportTool(input)));
+    assert.ok(results.every(result => result.ok));
+    const final = await supportTool({...inputs[0], idempotencyKey: "support-concurrent-final", message: "It is delivered."});
+    assert.ok(final.ok);
+    assert.equal(final.thread.filter(message => message.author === "client").length, 12);
+    assert.deepEqual(final.thread.map(message => message.sequence), Array.from({length: 13}, (_, i) => i + 1));
+    const replay = await supportTool(inputs[0]);
+    assert.deepEqual(replay, results[0]);
+  });
+
+  it("rolls back the reply when saving its idempotency response fails", async () => {
+    const {runtime, scope, orderHandle} = await paidOrder("support-rollback");
+    const input = {config: runtime.config, scope, orderHandle, store: runtime.store, now: DET_V3_CLOCK, idempotencyKey: "support-rollback-response", message: "Synthetic recoverable reply"};
+    const original = runtime.store.insertIdempotency;
+    runtime.store.insertIdempotency = async () => { throw new Error("injected_failure"); };
+    await assert.rejects(supportTool(input), /injected_failure/);
+    runtime.store.insertIdempotency = original;
+    const result = await supportTool(input);
+    assert.ok(result.ok);
+    assert.equal(result.thread.filter(message => message.author === "client").length, 1);
+  });
+
 });

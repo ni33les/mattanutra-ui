@@ -269,6 +269,21 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       `;
       return rows.map(mapOutbox);
     },
+    async claimOutboxBatch(limit) {
+      if (!inTransaction) throw new Error("Outbox claims require a transaction");
+      const rows = await sql`
+        select * from public.agentic_outbox_events
+        where processed_at is null and type = 'OMS_SUBMIT'
+        order by created_at, id limit ${Math.max(1, Math.min(50, limit))}
+        for update skip locked
+      `;
+      return rows.map(mapOutbox);
+    },
+    async getOrderForUpdate(id) {
+      if (!inTransaction) throw new Error("Order locks require a transaction");
+      const [row] = await sql`select * from public.agentic_orders where id = ${id}::uuid for update`;
+      return row ? mapOrder(row) : null;
+    },
     async getPlanForUpdate(id) {
       if (!inTransaction) throw new Error("Plan locks require a transaction");
       await sql`select id from public.agentic_plans where id = ${id}::uuid for update`;
@@ -575,6 +590,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       `;
     },
     async transaction<T>(work: (store: AgenticStore) => Promise<T>) {
+      if (inTransaction) return work(store);
       return sql.begin((tx) => work(createPostgresStore(tx as unknown as Sql, true))) as Promise<T>;
     },
     async updateCheckout(record) {

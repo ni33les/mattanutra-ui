@@ -37,16 +37,6 @@ function paymentProviderOf(event: VerifiedPaymentEvent) {
   return "mock" as const;
 }
 
-function isDuplicateProviderEvent(error: unknown) {
-  const record = error as { code?: unknown; constraint?: unknown; message?: unknown };
-  if (record.code === "23505") {
-    return true;
-  }
-  return /provider_event_duplicate|agentic_provider_events/i.test(
-    `${record.constraint ?? ""} ${record.message ?? error}`
-  );
-}
-
 async function existingProviderEvent(
   store: AgenticStore,
   event: VerifiedPaymentEvent,
@@ -81,7 +71,27 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
   now: string;
   store: AgenticStore;
 }>): Promise<PaymentApplyResult | null> {
-  const order = await input.store.getOrderByProviderSessionId(input.event.providerSessionId);
+  const result = await input.store.transaction(store => applyPaymentInTransaction({...input, store}));
+  // Analytics and retail projection use their own connections; never wait on them
+  // while holding the payment order lock. Their stable IDs make replay harmless.
+  if (result?.order.paymentStatus === "paid" && input.event.status === "succeeded") {
+    await recordPaymentFunnel({eventId: `pay-ok:${result.order.id}`, eventType: "payment_succeeded", now: input.now, planId: result.order.planId});
+  } else if (result?.order.latestPaymentAttempt === "declined") {
+    await recordPaymentFunnel({eventId: `pay-no:${result.order.id}`, eventType: "payment_declined", now: input.now, planId: result.order.planId});
+  }
+  if (result && (input.event.status === "refunded" || input.event.status === "partially_refunded")) {
+    await projectRefund(result.order);
+  }
+  return result;
+}
+
+async function applyPaymentInTransaction(input: Readonly<{
+  event: VerifiedPaymentEvent;
+  now: string;
+  store: AgenticStore;
+}>): Promise<PaymentApplyResult | null> {
+  const foundOrder = await input.store.getOrderByProviderSessionId(input.event.providerSessionId);
+  const order = foundOrder ? await input.store.getOrderForUpdate(foundOrder.id) : null;
 
   if (!order) {
     const applyKey = paymentApplyKey(input.event);
@@ -102,7 +112,7 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     : paymentApplyKey(input.event);
   const existing = await existingProviderEvent(input.store, input.event, applyKey);
 
-  if (existing && !mismatchPreview) {
+  if (existing) {
     const found = await input.store.getOrder(existing.orderId);
     return found ? { applied: false, order: found } : null;
   }
@@ -120,25 +130,14 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     return { applied: false, order };
   }
 
-  try {
-    await input.store.insertProviderEvent({
-      createdAt: input.now,
-      id: nextTestUuid(),
-      orderId: order.id,
-      payload: input.event,
-      provider: paymentProviderOf(input.event),
-      providerEventId: applyKey
-    });
-  } catch (error) {
-    if (!isDuplicateProviderEvent(error)) {
-      throw error;
-    }
-    const raced = await existingProviderEvent(input.store, input.event, applyKey);
-    const latest =
-      (raced ? await input.store.getOrder(raced.orderId) : null) ??
-      (await input.store.getOrder(order.id));
-    return latest ? { applied: false, order: latest } : null;
-  }
+  await input.store.insertProviderEvent({
+    createdAt: input.now,
+    id: nextTestUuid(),
+    orderId: order.id,
+    payload: input.event,
+    provider: paymentProviderOf(input.event),
+    providerEventId: applyKey
+  });
 
   await input.store.insertPaymentAttempt({
     createdAt: input.now,
@@ -201,12 +200,6 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
       orderId: order.id,
       type: input.event.status === "unavailable" ? "payment_unavailable" : "payment_declined"
     });
-    await recordPaymentFunnel({
-      eventId: `pay-no:${order.id}`,
-      eventType: "payment_declined",
-      now: input.now,
-      planId: order.planId
-    });
     return { applied: true, order: next };
   }
 
@@ -237,28 +230,6 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
       updatedAt: input.now
     };
     await input.store.updateOrder(next);
-    try {
-      const { getSql } = await import("@/lib/db");
-      const {
-        cancelRetailCustomerOrderForAgenticRefund,
-        getRetailOrderByAgenticOrderId
-      } = await import("@/lib/retail-product-checkout");
-      const { voidPendingRetailOrderSettlement } = await import(
-        "@/lib/admin-retail-financials"
-      );
-      const sql = getSql();
-      const retail = await getRetailOrderByAgenticOrderId(order.id);
-
-      if (sql && retail?.orderId) {
-        await voidPendingRetailOrderSettlement(sql, {
-          orderId: retail.orderId,
-          reason: "mcp_refund"
-        });
-      }
-      await cancelRetailCustomerOrderForAgenticRefund(order.id);
-    } catch {
-      // Settlement void is best-effort; paymentStatus is already refunded.
-    }
     return { applied: true, order: next };
   }
 
@@ -292,14 +263,33 @@ export async function applyVerifiedPaymentEvent(input: Readonly<{
     processedAt: null,
     type: "OMS_SUBMIT"
   });
-  await recordPaymentFunnel({
-    eventId: `pay-ok:${order.id}`,
-    eventType: "payment_succeeded",
-    now: input.now,
-    planId: order.planId
-  });
 
   return { applied: true, order: next };
+}
+
+async function projectRefund(order: OrderRecord) {
+  try {
+    const { getSql } = await import("@/lib/db");
+    const {
+      cancelRetailCustomerOrderForAgenticRefund,
+      getRetailOrderByAgenticOrderId
+    } = await import("@/lib/retail-product-checkout");
+    const { voidPendingRetailOrderSettlement } = await import(
+      "@/lib/admin-retail-financials"
+    );
+    const sql = getSql();
+    const retail = await getRetailOrderByAgenticOrderId(order.id);
+
+    if (sql && retail?.orderId) {
+      await voidPendingRetailOrderSettlement(sql, {
+        orderId: retail.orderId,
+        reason: "mcp_refund"
+      });
+    }
+    await cancelRetailCustomerOrderForAgenticRefund(order.id);
+  } catch {
+    // Settlement void is best-effort; paymentStatus is already refunded.
+  }
 }
 
 async function expireUnpaidOrder(input: Readonly<{
@@ -341,7 +331,12 @@ export async function expireCheckoutIfDue(input: Readonly<{
   if (!order.checkoutExpiresAt || Date.parse(input.now) < Date.parse(order.checkoutExpiresAt)) {
     return order;
   }
-  return expireUnpaidOrder({ now: input.now, order, store: input.store });
+  return input.store.transaction(async store => {
+    const current = await store.getOrderForUpdate(order.id);
+    if (!current || current.orderStatus !== "open" || current.paymentStatus !== "unpaid" ||
+        !current.checkoutExpiresAt || Date.parse(input.now) < Date.parse(current.checkoutExpiresAt)) return current;
+    return expireUnpaidOrder({now: input.now, order: current, store});
+  });
 }
 
 function fulfilmentTracking(

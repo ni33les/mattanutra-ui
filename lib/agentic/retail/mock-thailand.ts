@@ -45,36 +45,26 @@ export async function processOmsOutbox(input: Readonly<{
     return;
   }
 
-  const pending = await input.store.getOutboxPending();
-
-  for (const event of pending) {
-    if (event.type !== "OMS_SUBMIT" || !event.orderId) {
-      continue;
-    }
-
-    const existing = await input.store.getRetailLink(event.orderId);
-
-    if (!existing) {
-      await input.store.insertRetailLink({
-        adapter: "mock_thailand",
-        createdAt: input.now,
-        orderId: event.orderId,
-        retailerReference: `th-mock-${event.orderId.slice(0, 8)}`
-      });
-    }
-
-    const order = await input.store.getOrder(event.orderId);
-
-    if (order && order.fulfilmentStatus === "not_started" && order.paymentStatus === "paid") {
-      await applyFulfilmentEvent({
-        now: input.now,
-        orderId: order.id,
-        status: "processing",
-        store: input.store
-      });
-    }
-
-    await input.store.markOutboxProcessed(event.id, input.now);
+  // Each transaction claims one event, so it holds at most one order lock.
+  // A bounded pass avoids making a payment callback drain the whole backlog.
+  for (let index = 0; index < 25; index++) {
+    const processed = await input.store.transaction(async store => {
+      const [event] = await store.claimOutboxBatch(1);
+      if (!event) return false;
+      if (event.orderId) {
+        const order = await store.getOrderForUpdate(event.orderId);
+        const existing = await store.getRetailLink(event.orderId);
+        if (!existing) {
+          await store.insertRetailLink({adapter: "mock_thailand", createdAt: input.now, orderId: event.orderId, retailerReference: `th-mock-${event.orderId.slice(0, 8)}`});
+        }
+        if (order?.fulfilmentStatus === "not_started" && order.paymentStatus === "paid") {
+          await applyFulfilmentInTransaction({now: input.now, orderId: order.id, status: "processing", store});
+        }
+      }
+      await store.markOutboxProcessed(event.id, input.now);
+      return true;
+    });
+    if (!processed) break;
   }
 }
 
@@ -85,7 +75,40 @@ export async function applyFulfilmentEvent(input: Readonly<{
   status: FulfilmentAdvanceStatus;
   store: AgenticStore;
 }>): Promise<OrderRecord | null> {
-  const order = await input.store.getOrder(input.orderId);
+  const result = await input.store.transaction(store => applyFulfilmentInTransaction({...input, store}));
+  if (result && result.fulfilmentStatus === input.status) {
+    if (input.status === "shipped") {
+      await commitFunnelEvent({
+        attribution: "agent_connector",
+        correlationId: result.planId,
+        createdAt: input.now,
+        eventId: `ship:${result.id}`,
+        eventType: "fulfilment_dispatched",
+        payload: { locale: "en" }
+      });
+    }
+    if (input.status === "delivered") {
+      await commitFunnelEvent({
+        attribution: "agent_connector",
+        correlationId: result.planId,
+        createdAt: input.now,
+        eventId: `dlv:${result.id}`,
+        eventType: "order_delivered",
+        payload: { locale: "en" }
+      });
+    }
+  }
+  return result;
+}
+
+async function applyFulfilmentInTransaction(input: Readonly<{
+  now: string;
+  orderId: string;
+  reasonCode?: string;
+  status: FulfilmentAdvanceStatus;
+  store: AgenticStore;
+}>): Promise<OrderRecord | null> {
+  const order = await input.store.getOrderForUpdate(input.orderId);
 
   if (!order) {
     return null;
@@ -144,26 +167,6 @@ export async function applyFulfilmentEvent(input: Readonly<{
     status: input.status
   });
 
-  if (nextStatus === "shipped") {
-    await commitFunnelEvent({
-      attribution: "agent_connector",
-      correlationId: order.planId,
-      createdAt: input.now,
-      eventId: `ship:${order.id}`,
-      eventType: "fulfilment_dispatched",
-      payload: { locale: "en" }
-    });
-  }
-  if (nextStatus === "delivered") {
-    await commitFunnelEvent({
-      attribution: "agent_connector",
-      correlationId: order.planId,
-      createdAt: input.now,
-      eventId: `dlv:${order.id}`,
-      eventType: "order_delivered",
-      payload: { locale: "en" }
-    });
-  }
 
   return input.store.getOrder(input.orderId);
 }

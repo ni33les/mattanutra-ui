@@ -214,6 +214,7 @@ export type AgenticStore = {
     key: string
   ): Promise<IdempotencyRecord | null>;
   getOrder(id: string): Promise<OrderRecord | null>;
+  getOrderForUpdate(id: string): Promise<OrderRecord | null>;
   getOrderByProviderSessionId(id: string): Promise<OrderRecord | null>;
   getOpenOrderForPlanRevision(
     planId: string,
@@ -226,6 +227,7 @@ export type AgenticStore = {
   getExecuteResponseForOrder(orderId: string): Promise<unknown | null>;
   getOrderItems(orderId: string): Promise<readonly OrderItemRecord[]>;
   getOutboxPending(): Promise<readonly OutboxEventRecord[]>;
+  claimOutboxBatch(limit: number): Promise<readonly OutboxEventRecord[]>;
   getPlan(id: string): Promise<PlanRecord | null>;
   getPlanForUpdate(id: string): Promise<PlanRecord | null>;
   getPlanRevision(

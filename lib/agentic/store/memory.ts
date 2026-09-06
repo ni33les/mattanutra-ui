@@ -171,6 +171,10 @@ export function createMemoryStore(): AgenticStore {
     async getOrder(id) {
       return orders.get(id) ? clone(orders.get(id)!) : null;
     },
+    async getOrderForUpdate(id) {
+      if (!transactions.getStore()) throw new Error("Order locks require a transaction");
+      return store.getOrder(id);
+    },
     async getOrderByProviderSessionId(id) {
       for (const record of orders.values()) {
         if (record.providerSessionId === id) {
@@ -237,6 +241,13 @@ export function createMemoryStore(): AgenticStore {
         .filter((item) => !item.processedAt)
         .map((item) => clone(item));
     },
+    async claimOutboxBatch(limit) {
+      if (!transactions.getStore()) throw new Error("Outbox claims require a transaction");
+      return (await store.getOutboxPending())
+        .filter(item => item.type === "OMS_SUBMIT")
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+        .slice(0, Math.max(1, Math.min(50, limit)));
+    },
     async getPlanForUpdate(id) {
       if (!transactions.getStore()) throw new Error("Plan locks require a transaction");
       return store.getPlan(id);
@@ -280,7 +291,7 @@ export function createMemoryStore(): AgenticStore {
       feedback.set(record.id, clone(record));
     },
     async insertFulfilmentEvent(record) {
-      const list = fulfilment.get(record.orderId) ?? [];
+      const list = [...(fulfilment.get(record.orderId) ?? [])];
       list.push(clone(record));
       fulfilment.set(record.orderId, list);
     },
@@ -315,12 +326,12 @@ export function createMemoryStore(): AgenticStore {
       outbox.set(record.id, clone(record));
     },
     async insertPaymentAttempt(record) {
-      const list = paymentAttempts.get(record.orderId) ?? [];
+      const list = [...(paymentAttempts.get(record.orderId) ?? [])];
       list.push(clone(record));
       paymentAttempts.set(record.orderId, list);
     },
     async insertPaymentAudit(record) {
-      const list = paymentAudits.get(record.orderId) ?? [];
+      const list = [...(paymentAudits.get(record.orderId) ?? [])];
       list.push(clone(record));
       paymentAudits.set(record.orderId, list);
     },
@@ -346,7 +357,7 @@ export function createMemoryStore(): AgenticStore {
       supportCases.set(record.id, clone(record));
     },
     async insertSupportMessage(record) {
-      const list = supportMessages.get(record.caseId) ?? [];
+      const list = [...(supportMessages.get(record.caseId) ?? [])];
       list.push(clone(record));
       supportMessages.set(record.caseId, list);
     },

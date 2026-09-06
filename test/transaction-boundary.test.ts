@@ -219,7 +219,10 @@ describe("database transaction boundaries", () => {
         "lib/agentic/store/postgres.ts",
         [
           "getActiveOrderForPlanRevision",
-          "getOpenOrderForPlanRevision"
+          "getOpenOrderForPlanRevision",
+          "getPlanForUpdate",
+          "getOrderForUpdate",
+          "claimOutboxBatch"
         ]
       ]
     ]);

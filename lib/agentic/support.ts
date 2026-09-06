@@ -8,7 +8,7 @@ import {
   resolveCapability,
   type CapabilityScope
 } from "@/lib/agentic/capabilities";
-import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
+import { beginIdempotency, commitIdempotency, isIdempotencyRace } from "@/lib/agentic/idempotency";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { commerceTimelineStatus, publicFulfilmentStatus } from "@/lib/agentic/commerce/timeline";
 
@@ -88,6 +88,36 @@ export async function supportTool(input: Readonly<{
   store: AgenticStore;
   supportHandle?: string;
 }>): Promise<SupportSuccess | AgenticErrorResult> {
+  const capability = await resolveCapability({action: "support.create", config: input.config, handle: input.orderHandle, now: input.now, resourceType: "order", scope: input.scope, store: input.store});
+  if (!capability) return businessError({message: agenticMessage(negotiateLocale(input.locale), "mcp.errors.not_found"), reasonCode: "not_found"});
+  const { getRetailOrderByAgenticOrderId } = await import("@/lib/retail-product-checkout");
+  const retail = await getRetailOrderByAgenticOrderId(capability.resourceId);
+  try {
+    return await input.store.transaction(async store => {
+      // The order exists before its case, so this also serializes case creation.
+      const order = await store.getOrderForUpdate(capability.resourceId);
+      if (!order) return businessError({message: agenticMessage(negotiateLocale(input.locale), "mcp.errors.not_found"), reasonCode: "not_found"});
+      return supportInTransaction({...input, store}, retail);
+    });
+  } catch (error) {
+    if (!isIdempotencyRace(error)) throw error;
+    const replay = await beginIdempotency<SupportSuccess>({
+      key: input.idempotencyKey, now: input.now,
+      operation: input.supportHandle ? "support.reply" : "support.create",
+      ownerScope: `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`,
+      payload: {message: input.message, orderHandle: input.orderHandle, supportHandle: input.supportHandle ?? null},
+      store: input.store
+    });
+    if (replay.kind === "replay") return replay.response;
+    if (replay.kind === "conflict") return replay.error;
+    throw error;
+  }
+}
+
+async function supportInTransaction(
+  input: Parameters<typeof supportTool>[0],
+  retail: Awaited<ReturnType<typeof import("@/lib/retail-product-checkout").getRetailOrderByAgenticOrderId>>
+): Promise<SupportSuccess | AgenticErrorResult> {
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const operation = input.supportHandle ? "support.reply" : "support.create";
   const payload = {
@@ -201,14 +231,16 @@ export async function supportTool(input: Readonly<{
     (item) => publicAuthor(item.author) === "support" && item.body === ackBody
   );
 
-  let messageId = supportMessageId(caseId, prior.length + 1);
-  await input.store.transaction(async (store) => {
+  const nextSequence = 1 + Math.max(0, ...prior.map(message => message.sequence));
+  let messageId = supportMessageId(caseId, nextSequence);
+  const store = input.store;
+  {
     if (canned) {
       const existing = prior.find(
         (item) => publicAuthor(item.author) === "support" && item.body === input.message.trim()
       );
       if (!existing) {
-        const sequence = prior.length + 1;
+        const sequence = nextSequence;
         messageId = supportMessageId(caseId, sequence);
         await store.insertSupportMessage({
           author: "support",
@@ -222,7 +254,7 @@ export async function supportTool(input: Readonly<{
         messageId = existing.id;
       }
     } else {
-      const sequence = prior.length + 1;
+      const sequence = nextSequence;
       messageId = supportMessageId(caseId, sequence);
       await store.insertSupportMessage({
         author: "client",
@@ -243,13 +275,9 @@ export async function supportTool(input: Readonly<{
         });
       }
     }
-  });
+  }
 
   const supportCase = await input.store.getSupportCase(caseId);
-  const { getRetailOrderByAgenticOrderId } = await import(
-    "@/lib/retail-product-checkout"
-  );
-  const retail = await getRetailOrderByAgenticOrderId(orderCapability.resourceId);
   const order = await input.store.getOrder(orderCapability.resourceId);
   const messages = [...(await input.store.getSupportMessages(caseId))].sort((left, right) => {
     if (left.sequence !== right.sequence) {
