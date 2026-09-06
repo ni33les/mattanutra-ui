@@ -199,6 +199,8 @@ export type FeedbackRecord = Readonly<{
 }>;
 
 export type AgenticStore = {
+  getCatalogueSnapshot(id: string): Promise<import("@/lib/agentic/catalogue/types").CatalogueSnapshot | null>;
+  insertCatalogueSnapshot(id: string, snapshot: import("@/lib/agentic/catalogue/types").CatalogueSnapshot): Promise<void>;
   deleteAll(): Promise<void>;
   deletePrincipalScope(principalScope: string): Promise<void>;
   listPlanIdsByPrincipal(principalScope: string): Promise<readonly string[]>;

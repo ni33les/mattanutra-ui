@@ -20,8 +20,9 @@ import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
-  getPinnedCatalogueSnapshot,
+  persistCataloguePin,
   pinCatalogueSnapshot,
+  restoreCataloguePin,
   pinnedSnapshotIdFromResult
 } from "@/lib/agentic/catalogue/pin";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
@@ -263,18 +264,6 @@ function hasFullRequest(payload: PlanToolInput) {
   return Array.isArray(nested?.targets) && nested.targets.length > 0;
 }
 
-function snapshotForPin(previous: PlanResult): CatalogueSnapshot | null {
-  const pinned = getPinnedCatalogueSnapshot(pinnedSnapshotIdFromResult(previous));
-  return pinned?.snapshot ?? null;
-}
-
-function rememberSnapshot(snapshot: CatalogueSnapshot): CatalogueSnapshot {
-  if (snapshot.products.length > 0 || snapshot.supplements.length > 0) {
-    return pinCatalogueSnapshot(snapshot, GUIDANCE_RULES_VERSION).snapshot;
-  }
-  return snapshot;
-}
-
 function composeResult(input: Readonly<{
   ackMs?: number;
   alternatives: readonly StackOption[];
@@ -381,7 +370,7 @@ function composeResult(input: Readonly<{
     }
   }
 
-  rememberSnapshot(input.snapshot);
+  pinCatalogueSnapshot(input.snapshot, GUIDANCE_RULES_VERSION);
   return {
     alternatives: [...input.alternatives],
     appliedRequirements: Object.entries(pinnedState.requirements)
@@ -1482,7 +1471,9 @@ async function completePreparedPlan(
       supplements: []
     };
   } else if (prepared.previous && !loadLiveCatalogue) {
-    const pinned = snapshotForPin(prepared.previous);
+    const pinned = await restoreCataloguePin(
+      pinnedSnapshotIdFromResult(prepared.previous), GUIDANCE_RULES_VERSION, input.store
+    );
     if (!pinned) {
       return businessError({
         fieldPath: "planHandle",
@@ -1495,8 +1486,9 @@ async function completePreparedPlan(
     const permitId = `plan:${prepared.planId}:${prepared.revision}`;
     acquirePermit(permitId, "database");
     try {
-      snapshot = rememberSnapshot(
-        await ensureCatalogueSnapshot(input.config.environment, country)
+      snapshot = await persistCataloguePin(
+        await ensureCatalogueSnapshot(input.config.environment, country),
+        GUIDANCE_RULES_VERSION, input.store
       );
     } finally {
       releasePermit(permitId, "database");

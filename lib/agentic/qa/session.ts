@@ -10,7 +10,7 @@ import { AGENTIC_SCHEMA_CHECKSUM } from "@/lib/agentic/info";
 import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import {
-  ensureCatalogueSnapshot,
+  ensureQaCatalogueSnapshot,
   publishQaCatalogue,
   runWithCatalogueSnapshot
 } from "@/lib/agentic/catalogue/snapshot";
@@ -326,7 +326,7 @@ export async function beginQaRun(
   const nonce = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const namespace = `${QA_NAMESPACE_PREFIX}${runId}:${nonce}`;
   setQueryNamespace(namespace);
-  const live = await ensureCatalogueSnapshot(environment, "TH");
+  const live = await ensureQaCatalogueSnapshot(environment);
   const frozenSnapshot = freezeCatalogueSnapshot(live);
   publishQaCatalogue(frozenSnapshot);
   const session: QaSession = {

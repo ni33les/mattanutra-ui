@@ -23,6 +23,7 @@ function clone<T>(value: T): T {
 }
 
 export function createMemoryStore(): AgenticStore {
+  const catalogues = new Map<string, import("@/lib/agentic/catalogue/types").CatalogueSnapshot>();
   const capabilities = new Map<string, CapabilityRecord>();
   const checkouts = new Map<string, CheckoutSessionRecord>();
   const feedback = new Map<string, FeedbackRecord>();
@@ -49,6 +50,8 @@ export function createMemoryStore(): AgenticStore {
   }
 
   const store: AgenticStore = {
+    async getCatalogueSnapshot(id) { return catalogues.get(id) ?? null; },
+    async insertCatalogueSnapshot(id, snapshot) { catalogues.set(id, clone(snapshot)); },
     async deletePrincipalScope(principalScope) {
       const planIds = [...plans.values()]
         .filter((record) => record.principalScope === principalScope)

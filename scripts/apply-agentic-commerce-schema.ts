@@ -1,6 +1,12 @@
 import postgres from "postgres";
 
 const schemaSql = `
+create table if not exists public.agentic_catalogue_snapshots (
+  snapshot_id text primary key,
+  snapshot_json jsonb not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.agentic_plans (
   id uuid primary key,
   environment text not null,

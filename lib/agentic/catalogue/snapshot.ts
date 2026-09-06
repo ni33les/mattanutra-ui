@@ -7,7 +7,6 @@ import {
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
-import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { resetMatchPlanCache } from "@/lib/agentic/plan/matching";
 import { countQuery } from "@/lib/agentic/plan/query-budget";
 import {
@@ -125,15 +124,10 @@ export function getCatalogueSnapshot(countryCode?: string): CatalogueSnapshot {
     return scoped;
   }
 
-  const published = publishedSnapshot ?? loadPublishedCatalogueSync();
-  if (published) {
-    return published;
-  }
-
   if (countryCode) {
     const code = countryKey(countryCode);
     return snapshotOrEmpty(
-      cachedByCountry.get(code) ?? lastSnapshot ?? undefined,
+      cachedByCountry.get(code),
       code
     );
   }
@@ -181,42 +175,15 @@ async function loadCatalogueSnapshot(
     await catalogueInitGate;
   }
   countQuery(`catalogue.snapshot.${code}`);
-  if (publishedSnapshot) {
-    return publishedSnapshot;
-  }
 
-  const persisted = loadPublishedCatalogueSync() ?? (await loadPublishedCatalogue());
-  if (persisted) {
-    publishedSnapshot = freezeCatalogueSnapshot(persisted);
-    cachedByCountry.set(countryFromSnapshot(publishedSnapshot), publishedSnapshot);
-    lastSnapshot = publishedSnapshot;
-    return publishedSnapshot;
-  }
-
-  if (allowInstalledSnapshot(environment) && installedSnapshot) {
-    const installed = snapshotOrEmpty(
-      cachedByCountry.get(code) ?? installedSnapshot,
-      code
-    );
-    const frozen = freezeCatalogueSnapshot(installed);
-    const snapshotId = catalogueSnapshotId(frozen);
-    publishedSnapshot =
-      (await persistPublishedCatalogue(snapshotId, frozen, "first-writer")) ??
-      firstWriterPublish(snapshotId, frozen);
-    return publishedSnapshot;
+  if (
+    allowInstalledSnapshot(environment) && installedSnapshot &&
+    countryFromSnapshot(installedSnapshot) === code
+  ) {
+    return freezeCatalogueSnapshot(snapshotOrEmpty(installedSnapshot, code));
   }
 
   if (usesLiveCatalogue(environment)) {
-    const hit = cachedByCountry.get(code);
-
-    if (
-      hit &&
-      hit.catalogueVersion.startsWith(`retail-${code}-`) &&
-      !hit.catalogueVersion.endsWith("-loading")
-    ) {
-      return snapshotOrEmpty(hit, code);
-    }
-
     try {
       const live = await cachedLiveRetailSnapshot(code);
       const liveReady =
@@ -229,14 +196,8 @@ async function loadCatalogueSnapshot(
         cachedByCountry.set(code, live);
         lastSnapshot = live;
         const frozen = freezeCatalogueSnapshot(live);
-        const snapshotId = catalogueSnapshotId(frozen);
-        publishedSnapshot =
-          (await persistPublishedCatalogue(snapshotId, frozen, "first-writer")) ??
-          firstWriterPublish(snapshotId, frozen);
-        if (matcherSafetyCeilings().length < 1) {
-          await refreshAdminSafetyCeilings();
-        }
-        return publishedSnapshot;
+        await refreshAdminSafetyCeilings();
+        return frozen;
       }
     } catch (error) {
       console.warn("Unable to load live retail catalogue for MCP", {
@@ -249,6 +210,20 @@ async function loadCatalogueSnapshot(
   }
 
   return snapshotOrEmpty(cachedByCountry.get(code), code);
+}
+
+/** QA runs deliberately share a frozen manifest; live customer requests do not. */
+export async function ensureQaCatalogueSnapshot(environment?: AgenticEnvironment) {
+  const published = publishedSnapshot ?? loadPublishedCatalogueSync() ?? await loadPublishedCatalogue();
+  if (published) {
+    publishedSnapshot = freezeCatalogueSnapshot(published);
+    return publishedSnapshot;
+  }
+  const snapshot = freezeCatalogueSnapshot(await ensureCatalogueSnapshot(environment, "TH"));
+  const id = catalogueSnapshotId(snapshot);
+  publishedSnapshot = await persistPublishedCatalogue(id, snapshot, "first-writer") ??
+    firstWriterPublish(id, snapshot);
+  return publishedSnapshot;
 }
 
 export async function warmCatalogueSnapshot(

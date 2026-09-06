@@ -421,7 +421,10 @@ export function planRematchFingerprint(state: CanonicalPlanState) {
     omega3SourcePreference: state.requirements.omega3SourcePreference ?? null,
     optimization: state.optimization,
     sex: state.profile.sex,
-    targets: state.targets
+    targets: state.targets,
+    retainProductIds: state.requirements.retainProductIds ?? [],
+    retainSupplementIds: state.requirements.retainSupplementIds ?? [],
+    baseline: state.baseline ?? null
   });
 }
 

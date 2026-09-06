@@ -16,6 +16,21 @@ function asJson(value: unknown) {
 export function createPostgresStore(inputSql: Sql): AgenticStore {
   const sql = inputSql as unknown as AnySql;
   const store = {
+    async getCatalogueSnapshot(id) {
+      const [row] = await sql`
+        select snapshot_json from public.agentic_catalogue_snapshots where snapshot_id = ${id}
+        union all
+        select snapshot_json from public.agentic_qa_catalogues where snapshot_id = ${id}
+        limit 1
+      `;
+      return row?.snapshot_json ?? null;
+    },
+    async insertCatalogueSnapshot(id, snapshot) {
+      await sql`
+        insert into public.agentic_catalogue_snapshots (snapshot_id, snapshot_json)
+        values (${id}, ${asJson(snapshot)}) on conflict (snapshot_id) do nothing
+      `;
+    },
     async listPlanIdsByPrincipal(principalScope) {
       const rows = await sql`
         select id from public.agentic_plans where principal_scope = ${principalScope}
