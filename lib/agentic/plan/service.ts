@@ -45,6 +45,7 @@ import {
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
+import { matchPlanInWorker, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
 import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
@@ -481,7 +482,7 @@ function targetNameGroups(
   return { groups, unsupported };
 }
 
-function buildResult(input: Readonly<{
+async function buildResult(input: Readonly<{
   catalogueMs?: number;
   locale: Locale;
   matchPort?: PlanMatchPort;
@@ -490,7 +491,7 @@ function buildResult(input: Readonly<{
   shownRevision: number;
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
-}>): PlanResult {
+}>): Promise<PlanResult> {
   const searchStartedAt = Date.now();
   const portMatch = input.matchPort?.match(input.state);
   const matched = portMatch
@@ -506,7 +507,9 @@ function buildResult(input: Readonly<{
           state: input.state
         })
       }
-    : matchPlan({ snapshot: input.snapshot, state: input.state });
+    : process.env.NODE_TEST_CONTEXT
+      ? matchPlan({ snapshot: input.snapshot, state: input.state })
+      : await matchPlanInWorker({ snapshot: input.snapshot, state: input.state });
   const searchMs = Math.max(0, Date.now() - searchStartedAt);
   const matchMs =
     input.matchStartedAt != null ? Math.max(0, Date.now() - input.matchStartedAt) : searchMs;
@@ -1709,7 +1712,9 @@ async function completePreparedPlan(
         : previous.alternatives.find((item) => item.optionId === state.pinnedOptionId) ??
           previous.selected
       : null;
-  const result =
+  let result: PlanResult;
+  try {
+    result =
     pinPrevious && previous && pinnedOption
       ? buildPinnedResult({
           locale,
@@ -1719,7 +1724,7 @@ async function completePreparedPlan(
           snapshot,
           state
         })
-      : buildResult({
+      : await buildResult({
           catalogueMs,
           locale,
           matchPort: input.matchPort,
@@ -1729,6 +1734,15 @@ async function completePreparedPlan(
           snapshot,
           state
         });
+  } catch (error) {
+    if (error instanceof MatcherUnavailableError) {
+      return businessError({
+        message: "Matching is temporarily busy. Retry with the same idempotency key.",
+        reasonCode: "temporarily_unavailable", retryable: true
+      });
+    }
+    throw error;
+  }
 
   return persistTerminalPlan({
     input,

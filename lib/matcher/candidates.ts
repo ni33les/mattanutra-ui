@@ -627,36 +627,24 @@ function labelledForRequest(
   );
 }
 
-const compiledGroupMemo = new WeakMap<
-  MatcherProduct,
-  { group: ProductGroup | null; token: string }
->();
-
-function compileSessionToken(request: CanonicalRequest) {
-  return [
-    request.optimization,
-    request.profile.lifeStage,
-    request.maxDailyPills ?? "",
-    request.maxProductCount,
-    request.dietaryPreference,
-    request.omega3SourcePreference,
-    request.targets.map((target) => target.subjectId).join(",")
-  ].join("|");
-}
+// Reuse compilation only inside the same immutable request. A partial token
+// previously reused eligibility and dose variants across different forms,
+// doses, demographics, destinations and safety ceilings.
+const compiledGroupMemo = new WeakMap<CanonicalRequest, WeakMap<MatcherProduct, ProductGroup | null>>();
 
 function compileProductGroup(
   product: MatcherProduct,
   request: CanonicalRequest
 ): ProductGroup | null {
-  const token = compileSessionToken(request);
-  const hit = compiledGroupMemo.get(product);
-
-  if (hit && hit.token === token) {
-    return hit.group;
+  let session = compiledGroupMemo.get(request);
+  if (!session) {
+    session = new WeakMap();
+    compiledGroupMemo.set(request, session);
   }
+  if (session.has(product)) return session.get(product)!;
 
   const group = compileProductGroupFresh(product, request);
-  compiledGroupMemo.set(product, { group, token });
+  session.set(product, group);
   return group;
 }
 

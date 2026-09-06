@@ -39,7 +39,7 @@ function deferred() {
 let rpcId = 0;
 async function call(runtime: AgenticRuntime, args: Record<string, unknown>) {
   const response = await handleJsonRpc(runtime, { id: ++rpcId, method: "tools/call", params: { name: "plan", arguments: args } });
-  return response!.result!.structuredContent as Record<string, any>;
+  return response!.result!.structuredContent as Record<string, unknown> & { error: { reasonCode: string } };
 }
 
 describe("MCP reliability: catalogue persistence and cache isolation", () => {

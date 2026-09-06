@@ -111,7 +111,9 @@ describe("matcher search oracle", () => {
       products: [
         sku({ id: "A", name: "Vitamin D3", subjectId: "sup_d3", amount: 2000, unit: "IU", price: 39000 }),
         sku({ id: "B", name: "Omega-3", subjectId: "sup_omega", amount: 1000, unit: "mg", price: 89000 }),
-        sku({ id: "C", name: "Magnesium", subjectId: "sup_mag", amount: 300, unit: "mg", price: 49000 }),
+        // Keep doses within the target band so this fixture tests dominance;
+        // overshooting 200 mg by 50% is deliberately rejected by current rules.
+        sku({ id: "C", name: "Magnesium", subjectId: "sup_mag", amount: 200, unit: "mg", price: 49000 }),
         {
           ...sku({
             id: "D",
@@ -123,7 +125,7 @@ describe("matcher search oracle", () => {
           }),
           labelledContributions: [
             { amount: 2000, name: "Vitamin D3", subjectId: "sup_d3", unit: "IU" },
-            { amount: 300, name: "Magnesium", subjectId: "sup_mag", unit: "mg" }
+            { amount: 200, name: "Magnesium", subjectId: "sup_mag", unit: "mg" }
           ],
           contributionSubjectIds: ["sup_d3", "sup_mag"]
         },

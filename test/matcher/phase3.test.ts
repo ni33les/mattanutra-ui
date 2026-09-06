@@ -7,7 +7,7 @@ import {
   summarizeRejections
 } from "../../lib/matcher/explainer.ts";
 import { productRejectionReason } from "../../lib/matcher/eligibility.ts";
-import { publicPlanFields } from "../../lib/agentic/public-mapper.ts";
+import { publicPlanFields, publicMatcherTelemetry } from "../../lib/agentic/public-mapper.ts";
 import { qaCatalogSafetyCeilings } from "../../lib/matcher/qa/safety-ceilings.ts";
 import type {
   CanonicalRequest,
@@ -315,7 +315,7 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
     assert.equal(summary.sample.length <= PUBLIC_REJECTED_SAMPLE_LIMIT, true);
     assert.equal(summary.counts.oos, 20);
 
-    const plan = publicPlanFields({
+    const internalPlan = {
       alternatives: [],
       basket: [],
       changeSummary: [],
@@ -340,12 +340,12 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
       status: "needs_input",
       summary: "test",
       unmetRequirements: []
-    });
+    };
+    const plan = publicPlanFields(internalPlan);
     const encoded = JSON.stringify(plan);
     assert.equal(encoded.includes("rejectedAll"), false);
-    const telemetry = (
-      plan as { matcherTelemetry?: { rejected?: { sample: unknown[]; total: number } } }
-    ).matcherTelemetry;
+    assert.equal(encoded.includes("matcherTelemetry"), false);
+    const telemetry = publicMatcherTelemetry(internalPlan.matcherTelemetry).matcherTelemetry;
     assert.ok(telemetry?.rejected);
     assert.equal(telemetry.rejected.total, summary.total);
     assert.equal(telemetry.rejected.sample.length <= PUBLIC_REJECTED_SAMPLE_LIMIT, true);
