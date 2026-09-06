@@ -8,12 +8,29 @@ import {
   WORK_TASK_REGISTRY
 } from "../lib/system-agents.ts";
 import { hasRequiredCapabilities } from "../lib/task-service-utils.ts";
+import { buildTaskWorkItem } from "../lib/task-work-items.ts";
+import type { TaskRecord } from "../lib/task-service.ts";
 import {
   RUNTIME_WORKER_CREDENTIAL_PROFILES,
   RUNTIME_WORKER_PROFILES
 } from "../lib/worker-agent-credentials.ts";
 
 describe("system agents", () => {
+  for (const [taskType, field] of [
+    ["send_healthscore_email", "deliveryRequestId"],
+    ["fulfill_web_payment", "paymentId"]
+  ] as const) {
+    it(`builds ${taskType} through the registry without changing payload semantics`, async () => {
+      for (const payload of [{ [field]: "resource-id" }, { [field]: 42 }, {}, null]) {
+        const task = { id: "task-id", taskType, payload, planId: null } as TaskRecord;
+        assert.deepEqual(await buildTaskWorkItem(task), {
+          taskId: "task-id", taskType,
+          [field]: payload && typeof payload[field] === "string" ? payload[field] : ""
+        });
+      }
+    });
+  }
+
   it("defines a unique operational roster without OpenClaw", () => {
     const names = SYSTEM_AGENT_LIST.map((agent) => agent.name);
 

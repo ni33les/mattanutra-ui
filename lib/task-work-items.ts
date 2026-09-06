@@ -2290,6 +2290,22 @@ function buildDigitalOceanBillingSyncWorkItem(task: TaskRecord) {
 
 type TaskWorkItemBuilder = (task: TaskRecord) => Promise<TaskWorkItem> | TaskWorkItem;
 
+function buildHealthScoreEmailWorkItem(task: TaskRecord) {
+  return {
+    taskId: task.id,
+    taskType: "send_healthscore_email",
+    deliveryRequestId: payloadText(task.payload, "deliveryRequestId")
+  } satisfies TaskWorkItem;
+}
+
+function buildWebPaymentFulfillmentWorkItem(task: TaskRecord) {
+  return {
+    taskId: task.id,
+    taskType: "fulfill_web_payment",
+    paymentId: payloadText(task.payload, "paymentId")
+  } satisfies TaskWorkItem;
+}
+
 const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
   [ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE]: buildAdminCatalogueOptimizationWorkItem,
   analyze_healthscore: buildHealthScoreWorkItem,
@@ -2303,6 +2319,7 @@ const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
   customer_chat_reply: buildCustomerChatReplyWorkItem,
   dispatch_chat_communication_message: buildCommunicationDispatchWorkItem,
   dispatch_email_communication_message: buildCommunicationDispatchWorkItem,
+  fulfill_web_payment: buildWebPaymentFulfillmentWorkItem,
   generate_example_supplement_guidance: buildFormulationWorkItem,
   generate_food_gap_guidance: buildFoodGapSupportWorkItem,
   generate_food_guidance: buildFoodGuidanceWorkItem,
@@ -2316,6 +2333,7 @@ const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
   retail_stock_forecast_refresh: buildRetailStockForecastWorkItem,
   route_admin_communication: buildAdminCommunicationRouteWorkItem,
   send_example_email: buildExampleEmailWorkItem,
+  send_healthscore_email: buildHealthScoreEmailWorkItem,
   send_reassessment_email: buildReassessmentEmailWorkItem,
   send_retail_order_workflow_email: buildRetailOrderWorkflowEmailWorkItem,
   source_product_fda_approvals: buildProductFdaApprovalSourcingWorkItem,
@@ -2324,8 +2342,6 @@ const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
 };
 
 export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem> {
-  if (task.taskType === "send_healthscore_email") return { taskId: task.id, taskType: "send_healthscore_email", deliveryRequestId: payloadText(task.payload, "deliveryRequestId") };
-  if (task.taskType === "fulfill_web_payment") return { taskId: task.id, taskType: "fulfill_web_payment", paymentId: payloadText(task.payload, "paymentId") };
   const generation = generationInput(task.payload);
   if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {
     const sql = getSql();
