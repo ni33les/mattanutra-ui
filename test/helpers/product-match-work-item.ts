@@ -108,6 +108,6 @@ export function productMatchWorkItem() {
 const names=["Vitamin C","Magnesium","Zinc","Calcium","Vitamin B12","Vitamin B6","Vitamin D3","Iron"];
 const needs=names.map((name,i)=>dosedNeed({amount:i===6?25:100,displayName:name,id:name,normalizedName:name.toLowerCase().replaceAll(" ","_"),unit:i===6?"mcg":"mg"}));
 const candidates=Array.from({length:240},(_,i)=>candidate({id:"cpu-"+i,title:"Supplement "+i,facts:[i%8,(i+3)%8].map(n=>({amount:n===6?25:100,name:names[n],normalizedName:needs[n].normalizedName,unit:n===6?"mcg":"mg"}))}));
-const item: ProductMatchWorkItem={taskType:"generate_product_recommendations",taskId:"cpu-probe",planId:"cpu-probe",needs,clientSex:"male",countryCode:"TH",stackPreference:"balanced",retailerCandidateSets:[{candidates,organisationId:"delight",organisationName:"Delight",currency:"THB",dispatchCity:"Bangkok"}]};
+const item: ProductMatchWorkItem={taskType:"generate_product_recommendations",taskId:"cpu-probe",planId:"cpu-probe",needs,clientContext:{ageYears:38,lifestage:"adult"},clientSex:"male",countryCode:"TH",stackPreference:"balanced",retailerCandidateSets:[{candidates,organisationId:"delight",organisationName:"Delight",currency:"THB",dispatchCity:"Bangkok",etaDate:null,productCount:candidates.length,subtotalAmount:0}]};
 return item;
 }

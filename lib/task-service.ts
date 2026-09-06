@@ -2225,6 +2225,7 @@ async function claimTaskCompletionApplication(
       union all
       select null::text, null::text, null::text, null::text
       where ${!requiresReservation}
+        and not exists (select 1 from active_reservation)
     ),
     updated_task as (
       update public.tasks set
@@ -2349,6 +2350,7 @@ async function finalizeTaskCompletion(
       union all
       select null::text, null::text, null::text, null::text
       where ${!requiresReservation}
+        and not exists (select 1 from active_reservation)
     ),
     updated_task as (
       update public.tasks set
@@ -2707,6 +2709,7 @@ async function claimTaskFailureApplication(
       union all
       select null::text, null::text, null::text, null::text
       where ${!requiresReservation}
+        and not exists (select 1 from active_reservation)
     ),
     updated_task as (
       update public.tasks set
@@ -2831,6 +2834,7 @@ async function finalizeTaskFailure(
       union all
       select null::text, null::text, null::text, null::text
       where ${!requiresReservation}
+        and not exists (select 1 from active_reservation)
     ),
     updated_task as (
       update public.tasks set

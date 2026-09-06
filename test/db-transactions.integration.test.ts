@@ -4,7 +4,7 @@ import postgres from "postgres";
 import { closeSqlPool, getSql, getWorkerSql, withDatabaseTransaction } from "../lib/db.ts";
 import { withRequestLifetime } from "../lib/request-lifetime.ts";
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
+const databaseUrl = process.env.TEST_DB_URL;
 
 describe("bounded database phases on PostgreSQL", {skip: !databaseUrl}, () => {
   before(async () => {
@@ -43,6 +43,18 @@ describe("bounded database phases on PostgreSQL", {skip: !databaseUrl}, () => {
     }), /injected_failure/);
     assert.deepEqual([...await sql`select * from public.lock_review_values order by id`], [{id: 1, value: 0}]);
     assert.equal(getSql(), sql);
+  });
+
+  it("keeps a usable phase deadline when the statement timeout is explicitly disabled", async () => {
+    const previous = process.env.DB_STATEMENT_TIMEOUT_MS;
+    process.env.DB_STATEMENT_TIMEOUT_MS = "0";
+    try {
+      const [row] = await getSql()!`select current_setting('statement_timeout') as statement, pg_sleep(0.02)`;
+      assert.equal(row.statement, "0");
+    } finally {
+      if (previous === undefined) delete process.env.DB_STATEMENT_TIMEOUT_MS;
+      else process.env.DB_STATEMENT_TIMEOUT_MS = previous;
+    }
   });
 
   it("cancels active SQL and leaves the pool usable", async () => {

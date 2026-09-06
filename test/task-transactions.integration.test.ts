@@ -5,7 +5,7 @@ import { closeSqlPool, getSql, getWorkerSql, withDatabaseTransaction } from "../
 import { completeTask, reserveNextTask, releaseExpiredReservations, renewTaskLease, failTask } from "../lib/task-service.ts";
 import type { TaskAgentAccessScope } from "../lib/task-service-types.ts";
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
+const databaseUrl = process.env.TEST_DB_URL;
 describe("task lifecycle transactions on PostgreSQL", {skip: !databaseUrl}, () => {
   const organisationId = randomUUID(), agentId = randomUUID(), membershipId = randomUUID(), sessionId = randomUUID();
   const scope: TaskAgentAccessScope = {organisationId, agentId, membershipId, agentName: "Lock review", capabilities: [], role: "platform_agent"};
@@ -140,6 +140,12 @@ describe("task lifecycle transactions on PostgreSQL", {skip: !databaseUrl}, () =
       const [row] = await getSql()!`select status from public.tasks where id = ${input.taskId}`;
       assert.ok(["reserved", "queued"].includes(row.status));
     }
+  });
+  it("administrative completion closes the current reservation", async () => {
+    const input = await reserved();
+    await completeTask({taskId: input.taskId});
+    const [row] = await getSql()!`select status from public.task_reservations where id = ${input.reservationId}`;
+    assert.equal(row.status, "completed");
   });
 
 });

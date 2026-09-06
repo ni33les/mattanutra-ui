@@ -112,7 +112,8 @@ describe("consistency r3 regression guards", () => {
       assert.match(source, /getWorkerSql\(\)\s*\?\?\s*getSql\(\)/);
     }
 
-    assert.match(service, /withSingleQueuedTaskClaim/);
+    assert.doesNotMatch(service, /withSingleQueuedTaskClaim|claimQueuedTaskTail/);
+    assert.match(service, /withDatabaseTransaction/);
 
     const taskWorker = await readFile("lib/task-worker.ts", "utf8");
     const sweepLoop = await readFile("lib/task-sweep-loop.ts", "utf8");

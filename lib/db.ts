@@ -48,7 +48,7 @@ export function deferUntilDatabaseCommit(effect: () => void) {
 export async function withDatabaseTransaction<T>(
   sql: postgres.Sql,
   work: (tx: postgres.Sql) => Promise<T>,
-  timeoutMs = dbStatementTimeoutMs()
+  timeoutMs = dbStatementTimeoutMs() || DEFAULT_DB_STATEMENT_TIMEOUT_MS
 ): Promise<T> {
   const existing = transactionScope.getStore();
   if (existing) return work(existing);

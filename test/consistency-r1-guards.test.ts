@@ -89,17 +89,17 @@ describe("consistency r1 regression guards", () => {
     assert.match(db, /DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS = 10_000/);
     assert.match(
       db,
-      /set_config\('statement_timeout', \$\{String\(statementTimeoutMs\)\}, false\)/
+      /set_config\('statement_timeout', \$\{String\(dbStatementTimeoutMs\(\)\)\}, true\)/
     );
     assert.match(
       db,
-      /set_config\('lock_timeout', \$\{String\(lockTimeoutMs\)\}, false\)/
+      /set_config\('lock_timeout', \$\{String\(dbLockTimeoutMs\(\)\)\}, true\)/
     );
     assert.match(
       db,
-      /set_config\('idle_in_transaction_session_timeout', \$\{String\(idleInTxnTimeoutMs\)\}, false\)/
+      /set_config\('idle_in_transaction_session_timeout', \$\{String\(dbIdleInTxnTimeoutMs\(\)\)\}, true\)/
     );
-    assert.match(db, /applyInteractiveTimeouts/);
+    assert.match(db, /withDatabaseTransaction/);
     assert.match(db, /pool_initialized/);
     assert.match(db, /INTERACTIVE_STATEMENT_TIMEOUT_MS/);
     assert.match(db, /\[db:slow\]/);
