@@ -9,9 +9,10 @@ import { fileURLToPath } from 'node:url';
 import { compileGroups } from '@/lib/matcher/candidates';
 import { candidateEvidenceIdentity, parseComparisonArguments, joinCandidatePool, oraclePool } from '@/lib/matcher/experiments/comparison';
 import { loadAnnaCases } from '@/lib/matcher/experiments/frozen-corpus';
+import { createPoolScorer } from '@/lib/matcher/experiments/pool-scoring';
 import { syntheticCorpus } from '@/lib/matcher/experiments/synthetic-corpus';
 import { listProfiles, profileDefinition, resolveProfile, withPreferenceWeight, type ScoringProfile } from '@/lib/matcher/experiments/profiles';
-import { canonicalJSON, fingerprint, rankCandidates, runExperimentSearch, scoreCandidate, type ExperimentCandidate, type ExperimentCandidateInput, type ExperimentSearchResult } from '@/lib/matcher/experiments/search';
+import { canonicalJSON, fingerprint, runExperimentSearch, scoreCandidate, type ExperimentCandidateInput, type ExperimentSearchResult } from '@/lib/matcher/experiments/search';
 import { candidateMetrics, compareMetrics, factualChanges, renderComparisonReport, scoreBreakdown, type CaseComparison, type ComparisonReport, type ProfileComparison } from '@/lib/matcher/experiments/report';
 import { subtract, serialize } from '@/lib/matcher/experiments/rational';
 import type { ExperimentCase } from '@/lib/matcher/experiments/corpus-types';
@@ -43,12 +44,6 @@ function additional(result: Pick<ExperimentSearchResult, 'purchaseFallback' | 'i
 }
 function compactRun(result: ExperimentSearchResult): ExperimentSearchResult {
   return { ...result, candidates: [], incompleteCandidates: [] };
-}
-function* crossScores(profile: ScoringProfile, candidates: readonly ExperimentCandidate[]) {
-  for (const candidate of candidates) yield { signature: candidate.signature, profileId: profile.id, profileHash: profile.hash,
-    total: candidate.score.total ? serialize(candidate.score.total) : null, nutrientTotal: serialize(candidate.score.nutrientTotal),
-    preferenceTotal: candidate.score.preferenceTotal ? serialize(candidate.score.preferenceTotal) : null,
-    complete: candidate.score.complete, nutrientEvidenceComplete: candidate.score.nutrientEvidenceComplete, missingComponents: candidate.score.missingComponents };
 }
 
 export async function compareCase(input: ExperimentCase, profiles: readonly ScoringProfile[], effort: 'standard' | 'expanded', output: string, executeSearch = runExperimentSearch) {
@@ -95,11 +90,17 @@ export async function compareCase(input: ExperimentCase, profiles: readonly Scor
   jsonLines(join(directory, 'pool.jsonl'), common.candidates.map(candidateEvidence));
   if (oracle) save(join(directory, 'oracle.json'), oracle.reference);
   const comparisons: ProfileComparison[] = [], attribution: Record<string, unknown>[] = [];
+  const poolScorer = createPoolScorer(input.request, common.candidates);
   const evaluatePool = (profile: ScoringProfile, suffix: string) => {
-    const ranked = rankCandidates(profile, input.request, common.candidates);
-    jsonLines(join(directory, `${suffix}-cross-scores.jsonl`), crossScores(profile, ranked.candidates));
-    return { selected: ranked.selected, metrics: candidateMetrics(ranked.selected, input.request),
-      score: ranked.selected ? scoreBreakdown(ranked.selected.score) : null, ...additional(ranked, input) };
+    const fd = openSync(join(directory, `${suffix}-cross-scores.jsonl`), 'wx', 0o600);
+    try {
+      const ranked = poolScorer.evaluate(profile, row => { writeSync(fd, canonicalJSON(row) + '\n'); });
+      return { selected: ranked.selected, metrics: candidateMetrics(ranked.selected, input.request),
+        score: ranked.selected ? scoreBreakdown(ranked.selected.score) : null,
+        purchaseFallback: candidateMetrics(ranked.purchaseFallback, input.request),
+        incompleteCandidates: { count: ranked.incompleteCandidates.count,
+          examples: ranked.incompleteCandidates.examples.map(row => candidateMetrics(row, input.request)!) } };
+    } finally { closeSync(fd); }
   };
   for (const profile of profiles) {
     const pooled = evaluatePool(profile, profile.id), run = runs.get(profile.id)!;

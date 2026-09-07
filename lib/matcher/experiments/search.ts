@@ -42,7 +42,7 @@ export const fingerprint = (value: unknown) => createHash('sha256').update(canon
 export function candidateSignature(sellerId: string, state: SearchState) {
   return state.count === 0 ? 'empty' : `${sellerId}|${[...state.selectedVariantIds].sort().join('|')}`;
 }
-function retained(request: CanonicalRequest, state: SearchState) {
+export function retainedCandidate(request: CanonicalRequest, state: SearchState) {
   return (request.productDoses ?? []).every(row => state.selectedProductIds?.includes(row.productId)) &&
     request.retainProductIds.every(id => state.selectedProductIds?.includes(id) || request.currentSupplements.some(row => row.productId === id)) &&
     request.retainSubjectIds.every(id => (state.exposure.get(id) ?? BigInt(0)) > BigInt(0));
@@ -67,7 +67,7 @@ function withProductEvidence(score: ExperimentalScore, state: SearchState, group
     perTarget: score.perTarget.map(row => subjects.has('*') || subjects.has(row.subjectId) ? { ...row, certainty: 'unknown' as const } : row),
     uncertaintyNotes: [...new Set([...score.uncertaintyNotes, ...[...subjects].map(id => `unknown_product_amount:${id}`)])].sort() };
 }
-function commercial(a: ExperimentCandidate, b: ExperimentCandidate, request: CanonicalRequest) {
+export function compareCommercialCandidates(a: ExperimentCandidateInput, b: ExperimentCandidateInput, request: CanonicalRequest) {
   const pills = Number(a.state.pillCountKnown === false) - Number(b.state.pillCountKnown === false) ||
     (a.state.pillCountKnown === false ? 0 : a.state.pills - b.state.pills);
   if (request.optimization === 'fewest_pills' && pills) return pills;
@@ -128,7 +128,7 @@ function hasActivePreference(profile: ScoringProfile, request: CanonicalRequest)
   ] as const).some(([metric, preferred]) => preferred != null && profile.preferenceWeights[metric].num > BigInt(0));
 }
 export function rankCandidates(profile: ScoringProfile, request: CanonicalRequest, pool: readonly ExperimentCandidateInput[]) {
-  const scored = pool.filter(row => retained(request, row.state)).map(row => scoreCandidate(profile, request, row));
+  const scored = pool.filter(row => retainedCandidate(request, row.state)).map(row => scoreCandidate(profile, request, row));
   const complete = scored.filter(row => row.score.complete);
   const incomplete = scored.filter(row => !row.score.complete).sort((a,b) => a.signature.localeCompare(b.signature));
   let eligible = complete;
@@ -136,12 +136,12 @@ export function rankCandidates(profile: ScoringProfile, request: CanonicalReques
     request.targets.some(row => row.importance === 'required' || row.importance === 'core')) {
     eligible = protectedFrontier(complete, request);
   }
-  const order = (a: ExperimentCandidate,b: ExperimentCandidate) => compareScores(a.score,b.score) || commercial(a,b,request);
+  const order = (a: ExperimentCandidate,b: ExperimentCandidate) => compareScores(a.score,b.score) || compareCommercialCandidates(a,b,request);
   eligible.sort(order); complete.sort(order);
   let purchaseFallback = complete.find(row => row.state.count > 0) ?? null;
   if (!purchaseFallback) for (const candidate of incomplete) {
     if (candidate.state.count > 0 && (!purchaseFallback ||
-      (compare(candidate.score.nutrientTotal, purchaseFallback.score.nutrientTotal) || commercial(candidate, purchaseFallback, request)) < 0)) purchaseFallback = candidate;
+      (compare(candidate.score.nutrientTotal, purchaseFallback.score.nutrientTotal) || compareCommercialCandidates(candidate, purchaseFallback, request)) < 0)) purchaseFallback = candidate;
   }
   // An unknown active preference makes the whole score incomparable. It does
   // not erase the purchasable basket or turn its conditional score into zero.
@@ -191,7 +191,7 @@ export function runExperimentSearch(input: Readonly<{
   let cache=new WeakMap<SearchState,ExperimentalScore>();
   const stateScore=(state:SearchState)=>{let result=cache.get(state);if(!result){result=scoreStateFor(state);cache.set(state,result);}return result;};
   const observe=(sellerId:string,state:SearchState,groups:readonly ProductGroup[])=>{
-    if(!retained(request,state)) return;
+    if(!retainedCandidate(request,state)) return;
     const signature=candidateSignature(sellerId,state);
     if(!pool.has(signature)) pool.set(signature,{signature,sellerId:state.count?sellerId:'',state,groups});
   };

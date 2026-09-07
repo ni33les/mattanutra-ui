@@ -28,6 +28,10 @@ export type ExperimentalPreference = Readonly<{
   denominator: Rational | null; overrun: Rational | null; deviation: Rational | null;
   weight: Rational; rawPenalty: Rational | null; penalty: Rational | null;
 }>;
+export type ExperimentalPreferenceScore = Readonly<{
+  preferences: readonly ExperimentalPreference[]; preferenceTotal: Rational | null;
+  missingComponents: readonly string[]; complete: boolean;
+}>;
 export type ExperimentalScore = Readonly<{
   profile: Readonly<{ id: string; version: string; hash: string }>;
   total: Rational | null; nutrientTotal: Rational; preferenceTotal: Rational | null;
@@ -99,14 +103,21 @@ function preferenceScores(profile: ScoringProfile, request: CanonicalRequest, ac
   });
 }
 
+/** Pure preference-only calculation for reusing a candidate's independently
+ * calculated nutrient loss across profiles and preference-weight comparisons. */
+export function scorePreferences(profileInput: ScoringProfile, request: CanonicalRequest, actual: ScoringActuals): ExperimentalPreferenceScore {
+  const preferences = preferenceScores(resolveProfile(profileInput), request, actual);
+  const missingComponents = preferences.filter(row => !row.complete).map(row => row.kind);
+  const preferenceTotal = missingComponents.length ? null : sum(preferences.map(row => row.penalty!));
+  return { preferences, preferenceTotal, missingComponents, complete: missingComponents.length === 0 };
+}
+
 /** Amount fields are exact canonical scaled units; normalized deviations and
  * losses are dimensionless. Unknown intake stays annotated, never a zero fact. */
 export function scoreExposure(profileInput: ScoringProfile, request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, actual: ScoringActuals): ExperimentalScore {
   const profile = resolveProfile(profileInput);
   for (const value of exposure.values()) if (typeof value !== "bigint" || value < BigInt(0)) throw new Error("Exposure must contain nonnegative canonical scaled integers");
-  const preferences = preferenceScores(profile, request, actual);
-  const missingComponents = preferences.filter(row => !row.complete).map(row => row.kind);
-  const preferenceTotal = missingComponents.length ? null : sum(preferences.map(row => row.penalty!));
+  const { preferences, missingComponents, preferenceTotal, complete } = scorePreferences(profile, request, actual);
   const perTarget: ExperimentalTarget[] = [],perContinuedDose: ExperimentalContinuedDose[] = [],perLimit: ExperimentalLimit[] = [];
   let targetUnder = ZERO,targetOver = ZERO,continued = ZERO,safety = ZERO;
   const uncertainty = new Set<string>();
@@ -156,7 +167,7 @@ export function scoreExposure(profileInput: ScoringProfile, request: CanonicalRe
   }
   const nutrientTotal = sum([targetUnder, targetOver, continued, safety]);
   return { profile: { id: profile.id,version: profile.version,hash: profile.hash }, total: preferenceTotal === null ? null : add(nutrientTotal, preferenceTotal),nutrientTotal,preferenceTotal,
-    complete: missingComponents.length === 0,missingComponents,nutrientEvidenceComplete: ![...uncertainty].some(note => note.startsWith("unknown_")),uncertaintyNotes: [...uncertainty].sort(),
+    complete,missingComponents,nutrientEvidenceComplete: ![...uncertainty].some(note => note.startsWith("unknown_")),uncertaintyNotes: [...uncertainty].sort(),
     components: { targetUnder,targetOver,continued,safety },perTarget,perContinuedDose,perLimit,preferences };
 }
 

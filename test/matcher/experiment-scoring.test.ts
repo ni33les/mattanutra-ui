@@ -5,6 +5,7 @@ import { doseFitScore } from "../../lib/matcher/dose-fit.ts";
 import { add, compare, divide, fromDecimal, multiply, rational, serialize, toNumber } from "../../lib/matcher/experiments/rational.ts";
 import { listProfiles, profileDefinition, resolveProfile, withPreferenceWeight } from "../../lib/matcher/experiments/profiles.ts";
 import { compareScores, scoreBasket, scoreExposure } from "../../lib/matcher/experiments/score.ts";
+import * as scorer from "../../lib/matcher/experiments/score.ts";
 import { match } from "../../lib/matcher/index.ts";
 import { catalog, product, request } from "./flexible-v5-fixtures.ts";
 
@@ -174,4 +175,49 @@ test("EXP-SCORE-16 basket wrapper accepts absent optional uncertainty and propag
   const uncertain = scoreBasket(resolveProfile("baseline"), input, { ...basket, exposure: { ...basket.exposure, unknownSubjectIds: ["a"] } });
   assert.equal(uncertain.nutrientEvidenceComplete, false);assert.equal(uncertain.perTarget[0]!.certainty, "unknown");
   assert.ok(uncertain.uncertaintyNotes.includes("unknown_product_amount:a"));
+});
+
+test("EXP-SCORE-17 independent preference scoring equals full output for every curve and omitted preferences", () => {
+  const quantities = { ...actual, productCount: 3, dailyPills: 3, priceMinor: 15000 };
+  for (const input of [request(), request({ maxProductCount: 2, maxDailyPills: 2, maxPriceMinor: 10000 })]) {
+    for (const set of listProfiles()) {
+      const full = scoreExposure(set, input, exposure({ a: 80 }), quantities);
+      const preferences = scorer.scorePreferences(set, input, quantities);
+      assert.deepEqual(preferences, { preferences: full.preferences, preferenceTotal: full.preferenceTotal,
+        missingComponents: full.missingComponents, complete: full.complete });
+      assert.equal(Object.hasOwn(preferences, "nutrientTotal"), false);
+    }
+  }
+});
+
+test("EXP-SCORE-18 preference-only unknowns remain null and retain ordinary measurement validation", () => {
+  const input = request({ maxDailyPills: 2, maxPriceMinor: 10000 });
+  const unknown = { ...actual, dailyPills: null, priceMinor: null };
+  for (const set of [profile("mixed", "off"), profile("mixed", "linear"), profile("mixed", "quadratic"), withPreferenceWeight(profile("mixed", "quadratic"), 0)]) {
+    const full = scoreExposure(set, input, exposure({ a: 80 }), unknown);
+    const preferences = scorer.scorePreferences(set, input, unknown);
+    assert.deepEqual(preferences, { preferences: full.preferences, preferenceTotal: full.preferenceTotal,
+      missingComponents: full.missingComponents, complete: full.complete });
+  }
+  const missing = scorer.scorePreferences(profile("mixed", "quadratic"), input, unknown);
+  assert.equal(missing.preferenceTotal, null);assert.equal(missing.complete, false);
+  assert.deepEqual(missing.missingComponents, ["daily_pills", "first_order_goods_price"]);
+  for (const quantities of [{ ...actual, productCount: -1 }, { ...actual, dailyPills: Infinity }, { ...actual, priceMinor: 0.5 }, { ...actual, currency: "USD" }]) {
+    assert.throws(() => scorer.scorePreferences(profile("linear"), input, quantities));
+  }
+});
+
+test("EXP-SCORE-19 preference-only custom zero scales preserve exact weights and currency checks", () => {
+  const input = request({ currency: "USD", maxProductCount: 0, maxDailyPills: 0, maxPriceMinor: 0 });
+  const quantities = { productCount: 2, dailyPills: 4, priceMinor: 50000, currency: "USD" };
+  const set = resolveProfile({ ...profileDefinition(profile("quadratic", "quadratic")), id: "custom-preferences-only",
+    preferenceWeights: { productCount: "0.1", dailyPills: "0.2", priceMinor: "0.3" },
+    zeroPreferenceScales: { productCount: "2", dailyPills: "4", priceMinor: "50000", currency: "USD" } });
+  const preferences = scorer.scorePreferences(set, input, quantities);
+  const full = scoreExposure(set, input, exposure({ a: 120 }), quantities);
+  assert.deepEqual(exact(preferences.preferenceTotal), { numerator: "3", denominator: "5" });
+  assert.deepEqual(preferences, { preferences: full.preferences, preferenceTotal: full.preferenceTotal,
+    missingComponents: full.missingComponents, complete: full.complete });
+  assert.throws(() => scorer.scorePreferences(profile("quadratic", "quadratic"), input, quantities), /currency/i);
+  assert.throws(() => scorer.scorePreferences(set, input, { ...quantities, currency: "THB" }), /currency/i);
 });
