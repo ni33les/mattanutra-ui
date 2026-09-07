@@ -15,7 +15,7 @@ function evidence() {
   const inventory = { ...inventoryContent, sha256: hash(inventoryContent) };
   const tables = [{ table: "products", rows: 1, sha256: source }];
   const data = { tables, schemaSha256: source, catalogueSha256: hash(tables) };
-  const comparison = { passed: true, comparisons: ["en", "th", "zh-CN"].flatMap(locale => ["checkout", "-paid"].map(phase => ({ locale, phase, identical: true }))) };
+  const comparison = { passed: true, comparisons: ["resources", "tools_only"].flatMap(discovery => ["en", "th", "zh-CN"].flatMap(locale => ["checkout", "-paid"].map(phase => ({ discovery, locale, phase, identical: true })))) };
   const named: Record<string, unknown> = { "release-lint.json": lint, "test-inventory.json": inventory, "data-before.json": data, "data-after.json": data, "client-comparison.json": comparison };
   const artifacts = REQUIRED_VALIDATION_ARTIFACTS.map(file => {
     const path = join(directory, file);
@@ -23,7 +23,7 @@ function evidence() {
     writeFileSync(path, JSON.stringify(named[file] ?? { passed: true }));
     return { file, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") };
   });
-  const proof = { version: "dev-advisory-validation-2", contractVersion: "5.0.0", releaseBaseCommit: "b".repeat(40), releaseLintSha256: lint.sha256, testInventorySha256: inventory.sha256, databaseSchemaSha256: data.schemaSha256, catalogueSha256: data.catalogueSha256, environment: "dev", candidateOrigin: "http://127.0.0.1:3100",
+  const proof = { version: "dev-advisory-validation-3", contractVersion: "6.0.0", releaseBaseCommit: "b".repeat(40), releaseLintSha256: lint.sha256, testInventorySha256: inventory.sha256, databaseSchemaSha256: data.schemaSha256, catalogueSha256: data.catalogueSha256, environment: "dev", candidateOrigin: "http://127.0.0.1:3100",
     passed: true, unchangedSource: true, sourceSha256: source, buildId: source.slice(0, 40), schemaChecksum: "fixture-contract-checksum",
     steps: REQUIRED_VALIDATION_STAGES.map(label => ({ label, passed: true })), artifacts };
   const file = join(directory, "attestation.json");
@@ -66,6 +66,25 @@ it("V5-GATE-04 rejects internally inconsistent inventory and incomplete locale e
       fixture.proof.artifacts.find(row => row.file === target)!.sha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
       writeFileSync(fixture.file, JSON.stringify(fixture.proof));
       assert.throws(() => readDevValidationProof(fixture.file, fixture.source), /identity|language/);
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
+
+
+it("ANNA-GATE-01 rejects obsolete proofs and missing tools-only equality even when remaining evidence is rehashed", () => {
+  for (const obsolete of [true, false]) {
+    const fixture = evidence();
+    try {
+      if (obsolete) fixture.proof.version = "dev-advisory-validation-2";
+      else {
+        const path = join(fixture.directory, "client-comparison.json");
+        const comparison = JSON.parse(readFileSync(path, "utf8"));
+        comparison.comparisons = comparison.comparisons.filter((row: { discovery: string }) => row.discovery !== "tools_only");
+        writeFileSync(path, JSON.stringify(comparison));
+        fixture.proof.artifacts.find(row => row.file === "client-comparison.json")!.sha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
+      }
+      writeFileSync(fixture.file, JSON.stringify(fixture.proof));
+      assert.throws(() => readDevValidationProof(fixture.file, fixture.source), /incomplete|language/);
     } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
   }
 });

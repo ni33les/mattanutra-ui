@@ -315,7 +315,9 @@ export async function packProof(runtime: AgenticRuntime) {
         locale: "en",
         optimization: "balanced",
         profile: { ageYears: 60, lifeStage: "adult", sex: "male" },
-        requirements: { maxPriceMinor: 1 },
+        // D6-01 verifies execution readiness. Numeric preferences are advisory
+        // in v6; an explicit product exclusion still prevents selection.
+        requirements: { excludeProductIds: [...new Set(getCatalogueSnapshot().products.map(item => item.productId))] },
         targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       }
     },
@@ -806,5 +808,4 @@ export async function packProof(runtime: AgenticRuntime) {
     untestedIds: [...UNTESTED_IDS]
   };
 }
-
 

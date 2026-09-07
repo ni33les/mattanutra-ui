@@ -1,4 +1,16 @@
 /** Public connector documents and responses are this client's only contract source. */
+export function contractFromToolDiscovery(info, tools, guide) {
+  const examples = [];
+  for (const match of guide.matchAll(/^### ([^\n]+)\n+```json\n([\s\S]*?)\n```/gm)) {
+    const request = JSON.parse(match[2]);
+    if (request.method === "tools/call" && request.params?.name && request.params.arguments) {
+      examples.push({ name: match[1].trim(), tool: request.params.name, arguments: request.params.arguments });
+    }
+  }
+  if (!examples.length) throw new Error("Connector guide has no executable examples");
+  return { contractVersion: info.contractVersion, tools: Object.fromEntries(tools.map(tool => [tool.name, { inputSchema: tool.inputSchema, outputSchema: tool.outputSchema }])), examples };
+}
+
 export function selectPublishedResources(info, resources) {
   const schema = resources.find(row => row.uri === info.contractSchema && row.mimeType === "application/schema+json");
   const guide = resources.find(row => row.uri === info.clientGuide && row.mimeType === "text/markdown");

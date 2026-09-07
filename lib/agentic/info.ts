@@ -1,4 +1,5 @@
-import { CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI } from "@/lib/agentic/contract/guide";
+import { PLAN_OPERATION_SCHEMAS } from "@/lib/agentic/contract/schemas";
+import { clientDiscovery, clientGuideMarkdown, CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI } from "@/lib/agentic/contract/guide";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import {
   AGENTIC_CONTRACT_VERSION,
@@ -19,8 +20,6 @@ import {
 import { listCatalogueGaps } from "@/lib/agentic/plan/telemetry";
 import { connectorCopy } from "@/lib/agentic/discovery/content";
 import {
-  RESEARCH_VERSION,
-  RESPONSIBILITY_VERSION,
   VALUE_PROPOSITION_ID,
   WELLNESS_BOUNDARY_ID
 } from "@/lib/agentic/discovery/versions";
@@ -35,6 +34,11 @@ export const AGENTIC_SCHEMA_CHECKSUM = computeSchemaChecksum();
 export const PUBLIC_INFO_ALLOW_LIST = [
   "ok",
   "clientGuide",
+  "clientInstructions",
+  "clientExamples",
+  "clientGuideText",
+  "planSchemaJson",
+  "planOperation",
   "contractSchema",
   "serviceName",
   "contractVersion",
@@ -62,6 +66,11 @@ export type PublicInfoCountry = Readonly<{
 }>;
 
 export type PublicInfo = Readonly<{
+  clientInstructions: string;
+  clientExamples: ReturnType<typeof clientDiscovery>["clientExamples"];
+  clientGuideText?: string;
+  planSchemaJson?: string;
+  planOperation?: keyof typeof PLAN_OPERATION_SCHEMAS;
   clientGuide: string;
   contractSchema: string;
   buildId?: string;
@@ -125,7 +134,11 @@ async function recognisedNamesForMarkets(input: Readonly<{
   return [...names].sort((left, right) => left.localeCompare(right));
 }
 
+type InfoView = "overview" | "client_guide" | "plan_schema";
+
 function publicCapabilityInfo(input: Readonly<{
+  view?: InfoView;
+  planOperation?: keyof typeof PLAN_OPERATION_SCHEMAS;
   buildId?: string;
   conditionCodes: readonly string[];
   locale?: string;
@@ -136,6 +149,9 @@ function publicCapabilityInfo(input: Readonly<{
   void input.buildId;
   return {
     ok: true,
+    ...clientDiscovery(input.locale),
+    ...(input.view === "client_guide" ? { clientGuideText: clientGuideMarkdown() } : {}),
+    ...(input.view === "plan_schema" ? { planOperation: input.planOperation ?? "create", planSchemaJson: JSON.stringify(PLAN_OPERATION_SCHEMAS[input.planOperation ?? "create"]) } : {}),
     clientGuide: CLIENT_GUIDE_URI,
     contractSchema: CONTRACT_SCHEMA_URI,
     serviceName: AGENTIC_SERVICE_NAME,
@@ -238,6 +254,8 @@ export async function engineeringInfo(input: Readonly<{
 }
 
 export async function infoTool(input: Readonly<{
+  view?: InfoView;
+  planOperation?: keyof typeof PLAN_OPERATION_SCHEMAS;
   config: AgenticConfig;
   isolatedInfo?: {
     conditionCodes: readonly string[];
@@ -254,6 +272,7 @@ export async function infoTool(input: Readonly<{
 
   if (input.isolatedInfo) {
     return publicCapabilityInfo({
+      view: input.view, planOperation: input.planOperation,
       buildId: input.config.buildId,
       conditionCodes: input.isolatedInfo.conditionCodes,
       locale,
@@ -265,7 +284,7 @@ export async function infoTool(input: Readonly<{
   const supportedCountries = await supportedCountriesFor(input.config);
   const key = [
     input.config.buildId,
-    locale,
+    locale, input.view ?? "overview", input.planOperation ?? "create",
     supportedCountries.map((item) => item.countryCode).join(",")
   ].join(":");
   if (infoCache?.key === key) {
@@ -273,6 +292,7 @@ export async function infoTool(input: Readonly<{
   }
 
   const value = publicCapabilityInfo({
+    view: input.view, planOperation: input.planOperation,
     buildId: input.config.buildId,
     conditionCodes: RECOGNISED_CONDITION_CODES,
     locale,

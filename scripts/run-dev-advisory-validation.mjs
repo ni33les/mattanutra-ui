@@ -8,7 +8,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fullTestInventory, sourceManifest } from "./run-full-test-suite.mjs";
 import { mcpTestTarget } from "./mcp-test-target.mjs";
-import { REQUIRED_VALIDATION_STAGES, VALIDATION_CLIENT_LOCALES } from "./dev-validation-proof.mjs";
+import { REQUIRED_VALIDATION_STAGES, VALIDATION_CLIENT_LOCALES, VALIDATION_CLIENT_DISCOVERY } from "./dev-validation-proof.mjs";
 
 import { browserFixtureEnvironment } from "./browser-fixture-environment.mjs";
 
@@ -54,7 +54,7 @@ export function isolatedValidationEnvironment(input = process.env) {
   return env;
 }
 export function validationClientMatrix() {
-  return ["a", "b"].flatMap(runId => VALIDATION_CLIENT_LOCALES.map(locale => ({ runId, locale })));
+  return VALIDATION_CLIENT_DISCOVERY.flatMap(discovery => ["a", "b"].flatMap(runId => VALIDATION_CLIENT_LOCALES.map(locale => ({ runId, locale, discovery }))));
 }
 export function releaseLintInputs(root = ROOT, baseRef = process.env.DEV_ADVISORY_BASE_COMMIT) {
   if (baseRef?.startsWith("-") || baseRef && !/^[a-zA-Z0-9_./-]+$/.test(baseRef)) throw new Error("Invalid release base reference");
@@ -119,7 +119,7 @@ async function main() {
       if (candidateError || candidate.exitCode !== null || candidate.signalCode !== null) throw new Error(candidateError?.message ?? "Candidate exited before readiness.");
       try {
         const probe = await rpc(`${ORIGIN}/api/mcp`, "info", {}, env);
-        if (probe.result.buildId !== buildId || probe.result.contractVersion !== "5.0.0") throw new Error("Candidate identity differs from the built source.");
+        if (probe.result.buildId !== buildId || probe.result.contractVersion !== "6.0.0") throw new Error("Candidate identity differs from the built source.");
         schemaChecksum = probe.result.schemaChecksum;
         writeJson(join(evidence, "candidate-identity.json"), probe);
         return;
@@ -142,11 +142,12 @@ async function main() {
     await run("web-schema", process.execPath, [...TS, "scripts/apply-web-funnel-schema.ts"]);
     await run("agentic-schema", process.execPath, [...TS, "scripts/apply-agentic-commerce-schema.ts"]);
     await run("matcher-runtime-schema", process.execPath, [...TS, "scripts/apply-matcher-v5-runtime-schema.ts"]);
+    await run("reference-integrity-schema", process.execPath, [...TS, "scripts/apply-supplement-safety-reference-integrity-schema.ts"]);
     await run("demand-cache-schema", process.execPath, [...TS, "scripts/apply-product-coverage-demand-cache-schema.ts"]);
     await run("runtime-schema", process.execPath, [...TS, "scripts/verify-dev-runtime-schema.ts"]);
     await run("public-catalogue-fixtures", process.execPath, ["scripts/seed-matcher-public-fixtures.mjs", join(evidence, "public-catalogue-fixtures.json")]);
     await run("typecheck", process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit"],
-      { ...env, NODE_OPTIONS: env.NODE_OPTIONS.replace("--max-old-space-size=2300", "--max-old-space-size=3200") }, false);
+      { ...env, NODE_OPTIONS: env.NODE_OPTIONS.replace("--max-old-space-size=2300", "--max-old-space-size=1500") }, false);
     // Pass the complete release diff explicitly, including previously committed slices.
     await run("changed-lint", process.execPath, ["node_modules/eslint/bin/eslint.js", ...(releaseLint.files.length ? releaseLint.files : ["scripts/run-dev-advisory-validation.mjs"])], env, false);
     await run("production-build", process.execPath, ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...env, NODE_ENV: "production", NODE_OPTIONS: "--max-old-space-size=2300", NEXT_BUILD_CPUS: "1", NEXT_BUILD_SKIP_TYPECHECK: "1" });
@@ -166,18 +167,19 @@ async function main() {
     dataBefore = JSON.parse(readFileSync(join(evidence, "data-before.json"), "utf8"));
     await run("test-full", "npm", ["run", "test:full"], { ...env, FULL_TEST_EVIDENCE_DIR: join(evidence, "full-suite") }, false);
     await run("matcher-two-runs", process.execPath, ["scripts/run-mcp-matcher-pack-twice.mjs"], { ...env, NODE_ENV: "test", MCP_ACCEPTANCE_EVIDENCE_DIR: join(evidence, "matcher") }, false);
-    for (const { runId, locale } of validationClientMatrix()) {
-      const journey = `${runId}-${locale}`;
+    await run("documented-client-rate-window", process.execPath, ["scripts/published-client-pacing.mjs", "--clear-window"]);
+    for (const { runId, locale, discovery } of validationClientMatrix()) {
+      const journey = `${runId}-${locale}${discovery === "tools_only" ? "-tools" : ""}`;
       const clientDir = join(evidence, `client-${journey}`), resumeDir = join(evidence, `client-${journey}-paid`);
-      await run(`docs-client-${journey}`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--output", clientDir]);
+      await run(`docs-client-${journey}`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--discovery", discovery, "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--output", clientDir]);
       const receiptPath = join(clientDir, "receipt.json"), receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
       if (receipt.endpoint !== `${ORIGIN}/api/mcp` || receipt.locale !== locale || !receipt.checkout?.orderHandle) throw new Error("Client receipt is not an isolated candidate order.");
       await run(`fixture-settlement-${journey}`, process.execPath, [...TS, "scripts/settle-local-mcp-client-fixture.ts", receiptPath, join(evidence, `fixture-settlement-${journey}.json`)]);
-      await run(`docs-client-${journey}-paid`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--resume", receiptPath, "--output", resumeDir]);
+      await run(`docs-client-${journey}-paid`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--discovery", discovery, "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--resume", receiptPath, "--output", resumeDir]);
       const paid = JSON.parse(readFileSync(join(resumeDir, "receipt.json"), "utf8"));
       if (paid.order?.paymentStatus !== "paid" || paid.order?.fulfilment?.status !== "delivered" || paid.order?.terminal !== true) throw new Error("Public tracking did not confirm the fixture payment and delivery.");
     }
-    const comparisons = VALIDATION_CLIENT_LOCALES.flatMap(locale => ["", "-paid"].map(suffix => ({ locale, phase: suffix || "checkout", identical: readFileSync(join(evidence, `client-a-${locale}${suffix}/semantic.json`), "utf8") === readFileSync(join(evidence, `client-b-${locale}${suffix}/semantic.json`), "utf8") })));
+    const comparisons = VALIDATION_CLIENT_DISCOVERY.flatMap(discovery => VALIDATION_CLIENT_LOCALES.flatMap(locale => ["", "-paid"].map(suffix => ({ locale, discovery, phase: suffix || "checkout", identical: readFileSync(join(evidence, `client-a-${locale}${discovery === "tools_only" ? "-tools" : ""}${suffix}/semantic.json`), "utf8") === readFileSync(join(evidence, `client-b-${locale}${discovery === "tools_only" ? "-tools" : ""}${suffix}/semantic.json`), "utf8") }))));
     writeJson(join(evidence, "client-comparison.json"), { passed: comparisons.every(item => item.identical), comparisons, normalization: "Only declared identities/clocks/latency fields; complete intermediate transcripts are compared." });
     steps.push({ label: "documented-client-non-latency-equality", passed: comparisons.every(item => item.identical) });
     for (const [name, path] of [["full-suite-results", "full-suite/results.json"], ["matcher-results", "matcher/results.json"]]) {
@@ -202,7 +204,7 @@ async function main() {
     const unchangedSource = Boolean(before && before.sha256 === after?.sha256);
     const passed = !failure && !interrupted && unchangedSource && REQUIRED_VALIDATION_STAGES.every(label => steps.filter(step => step.label === label && step.passed).length === 1) && steps.every(step => step.passed);
     writeJson(join(evidence, "stage-results.json"), { passed, failure: failure ?? null, interrupted, steps });
-    const attestation = { version: "dev-advisory-validation-2", contractVersion: "5.0.0", releaseBaseCommit: releaseLint?.baseCommit ?? null, releaseLintSha256: releaseLint?.sha256 ?? null, testInventorySha256: inventory?.sha256 ?? null, databaseSchemaSha256: dataBefore?.schemaSha256 ?? null, catalogueSha256: dataBefore?.catalogueSha256 ?? null, environment: "dev", candidateOrigin: ORIGIN, sourceSha256: before?.sha256 ?? null, buildId: buildId ?? null, schemaChecksum: schemaChecksum ?? null, gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(), unchangedSource, passed, finishedAt: new Date().toISOString(), steps, failure: failure ?? null, artifacts: hashFiles(evidence) };
+    const attestation = { version: "dev-advisory-validation-3", contractVersion: "6.0.0", releaseBaseCommit: releaseLint?.baseCommit ?? null, releaseLintSha256: releaseLint?.sha256 ?? null, testInventorySha256: inventory?.sha256 ?? null, databaseSchemaSha256: dataBefore?.schemaSha256 ?? null, catalogueSha256: dataBefore?.catalogueSha256 ?? null, environment: "dev", candidateOrigin: ORIGIN, sourceSha256: before?.sha256 ?? null, buildId: buildId ?? null, schemaChecksum: schemaChecksum ?? null, gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(), unchangedSource, passed, finishedAt: new Date().toISOString(), steps, failure: failure ?? null, artifacts: hashFiles(evidence) };
     writeJson(join(evidence, "attestation.json"), attestation);
     console.log(JSON.stringify({ passed, evidence, attestation: join(evidence, "attestation.json"), failure: failure ?? null }));
     if (!passed) process.exitCode = 1;

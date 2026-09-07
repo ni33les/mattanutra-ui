@@ -94,6 +94,7 @@ const OPTION_REASON = {
 } as const;
 
 const PUBLIC_PLAN_KEYS = new Set([
+  "preferenceAssessment",
   "contractVersion", "operationalDecision", "nextReplenishmentDay", "scheduleComplete", "unavailableReasons",
   "acknowledgementStatus",
   "acknowledgedUnassessedConditionCodes",

@@ -18,6 +18,7 @@ export function operationalDecision(input: Readonly<{
   purchaseRequiredNow?: boolean;
   replenishesLater?: boolean;
   tooBroad?: boolean;
+  canRefine?: boolean;
 }>): OperationalDecision {
   const scheduledForLater = input.purchaseRequiredNow === false && input.replenishesLater;
   const status = input.status === "ready" && input.hasSelectedOption === false && !scheduledForLater
@@ -27,6 +28,7 @@ export function operationalDecision(input: Readonly<{
     : status === "blocked" ? "change_request"
     : status === "needs_input" ? input.hasQuestions === false ? "change_request" : "answer_questions"
     : status === "no_purchase" && input.hasPurchaseOptions ? "review_options"
+    : status === "no_purchase" && input.canRefine ? "change_request"
     : status === "no_purchase" ? input.replenishesLater ? "replenish_later" : "no_purchase"
     : input.purchaseRequiredNow === false && input.replenishesLater ? "replenish_later"
     : "confirm_with_user";

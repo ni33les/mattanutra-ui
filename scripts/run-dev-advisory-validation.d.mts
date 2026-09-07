@@ -32,7 +32,7 @@ export function signalValidationProcess(
   signal?: NodeJS.Signals,
   platform?: NodeJS.Platform
 ): boolean;
-export function validationClientMatrix(): Array<{ runId: "a" | "b"; locale: "en" | "th" | "zh-CN" }>;
+export function validationClientMatrix(): Array<{ runId: "a" | "b"; locale: "en" | "th" | "zh-CN"; discovery: "resources" | "tools_only" }>;
 export function releaseLintInputs(root?: string, baseRef?: string): {
   baseCommit: string;
   headCommit: string;

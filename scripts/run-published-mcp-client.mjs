@@ -5,18 +5,21 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import Ajv from "ajv";
-import { selectPublishedResources, publishedExample, selectPurchaseTradeOff, customerTargetConfirmation, recoverPublishedPatch } from "./published-client-journey.mjs";
+import { selectPublishedResources, contractFromToolDiscovery, publishedExample, selectPurchaseTradeOff, customerTargetConfirmation, recoverPublishedPatch } from "./published-client-journey.mjs";
 import { CLIENT_NORMALIZATION, normalizePublishedClientResult } from "./published-client-semantics.mjs";
+import { createPacedRequest } from "./published-client-pacing.mjs";
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => { const index = args.indexOf(name); return index >= 0 ? args[index + 1] : fallback; };
 const endpoint = new URL(arg("--url", process.env.MCP_URL ?? "http://127.0.0.1:3000/api/mcp"));
-if (!["localhost", "127.0.0.1", "[::1]", "dev.mattanutra.com"].includes(endpoint.hostname)) throw new Error("The documented client journey is restricted to DEV or localhost.");
+if (!["localhost", "127.0.0.1", "[::1]", "dev.mattanutra.com", "uat.mattanutra.com"].includes(endpoint.hostname)) throw new Error("The documented client journey is restricted to DEV, UAT or localhost.");
 const output = resolve(arg("--output", "/tmp/mattanutra-published-client"));
 const runKey = arg("--run-key", randomUUID());
 const resumeFile = arg("--resume", null);
 const locale = arg("--locale", "en");
 if (!["en", "th", "zh-CN"].includes(locale)) throw new Error("Documented acceptance locale must be en, th or zh-CN.");
+const discovery = arg("--discovery", "resources");
+if (!["resources", "tools_only"].includes(discovery)) throw new Error("Discovery must be resources or tools_only");
 const transcript = [];
 const assertions = [];
 const ajv = new Ajv({ allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true, coerceTypes: false, useDefaults: false, removeAdditional: false, validateFormats: false });
@@ -24,7 +27,8 @@ let requestId = 0, sessionId;
 const validators = new Map();
 let contract;
 function check(condition, message) { assertions.push({ message, passed: Boolean(condition) }); if (!condition) throw new Error(message); }
-async function rpc(method, params = {}) {
+const rpc = createPacedRequest(async (method, params = {}) => {
+  if (discovery === "tools_only" && method.startsWith("resources/")) throw new Error("Tools-only client cannot access resources");
   const request = { jsonrpc: "2.0", id: ++requestId, method, params };
   const started = performance.now();
   const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-06-18", ...(sessionId ? { "mcp-session-id": sessionId } : {}) }, body: JSON.stringify(request), signal: AbortSignal.timeout(30000) });
@@ -38,7 +42,7 @@ async function rpc(method, params = {}) {
   transcript.push({ request, httpStatus: response.status, response: body, latencyMs: Math.round(performance.now() - started) });
   check(response.ok && body && !body.error, `${method} succeeds`);
   return body.result;
-}
+});
 function validate(schema, value, name) {
   let compiled = validators.get(schema);
   if (!compiled) { compiled = ajv.compile(schema); validators.set(schema, compiled); }
@@ -84,13 +88,19 @@ async function exercisePartialMatchAndAnswer(request, baseline) {
   check(Boolean(retained), "published basket identifies the fixture nutrient and product");
   const nutrient = retained.requestedNutrients.find(item => item.name === target.name && item.unit === target.unit);
   check(nutrient.amount / retained.servingsPerDay === 1000 && target.amount === 2500 && target.unit === "IU", "partial example matches the published 1000 IU per-serving product fact");
+  const proposedServings = partialExample.arguments.request.requirements.productDoses[0].servingsPerDay;
+  const physical = retained.administration;
+  check(physical?.provenance?.status === "verified" && physical.unitsPerServing > 0 && physical.doseIncrement > 0 &&
+    Number.isSafeInteger(proposedServings * physical.unitsPerServing / physical.doseIncrement),
+  "the documented partial proposal uses physically supported quantities from the returned product");
   const partialRequest = { ...structuredClone(request), targets: structuredClone(partialExample.arguments.request.targets),
-    requirements: { ...structuredClone(request.requirements), ...structuredClone(partialExample.arguments.request.requirements), retainProductIds: [retained.productId] } };
+    requirements: { ...structuredClone(request.requirements), ...structuredClone(partialExample.arguments.request.requirements),
+      retainProductIds: [retained.productId], productDoses: [{ productId: retained.productId, servingsPerDay: proposedServings }] } };
   function preserved(plan, label) {
     check(isDeepStrictEqual(plan.medicationCodes, request.medicationCodes), `${label} preserves the disclosed medication`);
     const row = plan.coverage.find(item => item.name === target.name);
     check(row && row.requestedAmount === target.amount && row.unit === target.unit && row.basis === target.basis, `${label} preserves the provisional target amount, unit and basis`);
-    check(plan.basket.length === 1 && plan.basket.every(item => item.productId === retained.productId), `${label} respects the explicitly retained product`);
+    check(plan.basket.some(item => item.productId === retained.productId), `${label} respects the explicitly retained product`);
     return row;
   }
   function honestPartial(plan, label) {
@@ -98,7 +108,18 @@ async function exercisePartialMatchAndAnswer(request, baseline) {
     check(plan.status === "ready" && row.status === "partial" && row.coveragePercent === 80 && row.deliveredAmount === 2000 && row.remainingGap === 500, `${label} reports genuine 80% per-target dose coverage and a 500 IU gap`);
     check(plan.acknowledgementStatus === "not_required" && (plan.questions ?? []).length === 0, `${label} introduces no mandatory question or health acknowledgement`);
   }
+  async function choosePartial(plan, suffix) {
+    // A one-product preference no longer excludes a closer combination. Choose the
+    // documented partial trade-off by its returned ID; never force it as default.
+    const option = plan.options.find(item => item.purchaseEligible && item.basket.length === 1 &&
+      item.basket[0].productId === retained.productId && item.coverage.some(row =>
+        row.name === target.name && row.coveragePercent === 80 && row.deliveredAmount === 2000 && row.remainingGap === 500));
+    check(Boolean(option), "the returned choices include the documented 80% partial purchase trade-off");
+    return current(await call("plan", { ...publishedExample(contract, "select"), planHandle: plan.planHandle,
+      expectedRevision: plan.revision, optionId: option.optionId, idempotencyKey: `docs-partial-select-${suffix}-${runKey}` }));
+  }
   let partial = await current(await call("plan", { ...partialExample.arguments, request: partialRequest, idempotencyKey: `docs-partial-${runKey}` }));
+  partial = await choosePartial(partial, "created");
   honestPartial(partial, "Partial plan");
   partial = await current(await call("plan", { ...decisionExample.arguments, planHandle: partial.planHandle, expectedRevision: partial.revision, idempotencyKey: `docs-customer-decision-${runKey}` }));
   preserved(partial, "Customer-decision revision");
@@ -107,6 +128,7 @@ async function exercisePartialMatchAndAnswer(request, baseline) {
   check(Boolean(question && choice), "the connector offers a choice to confirm the customer's provisional target");
   partial = await current(await call("plan", { ...answerExample.arguments, planHandle: partial.planHandle, expectedRevision: partial.revision,
     idempotencyKey: `docs-customer-answer-${runKey}`, answers: [{ questionId: question.questionId, choice: choice.choice }] }));
+  partial = await choosePartial(partial, "answered");
   honestPartial(partial, "Answered customer decision");
 }
 
@@ -114,7 +136,7 @@ let receipt;
 let failure;
 try {
   await mkdir(output, { recursive: true });
-  const initialized = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "published-documentation-client", version: "5.0.0" } });
+  const initialized = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "published-documentation-client", version: "6.0.0" } });
   check(typeof initialized.instructions === "string" && /advi(?:ce|s)/i.test(initialized.instructions), "connector supplies essential advisory instructions");
   const tools = (await rpc("tools/list")).tools;
   check(tools.length === 7, "exactly seven public tools are advertised");
@@ -124,12 +146,28 @@ try {
   const bootstrap = await rpc("tools/call", { name: "info", arguments: { locale } });
   validate(infoTool.outputSchema, bootstrap.structuredContent, "info response");
   const info = bootstrap.structuredContent;
-  check(info.ok && info.contractVersion === "5.0.0", "v5 capability discovery succeeds");
+  check(info.ok && info.contractVersion === "6.0.0", "v6 capability discovery succeeds");
   check(info.supportedLocales.includes(locale), "the requested language is supported");
-  const resources = (await rpc("resources/list")).resources;
-  const selectedResources = selectPublishedResources(info, resources);
-  contract = JSON.parse((await rpc("resources/read", { uri: selectedResources.schema.uri })).contents[0].text);
-  const guide = (await rpc("resources/read", { uri: selectedResources.guide.uri })).contents[0].text;
+  check(typeof info.clientInstructions === "string" && /supplemental/.test(info.clientInstructions) && /total_daily/.test(info.clientInstructions), "ordinary info explains target basis without resources");
+  check(Array.isArray(info.clientExamples) && ["create", "get", "revise", "answer", "select"].every(operation => info.clientExamples.some(example => example.arguments?.operation === operation)), "ordinary info supplies all five operation templates");
+  let guide;
+  if (discovery === "tools_only") {
+    contract = { contractVersion: info.contractVersion, tools: Object.fromEntries(tools.map(tool => [tool.name, { inputSchema: tool.inputSchema, outputSchema: tool.outputSchema }])) };
+    const guideInfo = await call("info", { locale, view: "client_guide" });
+    check(typeof guideInfo.clientGuideText === "string", "guide content is available through tools/call");
+    guide = guideInfo.clientGuideText;
+    contract = contractFromToolDiscovery(info, tools, guide);
+    for (const planOperation of ["create", "get", "revise", "answer", "select"]) {
+      const schemaInfo = await call("info", { locale, view: "plan_schema", planOperation });
+      const operationSchema = JSON.parse(schemaInfo.planSchemaJson);
+      check(schemaInfo.planOperation === planOperation && contract.tools.plan.inputSchema.anyOf.some(schema => isDeepStrictEqual(schema, operationSchema)), `${planOperation} schema is available through tools/call and matches discovery`);
+    }
+  } else {
+    const resources = (await rpc("resources/list")).resources;
+    const selectedResources = selectPublishedResources(info, resources);
+    contract = JSON.parse((await rpc("resources/read", { uri: selectedResources.schema.uri })).contents[0].text);
+    guide = (await rpc("resources/read", { uri: selectedResources.guide.uri })).contents[0].text;
+  }
   check(contract.contractVersion === info.contractVersion, "current resources match capability discovery");
   check(/plan\.question\.satisfy_prerequisite/.test(guide) && /requestPatch/.test(guide) && /stale_revision/.test(guide) && /payment/i.test(guide) && /productDoses/.test(guide) && /searchEffort/.test(guide), "guide explains conversational refinement and recovery");
   for (const tool of tools) {

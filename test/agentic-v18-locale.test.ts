@@ -184,6 +184,14 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
   });
 
   it("DEV-LOC-003 only approved presentation paths may differ", async () => {
+    for (const prefix of ["", "/compactDecision"]) {
+      assert.equal(isPermittedPresentationPath(`${prefix}/matchingExplanation/message`), true);
+      assert.equal(isPermittedPresentationPath(`${prefix}/matchingExplanation/reasonCode`), false);
+      assert.equal(isPermittedPresentationPath(`${prefix}/preferenceAssessment/0/message`), true);
+      for (const field of ["actual", "preferred", "delta", "percent", "status", "prominent"]) {
+        assert.equal(isPermittedPresentationPath(`${prefix}/preferenceAssessment/0/${field}`), false);
+      }
+    }
     const en = await createReady("qa-v3:l8:loc003-en", "en", v18Key("loc003", 1, "en"));
     const th = await createReady("qa-v3:l8:loc003-th", "th", v18Key("loc003", 1, "th"));
     const paths = localeDiff(en.result, th.result);

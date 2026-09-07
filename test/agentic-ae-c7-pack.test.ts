@@ -741,12 +741,15 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           basketOf(control).map(row => row.productId).join("|") === "prd_ae_a_1|prd_ae_a_2|prd_ae_a_3|prd_ae_a_4" &&
           basketOf(control).reduce((sum, row) => sum + Number(row.lineTotalMinor), 0) === 467300;
         const named = new Set([...coverageNames(broad), ...leftoverNames(broad)].filter(Boolean));
-        // V5 removes artificial breadth blocks. A completed search with no
-        // purchasable result still returns every requested target and gap.
+        // V6 retains all requested targets and provides explicit recovery when
+        // the historical fixture has no matching trace or purchase option.
         const ok = controlOk && broad.ok === true && broad.status === "no_purchase" &&
           basketOf(broad).length === 0 && named.size === THIRTY_TARGETS.length &&
           THIRTY_TARGETS.every(target => named.has(target.name)) &&
-          stringList(broad.nextActions).length === 0 &&
+          stringList(broad.nextActions).join() === "change_request" &&
+          broad.reasonCode === "explanation_unavailable" &&
+          asRecord(broad.matchingExplanation).message === broad.summary &&
+          asRecord(broad.compactDecision).why === broad.summary &&
           broad.reasonCode !== "request_too_broad" &&
           JSON.stringify({ next: broad.nextActions, status: broad.status, summary: broad.summary, coverage: broad.coverage, leftovers: broad.leftovers }) ===
             JSON.stringify({ next: replay.nextActions, status: replay.status, summary: replay.summary, coverage: replay.coverage, leftovers: replay.leftovers });

@@ -1,3 +1,4 @@
+import { infoConversationBudget } from "./helpers/info-conversation-budget.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -750,7 +751,7 @@ export async function runAePack(): Promise<AePackReport> {
         const keys = Object.keys(info);
         const ok =
           info.ok === true &&
-          jsonSize(info) <= 4096 &&
+          infoConversationBudget(info).passed &&
           countries.length > 0 &&
           locales.includes("en") &&
           info.userAccountRequired === false &&

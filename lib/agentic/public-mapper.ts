@@ -1,3 +1,5 @@
+import { assessPreferences, type NumericPreferences } from "@/lib/matcher/preferences";
+import { matchingExplanationFor } from "@/lib/agentic/value/matching-explanation";
 import { parseProductAdministration } from "@/lib/product-administration";
 import { operationalDecision } from "@/lib/agentic/value/operational-decision";
 import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
@@ -51,7 +53,7 @@ function compactPublic(
     if (key === "snapshotId") {
       continue;
     }
-    if (key === "administration" || key === "labelledFacts" || key === "originalRequest") { out[key] = nested; continue; }
+    if (key === "administration" || key === "labelledFacts" || key === "originalRequest" || key === "preferenceAssessment" || key === "matchingDiagnostics" || key === "matchingExplanation") { out[key] = nested; continue; }
     if (nested == null) {
       if (nested === null && ["administration", "pills", "dailyPills", "pillsPerServing", "totalDailyPills", "pillDelta", "dailyPillsDelta", "dailyCostMinor", "supplyDays", "totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
       continue;
@@ -525,9 +527,13 @@ export function stackSummaryFor(basket: readonly BasketItem[], currency: string)
   };
 }
 
-export function publicCoverage(row: CoverageRow) {
+export function publicCoverage(row: CoverageRow, locale = "en") {
+  const reference = row as CoverageRow & { referenceConfidence?: "high" | "moderate" | "low"; basisRationale?: string };
   const claimIds = row.claimIds ?? selectCoverageClaimIds({ name: row.name });
   return {
+    ...(reference.referenceConfidence ? { referenceConfidence: reference.referenceConfidence } : {}),
+    ...(reference.basisRationale ? { basisRationale: reference.basisRationale } : {}),
+    ...(reference.referenceConfidence && reference.referenceConfidence !== "high" ? { uncertainty: agenticMessage(negotiateLocale(locale), "guidance.reference_unverified_uncertainty") } : {}),
     basis: row.basis ?? "supplemental",
     coveragePercent: Math.max(0, Math.min(100, publicAmount(row.coveragePercent))),
     ...(row.requestedTargetId ? { requestedTargetId: row.requestedTargetId } : {}),
@@ -696,7 +702,8 @@ export function publicOption(
   option: StackOption,
   selected: StackOption | null,
   locale = "en",
-  advertised: readonly StackOption[] = []
+  advertised: readonly StackOption[] = [],
+  preferences: NumericPreferences = {}
 ) {
   const currency = option.basket[0]?.currency ?? "THB";
   const group = advertised.length > 0 ? advertised : selected ? [selected, option] : [option];
@@ -706,11 +713,15 @@ export function publicOption(
   const reason = optionReasonFields(option, locale, unique);
   const pillComparisonKnown = comparedPillDelta(option, selected) != null;
   const counts = requestedTargetCoverage(option.coverage);
+  const preferenceAssessment = assessPreferences(preferences, { productCount: option.basket.length,
+    dailyPills: option.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : option.dailyPills,
+    firstOrderGoodsPriceMinor: option.basket.some(item => item.incompleteCommercialFacts) ? null : option.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0), currency }, locale).filter(row => row.status !== "not_requested");
   return {
+    ...(preferenceAssessment.length ? { preferenceAssessment } : {}),
     coveragePercent: option.coveragePercent,
     coverageSummary: { coveragePercent: counts.coveragePercent, fullyMetCount: counts.coveredCount, requestedCount: counts.requestedCount },
     ...(option.doseFit ? { doseFit: option.doseFit } : {}),
-    coverage: option.coverage.map(publicCoverage),
+    coverage: option.coverage.map(row => publicCoverage(row, locale)),
     basket: option.basket.map(item => publicBasketItem(item, locale)),
     ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item)) } : {}),
     optionId: option.optionId,
@@ -752,7 +763,10 @@ export function publicSafetyGuidance(
   acknowledgementStatus: "acknowledged" | "not_required" | "pending" = "not_required"
 ) {
   void acknowledgementStatus;
+  const reference = row as SafetyGuidance & { referenceConfidence?: "high" | "moderate" | "low"; basisRationale?: string };
   return {
+    ...(reference.referenceConfidence ? { referenceConfidence: reference.referenceConfidence } : {}),
+    ...(reference.basisRationale ? { basisRationale: reference.basisRationale } : {}),
     action: "review",
     ...(row.comparator ? { comparator: row.comparator } : {}),
     ...(row.authorityUrl ? { authorityUrl: row.authorityUrl } : {}),
@@ -891,6 +905,7 @@ export function publicPlanFields(result: Pick<
       | "gapReview"
       | "horizon"
       | "leftovers"
+      | "matchingDiagnostics"
       | "matcherTelemetry"
       | "researchVersion"
     >
@@ -959,14 +974,19 @@ export function publicPlanFields(result: Pick<
         result.horizon.nextReplenishmentDay > 0 &&
         result.horizon.nextReplenishmentDay < 90)
   );
-  const decision = operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected?.basket.length), hasPurchaseOptions: alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
+  const hasPurchaseOptions = alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false);
+  const matchingExplanation = matchingExplanationFor({ diagnostics: (result as PlanResult).matchingDiagnostics,
+    empty: !selected?.basket.length, hasPurchaseOptions, canExpand: (result as PlanResult).searchSummary?.canExpand,
+    durationUnknown: result.horizon?.durationUnknown,
+    hasUnmetTargets: result.coverage.some(row => row.remainingGap > 0 || row.unresolved), locale });
+  const decision = operationalDecision({ canRefine: matchingExplanation?.recoveryActions.includes("refine_request"), status: result.status, hasSelectedOption: Boolean(selected?.basket.length), hasPurchaseOptions: alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
   if (decision.status !== result.status) result = { ...result, status: decision.status,
     summary: agenticMessage(negotiateLocale(locale), `plan.summary.${decision.status}`) };
   const quoteBasket =
     result.status === "no_purchase" || result.status === "processing"
       ? []
       : (selected?.basket ?? result.basket);
-  const nextActions = decision.nextAction === "no_purchase" ? [] : [decision.nextAction];
+  const nextActions = [decision.nextAction];
   const subtotalMinor =
     result.status === "no_purchase" || result.status === "processing"
       ? 0
@@ -984,10 +1004,17 @@ export function publicPlanFields(result: Pick<
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const compactApplicable = planCompactApplicable(result.status);
-  const compactDecision = compactApplicable ? buildCompactDecision(result, decision) : null;
+  const compactDecision = compactApplicable ? buildCompactDecision(result, decision, matchingExplanation) : null;
   const claimIds = compactApplicable ? planClaimIds(result) : [];
 
+  const preferenceAssessment = assessPreferences(snapshot?.requirements ?? {}, { productCount: selected?.basket.length ?? 0,
+    dailyPills: selected?.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : selected?.dailyPills ?? 0,
+    firstOrderGoodsPriceMinor: selected?.basket.some(item => item.incompleteCommercialFacts) ? null : selected?.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0) ?? 0,
+    currency }, locale).filter(row => row.status !== "not_requested");
   const payload = {
+    ...(preferenceAssessment.length ? { preferenceAssessment } : {}),
+    ...((result as PlanResult).matchingDiagnostics ? { matchingDiagnostics: (result as PlanResult).matchingDiagnostics } : {}),
+    ...(matchingExplanation ? { matchingExplanation } : {}),
     ...(compactDecision
       ? {
           compactDecision,
@@ -1004,7 +1031,7 @@ export function publicPlanFields(result: Pick<
         }
       : {}),
     ...(result.coverage.length > 0
-      ? { coverage: result.coverage.map(publicCoverage) }
+      ? { coverage: result.coverage.map(row => publicCoverage(row, locale)) }
       : {}),
     contractVersion: AGENTIC_CONTRACT_VERSION,
     ...(legacy.sourceContractVersion ? { sourceContractVersion: legacy.sourceContractVersion, refreshRequired: Boolean(legacy.refreshRequired) } : {}),
@@ -1013,7 +1040,7 @@ export function publicPlanFields(result: Pick<
     ...((result as PlanResult).searchSummary ? { searchSummary: (result as PlanResult).searchSummary } : {}),
     ...(selected?.doseFit ? { doseFit: selected.doseFit } : {}),
     status: result.status,
-    summary: decision.nextAction === "review_options" ? agenticMessage(negotiateLocale(locale), "plan.summary.review_options") : result.summary,
+    summary: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.message : decision.nextAction === "review_options" ? agenticMessage(negotiateLocale(locale), "plan.summary.review_options") : result.summary,
     ...(snapshot?.currentSupplements
       ? {
           comparisonBasis: {
@@ -1088,7 +1115,7 @@ export function publicPlanFields(result: Pick<
             : {})
         }
       : {}),
-    summaryKey: tooBroad ? "plan.summary.request_too_broad" : decision.nextAction === "review_options" ? "plan.summary.review_options" : `plan.summary.${result.status}`,
+    summaryKey: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.messageKey : tooBroad ? "plan.summary.request_too_broad" : decision.nextAction === "review_options" ? "plan.summary.review_options" : `plan.summary.${result.status}`,
     locale,
     nextActions,
     ...(tooBroad
@@ -1138,6 +1165,11 @@ export function publicPlanFields(result: Pick<
           tradeOffs: publicTradeOffs(selected, selected, locale)
         }
       : {}),
+    ...(matchingExplanation && result.status === "no_purchase" ? {
+      reason: matchingExplanation.message,
+      reasonCode: matchingExplanation.reasonCode,
+      reasonKey: matchingExplanation.messageKey
+    } : {}),
     ...(result.questions.length > 0
       ? { questions: publicQuestions(result.questions) }
       : {}),
@@ -1156,7 +1188,7 @@ export function publicPlanFields(result: Pick<
     ...(advertisedOptions.length > 0
       ? {
           options: advertisedOptions.map((item) =>
-            publicOption(item, selected, locale, advertisedOptions)
+            publicOption(item, selected, locale, advertisedOptions, snapshot?.requirements ?? {})
           )
         }
       : {}),
@@ -1183,7 +1215,7 @@ export function publicPlanFields(result: Pick<
         orders: horizonUnavailable ? [] : result.horizon?.orders ?? [],
         options: advertisedOptions,
         questions: result.questions ?? [],
-        reasonCode: result.horizon?.reasonCode ?? (tooBroad ? "request_too_broad" : null),
+        reasonCode: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.reasonCode : result.horizon?.reasonCode ?? (tooBroad ? "request_too_broad" : null),
         safetyGuidance: result.safetyGuidance,
         selectedOptionId: selected?.optionId ?? null,
         snapshotId:

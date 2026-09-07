@@ -34,6 +34,36 @@ describe("MCP client and HTTP contract", () => {
     }
   });
 
+  it("ANNA-AX-09 forwards tools-only guide and operation schema views through lightweight discovery", async () => {
+    const config = loadAgenticConfig();
+    const isolatedInfo = { conditionCodes: [], medicationCodes: [], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] };
+    for (const locale of ["en", "th", "zh-CN"]) {
+      const call = async (arguments_: Record<string, unknown>) => {
+        const response = await handleLightweightJsonRpc(config, {
+          id: 1, method: "tools/call", params: { name: "info", arguments: { locale, ...arguments_ } }
+        }, isolatedInfo);
+        assert.equal(response?.result?.isError, false);
+        const value = response?.result?.structuredContent as Record<string, unknown>;
+        assert.equal(value.ok, true);
+        return value;
+      };
+      const guide = await call({ view: "client_guide" });
+      assert.equal(typeof guide.clientGuideText, "string", `${locale}: the real discovery path must return the requested guide`);
+      assert.match(guide.clientGuideText as string, /supplemental/);
+      for (const operation of ["create", "get", "revise", "answer", "select"]) {
+        const schema = await call({ view: "plan_schema", planOperation: operation });
+        assert.equal(schema.planOperation, operation);
+        const definition = JSON.parse(schema.planSchemaJson as string);
+        const branches = definition.anyOf ?? [definition];
+        assert.ok(branches.length > 0);
+        for (const branch of branches) assert.equal(branch.properties.operation.const, operation);
+      }
+      const overview = await call({});
+      assert.equal(overview.clientGuideText, undefined, "A detail request must not contaminate the compact overview");
+      assert.equal(overview.planSchemaJson, undefined);
+    }
+  });
+
   it("rejects batches before dispatching any calls", async () => {
     await assert.rejects(readMcpRequest(request(JSON.stringify([{ id: 1, method: "tools/call", params: { name: "execute" } }]))), McpInvalidRequestError);
   });

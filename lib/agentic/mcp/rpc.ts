@@ -308,15 +308,16 @@ export async function handleLightweightJsonRpc(
       };
     }
 
-    const locale =
-      args && typeof args === "object" && !Array.isArray(args)
-        ? (args as { locale?: unknown }).locale
-        : undefined;
+    // The public info schema was validated above. Keep every supported
+    // discovery selector when bypassing the full store-backed dispatcher.
+    const infoArgs = args as Pick<Parameters<typeof infoTool>[0], "locale" | "view" | "planOperation">;
 
     const value = await infoTool({
       config,
       isolatedInfo,
-      locale: typeof locale === "string" ? locale : undefined
+      locale: infoArgs.locale,
+      view: infoArgs.view,
+      planOperation: infoArgs.planOperation
     });
 
     const response = validateToolInput(AGENTIC_OUTPUT_SCHEMAS.info, value)

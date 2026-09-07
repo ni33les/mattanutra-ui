@@ -1,3 +1,4 @@
+import { infoConversationBudget } from "./helpers/info-conversation-budget.ts";
 import assert from "node:assert/strict";
 import { rejectObsoleteHealthAnswer, ADVISORY_SINGLE_RESPONSE_BYTES, ADVISORY_MULTI_RESPONSE_BYTES } from "./agentic/advisory-pack-helpers.ts";
 import { describe, it } from "node:test";
@@ -137,6 +138,7 @@ const LINE_REASON_CODES = new Set([
   "retained_by_user"
 ]);
 const OPTION_ONLY_KEYS = new Set([
+  "preferenceAssessment",
   "basket", "coverage", "coverageSummary", "advice", "doseFit", "roles", "purchaseEligible",
   "cash90DayMinor",
   "coveragePercent",
@@ -1066,7 +1068,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
         ];
         const ok =
           info.ok === true &&
-          jsonSize(info) <= 4096 &&
+          infoConversationBudget(info).passed &&
           countries.length > 0 &&
           currencies.length > 0 &&
           stringList(info.supportedLocales).includes("en") &&
@@ -1479,6 +1481,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
         const second = await harness.call("info", {});
         const keys = Object.keys(first).sort();
         const allowed = [
+          "clientInstructions", "clientExamples",
           "ok",
           "serviceName",
           "contractVersion",
@@ -1511,7 +1514,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           first.ok === true &&
           second.ok === true &&
           blob === JSON.stringify(second) &&
-          jsonSize(first) <= 4096 &&
+          infoConversationBudget(first).passed &&
           extra.length === 0 &&
           missing.length === 0 &&
           first.serviceName === "MattaNutra" &&

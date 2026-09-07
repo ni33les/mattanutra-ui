@@ -3,19 +3,21 @@ import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 export const VALIDATION_CLIENT_LOCALES = ["en", "th", "zh-CN"];
+export const VALIDATION_CLIENT_DISCOVERY = ["resources", "tools_only"];
+const clientSuffixes = ["", "-tools"];
 export const REQUIRED_VALIDATION_STAGES = [
-  "prepare-assets", "administration-schema", "web-schema", "matcher-runtime-schema", "demand-cache-schema", "runtime-schema", "public-catalogue-fixtures", "typecheck", "changed-lint", "production-build", "browser-fixtures", "data-fingerprints-before", "test-full",
-  "matcher-two-runs", ...["a", "b"].flatMap(run => VALIDATION_CLIENT_LOCALES.flatMap(locale => [`docs-client-${run}-${locale}`, `fixture-settlement-${run}-${locale}`, `docs-client-${run}-${locale}-paid`])),
+  "prepare-assets", "administration-schema", "web-schema", "agentic-schema", "matcher-runtime-schema", "reference-integrity-schema", "demand-cache-schema", "runtime-schema", "public-catalogue-fixtures", "typecheck", "changed-lint", "production-build", "browser-fixtures", "data-fingerprints-before", "test-full",
+  "matcher-two-runs", "documented-client-rate-window", ...clientSuffixes.flatMap(suffix => ["a", "b"].flatMap(run => VALIDATION_CLIENT_LOCALES.flatMap(locale => [`docs-client-${run}-${locale}${suffix}`, `fixture-settlement-${run}-${locale}${suffix}`, `docs-client-${run}-${locale}${suffix}-paid`]))),
   "documented-client-non-latency-equality", "full-suite-results", "matcher-results", "data-fingerprints-after", "unchanged-schema-and-catalogue"
 ];
 export const REQUIRED_VALIDATION_ARTIFACTS = ["source-before.json", "source-after.json", "stage-results.json", "build-identity.json", "release-lint.json", "test-inventory.json", "data-before.json", "data-after.json", "public-catalogue-fixtures.json",
   "candidate-identity.json", "full-suite/results.json", "matcher/results.json", "client-comparison.json",
-  ...["a", "b"].flatMap(run => VALIDATION_CLIENT_LOCALES.flatMap(locale => [`fixture-settlement-${run}-${locale}.json`, `client-${run}-${locale}/receipt.json`, `client-${run}-${locale}/semantic.json`, `client-${run}-${locale}-paid/receipt.json`, `client-${run}-${locale}-paid/semantic.json`]))];
+  ...clientSuffixes.flatMap(suffix => ["a", "b"].flatMap(run => VALIDATION_CLIENT_LOCALES.flatMap(locale => [`fixture-settlement-${run}-${locale}${suffix}.json`, `client-${run}-${locale}${suffix}/receipt.json`, `client-${run}-${locale}${suffix}/semantic.json`, `client-${run}-${locale}${suffix}-paid/receipt.json`, `client-${run}-${locale}${suffix}-paid/semantic.json`])))];
 
 /** Reuse complete evidence only for byte-identical source; a commit alone is insufficient. */
 export function readDevValidationProof(file, sourceSha256) {
   const proof = JSON.parse(readFileSync(file, "utf8"));
-  if (proof.version !== "dev-advisory-validation-2" || proof.contractVersion !== "5.0.0" || !/^[a-f0-9]{40}$/.test(proof.releaseBaseCommit ?? "") || ["releaseLintSha256", "testInventorySha256", "databaseSchemaSha256", "catalogueSha256"].some(key => !/^[a-f0-9]{64}$/.test(proof[key] ?? "")) || proof.environment !== "dev" ||
+  if (proof.version !== "dev-advisory-validation-3" || proof.contractVersion !== "6.0.0" || !/^[a-f0-9]{40}$/.test(proof.releaseBaseCommit ?? "") || ["releaseLintSha256", "testInventorySha256", "databaseSchemaSha256", "catalogueSha256"].some(key => !/^[a-f0-9]{64}$/.test(proof[key] ?? "")) || proof.environment !== "dev" ||
       proof.candidateOrigin !== "http://127.0.0.1:3100" || proof.passed !== true ||
       proof.unchangedSource !== true || proof.sourceSha256 !== sourceSha256 ||
       proof.buildId !== sourceSha256.slice(0, 40) || !proof.schemaChecksum) {
@@ -51,8 +53,8 @@ export function readDevValidationProof(file, sourceSha256) {
     throw new Error("DEV validation schema or catalogue identity changed.");
   }
   const comparison = json("client-comparison.json");
-  if (!Array.isArray(comparison.comparisons) || comparison.comparisons.length !== VALIDATION_CLIENT_LOCALES.length * 2 ||
-      VALIDATION_CLIENT_LOCALES.some(locale => ["checkout", "-paid"].some(phase => comparison.comparisons.filter(row => row.locale === locale && row.phase === phase && row.identical === true).length !== 1))) {
+  if (!Array.isArray(comparison.comparisons) || comparison.comparisons.length !== VALIDATION_CLIENT_LOCALES.length * VALIDATION_CLIENT_DISCOVERY.length * 2 ||
+      VALIDATION_CLIENT_DISCOVERY.some(discovery => VALIDATION_CLIENT_LOCALES.some(locale => ["checkout", "-paid"].some(phase => comparison.comparisons.filter(row => row.discovery === discovery && row.locale === locale && row.phase === phase && row.identical === true).length !== 1)))) {
     throw new Error("DEV validation omitted a language or payment phase from client equality.");
   }
   return proof;

@@ -21,6 +21,7 @@ export function buildExplanation(input: Readonly<{
     hasQuestions: input.nextActions.includes("answer_questions"),
     hasSelectedOption: Boolean(input.option.basket.length),
     hasPurchaseOptions: input.nextActions.includes("review_options"),
+    canRefine: input.nextActions.includes("change_request"),
     replenishesLater: input.nextActions.includes("replenish_later"),
     purchaseRequiredNow: !input.nextActions.includes("replenish_later") });
   const nextActionKey = `plan.next_action.${decision.nextAction}`;

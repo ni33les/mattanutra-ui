@@ -73,6 +73,8 @@ export function isForbiddenLocalePath(path: string) {
 export function isPermittedPresentationPath(path: string) {
   return LOCALE_PRESENTATION_ROOTS.some((root) => underRoot(path, root))
     || path === "/compactDecision/nextAction"
+    || /^\/(compactDecision\/)?matchingExplanation\/message$/.test(path)
+    || /^\/(compactDecision\/)?preferenceAssessment\/\d+\/message$/.test(path)
     || /^\/compactDecision\/advice\/\d+\/(message|uncertainty)$/.test(path);
 }
 

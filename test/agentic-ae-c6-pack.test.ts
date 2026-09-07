@@ -132,6 +132,7 @@ const PROCESSING_KEYS = new Set([
 ]);
 
 const COMPLETED_KEYS = new Set([
+  "preferenceAssessment",
   "contractVersion", "operationalDecision", "nextReplenishmentDay", "scheduleComplete", "unavailableReasons",
   "acknowledgementStatus",
   "acknowledgedUnassessedConditionCodes",

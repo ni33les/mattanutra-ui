@@ -95,8 +95,11 @@ describe("MCP v4 published contract and replanning", () => {
     const runtime = makeRuntime(); const listed = await handleJsonRpc(runtime, { id: 1, method: "tools/list" });
     assert.equal((listed?.result?.tools as unknown[]).length, 7);
     const resources = await handleJsonRpc(runtime, { id: 1, method: "resources/list" });
-    // v5 adds current resources while retaining the two historical v4 URIs.
-    assert.equal((resources?.result?.resources as unknown[]).length, 4);
+    // v6 adds current resources and preserves both guide/schema pairs for v4 and v5.
+    const publishedResources = resources?.result?.resources as Array<{ uri: string }>;
+    assert.equal(publishedResources.length, 6);
+    for (const version of ["4.0.0", "5.0.0", "6.0.0"]) for (const suffix of ["client-guide", "schema"])
+      assert.ok(publishedResources.some(resource => resource.uri === `mattanutra://contract/${version}/${suffix}`));
     for (const uri of [CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI]) {
       const read = await handleJsonRpc(runtime, { id: 1, method: "resources/read", params: { uri } });
       assert.ok((read?.result?.contents as Array<{text:string}>)[0].text.length > 100);

@@ -1264,7 +1264,7 @@ describe("Customer value implementation pack v1.4", () => {
       t.diagnostic(JSON.stringify({ first, second }));
     }
     assert.equal(canonicalR4Report(first), canonicalR4Report(second), "v1.4 runs diverged");
-    assert.equal(MATCHER_VERSION, "flexible-dose-fit-3");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-4");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
     const failed = [...first.cases, ...second.cases].filter((item) => item.result !== "PASS");
     assert.equal(

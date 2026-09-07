@@ -930,8 +930,10 @@ async function runDevSave04(session: PlanSession, runIndex: number): Promise<CvI
   if (!creatine || !mag) {
     return blocked("DEV-SAVE-04", { reason: "missing_core_supplements" });
   }
+  const excludedProducts = [...new Set(session.freeze.snapshot.products.filter(product => product.contributionSupplementIds.includes(mag.supplementId)).map(product => product.productId))];
+  assert.ok(excludedProducts.length > 0, "SAVE-04 requires actual relevant products to exclude");
   const request = primaryRequest(session.freeze, {
-    requirements: { maxProductCount: 1 },
+    requirements: { maxProductCount: 1, excludeProductIds: excludedProducts },
     targets: primaryRequest(session.freeze).targets.map((target) =>
       /magnesium/i.test(target.name) ? { ...target, importance: "core" as const } : target
     )
@@ -947,7 +949,7 @@ async function runDevSave04(session: PlanSession, runIndex: number): Promise<CvI
       row.status !== "over_target"
   );
   const assertions = [
-    assertTrue("SAVE-04.lostCore", lostCore.length > 0 || economics.equivalent === false),
+    assertTrue("SAVE-04.lostCore", lostCore.length > 0),
     assertTrue(
       "SAVE-04.notEquivalentSaving",
       economics.equivalent !== true || economics.savingClaim !== "positive"
@@ -1119,12 +1121,16 @@ async function runDevSafety01(session: PlanSession, runIndex: number): Promise<C
     )
   ];
   for (const row of withUl) {
+    const sourceScope = row.sourceScope === "total" ? "total" : row.sourceScope === "supplemental" ? "supplemental" : null;
+    assertions.push(assertTrue(`SAFETY-01.scope:${row.supplementId}`, sourceScope != null));
     const ceiling = safetyCeilingFor(matcherSafetyCeilings(), {
       conditionCodes: ["atrial_fibrillation"],
       name: String(row.name),
       profile: { ageYears: 52, lifeStage: "adult" },
+      ...(sourceScope ? { sourceScope } : {}),
       subjectId: String(row.supplementId)
     });
+    assertions.push(assertTrue(`SAFETY-01.ledger:${row.supplementId}`, ceiling != null));
     if (!ceiling) {
       continue;
     }
@@ -1133,12 +1139,13 @@ async function runDevSafety01(session: PlanSession, runIndex: number): Promise<C
       ceilings: matcherSafetyCeilings(),
       conditionCodes: ["atrial_fibrillation"],
       profile: { ageYears: 52, lifeStage: "adult" },
+      sourceScope: ceiling.sourceScope,
       subjectId: String(row.supplementId)
     });
     assertions.push(
       assertTrue(
         `SAFETY-01.match:${row.supplementId}`,
-        expected == null || Number(row.upperLimitAmount) === expected
+        expected != null && Number(row.upperLimitAmount) === expected
       )
     );
   }
@@ -1164,23 +1171,28 @@ async function runDevSafety03(session: PlanSession, runIndex: number): Promise<C
   const d3 = coverageOf(await createPlan(session, primaryRequest(session.freeze))).find((row) =>
     /vitamin d/i.test(String(row.name))
   );
+  const sourceScope = d3?.sourceScope === "total" ? "total" : d3?.sourceScope === "supplemental" ? "supplemental" : null;
   const ceiling = safetyCeilingFor(matcherSafetyCeilings(), {
     conditionCodes: ["atrial_fibrillation"],
     name: String(d3?.name ?? "Vitamin D3"),
     profile: { ageYears: 52, lifeStage: "adult" },
+    ...(sourceScope ? { sourceScope } : {}),
     subjectId: String(d3?.supplementId ?? "")
   });
   const L = ceiling?.maxAmount ?? null;
   const assertions = [
+    assertTrue("SAFETY-03.scope", sourceScope != null),
     assertTrue("SAFETY-03.ledger", L != null && L > 0),
-    assertTrue("SAFETY-03.notHardcoded", L !== 40000 || ceiling?.maxUnit !== "IU" || true)
+    assertTrue("SAFETY-03.notHardcoded", ceiling != null && d3?.ruleId === ceiling.bandId &&
+      String(d3?.rulesVersion) === String(ceiling.bandVersion)),
+    assertTrue("SAFETY-03.hasReturnedLimit", d3?.upperLimitAmount != null)
   ];
   if (d3?.upperLimitAmount != null && L != null) {
     const returned = Number(d3.upperLimitAmount);
     assertions.push(
       assertTrue(
         "SAFETY-03.derived",
-        returned === L ||
+        (d3.unit === ceiling?.maxUnit && returned === L) ||
           (d3.unit === "IU" && ceiling?.maxUnit === "mcg" && returned === L * 40) ||
           (d3.unit === "mcg" && ceiling?.maxUnit === "IU" && returned * 40 === L)
       )
@@ -1596,7 +1608,7 @@ describe("Customer value implementation pack v1.1", () => {
     );
     assert.equal(first.snapshotId, second.snapshotId);
     assert.equal(canonicalCvImplReport(first), canonicalCvImplReport(second), "CV implementation non-latency results diverged");
-    assert.equal(MATCHER_VERSION, "flexible-dose-fit-3");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-4");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });

@@ -148,6 +148,8 @@ async function callTool(
     switch (canonical) {
       case "info":
         value = await infoTool({
+          view: params.view as "overview" | "client_guide" | "plan_schema" | undefined,
+          planOperation: params.planOperation as "create" | "get" | "revise" | "answer" | "select" | undefined,
           config: runtime.config,
           isolatedInfo: runtime.isolatedInfo,
           locale: typeof params.locale === "string" ? params.locale : undefined

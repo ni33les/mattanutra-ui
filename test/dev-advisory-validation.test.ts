@@ -28,9 +28,18 @@ it("rejects remote, ordinary local, mismatched and non-DEV database configuratio
 
 it("V5-GATE-01 requires both complete documented journeys in English, Thai and Chinese", async () => {
   const { validationClientMatrix } = await import("../scripts/run-dev-advisory-validation.mjs");
-  assert.deepEqual(validationClientMatrix().map((row: { runId: string; locale: string }) => `${row.runId}:${row.locale}`), ["a:en", "a:th", "a:zh-CN", "b:en", "b:th", "b:zh-CN"]);
+  assert.deepEqual(validationClientMatrix().filter((row: { discovery: string }) => row.discovery === "resources").map((row: { runId: string; locale: string }) => `${row.runId}:${row.locale}`), ["a:en", "a:th", "a:zh-CN", "b:en", "b:th", "b:zh-CN"]);
   const { REQUIRED_VALIDATION_STAGES } = await import("../scripts/dev-validation-proof.mjs");
   for (const row of validationClientMatrix()) for (const stage of [`docs-client-${row.runId}-${row.locale}`, `docs-client-${row.runId}-${row.locale}-paid`, `fixture-settlement-${row.runId}-${row.locale}`]) assert.ok(REQUIRED_VALIDATION_STAGES.includes(stage), stage);
+});
+
+it("ANNA-GATE-01 adds tools-only journeys without omitting native resource journeys", async () => {
+  const { validationClientMatrix } = await import("../scripts/run-dev-advisory-validation.mjs");
+  const matrix = validationClientMatrix() as Array<{ runId: string; locale: string; discovery: string }>;
+  assert.equal(matrix.length, 12);
+  for (const discovery of ["resources", "tools_only"]) for (const runId of ["a", "b"]) for (const locale of ["en", "th", "zh-CN"]) {
+    assert.equal(matrix.filter(row => row.discovery === discovery && row.runId === runId && row.locale === locale).length, 1);
+  }
 });
 
 it("V5-GATE-02 release lint covers committed slices and current edits relative to the recorded base", async () => {

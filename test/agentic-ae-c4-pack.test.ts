@@ -140,6 +140,7 @@ const OPTION_CODES = new Set([
   "lowest_cost"
 ]);
 const INFO_ALLOWED = new Set([
+  "clientInstructions", "clientExamples",
   "ok",
   "serviceName",
   "contractVersion",

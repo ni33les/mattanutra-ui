@@ -495,7 +495,7 @@ const ROWS = [
   {
     category: "Customer value remediation",
     id: "FIX-06",
-    purpose: "Direct endpoint and installed connector advertise the same schema"
+    purpose: "Native tool registry and generated repository contract snapshot agree; installed connector projection is checked separately"
   },
   {
     category: "Customer value remediation",

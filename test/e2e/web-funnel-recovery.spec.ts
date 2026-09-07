@@ -1,6 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test, type Page } from "../helpers/offline-browser";
 const execute = promisify(execFile);
 const databaseUrl = process.env.TEST_DB_URL;
@@ -22,6 +25,17 @@ async function fill(page: Page) {
   const response = await captured;
   expect(response.status()).toBe(200);
   return response.json();
+}
+async function preferenceFixture(locale: string) {
+  const directory = await mkdtemp(join(tmpdir(), "anna-browser-preference-"));
+  try {
+    const output = join(directory, "fixture.json");
+    await execute(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./test/helpers/offline-network.mjs",
+      "scripts/seed-browser-fixtures.ts", output, JSON.stringify({ scenario: "numeric_preferences", locale })], {
+      env: { ...process.env, TEST_DB_URL: databaseUrl }, maxBuffer: 1024 * 1024, timeout: 60_000, killSignal: "SIGKILL"
+    });
+    return JSON.parse(await readFile(output, "utf8"));
+  } finally { await rm(directory, { recursive: true, force: true }); }
 }
 test("fresh browser resumes server answers; unrelated drafts and previous contact are ignored", async ({ page }) => {
   const resumed = await fixture({ action: "resume" });
@@ -88,7 +102,84 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
   await expect(page.getByTestId("reveal-hero-name")).toBeVisible();
 });
 
-for (const locale of ["en", "th", "zh-CN"]) {
+for (const locale of ["en", "th", "zh-CN"] as const) {
+  test(`ANNA-BROWSER-06 preference advice, unknown pills and exclusion binding in ${locale}`, async ({ page }) => {
+    const seeded = await preferenceFixture(locale);
+    const scenario = seeded.preferenceScenario;
+    expect(scenario.selectedProductCount).toBe(2);
+    expect(scenario.selectedDailyPills).toBe(2);
+    const reveal = `/${locale}/nutrition/reveal?plan=${seeded.planId}`;
+    await page.goto(reveal);
+    await expect(page.locator(".mn-reveal-final")).toBeVisible();
+    const preferences = page.getByTestId("selected-matching-preferences");
+    await expect(preferences.locator("[data-preference]")).toHaveCount(3);
+    for (const kind of ["product_count", "daily_pills", "first_order_goods_price"]) {
+      await expect(preferences.locator(`[data-preference="${kind}"]`)).toHaveAttribute("data-prominent", "true");
+    }
+    await expect(preferences).not.toContainText("THB_minor");
+
+    // A declared response fixture exercises incomplete physical metadata in the
+    // browser. The real stored purchase option and monetary facts remain intact.
+    let unknownResponses = 0;
+    await page.route("**/formulation?locale=*&products=1", async route => {
+      const response = await route.fetch();
+      const payload = await response.json();
+      const visit = (value: unknown) => {
+        if (Array.isArray(value)) { value.forEach(visit); return; }
+        if (!value || typeof value !== "object") return;
+        const row = value as Record<string, unknown>;
+        if (row.optionId && Array.isArray(row.productIds) && Array.isArray(row.preferences)) {
+          row.dailyPills = null;
+          for (const preference of row.preferences as Array<Record<string, unknown>>) {
+            if (preference.kind === "daily_pills") Object.assign(preference, { actual: null, complete: false, delta: null,
+              percent: null, status: "unknown", prominent: false, messageKey: "plan.preference.unknown" });
+          }
+          unknownResponses += 1;
+        }
+        Object.values(row).forEach(visit);
+      };
+      visit(payload);
+      await route.fulfill({ response, json: payload });
+    });
+    await page.reload();
+    const unknown = { en: "the actual amount is unknown", th: "ยังไม่ทราบจำนวนจริง", "zh-CN": "实际数值未知" }[locale]!;
+    await expect(preferences.locator('[data-preference="daily_pills"]')).toContainText(unknown);
+    await expect(preferences.locator('[data-preference="daily_pills"]')).not.toHaveAttribute("data-prominent", "true");
+    expect(unknownResponses).toBeGreaterThan(0);
+    const alternative = page.locator(`[data-testid="matching-option"][data-option-id="${scenario.alternative.optionId}"]`);
+    await expect(alternative.locator('[data-preference="daily_pills"]')).toContainText(unknown);
+    const choose = alternative.locator('a[href*="/basket/checkout?"]');
+    await expect(choose).toBeVisible();
+    const selectedUrl = new URL((await choose.getAttribute("href"))!, "http://127.0.0.1:3100");
+    expect(selectedUrl.searchParams.get("option")).toBe(scenario.alternative.optionId);
+    expect(selectedUrl.searchParams.get("run")).toBe(seeded.runId);
+    expect(selectedUrl.searchParams.get("revision")).toBe("1");
+    expect(selectedUrl.searchParams.get("selectionRevision")).toBe("0");
+    await expect(page.getByRole("checkbox", { name: /acknowledge|รับทราบ|确认风险/i })).toHaveCount(0);
+    await choose.click();
+    await expect(page).toHaveURL(/\/basket\/checkout\?/);
+    await expect(page.locator('input[name="customerName"]').first()).toBeVisible();
+    const selection = { action: "checkoutSelection", locale, planId: seeded.planId, runId: seeded.runId,
+      optionId: scenario.alternative.optionId, selectedItemIds: scenario.alternative.productIds, assessmentRevision: 1, selectionRevision: 0 };
+    expect(await fixture(selection)).toEqual({ allowed: true, productIds: scenario.alternative.productIds });
+
+    await page.unroute("**/formulation?locale=*&products=1");
+    await page.goto(reveal);
+    await expect(page.locator("#products .product-card")).toHaveCount(2);
+    const remove = page.locator("#products .product-card .product-remove-btn");
+    await remove.nth(0).click();
+    await remove.nth(1).click();
+    const replanLabel = { en: "Exclude removed products and replan", th: "ยกเว้นสินค้าที่นำออกและจัดแผนใหม่", "zh-CN": "排除已移除的商品并重新规划" }[locale]!;
+    const revisedResponse = page.waitForResponse(response => response.url().endsWith(`/api/assessment/${seeded.planId}/product-recommendations`) && response.request().method() === "POST");
+    await page.getByRole("button", { name: replanLabel, exact: true }).click();
+    const response = await revisedResponse;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON()).toMatchObject({ locale, assessmentRevision: 1, selectionRevision: 0,
+      excludeProductIds: expect.arrayContaining(scenario.selectedProductIds) });
+    expect((await response.json()).selectionRevision).toBe(1);
+    await expect(page.locator('#products a[href*="/basket/checkout?"]')).toHaveCount(0);
+    expect(await fixture(selection)).toEqual({ allowed: false, code: "stale_product_selection", status: 409 });
+  });
   test(`ordinary checkout and pending reveal recover in ${locale}`, async ({ page }) => {
     await page.goto(`/${locale}/nutrition/quiz`);
     const capture = await fill(page);

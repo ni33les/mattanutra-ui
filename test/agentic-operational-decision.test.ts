@@ -30,6 +30,45 @@ function adviceOption(guidance: readonly SafetyGuidance[]): StackOption {
 }
 
 describe("one operational decision", () => {
+  it("ANNA-AX-09: serialized preference advice preserves unknown pill counts and zero preferences without blocking a valid option", () => {
+    const option = adviceOption([adviceFixture]);
+    const selected = { ...option, basket: option.basket.map(item => ({ ...item, pillCountKnown: false })) };
+    const result = { alternatives: [], basket: selected.basket, selected, status: "ready" as const,
+      coverage: [], questions: [], changeSummary: [], unmetRequirements: [], safetyGuidance: [adviceFixture], summary: "Ready with advice.",
+      requestSnapshot: { locale: "en", targets: [], currentSupplements: [], medicationCodes: [], conditionCodes: [], requirements: { maxProductCount: 0, maxDailyPills: 2, maxPriceMinor: 100 } } };
+    const value = JSON.parse(JSON.stringify(publicPlanFields(result)));
+    assert.equal(value.status, "ready");
+    assert.equal(value.operationalDecision.purchaseEligible, true);
+    assert.deepEqual(value.nextActions, [value.operationalDecision.nextAction]);
+    for (const rows of [value.preferenceAssessment, value.options[0].preferenceAssessment, value.compactDecision.preferenceAssessment]) {
+      const pill = rows.find((row: { kind: string }) => row.kind === "daily_pills");
+      assert.equal(pill.actual, null); assert.equal(pill.delta, null); assert.equal(pill.percent, null); assert.equal(pill.complete, false);
+      assert.equal(pill.status, "unknown");
+      const count = rows.find((row: { kind: string }) => row.kind === "product_count");
+      assert.equal(count.prominent, true); assert.equal(count.preferred, 0); assert.equal(count.actual, 1); assert.equal(count.percent, null);
+    }
+    assert.equal(value.compactDecision.advice[0].severity, "high");
+    assert.equal(value.acknowledgementStatus, "not_required");
+  });
+  it("ANNA-AX-10: empty-result reason, summary and all recovery projections use the same candidate evidence", () => {
+    const option = adviceOption([]);
+    const empty = { ...option, basket: [], totalPriceMinor: 0, dailyPills: 0 };
+    const matchingDiagnostics = { catalogueListings: 2, catalogueProducts: 2, eligibleListings: 0, eligibleProducts: 0,
+      supportedDoseVariants: 0, evaluatedNonemptyBaskets: 0, reasonCode: "no_eligible_products" as const,
+      rejectionCounts: [{ reason: "excluded", count: 2 }], targets: [] };
+    const value = publicPlanFields({ alternatives: [], basket: [], selected: empty, status: "no_purchase",
+      coverage: [{ name: "Magnesium", requestedAmount: 100, currentAmount: 0, deliveredAmount: 0, remainingGap: 100, status: "uncovered", supplementId: "magnesium", unit: "mg", coveragePercent: 0 }],
+      questions: [], changeSummary: [], unmetRequirements: [], safetyGuidance: [], summary: "Legacy generic no-purchase copy", matchingDiagnostics });
+    assert.equal(value.status, "no_purchase");
+    assert.equal(value.reasonCode, "no_eligible_products");
+    assert.equal(value.reason, value.summary);
+    assert.equal(value.compactDecision?.why, value.summary);
+    assert.equal(value.matchingExplanation?.message, value.summary);
+    assert.equal(value.operationalDecision.nextAction, "change_request");
+    assert.deepEqual(value.nextActions, ["change_request"]);
+    assert.equal(value.explanation?.nextActionKey, "plan.next_action.change_request");
+    assert.deepEqual(value.compactDecision?.operationalDecision, value.operationalDecision);
+  });
   it("concise copy counts unresolved targets instead of claiming their names are covered", () => {
     const selected = { ...adviceOption([]), optionId: "opt_partial_fixture", coverage: [
       ...[0, 1, 2, 3].map(index => ({ name: `Known ${index}`, status: "covered" })),

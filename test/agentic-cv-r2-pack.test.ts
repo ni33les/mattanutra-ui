@@ -12,6 +12,7 @@ import {
 import { AGENTIC_SCHEMA_CHECKSUM } from "../lib/agentic/info.ts";
 import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
 import { toolList } from "../lib/agentic/mcp/rpc.ts";
+import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { MATCHER_VERSION } from "../lib/matcher/config.ts";
 import {
   matcherSafetyCeilings,
@@ -951,8 +952,12 @@ async function runSave03(session: PlanSession, runIndex: number): Promise<R2Case
 }
 
 async function runSave04(session: PlanSession, runIndex: number): Promise<R2CaseResult> {
+  const mag = supplementByName(session.freeze, "Magnesium");
+  assert.ok(mag, "SAVE-04 requires its magnesium core target fixture");
+  const excludedProducts = [...new Set(session.freeze.snapshot.products.filter(product => product.contributionSupplementIds.includes(mag.supplementId)).map(product => product.productId))];
+  assert.ok(excludedProducts.length > 0, "SAVE-04 requires actual relevant products to exclude");
   const request = primaryRequest(session.freeze, {
-    requirements: { maxProductCount: 1 },
+    requirements: { maxProductCount: 1, excludeProductIds: excludedProducts },
     targets: primaryRequest(session.freeze).targets.map((target) =>
       /magnesium/i.test(target.name) ? { ...target, importance: "core" as const } : target
     )
@@ -967,7 +972,7 @@ async function runSave04(session: PlanSession, runIndex: number): Promise<R2Case
       row.status !== "over_target"
   );
   const assertions = [
-    assertTrue("SAVE-04.lostCore", lostCore.length > 0 || economics.equivalent === false),
+    assertTrue("SAVE-04.lostCore", lostCore.length > 0),
     assertTrue("SAVE-04.notPositive", economics.equivalent !== true || economics.savingClaim !== "positive")
   ];
   return conclude("R2-SAVE-04", assertions, envelopeFor(session, request, plan, assertions, runIndex));
@@ -1098,7 +1103,7 @@ async function runContract02(session: PlanSession, runIndex: number): Promise<R2
     assertEq(
       "CONTRACT-02.checksum",
       officialChecksum,
-      JSON.parse(readFileSync(new URL("../contract/mcp/5.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
+      JSON.parse(readFileSync(new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, import.meta.url), "utf8")).schemaChecksum
     ),
     assertEq("CONTRACT-02.info", infoChecksum, officialChecksum),
     assertEq("CONTRACT-02.list", listedHash, directHash),
@@ -1113,7 +1118,7 @@ async function runContract03(session: PlanSession, runIndex: number): Promise<R2
     assertEq(
       "CONTRACT-03.checksum",
       officialChecksum,
-      JSON.parse(readFileSync(new URL("../contract/mcp/5.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
+      JSON.parse(readFileSync(new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, import.meta.url), "utf8")).schemaChecksum
     ),
     assertTrue(
       "CONTRACT-03.oneOf",
@@ -1125,7 +1130,7 @@ async function runContract03(session: PlanSession, runIndex: number): Promise<R2
 
 async function runContract04(session: PlanSession, runIndex: number): Promise<R2CaseResult> {
   const snapshot = JSON.parse(
-    readFileSync(new URL("../contract/mcp/5.0.0/tools.json", import.meta.url), "utf8")
+    readFileSync(new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, import.meta.url), "utf8")
   ) as { tools: Array<{ inputSchema: unknown; name: string }> };
   const wellKnown = JSON.parse(
     readFileSync(new URL("../public/.well-known/mcp.json", import.meta.url), "utf8")
@@ -1405,7 +1410,7 @@ describe("Customer value implementation pack v1.2", () => {
     );
     assert.equal(first.snapshotId, second.snapshotId);
     assert.equal(canonicalR2Report(first), canonicalR2Report(second), "All non-latency request and response evidence must match across runs");
-    assert.equal(MATCHER_VERSION, "flexible-dose-fit-3");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-4");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });

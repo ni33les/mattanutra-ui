@@ -279,6 +279,7 @@ function hasFullRequest(payload: PlanToolInput) {
 function composeResult(input: Readonly<{
   alternativeSearch?: PlanResult["alternativeSearch"];
   searchSummary?: PlanResult["searchSummary"];
+  matchingDiagnostics?: PlanResult["matchingDiagnostics"];
   ackMs?: number;
   alternatives: readonly StackOption[];
   catalogueMs?: number;
@@ -384,6 +385,7 @@ function composeResult(input: Readonly<{
     contractVersion: AGENTIC_CONTRACT_VERSION,
     ...(input.alternativeSearch ? { alternativeSearch: input.alternativeSearch } : {}),
     ...(input.searchSummary ? { searchSummary: input.searchSummary } : {}),
+    ...(input.matchingDiagnostics ? { matchingDiagnostics: { ...input.matchingDiagnostics, ...(input.selected?.basket.length ? { reasonCode: "purchase_options_available" as const } : {}) } } : {}),
     originalRequest: input.state.originalRequest,
     alternatives: [...input.alternatives],
     appliedRequirements: Object.entries(pinnedState.requirements)
@@ -532,6 +534,7 @@ async function buildResult(input: Readonly<{
     alternatives: matched.alternatives,
     alternativeSearch: "alternativeSearch" in matched ? matched.alternativeSearch : undefined,
     searchSummary: "searchSummary" in matched ? matched.searchSummary : undefined,
+    matchingDiagnostics: "matchingDiagnostics" in matched ? matched.matchingDiagnostics : undefined,
     catalogueMs: input.catalogueMs,
     locale: input.locale,
     leftovers: matched.leftovers,
@@ -582,6 +585,7 @@ function buildPinnedResult(input: Readonly<{
     alternatives: advertisedAlternatives(input.previous, input.selected),
     alternativeSearch: input.previous.alternativeSearch,
     searchSummary: input.previous.searchSummary,
+    matchingDiagnostics: input.previous.matchingDiagnostics,
     locale: input.locale,
     leftovers,
     previous: input.previous,

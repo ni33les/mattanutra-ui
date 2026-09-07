@@ -1,3 +1,5 @@
+import type { MatchingExplanation } from "@/lib/agentic/value/matching-explanation";
+import { assessPreferences, type PreferenceAssessment, type NumericPreferences } from "@/lib/matcher/preferences";
 import { RESEARCH_VERSION } from "@/lib/agentic/discovery/versions";
 import {
   planLevelSupplementNames,
@@ -13,6 +15,8 @@ import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
 const COMPACT_LIMIT_BYTES = 4 * 1024;
 
 export type CompactDecision = Readonly<{
+  preferenceAssessment?: readonly PreferenceAssessment[];
+  matchingExplanation?: MatchingExplanation;
   advice: readonly Readonly<{
     guidanceId: string;
     severity: SafetyGuidance["severity"];
@@ -65,6 +69,7 @@ export type CompactPlanView = Readonly<{
     purchaseRequiredNow?: boolean;
   }>;
   requestSnapshot?: Readonly<{
+    requirements?: NumericPreferences;
     currentSupplements?: readonly Readonly<{
       dailyAmount?: number;
       daysRemaining?: number;
@@ -87,7 +92,7 @@ export function compactDecisionBytes(decision: CompactDecision) {
   return Buffer.byteLength(JSON.stringify(decision), "utf8");
 }
 
-export function buildCompactDecision(result: CompactPlanView, resolvedDecision?: OperationalDecision): CompactDecision {
+export function buildCompactDecision(result: CompactPlanView, resolvedDecision?: OperationalDecision, matchingExplanation?: MatchingExplanation): CompactDecision {
   const selected = result.selected;
   const locale = negotiateLocale(result.requestSnapshot?.locale);
   const durationUnknown = Boolean(result.horizon?.durationUnknown);
@@ -124,7 +129,12 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
     (item) => item
   );
 
+  const preferenceAssessment = assessPreferences(result.requestSnapshot?.requirements ?? {}, { productCount: selected?.basket.length ?? 0,
+    dailyPills: selected?.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : selected?.dailyPills ?? 0,
+    firstOrderGoodsPriceMinor: selected?.basket.some(item => item.incompleteCommercialFacts) ? null : selected?.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0) ?? 0, currency: selected?.basket[0]?.currency ?? "THB" }, locale).filter(row => row.status !== "not_requested");
   return {
+    ...(preferenceAssessment.length ? { preferenceAssessment } : {}),
+    ...(matchingExplanation ? { matchingExplanation } : {}),
     advice,
     nextAction: operationalActionText(decision, locale),
     operationalDecision: decision,
@@ -146,7 +156,7 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
         : result.status === "no_purchase"
           ? agenticMessage(locale, "plan.compact.when.no_purchase")
           : agenticMessage(locale, "plan.compact.when.follow_schedule"),
-    why: decision.nextAction === "review_options"
+    why: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.message : decision.nextAction === "review_options"
       ? [agenticMessage(locale, "plan.summary.review_options"),
           ...(durationUnknown ? [agenticMessage(locale, "plan.compact.why.duration_unknown")] : [])].join(" ")
       : whyFor(result, locale)

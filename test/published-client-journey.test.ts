@@ -3,6 +3,16 @@ import { it } from "node:test";
 import { readFileSync } from "node:fs";
 import { selectPublishedResources, publishedExample, selectPurchaseTradeOff, customerTargetConfirmation } from "../scripts/published-client-journey.mjs";
 
+it("ANNA-CLIENT-01 tools-only discovery reconstructs examples from published guide content", async () => {
+  const { contractFromToolDiscovery } = await import("../scripts/published-client-journey.mjs");
+  const guide = '### create\n\n```json\n{"method":"tools/call","params":{"name":"plan","arguments":{"operation":"create","request":{"targets":[{"basis":"supplemental"}]}}}}\n```\n';
+  const tool = { name: "plan", inputSchema: { type: "object" }, outputSchema: { type: "object" } };
+  const contract = contractFromToolDiscovery({ contractVersion: "6.0.0" }, [tool], guide);
+  assert.deepEqual(contract.tools.plan.inputSchema, tool.inputSchema);
+  assert.equal(publishedExample(contract, "create").request.targets[0].basis, "supplemental");
+  assert.throws(() => contractFromToolDiscovery({ contractVersion: "6.0.0" }, [tool], "No executable examples"), /examples/);
+});
+
 it("V5-CLIENT-01 follows discovery references even when archived v4 resources are listed first", () => {
   const resources = [
     { uri: "mattanutra://contract/4.0.0/schema", mimeType: "application/schema+json" },
