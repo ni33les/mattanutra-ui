@@ -9,6 +9,7 @@ import {
   AGENTIC_PRD_TOOL_DESCRIPTIONS,
   AGENTIC_UAT_SERVER_INSTRUCTIONS,
   AGENTIC_INPUT_SCHEMAS,
+  AGENTIC_OUTPUT_SCHEMAS,
   AGENTIC_TOOL_SCHEMAS,
   PLAN_INPUT_SCHEMA,
   validateToolInput
@@ -17,6 +18,7 @@ import {
   handleJsonRpc,
   type JsonRpcResponse
 } from "../lib/agentic/mcp/dispatcher.ts";
+import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { createAgenticRuntime } from "../lib/agentic/runtime.ts";
 
 function rpcResult(response: JsonRpcResponse | null) {
@@ -25,7 +27,7 @@ function rpcResult(response: JsonRpcResponse | null) {
   return response.result;
 }
 
-describe("agentic MCP contract 4.0.0", () => {
+describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
   it("exposes the public tools including evidence", () => {
     assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], [
       "info",
@@ -55,12 +57,14 @@ describe("agentic MCP contract 4.0.0", () => {
 
   it("keeps the checked-in contract snapshot in sync", () => {
     const snapshot = JSON.parse(
-      readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
+      readFileSync(new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, import.meta.url), "utf8")
     ) as {
+      contractVersion: string;
       instructions?: string;
-      tools: Array<{ description: string; inputSchema: unknown; name: string }>;
+      tools: Array<{ description: string; inputSchema: unknown; outputSchema: unknown; name: string }>;
     };
 
+    assert.equal(snapshot.contractVersion, AGENTIC_CONTRACT_VERSION);
     assert.equal(snapshot.instructions, AGENTIC_SERVER_INSTRUCTIONS);
     assert.deepEqual(
       snapshot.tools.map((tool) => tool.name),
@@ -68,6 +72,7 @@ describe("agentic MCP contract 4.0.0", () => {
     );
 
     for (const tool of snapshot.tools) {
+      assert.deepEqual(tool.outputSchema, JSON.parse(JSON.stringify(AGENTIC_OUTPUT_SCHEMAS[tool.name as keyof typeof AGENTIC_OUTPUT_SCHEMAS])));
       assert.deepEqual(
         tool.inputSchema,
         JSON.parse(JSON.stringify(AGENTIC_TOOL_SCHEMAS[tool.name as keyof typeof AGENTIC_TOOL_SCHEMAS]))
@@ -92,14 +97,14 @@ describe("agentic MCP contract 4.0.0", () => {
 
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /plan, then execute/);
-    assert.match(String(result.instructions), /Never prefix mattanutra_dev/);
+    assert.match(String(result.instructions), /plan\(create\).*before execute/s);
+    assert.match(String(result.instructions), /never prefix a server name/i);
     assert.equal(/D1-01 through D10-10/.test(String(result.instructions)), false);
     assert.equal(/\/api\/mcp\/qa/.test(String(result.instructions)), false);
     assert.equal(/dev-mcp-qa-token/.test(String(result.instructions)), false);
     assert.equal(
       (result.serverInfo as { version: string }).version,
-      "4.0.0"
+      AGENTIC_CONTRACT_VERSION
     );
     assert.equal((result.serverInfo as { name: string }).name, "mattanutra_dev");
   });
@@ -122,7 +127,7 @@ describe("agentic MCP contract 4.0.0", () => {
     });
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_UAT_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /Polling is the only continuation method/);
+    assert.match(String(result.instructions), /polling is the only continuation method/i);
     assert.match(String(result.instructions), /order\(orderHandle\)/);
     assert.match(String(result.instructions), /Stripe Test Mode/);
     assert.match(String(result.instructions), /optionally invite feedback/);
@@ -156,7 +161,7 @@ describe("agentic MCP contract 4.0.0", () => {
     });
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_PRD_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /Polling is the only continuation method/);
+    assert.match(String(result.instructions), /polling is the only continuation method/i);
     assert.match(String(result.instructions), /order\(orderHandle\)/);
     assert.equal(String(result.instructions).includes("Stripe Test Mode"), false);
     assert.equal(String(result.instructions).includes("4242"), false);
