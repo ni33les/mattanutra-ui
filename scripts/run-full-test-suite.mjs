@@ -8,6 +8,8 @@ import { recursiveTestFiles, matcherTestInventory, unclassifiedMatcherConsumers 
 import { nodeExecutionProof, browserExecutionProof, testSourceHygiene } from "./test-execution-proof.mjs";
 export { nodeExecutionProof, browserExecutionProof, testSourceHygiene };
 
+import { browserFixtureEnvironment } from "./browser-fixture-environment.mjs";
+
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 export function fullTestInventory(root = ROOT) {
   const node = recursiveTestFiles(root);
@@ -140,10 +142,7 @@ async function main() {
   const browserEnv = { ...common };
   try {
     const fixtures = JSON.parse(readFileSync(join(evidence, "browser-fixtures-refreshed.json"), "utf8"));
-    for (const key of ["REVEAL_VISUAL_SMOKE_URL", "MOBILE_UX_REVEAL_URL", "MOBILE_UX_CHECKOUT_URL", "MOBILE_UX_ORDER_URL"]) {
-      if (!fixtures[key] || new URL(fixtures[key]).origin !== new URL(common.PLAYWRIGHT_BASE_URL).origin) throw new Error(`Invalid refreshed browser fixture: ${key}`);
-      browserEnv[key] = fixtures[key];
-    }
+    Object.assign(browserEnv, browserFixtureEnvironment(fixtures, new URL(common.PLAYWRIGHT_BASE_URL).origin));
   } catch (error) { results.push({ label: "browser-fixture-identity", passed: false, error: error.message }); }
   results.push(await runBatch("browser-discovery", ["node_modules/@playwright/test/cli.js", "test", "--list", "--reporter=json"],
     { ...browserEnv, CI: "1", PLAYWRIGHT_JSON_OUTPUT_FILE: join(evidence, "browser-discovery.json") }, evidence));

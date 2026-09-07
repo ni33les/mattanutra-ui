@@ -29,10 +29,35 @@ process.env.DB_WORKER_URL = database.href;
 process.env.STRIPE_PAYMENT_MODE = "mock";
 process.env.MATTANUTRA_ENV = "dev";
 const sql = getSql()!;
-const planId = randomUUID(), runId = randomUUID(), paymentId = randomUUID(), orderId = randomUUID();
+const planId = randomUUID(), runId = randomUUID(), paymentId = randomUUID(), orderId = randomUUID(), adminAgentId = randomUUID();
 const orderNumber = `E2E-${randomUUID().slice(0, 8).toUpperCase()}`;
 const outputPath = resolve(process.argv[2] ?? `/tmp/mattanutra-browser-fixtures-${Date.now()}.json`);
 try {
+  // Organisation writes advance catalogue identity. Provision every admin
+  // dependency before compiling a recommendation, then reuse the target in E2E.
+  const adminTargetId = await withDatabaseTransaction(sql, async tx => {
+    const [platform] = await tx`insert into public.organisations (slug, name, organisation_type, status) values ('mattanutra', 'MattaNutra', 'platform', 'active')
+      on conflict (lower(slug)) do update set status = 'active' returning id`;
+    const [person] = await tx`insert into public.people (email, display_name, status, metadata) values ('browser-owner@example.test', 'Browser Fixture Owner', 'active', '{"source":"isolated_browser_fixture"}')
+      on conflict (lower(email)) do update set status = 'active' returning id`;
+    await tx`insert into public.organisation_memberships (organisation_id, person_id, role, status) values (${platform.id}::uuid, ${person.id}::uuid, 'platform_owner', 'active') on conflict do nothing`;
+    await tx`insert into public.agents (id, name, organisation_id, metadata) values (${adminAgentId}::uuid, ${`Browser Fixture ${randomUUID().slice(0, 8)}`}, ${platform.id}::uuid, '{"source":"isolated_browser_fixture"}')`;
+    const targetSlug = "browser-admin-target-fixture";
+    const readTarget = () => tx<Array<{ id: string; name: string; organisation_type: string; status: string; metadata: { source?: string } }>>`
+      select id::text,name,organisation_type,status,metadata from public.organisations where lower(slug)=lower(${targetSlug})`;
+    let [target] = await readTarget();
+    if (!target) {
+      await tx`insert into public.organisations (slug,name,organisation_type,status,default_locale,metadata)
+        values (${targetSlug},'Browser Fixture Agent Target','tenant','active','en','{"source":"browser-admin-target-fixture"}')
+        on conflict (lower(slug)) do nothing`;
+      [target] = await readTarget();
+    }
+    assert.ok(target, "Preprovisioned admin target must exist");
+    assert.deepEqual({ name: target.name, type: target.organisation_type, status: target.status, source: target.metadata.source },
+      { name: "Browser Fixture Agent Target", type: "tenant", status: "active", source: "browser-admin-target-fixture" },
+      "Admin fixtures cannot replace an existing organisation or its commercial fields");
+    return target.id;
+  });
   const catalogue = await warmLiveRetailSnapshot("TH");
   const sets = await getLiveSaleEligibleRetailerCandidateSets({ sql, countryCode: "TH", limit: 1000 });
   const choices = sets.flatMap(set => set.candidates.map(product => ({ set, product }))).sort((a, b) =>
@@ -93,15 +118,11 @@ try {
       values (${paymentId}::uuid, ${planId}::uuid, ${runId}::uuid, ${orderId}::uuid, ${set.organisationId}::uuid, 'fulfilled',
         ${Math.round(price * 1_000_000)}, ${product.currency}, 'mock', 'browser-fixture@example.test', 'Browser Fixture', '+66000000000', ${tx.json(address)}, ${selectedIds}::text[],
         ${tx.json(toJsonValue(quoteLines))}, '{"source":"isolated_browser_fixture","synthetic":true,"channel":"web"}', ${`browser-fixture:${paymentId}`}, now(), now())`;
-    const [platform] = await tx`insert into public.organisations (slug, name, organisation_type, status) values ('mattanutra', 'MattaNutra', 'platform', 'active')
-      on conflict (lower(slug)) do update set status = 'active' returning id`;
-    const [person] = await tx`insert into public.people (email, display_name, status, metadata) values ('browser-owner@example.test', 'Browser Fixture Owner', 'active', '{"source":"isolated_browser_fixture"}')
-      on conflict (lower(email)) do update set status = 'active' returning id`;
-    await tx`insert into public.organisation_memberships (organisation_id, person_id, role, status) values (${platform.id}::uuid, ${person.id}::uuid, 'platform_owner', 'active') on conflict do nothing`;
-    await tx`insert into public.agents (id, name, organisation_id, metadata) values (${randomUUID()}::uuid, ${`Browser Fixture ${randomUUID().slice(0, 8)}`}, ${platform.id}::uuid, '{"source":"isolated_browser_fixture"}')`;
+
   });
   const checkoutQuery = new URLSearchParams({ plan: planId, selected: selectedIds.join(","), removed: "", run: runId, option: selectedOptionId, revision: "1", selectionRevision: "0", retailer: set.organisationId });
-  const fixtures = { planId, runId, paymentId, orderId, orderNumber, generatorVersion: FUNNEL_GENERATOR_VERSION,
+  const fixtures = { planId, runId, paymentId, orderId, orderNumber, adminAgentId, generatorVersion: FUNNEL_GENERATOR_VERSION,
+    ADMIN_E2E_TARGET_ORGANISATION_ID: adminTargetId,
     REVEAL_VISUAL_SMOKE_URL: new URL(`/en/nutrition/reveal?plan=${planId}`, base).href,
     MOBILE_UX_REVEAL_URL: new URL(`/en/nutrition/reveal?plan=${planId}`, base).href,
     MOBILE_UX_CHECKOUT_URL: new URL(`/en/basket/checkout?${checkoutQuery}`, base).href,

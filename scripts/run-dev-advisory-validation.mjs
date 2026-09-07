@@ -10,6 +10,8 @@ import { fullTestInventory, sourceManifest } from "./run-full-test-suite.mjs";
 import { mcpTestTarget } from "./mcp-test-target.mjs";
 import { REQUIRED_VALIDATION_STAGES, VALIDATION_CLIENT_LOCALES } from "./dev-validation-proof.mjs";
 
+import { browserFixtureEnvironment } from "./browser-fixture-environment.mjs";
+
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const ORIGIN = "http://127.0.0.1:3100";
 const PRELOAD = join(ROOT, "test/helpers/offline-network.mjs");
@@ -145,10 +147,7 @@ async function main() {
     const fixturePath = join(evidence, "browser-fixtures.json");
     await run("browser-fixtures", process.execPath, [...TS, "scripts/seed-browser-fixtures.ts", fixturePath]);
     const fixtures = JSON.parse(readFileSync(fixturePath, "utf8"));
-    for (const key of ["REVEAL_VISUAL_SMOKE_URL", "MOBILE_UX_REVEAL_URL", "MOBILE_UX_CHECKOUT_URL", "MOBILE_UX_ORDER_URL"]) {
-      if (!fixtures[key] || new URL(fixtures[key]).origin !== ORIGIN) throw new Error(`Invalid isolated browser fixture ${key}.`);
-      env[key] = fixtures[key];
-    }
+    Object.assign(env, browserFixtureEnvironment(fixtures, ORIGIN));
     await run("data-fingerprints-before", process.execPath, ["scripts/validation-data-fingerprints.mjs", join(evidence, "data-before.json")]);
     dataBefore = JSON.parse(readFileSync(join(evidence, "data-before.json"), "utf8"));
     await run("test-full", "npm", ["run", "test:full"], { ...env, FULL_TEST_EVIDENCE_DIR: join(evidence, "full-suite") }, false);
