@@ -46,13 +46,30 @@ describe("web advisory matching boundaries", () => {
       assert.match(typeof advice?.message === "string" ? advice.message : advice?.message.en ?? "", /not a medical limit or an agreed target/);
     } finally { resetMatcherSafetyCeilings(); }
   });
-  it("preserves form and pill metadata and applies explicit product exclusions to all options", () => {
+  it("preserves unverified form metadata without claiming a pill count and applies exclusions to all options", () => {
     setMatcherSafetyCeilings([]);
     try {
       const powder = { ...product("powder", { a: 100 }), matchingFacts: { form: "powder", dailyPillsPerServing: 0, dietarySource: "plant" as const, omegaSource: "none" as const } };
       const result = recommendWithMatcher({ needs: [need("a")], candidates: [powder, product("excluded", { a: 100 })],
         clientContext: { currentSupplements: "none", excludeProductIds: ["excluded"] } });
       assert.deepEqual(result.recommendations.map(row => row.product.id), ["powder"]);
+      assert.equal(result.recommendations[0]?.product.matchingFacts?.form, "powder");
+      assert.equal(result.diagnostics.matching?.options[0]?.dailyPills, null);
+      assert.ok(result.diagnostics.matching?.options.every(option => !option.productIds.includes("excluded")));
+    } finally { resetMatcherSafetyCeilings(); }
+  });
+  it("reports zero pills for verified oral powder administration while retaining exclusions", () => {
+    setMatcherSafetyCeilings([]);
+    try {
+      const powder: ProductCandidate = { ...product("powder", { a: 100 }), administration: {
+        route: "oral", physicalUnit: "g", unitsPerServing: 3.5, doseIncrement: 0.5, packQuantity: 105,
+        provenance: { status: "verified", sourceUrl: "https://example.test/powder", sourceText: "Synthetic label: 100 mg a per measured 3.5 g powder serving, 105 g pack.", verifiedAt: "2026-09-07T00:00:00Z" }
+      } };
+      const result = recommendWithMatcher({ needs: [need("a")], candidates: [powder, product("excluded", { a: 100 })],
+        clientContext: { currentSupplements: "none", excludeProductIds: ["excluded"] } });
+      assert.deepEqual(result.recommendations.map(row => row.product.id), ["powder"]);
+      assert.equal(result.recommendations[0]?.servingMultiplier, 1);
+      assert.equal(result.stackCoveragePercent, 100);
       assert.equal(result.diagnostics.matching?.options[0]?.dailyPills, 0);
       assert.ok(result.diagnostics.matching?.options.every(option => !option.productIds.includes("excluded")));
     } finally { resetMatcherSafetyCeilings(); }
