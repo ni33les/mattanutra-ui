@@ -77,6 +77,20 @@ test("v5 compact plan preserves explicit null pill deltas", () => {
   assert.ok(encoded.includes('"dailyPillsDelta":null'));
 });
 
+test("historical options without saved economic deltas remain readable without invented comparisons", () => {
+  const saved = option("historical", 2);
+  const economics = { ...saved.economics } as Partial<NonNullable<StackOption["economics"]>>;
+  delete economics.deltas;
+  const legacy = { ...saved, economics } as StackOption;
+  const before = structuredClone(legacy);
+  const published = publicOption(legacy, legacy);
+  assert.equal(published.economics?.cash90DayMinor, 100);
+  assert.equal(published.economics?.deltas, undefined);
+  assert.deepEqual(legacy, before);
+  const validate = new Ajv({ strict: true, strictRequired: false, allowUnionTypes: true }).compile(OPTION_SCHEMA);
+  assert.ok(validate(published), JSON.stringify(validate.errors));
+});
+
 test("v5 frozen orders preserve unknown counts and immutable commercial values on replay", () => {
   const frozen = { dailyPills: 0, items: [item("unknown", 0, false)],
     selectedOptionId: "frozen-option", planRevision: 7, subtotalMinor: 100, totalPriceMinor: 100 };

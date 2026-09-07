@@ -730,7 +730,10 @@ export function publicOption(
     ...(option.omittedTargetIds ? { omittedTargetIds: option.omittedTargetIds } : {}),
     ...(option.deferredTargetIds ? { deferredTargetIds: option.deferredTargetIds } : {}),
     ...(option.retainedCurrent ? { retainedCurrent: option.retainedCurrent } : {}),
-    ...(option.economics ? { economics: { ...option.economics, deltas: { ...option.economics.deltas, pills: pillComparisonKnown ? option.economics.deltas.pills : null } } } : {})
+    ...(option.economics ? { economics: { ...option.economics,
+      ...(option.economics.deltas ? { deltas: { ...option.economics.deltas,
+        pills: pillComparisonKnown ? option.economics.deltas.pills : null } } : {})
+    } } : {})
   };
 }
 
