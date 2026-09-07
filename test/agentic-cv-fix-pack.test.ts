@@ -153,8 +153,8 @@ function primaryRequest(freeze: ValueCatalogueFreeze, extra: Record<string, unkn
         importance: "conditional" as const,
         name: d3?.name ?? "Vitamin D3",
         prerequisite: {
-          nextAction: "Confirm vitamin D status with a clinician.",
-          reasonCode: "vitamin_d_status_unknown",
+          nextAction: "The customer is deciding whether to include this provisional target.",
+          reasonCode: "customer_target_confirmation",
           status: "unsatisfied" as const
         },
         ...(d3 ? { supplementId: d3.supplementId } : {}),
@@ -379,8 +379,8 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
               importance: "conditional",
               name: d3?.name ?? "Vitamin D3",
               prerequisite: {
-                nextAction: "Confirm vitamin D status with a clinician.",
-                reasonCode: "vitamin_d_status_unknown",
+                nextAction: "The customer is deciding whether to include this provisional target.",
+                reasonCode: "customer_target_confirmation",
                 status: "unsatisfied"
               },
               ...(d3 ? { supplementId: d3.supplementId } : {}),
@@ -400,8 +400,8 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
               importance: "conditional",
               name: d3?.name ?? "Vitamin D3",
               prerequisite: {
-                nextAction: "Confirm vitamin D status with a clinician.",
-                reasonCode: "vitamin_d_status_unknown",
+                nextAction: "The customer is deciding whether to include this provisional target.",
+                reasonCode: "customer_target_confirmation",
                 status: "unknown"
               },
               ...(d3 ? { supplementId: d3.supplementId } : {}),
@@ -422,7 +422,7 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
         const d3Row = coverageOf(unsatisfied).find((row) => /vitamin d/i.test(String(row.name)));
         if (
           d3Row?.status !== "conditional_deferred" ||
-          d3Row?.reasonCode !== "vitamin_d_status_unknown"
+          d3Row?.reasonCode !== "customer_target_confirmation"
         ) {
           failed.push("FIX-02.A4");
         }
@@ -721,7 +721,7 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
         }
         const { readFileSync } = await import("node:fs");
         const snapshot = JSON.parse(
-          readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
+          readFileSync(new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, import.meta.url), "utf8")
         ) as { tools: Array<{ inputSchema: unknown; name: string }> };
         const snapshotPlan = snapshot.tools.find((item) => item.name === "plan");
         const snapshotHash = createHash("sha256")
@@ -917,12 +917,9 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
 
 if (process.env.NODE_TEST_CONTEXT) {
 describe("Customer value remediation FIX pack", () => {
-  it("evaluates FIX-01 through FIX-09", async (t) => {
+  it("evaluates FIX-01 through FIX-09", async () => {
     const freeze = await freezeLiveThailandCatalogue("TH");
-    if (!isLiveRetailFreeze(freeze)) {
-      t.skip("live Thailand retail catalogue is not loaded in this runner");
-      return;
-    }
+    assert.equal(isLiveRetailFreeze(freeze), true, "The isolated retail catalogue fixture must be loaded");
     const report = await runCvFixPack();
     assert.equal(report.totalCases, CASE_IDS.length);
     assert.deepEqual(
