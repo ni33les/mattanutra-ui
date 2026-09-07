@@ -15,7 +15,7 @@ import type { CatalogueSnapshot } from "../lib/agentic/catalogue/types.ts";
 import { matchPlan } from "../lib/agentic/plan/matching.ts";
 import { evaluateSafety } from "../lib/agentic/plan/safety.ts";
 import { PLAN_MATCH_RETURN_BUDGET_MS, planTool } from "../lib/agentic/plan/service.ts";
-import { createMemoryStore } from "../lib/agentic/store/memory.ts";
+import { createSnapshotMemoryStore } from "./agentic/value/snapshot-store.ts";
 import type {
   CanonicalPlanState,
   CoverageContributor,
@@ -327,9 +327,8 @@ function fewestPillsWins(input: Readonly<{
   return selected.dailyPills === minPills && selected.optionId.length > 0;
 }
 
-async function pinWithoutRematch(snapshot: CatalogueSnapshot) {
+export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = createSnapshotMemoryStore(snapshot)) {
   replaceCatalogueSnapshot(snapshot);
-  const store = createMemoryStore();
   const config = loadAgenticConfig();
   const scope = {
     environment: "dev" as const,
