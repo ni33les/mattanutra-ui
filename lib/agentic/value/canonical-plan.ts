@@ -120,6 +120,18 @@ function canonicalCoverageRow(row: StackOption["coverage"][number]) {
   };
 }
 
+function canonicalLeftover(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const row = value as Record<string, unknown>;
+  if (!["g", "mg", "mcg"].includes(String(row.unit))) return value;
+  // A weaker-SKU note can carry a unit without claiming a measured gap. Keep
+  // that absence while canonicalizing the mass dimension of the annotation.
+  if (row.amount == null) return { ...row, unit: "mg" };
+  if (typeof row.amount !== "number" || !Number.isFinite(row.amount)) return value;
+  const dose = canonicalAmount(row.amount, String(row.unit), String(row.name ?? ""), String(row.supplementId ?? ""));
+  return { ...row, amount: dose.amount, unit: dose.unit };
+}
+
 function canonicalSafetyRow(row: Readonly<{
   action: string;
   code: string;
@@ -306,7 +318,7 @@ export function canonicalPlanValue(input: Readonly<{
     canonicalVersion: CANONICAL_PLAN_VERSION,
     contractVersion: AGENTIC_CONTRACT_VERSION,
     inventoryDays: [...(input.inventoryDays ?? [])].slice().sort((left, right) => left - right),
-    leftovers: [...input.leftovers].sort((left, right) =>
+    leftovers: input.leftovers.map(canonicalLeftover).sort((left, right) =>
       canonicalJson(left).localeCompare(canonicalJson(right))
     ),
     nextReplenishmentDay: input.nextReplenishmentDay ?? null,
