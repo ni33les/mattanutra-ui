@@ -34,9 +34,13 @@ if (!process.execArgv.includes(strip)) {
     writeBaseline
   } = await import("./mcp-matcher-pack-report.mjs");
 
-  const a = await runPackOnce();
+  const inputs = {};
+  const a = await runPackOnce(inputs);
+  const frozenInputs = JSON.stringify(inputs, null, 2);
+  writeFileSync(join(evidence, "frozen-inputs.json"), frozenInputs, { flag: "wx" });
   writeFileSync(join(evidence, "run-a.json"), JSON.stringify(a, null, 2), { flag: "wx" });
-  const b = await runPackOnce();
+  const b = await runPackOnce(inputs);
+  const unchangedInputs = frozenInputs === JSON.stringify(inputs, null, 2);
   writeFileSync(join(evidence, "run-b.json"), JSON.stringify(b, null, 2), { flag: "wx" });
   const left = canonicalPack(a);
   const right = canonicalPack(b);
@@ -44,8 +48,8 @@ if (!process.execArgv.includes(strip)) {
   writeFileSync(join(evidence, "canonical-a.json"), left, { flag: "wx" });
   writeFileSync(join(evidence, "canonical-b.json"), right, { flag: "wx" });
   const unchangedSource = before.sha256 === sourceManifest().sha256;
-  if (left !== right || !unchangedSource) {
-    writeFileSync(join(evidence, "results.json"), JSON.stringify({ passed: false, identicalNonLatency: left === right, unchangedSource }), { flag: "wx" });
+  if (left !== right || !unchangedSource || !unchangedInputs) {
+    writeFileSync(join(evidence, "results.json"), JSON.stringify({ passed: false, identicalNonLatency: left === right, unchangedSource, unchangedInputs }), { flag: "wx" });
     console.error("FAIL drift");
     console.error(
       JSON.stringify(
@@ -92,6 +96,6 @@ if (!process.execArgv.includes(strip)) {
     console.log("Baseline: not written");
   }
 
-  writeFileSync(join(evidence, "results.json"), JSON.stringify({ passed: totals.packPass, identicalNonLatency: true, unchangedSource, sourceSha256: before.sha256, totals }, null, 2), { flag: "wx" });
+  writeFileSync(join(evidence, "results.json"), JSON.stringify({ passed: totals.packPass, identicalNonLatency: true, unchangedSource, unchangedInputs, sourceSha256: before.sha256, totals }, null, 2), { flag: "wx" });
   process.exit(totals.packPass ? 0 : 1);
 }

@@ -8,7 +8,8 @@ import {
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { AGENTIC_TOOL_SCHEMAS } from "../lib/agentic/contract/index.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { publicCoverage } from "../lib/agentic/public-mapper.ts";
 import { canonicalizeTargets } from "../lib/matcher/canonicalizer.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
@@ -513,13 +514,9 @@ async function runCase(
   id: string,
   work: () => Promise<AeC7CaseResult>
 ): Promise<AeC7CaseResult> {
-  try {
-    return await work();
-  } catch (error) {
-    return fail(id, {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
+  return withRecordedMcpEvidence(work, error => fail(id, {
+    error: error instanceof Error ? error.message : String(error)
+  }));
 }
 
 export function canonicalAeC7Report(report: AeC7PackReport) {

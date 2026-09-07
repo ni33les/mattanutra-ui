@@ -9,9 +9,11 @@ import {
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_SCHEMA_CHECKSUM } from "../lib/agentic/info.ts";
 import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { toolList } from "../lib/agentic/mcp/rpc.ts";
-import { planTool } from "../lib/agentic/plan/service.ts";
+import { planTool } from "./helpers/recording-mcp-dispatcher.ts";
+import { normalizePublishedClientResult } from "../scripts/published-client-semantics.mjs";
 import { createSnapshotMemoryStore } from "./agentic/value/snapshot-store.ts";
 import {
   createAgenticRuntime,
@@ -88,13 +90,9 @@ async function runCase(
   id: CvFixCaseResult["id"],
   work: () => Promise<CvFixCaseResult>
 ): Promise<CvFixCaseResult> {
-  try {
-    return await work();
-  } catch (error) {
-    return fail(id, {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
+  return withRecordedMcpEvidence(work, error => fail(id, {
+    error: error instanceof Error ? error.message : String(error)
+  }));
 }
 
 function supplementByName(freeze: ValueCatalogueFreeze, name: string) {
@@ -266,7 +264,11 @@ function schemaHasIntent(schema: Record<string, unknown>) {
 export function canonicalCvFixReport(report: CvFixPackReport) {
   return JSON.stringify({
     cases: report.cases.map((item) => ({
-      evidence: item.evidence,
+      evidence: { ...item.evidence,
+        // Raw requests/responses stay in the saved report; fresh handles and keys
+        // use the same declared normalization as the published client journey.
+        ...(item.evidence.mcpTranscript ? { mcpTranscript: normalizePublishedClientResult(item.evidence.mcpTranscript, "https://fixture.example/api/mcp") } : {})
+      },
       id: item.id,
       result: item.result
     })),
@@ -276,10 +278,10 @@ export function canonicalCvFixReport(report: CvFixPackReport) {
   });
 }
 
-export async function runCvFixPack(): Promise<CvFixPackReport> {
+export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<CvFixPackReport> {
   const previous = null;
   setAgenticRuntimeForTests(previous);
-  const freeze = await freezeLiveThailandCatalogue("TH");
+  const freeze = frozenInput ?? await freezeLiveThailandCatalogue("TH");
   const snapshotId = isUsableLiveFreeze(freeze) ? catalogueSnapshotId(freeze.snapshot) : "";
 
   try {

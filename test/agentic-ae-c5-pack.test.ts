@@ -6,7 +6,8 @@ import {
   endDeterministicIdsForTests
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { DEFAULT_SHIPPING_MINOR } from "../lib/agentic/money.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
@@ -694,13 +695,9 @@ async function runCase(
   id: string,
   work: () => Promise<AeC5CaseResult>
 ): Promise<AeC5CaseResult> {
-  try {
-    return await work();
-  } catch (error) {
-    return fail(id, {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
+  return withRecordedMcpEvidence(work, error => fail(id, {
+    error: error instanceof Error ? error.message : String(error)
+  }));
 }
 
 export function canonicalAeC5Report(report: AeC5PackReport) {

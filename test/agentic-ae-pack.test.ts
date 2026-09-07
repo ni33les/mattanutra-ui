@@ -6,7 +6,8 @@ import {
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { agenticMessage, negotiateLocale } from "../lib/agentic/i18n.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
   BasketItem,
@@ -627,13 +628,9 @@ async function runCase(
   id: string,
   work: () => Promise<AeCaseResult>
 ): Promise<AeCaseResult> {
-  try {
-    return await work();
-  } catch (error) {
-    return fail(id, {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
+  return withRecordedMcpEvidence(work, error => fail(id, {
+    error: error instanceof Error ? error.message : String(error)
+  }));
 }
 
 export function canonicalAeReport(report: AePackReport) {

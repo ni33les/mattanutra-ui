@@ -5,16 +5,17 @@ import { describe, it } from "node:test";
 import nextEnv from "@next/env";
 import { AGENTIC_POLL_AFTER_SECONDS } from "../lib/agentic/config.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
-import { freezeCatalogueSnapshot } from "../lib/agentic/catalogue/freeze.ts";
+import { catalogueSnapshotId, freezeCatalogueSnapshot } from "../lib/agentic/catalogue/freeze.ts";
 import { loadLiveRetailSnapshot } from "../lib/agentic/catalogue/live.ts";
 import { refreshAdminSafetyCeilings } from "../lib/agentic/catalogue/load-safety-ceilings.ts";
 import {
   replaceCatalogueSnapshot
 } from "../lib/agentic/catalogue/snapshot.ts";
 import type { CatalogueSnapshot } from "../lib/agentic/catalogue/types.ts";
-import { matchPlan } from "../lib/agentic/plan/matching.ts";
-import { evaluateSafety } from "../lib/agentic/plan/safety.ts";
-import { PLAN_MATCH_RETURN_BUDGET_MS, planTool } from "../lib/agentic/plan/service.ts";
+import { matchPlan, evaluateSafety, planTool } from "./helpers/recording-mcp-dispatcher.ts";
+import { PLAN_MATCH_RETURN_BUDGET_MS } from "../lib/agentic/plan/service.ts";
+import { captureMcpTranscript, type RecordedMcpTranscript } from "./helpers/mcp-evidence.ts";
+import { normalizePublishedClientResult } from "../scripts/published-client-semantics.mjs";
 import { createSnapshotMemoryStore } from "./agentic/value/snapshot-store.ts";
 import type {
   CanonicalPlanState,
@@ -44,6 +45,7 @@ export type DetPackCatalog = Readonly<{
 }>;
 
 export type DetPackReport = Readonly<{
+  mcpTranscript?: RecordedMcpTranscript;
   catalog: Readonly<{
     catalogueVersion: string;
     productCount: number;
@@ -95,16 +97,9 @@ function sortedJson(value: unknown): unknown {
 export function freezeKey(catalog: DetPackCatalog) {
   return JSON.stringify(
     sortedJson({
-      catalogueVersion: catalog.snapshot.catalogueVersion,
-      ceilings: catalog.ceilings.map((row) => ({
-        bandId: row.bandId ?? null,
-        lifeStage: row.lifeStage ?? null,
-        maxAmount: row.maxAmount,
-        maxUnit: row.maxUnit,
-        sourceScope: row.sourceScope ?? null,
-        subjectId: row.subjectId
-      })),
-      productIds: catalog.snapshot.products.map((item) => item.productId).slice().sort()
+      // The observation clock is not a change to the captured catalogue facts.
+      catalogueId: catalogueSnapshotId({ ...catalog.snapshot, availabilityAsOf: "frozen-observation-clock" }),
+      ceilings: catalog.ceilings
     })
   );
 }
@@ -398,7 +393,18 @@ export async function loadDetCatalog(): Promise<DetPackCatalog> {
   };
 }
 
+export function canonicalDetReport(report: DetPackReport) {
+  return JSON.stringify({ ...report,
+    ...(report.mcpTranscript ? { mcpTranscript: normalizePublishedClientResult(report.mcpTranscript, "https://fixture.example/api/mcp") } : {})
+  });
+}
+
 export async function runDetPack(input: DetPackCatalog): Promise<DetPackReport> {
+  const { result, transcript } = await captureMcpTranscript(() => runDetPackRecorded(input));
+  return { ...result, mcpTranscript: transcript };
+}
+
+async function runDetPackRecorded(input: DetPackCatalog): Promise<DetPackReport> {
   setMatcherSafetyCeilings([...input.ceilings]);
   const snapshot = input.snapshot;
   const freezePeer = input.freezePeer ?? (await loadDetCatalog());

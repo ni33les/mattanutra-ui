@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -1717,7 +1718,9 @@ const RUNNERS: Record<ComCaseId, () => Promise<ComCaseResult>> = {
 export async function runComPack(): Promise<ComPackReport> {
   const cases: ComCaseResult[] = [];
   for (const id of COM_CASE_IDS) {
-    cases.push(await RUNNERS[id]());
+    cases.push(await withRecordedMcpEvidence(RUNNERS[id], error => fail(id, {
+      error: error instanceof Error ? error.message : String(error)
+    })));
   }
   return {
     cases,

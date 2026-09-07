@@ -6,7 +6,8 @@ import {
   endDeterministicIdsForTests
 } from "../lib/agentic/capabilities.ts";
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../lib/agentic/config.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
   BasketItem,
@@ -795,13 +796,9 @@ async function runCase(
   id: string,
   work: () => Promise<AeC2CaseResult>
 ): Promise<AeC2CaseResult> {
-  try {
-    return await work();
-  } catch (error) {
-    return fail(id, {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
+  return withRecordedMcpEvidence(work, error => fail(id, {
+    error: error instanceof Error ? error.message : String(error)
+  }));
 }
 
 export function canonicalAeC2Report(report: AeC2PackReport) {

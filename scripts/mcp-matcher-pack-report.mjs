@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
+  canonicalDetReport,
   freezeKey,
   loadDetCatalog,
   runDetPack
@@ -18,8 +19,12 @@ import { canonicalCvFixReport, runCvFixPack } from "../test/agentic-cv-fix-pack.
 import { canonicalCvImplReport, runCvImplPack } from "../test/agentic-cv-impl-pack.test.ts";
 import { canonicalR2Report, runCvR2Pack } from "../test/agentic-cv-r2-pack.test.ts";
 import { canonicalR3Report, runCvR3Pack } from "../test/agentic-cv-r3-pack.test.ts";
+import { freezeImplCatalogue, freezeFinancialCatalogue } from "../test/agentic/value/impl-harness.ts";
+import { frozenPackInput } from "../test/helpers/frozen-pack-input.ts";
+import { assertRecordedMcpEvidence } from "../test/helpers/mcp-evidence.ts";
+import { freezeLiveThailandCatalogue } from "../lib/agentic/value/freeze.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
-import { resetMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
+import { matcherSafetyCeilings, resetMatcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
 
 export const MATCHER_BAR = 9;
@@ -945,6 +950,9 @@ function matcherResult(score) {
 }
 
 export function canonicalPack(run) {
+  for (const label of ["contract", "honesty", "planning", "explanations", "copy", "state", "boundary", "evidence", "commercial", "valueRemediation", "matcher"]) {
+    assertRecordedMcpEvidence(run[label], label);
+  }
   return JSON.stringify({
     contract: JSON.parse(canonicalAeReport(run.contract)),
     honesty: JSON.parse(canonicalAeC2Report(run.honesty)),
@@ -959,7 +967,7 @@ export function canonicalPack(run) {
     valueImplementation: JSON.parse(canonicalCvImplReport(run.valueImplementation)),
     valueR2: JSON.parse(canonicalR2Report(run.valueR2)),
     valueR3: JSON.parse(canonicalR3Report(run.valueR3)),
-    matcher: run.matcher
+    matcher: JSON.parse(canonicalDetReport(run.matcher))
   });
 }
 
@@ -1311,13 +1319,14 @@ async function resetAfterMatcher() {
   setAgenticRuntimeForTests(null);
 }
 
-export async function runPackOnce() {
-  const catA = await loadDetCatalog();
-  const catB = await loadDetCatalog();
-  if (freezeKey(catA) !== freezeKey(catB)) {
-    throw new Error("FAIL freeze");
-  }
-  const matcher = await runDetPack({ ...catA, freezePeer: catB });
+export async function runPackOnce(inputs = {}) {
+  const detInput = await frozenPackInput(inputs, "det", async () => {
+    const catA = await loadDetCatalog();
+    const catB = await loadDetCatalog();
+    if (freezeKey(catA) !== freezeKey(catB)) throw new Error("FAIL freeze");
+    return { ...catA, freezePeer: catB };
+  });
+  const matcher = await runDetPack(detInput);
   await resetAfterMatcher();
   const contract = await runAePack();
   const honesty = await runAeC2Pack();
@@ -1330,13 +1339,28 @@ export async function runPackOnce() {
   await resetAfterMatcher();
   const commercial = await runComPack();
   await resetAfterMatcher();
-  const valueRemediation = await runCvFixPack();
+  setMatcherSafetyCeilings(detInput.ceilings);
+  const remediationInput = await frozenPackInput(inputs, "valueRemediation", async () => ({
+    freeze: await freezeLiveThailandCatalogue("TH"), ceilings: [...matcherSafetyCeilings()]
+  }));
+  setMatcherSafetyCeilings(remediationInput.ceilings);
+  const valueRemediation = await runCvFixPack(remediationInput.freeze);
   await resetAfterMatcher();
-  const valueImplementation = await runCvImplPack(1);
+  setMatcherSafetyCeilings(detInput.ceilings);
+  const valueInput = await frozenPackInput(inputs, "value", async () => ({
+    input: await freezeImplCatalogue(), ceilings: [...matcherSafetyCeilings()]
+  }));
+  setMatcherSafetyCeilings(valueInput.ceilings);
+  const valueImplementation = await runCvImplPack(1, valueInput.input);
   await resetAfterMatcher();
-  const valueR2 = await runCvR2Pack(1);
+  setMatcherSafetyCeilings(valueInput.ceilings);
+  const valueR2 = await runCvR2Pack(1, valueInput.input);
   await resetAfterMatcher();
-  const valueR3 = await runCvR3Pack(1);
+  const financialInput = await frozenPackInput(inputs, "financial", async () => ({
+    input: await freezeFinancialCatalogue(), ceilings: [...matcherSafetyCeilings()]
+  }));
+  setMatcherSafetyCeilings(financialInput.ceilings);
+  const valueR3 = await runCvR3Pack(1, financialInput.input);
   return {
     contract,
     honesty,
