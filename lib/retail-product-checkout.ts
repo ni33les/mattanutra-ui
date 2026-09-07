@@ -88,6 +88,7 @@ export type RetailCheckoutQuoteInput = Readonly<{
 }>;
 
 type CheckoutPaymentRow = Readonly<{
+  idempotency_key: string;
   amount: number | string;
   currency: string;
   customer_email: string | null;
@@ -363,8 +364,12 @@ export async function currentWebCheckoutRecommendations(
   sql: RetailCheckoutDb,
   input: Pick<RetailCheckoutQuoteInput, "planId" | "locale" | "selectedItemIds" | "recommendationRunId" | "optionId" | "assessmentRevision" | "selectionRevision">
 ) {
+  // The second call runs inside checkout's short intent transaction. Sharing
+  // this epoch row serializes a new purchase snapshot with catalogue edits.
+  const [catalogue] = await sql<Array<{ revision: number | string }>>`
+    select revision from public.catalogue_runtime_revision where singleton = true for share`;
   const runs = await sql`select distinct on (coalesce(r.diagnostics ->> 'stackPreference', 'balanced'))
-      r.id::text, r.diagnostics, r.selection_revision, a.input_revision,
+      r.id::text, r.diagnostics, r.selection_revision, r.catalogue_revision, a.input_revision,
       coalesce(p.revision, 0) as current_selection_revision, coalesce(p.excluded_product_ids, '{}'::uuid[]) as excluded_product_ids
     from public.product_recommendation_runs r join public.assessments a on a.plan_id = r.plan_id
     left join public.assessment_product_preferences p on p.plan_id = a.plan_id
@@ -373,6 +378,7 @@ export async function currentWebCheckoutRecommendations(
       and r.selection_revision = coalesce(p.revision, 0) and r.status in ('completed', 'partial')
     order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc, r.id desc`;
   for (const run of runs) {
+    if (catalogue?.revision == null || run.catalogue_revision == null || String(run.catalogue_revision) !== String(catalogue.revision)) continue;
     if (input.recommendationRunId && input.recommendationRunId !== run.id) continue;
     const matching = objectValue(run.diagnostics).matching as ProductRecommendationDiagnostics["matching"];
     const option = matching?.options.find(item => item.optionId === (input.optionId ?? matching.selectedOptionId));
@@ -698,6 +704,35 @@ async function ensureAssessmentForPlan(
   `;
 }
 
+/** Recompute the original request identity using the frozen shipping amount.
+ * Catalogue edits must not turn an exact paid/unpaid checkout retry into a
+ * differently priced purchase, or force a new matching revision first. */
+export async function findReusableWebCheckoutPayment(sql: RetailCheckoutDb, input: Readonly<{
+  planId: string; agenticOrderId?: string | null; recommendationRunId?: string | null; optionId?: string | null;
+  assessmentRevision?: number | null; selectionRevision?: number | null;
+  selectedRetailerOrganisationId?: string | null; selectedProductIds: readonly string[];
+  address: RetailCheckoutAddress; billingAddress: RetailCheckoutAddress; billingSameAsShipping: boolean;
+}>) {
+  const payments = await sql<CheckoutPaymentRow[]>`select * from public.retail_checkout_payments
+    where plan_id = ${input.planId}::uuid and coalesce(metadata->>'channel', 'web') = 'web'
+      and (paid_at is not null or status not in ('failed', 'cancelled', 'expired'))
+      and (${input.recommendationRunId ?? null}::uuid is null or recommendation_run_id = ${input.recommendationRunId ?? null}::uuid)
+    order by created_at desc`;
+  for (const payment of payments) {
+    const key = idempotencyHash({
+      address: input.address, agenticOrderId: input.agenticOrderId ?? null, billingAddress: input.billingAddress,
+      billingSameAsShipping: input.billingSameAsShipping, channel: 'web', planId: input.planId,
+      runId: payment.recommendation_run_id, optionId: input.optionId ?? null,
+      assessmentRevision: input.assessmentRevision ?? null, selectionRevision: input.selectionRevision ?? null,
+      selectedRetailerOrganisationId: input.selectedRetailerOrganisationId ?? null,
+      shippingAmount: Math.max(0, Number(objectValue(payment.metadata).shippingAmount) || 0),
+      selectedProductIds: input.selectedProductIds
+    });
+    if (payment.idempotency_key === key) return payment;
+  }
+  return null;
+}
+
 export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInput) {
   if (!isUuid(input.planId)) {
     throw new Error("Plan is required");
@@ -745,6 +780,10 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   }
 
   let selectedProductIds = [...new Set(input.selectedItemIds.filter(isUuid))];
+  if (checkoutMode === "web") {
+    const saved = await findReusableWebCheckoutPayment(sql, { ...input, address, billingAddress, billingSameAsShipping, selectedProductIds });
+    if (saved) return continueRetailCheckoutPayment(sql, saved, input);
+  }
   let quoteLines: QuoteLine[] = [];
   let retailerId = "";
   let shippingAmount = 0;
@@ -883,7 +922,6 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     currency = quoteLines[0]?.currency ?? resolved.currency ?? "THB";
   }
 
-  const checkoutChannel = checkoutMode === "agentic" ? "mcp" : "web";
   const shippingSource =
     checkoutMode === "agentic"
       ? "mcp"
@@ -907,10 +945,6 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   const payment = await withDatabaseTransaction(sql, async tx => {
     // Both web and MCP retries serialize intent creation before contacting the provider.
     await tx`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for no key update`;
-    if (checkoutMode === "web") {
-      // Serialize the checkout intent with answer edits, matching completion and exclusions.
-      await currentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds });
-    }
     const existing = await tx<CheckoutPaymentRow[]>`
       select *
       from public.retail_checkout_payments
@@ -923,6 +957,11 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     let payment = existing[0] ?? null;
 
     if (!payment) {
+      if (checkoutMode === "web") {
+        // Only new intents require the current revision and catalogue. Exact
+        // retries retain their existing payment and frozen commercial facts.
+        await currentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds });
+      }
       const rows = await tx<CheckoutPaymentRow[]>`
         insert into public.retail_checkout_payments (
           id,
@@ -1000,6 +1039,20 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     throw new Error("Unable to create product checkout");
   }
 
+  return continueRetailCheckoutPayment(sql, payment, input);
+}
+
+async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: CheckoutPaymentRow, input: RetailCheckoutQuoteInput) {
+  const config = stripePaymentConfig(input.request);
+  const quoteLines = arrayValue<QuoteLine>(payment.quote_lines);
+  const metadata = objectValue(payment.metadata);
+  const shippingAmount = Number(metadata.shippingAmount) || 0;
+  const subtotalAmount = Number(metadata.subtotalAmount) || quoteSubtotalAmount(quoteLines);
+  const totalAmount = Number(payment.amount) / AMOUNT_MICROS_PER_UNIT;
+  const currency = payment.currency;
+  const checkoutChannel = orderCheckoutChannelFromPayment(payment.metadata);
+  const retailerId = payment.selected_retailer_organisation_id;
+  const removedItemIds = payment.removed_item_ids ?? [];
   async function resumeExistingPayment() {
     const recovered = await fulfillRetailCheckoutSession({ paymentId: payment!.id, request: input.request });
     return { recovery: true as const, mock: false, paymentId: payment!.id,
