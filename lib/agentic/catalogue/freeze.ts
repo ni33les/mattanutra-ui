@@ -42,7 +42,7 @@ export function freezeCatalogueSnapshot(
   snapshot: CatalogueSnapshot
 ): CatalogueSnapshot {
   return Object.freeze({
-    runtimeRevision: snapshot.runtimeRevision,
+    ...(snapshot.runtimeRevision === undefined ? {} : { runtimeRevision: snapshot.runtimeRevision }),
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
     products: Object.freeze([...snapshot.products]),

@@ -69,6 +69,16 @@ describe("MCP reliability: catalogue persistence and cache isolation", () => {
     assert.equal(await restoreCataloguePin("snap_missing", "test", store), null);
   });
 
+  it("preserves explicit catalogue epochs including zero through pin restoration", async () => {
+    const store = createMemoryStore();
+    for (const runtimeRevision of [0, 7]) {
+      const snapshot = { ...fixtureSnapshot(), runtimeRevision };
+      await persistCataloguePin(snapshot, "test", store);
+      resetCataloguePins();
+      assert.deepEqual(await restoreCataloguePin(catalogueSnapshotId(snapshot), "test", store), snapshot);
+    }
+  });
+
   it("invalidates matching when either retention requirement changes", async () => {
     const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), request, snapshot: fixtureSnapshot() });
     assert.ok("state" in normalized);
