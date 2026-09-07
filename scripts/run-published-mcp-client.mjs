@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import Ajv from "ajv";
+import { selectPublishedResources, publishedExample, selectPurchaseTradeOff } from "./published-client-journey.mjs";
 import { CLIENT_NORMALIZATION, normalizePublishedClientResult } from "./published-client-semantics.mjs";
 
 const args = process.argv.slice(2);
@@ -14,6 +15,8 @@ if (!["localhost", "127.0.0.1", "[::1]", "dev.mattanutra.com"].includes(endpoint
 const output = resolve(arg("--output", "/tmp/mattanutra-published-client"));
 const runKey = arg("--run-key", randomUUID());
 const resumeFile = arg("--resume", null);
+const locale = arg("--locale", "en");
+if (!["en", "th", "zh-CN"].includes(locale)) throw new Error("Documented acceptance locale must be en, th or zh-CN.");
 const transcript = [];
 const assertions = [];
 const ajv = new Ajv({ allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true, coerceTypes: false, useDefaults: false, removeAdditional: false, validateFormats: false });
@@ -112,48 +115,74 @@ let receipt;
 let failure;
 try {
   await mkdir(output, { recursive: true });
-  const initialized = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "published-documentation-client", version: "4.0.0" } });
+  const initialized = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "published-documentation-client", version: "5.0.0" } });
   check(typeof initialized.instructions === "string" && /advis/i.test(initialized.instructions), "connector supplies essential advisory instructions");
-  const resources = (await rpc("resources/list")).resources;
-  const schemaResource = resources.find(item => item.mimeType === "application/schema+json");
-  const guideResource = resources.find(item => item.mimeType === "text/markdown");
-  check(schemaResource && guideResource, "connector publishes contract and guide resources");
-  contract = JSON.parse((await rpc("resources/read", { uri: schemaResource.uri })).contents[0].text);
-  const guide = (await rpc("resources/read", { uri: guideResource.uri })).contents[0].text;
-  check(/requestPatch/.test(guide) && /stale_revision/.test(guide) && /payment/i.test(guide), "guide explains refinement and recovery");
   const tools = (await rpc("tools/list")).tools;
   check(tools.length === 7, "exactly seven public tools are advertised");
+  const infoTool = tools.find(tool => tool.name === "info");
+  check(Boolean(infoTool), "capability discovery is advertised");
+  validate(infoTool.inputSchema, { locale }, "info request");
+  const bootstrap = await rpc("tools/call", { name: "info", arguments: { locale } });
+  validate(infoTool.outputSchema, bootstrap.structuredContent, "info response");
+  const info = bootstrap.structuredContent;
+  check(info.ok && info.contractVersion === "5.0.0", "v5 capability discovery succeeds");
+  check(info.supportedLocales.includes(locale), "the requested language is supported");
+  const resources = (await rpc("resources/list")).resources;
+  const selectedResources = selectPublishedResources(info, resources);
+  contract = JSON.parse((await rpc("resources/read", { uri: selectedResources.schema.uri })).contents[0].text);
+  const guide = (await rpc("resources/read", { uri: selectedResources.guide.uri })).contents[0].text;
+  check(contract.contractVersion === info.contractVersion, "current resources match capability discovery");
+  check(/requestPatch/.test(guide) && /stale_revision/.test(guide) && /payment/i.test(guide) && /productDoses/.test(guide) && /searchEffort/.test(guide), "guide explains conversational refinement and recovery");
   for (const tool of tools) {
     check(JSON.stringify(tool.inputSchema) === JSON.stringify(contract.tools[tool.name].inputSchema), `${tool.name} input matches published contract`);
     check(JSON.stringify(tool.outputSchema) === JSON.stringify(contract.tools[tool.name].outputSchema), `${tool.name} output matches published contract`);
   }
-  const info = await call("info", {});
-  check(info.ok && info.contractVersion === "4.0.0", "v4 capability discovery succeeds");
   if (resumeFile) {
     receipt = JSON.parse(await readFile(resumeFile, "utf8"));
-    check(receipt.endpoint === endpoint.href, "saved receipt belongs to this environment");
+    check(receipt.endpoint === endpoint.href && receipt.locale === locale, "saved receipt belongs to this environment and language");
     receipt.order = await call("order", { orderHandle: receipt.checkout.orderHandle });
     checkFrozenMoney(receipt.order.frozenOrder, "Recovered order");
     check(receipt.order.money.totalPriceMinor === receipt.order.frozenOrder.totalPriceMinor, "Recovered order money matches the frozen quote");
   } else {
     const example = contract.examples.find(item => item.name === "create");
     check(example?.tool === "plan", "create uses an example supplied by the connector");
-    const request = structuredClone(example.arguments.request);
+    const request = { ...structuredClone(example.arguments.request), locale };
     check(info.supportedCountries.some(country => country.countryCode === request.destinationCountry), "example destination is currently deliverable");
     check(info.medicationCodes.length > 0, "capabilities supply a medication for the context-preservation fixture");
     request.medicationCodes = [info.medicationCodes[0]];
     const create = { ...example.arguments, request, idempotencyKey: `docs-create-${runKey}` };
     let plan = await current(await call("plan", create));
+    check(plan.locale === locale, "created plan uses the requested language");
     check(plan.ok && Array.isArray(plan.options) && plan.options.length > 0, "fixture produces reviewable options from partial health information");
     check(JSON.stringify(plan.medicationCodes) === JSON.stringify(request.medicationCodes), "created plan retains the explicitly disclosed medication");
     check(plan.acknowledgementStatus === "not_required", "health advice requires no acknowledgement");
     check(plan.operationalDecision.status === plan.status, "operational status is consistent");
     await exercisePartialMatchAndAnswer(request, plan);
     const originalTargets = structuredClone(request.targets);
+    const tradeOff = selectPurchaseTradeOff(plan);
+    check(tradeOff.doseFit && tradeOff.coverage?.length && tradeOff.roles?.length, "trade-off exposes dose fit, coverage and explicit roles");
+    const selectedTradeOff = { ...publishedExample(contract, "select"), planHandle: plan.planHandle, expectedRevision: plan.revision,
+      idempotencyKey: `docs-tradeoff-${runKey}`, optionId: tradeOff.optionId };
+    plan = await current(await call("plan", selectedTradeOff));
+    check(plan.optionId === tradeOff.optionId && plan.operationalDecision.purchaseEligible, "selecting a disclosed trade-off is purchasable without acknowledgement");
+    const proposalProduct = plan.basket.find(item => item.administration?.route === "oral" && item.administration.provenance?.status === "verified" && item.administration.unitsPerServing > 0 && item.administration.doseIncrement > 0);
+    check(Boolean(proposalProduct), "a returned product provides verified physical administration for the quantity proposal");
+    const proposal = { productId: proposalProduct.productId, servingsPerDay: proposalProduct.servingsPerDay };
+    const physicalIncrements = proposal.servingsPerDay * proposalProduct.administration.unitsPerServing / proposalProduct.administration.doseIncrement;
+    check(Math.abs(physicalIncrements - Math.round(physicalIncrements)) < 1e-9, "the proposed returned quantity consists of supported measurable increments");
+    const quantityExample = publishedExample(contract, "propose-product-quantity");
+    plan = await current(await call("plan", { ...quantityExample, planHandle: plan.planHandle, expectedRevision: plan.revision,
+      idempotencyKey: `docs-quantity-${runKey}`, requestPatch: { ...quantityExample.requestPatch,
+        requirements: { ...quantityExample.requestPatch.requirements, productDoses: [proposal] } } }));
+    check(plan.ok && plan.basket.some(item => item.productId === proposal.productId && item.servingsPerDay === proposal.servingsPerDay), "revised evaluation honours the explicitly proposed product quantity");
+    check(isDeepStrictEqual(plan.medicationCodes, request.medicationCodes), "quantity refinement preserves medication context");
+    check(plan.acknowledgementStatus === "not_required", "quantity advice does not require acknowledgement");
+    plan = await current(await call("plan", { ...publishedExample(contract, "clear-quantity-proposals"), planHandle: plan.planHandle,
+      expectedRevision: plan.revision, idempotencyKey: `docs-clear-quantity-${runKey}` }));
     const product = plan.basket?.[0] ?? plan.options.flatMap(option => option.basket ?? [])[0];
     check(product?.productId, "published result identifies a product to reject");
     const before = plan;
-    const patch = { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-exclude-${runKey}`, requestPatch: { requirements: { excludeProductIds: [product.productId] } } };
+    const patch = { ...publishedExample(contract, "exclude-one-product"), planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-exclude-${runKey}`, requestPatch: { requirements: { excludeProductIds: [product.productId] } } };
     plan = await current(await call("plan", patch));
     check(plan.ok && !(plan.basket ?? []).some(item => item.productId === product.productId), "replanning excludes the requested product");
     check(JSON.stringify(plan.medicationCodes) === JSON.stringify(request.medicationCodes), "replanning retains disclosed medications");
@@ -161,9 +190,19 @@ try {
     check(originalTargets.every(target => requestedRows.some(row => row.name === target.name && (row.requestedAmount ?? row.amount) === target.amount && row.unit === target.unit && row.basis === (target.basis ?? "total_daily"))), "replanning retains every original target amount, unit and basis");
     const stale = await call("plan", { ...patch, idempotencyKey: `docs-stale-${runKey}`, expectedRevision: before.revision });
     check(stale.ok === false && stale.error.reasonCode === "stale_revision", "stale revisions provide an actionable error");
-    plan = await current(await call("plan", { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-clear-${runKey}`, requestPatch: { requirements: { excludeProductIds: [] } } }));
+    plan = await current(await call("plan", { ...publishedExample(contract, "clear-product-exclusions"), planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-clear-${runKey}` }));
+    plan = await current(await call("plan", { ...publishedExample(contract, "clear-customer-ceilings"), planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-clear-ceilings-${runKey}` }));
+    const standardLoss = plan.doseFit.total;
+    const expanded = { ...publishedExample(contract, "expand-search"), planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-expanded-${runKey}` };
+    plan = await current(await call("plan", expanded));
+    check(plan.searchSummary?.effort === "expanded" && plan.searchSummary.expansionBudget === 64000 && plan.searchSummary.canExpand === false,
+      "expanded search reports its larger finite effort without an ineffective further retry");
+    check(plan.doseFit.total <= standardLoss, "expanded search retains or improves the previous dose fit");
+    const expandedRetry = await current(await call("plan", expanded));
+    check(expandedRetry.revision === plan.revision && isDeepStrictEqual(expandedRetry.options, plan.options), "same-key expanded search retry reuses the evaluated result");
     check(plan.status === "ready", "clearing the rejection restores a ready fixture option");
-    const option = plan.options.find(item => item.selected) ?? plan.options[0];
+    const option = plan.options.find(item => item.selected && item.purchaseEligible) ?? plan.options.find(item => item.purchaseEligible && item.basket?.length);
+    check(Boolean(option), "expanded search still supplies a current purchase option");
     plan = await current(await call("plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-select-${runKey}`, optionId: option.optionId }));
     check(plan.status === "ready" && plan.operationalDecision.purchaseEligible, "fixture confirms the exact current purchasable revision");
     const execute = { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-execute-${runKey}` };
@@ -177,13 +216,13 @@ try {
     check(order.ok, "order tracking reads authoritative payment state");
     checkFrozenMoney(order.frozenOrder, "Tracked order");
     check(order.money.totalPriceMinor === checkout.frozenPlan.totalPriceMinor, "Tracked order money matches the checkout quote");
-    receipt = { endpoint: endpoint.href, runKey, plan, checkout, order, confirmation: { fixture: true, selectedOptionId: plan.optionId, revision: plan.revision }, guideSha256: createHash("sha256").update(guide).digest("hex"), schemaChecksum: info.schemaChecksum };
+    receipt = { endpoint: endpoint.href, locale, runKey, plan, checkout, order, confirmation: { fixture: true, selectedOptionId: plan.optionId, revision: plan.revision }, guideSha256: createHash("sha256").update(guide).digest("hex"), schemaChecksum: info.schemaChecksum };
   }
 } catch (error) { failure = error instanceof Error ? error.message : String(error); }
 await mkdir(output, { recursive: true });
-if (receipt) await writeFile(resolve(output, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`);
-await writeFile(resolve(output, "transcript.json"), `${JSON.stringify(transcript, null, 2)}\n`);
-await writeFile(resolve(output, "semantic.json"), `${JSON.stringify(normalizePublishedClientResult({ assertions, transcript, receipt, failure: failure ?? null }, endpoint), null, 2)}\n`);
-await writeFile(resolve(output, "normalization.json"), `${JSON.stringify(CLIENT_NORMALIZATION, null, 2)}\n`);
+if (receipt) await writeFile(resolve(output, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx" });
+await writeFile(resolve(output, "transcript.json"), `${JSON.stringify(transcript, null, 2)}\n`, { flag: "wx" });
+await writeFile(resolve(output, "semantic.json"), `${JSON.stringify(normalizePublishedClientResult({ assertions, transcript, receipt, failure: failure ?? null }, endpoint), null, 2)}\n`, { flag: "wx" });
+await writeFile(resolve(output, "normalization.json"), `${JSON.stringify(CLIENT_NORMALIZATION, null, 2)}\n`, { flag: "wx" });
 console.log(JSON.stringify({ passed: !failure, assertions: assertions.length, output, ...(failure ? { failure } : {}), receipt: receipt ? resolve(output, "receipt.json") : null }));
 if (failure) process.exitCode = 1;

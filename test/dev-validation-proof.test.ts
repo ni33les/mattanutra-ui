@@ -4,20 +4,26 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { it } from "node:test";
-import { readDevValidationProof, REQUIRED_VALIDATION_STAGES } from "../scripts/dev-validation-proof.mjs";
+import { readDevValidationProof, REQUIRED_VALIDATION_STAGES, REQUIRED_VALIDATION_ARTIFACTS } from "../scripts/dev-validation-proof.mjs";
 
 function evidence() {
   const directory = mkdtempSync(join(tmpdir(), "dev-validation-proof-"));
   const source = "a".repeat(64);
-  const artifacts = ["source-before.json", "source-after.json", "stage-results.json", "build-identity.json",
-    "candidate-identity.json", "full-suite/results.json", "matcher/results.json", "client-comparison.json",
-    "fixture-settlement-a.json", "fixture-settlement-b.json"].map(file => {
+  const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  const lint = { baseCommit: "b".repeat(40), files: ["matcher.ts"], sha256: hash(["matcher.ts"]) };
+  const inventoryContent = { node: ["test/matcher.test.ts"], mcp: ["test/matcher.test.ts"], browser: ["test/e2e/matcher.spec.ts"] };
+  const inventory = { ...inventoryContent, sha256: hash(inventoryContent) };
+  const tables = [{ table: "products", rows: 1, sha256: source }];
+  const data = { tables, schemaSha256: source, catalogueSha256: hash(tables) };
+  const comparison = { passed: true, comparisons: ["en", "th", "zh-CN"].flatMap(locale => ["checkout", "-paid"].map(phase => ({ locale, phase, identical: true }))) };
+  const named: Record<string, unknown> = { "release-lint.json": lint, "test-inventory.json": inventory, "data-before.json": data, "data-after.json": data, "client-comparison.json": comparison };
+  const artifacts = REQUIRED_VALIDATION_ARTIFACTS.map(file => {
     const path = join(directory, file);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify({ passed: true }));
+    writeFileSync(path, JSON.stringify(named[file] ?? { passed: true }));
     return { file, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") };
   });
-  const proof = { version: "dev-advisory-validation-1", environment: "dev", candidateOrigin: "http://127.0.0.1:3100",
+  const proof = { version: "dev-advisory-validation-2", contractVersion: "5.0.0", releaseBaseCommit: "b".repeat(40), releaseLintSha256: lint.sha256, testInventorySha256: inventory.sha256, databaseSchemaSha256: data.schemaSha256, catalogueSha256: data.catalogueSha256, environment: "dev", candidateOrigin: "http://127.0.0.1:3100",
     passed: true, unchangedSource: true, sourceSha256: source, buildId: source.slice(0, 40), schemaChecksum: "fixture-contract-checksum",
     steps: REQUIRED_VALIDATION_STAGES.map(label => ({ label, passed: true })), artifacts };
   const file = join(directory, "attestation.json");
@@ -41,8 +47,25 @@ it("does not accept an overall green claim with missing or failed full-suite sta
     fixture.proof.steps = fixture.proof.steps.filter(step => step.label !== "test-full");
     writeFileSync(fixture.file, JSON.stringify(fixture.proof));
     assert.throws(() => readDevValidationProof(fixture.file, fixture.source), /required passing stage/);
-    fixture.proof.steps = REQUIRED_VALIDATION_STAGES.map(label => ({ label, passed: label !== "docs-client-b-paid" }));
+    fixture.proof.steps = REQUIRED_VALIDATION_STAGES.map(label => ({ label, passed: label !== "docs-client-b-zh-CN-paid" }));
     writeFileSync(fixture.file, JSON.stringify(fixture.proof));
     assert.throws(() => readDevValidationProof(fixture.file, fixture.source), /required passing stage/);
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+
+it("V5-GATE-04 rejects internally inconsistent inventory and incomplete locale evidence even when rehashed", () => {
+  for (const target of ["test-inventory.json", "client-comparison.json", "data-after.json"]) {
+    const fixture = evidence();
+    try {
+      const path = join(fixture.directory, target), data = JSON.parse(readFileSync(path, "utf8"));
+      if (target === "test-inventory.json") data.mcp = [];
+      if (target === "client-comparison.json") data.comparisons = data.comparisons.filter((row: { locale: string }) => row.locale !== "zh-CN");
+      if (target === "data-after.json") data.schemaSha256 = "c".repeat(64);
+      writeFileSync(path, JSON.stringify(data));
+      fixture.proof.artifacts.find(row => row.file === target)!.sha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
+      writeFileSync(fixture.file, JSON.stringify(fixture.proof));
+      assert.throws(() => readDevValidationProof(fixture.file, fixture.source), /identity|language/);
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
 });

@@ -34,7 +34,7 @@ try {
   const sets = await getLiveSaleEligibleRetailerCandidateSets({ sql, countryCode: "TH", limit: 1000 });
   const choices = sets.flatMap(set => set.candidates.map(product => ({ set, product }))).sort((a, b) =>
     a.set.organisationId.localeCompare(b.set.organisationId) || a.product.id.localeCompare(b.product.id));
-  const choice = choices.find(({ product }) => product.facts.some(fact => fact.amount && fact.amount > 0 && fact.unit && parseDose(`${fact.amount} ${fact.unit}`, fact.normalizedName)));
+  const choice = choices.find(({ product }) => product.administration?.route === "oral" && product.administration.provenance.status === "verified" && product.facts.some(fact => fact.amount && fact.amount > 0 && fact.unit && parseDose(`${fact.amount} ${fact.unit}`, fact.normalizedName)));
   assert.ok(choice, "Seed the isolated sale-eligible product catalogue before browser fixtures");
   const { product, set } = choice;
   const facts = product.facts.filter(fact => fact.amount && fact.amount > 0 && fact.unit && parseDose(`${fact.amount} ${fact.unit}`, fact.normalizedName));
@@ -64,9 +64,12 @@ try {
     await insertFoodGuidanceVersion(tx, { planId, generation, modelVersion: "browser-advisory-fixture", foodGuidance: {
       foodGuidance: [{ id: "oats", category: "Food", food: "Oats", serving: "One portion", frequency: "A few times a week", effectivenessRank: 1, rationale: "A varied diet supports the plan.", status: "add" }]
     } });
-    await tx`insert into public.product_recommendation_runs (id, plan_id, assessment_revision, generation_locale, generator_version, selection_revision,
+    const [catalogueEpoch] = await tx`select revision from public.catalogue_runtime_revision where singleton=true`;
+    assert.ok(catalogueEpoch, "Browser fixture requires the current catalogue revision schema");
+    const catalogueFingerprint = recommendation.diagnostics.trace?.catalogueFingerprint ?? null;
+    await tx`insert into public.product_recommendation_runs (id, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, catalogue_revision, catalogue_fingerprint, search_effort,
       stack_coverage_percent, supplement_product_coverage_percent, total_coverage_percent, client_needs, diagnostics, notes)
-      values (${runId}::uuid, ${planId}::uuid, ${generation.revision}, 'en', ${FUNNEL_GENERATOR_VERSION}, 0,
+      values (${runId}::uuid, ${planId}::uuid, ${generation.revision}, 'en', ${FUNNEL_GENERATOR_VERSION}, 0, ${Number(catalogueEpoch.revision)}, ${catalogueFingerprint}, 'standard',
         ${recommendation.stackCoveragePercent}, ${recommendation.supplementProductCoveragePercent}, ${recommendation.totalPlanCoveragePercent},
         ${tx.json(toJsonValue(needs))}, ${tx.json(toJsonValue({ ...recommendation.diagnostics, retailerOptions: [retailer], selectedRetailer: retailer }))}, 'Synthetic browser fixture; no provider transaction')`;
     for (const item of recommendation.recommendations) await tx`insert into public.product_recommendation_items

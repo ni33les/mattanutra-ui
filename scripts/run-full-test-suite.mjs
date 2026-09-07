@@ -134,10 +134,21 @@ async function main() {
     writeFileSync(join(evidence, "mcp-canonical-b.json"), JSON.stringify(second.map(row => JSON.parse(row)), null, 2), { flag: "wx" });
   } catch (error) { mcpComparison = { label: "all-mcp-non-latency-results", passed: false, error: error.message }; }
   results.push(mcpComparison);
+  // PostgreSQL cases may advance catalogue epochs while creating/removing their
+  // own rows. Generate current browser matches after those cases have finished.
+  results.push(await runBatch("browser-fixtures-refresh", ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/seed-browser-fixtures.ts", join(evidence, "browser-fixtures-refreshed.json")], common, evidence));
+  const browserEnv = { ...common };
+  try {
+    const fixtures = JSON.parse(readFileSync(join(evidence, "browser-fixtures-refreshed.json"), "utf8"));
+    for (const key of ["REVEAL_VISUAL_SMOKE_URL", "MOBILE_UX_REVEAL_URL", "MOBILE_UX_CHECKOUT_URL", "MOBILE_UX_ORDER_URL"]) {
+      if (!fixtures[key] || new URL(fixtures[key]).origin !== new URL(common.PLAYWRIGHT_BASE_URL).origin) throw new Error(`Invalid refreshed browser fixture: ${key}`);
+      browserEnv[key] = fixtures[key];
+    }
+  } catch (error) { results.push({ label: "browser-fixture-identity", passed: false, error: error.message }); }
   results.push(await runBatch("browser-discovery", ["node_modules/@playwright/test/cli.js", "test", "--list", "--reporter=json"],
-    { ...common, CI: "1", PLAYWRIGHT_JSON_OUTPUT_FILE: join(evidence, "browser-discovery.json") }, evidence));
+    { ...browserEnv, CI: "1", PLAYWRIGHT_JSON_OUTPUT_FILE: join(evidence, "browser-discovery.json") }, evidence));
   results.push(await runBatch("browser", ["--import", "./test/helpers/offline-network.mjs", "node_modules/@playwright/test/cli.js", "test", "--workers=1", "--retries=0", "--reporter=json"],
-    { ...common, DB_URL: common.TEST_DB_URL, CI: "1", PLAYWRIGHT_JSON_OUTPUT_FILE: join(evidence, "browser.json") }, evidence));
+    { ...browserEnv, DB_URL: common.TEST_DB_URL, CI: "1", PLAYWRIGHT_JSON_OUTPUT_FILE: join(evidence, "browser.json") }, evidence));
   const browser = results.at(-1);
   try {
     const report = JSON.parse(readFileSync(join(evidence, "browser.json"), "utf8"));

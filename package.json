@@ -139,7 +139,10 @@
     "web-funnel:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-web-funnel-schema.ts",
     "web-funnel:audit": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/audit-web-funnel.ts",
     "test:full": "node scripts/run-full-test-suite.mjs",
-    "validate:dev:advisory": "node scripts/run-dev-advisory-validation.mjs"
+    "validate:dev:advisory": "node scripts/run-dev-advisory-validation.mjs",
+    "test:matcher": "node scripts/run-matcher-test-suite.mjs",
+    "test:matcher:twice": "node scripts/run-matcher-test-suite.mjs --twice",
+    "products:administration:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-product-administration-schema.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

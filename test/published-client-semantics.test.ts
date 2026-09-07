@@ -69,3 +69,24 @@ it("preserves distinct URL-only checkout capabilities while normalizing generate
   right.second = "http://127.0.0.1:3100/checkout?order=cap_cccccccccccccccccccccccc";
   assert.notDeepEqual(normalize(urls(left), endpoint), normalize(urls(right), endpoint));
 });
+
+it("V5-CLIENT-05 acceptance retains option roles, eligibility, physical quantities and search results", () => {
+  const baseline = { options: [{ optionId: "opt-current", roles: ["closest_dose", "simpler"], purchaseEligible: true,
+    basket: [{ productId: "p", servingsPerDay: 0.5, administration: { route: "oral", physicalUnit: "capsule", unitsPerServing: 2, doseIncrement: 1, provenance: { status: "verified", verifiedAt: "2026-09-01T00:00:00Z" } } }] }],
+    searchSummary: { effort: "expanded", complete: false, canExpand: false, expansionAttempts: 64000, expansionBudget: 64000 },
+    coverage: [{ currentAmount: 100, deliveredAmount: 50, remainingGap: 50, intakeCertainty: "unknown" }], locale: "zh-CN" };
+  const mutations = [
+    (row: typeof baseline) => { row.options[0].purchaseEligible = false; },
+    (row: typeof baseline) => { row.options[0].roles = ["lower_cost"]; },
+    (row: typeof baseline) => { row.options[0].basket[0].servingsPerDay = 1; },
+    (row: typeof baseline) => { row.options[0].basket[0].administration.provenance.status = "unverified"; },
+    (row: typeof baseline) => { row.options[0].basket[0].administration.provenance.verifiedAt = "2026-09-02T00:00:00Z"; },
+    (row: typeof baseline) => { row.searchSummary.expansionAttempts = 8000; },
+    (row: typeof baseline) => { row.coverage[0].intakeCertainty = "known"; },
+    (row: typeof baseline) => { row.locale = "en"; }
+  ];
+  for (const mutate of mutations) {
+    const changed = structuredClone(baseline); mutate(changed);
+    assert.notDeepEqual(normalize(baseline, endpoint), normalize(changed, endpoint));
+  }
+});

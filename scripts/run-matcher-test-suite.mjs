@@ -1,12 +1,41 @@
 #!/usr/bin/env node
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fullTestInventory, isolatedDatabasePreflight, runBatch, sourceManifest, testSourceHygiene } from "./run-full-test-suite.mjs";
+import { isolatedValidationEnvironment } from "./run-dev-advisory-validation.mjs";
 import { unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+
+async function startHttpCandidate(env, evidence) {
+  const log = createWriteStream(join(evidence, "mcp-http.log"), { flags: "wx", mode: 0o600 });
+  const child = spawn(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./scripts/register-matcher-http-loader.mjs", "scripts/serve-matcher-test-http.ts"],
+    { cwd: ROOT, env, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe", "ipc"] });
+  child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
+  const closed = new Promise(done => child.once("close", done));
+  const stop = async () => {
+    if (child.exitCode === null && child.signalCode === null) {
+      try { process.kill(process.platform === "win32" ? child.pid : -child.pid, "SIGTERM"); } catch { /* already exited */ }
+      await Promise.race([closed, new Promise(done => setTimeout(done, 5000))]);
+      if (child.exitCode === null && child.signalCode === null) { try { process.kill(process.platform === "win32" ? child.pid : -child.pid, "SIGKILL"); } catch { /* already exited */ } await closed; }
+    }
+    await new Promise(done => log.end(done));
+  };
+  try {
+    const identity = await new Promise((done, reject) => {
+      const timer = setTimeout(() => reject(new Error("Local MCP route adapter readiness exceeded 60 seconds; inspect mcp-http.log")), 60_000);
+      child.once("error", error => { clearTimeout(timer); reject(error); });
+      child.once("exit", code => { clearTimeout(timer); reject(new Error(`Local MCP route adapter exited ${code}; inspect mcp-http.log`)); });
+      child.once("message", message => { clearTimeout(timer); if (message?.ready) done(message); else reject(new Error("Invalid local MCP readiness message")); });
+    });
+    if (identity.buildId !== env.AGENTIC_BUILD_ID || !/^http:\/\/127\.0\.0\.1:\d+$/.test(identity.origin)) throw new Error("Local MCP adapter source/origin identity mismatch");
+    writeFileSync(join(evidence, "mcp-http-identity.json"), JSON.stringify(identity, null, 2), { flag: "wx" });
+    return { identity, stop };
+  } catch (error) { await stop(); throw error; }
+}
 
 /** Complete maintained MCP + matcher consumer gate; no browser server/build needed. */
 async function main() {
@@ -25,10 +54,18 @@ async function main() {
   const before = sourceManifest();
   const inventorySha256 = createHash("sha256").update(JSON.stringify(inventory)).digest("hex");
   for (const [name, data] of [["inventory", { ...inventory, sha256: inventorySha256 }], ["source-before", before]]) writeFileSync(join(evidence, `${name}.json`), JSON.stringify(data, null, 2), { flag: "wx" });
-  const common = { ...process.env, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
+  const common = { ...isolatedValidationEnvironment(process.env), AGENTIC_BUILD_ID: before.sha256.slice(0, 40), DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
     MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", NODE_ENV: "test", DB_POOL_IDLE_TIMEOUT_SECONDS: "1" };
   const args = ["--test", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
-  const results = [];
+  const fixture = await runBatch("public-catalogue-fixtures", ["scripts/seed-matcher-public-fixtures.mjs", join(evidence, "public-catalogue-fixtures.json")], common, evidence);
+  if (!fixture.passed) throw new Error("Public matcher fixture preparation failed");
+  const server = await startHttpCandidate(common, evidence);
+  common.MCP_URL = `${server.identity.origin}/api/mcp`;
+  common.MCP_ISOLATED_CANDIDATE = "1";
+  common.NEXT_PUBLIC_SITE_URL = server.identity.origin;
+  common.SITE_URL = server.identity.origin;
+  const results = [fixture];
+  try {
   const runs = process.argv.includes("--twice") ? ["a", "b"] : ["a"];
   for (const run of runs) {
     results.push(await runBatch(`node-matcher-${run}`, [...args, ...inventory.files.filter(file => !inventory.integration.includes(file))],
@@ -50,6 +87,7 @@ async function main() {
   writeFileSync(join(evidence, "results.json"), JSON.stringify(result, null, 2), { flag: "wx" });
   console.log(JSON.stringify({ evidence, passed: result.passed, unchangedSource, identicalNonLatency }));
   if (!result.passed) process.exitCode = 1;
+  } finally { await server.stop(); }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(error.message); process.exitCode = 1; });
