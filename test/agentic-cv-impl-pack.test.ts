@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import {
   AGENTIC_TOOL_SCHEMAS,
   agenticServerInstructions
@@ -44,6 +45,7 @@ import {
   createPlan,
   d3OnlyRequest,
   freezeImplCatalogue,
+  withFinancialSession,
   gapTargets,
   identityOf,
   magnesiumProduct,
@@ -284,7 +286,7 @@ async function runRegCv02(session: PlanSession, runIndex: number): Promise<CvImp
       !stringList(unsatisfied.nextActions).includes("execute") && unsatisfied.ok !== false
     ),
     assertEq("FIX-02.A4", "conditional_deferred", d3Row?.status),
-    assertEq("FIX-02.A4b", "vitamin_d_status_unknown", d3Row?.reasonCode),
+    assertEq("FIX-02.A4b", "customer_target_confirmation", d3Row?.reasonCode),
     assertTrue(
       "FIX-02.A5",
       !(stringList(unsatisfied.nextActions).includes("answer_questions") &&
@@ -373,7 +375,7 @@ async function runRegCv03(session: PlanSession, runIndex: number): Promise<CvImp
       : [],
     targets: primaryRequest(session.freeze).targets.map((target) =>
       /magnesium/i.test(target.name)
-        ? { ...target, amount: 300, importance: "core" as const }
+        ? { ...target, amount: 300, acceptableRange: { minimum: 300, maximum: 375, unit: "mg" as const }, importance: "core" as const }
         : target
     )
   });
@@ -513,7 +515,7 @@ async function runDevState01(session: PlanSession, runIndex: number): Promise<Cv
     assertTrue("STATE-01.A3", answeredId.snapshotId === createdId.snapshotId && createdId.snapshotId.length > 0),
     assertTrue(
       "STATE-01.A4",
-      d3?.status !== "conditional_deferred" || d3?.reasonCode !== "vitamin_d_status_unknown"
+      d3?.status !== "conditional_deferred" || d3?.reasonCode !== "customer_target_confirmation"
     ),
     assertTrue(
       "STATE-01.A5",
@@ -603,7 +605,9 @@ async function runDevState03(session: PlanSession, runIndex: number): Promise<Cv
   const assertions = [
     assertTrue("STATE-03.created", originalId.length > 0),
     assertEq("STATE-03.get", originalId, identityOf(got).snapshotId),
-    assertEq("STATE-03.select", originalId, identityOf(selected).snapshotId),
+    assertEq("STATE-03.select", "availability_changed", asRecord(selected.error).reasonCode),
+    assertEq("STATE-03.selectRetryable", false, asRecord(selected.error).retryable),
+    assertEq("STATE-03.refresh", "refresh_plan", stringList(asRecord(selected.error).nextActions).join()),
     assertTrue(
       "STATE-03.replan",
       identityOf(replanned).snapshotId.length > 0 &&
@@ -1048,7 +1052,7 @@ async function runDevContract02(session: PlanSession, runIndex: number): Promise
     assertEq(
       "CONTRACT-02.checksum",
       officialChecksum,
-      JSON.parse(readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
+      JSON.parse(readFileSync(new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, import.meta.url), "utf8")).schemaChecksum
     ),
     assertEq("CONTRACT-02.info", infoChecksum, officialChecksum),
     assertEq("CONTRACT-02.list", listedHash, directHash),
@@ -1071,7 +1075,7 @@ async function runDevContract03(session: PlanSession, runIndex: number): Promise
 
 async function runDevContract04(session: PlanSession, runIndex: number): Promise<CvImplCaseResult> {
   const snapshot = JSON.parse(
-    readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
+    readFileSync(new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, import.meta.url), "utf8")
   ) as { tools: Array<{ inputSchema: unknown; name: string }> };
   const wellKnown = JSON.parse(
     readFileSync(new URL("../public/.well-known/mcp.json", import.meta.url), "utf8")
@@ -1265,7 +1269,7 @@ async function runDevSafety06(session: PlanSession, runIndex: number): Promise<C
           ]
         : [],
       targets: primaryRequest(session.freeze).targets.map((target) =>
-        /magnesium/i.test(target.name) ? { ...target, amount: 300, importance: "core" as const } : target
+        /magnesium/i.test(target.name) ? { ...target, amount: 300, acceptableRange: { minimum: 300, maximum: 375, unit: "mg" as const }, importance: "core" as const } : target
       )
     })
   );
@@ -1366,8 +1370,10 @@ async function runDevDet02(session: PlanSession, runIndex: number): Promise<CvIm
 async function runDevDet03(session: PlanSession, runIndex: number): Promise<CvImplCaseResult> {
   const request = primaryRequest(session.freeze);
   const hashes = [];
+  const plans: Record<string, unknown>[] = [];
   for (let index = 0; index < 10; index += 1) {
     const plan = await createPlan(session, request);
+    plans.push(plan);
     hashes.push(
       canonicalHash({
         coverage: coverageSignature(plan),
@@ -1377,12 +1383,13 @@ async function runDevDet03(session: PlanSession, runIndex: number): Promise<CvIm
     );
   }
   const assertions = [assertEq("DET-03.unique", 1, new Set(hashes).size)];
-  return conclude("DEV-DET-03", assertions, envelopeFor(session, request, { hashes }, assertions, runIndex));
+  return conclude("DEV-DET-03", assertions, envelopeFor(session, request, { hashes, plans }, assertions, runIndex));
 }
 
 async function runDevDet04(session: PlanSession, runIndex: number): Promise<CvImplCaseResult> {
   const base = primaryRequest(session.freeze);
   const hashes = new Set<string>();
+  const responses: { request: unknown; plan: Record<string, unknown> }[] = [];
   for (let index = 0; index < 20; index += 1) {
     const request = {
       ...base,
@@ -1395,21 +1402,20 @@ async function runDevDet04(session: PlanSession, runIndex: number): Promise<CvIm
     if (index % 2 === 1) {
       request.conditionCodes = [...(base.conditionCodes ?? [])];
     }
-    const plan = await createPlan(session, {
-      ...base,
-      targets: [...base.targets].reverse()
-    });
+    const plan = await createPlan(session, request);
+    responses.push({ request, plan });
     hashes.add(
       canonicalHash({
-        coverage: coverageSignature(plan),
+        // Coverage follows the requested display order; compare complete rows by identity.
+        coverage: coverageOf(plan).sort((left, right) => String(left.supplementId).localeCompare(String(right.supplementId))),
+        basket: basketOf(plan),
         optionId: plan.optionId ?? null,
         status: plan.status ?? null
       })
     );
-    void request;
   }
   const assertions = [assertEq("DET-04.unique", 1, hashes.size)];
-  return conclude("DEV-DET-04", assertions, envelopeFor(session, base, { size: hashes.size }, assertions, runIndex));
+  return conclude("DEV-DET-04", assertions, envelopeFor(session, base, { size: hashes.size, responses }, assertions, runIndex));
 }
 
 async function runDevDet05(session: PlanSession, runIndex: number): Promise<CvImplCaseResult> {
@@ -1521,15 +1527,15 @@ export async function runCvImplPack(
     cases.push(await runCase("DEV-STATE-01", () => runDevState01(session, runIndex)));
     cases.push(await runCase("DEV-STATE-02", () => runDevState02(session, runIndex)));
     cases.push(await runCase("DEV-STATE-03", () => runDevState03(session, runIndex)));
-    cases.push(await runCase("DEV-PACK-01", () => runDevPack01(session, runIndex)));
+    cases.push(await runCase("DEV-PACK-01", () => withFinancialSession(session, fixture => runDevPack01(fixture, runIndex))));
     cases.push(await runCase("DEV-PACK-02", () => runDevPack02(session, runIndex)));
-    cases.push(await runCase("DEV-ECON-01", () => runDevEcon01(session, runIndex)));
-    cases.push(await runCase("DEV-SAVE-01", () => runDevSave01(session, runIndex)));
+    cases.push(await runCase("DEV-ECON-01", () => withFinancialSession(session, fixture => runDevEcon01(fixture, runIndex))));
+    cases.push(await runCase("DEV-SAVE-01", () => withFinancialSession(session, fixture => runDevSave01(fixture, runIndex))));
     cases.push(await runCase("DEV-SAVE-02", () => runDevSave02(session, runIndex)));
     cases.push(await runCase("DEV-SAVE-03", () => runDevSave03(session, runIndex)));
     cases.push(await runCase("DEV-SAVE-04", () => runDevSave04(session, runIndex)));
     cases.push(await runCase("DEV-SAVE-05", () => runDevSave05(session, runIndex)));
-    cases.push(await runCase("DEV-SAVE-06", () => runDevSave06(session, runIndex)));
+    cases.push(await runCase("DEV-SAVE-06", () => withFinancialSession(session, fixture => runDevSave06(fixture, runIndex))));
     cases.push(await runCase("DEV-CONTRACT-01", () => runDevContract01(session, runIndex)));
     cases.push(await runCase("DEV-CONTRACT-02", () => runDevContract02(session, runIndex)));
     cases.push(await runCase("DEV-CONTRACT-03", () => runDevContract03(session, runIndex)));
@@ -1575,12 +1581,9 @@ export async function runCvImplPackTwice() {
 
 if (process.env.NODE_TEST_CONTEXT) {
 describe("Customer value implementation pack v1.1", () => {
-  it("Slices 0-8 pass twice on one freeze", async (t) => {
+  it("Slices 0-8 pass twice on one freeze", async () => {
     const frozen = await freezeImplCatalogue();
-    if (!frozen.live) {
-      t.skip("live Thailand retail catalogue is not loaded in this runner");
-      return;
-    }
+    assert.equal(frozen.live, true, "The isolated retail catalogue fixture must be loaded");
     const { first, second } = await runCvImplPackTwice();
     assert.equal(first.totalCases, PACK_IDS.length);
     assert.equal(second.totalCases, PACK_IDS.length);
@@ -1595,7 +1598,8 @@ describe("Customer value implementation pack v1.1", () => {
       failed.map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.result)}`).join("; ")
     );
     assert.equal(first.snapshotId, second.snapshotId);
-    assert.equal(MATCHER_VERSION, "advisory-dose-fit-2");
+    assert.equal(canonicalCvImplReport(first), canonicalCvImplReport(second), "CV implementation non-latency results diverged");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-3");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });
