@@ -1,0 +1,313 @@
+{
+  "version": 1,
+  "corrections": [
+    {
+      "correctionId": "v5-vistra-administration-7a0cf191-e51e-5a8b-84d1-522cf432db04",
+      "entityTable": "products",
+      "entityId": "7a0cf191-e51e-5a8b-84d1-522cf432db04",
+      "before": {
+        "id": "7a0cf191-e51e-5a8b-84d1-522cf432db04",
+        "title": "ODORLESS FISH OIL 1000MG 100'S",
+        "product_url": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/x",
+        "administration": null
+      },
+      "after": {
+        "id": "7a0cf191-e51e-5a8b-84d1-522cf432db04",
+        "title": "ODORLESS FISH OIL 1000MG 100'S",
+        "product_url": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/x",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+            "sourceText": "Manufacturer composition is per capsule. One capsule supplies fish oil 1000 mg and Omega-3 350 mg. Pack count was not verified.",
+            "verifiedAt": "2026-09-07T05:18:00.000Z"
+          }
+        }
+      },
+      "beforeFingerprint": "05e88f794e1f24cbfd49b6b8a0a9086c1be5b02b4d4875055a3ee9565ee12ffe",
+      "afterFingerprint": "64073f2137c90fc851d7bbfdbd498dd381a456d27a48fcbfb992c14c6a6ee2c2",
+      "evidence": {
+        "checkedAt": "2026-09-07T05:18:00.000Z",
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+        "summary": "One capsule is the labelled serving; package-specific quantity remains unknown."
+      }
+    },
+    {
+      "correctionId": "v5-vistra-active-omega3-1673af88-bf59-442c-84a2-36d3de02b63c",
+      "entityTable": "product_facts",
+      "entityId": "1673af88-bf59-442c-84a2-36d3de02b63c",
+      "before": {
+        "id": "1673af88-bf59-442c-84a2-36d3de02b63c",
+        "product_id": "7a0cf191-e51e-5a8b-84d1-522cf432db04",
+        "name": "Omega-3",
+        "normalized_name": "omega_3",
+        "amount": 350,
+        "unit": "mg",
+        "serving_label": null,
+        "supplement_id": "9da42d1d-24f5-56d2-bd62-5ea45adfcc4b",
+        "confidence": "high",
+        "source": "admin",
+        "source_url": null,
+        "source_text": null
+      },
+      "after": {
+        "id": "1673af88-bf59-442c-84a2-36d3de02b63c",
+        "product_id": "7a0cf191-e51e-5a8b-84d1-522cf432db04",
+        "name": "Omega-3",
+        "normalized_name": "omega_3",
+        "amount": 350,
+        "unit": "mg",
+        "serving_label": "1 capsule",
+        "supplement_id": "9da42d1d-24f5-56d2-bd62-5ea45adfcc4b",
+        "confidence": "high",
+        "source": "manufacturer_verified_v5",
+        "source_url": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+        "source_text": "Manufacturer lists fish oil 1000 mg per capsule, providing total Omega-3 350 mg (including EPA 180 mg and DHA 120 mg)."
+      },
+      "beforeFingerprint": "3df1eecc46357c05619f64080950219c63312be6573bb57970dc0688209ee6a1",
+      "afterFingerprint": "07b65e0e4792e5791aebdd17866417859f91fe9be78b55407ec201737f01a711",
+      "evidence": {
+        "checkedAt": "2026-09-07T05:18:00.000Z",
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+        "summary": "Distinguish carrier fish-oil mass from measured active total Omega-3. Preserve original record in audit."
+      }
+    },
+    {
+      "correctionId": "v5-vistra-administration-ec8953ee-188d-41c3-adeb-558581dd6fc2",
+      "entityTable": "products",
+      "entityId": "ec8953ee-188d-41c3-adeb-558581dd6fc2",
+      "before": {
+        "id": "ec8953ee-188d-41c3-adeb-558581dd6fc2",
+        "title": "VISTRA Odorless Fish Oil 1000 mg",
+        "product_url": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+        "administration": null
+      },
+      "after": {
+        "id": "ec8953ee-188d-41c3-adeb-558581dd6fc2",
+        "title": "VISTRA Odorless Fish Oil 1000 mg",
+        "product_url": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+            "sourceText": "Manufacturer composition is per capsule. One capsule supplies fish oil 1000 mg and Omega-3 350 mg. Pack count was not verified.",
+            "verifiedAt": "2026-09-07T05:18:00.000Z"
+          }
+        }
+      },
+      "beforeFingerprint": "52ef070609f7b870cc6ca618b05e04cafee0cca07a8dfec5be9483dc5215ae34",
+      "afterFingerprint": "cd6e43fdfc4339fc04b5ca0b4bdd1d0e7062e3fb36d0470e09d7b0d6f4a11bb2",
+      "evidence": {
+        "checkedAt": "2026-09-07T05:18:00.000Z",
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+        "summary": "One capsule is the labelled serving; package-specific quantity remains unknown."
+      }
+    },
+    {
+      "correctionId": "v5-vistra-active-omega3-f0ab69ed-36c3-42fd-9cd9-e2150625039f",
+      "entityTable": "product_facts",
+      "entityId": "f0ab69ed-36c3-42fd-9cd9-e2150625039f",
+      "before": {
+        "id": "f0ab69ed-36c3-42fd-9cd9-e2150625039f",
+        "product_id": "ec8953ee-188d-41c3-adeb-558581dd6fc2",
+        "name": "Omega-3",
+        "normalized_name": "omega_3",
+        "amount": 1000,
+        "unit": "mg",
+        "serving_label": null,
+        "supplement_id": "9da42d1d-24f5-56d2-bd62-5ea45adfcc4b",
+        "confidence": "high",
+        "source": "admin",
+        "source_url": null,
+        "source_text": "page_text: น้ำมันปลา 1000 มก."
+      },
+      "after": {
+        "id": "f0ab69ed-36c3-42fd-9cd9-e2150625039f",
+        "product_id": "ec8953ee-188d-41c3-adeb-558581dd6fc2",
+        "name": "Omega-3",
+        "normalized_name": "omega_3",
+        "amount": 350,
+        "unit": "mg",
+        "serving_label": "1 capsule",
+        "supplement_id": "9da42d1d-24f5-56d2-bd62-5ea45adfcc4b",
+        "confidence": "high",
+        "source": "manufacturer_verified_v5",
+        "source_url": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+        "source_text": "Manufacturer lists fish oil 1000 mg per capsule, providing total Omega-3 350 mg (including EPA 180 mg and DHA 120 mg)."
+      },
+      "beforeFingerprint": "f6c91d6cc12ae91f20f09bb970ecc0d00ecf9cf1a3a0e870c77e80d4b665fb24",
+      "afterFingerprint": "eeabec0c261317bc1583f69192184f852dc8b55fb439ffd1c4e477e3aab1ae45",
+      "evidence": {
+        "checkedAt": "2026-09-07T05:18:00.000Z",
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-odorless-fish-oil-1000mg/",
+        "summary": "Distinguish carrier fish-oil mass from measured active total Omega-3. Preserve original record in audit."
+      }
+    },
+    {
+      "correctionId": "v5-joinplus-conflict-dd25935c-c1f0-4462-973f-aaf71a1bd5ef",
+      "entityTable": "product_facts",
+      "entityId": "dd25935c-c1f0-4462-973f-aaf71a1bd5ef",
+      "before": {
+        "id": "dd25935c-c1f0-4462-973f-aaf71a1bd5ef",
+        "product_id": "1cb381be-68df-56ec-9a01-9b58643a8fd3",
+        "name": "Vitamin D3",
+        "normalized_name": "vitamin_d3",
+        "amount": 400,
+        "unit": "IU",
+        "serving_label": null,
+        "supplement_id": "d5b9d597-5e92-500d-a691-f7e406eda7b1",
+        "confidence": "high",
+        "source": "admin",
+        "source_url": null,
+        "source_text": null
+      },
+      "after": {
+        "id": "dd25935c-c1f0-4462-973f-aaf71a1bd5ef",
+        "product_id": "1cb381be-68df-56ec-9a01-9b58643a8fd3",
+        "name": "Vitamin D3",
+        "normalized_name": "vitamin_d3",
+        "amount": 400,
+        "unit": "IU",
+        "serving_label": null,
+        "supplement_id": null,
+        "confidence": "low",
+        "source": "catalogue_conflict_review",
+        "source_url": null,
+        "source_text": "Catalogue identity conflict: fact labelled Vitamin D3 was mapped to Vitamin B3. Nutrient identity and amount require label verification; retained for exploration, excluded from quantified coverage."
+      },
+      "beforeFingerprint": "2e5032a0a86cbc9d2ae9d6993bb9a907ae0116b84a26d544ac272d5e6a67e3d1",
+      "afterFingerprint": "fec85a1a3b2c3a337e880d9b5397de1e42386f105022e87033e5f017c2de92d0",
+      "evidence": {
+        "checkedAt": "2026-09-07T05:18:00.000Z",
+        "sourceUrl": "catalogue://products/1cb381be-68df-56ec-9a01-9b58643a8fd3/facts/dd25935c-c1f0-4462-973f-aaf71a1bd5ef",
+        "summary": "Internal source evidence contradicts mapping: Vitamin D3 is not Vitamin B3. No replacement identity or amount is asserted."
+      }
+    },
+    {
+      "correctionId": "v5-joinplus-conflict-cb732b5f-00c3-46fe-95cf-0f705bd70806",
+      "entityTable": "product_facts",
+      "entityId": "cb732b5f-00c3-46fe-95cf-0f705bd70806",
+      "before": {
+        "id": "cb732b5f-00c3-46fe-95cf-0f705bd70806",
+        "product_id": "1cb381be-68df-56ec-9a01-9b58643a8fd3",
+        "name": "Inulin",
+        "normalized_name": "inulin",
+        "amount": 45,
+        "unit": "mg",
+        "serving_label": null,
+        "supplement_id": "e7f08498-3cf8-5caa-868a-27adf61afeab",
+        "confidence": "high",
+        "source": "admin",
+        "source_url": null,
+        "source_text": null
+      },
+      "after": {
+        "id": "cb732b5f-00c3-46fe-95cf-0f705bd70806",
+        "product_id": "1cb381be-68df-56ec-9a01-9b58643a8fd3",
+        "name": "Inulin",
+        "normalized_name": "inulin",
+        "amount": 45,
+        "unit": "mg",
+        "serving_label": null,
+        "supplement_id": null,
+        "confidence": "low",
+        "source": "catalogue_conflict_review",
+        "source_url": null,
+        "source_text": "Catalogue identity conflict: fact labelled Inulin was mapped to Zinc. Nutrient identity and amount require label verification; retained for exploration, excluded from quantified coverage."
+      },
+      "beforeFingerprint": "c909ce6cc47ef160170657aef11c872a2a4dae78a6a4aca798e8d0835a10ef8d",
+      "afterFingerprint": "06609057fd7d438d4609700a39b011d52b68a3b0a85b88591434e39566d2f853",
+      "evidence": {
+        "checkedAt": "2026-09-07T05:18:00.000Z",
+        "sourceUrl": "catalogue://products/1cb381be-68df-56ec-9a01-9b58643a8fd3/facts/cb732b5f-00c3-46fe-95cf-0f705bd70806",
+        "summary": "Internal source evidence contradicts mapping: Inulin is not Zinc. No replacement identity or amount is asserted."
+      }
+    },
+    {
+      "correctionId": "v5-joinplus-conflict-3f5d48d0-d5f3-487b-b229-2a5bb4a0c5db",
+      "entityTable": "product_facts",
+      "entityId": "3f5d48d0-d5f3-487b-b229-2a5bb4a0c5db",
+      "before": {
+        "id": "3f5d48d0-d5f3-487b-b229-2a5bb4a0c5db",
+        "product_id": "1cb381be-68df-56ec-9a01-9b58643a8fd3",
+        "name": "Vitamin c",
+        "normalized_name": "vitamin_c",
+        "amount": 50,
+        "unit": "mg",
+        "serving_label": null,
+        "supplement_id": "d3b7491b-d6aa-57b0-8d1b-a03945d34b5e",
+        "confidence": "high",
+        "source": "admin",
+        "source_url": null,
+        "source_text": null
+      },
+      "after": {
+        "id": "3f5d48d0-d5f3-487b-b229-2a5bb4a0c5db",
+        "product_id": "1cb381be-68df-56ec-9a01-9b58643a8fd3",
+        "name": "Vitamin c",
+        "normalized_name": "vitamin_c",
+        "amount": 50,
+        "unit": "mg",
+        "serving_label": null,
+        "supplement_id": null,
+        "confidence": "low",
+        "source": "catalogue_conflict_review",
+        "source_url": null,
+        "source_text": "Catalogue identity conflict: fact labelled Vitamin c was mapped to Vitamin E. Nutrient identity and amount require label verification; retained for exploration, excluded from quantified coverage."
+      },
+      "beforeFingerprint": "382efcb89bf683bb3ad86226f0f16acb7371d5ffc49b515c994b4739396f276f",
+      "afterFingerprint": "48756e95fea8a9e5b1df1407a5df1815af64980544c64e4b3c845f63379f0acc",
+      "evidence": {
+        "checkedAt": "2026-09-07T05:18:00.000Z",
+        "sourceUrl": "catalogue://products/1cb381be-68df-56ec-9a01-9b58643a8fd3/facts/3f5d48d0-d5f3-487b-b229-2a5bb4a0c5db",
+        "summary": "Internal source evidence contradicts mapping: Vitamin c is not Vitamin E. No replacement identity or amount is asserted."
+      }
+    },
+    {
+      "correctionId": "v5-hair-rise-topical-13d0bb70-218d-4181-9fe9-26f7b5d077d2",
+      "entityTable": "products",
+      "entityId": "13d0bb70-218d-4181-9fe9-26f7b5d077d2",
+      "before": {
+        "id": "13d0bb70-218d-4181-9fe9-26f7b5d077d2",
+        "title": "Hair Rise hair spray 20m",
+        "product_url": "https://www.hairrisethailand.com/product/6/hair-rise-hair-spray-20m",
+        "administration": null
+      },
+      "after": {
+        "id": "13d0bb70-218d-4181-9fe9-26f7b5d077d2",
+        "title": "Hair Rise hair spray 20m",
+        "product_url": "https://www.hairrisethailand.com/product/6/hair-rise-hair-spray-20m",
+        "administration": {
+          "route": "topical",
+          "physicalUnit": "ml",
+          "unitsPerServing": null,
+          "doseIncrement": null,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.hairrisethailand.com/",
+            "sourceText": "Official manufacturer instructions apply Hair Rise Spray onto the scalp. Per-application volume and package quantity have not been verified for this SKU.",
+            "verifiedAt": "2026-09-07T05:18:00.000Z"
+          }
+        }
+      },
+      "beforeFingerprint": "4726b4775378f71c5d2be4881445fab8be474fdf27029ab6d02592177786302e",
+      "afterFingerprint": "406c61f4958867f4077477a467c710cd933cc9e1153ac933d27756e7ca5f8f0b",
+      "evidence": {
+        "checkedAt": "2026-09-07T05:18:00.000Z",
+        "sourceUrl": "https://www.hairrisethailand.com/",
+        "summary": "Scalp application establishes topical route. Do not count topical ingredients towards oral intake; do not change retail purchase status."
+      }
+    }
+  ]
+}

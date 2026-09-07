@@ -52,6 +52,14 @@ export function sampleRetailProduct(input: Readonly<{
   return {
     audience: "adult",
     candidate: {
+      administration: {
+        route: "oral",
+        physicalUnit: input.form === "powder" ? "scoop" : "capsule",
+        unitsPerServing: 1,
+        doseIncrement: 1,
+        packQuantity: Number(input.servingLabel.match(/(\d+)\s+(?:servings|capsules|tablets|softgels)\s+per/)?.[1]) || null,
+        provenance: { status: "verified", sourceUrl: "https://fixture.example/declared-label", sourceText: input.servingLabel, verifiedAt: "2026-08-31T00:00:00.000Z" }
+      },
       automatedSafetyPassed: true,
       availabilityStatus: "in_stock",
       currency: "THB",

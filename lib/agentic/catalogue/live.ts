@@ -1,3 +1,4 @@
+import { administrationDailyPills, parseProductAdministration } from "@/lib/product-administration";
 import { assessRetailSellability } from "@/lib/retail-sellability";
 import { publicProductId } from "@/lib/agentic/contract/ids";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "@/lib/agentic/catalogue/market";
@@ -97,6 +98,7 @@ function contributionSupplementIds(
   const ids = new Set<string>();
 
   for (const fact of candidate.facts ?? []) {
+    if (fact.mappingStatus === "conflicting") continue;
     if (fact.supplementId) {
       const mapped =
         index.get(fact.supplementId) ??
@@ -182,39 +184,6 @@ function inferDietarySource(
   return "any";
 }
 
-function inferForm(candidate: ProductCandidate) {
-  const haystack = [
-    candidate.title,
-    ...candidate.facts.map((item) => item.servingLabel ?? "")
-  ]
-    .join(" ")
-    .toLowerCase();
-  const forms = [
-    "softgel",
-    "capsule",
-    "tablet",
-    "powder",
-    "gummy",
-    "liquid",
-    "sachet"
-  ] as const;
-
-  return forms.find((form) => haystack.includes(form)) ?? "capsule";
-}
-
-function inferDailyPills(candidate: ProductCandidate) {
-  for (const fact of candidate.facts) {
-    const match = fact.servingLabel?.match(/(\d+(?:\.\d+)?)/);
-    const value = match ? Number(match[1]) : NaN;
-
-    if (Number.isFinite(value) && value > 0 && value <= 12) {
-      return value;
-    }
-  }
-
-  return 1;
-}
-
 function isSaleEligible(candidate: ProductCandidate) {
   const price = candidate.unitPriceAmount ?? candidate.priceAmount ?? 0;
   return (
@@ -232,7 +201,7 @@ function isSaleEligible(candidate: ProductCandidate) {
   );
 }
 
-function toCatalogueProduct(
+export function toCatalogueProduct(
   candidate: ProductCandidate,
   supplements: readonly CatalogueSupplement[],
   index: Map<string, string>
@@ -270,9 +239,9 @@ function toCatalogueProduct(
     audience: candidate.productAudience === "both" ? "both" : "adult",
     candidate,
     contributionSupplementIds: contributions,
-    dailyPills: inferDailyPills(candidate),
+    dailyPills: administrationDailyPills(candidate.administration) ?? 0,
     dietarySource: inferDietarySource(candidate, omegaSource),
-    form: inferForm(candidate),
+    form: candidate.administration?.physicalUnit ?? "unknown",
     incompleteCommercialFacts: false,
     omegaSource,
     orderable: true,
@@ -287,6 +256,7 @@ function toCatalogueProduct(
 }
 
 type SnapshotSkuRow = Readonly<{
+  administration?: unknown;
   backorder_policy: string | null;
   brand_status: string | null;
   currency: string | null;
@@ -316,7 +286,15 @@ function numberOrZero(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function snapshotFacts(value: unknown): ProductCandidateFact[] {
+export function factMappingStatus(row: Record<string, unknown>): "verified" | "unverified" | "conflicting" {
+  if (row.mappingStatus === "conflicting" || row.source === "catalogue_conflict_review") return "conflicting";
+  if (typeof row.supplementId !== "string" || typeof row.mappedName !== "string") return "unverified";
+  const names = [row.mappedName, ...(Array.isArray(row.mappedAliases) ? row.mappedAliases : [])].filter((value): value is string => typeof value === "string").map(normalizeName);
+  const supplied = [row.name, row.normalizedName].filter((value): value is string => typeof value === "string").map(normalizeName);
+  return supplied.some(name => names.includes(name)) ? "verified" : "conflicting";
+}
+
+export function snapshotFacts(value: unknown): ProductCandidateFact[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -329,7 +307,8 @@ function snapshotFacts(value: unknown): ProductCandidateFact[] {
     const row = item as Record<string, unknown>;
     const name = typeof row.name === "string" ? row.name : "";
     const unit = typeof row.unit === "string" ? row.unit : null;
-    const amount = Number(row.amount);
+    const amount = row.amount == null || row.amount === "" ? NaN : Number(row.amount);
+    const mappingStatus = factMappingStatus(row);
 
     if (!name) {
       return [];
@@ -338,8 +317,12 @@ function snapshotFacts(value: unknown): ProductCandidateFact[] {
     const fact = {
       amount: Number.isFinite(amount) ? amount : null,
       comparableAmount: null,
-      confidence: "high" as const,
-      itemType: "supplement" as const,
+      confidence: row.confidence === "high" || row.confidence === "moderate" ? row.confidence : "low",
+      source: typeof row.source === "string" ? row.source : null,
+      sourceUrl: typeof row.sourceUrl === "string" ? row.sourceUrl : null,
+      sourceText: typeof row.sourceText === "string" ? row.sourceText : null,
+      mappingStatus,
+      itemType: row.itemType === "food" || row.itemType === "nutrient" ? row.itemType : "supplement",
       name,
       normalizedName:
         typeof row.normalizedName === "string"
@@ -390,6 +373,7 @@ function candidateFromSnapshotRow(
         : "unavailable";
 
   return {
+    administration: parseProductAdministration(row.administration),
     automatedSafetyPassed: (row.validation_status ?? "pass") === "pass",
     availabilityStatus: stockQuantity > 0 ? "in_stock" : "out_of_stock",
     availableCountryCodes: [countryCode],
@@ -496,6 +480,7 @@ export async function loadLiveRetailSnapshot(
       products.validation_status,
       products.product_kind,
       products.product_audience,
+      products.administration,
       product_brands.status as brand_status,
       coalesce(stock.stock_quantity, 0)::int as stock_quantity,
       coalesce(fact_rows.facts, '[]'::jsonb) as facts,
@@ -520,18 +505,25 @@ export async function loadLiveRetailSnapshot(
         coalesce(
           jsonb_agg(
             jsonb_build_object(
-              'name', name,
-              'normalizedName', normalized_name,
-              'amount', amount,
-              'unit', unit,
-              'servingLabel', serving_label,
-              'supplementId', supplement_id::text,
-              'itemType', item_type
+              'name', product_facts.name,
+              'normalizedName', product_facts.normalized_name,
+              'amount', product_facts.amount,
+              'unit', product_facts.unit,
+              'servingLabel', product_facts.serving_label,
+              'supplementId', product_facts.supplement_id::text,
+              'itemType', product_facts.item_type,
+              'confidence', product_facts.confidence,
+              'source', product_facts.source,
+              'sourceUrl', product_facts.source_url,
+              'sourceText', product_facts.source_text,
+              'mappedName', supplements.name,
+              'mappedAliases', (select coalesce(jsonb_agg(alias), '[]'::jsonb) from public.supplement_aliases where supplement_aliases.supplement_id = product_facts.supplement_id)
             )
-          ) filter (where supplement_id is not null),
+          ),
           '[]'::jsonb
         ) as facts
       from public.product_facts
+      left join public.supplements on supplements.id = product_facts.supplement_id
       where product_facts.product_id = products.id
     ) fact_rows on true
     where products.status = 'approved'

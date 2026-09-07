@@ -1,3 +1,4 @@
+import { administrationDailyPills } from "@/lib/product-administration";
 import {
   isFalseOmegaAttribution,
   isPrenatalOrFertilitySku
@@ -30,23 +31,26 @@ export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
     return cached;
   }
 
+  const nonOral = product.candidate.administration?.route === "topical" || product.candidate.administration?.route === "other";
   const falseOmega = isFalseOmegaAttribution(product.candidate);
   const labelledContributions = collapseDuplicateLabelledFacts(
-    product.candidate.facts.map((fact) => {
+    product.candidate.facts.filter(fact => fact.amount != null).map((fact) => {
       const mappedId = contributionSubjectId(fact.supplementId);
       return {
-        amount: fact.amount ?? fact.comparableAmount ?? 0,
+        ...{ mappingStatus: nonOral ? "conflicting" as const : fact.mappingStatus, confidence: fact.confidence, source: fact.source, sourceUrl: fact.sourceUrl, sourceText: fact.sourceText },
+        amount: fact.amount!,
         name: fact.name,
-        subjectId: falseOmega ? null : mappedId,
+        subjectId: nonOral || falseOmega || fact.mappingStatus === "conflicting" ? null : mappedId,
         unit: fact.unit
       };
     })
   );
-  const contributionSubjectIds = falseOmega
+  const contributionSubjectIds = nonOral || falseOmega || product.candidate.facts.some(fact => fact.mappingStatus === "conflicting")
     ? [...new Set(labelledContributions.map((item) => item.subjectId).filter((id): id is string => Boolean(id)))]
     : product.contributionSupplementIds;
 
   const created: MatcherProduct = {
+    ...{ administration: product.candidate.administration ?? null, pillCountKnown: product.source === "fixture" || administrationDailyPills(product.candidate.administration) != null },
     availableCountryCodes: product.candidate.availableCountryCodes ?? null,
     contributionSubjectIds,
     currency: product.candidate.currency,
@@ -73,7 +77,7 @@ export function toMatcherProduct(product: CatalogueProduct): MatcherProduct {
           ? "unavailable"
           : "in_stock",
     title: product.candidate.title,
-    unknownSafetyAmount: false,
+    unknownSafetyAmount: product.candidate.facts.some(fact => fact.amount == null || fact.confidence !== "high" || fact.mappingStatus === "conflicting"),
     unitPriceMinor: product.unitPriceMinor
   };
 

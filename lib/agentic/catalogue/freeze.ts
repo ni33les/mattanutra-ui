@@ -10,8 +10,10 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
   hash.update("\0");
 
   for (const product of [...snapshot.products].sort((left, right) =>
-    left.productId.localeCompare(right.productId)
+    `${left.productId}:${left.sellerId}`.localeCompare(`${right.productId}:${right.sellerId}`)
   )) {
+    hash.update(JSON.stringify(product.candidate.administration ?? null));
+    hash.update("\0");
     hash.update(product.productId);
     hash.update(":");
     hash.update(product.sellerId);
@@ -34,6 +36,8 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
         `${right.normalizedName}:${right.unit}`
       )
     )) {
+      hash.update(JSON.stringify([fact.confidence, fact.source ?? null, fact.sourceUrl ?? null, fact.sourceText ?? null, fact.mappingStatus ?? null, fact.servingLabel ?? null]));
+      hash.update("\0");
       hash.update(fact.normalizedName);
       hash.update(":");
       hash.update(String(fact.amount ?? ""));

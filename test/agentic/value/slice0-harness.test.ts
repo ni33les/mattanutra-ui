@@ -68,6 +68,14 @@ function retailProduct(input: Readonly<{
   return {
     audience: "adult",
     candidate: {
+      administration: {
+        route: "oral",
+        physicalUnit: input.form === "powder" ? "scoop" : "capsule",
+        unitsPerServing: 1,
+        doseIncrement: 1,
+        packQuantity: Number(input.servingLabel.match(/(\d+)\s+(?:servings|capsules|tablets|softgels)\s+per/)?.[1]) || null,
+        provenance: { status: "verified", sourceUrl: "https://fixture.example/declared-label", sourceText: input.servingLabel, verifiedAt: "2026-08-31T00:00:00.000Z" }
+      },
       automatedSafetyPassed: true,
       availabilityStatus: "in_stock",
       currency: "THB",
@@ -245,7 +253,7 @@ describe("Slice 0 value harness", () => {
     );
   });
 
-  it("recognizes explicit single-capsule pack counts without treating strength or duration as a pack count", () => {
+  it("uses declared pack metadata without treating title strength or duration as pack facts", () => {
     const snapshot = sampleSnapshot();
     const titled = retailProduct({
       amount: 150,
@@ -259,8 +267,8 @@ describe("Slice 0 value harness", () => {
       unitPriceMinor: 10000
     });
 
-    // Explicit quantity notation was added in b16d54cb. This fixture serves one capsule.
-    assert.equal(servingsPerPackFromProduct(titled), 90);
+    // v5 requires verified physical pack facts; even a plausible title count is not evidence.
+    assert.equal(servingsPerPackFromProduct(titled), null);
     for (const title of ["Magnesium 90 mg", "Magnesium 90 day support", "Magnesium"]) {
       assert.equal(servingsPerPackFromProduct({
         ...titled, candidate: { ...titled.candidate, title }

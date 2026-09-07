@@ -1,3 +1,4 @@
+import type { ProductAdministration } from "@/lib/product-administration";
 import type { ParsedDose } from "@/lib/dose-conversion";
 import type { ValidationResult } from "@/lib/product-validation";
 
@@ -37,6 +38,10 @@ export type ProductRecommendationNeed = Readonly<{
 }>;
 
 export type ProductCandidateFact = Readonly<{
+  source?: string | null;
+  sourceUrl?: string | null;
+  sourceText?: string | null;
+  mappingStatus?: "verified" | "unverified" | "conflicting";
   aliasKeys?: readonly string[];
   amount: number | null;
   comparableAmount: number | null;
@@ -56,6 +61,7 @@ export type ProductCandidateFact = Readonly<{
 }>;
 
 export type ProductCandidate = Readonly<{
+  administration?: ProductAdministration | null;
   matchingFacts?: Readonly<{ dailyPillsPerServing: number; form: string; dietarySource: "algae" | "any" | "fish" | "plant"; omegaSource: "algae" | "fish" | "none" }>;
   automatedSafetyPassed: boolean;
   availabilityStatus: ProductAvailabilityStatus;

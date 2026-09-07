@@ -1,3 +1,4 @@
+import { verifiedAdministration } from "@/lib/product-administration";
 import type { CatalogueProduct } from "@/lib/agentic/catalogue/types";
 
 const PACK_COUNT_PATTERN =
@@ -75,6 +76,11 @@ export function packCountFromFacts(
 }
 
 export function servingsPerPackFromProduct(product: CatalogueProduct): number | null {
+  const administration = verifiedAdministration(product.candidate.administration);
+  if (administration?.packQuantity && administration.unitsPerServing) return administration.packQuantity / administration.unitsPerServing;
+  // Frozen historical fixture packs encode their declared facts in serving labels.
+  // Live products never obtain supply duration by extracting numbers from titles.
+  if (product.source !== "fixture") return null;
   const fromTitle = countFromText(product.candidate.title);
   if (fromTitle != null) {
     return fromTitle;
@@ -90,13 +96,14 @@ export function servingsPerPackFromProduct(product: CatalogueProduct): number | 
 
 export function packFactsFromProduct(product: CatalogueProduct): ProductPackFacts {
   const servingsPerPack = servingsPerPackFromProduct(product);
-  const unitsPerServing =
-    Number.isFinite(product.dailyPills) && product.dailyPills > 0 ? product.dailyPills : null;
+  const administration = verifiedAdministration(product.candidate.administration);
+  const unitsPerServing = administration?.unitsPerServing ?? (product.source === "fixture" && Number.isFinite(product.dailyPills) && product.dailyPills > 0 ? product.dailyPills : null);
   const serving = product.candidate.facts.find(
     (item) => item.amount != null && item.unit && item.supplementId
   );
-  const servingSize =
-    serving && serving.amount != null && serving.unit
+  const servingSize = administration?.unitsPerServing && administration.physicalUnit !== "unknown"
+    ? { amount: administration.unitsPerServing, unit: administration.physicalUnit }
+    : product.source === "fixture" && serving && serving.amount != null && serving.unit
       ? { amount: serving.amount, unit: serving.unit }
       : null;
   const missing: PackFactNames[] = [];
