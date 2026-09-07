@@ -6,7 +6,7 @@ import { isFalseOmegaAttribution } from "@/lib/agentic/catalogue/product-fit";
 import { canonicalNutrientKey, normalizeProductFactKey, productKeysMatch } from "@/lib/product-key-matching";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
 import { labelledSafetyExposure } from "@/lib/matcher/safety";
-import { knownCurrentTargetExposure } from "@/lib/matcher/target-basis";
+import { knownCurrentTargetExposure, targetDoseTicks } from "@/lib/matcher/target-basis";
 import type {
   CanonicalRequest,
   CanonicalTarget,
@@ -519,18 +519,14 @@ export function supportedDoseDomain(product: MatcherProduct, request: CanonicalR
   const compiled = compileVariant({ product, request, dailyUnits: Number(step.num) / Number(step.den), dailyUnitsRatio: step });
   for (const target of request.targets) {
     if (isDeferredConditional(target)) continue;
-    const increment = compiled?.contributions.get(target.subjectId)?.units;
-    if (!increment || increment <= 0) continue;
-    const remaining = remainingRequestedUnits(request, target.subjectId);
-    const floor = remaining / increment;
-    for (const value of [floor - BigInt(1), floor, floor + BigInt(1)]) if (value > 0 && value <= BigInt(Number.MAX_SAFE_INTEGER)) ticks.add(value);
+    const perServing = compiled?.amountPerUnit.get(target.subjectId)?.units;
+    if (!perServing || perServing <= 0) continue;
+    for (const value of targetDoseTicks(request, target, perServing, step)) ticks.add(value);
     for (const bound of [target.acceptableMinimum, target.acceptableMaximum]) {
       if (bound == null) continue;
       const scaled = scaleAmount({ amount: bound, subjectId: target.subjectId, subjectName: target.name, unit: target.requestedUnit });
       if (!isDoseError(scaled)) {
-        const current = knownCurrentTargetExposure(request, target);
-        const value = (scaled.units > current ? scaled.units - current : BigInt(0)) / increment;
-        for (const neighbor of [value, value + BigInt(1)]) if (neighbor > 0 && neighbor <= BigInt(Number.MAX_SAFE_INTEGER)) ticks.add(neighbor);
+        for (const value of targetDoseTicks(request, target, perServing, step, undefined, scaled.units)) ticks.add(value);
       }
     }
   }

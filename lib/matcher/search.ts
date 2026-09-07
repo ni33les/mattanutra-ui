@@ -1,4 +1,4 @@
-import { knownTargetExposure } from "@/lib/matcher/target-basis";
+import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
@@ -161,11 +161,7 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
     for (const target of request.targets) {
       const perServing = initial[0]!.amountPerUnit.get(target.subjectId)?.units;
       if (!perServing || perServing <= 0 || isDeferredConditional(target)) continue;
-      const exposure = knownTargetExposure(request, target, state.exposure.get(target.subjectId) ?? BigInt(0));
-      const remainder = target.requested.units > exposure ? target.requested.units - exposure : BigInt(0);
-      const floor = remainder * step.den / (perServing * step.num);
-      for (const tick of [floor - BigInt(1), floor, floor + BigInt(1)]) {
-        if (tick <= 0 || tick > BigInt(Number.MAX_SAFE_INTEGER)) continue;
+      for (const tick of targetDoseTicks(request, target, perServing, step, state.exposure.get(target.subjectId) ?? BigInt(0))) {
         const ratio = { num: tick * step.num, den: step.den };
         const dailyUnits = Number(ratio.num) / Number(ratio.den);
         const id = `${group.sellerId}:${group.productId}:x${dailyUnits}`;
