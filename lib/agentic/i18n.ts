@@ -564,6 +564,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "เม็ดต่อวันน้อยกว่า",
     "zh-CN": "更少的每日粒数"
   },
+  "plan.option.closest_dose": {
+    en: "Closest dose fit among the evaluated options",
+    th: "ปริมาณใกล้เคียงเป้าหมายที่สุดในตัวเลือกที่ประเมิน",
+    "zh-CN": "在已评估选项中，剂量最接近目标"
+  },
   "plan.option.lowest_cost": {
     en: "Lower cost",
     th: "ค่าใช้จ่ายต่ำกว่า",

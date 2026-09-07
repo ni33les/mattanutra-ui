@@ -18,6 +18,22 @@ async function call<T extends keyof SuccessByTool>(runtime: ReturnType<typeof ru
 const request = { locale: "en", destinationCountry: "TH", optimization: "balanced", profile: {}, requirements: {}, medicationCodes: ["apixaban"], targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU" }] };
 beforeEach(installGoldCatalogue); afterEach(uninstallGoldCatalogue);
 describe("v5 complete conversational plan mutations and immutable purchase", () => {
+  for (const locale of ["en", "th", "zh-CN"]) it(`describes a current-intake dose fit without claiming unknown future costs (${locale})`, async () => {
+    const runtime = runtimeFor(), snapshot = sampleValueSnapshot(); replaceCatalogueSnapshot(snapshot);
+    const magnesium = snapshot.supplements.find(row => row.name === "Magnesium")!;
+    const plan = await call(runtime, "plan", { operation: "create", idempotencyKey: `v5-unknown-cost-${locale}-01`, request: {
+      ...request, locale, optimization: "lowest_cost", targets: [{ name: magnesium.name, amount: 300, unit: "mg" }],
+      currentSupplements: [{ name: magnesium.name, supplementId: magnesium.supplementId, dailyAmount: 300, unit: "mg" }]
+    } });
+    assert.equal(plan.ok, true, JSON.stringify(plan)); assert.equal(plan.status, "no_purchase");
+    assert.equal((plan.basket ?? []).length, 0);
+    assert.equal(plan.cash90DayMinor, null); assert.equal(plan.cash30DayMinor, null);
+    const recommended = plan.options.find(option => option.recommended)!;
+    assert.ok(recommended); assert.equal(recommended.basket.length, 0);
+    assert.ok(recommended.roles?.includes("closest_dose"));
+    assert.equal(plan.reasonCode, "closest_dose"); assert.equal(recommended.reasonCode, plan.reasonCode);
+    assert.equal(plan.reasonKey, "plan.option.closest_dose"); assert.equal(recommended.reason, plan.reason);
+  });
   for (const locale of ["en", "th", "zh-CN"]) it(`makes the empty default and selectable purchase trade-off clear in every concise view (${locale})`, async () => {
     const runtime = runtimeFor(), snapshot = sampleValueSnapshot(), target = snapshot.supplements.find(row => /vitamin d/i.test(row.name))!;
     const product = sampleRetailProduct({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee18", title: "Whole-unit vitamin D fixture", supplementId: target.supplementId, name: target.name, amount: 2000, unit: "IU", unitPriceMinor: 10000, form: "capsule", servingLabel: "1 capsule; 30 capsules per bottle" });

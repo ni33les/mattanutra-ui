@@ -391,6 +391,13 @@ function optionReasonFields(
       message: agenticMessage(negotiated, "plan.option.no_distinct_alternative")
     };
   }
+  if (option.roles?.includes("closest_dose")) {
+    return {
+      code: "closest_dose" as const,
+      key: "plan.option.closest_dose",
+      message: agenticMessage(negotiated, "plan.option.closest_dose")
+    };
+  }
   if (group.length < 2) {
     return {
       code: "best_available" as const,
