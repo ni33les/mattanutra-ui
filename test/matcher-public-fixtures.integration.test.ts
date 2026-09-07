@@ -20,6 +20,8 @@ it("V5-CLIENT-06 isolated public catalogue fixtures are explicit, reproducible a
       for (const row of PUBLIC_MATCHER_FIXTURES) {
         const fixture = publicFixtureDefinition(row);
         assert.equal(fixture.administration.provenance.status, "verified");
+        const [stored] = await tx`select image_url from public.products where id=${fixture.productId}`;
+        assert.equal(stored.image_url, fixture.imageUrl, "Ordinary catalogue eligibility requires the declared local fixture image");
         assert.equal(fixture.administration.unitsPerServing, 1); assert.equal(fixture.administration.packQuantity, 30);
       }
       const [after] = await tx`select count(*)::int as products from public.products where source<>'matcher-v5-public-fixture-1'`;

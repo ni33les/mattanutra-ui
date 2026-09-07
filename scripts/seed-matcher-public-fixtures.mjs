@@ -27,7 +27,7 @@ export const PUBLIC_MATCHER_FIXTURES = Object.freeze([
 export function publicFixtureDefinition(row) {
   const productId = id(`product:${row.key}`), sourceUrl = `https://fixtures.example.test/${TAG}/${row.key}`;
   const sourceText = `Synthetic acceptance label: one tablet supplies ${row.amount} ${row.unit} ${row.nutrient}. One pack contains 30 whole tablets. This is a declared test fixture, not a marketed product.`;
-  return { ...row, productId, sourceUrl, sourceText, administration: { route: "oral", physicalUnit: "tablet", unitsPerServing: 1, doseIncrement: 1, packQuantity: 30,
+  return { ...row, productId, sourceUrl, sourceText, imageUrl: "/healthscore/box-v7.jpg", administration: { route: "oral", physicalUnit: "tablet", unitsPerServing: 1, doseIncrement: 1, packQuantity: 30,
     provenance: { status: "verified", sourceUrl, sourceText, verifiedAt: "2026-09-07T00:00:00.000Z" } } };
 }
 
@@ -45,14 +45,17 @@ export async function seedPublicMatcherFixtures(tx) {
     const supplements = await tx`select id,name from public.supplements where name=${row.nutrient}`;
     assert.equal(supplements.length, 1, `Fixture requires one canonical ${row.nutrient} reference`);
     const supplementId = supplements[0].id;
-    await tx`insert into public.products (id,platform,region,title,normalized_title,product_url,normalized_url,source_url,description,source_snapshot,
+    await tx`insert into public.products (id,platform,region,title,normalized_title,product_url,normalized_url,source_url,image_url,description,source_snapshot,
       product_kind,product_audience,status,label_status,availability_status,price_amount,currency,source,validation_status,administration)
       values (${fixture.productId},'manual','TH',${`Synthetic fixture ${row.nutrient} ${row.amount} ${row.unit}`},${`synthetic_fixture_${row.key}`},
-      ${fixture.sourceUrl},${fixture.sourceUrl},${fixture.sourceUrl},${fixture.sourceText},${tx.json({ fixture: TAG })},'supplement','both','approved','parsed','in_stock',
+      ${fixture.sourceUrl},${fixture.sourceUrl},${fixture.sourceUrl},${fixture.imageUrl},${fixture.sourceText},${tx.json({ fixture: TAG })},'supplement','both','approved','parsed','in_stock',
       ${row.rrpPriceThb},'THB',${TAG},'pass',${tx.json(fixture.administration)}) on conflict (id) do nothing`;
-    const [product] = await tx`select source,source_snapshot,administration,price_amount,status,validation_status from public.products where id=${fixture.productId}`;
+    const [product] = await tx`select source,source_snapshot,administration,price_amount,status,validation_status,image_url from public.products where id=${fixture.productId}`;
     assert.equal(product.source, TAG, "Synthetic fixture must never upgrade copied catalogue facts");
     assert.equal(product.source_snapshot.fixture, TAG);
+    assert.ok(product.image_url === null || product.image_url === fixture.imageUrl, "Fixture image cannot overwrite an unexpected value");
+    // Early v1 preparation lacked its local image; repair only this explicitly identified synthetic field.
+    if (product.image_url === null) await tx`update public.products set image_url=${fixture.imageUrl} where id=${fixture.productId} and source=${TAG} and image_url is null`;
     assert.deepEqual(product.administration, fixture.administration, "Existing fixture physical metadata must match its declared label");
     assert.equal(Number(product.price_amount), row.rrpPriceThb, "Historical synthetic fixture prices cannot be rewritten to make a test green");
     assert.equal(product.status, "approved"); assert.equal(product.validation_status, "pass");

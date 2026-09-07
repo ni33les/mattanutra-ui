@@ -33,3 +33,10 @@ it("V5-CLIENT-04 documented client has no application, database, fixture-endpoin
   assert.doesNotMatch(client, /(?:from|import\s*\()[\s\S]*?["'](?:@\/|\.\.\/lib\/|postgres|\.\.\/test\/)/);
   assert.doesNotMatch(client, /(?:qa_fixture|drivePaymentFixture|settle-local|TEST_DB_URL|DB_URL)/);
 });
+
+it("V5-CLIENT-08 connector guidance explains customer choices without test-harness directions", () => {
+  const guide = readFileSync("lib/agentic/contract/guide.ts", "utf8");
+  assert.match(guide, /Illustrative amounts[^.]+not personal dose recommendations/);
+  assert.match(guide, /actual questionId and choice corresponding to the customer/);
+  assert.doesNotMatch(guide, /To exercise answer|Do not execute this separate diagnostic|In this fixture the customer|only if its requestedNutrients amount/);
+});

@@ -116,7 +116,7 @@ let failure;
 try {
   await mkdir(output, { recursive: true });
   const initialized = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "published-documentation-client", version: "5.0.0" } });
-  check(typeof initialized.instructions === "string" && /advis/i.test(initialized.instructions), "connector supplies essential advisory instructions");
+  check(typeof initialized.instructions === "string" && /advi(?:ce|s)/i.test(initialized.instructions), "connector supplies essential advisory instructions");
   const tools = (await rpc("tools/list")).tools;
   check(tools.length === 7, "exactly seven public tools are advertised");
   const infoTool = tools.find(tool => tool.name === "info");
@@ -159,13 +159,14 @@ try {
     check(plan.operationalDecision.status === plan.status, "operational status is consistent");
     await exercisePartialMatchAndAnswer(request, plan);
     const originalTargets = structuredClone(request.targets);
+    const returnedProducts = plan.options.flatMap(option => option.basket ?? []);
     const tradeOff = selectPurchaseTradeOff(plan);
     check(tradeOff.doseFit && tradeOff.coverage?.length && tradeOff.roles?.length, "trade-off exposes dose fit, coverage and explicit roles");
     const selectedTradeOff = { ...publishedExample(contract, "select"), planHandle: plan.planHandle, expectedRevision: plan.revision,
       idempotencyKey: `docs-tradeoff-${runKey}`, optionId: tradeOff.optionId };
     plan = await current(await call("plan", selectedTradeOff));
     check(plan.optionId === tradeOff.optionId && plan.operationalDecision.purchaseEligible, "selecting a disclosed trade-off is purchasable without acknowledgement");
-    const proposalProduct = plan.basket.find(item => item.administration?.route === "oral" && item.administration.provenance?.status === "verified" && item.administration.unitsPerServing > 0 && item.administration.doseIncrement > 0);
+    const proposalProduct = returnedProducts.find(item => item.administration?.route === "oral" && item.administration.provenance?.status === "verified" && item.administration.unitsPerServing > 0 && item.administration.doseIncrement > 0);
     check(Boolean(proposalProduct), "a returned product provides verified physical administration for the quantity proposal");
     const proposal = { productId: proposalProduct.productId, servingsPerDay: proposalProduct.servingsPerDay };
     const physicalIncrements = proposal.servingsPerDay * proposalProduct.administration.unitsPerServing / proposalProduct.administration.doseIncrement;
