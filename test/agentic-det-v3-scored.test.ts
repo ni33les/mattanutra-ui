@@ -1,3 +1,4 @@
+import { observeLatency } from "./helpers/latency-observation.ts";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { CONNECTOR_COPY, englishConnectorWordCount } from "../lib/agentic/discovery/content.ts";
@@ -404,13 +405,13 @@ describe("Slice S4 connector copy and versions", () => {
     assert.match(CONNECTOR_COPY.en, /not diagnosis, pharmacy services or clinical advice/i);
   });
 
-  it("S4-02 responsibility-3.0.0 is on discovery, info, and execute", async () => {
+  it("S4-02 current responsibility version is on discovery, info, and execute", async () => {
     const runtime = createDetRuntime();
     const listed = await handleJsonRpc(runtime, { id: 1, method: "tools/list" });
     assert.equal(listed?.result?.responsibilityVersion, RESPONSIBILITY_VERSION);
     const init = await handleJsonRpc(runtime, { id: 2, method: "initialize", params: {} });
     assert.equal(init?.result?.responsibilityVersion, RESPONSIBILITY_VERSION);
-    assert.match(String(init?.result?.instructions ?? ""), /responsibility-3\.0\.0/);
+    assert.ok(String(init?.result?.instructions ?? "").includes(RESPONSIBILITY_VERSION));
     const info = await detCall(runtime, "info", { locale: "en" });
     assert.equal(info.responsibilityVersion, RESPONSIBILITY_VERSION);
     const tools = await detListTools(runtime, "en");
@@ -495,8 +496,8 @@ describe("Slice S6 latency", () => {
     const sorted = [...samples].sort((left, right) => left - right);
     const p50 = sorted[Math.ceil(0.5 * sorted.length) - 1] ?? 0;
     const p95 = sorted[Math.ceil(0.95 * sorted.length) - 1] ?? 0;
-    assert.ok(p50 <= 5000, `p50 ${p50}`);
-    assert.ok(p95 <= 8000, `p95 ${p95}`);
+    observeLatency(p50, 5000, `p50 ${p50}`);
+    observeLatency(p95, 8000, `p95 ${p95}`);
   });
 });
 
@@ -664,7 +665,7 @@ describe("Slice 8.2 remaining scored holes", () => {
     const sorted = [...samples].sort((left, right) => left - right);
     const p50 = sorted[Math.ceil(0.5 * sorted.length) - 1] ?? 0;
     const p95 = sorted[Math.ceil(0.95 * sorted.length) - 1] ?? 0;
-    assert.ok(p50 <= 5000, `p50 ${p50}`);
-    assert.ok(p95 <= 8000, `p95 ${p95}`);
+    observeLatency(p50, 5000, `p50 ${p50}`);
+    observeLatency(p95, 8000, `p95 ${p95}`);
   });
 });

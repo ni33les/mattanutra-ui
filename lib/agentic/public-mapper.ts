@@ -1,4 +1,5 @@
-import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
+import { operationalDecision } from "@/lib/agentic/value/operational-decision";
+import { AGENTIC_CONTRACT_VERSION, AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { payableSnapshot } from "@/lib/agentic/money";
 import { MATCHER_VERSION } from "@/lib/matcher/config";
@@ -49,6 +50,7 @@ function compactPublic(
       continue;
     }
     if (nested == null) {
+      if (nested === null && ["totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
       continue;
     }
     if (stripEmptyArrays && Array.isArray(nested) && nested.length === 0) {
@@ -580,15 +582,21 @@ export function stackSummaryFor(basket: readonly BasketItem[], currency: string)
 export function publicCoverage(row: CoverageRow) {
   const claimIds = row.claimIds ?? selectCoverageClaimIds({ name: row.name });
   return {
-    coveragePercent: publicAmount(row.coveragePercent),
+    basis: row.basis ?? "supplemental",
+    coveragePercent: Math.max(0, Math.min(100, publicAmount(row.coveragePercent))),
+    ...(row.requestedTargetId ? { requestedTargetId: row.requestedTargetId } : {}),
+    ...(row.unresolved ? { unresolved: row.unresolved } : {}),
     currentAmount: publicAmount(row.currentAmount),
     deliveredAmount: publicAmount(row.deliveredAmount),
     name: row.name,
     remainingGap: publicAmount(row.remainingGap),
     requestedAmount: publicAmount(row.requestedAmount),
     status: row.status,
-    supplementId: row.supplementId,
-    totalExposureAmount: publicAmount(row.totalExposureAmount),
+    supplementId: row.unresolved ? null : row.supplementId,
+    totalExposureAmount: row.totalExposureComplete === false ? null : publicAmount(row.totalExposureAmount),
+    quantifiedExposureAmount: publicAmount(row.totalExposureAmount),
+    totalExposureComplete: row.totalExposureComplete ?? true,
+    intakeCertainty: row.intakeCertainty ?? "known",
     unit: row.unit,
     ...(claimIds.length > 0 ? { claimIds } : {}),
     ...(row.importance ? { importance: row.importance } : {}),
@@ -745,6 +753,10 @@ export function publicOption(
   const reason = optionReasonFields(option, locale, unique);
   return {
     coveragePercent: option.coveragePercent,
+    ...(option.doseFit ? { doseFit: option.doseFit } : {}),
+    coverage: option.coverage.map(publicCoverage),
+    basket: option.basket.map(item => publicBasketItem(item, locale)),
+    ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item)) } : {}),
     optionId: option.optionId,
     reason: reason.message,
     reasonCode: reason.code,
@@ -778,17 +790,16 @@ export function publicSafetyGuidance(
   row: SafetyGuidance,
   acknowledgementStatus: "acknowledged" | "not_required" | "pending" = "not_required"
 ) {
-  const rowStatus =
-    row.action === "block"
-      ? "not_applicable"
-      : row.action === "acknowledge"
-        ? acknowledgementStatus === "acknowledged"
-          ? "acknowledged"
-          : "pending"
-        : "not_required";
+  void acknowledgementStatus;
   return {
-    action: row.action,
-    acknowledgementStatus: rowStatus,
+    action: "review",
+    ...(row.comparator ? { comparator: row.comparator } : {}),
+    ...(row.authorityUrl ? { authorityUrl: row.authorityUrl } : {}),
+    ...(row.evidence ? { evidence: row.evidence } : {}),
+    ...(row.uncertainty ? { uncertainty: row.uncertainty } : {}),
+    ...(row.uncertaintyCodes ? { uncertaintyCodes: row.uncertaintyCodes } : {}),
+    ...(row.referenceBasis ? { referenceBasis: row.referenceBasis } : {}),
+    acknowledgementStatus: "not_required",
     code: row.code,
     guidanceId: row.guidanceId,
     message: row.message,
@@ -799,8 +810,8 @@ export function publicSafetyGuidance(
     ...(row.nutrientName ? { nutrientName: row.nutrientName } : {}),
     ...(row.unit ? { unit: row.unit } : {}),
     ...(row.sourceScope ? { sourceScope: row.sourceScope } : {}),
-    ...(row.exposure != null ? { exposure: publicAmount(row.exposure) } : {}),
-    ...(row.threshold != null ? { threshold: publicAmount(row.threshold) } : {}),
+    exposure: row.exposure != null ? publicAmount(row.exposure) : null,
+    threshold: row.threshold != null ? publicAmount(row.threshold) : null,
     ...(row.productIds.length > 0 ? { productIds: row.productIds } : {}),
     ...(row.supplementIds.length > 0 ? { supplementIds: row.supplementIds } : {}),
     ...(row.contributors.length > 0
@@ -925,6 +936,8 @@ export function publicPlanFields(result: Pick<
       | "researchVersion"
     >
   >) {
+  const legacy = result as PlanResult;
+  if (legacy.refreshRequired) result = { ...result, status: "needs_input", summary: "This saved plan needs a contract refresh. Revise with requestPatch={} and the current revision; existing health information is preserved.", questions: [] };
   const selected = result.selected;
   const guidanceIds = result.safetyGuidance.map((item) => item.guidanceId);
   const snapshot =
@@ -933,15 +946,7 @@ export function publicPlanFields(result: Pick<
       : null;
   const medicationCodes = snapshot?.medicationCodes ?? [];
   const conditionCodes = snapshot?.conditionCodes ?? [];
-  const ackable = result.safetyGuidance.filter((item) => item.action === "acknowledge");
-  const ackBound = snapshot?.safetyAcknowledgement;
-  const acknowledgementStatus =
-    ackable.length === 0
-      ? "not_required"
-      : ackBound?.confirmed === true &&
-          ackable.every((item) => ackBound.guidanceIds.includes(item.guidanceId))
-        ? "acknowledged"
-        : "pending";
+  const acknowledgementStatus = "not_required" as const;
   const requestedTargets = requestedTargetsFrom(snapshot);
   const alternatives = result.alternatives.filter((item) => {
     if (!selected) {
@@ -951,12 +956,12 @@ export function publicPlanFields(result: Pick<
     const sameProducts =
       item.optionId === selected.optionId ||
       item.basket
-        .map((row) => row.productId)
+        .map((row) => `${row.productId}:${row.servingsPerDay}:${row.quantity}`)
         .slice()
         .sort()
         .join("|") ===
         selected.basket
-          .map((row) => row.productId)
+          .map((row) => `${row.productId}:${row.servingsPerDay}:${row.quantity}`)
           .slice()
           .sort()
           .join("|");
@@ -981,7 +986,7 @@ export function publicPlanFields(result: Pick<
     ...new Set(snapshot?.acknowledgedUnassessedConditionCodes ?? [])
   ];
   const safetyScope =
-    unassessedMedicationCodes.length > 0 || unassessedConditionCodes.length > 0
+    unassessedMedicationCodes.length > 0 || unassessedConditionCodes.length > 0 || result.safetyGuidance.some(item => item.code === "incomplete_information")
       ? "partial"
       : "complete";
   const tooBroad = result.breadth?.reasonCode === "request_too_broad";
@@ -990,33 +995,21 @@ export function publicPlanFields(result: Pick<
     result.status === "no_purchase" || result.status === "processing"
       ? []
       : (selected?.basket ?? result.basket);
-  const replenishesLater = Boolean(
+  const horizonUnavailable = result.horizon?.complete === false || Boolean(result.horizon?.durationUnknown);
+  const horizonUnavailableReason = result.horizon?.unavailableReasons?.[0]?.reasonCode ?? (result.horizon?.durationUnknown ? "current_inventory_duration_unknown" : "current_inventory_information_incomplete");
+  const horizonReasons = [...(result.horizon?.unavailableReasons ?? []), ...(selected?.economics?.unavailableReasons ?? [])].filter((item, index, all) => all.findIndex(other => JSON.stringify(other) === JSON.stringify(item)) === index);
+  const replenishesLater = !horizonUnavailable && Boolean(
     result.horizon?.orders.some((item) => item.day > 0 && item.day < 90) ||
       (typeof result.horizon?.nextReplenishmentDay === "number" &&
         result.horizon.nextReplenishmentDay > 0 &&
         result.horizon.nextReplenishmentDay < 90)
   );
-  const nextActions =
-    result.status === "processing"
-      ? ["poll_plan"]
-      : tooBroad
-        ? ["split_request"]
-        : result.status === "needs_input"
-          ? ["answer_questions"]
-          : result.status === "ready"
-            ? quoteBasket.length === 0 && replenishesLater
-              ? ["replenish_later"]
-              : ["confirm_with_user"]
-            : result.status === "no_purchase"
-              ? replenishesLater
-                ? ["replenish_later"]
-                : []
-              : ["change_request"];
+  const decision = operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
+  const nextActions = decision.nextAction === "no_purchase" ? [] : [decision.nextAction];
   const subtotalMinor =
     result.status === "no_purchase" || result.status === "processing"
       ? 0
-      : selected?.totalPriceMinor ??
-        quoteBasket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
+      : quoteBasket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
   const payable = payableSnapshot({ subtotalMinor });
   const uniqueAlternatives = mergeBySemanticKey(
     alternatives.filter(
@@ -1053,6 +1046,11 @@ export function publicPlanFields(result: Pick<
     ...(result.coverage.length > 0
       ? { coverage: result.coverage.map(publicCoverage) }
       : {}),
+    contractVersion: AGENTIC_CONTRACT_VERSION,
+    ...(legacy.sourceContractVersion ? { sourceContractVersion: legacy.sourceContractVersion, refreshRequired: Boolean(legacy.refreshRequired) } : {}),
+    operationalDecision: decision,
+    ...((result as PlanResult).alternativeSearch ? { alternativeSearch: (result as PlanResult).alternativeSearch } : {}),
+    ...(selected?.doseFit ? { doseFit: selected.doseFit } : {}),
     status: result.status,
     summary: result.summary,
     ...(snapshot?.currentSupplements
@@ -1068,18 +1066,19 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(result.horizon
       ? {
-          nextReplenishmentDay: result.horizon.durationUnknown
+          scheduleComplete: !horizonUnavailable,
+          nextReplenishmentDay: horizonUnavailable
             ? null
             : result.horizon.nextReplenishmentDay,
-          orderSchedule: result.horizon.durationUnknown
+          orderSchedule: horizonUnavailable
             ? {
                 "30": {
                   available: false,
-                  reasonCode: "current_inventory_duration_unknown"
+                  reasonCode: horizonUnavailableReason
                 },
                 "90": {
                   available: false,
-                  reasonCode: "current_inventory_duration_unknown"
+                  reasonCode: horizonUnavailableReason
                 }
               }
             : {
@@ -1088,28 +1087,28 @@ export function publicPlanFields(result: Pick<
               },
           purchaseRequiredNow: result.horizon.purchaseRequiredNow,
           ...(result.horizon.reasonCode ? { reasonCode: result.horizon.reasonCode } : {}),
-          cash30DayMinor: result.horizon.durationUnknown
+          cash30DayMinor: horizonUnavailable
             ? null
             : result.horizon.orders
                 .filter((item) => item.day < 30)
                 .reduce((sum, item) => sum + item.totalMinor, 0),
-          cash90DayMinor: result.horizon.durationUnknown
+          cash90DayMinor: horizonUnavailable
             ? null
             : result.horizon.orders
                 .filter((item) => item.day < 90)
                 .reduce((sum, item) => sum + item.totalMinor, 0),
-          cashComplete: result.horizon.durationUnknown
+          cashComplete: horizonUnavailable
             ? false
             : (selected?.economics?.cashComplete ?? true),
           consumptionComplete: selected?.economics?.consumptionComplete ?? false,
-          comparisonComplete: result.horizon.durationUnknown
+          comparisonComplete: horizonUnavailable
             ? false
             : (selected?.economics?.comparisonComplete ?? false),
-          ...(result.horizon.durationUnknown ||
-          (selected?.economics?.unavailableReasons?.length ?? 0) > 0
+          ...(horizonUnavailable ||
+          horizonReasons.length > 0
             ? {
                 unavailableReasons:
-                  selected?.economics?.unavailableReasons ??
+                  horizonReasons.length ? horizonReasons :
                   [
                     {
                       dependentCapabilities: [
@@ -1121,18 +1120,14 @@ export function publicPlanFields(result: Pick<
                       ],
                       dimension: "schedule",
                       missingFieldNames: ["daysRemaining"],
-                      reasonCode: "current_inventory_duration_unknown"
+                      reasonCode: horizonUnavailableReason
                     }
                   ]
               }
             : {})
         }
       : {}),
-    summaryKey: tooBroad
-      ? "plan.summary.request_too_broad"
-      : result.horizon?.durationUnknown
-        ? "plan.summary.current_inventory_duration_unknown"
-        : `plan.summary.${result.status}`,
+    summaryKey: tooBroad ? "plan.summary.request_too_broad" : `plan.summary.${result.status}`,
     locale,
     nextActions,
     ...(tooBroad
@@ -1160,12 +1155,7 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(result.basket.length > 0
       ? {
-          stackSummary: {
-            ...stackSummaryFor(result.basket, currency),
-            ...(selected && Number.isFinite(selected.totalPriceMinor)
-              ? { totalPriceMinor: selected.totalPriceMinor }
-              : {})
-          }
+          stackSummary: stackSummaryFor(result.basket, currency)
         }
       : {}),
     acknowledgementStatus,
@@ -1228,8 +1218,8 @@ export function publicPlanFields(result: Pick<
           .filter((item): item is number => item != null),
         leftovers: result.leftovers ?? [],
         matcherVersion: selected?.matcherVersion ?? MATCHER_VERSION,
-        nextReplenishmentDay: result.horizon?.nextReplenishmentDay ?? null,
-        orders: result.horizon?.orders ?? [],
+        nextReplenishmentDay: horizonUnavailable ? null : result.horizon?.nextReplenishmentDay ?? null,
+        orders: horizonUnavailable ? [] : result.horizon?.orders ?? [],
         options: advertisedOptions,
         questions: result.questions ?? [],
         reasonCode: result.horizon?.reasonCode ?? (tooBroad ? "request_too_broad" : null),
@@ -1246,7 +1236,8 @@ export function publicPlanFields(result: Pick<
     ),
     ...(result.status === "processing"
       ? { pollAfterSeconds: 1 }
-      : {})
+      : {}),
+    ...(legacy.refreshRequired ? { reasonCode: "contract_refresh_required", summaryKey: "plan.summary.contract_refresh_required" } : {})
   };
 
   const compacted = compactPublic(payload, result.status === "blocked") as typeof payload;

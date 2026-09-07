@@ -5,7 +5,11 @@ import type { CatalogueSnapshot, CatalogueSupplement } from "@/lib/agentic/catal
 import { CONDITION_ALIASES, MEDICATION_ALIASES } from "@/lib/agentic/catalogue/names";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import type { AgenticConfig } from "@/lib/agentic/config";
+import { scaleAmount, isDoseError } from "@/lib/matcher/dose";
+import type { MatcherUnit } from "@/lib/matcher/types";
+import { DEFAULT_TARGET_BASIS } from "@/lib/agentic/contract/schemas";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
+import { resolvedNutrientFormName } from "@/lib/nutrient-identity";
 import type {
   AcceptedGap,
   CanonicalPlanState,
@@ -14,6 +18,16 @@ import type {
   PlanRequest,
   PlanTarget
 } from "@/lib/agentic/plan/types";
+
+function validateQuantityPrecision(amount: number, unit: string, supplement: CatalogueSupplement, fieldPath: string): AgenticErrorResult | null {
+  if (!supplement.acceptedUnits.includes(unit as MatcherUnit)) return businessError({ fieldPath: fieldPath.replace(/(?:amount|dailyAmount|minimum|maximum)$/, "unit"), reasonCode: "unsupported_unit", message: `${supplement.name} accepts ${supplement.acceptedUnits.join(", ")}.` });
+  if (amount === 0) return null;
+  const one = scaleAmount({ amount: 1, unit: unit as MatcherUnit, subjectId: supplement.supplementId, subjectName: supplement.name });
+  if (isDoseError(one) || one.units <= BigInt(0)) return businessError({ fieldPath, reasonCode: "unsupported_unit", message: "This nutrient form and unit cannot be converted without losing its identity." });
+  const minimum = 1 / Number(one.units);
+  if (amount >= minimum) return null;
+  return businessError({ fieldPath, reasonCode: "invalid_request", message: `${fieldPath} must be at least ${minimum} ${unit}, the supported quantity precision.`, issues: [{ fieldPath, reasonCode: "out_of_range", messageKey: "mcp.errors.out_of_range", permittedLimit: minimum, actual: amount }] });
+}
 
 function normalizeCode(
   value: string,
@@ -57,7 +71,7 @@ function uniqueIds(
 }
 
 function normalizeName(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return value.normalize("NFKC").trim().toLowerCase().replace(new RegExp("[^\\p{L}\\p{N}]+", "gu"), " ").trim();
 }
 
 function namesOf(item: CatalogueSupplement) {
@@ -73,28 +87,14 @@ function isIdShaped(value: string) {
   );
 }
 
-function tokensOf(value: string) {
-  return normalizeName(value).split(" ").filter((part) => part.length > 0);
+function formIdentity(name: string) {
+  if (/\b(?:epa|eicosapentaenoic)\b/.test(name)) return "epa";
+  if (/\b(?:dha|docosahexaenoic)\b/.test(name)) return "dha";
+  return null;
 }
-
-function tokenSubsetMatch(left: string, right: string) {
-  const leftTokens = tokensOf(left);
-  const rightTokens = tokensOf(right);
-
-  if (leftTokens.length === 0 || rightTokens.length === 0) {
-    return false;
-  }
-
-  const [shorter, longer] =
-    leftTokens.length <= rightTokens.length
-      ? [leftTokens, rightTokens]
-      : [rightTokens, leftTokens];
-
-  if (shorter.length === 1 && (shorter[0]?.length ?? 0) < 2) {
-    return false;
-  }
-
-  return shorter.every((part) => longer.includes(part));
+function formCompatible(item: CatalogueSupplement, wanted: string) {
+  const form = formIdentity(wanted);
+  return !form || formIdentity(normalizeName(item.name)) === form;
 }
 
 function matchByName(snapshot: CatalogueSnapshot, wanted: string) {
@@ -106,7 +106,7 @@ function matchByName(snapshot: CatalogueSnapshot, wanted: string) {
     return exactName;
   }
 
-  const exact = snapshot.supplements.filter((item) => namesOf(item).includes(wanted));
+  const exact = snapshot.supplements.filter((item) => namesOf(item).includes(wanted) && formCompatible(item, wanted));
 
   if (exact.length === 1) {
     return exact;
@@ -116,21 +116,8 @@ function matchByName(snapshot: CatalogueSnapshot, wanted: string) {
     return [];
   }
 
-  const prefix = snapshot.supplements.filter((item) =>
-    namesOf(item).some((name) => name === wanted || name.startsWith(`${wanted} `))
-  );
-
-  if (prefix.length === 1) {
-    return prefix;
-  }
-
-  const token = snapshot.supplements.filter((item) =>
-    namesOf(item).some((name) => tokenSubsetMatch(name, wanted))
-  );
-
-  if (token.length === 1) {
-    return token;
-  }
+  // Qualifiers such as D2/D3, MK-4/MK-7, salts and elemental amounts are meaningful.
+  // A supported form must be an explicit catalogue alias; do not erase it by token matching.
 
   return [];
 }
@@ -156,11 +143,11 @@ function resolveSupplement(
     if (input.name) {
       const wanted = normalizeName(input.name);
 
-      if (!namesOf(found).includes(wanted) && !namesOf(found).some((name) => name.startsWith(`${wanted} `))) {
+      if (!namesOf(found).includes(wanted) || !formCompatible(found, wanted)) {
         return businessError({
           fieldPath,
-          message: "That identifier is not a current supplement ID. Send a recognised supplement name instead.",
-          reasonCode: "legacy_id"
+          message: "The supplied nutrient name/form does not match this identifier. Use an identifier for that exact form or send the requested name without an identifier.",
+          reasonCode: "incompatible_identity"
         });
       }
     }
@@ -204,11 +191,15 @@ function leftoverForUnknown(input: Readonly<{
   amount?: number;
   name: string;
   unit?: PlanTarget["unit"];
+  source: "target" | "current_supplement";
+  requestIndex: number;
 }>): PlanLeftover {
   return {
     ...(input.amount != null ? { amount: input.amount } : {}),
     name: input.name,
     note: "not_in_catalogue",
+    source: input.source,
+    requestIndex: input.requestIndex,
     reason: "not_in_catalogue",
     severity: "high",
     ...(input.unit ? { unit: input.unit } : {})
@@ -375,8 +366,26 @@ export function applyPlanAnswers(
   const remainingIds = new Set(next.targets.map((item) => item.supplementId));
   const remainingNames = new Set(next.targets.map((item) => item.name.trim().toLowerCase()));
   const acceptedIds = new Set(acceptedGaps.map((item) => item.supplementId));
+  const original = next.originalRequest;
+  const effectiveOriginal = original && answers.length ? {
+    ...original,
+    requirements: { ...next.requirements },
+    targets: original.targets.filter((target, index) => {
+      const mapped = state.targets.find(item => item.requestedName === target.name || item.name === target.name || item.supplementId === target.supplementId);
+      if (mapped) return remainingIds.has(mapped.supplementId);
+      return !answers.some(answer => answer.choice === `remove_target:leftover:${target.name}`) && original.targets[index] != null;
+    }).map(target => {
+      const mapped = next.targets.find(item => item.requestedName === target.name || item.name === target.name || item.supplementId === target.supplementId);
+      return mapped?.prerequisite ? { ...target, prerequisite: mapped.prerequisite } : target;
+    }),
+    ...(original.currentSupplements ? { currentSupplements: original.currentSupplements.map(current => {
+      const mapped = next.currentSupplements.find(item => item.name === current.name || item.supplementId === current.supplementId);
+      return mapped?.daysRemaining != null ? { ...current, daysRemaining: mapped.daysRemaining } : current;
+    }) } : {})
+  } : original;
   return {
     ...next,
+    ...(effectiveOriginal ? { originalRequest: effectiveOriginal } : {}),
     acceptedGaps,
     leftovers: state.leftovers.filter((item) => {
       if (item.supplementId && !remainingIds.has(item.supplementId) && item.reason !== "not_in_catalogue") {
@@ -412,6 +421,9 @@ export function planRematchFingerprint(state: CanonicalPlanState) {
     destinationCountry: state.destinationCountry,
     dietaryPreference: state.requirements.dietaryPreference ?? null,
     excludeSupplementIds: state.requirements.excludeSupplementIds ?? [],
+    excludeProductIds: state.requirements.excludeProductIds ?? [],
+    intake: state.intake ?? [],
+    profileKnown: state.profileKnown,
     forms: state.requirements.allowedForms ?? [],
     lifeStage: state.profile.lifeStage,
     maxDailyPills: state.requirements.maxDailyPills ?? null,
@@ -472,7 +484,8 @@ export async function normalizePlanRequest(input: Readonly<{
         leftovers.push(leftoverForUnknown({
           amount: target.amount,
           name: target.name,
-          unit: target.unit
+          unit: target.unit,
+          source: "target", requestIndex: index
         }));
         continue;
       }
@@ -488,11 +501,19 @@ export async function normalizePlanRequest(input: Readonly<{
       });
     }
 
+    const precision = validateQuantityPrecision(target.amount, target.unit, supplement, `request.targets[${index}].amount`);
+    if (precision) return precision;
+    if (target.acceptableRange) for (const field of ["minimum", "maximum"] as const) {
+      const rangePrecision = validateQuantityPrecision(target.acceptableRange[field], target.acceptableRange.unit, supplement, `request.targets[${index}].acceptableRange.${field}`);
+      if (rangePrecision) return rangePrecision;
+    }
+
     targets.push({
+      basis: target.basis ?? DEFAULT_TARGET_BASIS,
       ...(target.acceptableRange ? { acceptableRange: target.acceptableRange } : {}),
       amount: target.amount,
       importance: target.importance ?? "required",
-      name: supplement.name,
+      name: resolvedNutrientFormName(target.name, supplement.name),
       ...(target.prerequisite ? { prerequisite: target.prerequisite } : {}),
       requestedName: target.name,
       supplementId: supplement.supplementId,
@@ -512,6 +533,10 @@ export async function normalizePlanRequest(input: Readonly<{
   const currentSupplements: CurrentSupplement[] = [];
 
   for (const [index, item] of (request.currentSupplements ?? []).entries()) {
+    if (item.daysRemaining != null && item.daysRemaining <= 0) {
+      const fieldPath = `request.currentSupplements[${index}].daysRemaining`;
+      return businessError({ fieldPath, reasonCode: "invalid_request", message: "Retained stock must have positive days remaining. Omit when unknown; if no stock remains, remove this retained inventory entry and revise the intended request.", issues: [{ fieldPath, reasonCode: "out_of_range", messageKey: "mcp.errors.out_of_range", permittedLimit: "> 0", actual: item.daysRemaining }] });
+    }
     const fieldPath = item.supplementId
       ? `request.currentSupplements[${index}].supplementId`
       : `request.currentSupplements[${index}].name`;
@@ -526,13 +551,17 @@ export async function normalizePlanRequest(input: Readonly<{
         leftovers.push(leftoverForUnknown({
           amount: item.dailyAmount,
           name: item.name,
-          unit: item.unit
+          unit: item.unit,
+          source: "current_supplement", requestIndex: index
         }));
         continue;
       }
 
       return supplement;
     }
+
+    const precision = validateQuantityPrecision(item.dailyAmount, item.unit, supplement, `request.currentSupplements[${index}].dailyAmount`);
+    if (precision) return precision;
 
     currentSupplements.push({
       dailyAmount: item.dailyAmount,
@@ -545,7 +574,7 @@ export async function normalizePlanRequest(input: Readonly<{
   }
 
   const currentDup = uniqueIds(
-    currentSupplements.map((item) => item.supplementId),
+    currentSupplements.map((item) => `${item.productId ?? "unspecified"}:${item.supplementId}`),
     "currentSupplements"
   );
 
@@ -564,6 +593,39 @@ export async function normalizePlanRequest(input: Readonly<{
     });
   }
 
+  const excludeProducts = request.requirements.excludeProductIds ?? [];
+  if (excludeProducts.some(id => request.requirements.retainProductIds?.includes(id))) {
+    return businessError({ fieldPath: "request.requirements.retainProductIds", reasonCode: "invalid_request", message: "A product cannot be both retained and excluded. Clear one constraint explicitly." });
+  }
+  const intake = [];
+  for (const [index, observation] of (request.intake ?? []).entries()) {
+    if (observation.daysRemaining != null && (observation.source !== "current_supplement" || observation.daysRemaining <= 0)) return businessError({ fieldPath: `request.intake[${index}].daysRemaining`, reasonCode: "invalid_request", message: "daysRemaining is positive retained stock duration for current_supplement observations only; omit unknown duration and do not supply it for diet.", issues: [{ fieldPath: `request.intake[${index}].daysRemaining`, reasonCode: "out_of_range", messageKey: "mcp.errors.out_of_range", permittedLimit: observation.source === "diet" ? "omit for diet" : "> 0", actual: observation.daysRemaining }] });
+    if (observation.certainty === "estimated" && ((observation.amount != null || observation.minimum != null || observation.maximum != null) && !observation.unit)) {
+      return businessError({ fieldPath: `request.intake[${index}].unit`, reasonCode: "required", message: "A quantified estimate requires its unit." });
+    }
+    if (observation.certainty === "estimated" && observation.minimum != null && observation.maximum != null && observation.minimum > observation.maximum) {
+      return businessError({ fieldPath: `request.intake[${index}].minimum`, reasonCode: "invalid_request", message: "The estimated minimum must not exceed the maximum." });
+    }
+    if (!observation.name && !observation.supplementId) { intake.push(observation); continue; }
+    const resolved = resolveSupplement(input.snapshot, observation, `request.intake[${index}]`);
+    if (isAgenticErrorResult(resolved)) {
+      if (observation.supplementId) return resolved;
+      intake.push(observation);
+    } else {
+      if (observation.certainty !== "unknown" && observation.unit) for (const field of ["amount", "minimum", "maximum"] as const) {
+        const value = field in observation ? (observation as Record<string, unknown>)[field] : undefined;
+        if (typeof value === "number") {
+          const precision = validateQuantityPrecision(value, observation.unit, resolved, `request.intake[${index}].${field}`);
+          if (precision) return precision;
+        }
+      }
+      if (observation.source === "current_supplement" && (
+        currentSupplements.some(item => item.supplementId === resolved.supplementId && item.productId === observation.productId) ||
+        intake.some(item => item.source === "current_supplement" && item.supplementId === resolved.supplementId && item.productId === observation.productId)
+      )) return businessError({ fieldPath: `request.intake[${index}]`, reasonCode: "duplicate_supplement", message: "Report each product and nutrient pair once, in currentSupplements or intake. Distinct products or nutrients may be reported separately." });
+      intake.push({ ...observation, supplementId: resolved.supplementId, name: resolved.name });
+    }
+  }
   const acceptedGaps: AcceptedGap[] = [];
   let state: CanonicalPlanState = {
     acceptedGaps,
@@ -581,7 +643,10 @@ export async function normalizePlanRequest(input: Readonly<{
     ))],
     optimization: request.optimization,
     pinnedOptionId: null,
-    profile: request.profile,
+    profile: { ...request.profile, ageYears: request.profile.ageYears ?? 0, lifeStage: request.profile.lifeStage ?? "adult" },
+    profileKnown: { ageYears: request.profile.ageYears != null, lifeStage: request.profile.lifeStage != null, sex: request.profile.sex != null },
+    originalRequest: structuredClone(request),
+    intake,
     requirements: { ...request.requirements },
     safetyAcknowledgement: request.safetyAcknowledgement ?? null,
     targets

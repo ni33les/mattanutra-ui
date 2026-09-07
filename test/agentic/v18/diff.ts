@@ -71,13 +71,14 @@ export function isForbiddenLocalePath(path: string) {
 }
 
 export function isPermittedPresentationPath(path: string) {
-  return LOCALE_PRESENTATION_ROOTS.some((root) => underRoot(path, root));
+  return LOCALE_PRESENTATION_ROOTS.some((root) => underRoot(path, root))
+    || path === "/compactDecision/nextAction"
+    || /^\/compactDecision\/advice\/\d+\/(message|uncertainty)$/.test(path);
 }
 
 export function isClosedAllowlistPath(path: string) {
-  return [...LOCALE_PRESENTATION_ROOTS, ...EXISTING_PRESENTATION_ROOTS].some((root) =>
-    underRoot(path, root)
-  );
+  return isPermittedPresentationPath(path)
+    || EXISTING_PRESENTATION_ROOTS.some((root) => underRoot(path, root));
 }
 
 export function firstForbiddenDiff(paths: readonly string[]) {

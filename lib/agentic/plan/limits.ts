@@ -16,6 +16,7 @@ export function upperLimitAmount(
     ceilings?: readonly SafetyCeiling[];
     conditionCodes?: readonly string[] | null;
     profile?: SafetyProfile | null;
+    sourceScope?: "supplemental" | "total";
     subjectId: string;
   }>
 ): number | null {
@@ -23,6 +24,7 @@ export function upperLimitAmount(
     conditionCodes: input.conditionCodes,
     name,
     profile: input.profile,
+    sourceScope: input.sourceScope,
     subjectId: input.subjectId
   });
 

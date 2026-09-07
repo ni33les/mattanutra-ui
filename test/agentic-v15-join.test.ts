@@ -1,3 +1,4 @@
+import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "./helpers/current-contract-lock.ts";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -112,7 +113,7 @@ describe("v1.5 joined non-latency gate", () => {
     assert.equal(V15_TEST_IDS.length, 8 + 8 + 10 + 9);
     assert.equal(
       AGENTIC_SCHEMA_CHECKSUM,
-      "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"
+      CURRENT_CONTRACT_SCHEMA_CHECKSUM
     );
     for (const relative of [
       "test/agentic-v12-ctx.test.ts",

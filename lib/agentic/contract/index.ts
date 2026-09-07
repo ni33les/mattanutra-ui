@@ -70,3 +70,5 @@ export {
   publicProductId,
   publicSupplementId
 } from "@/lib/agentic/contract/ids";
+
+export { AGENTIC_OUTPUT_SCHEMAS } from "@/lib/agentic/contract/outputs";

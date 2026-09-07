@@ -250,27 +250,22 @@ function magOptionFrom(selected: StackOption | null): StackOption | null {
   };
 }
 
-function magDoseBlock(guidance: readonly SafetyGuidance[]) {
+function magDoseAdvice(guidance: readonly SafetyGuidance[], ruleId: string | null) {
   return guidance.find(
     (item) =>
-      item.action === "block" &&
+      item.action === "review" &&
       item.code === "dose_review_required" &&
+      item.ruleId === ruleId &&
       item.supplementIds.includes(MAG_ID)
   );
 }
 
-function computedMagExposure(selected: StackOption | null, block: SafetyGuidance | undefined) {
+function computedMagExposure(selected: StackOption | null, advice: SafetyGuidance | undefined) {
   const magIds = magProductIds(selected);
-  const fromBlock = (block?.contributors ?? []).filter(
-    (item) => item.productId && magIds.has(item.productId)
+  const contributions = (advice?.contributors ?? []).filter(
+    item => item.source === "current" || (item.productId && magIds.has(item.productId))
   );
-  const sum = fromBlock.reduce((total, item) => total + Number(item.amount), 0);
-  if (sum > 0) {
-    return sum;
-  }
-
-  const row = selected?.coverage.find((item) => item.supplementId === MAG_ID);
-  return row?.totalExposureAmount ?? 0;
+  return contributions.reduce((total, item) => total + Number(item.amount), 0);
 }
 
 function targetCoveredOrLeftover(input: Readonly<{
@@ -288,7 +283,7 @@ function targetCoveredOrLeftover(input: Readonly<{
   return input.leftovers.some(
     (item) =>
       item.supplementId === input.target.supplementId &&
-      (item.reason === "dose_gap" || item.reason === "not_in_catalogue")
+      (item.reason === "dose_gap" || item.reason === "not_in_catalogue" || item.reason === "uncovered")
   );
 }
 
@@ -324,7 +319,11 @@ function fewestPillsWins(input: Readonly<{
     return false;
   }
 
-  const minPills = Math.min(...generated.map((item) => item.dailyPills));
+  // Dose fit is the primary objective. Pills decide only equal-penalty baskets.
+  const penalty = selected.doseFit?.total;
+  if (penalty == null || !Number.isFinite(penalty) || generated.some(item => item.doseFit == null)) return false;
+  if (generated.some(item => item.doseFit!.total < penalty)) return false;
+  const minPills = Math.min(...generated.filter(item => item.doseFit!.total === penalty).map(item => item.dailyPills));
   return selected.dailyPills === minPills && selected.optionId.length > 0;
 }
 
@@ -450,7 +449,15 @@ export async function runDetPack(input: DetPackCatalog): Promise<DetPackReport> 
     selected: official.selected,
     state: officialState
   });
+  const magReference = safetyCeilingFor(input.ceilings, {
+    name: "Magnesium", profile: { ageYears: 52, lifeStage: "adult" }, subjectId: MAG_ID
+  });
+  const retainedMag = official.selected?.basket.find(item => item.contributionSupplementIds.includes(MAG_ID));
+  // Force a verified retail contributor plus known continued intake over the
+  // catalogue limit. A target above a limit alone is not evidence of exposure.
   const mag351State = planState({
+    currentSupplements: [{ name: "Magnesium", supplementId: MAG_ID, dailyAmount: 351, unit: "mg" }],
+    requirements: { retainProductIds: retainedMag ? [retainedMag.productId] : [], maxProductCount: 1 },
     targets: [{ amount: 351, name: "Magnesium", supplementId: MAG_ID, unit: "mg" }]
   });
   const mag351 = matchPlan({ snapshot, state: mag351State });
@@ -498,7 +505,7 @@ export async function runDetPack(input: DetPackCatalog): Promise<DetPackReport> 
     return official.leftovers.some(
       (item) =>
         item.supplementId === target.supplementId &&
-        (item.reason === "dose_gap" || item.reason === "not_in_catalogue")
+        (item.reason === "dose_gap" || item.reason === "not_in_catalogue" || item.reason === "uncovered")
     );
   });
 
@@ -519,49 +526,32 @@ export async function runDetPack(input: DetPackCatalog): Promise<DetPackReport> 
     matching += 2;
   }
 
-  const magBandId = catalogBandRuleId(
-    safetyCeilingFor(input.ceilings, {
-      name: "Magnesium",
-      profile: { ageYears: 52, lifeStage: "adult" },
-      subjectId: MAG_ID
-    })
-  );
-  const mag351Block = magDoseBlock(mag351Safety);
+  const magBandId = catalogBandRuleId(magReference);
+  const mag351Advice = magDoseAdvice(mag351Safety, magBandId);
   const magIds = magProductIds(mag351.selected);
-  const magContribs = (mag351Block?.contributors ?? []).filter(
-    (item) => item.productId && magIds.has(item.productId) && Number(item.amount) > 0
+  const magContribs = (mag351Advice?.contributors ?? []).filter(
+    item => item.productId && magIds.has(item.productId) && Number(item.amount) > 0
   );
-  const computedExposure = computedMagExposure(mag351.selected, mag351Block);
+  const computedExposure = computedMagExposure(mag351.selected, mag351Advice);
   const mag351Ok = Boolean(
-    mag351Block &&
-      mag351Block.action === "block" &&
-      mag351Block.code === "dose_review_required" &&
-      magBandId &&
-      mag351Block.ruleId === magBandId &&
-      mag351Block.exposure != null &&
-      mag351Block.exposure > 0 &&
-      computedExposure > 0 &&
-      mag351Block.exposure === computedExposure &&
-      magContribs.length > 0 &&
-      magContribs.reduce((sum, item) => sum + Number(item.amount), 0) === mag351Block.exposure
+    mag351Advice && mag351Advice.action === "review" &&
+      mag351Advice.severity === "high" && magBandId &&
+      mag351Advice.ruleId === magBandId && mag351Advice.threshold === magReference?.maxAmount &&
+      mag351Advice.exposure != null && mag351Advice.exposure > Number(mag351Advice.threshold) &&
+      mag351Advice.exposure === computedExposure && magContribs.length > 0 &&
+      mag351Advice.contributors.some(item => item.source === "current" && item.amount === 351) &&
+      mag351Safety.every(item => item.action !== "block" && item.action !== "acknowledge")
   );
-  const ckdBlock = ckdSafety.find(
-    (item) =>
-      item.action === "block" &&
-      item.code === "dose_review_required" &&
-      item.supplementIds.includes(MAG_ID)
-  );
+  const ckdAdvice = ckdSafety.find(item =>
+    item.action === "review" && item.code === "condition_review_required" && item.supplementIds.includes(MAG_ID));
   const ckdOk = Boolean(
-    ckdBlock &&
-      ckdBlock.threshold === 0 &&
-      ckdBlock.code !== "duplicate_or_overlap"
+    ckdMatch.selected && ckdAdvice && ckdAdvice.threshold == null && ckdAdvice.severity === "high" &&
+    ckdAdvice.exposure != null && ckdAdvice.exposure > 0 &&
+    ckdSafety.every(item => item.action !== "block" && item.action !== "acknowledge")
   );
-  const mag200Safe = !officialSafety.some(
-    (item) =>
-      item.action === "block" &&
-      item.code === "dose_review_required" &&
-      item.supplementIds.includes(MAG_ID)
-  );
+  const mag200Safe = officialSafety.every(item => item.action !== "block" && item.action !== "acknowledge") &&
+    officialSafety.filter(item => item.ruleId === magBandId && item.code === "dose_review_required")
+      .every(item => item.exposure != null && item.threshold != null && item.exposure >= item.threshold);
 
   let safety = 0;
   if (mag351Ok) {
@@ -653,8 +643,8 @@ if (invokedAsTest) {
       assert.equal(typeof report.scores.matching, "number");
       assert.equal(typeof report.scores.safety, "number");
       assert.equal(typeof report.scores.efficiency, "number");
-      assert.ok(report.scores.matching >= 0 && report.scores.matching <= 10);
-      assert.ok(report.scores.safety >= 0 && report.scores.safety <= 10);
+      assert.equal(report.scores.matching, 10);
+      assert.equal(report.scores.safety, 10);
       assert.ok(report.scores.efficiency >= 0 && report.scores.efficiency <= 10);
       assert.equal("availabilityAsOf" in report, false);
       assert.equal("matchMs" in report, false);

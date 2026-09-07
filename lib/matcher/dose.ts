@@ -80,6 +80,10 @@ export function numberToRational(
     return { message: "Amount is not finite.", reason: "overflow" };
   }
 
+  if (Math.abs(amount) > Number.MAX_SAFE_INTEGER) {
+    return { message: "Amount exceeds the supported precise numeric limit.", reason: "overflow" };
+  }
+
   if (Number.isInteger(amount) && Math.abs(amount) <= Number.MAX_SAFE_INTEGER) {
     return { den: BigInt(1), num: BigInt(amount) };
   }
@@ -372,10 +376,12 @@ export function aggregateDailyExposure(input: Readonly<{
   );
 
   for (const variant of variants) {
-    const subjects = [...variant.contributions.keys()].sort();
+    const supplied = new Map(variant.safetyExposure ?? []);
+    for (const [id, amount] of variant.contributions) supplied.set(id, amount);
+    const subjects = [...supplied.keys()].sort();
 
     for (const subjectId of subjects) {
-      const contribution = variant.contributions.get(subjectId);
+      const contribution = supplied.get(subjectId);
 
       if (!contribution) {
         continue;

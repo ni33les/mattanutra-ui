@@ -12,7 +12,7 @@ function catalog(products: ReturnType<typeof qaProduct>[]) {
 }
 
 describe("Phase 0 compact compile", () => {
-  it("does not compile D3 carriers when a dedicated covering SKU exists", () => {
+  it("compiles all eligible labelled D3 contributors before dose-fit ranking", () => {
     const dedicated = qaProduct({
       facts: [{ amount: 2000, key: "d3" }],
       id: "G-D3-2000",
@@ -45,8 +45,8 @@ describe("Phase 0 compact compile", () => {
     );
     const ids = groups.map((item) => item.productId);
     assert.equal(ids.includes("G-D3-2000"), true);
-    assert.equal(ids.includes("G-BETA-GLUCAN"), false);
-    assert.equal(ids.includes("G-MULTI-50PLUS"), false);
+    assert.equal(ids.includes("G-BETA-GLUCAN"), true);
+    assert.equal(ids.includes("G-MULTI-50PLUS"), true);
   });
 
   it("still compiles G-C-500 for standalone vitamin C", () => {

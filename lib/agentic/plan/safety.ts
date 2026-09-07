@@ -1,3 +1,7 @@
+import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
+import { intakeCertaintyFor } from "@/lib/agentic/plan/intake-certainty";
+import { conditionImpliesCkd, subjectIsMagnesium } from "@/lib/matcher/condition-ceilings";
+import { knownLimitProfile } from "@/lib/matcher/dose-fit";
 import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import type { Locale } from "@/lib/i18n";
@@ -29,19 +33,24 @@ import {
 function catalogRule(
   name: string,
   subjectId: string,
-  profile: CanonicalPlanState["profile"],
+  state: Pick<CanonicalPlanState, "profile" | "profileKnown">,
   fallbackRuleId: string,
-  conditionCodes: readonly string[] = []
+  conditionCodes: readonly string[] = [],
+  sourceScope?: "supplemental" | "total"
 ) {
-  const ceiling = safetyCeilingFor(matcherSafetyCeilings(), {
+  const profile = knownLimitProfile(state);
+  const ceiling = safetyCeilingFor(profile ? matcherSafetyCeilings() : [], {
     conditionCodes,
     name,
     profile,
+    sourceScope,
     subjectId
   });
   return {
     ruleId: catalogBandRuleId(ceiling) ?? fallbackRuleId,
-    rulesVersion: catalogBandRulesVersion(ceiling) ?? GUIDANCE_RULES_VERSION
+    rulesVersion: catalogBandRulesVersion(ceiling) ?? GUIDANCE_RULES_VERSION,
+    ...(ceiling?.sourceScope ? { sourceScope: ceiling.sourceScope } : {}),
+    ...(ceiling?.authorityUrl ? { authorityUrl: ceiling.authorityUrl, evidence: [ceiling.authorityUrl] } : {})
   };
 }
 
@@ -68,7 +77,7 @@ function exposureContributors(
   }
 ): CoverageContributor[] {
   const rows = [
-    ...currentContributors(row),
+    ...((row.contributors ?? []).some(item => item.source === "current" || item.source === "diet") ? [] : currentContributors(row)),
     ...(row.contributors ?? []).map((item) => ({
       ...item,
       source: item.source ?? ("selected" as const)
@@ -91,6 +100,9 @@ function exposureContributors(
 
 function guidance(input: Readonly<{
   action: SafetyGuidance["action"];
+  comparator?: SafetyGuidance["comparator"];
+  authorityUrl?: string | null;
+  evidence?: readonly string[];
   code: SafetyGuidance["code"];
   locale: Locale;
   productIds: readonly string[];
@@ -137,8 +149,8 @@ function guidance(input: Readonly<{
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
   const guidanceId =
-    input.code === "duplicate_or_overlap"
-      ? ["gdn", input.code, family, factSlug || "fact"].join(":")
+    input.code === "duplicate_or_overlap" || input.code === "dose_review_required" || input.code === "continued_dose_increased"
+      ? ["gdn", input.code, factSlug || "fact", input.sourceScope ?? "unknown", input.ruleId ?? family].join(":")
       : ["gdn", input.code, family].join(":");
   const contributorLabel =
     (input.contributors ?? [])
@@ -157,21 +169,26 @@ function guidance(input: Readonly<{
     remainingZero
       ? "do not add this nutrient"
       : input.code === "condition_review_required"
-        ? "stop and seek clinician review"
+        ? "seek clinician review before use"
         : informationalOverlap
           ? "listed for awareness"
         : input.code === "medication_interaction"
           ? "listed as a safety fact"
-          : "review before purchase";
+          : "review before use";
 
   return {
-    action: input.action,
+    action: "review",
+    comparator: input.comparator ?? null,
+    ...(input.authorityUrl ? { authorityUrl: input.authorityUrl } : {}),
+    ...(input.evidence ? { evidence: input.evidence } : {}),
     code: input.code,
     contributors: input.contributors ?? [],
     exposure: input.exposure ?? null,
     guidanceId,
     message: agenticMessage(input.locale, messageKey, {
       contributors: contributorLabel,
+      threshold: input.threshold ?? 0,
+      exposure: input.exposure ?? 0,
       nextAction,
       nutrientName: input.nutrientName ?? "",
       overflow: input.overflow ?? 0,
@@ -183,7 +200,7 @@ function guidance(input: Readonly<{
     productIds: input.productIds,
     ruleId: input.ruleId ?? family,
     rulesVersion: input.rulesVersion ?? GUIDANCE_RULES_VERSION,
-    severity: input.severity,
+    severity: input.severity === "blocking" ? "high" : input.severity,
     sourceScope: input.sourceScope ?? null,
     supplementIds: input.supplementIds,
     threshold: input.threshold ?? null,
@@ -276,6 +293,8 @@ export function evaluateSafety(input: Readonly<{
   state: CanonicalPlanState;
 }>): readonly SafetyGuidance[] {
   const items: SafetyGuidance[] = [];
+  const knownProfile = knownLimitProfile(input.state);
+  const populationCeilings = knownProfile ? matcherSafetyCeilings() : [];
   const productIds = input.selected?.basket.map((item) => item.productId) ?? [];
   const omegaIds = input.state.targets
     .filter((item) => /omega/i.test(item.name))
@@ -291,6 +310,12 @@ export function evaluateSafety(input: Readonly<{
       : zincCoverage
         ? [zincCoverage]
         : [];
+
+  if (conditionImpliesCkd(input.state.conditionCodes)) {
+    for (const row of coverageRows.filter(item => subjectIsMagnesium({ name: item.name, subjectId: item.supplementId }))) {
+      items.push(guidance({ action: "review", code: "condition_review_required", contributors: exposureContributors(row), exposure: row.totalExposureAmount, locale: input.locale, nutrientName: row.name, productIds, severity: "high", sourceScope: "total", supplementIds: [row.supplementId], threshold: null, unit: row.unit }));
+    }
+  }
 
   const omegaCoverage = input.selected?.coverage.find((row) => /omega/i.test(row.name));
 
@@ -322,7 +347,7 @@ export function evaluateSafety(input: Readonly<{
     }
 
     const limit = upperLimitAmount(target.name, target.unit, {
-      ceilings: matcherSafetyCeilings(),
+      ceilings: populationCeilings,
       conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
       subjectId: target.supplementId
@@ -345,7 +370,7 @@ export function evaluateSafety(input: Readonly<{
         ...catalogRule(
           target.name,
           target.supplementId,
-          input.state.profile,
+          input.state,
           `ul:${target.supplementId}`,
           input.state.conditionCodes
         )
@@ -354,6 +379,7 @@ export function evaluateSafety(input: Readonly<{
   }
 
   for (const leftover of input.state.leftovers) {
+    if (leftover.source === "current_supplement") continue;
     const amount = leftover.amount;
     const unit = leftover.unit;
     if (amount == null || !unit) {
@@ -375,7 +401,7 @@ export function evaluateSafety(input: Readonly<{
       continue;
     }
     const limit = upperLimitAmount(leftover.name, unit, {
-      ceilings: matcherSafetyCeilings(),
+      ceilings: populationCeilings,
       conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
       subjectId
@@ -397,7 +423,7 @@ export function evaluateSafety(input: Readonly<{
         ...catalogRule(
           leftover.name,
           subjectId,
-          input.state.profile,
+          input.state,
           `ul:${subjectId}`,
           input.state.conditionCodes
         )
@@ -405,11 +431,17 @@ export function evaluateSafety(input: Readonly<{
     }
   }
 
-  for (const row of coverageRows) {
+  for (const originalRow of coverageRows) {
+    const rowScope = originalRow.sourceScope ?? "supplemental";
+    const allContributors = exposureContributors(originalRow);
+    const sourceContributors = allContributors.filter(item => rowScope === "total" || item.source !== "diet");
+    const quantifiedExposure = allContributors.length ? sourceContributors.reduce((sum, item) => sum + item.amount, 0) : originalRow.totalExposureAmount;
+    const row = { ...originalRow, totalExposureAmount: quantifiedExposure, contributors: sourceContributors };
     const limit = upperLimitAmount(row.name, row.unit, {
-      ceilings: matcherSafetyCeilings(),
+      ceilings: populationCeilings,
       conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
+      sourceScope: rowScope,
       subjectId: row.supplementId
     });
     const missingRequiredBand =
@@ -433,16 +465,17 @@ export function evaluateSafety(input: Readonly<{
         productIds,
         requested: row.requestedAmount,
         severity: "blocking",
-        sourceScope: "supplemental",
+        sourceScope: rowScope,
         supplementIds: [row.supplementId],
         threshold: null,
         unit: row.unit,
         ...catalogRule(
           row.name,
           row.supplementId,
-          input.state.profile,
+          input.state,
           `ul:missing:${row.supplementId}`,
-          input.state.conditionCodes
+          input.state.conditionCodes,
+          rowScope
         )
       }));
     } else if (limit == null && row.coveragePercent > 125) {
@@ -456,16 +489,17 @@ export function evaluateSafety(input: Readonly<{
         productIds,
         requested: row.requestedAmount,
         severity: "blocking",
-        sourceScope: "supplemental",
+        sourceScope: rowScope,
         supplementIds: [row.supplementId],
         threshold: null,
         unit: row.unit,
         ...catalogRule(
           row.name,
           row.supplementId,
-          input.state.profile,
+          input.state,
           `ul:missing:${row.supplementId}`,
-          input.state.conditionCodes
+          input.state.conditionCodes,
+          rowScope
         )
       }));
     } else if (
@@ -482,21 +516,23 @@ export function evaluateSafety(input: Readonly<{
         productIds,
         requested: row.requestedAmount,
         severity: "blocking",
-        sourceScope: "supplemental",
+        sourceScope: rowScope,
         supplementIds: [row.supplementId],
         threshold: limit,
         unit: row.unit,
         ...catalogRule(
           row.name,
           row.supplementId,
-          input.state.profile,
+          input.state,
           `ul:${row.supplementId}`,
-          input.state.conditionCodes
+          input.state.conditionCodes,
+          rowScope
         )
       }));
     } else if (amountExceedsCeiling(row.totalExposureAmount, limit)) {
       items.push(guidance({
         action: "block",
+        comparator: "gt",
         code: "dose_review_required",
         contributors: rowContributors,
         exposure: row.totalExposureAmount,
@@ -505,16 +541,17 @@ export function evaluateSafety(input: Readonly<{
         productIds,
         requested: row.requestedAmount,
         severity: "blocking",
-        sourceScope: "supplemental",
+        sourceScope: rowScope,
         supplementIds: [row.supplementId],
         threshold: limit,
         unit: row.unit,
         ...catalogRule(
           row.name,
           row.supplementId,
-          input.state.profile,
+          input.state,
           `ul:${row.supplementId}`,
-          input.state.conditionCodes
+          input.state.conditionCodes,
+          rowScope
         )
       }));
     } else if (
@@ -525,6 +562,7 @@ export function evaluateSafety(input: Readonly<{
     ) {
       items.push(guidance({
         action: "acknowledge",
+        comparator: "gte",
         code: "dose_review_required",
         contributors: rowContributors,
         exposure: row.totalExposureAmount,
@@ -533,16 +571,17 @@ export function evaluateSafety(input: Readonly<{
         productIds,
         requested: row.requestedAmount,
         severity: "high",
-        sourceScope: "supplemental",
+        sourceScope: rowScope,
         supplementIds: [row.supplementId],
         threshold: limit,
         unit: row.unit,
         ...catalogRule(
           row.name,
           row.supplementId,
-          input.state.profile,
+          input.state,
           `ul:${row.supplementId}`,
-          input.state.conditionCodes
+          input.state.conditionCodes,
+          rowScope
         )
       }));
     }
@@ -581,12 +620,36 @@ export function evaluateSafety(input: Readonly<{
         remainingGap: row.remainingGap,
         requested: row.requestedAmount,
         severity: harmful ? "high" : "info",
-        sourceScope: "supplemental",
+        sourceScope: rowScope,
         supplementIds: [row.supplementId],
         threshold: row.upperLimitAmount,
         unit: row.unit
       }));
     }
+  }
+
+  for (const reference of input.selected?.doseFit?.perLimit ?? []) {
+    const maximum = reference.exposureMaximum ?? reference.exposure;
+    if (maximum < reference.limit) continue;
+    const row = coverageRows.find(item => item.supplementId === reference.subjectId);
+    const contributors = row ? exposureContributors(row)
+      .filter(item => reference.sourceScope === "total" || item.source !== "diet")
+      .map(item => ({ ...item, amount: roundDose(fromComparable(doseComparable(item.amount, item.unit, reference.name), reference.unit, reference.name)), unit: reference.unit })) : [];
+    const ruleId = reference.ruleId ?? `ul:${reference.subjectId}:${reference.sourceScope}`;
+    const uncertainty = reference.certainty === "known" ? undefined : agenticMessage(input.locale, "guidance.estimated_limit_uncertainty", { amount: maximum, unit: reference.unit });
+    const existing = items.findIndex(item => item.code === "dose_review_required" && item.supplementIds.includes(reference.subjectId) && item.sourceScope === reference.sourceScope);
+    const advice = { ...guidance({ action: "review", code: "dose_review_required", comparator: maximum > reference.limit ? "gt" : "gte", contributors, exposure: maximum, locale: input.locale, nutrientName: reference.name, productIds: contributors.flatMap(item => item.productId ? [item.productId] : []), requested: row?.requestedAmount ?? null, severity: "high", sourceScope: reference.sourceScope, supplementIds: [reference.subjectId], threshold: reference.limit, unit: reference.unit, ruleId, authorityUrl: reference.authorityUrl, ...(reference.authorityUrl ? { evidence: [reference.authorityUrl] } : {}) }), ...(uncertainty ? { uncertainty, uncertaintyCodes: [reference.certainty + "_intake", "upper_endpoint_of_estimate"] } : {}) };
+    if (existing >= 0) items[existing] = advice; else items.push(advice);
+  }
+
+  for (const reference of input.selected?.doseFit?.perContinuedDose ?? []) {
+    if (reference.over <= 0) continue;
+    const contributors: CoverageContributor[] = [
+      ...input.state.currentSupplements.filter(item => item.supplementId === reference.subjectId).map(item => ({ amount: roundDose(fromComparable(doseComparable(item.dailyAmount, item.unit, reference.name), reference.unit, reference.name)), productId: item.productId, productName: item.name, unit: reference.unit, source: "current" as const })),
+      ...(input.state.intake ?? []).flatMap(item => item.source === "current_supplement" && item.supplementId === reference.subjectId && item.certainty !== "unknown" && item.amount != null && item.unit ? [{ amount: roundDose(fromComparable(doseComparable(item.amount, item.unit, reference.name), reference.unit, reference.name)), productId: item.productId, productName: item.name ?? reference.name, unit: reference.unit, source: "current" as const }] : []),
+      ...(input.selected?.basket ?? []).flatMap(item => [...(item.requestedNutrients ?? []), ...item.incidentalNutrients].filter(nutrient => nutrientNameMatchesTarget(reference.name, nutrient.name)).map(nutrient => ({ amount: roundDose(fromComparable(doseComparable(nutrient.amount, nutrient.unit, reference.name), reference.unit, reference.name)), productId: item.productId, productName: item.productName, unit: reference.unit, source: "selected" as const })))
+    ];
+    items.push({ ...guidance({ action: "review", code: "continued_dose_increased", comparator: "gt", contributors, exposure: reference.exposure, locale: input.locale, nutrientName: reference.name, productIds: contributors.flatMap(item => item.productId ? [item.productId] : []), severity: "info", sourceScope: "supplemental", supplementIds: [reference.subjectId], threshold: reference.referenceDose, unit: reference.unit, ruleId: `continued_dose:${reference.subjectId}` }), referenceBasis: "continued_dose", uncertainty: agenticMessage(input.locale, "guidance.continued_dose_uncertainty"), uncertaintyCodes: ["continued_dose_is_not_medical_limit", ...(reference.certainty === "known" ? [] : [reference.certainty + "_intake"])] });
   }
 
   const incidentalTotals = new Map<string, { amount: number; name: string; unit: string }>();
@@ -618,7 +681,7 @@ export function evaluateSafety(input: Readonly<{
     }
 
     const limit = upperLimitAmount(nutrient.name, nutrient.unit, {
-      ceilings: matcherSafetyCeilings(),
+      ceilings: populationCeilings,
       conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
       subjectId: nutrient.name
@@ -659,7 +722,7 @@ export function evaluateSafety(input: Readonly<{
         ...catalogRule(
           nutrient.name,
           nutrient.name,
-          input.state.profile,
+          input.state,
           `ul:incidental:${nutrient.name}`,
           input.state.conditionCodes
         )
@@ -683,6 +746,18 @@ export function evaluateSafety(input: Readonly<{
     }
   }
 
+  const original = input.state.originalRequest;
+  const undisclosedContext = Boolean(original && (original.medicationCodes === undefined || original.conditionCodes === undefined)) || input.state.targets.some(item => intakeCertaintyFor(input.state, item.supplementId) !== "known") || coverageRows.some(item => intakeCertaintyFor(input.state, item.supplementId) !== "known");
+  if (undisclosedContext || (input.state.profileKnown && Object.values(input.state.profileKnown).some(known => !known)) || (input.state.intake ?? []).some(item => item.certainty !== "known") || input.state.medicationCodes.some(code => !MEDICATION_ALIASES[code]) || input.state.conditionCodes.some(code => !CONDITION_ALIASES[code])) {
+    items.push({ ...guidance({ action: "review", code: "incomplete_information", locale: input.locale, productIds, severity: "high", supplementIds: [] }), uncertainty: agenticMessage(input.locale, "guidance.incomplete_information_uncertainty"), uncertaintyCodes: [
+      ...(original?.medicationCodes === undefined ? ["medication_context_unknown"] : []),
+      ...(original?.conditionCodes === undefined ? ["condition_context_unknown"] : []),
+      ...Object.entries(input.state.profileKnown ?? {}).filter(([, known]) => !known).map(([field]) => `profile_unknown:${field}`),
+      ...[...new Set([...input.state.targets.map(item => item.supplementId), ...coverageRows.map(item => item.supplementId)])].filter(id => intakeCertaintyFor(input.state, id) !== "known").map(id => `intake_${intakeCertaintyFor(input.state, id)}:${id}`),
+      ...input.state.medicationCodes.filter(code => !MEDICATION_ALIASES[code]).map(code => `medication_unassessed:${code}`),
+      ...input.state.conditionCodes.filter(code => !CONDITION_ALIASES[code]).map(code => `condition_unassessed:${code}`)
+    ].sort() });
+  }
   return items;
 }
 
@@ -696,62 +771,18 @@ export function safetyQuestions(input: Readonly<{
   unmetRequirements?: readonly string[];
 }>): PlanQuestion[] {
   const questions: PlanQuestion[] = [];
-  const acknowledgedMeds = new Set(input.state.acknowledgedUnassessedMedicationCodes ?? []);
-  const acknowledgedConditions = new Set(
-    input.state.acknowledgedUnassessedConditionCodes ?? []
-  );
-  const unassessedMeds = input.state.medicationCodes.filter(
-    (code) => !MEDICATION_ALIASES[code] && !acknowledgedMeds.has(code)
-  );
-  const unassessedConditions = input.state.conditionCodes.filter(
-    (code) => !CONDITION_ALIASES[code] && !acknowledgedConditions.has(code)
-  );
-
-  const unknownConditionals = input.state.targets.filter(
-    (target) =>
-      target.importance === "conditional" && target.prerequisite?.status === "unknown"
-  );
-
-  for (const target of unknownConditionals) {
+  for (const target of input.state.targets) {
+    if (target.importance !== "conditional" || target.prerequisite?.status !== "unknown") continue;
     questions.push({
-      choices: [
-        {
-          choice: `satisfy_prerequisite:${target.supplementId}`,
-          effect: `prerequisite.satisfied=${target.supplementId}`,
-          label: agenticMessage(input.locale, "plan.question.satisfy_prerequisite"),
-          labelKey: "plan.question.satisfy_prerequisite"
-        },
-        {
-          choice: `leave_prerequisite:${target.supplementId}`,
-          effect: `prerequisite.unsatisfied=${target.supplementId}`,
-          label: agenticMessage(input.locale, "plan.question.leave_prerequisite"),
-          labelKey: "plan.question.leave_prerequisite"
-        }
-      ],
-      prompt: agenticMessage(input.locale, "plan.question.unknown_prerequisite", {
-        name: target.name
-      }),
+      questionId: `q_prerequisite_${target.supplementId}`,
+      prompt: agenticMessage(input.locale, "plan.question.unknown_prerequisite", { name: target.name }),
       promptKey: "plan.question.unknown_prerequisite",
-      questionId: `q_prerequisite_${target.supplementId}`
-    });
-  }
-
-  if (unassessedMeds.length > 0 || unassessedConditions.length > 0) {
-    questions.push({
       choices: [
-        {
-          choice: "acknowledge_unassessed",
-          effect: "acknowledge_unassessed",
-          label: agenticMessage(input.locale, "plan.question.acknowledge_unassessed"),
-          labelKey: "plan.question.acknowledge_unassessed"
-        }
-      ],
-      prompt: agenticMessage(input.locale, "plan.question.unassessed_medical_context"),
-      promptKey: "plan.question.unassessed_medical_context",
-      questionId: "q_unassessed_medical_context"
+        { choice: `satisfy_prerequisite:${target.supplementId}`, effect: "prerequisite.status=satisfied", label: agenticMessage(input.locale, "plan.question.satisfy_prerequisite"), labelKey: "plan.question.satisfy_prerequisite" },
+        { choice: `leave_prerequisite:${target.supplementId}`, effect: "prerequisite.status=unsatisfied", label: agenticMessage(input.locale, "plan.question.leave_prerequisite"), labelKey: "plan.question.leave_prerequisite" }
+      ]
     });
   }
-
   const omegaTarget = input.state.targets.find((item) => /omega/i.test(item.name));
 
   if (
@@ -855,31 +886,6 @@ export function safetyQuestions(input: Readonly<{
     }
   }
 
-  const ackable = input.guidance.filter((item) => item.action === "acknowledge");
-
-  if (ackable.length > 0) {
-    const bound = input.state.safetyAcknowledgement;
-    const covered =
-      bound?.confirmed === true &&
-      ackable.every((item) => bound.guidanceIds.includes(item.guidanceId));
-
-    if (!covered) {
-      questions.push({
-        choices: [
-          {
-            choice: "acknowledge_safety",
-            effect: "safetyAcknowledgement.confirmed=true",
-            label: agenticMessage(input.locale, "plan.question.acknowledge_safety"),
-            labelKey: "plan.question.acknowledge_safety"
-          }
-        ],
-        prompt: agenticMessage(input.locale, "plan.question.safety_review"),
-        promptKey: "plan.question.safety_review",
-        questionId: "q_safety_ack"
-      });
-    }
-  }
-
   const unmet = input.unmetRequirements ?? [];
   const alternatives = input.alternatives ?? [];
 
@@ -964,47 +970,8 @@ export function safetyQuestions(input: Readonly<{
     });
   }
 
-  const durationQuestions: PlanQuestion[] = [];
-  for (const current of input.state.currentSupplements) {
-    if (current.daysRemaining != null || current.durationUnknown) {
-      continue;
-    }
-    const row = input.selected?.coverage.find((item) => item.supplementId === current.supplementId);
-    const covers = row
-      ? row.status === "already_covered" ||
-        row.status === "over_target" ||
-        (row.currentAmount >= row.requestedAmount && row.deliveredAmount <= 0)
-      : input.state.targets.some(
-          (target) =>
-            target.supplementId === current.supplementId && current.dailyAmount >= target.amount
-        );
-    if (!covers) {
-      continue;
-    }
-    durationQuestions.push({
-      choices: [
-        ...[7, 14, 30, 60, 90].map((days) => ({
-          choice: `days:${days}`,
-          effect: `currentSupplements.daysRemaining=${days}`,
-          label: agenticMessage(input.locale, "plan.question.inventory_duration_days", { days }),
-          labelKey: "plan.question.inventory_duration_days"
-        })),
-        {
-          choice: "unknown",
-          effect: "currentSupplements.durationUnknown=true",
-          label: agenticMessage(input.locale, "plan.question.inventory_duration_unknown"),
-          labelKey: "plan.question.inventory_duration_unknown"
-        }
-      ],
-      prompt: agenticMessage(input.locale, "plan.question.inventory_duration", {
-        name: current.name
-      }),
-      promptKey: "plan.question.inventory_duration",
-      questionId: `q_inventory_duration_${current.supplementId}`
-    });
-  }
 
-  return [...durationQuestions, ...questions];
+  return questions;
 }
 
 export function planStatus(input: Readonly<{
@@ -1021,10 +988,6 @@ export function planStatus(input: Readonly<{
   unmetRequirements: readonly string[];
 }>): "blocked" | "needs_input" | "no_purchase" | "ready" {
   void input.unmetRequirements;
-
-  if (input.guidance.some((item) => item.action === "block")) {
-    return "blocked";
-  }
 
   if (input.questions.length > 0) {
     return "needs_input";
@@ -1052,17 +1015,6 @@ export function planStatus(input: Readonly<{
       row.status === "partial"
   );
   const basketEmpty = !input.selected || input.selected.basket.length === 0;
-
-  if (
-    input.selected?.coverage.some(
-      (row) =>
-        row.upperLimitAmount != null &&
-        row.totalExposureAmount > row.upperLimitAmount &&
-        row.status !== "conditional_deferred"
-    )
-  ) {
-    return "blocked";
-  }
 
   if (basketEmpty) {
     if (unknownPrerequisite && !coreUnresolved) {
@@ -1121,6 +1073,7 @@ function unresolvedGapReview(
   }
 
   for (const leftover of input.state.leftovers) {
+    if (leftover.source === "current_supplement") continue;
     const id = leftoverGapId(leftover);
     if (accepted.has(id)) {
       continue;

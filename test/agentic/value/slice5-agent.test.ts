@@ -275,10 +275,14 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     for (const option of published.options ?? []) {
       assert.ok(option.economics);
       assert.ok(option.stackSummary);
-      // AX2-08 deliberately puts details on the selected plan, not each compact option.
-      for (const field of ["coverage", "burden", "safety", "productIds", "basket"]) {
+      // V4 publishes the facts needed to compare each option without inspecting ledgers.
+      for (const field of ["burden", "safety", "productIds"]) {
         assert.equal(field in option, false, field);
       }
+      assert.ok(Array.isArray(option.coverage));
+      assert.ok(Array.isArray(option.basket));
+      assert.ok(Array.isArray(option.advice));
+      assert.equal(option.doseFit?.limitWeight, 2);
     }
     assert.ok((published.coverage?.length ?? 0) > 0);
     assert.ok((published.basket?.length ?? 0) > 0);
@@ -303,7 +307,7 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     }
   });
 
-  it("SAFE-01.B apixaban plus omega-3 is a frozen acknowledgement on every option, never a cheaper hard block", () => {
+  it("SAFE-01.B apixaban plus omega-3 preserves interaction advice across every option without acknowledgement", () => {
     const snapshot = withOmega(sampleValueSnapshot());
     const omega = snapshot.supplements.find((item) => item.name === "Omega-3")!;
     const { published, options, result } = publishPlan(snapshot, {
@@ -332,14 +336,14 @@ describe("Slice 5 agent explanation safety and determinism", () => {
         (row) => row.code === "medication_interaction"
       );
       assert.ok(interaction);
-      assert.equal(interaction.action, "acknowledge");
+      assert.equal(interaction.action, "review");
       assert.notEqual(interaction.action, "block");
       assert.ok(String(interaction.ruleId ?? "").length > 0);
       assert.ok(String(interaction.rulesVersion ?? "").length > 0);
       const selected = publishSelection(result, option);
       assert.ok(selected.coverage?.some((row) => row.supplementId === omega.supplementId && row.status === "covered"));
-      assert.ok(selected.safetyGuidance?.some((row) => row.code === "medication_interaction" && row.action === "acknowledge"));
-      assert.equal(selected.acknowledgementStatus, "pending");
+      assert.ok(selected.safetyGuidance?.some((row) => row.code === "medication_interaction" && row.action === "review"));
+      assert.equal(selected.acknowledgementStatus, "not_required");
     }
     assert.equal(
       options.some((option) => option.economics?.savingClaim === "positive" && option.recommended &&
@@ -349,7 +353,7 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     );
   });
 
-  it("SAFE-01.C a cheaper over-UL magnesium is never returned in an option", () => {
+  it("SAFE-01.C dose fit ranks a cheap excessive magnesium below the exact labelled dose", () => {
     const snapshot = withCheapMegaMag(sampleValueSnapshot());
     const megaId = publicProductId(MEGA_MAG_UUID);
     const { options, result } = publishPlan(snapshot, intentState(snapshot));
@@ -409,17 +413,18 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     }
   });
 
-  it("SAFE-01.E missing required safety data fails closed", () => {
+  it("SAFE-01.E unknown medication details remain explicit and advisory", () => {
     const snapshot = sampleValueSnapshot();
     const { published } = publishPlan(snapshot, {
       ...intentState(snapshot),
       medicationCodes: ["mystery_anticoagulant"]
     });
-    assert.equal(published.status, "needs_input");
+    assert.equal(published.status, "ready");
+    assert.ok(published.safetyGuidance?.some(item => item.code === "incomplete_information"));
     assert.ok((published.unassessedMedicationCodes ?? []).includes("mystery_anticoagulant"));
   });
 
-  it("SAFE-01.F acknowledgement is scoped to guidance ids and revision", () => {
+  it("SAFE-01.F legacy acknowledgements do not alter advisory readiness or erase the guidance", () => {
     const snapshot = withOmega(sampleValueSnapshot());
     const omega = snapshot.supplements.find((item) => item.name === "Omega-3")!;
     const base = {
@@ -439,11 +444,11 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     };
     const pending = publishPlan(snapshot, base);
     const guidanceIds = (pending.published.safetyGuidance ?? [])
-      .filter((row) => row.action === "acknowledge")
+      .filter((row) => row.action === "review")
       .map((row) => row.guidanceId)
       .filter((id): id is string => Boolean(id));
     assert.ok(guidanceIds.length > 0);
-    assert.equal(pending.published.acknowledgementStatus, "pending");
+    assert.equal(pending.published.acknowledgementStatus, "not_required");
 
     const wrong = publishPlan(snapshot, {
       ...base,
@@ -453,7 +458,7 @@ describe("Slice 5 agent explanation safety and determinism", () => {
         revision: 1
       }
     });
-    assert.equal(wrong.published.acknowledgementStatus, "pending");
+    assert.equal(wrong.published.acknowledgementStatus, "not_required");
 
     const ok = publishPlan(snapshot, {
       ...base,
@@ -463,7 +468,12 @@ describe("Slice 5 agent explanation safety and determinism", () => {
         revision: 1
       }
     });
-    assert.equal(ok.published.acknowledgementStatus, "acknowledged");
+    assert.equal(ok.published.acknowledgementStatus, "not_required");
+    for (const outcome of [pending, wrong, ok]) {
+      assert.equal(outcome.published.status, "ready");
+      assert.ok(outcome.published.safetyGuidance?.some(item => item.code === "medication_interaction" && item.action === "review"));
+      assert.equal(outcome.published.optionId, pending.published.optionId);
+    }
   });
 
   it("DET-01.A two canonical runs are byte-identical and keep prices products roles savings and safety", () => {

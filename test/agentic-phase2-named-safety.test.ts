@@ -66,7 +66,7 @@ function optionWithIncidental(
 }
 
 describe("Phase 2 named incidental safety", () => {
-  it("names the incidental nutrient on a vitamin A UL block", () => {
+  it("names the incidental nutrient, amount and limit in vitamin A advice", () => {
     setMatcherSafetyCeilings([
       {
         lifeStage: "adult",
@@ -83,7 +83,7 @@ describe("Phase 2 named incidental safety", () => {
       state: aug25PlanState()
     });
     const dose = guidance.find(
-      (item) => item.code === "dose_review_required" && item.action === "block"
+      (item) => item.code === "dose_review_required" && item.action === "review"
     );
     assert.ok(dose);
     assert.equal(dose.nutrientName, "Vitamin A");

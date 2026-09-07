@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { parseCheckoutAddress } from "../lib/agentic/checkout-address.ts";
-import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
@@ -23,6 +23,8 @@ import {
   payableSnapshot
 } from "../lib/agentic/money.ts";
 import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
+import { PROFILE_SCHEMA } from "../lib/agentic/contract/schemas.ts";
+import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { engineeringInfo } from "../lib/agentic/info.ts";
 
 function supplementId(name: string) {
@@ -88,7 +90,7 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(JSON.stringify(result).includes("stockStatus"), false);
   });
 
-  it("does not mark a 50% retained zinc target ready", async () => {
+  it("reports retained zinc coverage honestly and keeps upper-limit advice advisory", async () => {
     const zinc = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Zinc");
     assert.ok(zinc);
     setMatcherSafetyCeilings([
@@ -119,15 +121,17 @@ describe("agentic P1 pack fixes", () => {
     });
 
     assert.equal(result.ok, true);
-    assert.notEqual(result.status, "ready");
     const row = (result.coverage as Array<Record<string, unknown>>)[0];
     assert.equal(row.unit, "mg");
     assert.equal(row.requestedAmount, 50);
-    assert.equal(row.deliveredAmount, 25);
-    assert.ok((row.coveragePercent as number) < 90);
+    assert.equal(row.coveragePercent, Math.min(100, Math.round(100 * Number(row.deliveredAmount) / 50)));
+    assert.equal(row.remainingGap, Math.max(0, 50 - Number(row.deliveredAmount)));
+    assert.equal(result.acknowledgementStatus, "not_required");
+    if (Number(row.deliveredAmount) < 50) assert.notEqual(result.status, "ready");
+    if (Number(row.deliveredAmount) > 40) assert.ok((result.safetyGuidance as Array<{ code: string }>).some(item => item.code === "dose_review_required"));
   });
 
-  it("invalidates safety acknowledgement after exposure changes", async () => {
+  it("refreshes advice after exposure changes without requiring legacy acknowledgement", async () => {
     const runtime = runtimeFor();
     const first = await call(runtime, "plan", {
       idempotencyKey: "p1-ack-first-0000001",
@@ -144,10 +148,10 @@ describe("agentic P1 pack fixes", () => {
       }
     });
 
-    assert.equal(first.status, "needs_input");
+    assert.equal(first.status, "ready");
     const guidanceIds = first.guidanceIds as string[];
     assert.ok(Array.isArray(guidanceIds) && guidanceIds.length > 0);
-    assert.equal(first.acknowledgementStatus, "pending");
+    assert.equal(first.acknowledgementStatus, "not_required");
     assert.deepEqual(first.medicationCodes, ["apixaban"]);
     const fromGuidance = (first.safetyGuidance as Array<{ guidanceId: string }>).map(
       (item) => item.guidanceId
@@ -199,7 +203,9 @@ describe("agentic P1 pack fixes", () => {
         ]
       }
     });
-    assert.equal(changed.status, "needs_input");
+    assert.equal(changed.status, "ready");
+    assert.equal(changed.acknowledgementStatus, "not_required");
+    assert.equal((changed.coverage as Array<{ requestedAmount: number }>)[0].requestedAmount, 2000);
   });
 
   it("rejects feedback for a stale plan revision", async () => {
@@ -405,15 +411,17 @@ describe("agentic P1 pack fixes", () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.status, "needs_input");
+    assert.equal(result.status, "ready");
+    assert.equal(result.acknowledgementStatus, "not_required");
     const row = (result.coverage as Array<Record<string, unknown>>)[0];
     assert.equal(row.unit, "mg");
     assert.equal(row.requestedAmount, 50);
     assert.equal(row.currentAmount, 15);
     assert.equal(row.deliveredAmount, 25);
-    assert.equal(row.totalExposureAmount, 40);
+    assert.equal(row.quantifiedExposureAmount, 40);
     assert.equal(row.upperLimitAmount, 40);
-    assert.equal(row.status, "upper_limit_risk");
+    assert.equal(row.status, "partial");
+    assert.equal(row.coveragePercent, 80);
     const codes = (result.safetyGuidance as Array<{ code: string }>).map((item) => item.code);
     assert.ok(codes.includes("dose_review_required"));
     assert.ok(codes.includes("duplicate_or_overlap"));
@@ -539,7 +547,7 @@ describe("agentic P1 pack fixes", () => {
     assert.equal((result.error as { reasonCode: string }).reasonCode, "unexpected_property");
   });
 
-  it("asks one budget question when a covered stack is over maxPriceMinor", async () => {
+  it("keeps the budget hard and recovers through an explicit budget revision", async () => {
     const runtime = runtimeFor();
     const result = await call(runtime, "plan", {
       idempotencyKey: "p1-over-budget-0000001",
@@ -555,21 +563,14 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(result.status, "needs_input");
     const questions = (result.questions as Array<{ questionId: string }>) ?? [];
     assert.ok(questions.length > 0);
-    assert.ok(questions.some((item) => item.questionId === "q_max_price"));
+    assert.ok(!Array.isArray(result.basket) || result.basket.reduce((sum, item) => sum + Number(item.lineTotalMinor), 0) <= 1000);
 
     const relaxed = await call(runtime, "plan", {
       expectedRevision: result.revision,
       idempotencyKey: "p1-over-budget-relax-01",
       planHandle: result.planHandle,
-      request: {
-        answers: [{ choice: "relax_max_price", questionId: "q_max_price" }],
-        destinationCountry: "TH",
-        locale: "en",
-        optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
-        requirements: { maxPriceMinor: 1000 },
-        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
-      }
+      operation: "revise",
+      requestPatch: { requirements: { maxPriceMinor: 100000 } }
     });
     assert.equal(relaxed.status, "ready");
   });
@@ -622,7 +623,7 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(typeof info.buildId, "string");
     assert.equal(String(info.buildId).length, 40);
     assert.equal(info.serviceName, "MattaNutra");
-    assert.equal(info.contractVersion, "3.0.0");
+    assert.equal(info.contractVersion, AGENTIC_CONTRACT_VERSION);
     assert.ok(Array.isArray(info.supportedCountries));
     assert.ok(
       (info.supportedCountries as Array<{ countryCode: string }>).every(
@@ -716,7 +717,7 @@ describe("agentic P1 pack fixes", () => {
     assert.match(text, /paid|completed|confirmed/i);
   });
 
-  it("omits null placeholders and empty collections from blocked plan payloads", async () => {
+  it("preserves explicit uncertainty and serious condition advice in a purchasable plan", async () => {
     const runtime = runtimeFor();
     const plan = await call(runtime, "plan", {
       idempotencyKey: "p1-d410-blocked-00001",
@@ -730,19 +731,18 @@ describe("agentic P1 pack fixes", () => {
         targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       }
     });
-    assert.equal(plan.status, "blocked");
+    assert.equal(plan.status, "ready");
     const guidanceIds = plan.guidanceIds as string[] | undefined;
     assert.ok(Array.isArray(guidanceIds) && guidanceIds.length > 0);
     assert.equal(plan.acknowledgementStatus, "not_required");
     assert.ok(
       ((plan.safetyGuidance as Array<{ action?: string }>) ?? []).some(
-        (item) => item.action === "block"
+        (item) => item.action === "review"
       )
     );
     assert.deepEqual(plan.conditionCodes, ["ckd"]);
     const encoded = JSON.stringify(plan);
-    assert.equal(encoded.includes(":null"), false);
-    assert.equal(/:\s*\[\]/.test(encoded), false);
+    assert.ok((plan.safetyGuidance as Array<{ exposure?: unknown }>).some(item => item.exposure === null));
     assert.equal(encoded.includes("rulesVersion"), true);
     assert.equal(encoded.includes("ruleId"), true);
     const guidance = plan.safetyGuidance as Array<{
@@ -875,19 +875,19 @@ describe("agentic P1 pack fixes", () => {
         ]
       }
     });
-    const selectedIds = ((plan.basket as Array<{ productId: string }>) ?? [])
-      .map((item) => item.productId)
+    const selectedIds = ((plan.basket as Array<{ productId: string; servingsPerDay?: number; quantity?: number }>) ?? [])
+      .map((item) => `${item.productId}:${item.servingsPerDay}:${item.quantity}`)
       .slice()
       .sort()
       .join("|");
     const alternatives = (plan.alternatives as Array<{
-      basket?: Array<{ productId: string }>;
+      basket?: Array<{ productId: string; servingsPerDay?: number; quantity?: number }>;
       optionId?: string;
       tradeOffs?: { summary?: string };
     }>) ?? [];
     for (const option of alternatives) {
       const ids = (option.basket ?? [])
-        .map((item) => item.productId)
+        .map((item) => `${item.productId}:${item.servingsPerDay}:${item.quantity}`)
         .slice()
         .sort()
         .join("|");
@@ -1153,7 +1153,7 @@ describe("agentic P1 pack fixes", () => {
     assert.equal((cancelled as { messageKey?: string }).messageKey, "order.cancelled");
   });
 
-  it("binds acknowledge_safety answers and returns revision_conflict on stale execute", async () => {
+  it("rejects obsolete safety answers and retains revision conflicts after explicit refresh", async () => {
     const runtime = runtimeFor();
     const first = await call(runtime, "plan", {
       idempotencyKey: "p1-ack-answer-first-01",
@@ -1167,24 +1167,17 @@ describe("agentic P1 pack fixes", () => {
         targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
       }
     });
-    assert.equal(first.status, "needs_input");
+    assert.equal(first.status, "ready");
     const questions = (first.questions as Array<{ questionId?: string }>) ?? [];
-    assert.ok(questions.some((item) => item.questionId === "q_safety_ack"));
+    assert.ok(questions.every((item) => item.questionId !== "q_safety_ack"));
 
+    const rejected = await call(runtime, "plan", {
+      operation: "answer", expectedRevision: first.revision, idempotencyKey: "p1-obsolete-answer-001", planHandle: first.planHandle,
+      answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }]
+    });
+    assert.equal(rejected.ok, false);
     const acked = await call(runtime, "plan", {
-      expectedRevision: first.revision,
-      idempotencyKey: "p1-ack-answer-second01",
-      planHandle: first.planHandle,
-      request: {
-        answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
-        destinationCountry: "TH",
-        locale: "en",
-        optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
-        requirements: {},
-        medicationCodes: ["apixaban"],
-        targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
-      }
+      operation: "revise", expectedRevision: first.revision, idempotencyKey: "p1-refresh-plan-00001", planHandle: first.planHandle, requestPatch: {}
     });
     assert.equal(acked.status, "ready");
 
@@ -1214,7 +1207,7 @@ describe("agentic P1 pack fixes", () => {
     assert.equal("supplements" in info, false);
   });
 
-  it("returns D5-07 medicationCodes plus safetyAcknowledgement and D5-09 blocked guidanceIds", async () => {
+  it("returns medication and condition guidance IDs without acknowledgement or blocking", async () => {
     const runtime = runtimeFor();
     const first = await call(runtime, "plan", {
       idempotencyKey: "p1-d507-plan-0000001",
@@ -1228,12 +1221,12 @@ describe("agentic P1 pack fixes", () => {
         targets: [{ amount: 1000, name: "Omega-3", unit: "mg" }]
       }
     });
-    assert.equal(first.status, "needs_input");
-    assert.equal(first.acknowledgementStatus, "pending");
+    assert.equal(first.status, "ready");
+    assert.equal(first.acknowledgementStatus, "not_required");
     assert.ok(Array.isArray(first.guidanceIds) && (first.guidanceIds as string[]).length > 0);
     assert.ok(
-      ((first.questions as Array<{ questionId?: string }>) ?? []).some(
-        (item) => item.questionId === "q_safety_ack"
+      ((first.questions as Array<{ questionId?: string }>) ?? []).every(
+        (item) => item.questionId !== "q_safety_ack"
       )
     );
     const acked = await call(runtime, "plan", {
@@ -1269,11 +1262,11 @@ describe("agentic P1 pack fixes", () => {
         targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       }
     });
-    assert.equal(blocked.status, "blocked");
+    assert.equal(blocked.status, "ready");
     assert.ok(Array.isArray(blocked.guidanceIds) && (blocked.guidanceIds as string[]).length > 0);
     assert.ok(
       ((blocked.safetyGuidance as Array<{ action?: string }>) ?? []).some(
-        (item) => item.action === "block"
+        (item) => item.action === "review"
       )
     );
     assert.deepEqual(blocked.conditionCodes, ["ckd"]);
@@ -1468,7 +1461,8 @@ describe("agentic P1 pack fixes", () => {
     assert.match(tracking, /Please return to your AI Agent Chat/);
     assert.match(workflow, /Payment was received/);
     assert.equal(workflow.includes("Thank you for trusting MattaNutra"), false);
-    assert.match(schema, /required: \["ageYears", "lifeStage"\]/);
+    assert.deepEqual(validateToolIssues(PROFILE_SCHEMA, {}), []);
+    assert.ok(validateToolIssues(PROFILE_SCHEMA, { ageYears: 121 }).length > 0);
     assert.equal(schema.includes("sexAtBirth"), false);
     assert.match(join, /persistMcpPlanFeedback/);
     assert.match(join, /persistAssessmentSubmission/);

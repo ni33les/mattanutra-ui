@@ -87,7 +87,7 @@ export type AeCaseResult = Readonly<{
 
 export type AePackReport = Readonly<{
   cases: readonly AeCaseResult[];
-  contractVersion: "agentic-experience-1.0";
+  contractVersion: "agentic-experience-2.0";
   passedCases: number;
   totalCases: 19;
 }>;
@@ -689,28 +689,17 @@ export async function runAePack(): Promise<AePackReport> {
         const tools = Array.isArray(listed.tools) ? listed.tools.map(asRecord) : [];
         const plan = tools.find((tool) => tool.name === "plan") ?? {};
         const schema = asRecord(plan.inputSchema);
-        const properties = asRecord(schema.properties);
-        const operation = asRecord(properties.operation);
-        const enumOps = Array.isArray(operation.enum)
-          ? operation.enum.filter((item): item is string => typeof item === "string")
-          : [];
-        const branches = Array.isArray(schema.oneOf) ? schema.oneOf.map(asRecord) : [];
-        const branchOps = branches.map((branch) => {
-          const branchProperties = asRecord(branch.properties);
-          return String(asRecord(branchProperties.operation).const ?? "");
-        }).filter(Boolean);
-        const operations = enumOps.length > 0 ? enumOps : branchOps;
+        const outer = Array.isArray(schema.anyOf) ? schema.anyOf.map(asRecord) : [];
+        const branches = outer.flatMap(branch => Array.isArray(branch.anyOf) ? branch.anyOf.map(asRecord) : [branch]);
+        const byOp = new Map(branches.map(branch => [String(asRecord(asRecord(branch.properties).operation).const ?? ""), branch]));
+        const operations = [...byOp.keys()];
         const expected = ["create", "revise", "answer", "select", "get"];
-        const ok =
-          expected.every((item) => operations.includes(item)) &&
-          typeof properties.idempotencyKey === "object" &&
-          typeof properties.request === "object" &&
-          typeof properties.planHandle === "object" &&
-          typeof properties.expectedRevision === "object" &&
-          typeof properties.optionId === "object" &&
-          typeof properties.answers === "object" &&
-          !/"\$defs"/.test(JSON.stringify(schema)) &&
-          !Array.isArray(schema.oneOf);
+        const required = { create: ["request", "idempotencyKey"], get: ["planHandle"], revise: ["planHandle", "expectedRevision", "idempotencyKey"],
+          answer: ["planHandle", "expectedRevision", "idempotencyKey"], select: ["planHandle", "expectedRevision", "idempotencyKey", "optionId"] };
+        const ok = expected.every(operation => {
+          const branch = byOp.get(operation);
+          return branch && required[operation as keyof typeof required].every(field => Array.isArray(branch.required) && branch.required.includes(field));
+        });
         return ok
           ? pass("AE-02", { operations: expected })
           : fail("AE-02", { operations, requiredByOp: {} });
@@ -838,15 +827,14 @@ export async function runAePack(): Promise<AePackReport> {
         const questions = questionsOf(created);
         const next = nextActionsOf(created);
         const ok =
-          created.status === "needs_input" &&
+          created.status === "ready" &&
           created.safetyScope === "partial" &&
           stringList(created.assessedMedicationCodes).length === 0 &&
           stringList(created.unassessedMedicationCodes).join() === "warfarin" &&
-          next.some((item) => /answer/i.test(item)) &&
+          next.includes("confirm_with_user") &&
           !next.some((item) => /execute/i.test(item)) &&
-          questions.some(
-            (item) => item.promptKey === "plan.question.unassessed_medical_context"
-          );
+          questions.length === 0 &&
+          guidanceOf(created).some(item => item.action === "review");
         return ok
           ? pass("AE-07", {
               safetyScope: created.safetyScope,
@@ -872,15 +860,14 @@ export async function runAePack(): Promise<AePackReport> {
         const questions = questionsOf(created);
         const next = nextActionsOf(created);
         const ok =
-          created.status === "needs_input" &&
+          created.status === "ready" &&
           created.safetyScope === "partial" &&
           stringList(created.assessedConditionCodes).length === 0 &&
           stringList(created.unassessedConditionCodes).join() === "diabetes" &&
-          next.some((item) => /answer/i.test(item)) &&
+          next.includes("confirm_with_user") &&
           !next.some((item) => /execute/i.test(item)) &&
-          questions.some(
-            (item) => item.promptKey === "plan.question.unassessed_medical_context"
-          );
+          questions.length === 0 &&
+          guidanceOf(created).some(item => item.action === "review");
         return ok
           ? pass("AE-08", {
               safetyScope: created.safetyScope,
@@ -920,18 +907,19 @@ export async function runAePack(): Promise<AePackReport> {
           Array.isArray(question.choices) ? question.choices.map(asRecord) : []
         );
         const ok =
-          created.status === "needs_input" &&
-          created.safetyScope === "complete" &&
+          created.status === "ready" &&
+          created.safetyScope === "partial" &&
           stringList(created.assessedMedicationCodes).join() === "apixaban" &&
           stringList(created.unassessedMedicationCodes).length === 0 &&
           guidance.length === 1 &&
-          only.action === "acknowledge" &&
-          created.acknowledgementStatus === "pending" &&
+          only.action === "review" &&
+          created.acknowledgementStatus === "not_required" &&
           Number.isFinite(exposure) &&
           exposure > 0 &&
           exposure === contributorSum &&
-          questions.length === 1 &&
-          ackChoices.some((item) => item.choice === "acknowledge_safety");
+          questions.length === 0 &&
+          !ackChoices.some((item) => item.choice === "acknowledge_safety") &&
+          (asRecord(created.compactDecision).advice as unknown[]).length > 0;
         return ok
           ? pass("AE-09", { exposure, status: created.status })
           : fail("AE-09", {
@@ -956,8 +944,8 @@ export async function runAePack(): Promise<AePackReport> {
         const guidance = guidanceOf(created);
         const blocking = guidance.filter(
           (item) =>
-            item.severity === "high" ||
             item.severity === "blocking" ||
+            item.action === "block" ||
             item.action === "acknowledge" ||
             item.requiresSafetyAcknowledgement === true
         );
@@ -1165,16 +1153,17 @@ export async function runAePack(): Promise<AePackReport> {
           operation: "answer",
           planHandle: created.planHandle
         });
+        const current = await harness.call("plan", { operation: "get", planHandle: created.planHandle });
         const blob = JSON.stringify(answered);
         const ok =
-          answered.planHandle === created.planHandle &&
-          answered.optionId === created.optionId &&
-          answered.revision === Number(created.revision) + 1 &&
-          answered.status === "ready" &&
+          answered.ok === false && asRecord(answered.error).reasonCode === "invalid_request" &&
+          current.planHandle === created.planHandle &&
+          current.optionId === created.optionId &&
+          current.revision === created.revision && current.status === "ready" &&
           !MATCHER_DIAGNOSTIC.test(blob) &&
           harness.port.getCallCount() === before;
         return ok
-          ? pass("AE-15", { revision: answered.revision, status: answered.status })
+          ? pass("AE-15", { revision: current.revision, status: current.status, obsoleteAcknowledgementRejected: true })
           : fail("AE-15", {
               matchCount: harness.port.getCallCount(),
               optionId: answered.optionId ?? null,
@@ -1224,21 +1213,17 @@ export async function runAePack(): Promise<AePackReport> {
           request: omegaRequest()
         });
         const answered = await harness.call("plan", {
-          answers: [
-            { choice: "acknowledge_safety", questionId: "q_safety_ack" }
-          ],
+          requestPatch: {},
           expectedRevision: created.revision,
           idempotencyKey: "ae17-answer-000001",
-          operation: "answer",
+          operation: "revise",
           planHandle: created.planHandle
         });
         const stale = await harness.call("plan", {
-          answers: [
-            { choice: "acknowledge_safety", questionId: "q_safety_ack" }
-          ],
+          requestPatch: {},
           expectedRevision: created.revision,
           idempotencyKey: "ae17-stale-000001",
-          operation: "answer",
+          operation: "revise",
           planHandle: created.planHandle
         });
         const error = asRecord(stale.error);
@@ -1276,6 +1261,8 @@ export async function runAePack(): Promise<AePackReport> {
           request: singleRequest()
         });
         const allowed = new Set([
+          "contractVersion",
+          "operationalDecision",
           "locale",
           "nextActions",
           "ok",
@@ -1382,7 +1369,7 @@ export async function runAePack(): Promise<AePackReport> {
 
     return {
       cases: ordered,
-      contractVersion: "agentic-experience-1.0",
+      contractVersion: "agentic-experience-2.0",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 19
     };
@@ -1406,7 +1393,7 @@ if (process.env.NODE_TEST_CONTEXT) {
         report.cases.map((item) => item.id),
         [...CASE_IDS]
       );
-      assert.equal(report.passedCases, 19);
+      assert.equal(report.passedCases, 19, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       const encoded = canonicalAeReport(report);
       assert.equal(typeof encoded, "string");
       assert.equal(encoded, canonicalAeReport(JSON.parse(encoded) as AePackReport));

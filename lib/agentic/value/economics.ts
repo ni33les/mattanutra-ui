@@ -15,7 +15,9 @@ import { actualDaysSupplied, servingsPerPackFromProduct } from "@/lib/agentic/va
 import {
   buildHorizonPlan,
   cashInHorizon,
-  coveringInventoryDurationUnknown,
+  hasContinuedInventory,
+  labelledNutrientPerServing,
+  newProductReplenishment,
   type HorizonOrder
 } from "@/lib/agentic/value/inventory-ledger";
 
@@ -48,7 +50,7 @@ export function leftoverServingsAt(input: Readonly<{
 export function enrichBasketPackFacts(item: BasketItem): BasketItem {
   const servingsPerPack = item.servingsPerPack ?? null;
   const purchasedQuantity = Math.max(1, item.quantity);
-  const dailyServings = Math.max(1, item.servingsPerDay);
+  const dailyServings = item.servingsPerDay;
   const availableServings =
     servingsPerPack != null ? servingsPerPack * purchasedQuantity : null;
   const daysOfSupply = actualDaysSupplied({
@@ -56,21 +58,17 @@ export function enrichBasketPackFacts(item: BasketItem): BasketItem {
     purchasedQuantity,
     servingsPerPack
   });
+  const refill = newProductReplenishment({ servingsPerPack, dailyServings, quantity: purchasedQuantity });
+  const scheduledLeftover = (horizonDays: number) => availableServings == null ? null :
+    availableServings + (refill.depletion != null && refill.depletion < horizonDays && refill.quantity != null
+      ? refill.quantity * (servingsPerPack ?? 0) : 0) - horizonDays * dailyServings;
 
   return {
     ...item,
     availableServings,
     daysOfSupply,
-    leftoverServings30: leftoverServingsAt({
-      dailyServings,
-      horizonDays: 30,
-      servingsPerPack
-    }),
-    leftoverServings90: leftoverServingsAt({
-      dailyServings,
-      horizonDays: 90,
-      servingsPerPack
-    }),
+    leftoverServings30: scheduledLeftover(30),
+    leftoverServings90: scheduledLeftover(90),
     lineTotalMinor: item.unitPriceMinor * purchasedQuantity,
     quantity: purchasedQuantity,
     replenishmentDay: daysOfSupply,
@@ -78,14 +76,29 @@ export function enrichBasketPackFacts(item: BasketItem): BasketItem {
   };
 }
 
-function lineConsumption(item: BasketItem, horizonDays: number) {
-  if (item.servingsPerPack == null || item.servingsPerPack <= 0 || item.servingsPerDay <= 0) {
-    return null;
-  }
+function decimalFraction(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const [mantissa, exponent = "0"] = String(value).toLowerCase().split("e");
+  const [whole, decimals = ""] = mantissa!.split(".");
+  const scale = decimals.length - Number(exponent);
+  return { numerator: BigInt(`${whole}${decimals}`) * (scale < 0 ? BigInt(10) ** BigInt(-scale) : BigInt(1)),
+    denominator: scale > 0 ? BigInt(10) ** BigInt(scale) : BigInt(1) };
+}
 
-  return Math.round(
-    (item.unitPriceMinor / item.servingsPerPack) * horizonDays * item.servingsPerDay
-  );
+/** Sum exact decimal-input fractions, then round once to the nearest minor unit. */
+function totalConsumption(items: readonly BasketItem[], horizonDays: number) {
+  let numerator = BigInt(0), denominator = BigInt(1);
+  for (const item of items) {
+    const pack = item.servingsPerPack == null ? null : decimalFraction(item.servingsPerPack);
+    const daily = decimalFraction(item.servingsPerDay);
+    if (!pack || !daily || !Number.isSafeInteger(item.unitPriceMinor) || item.unitPriceMinor < 0) return null;
+    const lineNumerator = BigInt(item.unitPriceMinor) * BigInt(horizonDays) * daily.numerator * pack.denominator;
+    const lineDenominator = daily.denominator * pack.numerator;
+    numerator = numerator * lineDenominator + lineNumerator * denominator;
+    denominator *= lineDenominator;
+  }
+  const rounded = (BigInt(2) * numerator + denominator) / (BigInt(2) * denominator);
+  return rounded <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(rounded) : null;
 }
 
 function coveredCount(coverage: readonly CoverageRow[]) {
@@ -169,7 +182,7 @@ function syntheticBasketItem(
     retailerSku: product.retailerSku,
     sellerId: product.sellerId,
     sellerName: product.sellerName,
-    servingsPerDay: Math.max(1, dailyServings),
+    servingsPerDay: dailyServings,
     servingsPerPack: servingsPerPackFromProduct(product),
     source: product.source,
     stockStatus: product.stockStatus === "backorder" ? "backorder" : "in_stock",
@@ -191,11 +204,8 @@ function baselineBasketItems(input: Readonly<{
           return null;
         }
         const quantity = Math.max(1, Math.ceil(item.quantity));
-        const fromOption = input.items.find((row) => row.productId === product.productId);
-        if (fromOption) {
-          return enrichBasketPackFacts({ ...fromOption, quantity });
-        }
-        return syntheticBasketItem(product, input.snapshot, input.state, 1, quantity);
+        if (item.dailyServings == null) return null;
+        return syntheticBasketItem(product, input.snapshot, input.state, item.dailyServings, quantity);
       })
       .filter((item): item is BasketItem => Boolean(item));
   }
@@ -203,7 +213,7 @@ function baselineBasketItems(input: Readonly<{
   const seen = new Set<string>();
   const items: BasketItem[] = [];
   for (const row of input.coverage) {
-    if (row.status !== "covered" && row.status !== "over_target") {
+    if (row.deliveredAmount <= 0 || row.status === "conditional_deferred" || row.status === "optional_omitted") {
       continue;
     }
     const product = dedicatedProduct(input.snapshot, input.state, row);
@@ -211,10 +221,40 @@ function baselineBasketItems(input: Readonly<{
       continue;
     }
     seen.add(product.productId);
-    const fromOption = input.items.find((item) => item.productId === product.productId);
-    items.push(fromOption ?? syntheticBasketItem(product, input.snapshot, input.state));
+    const target = input.state.targets.find(target => target.supplementId === row.supplementId);
+    const perServing = target ? nutrientPerServing(product, target) : null;
+    if (perServing == null || perServing <= 0) continue;
+    items.push(syntheticBasketItem(product, input.snapshot, input.state, Math.max(1, Math.ceil(row.deliveredAmount / perServing))));
   }
   return items;
+}
+
+function nutrientPerServing(product: CatalogueProduct, target: CanonicalPlanState["targets"][number]): number | null {
+  return labelledNutrientPerServing(product, target);
+}
+
+/** Equivalence concerns every requested target, including disclosed partial coverage. */
+export function baselineCoverageEquivalent(input: Readonly<{
+  coverage: readonly CoverageRow[];
+  baselineItems: readonly BasketItem[];
+  snapshot: CatalogueSnapshot;
+  state: CanonicalPlanState;
+}>) {
+  return input.coverage.every(row => {
+    const target = input.state.targets.find(target => target.supplementId === row.supplementId);
+    if (!target) return row.coveragePercent === 0;
+    let amount = row.currentAmount;
+    for (const item of input.baselineItems) {
+      const product = input.snapshot.products.find(product => product.productId === item.productId);
+      if (!product) return false;
+      const perServing = nutrientPerServing(product, target);
+      if (perServing != null) amount += perServing * item.servingsPerDay;
+      else if (product.contributionSupplementIds.includes(target.supplementId)) return false;
+    }
+    const baselineRatio = target.amount > 0 ? Math.min(1, amount / target.amount) : 0;
+    const selectedRatio = target.amount > 0 ? Math.min(1, (row.currentAmount + row.deliveredAmount) / target.amount) : 0;
+    return Math.abs(baselineRatio - selectedRatio) < 1e-9;
+  });
 }
 
 function linesFromOrders(
@@ -271,33 +311,20 @@ export function buildEconomics(input: Readonly<{
   state: CanonicalPlanState;
 }>): EconomicsLedger {
   const items = input.items.map(enrichBasketPackFacts);
-  const consumption30Parts = items.map((item) => lineConsumption(item, 30));
-  const consumption90Parts = items.map((item) => lineConsumption(item, 90));
-  const hasCurrent = input.state.currentSupplements.length > 0;
+  const hasCurrent = hasContinuedInventory(input.state);
   const consumption30DayMinor =
-    items.length < 1
-      ? hasCurrent
-        ? null
-        : 0
-      : consumption30Parts.every((item) => item != null)
-        ? consumption30Parts.reduce((sum, item) => sum + (item ?? 0), 0)
-        : null;
+    hasCurrent ? null : items.length < 1 ? 0
+      : totalConsumption(items, 30);
   const consumption90DayMinor =
-    items.length < 1
-      ? hasCurrent
-        ? null
-        : 0
-      : consumption90Parts.every((item) => item != null)
-        ? consumption90Parts.reduce((sum, item) => sum + (item ?? 0), 0)
-        : null;
+    hasCurrent ? null : items.length < 1 ? 0
+      : totalConsumption(items, 90);
   const horizon = buildHorizonPlan({
     items,
     snapshot: input.snapshot,
     state: input.state
   });
-  const durationUnknown = coveringInventoryDurationUnknown(input.state);
-  const cash30DayMinor = durationUnknown ? null : cashInHorizon(horizon.orders, 30);
-  const cash90DayMinor = durationUnknown ? null : cashInHorizon(horizon.orders, 90);
+  const cash30DayMinor = horizon.complete ? cashInHorizon(horizon.orders, 30) : null;
+  const cash90DayMinor = horizon.complete ? cashInHorizon(horizon.orders, 90) : null;
   const day0 = horizon.orders.find((item) => item.day === 0);
   const firstOrderSubtotalMinor =
     day0?.subtotalMinor ?? items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
@@ -314,38 +341,39 @@ export function buildEconomics(input: Readonly<{
     snapshot: input.snapshot,
     state: input.state
   });
-  const baselineCash90 = durationUnknown ? null : cashInHorizon(baselineHorizon.orders, 90);
+  const baselineCash90 = baselineHorizon.complete ? cashInHorizon(baselineHorizon.orders, 90) : null;
   const baselineLines = linesFromOrders(baselineHorizon.orders, input.snapshot);
   const savings90DayMinor =
     baselineCash90 == null || cash90DayMinor == null ? null : baselineCash90 - cash90DayMinor;
-  const equivalent = input.coverage.every((row) => {
-    const target = input.state.targets.find((item) => item.supplementId === row.supplementId);
-    const importance = target?.importance ?? "required";
-
-    if (importance !== "core" && importance !== "required") {
-      return true;
-    }
-
-    return (
-      row.status === "covered" ||
-      row.status === "already_covered" ||
-      row.status === "over_target"
-    );
-  });
+  const equivalent = baselineCoverageEquivalent({ ...input, baselineItems });
+  const baselineMissing = input.state.baseline?.type === "current_basket" &&
+    (!input.state.baseline.items?.length || input.state.baseline.items.some(item => !input.snapshot.products.some(p => p.productId === item.productId)));
+  const baselineDoseUnknown = input.state.baseline?.type === "current_basket" &&
+    input.state.baseline.items?.some(item => item.dailyServings == null);
+  // A fresh purchase cannot be compared to retained stock without a replacement/inventory basis.
+  // Do not add the same product's exposure and replenishment cost twice.
+  const baselineInventoryOverlap = input.state.baseline?.type === "current_basket" &&
+    input.state.baseline.items?.some(item => input.state.currentSupplements.some(current => current.productId === item.productId));
   const recommended = input.recommendedItems?.map(enrichBasketPackFacts) ?? items;
   const recommendedCoverage = input.recommendedCoverage ?? input.coverage;
-  const pricedOrders = [...horizon.orders, ...baselineHorizon.orders].every((order) =>
+  const pricedOrders = horizon.orders.every((order) =>
     order.lines.every((line) => line.unitPriceMinor > 0)
   );
-  const currentNeedsRestock = input.state.currentSupplements.some(
-    (item) => item.daysRemaining != null && item.daysRemaining < 90
-  );
-  const restockPresent =
-    !currentNeedsRestock || horizon.orders.some((item) => item.type === "replenishment");
-  const cashComplete = !durationUnknown && pricedOrders && restockPresent;
-  const consumptionComplete = consumption30DayMinor != null && consumption90DayMinor != null;
-  const comparisonComplete = cashComplete && equivalent;
+  const cashComplete = horizon.complete && pricedOrders;
+  const consumptionComplete = !hasCurrent && consumption30DayMinor != null && consumption90DayMinor != null;
+  const baselineFactsComplete = baselineItems.every(item => item.servingsPerPack != null && item.servingsPerPack > 0 &&
+    item.currency === input.state.currency && !item.incompleteCommercialFacts);
+  const comparisonComplete = cashComplete && baselineHorizon.complete && equivalent && !baselineMissing && !baselineDoseUnknown && !baselineInventoryOverlap && baselineFactsComplete;
   const unavailableReasons = [
+    ...horizon.unavailableReasons,
+    ...baselineHorizon.unavailableReasons.filter(reason => !horizon.unavailableReasons.some(existing => existing.reasonCode === reason.reasonCode &&
+      existing.missingFieldNames.join() === reason.missingFieldNames.join())).map(reason => ({ ...reason, dimension: "comparison" as const,
+        dependentCapabilities: ["savings", "comparison"], missingFieldNames: reason.missingFieldNames.map(field => `baseline.${field}`) })),
+    ...(!equivalent || baselineMissing || baselineDoseUnknown || baselineInventoryOverlap || !baselineFactsComplete
+      ? [{ dependentCapabilities: ["savings", "comparison"], dimension: "comparison" as const,
+          missingFieldNames: baselineMissing ? ["baseline.items.productId"] : baselineDoseUnknown ? ["baseline.items.dailyServings"] : baselineInventoryOverlap ? ["baseline.inventoryBasis"] : !baselineFactsComplete ? ["baseline.packFacts"] : ["baseline.equivalentCoverage"],
+          reasonCode: baselineMissing ? "baseline_product_unavailable" : baselineDoseUnknown ? "baseline_dose_unknown" : baselineInventoryOverlap ? "baseline_inventory_overlap" : !baselineFactsComplete ? "baseline_facts_incomplete" : "baseline_coverage_not_equivalent" }]
+      : []),
     ...(!consumptionComplete && hasCurrent
       ? [
           {
@@ -356,31 +384,10 @@ export function buildEconomics(input: Readonly<{
           }
         ]
       : []),
-    ...(durationUnknown
-      ? [
-          {
-            dependentCapabilities: [
-              "inventory_depletion_date",
-              "future_order_schedule",
-              "delivered_cash",
-              "savings",
-              "comparison"
-            ],
-            dimension: "schedule" as const,
-            missingFieldNames: ["daysRemaining"],
-            reasonCode: "current_inventory_duration_unknown"
-          }
-        ]
-      : !cashComplete
-        ? [
-            {
-              dependentCapabilities: ["delivered_cash", "savings", "cost_ranking"],
-              dimension: "cash" as const,
-              missingFieldNames: pricedOrders ? ["servingsPerPack"] : ["unitPriceMinor"],
-              reasonCode: pricedOrders ? "pack_duration_unknown" : "price_unavailable"
-            }
-          ]
-        : [])
+    ...(!cashComplete && horizon.unavailableReasons.length === 0
+      ? [{ dependentCapabilities: ["delivered_cash", "savings", "cost_ranking"], dimension: "cash" as const,
+          missingFieldNames: ["unitPriceMinor"], reasonCode: "price_unavailable" }]
+      : [])
   ];
   const complete =
     cashComplete &&
@@ -398,7 +405,7 @@ export function buildEconomics(input: Readonly<{
 
   return {
     baseline: {
-      cash90DayMinor: baselineCash90,
+      cash90DayMinor: comparisonComplete ? baselineCash90 : null,
       lines: baselineLines,
       type: input.state.baseline?.type ?? "separate_direct_products"
     },

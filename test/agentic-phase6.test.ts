@@ -251,7 +251,7 @@ describe("Phase 6 bounded evidence fields", () => {
     );
   });
 
-  it("does not treat incidental sub-floor B12 as a 3% match", () => {
+  it("reports small measured B12 coverage as partial with its remaining gap", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const base = live.products.find((item) => /magnesium/i.test(item.candidate.title));
     assert.ok(base);
@@ -301,8 +301,9 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.ok(matched.selected);
     const b12Row = matched.selected.coverage.find((row) => row.name === "Vitamin B12");
     assert.ok(b12Row);
-    assert.equal(b12Row.coveragePercent, 0);
-    assert.equal(b12Row.status, "uncovered");
+    assert.equal(b12Row.coveragePercent, 3);
+    assert.ok(Math.abs(b12Row.deliveredAmount - 7.2) < 1e-9);
+    assert.equal(b12Row.status, "partial");
     assert.ok(b12Row.remainingGap > 0);
     assert.equal(
       Math.max(0, b12Row.requestedAmount - b12Row.totalExposureAmount),
@@ -312,8 +313,7 @@ describe("Phase 6 bounded evidence fields", () => {
       matched.leftovers.some(
         (item) =>
           item.name === "Vitamin B12" &&
-          (item.reason === "dose_gap" || item.reason === "uncovered") &&
-          !String(item.note ?? "").includes("covered 3%")
+          (item.reason === "dose_gap" || item.reason === "uncovered")
       ),
       true
     );
@@ -321,7 +321,7 @@ describe("Phase 6 bounded evidence fields", () => {
       /50\+/.test(item.productName)
     );
     assert.ok(line);
-    assert.equal(line.requestedNutrientNames.includes("Vitamin B12"), false);
+    assert.equal(line.requestedNutrientNames.includes("Vitamin B12"), true);
   });
 
   it("credits Conceive Well Folic acid 500 mcg as Vitamin B9 500 mcg", () => {
@@ -469,7 +469,7 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.equal(telemetry.targetFrontiers?.length, matched.targetFrontiers?.length);
   });
 
-  it("credits Conceive Well Vitamin D 400 IU as Vitamin D3 400 IU", () => {
+  it("does not infer the specifically requested D3 form from a generic Vitamin D label", () => {
     const live = fixtureSnapshot("2026-08-25T00:00:00.000Z");
     const base = live.products.find((item) => /d3/i.test(item.candidate.title));
     assert.ok(base);
@@ -501,15 +501,15 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.ok(matched.selected);
     const row = matched.selected.coverage.find((item) => item.supplementId === d3.supplementId);
     assert.ok(row);
-    assert.equal(row.deliveredAmount, 400);
-    assert.equal(row.totalExposureAmount, 400);
-    assert.equal(row.remainingGap, 1600);
+    assert.equal(row.deliveredAmount, 0);
+    assert.equal(row.totalExposureAmount, 0);
+    assert.equal(row.remainingGap, 2000);
     assert.deepEqual(
       row.contributors?.map((item) => ({
         amount: item.amount,
         name: item.productName
       })),
-      [{ amount: 400, name: "Blackmores Conceive Well Gold" }]
+      []
     );
   });
 
@@ -580,7 +580,7 @@ describe("Phase 6 bounded evidence fields", () => {
       },
       [
         item("prd_cw", "Blackmores Conceive Well Gold", [
-          { amount: 400, name: "Vitamin D", unit: "IU" }
+          { amount: 400, name: "Vitamin D3", unit: "IU" }
         ]),
         item("prd_joint", "Blackmores Joint Mobility Plus", [
           { amount: 10, name: "Vitamin D3", unit: "mcg" }
@@ -694,7 +694,9 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.equal(typeof coverage[0].remainingGap, "number");
     assert.equal(typeof coverage[0].currentAmount, "number");
     assert.equal(typeof coverage[0].deliveredAmount, "number");
-    assert.equal(typeof coverage[0].totalExposureAmount, "number");
+    assert.equal(coverage[0].totalExposureAmount, null);
+    assert.equal(coverage[0].totalExposureComplete, false);
+    assert.equal(typeof coverage[0].quantifiedExposureAmount, "number");
     assert.ok(basket[0]);
     assert.equal(typeof basket[0].servingsPerDay, "number");
     assert.equal(typeof basket[0].pillsPerServing, "number");

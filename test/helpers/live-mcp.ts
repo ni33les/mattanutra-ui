@@ -1,11 +1,13 @@
 import http from "node:http";
 import https from "node:https";
 import { URL } from "node:url";
+import { mcpTestTarget } from "../../scripts/mcp-test-target.mjs";
 import { decodeMcpPayload } from "../../lib/agentic/mcp/transport.ts";
 
-export const LIVE_PUBLIC = "https://dev.mattanutra.com/api/mcp";
-export const LIVE_ORIGIN = "http://127.0.0.1:3000/api/mcp";
-export const LIVE_QA = "https://dev.mattanutra.com/api/mcp/qa";
+const target = mcpTestTarget();
+export const LIVE_PUBLIC = target.publicUrl;
+export const LIVE_ORIGIN = target.originUrl;
+export const LIVE_QA = target.qaUrl;
 
 export type LiveMcpCall = Readonly<{
   headers: Record<string, string>;
@@ -88,6 +90,7 @@ export function livePost(
       }
     );
     request.on("error", reject);
+    request.setTimeout(30_000, () => request.destroy(new Error("MCP test request exceeded 30 seconds.")));
     request.write(payload);
     request.end();
   });

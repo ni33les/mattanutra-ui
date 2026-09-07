@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { allTestFiles } from "./dev-cycle-utils.mjs";
+import { mcpTestTarget } from "./mcp-test-target.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RELATED_REGRESSIONS = new Set([
@@ -51,9 +52,8 @@ export function runMcpSuite() {
     console.log(files.join("\n"));
     return 0;
   }
-  if ((process.env.MATTANUTRA_ENV ?? "dev") !== "dev" ||
-      (process.env.MCP_URL && process.env.MCP_URL !== "https://dev.mattanutra.com/api/mcp")) {
-    console.error("The repository MCP suite targets DEV. Use MATTANUTRA_ENV=dev and the DEV MCP URL.");
+  try { mcpTestTarget(process.env); } catch (error) {
+    console.error(error.message);
     return 2;
   }
   if (!process.env.DB_URL || !process.env.TEST_DB_URL) {

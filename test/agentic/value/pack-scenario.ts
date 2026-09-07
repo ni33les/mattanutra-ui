@@ -12,7 +12,7 @@ function band(amount: number, unit: MatcherUnit, name: string) {
   };
 }
 
-export const VALUE_PACK_VERSION = "dev-customer-value-v1.0";
+export const VALUE_PACK_VERSION = "dev-customer-value-v4.0";
 export const VALUE_QA_PACK_VERSION = "v8.0";
 
 export const VALUE_ROLE_REQUEST: ValueRoleRequest = {

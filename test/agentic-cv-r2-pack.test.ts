@@ -209,9 +209,20 @@ function magOrders(plan: Record<string, unknown>, horizon: number, magProductId:
   });
 }
 
-function magPurchaseRequest(session: PlanSession) {
+function magPurchaseRequest(session: PlanSession, dailyServings = 1) {
+  const product = completeMagProduct(session);
   const request = magCoveredRequest(session, 90);
-  return { ...request, currentSupplements: [] };
+  const fact = product?.candidate.facts.find(item =>
+    item.name.toLowerCase() === "magnesium" && item.unit === "mg" && Number(item.amount) > 0);
+  // Accounting fixtures specify a known product and labelled daily serving.
+  // Matcher objective changes must not silently replace the pack under test.
+  return {
+    ...request,
+    baseline: { type: "current_basket" as const, items: product ? [{ productId: product.productId, dailyServings, quantity: 1 }] : [] },
+    currentSupplements: [],
+    requirements: { maxProductCount: 1, retainProductIds: product ? [product.productId] : [] },
+    targets: request.targets.map(target => ({ ...target, amount: Number(fact?.amount ?? target.amount) * dailyServings }))
+  };
 }
 
 function economicsOf(plan: Record<string, unknown>) {
@@ -519,7 +530,6 @@ async function runInv02(session: PlanSession, runIndex: number): Promise<R2CaseR
   const request = magCoveredRequest(session, 30);
   const plan = await createPlan(session, request);
   const magId = magProduct?.productId ?? null;
-  const economics = asRecord(optionsOf(plan).find((item) => item.recommended)?.economics ?? plan);
   const in90 = magOrders(plan, 90, magId);
   const in30 = magOrders(plan, 30, magId);
   const assertions = [
@@ -614,10 +624,9 @@ async function runInv05(session: PlanSession, runIndex: number): Promise<R2CaseR
 
 async function runHash01(session: PlanSession, runIndex: number): Promise<R2CaseResult> {
   const created = await createPlan(session, primaryRequest(session.freeze));
-  const extra = optionsOf(created).find((item) => item.optionId !== created.optionId && item.recommended !== true);
-  if (!extra?.optionId) {
-    return blocked("R2-HASH-01", { reason: "no_second_option" });
-  }
+  const alternative = optionsOf(created).find((item) => item.optionId !== created.optionId && item.recommended !== true);
+  const extra = alternative ?? optionsOf(created).find((item) => item.optionId === created.optionId);
+  if (!extra?.optionId) return blocked("R2-HASH-01", { reason: "no_returned_option" });
   const selected = await callPlan(session, {
     expectedRevision: created.revision,
     idempotencyKey: "r2-hash-01-select",
@@ -643,7 +652,7 @@ async function runHash01(session: PlanSession, runIndex: number): Promise<R2Case
     assertTrue("HASH-01.option", String(selected.optionId) === String(extra.optionId)),
     assertTrue(
       "HASH-01.hashChanged",
-      String(asRecord(created.canonical).hash) !== String(asRecord(selected.canonical).hash)
+      alternative ? String(asRecord(created.canonical).hash) !== String(asRecord(selected.canonical).hash) : String(asRecord(created.canonical).hash) === String(asRecord(selected.canonical).hash)
     ),
     assertEq("HASH-01.rev", Number(created.revision) + 1, Number(selected.revision)),
     assertEq("HASH-01.get", String(asRecord(selected.canonical).hash), String(asRecord(got.canonical).hash)),
@@ -681,7 +690,8 @@ function packCompleteOrOptional(plan: Record<string, unknown>, name: RegExp) {
   const economics = economicsOf(plan);
   const complete = lineComplete(line) && economics.complete === true;
   const missingAllowed =
-    !lineComplete(line) &&
+    !complete &&
+    (stringList(economics.unavailableReasons).length > 0 || economics.equivalent === false) &&
     plan.status !== "blocked" &&
     economics.savingClaim === "none" &&
     economics.savings90DayMinor == null;
@@ -786,7 +796,7 @@ async function runPack05(session: PlanSession, runIndex: number): Promise<R2Case
 }
 
 async function runOrder01(session: PlanSession, runIndex: number): Promise<R2CaseResult> {
-  const plan = await createPlan(session, magPurchaseRequest(session));
+  const plan = await createPlan(session, magPurchaseRequest(session, 2));
   const line = basketOf(plan)[0];
   const spp = Number(line?.servingsPerPack);
   const daily = Number(line?.servingsPerDay) || 1;
@@ -811,7 +821,7 @@ async function runOrder01(session: PlanSession, runIndex: number): Promise<R2Cas
       leftover30 === in30.reduce((sum, row) => sum + orderQty(row), 0) * spp - 30 * daily
     )
   ];
-  return conclude("R2-ORDER-01", assertions, envelopeFor(session, magPurchaseRequest(session), plan, assertions, runIndex));
+  return conclude("R2-ORDER-01", assertions, envelopeFor(session, magPurchaseRequest(session, 2), plan, assertions, runIndex));
 }
 
 async function runOrder02(session: PlanSession, runIndex: number): Promise<R2CaseResult> {
@@ -1087,7 +1097,7 @@ async function runContract02(session: PlanSession, runIndex: number): Promise<R2
     assertEq(
       "CONTRACT-02.checksum",
       officialChecksum,
-      "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"
+      JSON.parse(readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
     ),
     assertEq("CONTRACT-02.info", infoChecksum, officialChecksum),
     assertEq("CONTRACT-02.list", listedHash, directHash),
@@ -1102,7 +1112,7 @@ async function runContract03(session: PlanSession, runIndex: number): Promise<R2
     assertEq(
       "CONTRACT-03.checksum",
       officialChecksum,
-      "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"
+      JSON.parse(readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
     ),
     assertTrue(
       "CONTRACT-03.oneOf",
@@ -1114,7 +1124,7 @@ async function runContract03(session: PlanSession, runIndex: number): Promise<R2
 
 async function runContract04(session: PlanSession, runIndex: number): Promise<R2CaseResult> {
   const snapshot = JSON.parse(
-    readFileSync(new URL("../contract/mcp/3.0.0/tools.json", import.meta.url), "utf8")
+    readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
   ) as { tools: Array<{ inputSchema: unknown; name: string }> };
   const wellKnown = JSON.parse(
     readFileSync(new URL("../public/.well-known/mcp.json", import.meta.url), "utf8")
@@ -1191,8 +1201,8 @@ async function runSafe02(session: PlanSession, runIndex: number): Promise<R2Case
   try {
     const plan = await createPlan(session, d3OnlyRequest(session.freeze, "satisfied"));
     const assertions = [
-      assertTrue("SAFE-02.notReady", plan.status !== "ready"),
-      assertTrue("SAFE-02.notExecute", !stringList(plan.nextActions).includes("execute"))
+      assertEq("SAFE-02.advisoryReady", "ready", plan.status),
+      assertTrue("SAFE-02.unknownReference", safetyGuidanceOf(plan).some((row) => String(row.ruleId).startsWith("ul:missing:") && row.threshold == null))
     ];
     return conclude("R2-SAFE-02", assertions, envelopeFor(session, d3OnlyRequest(session.freeze, "satisfied"), plan, assertions, runIndex));
   } finally {
@@ -1397,8 +1407,8 @@ describe("Customer value implementation pack v1.2", () => {
       failed.map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.result)}`).join("; ")
     );
     assert.equal(first.snapshotId, second.snapshotId);
-    assert.equal(MATCHER_VERSION, "pareto-hybrid-1");
-    assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v1.0");
+    assert.equal(MATCHER_VERSION, "advisory-dose-fit-2");
+    assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });
 }

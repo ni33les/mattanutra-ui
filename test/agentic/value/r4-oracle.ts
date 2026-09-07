@@ -171,7 +171,8 @@ export function serviceCanonicalHash(plan: Record<string, unknown>) {
 
 export function narrativeBlob(plan: Record<string, unknown>) {
   const explanation = asRecord(plan.explanation);
-  return `${plan.summary ?? ""} ${plan.reason ?? ""} ${explanation.nextAction ?? ""} ${plan.summaryKey ?? ""}`.toLowerCase();
+  const compact = asRecord(plan.compactDecision);
+  return `${plan.summary ?? ""} ${plan.reason ?? ""} ${explanation.nextAction ?? ""} ${plan.summaryKey ?? ""} ${compact.why ?? ""} ${compact.when ?? ""}`.toLowerCase();
 }
 
 export function independentLineConsumption(item: Record<string, unknown>, horizonDays: number) {
@@ -188,7 +189,7 @@ export function independentLineConsumption(item: Record<string, unknown>, horizo
   ) {
     return null;
   }
-  return Math.round((unitPriceMinor / servingsPerPack) * horizonDays * servingsPerDay);
+  return (unitPriceMinor * horizonDays * servingsPerDay) / servingsPerPack;
 }
 
 export function independentBasketConsumption(
@@ -202,7 +203,7 @@ export function independentBasketConsumption(
   if (parts.some((item) => item == null)) {
     return null;
   }
-  return parts.reduce((sum, item) => sum + (item ?? 0), 0);
+  return Math.round(parts.reduce((sum, item) => sum + (item ?? 0), 0));
 }
 
 export function consumptionReasons(plan: Record<string, unknown>) {

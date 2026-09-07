@@ -1,3 +1,4 @@
+import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "../../helpers/current-contract-lock.ts";
 import { beginDeterministicIdsForTests, endDeterministicIdsForTests } from "../../../lib/agentic/capabilities.ts";
 import { catalogueSnapshotId, freezeCatalogueSnapshot } from "../../../lib/agentic/catalogue/freeze.ts";
 import { cachedLiveRetailSnapshot } from "../../../lib/agentic/catalogue/live.ts";
@@ -28,7 +29,7 @@ import {
   resetResourcePermits,
   snapshotResourcePermits
 } from "../../../lib/agentic/qa/resource-permits.ts";
-import { resetServiceClock, useInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
+import { resetServiceClock, useInjectedServiceClock as setInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
 import {
   createAgenticRuntime,
   setAgenticRuntimeForTests,
@@ -36,7 +37,7 @@ import {
 } from "../../../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
-import { F_READY, UAT_NL_CLOCK, UAT_NL_SCHEMA_CHECKSUM, uatNlFreshKey } from "./manifest.ts";
+import { F_READY, UAT_NL_CLOCK, uatNlFreshKey } from "./manifest.ts";
 
 export function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -126,7 +127,7 @@ export function beginUatNlRun() {
   resetRequestTraces();
   resetResourcePermits();
   resetServiceClock();
-  useInjectedServiceClock();
+  setInjectedServiceClock();
   if (frozenReal) {
     replaceCatalogueSnapshot(frozenReal);
   }
@@ -275,7 +276,7 @@ export function orphanCensus() {
 }
 
 export function assertSchemaLock() {
-  if (AGENTIC_SCHEMA_CHECKSUM !== UAT_NL_SCHEMA_CHECKSUM) {
+  if (AGENTIC_SCHEMA_CHECKSUM !== CURRENT_CONTRACT_SCHEMA_CHECKSUM) {
     throw new Error(`schema checksum moved: ${AGENTIC_SCHEMA_CHECKSUM}`);
   }
 }

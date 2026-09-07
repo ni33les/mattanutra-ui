@@ -99,7 +99,7 @@ describe("matcher safety engine", () => {
     );
   });
 
-  it("blocks a stack that exceeds the admin ceiling", () => {
+  it("advises on a stack that exceeds the admin ceiling", () => {
     const amount = scaleAmount({
       amount: 41,
       subjectId: "sup_zinc",
@@ -139,16 +139,17 @@ describe("matcher safety engine", () => {
       }),
       variants: [variant]
     });
-    assert.equal(safety.hardBlocked, true);
+    assert.equal(safety.hardBlocked, false);
+    assert.equal(safety.requiresAck, false);
     assert.equal(
       safety.findings.some(
-        (item) => item.code === "dose_review_required" && item.action === "block"
+        (item) => item.code === "dose_review_required" && item.action === "inform"
       ),
       true
     );
   });
 
-  it("SAFE-04 blocks CKD plus magnesium at the stack UL", () => {
+  it("SAFE-04 gives serious CKD advice without a fictitious zero UL", () => {
     const mag = scaleAmount({
       amount: 300,
       subjectId: "sup_mag",
@@ -193,11 +194,14 @@ describe("matcher safety engine", () => {
       variants: [variant]
     });
     const block = safety.findings.find(
-      (item) => item.code === "dose_review_required" && item.action === "block"
+      (item) => item.code === "condition_review_required" && item.action === "inform"
     );
-    assert.equal(safety.hardBlocked, true);
+    assert.equal(safety.hardBlocked, false);
+    assert.equal(safety.requiresAck, false);
     assert.ok(block);
-    assert.equal(block?.thresholdUnits, BigInt(0));
+    assert.equal(block?.thresholdUnits, null);
+    assert.equal(block?.severity, "high");
+    assert.ok(block?.uncertainty?.includes("clinical_caution_is_not_a_numeric_zero_limit"));
   });
 
   it("SAFE-01 does not fire zinc UL at 39.999 mg", () => {
@@ -246,7 +250,7 @@ describe("matcher safety engine", () => {
     );
   });
 
-  it("blocks magnesium exposure above the NIH supplemental UL when no admin ceiling is loaded", () => {
+  it("reports a missing magnesium reference without inventing a limit", () => {
     const amount = scaleAmount({
       amount: 2046,
       subjectId: "sup_mag",
@@ -298,16 +302,17 @@ describe("matcher safety engine", () => {
       }),
       variants: [variant]
     });
-    assert.equal(safety.hardBlocked, true);
+    assert.equal(safety.hardBlocked, false);
+    assert.equal(safety.requiresAck, false);
     assert.equal(
       safety.findings.some(
-        (item) => item.code === "dose_review_required" && item.action === "block"
+        (item) => item.code === "incomplete_health_information" && item.uncertainty?.includes("no_applicable_reference:sup_mag")
       ),
       true
     );
   });
 
-  it("blocks vitamin D exposure above 4000 IU when no admin ceiling is loaded", () => {
+  it("reports a missing vitamin D reference without inventing a limit", () => {
     const amount = scaleAmount({
       amount: 4600,
       subjectId: "sup_d3",
@@ -359,6 +364,7 @@ describe("matcher safety engine", () => {
       }),
       variants: [variant]
     });
-    assert.equal(safety.hardBlocked, true);
+    assert.equal(safety.hardBlocked, false);
+    assert.equal(safety.requiresAck, false);
   });
 });

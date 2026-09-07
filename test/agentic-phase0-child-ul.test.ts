@@ -181,7 +181,8 @@ describe("Phase 0 child and life-stage upper limits", () => {
       }),
       variants: [variant]
     });
-    assert.equal(safety.hardBlocked, true);
+    assert.equal(safety.hardBlocked, false);
+    assert.ok(safety.findings.some((row) => row.uncertainty?.includes("no_applicable_reference:sup_calcium")));
   });
 
   it("converts the adult magnesium UL into grams without truncating to zero", () => {
@@ -195,7 +196,7 @@ describe("Phase 0 child and life-stage upper limits", () => {
     );
   });
 
-  it("blocks a child magnesium 130 mg fixture plan instead of applying 350 mg", () => {
+  it("keeps known child demographic fit and the child reference on an adult-product fixture", () => {
     installFixtureCatalogCeilings();
     const snapshot = freezeCatalogueSnapshot({
       ...fixtureSnapshot("2026-08-25T00:00:00.000Z"),
@@ -255,7 +256,7 @@ describe("Phase 0 child and life-stage upper limits", () => {
     assert.ok(status === "blocked" || status === "needs_input");
   });
 
-  it("prunes a 200 mg magnesium SKU from an 8-year-old search", () => {
+  it("prefers the lower-penalty 100 mg dose for a known 8-year-old", () => {
     const mag200 = qaProduct({
       facts: [{ amount: 200, key: "mag" }],
       id: "G-MAG-200",

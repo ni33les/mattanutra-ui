@@ -143,13 +143,13 @@ function magOption(coverage: CoverageRow, item: BasketItem): StackOption {
   };
 }
 
-function assertHardBlockComplete(block: SafetyGuidance | ReturnType<typeof publicSafetyGuidance>) {
-  assert.equal(block.action, "block");
+function assertAdviceComplete(block: SafetyGuidance | ReturnType<typeof publicSafetyGuidance>) {
+  assert.equal(block.action, "review");
   assert.equal(typeof block.ruleId, "string");
-  assert.ok(String(block.ruleId).length > 0, "hard block omitted catalog rule");
-  assert.equal("exposure" in block, true, "hard block omitted exposure");
-  assert.equal(block.exposure == null, false, "hard block omitted exposure");
-  assert.ok(Array.isArray(block.contributors), "hard block omitted contributors");
+  assert.ok(String(block.ruleId).length > 0, "advice omitted catalog rule");
+  assert.equal("exposure" in block, true, "advice omitted exposure");
+  assert.equal(block.exposure == null, false, "advice omitted exposure");
+  assert.ok(Array.isArray(block.contributors), "advice omitted contributors");
 }
 
 function installCatalogMagBand() {
@@ -194,7 +194,7 @@ describe("R25 bounce gates — R24 crash class", () => {
     assert.equal(/PLAN_MATCH_RETURN_BUDGET_MS = 400/.test(source), false);
   });
 
-  it("publishes catalog rule, real exposure, and contributors on every hard block", () => {
+  it("publishes catalog rule, real exposure, and contributors on limit advice", () => {
     installCatalogMagBand();
     const item = magItem({
       amount: 350,
@@ -215,15 +215,15 @@ describe("R25 bounce gates — R24 crash class", () => {
         targets: [{ amount: 351, name: "Magnesium", supplementId: MAG_ID, unit: "mg" }]
       })
     });
-    const block = guidance.find((item) => item.action === "block");
-    assert.ok(block, "expected a hard block");
-    assertHardBlockComplete(block);
+    const block = guidance.find((item) => item.action === "review" && item.code === "dose_review_required");
+    assert.ok(block, "expected reference-limit advice");
+    assertAdviceComplete(block);
     assert.equal(block.ruleId, MAG_BAND_ID);
     assert.equal(block.exposure, 350);
     assert.ok(block.contributors.some((row) => row.productName === "MAGNESIUM"));
 
     const published = publicSafetyGuidance(block);
-    assertHardBlockComplete(published);
+    assertAdviceComplete(published);
     assert.equal(published.ruleId, MAG_BAND_ID);
     assert.equal(published.exposure, 350);
     assert.ok((published.contributors ?? []).length > 0);
@@ -258,20 +258,20 @@ describe("R25 bounce gates — R24 crash class", () => {
       state: planState({ conditionCodes: ["ckd"] })
     });
     const block = guidance.find(
-      (item) => item.action === "block" && item.code === "dose_review_required"
+      (item) => item.action === "review" && item.code === "condition_review_required"
     );
     assert.ok(block);
-    assertHardBlockComplete(block);
+    assertAdviceComplete(block);
     assert.ok(Number(block.exposure) > 0, "CKD Mag silent zero");
     assert.equal(block.exposure, 301.5);
-    assert.equal(block.threshold, 0);
+    assert.equal(block.threshold, null);
     assert.ok(
       block.contributors.some((row) => /magnesium/i.test(row.productName))
     );
 
     const published = publicSafetyGuidance(block);
     assert.ok(Number(published.exposure) > 0);
-    assert.equal(published.threshold, 0);
+    assert.equal(published.threshold, null);
     assert.equal("exposure" in published, true);
   });
 
@@ -390,8 +390,10 @@ describe("R25 bounce gates — R24 crash class", () => {
       unmetRequirements: []
     });
     assert.equal(plan.shippingMinor, 5000);
-    assert.equal((plan.stackSummary as { totalPriceMinor?: number }).totalPriceMinor, 618000);
-    assert.equal(plan.estimatedOrderTotalMinor, 623000);
+    assert.equal(selected.totalPriceMinor, 618000, "fixture retains the stale aggregate");
+    assert.equal(item.lineTotalMinor, 89000);
+    assert.equal((plan.stackSummary as { totalPriceMinor?: number }).totalPriceMinor, 89000);
+    assert.equal(plan.estimatedOrderTotalMinor, 94000);
     assert.equal("subtotalMinor" in plan, false);
     assert.equal("totalPriceMinor" in plan, false);
 

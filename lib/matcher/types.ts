@@ -38,6 +38,7 @@ export type OmegaPreference = "algae_only" | "any" | "fish_allowed";
 export type TargetImportance = "conditional" | "core" | "optional" | "required";
 
 export type CanonicalTarget = Readonly<{
+  basis?: "total_daily" | "supplemental";
   acceptableMaximum?: number;
   acceptableMinimum?: number;
   importance: TargetImportance;
@@ -54,8 +55,11 @@ export type CanonicalTarget = Readonly<{
 }>;
 
 export type CanonicalCurrent = Readonly<{
+  certainty?: "known" | "estimated" | "unknown";
   daily: ScaledAmount;
   dailyAmount: number;
+  minimumDailyAmount?: number;
+  maximumDailyAmount?: number;
   daysRemaining?: number;
   name: string;
   productId?: string;
@@ -113,6 +117,14 @@ export type CanonicalRequest = Readonly<{
   destinationCountry: string;
   dietaryPreference: DietaryPreference;
   excludeSubjectIds: readonly string[];
+  /** Explicit product exclusions are distinct from nutrient exclusions. */
+  excludeProductIds?: readonly string[];
+  /** Quantified food intake is used only for total-source reference limits. */
+  dietaryIntake?: readonly CanonicalCurrent[];
+  unknownIntakeSubjectIds?: readonly string[];
+  estimatedIntakeSubjectIds?: readonly string[];
+  /** False means the adapter's placeholder must not become a known demographic fact. */
+  profileKnown?: Readonly<{ ageYears?: boolean; lifeStage?: boolean; sex?: boolean }>;
   leftovers: readonly MatcherLeftover[];
   maxDailyPills: number | null;
   maxPriceMinor: number | null;
@@ -200,6 +212,11 @@ export type SafetyFinding = Readonly<{
   subjectId: string | null;
   thresholdUnits: bigint | null;
   unit: string | null;
+  severity?: "high" | "info";
+  comparator?: "gt" | "gte" | null;
+  sourceScope?: SafetySourceScope | null;
+  authorityUrl?: string | null;
+  uncertainty?: readonly string[];
 }>;
 
 export type SafetyResult = Readonly<{
@@ -246,9 +263,44 @@ export type SearchState = Readonly<{
   pills: number;
   price: number;
   selectedVariantIds: readonly string[];
+  selectedProductIds?: readonly string[];
+  unknownProductIds?: readonly string[];
 }>;
 
-export type ValueOptionRole = "best_value" | "complete" | "minimum_core";
+/** Dimensionless ratios: 1 means a deviation equal to the agreed daily target. */
+export type DoseFitScore = Readonly<{
+  version: string;
+  limitWeight: 2;
+  under: number;
+  over: number;
+  limit: number;
+  weightedLimit: number;
+  total: number;
+  perTarget: readonly Readonly<{
+    basis?: "total_daily" | "supplemental";
+    subjectId: string; name: string; unit: MatcherUnit;
+    target: number; exposure: number; under: number; over: number;
+    exposureMinimum?: number; exposureMaximum?: number; conservativeExposure?: number;
+    certainty: "known" | "estimated" | "unknown";
+  }>[];
+  perContinuedDose?: readonly Readonly<{
+    subjectId: string; name: string; unit: MatcherUnit;
+    referenceBasis: "continued_dose"; referenceDose: number; sourceIds: readonly string[];
+    exposure: number; exposureMinimum: number; exposureMaximum: number; conservativeExposure: number;
+    over: number; certainty: "known" | "estimated" | "unknown";
+  }>[];
+  perLimit: readonly Readonly<{
+    subjectId: string; name: string; unit: MatcherUnit;
+    exposure: number; limit: number; excess: number;
+    exposureMinimum?: number; exposureMaximum?: number; conservativeExposure?: number;
+    sourceScope: SafetySourceScope; ruleId: string | null; authorityUrl: string | null;
+    certainty: "known" | "estimated" | "unknown";
+  }>[];
+  unknownSubjectIds: readonly string[];
+  estimatedSubjectIds: readonly string[];
+}>;
+
+export type ValueOptionRole = "requested_objective" | "fewer_concerns" | "best_value" | "complete" | "minimum_core";
 
 export type ScoredBasket = Readonly<{
   aggregateCoverage: number;
@@ -260,6 +312,7 @@ export type ScoredBasket = Readonly<{
   incidentalCount: number;
   optionRole?: ValueOptionRole;
   oversupplyScore: number;
+  doseFit?: DoseFitScore;
   priceMinor: number;
   productCount: number;
   productIds: readonly string[];
@@ -330,6 +383,10 @@ export type TargetFrontier = Readonly<{
 
 export type MatchResult = Readonly<{
   alternatives: readonly ScoredBasket[];
+  alternativeSearch?: Readonly<{
+    status: "found" | "none_found" | "incomplete" | "not_needed";
+    reason: string;
+  }>;
   leftovers: readonly MatcherLeftover[];
   lossCertificates?: readonly LossCertificate[];
   rejected: readonly RejectedCandidate[];

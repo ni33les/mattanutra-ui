@@ -35,6 +35,8 @@ export const AGENTIC_REASON_CODES = [
   "stale_safety_acknowledgement",
   "stale_revision",
   "invalid_request",
+  "contract_refresh_required",
+  "incompatible_identity",
   "request_too_broad",
   "too_short",
   "unsafe_content"
@@ -53,6 +55,9 @@ export type AgenticBusinessError = Readonly<{
     fieldPath: string;
     messageKey: string;
     reasonCode: string;
+    message?: string;
+    permittedLimit?: number | string | readonly unknown[];
+    actual?: number | string;
   }>[];
   message: string;
   messageKey: string;
@@ -75,6 +80,8 @@ const CATEGORY_BY_REASON: Record<AgenticReasonCode, AgenticErrorCategory> = {
   duplicate_supplement: "INVALID_ARGUMENT",
   idempotency_conflict: "ABORTED",
   invalid_request: "INVALID_ARGUMENT",
+  contract_refresh_required: "FAILED_PRECONDITION",
+  incompatible_identity: "INVALID_ARGUMENT",
   legacy_id: "INVALID_ARGUMENT",
   not_found: "NOT_FOUND",
   open_query: "INVALID_ARGUMENT",
@@ -115,6 +122,9 @@ export function businessError(input: Readonly<{
     fieldPath: string;
     messageKey: string;
     reasonCode: string;
+    message?: string;
+    permittedLimit?: number | string | readonly unknown[];
+    actual?: number | string;
   }>[];
   message: string;
   messageKey?: string;

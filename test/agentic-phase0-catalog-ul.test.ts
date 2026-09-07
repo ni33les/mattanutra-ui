@@ -173,7 +173,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
     resetMatcherSafetyCeilings();
   });
 
-  it("does not mark 700 mg total exposure ready after an overlap acknowledgement", () => {
+  it("keeps 700 mg exposure advice serious while operationally ready", () => {
     installCatalogCeilings();
     const mag = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Magnesium");
     assert.ok(mag);
@@ -261,7 +261,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
     });
     assert.equal(
       guidance.some(
-        (item) => item.action === "block" && item.code === "dose_review_required"
+        (item) => item.action === "review" && item.code === "dose_review_required"
       ),
       true
     );
@@ -272,8 +272,8 @@ describe("Phase 0 catalog-sourced upper limits", () => {
       state,
       unmetRequirements: []
     });
-    assert.equal(status, "blocked");
-    assert.notEqual(status, "ready");
+    assert.equal(status, "ready");
+    assert.ok(guidance.some((item) => item.code === "dose_review_required" && item.severity === "high"));
     resetMatcherSafetyCeilings();
   });
 
@@ -347,7 +347,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
     assert.equal(status, "ready");
   });
 
-  it("blocks a child 130 mg magnesium fixture plan using catalog 110 mg", () => {
+  it("preserves known child demographic fit and the catalog 110 mg reference", () => {
     installCatalogCeilings();
     const snapshot = freezeCatalogueSnapshot({
       ...fixtureSnapshot("2026-08-25T00:00:00.000Z"),
@@ -397,7 +397,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
     resetMatcherSafetyCeilings();
   });
 
-  it("blocks a request above the catalog UL even when delivered exposure is capped", () => {
+  it("advises about requested amounts above the reference without blocking a valid option", () => {
     installCatalogCeilings();
     const snapshot = freezeCatalogueSnapshot({
       ...fixtureSnapshot("2026-08-25T00:00:00.000Z"),
@@ -428,7 +428,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
         state: magState,
         unmetRequirements: magMatched.unmetRequirements
       }),
-      "blocked"
+      "ready"
     );
 
     const ironState = aug25PlanState({
@@ -451,12 +451,12 @@ describe("Phase 0 catalog-sourced upper limits", () => {
         state: ironState,
         unmetRequirements: ironMatched.unmetRequirements
       }),
-      "blocked"
+      "ready"
     );
     resetMatcherSafetyCeilings();
   });
 
-  it("prunes a 200 mg magnesium SKU from an 8-year-old search against catalog 110 mg", () => {
+  it("ranks the 100 mg child dose ahead of 200 mg using catalog 110 mg penalty", () => {
     const mag200 = qaProduct({
       facts: [{ amount: 200, key: "mag" }],
       id: "G-MAG-200",

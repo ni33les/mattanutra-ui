@@ -1,6 +1,8 @@
 import type { MatcherConfig } from "@/lib/matcher/types";
 
-export const MATCHER_VERSION = "pareto-hybrid-1";
+export const MATCHER_VERSION = "advisory-dose-fit-2";
+export const DOSE_FIT_VERSION = "dose-fit-1";
+export const UPPER_LIMIT_EXTRA_WEIGHT = 2;
 
 export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   exactGroupLimit: 8,

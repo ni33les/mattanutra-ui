@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { ADVISORY_MULTI_RESPONSE_BYTES } from "./agentic/advisory-pack-helpers.ts";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
@@ -114,7 +115,7 @@ export type AeC7CaseResult = Readonly<{
 
 export type AeC7PackReport = Readonly<{
   cases: readonly AeC7CaseResult[];
-  packVersion: "agentic-experience-7.0";
+  packVersion: "agentic-experience-7.1";
   passedCases: number;
   totalCases: 6;
 }>;
@@ -552,7 +553,7 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           /\$defs/.test(schemaBlob) ||
           /PlanRequest/.test(schemaBlob);
         const snapshot = JSON.parse(
-          readFileSync(new URL("../contract/mcp/3.0.0/tools.json", import.meta.url), "utf8")
+          readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
         ) as { tools?: Array<{ inputSchema?: unknown; name?: string }> };
         const snapshotPlan = asRecord(
           (snapshot.tools ?? []).find((item) => item.name === "plan")?.inputSchema
@@ -971,7 +972,7 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           amounts.length === 0 &&
           names.length <= 8 &&
           names.length > 0 &&
-          jsonSize(four) <= 16384 &&
+          jsonSize(four) <= ADVISORY_MULTI_RESPONSE_BYTES &&
           asRecord(line.selectionReason).messageKey &&
           rounded.deliveredAmount === 0.7 &&
           rounded.remainingGap === 0.55 &&
@@ -1006,7 +1007,7 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-7.0",
+      packVersion: "agentic-experience-7.1",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 6
     };
@@ -1021,6 +1022,7 @@ if (process.env.NODE_TEST_CONTEXT) {
     it("exports 6 cases and a canonical report", async () => {
       const report = await runAeC7Pack();
       assert.equal(report.totalCases, 6);
+      assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 6);
       assert.deepEqual(
         report.cases.map((item) => item.id),

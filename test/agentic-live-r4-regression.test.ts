@@ -31,8 +31,8 @@ function magSafetyAction(plan: Record<string, unknown>) {
   if (plan.status === "blocked" || items.some((item) => item.action === "block")) {
     return "block";
   }
-  if (items.some((item) => item.action === "acknowledge")) {
-    return "acknowledge";
+  if (items.some((item) => item.code === "dose_review_required")) {
+    return "review";
   }
   return "clear";
 }
@@ -41,7 +41,7 @@ function scheduleBucket(plan: Record<string, unknown>, horizon: number) {
   return asRecord(asRecord(plan.orderSchedule)[String(horizon)]);
 }
 
-describe("live v1.4 DUR/CON/CAN/IDENT regression", () => {
+describe("live v4 DUR/CON/CAN/IDENT regression", () => {
   it("LIVE-IDENT public origin and QA share one build and schema checksum", async () => {
     const pub = await liveCall(LIVE_PUBLIC, "info", { locale: "en" });
     const origin = await liveCall(LIVE_ORIGIN, "info", { locale: "en" });
@@ -70,7 +70,7 @@ describe("live v1.4 DUR/CON/CAN/IDENT regression", () => {
       String(item.questionId).startsWith("q_inventory_duration_")
     );
     assert.equal(plan.ok, true);
-    assert.equal(plan.status, "needs_input");
+    assert.equal(plan.status, "no_purchase");
     assert.equal(Number(row?.currentAmount), 300);
     assert.equal(plan.cash30DayMinor ?? null, null);
     assert.equal(plan.cash90DayMinor ?? null, null);
@@ -80,7 +80,7 @@ describe("live v1.4 DUR/CON/CAN/IDENT regression", () => {
     assert.equal(scheduleBucket(plan, 30).available, false);
     assert.equal(scheduleBucket(plan, 30).reasonCode, "current_inventory_duration_unknown");
     assert.equal(scheduleBucket(plan, 90).available, false);
-    assert.equal(duration.length, 1);
+    assert.equal(duration.length, 0);
     assert.equal(plan.nextReplenishmentDay ?? null, null);
   });
 
@@ -98,7 +98,8 @@ describe("live v1.4 DUR/CON/CAN/IDENT regression", () => {
     assert.notEqual(economics.consumption90DayMinor, 0);
     assert.equal(economics.consumptionComplete ?? plan.consumptionComplete, false);
     assert.notEqual(String(economics.consumptionScope), "newly_purchased");
-    assert.equal(typeof plan.cash30DayMinor === "number" || plan.cashComplete === true, true);
+    assert.equal(plan.cashComplete, false);
+    assert.equal(plan.cash90DayMinor, null);
   });
 
   it("LIVE-CAN-01 300 vs 349 hashes differ and 349/350/351 stay distinct", async () => {
@@ -131,8 +132,9 @@ describe("live v1.4 DUR/CON/CAN/IDENT regression", () => {
     assert.notEqual(hash(low.structured), hash(high.structured));
     assert.equal(hash(low.structured), hash(lowReplay.structured));
     assert.equal(magSafetyAction(a349.structured), "clear");
-    assert.equal(magSafetyAction(a350.structured), "acknowledge");
-    assert.equal(magSafetyAction(a351.structured), "block");
+    assert.equal(magSafetyAction(a350.structured), "review");
+    assert.equal(magSafetyAction(a351.structured), "review");
+    assert.notEqual(a351.structured.status, "blocked");
     assert.equal(
       new Set([hash(a349.structured), hash(a350.structured), hash(a351.structured)]).size,
       3

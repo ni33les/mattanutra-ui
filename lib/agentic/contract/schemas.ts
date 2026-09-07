@@ -1,460 +1,105 @@
+import { Type, type Static, type TSchema, type TProperties } from "@sinclair/typebox";
+
 export type JsonSchema = Readonly<Record<string, unknown>>;
-
-const PLAN_ANSWERS: JsonSchema = {
-  items: {
-    additionalProperties: false,
-    properties: {
-      choice: { type: "string" },
-      questionId: { type: "string" }
-    },
-    required: ["questionId", "choice"],
-    type: "object"
-  },
-  type: "array",
-  uniqueItems: true
+export const object = <T extends TProperties>(properties: T, description?: string) => Type.Object(properties, { additionalProperties: false, ...(description ? { description } : {}) });
+export const enumeration = <const T extends readonly string[]>(values: T) => Type.Unsafe<T[number]>({ type: "string", enum: [...values] });
+export const optional = Type.Optional;
+export const nullable = <T extends TSchema>(schema: T) => Type.Union([schema, Type.Null()]);
+export const text = (maxLength = 1000) => Type.String({ minLength: 1, maxLength });
+export const strings = (maxItems = 50) => Type.Array(text(128), { maxItems, uniqueItems: true });
+export const UNIT_SCHEMA = enumeration(["mcg", "mg", "g", "IU", "CFU", "ml", "serving"] as const);
+const productId = Type.String({ pattern: "^prd_[A-Za-z0-9_-]+$", maxLength: 128 });
+const supplementId = Type.String({ pattern: "^sup_[A-Za-z0-9_-]+$", maxLength: 128 });
+const productIds = Type.Array(productId, { maxItems: 100, uniqueItems: true });
+const supplementIds = Type.Array(supplementId, { maxItems: 100, uniqueItems: true });
+const amount = Type.Number({ minimum: 0, maximum: 1e15, description: "Daily amount in the accompanying unit; zero must be explicitly reported." });
+const positiveAmount = Type.Number({ exclusiveMinimum: 0, maximum: 1e15, description: "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision." });
+export const PLAN_ANSWERS = Type.Array(object({ choice: text(240), questionId: text(128) }), { maxItems: 50, uniqueItems: true });
+export const PLAN_SAFETY_ACK = object({ confirmed: Type.Literal(true), guidanceIds: strings(), revision: Type.Integer({ minimum: 1 }) }, "Deprecated compatibility input. Health advice never requires acknowledgement.");
+export const PROFILE_SCHEMA = object({
+  ageYears: optional(Type.Integer({ minimum: 0, maximum: 120, description: "Reported age. Omit when unknown; scoring defaults are not health evidence." })),
+  goals: optional(Type.Array(text(80), { maxItems: 30, uniqueItems: true })),
+  lifeStage: optional(enumeration(["adult", "child", "pregnant", "breastfeeding", "trying_to_conceive"] as const)),
+  sex: optional(enumeration(["female", "male"] as const))
+});
+export const DEFAULT_MAX_PRODUCT_COUNT = 6;
+export const REQUIREMENTS_SCHEMA = object({
+  allowedForms: optional(Type.Array(enumeration(["capsule", "softgel", "tablet", "powder", "liquid", "gummy", "sachet", "other"] as const), { uniqueItems: true, maxItems: 8 })),
+  dietaryPreference: optional(enumeration(["any", "plant_based", "vegan"] as const)),
+  excludeProductIds: optional({ ...productIds, description: "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion." }),
+  excludeSupplementIds: optional({ ...supplementIds, description: "Exclude products containing these nutrient concepts, not particular product IDs. [] clears this exclusion." }),
+  maxDailyPills: optional(Type.Number({ minimum: 0, maximum: 1000 })),
+  maxPriceMinor: optional(Type.Integer({ minimum: 0, maximum: 1e12, description: "Goods/basket budget in destination currency minor units; applicable delivery cost is quoted separately and included in delivered-cost comparisons." })),
+  maxProductCount: optional(Type.Integer({ minimum: 1, maximum: 30, default: DEFAULT_MAX_PRODUCT_COUNT })),
+  omega3SourcePreference: optional(enumeration(["any", "algae_only", "fish_allowed"] as const)),
+  retainProductIds: optional(productIds), retainSupplementIds: optional(supplementIds)
+});
+export const DEFAULT_TARGET_BASIS = "total_daily" as const;
+export const TARGET_BASIS_SCHEMA = enumeration(["total_daily", "supplemental"] as const);
+export const TARGET_SCHEMA = object({
+  basis: optional({ ...TARGET_BASIS_SCHEMA, default: DEFAULT_TARGET_BASIS, description: "total_daily covers known dietary intake, continued supplements and new products; supplemental covers continued supplements and new products only. Web food-gap recommendations explicitly use supplemental. Estimated intake affects dose-fit ranges, never guaranteed coverage." }),
+  acceptableRange: optional(object({ maximum: positiveAmount, minimum: positiveAmount, unit: UNIT_SCHEMA })),
+  amount: positiveAmount,
+  importance: optional({ ...enumeration(["core", "optional", "conditional", "required"] as const), default: "required" }),
+  name: text(240),
+  prerequisite: optional(object({ nextAction: optional(text()), reasonCode: optional(text(128)), status: enumeration(["satisfied", "unsatisfied", "unknown"] as const) })),
+  supplementId: optional(supplementId), unit: UNIT_SCHEMA
+});
+const observation = {
+  daysRemaining: optional(Type.Number({ exclusiveMinimum: 0, maximum: 36500, description: "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations." })),
+  source: enumeration(["diet", "current_supplement"] as const),
+  name: optional(text(240)), supplementId: optional(supplementId), productId: optional(productId),
+  description: optional(text(1000)), evidence: optional(text(1000))
 };
-
-const PLAN_SAFETY_ACK: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    confirmed: { const: true },
-    guidanceIds: {
-      items: { type: "string" },
-      minItems: 1,
-      type: "array",
-      uniqueItems: true
-    },
-    revision: { minimum: 1, type: "integer" }
-  },
-  required: ["revision", "guidanceIds", "confirmed"],
-  type: "object"
-};
-
-const PLAN_REQUEST: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    answers: PLAN_ANSWERS,
-    conditionCodes: {
-      description:
-        "Condition codes from info.conditionCodes. Send here, not on profile.conditions.",
-      items: { type: "string" },
-      type: "array",
-      uniqueItems: true
-    },
-    currentSupplements: {
-      items: {
-        additionalProperties: false,
-        properties: {
-          dailyAmount: { exclusiveMinimum: 0, type: "number" },
-          daysRemaining: { minimum: 0, type: "number" },
-          name: { type: "string" },
-          productId: { pattern: "^prd_", type: "string" },
-          supplementId: { pattern: "^sup_", type: "string" },
-          unit: {
-            enum: ["mcg", "mg", "g", "IU", "CFU", "ml", "serving"],
-            type: "string"
-          }
-        },
-        required: ["name", "dailyAmount", "unit"],
-        type: "object"
-      },
-      maxItems: 50,
-      type: "array"
-    },
-    costHorizonsDays: {
-      items: { minimum: 1, type: "integer" },
-      minItems: 1,
-      type: "array",
-      uniqueItems: true
-    },
-    baseline: {
-      additionalProperties: false,
-      properties: {
-        items: {
-          items: {
-            additionalProperties: false,
-            properties: {
-              daysRemaining: { minimum: 0, type: "number" },
-              productId: { pattern: "^prd_", type: "string" },
-              quantity: { exclusiveMinimum: 0, type: "number" }
-            },
-            required: ["productId", "quantity"],
-            type: "object"
-          },
-          type: "array"
-        },
-        type: {
-          enum: ["current_basket", "separate_direct_products"],
-          type: "string"
-        }
-      },
-      required: ["type"],
-      type: "object"
-    },
-    destinationCountry: {
-      description:
-        "ISO 3166-1 alpha-2 destination. Call info for supportedCountries. If MattaNutra does not deliver there yet, plan returns unsupported_country with a polite cannot-deliver message.",
-      pattern: "^[A-Z]{2}$",
-      type: "string"
-    },
-    locale: { type: "string" },
-    medicationCodes: {
-      description:
-        "Medication codes from info.medicationCodes. Send here, not on profile.medications.",
-      items: { type: "string" },
-      type: "array",
-      uniqueItems: true
-    },
-    optimization: {
-      description:
-        "A string, not an object: balanced, best_coverage, lowest_cost, or fewest_pills.",
-      enum: ["balanced", "best_coverage", "lowest_cost", "fewest_pills"],
-      type: "string"
-    },
-    profile: {
-      additionalProperties: false,
-      properties: {
-        ageYears: { maximum: 120, minimum: 0, type: "integer" },
-        goals: {
-          items: { maxLength: 80, type: "string" },
-          type: "array",
-          uniqueItems: true
-        },
-        lifeStage: {
-          enum: ["adult", "child", "pregnant", "breastfeeding", "trying_to_conceive"],
-          type: "string"
-        },
-        sex: {
-          description: "Person sex: female or male. Omit the field if unknown.",
-          enum: ["female", "male"],
-          type: "string"
-        }
-      },
-      required: ["ageYears", "lifeStage"],
-      type: "object"
-    },
-    requirements: {
-      additionalProperties: false,
-      description:
-        "Plan constraints. Exclusions are excludeSupplementIds, not a top-level exclude list.",
-      properties: {
-        allowedForms: {
-          items: {
-            enum: [
-              "capsule",
-              "softgel",
-              "tablet",
-              "powder",
-              "liquid",
-              "gummy",
-              "sachet",
-              "other"
-            ],
-            type: "string"
-          },
-          type: "array",
-          uniqueItems: true
-        },
-        dietaryPreference: {
-          enum: ["any", "plant_based", "vegan"],
-          type: "string"
-        },
-        excludeSupplementIds: {
-          items: { pattern: "^sup_", type: "string" },
-          type: "array",
-          uniqueItems: true
-        },
-        maxDailyPills: { minimum: 0, type: "number" },
-        maxPriceMinor: { minimum: 0, type: "integer" },
-        maxProductCount: { maximum: 30, minimum: 1, type: "integer" },
-        omega3SourcePreference: {
-          enum: ["any", "algae_only", "fish_allowed"],
-          type: "string"
-        },
-        retainProductIds: {
-          items: { pattern: "^prd_", type: "string" },
-          type: "array",
-          uniqueItems: true
-        },
-        retainSupplementIds: {
-          items: { pattern: "^sup_", type: "string" },
-          type: "array",
-          uniqueItems: true
-        }
-      },
-      type: "object"
-    },
-    safetyAcknowledgement: PLAN_SAFETY_ACK,
-    targets: {
-      description:
-        "Agreed nutrient targets. Each item has name, amount, and unit. Optional importance, acceptableRange, and prerequisite preserve core/optional/conditional intent. A target without importance remains required.",
-      items: {
-        additionalProperties: false,
-        properties: {
-          acceptableRange: {
-            additionalProperties: false,
-            properties: {
-              maximum: { exclusiveMinimum: 0, type: "number" },
-              minimum: { exclusiveMinimum: 0, type: "number" },
-              unit: {
-                enum: ["mcg", "mg", "g", "IU", "CFU", "ml", "serving"],
-                type: "string"
-              }
-            },
-            required: ["minimum", "maximum", "unit"],
-            type: "object"
-          },
-          amount: { exclusiveMinimum: 0, type: "number" },
-          importance: {
-            enum: ["core", "optional", "conditional", "required"],
-            type: "string"
-          },
-          name: { minLength: 1, type: "string" },
-          prerequisite: {
-            additionalProperties: false,
-            properties: {
-              nextAction: { minLength: 1, type: "string" },
-              reasonCode: { minLength: 1, type: "string" },
-              status: {
-                enum: ["satisfied", "unsatisfied", "unknown"],
-                type: "string"
-              }
-            },
-            required: ["status"],
-            type: "object"
-          },
-          supplementId: { pattern: "^sup_", type: "string" },
-          unit: {
-            enum: ["mcg", "mg", "g", "IU", "CFU", "ml", "serving"],
-            type: "string"
-          }
-        },
-        required: ["name", "amount", "unit"],
-        type: "object"
-      },
-      maxItems: 30,
-      minItems: 1,
-      type: "array"
-    }
-  },
-  required: [
-    "locale",
-    "destinationCountry",
-    "optimization",
-    "profile",
-    "requirements",
-    "targets"
-  ],
-  type: "object"
-};
-
-const IDEMPOTENCY_KEY: JsonSchema = {
-  maxLength: 128,
-  minLength: 16,
-  type: "string"
-};
-
-const HANDLE: JsonSchema = {
-  minLength: 32,
-  type: "string"
-};
-
-export const INFO_INPUT_SCHEMA: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    locale: {
-      description: "Optional BCP 47 response locale.",
-      type: "string"
-    }
-  },
-  type: "object"
-};
-
-export const EVIDENCE_INPUT_SCHEMA: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    claimIds: {
-      items: { type: "string" },
-      type: "array",
-      uniqueItems: true
-    },
-    evidenceHandle: { minLength: 32, type: "string" },
-    locale: { type: "string" },
-    mode: { enum: ["summary", "sources"], type: "string" }
-  },
-  required: ["evidenceHandle"],
-  type: "object"
-};
-
+export const INTAKE_OBSERVATION_SCHEMA = Type.Union([
+  object({ ...observation, certainty: Type.Literal("known"), amount, unit: UNIT_SCHEMA }),
+  object({ ...observation, certainty: Type.Literal("estimated"), amount: optional(amount), minimum: optional(amount), maximum: optional(amount), unit: optional(UNIT_SCHEMA) }),
+  object({ ...observation, certainty: Type.Literal("unknown") })
+], { description: "Reported daily intake. Missing quantities are unknown, never zero. Broad dietary descriptions are accepted without labels or portion sizes." });
+export type IntakeObservation = Static<typeof INTAKE_OBSERVATION_SCHEMA>;
+export const PLAN_REQUEST = object({
+  answers: optional(PLAN_ANSWERS),
+  conditionCodes: optional({ ...strings(), description: "Condition codes from info.conditionCodes; unrecognised reported context is preserved as unassessed advice." }), medicationCodes: optional({ ...strings(), description: "Medication codes from info.medicationCodes; omission means unknown, not confirmed none." }),
+  currentSupplements: optional(Type.Array(object({ dailyAmount: amount, daysRemaining: optional(Type.Number({ exclusiveMinimum: 0, maximum: 36500, description: "Positive remaining days of retained inventory. Omit when unknown. If none remains, remove this retained inventory entry and revise the intended request." })), name: text(240), productId: optional(productId), supplementId: optional(supplementId), unit: UNIT_SCHEMA }), { maxItems: 50, description: "Quantified continued supplements. Omission means unknown; [] explicitly reports none. A (productId, nutrient) pair may occur only once across this field and current-source intake observations." })),
+  intake: optional(Type.Array(INTAKE_OBSERVATION_SCHEMA, { maxItems: 100, description: "Reported observations. Omission or [] does not establish zero dietary intake. An explicitly reported known amount of 0 is required to establish zero for a nutrient." })),
+  costHorizonsDays: optional(Type.Array(Type.Unsafe<30 | 90>({ type: "integer", enum: [30, 90] }), { minItems: 1, maxItems: 2, uniqueItems: true, default: [30, 90], description: "Supported comparison horizons in days. The response exposes the 30- and 90-day ledgers; other periods are unavailable." })),
+  baseline: optional(object({ items: optional(Type.Array(object({ daysRemaining: optional(Type.Number({ minimum: 0, maximum: 36500 })), dailyServings: optional(Type.Number({ exclusiveMinimum: 0, maximum: 1000, description: "Actual catalogue servings per day for this comparison basket. Omission makes equivalent-coverage savings unavailable; quantity remains packs purchased." })), productId, quantity: positiveAmount }), { maxItems: 100 })), type: enumeration(["current_basket", "separate_direct_products"] as const) })),
+  destinationCountry: Type.String({ pattern: "^[A-Z]{2}$", description: "Deliverable ISO country from info.supportedCountries." }),
+  locale: Type.String({ minLength: 2, maxLength: 35, description: "BCP 47 locale; supported locales are advertised by info. Unsupported locales fall back to English." }),
+  optimization: enumeration(["balanced", "best_coverage", "lowest_cost", "fewest_pills"] as const),
+  profile: PROFILE_SCHEMA, requirements: REQUIREMENTS_SCHEMA,
+  safetyAcknowledgement: optional(PLAN_SAFETY_ACK),
+  targets: Type.Array(TARGET_SCHEMA, { minItems: 1, maxItems: 30, description: "Agreed targets: name, amount, and unit. Optional importance defaults to required." })
+}, "Complete plan request. Replacement revisions reset omitted optional fields. Agreed targets are not diagnoses. Resolved nutrient amounts must represent at least one nanogram, one CFU, or 0.001 ml/serving; IU precision depends on nutrient form. Below-precision errors report the exact field and permitted minimum.");
+export const PLAN_REQUEST_PATCH = Type.Partial(Type.Object({ ...PLAN_REQUEST.properties, baseline: optional(Type.Partial(Type.Object(PLAN_REQUEST.properties.baseline.properties, { additionalProperties: false }))) }), { additionalProperties: false, description: "Merge supplied object fields; supplied arrays replace completely; [] clears arrays; null is invalid. {} explicitly refreshes contract/policy without changing inputs." });
+export type PlanRequestWire = Static<typeof PLAN_REQUEST>;
+export type PlanRequestPatchWire = Static<typeof PLAN_REQUEST_PATCH>;
+const key = Type.String({ minLength: 16, maxLength: 128 });
+const handle = Type.String({ minLength: 32, maxLength: 4096 });
+const revision = Type.Integer({ minimum: 1 });
+export const PLAN_OPERATION_SCHEMAS = {
+  create: object({ operation: Type.Literal("create"), idempotencyKey: key, request: PLAN_REQUEST }),
+  get: object({ operation: Type.Literal("get"), planHandle: handle }),
+  revise: Type.Union([
+    object({ operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, request: PLAN_REQUEST }),
+    object({ operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, requestPatch: PLAN_REQUEST_PATCH })
+  ]),
+  answer: object({ operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
+  select: object({ operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })
+} as const;
+// MCP requires an object root; the discriminated branches specify each operation completely.
+export const PLAN_INPUT_SCHEMA = { type: "object", anyOf: Object.values(PLAN_OPERATION_SCHEMAS) } as const;
+export const PLAN_ADVERTISED_SCHEMA = PLAN_INPUT_SCHEMA;
+export const INFO_INPUT_SCHEMA = object({ locale: optional(Type.String({ minLength: 2, maxLength: 35 })) });
+export const EVIDENCE_INPUT_SCHEMA = object({ evidenceHandle: handle, claimIds: optional(strings()), locale: optional(text(35)), mode: optional({ ...enumeration(["summary", "sources"] as const), default: "summary" }) });
+export const EXECUTE_INPUT_SCHEMA = object({ planHandle: handle, expectedRevision: revision, idempotencyKey: key });
+export const ORDER_INPUT_SCHEMA = object({ orderHandle: handle });
+export const SUPPORT_INPUT_SCHEMA = object({ orderHandle: handle, supportHandle: optional(handle), idempotencyKey: key, message: text(4000) });
+export const FEEDBACK_INPUT_SCHEMA = object({ planHandle: handle, expectedRevision: revision, idempotencyKey: key, consentConfirmed: Type.Literal(true), optionId: optional(Type.String({ minLength: 8, maxLength: 128 })), points: optional(Type.Array(text(240), { maxItems: 8, uniqueItems: true })), rating: optional(Type.Integer({ minimum: 1, maximum: 5 })), summary: optional(text(1000)) });
+export const AGENTIC_INPUT_SCHEMAS = { info: INFO_INPUT_SCHEMA, plan: PLAN_INPUT_SCHEMA, execute: EXECUTE_INPUT_SCHEMA, order: ORDER_INPUT_SCHEMA, support: SUPPORT_INPUT_SCHEMA, feedback: FEEDBACK_INPUT_SCHEMA, evidence: EVIDENCE_INPUT_SCHEMA } as const;
+export const AGENTIC_TOOL_SCHEMAS = AGENTIC_INPUT_SCHEMAS;
 export const EVIDENCE_ADVERTISED_SCHEMA = EVIDENCE_INPUT_SCHEMA;
-
-export const PLAN_INPUT_SCHEMA: JsonSchema = {
-  $defs: {
-    PlanRequest: PLAN_REQUEST
-  },
-  oneOf: [
-    {
-      additionalProperties: false,
-      properties: {
-        idempotencyKey: IDEMPOTENCY_KEY,
-        operation: { const: "create" },
-        request: PLAN_REQUEST
-      },
-      required: ["operation", "idempotencyKey", "request"],
-      type: "object"
-    },
-    {
-      additionalProperties: false,
-      properties: {
-        expectedRevision: { minimum: 1, type: "integer" },
-        idempotencyKey: IDEMPOTENCY_KEY,
-        operation: { const: "revise" },
-        planHandle: HANDLE,
-        request: PLAN_REQUEST
-      },
-      required: ["operation", "idempotencyKey", "planHandle", "expectedRevision", "request"],
-      type: "object"
-    },
-    {
-      additionalProperties: false,
-      properties: {
-        answers: PLAN_ANSWERS,
-        expectedRevision: { minimum: 1, type: "integer" },
-        idempotencyKey: IDEMPOTENCY_KEY,
-        operation: { const: "answer" },
-        planHandle: HANDLE,
-        safetyAcknowledgement: PLAN_SAFETY_ACK
-      },
-      required: ["operation", "idempotencyKey", "planHandle", "expectedRevision"],
-      type: "object"
-    },
-    {
-      additionalProperties: false,
-      properties: {
-        expectedRevision: { minimum: 1, type: "integer" },
-        idempotencyKey: IDEMPOTENCY_KEY,
-        operation: { const: "select" },
-        optionId: { minLength: 8, type: "string" },
-        planHandle: HANDLE
-      },
-      required: [
-        "operation",
-        "idempotencyKey",
-        "planHandle",
-        "expectedRevision",
-        "optionId"
-      ],
-      type: "object"
-    },
-    {
-      additionalProperties: false,
-      properties: {
-        operation: { const: "get" },
-        planHandle: HANDLE
-      },
-      required: ["operation", "planHandle"],
-      type: "object"
-    }
-  ]
-};
-
-export const PLAN_ADVERTISED_SCHEMA: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    answers: PLAN_ANSWERS,
-    expectedRevision: { minimum: 1, type: "integer" },
-    idempotencyKey: IDEMPOTENCY_KEY,
-    operation: {
-      enum: ["answer", "create", "get", "revise", "select"],
-      type: "string"
-    },
-    optionId: { minLength: 8, type: "string" },
-    planHandle: HANDLE,
-    request: PLAN_REQUEST,
-    safetyAcknowledgement: PLAN_SAFETY_ACK
-  },
-  type: "object"
-};
-
-export const EXECUTE_INPUT_SCHEMA: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    expectedRevision: { minimum: 1, type: "integer" },
-    idempotencyKey: IDEMPOTENCY_KEY,
-    planHandle: HANDLE
-  },
-  required: ["planHandle", "expectedRevision", "idempotencyKey"],
-  type: "object"
-};
-
-export const ORDER_INPUT_SCHEMA: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    orderHandle: HANDLE
-  },
-  required: ["orderHandle"],
-  type: "object"
-};
-
-export const SUPPORT_INPUT_SCHEMA: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    idempotencyKey: IDEMPOTENCY_KEY,
-    message: { maxLength: 4000, minLength: 1, type: "string" },
-    orderHandle: HANDLE,
-    supportHandle: HANDLE
-  },
-  required: ["orderHandle", "idempotencyKey", "message"],
-  type: "object"
-};
-
-export const FEEDBACK_INPUT_SCHEMA: JsonSchema = {
-  additionalProperties: false,
-  properties: {
-    consentConfirmed: { const: true },
-    expectedRevision: { minimum: 1, type: "integer" },
-    idempotencyKey: IDEMPOTENCY_KEY,
-    optionId: { minLength: 8, type: "string" },
-    planHandle: HANDLE,
-    points: {
-      items: { maxLength: 240, minLength: 1, type: "string" },
-      maxItems: 8,
-      type: "array",
-      uniqueItems: true
-    },
-    rating: { maximum: 5, minimum: 1, type: "integer" },
-    summary: { maxLength: 1000, minLength: 1, type: "string" }
-  },
-  required: [
-    "idempotencyKey",
-    "planHandle",
-    "expectedRevision",
-    "consentConfirmed"
-  ],
-  type: "object"
-};
-
 export const EXECUTE_ADVERTISED_SCHEMA = EXECUTE_INPUT_SCHEMA;
 export const ORDER_ADVERTISED_SCHEMA = ORDER_INPUT_SCHEMA;
 export const SUPPORT_ADVERTISED_SCHEMA = SUPPORT_INPUT_SCHEMA;
 export const FEEDBACK_ADVERTISED_SCHEMA = FEEDBACK_INPUT_SCHEMA;
-
-export const AGENTIC_INPUT_SCHEMAS = {
-  evidence: EVIDENCE_INPUT_SCHEMA,
-  execute: EXECUTE_INPUT_SCHEMA,
-  feedback: FEEDBACK_INPUT_SCHEMA,
-  info: INFO_INPUT_SCHEMA,
-  order: ORDER_INPUT_SCHEMA,
-  plan: PLAN_INPUT_SCHEMA,
-  support: SUPPORT_INPUT_SCHEMA
-} as const;
-
-export const AGENTIC_TOOL_SCHEMAS = {
-  evidence: EVIDENCE_ADVERTISED_SCHEMA,
-  execute: EXECUTE_ADVERTISED_SCHEMA,
-  feedback: FEEDBACK_ADVERTISED_SCHEMA,
-  info: INFO_INPUT_SCHEMA,
-  order: ORDER_ADVERTISED_SCHEMA,
-  plan: PLAN_ADVERTISED_SCHEMA,
-  support: SUPPORT_ADVERTISED_SCHEMA
-} as const;

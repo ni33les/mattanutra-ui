@@ -1,5 +1,5 @@
 import type { AgenticConfig } from "@/lib/agentic/config";
-import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
+import { AGENTIC_CONTRACT_VERSION, AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { RESPONSIBILITY_VERSION } from "@/lib/agentic/discovery/versions";
 import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
 import { businessError, isAgenticErrorResult, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
@@ -394,7 +394,7 @@ async function executeFresh(
     peekedPlan.currentRevision
   );
 
-  if (!peekedRevision || peekedRevision.status !== "ready") {
+  if (!peekedRevision) {
     return executeError("en", "plan_not_ready");
   }
 
@@ -424,10 +424,12 @@ async function executeFresh(
   }
 
   const peekedResult = peekedRevision.result as PlanResult;
-  const snapshot = await ensureCatalogueSnapshot(
-    input.config.environment,
-    peekedResult.requestSnapshot.destinationCountry
-  );
+  // Existing frozen checkout work must remain resumable even when old plan
+  // policy or current catalogue availability differs.
+  const peekedOrder = await input.store.getActiveOrderForPlanRevision(peekedPlan.id, peekedPlan.currentRevision);
+  const snapshot = !peekedOrder && peekedResult.contractVersion === AGENTIC_CONTRACT_VERSION && peekedRevision.status === "ready"
+    ? await ensureCatalogueSnapshot(input.config.environment, peekedResult.requestSnapshot.destinationCountry)
+    : null;
 
   const created: Array<{ locale: Locale; orderId: string; planId: string }> = [];
   const outcome = await input.store.transaction(async (store) => {
@@ -458,38 +460,12 @@ async function executeFresh(
 
     const revision = await store.getPlanRevision(plan.id, plan.currentRevision);
 
-    if (!revision || revision.status !== "ready") {
+    if (!revision) {
       return executeError("en", "plan_not_ready");
     }
 
     const result = revision.result as PlanResult;
     const locale = negotiateLocale(result.requestSnapshot.locale);
-    const selected = result.selected;
-    const unavailable = Boolean(
-      selected?.basket.some((item) => {
-        const product = snapshot.products.find((row) => row.productId === item.productId);
-        return (
-          item.incompleteCommercialFacts ||
-          !product ||
-          !product.orderable ||
-          product.incompleteCommercialFacts
-        );
-      })
-    );
-
-    if (!selected || unavailable) {
-      return executeError(locale, "availability_changed");
-    }
-
-    if (selected.basket.length === 0) {
-      return businessError({
-        message:
-          "Nothing needs to be bought now. Current stock covers today; replenish later in the requested horizon.",
-        nextAction: "none",
-        reasonCode: "invalid_request"
-      });
-    }
-
     const raced = await beginIdempotency<ExecuteSuccess>({
       key: input.idempotencyKey, now, operation: "execute", ownerScope, payload, store
     });
@@ -519,9 +495,43 @@ async function executeFresh(
       return stored;
     }
 
+    if (result.contractVersion !== AGENTIC_CONTRACT_VERSION) {
+      return businessError({ reasonCode: "contract_refresh_required",
+        message: "Refresh this unexecuted plan with revise, its expectedRevision and requestPatch:{} before creating checkout.",
+        nextAction: "revise_plan", fieldPath: "expectedRevision" });
+    }
+    if (revision.status !== "ready" || !snapshot) return executeError(locale, "plan_not_ready");
+
+    const selected = result.selected;
+    const unavailable = Boolean(
+      selected?.basket.some((item) => {
+        const product = snapshot.products.find((row) => row.productId === item.productId);
+        return (
+          item.incompleteCommercialFacts ||
+          !product ||
+          !product.orderable ||
+          product.incompleteCommercialFacts
+        );
+      })
+    );
+
+    if (!selected || unavailable) {
+      return executeError(locale, "availability_changed");
+    }
+
+    if (selected.basket.length === 0) {
+      return businessError({
+        message:
+          "Nothing needs to be bought now. Current stock covers today; replenish later in the requested horizon.",
+        nextAction: "none",
+        reasonCode: "invalid_request"
+      });
+    }
+
     const payable = payableSnapshot({
       shippingMinor: DEFAULT_SHIPPING_MINOR,
-      subtotalMinor: selected.totalPriceMinor,
+      // Freeze the purchased pack lines, including for older saved v4 results.
+      subtotalMinor: selected.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0),
       taxMinor: DEFAULT_TAX_MINOR
     });
     bindQaChannel(plan.id, channel);

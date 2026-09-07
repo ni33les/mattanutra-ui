@@ -19,7 +19,7 @@ import { resetQaPersistForTests } from "../../../lib/agentic/qa/persist.ts";
 import { resetQaSessions } from "../../../lib/agentic/qa/session.ts";
 import { resetRequestTraces } from "../../../lib/agentic/qa/request-trace.ts";
 import { resetResourcePermits } from "../../../lib/agentic/qa/resource-permits.ts";
-import { resetServiceClock, useInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
+import { resetServiceClock, useInjectedServiceClock as setInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
 import { resetInfoCache } from "../../../lib/agentic/info.ts";
 import {
   createAgenticRuntime,
@@ -118,7 +118,7 @@ export function beginV16Run() {
   resetRequestTraces();
   resetResourcePermits();
   resetServiceClock();
-  useInjectedServiceClock();
+  setInjectedServiceClock();
   if (frozenReal) {
     replaceCatalogueSnapshot(frozenReal);
   }

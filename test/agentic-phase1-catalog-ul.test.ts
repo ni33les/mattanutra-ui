@@ -80,7 +80,7 @@ describe("Phase 1 catalog threshold table", () => {
     assert.doesNotMatch(matcher, /return 45/);
   });
 
-  it("reports pregnancy iron against catalog 45 mg and does not ready 48 mg", () => {
+  it("reports pregnancy iron against catalog 45 mg while keeping operational status ready", () => {
     installFixtureCatalogCeilings();
     const iron = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Iron");
     assert.ok(iron);
@@ -127,7 +127,8 @@ describe("Phase 1 catalog threshold table", () => {
       state,
       unmetRequirements: matched.unmetRequirements
     });
-    assert.notEqual(status, "ready");
+    assert.equal(status, "ready");
+    assert.ok(guidance.every((item) => item.action !== "block" && item.action !== "acknowledge"));
     resetMatcherSafetyCeilings();
   });
 });

@@ -4,7 +4,9 @@ import { getLegalContent } from "../lib/legal-content.ts";
 import { CONNECTOR_COPY } from "../lib/agentic/discovery/content.ts";
 import { RESPONSIBILITY_MATRIX } from "../lib/agentic/responsibility/matrix.ts";
 import { RESPONSIBILITY_VERSION } from "../lib/agentic/discovery/versions.ts";
-import { LIVE_PUBLIC, liveCall } from "./helpers/live-mcp.ts";
+import { LIVE_PUBLIC, liveCall, livePost } from "./helpers/live-mcp.ts";
+import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
+import { CONTRACT_SCHEMA_URI } from "../lib/agentic/contract/guide.ts";
 
 describe("live connector and Terms consistency", () => {
   it("LIVE-TRUST-01 public info description is specific wellness matching copy", async () => {
@@ -19,7 +21,7 @@ describe("live connector and Terms consistency", () => {
     assert.match(description, /safety/i);
     assert.match(description, /wellness guidance/i);
     assert.match(description, /pharmacy/i);
-    assert.match(description, /responsibility-3\.0\.0/);
+    assert.equal(info.structured.responsibilityVersion, RESPONSIBILITY_VERSION);
     assert.equal(description, CONNECTOR_COPY.en);
   });
 
@@ -44,5 +46,28 @@ describe("live connector and Terms consistency", () => {
     assert.equal(en.structured.responsibilityVersion, RESPONSIBILITY_VERSION);
     assert.equal(en.structured.responsibilityVersion, th.structured.responsibilityVersion);
     assert.equal(en.structured.buildId, th.structured.buildId);
+  });
+});
+
+
+describe("live connector discovery contract identity", () => {
+  it("GET discovery, RPC info and the published contract agree on version and schemas", async () => {
+    const response = await fetch(LIVE_PUBLIC, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
+    assert.equal(response.status, 200);
+    const discovery = await response.json();
+    const info = await liveCall(LIVE_PUBLIC, "info", { locale: "en" });
+    const resource = await livePost(LIVE_PUBLIC, { jsonrpc: "2.0", id: 2, method: "resources/read", params: { uri: CONTRACT_SCHEMA_URI } });
+    assert.equal(info.structured.ok, true);
+    const contents = resource.structured.contents as Array<{ text: string }>;
+    assert.equal(contents.length, 1);
+    const contract = JSON.parse(contents[0].text);
+    assert.equal(discovery.contractVersion, AGENTIC_CONTRACT_VERSION);
+    assert.equal(discovery.contractVersion, info.structured.contractVersion);
+    assert.equal(discovery.contractVersion, contract.contractVersion);
+    assert.equal(discovery.tools.length, 7);
+    for (const tool of discovery.tools) {
+      assert.deepEqual(tool.inputSchema, contract.tools[tool.name].inputSchema);
+      assert.deepEqual(tool.outputSchema, contract.tools[tool.name].outputSchema);
+    }
   });
 });

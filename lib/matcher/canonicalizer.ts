@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
+import { sha256Hex } from "@/lib/sha256";
 import { scaleAmount, isDoseError } from "@/lib/matcher/dose";
+import { DOSE_FIT_VERSION } from "@/lib/matcher/config";
 import type {
   CanonicalCurrent,
   CanonicalRequest,
@@ -13,6 +14,7 @@ import type {
 export function canonicalizeTargets(input: Readonly<{
   leftovers?: readonly MatcherLeftover[];
   targets: readonly Readonly<{
+    basis?: CanonicalTarget["basis"];
     acceptableMaximum?: number;
     acceptableMinimum?: number;
     amount: number;
@@ -34,7 +36,7 @@ export function canonicalizeTargets(input: Readonly<{
       unit: target.unit
     });
 
-    if (isDoseError(requested)) {
+    if (isDoseError(requested) || (target.amount > 0 && requested.units <= BigInt(0))) {
       leftovers.push({
         amount: target.amount,
         name: target.name,
@@ -47,6 +49,7 @@ export function canonicalizeTargets(input: Readonly<{
     }
 
     targets.push({
+      ...(target.basis ? { basis: target.basis } : {}),
       ...(target.acceptableMaximum != null
         ? { acceptableMaximum: target.acceptableMaximum }
         : {}),
@@ -84,6 +87,15 @@ function compareStrings(left: string, right: string) {
   return left.localeCompare(right);
 }
 
+function compareCurrentOrder(left: CanonicalCurrent, right: CanonicalCurrent) {
+  return left.subjectId.localeCompare(right.subjectId) || left.name.localeCompare(right.name) ||
+    left.unit.localeCompare(right.unit) || left.dailyAmount - right.dailyAmount ||
+    (left.minimumDailyAmount ?? left.dailyAmount) - (right.minimumDailyAmount ?? right.dailyAmount) ||
+    (left.maximumDailyAmount ?? left.dailyAmount) - (right.maximumDailyAmount ?? right.dailyAmount) ||
+    (left.productId ?? "").localeCompare(right.productId ?? "") ||
+    (left.certainty ?? "known").localeCompare(right.certainty ?? "known") || left.sourceId.localeCompare(right.sourceId);
+}
+
 export function orderInvariantRequest(request: CanonicalRequest): CanonicalRequest {
   return {
     ...request,
@@ -92,14 +104,12 @@ export function orderInvariantRequest(request: CanonicalRequest): CanonicalReque
       ? [...request.allowedForms].sort(compareStrings)
       : null,
     conditionCodes: [...request.conditionCodes].sort(compareStrings),
-    currentSupplements: [...request.currentSupplements].sort(
-      (left, right) =>
-        left.subjectId.localeCompare(right.subjectId) ||
-        left.sourceId.localeCompare(right.sourceId) ||
-        left.name.localeCompare(right.name) ||
-        left.dailyAmount - right.dailyAmount
-    ),
+    currentSupplements: [...request.currentSupplements].sort(compareCurrentOrder),
     excludeSubjectIds: [...request.excludeSubjectIds].sort(compareStrings),
+    excludeProductIds: [...(request.excludeProductIds ?? [])].sort(compareStrings),
+    unknownIntakeSubjectIds: [...(request.unknownIntakeSubjectIds ?? [])].sort(compareStrings),
+    estimatedIntakeSubjectIds: [...(request.estimatedIntakeSubjectIds ?? [])].sort(compareStrings),
+    dietaryIntake: [...(request.dietaryIntake ?? [])].sort(compareCurrentOrder),
     leftovers: [...request.leftovers].sort(
       (left, right) =>
         (left.subjectId ?? "").localeCompare(right.subjectId ?? "") ||
@@ -116,15 +126,18 @@ export function orderInvariantRequest(request: CanonicalRequest): CanonicalReque
 export function canonicalTargetSetHash(request: CanonicalRequest): string {
   const canonical = orderInvariantRequest(request);
 
-  return createHash("sha256")
-    .update(
+  return sha256Hex(
       JSON.stringify({
         acceptedGapSubjectIds: canonical.acceptedGapSubjectIds,
         allowedForms: canonical.allowedForms,
         conditionCodes: canonical.conditionCodes,
         currency: canonical.currency,
         currentSupplements: canonical.currentSupplements.map((item) => ({
+          certainty: item.certainty,
           amount: item.dailyAmount,
+          minimum: item.minimumDailyAmount,
+          maximum: item.maximumDailyAmount,
+          productId: item.productId,
           name: item.name,
           subjectId: item.subjectId,
           unit: item.unit
@@ -132,6 +145,12 @@ export function canonicalTargetSetHash(request: CanonicalRequest): string {
         destinationCountry: canonical.destinationCountry,
         dietaryPreference: canonical.dietaryPreference,
         excludeSubjectIds: canonical.excludeSubjectIds,
+        excludeProductIds: canonical.excludeProductIds,
+        unknownIntakeSubjectIds: canonical.unknownIntakeSubjectIds,
+        estimatedIntakeSubjectIds: canonical.estimatedIntakeSubjectIds,
+        dietaryIntake: canonical.dietaryIntake?.map((row) => ({ subjectId: row.subjectId, amount: row.dailyAmount, minimum: row.minimumDailyAmount, maximum: row.maximumDailyAmount, unit: row.unit, certainty: row.certainty })),
+        profileKnown: canonical.profileKnown,
+        doseFitVersion: DOSE_FIT_VERSION,
         maxDailyPills: canonical.maxDailyPills,
         maxPriceMinor: canonical.maxPriceMinor,
         maxProductCount: canonical.maxProductCount,
@@ -143,19 +162,24 @@ export function canonicalTargetSetHash(request: CanonicalRequest): string {
         retainSubjectIds: canonical.retainSubjectIds,
         selectorMode: canonical.selectorMode,
         targets: canonical.targets.map((item) => ({
+          basis: item.basis ?? "supplemental",
           amount: item.requestedAmount,
+          importance: item.importance,
+          prerequisite: item.prerequisite,
           name: item.name,
           subjectId: item.subjectId,
           unit: item.requestedUnit
         }))
       })
-    )
-    .digest("hex");
+    );
 }
 
 export function canonicalizeCurrents(
   currents: readonly Readonly<{
+    certainty?: "known" | "estimated" | "unknown";
     dailyAmount: number;
+    minimumDailyAmount?: number;
+    maximumDailyAmount?: number;
     daysRemaining?: number;
     name: string;
     productId?: string;
@@ -167,6 +191,12 @@ export function canonicalizeCurrents(
   const result: CanonicalCurrent[] = [];
 
   for (const current of currents) {
+    const minimum = current.minimumDailyAmount ?? current.dailyAmount;
+    const maximum = current.maximumDailyAmount ?? current.dailyAmount;
+    if (![minimum, current.dailyAmount, maximum].every((value) => Number.isFinite(value) && value >= 0) ||
+      minimum > current.dailyAmount || current.dailyAmount > maximum) {
+      return { error: `Intake ${current.sourceId} must have finite, nonnegative minimum <= dailyAmount <= maximum.`, reason: "unsupported_unit" };
+    }
     const daily = scaleAmount({
       amount: current.dailyAmount,
       subjectId: current.subjectId,
@@ -177,10 +207,21 @@ export function canonicalizeCurrents(
     if (isDoseError(daily)) {
       return { error: daily.message, reason: "unsupported_unit" };
     }
+    if (current.dailyAmount > 0 && daily.units <= BigInt(0)) {
+      return { error: `Intake ${current.sourceId} is below the supported dose resolution.`, reason: "unsupported_unit" };
+    }
+    for (const amount of [minimum, maximum]) {
+      const bound = scaleAmount({ amount, subjectId: current.subjectId, subjectName: current.name, unit: current.unit });
+      if (isDoseError(bound)) return { error: bound.message, reason: "unsupported_unit" };
+      if (amount > 0 && bound.units <= BigInt(0)) return { error: `Intake ${current.sourceId} bound is below the supported dose resolution.`, reason: "unsupported_unit" };
+    }
 
     result.push({
+      ...(current.certainty ? { certainty: current.certainty } : {}),
       daily,
       dailyAmount: current.dailyAmount,
+      ...(current.minimumDailyAmount != null ? { minimumDailyAmount: current.minimumDailyAmount } : {}),
+      ...(current.maximumDailyAmount != null ? { maximumDailyAmount: current.maximumDailyAmount } : {}),
       ...(current.daysRemaining != null ? { daysRemaining: current.daysRemaining } : {}),
       name: current.name,
       ...(current.productId ? { productId: current.productId } : {}),

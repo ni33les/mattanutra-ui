@@ -1,3 +1,4 @@
+import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "./helpers/current-contract-lock.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, before, beforeEach, describe, it } from "node:test";
@@ -125,7 +126,7 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     assert.equal(hygiene.hashes.lockEntry, V18_LOCK_HASH);
     assert.equal(V18_NL_DEF_HASH, "574b78411253f20a7f52a23ade7350a6277d632d14555775c5043bbbd05accca");
     assert.deepEqual([...V18_NL_EXCLUSION], ["/checks/TECH-07"]);
-    assert.equal(AGENTIC_SCHEMA_CHECKSUM, "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6");
+    assert.equal(AGENTIC_SCHEMA_CHECKSUM, CURRENT_CONTRACT_SCHEMA_CHECKSUM);
     assert.equal(V18_TEST_IDS.length, 11);
   });
 
@@ -177,8 +178,9 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
       assert.deepEqual(thReasons[index]?.requestedSupplementIds, enReasons[index]?.requestedSupplementIds);
       assert.equal(thReasons[index]?.message, enReasons[index]?.message);
     }
-    assert.equal(enReasons[0]?.message, V18_STABLE_MESSAGE);
-    assert.equal(thReasons[0]?.message, V18_STABLE_MESSAGE);
+    const message = `This product covers Magnesium at ${coverageOf(en.result)[0]?.deliveredAmount} mg per day.`;
+    assert.equal(enReasons[0]?.message, message);
+    assert.equal(thReasons[0]?.message, message);
   });
 
   it("DEV-LOC-003 only approved presentation paths may differ", async () => {
@@ -245,7 +247,11 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     assert.equal(coverageOf(dose.result)[0]?.requestedAmount, 301);
     assert.equal(coverageOf(stock.result)[0]?.currentAmount, 300);
     assert.equal(coverageOf(optional.result)[0]?.importance, "optional");
-    assert.equal(["needs_input", "blocked"].includes(String(safety.result.status)), true);
+    assert.notEqual(safety.result.status, "blocked");
+    assert.ok((safety.result.safetyGuidance as Array<{ action: string; exposure: number; threshold: number }>).some(
+      row => row.action === "review" && row.exposure === 350 && row.threshold === 350
+    ), "the same real exposure and limit remain visible as advice");
+    assert.equal(((safety.result.questions as Array<{ questionId: string }> | undefined) ?? []).some(row => row.questionId === "q_safety_ack"), false);
     assert.equal(canonicalHashOf(thai.result), canonicalHashOf(baseline.result));
     assert.deepEqual(basketOf(thai.result), basketOf(baseline.result));
     assert.deepEqual(coverageOf(thai.result), coverageOf(baseline.result));
@@ -294,6 +300,12 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     const paths = localeDiff(en, th);
     assert.equal(paths.includes("/basket/0/selectionReason/message"), true);
     assert.equal(firstForbiddenDiff(paths), "/basket/0/selectionReason/message");
+    for (const field of ["message", "uncertainty"]) assert.equal(isClosedAllowlistPath(`/compactDecision/advice/0/${field}`), true);
+    for (const field of ["exposure", "threshold", "code", "severity", "sourceScope"]) {
+      assert.equal(isClosedAllowlistPath(`/compactDecision/advice/0/${field}`), false, field);
+    }
+    assert.equal(isClosedAllowlistPath("/compactDecision/status"), false);
+    assert.equal(isClosedAllowlistPath("/canonical/hash"), false);
   });
 
   it("DEV-DET-001 same-locale replay is byte-identical", async () => {
@@ -344,7 +356,8 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     hold.resolve();
     const [enResults, thResults] = await Promise.all([Promise.all(english), Promise.all(thai)]);
     for (const result of [...enResults, ...thResults]) {
-      assert.equal(selectionReasons(result)[0]?.message, V18_STABLE_MESSAGE);
+      assert.equal(selectionReasons(result)[0]?.message,
+        `This product covers Magnesium at ${coverageOf(result)[0]?.deliveredAmount} mg per day.`);
     }
     for (const result of thResults) {
       assert.equal(hasThaiScript(compactOf(result)), true);

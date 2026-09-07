@@ -19,12 +19,12 @@ describe("Slice A connector copy contract", () => {
     assert.match(lowered, /\bsafety\b/);
   });
 
-  it("COPY-RED-02 description contains exact responsibilityVersion", async () => {
+  it("COPY-RED-02 publishes the exact responsibilityVersion as a contract field", async () => {
     const info = await infoTool({ config: loadAgenticConfig(), locale: "en" });
     assert.equal(info.ok, true);
     assert.equal(typeof info.responsibilityVersion, "string");
-    assert.equal(info.description.includes(String(info.responsibilityVersion)), true);
-    assert.equal(info.description.includes(RESPONSIBILITY_VERSION), true);
+    assert.equal(info.responsibilityVersion, RESPONSIBILITY_VERSION);
+    assert.equal(info.description, CONNECTOR_COPY.en);
   });
 
   it("COPY-RED-03 word budget is at most 45 English words", () => {

@@ -1,8 +1,7 @@
-import { createHash } from "node:crypto";
+import { sha256Hex } from "@/lib/sha256";
 import { compileVariant } from "@/lib/matcher/candidates";
 import { COVERAGE_SCALE } from "@/lib/matcher/config";
 import { productRejectionReason } from "@/lib/matcher/eligibility";
-import { exposureExceedsCeiling } from "@/lib/matcher/safety";
 import { seedState, tryAddVariant } from "@/lib/matcher/search";
 import type {
   CanonicalRequest,
@@ -26,10 +25,7 @@ export function publicCoveragePercent(basket: ScoredBasket | null) {
 }
 
 export function optionIdFor(productIds: readonly string[]) {
-  return `opt_${createHash("sha256")
-    .update([...productIds].sort().join("|"))
-    .digest("hex")
-    .slice(0, 16)}`;
+  return `opt_${sha256Hex([...productIds].sort().join("|")).slice(0, 16)}`;
 }
 
 function asRejected(
@@ -75,40 +71,26 @@ function seedUnusableReason(
 
   if (
     request.maxPriceMinor != null &&
-    group.product.unitPriceMinor * variant.dailyUnits > request.maxPriceMinor
+    group.product.unitPriceMinor > request.maxPriceMinor
   ) {
     return "budget";
   }
 
-  for (const [subjectId, amount] of variant.contributions) {
-    const next =
-      (seed.exposure.get(subjectId) ?? BigInt(0)) + amount.units;
+  return "incidental_only";
 
-    if (exposureExceedsCeiling(request, subjectId, next)) {
-      return "ul_exceeded";
-    }
-  }
-
-  if (request.profile.lifeStage === "child") {
-    return "life_stage";
-  }
-
-  return "ul_exceeded";
 }
 
 export function rejectedCandidatesFor(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
   groups: readonly ProductGroup[],
-  deadlineAt?: number
+  _deadlineAt?: number
 ): RejectedCandidate[] {
-  const compiled = new Map(groups.map((item) => [item.productId, item]));
+  void _deadlineAt;
+  const compiled = new Map(groups.map((item) => [`${item.sellerId}:${item.productId}`, item]));
   const rejected: RejectedCandidate[] = [];
 
   for (const product of catalog.products) {
-    if (deadlineAt != null && Date.now() >= deadlineAt) {
-      break;
-    }
     const eligibility = productRejectionReason(product, request);
 
     if (eligibility) {
@@ -116,7 +98,7 @@ export function rejectedCandidatesFor(
       continue;
     }
 
-    const group = compiled.get(product.productId);
+    const group = compiled.get(`${product.sellerId}:${product.productId}`);
 
     if (group) {
       const unusable = seedUnusableReason(group, request);
@@ -151,15 +133,7 @@ export function rejectedCandidatesFor(
       continue;
     }
 
-    for (const [subjectId, amount] of variant.contributions) {
-      const next =
-        (seedState(request).exposure.get(subjectId) ?? BigInt(0)) + amount.units;
 
-      if (exposureExceedsCeiling(request, subjectId, next)) {
-        rejected.push(asRejected(product, "ul_exceeded"));
-        break;
-      }
-    }
   }
 
   return rejected.sort(

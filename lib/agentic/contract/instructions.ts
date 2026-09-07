@@ -1,36 +1,23 @@
-import { recognisedNamesForPlanCopy } from "@/lib/agentic/catalogue/fixtures";
+import { GUIDE_ESSENTIALS, CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI } from "@/lib/agentic/contract/guide";
 import { connectorCopy } from "@/lib/agentic/discovery/content";
 
-function planRecognisedNamesSentence() {
-  const names = recognisedNamesForPlanCopy();
-
-  if (names.length < 2) {
-    return `Recognised names include ${names[0] ?? "Vitamin D3"}.`;
-  }
-
-  return `Recognised names include ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}.`;
-}
-
-export const AGENTIC_SERVER_INSTRUCTIONS =
-  "The purchasing flow is plan, then execute, then external MattaNutra checkout, then order polling. Polling is the only continuation method. Confirm payment only when order.paymentStatus is paid. Continue fulfilment polling while order.terminal is false; stop when terminal is true. After execute, the customer opens checkoutUrl on MattaNutra, enters delivery details for the planned destination country, ticks AI-agent authorization, and pays in Stripe Test Mode. Call tools only by the short names info, plan, execute, order, support, feedback, evidence. Never prefix mattanutra_dev. Use evidence with the plan evidenceHandle and claimIds to read approved sources; evidence never changes a plan. An algae-named omega-3 target is algae-source; fish DHA/EPA is wrong_source. Vitamin K2, MK-7 and Menaquinone-7 map to one recognised supplement and do not become leftover not_in_catalogue. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching; send a full request only when targets or requirements change. optionId stays sticky until the host selects another option or changes targets. After execute, or after 3 plan calls on the same planHandle, optionally invite feedback. Call feedback only when the person consents, using their rating and notes; never invent consent or a rating. Send plan request.profile.sex as female or male; omit the field if unknown. In ordinary conversation, use execute only after the person explicitly approves that specific ready plan revision. MattaNutra supplies product and safety facts; it does not diagnose or replace qualified clinical advice. Responsibility version is responsibility-3.0.0.";
+export const AGENTIC_SERVER_INSTRUCTIONS = `${GUIDE_ESSENTIALS} Guide: ${CLIENT_GUIDE_URI}. Schema: ${CONTRACT_SCHEMA_URI}. DEV uses Stripe Test Mode; explicit customer confirmation of the exact current option/revision is required before execute. Feedback remains optional and requires explicit consent.`;
 
 export const AGENTIC_TOOL_DESCRIPTIONS = {
   evidence:
     "Read approved, plan-linked research claims for one evidence handle. Send only that handle, optional attached claim IDs, locale, and summary or sources. This never changes a plan.",
-  execute:
-    "After the person confirms one ready plan, create a single MattaNutra checkout for that revision. Send the plan handle, expected revision, and a stable idempotency key. Do not call this for a plan that still needs answers.",
+  execute: "After explicit customer confirmation of this technically ready option/revision, create or recover its external checkout. Use the same idempotency key and payload for retries. Health advice does not block checkout. Existing checkout/payment identity takes priority over plan refresh.",
   feedback:
     "Submit optional consented improvement notes for one plan revision. This never changes a plan or checkout. Require consentConfirmed=true.",
   info: connectorCopy("en"),
   order:
     "Read payment and fulfilment for an existing checkout using only the order handle. Poll no faster than pollAfterSeconds while terminal is false, including after payment; stop when terminal is true.",
-  plan: "Create or refine a supplement stack from agreed nutrient targets, profile, current intake, and constraints. Send profile.ageYears (not profile.age), profile.sex (female or male; omit the field if unknown), and profile.lifeStage. Send medications as request.medicationCodes and conditions as request.conditionCodes — not profile.medications, profile.conditions, medications, or conditions. Exclusions are request.requirements.excludeSupplementIds. request.optimization is one of balanced, best_coverage, lowest_cost, fewest_pills (a string, not an object). Target objects are name, amount, unit, and optional importance (core, optional, conditional, required; omitted importance stays required), acceptableRange, and prerequisite. algae_only remains its own flag. An algae-named omega-3 target is algae-source even without that flag; fish DHA/EPA is wrong_source. Set operation to create, revise, answer, select, or get. This tool never starts a purchase.",
+  plan: "Create, get, revise, answer or select agreed nutrient targets. Read each operation schema. revise.request replaces the request; revise.requestPatch merges objects and replaces arrays, [] clears, null is invalid. requirements.excludeProductIds rejects one product; excludeSupplementIds excludes a nutrient. Health concerns are serious advice and never require acknowledgement. Unknown profile/intake is allowed. Preserve constraints and confirm the selected revision before execute.",
   support:
     "Create or reply to a help case for an existing order. Omit supportHandle to open a case; include it to reply."
 } as const;
 
-export const AGENTIC_UAT_SERVER_INSTRUCTIONS =
-  "The purchasing flow is plan, then execute, then external MattaNutra checkout, then order polling. Polling is the only continuation method. Confirm payment only when order.paymentStatus is paid. Continue fulfilment polling while order.terminal is false; stop when terminal is true. After execute, the customer opens checkoutUrl on MattaNutra, enters delivery details for the planned destination country, ticks AI-agent authorization, and pays in Stripe Test Mode. Use Stripe test card 4000000000009995 once for insufficient_funds, poll order until unpaid/declined/insufficient_funds/stateVersion=1, then pay the same checkout with 4242424242424242 and poll until paid/stateVersion=2. For 3DS use a separate unpaid checkout and card 4000000000003220. Do not use live cards. Do not use DEV mock payment scenarios or the DEV internal evidence harness. Do not use any callback, webhook-to-agent, or return-to-agent path. The calling agent learns payment and fulfilment ONLY by polling order(orderHandle). Call tools only by the short names info, plan, execute, order, support, feedback, evidence. Never prefix mattanutra_uat. Use evidence with the plan evidenceHandle and claimIds to read approved sources; evidence never changes a plan. When the user asks to run the UAT pack, open with Official MattaNutra UAT QA Pack and PASS or FAIL for U1 through U10 plus a /10 score. After execute, or after 3 plan calls on the same planHandle, optionally invite feedback. Call feedback only when the person consents, using their rating and notes; never invent consent or a rating. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching; send a full request only when targets or requirements change. optionId stays sticky until the host selects another option or changes targets. The Official MattaNutra Agentic QA Pack is a script, not an MCP tool; never add it to tools/list. Official MattaNutra Agentic QA Pack scores A1–A13 = 13/13 plus A15/A16; first line Official MattaNutra Agentic QA Pack, NN/13. When the user says run the full agentic test pack, follow A1–A13 and A15–A16 and print T1–T3. Send plan request.profile.sex as female or male; omit the field if unknown. Do not open with the D1–D10 /100 pack. A9 is GET-only; do not POST pay; do not ChatGPT. MattaNutra supplies product and safety facts; it does not diagnose or replace qualified clinical advice.";
+export const AGENTIC_UAT_SERVER_INSTRUCTIONS = `${GUIDE_ESSENTIALS} UAT uses Stripe Test Mode. Do not use live cards or DEV mock scenarios. After execute or after 3 plan calls, optionally invite feedback, only when the person consents.`;
 
 export const AGENTIC_UAT_TOOL_DESCRIPTIONS = {
   evidence: AGENTIC_TOOL_DESCRIPTIONS.evidence,
@@ -46,8 +33,7 @@ export const AGENTIC_UAT_TOOL_DESCRIPTIONS = {
     "Create or reply to support for an existing order using its orderHandle. Omit supportHandle to create a case; include it to reply."
 } as const;
 
-export const AGENTIC_PRD_SERVER_INSTRUCTIONS =
-  "The purchasing flow is plan, then execute, then external MattaNutra checkout, then order polling. Polling is the only continuation method. Confirm payment only when order.paymentStatus is paid. Continue fulfilment polling while order.terminal is false; stop when terminal is true. After execute, the customer opens checkoutUrl on MattaNutra, enters delivery details for the planned destination country, ticks AI-agent authorization, and pays. Do not use Stripe test cards. Do not use DEV mock payment scenarios or the DEV internal evidence harness. Do not use any callback, webhook-to-agent, or return-to-agent path. The calling agent learns payment and fulfilment ONLY by polling order(orderHandle). Call tools only by the short names info, plan, execute, order, support, feedback, evidence. Never prefix a server name onto those tool names. Use evidence with the plan evidenceHandle and claimIds to read approved sources; evidence never changes a plan. After execute, or after 3 plan calls on the same planHandle, optionally invite feedback. Call feedback only when the person consents, using their rating and notes; never invent consent or a rating. expectedRevision plus answers and safetyAcknowledgement patches the current option without rematching; send a full request only when targets or requirements change. optionId stays sticky until the host selects another option or changes targets. Send plan request.profile.sex as female or male; omit the field if unknown. MattaNutra supplies product and safety facts; it does not diagnose or replace qualified clinical advice.";
+export const AGENTIC_PRD_SERVER_INSTRUCTIONS = `${GUIDE_ESSENTIALS} The customer pays the merchant checkout; do not use test cards. Feedback requires explicit consent.`;
 
 export const AGENTIC_PRD_TOOL_DESCRIPTIONS = {
   evidence: AGENTIC_TOOL_DESCRIPTIONS.evidence,
@@ -84,6 +70,8 @@ export function agenticToolDescriptions(
         : AGENTIC_UAT_TOOL_DESCRIPTIONS;
   return {
     ...base,
+    plan: "Create, get, revise, answer or select agreed nutrient targets. Read each operation schema. revise.request replaces the request; revise.requestPatch merges objects and replaces arrays, [] clears, null is invalid. requirements.excludeProductIds rejects one product; excludeSupplementIds excludes a nutrient. Health concerns are serious advice and never require acknowledgement. Unknown profile/intake is allowed. Preserve constraints and confirm the selected revision before execute.",
+    execute: "After explicit customer confirmation of this technically ready option/revision, create or recover its external checkout. Use the same idempotency key and payload for retries. Health advice does not block checkout. Existing checkout/payment identity takes priority over plan refresh.",
     info: connectorCopy(locale)
   };
 }

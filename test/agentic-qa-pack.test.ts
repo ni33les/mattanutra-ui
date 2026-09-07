@@ -13,6 +13,7 @@ import {
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { engineeringInfo } from "../lib/agentic/info.ts";
+import type { PlanResult } from "../lib/agentic/plan/types.ts";
 import { AGENTIC_SERVER_INSTRUCTIONS } from "../lib/agentic/contract/instructions.ts";
 import { mcpTestBatches, mcpTestFiles } from "../scripts/agentic-qa-pack.mjs";
 import {
@@ -132,12 +133,14 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
     );
   });
 
-  it("A2 answers+expectedRevision patch stays sticky", async () => {
+  it("A2 explicit prerequisite answer preserves targets and medication context", async () => {
     const runtime = runtimeFor();
     const created = await call(runtime, "plan", {
       idempotencyKey: "qa-a2-create-0000001",
       request: baseRequest({
-        medicationCodes: ["apixaban"]
+        medicationCodes: ["apixaban"],
+        requirements: { maxProductCount: 8 },
+        targets: eightTargets().map((target) => target.name === "Iron" ? { ...target, importance: "conditional", prerequisite: { status: "unknown" } } : target)
       })
     });
     assert.equal(created.ok, true);
@@ -145,40 +148,35 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
     const zincB12 = namesInBasket(created);
     assert.ok(zincB12.some((name) => /zinc/i.test(name)));
     assert.ok(zincB12.some((name) => /b12/i.test(name)));
-    const optionId = created.optionId;
     const questions = (created.questions as Array<{
       questionId?: string;
       choices?: Array<{ choice?: string }>;
     }>) ?? [];
-    const answers = questions.flatMap((question) => {
-      const choice = question.choices?.[0]?.choice;
-      if (question.questionId === "q_safety_ack" && choice) {
-        return [{ questionId: "q_safety_ack", choice }];
-      }
-      if (String(question.questionId).startsWith("q_gap_") && choice) {
-        return [{ questionId: question.questionId, choice }];
-      }
-      return [];
-    });
+    const prerequisite = questions.find((question) => question.choices?.some((choice) => choice.choice?.startsWith("satisfy_prerequisite:")));
+    assert.ok(prerequisite, "explicit prerequisites remain actionable customer decisions");
+    assert.equal(questions.some((question) => question.questionId === "q_safety_ack"), false);
     const patched = await call(runtime, "plan", {
-      answers,
+      operation: "answer",
+      answers: [{ questionId: prerequisite.questionId, choice: prerequisite.choices!.find((choice) => choice.choice?.startsWith("satisfy_prerequisite:"))!.choice }],
       expectedRevision: created.revision,
       idempotencyKey: "qa-a2-patch-00000001",
-      planHandle: created.planHandle,
-      safetyAcknowledgement: created.guidanceIds
-        ? {
-            confirmed: true,
-            guidanceIds: created.guidanceIds,
-            revision: created.revision
-          }
-        : undefined
+      planHandle: created.planHandle
     });
-    assert.equal(patched.ok, true);
-    assert.equal(patched.optionId, optionId);
-    assert.equal(
-      (patched.basket as unknown[]).length,
-      (created.basket as unknown[]).length
-    );
+    assert.equal(patched.ok, true, JSON.stringify(patched));
+    assert.equal(patched.status, "ready");
+    const [planId] = await runtime.store.listPlanIdsByPrincipal("agentic-qa");
+    const stored = (await runtime.store.getPlanRevision(planId, Number(patched.revision)))!.result as PlanResult;
+    assert.deepEqual(stored.originalRequest?.medicationCodes, ["apixaban"]);
+    assert.equal(stored.originalRequest?.requirements?.maxProductCount, 8);
+    assert.equal(stored.requestSnapshot.targets.find(target => target.name === "Iron")?.prerequisite?.status, "satisfied");
+    assert.deepEqual(stored.originalRequest?.targets.map(({ name, amount, unit }) => ({ name, amount, unit })), eightTargets());
+    const selected = await call(runtime, "plan", {
+      operation: "select", planHandle: patched.planHandle, expectedRevision: patched.revision,
+      idempotencyKey: "qa-a2-select-0000001", optionId: patched.optionId
+    });
+    assert.equal(selected.ok, true, JSON.stringify(selected));
+    assert.equal(selected.optionId, patched.optionId);
+    assert.deepEqual(selected.basket, patched.basket);
     const after = namesInBasket(patched);
     assert.ok(after.some((name) => /zinc/i.test(name)));
     assert.ok(after.some((name) => /b12/i.test(name)));
@@ -195,13 +193,13 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
       request: baseRequest()
     });
     const sticky = await call(runtime, "plan", {
-      expectedRevision: created.revision,
-      idempotencyKey: "qa-a3-sticky-0000001",
+      operation: "get",
       planHandle: created.planHandle
     });
     assert.equal(sticky.ok, true);
     assert.equal(sticky.optionId, created.optionId);
     const changed = await call(runtime, "plan", {
+      operation: "revise",
       expectedRevision: sticky.revision,
       idempotencyKey: "qa-a3-change-0000001",
       planHandle: created.planHandle,
@@ -213,7 +211,7 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
     assert.notEqual(changed.optionId, created.optionId);
   });
 
-  it("A4 safety ack is per family and wrong revision errors", async () => {
+  it("A4 clinical advice uses stable family IDs and stale selection revisions fail", async () => {
     const runtime = runtimeFor();
     const created = await call(runtime, "plan", {
       idempotencyKey: "qa-a4-create-0000001",
@@ -225,20 +223,18 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
     const ids = (created.guidanceIds as string[]) ?? [];
     assert.ok(ids.some((id) => id === "gdn:medication_interaction:omega3+anticoagulant"));
     assert.equal(ids.some((id) => /prd_/.test(id)), false);
+    assert.equal(((created.questions as Array<{ questionId: string }>) ?? []).some((question) => question.questionId === "q_safety_ack"), false);
     const stale = await call(runtime, "plan", {
-      expectedRevision: created.revision,
+      operation: "select",
+      expectedRevision: 99,
       idempotencyKey: "qa-a4-stale-00000001",
       planHandle: created.planHandle,
-      safetyAcknowledgement: {
-        confirmed: true,
-        guidanceIds: ids,
-        revision: 99
-      }
+      optionId: created.optionId
     });
     assert.equal(stale.ok, false);
     assert.equal(
       (stale.error as { reasonCode: string }).reasonCode,
-      "stale_safety_acknowledgement"
+      "stale_revision"
     );
   });
 
@@ -484,12 +480,12 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
     assert.match(unsafe.stderr, /isolated localhost/);
     const uat = run([], { MATTANUTRA_ENV: "uat" });
     assert.equal(uat.status, 2);
-    assert.match(uat.stderr, /targets DEV/);
+    assert.match(uat.stderr, /MATTANUTRA_ENV=dev/);
   });
 
   it("T3 initialize instructions invite consented feedback", () => {
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /after 3 plan calls/);
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /only when the person consents/);
+    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /Feedback remains optional/);
+    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /requires explicit consent/);
     assert.equal(/A1–A13 = 13\/13/.test(AGENTIC_SERVER_INSTRUCTIONS), false);
     const schema = readFileSync(
       new URL("../scripts/apply-agentic-commerce-schema.ts", import.meta.url),

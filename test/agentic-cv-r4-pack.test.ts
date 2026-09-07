@@ -46,7 +46,6 @@ import {
   authoritativeEmptySchedule,
   cashIsNullNotZero,
   cashValue,
-  daysChoice,
   consumptionReasons,
   durationQuestions,
   durationReasons,
@@ -60,11 +59,9 @@ import {
   optionRecords,
   presentCoverageAvailable,
   presentSafetyAvailable,
-  questionChoices,
   rawSchedule,
   scheduleUnavailable,
-  serviceCanonicalHash,
-  unknownDurationChoice
+  serviceCanonicalHash
 } from "./agentic/value/r4-oracle.ts";
 
 const DUR_IDS = ["R4-DUR-01", "R4-DUR-02", "R4-DUR-03"] as const;
@@ -187,6 +184,7 @@ function magAdultRequest(
     conditionCodes: [] as string[],
     costHorizonsDays: [30, 90],
     currentSupplements: current,
+    intake: mag ? [{ source: "diet" as const, certainty: "known" as const, supplementId: mag.supplementId, name: mag.name, amount: 0, unit: "mg" as const }] : [],
     destinationCountry: "TH",
     locale: "en",
     medicationCodes: [] as string[],
@@ -206,7 +204,14 @@ function magAdultRequest(
 }
 
 function magPurchaseRequest(session: PlanSession) {
-  return { ...magAdultRequest(session, { daysRemaining: 90 }), currentSupplements: [] };
+  // The schedule case needs a catalogue-backed product with a known pack size.
+  // Dose-first matching may otherwise correctly select a product with an unknown horizon.
+  const product = completeProducts(session).find(item => /magnesium/i.test(item.candidate.title));
+  const fact = product?.candidate.facts.find(item => item.name === "Magnesium" && item.unit === "mg");
+  assert.ok(product && fact && fact.amount > 0, "Schedule fixture requires a quantified magnesium product with complete pack facts");
+  return { ...magAdultRequest(session, { dailyAmount: fact.amount, daysRemaining: 90 }), currentSupplements: [],
+    requirements: { maxProductCount: 1, excludeProductIds: [...new Set(session.freeze.snapshot.products
+      .filter(item => item.productId !== product.productId).map(item => item.productId))] } };
 }
 
 function magCoveredRequest(session: PlanSession, daysRemaining: number, dailyAmount = 300) {
@@ -255,7 +260,7 @@ function magSafetyAction(plan: Record<string, unknown>) {
     return "block";
   }
   if (items.some((item) => item.action === "acknowledge" || item.code === "dose_review_required")) {
-    return "acknowledge";
+    return "review";
   }
   return "clear";
 }
@@ -294,7 +299,7 @@ function durationReasonOk(plan: Record<string, unknown>) {
     const dependents = stringList(row.dependentCapabilities).join(" ").toLowerCase();
     return (
       String(row.reasonCode) === "current_inventory_duration_unknown" &&
-      names.includes("daysRemaining") &&
+      names.some(name => name === "daysRemaining" || name.endsWith(".daysRemaining")) &&
       (/schedule|cash|replenish|comparison|saving/.test(dependents) || dependents.length > 0)
     );
   });
@@ -310,8 +315,6 @@ async function runDur01(session: PlanSession, runIndex: number): Promise<R4CaseR
   const known = await createPlan(session, magAdultRequest(session, { daysRemaining: 30 }));
   const row = magCoverage(plan);
   const questions = durationQuestions(plan);
-  const question = questions[0];
-  const choices = questionChoices(question);
   const economics = economicsOf(plan);
   const inventory = Array.isArray(asRecord(plan.comparisonBasis).currentInventory)
     ? asRecord(plan.comparisonBasis).currentInventory.map(asRecord)
@@ -352,21 +355,8 @@ async function runDur01(session: PlanSession, runIndex: number): Promise<R4CaseR
         plan.comparisonComplete === false
     ),
     assertTrue("DUR-01.reason", durationReasonOk(plan)),
-    assertEq("DUR-01.oneQuestion", 1, questions.length),
-    assertTrue(
-      "DUR-01.questionId",
-      String(question?.questionId ?? "").startsWith(`q_inventory_duration_${mag.supplementId}`)
-    ),
-    assertTrue(
-      "DUR-01.unknownChoice",
-      choices.some((item) => /unknown/i.test(`${item.choice ?? ""} ${item.label ?? ""}`))
-    ),
-    assertTrue(
-      "DUR-01.daysChoice",
-      choices.some((item) => /days:\d+/.test(String(item.choice))) ||
-        /day/i.test(String(question?.prompt ?? ""))
-    ),
-    assertTrue("DUR-01.needsInput", plan.status === "needs_input"),
+    assertEq("DUR-01.noForcedQuestion", 0, questions.length),
+    assertEq("DUR-01.noPurchase", "no_purchase", plan.status),
     assertTrue("DUR-01.usable", presentCoverageAvailable(plan) && presentSafetyAvailable(plan)),
     assertTrue("DUR-01.noGuess", !guessedDays),
     assertTrue(
@@ -381,31 +371,16 @@ async function runDur01(session: PlanSession, runIndex: number): Promise<R4CaseR
 async function runDur02(session: PlanSession, runIndex: number): Promise<R4CaseResult> {
   const request = magAdultRequest(session);
   const created = await createPlan(session, request);
-  const question = durationQuestions(created)[0];
-  if (!question) {
-    const assertions = [assertTrue("DUR-02.question", false)];
-    return conclude(
-      "R4-DUR-02",
-      assertions,
-      envelopeFor(session, request, created, assertions, runIndex)
-    );
-  }
-  const choice = daysChoice(question, 30);
-  const key = `r4-dur-02-${runIndex}`;
-  const answered = await callPlan(session, {
-    answers: [{ choice, questionId: String(question.questionId) }],
+  const requestPatch = { currentSupplements: magCoveredRequest(session, 30).currentSupplements };
+  const mutation = {
     expectedRevision: created.revision,
-    idempotencyKey: key,
-    operation: "answer",
-    planHandle: created.planHandle
-  });
-  const replay = await callPlan(session, {
-    answers: [{ choice, questionId: String(question.questionId) }],
-    expectedRevision: created.revision,
-    idempotencyKey: key,
-    operation: "answer",
-    planHandle: created.planHandle
-  });
+    idempotencyKey: `r4-duration-refine-${runIndex}`,
+    operation: "revise",
+    planHandle: created.planHandle,
+    requestPatch
+  };
+  const answered = await callPlan(session, mutation);
+  const replay = await callPlan(session, mutation);
   const economics = economicsOf(answered);
   const in90 = scheduleOf(answered, 90);
   const assertions = [
@@ -443,33 +418,28 @@ async function runDur02(session: PlanSession, runIndex: number): Promise<R4CaseR
   return conclude(
     "R4-DUR-02",
     assertions,
-    envelopeFor(session, { request, choice }, answered, assertions, runIndex, "same-key")
+    envelopeFor(session, { request, requestPatch }, answered, assertions, runIndex, "same-key")
   );
 }
 
 async function runDur03(session: PlanSession, runIndex: number): Promise<R4CaseResult> {
   const request = magAdultRequest(session);
   const created = await createPlan(session, request);
-  const question = durationQuestions(created)[0];
-  if (!question) {
-    const assertions = [assertTrue("DUR-03.question", false)];
-    return conclude(
-      "R4-DUR-03",
-      assertions,
-      envelopeFor(session, request, created, assertions, runIndex)
-    );
-  }
-  const choice = unknownDurationChoice(question);
-  const answered = await callPlan(session, {
-    answers: [{ choice, questionId: String(question.questionId) }],
+  // Keeping the duration unknown remains an explicit, idempotent refinement.
+  const requestPatch = {};
+  const mutation = {
     expectedRevision: created.revision,
-    idempotencyKey: `r4-dur-03-${runIndex}`,
-    operation: "answer",
-    planHandle: created.planHandle
-  });
+    idempotencyKey: `r4-duration-unknown-${runIndex}`,
+    operation: "revise",
+    planHandle: created.planHandle,
+    requestPatch
+  };
+  const answered = await callPlan(session, mutation);
+  const replay = await callPlan(session, mutation);
   const narrative = narrativeBlob(answered);
   const assertions = [
     assertEq("DUR-03.handle", created.planHandle, answered.planHandle),
+    assertEq("DUR-03.replay", rawResponseHash(answered), rawResponseHash(replay)),
     assertEq("DUR-03.noQ", 0, durationQuestions(answered).length),
     assertTrue("DUR-03.coverage", presentCoverageAvailable(answered)),
     assertTrue("DUR-03.safety", presentSafetyAvailable(answered)),
@@ -481,7 +451,7 @@ async function runDur03(session: PlanSession, runIndex: number): Promise<R4CaseR
     assertTrue(
       "DUR-03.narrative",
       String(answered.summaryKey ?? "").includes("duration") ||
-        (/cover/.test(narrative) && /cannot|unknown|timing|duration|not yet/.test(narrative))
+        (/current stock/.test(narrative) && /cannot|unknown|timing|duration|not yet/.test(narrative))
     ),
     assertTrue("DUR-03.noClaim", futureCoverageClaim(answered) == null),
     assertTrue("DUR-03.notBlocked", answered.status !== "blocked")
@@ -489,7 +459,7 @@ async function runDur03(session: PlanSession, runIndex: number): Promise<R4CaseR
   return conclude(
     "R4-DUR-03",
     assertions,
-    envelopeFor(session, { request, choice }, answered, assertions, runIndex, "same-key")
+    envelopeFor(session, { request, requestPatch }, answered, assertions, runIndex, "same-key")
   );
 }
 
@@ -574,19 +544,11 @@ async function runCon01(session: PlanSession, runIndex: number): Promise<R4CaseR
       "CON-01.noInfer",
       economics.consumption90DayMinor == null && !blob.includes("historical")
     ),
-    assertTrue("CON-01.cashComplete", economics.cashComplete === true || plan.cashComplete === true),
-    assertEq("CON-01.cash30", 0, Number(plan.cash30DayMinor ?? economics.cash30DayMinor)),
-    assertEq(
-      "CON-01.cash90",
-      cashFromEvents(in90),
-      Number(plan.cash90DayMinor ?? economics.cash90DayMinor)
-    ),
-    assertTrue(
-      "CON-01.comparison",
-      economics.comparisonComplete === true ||
-        (economics.equivalent === true &&
-          Number(economics.cash90DayMinor) === Number(asRecord(economics.baseline).cash90DayMinor))
-    ),
+    assertEq("CON-01.cashIncomplete", false, economics.cashComplete),
+    assertEq("CON-01.cash30", null, plan.cash30DayMinor),
+    assertEq("CON-01.cash90", null, plan.cash90DayMinor),
+    assertEq("CON-01.comparison", false, economics.comparisonComplete),
+    assertEq("CON-01.noInventedRefill", 0, in90.length),
     assertTrue(
       "CON-01.saving",
       economics.savings90DayMinor == null ||
@@ -823,8 +785,8 @@ async function runCan02(session: PlanSession, runIndex: number): Promise<R4CaseR
   ];
   const assertions = [
     assertEq("CAN-02.349", "clear", magSafetyAction(plans[349])),
-    assertEq("CAN-02.350", "acknowledge", magSafetyAction(plans[350])),
-    assertEq("CAN-02.351", "block", magSafetyAction(plans[351])),
+    assertEq("CAN-02.350", "review", magSafetyAction(plans[350])),
+    assertEq("CAN-02.351", "review", magSafetyAction(plans[351])),
     assertTrue("CAN-02.uniqueService", new Set(hashes).size === 3 && hashes.every((item) => item.length > 0)),
     assertTrue("CAN-02.uniqueIndependent", new Set(independent).size === 3),
     assertTrue("CAN-02.fields349", coverageHasSafetyIdentity(magCoverage(plans[349]))),
@@ -1028,15 +990,12 @@ async function runReg02(session: PlanSession, runIndex: number): Promise<R4CaseR
   const economics = economicsOf(plan);
   const in90 = scheduleOf(plan, 90);
   const assertions = [
-    assertTrue("REG-02.cashComplete", economics.cashComplete === true || plan.cashComplete === true),
-    assertEq("REG-02.cash30", 0, Number(plan.cash30DayMinor ?? economics.cash30DayMinor)),
-    assertEq("REG-02.cash90", cashFromEvents(in90), Number(plan.cash90DayMinor ?? economics.cash90DayMinor)),
-    assertTrue(
-      "REG-02.comparison",
-      economics.comparisonComplete === true ||
-        (economics.equivalent === true &&
-          Number(economics.cash90DayMinor) === Number(asRecord(economics.baseline).cash90DayMinor))
-    ),
+    assertEq("REG-02.cashIncomplete", false, economics.cashComplete),
+    assertEq("REG-02.cash30", null, plan.cash30DayMinor),
+    assertEq("REG-02.cash90", null, plan.cash90DayMinor),
+    assertEq("REG-02.noInventedRefill", 0, in90.length),
+    assertEq("REG-02.comparison", false, economics.comparisonComplete),
+    assertTrue("REG-02.missingIdentity", (economics.unavailableReasons as Array<{ reasonCode: string }>).some(row => row.reasonCode === "current_inventory_product_unknown")),
     assertTrue(
       "REG-02.consumptionNull",
       economics.consumption90DayMinor == null || economics.consumptionComplete === false
@@ -1058,9 +1017,9 @@ async function runReg03(session: PlanSession, runIndex: number): Promise<R4CaseR
   );
   const assertions = [
     assertEq("REG-03.349", "clear", magSafetyAction(clear)),
-    assertEq("REG-03.350", "acknowledge", magSafetyAction(review)),
-    assertEq("REG-03.351", "block", magSafetyAction(blockedPlan)),
-    assertEq("REG-03.351status", "blocked", blockedPlan.status)
+    assertEq("REG-03.350", "review", magSafetyAction(review)),
+    assertEq("REG-03.351", "review", magSafetyAction(blockedPlan)),
+    assertEq("REG-03.351status", "no_purchase", blockedPlan.status)
   ];
   return conclude(
     "R4-REG-03",
@@ -1210,7 +1169,7 @@ export async function runCvR4Pack(
   if (!frozen.usable) {
     return {
       cases: PACK_IDS.map((id) => blocked(id, { freeze: "unusable" })),
-      contractVersion: "3.0.0",
+      contractVersion: "4.0.0",
       passedCases: 0,
       snapshotId: "",
       totalCases: PACK_IDS.length
@@ -1242,7 +1201,7 @@ export async function runCvR4Pack(
     cases.push(await runCase("R4-REG-06", () => runReg06(session, runIndex, commerce, responses)));
     return {
       cases,
-      contractVersion: "3.0.0",
+      contractVersion: "4.0.0",
       passedCases: cases.filter((item) => item.result === "PASS").length,
       snapshotId: session.snapshotId,
       totalCases: PACK_IDS.length
@@ -1278,14 +1237,14 @@ describe("Customer value implementation pack v1.4", () => {
       t.diagnostic(JSON.stringify({ first, second }));
     }
     assert.equal(canonicalR4Report(first), canonicalR4Report(second), "v1.4 runs diverged");
-    assert.equal(MATCHER_VERSION, "pareto-hybrid-1");
-    assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v1.0");
+    assert.equal(MATCHER_VERSION, "advisory-dose-fit-2");
+    assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
     const failed = [...first.cases, ...second.cases].filter((item) => item.result !== "PASS");
     assert.equal(
       failed.length,
       0,
       failed
-        .map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.result)}`)
+        .map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.evidence)}`)
         .join("; ")
     );
   });

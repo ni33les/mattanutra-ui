@@ -27,7 +27,7 @@ function isPlanHandlePoll(payload: unknown, responseJson: string) {
     return false;
   }
 
-  if (body.request != null || body.selectOptionId != null) {
+  if (body.request != null || body.requestPatch != null || body.optionId != null || body.selectOptionId != null) {
     return false;
   }
 

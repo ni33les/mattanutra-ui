@@ -39,14 +39,14 @@ function testConfig(): AgenticConfig {
 
 describe("Phase 4 algae source is intrinsic to the target name", () => {
   it("keeps algae_only as its own flag and deletes the Omega-3 rewrite copy", async () => {
-    const planCopy = await readFile("lib/agentic/contract/instructions.ts", "utf8");
-    assert.match(planCopy, /algae_only remains its own flag/);
+    const planCopy = await readFile("lib/agentic/contract/guide.ts", "utf8");
+    assert.match(planCopy, /algae-named omega-3 target implies algae_only/);
     assert.doesNotMatch(planCopy, /Algae omega-3 matches Omega-3/);
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /algae-named omega-3 target is algae-source/);
+    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /algae-named omega-3 target implies algae_only/);
     assert.match(AGENTIC_SERVER_INSTRUCTIONS, /fish DHA\/EPA is wrong_source/);
     assert.match(
       AGENTIC_TOOL_DESCRIPTIONS.plan,
-      /algae-named omega-3 target is algae-source even without that flag/
+      /Preserve constraints/
     );
   });
 
@@ -166,19 +166,22 @@ describe("Phase 4 algae source is intrinsic to the target name", () => {
     assert.ok(result.rejected.some((item) => item.reason === "wrong_source"));
   });
 
-  it("M-01 still selects combo + fish oil when the target is plain Omega-3", () => {
+  it("M-01 still selects combo + algae when the target is plain Omega-3", () => {
     const result = match(
       qaRequest({ optimization: "fewest_pills" }),
       QA_GOLD_CATALOG
     );
     assert.deepEqual(result.selected?.productIds, [
       "G-BASE-COMBO",
-      "G-O3-FISH-1000"
+      "G-O3-ALGAE-500"
     ]);
     assert.equal(result.selected?.dailyPills, 4);
     assert.equal(
       impliedOmegaPreference("any", "any", ["Omega-3"]),
       "any"
     );
+    assert.equal(result.selected?.priceMinor, 61000);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 5);
   });
 });

@@ -67,7 +67,7 @@ const G_MULTI_WEAK_B12 = qaProduct({
 });
 
 describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
-  it("keeps an isolated 60% B12 SKU when D3, omega-3 and magnesium are added", () => {
+  it("keeps the B12 contributor and selects the closer two-serving dose", () => {
     const isolated = match(
       qaRequest({
         optimization: "fewest_pills",
@@ -80,7 +80,9 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
     const coverage = Math.round(
       (isolated.selected.coverageBySubject.get(b12.subjectId) ?? 0) / 100
     );
-    assert.equal(coverage >= 55 && coverage < 90, true);
+    assert.equal(coverage, 100);
+    assert.equal(isolated.selected.doseFit?.total, 0.264);
+    assert.equal(isolated.selected.doseFit?.perTarget[0]?.exposure, 316);
 
     const combined = match(
       qaRequest({
@@ -122,7 +124,7 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
     assert.doesNotMatch(copy, /K2 becomes leftover not_in_catalogue/i);
     assert.match(
       AGENTIC_SERVER_INSTRUCTIONS,
-      /Vitamin K2, MK-7 and Menaquinone-7 map to one recognised supplement and do not become leftover not_in_catalogue/
+      /Vitamin K2, MK-7 and Menaquinone-7 resolve through supported explicit catalogue aliases/
     );
     assert.doesNotMatch(
       AGENTIC_TOOL_DESCRIPTIONS.plan,

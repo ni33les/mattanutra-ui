@@ -1,3 +1,4 @@
+import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "./helpers/current-contract-lock.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -92,7 +93,8 @@ describe("UAT execute/order request-completion", () => {
     assert.equal(hygiene.hashes.lockEntry, UAT_EXEC_LOCK_HASH);
     assert.equal(UAT_EXEC_NL_DEF_HASH, "574b78411253f20a7f52a23ade7350a6277d632d14555775c5043bbbd05accca");
     assert.deepEqual([...UAT_EXEC_NL_EXCLUSION], ["/checks/TECH-07"]);
-    assert.equal(AGENTIC_SCHEMA_CHECKSUM, UAT_EXEC_SCHEMA_CHECKSUM);
+    assert.equal(UAT_EXEC_SCHEMA_CHECKSUM, "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6", "historical v3 record is preserved");
+    assert.equal(AGENTIC_SCHEMA_CHECKSUM, CURRENT_CONTRACT_SCHEMA_CHECKSUM);
     assert.equal(SERVICE_INTERNAL_DEADLINE_MS, UAT_EXEC_SUCCESS_DEADLINE_MS);
     assert.equal(CLIENT_READ_DEADLINE_MS, UAT_EXEC_CLIENT_DEADLINE_MS);
     assert.equal(SERVICE_INTERNAL_DEADLINE_MS < CLIENT_READ_DEADLINE_MS, true);

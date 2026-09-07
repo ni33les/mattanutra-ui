@@ -12,7 +12,7 @@ function catalog(products: ReturnType<typeof qaProduct>[]) {
 }
 
 describe("Phase 1 dedicated D3 and B12 preference", () => {
-  it("selects a dedicated D3 SKU over a beta-glucan incidental D3 carrier", () => {
+  it("uses price after equal dose fit and pill count instead of a title preference", () => {
     const dedicated = qaProduct({
       facts: [{ amount: 2000, key: "d3" }],
       id: "G-D3-2000",
@@ -36,7 +36,10 @@ describe("Phase 1 dedicated D3 and B12 preference", () => {
       }),
       catalog([carrier, dedicated])
     );
-    assert.deepEqual(result.selected?.productIds, ["G-D3-2000"]);
+    assert.deepEqual(result.selected?.productIds, ["G-BETA-GLUCAN"]);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.dailyPills, 1);
+    assert.equal(result.selected?.priceMinor, 8000);
   });
 
   it("does not drop a covering dedicated B12 SKU for a weak incidental multi", () => {

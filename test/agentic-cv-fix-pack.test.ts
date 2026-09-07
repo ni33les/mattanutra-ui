@@ -23,10 +23,8 @@ import {
   runWithCatalogueSnapshot
 } from "../lib/agentic/catalogue/snapshot.ts";
 import { catalogueSnapshotId } from "../lib/agentic/catalogue/freeze.ts";
-import { MATCHER_VERSION } from "../lib/matcher/config.ts";
 import { matcherSafetyCeilings, safetyCeilingFor } from "../lib/matcher/safety-ceilings.ts";
 import { canonicalHash } from "../lib/agentic/value/canonical.ts";
-import { CUSTOMER_VALUE_PACK_VERSION } from "../lib/agentic/value/canonical-plan.ts";
 import {
   freezeLiveThailandCatalogue,
   isLiveRetailFreeze,
@@ -527,7 +525,7 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
         if (overlapNames.length > 1) {
           failed.push("FIX-03.A4");
         }
-        if (Number(magRow?.currentAmount) !== 150 || Number(magRow?.totalExposureAmount) !== 150) {
+        if (Number(magRow?.currentAmount) !== 150 || Number(magRow?.quantifiedExposureAmount) !== 150 || magRow?.totalExposureAmount !== null || magRow?.totalExposureComplete !== false) {
           failed.push("FIX-03.A5");
         }
         if (overlap.length > 0) {
@@ -723,7 +721,7 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
         }
         const { readFileSync } = await import("node:fs");
         const snapshot = JSON.parse(
-          readFileSync(new URL("../contract/mcp/3.0.0/tools.json", import.meta.url), "utf8")
+          readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
         ) as { tools: Array<{ inputSchema: unknown; name: string }> };
         const snapshotPlan = snapshot.tools.find((item) => item.name === "plan");
         const snapshotHash = createHash("sha256")
@@ -736,8 +734,7 @@ export async function runCvFixPack(): Promise<CvFixPackReport> {
           failed.push("FIX-06.A5");
         }
         if (
-          officialChecksum !==
-            "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6" ||
+          officialChecksum !== String((snapshot as { schemaChecksum?: string }).schemaChecksum) ||
           AGENTIC_SCHEMA_CHECKSUM !== officialChecksum
         ) {
           failed.push("FIX-06.A6");

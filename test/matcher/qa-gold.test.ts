@@ -34,14 +34,17 @@ describe("QA-GOLD-v1 catalogue", () => {
     }
   });
 
-  it("M-01 fewest_pills golden is G-BASE-COMBO + G-O3-FISH-1000", () => {
+  it("M-01 fewest_pills golden is G-BASE-COMBO + G-O3-ALGAE-500", () => {
     const result = match(qaRequest({ optimization: "fewest_pills" }), QA_GOLD_CATALOG);
-    assert.deepEqual(ids(result), ["G-BASE-COMBO", "G-O3-FISH-1000"]);
+    assert.deepEqual(ids(result), ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
     assert.equal(result.selected?.dailyPills, 4);
     assert.equal(result.selected?.productCount, 2);
     assert.equal(publicCoveragePercent(result.selected), 100);
     assert.equal(result.selected?.incidentalCount, 0);
     assert.equal(ids(result).includes("G-HIGH-TRAP"), false);
+    assert.equal(result.selected?.priceMinor, 61000);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 5);
   });
 
   it("M-02 lowest_cost does not select G-HIGH-TRAP", () => {
@@ -74,7 +77,10 @@ describe("QA-GOLD-v1 catalogue", () => {
       }),
       QA_GOLD_CATALOG
     );
-    assert.deepEqual(ids(result), ["G-BASE-COMBO", "G-O3-FISH-1000"]);
+    assert.deepEqual(ids(result), ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
+    assert.equal(result.selected?.priceMinor, 61000);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 5);
   });
 
   it("M-06 maxProductCount=1 does not invent omega coverage", () => {
@@ -215,7 +221,7 @@ describe("QA-GOLD-v1 catalogue", () => {
     }
   });
 
-  it("M-19 K2 and MK-7 both resolve to G-K2-MK7-100", () => {
+  it("M-19 generic K2 resolves while specific MK-7 requires a measured MK-7 label", () => {
     const k2 = match(
       qaRequest({ targets: [qaTarget("k2", 100, "mcg", "Vitamin K2")] }),
       QA_GOLD_CATALOG
@@ -225,15 +231,25 @@ describe("QA-GOLD-v1 catalogue", () => {
       QA_GOLD_CATALOG
     );
     assert.deepEqual(ids(k2), ["G-K2-MK7-100"]);
-    assert.deepEqual(ids(mk7), ["G-K2-MK7-100"]);
+    assert.deepEqual(ids(mk7), []);
+    const explicitMk7 = match(
+      qaRequest({ targets: [qaTarget("k2", 100, "mcg", "MK-7")] }),
+      { ...QA_GOLD_CATALOG, catalogueVersion: "QA-GOLD-MK7-form-control-v2", products: QA_GOLD_CATALOG.products.map((product) =>
+        product.productId === "G-K2-MK7-100" ? { ...product, labelledContributions: product.labelledContributions.map((fact) => ({ ...fact, name: "Menaquinone-7" })) } : product) }
+    );
+    assert.deepEqual(ids(explicitMk7), ["G-K2-MK7-100"]);
     assert.equal(resolveQaSubject("Menaquinone-7")?.id, "sup_k2");
   });
 
-  it("M-20 prefers G-C-500 over incidental collagen+C", () => {
+  it("M-20 lowest cost uses two servings of the cheaper measured C pack", () => {
     const result = match(
       qaRequest({ optimization: "lowest_cost", targets: [qaTarget("c", 500)] }),
       QA_GOLD_CATALOG
     );
-    assert.deepEqual(ids(result), ["G-C-500"]);
+    assert.deepEqual(ids(result), ["G-INCIDENTAL-C"]);
+    assert.equal(result.selected?.priceMinor, 7000);
+    assert.equal(result.selected?.dailyPills, 2);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(publicCoveragePercent(result.selected), 100);
   });
 });

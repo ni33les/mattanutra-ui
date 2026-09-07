@@ -197,7 +197,7 @@ function collectDomains(input: unknown): string[] {
   return [...found];
 }
 
-export function scoreTrust06(input: unknown): ScoreVerdict {
+export function scoreTrust06(input: unknown, expectedVersion: string = RESPONSIBILITY_VERSION): ScoreVerdict {
   const versions = [
     ...collectVersions(input),
     nested(input, ["info", "responsibilityVersion"]),
@@ -207,14 +207,14 @@ export function scoreTrust06(input: unknown): ScoreVerdict {
     nested(input, ["responsibility", "version"])
   ].filter((item): item is string => typeof item === "string" && item.length > 0);
   const domains = collectDomains(input);
-  const allVersioned = versions.length > 0 && versions.every((item) => item === RESPONSIBILITY_VERSION);
+  const allVersioned = versions.length > 0 && versions.every((item) => item === expectedVersion);
   const allDomains = DOMAINS.every((domain) => domains.includes(domain));
   const passed = allVersioned && allDomains;
   return {
     assertionId: "TRUST-06",
     passed,
     reason: passed
-      ? "responsibility-3.0.0 is consistent across info/checkout/order and all four domains are present."
+      ? `${expectedVersion} is consistent across info/checkout/order and all four domains are present.`
       : `TRUST-06 versions=${versions.join(",")} domains=${domains.join(",")}`
   };
 }
@@ -224,12 +224,12 @@ export function scoreV3Assertions(input: Readonly<{
   description?: unknown;
   latency?: unknown;
   responsibility?: unknown;
-}>) {
+}>, expectedResponsibilityVersion: string = RESPONSIBILITY_VERSION) {
   return [
     scoreVal01({ description: input.description }),
     scoreTech07(input.latency),
     scoreMkt09(input.contribution),
-    scoreTrust06(input.responsibility)
+    scoreTrust06(input.responsibility, expectedResponsibilityVersion)
   ];
 }
 

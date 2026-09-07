@@ -1,9 +1,10 @@
+import { CANONICAL_PLAN_VERSION } from "@/lib/agentic/value/canonical-plan";
+import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
 import { createHash } from "node:crypto";
 import {
   AGENTIC_CONTRACT_VERSION,
   type AgenticEnvironment
 } from "@/lib/agentic/config";
-import { AGENTIC_TOOL_SCHEMAS } from "@/lib/agentic/contract";
 import {
   RESEARCH_VERSION,
   RESPONSIBILITY_VERSION
@@ -45,7 +46,7 @@ export class ReleaseManifestError extends Error {
 export function servedSchemaBundle() {
   return {
     contractVersion: AGENTIC_CONTRACT_VERSION,
-    tools: AGENTIC_TOOL_SCHEMAS
+    tools: AGENTIC_CONTRACT_REGISTRY
   };
 }
 
@@ -77,7 +78,7 @@ export function buildReleaseManifest(input: Readonly<{
   const schemaChecksum = input.schemaChecksum ?? computeSchemaChecksum(bundle);
   return Object.freeze({
     buildId: (input.buildId ?? pipelineBuildId()).toLowerCase(),
-    canonicalVersion: "cv-1.4",
+    canonicalVersion: CANONICAL_PLAN_VERSION,
     contractVersion: AGENTIC_CONTRACT_VERSION,
     manifestVersion: RELEASE_MANIFEST_VERSION,
     researchVersion: RESEARCH_VERSION,

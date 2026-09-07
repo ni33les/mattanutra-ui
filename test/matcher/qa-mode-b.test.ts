@@ -40,7 +40,7 @@ describe("Mode B adversarial catalogues", () => {
     assert.equal(ids(result).includes("G-INCIDENTAL-C"), false);
   });
 
-  it("QA-UNSAFE-ONLY returns no trap basket", () => {
+  it("QA-UNSAFE-ONLY prefers a valid no-purchase option when additions worsen dose fit", () => {
     const result = match(
       qaRequest({
         optimization: "lowest_cost",
@@ -48,9 +48,9 @@ describe("Mode B adversarial catalogues", () => {
       }),
       QA_UNSAFE_ONLY
     );
-    assert.equal(result.selected, null);
+    assert.deepEqual(result.selected?.productIds, []);
     assert.equal(ids(result).includes("G-HIGH-TRAP"), false);
-    assert.ok(result.rejected.some((item) => item.reason === "ul_exceeded"));
+    assert.equal(result.rejected.some((item) => item.reason === "ul_exceeded"), false);
     assert.ok(result.leftovers.some((item) => item.reason === "uncovered"));
   });
 
@@ -67,16 +67,17 @@ describe("Mode B adversarial catalogues", () => {
     }
   });
 
-  it("QA-CORRUPT quarantines unknown and incomplete facts", () => {
+  it("QA-CORRUPT separates unknown health facts from incomplete commercial facts", () => {
     const result = match(
       qaRequest({ targets: [qaTarget("d3", 2000)] }),
       QA_CORRUPT
     );
-    assert.equal(ids(result).includes("G-CORRUPT-NO-UNIT"), false);
+    assert.equal(result.rejected.some((row) => row.productId === "G-CORRUPT-NO-UNIT" && row.reason === "ul_exceeded"), false);
+    if (ids(result).includes("G-CORRUPT-NO-UNIT")) assert.ok(result.selected?.safety.findings.some((row) => row.code === "incomplete_health_information"));
     assert.equal(ids(result).includes("G-CORRUPT-INCOMPLETE"), false);
     assert.ok(
       result.rejected.some(
-        (item) => item.reason === "ul_exceeded" || item.reason === "incomplete_facts"
+        (item) => item.reason === "incomplete_facts"
       )
     );
   });
@@ -97,14 +98,14 @@ describe("Mode B adversarial catalogues", () => {
     assert.equal(ids(result).includes("G-COLLAGEN-5G"), false);
   });
 
-  it("QA-IMPOSSIBLE is blocked or uncovered with reasons", () => {
+  it("QA-IMPOSSIBLE reports no new products and explains unavailable choices", () => {
     const result = match(
       qaRequest({ targets: [qaTarget("d3", 2000)] }),
       QA_IMPOSSIBLE
     );
-    assert.equal(result.selected, null);
+    assert.deepEqual(result.selected?.productIds, []);
     const reasons = new Set(result.rejected.map((item) => item.reason));
-    assert.ok(reasons.has("ul_exceeded") || reasons.has("oos") || reasons.has("foreign_retailer"));
+    assert.ok(reasons.has("oos") || reasons.has("foreign_retailer"));
   });
 
   it("QA-LARGE-NOISY still finds the gold combo on a bounded noisy set", () => {

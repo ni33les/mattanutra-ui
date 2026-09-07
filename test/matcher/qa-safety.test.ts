@@ -54,13 +54,13 @@ describe("QA-GOLD safety stacks", () => {
     }
   });
 
-  it("S-03 G-HIGH-TRAP is excluded before optimisation", () => {
+  it("S-03 G-HIGH-TRAP stays eligible and loses on dose fit", () => {
     const result = match(qaRequest({ optimization: "lowest_cost" }), QA_GOLD_CATALOG);
     assert.equal(ids(result).includes("G-HIGH-TRAP"), false);
-    assert.ok(result.rejected.some((item) => item.productId === "G-HIGH-TRAP"));
+    assert.equal(result.rejected.some((item) => item.productId === "G-HIGH-TRAP"), false);
   });
 
-  it("S-10 CKD plus magnesium hard-blocks", () => {
+  it("S-10 CKD plus magnesium gives actionable advice without blocking", () => {
     const result = match(
       qaRequest({
         conditionCodes: ["ckd"],
@@ -68,10 +68,12 @@ describe("QA-GOLD safety stacks", () => {
       }),
       QA_GOLD_CATALOG
     );
-    assert.equal(result.selected, null);
+    assert.ok(result.selected);
+    assert.equal(result.selected.safety.hardBlocked, false);
+    assert.ok(result.selected.safety.findings.some((row) => row.code === "condition_review_required" && row.severity === "high"));
   });
 
-  it("S-07 apixaban plus omega-3 requires acknowledgement, not a hard block", () => {
+  it("S-07 apixaban plus omega-3 gives serious advice without mandatory acknowledgement", () => {
     const result = match(
       qaRequest({
         medicationCodes: ["apixaban"],
@@ -81,7 +83,7 @@ describe("QA-GOLD safety stacks", () => {
     );
     assert.ok(result.selected);
     assert.equal(result.selected?.safety.hardBlocked, false);
-    assert.equal(result.selected?.safety.requiresAck, true);
+    assert.equal(result.selected?.safety.requiresAck, false);
     assert.ok(
       result.selected?.safety.findings.some(
         (item) => item.code === "medication_interaction"
@@ -89,7 +91,7 @@ describe("QA-GOLD safety stacks", () => {
     );
   });
 
-  it("S-13 zinc UL+1 is blocked", () => {
+  it("S-13 zinc UL+1 gives dose advice", () => {
     const amount = scaled("Zinc", "sup_zinc", 41, "mg");
     const variant: DoseVariant = {
       amountPerUnit: new Map([["sup_zinc", amount]]),
@@ -111,7 +113,8 @@ describe("QA-GOLD safety stacks", () => {
       request: qaRequest({ targets: [qaTarget("zinc", 15)] }),
       variants: [variant]
     });
-    assert.equal(safety.hardBlocked, true);
+    assert.equal(safety.hardBlocked, false);
+    assert.ok(safety.findings.some((row) => row.code === "dose_review_required" && row.severity === "high" && row.action === "inform"));
   });
 
   it("S-19 vegan algae-only cannot be overridden by a cheaper fish SKU", () => {
@@ -128,7 +131,7 @@ describe("QA-GOLD safety stacks", () => {
     assert.ok(result.rejected.some((item) => item.reason === "wrong_source" || item.reason === "vegan"));
   });
 
-  it("S-20 unknown ingredient amount is quarantined", () => {
+  it("S-20 unknown ingredient amount remains visible as uncertainty", () => {
     const result = match(qaRequest({ targets: [qaTarget("d3", 2000)] }), {
       ...QA_GOLD_CATALOG,
       products: QA_GOLD_CATALOG.products.map((item) =>
@@ -137,11 +140,12 @@ describe("QA-GOLD safety stacks", () => {
           : item
       )
     });
-    assert.equal(ids(result).includes("G-D3-2000"), false);
-    assert.ok(result.rejected.some((item) => item.productId === "G-D3-2000"));
+    assert.equal(ids(result).includes("G-D3-2000"), true);
+    assert.equal(result.rejected.some((item) => item.productId === "G-D3-2000"), false);
+    assert.ok(result.selected?.safety.findings.some((row) => row.uncertainty?.includes("unknown_product_amount")));
   });
 
-  it("refuses a stack whose labelled zinc exceeds the adult UL", () => {
+  it("prefers a lower-penalty stack when labelled zinc would exceed the adult UL", () => {
     const catalog = {
       ...QA_GOLD_CATALOG,
       products: [
@@ -217,11 +221,16 @@ describe("QA-GOLD safety stacks", () => {
     const selected = ids(result);
     assert.equal(
       selected.includes("MULTI-ZN-15") && selected.includes("D3-ZN-15"),
-      false
+      true
     );
+    const zinc = result.selected?.doseFit?.perLimit.find((row) => row.subjectId === "sup_zinc");
+    assert.equal(zinc?.limit, 25);
+    assert.equal(zinc?.exposure, 30);
+    assert.equal(zinc?.excess, 0.2);
+    assert.ok(result.selected?.safety.findings.some((row) => row.subjectId === "sup_zinc" && row.code === "dose_review_required"));
   });
 
-  it("fails closed when zinc has a table UL but not for this life stage", () => {
+  it("reports unknown reference when zinc has no UL for this life stage", () => {
     const withoutPregnantZinc = qaCatalogSafetyCeilings().filter(
       (ceiling) =>
         !(ceiling.subjectId === "sup_zinc" && ceiling.lifeStage === "pregnant")
@@ -247,11 +256,12 @@ describe("QA-GOLD safety stacks", () => {
       }),
       catalog
     );
-    assert.equal(ids(result).includes("MULTI-ZN-10"), false);
+    assert.equal(ids(result).includes("MULTI-ZN-10"), true);
+    assert.ok(result.selected?.safety.findings.some((row) => row.uncertainty?.includes("no_applicable_reference:sup_zinc")));
   });
 
-  it("UNSAFE-ONLY is not selected even as the only covering SKU", () => {
+  it("UNSAFE-ONLY produces a valid no-new-products option if its penalty is worse", () => {
     const result = match(qaRequest({ optimization: "lowest_cost" }), QA_UNSAFE_ONLY);
-    assert.equal(result.selected, null);
+    assert.deepEqual(result.selected?.productIds, []);
   });
 });

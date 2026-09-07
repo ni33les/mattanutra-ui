@@ -120,7 +120,7 @@ describe("Phase 5 demographic eligibility", () => {
     assert.equal(productRejectionReason(product, request), null);
   });
 
-  it("persists incidental nutrient amounts and blocks over-UL vitamin A", () => {
+  it("persists incidental nutrient amounts and reports over-limit vitamin A advice", () => {
     setMatcherSafetyCeilings(
       ceilingsForSubjects([
         ...FIXTURE_SUPPLEMENTS.flatMap((item) => [
@@ -205,16 +205,17 @@ describe("Phase 5 demographic eligibility", () => {
         ]
       }
     });
-    const blocked = guidance.some(
-      (item) => item.code === "dose_review_required" && item.action === "block"
+    const advised = guidance.some(
+      (item) => item.code === "dose_review_required" && item.action === "review"
     );
-    assert.equal(matched.selected == null || blocked, true);
+    assert.ok(matched.selected);
+    assert.equal(advised, true);
     if (line) {
       const vitaminA = line.incidentalNutrients.find((item) => /vitamin a/i.test(item.name));
       assert.ok(vitaminA);
       assert.equal(vitaminA.amount >= 4000, true);
       assert.equal(vitaminA.unit, "mcg");
-      assert.equal(blocked, true);
+      assert.equal(advised, true);
     }
     assert.equal(
       safetyCeilingFor(

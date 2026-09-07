@@ -188,7 +188,7 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
     assert.doesNotMatch(smoke, /supplement_safety_limit_bands/);
   });
 
-  it("RCA-07: Magnesium 351 mg with the adult 350 mg band is blocked", () => {
+  it("RCA-07: Magnesium reference-limit advice remains complete and nonblocking", () => {
     installAdultMagBand();
     const item = magItem(350);
     const coverage = magCoverage({ amount: 350, requested: 351, limit: 350 });
@@ -197,7 +197,7 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
     const guidance = evaluateSafety({ locale: "en", selected, state });
     const block = guidance.find((row) => row.code === "dose_review_required");
     assert.ok(block);
-    assert.equal(block.action, "block");
+    assert.equal(block.action, "review");
     assert.equal(block.ruleId, MAG_BAND_ID);
     assert.equal(block.threshold, 350);
     assert.equal(block.exposure, 350);
@@ -209,10 +209,10 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
         state,
         unmetRequirements: []
       }),
-      "blocked"
+      "ready"
     );
     const published = publicSafetyGuidance(block);
-    assert.equal(published.acknowledgementStatus, "not_applicable");
+    assert.equal(published.acknowledgementStatus, "not_required");
     assert.equal(coverage.status, "upper_limit_risk");
     assert.equal(coverage.upperLimitAmount, 350);
     assert.equal(coverage.percentOfUpperLimit, 100);
@@ -261,7 +261,7 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
     assert.equal(coverage.status, "covered");
   });
 
-  it("RCA-10: CKD plus Magnesium is blocked by remaining allowed 0", () => {
+  it("RCA-10: CKD retains serious condition advice without inventing a zero reference limit", () => {
     installAdultMagBand();
     const item = magItem(200);
     const coverage = magCoverage({ amount: 200, requested: 200, limit: 350 });
@@ -272,10 +272,10 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
     });
     const guidance = evaluateSafety({ locale: "en", selected, state });
     const block = guidance.find(
-      (row) => row.action === "block" && row.code === "dose_review_required"
+      (row) => row.action === "review" && row.code === "condition_review_required"
     );
     assert.ok(block);
-    assert.equal(block?.threshold, 0);
+    assert.equal(block?.threshold, null);
     assert.equal(Number(block.exposure) > 0, true);
     assert.equal(
       planStatus({
@@ -285,7 +285,7 @@ describe("RCA safety-parity — Magnesium catalogue bands", () => {
         state,
         unmetRequirements: []
       }),
-      "blocked"
+      "ready"
     );
   });
 });

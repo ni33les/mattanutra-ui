@@ -1,3 +1,4 @@
+import { CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI } from "@/lib/agentic/contract/guide";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import {
   AGENTIC_CONTRACT_VERSION,
@@ -33,6 +34,8 @@ export const AGENTIC_SCHEMA_CHECKSUM = computeSchemaChecksum();
 
 export const PUBLIC_INFO_ALLOW_LIST = [
   "ok",
+  "clientGuide",
+  "contractSchema",
   "serviceName",
   "contractVersion",
   "schemaChecksum",
@@ -59,6 +62,8 @@ export type PublicInfoCountry = Readonly<{
 }>;
 
 export type PublicInfo = Readonly<{
+  clientGuide: string;
+  contractSchema: string;
   buildId?: string;
   conditionCodes: readonly string[];
   continuation: "polling_only";
@@ -131,6 +136,8 @@ function publicCapabilityInfo(input: Readonly<{
   void input.buildId;
   return {
     ok: true,
+    clientGuide: CLIENT_GUIDE_URI,
+    contractSchema: CONTRACT_SCHEMA_URI,
     serviceName: AGENTIC_SERVICE_NAME,
     contractVersion: identity.contractVersion,
     schemaChecksum: identity.schemaChecksum,
@@ -193,6 +200,8 @@ export async function engineeringInfo(input: Readonly<{
     pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS,
     recognisedNames,
     schemaChecksum: AGENTIC_SCHEMA_CHECKSUM,
+    clientGuide: CLIENT_GUIDE_URI,
+    contractSchema: CONTRACT_SCHEMA_URI,
     serviceName: AGENTIC_SERVICE_NAME,
     serviceVersion: AGENTIC_SERVICE_VERSION,
     supportAvailable: true as const,

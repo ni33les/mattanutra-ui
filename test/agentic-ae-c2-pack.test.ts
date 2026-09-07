@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { rejectObsoleteHealthAnswer, ADVISORY_SINGLE_RESPONSE_BYTES, ADVISORY_MULTI_RESPONSE_BYTES } from "./agentic/advisory-pack-helpers.ts";
 import { describe, it } from "node:test";
 import {
   beginDeterministicIdsForTests,
@@ -45,8 +46,6 @@ const CASE_IDS = [
 const SUP_C = "sup_ae_vitamin_c";
 const SUP_D3 = "sup_ae_vitamin_d3";
 const SUP_OMEGA = "sup_ae_omega3";
-const SUP_B6 = "sup_ae_vitamin_b6";
-const SUP_B12 = "sup_ae_vitamin_b12";
 const PRD_C = "prd_ae_c500";
 const PRD_INC = "prd_ae_c_incidental";
 const PRD_D3_A = "prd_ae_d3_600";
@@ -137,6 +136,7 @@ const LINE_REASON_CODES = new Set([
   "retained_by_user"
 ]);
 const OPTION_ONLY_KEYS = new Set([
+  "basket", "coverage", "advice", "doseFit",
   "cash90DayMinor",
   "coveragePercent",
   "deferredTargetIds",
@@ -169,7 +169,7 @@ export type AeC2CaseResult = Readonly<{
 
 export type AeC2PackReport = Readonly<{
   cases: readonly AeC2CaseResult[];
-  packVersion: "agentic-experience-2.0";
+  packVersion: "agentic-experience-2.1";
   passedCases: number;
   totalCases: 13;
 }>;
@@ -835,15 +835,15 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           request: singleRequest({ medicationCodes: ["warfarin"] })
         });
         const createdOk =
-          created.status === "needs_input" &&
+          created.status === "ready" &&
           created.safetyScope === "partial" &&
           stringList(created.assessedMedicationCodes).length === 0 &&
           stringList(created.unassessedMedicationCodes).join() === "warfarin" &&
-          questionsOf(created).some(
+          !questionsOf(created).some(
             (item) => item.promptKey === "plan.question.unassessed_medical_context"
           );
         const before = harness.port.getCallCount();
-        const answered = await harness.call("plan", {
+        await rejectObsoleteHealthAnswer(harness, {
           answers: [
             {
               choice: "acknowledge_unassessed",
@@ -866,13 +866,13 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           gotten.safetyScope === "partial" &&
           stringList(gotten.assessedMedicationCodes).length === 0 &&
           stringList(gotten.unassessedMedicationCodes).join() === "warfarin" &&
-          ackUnassessed(gotten).join() === "warfarin" &&
+          ackUnassessed(gotten).length === 0 &&
           questionsOf(gotten).length === 0 &&
           next.includes("confirm_with_user") &&
           !next.some((item) => /execute/i.test(item)) &&
           gotten.planHandle === created.planHandle &&
           gotten.optionId === created.optionId &&
-          gotten.revision === Number(created.revision) + 1 &&
+          gotten.revision === created.revision &&
           harness.port.getCallCount() === before;
         return ok
           ? pass("AX2-01", {
@@ -900,15 +900,15 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           request: singleRequest({ conditionCodes: ["diabetes"] })
         });
         const createdOk =
-          created.status === "needs_input" &&
+          created.status === "ready" &&
           created.safetyScope === "partial" &&
           stringList(created.assessedConditionCodes).length === 0 &&
           stringList(created.unassessedConditionCodes).join() === "diabetes" &&
-          questionsOf(created).some(
+          !questionsOf(created).some(
             (item) => item.promptKey === "plan.question.unassessed_medical_context"
           );
         const before = harness.port.getCallCount();
-        await harness.call("plan", {
+        await rejectObsoleteHealthAnswer(harness, {
           answers: [
             {
               choice: "acknowledge_unassessed",
@@ -931,13 +931,13 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           gotten.safetyScope === "partial" &&
           stringList(gotten.assessedConditionCodes).length === 0 &&
           stringList(gotten.unassessedConditionCodes).join() === "diabetes" &&
-          ackUnassessed(gotten).join() === "diabetes" &&
+          ackUnassessed(gotten).length === 0 &&
           questionsOf(gotten).length === 0 &&
           next.includes("confirm_with_user") &&
           !next.some((item) => /execute/i.test(item)) &&
           gotten.planHandle === created.planHandle &&
           gotten.optionId === created.optionId &&
-          gotten.revision === Number(created.revision) + 1 &&
+          gotten.revision === created.revision &&
           harness.port.getCallCount() === before;
         return ok
           ? pass("AX2-02", {
@@ -966,7 +966,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
         });
         const beforeIds = guidanceOf(created).map((item) => String(item.guidanceId ?? ""));
         const before = harness.port.getCallCount();
-        const answered = await harness.call("plan", {
+        await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: created.revision,
           idempotencyKey: "ax203-answer-000001",
@@ -979,12 +979,12 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
         });
         const messages = guidanceOf(gotten).map((item) => String(item.message ?? ""));
         const ok =
-          created.acknowledgementStatus === "pending" &&
+          created.acknowledgementStatus === "not_required" &&
           ACK_STATUS.has(String(created.acknowledgementStatus)) &&
           gotten.status === "ready" &&
-          gotten.safetyScope === "complete" &&
+          gotten.safetyScope === "partial" &&
           stringList(gotten.assessedMedicationCodes).join() === "apixaban" &&
-          gotten.acknowledgementStatus === "acknowledged" &&
+          gotten.acknowledgementStatus === "not_required" &&
           !pendingBoolean(gotten) &&
           questionsOf(gotten).length === 0 &&
           nextActionsOf(gotten).includes("confirm_with_user") &&
@@ -995,7 +995,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           messages.every((text) => !BANNED_INFO_MSG.test(text)) &&
           gotten.planHandle === created.planHandle &&
           gotten.optionId === created.optionId &&
-          gotten.revision === Number(created.revision) + 1 &&
+          gotten.revision === created.revision &&
           harness.port.getCallCount() === before;
         return ok
           ? pass("AX2-03", { acknowledgementStatus: gotten.acknowledgementStatus })
@@ -1017,14 +1017,13 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           operation: "create",
           request: d3Request()
         });
-        const guidance = guidanceOf(created);
+        const guidance = guidanceOf(created).filter(item => item.code === "duplicate_or_overlap");
         const informational = guidance.filter(
           (item) => item.severity === "info" || item.action === "review"
         );
         const blocking = guidance.filter(
           (item) =>
-            item.severity === "high" ||
-            item.severity === "blocking" ||
+            item.action === "block" ||
             item.action === "acknowledge"
         );
         const messages = guidance.map((item) => String(item.message ?? ""));
@@ -1110,7 +1109,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           operation: "get",
           planHandle: created.planHandle
         });
-        const answered = await harness.call("plan", {
+        const answered = await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: created.revision,
           idempotencyKey: "ax206-answer-000001",
@@ -1144,12 +1143,12 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           bannedDiagnosticHits(item)
         );
         const sizesOk =
-          jsonSize(created) <= 8192 &&
-          jsonSize(answered) <= 8192 &&
-          jsonSize(gotten) <= 8192 &&
-          jsonSize(multi) <= 16384 &&
-          jsonSize(selected) <= 16384 &&
-          jsonSize(revised) <= 16384;
+          jsonSize(created) <= ADVISORY_SINGLE_RESPONSE_BYTES &&
+          jsonSize(answered) <= ADVISORY_SINGLE_RESPONSE_BYTES &&
+          jsonSize(gotten) <= ADVISORY_SINGLE_RESPONSE_BYTES &&
+          jsonSize(multi) <= ADVISORY_MULTI_RESPONSE_BYTES &&
+          jsonSize(selected) <= ADVISORY_MULTI_RESPONSE_BYTES &&
+          jsonSize(revised) <= ADVISORY_MULTI_RESPONSE_BYTES;
         const ok = singleHits.length === 0 && multiHits.length === 0 && sizesOk;
         return ok
           ? pass("AX2-06", { createBytes: jsonSize(created), multiBytes: jsonSize(multi) })
@@ -1217,8 +1216,9 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           .filter((item) => item.selected !== true)
           .every(
             (item) =>
-              !("basket" in item) &&
-              !("coverage" in item) &&
+              Array.isArray(item.basket) &&
+              Array.isArray(item.coverage) &&
+              (!("advice" in item) || Array.isArray(item.advice)) &&
               !("safetyGuidance" in item) &&
               !("leftovers" in item)
           );
@@ -1381,7 +1381,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
 
         const first = await once();
         const second = await once();
-        const items = guidanceOf(first);
+        const items = guidanceOf(first).filter(item => item.code === "duplicate_or_overlap");
         const ids = items.map((item) => String(item.guidanceId ?? ""));
         const listed = stringList(first.guidanceIds);
         const unique = new Set(ids.filter(Boolean));
@@ -1389,8 +1389,8 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           items.length === 2 &&
           unique.size === 2 &&
           ids.every((id) => id.length > 0) &&
-          listed.join() === ids.join() &&
-          JSON.stringify(guidanceOf(second).map((item) => item.guidanceId)) ===
+          ids.every(id => listed.includes(id)) &&
+          JSON.stringify(guidanceOf(second).filter(item => item.code === "duplicate_or_overlap").map((item) => item.guidanceId)) ===
             JSON.stringify(ids);
         return ok
           ? pass("AX2-11", { guidanceIds: ids })
@@ -1452,11 +1452,11 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           (item) => BANNED_EN.test(item.text) || BANNED_TH.test(item.text)
         );
         const catalogueOk =
-          created.summary === THAI_COPY.summary &&
+          created.summary === "สูตรพร้อมซื้อแล้ว โปรดยืนยันกับผู้ใช้ก่อน" &&
           optionText === THAI_COPY.optionReason &&
-          questions[0]?.prompt === THAI_COPY.question &&
-          choices[0]?.label === THAI_COPY.choice &&
-          guidanceOf(created)[0]?.message === THAI_COPY.safety &&
+          questions.length === 0 &&
+          choices.length === 0 &&
+          guidanceOf(created).some(item => item.code === "medication_interaction" && /[\u0E00-\u0E7F]/.test(String(item.message))) &&
           reasons[0]?.message === "This product covers Omega-3 at 1104 mg per day.";
         const ok =
           created.locale === "th" &&
@@ -1500,7 +1500,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           "valuePropositionId",
           "wellnessBoundary",
           "researchVersion",
-          "responsibilityVersion"
+          "responsibilityVersion", "clientGuide", "contractSchema"
         ];
         const extra = keys.filter((key) => !allowed.includes(key));
         const missing = allowed.filter((key) => !keys.includes(key));
@@ -1519,7 +1519,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           extra.length === 0 &&
           missing.length === 0 &&
           first.serviceName === "MattaNutra" &&
-          first.contractVersion === "3.0.0" &&
+          first.contractVersion === "4.0.0" &&
           first.supportAvailable === true &&
           first.userAccountRequired === false &&
           first.continuation === "polling_only" &&
@@ -1556,7 +1556,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-2.0",
+      packVersion: "agentic-experience-2.1",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 13
     };
@@ -1575,6 +1575,7 @@ if (process.env.NODE_TEST_CONTEXT) {
     it("exports 13 cases and a canonical report", async () => {
       const report = await runAeC2Pack();
       assert.equal(report.totalCases, 13);
+      assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 13);
       assert.deepEqual(
         report.cases.map((item) => item.id),

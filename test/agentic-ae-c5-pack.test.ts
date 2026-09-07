@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { rejectObsoleteHealthAnswer, ADVISORY_SINGLE_RESPONSE_BYTES, ADVISORY_MULTI_RESPONSE_BYTES } from "./agentic/advisory-pack-helpers.ts";
 import { describe, it } from "node:test";
 import {
   beginDeterministicIdsForTests,
@@ -85,6 +86,7 @@ const BANNED_DIAGNOSTIC_KEYS = new Set([
 ]);
 
 const PROCESSING_KEYS = new Set([
+  "contractVersion", "operationalDecision",
   "locale",
   "nextActions",
   "ok",
@@ -132,7 +134,7 @@ export type AeC5CaseResult = Readonly<{
 
 export type AeC5PackReport = Readonly<{
   cases: readonly AeC5CaseResult[];
-  packVersion: "agentic-experience-5.0";
+  packVersion: "agentic-experience-5.1";
   passedCases: number;
   totalCases: 7;
 }>;
@@ -555,7 +557,7 @@ function matchFor(state: CanonicalPlanState) {
     return {
       alternatives: [],
       leftovers: [],
-      selected: magOption(requested > 350 ? 350 : requested, requested)
+      selected: magOption(requested, requested)
     };
   }
 
@@ -745,7 +747,7 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
             ]
           })
         });
-        const answered = await harness.call("plan", {
+        const answered = await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: omega.revision,
           idempotencyKey: "ax501-answer-000001",
@@ -778,12 +780,12 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
           request: singleRequest()
         });
         const payloads = [
-          { max: 8192, name: "create", value: created },
-          { max: 8192, name: "get", value: gotten },
-          { max: 8192, name: "answer", value: answered },
-          { max: 16384, name: "select", value: selected },
-          { max: 16384, name: "revise", value: revised },
-          { max: 8192, name: "replay", value: replay }
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "create", value: created },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "get", value: gotten },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "answer", value: answered },
+          { max: ADVISORY_MULTI_RESPONSE_BYTES, name: "select", value: selected },
+          { max: ADVISORY_MULTI_RESPONSE_BYTES, name: "revise", value: revised },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "replay", value: replay }
         ];
         const dirty = payloads
           .map((item) => ({
@@ -858,7 +860,7 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
           operation: "create",
           request: singleRequest({ medicationCodes: ["warfarin"] })
         });
-        const warfarinAck = await harness.call("plan", {
+        const warfarinAck = await rejectObsoleteHealthAnswer(harness, {
           answers: [
             {
               choice: "acknowledge_unassessed",
@@ -881,7 +883,7 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
           })
         });
         const beforeOmega = harness.port.getCallCount();
-        const omegaAck = await harness.call("plan", {
+        const omegaAck = await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: omega.revision,
           idempotencyKey: "ax503-omega-ack-0001",
@@ -928,7 +930,7 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
           operation: "get",
           planHandle: processing.planHandle
         });
-        const blockRow = guidanceOf(blocked).find((item) => item.action === "block") ?? {};
+        const blockRow = guidanceOf(blocked).find((item) => item.code === "dose_review_required") ?? {};
         const omegaExposure = Number(guidanceOf(omegaAck)[0]?.exposure ?? 0);
         const contributorSum = (
           Array.isArray(guidanceOf(omegaAck)[0]?.contributors)
@@ -946,16 +948,17 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
             Number(ready.estimatedOrderTotalMinor) &&
           stringList(warfarin.unassessedMedicationCodes).join() === "warfarin" &&
           stringList(warfarinAck.unassessedMedicationCodes).join() === "warfarin" &&
-          stringList(warfarinAck.acknowledgedUnassessedMedicationCodes).join() ===
-            "warfarin" &&
-          omega.acknowledgementStatus === "pending" &&
-          omegaAck.acknowledgementStatus === "acknowledged" &&
+          stringList(warfarinAck.acknowledgedUnassessedMedicationCodes).length === 0 &&
+          omega.acknowledgementStatus === "not_required" &&
+          omegaAck.acknowledgementStatus === "not_required" &&
           omegaDidNotRematch &&
           omegaExposure > 0 &&
           omegaExposure === contributorSum &&
-          blocked.status === "blocked" &&
-          blockRow.acknowledgementStatus === "not_applicable" &&
-          nextActionsOf(blocked).join() === "change_request" &&
+          blocked.status === "ready" &&
+          questionsOf(blocked).length === 0 &&
+          blockRow.action === "review" && blockRow.severity === "high" &&
+          blockRow.acknowledgementStatus === "not_required" &&
+          nextActionsOf(blocked).includes("confirm_with_user") &&
           beforeIds.join() === afterIds.join() &&
           optionsOf(selected).filter((item) => item.selected === true).length === 1 &&
           processing.status === "processing" &&
@@ -1201,7 +1204,7 @@ export async function runAeC5Pack(): Promise<AeC5PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-5.0",
+      packVersion: "agentic-experience-5.1",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 7
     };
@@ -1220,6 +1223,7 @@ if (process.env.NODE_TEST_CONTEXT) {
     it("exports 7 cases and a canonical report", async () => {
       const report = await runAeC5Pack();
       assert.equal(report.totalCases, 7);
+      assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 7);
       assert.deepEqual(
         report.cases.map((item) => item.id),

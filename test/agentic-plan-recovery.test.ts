@@ -50,7 +50,9 @@ async function interrupt(runtime: AgenticRuntime, args: Record<string, unknown>)
   setMatcherEnteredForTests(entered.resolve);
   const pending = withRequestLifetime({ signal: controller.signal }, () => call(runtime, args));
   try {
-    await entered.promise;
+    await Promise.race([entered.promise, pending.then(result => {
+      throw new Error(`Plan returned before the matcher interruption point: ${JSON.stringify(result)}`);
+    })]);
     controller.abort();
     assert.equal((await pending).ok, false);
   } finally {
@@ -81,7 +83,7 @@ describe("MCP interrupted plan recovery", { timeout: 15_000 }, () => {
       const input = { ...request,
         targets: request.targets.map(target => ({ ...target,
           ...(explicitIds ? { supplementId: supplements.find(item => item.name === target.name)!.supplementId } : {}) })),
-        currentSupplements: [{ name: "Magnesium", dailyAmount: 75, daysRemaining: 0, unit: "mg",
+        currentSupplements: [{ name: "Magnesium", dailyAmount: 75, daysRemaining: 7, unit: "mg",
           ...(explicitIds ? { supplementId: supplements.find(item => item.name === "Magnesium")!.supplementId } : {}) }]
       };
       const args = create(`recovery-input-${explicitIds}`, input);
@@ -107,7 +109,7 @@ describe("MCP interrupted plan recovery", { timeout: 15_000 }, () => {
     const receipt = await runtime.store.getIdempotency("plan", owner, args.idempotencyKey);
     assert.ok(receipt);
     const { planHandle } = JSON.parse(receipt.responseJson);
-    const resumed = await call(runtime, { operation: "get", planHandle, idempotencyKey: args.idempotencyKey });
+    const resumed = await call(runtime, { operation: "get", planHandle });
     assert.equal(resumed.status, "ready", JSON.stringify(resumed));
     assert.equal((await runtime.store.getIdempotency("plan", owner, args.idempotencyKey))?.requestHash, receipt.requestHash);
     assert.deepEqual(await call(runtime, args), resumed);
@@ -151,7 +153,7 @@ describe("MCP interrupted plan recovery", { timeout: 15_000 }, () => {
     const args = create("recovery-invalid-id", { ...request,
       targets: [{ ...request.targets[0]!, supplementId: "sup_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }] } as typeof request);
     await interrupt(runtime, args);
-    assert.equal((await call(runtime, args)).error?.reasonCode, "legacy_id");
+    assert.equal((await call(runtime, args)).error?.reasonCode, "incompatible_identity");
     assert.equal((await storedRevision(runtime)).status, "processing");
   });
 

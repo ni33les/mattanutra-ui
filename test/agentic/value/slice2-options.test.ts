@@ -62,7 +62,7 @@ function optionList(selected: StackOption | null, alternatives: readonly StackOp
 }
 
 describe("Slice 2 value options and current supplements", () => {
-  it("VAL-02 returns one to three labelled options from one lowest_cost request", () => {
+  it("VAL-02 returns one or two labelled options from one lowest_cost request", () => {
     const snapshot = sampleValueSnapshot();
     const state = intentState(snapshot);
     const first = matchPlan({ snapshot, state });
@@ -76,9 +76,9 @@ describe("Slice 2 value options and current supplements", () => {
       snapshot.products.filter((item) => item.contributionSupplementIds.includes(d3Id)).map((item) => item.productId)
     );
 
-    assert.ok(options.length >= 1 && options.length <= 3);
+    assert.ok(options.length >= 1 && options.length <= 2);
     assert.equal(options.filter((item) => item.recommended).length, 1);
-    const core = options.find((item) => item.role === "minimum_core");
+    const core = options.find((item) => item.role === "requested_objective");
     assert.ok(core);
     assert.equal(
       core.coverage.find((row) => row.supplementId === creatineId)?.status === "covered" ||
@@ -90,12 +90,13 @@ describe("Slice 2 value options and current supplements", () => {
       false
     );
     const magRow = core.coverage.find((row) => row.supplementId === magId);
-    assert.ok(magRow?.status === "optional_omitted" || magRow?.status === "covered");
+    assert.equal(magRow?.status, "covered");
+    assert.equal(core.doseFit?.total, 0);
     const recommended = options.find((item) => item.recommended);
-    assert.equal(recommended?.role, "minimum_core");
+    assert.equal(recommended?.role, "requested_objective");
     const signatures = new Set(
       options.map((item) =>
-        item.basket.map((row) => `${row.productId}:${row.quantity}`).slice().sort().join("|")
+        item.basket.map((row) => `${row.productId}:${row.servingsPerDay}:${row.quantity}`).slice().sort().join("|")
       )
     );
     assert.equal(signatures.size, options.length);
@@ -153,7 +154,7 @@ describe("Slice 2 value options and current supplements", () => {
       true
     );
     const withoutCurrent = matchPlan({ snapshot, state });
-    const restored = withoutCurrent.selected ?? withoutCurrent.alternatives.find((item) => item.role === "complete");
+    const restored = withoutCurrent.selected ?? withoutCurrent.alternatives.find((item) => item.role === "requested_objective");
     assert.ok(
       restored?.basket.some((item) => item.productId === magProduct.productId) ||
         withoutCurrent.alternatives.some((item) =>

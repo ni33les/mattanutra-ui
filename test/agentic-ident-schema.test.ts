@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { loadAgenticConfig } from "../lib/agentic/config.ts";
-import { AGENTIC_TOOL_SCHEMAS } from "../lib/agentic/contract/index.ts";
+import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../lib/agentic/config.ts";
+import { AGENTIC_TOOL_SCHEMAS, AGENTIC_OUTPUT_SCHEMAS } from "../lib/agentic/contract/index.ts";
 import { infoTool, resetInfoCache } from "../lib/agentic/info.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { qaPreflight } from "../lib/agentic/qa/preflight.ts";
@@ -33,10 +33,10 @@ describe("SCHEMA checksum contract", () => {
     const mutated = {
       ...servedSchemaBundle(),
       tools: {
-        ...AGENTIC_TOOL_SCHEMAS,
+        ...servedSchemaBundle().tools,
         info: {
-          ...AGENTIC_TOOL_SCHEMAS.info,
-          additionalProperties: true
+          inputSchema: { ...AGENTIC_TOOL_SCHEMAS.info, additionalProperties: true },
+          outputSchema: AGENTIC_OUTPUT_SCHEMAS.info
         }
       }
     };
@@ -62,14 +62,14 @@ describe("SCHEMA checksum contract", () => {
     });
     const listed = await handleJsonRpc(runtime, { id: 1, method: "tools/list" });
     const tools = (
-      listed?.result as { tools?: Array<{ inputSchema: unknown; name: string }> }
+      listed?.result as { tools?: Array<{ inputSchema: unknown; outputSchema: unknown; name: string }> }
     )?.tools;
     assert.ok(tools);
     const advertised = Object.fromEntries(
-      tools.map((tool) => [tool.name, tool.inputSchema])
+      tools.map((tool) => [tool.name, { inputSchema: tool.inputSchema, outputSchema: tool.outputSchema }])
     );
     const recomputed = computeSchemaChecksum({
-      contractVersion: "3.0.0",
+      contractVersion: AGENTIC_CONTRACT_VERSION,
       tools: advertised
     });
     const info = await infoTool({ config: runtime.config, locale: "en" });

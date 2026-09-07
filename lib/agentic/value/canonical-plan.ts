@@ -7,8 +7,8 @@ import { canonicalHash, canonicalJson } from "@/lib/agentic/value/canonical";
 import { amountFromScaled, scaleAmount } from "@/lib/matcher/dose";
 import type { MatcherUnit } from "@/lib/matcher/types";
 
-export const CUSTOMER_VALUE_PACK_VERSION = "dev-customer-value-v1.0";
-export const CANONICAL_PLAN_VERSION = "cv-1.4";
+export const CUSTOMER_VALUE_PACK_VERSION = "dev-customer-value-v4.0";
+export const CANONICAL_PLAN_VERSION = "cv-2.0";
 
 function canonicalContributors(
   items: readonly Readonly<{
@@ -36,20 +36,8 @@ function canonicalContributors(
     );
 }
 
-function canonicalComparator(row: Readonly<{
-  action?: string | null;
-  comparator?: string | null;
-}>) {
-  if (typeof row.comparator === "string" && row.comparator.length > 0) {
-    return row.comparator;
-  }
-  if (row.action === "block") {
-    return "gt";
-  }
-  if (row.action === "acknowledge") {
-    return "gte";
-  }
-  return "lt";
+function canonicalComparator(row: Readonly<{ comparator?: string | null }>) {
+  return typeof row.comparator === "string" && row.comparator.length > 0 ? row.comparator : null;
 }
 
 function canonicalMassUnit(unit: string | null | undefined): MatcherUnit | null {
@@ -114,12 +102,18 @@ function canonicalCoverageRow(row: StackOption["coverage"][number]) {
       return { ...item, amount: dose.amount, unit: dose.unit };
     }),
     currentAmount: current.amount,
+    requestedTargetId: row.requestedTargetId ?? null,
+    unresolved: row.unresolved ?? false,
+    intakeCertainty: row.intakeCertainty ?? "unknown",
+    totalExposureComplete: row.totalExposureComplete ?? false,
+    sourceScope: row.sourceScope ?? null,
     population: row.populationScope ?? null,
     requestedAmount: requested.amount,
     ruleId: row.ruleId ?? null,
     rulesVersion: row.rulesVersion ?? null,
     status: row.status,
     supplementId: row.supplementId,
+    basis: row.basis ?? "supplemental",
     threshold: row.upperLimitAmount ?? null,
     totalExposureAmount: exposure.amount,
     unit: requested.unit
@@ -147,8 +141,19 @@ function canonicalSafetyRow(row: Readonly<{
   supplementIds?: readonly string[];
   threshold?: number | null;
   unit?: string | null;
+  authorityUrl?: string | null;
+  uncertainty?: string;
+  uncertaintyCodes?: readonly string[];
+  referenceBasis?: string;
+  evidence?: readonly string[];
+  sourceScope?: string | null;
 }>) {
   return {
+    authorityUrl: row.authorityUrl ?? null,
+    uncertaintyCodes: [...(row.uncertaintyCodes ?? (row.uncertainty ? ["legacy_uncertainty_present"] : []))].sort(),
+    referenceBasis: row.referenceBasis ?? null,
+    evidence: [...(row.evidence ?? [])].sort(),
+    sourceScope: row.sourceScope ?? null,
     action: row.action,
     code: row.code,
     comparator: canonicalComparator(row),
@@ -181,6 +186,40 @@ function canonicalOptionValue(option: StackOption) {
     coverage: [...option.coverage]
       .map(canonicalCoverageRow)
       .sort((left, right) => left.supplementId.localeCompare(right.supplementId)),
+    doseFit: option.doseFit ? {
+      version: option.doseFit.version, limitWeight: option.doseFit.limitWeight,
+      under: option.doseFit.under, over: option.doseFit.over, limit: option.doseFit.limit,
+      weightedLimit: option.doseFit.weightedLimit, total: option.doseFit.total,
+      unknownSubjectIds: [...option.doseFit.unknownSubjectIds].sort(),
+      estimatedSubjectIds: [...option.doseFit.estimatedSubjectIds].sort(),
+      perTarget: option.doseFit.perTarget.map(row => ({
+        subjectId: row.subjectId, basis: row.basis ?? "supplemental", under: row.under, over: row.over, certainty: row.certainty,
+        target: canonicalAmount(row.target, row.unit, row.name, row.subjectId),
+        exposure: canonicalAmount(row.exposure, row.unit, row.name, row.subjectId),
+        exposureMinimum: canonicalAmount(row.exposureMinimum, row.unit, row.name, row.subjectId),
+        exposureMaximum: canonicalAmount(row.exposureMaximum, row.unit, row.name, row.subjectId)
+      })).sort((a, b) => a.subjectId.localeCompare(b.subjectId)),
+      perContinuedDose: (option.doseFit.perContinuedDose ?? []).map(row => ({
+        subjectId: row.subjectId, referenceBasis: row.referenceBasis, over: row.over, certainty: row.certainty,
+        sourceIds: [...row.sourceIds].sort(),
+        referenceDose: canonicalAmount(row.referenceDose, row.unit, row.name, row.subjectId),
+        exposure: canonicalAmount(row.exposure, row.unit, row.name, row.subjectId),
+        exposureMinimum: canonicalAmount(row.exposureMinimum, row.unit, row.name, row.subjectId),
+        exposureMaximum: canonicalAmount(row.exposureMaximum, row.unit, row.name, row.subjectId),
+        conservativeExposure: canonicalAmount(row.conservativeExposure, row.unit, row.name, row.subjectId)
+      })).sort((a, b) => a.subjectId.localeCompare(b.subjectId)),
+      perLimit: option.doseFit.perLimit.map(row => ({
+        subjectId: row.subjectId, excess: row.excess, certainty: row.certainty, ruleId: row.ruleId,
+        sourceScope: row.sourceScope,
+        limit: canonicalAmount(row.limit, row.unit, row.name, row.subjectId),
+        exposure: canonicalAmount(row.exposure, row.unit, row.name, row.subjectId)
+      })).sort((a, b) => a.subjectId.localeCompare(b.subjectId))
+    } : null,
+    comparisonBasis: option.economics?.comparisonBasis ? {
+      ...option.economics.comparisonBasis,
+      costHorizonsDays: [...option.economics.comparisonBasis.costHorizonsDays].sort((a, b) => a - b),
+      currentInventory: [...option.economics.comparisonBasis.currentInventory].sort((a, b) => a.supplementId.localeCompare(b.supplementId) || String(a.productId).localeCompare(String(b.productId)) || Number(a.daysRemaining) - Number(b.daysRemaining))
+    } : null,
     equivalent: option.economics?.equivalent ?? null,
     optionId: option.optionId,
     products: option.basket
@@ -188,6 +227,7 @@ function canonicalOptionValue(option: StackOption) {
         daysOfSupply: item.daysOfSupply ?? null,
         productId: item.productId,
         quantity: item.quantity,
+        servingsPerDay: item.servingsPerDay,
         servingsPerPack: item.servingsPerPack ?? null
       }))
       .sort((left, right) => left.productId.localeCompare(right.productId)),
@@ -263,6 +303,8 @@ export function canonicalPlanValue(input: Readonly<{
     input.options.find((item) => item.recommended) ??
     null;
   return {
+    canonicalVersion: CANONICAL_PLAN_VERSION,
+    contractVersion: AGENTIC_CONTRACT_VERSION,
     inventoryDays: [...(input.inventoryDays ?? [])].slice().sort((left, right) => left - right),
     leftovers: [...input.leftovers].sort((left, right) =>
       canonicalJson(left).localeCompare(canonicalJson(right))

@@ -9,7 +9,6 @@ import {
   MATCHER_VERSION,
   match,
   optionIdFor,
-  publicCoveragePercent,
   summarizeRejections
 } from "@/lib/matcher";
 import {
@@ -19,12 +18,15 @@ import {
 } from "@/lib/matcher/candidates";
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
+import { knownLimitProfile } from "@/lib/matcher/dose-fit";
+import { intakeCertaintyFor } from "@/lib/agentic/plan/intake-certainty";
 import {
   canonicalTargetSetHash,
   canonicalizeCurrents,
   canonicalizeTargets
 } from "@/lib/matcher/canonicalizer";
-import { normalizeProductKey, productKeysMatch } from "@/lib/product-key-matching";
+import { normalizeProductKey } from "@/lib/product-key-matching";
+import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
 import type {
   CanonicalRequest,
   CanonicalTarget,
@@ -44,6 +46,7 @@ import { optionSafety } from "@/lib/agentic/plan/safety";
 import type {
   BasketItem,
   CanonicalPlanState,
+  CoverageContributor,
   CoverageRow,
   FactLedgerRow,
   MatcherTelemetry,
@@ -55,7 +58,7 @@ import type {
 } from "@/lib/agentic/plan/types";
 import { buildBurden } from "@/lib/agentic/value/burden";
 import { buildEconomics, enrichBasketPackFacts } from "@/lib/agentic/value/economics";
-import { cashCostForHorizon } from "@/lib/agentic/value/horizon-cash";
+import { DEFAULT_MAX_PRODUCT_COUNT } from "@/lib/agentic/contract/schemas";
 import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
 import { planRematchFingerprint } from "@/lib/agentic/plan/normalize";
 import { countQuery } from "@/lib/agentic/plan/query-budget";
@@ -141,6 +144,7 @@ export function toCanonicalRequest(
       acceptableMaximum: item.acceptableRange?.maximum,
       acceptableMinimum: item.acceptableRange?.minimum,
       amount: item.amount,
+      basis: item.basis ?? "supplemental",
       importance: item.importance ?? "required",
       name: item.name,
       prerequisite: item.prerequisite,
@@ -149,7 +153,19 @@ export function toCanonicalRequest(
     }))
   });
 
-  const currentRows = [...state.currentSupplements].sort(
+  const observations = state.intake ?? [];
+  const quantified = observations.flatMap((item, index) => {
+    if (item.certainty === "unknown" || !item.supplementId || !item.unit) return [];
+    const minimum = item.certainty === "estimated" ? item.minimum : undefined;
+    const maximum = item.certainty === "estimated" ? item.maximum : undefined;
+    const amount = item.amount ?? (minimum != null && maximum != null ? (minimum + maximum) / 2 : null);
+    if (amount == null || amount <= 0) return [];
+    return [{ dailyAmount: amount, name: item.name ?? item.supplementId, supplementId: item.supplementId,
+      unit: item.unit, productId: item.productId, source: item.source, certainty: item.certainty, observationIndex: index,
+      daysRemaining: item.daysRemaining,
+      minimumDailyAmount: minimum, maximumDailyAmount: maximum }];
+  });
+  const currentRows = [...state.currentSupplements, ...quantified.filter(item => item.source === "current_supplement")].sort(
     (left, right) =>
       left.supplementId.localeCompare(right.supplementId) ||
       left.name.localeCompare(right.name) ||
@@ -159,6 +175,7 @@ export function toCanonicalRequest(
   const currents = canonicalizeCurrents(
     currentRows.map((item, index) => ({
       dailyAmount: item.dailyAmount,
+      certainty: "certainty" in item ? item.certainty : "known" as const,
       daysRemaining: item.daysRemaining,
       name: item.name,
       productId: item.productId,
@@ -171,25 +188,42 @@ export function toCanonicalRequest(
   if ("error" in currents) {
     return currents;
   }
+  const withRanges = currents.map((item, index) => {
+    const original = currentRows[index];
+    return { ...item, ...(original && "minimumDailyAmount" in original ? {
+      minimumDailyAmount: original.minimumDailyAmount, maximumDailyAmount: original.maximumDailyAmount } : {}) };
+  });
+  const dietary = canonicalizeCurrents(quantified.filter(item => item.source === "diet").map(item => ({ ...item,
+    sourceId: `diet:${item.observationIndex}`, subjectId: item.supplementId })));
+  if ("error" in dietary) return dietary;
+  const dietaryWithRanges = dietary.map(item => {
+    const original = quantified.find(row => `diet:${row.observationIndex}` === item.sourceId);
+    return { ...item, minimumDailyAmount: original?.minimumDailyAmount, maximumDailyAmount: original?.maximumDailyAmount };
+  });
 
-  const dietary = state.requirements.dietaryPreference ?? "any";
+  const dietaryPreference = state.requirements.dietaryPreference ?? "any";
 
   return {
     acceptedGapSubjectIds: state.acceptedGaps.map((item) => item.supplementId),
     allowedForms: state.requirements.allowedForms ?? null,
     conditionCodes: state.conditionCodes,
     currency: state.currency,
-    currentSupplements: currents,
+    currentSupplements: withRanges,
+    dietaryIntake: dietaryWithRanges,
+    profileKnown: state.profileKnown,
+    unknownIntakeSubjectIds: state.targets.filter(target => intakeCertaintyFor(state, target.supplementId) === "unknown").map(target => target.supplementId),
+    estimatedIntakeSubjectIds: observations.filter(item => item.certainty === "estimated").flatMap(item => item.supplementId ? [item.supplementId] : state.targets.map(target => target.supplementId)),
     destinationCountry: state.destinationCountry,
-    dietaryPreference: dietary,
+    dietaryPreference,
+    excludeProductIds: state.requirements.excludeProductIds ?? [],
     excludeSubjectIds: state.requirements.excludeSupplementIds ?? [],
     leftovers: targets.leftovers,
     maxDailyPills: state.requirements.maxDailyPills ?? null,
     maxPriceMinor: state.requirements.maxPriceMinor ?? null,
-    maxProductCount: state.requirements.maxProductCount ?? 8,
+    maxProductCount: state.requirements.maxProductCount ?? DEFAULT_MAX_PRODUCT_COUNT,
     medicationCodes: state.medicationCodes,
     omega3SourcePreference: impliedOmegaPreference(
-      dietary,
+      dietaryPreference,
       state.requirements.omega3SourcePreference,
       state.targets.map((item) => item.requestedName ?? item.name)
     ),
@@ -208,8 +242,12 @@ export function coverageFor(
   basket: ScoredBasket | null,
   items: readonly BasketItem[] = []
 ): CoverageRow[] {
-  return state.targets.map((target) => {
-    const current = state.currentSupplements.filter(
+  const rows = state.targets.map((target): CoverageRow => {
+    const knownObservations = (state.intake ?? []).flatMap(item => item.certainty === "known" && item.supplementId === target.supplementId ? [item] : []);
+    const intakeCertainty = intakeCertaintyFor(state, target.supplementId);
+    const current = [...state.currentSupplements, ...knownObservations.map(item => ({ dailyAmount: item.amount!,
+      name: item.name ?? target.name, supplementId: target.supplementId, productId: item.productId,
+      unit: item.unit!, source: item.source === "diet" ? "diet" as const : "current" as const }))].filter(
       (item) => item.supplementId === target.supplementId
     );
     const currentContributors = current.flatMap((item) => {
@@ -230,34 +268,33 @@ export function coverageFor(
           amount: converted,
           productId: item.productId,
           productName: item.name,
-          source: "current" as const,
+          source: "source" in item ? item.source : "current" as const,
           unit: target.unit
         }
       ];
     });
-    const currentAmount = currentContributors.reduce((sum, item) => sum + item.amount, 0);
-    const ceilings = matcherSafetyCeilings();
+    const basis = target.basis ?? "supplemental";
+    const knownSupplementalAmount = currentContributors.filter(item => item.source !== "diet").reduce((sum, item) => sum + item.amount, 0);
+    const knownDietAmount = currentContributors.filter(item => item.source === "diet").reduce((sum, item) => sum + item.amount, 0);
+    const currentAmount = knownSupplementalAmount + (basis === "total_daily" ? knownDietAmount : 0);
+    const limitProfile = knownLimitProfile(state);
+    const ceilings = limitProfile ? matcherSafetyCeilings() : [];
     const ceiling = safetyCeilingFor(ceilings, {
       conditionCodes: state.conditionCodes,
       name: target.name,
-      profile: state.profile,
+      profile: limitProfile,
       subjectId: target.supplementId
     });
     const limit = upperLimitAmount(target.name, target.unit, {
       ceilings,
+      sourceScope: ceiling?.sourceScope,
       conditionCodes: state.conditionCodes,
-      profile: state.profile,
+      profile: limitProfile,
       subjectId: target.supplementId
     });
     const contributors = items.flatMap((item) => {
       const matching = (item.requestedNutrients ?? []).filter((nutrient) => {
-        const sameNutrient =
-          productKeysMatch(nutrient.name, target.name) ||
-          productKeysMatch(nutrient.name, target.supplementId);
-        const omegaLike =
-          /omega|epa|dha|n-3/i.test(`${target.name} ${target.supplementId}`) &&
-          /omega|epa|dha|n-3/i.test(nutrient.name);
-        return sameNutrient || omegaLike;
+        return nutrientNameMatchesTarget(target.name, nutrient.name);
       });
 
       if (matching.length > 0) {
@@ -285,26 +322,22 @@ export function coverageFor(
     });
 
     const deliveredFromFacts = contributors.reduce((sum, item) => sum + item.amount, 0);
-    const matcherUnits = basket?.coverageBySubject.get(target.supplementId) ?? 0;
     const deliveredScaled = basket?.exposure.totals.get(target.supplementId);
     const deliveredTotal = deliveredScaled
       ? amountFromScaled(deliveredScaled, target.unit, target.name)
       : 0;
-    const ignoreIncidentalFacts =
-      items.length > 0 && matcherUnits < 1 && deliveredFromFacts > 0;
     const deliveredAmount = items.length > 0
-      ? ignoreIncidentalFacts
-        ? 0
-        : deliveredFromFacts
-      : Math.max(0, (deliveredTotal ?? 0) - currentAmount);
-    const publishedContributors = [
+      ? deliveredFromFacts
+      : basket?.productIds.length ? Math.max(0, (deliveredTotal ?? 0) - knownSupplementalAmount) : 0;
+    const publishedContributors: CoverageContributor[] = [
       ...currentContributors,
-      ...(ignoreIncidentalFacts ? [] : contributors)
+      ...contributors
     ];
-    const totalExposureAmount = currentAmount + deliveredAmount;
-    const coveragePercent =
+    const totalExposureAmount = knownSupplementalAmount + knownDietAmount + deliveredAmount;
+    const targetExposureAmount = currentAmount + deliveredAmount;
+    const exposurePercent =
       target.amount > 0
-        ? Math.round((totalExposureAmount / target.amount) * 100)
+        ? (targetExposureAmount / target.amount) * 100
         : 0;
     let status: CoverageRow["status"] = "uncovered";
     const importance = target.importance ?? "required";
@@ -316,30 +349,29 @@ export function coverageFor(
       status = "conditional_deferred";
     } else if (
       currentAmount > 0 &&
-      coveragePercent >= COVERED_THRESHOLD &&
+      exposurePercent >= COVERED_THRESHOLD &&
       deliveredAmount <= 0
     ) {
       status = "already_covered";
-    } else if (coveragePercent >= COVERED_THRESHOLD && coveragePercent <= 125) {
+    } else if (exposurePercent >= COVERED_THRESHOLD && exposurePercent <= 100) {
       status = "covered";
-    } else if (coveragePercent > 125) {
+    } else if (exposurePercent > 100) {
       status = "over_target";
     } else if (importance === "optional" && deliveredAmount <= 0) {
       status = "optional_omitted";
-    } else if (coveragePercent > 0 && contributors.length > 0) {
+    } else if (exposurePercent > 0 && contributors.length > 0) {
       status = "partial";
     } else if (importance === "core" || importance === "required") {
-      status = coveragePercent > 0 ? "gap" : "uncovered";
-    }
-
-    if (limit != null && totalExposureAmount >= limit && !deferredConditional) {
-      status = "upper_limit_risk";
+      status = exposurePercent > 0 ? "gap" : "uncovered";
     }
 
     return {
+      basis,
       authorityUrl: ceiling?.authorityUrl ?? null,
       contributors: publishedContributors,
-      coveragePercent,
+      coveragePercent: Math.min(100, Math.round(exposurePercent)),
+      intakeCertainty,
+      totalExposureComplete: intakeCertainty === "known",
       currentAmount,
       deliveredAmount,
       importance,
@@ -355,9 +387,10 @@ export function coverageFor(
           : {}),
       percentOfUpperLimit:
         limit != null && limit > 0
-          ? Math.round((totalExposureAmount / limit) * 100)
+          ? Math.round((publishedContributors.filter(item => ceiling?.sourceScope !== "supplemental" || item.source !== "diet")
+            .reduce((sum, item) => sum + item.amount, 0) / limit) * 100)
           : null,
-      remainingGap: Math.max(0, target.amount - totalExposureAmount),
+      remainingGap: Math.max(0, target.amount - targetExposureAmount),
       requestedAmount: target.amount,
       ...(ceiling
         ? {
@@ -375,7 +408,30 @@ export function coverageFor(
       upperLimitAmount: limit
     };
   });
+  // Only unresolved requested targets belong in the denominator. An unknown
+  // continued supplement must not manufacture another requested target.
+  const unresolved = state.leftovers.filter(item => item.source === "target" &&
+    (item.reason === "not_in_catalogue" || item.reason === "unsupported_unit_conversion"));
+  for (const item of unresolved) {
+    const original = item.requestIndex != null ? state.originalRequest?.targets[item.requestIndex] : undefined;
+    const amount = original?.amount ?? item.amount;
+    const unit = original?.unit ?? item.unit;
+    if (amount == null || !unit) throw new Error("Unresolved requested target is missing its validated amount or unit");
+    if (rows.some(row => item.supplementId ? row.supplementId === item.supplementId : row.name === item.name)) continue;
+    rows.push({ name: item.name, supplementId: item.supplementId ?? `unresolved:${item.requestIndex ?? item.name}`,
+      requestedTargetId: `target:${item.requestIndex ?? item.name}`, unresolved: true,
+      basis: original?.basis ?? "total_daily",
+      requestedAmount: amount, unit,
+      importance: original?.importance ?? "required", status: "uncovered", reasonCode: item.reason,
+      coveragePercent: 0, currentAmount: 0, deliveredAmount: 0, totalExposureAmount: 0,
+      remainingGap: amount, percentOfUpperLimit: null, upperLimitAmount: null,
+      intakeCertainty: "unknown", totalExposureComplete: false });
+  }
+  return rows;
 }
+
+import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
+export { requestedTargetCoverage };
 
 export function factLedgerFor(input: Readonly<{
   catalogueId: string;
@@ -399,7 +455,7 @@ export function factLedgerFor(input: Readonly<{
         (basketItem) => basketItem.productId === contributor.productId
       );
       const nutrient = item?.requestedNutrients?.find((entry) =>
-        productKeysMatch(entry.name, target.name)
+        nutrientNameMatchesTarget(target.name, entry.name)
       );
       const ruleId = normalizeProductKey(nutrient?.name ?? target.name);
       const productFactId = [
@@ -558,7 +614,6 @@ function nutrientSplit(
         continue;
       }
 
-      requestedKeys.add(key);
       const scaled = fact.amount * multiplier;
       const comparable =
         convertAmount({
@@ -567,16 +622,9 @@ function nutrientSplit(
           subjectId: target.supplementId,
           subjectName: target.name,
           toUnit: target.unit
-        }) ?? scaled;
-
-      if (target.amount > 0 && comparable * 10 < target.amount) {
-        incidental.push({
-          amount: scaled,
-          name: fact.name,
-          unit: fact.unit
         });
-        continue;
-      }
+      if (comparable == null) continue;
+      requestedKeys.add(key);
 
       requested.push({
         amount: scaled,
@@ -605,7 +653,9 @@ function nutrientSplit(
   }
 
   const incidentalNutrients = uniqueBoundedNutrients(incidental);
-  const requestedNutrients = uniqueBoundedNutrients(requested);
+  // These quantities are the coverage ledger, so presentation limits and small
+  // contribution thresholds must never discard a requested measured nutrient.
+  const requestedNutrients = uniqueBoundedNutrients(requested, requested.length);
 
   return {
     incidentalNutrientNames: uniqueBoundedNames(incidentalNutrients.map((item) => item.name)),
@@ -620,6 +670,7 @@ function asMatcherTarget(
 ): CanonicalTarget {
   return {
     importance: target.importance ?? "required",
+    basis: target.basis ?? "supplemental",
     name: target.name,
     requested: {
       dim: "mass_ng",
@@ -779,7 +830,7 @@ function toStackOption(
   const cash90DayMinor = economics.cash90DayMinor;
   const recommendedCash =
     recommendedBasket && recommendedBasket !== basket
-      ? cashCostForHorizon(recommendedItems, 90)
+      ? buildEconomics({ coverage: recommendedCoverage, items: recommendedItems, snapshot, state }).cash90DayMinor
       : cash90DayMinor;
   const retainedCurrent: RetainedCurrent[] = state.currentSupplements
     .filter((item) =>
@@ -801,25 +852,27 @@ function toStackOption(
     burden,
     ...(cash90DayMinor != null ? { cash90DayMinor } : {}),
     coverage,
-    coveragePercent: publicCoveragePercent(basket),
+    coveragePercent: requestedTargetCoverage(coverage).coveragePercent,
+    doseFit: basket.doseFit,
     dailyPills: basket.dailyPills,
     deferredTargetIds,
     economics,
     includedTargetIds,
     matcherVersion: MATCHER_VERSION,
     omittedTargetIds,
-    optionId: optionIdFor(basket.productIds),
+    optionId: optionIdFor(basket.variantIds),
     reason: basket.reason,
     recommended: Boolean(basket.recommended) || basket === recommendedBasket,
     ...(retainedCurrent.length > 0 ? { retainedCurrent } : {}),
     ...(basket.optionRole ? { role: basket.optionRole } : {}),
     snapshotId: catalogueSnapshotId(snapshot),
-    totalPriceMinor: basket.priceMinor,
+    // Daily serving variants determine dose; checkout purchases the packs above.
+    totalPriceMinor: items.reduce((sum, item) => sum + item.lineTotalMinor, 0),
     tradeOff: {
       cash90DayDeltaMinor:
         cash90DayMinor != null && recommendedCash != null
           ? cash90DayMinor - recommendedCash
-          : 0,
+          : null,
       coverageDelta: basket.aggregateCoverage - (recommendedBasket?.aggregateCoverage ?? basket.aggregateCoverage),
       dailyPillsDelta: basket.dailyPills - (recommendedBasket?.dailyPills ?? basket.dailyPills)
     }
@@ -1059,6 +1112,7 @@ export function matchPlan(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): {
+  alternativeSearch?: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
   alternatives: StackOption[];
   leftovers: PlanLeftover[];
   lossCertificates?: NonNullable<MatcherTelemetry["lossCertificates"]>;
@@ -1150,7 +1204,7 @@ function computeMatchPlan(input: Readonly<{
         row.name === item.name
     );
     if (item.reason === "unsupported_unit_conversion" && existing >= 0) {
-      leftovers[existing] = mapped;
+      leftovers[existing] = { ...leftovers[existing], ...mapped };
       seen.add(`${mapped.reason}:${mapped.name}`);
       continue;
     }
@@ -1164,6 +1218,7 @@ function computeMatchPlan(input: Readonly<{
 
   return {
     alternatives,
+    alternativeSearch: result.alternativeSearch,
     leftovers,
     ...(result.lossCertificates ? { lossCertificates: result.lossCertificates } : {}),
     rejected: [...result.rejected],

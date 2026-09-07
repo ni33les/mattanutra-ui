@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { rejectObsoleteHealthAnswer, ADVISORY_SINGLE_RESPONSE_BYTES, ADVISORY_MULTI_RESPONSE_BYTES } from "./agentic/advisory-pack-helpers.ts";
 import { describe, it } from "node:test";
 import {
   beginDeterministicIdsForTests,
@@ -117,6 +118,7 @@ const BANNED_DIAGNOSTIC_KEYS = new Set([
 ]);
 
 const PROCESSING_KEYS = new Set([
+  "contractVersion", "operationalDecision",
   "locale",
   "nextActions",
   "ok",
@@ -129,6 +131,7 @@ const PROCESSING_KEYS = new Set([
 ]);
 
 const COMPLETED_KEYS = new Set([
+  "contractVersion", "operationalDecision", "nextReplenishmentDay", "scheduleComplete", "unavailableReasons",
   "acknowledgementStatus",
   "acknowledgedUnassessedConditionCodes",
   "acknowledgedUnassessedMedicationCodes",
@@ -217,7 +220,7 @@ export type AeC6CaseResult = Readonly<{
 
 export type AeC6PackReport = Readonly<{
   cases: readonly AeC6CaseResult[];
-  packVersion: "agentic-experience-6.0";
+  packVersion: "agentic-experience-6.1";
   passedCases: number;
   totalCases: 6;
 }>;
@@ -679,7 +682,7 @@ function matchFor(state: CanonicalPlanState) {
     return {
       alternatives: [],
       leftovers: [],
-      selected: magOption(requested > 350 ? 350 : requested, requested)
+      selected: magOption(requested, requested)
     };
   }
 
@@ -956,7 +959,7 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
             ]
           })
         });
-        const answered = await harness.call("plan", {
+        const answered = await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: omega.revision,
           idempotencyKey: "ax601-answer-000001",
@@ -1000,15 +1003,15 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
           planHandle: processing.planHandle
         });
         const payloads = [
-          { max: 8192, name: "create", value: created },
-          { max: 8192, name: "get", value: gotten },
-          { max: 8192, name: "replay", value: replay },
-          { max: 16384, name: "answer", value: answered },
-          { max: 16384, name: "select", value: selected },
-          { max: 16384, name: "revise", value: revised },
-          { max: 16384, name: "blocked", value: blocked },
-          { max: 8192, name: "processing", value: processing },
-          { max: 8192, name: "poll", value: polled }
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "create", value: created },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "get", value: gotten },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "replay", value: replay },
+          { max: ADVISORY_MULTI_RESPONSE_BYTES, name: "answer", value: answered },
+          { max: ADVISORY_MULTI_RESPONSE_BYTES, name: "select", value: selected },
+          { max: ADVISORY_MULTI_RESPONSE_BYTES, name: "revise", value: revised },
+          { max: ADVISORY_MULTI_RESPONSE_BYTES, name: "blocked", value: blocked },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "processing", value: processing },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "poll", value: polled }
         ];
         const dirty = payloads
           .map((item) => ({ name: item.name, ...planClean(item.value, item.max) }))
@@ -1061,7 +1064,7 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
           operation: "create",
           request: singleRequest({ medicationCodes: ["warfarin"] })
         });
-        const warfarinAck = await harness.call("plan", {
+        const warfarinAck = await rejectObsoleteHealthAnswer(harness, {
           answers: [
             { choice: "acknowledge_unassessed", questionId: "q_unassessed_medical_context" }
           ],
@@ -1080,7 +1083,7 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
             ]
           })
         });
-        const omegaAck = await harness.call("plan", {
+        const omegaAck = await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: omega.revision,
           idempotencyKey: "ax603-omega-ack-0001",
@@ -1125,24 +1128,25 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
           .sort();
         const ok =
           missingReady.length === 0 &&
+          basketOf(ready).length > 0 &&
+          nextActionsOf(blocked).includes("confirm_with_user") &&
+          questionsOf(blocked).length === 0 &&
           priceOk &&
-          planClean(ready, 8192).ok &&
-          planClean(selected, 16384).ok &&
-          planClean(processing, 8192).ok &&
-          planClean(polled, 8192).ok &&
+          planClean(ready, ADVISORY_SINGLE_RESPONSE_BYTES).ok &&
+          planClean(selected, ADVISORY_MULTI_RESPONSE_BYTES).ok &&
+          planClean(processing, ADVISORY_SINGLE_RESPONSE_BYTES).ok &&
+          planClean(polled, ADVISORY_SINGLE_RESPONSE_BYTES).ok &&
           stringList(warfarin.unassessedMedicationCodes).includes("warfarin") &&
           stringList(warfarinAck.unassessedMedicationCodes).includes("warfarin") &&
-          stringList(warfarinAck.acknowledgedUnassessedMedicationCodes).includes(
-            "warfarin"
-          ) &&
+          stringList(warfarinAck.acknowledgedUnassessedMedicationCodes).length === 0 &&
           warfarinAck.safetyScope === "partial" &&
-          omega.acknowledgementStatus === "pending" &&
-          omegaAck.acknowledgementStatus === "acknowledged" &&
+          omega.acknowledgementStatus === "not_required" &&
+          omegaAck.acknowledgementStatus === "not_required" &&
           guidanceOf(omega).some((item) => item.exposure === 1104) &&
           guidanceOf(omegaAck).some((item) => item.exposure === 1104) &&
           guidanceOf(blocked).some(
             (item) =>
-              item.action === "block" && item.acknowledgementStatus === "not_applicable"
+              item.code === "dose_review_required" && item.action === "review" && item.severity === "high" && item.acknowledgementStatus === "not_required"
           ) &&
           selectedIds.join() === [OPT_A, OPT_B, OPT_C].sort().join() &&
           optionsOf(selected).filter((item) => item.selected === true).length === 1 &&
@@ -1323,7 +1327,7 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-6.0",
+      packVersion: "agentic-experience-6.1",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 6
     };
@@ -1342,6 +1346,7 @@ if (process.env.NODE_TEST_CONTEXT) {
     it("exports 6 cases and a canonical report", async () => {
       const report = await runAeC6Pack();
       assert.equal(report.totalCases, 6);
+      assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 6);
       assert.deepEqual(
         report.cases.map((item) => item.id),

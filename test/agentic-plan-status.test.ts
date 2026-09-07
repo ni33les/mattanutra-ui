@@ -99,8 +99,8 @@ function state(): CanonicalPlanState {
   } as CanonicalPlanState;
 }
 
-describe("plan status fail-closed on oversupply", () => {
-  it("does not mark over_target coverage as ready", () => {
+describe("plan operational status with advisory health guidance", () => {
+  it("keeps over-target coverage operationally ready", () => {
     const selected = option([
       coverage({
         coveragePercent: 1023,
@@ -118,10 +118,10 @@ describe("plan status fail-closed on oversupply", () => {
       state: state(),
       unmetRequirements: []
     });
-    assert.notEqual(status, "ready");
+    assert.equal(status, "ready");
   });
 
-  it("blocks exposure above the magnesium UL", () => {
+  it("reports exposure above the magnesium reference limit without blocking", () => {
     setMatcherSafetyCeilings([
       {
         lifeStage: "adult",
@@ -148,7 +148,7 @@ describe("plan status fail-closed on oversupply", () => {
       state: state()
     });
     assert.equal(
-      guidance.some((item) => item.action === "block" && item.code === "dose_review_required"),
+      guidance.some((item) => item.action === "review" && item.code === "dose_review_required"),
       true
     );
     const status = planStatus({
@@ -158,10 +158,10 @@ describe("plan status fail-closed on oversupply", () => {
       state: state(),
       unmetRequirements: []
     });
-    assert.equal(status, "blocked");
+    assert.equal(status, "ready");
   });
 
-  it("keeps exact UL as needs_input rather than ready", () => {
+  it("reports exact-limit advice without requiring acknowledgement", () => {
     setMatcherSafetyCeilings([
       {
         lifeStage: "adult",
@@ -189,20 +189,20 @@ describe("plan status fail-closed on oversupply", () => {
       state: state()
     });
     assert.equal(
-      guidance.some((item) => item.action === "acknowledge" && item.code === "dose_review_required"),
+      guidance.some((item) => item.action === "review" && item.code === "dose_review_required"),
       true
     );
     const status = planStatus({
       guidance,
-      questions: [{ choices: [], prompt: "ack", promptKey: "x", questionId: "q_safety_ack" }],
+      questions: [],
       selected,
       state: state(),
       unmetRequirements: []
     });
-    assert.equal(status, "needs_input");
+    assert.equal(status, "ready");
   });
 
-  it("closes a bound review acknowledgement at exact UL with zero remaining gap", () => {
+  it("does not require historical acknowledgements at exact UL with zero remaining gap", () => {
     setMatcherSafetyCeilings([
       {
         lifeStage: "adult",
@@ -331,7 +331,7 @@ describe("plan status fail-closed on oversupply", () => {
       state: state()
     });
     const dose = guidance.find(
-      (item) => item.action === "block" && item.code === "dose_review_required"
+      (item) => item.action === "review" && item.code === "dose_review_required"
     );
     assert.ok(dose);
     assert.equal(dose.ruleId, bandId);
@@ -344,7 +344,7 @@ describe("plan status fail-closed on oversupply", () => {
     resetMatcherSafetyCeilings();
   });
 
-  it("lists current-intake contributors on a magnesium UL block", () => {
+  it("lists current-intake contributors on magnesium reference-limit advice", () => {
     setMatcherSafetyCeilings([
       {
         bandId: "8c2b0d1a-4f3e-4a91-9b77-2c6d8e0f1a23",
@@ -375,7 +375,7 @@ describe("plan status fail-closed on oversupply", () => {
       state: state()
     });
     const dose = guidance.find(
-      (item) => item.action === "block" && item.code === "dose_review_required"
+      (item) => item.action === "review" && item.code === "dose_review_required"
     );
     assert.ok(dose);
     assert.equal(dose.nutrientName, "Magnesium");

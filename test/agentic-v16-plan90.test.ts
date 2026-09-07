@@ -1,3 +1,4 @@
+import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "./helpers/current-contract-lock.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -52,7 +53,6 @@ import {
   publicPlanCreate
 } from "./agentic/v16/harness.ts";
 import {
-  F_READY_MAG,
   V16_CLIENT_DEADLINE_MS,
   V16_HARD_DEADLINE_MS,
   V16_HYGIENE_IDS,
@@ -119,7 +119,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     assert.equal(hygiene.hashes.lockEntry, V16_LOCK_HASH);
     assert.equal(V16_NL_DEF_HASH, "574b78411253f20a7f52a23ade7350a6277d632d14555775c5043bbbd05accca");
     assert.deepEqual([...V16_NL_EXCLUSION], ["/checks/TECH-07"]);
-    assert.equal(AGENTIC_SCHEMA_CHECKSUM, "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6");
+    assert.equal(AGENTIC_SCHEMA_CHECKSUM, CURRENT_CONTRACT_SCHEMA_CHECKSUM);
   });
 
   it("L2-HYGIENE-02 complete developer manifest", () => {

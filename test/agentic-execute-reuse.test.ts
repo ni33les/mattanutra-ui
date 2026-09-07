@@ -10,6 +10,8 @@ import {
 } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { simulatePayment } from "../lib/agentic/qa/simulate.ts";
+import { resolveCapability } from "../lib/agentic/capabilities.ts";
+import type { PlanResult } from "../lib/agentic/plan/types.ts";
 
 function runtimeFor(): AgenticRuntime {
   return createAgenticRuntime({
@@ -43,6 +45,44 @@ afterEach(() => {
 });
 
 describe("execute key reuses one unpaid order", () => {
+  async function legacyPlan(runtime: AgenticRuntime, key: string, executeFirst = false) {
+    const plan = await call(runtime, "plan", { operation: "create", idempotencyKey: `${key}-create`, request: {
+      destinationCountry: "TH", locale: "en", optimization: "balanced", profile: { ageYears: 38, lifeStage: "adult" },
+      requirements: {}, targets: [{ amount: 500, name: "Vitamin C", unit: "mg" }]
+    } });
+    assert.equal(plan.status, "ready");
+    const checkout = executeFirst ? await call(runtime, "execute", { expectedRevision: plan.revision,
+      idempotencyKey: `${key}-execute`, planHandle: plan.planHandle }) : null;
+    if (checkout) assert.equal(checkout.ok, true);
+    const capability = await resolveCapability({ action: "plan.read", config: runtime.config, handle: String(plan.planHandle),
+      now: new Date().toISOString(), resourceType: "plan", scope: runtime.scope, store: runtime.store });
+    assert.ok(capability);
+    const revision = await runtime.store.getPlanRevision(capability.resourceId, Number(plan.revision));
+    assert.ok(revision);
+    const result = { ...(revision.result as PlanResult) };
+    delete result.contractVersion;
+    await runtime.store.updatePlanRevision({ ...revision, result });
+    return { plan, checkout };
+  }
+
+  it("requires explicit refresh before a new checkout for a legacy unexecuted plan", async () => {
+    const runtime = runtimeFor();
+    const { plan } = await legacyPlan(runtime, "legacy-unexecuted-v4");
+    const result = await call(runtime, "execute", { expectedRevision: plan.revision, idempotencyKey: "legacy-new-checkout-v4", planHandle: plan.planHandle });
+    assert.equal(result.ok, false);
+    assert.equal((result.error as { reasonCode: string }).reasonCode, "contract_refresh_required");
+  });
+
+  it("resumes an existing unpaid legacy checkout before applying new-version gates", async () => {
+    const runtime = runtimeFor();
+    const { plan, checkout } = await legacyPlan(runtime, "legacy-unpaid-checkout-v4", true);
+    const replay = await call(runtime, "execute", { expectedRevision: plan.revision, idempotencyKey: "legacy-unpaid-new-key-v4", planHandle: plan.planHandle });
+    assert.equal(replay.ok, true);
+    assert.equal(replay.checkoutUrl, checkout!.checkoutUrl);
+    assert.equal(replay.orderHandle, checkout!.orderHandle);
+    assert.equal(replay.paymentStatus, "unpaid");
+  });
+
   it("returns the same orderHandle for two execute keys on one plan revision", async () => {
     const runtime = runtimeFor();
     const plan = await call(runtime, "plan", {

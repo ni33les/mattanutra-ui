@@ -17,11 +17,14 @@ describe("Phase 3 public contribution ledger", () => {
     assert.equal(result.selected.productIds.includes("G-C-500"), true);
   });
 
-  it("names the fish-oil product as the omega-3 contributor on the official gold stack", () => {
-    const result = match(qaRequest({ optimization: "fewest_pills" }), QA_GOLD_CATALOG);
+  it("names the fish-oil product as the omega-3 contributor when the customer excludes the algae product", () => {
+    const result = match(qaRequest({ optimization: "fewest_pills", excludeProductIds: ["G-O3-ALGAE-500"] }), QA_GOLD_CATALOG);
     assert.ok(result.selected);
     assert.equal(result.selected.productIds.includes("G-O3-FISH-1000"), true);
     assert.equal(result.selected.productIds.includes("G-O3-ALGAE-500"), false);
+    assert.equal(result.selected.priceMinor, 65000);
+    assert.equal(result.selected.doseFit?.total, 0);
+    assert.equal(result.selected.coveredCount, 5);
   });
 
   it("forwards coverage contributors and requested nutrient amounts", () => {

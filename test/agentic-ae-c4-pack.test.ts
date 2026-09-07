@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { rejectObsoleteHealthAnswer, ADVISORY_SINGLE_RESPONSE_BYTES, ADVISORY_MULTI_RESPONSE_BYTES } from "./agentic/advisory-pack-helpers.ts";
 import { describe, it } from "node:test";
 import {
   beginDeterministicIdsForTests,
@@ -120,6 +121,7 @@ const BANNED_DIAGNOSTIC_KEYS = new Set([
 const BANNED_TRADEOFF =
   /selected stack|satang|\bcoverage\b|\bpills\b|\bproducts\b/i;
 const PROCESSING_KEYS = new Set([
+  "contractVersion", "operationalDecision",
   "locale",
   "nextActions",
   "ok",
@@ -146,7 +148,7 @@ const INFO_ALLOWED = new Set([
   "valuePropositionId",
   "wellnessBoundary",
   "researchVersion",
-  "responsibilityVersion",
+  "responsibilityVersion", "clientGuide", "contractSchema",
   "supportedCountries",
   "supportedLocales",
   "medicationCodes",
@@ -165,7 +167,7 @@ export type AeC4CaseResult = Readonly<{
 
 export type AeC4PackReport = Readonly<{
   cases: readonly AeC4CaseResult[];
-  packVersion: "agentic-experience-4.0";
+  packVersion: "agentic-experience-4.1";
   passedCases: number;
   totalCases: 9;
 }>;
@@ -638,7 +640,7 @@ function matchFor(state: CanonicalPlanState) {
     return {
       alternatives: [],
       leftovers: [],
-      selected: magOption(requested > 350 ? 350 : requested, requested)
+      selected: magOption(requested, requested)
     };
   }
 
@@ -859,7 +861,7 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
             medicationCodes: ["apixaban"]
           }
         });
-        const answered = await harness.call("plan", {
+        const answered = await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: omega.revision,
           idempotencyKey: "ax401-answer-000001",
@@ -887,11 +889,11 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           request: multiRequest({ requirements: { maxDailyPills: 3 } })
         });
         const payloads = [
-          { max: 8192, name: "create", value: created },
-          { max: 8192, name: "get", value: gotten },
-          { max: 8192, name: "answer", value: answered },
-          { max: 16384, name: "select", value: selected },
-          { max: 16384, name: "revise", value: revised }
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "create", value: created },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "get", value: gotten },
+          { max: ADVISORY_SINGLE_RESPONSE_BYTES, name: "answer", value: answered },
+          { max: ADVISORY_MULTI_RESPONSE_BYTES, name: "select", value: selected },
+          { max: ADVISORY_MULTI_RESPONSE_BYTES, name: "revise", value: revised }
         ];
         const dirty = payloads
           .map((item) => ({
@@ -1124,11 +1126,11 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           })
         });
 
-        function checkBlock(
+        function checkAdvice(
           plan: Record<string, unknown>,
           code: "condition_review_required" | "dose_review_required"
         ) {
-          const rows = guidanceOf(plan).filter((item) => item.action === "block");
+          const rows = guidanceOf(plan).filter((item) => item.code === code);
           const only = rows[0] ?? {};
           const contributors = Array.isArray(only.contributors)
             ? only.contributors.map(asRecord)
@@ -1143,30 +1145,25 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           );
           const next = nextActionsOf(plan);
           return (
-            plan.status === "blocked" &&
-            next.length === 1 &&
-            next[0] === "change_request" &&
+            plan.status === "ready" &&
+            next.includes("confirm_with_user") &&
             !ackChoices.some((item) => /acknowledge/i.test(String(item.choice ?? ""))) &&
             !questionsOf(plan).some((item) => /ack/i.test(String(item.questionId ?? ""))) &&
             rows.length >= 1 &&
-            only.action === "block" &&
-            only.acknowledgementStatus === "not_applicable" &&
-            only.acknowledgementStatus !== "pending" &&
-            only.acknowledgementStatus !== "acknowledged" &&
-            only.acknowledgementStatus !== "not_required" &&
-            (plan.acknowledgementStatus === "not_required" ||
-              !("acknowledgementStatus" in plan) ||
-              plan.acknowledgementStatus !== "pending") &&
+            only.action === "review" &&
+            only.severity === "high" &&
+            only.acknowledgementStatus === "not_required" &&
+            plan.acknowledgementStatus === "not_required" &&
             Number.isFinite(exposure) &&
             exposure > 0 &&
             exposure === contributorSum &&
             only.code === code &&
-            !next.some((item) => /execute|confirm/i.test(item))
+            !next.some((item) => /execute/i.test(item))
           );
         }
 
-        const magOk = checkBlock(mag, "dose_review_required");
-        const ckdOk = checkBlock(ckd, "dose_review_required");
+        const magOk = checkAdvice(mag, "dose_review_required") && guidanceOf(mag).some(item => item.code === "dose_review_required" && item.threshold === 350 && item.exposure === 351);
+        const ckdOk = checkAdvice(ckd, "condition_review_required") && guidanceOf(ckd).some(item => item.code === "condition_review_required" && item.threshold === null && item.comparator == null);
         setMatcherSafetyCeilings([]);
         return magOk && ckdOk
           ? pass("AX4-06", {
@@ -1174,6 +1171,9 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
               mag: mag.status
             })
           : fail("AX4-06", {
+              magOk, ckdOk,
+              magAdvice: guidanceOf(mag).filter(item => item.code === "dose_review_required"),
+              ckdAdvice: guidanceOf(ckd).filter(item => item.code === "condition_review_required"),
               ckdAck: guidanceOf(ckd)[0]?.acknowledgementStatus ?? null,
               ckdCode: guidanceOf(ckd)[0]?.code ?? null,
               ckdStatus: ckd.status ?? null,
@@ -1242,7 +1242,7 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           operation: "create",
           request: singleRequest({ medicationCodes: ["warfarin"] })
         });
-        const warfarinAck = await harness.call("plan", {
+        const warfarinAck = await rejectObsoleteHealthAnswer(harness, {
           answers: [
             {
               choice: "acknowledge_unassessed",
@@ -1259,7 +1259,7 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           operation: "create",
           request: singleRequest({ conditionCodes: ["diabetes"] })
         });
-        const diabetesAck = await harness.call("plan", {
+        const diabetesAck = await rejectObsoleteHealthAnswer(harness, {
           answers: [
             {
               choice: "acknowledge_unassessed",
@@ -1277,7 +1277,7 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           request: { ...omegaRequest(), medicationCodes: ["apixaban"] }
         });
         const beforeOmega = harness.port.getCallCount();
-        const omegaAck = await harness.call("plan", {
+        const omegaAck = await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: omega.revision,
           idempotencyKey: "ax408-omega-ack-0001",
@@ -1312,11 +1312,11 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           .map((item) => String(item.optionId ?? ""))
           .sort();
         const stale = await harness.call("plan", {
-          answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
-          expectedRevision: omega.revision,
+          expectedRevision: multi.revision,
           idempotencyKey: "ax408-stale-0000001",
-          operation: "answer",
-          planHandle: omega.planHandle
+          operation: "select",
+          optionId: multi.optionId,
+          planHandle: multi.planHandle
         });
         const processingHarness = createHarness({ deferProcessing: true });
         const processing = await processingHarness.call("plan", {
@@ -1345,13 +1345,11 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
           ready.status === "ready" &&
           priceOk &&
           stringList(warfarinAck.unassessedMedicationCodes).join() === "warfarin" &&
-          stringList(warfarinAck.acknowledgedUnassessedMedicationCodes).join() ===
-            "warfarin" &&
+          stringList(warfarinAck.acknowledgedUnassessedMedicationCodes).length === 0 &&
           stringList(diabetesAck.unassessedConditionCodes).join() === "diabetes" &&
-          stringList(diabetesAck.acknowledgedUnassessedConditionCodes).join() ===
-            "diabetes" &&
-          omega.acknowledgementStatus === "pending" &&
-          omegaAck.acknowledgementStatus === "acknowledged" &&
+          stringList(diabetesAck.acknowledgedUnassessedConditionCodes).length === 0 &&
+          omega.acknowledgementStatus === "not_required" &&
+          omegaAck.acknowledgementStatus === "not_required" &&
           omegaDidNotRematch &&
           overlap.status === "ready" &&
           overlap.acknowledgementStatus === "not_required" &&
@@ -1398,7 +1396,7 @@ export async function runAeC4Pack(): Promise<AeC4PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-4.0",
+      packVersion: "agentic-experience-4.1",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 9
     };
@@ -1417,6 +1415,7 @@ if (process.env.NODE_TEST_CONTEXT) {
     it("exports 9 cases and a canonical report", async () => {
       const report = await runAeC4Pack();
       assert.equal(report.totalCases, 9);
+      assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 9);
       assert.deepEqual(
         report.cases.map((item) => item.id),

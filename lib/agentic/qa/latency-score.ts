@@ -82,10 +82,13 @@ export function scoreUncachedPlanBenchmark(input: Readonly<{
   const p95Ms = interpolatePercentile(input.samples, 95);
   const p50Pass = p50Ms <= input.budgets.p50BudgetMs;
   const p95Pass = p95Ms <= input.budgets.p95BudgetMs;
-  const passed = input.samples.length === input.n && p50Pass && p95Pass;
+  const validSamples = input.samples.every(value => Number.isFinite(value) && value >= 0);
+  const passed = validSamples && input.samples.length === input.n && p50Pass && p95Pass;
   let failureStage = "NONE";
   if (input.samples.length !== input.n) {
     failureStage = "SAMPLE_COUNT";
+  } else if (!validSamples) {
+    failureStage = "INVALID_SAMPLE";
   } else if (!p95Pass) {
     failureStage = "P95";
   } else if (!p50Pass) {

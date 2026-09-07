@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { compileGroups } from "../lib/matcher/candidates.ts";
 import { describe, it } from "node:test";
 import { match } from "../lib/matcher/index.ts";
 import { QA_GOLD_CATALOG, qaProduct, qaRequest, qaTarget } from "../lib/matcher/qa/index.ts";
 
 describe("Phase 2 compactness ranking", () => {
-  it("does not recompile products already rejected as below-floor", () => {
-    const source = readFileSync("lib/matcher/candidates.ts", "utf8");
-    assert.match(source, /compiledIds/);
-    assert.match(source, /contributesUncovered/);
+  it("retains all supported doses of an eligible below-floor contributor", () => {
+    const request = qaRequest({ targets: [qaTarget("d3", 2000)] });
+    const product = qaProduct({ id: "partial", facts: [{ amount: 100, key: "d3" }], priceThb: 10 });
+    const groups = compileGroups(request, { products: [product], availabilityAsOf: "frozen", catalogueVersion: "partial" });
+    assert.deepEqual(groups.map((row) => row.productId), ["partial"]);
+    assert.deepEqual(groups[0]?.variants.map((row) => row.dailyUnits), [1, 2, 3]);
   });
 
   it("does not double-count duplicate catalog D3 facts on one SKU", () => {
@@ -57,8 +59,12 @@ describe("Phase 2 compactness ranking", () => {
       QA_GOLD_CATALOG
     );
     assert.ok(result.selected);
-    assert.equal(result.selected.productCount <= 2, true);
-    assert.equal(result.selected.productIds.includes("G-D3-2000"), true);
+    assert.equal(result.selected.productCount, 1);
+    assert.deepEqual(result.selected.productIds, ["G-D3-1000"]);
+    assert.equal(result.selected.dailyPills, 2);
+    assert.equal(result.selected.priceMinor, 10000);
+    assert.equal(result.selected.doseFit?.total, 0);
+    assert.equal(result.selected.coveredCount, 1);
   });
 
   it("uses extra servings of one SKU before adding a second product when coverage is still partial", () => {
@@ -105,14 +111,21 @@ describe("Phase 2 compactness ranking", () => {
       QA_GOLD_CATALOG
     );
     assert.ok(result.selected);
-    assert.equal(result.selected.productCount <= 2, true);
-    assert.equal(result.selected.productIds.includes("G-C-500"), true);
+    assert.equal(result.selected.productCount, 1);
+    assert.deepEqual(result.selected.productIds, ["G-INCIDENTAL-C"]);
+    assert.equal(result.selected.dailyPills, 2);
+    assert.equal(result.selected.priceMinor, 7000);
+    assert.equal(result.selected.doseFit?.total, 0);
+    assert.equal(result.selected.coveredCount, 1);
   });
 
-  it("M-01 remains combo plus fish oil at 4 pills", () => {
+  it("M-01 remains combo plus the cheaper algae pack at 4 pills", () => {
     const result = match(qaRequest({ optimization: "fewest_pills" }), QA_GOLD_CATALOG);
-    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-FISH-1000"]);
+    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
     assert.equal(result.selected?.dailyPills, 4);
+    assert.equal(result.selected?.priceMinor, 61000);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 5);
   });
 
   it("keeps dedicated C and fish oil in an official-shaped request when a 50+ multi exists", () => {
@@ -650,7 +663,7 @@ describe("Phase 2 compactness ranking", () => {
     );
   });
 
-  it("does not stack a 50+ multi to three pills just to inch D3", () => {
+  it("uses two multi servings when the complete dose penalty beats standalone magnesium", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-covering-50plus",
@@ -702,7 +715,9 @@ describe("Phase 2 compactness ranking", () => {
     assert.ok(fewest.selected);
     assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
-    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
+    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), false);
+    assert.equal(fewest.selected.doseFit?.total, 1.63);
+    assert.equal(fewest.selected.doseFit?.perTarget.find((row) => row.subjectId === "sup_mag")?.exposure, 210);
     const d3Target = qaTarget("d3", 2000);
     const d3Percent = Math.round(
       (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
@@ -717,7 +732,7 @@ describe("Phase 2 compactness ranking", () => {
     );
   });
 
-  it("does not stuff below-floor D3 joints to fake a 90% D3 cover", () => {
+  it("combines labelled contributors and reports actual full coverage with collateral penalties", () => {
     const joints = Array.from({ length: 8 }, (_, index) =>
       qaProduct({
         facts: [
@@ -780,10 +795,11 @@ describe("Phase 2 compactness ranking", () => {
       catalog
     );
     assert.ok(fewest.selected);
-    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
+    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), false);
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
     assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
-    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), false);
+    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
+    assert.equal(fewest.selected.doseFit?.total, 1.39);
     const jointCount = fewest.selected.productIds.filter((id) =>
       id.startsWith("G-JOINT-D3-")
     ).length;
@@ -792,10 +808,11 @@ describe("Phase 2 compactness ranking", () => {
     const d3Percent = Math.round(
       (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
     );
-    assert.equal(d3Percent >= 90, false);
+    assert.equal(d3Percent, 100);
+    assert.equal(fewest.selected.doseFit?.perTarget.find((row) => row.subjectId === "sup_d3")?.exposure, 2000);
   });
 
-  it("does not absorb a covering B12 SKU that fails an incidental catalog UL", () => {
+  it("keeps an incidental UL concern advisory and includes its twice-weighted penalty", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-b12-incidental-ul",
@@ -855,12 +872,14 @@ describe("Phase 2 compactness ranking", () => {
       catalog
     );
     assert.ok(fewest.selected);
-    assert.equal(fewest.selected.productIds.includes("G-B12-ZINC-UL"), false);
+    assert.equal(fewest.selected.productIds.includes("G-B12-ZINC-UL"), true);
+    assert.equal(fewest.selected.doseFit?.weightedLimit, 0.5);
+    assert.ok(fewest.selected.safety.findings.some((row) => row.code === "dose_review_required" && row.subjectId === "sup_zinc" && row.action === "inform"));
     const b12Target = qaTarget("b12", 250);
     const b12Percent = Math.round(
       (fewest.selected.coverageBySubject.get(b12Target.subjectId) ?? 0) / 100
     );
-    assert.equal(b12Percent >= 90, false);
+    assert.equal(b12Percent, 100);
   });
 
   it("absorbs a UL-feasible dedicated B12 covering SKU into official", () => {
@@ -928,7 +947,7 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(b12Percent >= 90, true);
   });
 
-  it("keeps a below-floor B12 SKU when the covering B12 SKU is UL-blocked", () => {
+  it("compares partial B12 loss with full B12 plus an incidental UL penalty", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-b12-partial-not-empty",
@@ -960,13 +979,14 @@ describe("Phase 2 compactness ranking", () => {
       catalog
     );
     assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("G-B12-ZINC-UL"), false);
-    assert.equal(result.selected.productIds.includes("G-B12-30"), true);
+    assert.equal(result.selected.productIds.includes("G-B12-ZINC-UL"), true);
+    assert.equal(result.selected.doseFit?.total, 0.5);
+    assert.equal(result.selected.productIds.includes("G-B12-30"), false);
     const percent = Math.round(
       (result.selected.coverageBySubject.get(qaTarget("b12", 250).subjectId) ??
         0) / 100
     );
-    assert.equal(percent >= 90, false);
+    assert.equal(percent, 100);
     assert.equal(percent > 0, true);
   });
 
@@ -1075,7 +1095,7 @@ describe("Phase 2 compactness ranking", () => {
     }
   });
 
-  it("keeps MAG, omega, C, Bio Calcium, Mega B, and Joint when Joint still reaches 90% D3", () => {
+  it("keeps useful contributors when a multi improves total dose fit despite extra pills", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-official-no-stuff",
@@ -1149,7 +1169,8 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(result.selected.productIds.includes("G-CALCIUM-D3-200"), true);
     assert.equal(result.selected.productIds.includes("G-MEGA-B-50"), true);
     assert.equal(result.selected.productIds.includes("G-JOINT-D3"), true);
-    assert.equal(result.selected.productIds.includes("G-MULTI-50PLUS"), false);
+    assert.equal(result.selected.productIds.includes("G-MULTI-50PLUS"), true);
+    assert.equal(result.selected.doseFit?.total, 0.72);
     const d3 = qaTarget("d3", 2000);
     assert.equal(
       Math.round((result.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,

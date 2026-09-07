@@ -9,6 +9,7 @@ import {
   scoreV3Assertions,
   scoreVal01
 } from "../lib/agentic/qa/v3-scorer.ts";
+import { RESPONSIBILITY_VERSION } from "../lib/agentic/discovery/versions.ts";
 import { CONNECTOR_COPY } from "../lib/agentic/discovery/content.ts";
 
 const passGolden = JSON.parse(
@@ -57,16 +58,16 @@ describe("Slice 0 v3.0 scorer conformance", () => {
 
   it("SCORE-TRUST06-RED stale runner required the version inside marketing prose", () => {
     const stale = staleRunnerScore(passGolden);
-    assert.equal(/\bresponsibility-3\.0\.0\b/.test(CONNECTOR_COPY.en), true);
-    assert.equal(scoreTrust06(passGolden.responsibility).passed, true);
-    assert.equal(scoreTrust06(failGolden.responsibility).passed, false);
+    assert.ok(CONNECTOR_COPY.en.includes(RESPONSIBILITY_VERSION));
+    assert.equal(scoreTrust06(passGolden.responsibility, "responsibility-3.0.0").passed, true);
+    assert.equal(scoreTrust06(failGolden.responsibility, "responsibility-3.0.0").passed, false);
   });
 
   it("eight goldens score twice with identical canonical rows", () => {
-    const first = scoreV3Assertions(passGolden);
-    const second = scoreV3Assertions(passGolden);
-    const failFirst = scoreV3Assertions(failGolden);
-    const failSecond = scoreV3Assertions(failGolden);
+    const first = scoreV3Assertions(passGolden, "responsibility-3.0.0");
+    const second = scoreV3Assertions(passGolden, "responsibility-3.0.0");
+    const failFirst = scoreV3Assertions(failGolden, "responsibility-3.0.0");
+    const failSecond = scoreV3Assertions(failGolden, "responsibility-3.0.0");
     assert.deepEqual(
       first.map((row) => row.passed),
       [true, true, true, true]

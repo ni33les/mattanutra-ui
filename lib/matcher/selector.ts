@@ -1,23 +1,14 @@
-import {
-  COVERED_THRESHOLD,
-  DEFAULT_MATCHER_CONFIG,
-  MATERIAL_COVERAGE_POINTS,
-  MATERIAL_PILL_DELTA,
-  MATERIAL_PRICE_MINOR
-} from "@/lib/matcher/config";
-import {
-  bestCompactCoveringGroup,
-  contributionFor,
-  labelledTargetCount,
-  productIsDedicatedForTarget,
-  variantIncidentalUlBlocked
-} from "@/lib/matcher/candidates";
+import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
+import { COVERED_THRESHOLD, DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
+import { contributionFor, productIsDedicatedForTarget } from "@/lib/matcher/candidates";
 import {
   aggregateCoverage,
   coverageUnits,
   oversupplyScore
 } from "@/lib/matcher/dominance";
 import { seedState, tryAddVariant, reconstructVariants, revalidateState } from "@/lib/matcher/search";
+import { minUnits } from "@/lib/matcher/dose";
+import { knownTargetExposure } from "@/lib/matcher/target-basis";
 import type {
   CanonicalRequest,
   MatcherConfig,
@@ -36,7 +27,7 @@ function coverageMap(
   for (const target of request.targets) {
     map.set(
       target.subjectId,
-      coverageUnits(delivered.get(target.subjectId) ?? BigInt(0), target.requested.units)
+      coverageUnits(knownTargetExposure(request, target, delivered.get(target.subjectId) ?? BigInt(0)), target.requested.units)
     );
   }
 
@@ -228,11 +219,12 @@ export function scoreState(input: Readonly<{
     ),
     exposure: validated.exposure,
     incidentalCount: incidentalNutrientCount(input.groups, productIds, input.request),
-    oversupplyScore: oversupplyScore(input.request, input.state.delivered),
+    oversupplyScore: oversupplyScore(input.request, input.state.exposure),
+    doseFit: doseFitScore(input.request, input.state.exposure),
     priceMinor: input.state.price,
     productCount: input.state.count,
     productIds,
-    reason: "Highest-coverage feasible stack",
+    reason: selectedReason(input.request),
     titleExactCount: titleExactCountFor(
       input.groups,
       productIds,
@@ -249,695 +241,129 @@ export function scoreState(input: Readonly<{
   };
 }
 
-function compareDefault(left: ScoredBasket, right: ScoredBasket) {
-  if (right.coveredCount !== left.coveredCount) {
-    return right.coveredCount - left.coveredCount;
-  }
-
-  if (right.dedicatedPartialCount !== left.dedicatedPartialCount) {
-    return right.dedicatedPartialCount - left.dedicatedPartialCount;
-  }
-
-  if (left.productCount !== right.productCount) {
-    return left.productCount - right.productCount;
-  }
-
-  if (
-    left.coveredCount < 1 &&
-    right.aggregateCoverage !== left.aggregateCoverage
-  ) {
-    return right.aggregateCoverage - left.aggregateCoverage;
-  }
-
-  if (left.dailyPills !== right.dailyPills) {
-    return left.dailyPills - right.dailyPills;
-  }
-
-  if (left.incidentalCount !== right.incidentalCount) {
-    return left.incidentalCount - right.incidentalCount;
-  }
-
-  if (right.titleExactCount !== left.titleExactCount) {
-    return right.titleExactCount - left.titleExactCount;
-  }
-
-  if (left.requestedLabelCount !== right.requestedLabelCount) {
-    return left.requestedLabelCount - right.requestedLabelCount;
-  }
-
-  if (left.priceMinor !== right.priceMinor) {
-    return left.priceMinor - right.priceMinor;
-  }
-
-  if (left.oversupplyScore !== right.oversupplyScore) {
-    return left.oversupplyScore - right.oversupplyScore;
-  }
-
-  if (right.aggregateCoverage !== left.aggregateCoverage) {
-    return right.aggregateCoverage - left.aggregateCoverage;
-  }
-
-  return left.productIds.join("|").localeCompare(right.productIds.join("|"));
+function fitOf(basket: ScoredBasket, request: CanonicalRequest) {
+  return basket.doseFit ?? doseFitScore(request, new Map([...basket.exposure.totals].map(([id, row]) => [id, row.units])));
 }
 
-function compareWeb(left: ScoredBasket, right: ScoredBasket) {
-  if (right.aggregateCoverage !== left.aggregateCoverage) {
-    return right.aggregateCoverage - left.aggregateCoverage;
-  }
-
-  if (left.priceMinor !== right.priceMinor) {
-    return left.priceMinor - right.priceMinor;
-  }
-
-  if (left.dailyPills !== right.dailyPills) {
-    return left.dailyPills - right.dailyPills;
-  }
-
-  if (left.productCount !== right.productCount) {
-    return left.productCount - right.productCount;
-  }
-
-  return left.productIds.join("|").localeCompare(right.productIds.join("|"));
+export function basketSignature(basket: Pick<ScoredBasket, "sellerId" | "variantIds">) {
+  return [basket.sellerId, ...[...basket.variantIds].sort()].join("|");
 }
 
-function meetsCoverageFloor(
-  item: ScoredBasket,
-  best: ScoredBasket,
-  config: MatcherConfig
-) {
-  return item.aggregateCoverage >= coverageFloor(best, config);
-}
-
-function coverageDominates(left: ScoredBasket, right: ScoredBasket) {
-  const ids = new Set([
-    ...left.coverageBySubject.keys(),
-    ...right.coverageBySubject.keys()
-  ]);
-  let better = false;
-  const floor = COVERED_THRESHOLD * 100;
-
-  for (const id of ids) {
-    const leftUnits = left.coverageBySubject.get(id) ?? 0;
-    const rightUnits = right.coverageBySubject.get(id) ?? 0;
-    const leftOk = leftUnits >= floor;
-    const rightOk = rightUnits >= floor;
-
-    if (leftOk !== rightOk) {
-      if (!leftOk) {
-        return false;
-      }
-
-      better = true;
-      continue;
-    }
-
-    if (!leftOk) {
-      continue;
-    }
-
-    if (leftUnits < rightUnits) {
-      return false;
-    }
-
-    if (leftUnits > rightUnits) {
-      better = true;
-    }
-  }
-
-  return better;
-}
-
-export function compareBaskets(
-  left: ScoredBasket,
-  right: ScoredBasket,
-  request: CanonicalRequest,
-  config: MatcherConfig = DEFAULT_MATCHER_CONFIG
-) {
-  if (request.selectorMode === "web_single") {
-    return compareWeb(left, right);
-  }
-
-  const bestCoverage = Math.max(left.aggregateCoverage, right.aggregateCoverage);
-  const probe: ScoredBasket = left.aggregateCoverage >= right.aggregateCoverage ? left : right;
-  const floorBest = { ...probe, aggregateCoverage: bestCoverage };
-
+/** One total ordering shared by ranking, salvage and the final selection. */
+export function compareBaskets(left: ScoredBasket, right: ScoredBasket, request: CanonicalRequest, _config: MatcherConfig = DEFAULT_MATCHER_CONFIG) {
+  void _config;
+  const fit = compareDoseFit(fitOf(left, request), fitOf(right, request));
+  if (fit !== 0) return fit;
   if (request.optimization === "fewest_pills") {
-    const bestCovered = Math.max(left.coveredCount, right.coveredCount);
-    const leftOk = left.coveredCount >= bestCovered;
-    const rightOk = right.coveredCount >= bestCovered;
-
-    if (leftOk !== rightOk) {
-      return leftOk ? -1 : 1;
-    }
-
-    if (leftOk) {
-      const dedicatedPartial =
-        right.dedicatedPartialCount - left.dedicatedPartialCount;
-
-      if (dedicatedPartial !== 0) {
-        return dedicatedPartial;
-      }
-
-      const exactTitle = right.titleExactCount - left.titleExactCount;
-
-      if (exactTitle !== 0) {
-        return exactTitle;
-      }
-
-      const pills = left.dailyPills - right.dailyPills;
-
-      if (pills !== 0) {
-        return pills;
-      }
-
-      const products = left.productCount - right.productCount;
-
-      if (products !== 0) {
-        return products;
-      }
-
-      if (coverageDominates(left, right)) {
-        return -1;
-      }
-
-      if (coverageDominates(right, left)) {
-        return 1;
-      }
-
-      const incidental = left.incidentalCount - right.incidentalCount;
-
-      if (incidental !== 0) {
-        return incidental;
-      }
-
-      const labels = left.requestedLabelCount - right.requestedLabelCount;
-
-      if (labels !== 0) {
-        return labels;
-      }
-
-      return (
-        left.priceMinor - right.priceMinor ||
-        left.oversupplyScore - right.oversupplyScore ||
-        compareDefault(left, right)
-      );
-    }
+    const pills = left.dailyPills - right.dailyPills;
+    if (pills !== 0) return pills;
+  } else if (request.optimization === "best_coverage" || request.optimization === "balanced") {
+    const coverage = right.aggregateCoverage - left.aggregateCoverage;
+    if (coverage !== 0) return coverage;
   }
+  return left.priceMinor - right.priceMinor || left.dailyPills - right.dailyPills ||
+    left.productCount - right.productCount || basketSignature(left).localeCompare(basketSignature(right));
+}
 
-  if (request.optimization === "lowest_cost") {
-    const leftOk = meetsCoverageFloor(left, floorBest, config);
-    const rightOk = meetsCoverageFloor(right, floorBest, config);
-
-    if (leftOk !== rightOk) {
-      return leftOk ? -1 : 1;
-    }
-
-    if (leftOk) {
-      return (
-        right.coveredCount - left.coveredCount ||
-        left.priceMinor - right.priceMinor ||
-        left.dailyPills - right.dailyPills ||
-        left.productCount - right.productCount ||
-        left.oversupplyScore - right.oversupplyScore ||
-        left.incidentalCount - right.incidentalCount ||
-        compareDefault(left, right)
-      );
-    }
-  }
-
-  return compareDefault(left, right);
+function productDoseSignature(basket: ScoredBasket) {
+  return basket.variantIds.map(variantId => {
+    const productId = basket.productIds?.find(id => variantId.includes(`:${id}:x`));
+    return productId ? variantId.slice(variantId.lastIndexOf(`:${productId}:x`) + 1) : variantId;
+  }).sort().join("|");
 }
 
 export function materiallyDifferent(left: ScoredBasket, right: ScoredBasket) {
-  if (left.productIds.join("|") === right.productIds.join("|")) {
-    return false;
-  }
-
-  return (
-    Math.abs(left.aggregateCoverage - right.aggregateCoverage) >=
-      MATERIAL_COVERAGE_POINTS * 100 ||
-    Math.abs(left.priceMinor - right.priceMinor) >= MATERIAL_PRICE_MINOR ||
-    Math.abs(left.dailyPills - right.dailyPills) >= MATERIAL_PILL_DELTA ||
-    left.productCount !== right.productCount
-  );
+  // A different listing of the same product and dose is not a product alternative.
+  return productDoseSignature(left) !== productDoseSignature(right);
 }
 
-function coverageFloor(best: ScoredBasket, config: MatcherConfig) {
-  return Math.round((best.aggregateCoverage * config.usefulCoverageFloor) / 100);
-}
+// Kept for older callers. Optional targets are still part of the request and
+// scoring them as zero would manufacture a different customer request.
+export function requestWithoutOptionalPurchases(request: CanonicalRequest): CanonicalRequest { return request; }
 
 function selectedReason(request: CanonicalRequest) {
-  if (request.optimization === "fewest_pills") {
-    return "Fewer daily pills";
+  if (request.optimization === "lowest_cost") return "Lowest-cost option among the best dose-fit baskets";
+  if (request.optimization === "fewest_pills") return "Fewest daily pills among the best dose-fit baskets";
+  return "Closest overall fit to the agreed daily targets";
+}
+
+function satisfiesRetained(request: CanonicalRequest, basket: ScoredBasket) {
+  return request.retainProductIds.every((id) => basket.productIds.includes(id) || request.currentSupplements.some((row) => row.productId === id)) &&
+    request.retainSubjectIds.every((id) => (basket.exposure.totals.get(id)?.units ?? BigInt(0)) > BigInt(0));
+}
+
+function concernMap(basket: ScoredBasket, request: CanonicalRequest) {
+  const concerns = new Map<string, number>();
+  const fit = fitOf(basket, request);
+  for (const row of fit.perTarget) {
+    const over = Math.max(0, ((row.exposureMaximum ?? row.exposure) - row.target) / row.target);
+    if (over > 0) concerns.set("target:" + row.subjectId, over);
   }
-
-  if (request.optimization === "lowest_cost") {
-    return "Lowest-cost stack meeting coverage floor";
+  for (const row of fit.perLimit) {
+    const over = Math.max(0, ((row.exposureMaximum ?? row.exposure) - row.limit) / row.limit);
+    if (over > 0) concerns.set(`limit:${row.sourceScope}:${row.subjectId}`, over);
   }
-
-  return "Highest-coverage feasible stack";
+  for (const row of fit.perContinuedDose ?? []) {
+    if (row.over > 0) concerns.set("continued_dose:" + row.subjectId, row.over);
+  }
+  for (const finding of basket.safety.findings) {
+    if (finding.code === "target_exceeded" || finding.code === "continued_dose_increased" || finding.code === "dose_review_required") continue;
+    const key = `${finding.code}:${finding.ruleId}:${finding.subjectId ?? ""}`;
+    if (finding.uncertainty?.length) {
+      for (const reason of finding.uncertainty) concerns.set(key + ":" + reason, 1);
+    } else concerns.set(key, 1);
+  }
+  return concerns;
 }
 
-function currentUnitsFor(request: CanonicalRequest, subjectId: string) {
-  return request.currentSupplements
-    .filter((item) => item.subjectId === subjectId)
-    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
+export function hasFewerConcerns(candidate: ScoredBasket, selected: ScoredBasket, request: CanonicalRequest) {
+  if (!materiallyDifferent(candidate, selected)) return false;
+  // Coverage is capped at the agreed target; reducing 150% to 100% loses none.
+  if (request.targets.some((target) =>
+    minUnits(knownTargetExposure(request, target, candidate.exposure.totals.get(target.subjectId)?.units ?? BigInt(0)), target.requested.units) <
+    minUnits(knownTargetExposure(request, target, selected.exposure.totals.get(target.subjectId)?.units ?? BigInt(0)), target.requested.units))) return false;
+  const before = concernMap(selected, request);
+  const after = concernMap(candidate, request);
+  if ([...after].some(([key, value]) => value > (before.get(key) ?? 0))) return false;
+  return [...before].some(([key, value]) => (after.get(key) ?? 0) < value);
 }
 
-export function requestWithoutOptionalPurchases(request: CanonicalRequest): CanonicalRequest {
-  return {
-    ...request,
-    targets: request.targets.map((target) => {
-      if (target.importance !== "optional") {
-        return target;
-      }
-
-      const current = currentUnitsFor(request, target.subjectId);
-      return {
-        ...target,
-        requested: { ...target.requested, units: current }
-      };
-    })
-  };
-}
-
-function purchasableTargets(request: CanonicalRequest) {
-  return request.targets.filter(
-    (target) =>
-      target.importance !== "conditional" ||
-      target.prerequisite?.status === "satisfied"
-  );
-}
-
-function coversSubjects(
-  basket: ScoredBasket,
-  subjectIds: readonly string[]
-) {
-  const floor = COVERED_THRESHOLD * 100;
-  return subjectIds.every((id) => (basket.coverageBySubject.get(id) ?? 0) >= floor);
-}
-
-function signatureOf(basket: ScoredBasket) {
-  return basket.productIds.join("|");
-}
-
-function labelAgenticOptions(
-  baskets: readonly ScoredBasket[],
-  request: CanonicalRequest,
-  config: MatcherConfig
-) {
+export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]; config?: MatcherConfig; request: CanonicalRequest }>) {
   const unique = new Map<string, ScoredBasket>();
-
-  for (const basket of baskets) {
-    const key = signatureOf(basket);
-    const previous = unique.get(key);
-
-    if (!previous || compareBaskets(basket, previous, request, config) < 0) {
-      unique.set(key, basket);
-    }
+  for (const basket of input.baskets) {
+    if (!satisfiesRetained(input.request, basket)) continue;
+    const signature = basketSignature(basket);
+    const previous = unique.get(signature);
+    if (!previous || compareBaskets(basket, previous, input.request, input.config) < 0) unique.set(signature, basket);
   }
-
-  const distinct = [...unique.values()];
-  const purchasable = purchasableTargets(request);
-  const coreIds = purchasable
-    .filter((item) => item.importance === "core" || item.importance === "required")
-    .map((item) => item.subjectId);
-  const optionalIds = purchasable
-    .filter((item) => item.importance === "optional")
-    .map((item) => item.subjectId);
-  const coreEligible =
-    coreIds.length > 0
-      ? distinct.filter((item) => coversSubjects(item, coreIds))
-      : distinct;
-
-  const rankedCore = [...coreEligible].sort((left, right) =>
-    left.priceMinor - right.priceMinor ||
-    left.dailyPills - right.dailyPills ||
-    left.productCount - right.productCount ||
-    left.incidentalCount - right.incidentalCount ||
-    left.oversupplyScore - right.oversupplyScore ||
-    signatureOf(left).localeCompare(signatureOf(right))
-  );
-  const minimumCore = rankedCore[0] ?? null;
-  const completePool =
-    optionalIds.length > 0
-      ? rankedCore.filter((item) => coversSubjects(item, optionalIds))
-      : [];
-  const complete =
-    completePool.find((item) => signatureOf(item) !== (minimumCore ? signatureOf(minimumCore) : "")) ??
-    null;
-  const bestValue =
-    optionalIds.length > 0 && minimumCore && complete
-      ? rankedCore.find(
-          (item) =>
-            signatureOf(item) !== signatureOf(minimumCore) &&
-            signatureOf(item) !== signatureOf(complete) &&
-            item.priceMinor > minimumCore.priceMinor &&
-            item.priceMinor < complete.priceMinor &&
-            optionalIds.some((id) => (item.coverageBySubject.get(id) ?? 0) >= COVERED_THRESHOLD * 100)
-        ) ?? null
-      : null;
-
-  const labelled: ScoredBasket[] = [];
-
-  if (minimumCore) {
-    labelled.push({
-      ...minimumCore,
-      optionRole: "minimum_core",
-      reason: selectedReason(request),
-      recommended: request.optimization === "lowest_cost"
-    });
-  }
-
-  if (bestValue) {
-    labelled.push({
-      ...bestValue,
-      optionRole: "best_value",
-      reason: "Adds accepted optional coverage at a disclosed extra cost",
-      recommended: false
-    });
-  }
-
-  if (complete) {
-    labelled.push({
-      ...complete,
-      optionRole: "complete",
-      reason: "Covers feasible optional targets",
-      recommended: request.optimization !== "lowest_cost" && !minimumCore
-    });
-  }
-
-  if (labelled.length === 1) {
-    labelled[0] = {
-      ...labelled[0]!,
-      reason: labelled[0]!.reason,
-      recommended: true
-    };
-  }
-
-  const recommended =
-    labelled.find((item) => item.recommended) ?? labelled[0] ?? null;
-  const alternatives = labelled.filter(
-    (item) => recommended && signatureOf(item) !== signatureOf(recommended)
-  );
-
-  return {
-    alternatives,
-    selected: recommended
-      ? { ...recommended, recommended: true }
-      : null
-  };
+  const ranked = [...unique.values()].sort((a, b) => compareBaskets(a, b, input.request, input.config));
+  const best = ranked[0];
+  if (!best) return { alternatives: [] as ScoredBasket[], selected: null };
+  const selected = { ...best, optionRole: "requested_objective" as const, recommended: true, reason: selectedReason(input.request) };
+  const alternative = ranked.find((row) => hasFewerConcerns(row, selected, input.request));
+  return { selected, alternatives: alternative ? [{ ...alternative, optionRole: "fewer_concerns" as const, recommended: false,
+    reason: "Fewer concerns without lower requested-target coverage" }] : [] };
 }
 
-export function selectOptions(input: Readonly<{
-  baskets: readonly ScoredBasket[];
-  config?: MatcherConfig;
-  request: CanonicalRequest;
-}>) {
-  const config = input.config ?? DEFAULT_MATCHER_CONFIG;
-
-  if (input.request.selectorMode !== "web_single") {
-    const labelled = labelAgenticOptions(input.baskets, input.request, config);
-
-    if (labelled.selected) {
-      return labelled;
-    }
-  }
-
-  const ranked = [...input.baskets].sort((left, right) =>
-    compareBaskets(left, right, input.request, config)
-  );
-  const best = ranked[0] ?? null;
-
-  if (!best) {
-    return { alternatives: [] as ScoredBasket[], selected: null };
-  }
-
-  const selected: ScoredBasket = {
-    ...best,
-    reason: selectedReason(input.request),
-    recommended: true
-  };
-
-  if (
-    input.request.selectorMode === "web_single" ||
-    input.request.optimization === "lowest_cost" ||
-    input.request.optimization === "fewest_pills"
-  ) {
-    return { alternatives: [], selected };
-  }
-
-  const alternatives: ScoredBasket[] = [];
-  const floor = coverageFloor(selected, config);
-  const cheap = [...input.baskets]
-    .filter(
-      (item) =>
-        item.aggregateCoverage >= floor &&
-        materiallyDifferent(selected, item) &&
-        item.priceMinor < selected.priceMinor
-    )
-    .sort((left, right) => left.priceMinor - right.priceMinor)[0];
-
-  if (cheap) {
-    alternatives.push({
-      ...cheap,
-      reason:
-        cheap.aggregateCoverage >= COVERED_THRESHOLD * 100
-          ? "Lower-cost complete stack"
-          : "Lower-cost incomplete stack"
-    });
-  }
-
-  const compact = [...input.baskets]
-    .filter(
-      (item) =>
-        item.aggregateCoverage >= floor &&
-        materiallyDifferent(selected, item) &&
-        alternatives.every((alt) => materiallyDifferent(alt, item)) &&
-        item.dailyPills < selected.dailyPills
-    )
-    .sort((left, right) => left.dailyPills - right.dailyPills)[0];
-
-  if (compact && alternatives.length < 2) {
-    alternatives.push({ ...compact, reason: "Fewer daily pills" });
-  }
-
-  return { alternatives: alternatives.slice(0, 2), selected };
-}
-
-export function salvagePartialBasket(input: Readonly<{
-  groups: readonly ProductGroup[];
-  request: CanonicalRequest;
-  sellerId: string;
-}>): ScoredBasket | null {
+/** Deterministic fallback improves the same score, never just covered-target count. */
+export function salvagePartialBasket(input: Readonly<{ groups: readonly ProductGroup[]; request: CanonicalRequest; sellerId: string }>): ScoredBasket | null {
   let state = seedState(input.request);
-  const used = new Set<string>();
-  const coveringFirst = [
-    ...input.request.targets.filter((target) =>
-      Boolean(bestCompactCoveringGroup(input.groups, input.request, target.subjectId))
-    ),
-    ...input.request.targets.filter(
-      (target) =>
-        !bestCompactCoveringGroup(input.groups, input.request, target.subjectId)
-    )
-  ];
-
-  for (const target of coveringFirst) {
-    const already =
-      coverageUnits(
-        state.delivered.get(target.subjectId) ?? BigInt(0),
-        target.requested.units
-      ) >= COVERED_THRESHOLD * 100;
-
-    if (already) {
-      continue;
+  let best = scoreState({ ...input, state });
+  if (!best) return null;
+  for (let iteration = 0; iteration < input.request.maxProductCount; iteration += 1) {
+    let chosen: { state: SearchState; basket: ScoredBasket } | null = null;
+    for (const group of input.groups) for (const variant of group.variants) {
+      const next = tryAddVariant(state, variant, group, input.request);
+      if (!next) continue;
+      const basket = scoreState({ ...input, state: next });
+      if (!basket || compareBaskets(basket, best, input.request) >= 0) continue;
+      if (!chosen || compareBaskets(basket, chosen.basket, input.request) < 0) chosen = { state: next, basket };
     }
-
-    const ranked = input.groups
-      .filter(
-        (group) =>
-          !used.has(group.productId) &&
-          group.variants.some((variant) =>
-            variant.contributions.has(target.subjectId)
-          )
-      )
-      .flatMap((group) =>
-        group.variants
-          .filter((variant) => variant.contributions.has(target.subjectId))
-          .map((variant) => ({ group, variant }))
-      )
-      .sort((left, right) => {
-        const want = target.requested.units;
-        const leftUnits =
-          left.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
-        const rightUnits =
-          right.variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
-        const leftCover = coverageUnits(leftUnits, want);
-        const rightCover = coverageUnits(rightUnits, want);
-        const floor = COVERED_THRESHOLD * 100;
-        const leftOk = leftCover >= floor;
-        const rightOk = rightCover >= floor;
-
-        if (leftOk !== rightOk) {
-          return leftOk ? -1 : 1;
-        }
-
-        if (leftOk) {
-          const leftDedicated = productIsDedicatedForTarget(
-            left.group.product,
-            target
-          );
-          const rightDedicated = productIsDedicatedForTarget(
-            right.group.product,
-            target
-          );
-
-          if (leftDedicated && rightDedicated) {
-            const leftFacts = labelledTargetCount(
-              left.group.product,
-              input.request
-            );
-            const rightFacts = labelledTargetCount(
-              right.group.product,
-              input.request
-            );
-
-            if (leftFacts !== rightFacts) {
-              return leftFacts - rightFacts;
-            }
-
-            const needle = target.name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-            const leftExact =
-              left.group.product.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() ===
-              needle;
-            const rightExact =
-              right.group.product.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() ===
-              needle;
-
-            if (leftExact !== rightExact) {
-              return leftExact ? -1 : 1;
-            }
-          }
-
-          if (left.variant.dailyPills !== right.variant.dailyPills) {
-            return left.variant.dailyPills - right.variant.dailyPills;
-          }
-
-          if (input.request.optimization === "lowest_cost") {
-            const leftPrice =
-              left.group.product.unitPriceMinor * left.variant.dailyUnits;
-            const rightPrice =
-              right.group.product.unitPriceMinor * right.variant.dailyUnits;
-
-            if (leftPrice !== rightPrice) {
-              return leftPrice - rightPrice;
-            }
-          }
-
-          if (
-            input.request.optimization === "best_coverage" &&
-            rightCover !== leftCover
-          ) {
-            return rightCover - leftCover;
-          }
-        }
-
-        if (!(input.request.optimization === "fewest_pills" && leftOk)) {
-          const leftDedicated = productIsDedicatedForTarget(
-            left.group.product,
-            target
-          );
-          const rightDedicated = productIsDedicatedForTarget(
-            right.group.product,
-            target
-          );
-
-          if (leftDedicated !== rightDedicated) {
-            return leftDedicated ? -1 : 1;
-          }
-
-          if (rightCover !== leftCover) {
-            return rightCover - leftCover;
-          }
-        }
-
-        const leftOver =
-          leftUnits > want ? leftUnits - want : BigInt(0);
-        const rightOver =
-          rightUnits > want ? rightUnits - want : BigInt(0);
-
-        if (leftOver !== rightOver) {
-          return leftOver > rightOver ? 1 : -1;
-        }
-
-        if (left.variant.dailyPills !== right.variant.dailyPills) {
-          return left.variant.dailyPills - right.variant.dailyPills;
-        }
-
-        const leftPrice =
-          left.group.product.unitPriceMinor * left.variant.dailyUnits;
-        const rightPrice =
-          right.group.product.unitPriceMinor * right.variant.dailyUnits;
-
-        if (leftPrice !== rightPrice) {
-          return leftPrice - rightPrice;
-        }
-
-        return left.group.productId.localeCompare(right.group.productId);
-      });
-
-    for (const candidate of ranked) {
-      if (
-        variantIncidentalUlBlocked(candidate.group, candidate.variant, input.request) &&
-        input.groups.length > 1
-      ) {
-        continue;
-      }
-
-      const next = tryAddVariant(
-        state,
-        candidate.variant,
-        candidate.group,
-        input.request
-      );
-
-      if (!next) {
-        continue;
-      }
-
-      const scored = scoreState({
-        allowIncidentalBlock: true,
-        groups: input.groups,
-        request: input.request,
-        sellerId: input.sellerId,
-        state: next
-      });
-
-      if (scored) {
-        state = next;
-        used.add(candidate.group.productId);
-        break;
-      }
-    }
+    if (!chosen) break;
+    state = chosen.state;
+    best = chosen.basket;
   }
-
-  if (state.count < 1) {
-    return null;
-  }
-
-  const scored = scoreState({
-    allowIncidentalBlock: true,
-    groups: input.groups,
-    request: input.request,
-    sellerId: input.sellerId,
-    state
-  });
-
-  if (!scored) {
-    return null;
-  }
-
-  return { ...scored, reason: "Feasible partial stack" };
+  return best;
 }
 
 export function groupProduct(

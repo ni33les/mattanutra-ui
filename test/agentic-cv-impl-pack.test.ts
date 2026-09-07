@@ -398,7 +398,9 @@ async function runRegCv03(session: PlanSession, runIndex: number): Promise<CvImp
     ),
     assertEq("FIX-03.A3", 1, currentContributors.length),
     assertEq("FIX-03.A5", 150, Number(magRow?.currentAmount)),
-    assertEq("FIX-03.A5b", 150, Number(magRow?.totalExposureAmount)),
+    assertEq("FIX-03.A5b", 150, Number(magRow?.quantifiedExposureAmount)),
+    assertEq("FIX-03.unknownTotal", null, magRow?.totalExposureAmount),
+    assertEq("FIX-03.incompleteTotal", false, magRow?.totalExposureComplete),
     assertEq("FIX-03.A6", 0, overlap.length),
     assertTrue("FIX-03.A7", !(plan.status === "needs_input" && overlap.length > 0)),
     assertTrue("FIX-03.A8", retained.length >= 1 || magRow?.status !== "already_covered"),
@@ -1046,7 +1048,7 @@ async function runDevContract02(session: PlanSession, runIndex: number): Promise
     assertEq(
       "CONTRACT-02.checksum",
       officialChecksum,
-      "5a34f93589f374518b642359e0cbe1b419dcfb0230cdfe5e1f85fe95e32a63e6"
+      JSON.parse(readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
     ),
     assertEq("CONTRACT-02.info", infoChecksum, officialChecksum),
     assertEq("CONTRACT-02.list", listedHash, directHash),
@@ -1069,7 +1071,7 @@ async function runDevContract03(session: PlanSession, runIndex: number): Promise
 
 async function runDevContract04(session: PlanSession, runIndex: number): Promise<CvImplCaseResult> {
   const snapshot = JSON.parse(
-    readFileSync(new URL("../contract/mcp/3.0.0/tools.json", import.meta.url), "utf8")
+    readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
   ) as { tools: Array<{ inputSchema: unknown; name: string }> };
   const wellKnown = JSON.parse(
     readFileSync(new URL("../public/.well-known/mcp.json", import.meta.url), "utf8")
@@ -1203,11 +1205,11 @@ async function runDevSafety04(session: PlanSession, runIndex: number): Promise<C
   try {
     const plan = await createPlan(session, d3OnlyRequest(session.freeze, "satisfied"));
     const assertions = [
-      assertTrue("SAFETY-04.notReady", plan.status !== "ready"),
-      assertTrue("SAFETY-04.notExecutable", !stringList(plan.nextActions).includes("execute")),
+      assertEq("SAFETY-04.advisoryReady", "ready", plan.status),
+      assertTrue("SAFETY-04.noMedicalBlock", safetyGuidanceOf(plan).every((row) => row.action !== "block" && row.action !== "acknowledge")),
       assertTrue(
         "SAFETY-04.noFallback",
-        !JSON.stringify(plan).includes("ul:missing") || plan.status === "blocked"
+        safetyGuidanceOf(plan).some((row) => String(row.ruleId).startsWith("ul:missing:") && row.threshold == null) && coverageOf(plan).every((row) => row.upperLimitAmount == null)
       )
     ];
     return conclude("DEV-SAFETY-04", assertions, envelopeFor(session, d3OnlyRequest(session.freeze, "satisfied"), plan, assertions, runIndex));
@@ -1593,8 +1595,8 @@ describe("Customer value implementation pack v1.1", () => {
       failed.map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.result)}`).join("; ")
     );
     assert.equal(first.snapshotId, second.snapshotId);
-    assert.equal(MATCHER_VERSION, "pareto-hybrid-1");
-    assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v1.0");
+    assert.equal(MATCHER_VERSION, "advisory-dose-fit-2");
+    assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });
 }

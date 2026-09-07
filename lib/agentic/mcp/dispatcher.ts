@@ -1,5 +1,6 @@
 import {
   AGENTIC_INPUT_SCHEMAS,
+  AGENTIC_OUTPUT_SCHEMAS,
   businessError,
   isAgenticErrorResult,
   schemaIssuesToError,
@@ -61,7 +62,7 @@ function inferPlanOperation(params: Record<string, unknown>) {
     return "select";
   }
 
-  if (params.request != null) {
+  if (params.request != null || params.requestPatch != null) {
     return "revise";
   }
 
@@ -78,6 +79,7 @@ function withPlanOperation(args: unknown): unknown {
 
   if (operation === "get") {
     return {
+      ...params,
       operation: "get",
       planHandle: params.planHandle
     };
@@ -186,6 +188,7 @@ async function callTool(
                 planHandle:
                   typeof params.planHandle === "string" ? params.planHandle : undefined,
                 request: params.request,
+                requestPatch: params.requestPatch,
                 safetyAcknowledgement: params.safetyAcknowledgement,
                 selectOptionId:
                   typeof params.optionId === "string"
@@ -279,6 +282,11 @@ async function callTool(
         });
     }
 
+    const outputIssues = validateToolIssues(AGENTIC_OUTPUT_SCHEMAS[canonical], value);
+    if (outputIssues.length > 0) {
+      log.error("contract_output_invalid", { tool: canonical, fields: outputIssues.map(issue => issue.fieldPath) });
+      value = businessError({ reasonCode: "temporarily_unavailable", message: "The response could not be completed consistently. Retry with the same request and idempotency key." });
+    }
     return {
       result: toolResult(value, isAgenticErrorResult(value))
     };

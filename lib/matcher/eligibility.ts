@@ -54,13 +54,13 @@ export function productRejectionReason(
     return "oos";
   }
 
-  if (product.unitPriceMinor <= 0) {
+  if (!Number.isSafeInteger(product.unitPriceMinor) || product.unitPriceMinor <= 0 ||
+    !Number.isFinite(product.dailyPillsPerServing) || product.dailyPillsPerServing < 0) {
     return "incomplete_facts";
   }
 
-  if (product.unknownSafetyAmount) {
-    return "ul_exceeded";
-  }
+  // Unknown health facts are advice, never a catalogue availability restriction.
+  if (request.excludeProductIds?.includes(product.productId)) return "excluded";
 
   if (
     product.availableCountryCodes &&
@@ -128,8 +128,9 @@ export function productRejectionReason(
     return "vegan";
   }
 
-  const sex = request.profile.sex;
-  const { ageYears, lifeStage } = request.profile;
+  const sex = request.profileKnown?.sex === false ? undefined : request.profile.sex;
+  const ageYears = request.profileKnown?.ageYears === false ? undefined : request.profile.ageYears;
+  const lifeStage = request.profileKnown?.lifeStage === false ? undefined : request.profile.lifeStage;
 
   if (sex === "male" && product.productAudience === "female") {
     return "life_stage";
@@ -151,14 +152,14 @@ export function productRejectionReason(
     const prenatalLifeStage =
       lifeStage === "pregnant" || lifeStage === "trying_to_conceive";
 
-    if (sex === "male" || !prenatalLifeStage) {
+    if (sex === "male" || (lifeStage !== undefined && !prenatalLifeStage)) {
       return "life_stage";
     }
   }
 
   if (titleImpliesSeniorAgeBand(product.title)) {
     if (
-      ageYears < 50 ||
+      (ageYears !== undefined && ageYears < 50) ||
       lifeStage === "child" ||
       lifeStage === "pregnant" ||
       lifeStage === "trying_to_conceive"
@@ -167,7 +168,7 @@ export function productRejectionReason(
     }
   }
 
-  if (titleImpliesChildAgeBand(product.title) && lifeStage !== "child") {
+  if (titleImpliesChildAgeBand(product.title) && lifeStage !== undefined && lifeStage !== "child") {
     return "life_stage";
   }
 

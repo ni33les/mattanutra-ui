@@ -40,7 +40,7 @@ describe("Phase 1 material contribution", () => {
     assert.deepEqual(result.selected?.productIds, ["G-C-500"]);
   });
 
-  it("keeps only dedicated D3 over beta glucan", () => {
+  it("accepts an equally fitting lower-price labelled D3 carrier", () => {
     const result = match(
       qaRequest({
         optimization: "balanced",
@@ -64,11 +64,15 @@ describe("Phase 1 material contribution", () => {
         })
       ])
     );
-    assert.deepEqual(result.selected?.productIds, ["G-D3-2000"]);
+    assert.deepEqual(result.selected?.productIds, ["G-BETA-GLUCAN"]);
+    assert.equal(result.selected?.doseFit?.total, 0);
   });
 
-  it("keeps official combo plus fish oil", () => {
+  it("keeps official combo plus the cheaper algae pack", () => {
     const result = match(qaRequest({ optimization: "fewest_pills" }), QA_GOLD_CATALOG);
-    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-FISH-1000"]);
+    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
+    assert.equal(result.selected?.priceMinor, 61000);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 5);
   });
 });

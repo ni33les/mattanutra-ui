@@ -32,6 +32,7 @@ import {
   freezeImplCatalogue,
   openSession,
   optionsOf,
+  safetyGuidanceOf,
   primaryRequest,
   supplementByName,
   type PlanSession
@@ -174,8 +175,20 @@ function magCoveredRequest(session: PlanSession, daysRemaining: number, dailyAmo
   };
 }
 
-function magPurchaseRequest(session: PlanSession) {
-  return { ...magCoveredRequest(session, 90), currentSupplements: [] };
+function magPurchaseRequest(session: PlanSession, dailyServings = 1) {
+  const product = completeMagProduct(session);
+  const request = magCoveredRequest(session, 90);
+  const fact = product?.candidate.facts.find(item =>
+    item.name.toLowerCase() === "magnesium" && item.unit === "mg" && Number(item.amount) > 0);
+  // Accounting fixtures specify a known product and labelled daily serving.
+  // Matcher objective changes must not silently replace the pack under test.
+  return {
+    ...request,
+    baseline: { type: "current_basket" as const, items: product ? [{ productId: product.productId, dailyServings, quantity: 1 }] : [] },
+    currentSupplements: [],
+    requirements: { maxProductCount: 1, retainProductIds: product ? [product.productId] : [] },
+    targets: request.targets.map(target => ({ ...target, amount: Number(fact?.amount ?? target.amount) * dailyServings }))
+  };
 }
 
 function economicsOf(plan: Record<string, unknown>) {
@@ -502,8 +515,8 @@ async function runEco08(session: PlanSession, runIndex: number): Promise<R3CaseR
   try {
     const plan = await createPlan(session, d3OnlyRequest(session.freeze, "satisfied"));
     const assertions = [
-      assertTrue("ECO-08.notReady", plan.status !== "ready"),
-      assertTrue("ECO-08.notExecute", !stringList(plan.nextActions).includes("execute"))
+      assertEq("ECO-08.advisoryReady", "ready", plan.status),
+      assertTrue("ECO-08.unknownReference", safetyGuidanceOf(plan).some((row) => String(row.ruleId).startsWith("ul:missing:") && row.threshold == null))
     ];
     return conclude("R3-ECO-08", assertions, envelopeFor(session, d3OnlyRequest(session.freeze, "satisfied"), plan, assertions, runIndex));
   } finally {
@@ -622,8 +635,8 @@ describe("Customer value implementation pack v1.3", () => {
       failed.map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.result)}`).join("; ")
     );
     assert.equal(first.snapshotId, second.snapshotId);
-    assert.equal(MATCHER_VERSION, "pareto-hybrid-1");
-    assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v1.0");
+    assert.equal(MATCHER_VERSION, "advisory-dose-fit-2");
+    assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });
 }

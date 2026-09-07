@@ -112,11 +112,13 @@ describe("MCP plan create — PRD reporter payload", () => {
     const plan = tools?.find((tool) => tool.name === "plan");
     assert.ok(plan);
     const schema = plan.inputSchema as Record<string, unknown>;
-    assert.equal(schema.additionalProperties, false);
+    assert.equal(schema.type, "object");
+    assert.ok(Array.isArray(schema.anyOf));
     assert.equal("oneOf" in schema, false);
     assert.equal("$defs" in schema, false);
 
-    const properties = schema.properties as Record<string, Record<string, unknown>>;
+    const createSchema = (schema.anyOf as Array<{properties: Record<string, Record<string, unknown>>}>).find(item => item.properties?.operation?.const === "create")!;
+    const properties = createSchema.properties;
     const request = properties.request;
     assert.equal(request.additionalProperties, false);
     const requestProperties = request.properties as Record<string, Record<string, unknown>>;
@@ -154,7 +156,7 @@ describe("MCP plan create — PRD reporter payload", () => {
             profile: { age: 52, lifeStage: "adult", sex: "male" }
           }
         },
-        "request.profile.ageYears"
+        "request.profile.age"
       ],
       [
         {

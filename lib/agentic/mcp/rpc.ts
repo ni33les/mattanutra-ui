@@ -1,3 +1,5 @@
+import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
+import { CONTRACT_RESOURCES, readContractResource } from "@/lib/agentic/contract/guide";
 import type { AgenticConfig, AgenticEnvironment } from "@/lib/agentic/config";
 import {
   AGENTIC_SERVICE_NAME,
@@ -6,10 +8,12 @@ import {
 import {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_TOOL_SCHEMAS,
+  AGENTIC_OUTPUT_SCHEMAS,
   agenticServerInstructions,
   agenticToolDescriptions,
   isAgenticErrorResult,
   schemaIssueToError,
+  businessError,
   validateToolInput,
   type AgenticPublicToolName
 } from "@/lib/agentic/contract";
@@ -102,8 +106,7 @@ export function toolList(environment: AgenticEnvironment = "dev", locale?: strin
   const descriptions = agenticToolDescriptions(environment, locale);
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: descriptions[name],
-    inputSchema: AGENTIC_TOOL_SCHEMAS[name],
-    outputSchema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+    ...AGENTIC_CONTRACT_REGISTRY[name],
     annotations: {
       readOnlyHint: ["info", "order", "evidence"].includes(name),
       destructiveHint: false,
@@ -199,6 +202,7 @@ export function mcpCallNeedsStore(body: unknown) {
 
   const method = (body as { method?: unknown }).method;
   if (
+    method === "resources/list" || method === "resources/read" ||
     method === "initialize" ||
     method === "tools/list" ||
     method === "ping" ||
@@ -231,7 +235,8 @@ export async function handleLightweightJsonRpc(
       jsonrpc: "2.0",
       result: {
         capabilities: {
-          tools: { listChanged: false }
+          tools: { listChanged: false },
+          resources: { subscribe: false, listChanged: false }
         },
         instructions: agenticServerInstructions(config.environment),
         protocolVersion: params.protocolVersion === "2025-03-26" ? "2025-03-26" : "2025-06-18",
@@ -243,6 +248,12 @@ export async function handleLightweightJsonRpc(
         tools: toolList(config.environment, typeof params.locale === "string" ? params.locale : undefined)
       }
     };
+  }
+
+  if (method === "resources/list") return { id, jsonrpc: "2.0", result: { resources: CONTRACT_RESOURCES } };
+  if (method === "resources/read") {
+    const resource = readContractResource(String(params.uri ?? ""));
+    return resource ? { id, jsonrpc: "2.0", result: resource } : { id, jsonrpc: "2.0", error: { code: -32602, message: "Unknown contract resource." } };
   }
 
   if (method === "notifications/initialized") {
@@ -308,11 +319,10 @@ export async function handleLightweightJsonRpc(
       locale: typeof locale === "string" ? locale : undefined
     });
 
-    return {
-      id,
-      jsonrpc: "2.0",
-      result: toolResult(value, isAgenticErrorResult(value))
-    };
+    const response = validateToolInput(AGENTIC_OUTPUT_SCHEMAS.info, value)
+      ? businessError({ message: "The capability response is temporarily unavailable.", reasonCode: "temporarily_unavailable", nextActions: ["retry"] })
+      : value;
+    return { id, jsonrpc: "2.0", result: toolResult(response, isAgenticErrorResult(response)) };
   }
 
   return undefined;

@@ -6,7 +6,6 @@ import type {
   SafetySourceScope
 } from "@/lib/matcher/types";
 import { MATCHER_SOURCE_SCOPE } from "@/lib/matcher/types";
-import { conditionCeilingFor } from "@/lib/matcher/condition-ceilings";
 
 export type SafetyProfile = Readonly<{
   ageYears: number;
@@ -193,7 +192,7 @@ export function catalogLifeStageFor(
   }
 
   const ageYears = profile.ageYears;
-  const pediatric = profile.lifeStage === "child" || ageYears < 9;
+  const pediatric = profile.lifeStage === "child" || ageYears < 19;
 
   if (pediatric) {
     if (ageYears <= 3) {
@@ -283,23 +282,15 @@ export function safetyCeilingFor(
     name?: string;
     profile?: SafetyProfile | null;
     subjectId: string;
+    sourceScope?: SafetySourceScope;
   }>
 ) {
-  const overlay = conditionCeilingFor(input.conditionCodes, {
-    name: input.name,
-    subjectId: input.subjectId
-  });
-
-  if (overlay) {
-    return overlay;
-  }
-
   const lifeStage = catalogLifeStageFor(input.profile);
   return catalogCeilingFor(
     ceilings,
     input,
     lifeStage,
-    MATCHER_SOURCE_SCOPE
+    input.sourceScope ?? MATCHER_SOURCE_SCOPE
   );
 }
 

@@ -1,18 +1,9 @@
-import { isDeferredConditional, remainingRequestedUnits } from "@/lib/matcher/candidates";
+import { isDeferredConditional } from "@/lib/matcher/candidates";
+import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
-import {
-  aggregateCoverage,
-  dominatesAtLayer,
-  fingerprintState,
-  paretoPrune
-} from "@/lib/matcher/dominance";
-import { aggregateDailyExposure, isDoseError, unitsOrZero } from "@/lib/matcher/dose";
-import {
-  evaluateSafety,
-  labelledSafetyExposure,
-  stackUnitsViolateCeiling,
-  variantDedicatedOvershoot
-} from "@/lib/matcher/safety";
+import { aggregateCoverage, fingerprintState, paretoPrune } from "@/lib/matcher/dominance";
+import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
+import { evaluateSafety, labelledSafetyExposure } from "@/lib/matcher/safety";
 import type {
   CanonicalRequest,
   DoseVariant,
@@ -26,10 +17,6 @@ export type SearchRun = Readonly<{
   mode: "bounded" | "exact";
   trimmed: boolean;
 }>;
-
-type Budget = {
-  remaining: number;
-};
 
 function cloneMap(source: ReadonlyMap<string, bigint>) {
   return new Map(source);
@@ -52,20 +39,9 @@ export function seedState(request: CanonicalRequest): SearchState {
     nextGroupIndex: 0,
     pills: 0,
     price: 0,
-    selectedVariantIds: []
+    selectedVariantIds: [],
+    selectedProductIds: []
   };
-}
-
-function pediatricBlocked(request: CanonicalRequest, variant: DoseVariant) {
-  if (request.profile.lifeStage !== "child") {
-    return false;
-  }
-
-  return [...variant.contributions.keys()].some((subjectId) => {
-    const name =
-      request.targets.find((item) => item.subjectId === subjectId)?.name ?? "";
-    return /zinc|iron/i.test(name) || /zinc|iron/i.test(subjectId);
-  });
 }
 
 export function tryAddVariant(
@@ -74,33 +50,28 @@ export function tryAddVariant(
   group: ProductGroup,
   request: CanonicalRequest
 ): SearchState | null {
-  if (pediatricBlocked(request, variant)) {
-    return null;
-  }
 
   const helpsPurchasableTarget = request.targets.some((target) => {
     if (isDeferredConditional(target)) {
       return false;
     }
 
-    if (remainingRequestedUnits(request, target.subjectId) <= BigInt(0)) {
-      return false;
-    }
 
     return variant.contributions.has(target.subjectId);
   });
 
-  if (!helpsPurchasableTarget && !request.retainProductIds.includes(group.productId)) {
+  if (!helpsPurchasableTarget && !request.retainProductIds.includes(group.productId) &&
+    !request.retainSubjectIds.some((id) => (variant.safetyExposure?.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
     return null;
   }
 
-  if (variantDedicatedOvershoot(request, variant.contributions, variant.dailyUnits)) {
-    return null;
-  }
 
+  if (state.selectedVariantIds.some((id) => group.variants.some((row) => row.variantId === id))) return null;
   const count = state.count + 1;
+  const remainingRetainedCount = request.retainProductIds.filter((id) => id !== group.productId &&
+    !state.selectedProductIds?.includes(id) && !request.currentSupplements.some((row) => row.productId === id)).length;
 
-  if (count > request.maxProductCount) {
+  if (count + remainingRetainedCount > request.maxProductCount) {
     return null;
   }
 
@@ -110,7 +81,9 @@ export function tryAddVariant(
     return null;
   }
 
-  const price = state.price + group.product.unitPriceMinor * variant.dailyUnits;
+  // Checkout acquires one pack per selected product. Daily servings affect
+  // depletion and replenishment, not the number of packs in this order.
+  const price = state.price + group.product.unitPriceMinor;
 
   if (request.maxPriceMinor != null && price > request.maxPriceMinor) {
     return null;
@@ -120,23 +93,13 @@ export function tryAddVariant(
   const exposure = cloneMap(state.exposure);
   const safetyExposure =
     variant.safetyExposure ??
-    labelledSafetyExposure(group.product, variant.dailyUnits);
-  const additions =
-    safetyExposure.size > 0 ? safetyExposure : variant.contributions;
+    labelledSafetyExposure(group.product, variant.dailyUnits, request);
+  const additions = new Map(safetyExposure);
+  for (const [id, amount] of variant.contributions) additions.set(id, amount);
 
   for (const [subjectId, amount] of additions) {
     const nextExposure =
       (exposure.get(subjectId) ?? BigInt(0)) + amount.units;
-    const nutrientName =
-      group.product.labelledContributions.find(
-        (fact) => (fact.subjectId || fact.name) === subjectId
-      )?.name ?? subjectId;
-
-    if (
-      stackUnitsViolateCeiling(request, subjectId, nutrientName, nextExposure)
-    ) {
-      return null;
-    }
 
     exposure.set(subjectId, nextExposure);
   }
@@ -155,7 +118,9 @@ export function tryAddVariant(
     nextGroupIndex: state.nextGroupIndex + 1,
     pills,
     price,
-    selectedVariantIds: [...state.selectedVariantIds, variant.variantId]
+    selectedVariantIds: [...state.selectedVariantIds, variant.variantId],
+    selectedProductIds: [...(state.selectedProductIds ?? []), group.productId],
+    unknownProductIds: [...(state.unknownProductIds ?? []), ...(variant.unknownSafetyAmount ? [variant.productId] : [])]
   };
 }
 
@@ -163,223 +128,64 @@ function skipGroup(state: SearchState): SearchState {
   return { ...state, nextGroupIndex: state.nextGroupIndex + 1 };
 }
 
-function isUseful(state: SearchState, request: CanonicalRequest) {
-  return aggregateCoverage(request, state.delivered) > 0 || state.count > 0;
+function compareStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
+  const fit = compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure));
+  if (fit !== 0) return fit;
+  // Explore the same bounded frontier for every commercial objective. Otherwise
+  // an early pill/cost tie can discard a branch with a better eventual dose fit.
+  // The requested commercial tie-break is applied to the completed candidates.
+  const coverage = aggregateCoverage(request, b.delivered) - aggregateCoverage(request, a.delivered);
+  if (coverage !== 0) return coverage;
+  return a.price - b.price || a.pills - b.pills || a.count - b.count || fingerprintState(a).localeCompare(fingerprintState(b));
 }
 
-function completeDominates(
-  left: SearchState,
-  right: SearchState,
-  request: CanonicalRequest
-) {
-  return dominatesAtLayer(
-    { ...left, nextGroupIndex: 0 },
-    { ...right, nextGroupIndex: 0 },
-    request
-  );
-}
-
-function pruneComplete(states: SearchState[], request: CanonicalRequest) {
-  return states.filter(
-    (candidate, index) =>
-      !states.some(
-        (other, otherIndex) =>
-          otherIndex !== index && completeDominates(other, candidate, request)
-      )
-  );
-}
-
-function exactSearch(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  budget: Budget,
-  deadlineAt: number
-): SearchRun {
-  const complete: SearchState[] = [];
-  const seed = seedState(request);
-
-  const dfs = (state: SearchState) => {
-    if (budget.remaining < 0 || Date.now() >= deadlineAt) {
-      return;
-    }
-
-    budget.remaining -= 1;
-
-    if (state.nextGroupIndex >= groups.length) {
-      if (isUseful(state, request)) {
-        complete.push(state);
-      }
-
-      return;
-    }
-
-    const group = groups[state.nextGroupIndex]!;
-
-    for (const variant of group.variants) {
-      const next = tryAddVariant(state, variant, group, request);
-
-      if (next) {
-        dfs(next);
-      }
-    }
-
-    dfs(skipGroup(state));
-  };
-
-  dfs(seed);
-  return {
-    complete: pruneComplete(complete, request),
-    mode: "exact",
-    trimmed: budget.remaining < 0 || Date.now() >= deadlineAt
-  };
-}
-
-function compactBeam(
-  states: SearchState[],
-  width: number,
-  request: CanonicalRequest
-) {
-  const pruned = paretoPrune(states, request);
-
-  if (pruned.length <= width) {
-    return pruned;
-  }
-
-  return [...pruned]
-    .sort((left, right) => {
-      const cover =
-        aggregateCoverage(request, right.delivered) -
-        aggregateCoverage(request, left.delivered);
-
-      if (cover !== 0) {
-        return cover;
-      }
-
-      if (left.price !== right.price) {
-        return left.price - right.price;
-      }
-
-      if (left.pills !== right.pills) {
-        return left.pills - right.pills;
-      }
-
-      return left.selectedVariantIds.join("|").localeCompare(
-        right.selectedVariantIds.join("|")
-      );
-    })
-    .slice(0, width);
-}
-
-function beamSearch(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  config: MatcherConfig,
-  budget: Budget,
-  deadlineAt: number
-): SearchRun {
-  let width = config.initialBeamWidth;
-  let best: SearchState[] = [];
-  let trimmed = false;
-
-  while (width <= config.maxBeamWidth && budget.remaining > 0 && Date.now() < deadlineAt) {
-    let beam: SearchState[] = [seedState(request)];
-    const complete: SearchState[] = [];
-    let runTrimmed = false;
-
-    for (let index = 0; index < groups.length; index += 1) {
-      const group = groups[index]!;
-      const expanded: SearchState[] = [];
-
-      for (const state of beam) {
-        budget.remaining -= 1;
-
-        if (budget.remaining < 0 || Date.now() >= deadlineAt) {
-          runTrimmed = true;
-          break;
-        }
-
-        expanded.push(skipGroup(state));
-
-        for (const variant of group.variants) {
-          const next = tryAddVariant(state, variant, group, request);
-
-          if (next) {
-            expanded.push(next);
-          }
-        }
-      }
-
-      const unique = new Map<string, SearchState>();
-
-      for (const state of expanded) {
-        unique.set(fingerprintState(state), state);
-      }
-
-      if (Date.now() >= deadlineAt) {
-        runTrimmed = true;
-        beam = compactBeam([...unique.values()], width, request);
-        break;
-      }
-
-      let layer = paretoPrune([...unique.values()], request);
-
-      if (Date.now() >= deadlineAt) {
-        runTrimmed = true;
-        beam = layer.length > width ? compactBeam(layer, width, request) : layer;
-        break;
-      }
-
-      if (layer.length > width) {
-        layer = compactBeam(layer, width, request);
-        runTrimmed = true;
-      }
-
-      beam = layer;
-    }
-
-    for (const state of beam) {
-      if (isUseful(state, request)) {
-        complete.push(state);
-      }
-    }
-
-    const merged = pruneComplete([...best, ...complete], request);
-    best = merged;
-    trimmed = trimmed || runTrimmed;
-
-    const hasUsefulBasket = best.some(
-      (state) => state.count > 0 && isUseful(state, request)
-    );
-
-    if (!runTrimmed || width === config.maxBeamWidth || hasUsefulBasket) {
-      break;
-    }
-
-    width = Math.min(width * 2, config.maxBeamWidth);
-  }
-
-  return {
-    complete: best,
-    mode: "bounded",
-    trimmed: trimmed || Date.now() >= deadlineAt
-  };
-}
-
-export function searchGroups(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  config: MatcherConfig = DEFAULT_MATCHER_CONFIG
-): SearchRun {
+export function searchGroups(groups: readonly ProductGroup[], request: CanonicalRequest,
+  config: MatcherConfig = DEFAULT_MATCHER_CONFIG): SearchRun {
+  const mustSelect = (group: ProductGroup) => request.retainProductIds.includes(group.productId) &&
+    !request.currentSupplements.some((row) => row.productId === group.productId);
   const variantCount = groups.reduce((sum, group) => sum + group.variants.length, 0);
-  const budget: Budget = { remaining: config.expansionBudget };
-  const deadlineAt = Date.now() + config.searchDeadlineMs;
-  const exact =
-    groups.length <= config.exactGroupLimit &&
-    variantCount <= config.exactVariantLimit;
-
-  return exact
-    ? exactSearch(groups, request, budget, deadlineAt)
-    : beamSearch(groups, request, config, budget, deadlineAt);
+  const exact = groups.length <= config.exactGroupLimit && variantCount <= config.exactVariantLimit;
+  const complete: SearchState[] = [];
+  let remaining = Math.max(0, Math.floor(config.expansionBudget));
+  let trimmed = false;
+  if (exact) {
+    const visit = (state: SearchState) => {
+      if (remaining <= 0) { trimmed = true; complete.push(state); return; }
+      remaining -= 1;
+      if (state.nextGroupIndex >= groups.length) { complete.push(state); return; }
+      const group = groups[state.nextGroupIndex]!;
+      // The zero-purchase branch is equally valid and cannot disappear on timeout.
+      if (!mustSelect(group)) visit(skipGroup(state));
+      for (const variant of group.variants) {
+        if (remaining <= 0) { trimmed = true; break; }
+        const next = tryAddVariant(state, variant, group, request);
+        if (next) visit(next);
+      }
+    };
+    visit(seedState(request));
+    return { complete, mode: trimmed ? "bounded" : "exact", trimmed };
+  }
+  let beam: SearchState[] = [seedState(request)];
+  const width = Math.max(1, Math.min(config.initialBeamWidth, config.maxBeamWidth));
+  for (let index = 0; index < groups.length; index += 1) {
+    const group = groups[index]!;
+    const expanded: SearchState[] = [];
+    for (const state of beam) {
+      if (remaining <= 0) { trimmed = true; expanded.push(state); continue; }
+      remaining -= 1;
+      if (!mustSelect(group)) expanded.push(skipGroup(state));
+      for (const variant of group.variants) {
+        const next = tryAddVariant(state, variant, group, request);
+        if (next) expanded.push(next);
+      }
+    }
+    const unique = [...new Map(expanded.map((state) => [fingerprintState(state), state])).values()];
+    const layer = paretoPrune(unique, request);
+    if (layer.length > width) trimmed = true;
+    beam = [...layer].sort((a, b) => compareStates(a, b, request)).slice(0, width);
+    if (remaining <= 0) break;
+  }
+  return { complete: beam, mode: "bounded", trimmed };
 }
 
 export function reconstructVariants(
@@ -405,6 +211,7 @@ export function revalidateState(
   request: CanonicalRequest,
   options?: Readonly<{ allowIncidentalBlock?: boolean }>
 ) {
+  void options;
   const variants = reconstructVariants(groups, state.selectedVariantIds);
   const exposure = aggregateDailyExposure({
     current: request.currentSupplements,
@@ -422,44 +229,7 @@ export function revalidateState(
     variants
   });
 
-  if (safety.hardBlocked) {
-    if (!options?.allowIncidentalBlock) {
-      return null;
-    }
 
-    const targetIds = new Set(request.targets.map((item) => item.subjectId));
-    const targetBlocked = safety.findings.some(
-      (item) =>
-        item.action === "block" &&
-        (item.subjectId == null ||
-          targetIds.has(item.subjectId) ||
-          request.currentSupplements.some((row) => row.subjectId === item.subjectId))
-    );
-
-    if (targetBlocked) {
-      return null;
-    }
-  }
-
-  for (const target of request.targets) {
-    const expected = unitsOrZero(
-      new Map(
-        [...state.delivered].map(([subjectId, units]) => [
-          subjectId,
-          { dim: target.requested.dim, subjectId, units }
-        ])
-      ),
-      target.subjectId
-    );
-    const actual = exposure.totals.get(target.subjectId)?.units ?? BigInt(0);
-    const current = request.currentSupplements
-      .filter((item) => item.subjectId === target.subjectId)
-      .reduce((sum, item) => sum + item.daily.units, BigInt(0));
-
-    if (actual !== expected + current && actual !== expected) {
-      // delivered is selected-only; exposure includes current
-    }
-  }
 
   return { exposure, safety, variants };
 }

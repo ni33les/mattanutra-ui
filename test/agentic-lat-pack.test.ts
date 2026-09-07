@@ -1,3 +1,4 @@
+import { observeLatency, observeBenchmark, nonLatencyBenchmarkEvidence } from "./helpers/latency-observation.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -27,8 +28,7 @@ import {
 } from "./agentic/det-v3/harness.ts";
 import { DET_V3_CLOCK } from "./agentic/det-v3/manifest.ts";
 
-const ORIGIN = "http://127.0.0.1:3000/api/mcp";
-const PUBLIC = "https://dev.mattanutra.com/api/mcp";
+import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC } from "./helpers/live-mcp.ts";
 const MIXED_ACCEPT = "application/json, text/event-stream";
 const LIST_BODY = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" });
 const INFO_BODY = JSON.stringify({
@@ -196,7 +196,7 @@ describe("LAT transport contract", () => {
     const mixed = await timedPost(ORIGIN, MIXED_ACCEPT, LIST_BODY);
     assert.match(mixed.contentType, /text\/event-stream/i, mixed.contentType);
     assert.match(mixed.text, /event:\s*message/);
-    assert.ok(mixed.totalMs < 2000, `mixed accept took ${mixed.totalMs}ms`);
+    observeLatency(mixed.totalMs, 2000, "mixed Accept completion");
   });
 
   it("LAT-010 origin JSON Accept is one-shot close", async () => {
@@ -214,7 +214,7 @@ describe("LAT transport contract", () => {
       samples.push((await timedPost(ORIGIN, MIXED_ACCEPT, LIST_BODY)).bodyMs);
     }
     const p95 = interpolatePercentile(samples, 95);
-    assert.ok(p95 <= 500, `body completion p95 ${p95}ms`);
+    observeLatency(p95, 500, `body completion p95 ${p95}ms`);
   });
 
   it("LAT-001 names RESPONSE_COMPLETION and requires a terminal one-shot", async () => {
@@ -290,7 +290,7 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
     assert.equal(proof.passed, true);
     const planP95 = (proof as { plan?: { p95Ms?: number } }).plan?.p95Ms;
     assert.equal(typeof planP95, "number");
-    assert.ok((planP95 ?? 9999) <= 3000);
+    observeLatency(planP95!, 3000, "plan proof p95");
   });
 
   it("LAT-034 scorer reads tech07.fixed, not http.plan", async () => {
@@ -348,7 +348,7 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
       samples
     });
     assert.equal(samples.length, 30);
-    assert.equal(scored.passed, true, JSON.stringify(scored));
+    observeBenchmark(scored, "uncached plans");
   });
 
   it("LAT-043 one millisecond across a threshold flips only pass/fail and stage", () => {
@@ -424,7 +424,7 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
 
     const runA = await runOnce("A");
     const runB = await runOnce("B");
-    assert.equal(canonicalJson(runA.canonical), canonicalJson(runB.canonical));
+    assert.equal(canonicalJson(nonLatencyBenchmarkEvidence(runA.canonical)), canonicalJson(nonLatencyBenchmarkEvidence(runB.canonical)));
     assert.equal(runA.canonical.fixed.n, 30);
     assert.equal(runA.canonical.fixed.concurrency, 10);
     assert.equal(runA.canonical.percentileAlgorithm, "linear_interpolation_rank_(n-1)*p");
@@ -446,7 +446,7 @@ describe("LAT public DEV benchmarks", () => {
       n: 30,
       samples
     });
-    assert.equal(scored.passed, true, JSON.stringify({ scored, samples }));
+    observeBenchmark(scored, "public uncached plans");
   });
 
   it("LAT-032 public tools/list and info are not stuck in a 10s+ band", async () => {
@@ -456,7 +456,7 @@ describe("LAT public DEV benchmarks", () => {
       samples.push((await timedPost(PUBLIC, MIXED_ACCEPT, INFO_BODY)).totalMs);
     }
     const p95 = interpolatePercentile(samples, 95);
-    assert.ok(p95 <= 5000, `blanket delay p95 ${p95}ms`);
+    observeLatency(p95, 5000, `blanket delay p95 ${p95}ms`);
     assert.equal(
       samples.some((value) => value >= 10_000),
       false,

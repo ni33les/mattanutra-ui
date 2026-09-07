@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { QA_FIXTURE_RECIPES } from "../lib/agentic/qa/preflight.ts";
+import { fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
+import { replaceCatalogueSnapshot } from "../lib/agentic/catalogue/snapshot.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
 import { supportTool } from "../lib/agentic/support.ts";
@@ -359,15 +361,25 @@ describe("Slice 5 one catalogue load per plan", () => {
 });
 
 describe("Slice 6 missing-days completion", () => {
-  it("MISSING-DAYS-RED / MISSING-01..02 days:7 completes a ready replenishment plan", async () => {
+  it("MISSING-DAYS-RED / MISSING-01..02 optional stock-duration refinement completes a replenishment plan", async () => {
     const runtime = createDetRuntime();
+    const snapshot = fixtureSnapshot();
+    const currentProduct = snapshot.products.find(item => item.retailerSku === "TH-MG-300");
+    assert.ok(currentProduct);
+    // Isolate the missing duration: this continued product and its pack are known.
+    replaceCatalogueSnapshot({ ...snapshot, products: snapshot.products.map(item =>
+      item.productId === currentProduct.productId ? { ...item, candidate: { ...item.candidate,
+        title: `${item.candidate.title} 30 capsules` } } : item) });
     const request = {
       destinationCountry: "TH",
       locale: "en",
       optimization: "balanced" as const,
       profile: { ageYears: 38, lifeStage: "adult" as const, sex: "male" as const },
       requirements: {},
-      ...QA_FIXTURE_RECIPES.F_MISSING_DAYS
+      ...QA_FIXTURE_RECIPES.F_MISSING_DAYS,
+      currentSupplements: QA_FIXTURE_RECIPES.F_MISSING_DAYS.currentSupplements.map(item => ({
+        ...item, productId: currentProduct.productId
+      }))
     };
     const asked = await planTool({
       config: runtime.config,
@@ -376,14 +388,15 @@ describe("Slice 6 missing-days completion", () => {
       scope: runtime.scope,
       store: runtime.store
     });
-    assert.equal((asked as { status?: string }).status, "needs_input");
+    assert.equal((asked as { status?: string }).status, "no_purchase");
     const questions = (asked as { questions?: Array<{ questionId?: string }> }).questions ?? [];
-    assert.equal(questions.length, 1);
+    assert.equal(questions.length, 0);
     const answered = await planTool({
       config: runtime.config,
       now: CLOCK_09,
       payload: {
-        answers: [{ choice: "days:7", questionId: String(questions[0]?.questionId) }],
+        operation: "revise",
+        requestPatch: { currentSupplements: request.currentSupplements.map(item => ({ ...item, daysRemaining: 7 })) },
         expectedRevision: (asked as { revision: number }).revision,
         idempotencyKey: "missing-ans-planxxxxxx",
         planHandle: (asked as { planHandle: string }).planHandle
@@ -393,6 +406,8 @@ describe("Slice 6 missing-days completion", () => {
     });
     assert.equal((answered as { status?: string }).status, "ready", canonicalJson(answered));
     assert.equal((answered as { purchaseRequiredNow?: boolean }).purchaseRequiredNow, false);
+    assert.equal((answered as { scheduleComplete?: boolean }).scheduleComplete, true);
+    assert.equal((answered as { nextReplenishmentDay?: number }).nextReplenishmentDay, 7);
     const executed = await executeTool({
       config: runtime.config,
       expectedRevision: (answered as { revision: number }).revision,

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { rejectObsoleteHealthAnswer, ADVISORY_SINGLE_RESPONSE_BYTES, ADVISORY_MULTI_RESPONSE_BYTES } from "./agentic/advisory-pack-helpers.ts";
 import { describe, it } from "node:test";
 import {
   beginDeterministicIdsForTests,
@@ -92,6 +93,7 @@ const OPTION_REASON = {
 } as const;
 
 const PUBLIC_PLAN_KEYS = new Set([
+  "contractVersion", "operationalDecision", "nextReplenishmentDay", "scheduleComplete", "unavailableReasons",
   "acknowledgementStatus",
   "acknowledgedUnassessedConditionCodes",
   "acknowledgedUnassessedMedicationCodes",
@@ -143,6 +145,7 @@ const PUBLIC_PLAN_KEYS = new Set([
 ]);
 
 const PROCESSING_KEYS = new Set([
+  "contractVersion", "operationalDecision",
   "locale",
   "nextActions",
   "ok",
@@ -196,6 +199,7 @@ const LINE_REASON_CODES = new Set([
   "retained_by_user"
 ]);
 const OPTION_ONLY_KEYS = new Set([
+  "basket", "coverage", "advice", "doseFit",
   "cash90DayMinor",
   "coveragePercent",
   "deferredTargetIds",
@@ -234,7 +238,7 @@ export type AeC3CaseResult = Readonly<{
 
 export type AeC3PackReport = Readonly<{
   cases: readonly AeC3CaseResult[];
-  packVersion: "agentic-experience-3.0";
+  packVersion: "agentic-experience-3.1";
   passedCases: number;
   totalCases: 15;
 }>;
@@ -857,8 +861,8 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
         const ok =
           created.ok === true &&
           created.status === "ready" &&
-          jsonSize(created) <= 8192 &&
-          isClean(created, 8192);
+          jsonSize(created) <= ADVISORY_SINGLE_RESPONSE_BYTES &&
+          isClean(created, ADVISORY_SINGLE_RESPONSE_BYTES);
         return ok
           ? pass("AX3-01", { bytes: jsonSize(created), status: created.status })
           : fail("AX3-01", {
@@ -886,7 +890,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           operation: "create",
           request: omegaRequest()
         });
-        const answered = await harness.call("plan", {
+        const answered = await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: omega.revision,
           idempotencyKey: "ax302-answer-000001",
@@ -920,7 +924,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
             status: item.status ?? null,
             ...cleanliness(item)
           }))
-          .filter((item, index) => !isClean(payloads[index], index < 2 ? 8192 : 16384));
+          .filter((item, index) => !isClean(payloads[index], index < 2 ? ADVISORY_SINGLE_RESPONSE_BYTES : ADVISORY_MULTI_RESPONSE_BYTES));
         const ok = dirty.length === 0;
         return ok
           ? pass("AX3-02", { operations: ["get", "answer", "select", "revise"] })
@@ -985,15 +989,17 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           request: omegaRequest()
         });
         const guidance = guidanceOf(created);
-        const ackRows = guidance.filter((item) => item.action === "acknowledge");
+        const ackRows = guidance.filter((item) => item.code === "medication_interaction");
         const competing = competingAckHits(created);
         const rowStatus = ackRows.map((item) => item.acknowledgementStatus ?? null);
         const ok =
-          created.status === "needs_input" &&
-          created.acknowledgementStatus === "pending" &&
+          created.status === "ready" &&
+          created.acknowledgementStatus === "not_required" &&
           competing.length === 0 &&
           ackRows.length > 0 &&
-          ackRows.every((item) => item.acknowledgementStatus === "pending") &&
+          ackRows.every((item) => item.acknowledgementStatus === "not_required" && item.action === "review" && item.severity === "high") &&
+          questionsOf(created).length === 0 &&
+          nextActionsOf(created).includes("confirm_with_user") &&
           ackRows.every((item) => !("requiresSafetyAcknowledgement" in item));
         return ok
           ? pass("AX3-04", { acknowledgementStatus: created.acknowledgementStatus })
@@ -1015,7 +1021,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           request: omegaRequest()
         });
         const before = harness.port.getCallCount();
-        const answered = await harness.call("plan", {
+        await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: created.revision,
           idempotencyKey: "ax305-answer-000001",
@@ -1028,13 +1034,13 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           planHandle: created.planHandle
         });
         const competing = competingAckHits(gotten);
-        const ackRows = guidanceOf(gotten).filter((item) => item.action === "acknowledge");
+        const ackRows = guidanceOf(gotten).filter((item) => item.code === "medication_interaction");
         const ok =
           gotten.status === "ready" &&
-          gotten.acknowledgementStatus === "acknowledged" &&
+          gotten.acknowledgementStatus === "not_required" &&
           competing.length === 0 &&
           ackRows.length > 0 &&
-          ackRows.every((item) => item.acknowledgementStatus === "acknowledged") &&
+          ackRows.every((item) => item.acknowledgementStatus === "not_required" && item.action === "review" && item.severity === "high") &&
           questionsOf(gotten).length === 0 &&
           afterAnswer === before &&
           harness.port.getCallCount() === before;
@@ -1057,7 +1063,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           operation: "create",
           request: singleRequest({ medicationCodes: ["warfarin"] })
         });
-        const answered = await harness.call("plan", {
+        await rejectObsoleteHealthAnswer(harness, {
           answers: [
             {
               choice: "acknowledge_unassessed",
@@ -1078,8 +1084,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           gotten.safetyScope === "partial" &&
           stringList(gotten.assessedMedicationCodes).length === 0 &&
           stringList(gotten.unassessedMedicationCodes).join() === "warfarin" &&
-          stringList(gotten.acknowledgedUnassessedMedicationCodes).join() ===
-            "warfarin" &&
+          stringList(gotten.acknowledgedUnassessedMedicationCodes).length === 0 &&
           !("acknowledgedUnassessed" in gotten) &&
           stringList(gotten.acknowledgedUnassessedConditionCodes).length === 0;
         return ok
@@ -1107,7 +1112,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           operation: "create",
           request: singleRequest({ conditionCodes: ["diabetes"] })
         });
-        const answered = await harness.call("plan", {
+        await rejectObsoleteHealthAnswer(harness, {
           answers: [
             {
               choice: "acknowledge_unassessed",
@@ -1134,8 +1139,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           gotten.safetyScope === "partial" &&
           stringList(gotten.assessedConditionCodes).length === 0 &&
           stringList(gotten.unassessedConditionCodes).join() === "diabetes" &&
-          stringList(gotten.acknowledgedUnassessedConditionCodes).join() ===
-            "diabetes" &&
+          stringList(gotten.acknowledgedUnassessedConditionCodes).length === 0 &&
           !("acknowledgedUnassessed" in gotten) &&
           stringList(gotten.acknowledgedUnassessedMedicationCodes).length === 0 &&
           !meds.includes("diabetes");
@@ -1458,7 +1462,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
           request: omegaRequest()
         });
         const afterOmega = harness.port.getCallCount();
-        await harness.call("plan", {
+        await rejectObsoleteHealthAnswer(harness, {
           answers: [{ choice: "acknowledge_safety", questionId: "q_safety_ack" }],
           expectedRevision: omega.revision,
           idempotencyKey: "ax314-answer-000001",
@@ -1515,7 +1519,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-3.0",
+      packVersion: "agentic-experience-3.1",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 15
     };
@@ -1534,6 +1538,7 @@ if (process.env.NODE_TEST_CONTEXT) {
     it("exports 15 cases and a canonical report", async () => {
       const report = await runAeC3Pack();
       assert.equal(report.totalCases, 15);
+      assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 15);
       assert.deepEqual(
         report.cases.map((item) => item.id),

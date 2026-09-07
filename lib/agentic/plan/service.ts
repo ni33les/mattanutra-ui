@@ -1,3 +1,4 @@
+import { mergeRequestPatch, originalRequestFor } from "@/lib/agentic/plan/request-patch";
 import { requestLifetime } from "@/lib/request-lifetime";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Locale } from "@/lib/i18n";
@@ -19,7 +20,7 @@ import {
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
-import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
+import { AGENTIC_CONTRACT_VERSION, GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
   persistCataloguePin,
@@ -60,7 +61,7 @@ import {
   serviceDeadlineError,
   waitUntilDeadline
 } from "@/lib/agentic/qa/service-clock";
-import { buildHorizonPlan, ordersInHorizon } from "@/lib/agentic/value/inventory-ledger";
+import { buildHorizonPlan } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import type {
@@ -68,6 +69,7 @@ import type {
   PlanAnswer,
   PlanQuestion,
   PlanRequest,
+  PlanRequestPatch,
   PlanResult,
   SafetyAcknowledgement,
   StackOption
@@ -197,6 +199,7 @@ export type PlanToolInput = Readonly<{
   optionId?: string;
   planHandle?: string;
   request?: unknown;
+  requestPatch?: unknown;
   safetyAcknowledgement?: unknown;
   selectOptionId?: string;
 }>;
@@ -265,10 +268,11 @@ function incomingAck(payload: PlanToolInput) {
 
 function hasFullRequest(payload: PlanToolInput) {
   const nested = requestRecord(payload.request);
-  return Array.isArray(nested?.targets) && nested.targets.length > 0;
+  return (Array.isArray(nested?.targets) && nested.targets.length > 0) || Boolean(requestRecord(payload.requestPatch));
 }
 
 function composeResult(input: Readonly<{
+  alternativeSearch?: PlanResult["alternativeSearch"];
   ackMs?: number;
   alternatives: readonly StackOption[];
   catalogueMs?: number;
@@ -343,14 +347,9 @@ function composeResult(input: Readonly<{
         state: workState,
         unmetRequirements: [...input.unmetRequirements]
       });
-  const laterOrders = horizon ? ordersInHorizon(horizon.orders, 90).filter((item) => item.day > 0) : [];
   const summary = tooBroad
     ? agenticMessage(input.locale, "plan.summary.request_too_broad")
-    : horizon?.durationUnknown
-      ? agenticMessage(input.locale, "plan.summary.current_inventory_duration_unknown")
-      : horizon?.reasonCode === "current_inventory_covers_now" && laterOrders.length > 0
-        ? agenticMessage(input.locale, "plan.summary.current_inventory_covers_now")
-        : agenticMessage(input.locale, `plan.summary.${status}`);
+    : agenticMessage(input.locale, `plan.summary.${status}`);
   const split = tooBroad ? targetNameGroups(input.state.targets, 10) : undefined;
   const suggestedGroups = split?.groups;
   const changeSummary: string[] = [];
@@ -376,6 +375,9 @@ function composeResult(input: Readonly<{
 
   pinCatalogueSnapshot(input.snapshot, GUIDANCE_RULES_VERSION);
   return {
+    contractVersion: AGENTIC_CONTRACT_VERSION,
+    ...(input.alternativeSearch ? { alternativeSearch: input.alternativeSearch } : {}),
+    originalRequest: input.state.originalRequest,
     alternatives: [...input.alternatives],
     appliedRequirements: Object.entries(pinnedState.requirements)
       .filter(([, value]) => value !== undefined)
@@ -386,7 +388,7 @@ function composeResult(input: Readonly<{
     catalogueVersion: input.snapshot.catalogueVersion,
     changeSummary,
     coverage,
-    guidanceRulesVersion: input.snapshot.catalogueVersion,
+    guidanceRulesVersion: GUIDANCE_RULES_VERSION,
     leftovers: tooBroad ? [] : input.leftovers,
     ...(horizon ? { horizon } : {}),
     matcherTelemetry: matcherTelemetryFor({
@@ -406,13 +408,12 @@ function composeResult(input: Readonly<{
     optimizationEvidence: {
       mode: pinnedState.optimization,
       tieBreak: [
-        "objective",
-        "unmet_targets",
-        "safety",
-        "price",
-        "pills",
+        "exact_normalized_dose_total_with_upper_limit_weight_2",
+        ...(pinnedState.optimization === "fewest_pills" ? ["daily_pills"] : pinnedState.optimization === "balanced" || pinnedState.optimization === "best_coverage" ? ["capped_aggregate_coverage_desc"] : []),
+        "price_minor",
+        "daily_pills",
         "product_count",
-        "productId"
+        "seller_id_and_sorted_product_dose_variant_ids"
       ]
     },
     questions,
@@ -522,6 +523,7 @@ async function buildResult(input: Readonly<{
   return composeResult({
     ackMs,
     alternatives: matched.alternatives,
+    alternativeSearch: "alternativeSearch" in matched ? matched.alternativeSearch : undefined,
     catalogueMs: input.catalogueMs,
     locale: input.locale,
     leftovers: matched.leftovers,
@@ -570,6 +572,7 @@ function buildPinnedResult(input: Readonly<{
 
   return composeResult({
     alternatives: advertisedAlternatives(input.previous, input.selected),
+    alternativeSearch: input.previous.alternativeSearch,
     locale: input.locale,
     leftovers,
     previous: input.previous,
@@ -689,6 +692,8 @@ function successFromResult(input: Readonly<{
 
   if (input.result.status === "processing") {
     return {
+      contractVersion: AGENTIC_CONTRACT_VERSION,
+      operationalDecision: fields.operationalDecision,
       locale: input.locale,
       nextActions: ["poll_plan"],
       ok: true as const,
@@ -711,6 +716,8 @@ function successFromResult(input: Readonly<{
 
 function requestFromState(state: CanonicalPlanState): PlanRequest {
   return {
+    ...(state.originalRequest ?? {}),
+    ...(state.intake ? { intake: state.intake } : {}),
     ...(state.baseline ? { baseline: state.baseline } : {}),
     ...(state.conditionCodes.length > 0 ? { conditionCodes: state.conditionCodes } : {}),
     ...(state.currentSupplements.length > 0
@@ -756,7 +763,10 @@ function draftStateFromPayload(input: Readonly<{
         medicationCodes: [...new Set(request.medicationCodes ?? [])],
         optimization: request.optimization,
         pinnedOptionId: input.previous?.selected?.optionId ?? null,
-        profile: request.profile,
+        profile: { ...request.profile, ageYears: request.profile.ageYears ?? 0, lifeStage: request.profile.lifeStage ?? "adult" },
+        profileKnown: { ageYears: request.profile.ageYears != null, lifeStage: request.profile.lifeStage != null, sex: request.profile.sex != null },
+        originalRequest: structuredClone(request),
+        intake: request.intake ?? [],
         requirements: { ...request.requirements },
         safetyAcknowledgement: request.safetyAcknowledgement ?? null,
         targets: request.targets.map((item) => ({
@@ -817,17 +827,17 @@ function processingResult(input: Readonly<{
     optimizationEvidence: {
       mode: pinnedState.optimization,
       tieBreak: [
-        "objective",
-        "unmet_targets",
-        "safety",
-        "price",
-        "pills",
+        "exact_normalized_dose_total_with_upper_limit_weight_2",
+        ...(pinnedState.optimization === "fewest_pills" ? ["daily_pills"] : pinnedState.optimization === "balanced" || pinnedState.optimization === "best_coverage" ? ["capped_aggregate_coverage_desc"] : []),
+        "price_minor",
+        "daily_pills",
         "product_count",
-        "productId"
+        "seller_id_and_sorted_product_dose_variant_ids"
       ]
     },
     questions: input.previous?.questions ?? [],
-    ...(input.pendingInput ? { pendingInput: input.pendingInput } : {}),
+    contractVersion: AGENTIC_CONTRACT_VERSION,
+    ...(input.pendingInput ? { pendingInput: input.pendingInput, originalRequest: input.pendingInput.request } : {}),
     requestSnapshot: pinnedState,
     safetyGuidance: input.previous?.safetyGuidance ?? [],
     selected,
@@ -895,6 +905,7 @@ async function commitTerminalIdempotency(input: Readonly<{
 }
 
 type PreparedPlanCommand = Readonly<{
+  effectiveRequest?: PlanRequest;
   answers: readonly PlanAnswer[];
   ack: SafetyAcknowledgement | null;
   existingPlan: Awaited<ReturnType<AgenticStore["getPlan"]>>;
@@ -1111,7 +1122,7 @@ async function executePlanTool(input: Readonly<{
   async function persistPreparedPlan() {
     return input.store.transaction(async (store) => {
     const answers = incomingAnswers(payload);
-    const ack = incomingAck(payload);
+    const ack = null;
     const selectOptionId =
       payload.selectOptionId ?? payload.optionId ?? selectFromAnswers(answers);
 
@@ -1167,6 +1178,10 @@ async function executePlanTool(input: Readonly<{
       }
 
       previous = previousResult(current.result);
+      if (previous && previous.contractVersion !== AGENTIC_CONTRACT_VERSION && current.status !== "processing") {
+        const existingOrder = await store.getActiveOrderForPlanRevision(plan.id, plan.currentRevision);
+        previous = { ...previous, sourceContractVersion: previous.contractVersion ?? "3.0.0", refreshRequired: !existingOrder };
+      }
       existingPlan = plan;
       planId = plan.id;
       shownRevision = payload.expectedRevision ?? 1;
@@ -1186,14 +1201,6 @@ async function executePlanTool(input: Readonly<{
       planId = nextTestUuid();
     }
 
-    if (ack && previous && ack.revision !== shownRevision) {
-      return businessError({
-        fieldPath: "safetyAcknowledgement.revision",
-        message:
-          "safetyAcknowledgement.revision does not match the current plan revision. Reload the latest revision and resubmit the acknowledgement.",
-        reasonCode: "stale_safety_acknowledgement"
-      });
-    }
 
     if (selectOptionId && (!previous || !existingPlan || !planHandle)) {
       return businessError({
@@ -1219,9 +1226,26 @@ async function executePlanTool(input: Readonly<{
       }
     }
 
+    let effectiveRequest = payload.request as PlanRequest | undefined;
+    if (payload.requestPatch != null) {
+      if (!previous) return businessError({ fieldPath: "planHandle", reasonCode: "not_found", message: "A patch requires an existing plan." });
+      const original = originalRequestFor(previous);
+      if (isAgenticErrorResult(original)) return original;
+      const merged = mergeRequestPatch(original, payload.requestPatch as PlanRequestPatch);
+      if (isAgenticErrorResult(merged)) return merged;
+      effectiveRequest = merged;
+    }
+    if (previous?.refreshRequired && !hasFullRequest(payload) && (selectOptionId || answers.length > 0)) return businessError({ fieldPath: "planHandle", reasonCode: "contract_refresh_required", message: "Refresh this unexecuted plan with revise.requestPatch={} and the current revision before selecting or answering.", nextActions: ["refresh_plan"] });
+    for (const [index, answer] of answers.entries()) {
+      const question = previous?.questions?.find(item => item.questionId === answer.questionId);
+      const fieldPath = `answers[${index}].${question ? "choice" : "questionId"}`;
+      if (!question || !question.choices.some(item => item.choice === answer.choice)) {
+        return businessError({ fieldPath, reasonCode: "invalid_request", message: question ? "Choose one of the choices offered for this question and revision." : "This question was not offered for the current revision.", issues: [{ fieldPath, messageKey: "mcp.errors.invalid_enum", reasonCode: "invalid_enum", permittedLimit: question ? question.choices.map(item => item.choice) : (previous?.questions ?? []).map(item => item.questionId), message: question ? "The choice is not permitted for this question." : "The question ID is not present in the current plan." }] });
+      }
+    }
     const draft = draftStateFromPayload({
       answers,
-      payload,
+      payload: effectiveRequest ? { ...payload, request: effectiveRequest } : payload,
       previous
     });
 
@@ -1246,7 +1270,7 @@ async function executePlanTool(input: Readonly<{
       }
     });
     const pendingInput = hasFullRequest(payload)
-      ? { request: structuredClone(payload.request as PlanRequest), answers, safetyAcknowledgement: ack }
+      ? { request: structuredClone(effectiveRequest!), answers, safetyAcknowledgement: null }
       : previous?.pendingInput;
     const processing = processingResult({ locale, previous, state, pendingInput });
 
@@ -1261,6 +1285,7 @@ async function executePlanTool(input: Readonly<{
 
     if (!persistProcessing) {
       return {
+        effectiveRequest,
         answers,
         ack,
         existingPlan,
@@ -1332,6 +1357,7 @@ async function executePlanTool(input: Readonly<{
     }
 
     return {
+      effectiveRequest,
       answers,
       ack,
       existingPlan,
@@ -1584,7 +1610,7 @@ async function completePreparedPlan(
     if (hasFullRequest(input.payload) && !prepared.resume) {
       const merged = applyPlanAnswers(prepared.state, { answers });
       pinPrevious = Boolean(
-        previous &&
+        previous && previous.contractVersion === AGENTIC_CONTRACT_VERSION &&
           planRematchFingerprint(previous.requestSnapshot) ===
             planRematchFingerprint(merged)
       );
@@ -1607,7 +1633,7 @@ async function completePreparedPlan(
   } else if (hasFullRequest(input.payload) && !prepared.resume) {
     const normalized = await normalizePlanRequest({
       config: input.config,
-      request: input.payload.request,
+      request: prepared.effectiveRequest ?? input.payload.request,
       snapshot
     });
 
@@ -1617,7 +1643,7 @@ async function completePreparedPlan(
 
     const merged = applyPlanAnswers(normalized.state, { answers });
     pinPrevious = Boolean(
-      previous &&
+      previous && previous.contractVersion === AGENTIC_CONTRACT_VERSION &&
         planRematchFingerprint(previous.requestSnapshot) ===
           planRematchFingerprint(merged)
     );

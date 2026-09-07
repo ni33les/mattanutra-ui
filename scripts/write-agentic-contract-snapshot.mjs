@@ -1,27 +1,35 @@
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_DESCRIPTIONS,
+  AGENTIC_OUTPUT_SCHEMAS,
   AGENTIC_TOOL_SCHEMAS
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
+import { clientGuideMarkdown, publicContractBundle, CONTRACT_RESOURCES } from "../lib/agentic/contract/guide.ts";
 import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
 
+const schemaChecksum = computeSchemaChecksum();
 const snapshot = {
+  schemaChecksum,
   contractVersion: AGENTIC_CONTRACT_VERSION,
   instructions: AGENTIC_SERVER_INSTRUCTIONS,
   tools: AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: AGENTIC_TOOL_DESCRIPTIONS[name],
     inputSchema: AGENTIC_TOOL_SCHEMAS[name],
+    outputSchema: AGENTIC_OUTPUT_SCHEMAS[name],
     name
   }))
 };
 
-const schemaChecksum = computeSchemaChecksum();
+const versionDirectory = new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/`, import.meta.url);
+mkdirSync(versionDirectory, { recursive: true });
+writeFileSync(new URL("README.md", versionDirectory), clientGuideMarkdown());
+writeFileSync(new URL("schema.json", versionDirectory), `${JSON.stringify(publicContractBundle(), null, 2)}\n`);
 
 writeFileSync(
-  new URL("../contract/mcp/3.0.0/tools.json", import.meta.url),
+  new URL("tools.json", versionDirectory),
   `${JSON.stringify(snapshot, null, 2)}\n`
 );
 
@@ -33,6 +41,7 @@ writeFileSync(
       name: "mattanutra_dev",
       schemaChecksum,
       tools: snapshot.tools,
+      resources: CONTRACT_RESOURCES,
       transport: "streamable-http",
       url: "https://dev.mattanutra.com/api/mcp"
     },

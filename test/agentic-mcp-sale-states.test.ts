@@ -144,11 +144,15 @@ describe("MCP sale states", () => {
     assert.match(encoded, /"excludeSupplementIds"/);
     assert.match(encoded, /"female"/);
     assert.match(encoded, /"male"/);
-    assert.match(String(plan.description ?? ""), /omit the field if unknown/i);
-    const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+    assert.match(String(plan.description ?? ""), /unknown profile\/intake is allowed/i);
+    const branches = schema.anyOf as Array<{ properties?: Record<string, Record<string, unknown>> }>;
+    const create = branches.find(branch => branch.properties?.operation?.const === "create");
+    assert.ok(create, "create has a separately published operation schema");
+    const properties = create.properties!;
     const requestProperties = ((properties.request as { properties?: Record<string, Record<string, unknown>> } | undefined)
       ?.properties ?? {}) as Record<string, Record<string, unknown>>;
-    if (Object.keys(requestProperties).length > 0) {
+    assert.ok(Object.keys(requestProperties).length > 0);
+    {
       assert.ok(requestProperties.medicationCodes);
       assert.ok(requestProperties.conditionCodes);
       assert.ok(requestProperties.targets);

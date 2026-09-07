@@ -84,11 +84,11 @@ function burdenOf(option: StackOption) {
 }
 
 describe("Slice 4 Pareto relevance burden and labels", () => {
-  it("OPT-01 caps three unique non-dominated options and names a lone option", () => {
+  it("OPT-01 caps two unique non-dominated options and names a lone option", () => {
     const snapshot = sampleValueSnapshot();
     const full = matchPlan({ snapshot, state: intentState(snapshot) });
     const options = optionsOf(full);
-    assert.ok(options.length >= 1 && options.length <= 3);
+    assert.ok(options.length >= 1 && options.length <= 2);
     const signatures = new Set(options.map(oracleOptionSignature));
     assert.equal(signatures.size, options.length);
     assert.equal(oracleHasDominatedPair(options), false);
@@ -208,7 +208,7 @@ describe("Slice 4 Pareto relevance burden and labels", () => {
     const magProduct = snapshot.products[1]!;
     const result = matchPlan({ snapshot, state: intentState(snapshot) });
     const options = optionsOf(result);
-    const complete = options.find((item) => item.role === "complete") ?? result.selected;
+    const complete = options.find((item) => item.role === "requested_objective") ?? result.selected;
     assert.ok(complete);
     const burden = burdenOf(complete);
     const expected = oracleBurden(complete);
@@ -263,12 +263,12 @@ describe("Slice 4 Pareto relevance burden and labels", () => {
     const result = matchPlan({ snapshot, state: intentState(snapshot) });
     const options = optionsOf(result);
     const derived = oracleLabelRoles(options);
-    assert.ok(derived.minimumCore);
-    assert.equal(derived.recommended?.optionId, derived.minimumCore.optionId);
+    assert.ok(derived.requestedObjective);
+    assert.equal(derived.recommended?.optionId, derived.requestedObjective.optionId);
     const recommended = options.find((item) => item.recommended);
     assert.ok(recommended);
     assert.equal(recommended.optionId, derived.recommended?.optionId);
-    assert.equal(recommended.role, "minimum_core");
+    assert.equal(recommended.role, "requested_objective");
     for (const option of options) {
       const expectedRole = derived.byOptionId.get(option.optionId);
       assert.ok(expectedRole);

@@ -91,7 +91,7 @@ describe("Phase 3 fewest_pills ranking", () => {
     );
   });
 
-  it("keeps labelled dedicated partials over a lower-pill covering-only stack", () => {
+  it("does not let dedicated-title metadata beat fewer pills at equal dose fit", () => {
     const withPartials = scored({
       coveredCount: 3,
       dailyPills: 10,
@@ -111,12 +111,12 @@ describe("Phase 3 fewest_pills ranking", () => {
         withPartials,
         coveringOnly,
         qaRequest({ optimization: "fewest_pills" })
-      ) < 0,
+      ) > 0,
       true
     );
   });
 
-  it("counts a labelled B12-only complex as a dedicated partial", () => {
+  it("does not let B12 complex metadata alone justify six extra pills", () => {
     const withMegaB = scored({
       coveredCount: 3,
       dailyPills: 10,
@@ -136,7 +136,7 @@ describe("Phase 3 fewest_pills ranking", () => {
         withMegaB,
         coveringOnly,
         qaRequest({ optimization: "fewest_pills" })
-      ) < 0,
+      ) > 0,
       true
     );
   });
@@ -251,7 +251,7 @@ describe("Phase 3 fewest_pills ranking", () => {
     }
   });
 
-  it("M-01 still selects G-BASE-COMBO + G-O3-FISH-1000 at 4 pills", () => {
+  it("M-01 still selects G-BASE-COMBO + G-O3-ALGAE-500 at 4 pills", () => {
     const result = match(
       qaRequest({ optimization: "fewest_pills" }),
       QA_GOLD_CATALOG
@@ -259,9 +259,12 @@ describe("Phase 3 fewest_pills ranking", () => {
     assert.ok(result.selected);
     assert.deepEqual(result.selected.productIds, [
       "G-BASE-COMBO",
-      "G-O3-FISH-1000"
+      "G-O3-ALGAE-500"
     ]);
     assert.equal(result.selected.dailyPills, 4);
+    assert.equal(result.selected?.priceMinor, 61000);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 5);
   });
 
   it("among stacks covering the same targets, fewer pills beat more pills", () => {
@@ -428,7 +431,7 @@ describe("Phase 3 fewest_pills ranking", () => {
     );
   });
 
-  it("picks dedicated MAGNESIUM over MAGNESIUM+D3 when both cover Mag at the floor", () => {
+  it("uses the magnesium+D3 option when it improves the complete dose-fit score", () => {
     const result = match(
       qaRequest({
         optimization: "fewest_pills",
@@ -495,8 +498,9 @@ describe("Phase 3 fewest_pills ranking", () => {
       ])
     );
     assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("prd_magnesium"), true);
-    assert.equal(result.selected.productIds.includes("prd_magnesium_d3"), false);
+    assert.equal(result.selected.productIds.includes("prd_magnesium"), false);
+    assert.equal(result.selected.productIds.includes("prd_magnesium_d3"), true);
+    assert.equal(result.selected.doseFit?.total, 0.7);
     assert.equal(result.selected.productIds.includes("prd_mega_b"), true);
     assert.equal(result.selected.productIds.includes("prd_vistra_omega"), true);
   });

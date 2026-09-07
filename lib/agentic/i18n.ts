@@ -4,6 +4,21 @@ import { isLocale } from "@/lib/i18n";
 export const AGENTIC_LOCALES = ["en", "th", "zh-CN"] as const;
 
 const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>> = {
+  "guidance.estimated_limit_uncertainty": {
+    en: "This advice uses a possible exposure up to {amount} {unit} from reported estimates. It is not a measured total; unknown intake remains unquantified.",
+    th: "คำแนะนำนี้ใช้ปริมาณที่อาจได้รับสูงสุด {amount} {unit} จากค่าประมาณที่รายงาน ไม่ใช่ปริมาณรวมที่วัดได้ และปริมาณที่ไม่ทราบยังไม่ถูกนำมาคำนวณ",
+    "zh-CN": "此建议使用报告估计值中最高可能达到 {amount} {unit} 的摄入量，并非实测总量；未知摄入量仍未量化。"
+  },
+  "guidance.incomplete_information": {
+    en: "Some health or intake information is unknown or estimated. The quantities shown do not establish complete exposure or medical suitability; discuss relevant uncertainties with a clinician or pharmacist before use.",
+    th: "ข้อมูลสุขภาพหรือปริมาณที่รับประทานบางส่วนยังไม่ทราบหรือเป็นค่าประมาณ ปริมาณที่แสดงไม่ยืนยันปริมาณรวมทั้งหมดหรือความเหมาะสมทางการแพทย์ ควรปรึกษาแพทย์หรือเภสัชกรเกี่ยวกับความไม่แน่นอนที่เกี่ยวข้องก่อนใช้",
+    "zh-CN": "部分健康或摄入信息未知或为估计值。所示数量不能确认完整总摄入量或医疗适用性；使用前请与医生或药师讨论相关不确定性。"
+  },
+  "guidance.incomplete_information_uncertainty": {
+    en: "Unknown intake is not zero. Reported estimates are not verified measurements.",
+    th: "ปริมาณที่ไม่ทราบไม่ได้หมายถึงศูนย์ ค่าประมาณที่รายงานไม่ใช่ค่าที่วัดและตรวจสอบแล้ว",
+    "zh-CN": "未知摄入量不等于零。报告的估计值并非经核实的测量值。"
+  },
   "checkout.expired": {
     en: "This checkout has expired. Ask the agent to create a new one.",
     th: "การชำระเงินนี้หมดอายุแล้ว ขอให้ผู้ช่วยสร้างรายการใหม่",
@@ -133,6 +148,16 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     en: "Total exposure from current intake plus selected products needs a dose review.",
     th: "ปริมาณรวมจากการทานอยู่แล้วบวกสินค้าที่เลือกควรได้รับการตรวจทานขนาด",
     "zh-CN": "当前摄入加上所选产品的总暴露量需要剂量复核。"
+  },
+  "guidance.continued_dose_increased": {
+    en: "The selected products increase {nutrientName} from your reported {threshold} to {exposure} {unit} per day. Review this increase. The reference is your existing dose, not a medical maximum.",
+    th: "สินค้าที่เลือกเพิ่ม {nutrientName} จากปริมาณที่คุณแจ้ง {threshold} เป็น {exposure} {unit} ต่อวัน โปรดทบทวนการเพิ่มนี้ ปริมาณอ้างอิงคือขนาดที่คุณใช้อยู่ ไม่ใช่ขีดจำกัดทางการแพทย์",
+    "zh-CN": "所选产品将 {nutrientName} 从你报告的每日 {threshold} 增加到 {exposure} {unit}。请考虑这一增量。参考值是你现有的剂量，并非医学上限。"
+  },
+  "guidance.continued_dose_uncertainty": {
+    en: "This comparison uses your reported continued dose and available product facts. It does not establish that either dose is medically appropriate.",
+    th: "การเปรียบเทียบนี้ใช้ขนาดที่คุณแจ้งว่าใช้อยู่และข้อมูลสินค้าที่มี ไม่ได้ยืนยันว่าขนาดใดเหมาะสมทางการแพทย์",
+    "zh-CN": "此比较使用你报告的现有剂量和可用的产品资料，不能证明任一剂量在医学上适合你。"
   },
   "guidance.dose_review_required_remaining_zero": {
     en: "{nutrientName} remaining allowed is 0 {unit} because of a declared condition. Next action: {nextAction}.",
@@ -420,9 +445,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "是否取消保留该产品以便继续匹配？"
   },
   "plan.summary.blocked": {
-    en: "This stack is blocked until a hard constraint or safety choice is changed.",
-    th: "สูตรนี้ถูกบล็อกจนกว่าจะเปลี่ยนข้อจำกัดหรือตัวเลือกความปลอดภัย",
-    "zh-CN": "在客户更改硬性限制或安全选择之前，该组合被阻止。"
+    en: "This stack cannot proceed until the unresolved request constraints are addressed.",
+    th: "สูตรนี้ยังดำเนินการต่อไม่ได้จนกว่าจะแก้ไขข้อจำกัดของคำขอที่ค้างอยู่",
+    "zh-CN": "请先处理尚未解决的请求限制，再继续此方案。"
   },
   "plan.question.acknowledge_safety": {
     en: "Confirm the safety facts",
@@ -431,7 +456,7 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
   },
   "plan.summary.needs_input": {
     en: "One more choice is needed before this stack is ready to buy.",
-    th: "สูตรพร้อมแล้ว โปรดยืนยันกับผู้ใช้ก่อน",
+    th: "ต้องเลือกเพิ่มเติมก่อนที่สูตรนี้จะพร้อมซื้อ",
     "zh-CN": "购买前还需要客户做一个选择。"
   },
   "plan.summary.processing": {
@@ -440,9 +465,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "仍在匹配中。请轮询此方案，直到状态为 ready、needs_input、no_purchase 或 blocked。"
   },
   "plan.summary.no_purchase": {
-    en: "Nothing needs to be bought for the accepted goals. Confirm that outcome with the person.",
-    th: "เป้าหมายที่ยอมรับแล้วไม่ต้องซื้อเพิ่ม โปรดยืนยันผลนี้กับผู้ใช้",
-    "zh-CN": "已接受的目标无需再买。请先与当事人确认该结果。"
+    en: "No purchase is recommended for this result. Review any remaining target gaps and advice with the person.",
+    th: "ผลลัพธ์นี้ไม่แนะนำให้ซื้อเพิ่ม โปรดทบทวนเป้าหมายที่ยังไม่ครบและคำแนะนำกับผู้ใช้",
+    "zh-CN": "此结果不建议新增购买。请与用户查看尚未满足的目标及建议。"
   },
   "plan.summary.current_inventory_covers_now": {
     en: "Nothing needs to be bought now. Current stock covers today; replenish later in the requested horizon.",
@@ -569,6 +594,41 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ยืนยันตัวเลือกนี้กับผู้ใช้ก่อน execute",
     "zh-CN": "执行前请与用户确认此方案。"
   },
+  "plan.next_action.poll_plan": {
+    en: "Matching is in progress. Check this plan again.",
+    th: "กำลังจับคู่ โปรดตรวจสอบแผนนี้อีกครั้ง",
+    "zh-CN": "正在匹配，请再次查询此方案。"
+  },
+  "plan.next_action.answer_questions": {
+    en: "Answer the remaining request questions to continue.",
+    th: "ตอบคำถามเกี่ยวกับคำขอที่เหลือเพื่อดำเนินการต่อ",
+    "zh-CN": "请回答剩余的请求问题后继续。"
+  },
+  "plan.next_action.change_request": {
+    en: "Revise this plan to address the reported request issue.",
+    th: "แก้ไขแผนนี้เพื่อจัดการปัญหาของคำขอที่แจ้งไว้",
+    "zh-CN": "请修订此方案，处理已报告的请求问题。"
+  },
+  "plan.next_action.confirm_with_user": {
+    en: "Review the advice and confirm this option with the person before checkout. Ready describes purchase readiness, not medical approval.",
+    th: "ทบทวนคำแนะนำและยืนยันตัวเลือกนี้กับผู้ใช้ก่อนชำระเงิน ความพร้อมหมายถึงพร้อมซื้อ ไม่ใช่การรับรองทางการแพทย์",
+    "zh-CN": "请查看建议并与用户确认此选项，再进入结账。就绪表示可购买，并不代表医学认可。"
+  },
+  "plan.next_action.replenish_later": {
+    en: "Review the advice and the planned replenishment schedule.",
+    th: "ทบทวนคำแนะนำและกำหนดการเติมสินค้าที่วางไว้",
+    "zh-CN": "请查看建议及计划的补货时间。"
+  },
+  "plan.next_action.no_purchase": {
+    en: "Review remaining target gaps and advice; no new purchase is recommended.",
+    th: "ทบทวนเป้าหมายที่ยังไม่ครบและคำแนะนำ โดยไม่แนะนำให้ซื้อเพิ่ม",
+    "zh-CN": "请查看尚未满足的目标及建议；目前不建议新增购买。"
+  },
+  "plan.next_action.split_request": {
+    en: "Split the request using the documented target limit and try again.",
+    th: "แบ่งคำขอตามจำนวนเป้าหมายสูงสุดที่ระบุไว้แล้วลองอีกครั้ง",
+    "zh-CN": "请按已公布的目标数量上限拆分请求，然后重试。"
+  },
   "plan.selection.dedicated_unavailable": {
     en: "A dedicated product was not available, so this covering product is used instead.",
     th: "ไม่มีสินค้าเฉพาะทางที่ใช้ได้ จึงใช้สินค้าที่ครอบคลุมเป้าหมายนี้แทน",
@@ -675,9 +735,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "用 {count} 件产品覆盖核心目标。"
   },
   "plan.compact.why.selected": {
-    en: "Selected {optionId} covers {names}.",
-    th: "เลือก {optionId} เพื่อครอบคลุม {names}",
-    "zh-CN": "已选 {optionId}，覆盖 {names}。"
+    en: "This option covers {coveredCount} of {requestedCount} requested targets; {gapCount} remain partial or unresolved.",
+    th: "ตัวเลือกนี้ครอบคลุม {coveredCount} จาก {requestedCount} เป้าหมายที่ขอ อีก {gapCount} เป้าหมายยังครอบคลุมบางส่วนหรือยังหาคำตอบไม่ได้",
+    "zh-CN": "此方案覆盖所请求的 {requestedCount} 个目标中的 {coveredCount} 个；还有 {gapCount} 个仅部分覆盖或尚未解决。"
   },
   "plan.compact.why.status": {
     en: "Plan status is {status}.",

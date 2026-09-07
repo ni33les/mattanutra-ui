@@ -8,7 +8,7 @@ import {
   normalizeProductFactKey,
   normalizeProductFactName,
   productFactLooksLikeConcentration
-} from "@/lib/product-recommendations";
+} from "@/lib/product-key-matching";
 import { isFirstPartyImageUrl } from "@/lib/first-party-image-rules";
 
 export type ValidationStatus = "failed" | "needs_review" | "pass";

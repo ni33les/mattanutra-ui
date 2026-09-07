@@ -1,3 +1,5 @@
+import type { IntakeObservation } from "@/lib/agentic/contract/schemas";
+export type { IntakeObservation } from "@/lib/agentic/contract/schemas";
 import type { CatalogueUnit } from "@/lib/agentic/catalogue/types";
 
 export type OptimizationMode =
@@ -30,6 +32,7 @@ export type TargetPrerequisite = Readonly<{
 }>;
 
 export type PlanTarget = Readonly<{
+  basis?: "total_daily" | "supplemental";
   acceptableRange?: TargetAcceptableRange;
   amount: number;
   importance?: TargetImportance;
@@ -54,6 +57,7 @@ export type PlanRequirements = Readonly<{
   allowedForms?: readonly string[];
   dietaryPreference?: "any" | "plant_based" | "vegan";
   excludeSupplementIds?: readonly string[];
+  excludeProductIds?: readonly string[];
   maxDailyPills?: number;
   maxPriceMinor?: number;
   maxProductCount?: number;
@@ -81,6 +85,7 @@ export type PlanAnswer = Readonly<{
 }>;
 
 export type PlanRequestTarget = Readonly<{
+  basis?: "total_daily" | "supplemental";
   acceptableRange?: TargetAcceptableRange;
   amount: number;
   importance?: TargetImportance;
@@ -101,6 +106,7 @@ export type PlanRequestCurrent = Readonly<{
 
 export type PlanBaseline = Readonly<{
   items?: readonly Readonly<{
+    dailyServings?: number;
     daysRemaining?: number;
     productId: string;
     quantity: number;
@@ -114,15 +120,18 @@ export type PlanRequest = Readonly<{
   conditionCodes?: readonly string[];
   costHorizonsDays?: readonly number[];
   currentSupplements?: readonly PlanRequestCurrent[];
+  intake?: readonly IntakeObservation[];
   destinationCountry: string;
   locale: string;
   medicationCodes?: readonly string[];
   optimization: OptimizationMode;
-  profile: PlanProfile;
+  profile: Partial<PlanProfile>;
   requirements: PlanRequirements;
   safetyAcknowledgement?: SafetyAcknowledgement;
   targets: readonly PlanRequestTarget[];
 }>;
+
+export type PlanRequestPatch = Partial<Omit<PlanRequest, "profile" | "requirements" | "baseline">> & Readonly<{ profile?: Partial<PlanProfile>; requirements?: Partial<PlanRequirements>; baseline?: Partial<PlanBaseline> }>;
 
 export type AcceptedGap = Readonly<{
   revision: number;
@@ -141,6 +150,8 @@ export type PlanLeftover = Readonly<{
   name: string;
   note?: string;
   reason: PlanLeftoverReason;
+  source?: "target" | "current_supplement";
+  requestIndex?: number;
   severity: "high" | "low" | "medium";
   supplementId?: string;
   unit?: CatalogueUnit;
@@ -154,6 +165,9 @@ export type CanonicalPlanState = Readonly<{
   conditionCodes: readonly string[];
   currency: string;
   currentSupplements: readonly CurrentSupplement[];
+  intake?: readonly IntakeObservation[];
+  profileKnown?: Readonly<{ ageYears: boolean; lifeStage: boolean; sex: boolean }>;
+  originalRequest?: PlanRequest;
   destinationCountry: string;
   leftovers: readonly PlanLeftover[];
   locale: string;
@@ -283,7 +297,7 @@ export type CoverageContributor = Readonly<{
   amount: number;
   productId?: string;
   productName: string;
-  source?: "current" | "selected";
+  source?: "current" | "selected" | "diet";
   unit: CatalogueUnit;
 }>;
 
@@ -339,6 +353,11 @@ export type BasketItem = Readonly<{
 }>;
 
 export type CoverageRow = Readonly<{
+  basis?: "total_daily" | "supplemental";
+  totalExposureComplete?: boolean;
+  intakeCertainty?: "known" | "estimated" | "unknown";
+  requestedTargetId?: string;
+  unresolved?: boolean;
   authorityUrl?: string | null;
   claimIds?: readonly string[];
   contributors?: readonly CoverageContributor[];
@@ -374,8 +393,16 @@ export type CoverageRow = Readonly<{
 }>;
 
 export type SafetyGuidance = Readonly<{
+  comparator?: "gt" | "gte" | "lt" | "lte" | "eq" | null;
+  authorityUrl?: string | null;
+  evidence?: readonly string[];
+  uncertainty?: string;
+  uncertaintyCodes?: readonly string[];
+  referenceBasis?: "continued_dose";
   action: "acknowledge" | "block" | "review";
   code:
+    | "incomplete_information"
+    | "continued_dose_increased"
     | "audience_mismatch"
     | "condition_review_required"
     | "dose_review_required"
@@ -422,7 +449,7 @@ export type PlanQuestion = Readonly<{
   targets?: readonly GapReviewTarget[];
 }>;
 
-export type ValueOptionRole = "best_value" | "complete" | "minimum_core";
+export type ValueOptionRole = "requested_objective" | "fewer_concerns" | "best_value" | "complete" | "minimum_core";
 
 export type BurdenLedger = Readonly<{
   administrationEvents: number;
@@ -498,7 +525,7 @@ export type EconomicsLedger = Readonly<{
 }>;
 
 export type OptionTradeOff = Readonly<{
-  cash90DayDeltaMinor: number;
+  cash90DayDeltaMinor: number | null;
   coverageDelta: number;
   dailyPillsDelta: number;
 }>;
@@ -573,6 +600,9 @@ export type HorizonOrder = Readonly<{
 }>;
 
 export type HorizonPlan = Readonly<{
+  /** Absent only on legacy persisted results. */
+  complete?: boolean;
+  unavailableReasons?: readonly EconomicsUnavailableReason[];
   durationUnknown?: boolean;
   nextReplenishmentDay: number | null;
   orders: readonly HorizonOrder[];
@@ -580,6 +610,7 @@ export type HorizonPlan = Readonly<{
   reasonCode:
     | "current_inventory_covers_now"
     | "current_inventory_duration_unknown"
+    | "current_inventory_information_incomplete"
     | "purchase_now"
     | null;
   snapshotId: string;
@@ -596,6 +627,7 @@ export type CanonicalPlanStamp = Readonly<{
 }>;
 
 export type StackOption = Readonly<{
+  doseFit?: import("@/lib/matcher/types").DoseFitScore;
   basket: readonly BasketItem[];
   burden?: BurdenLedger;
   cash90DayMinor?: number;
@@ -639,6 +671,11 @@ export type PlanBreadth = Readonly<{
 }>;
 
 export type PlanResult = Readonly<{
+  alternativeSearch?: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
+  contractVersion?: string;
+  originalRequest?: PlanRequest;
+  refreshRequired?: boolean;
+  sourceContractVersion?: string;
   alternatives: readonly StackOption[];
   gapReview?: Readonly<{
     targets: readonly GapReviewTarget[];

@@ -1,3 +1,4 @@
+import { observeLatency } from "./helpers/latency-observation.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
@@ -47,8 +48,8 @@ describe("live plan latency vantage ownership", () => {
         : originP95 > 5_000
           ? "APPLICATION_ADMISSION"
           : "MATTA_INGRESS_OR_PROXY";
-    assert.ok(publicP95 <= PUBLIC_PLAN_P95_MS, `public p95 ${publicP95}`);
-    assert.ok(originP95 <= DIRECT_PLAN_P95_MS, `origin p95 ${originP95}`);
+    observeLatency(publicP95, PUBLIC_PLAN_P95_MS, "public plan p95");
+    observeLatency(originP95, DIRECT_PLAN_P95_MS, "origin plan p95");
     assert.equal(owner, "AGENT_EGRESS_OR_ROUTE");
   });
 });

@@ -1,15 +1,12 @@
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { productEligible } from "@/lib/matcher/eligibility";
-import { aggregateDailyExposure, isDoseError, scaleAmount } from "@/lib/matcher/dose";
+import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { isFalseOmegaAttribution } from "@/lib/agentic/catalogue/product-fit";
-import { canonicalNutrientKey, productKeysMatch } from "@/lib/product-key-matching";
-import {
-  evaluateSafety,
-  exposureExceedsCeiling,
-  labelledSafetyExposure,
-  variantDedicatedOvershoot
-} from "@/lib/matcher/safety";
+import { canonicalNutrientKey, normalizeProductFactKey, productKeysMatch } from "@/lib/product-key-matching";
+import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
+import { labelledSafetyExposure } from "@/lib/matcher/safety";
+import { knownCurrentTargetExposure } from "@/lib/matcher/target-basis";
 import type {
   CanonicalRequest,
   CanonicalTarget,
@@ -21,8 +18,6 @@ import type {
 } from "@/lib/matcher/types";
 
 const MAX_DAILY_UNITS = 3;
-const HIGH_COLLATERAL_MULTI_MAX_DAILY_UNITS = 1;
-const SALVAGE_BELOW_FLOOR_PER_TARGET = 3;
 const NON_PILL_FORM = /powder|liquid|sachet|oil|drops|\bml\b/i;
 
 function listingId(product: Readonly<{ productId: string; sellerId: string }>) {
@@ -61,9 +56,7 @@ export function remainingRequestedUnits(
     return BigInt(0);
   }
 
-  const current = request.currentSupplements
-    .filter((item) => item.subjectId === subjectId)
-    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
+  const current = knownCurrentTargetExposure(request, target);
 
   return target.requested.units > current
     ? target.requested.units - current
@@ -83,6 +76,8 @@ function subjectKeyVariants(value: string) {
 function labelledFactKey(
   fact: Readonly<{ name?: string | null; subjectId?: string | null; unit?: string | null }>
 ) {
+  if (nutrientNameMatchesTarget("EPA", fact.name ?? "")) return "omega:epa";
+  if (nutrientNameMatchesTarget("DHA", fact.name ?? "")) return "omega:dha";
   const subject = fact.subjectId?.trim().toLowerCase() ?? "";
 
   if (subject) {
@@ -117,7 +112,11 @@ export function collapseDuplicateLabelledFacts<
     const key = labelledFactKey(fact);
     const existing = best.get(key);
 
-    if (!existing || fact.amount > (existing.amount ?? 0)) {
+    const scaled = fact.unit ? scaleAmount({ amount: fact.amount, subjectId: fact.subjectId ?? key, subjectName: fact.name ?? "", unit: fact.unit }) : null;
+    const previous = existing?.unit && existing.amount != null ? scaleAmount({ amount: existing.amount, subjectId: existing.subjectId ?? key, subjectName: existing.name ?? "", unit: existing.unit }) : null;
+    const larger = scaled && previous && !isDoseError(scaled) && !isDoseError(previous) && scaled.dim === previous.dim
+      ? scaled.units > previous.units : fact.amount > (existing?.amount ?? 0);
+    if (!existing || larger) {
       best.set(key, fact);
     }
   }
@@ -167,6 +166,7 @@ function contributionForFresh(
     if (item.amount == null || item.amount <= 0) {
       return false;
     }
+    if (item.name?.trim() && targetName.trim() && !nutrientNameMatchesTarget(targetName, item.name)) return false;
 
     if (item.subjectId) {
       const factIds = subjectKeyVariants(item.subjectId);
@@ -188,10 +188,12 @@ function contributionForFresh(
     }
 
     return Boolean(item.name?.trim() && targetName.trim()) &&
-      productKeysMatch(targetName, item.name);
+      nutrientNameMatchesTarget(targetName, item.name);
   });
 
-  return collapseDuplicateLabelledFacts(hits);
+  const explicitOmegaTotal = hits.filter((fact) => ["omega_3", "omega3", "omega_3_fatty_acids"].includes(normalizeProductFactKey(fact.name)));
+  // A total and its EPA/DHA components describe the same labelled amount.
+  return collapseDuplicateLabelledFacts(explicitOmegaTotal.length ? explicitOmegaTotal : hits);
 }
 
 export function compileVariant(input: Readonly<{
@@ -234,22 +236,26 @@ export function compileVariant(input: Readonly<{
         }
       }
 
-      if (!scaled) {
+      if (!scaled || scaled.dim !== target.requested.dim) {
         unknown = true;
         continue;
       }
 
       const existing = amountPerUnit.get(target.subjectId);
+      const omegaComponents = /^(?:omega[- _]?3|omega[- _]?3 fatty acids)$/i.test(target.name.trim()) &&
+        labelled.every((row) => nutrientNameMatchesTarget("EPA", row.name) || nutrientNameMatchesTarget("DHA", row.name));
       amountPerUnit.set(
         target.subjectId,
         existing
-          ? { ...scaled, units: existing.units + scaled.units }
+          ? { ...scaled, units: omegaComponents ? existing.units + scaled.units : existing.units > scaled.units ? existing.units : scaled.units }
           : scaled
       );
     }
   }
 
-  if (amountPerUnit.size < 1) {
+  const safetyExposure = labelledSafetyExposure(input.product, input.dailyUnits, input.request);
+  if (amountPerUnit.size < 1 && !input.request.retainProductIds.includes(input.product.productId) &&
+    !input.request.retainSubjectIds.some((id) => (safetyExposure.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
     return null;
   }
 
@@ -268,65 +274,10 @@ export function compileVariant(input: Readonly<{
     dailyPills: variantPillBurden(input.product, input.dailyUnits),
     dailyUnits: input.dailyUnits,
     productId: input.product.productId,
-    safetyExposure: labelledSafetyExposure(input.product, input.dailyUnits),
+    safetyExposure,
     unknownSafetyAmount: unknown,
     variantId: `${listingId(input.product)}:x${input.dailyUnits}`
   };
-}
-
-function variantDominates(left: DoseVariant, right: DoseVariant) {
-  if (left.productId !== right.productId) {
-    return false;
-  }
-
-  const subjects = new Set([...left.contributions.keys(), ...right.contributions.keys()]);
-
-  for (const subjectId of subjects) {
-    const a = left.contributions.get(subjectId)?.units ?? BigInt(0);
-    const b = right.contributions.get(subjectId)?.units ?? BigInt(0);
-
-    if (a < b) {
-      return false;
-    }
-  }
-
-  if (left.dailyPills > right.dailyPills) {
-    return false;
-  }
-
-  return (
-    left.dailyPills < right.dailyPills ||
-    [...subjects].some((subjectId) => {
-      const a = left.contributions.get(subjectId)?.units ?? BigInt(0);
-      const b = right.contributions.get(subjectId)?.units ?? BigInt(0);
-      return a > b;
-    })
-  );
-}
-
-function pruneVariants(variants: DoseVariant[]) {
-  return variants.filter(
-    (candidate, index) =>
-      !variants.some(
-        (other, otherIndex) =>
-          otherIndex !== index && variantDominates(other, candidate)
-      )
-  );
-}
-
-function variantLeavesTargetShortfall(
-  variant: DoseVariant,
-  request: CanonicalRequest
-) {
-  for (const [subjectId, amount] of variant.contributions) {
-    const target = request.targets.find((item) => item.subjectId === subjectId);
-
-    if (target && amount.units < remainingRequestedUnits(request, subjectId)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 function carrierTitle(title: string) {
@@ -335,95 +286,15 @@ function carrierTitle(title: string) {
   );
 }
 
-function highCollateralMultiTitle(title: string) {
-  return /\b50\+|multivitamins for 50/i.test(title);
-}
-
-function jointTitle(title: string) {
-  return /\bjoint\b/i.test(title);
-}
-
 export function productHitsCoverageFloor(
   product: MatcherProduct,
   request: CanonicalRequest,
   target: CanonicalTarget
 ) {
-  if (
-    highCollateralMultiTitle(product.title) &&
-    !productIsDedicatedForTarget(product, target)
-  ) {
-    return false;
-  }
-
   const group = compileProductGroup(product, request);
   return Boolean(
     group &&
-      groupCoversTargetAtFloor(group, request, target.subjectId) &&
-      contributingVariantForTarget(group, request, target.subjectId)
-  );
-}
-
-function currentUnitsForSubject(request: CanonicalRequest, subjectId: string) {
-  return request.currentSupplements
-    .filter((item) => item.subjectId === subjectId)
-    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
-}
-
-export function variantHardBlocked(
-  group: ProductGroup,
-  variant: DoseVariant,
-  request: CanonicalRequest
-) {
-  const exposure = aggregateDailyExposure({
-    current: request.currentSupplements,
-    variants: [variant]
-  });
-
-  if (isDoseError(exposure)) {
-    return true;
-  }
-
-  const targetIds = new Set(request.targets.map((item) => item.subjectId));
-  return evaluateSafety({
-    exposure,
-    products: [group.product],
-    request,
-    variants: [variant]
-  }).findings.some(
-    (item) =>
-      item.action === "block" &&
-      (item.subjectId == null ||
-        targetIds.has(item.subjectId) ||
-        request.currentSupplements.some((row) => row.subjectId === item.subjectId))
-  );
-}
-
-export function variantIncidentalUlBlocked(
-  group: ProductGroup,
-  variant: DoseVariant,
-  request: CanonicalRequest
-) {
-  const exposure = aggregateDailyExposure({
-    current: request.currentSupplements,
-    variants: [variant]
-  });
-
-  if (isDoseError(exposure)) {
-    return true;
-  }
-
-  const targetIds = new Set(request.targets.map((item) => item.subjectId));
-  return evaluateSafety({
-    exposure,
-    products: [group.product],
-    request,
-    variants: [variant]
-  }).findings.some(
-    (item) =>
-      item.action === "block" &&
-      item.code === "dose_review_required" &&
-      item.subjectId != null &&
-      !targetIds.has(item.subjectId)
+      groupCoversTargetAtFloor(group, request, target.subjectId)
   );
 }
 
@@ -438,7 +309,7 @@ export function groupCoversTargetAtFloor(
     return false;
   }
 
-  const current = currentUnitsForSubject(request, subjectId);
+  const current = knownCurrentTargetExposure(request, target);
   const floor = COVERED_THRESHOLD * 100;
 
   for (const variant of group.variants) {
@@ -450,9 +321,6 @@ export function groupCoversTargetAtFloor(
 
     const exposure = current + contributed.units;
 
-    if (exposureExceedsCeiling(request, subjectId, exposure)) {
-      continue;
-    }
 
     if (coverageUnits(exposure, target.requested.units) >= floor) {
       return true;
@@ -460,91 +328,6 @@ export function groupCoversTargetAtFloor(
   }
 
   return false;
-}
-
-export function targetHasCoveringGroup(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  subjectId: string
-) {
-  return groups.some((group) =>
-    groupCoversTargetAtFloor(group, request, subjectId)
-  );
-}
-
-function targetHasLowCollateralCoveringGroup(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  subjectId: string
-) {
-  const target = request.targets.find((item) => item.subjectId === subjectId);
-
-  if (!target) {
-    return false;
-  }
-
-  return groups.some((group) => {
-    if (!groupCoversTargetAtFloor(group, request, subjectId)) {
-      return false;
-    }
-
-    if (
-      highCollateralMultiTitle(group.product.title) &&
-      !productIsDedicatedForTarget(group.product, target)
-    ) {
-      return false;
-    }
-
-    if (
-      !productIsDedicatedForTarget(group.product, target) &&
-      labelledTargetCount(group.product, request) > 1
-    ) {
-      return false;
-    }
-
-    return Boolean(contributingVariantForTarget(group, request, subjectId));
-  });
-}
-
-function isCarrierNoise(
-  product: MatcherProduct,
-  request: CanonicalRequest,
-  groups: readonly ProductGroup[]
-) {
-  if (
-    highCollateralMultiTitle(product.title) &&
-    !request.targets.some((target) => productIsDedicatedForTarget(product, target))
-  ) {
-    return groups.length > 0;
-  }
-
-  if (!carrierTitle(product.title)) {
-    return false;
-  }
-
-  if (
-    (request.profile.lifeStage === "pregnant" ||
-      request.profile.lifeStage === "trying_to_conceive") &&
-    /pre[-\s]?natal|conceive|pre\s*9/i.test(product.title)
-  ) {
-    return false;
-  }
-
-  if (request.targets.some((target) => productIsDedicatedForTarget(product, target))) {
-    return false;
-  }
-
-  const labelled = request.targets.filter(
-    (target) => contributionFor(product, target.name, target.subjectId).length > 0
-  );
-
-  if (labelled.length < 1) {
-    return true;
-  }
-
-  return labelled.every((target) =>
-    targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)
-  );
 }
 
 export function productIsDedicatedForTarget(
@@ -569,62 +352,6 @@ export function productIsDedicatedForTarget(
   }
 
   return titleMentions || factCount === 1;
-}
-
-function dedicatedTargetCount(product: MatcherProduct, request: CanonicalRequest) {
-  return request.targets.reduce(
-    (sum, target) => sum + (productIsDedicatedForTarget(product, target) ? 1 : 0),
-    0
-  );
-}
-
-export function labelledTargetCount(product: MatcherProduct, request: CanonicalRequest) {
-  return request.targets.reduce(
-    (sum, target) =>
-      sum +
-      (contributionFor(product, target.name, target.subjectId).length > 0 ? 1 : 0),
-    0
-  );
-}
-
-function compareDedicatedThenId(
-  left: MatcherProduct,
-  right: MatcherProduct,
-  request: CanonicalRequest
-) {
-  const dedicated =
-    dedicatedTargetCount(right, request) - dedicatedTargetCount(left, request);
-
-  if (dedicated !== 0) {
-    return dedicated;
-  }
-
-  const labelled =
-    labelledTargetCount(left, request) - labelledTargetCount(right, request);
-
-  if (labelled !== 0) {
-    return labelled;
-  }
-
-  return left.productId.localeCompare(right.productId);
-}
-
-function mappedToRequest(
-  product: MatcherProduct,
-  request: CanonicalRequest
-) {
-  return request.targets.some((target) =>
-    product.contributionSubjectIds.includes(target.subjectId)
-  );
-}
-
-function labelledForRequest(
-  product: MatcherProduct,
-  request: CanonicalRequest
-) {
-  return request.targets.some(
-    (target) => contributionFor(product, target.name, target.subjectId).length > 0
-  );
 }
 
 // Reuse compilation only inside the same immutable request. A partial token
@@ -657,16 +384,10 @@ function compileProductGroupFresh(
   }
 
   const variants: DoseVariant[] = [];
-  const maxDailyUnits =
-    highCollateralMultiTitle(product.title) &&
-    !request.targets.some((target) => productIsDedicatedForTarget(product, target))
-      ? HIGH_COLLATERAL_MULTI_MAX_DAILY_UNITS
-      : MAX_DAILY_UNITS;
-
-  for (let dailyUnits = 1; dailyUnits <= maxDailyUnits; dailyUnits += 1) {
+  for (let dailyUnits = 1; dailyUnits <= MAX_DAILY_UNITS; dailyUnits += 1) {
     if (
       request.maxDailyPills != null &&
-      product.dailyPillsPerServing * dailyUnits > request.maxDailyPills
+      variantPillBurden(product, dailyUnits) > request.maxDailyPills
     ) {
       break;
     }
@@ -679,12 +400,9 @@ function compileProductGroupFresh(
 
     variants.push(variant);
 
-    if (!variantLeavesTargetShortfall(variant, request)) {
-      break;
-    }
   }
 
-  const kept = pruneVariants(variants);
+  const kept = variants;
 
   if (kept.length < 1) {
     return null;
@@ -700,1023 +418,31 @@ function compileProductGroupFresh(
   };
 }
 
-function groupCoversTarget(group: ProductGroup, subjectId: string) {
-  return group.variants.some((variant) => variant.contributions.has(subjectId));
-}
-
-function keepCompiledContributor(
-  product: MatcherProduct,
-  group: ProductGroup,
-  request: CanonicalRequest
-) {
-  return request.targets.some((target) => {
-    if (productIsDedicatedForTarget(product, target)) {
-      return true;
-    }
-
-    if (groupCoversTargetAtFloor(group, request, target.subjectId)) {
-      return true;
-    }
-
-    if (
-      highCollateralMultiTitle(product.title) &&
-      groupCoversTarget(group, target.subjectId)
-    ) {
-      return true;
-    }
-
-    return (
-      (request.targets.length === 1 ||
-        request.profile.lifeStage === "pregnant" ||
-        request.profile.lifeStage === "trying_to_conceive") &&
-      groupCoversTarget(group, target.subjectId)
-    );
-  });
-}
-
-function convertedContributionUnits(
-  product: MatcherProduct,
-  target: CanonicalTarget
-) {
-  let total = BigInt(0);
-
-  for (const fact of contributionFor(product, target.name, target.subjectId)) {
-    if (fact.amount == null || fact.amount <= 0 || !fact.unit) {
-      continue;
-    }
-
-    let scaled = scaleAmount({
-      amount: fact.amount,
-      subjectId: target.subjectId,
-      subjectName: target.name,
-      unit: fact.unit
-    });
-
-    if (isDoseError(scaled)) {
-      scaled = scaleAmount({
-        amount: fact.amount,
-        subjectId: target.subjectId,
-        subjectName: fact.name ?? target.name,
-        unit: fact.unit
-      });
-    }
-
-    if (!isDoseError(scaled)) {
-      total += scaled.units;
-    }
-  }
-
-  return total;
-}
-
 export function compileGroups(
   request: CanonicalRequest,
   catalog: CatalogSnapshot,
-  deadlineAt?: number
+  _deadlineAt?: number
 ): ProductGroup[] {
-  const groups: ProductGroup[] = [];
-  const compiledIds = new Set<string>();
-  const products = [...catalog.products].sort((left, right) =>
-    left.productId.localeCompare(right.productId)
-  );
-  const mapped = products
-    .filter((product) => mappedToRequest(product, request))
-    .sort((left, right) => compareDedicatedThenId(left, right, request));
-  const labelled = products
-    .filter(
-      (product) =>
-        !mappedToRequest(product, request) && labelledForRequest(product, request)
-    )
-    .sort((left, right) => compareDedicatedThenId(left, right, request));
-
-  const tryCompile = (product: MatcherProduct, ignoreDeadline = false) => {
-    if (!ignoreDeadline && deadlineAt != null && Date.now() >= deadlineAt) {
-      return;
-    }
-
-    if (
-      groups.some((group) => listingId(group.product) === listingId(product)) ||
-      compiledIds.has(listingId(product))
-    ) {
-      return;
-    }
-
-    compiledIds.add(listingId(product));
-    const group = compileProductGroup(product, request);
-
-    if (group) {
-      groups.push(group);
-    }
-  };
-
-  const dedicatedMapped = mapped.filter((product) =>
-    request.targets.some((target) => productIsDedicatedForTarget(product, target))
-  );
-  const otherMapped = mapped.filter(
-    (product) => !dedicatedMapped.some((item) => item.productId === product.productId)
-  );
-
-  for (const product of dedicatedMapped) {
-    tryCompile(product, true);
-  }
-
-  for (const product of otherMapped) {
-    if (deadlineAt != null && Date.now() >= deadlineAt) {
-      break;
-    }
-
-    if (isCarrierNoise(product, request, groups)) {
-      continue;
-    }
-
-    const before = groups.length;
-    tryCompile(product, false);
-    const added = groups[groups.length - 1];
-
-    if (
-      groups.length > before &&
-      added &&
-      !keepCompiledContributor(product, added, request)
-    ) {
-      groups.pop();
-      compiledIds.delete(listingId(product));
-    }
-  }
-
-  if (request.targets.length === 1) {
-    for (const product of labelled) {
-      if (deadlineAt != null && Date.now() >= deadlineAt) {
-        break;
-      }
-
-      if (isCarrierNoise(product, request, groups)) {
-        continue;
-      }
-
-      const contributesUncovered = request.targets.some(
-        (target) =>
-          !targetHasCoveringGroup(groups, request, target.subjectId) &&
-          contributionFor(product, target.name, target.subjectId).length > 0
-      );
-
-      if (!contributesUncovered) {
-        continue;
-      }
-
-      const before = groups.length;
-      tryCompile(product);
-      const added = groups[groups.length - 1];
-
-      if (
-        groups.length > before &&
-        added &&
-        !keepCompiledContributor(product, added, request)
-      ) {
-        groups.pop();
-        compiledIds.delete(listingId(product));
-      }
-    }
-  }
-
-  for (const target of request.targets) {
-    if (remainingRequestedUnits(request, target.subjectId) <= BigInt(0)) {
-      continue;
-    }
-
-    if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
-      const covering = bestCompactCoveringGroup(groups, request, target.subjectId);
-      const oneServingCoversFloor = Boolean(
-        covering?.variants.some((variant) => {
-          if (variant.dailyUnits !== 1) {
-            return false;
-          }
-
-          const contributed = variant.contributions.get(target.subjectId);
-          if (!contributed) {
-            return false;
-          }
-
-          return (
-            coverageUnits(
-              currentUnitsForSubject(request, target.subjectId) + contributed.units,
-              target.requested.units
-            ) >= COVERED_THRESHOLD * 100
-          );
-        })
-      );
-
-      if (oneServingCoversFloor) {
-        continue;
-      }
-    }
-
-    let belowFloorAdded = 0;
-    const ranked = [...mapped, ...labelled]
-      .filter(
-        (product) =>
-          product.contributionSubjectIds.includes(target.subjectId) ||
-          contributionFor(product, target.name, target.subjectId).length > 0
-      )
-      .sort((left, right) => {
-        const dedicated =
-          Number(productIsDedicatedForTarget(right, target)) -
-          Number(productIsDedicatedForTarget(left, target));
-
-        if (dedicated !== 0) {
-          return dedicated;
-        }
-
-        const facts =
-          labelledTargetCount(left, request) - labelledTargetCount(right, request);
-
-        if (facts !== 0) {
-          return facts;
-        }
-
-        const amount = convertedContributionUnits(right, target) -
-          convertedContributionUnits(left, target);
-
-        if (amount !== BigInt(0)) {
-          return amount > BigInt(0) ? 1 : -1;
-        }
-
-        return left.productId.localeCompare(right.productId);
-      });
-    const strongest = [...ranked].sort((left, right) => {
-      const amount =
-        convertedContributionUnits(right, target) * BigInt(MAX_DAILY_UNITS) -
-        convertedContributionUnits(left, target) * BigInt(MAX_DAILY_UNITS);
-
-      if (amount !== BigInt(0)) {
-        return amount > BigInt(0) ? 1 : -1;
-      }
-
-      return left.productId.localeCompare(right.productId);
-    })[0];
-    const pool = ranked.slice(0, 8);
-
-    if (
-      strongest &&
-      !pool.some((product) => product.productId === strongest.productId)
-    ) {
-      pool.unshift(strongest);
-    }
-
-    const dedicatedCoveringExists = ranked.some(
-      (product) =>
-        productIsDedicatedForTarget(product, target) &&
-        productHitsCoverageFloor(product, request, target)
-    );
-    const jointCandidate = ranked.find(
-      (product) =>
-        jointTitle(product.title) &&
-        contributionFor(product, target.name, target.subjectId).length > 0
-    );
-
-    if (
-      jointCandidate &&
-      !dedicatedCoveringExists &&
-      !pool.some((product) => product.productId === jointCandidate.productId)
-    ) {
-      pool.unshift(jointCandidate);
-    }
-
-    for (const product of pool) {
-      if (dedicatedCoveringExists && jointTitle(product.title)) {
-        continue;
-      }
-
-      if (targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)) {
-        break;
-      }
-
-      if (groups.some((group) => listingId(group.product) === listingId(product))) {
-        continue;
-      }
-
-      if (isCarrierNoise(product, request, groups)) {
-        continue;
-      }
-
-      if (
-        !product.contributionSubjectIds.includes(target.subjectId) &&
-        contributionFor(product, target.name, target.subjectId).length < 1
-      ) {
-        continue;
-      }
-
-      const compiled = compileProductGroup(product, request);
-      compiledIds.add(listingId(product));
-
-      if (
-        !compiled ||
-        !groupCoversTarget(compiled, target.subjectId) ||
-        !contributingVariantForTarget(compiled, request, target.subjectId)
-      ) {
-        continue;
-      }
-
-      const coversFloor = groupCoversTargetAtFloor(
-        compiled,
-        request,
-        target.subjectId
-      );
-      const facts = labelledTargetCount(product, request);
-      const hasLowCollateralContributor = groups.some(
-        (group) =>
-          groupCoversTarget(group, target.subjectId) &&
-          labelledTargetCount(group.product, request) <= 1
-      );
-      const keepBelowFloor =
-        request.targets.length === 1 ||
-        request.profile.lifeStage === "pregnant" ||
-        request.profile.lifeStage === "trying_to_conceive" ||
-        (facts <= 1 &&
-          belowFloorAdded < SALVAGE_BELOW_FLOOR_PER_TARGET) ||
-        (facts > 1 &&
-          belowFloorAdded < 1 &&
-          !hasLowCollateralContributor);
-
-      const servingUnits = (group: ProductGroup, dailyUnits: number | "best") => {
-        if (dailyUnits === "best") {
-          return group.variants.reduce((best, variant) => {
-            const units = variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
-            return units > best ? units : best;
-          }, BigInt(0));
-        }
-
-        return (
-          group.variants.find((variant) => variant.dailyUnits === dailyUnits)?.contributions.get(
-            target.subjectId
-          )?.units ?? BigInt(0)
-        );
-      };
-      const labelledUnits = groups.reduce((best, group) => {
-        if (labelledTargetCount(group.product, request) > 1) {
-          return best;
-        }
-
-        const units = servingUnits(group, "best");
-        return units > best ? units : best;
-      }, BigInt(0));
-      const jointClosesFloor =
-        jointTitle(product.title) &&
-        labelledUnits > BigInt(0) &&
-        coverageUnits(
-          currentUnitsForSubject(request, target.subjectId) +
-            labelledUnits +
-            servingUnits(compiled, "best"),
-          target.requested.units
-        ) >= COVERED_THRESHOLD * 100;
-
-      if (!coversFloor && !keepBelowFloor && !jointClosesFloor) {
-        continue;
-      }
-
-      if (
-        !coversFloor &&
-        jointTitle(product.title) &&
-        labelledUnits > BigInt(0) &&
-        !jointClosesFloor
-      ) {
-        continue;
-      }
-
-      if (
-        !coversFloor &&
-        highCollateralMultiTitle(product.title) &&
-        !productIsDedicatedForTarget(product, target) &&
-        targetHasLowCollateralCoveringGroup(groups, request, target.subjectId)
-      ) {
-        continue;
-      }
-
-      compiledIds.add(listingId(product));
-      groups.push(compiled);
-
-      if (!coversFloor) {
-        belowFloorAdded += 1;
-      }
-    }
-  }
-
-  return groups;
-}
-
-function currentUnitsFor(request: CanonicalRequest, subjectId: string) {
-  return request.currentSupplements
-    .filter((item) => item.subjectId === subjectId)
-    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
-}
-
-function usedContributorUnits(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  subjectId: string,
-  used?: ReadonlySet<string>
-) {
-  if (!used || used.size < 1) {
-    return BigInt(0);
-  }
-
-  let total = BigInt(0);
-
-  for (const productId of used) {
-    const group = groups.find((item) => item.productId === productId);
-
-    if (!group) {
-      continue;
-    }
-
-    const variant = contributingVariantForTarget(group, request, subjectId);
-    total += variant?.contributions.get(subjectId)?.units ?? BigInt(0);
-  }
-
-  return total;
-}
-
-function variantRankForTarget(
-  group: ProductGroup,
-  variant: DoseVariant,
-  target: CanonicalTarget,
-  request: CanonicalRequest
-) {
-  const contributed = variant.contributions.get(target.subjectId);
-
-  if (!contributed || contributed.units <= BigInt(0)) {
-    return null;
-  }
-
-  const exposure = currentUnitsFor(request, target.subjectId) + contributed.units;
-
-  if (exposureExceedsCeiling(request, target.subjectId, exposure)) {
-    return null;
-  }
-
-  return {
-    coverage: coverageUnits(exposure, target.requested.units),
-    dedicated: productIsDedicatedForTarget(group.product, target) ? 1 : 0,
-    labelledTargets: labelledTargetCount(group.product, request),
-    pills: variant.dailyPills,
-    price: group.product.unitPriceMinor * variant.dailyUnits,
-    productId: group.productId
-  };
-}
-
-export function coveringVariantForTarget(
-  group: ProductGroup,
-  request: CanonicalRequest,
-  subjectId: string
-) {
-  const target = request.targets.find((item) => item.subjectId === subjectId);
-
-  if (!target || target.requested.units <= BigInt(0)) {
-    return null;
-  }
-
-  const current = currentUnitsFor(request, subjectId);
-  const floor = COVERED_THRESHOLD * 100;
-  let best: DoseVariant | null = null;
-
-  for (const variant of group.variants) {
-    const contributed = variant.contributions.get(subjectId);
-
-    if (!contributed || contributed.units <= BigInt(0)) {
-      continue;
-    }
-
-    const exposure = current + contributed.units;
-
-    if (exposureExceedsCeiling(request, subjectId, exposure)) {
-      continue;
-    }
-
-    if (variantHardBlocked(group, variant, request)) {
-      continue;
-    }
-
-    if (variantDedicatedOvershoot(request, variant.contributions, variant.dailyUnits)) {
-      continue;
-    }
-
-    if (coverageUnits(exposure, target.requested.units) < floor) {
-      continue;
-    }
-
-    if (
-      !best ||
-      variant.dailyPills < best.dailyPills ||
-      (variant.dailyPills === best.dailyPills &&
-        variant.dailyUnits < best.dailyUnits)
-    ) {
-      best = variant;
-    }
-  }
-
-  return best;
-}
-
-export function contributingVariantForTarget(
-  group: ProductGroup,
-  request: CanonicalRequest,
-  subjectId: string
-) {
-  const target = request.targets.find((item) => item.subjectId === subjectId);
-
-  if (!target || target.requested.units <= BigInt(0)) {
-    return null;
-  }
-
-  const current = currentUnitsFor(request, subjectId);
-  let best: DoseVariant | null = null;
-  let bestCoverage = -1;
-
-  for (const variant of group.variants) {
-    const contributed = variant.contributions.get(subjectId);
-
-    if (!contributed || contributed.units <= BigInt(0)) {
-      continue;
-    }
-
-    const exposure = current + contributed.units;
-
-    if (exposureExceedsCeiling(request, subjectId, exposure)) {
-      continue;
-    }
-
-    if (variantHardBlocked(group, variant, request)) {
-      continue;
-    }
-
-    if (variantDedicatedOvershoot(request, variant.contributions, variant.dailyUnits)) {
-      continue;
-    }
-
-    const coverage = coverageUnits(exposure, target.requested.units);
-
-    if (
-      !best ||
-      coverage > bestCoverage ||
-      (coverage === bestCoverage && variant.dailyPills < best.dailyPills) ||
-      (coverage === bestCoverage &&
-        variant.dailyPills === best.dailyPills &&
-        variant.dailyUnits < best.dailyUnits)
-    ) {
-      best = variant;
-      bestCoverage = coverage;
-    }
-  }
-
-  return best;
-}
-
-export function bestStandaloneContributorGroup(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  subjectId: string,
-  used?: ReadonlySet<string>
-): ProductGroup | null {
-  const target = request.targets.find((item) => item.subjectId === subjectId);
-
-  if (!target) {
-    return null;
-  }
-
-  let best: ProductGroup | null = null;
-  let bestRank: {
-    coverage: number;
-    dedicated: number;
-    extraCovered: number;
-    facts: number;
-    pills: number;
-    price: number;
-    productId: string;
-  } | null = null;
-  const alreadyHasContributor = Boolean(
-    used &&
-      [...used].some((productId) => {
-        const group = groups.find((item) => item.productId === productId);
-        return Boolean(
-          group && contributingVariantForTarget(group, request, subjectId)
-        );
-      })
-  );
-
-  for (const group of groups) {
-    if (used?.has(group.productId)) {
-      continue;
-    }
-
-    if (
-      highCollateralMultiTitle(group.product.title) &&
-      !productIsDedicatedForTarget(group.product, target)
-    ) {
-      continue;
-    }
-
-    if (
-      request.targets.length > 1 &&
-      jointTitle(group.product.title) &&
-      !productIsDedicatedForTarget(group.product, target) &&
-      used &&
-      used.size > 0 &&
-      [...used].some((productId) => {
-        const other = groups.find((item) => item.productId === productId);
-
-        return Boolean(
-          other &&
-            other.productId !== group.productId &&
-            !jointTitle(other.product.title) &&
-            !highCollateralMultiTitle(other.product.title) &&
-            labelledTargetCount(other.product, request) <= 1 &&
-            groupCoversTargetAtFloor(other, request, subjectId)
-        );
-      })
-    ) {
-      continue;
-    }
-
-    const variant = contributingVariantForTarget(group, request, subjectId);
-
-    if (!variant) {
-      continue;
-    }
-
-    const facts = labelledTargetCount(group.product, request);
-
-    if (alreadyHasContributor && facts > 1) {
-      const extra = variant.contributions.get(subjectId)?.units ?? BigInt(0);
-      const combined =
-        currentUnitsFor(request, subjectId) +
-        usedContributorUnits(groups, request, subjectId, used) +
-        extra;
-
-      if (
-        coverageUnits(combined, target.requested.units) <
-        COVERED_THRESHOLD * 100
-      ) {
-        continue;
-      }
-    }
-
-    const contributed = variant.contributions.get(subjectId);
-    const exposure =
-      currentUnitsFor(request, subjectId) + (contributed?.units ?? BigInt(0));
-    const extraCovered = request.targets.filter(
-      (item) =>
-        item.subjectId !== subjectId &&
-        contributionFor(group.product, item.name, item.subjectId).length > 0
-    ).length;
-    const rank = {
-      coverage: coverageUnits(exposure, target.requested.units),
-      dedicated: productIsDedicatedForTarget(group.product, target) ? 1 : 0,
-      extraCovered,
-      facts,
-      pills: variant.dailyPills,
-      price: group.product.unitPriceMinor * variant.dailyUnits,
-      productId: group.productId
-    };
-
-    if (
-      !bestRank ||
-      rank.dedicated > bestRank.dedicated ||
-      (rank.dedicated === bestRank.dedicated && rank.facts < bestRank.facts) ||
-      (rank.dedicated === bestRank.dedicated &&
-        rank.facts === bestRank.facts &&
-        rank.extraCovered < bestRank.extraCovered) ||
-      (rank.dedicated === bestRank.dedicated &&
-        rank.facts === bestRank.facts &&
-        rank.extraCovered === bestRank.extraCovered &&
-        rank.coverage > bestRank.coverage) ||
-      (rank.dedicated === bestRank.dedicated &&
-        rank.facts === bestRank.facts &&
-        rank.extraCovered === bestRank.extraCovered &&
-        rank.coverage === bestRank.coverage &&
-        rank.pills < bestRank.pills) ||
-      (rank.dedicated === bestRank.dedicated &&
-        rank.facts === bestRank.facts &&
-        rank.extraCovered === bestRank.extraCovered &&
-        rank.coverage === bestRank.coverage &&
-        rank.pills === bestRank.pills &&
-        rank.price < bestRank.price) ||
-      (rank.dedicated === bestRank.dedicated &&
-        rank.facts === bestRank.facts &&
-        rank.extraCovered === bestRank.extraCovered &&
-        rank.coverage === bestRank.coverage &&
-        rank.pills === bestRank.pills &&
-        rank.price === bestRank.price &&
-        rank.productId < bestRank.productId)
-    ) {
-      best = group;
-      bestRank = rank;
-    }
-  }
-
-  return best;
-}
-
-export function compactMultiCoveringGroups(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest
-) {
-  return [...groups]
-    .filter((group) => floorCoverCount(group, request) >= 2)
-    .sort((left, right) => {
-      const floors =
-        floorCoverCount(right, request) - floorCoverCount(left, request);
-
-      if (floors !== 0) {
-        return floors;
-      }
-
-      const pills = minVariantPills(left) - minVariantPills(right);
-
-      if (pills !== 0) {
-        return pills;
-      }
-
-      return left.productId.localeCompare(right.productId);
-    });
-}
-
-export function coveringVariantForMostFloors(
-  group: ProductGroup,
-  request: CanonicalRequest
-) {
-  const floor = COVERED_THRESHOLD * 100;
-  let best: DoseVariant | null = null;
-  let bestFloors = 0;
-
-  for (const variant of group.variants) {
-    if (variantHardBlocked(group, variant, request)) {
-      continue;
-    }
-
-    if (variantDedicatedOvershoot(request, variant.contributions, variant.dailyUnits)) {
-      continue;
-    }
-
-    let floors = 0;
-    let blocked = false;
-
-    for (const target of request.targets) {
-      const units = variant.contributions.get(target.subjectId)?.units ?? BigInt(0);
-
-      if (units <= BigInt(0)) {
-        continue;
-      }
-
-      const exposure =
-        currentUnitsFor(request, target.subjectId) + units;
-
-      if (exposureExceedsCeiling(request, target.subjectId, exposure)) {
-        blocked = true;
-        break;
-      }
-
-      if (coverageUnits(exposure, target.requested.units) >= floor) {
-        floors += 1;
-      }
-    }
-
-    if (blocked || floors < 2) {
-      continue;
-    }
-
-    if (
-      !best ||
-      floors > bestFloors ||
-      (floors === bestFloors && variant.dailyPills < best.dailyPills)
-    ) {
-      best = variant;
-      bestFloors = floors;
-    }
-  }
-
-  return best;
-}
-
-export function bestCompactCoveringGroup(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  subjectId: string
-): ProductGroup | null {
-  const target = request.targets.find((item) => item.subjectId === subjectId);
-
-  if (!target) {
-    return null;
-  }
-
-  let best: ProductGroup | null = null;
-  let bestRank: {
-    dedicated: number;
-    facts: number;
-    pills: number;
-    price: number;
-    productId: string;
-  } | null = null;
-
-  for (const group of groups) {
-    const variant = coveringVariantForTarget(group, request, subjectId);
-
-    if (!variant) {
-      continue;
-    }
-
-    const rank = {
-      dedicated: productIsDedicatedForTarget(group.product, target) ? 1 : 0,
-      facts: labelledTargetCount(group.product, request),
-      pills: variant.dailyPills,
-      price: group.product.unitPriceMinor * variant.dailyUnits,
-      productId: group.productId
-    };
-
-    if (
-      !bestRank ||
-      rank.dedicated > bestRank.dedicated ||
-      (rank.dedicated === bestRank.dedicated && rank.facts < bestRank.facts) ||
-      (rank.dedicated === bestRank.dedicated &&
-        rank.facts === bestRank.facts &&
-        rank.pills < bestRank.pills) ||
-      (rank.dedicated === bestRank.dedicated &&
-        rank.facts === bestRank.facts &&
-        rank.pills === bestRank.pills &&
-        rank.price < bestRank.price) ||
-      (rank.dedicated === bestRank.dedicated &&
-        rank.facts === bestRank.facts &&
-        rank.pills === bestRank.pills &&
-        rank.price === bestRank.price &&
-        rank.productId < bestRank.productId)
-    ) {
-      best = group;
-      bestRank = rank;
-    }
-  }
-
-  return best;
-}
-
-export function bestGroupForTarget(
-  groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  subjectId: string
-): ProductGroup | null {
-  const target = request.targets.find((item) => item.subjectId === subjectId);
-
-  if (!target || remainingRequestedUnits(request, subjectId) <= BigInt(0)) {
-    return null;
-  }
-
-  let best: ProductGroup | null = null;
-  let bestRank: ReturnType<typeof variantRankForTarget> = null;
-
-  for (const group of groups) {
-    for (const variant of group.variants) {
-      const rank = variantRankForTarget(group, variant, target, request);
-
-      if (!rank) {
-        continue;
-      }
-
-      if (
-        !bestRank ||
-        rank.coverage > bestRank.coverage ||
-        (rank.coverage === bestRank.coverage &&
-          rank.labelledTargets > bestRank.labelledTargets) ||
-        (rank.coverage === bestRank.coverage &&
-          rank.labelledTargets === bestRank.labelledTargets &&
-          rank.dedicated > bestRank.dedicated) ||
-        (rank.coverage === bestRank.coverage &&
-          rank.labelledTargets === bestRank.labelledTargets &&
-          rank.dedicated === bestRank.dedicated &&
-          rank.pills < bestRank.pills) ||
-        (rank.coverage === bestRank.coverage &&
-          rank.labelledTargets === bestRank.labelledTargets &&
-          rank.dedicated === bestRank.dedicated &&
-          rank.pills === bestRank.pills &&
-          rank.price < bestRank.price) ||
-        (rank.coverage === bestRank.coverage &&
-          rank.labelledTargets === bestRank.labelledTargets &&
-          rank.dedicated === bestRank.dedicated &&
-          rank.pills === bestRank.pills &&
-          rank.price === bestRank.price &&
-          rank.productId < bestRank.productId)
-      ) {
-        best = group;
-        bestRank = rank;
-      }
-    }
-  }
-
-  return best;
-}
-
-function floorCoverCount(group: ProductGroup, request: CanonicalRequest) {
-  return request.targets.filter((target) =>
-    groupCoversTargetAtFloor(group, request, target.subjectId)
-  ).length;
-}
-
-function minVariantPills(group: ProductGroup) {
-  return group.variants.reduce(
-    (min, variant) => Math.min(min, variant.dailyPills),
-    Number.POSITIVE_INFINITY
-  );
-}
-
-function seedPriorityGroups(
-  groups: ProductGroup[],
-  request: CanonicalRequest,
-  _sellerGroupLimit: number
-) {
-  const ranked = orderByScarcity(groups, request);
-  const priority: ProductGroup[] = [];
+  void _deadlineAt;
+  // Compilation is deterministic. Health advice and weak contribution are not
+  // reasons to discard an otherwise valid option before dose-fit comparison.
   const seen = new Set<string>();
-
-  const compactMultis = [...ranked]
-    .filter((group) => floorCoverCount(group, request) >= 2)
-    .sort((left, right) => {
-      const floors =
-        floorCoverCount(right, request) - floorCoverCount(left, request);
-
-      if (floors !== 0) {
-        return floors;
-      }
-
-      const pills = minVariantPills(left) - minVariantPills(right);
-
-      if (pills !== 0) {
-        return pills;
-      }
-
-      return left.productId.localeCompare(right.productId);
+  return [...catalog.products]
+    .sort((a, b) => listingId(a).localeCompare(listingId(b)))
+    .flatMap((product) => {
+      const id = listingId(product);
+      if (seen.has(id)) return [];
+      seen.add(id);
+      const group = compileProductGroup(product, request);
+      return group ? [group] : [];
     });
+}
 
-  for (const group of compactMultis) {
-    if (seen.has(group.productId)) {
-      continue;
-    }
-
-    seen.add(group.productId);
-    priority.push(group);
-  }
-
-  for (const target of request.targets) {
-    const group = bestCompactCoveringGroup(ranked, request, target.subjectId);
-
-    if (!group || seen.has(group.productId)) {
-      continue;
-    }
-
-    seen.add(group.productId);
-    priority.push(group);
-  }
-
-  for (const target of request.targets) {
-    if (targetHasCoveringGroup(priority, request, target.subjectId)) {
-      continue;
-    }
-
-    const group = bestGroupForTarget(ranked, request, target.subjectId);
-
-    if (!group || seen.has(group.productId)) {
-      continue;
-    }
-
-    seen.add(group.productId);
-    priority.push(group);
-  }
-
-  for (const target of request.targets) {
-    const group = bestStandaloneContributorGroup(
-      ranked,
-      request,
-      target.subjectId,
-      seen
-    );
-
-    if (!group || seen.has(group.productId)) {
-      continue;
-    }
-
-    seen.add(group.productId);
-    priority.push(group);
-  }
-
-  const rest = ranked.filter((item) => !seen.has(item.productId));
-  const covering = request.targets.every(
-    (target) =>
-      remainingRequestedUnits(request, target.subjectId) <= BigInt(0) ||
-      Boolean(bestCompactCoveringGroup(priority, request, target.subjectId))
-  );
-
-  if (covering) {
-    return priority;
-  }
-
-  const limit = Math.max(priority.length + 4, 8);
-
-  return [...priority, ...rest].slice(0, limit);
+function seedPriorityGroups(groups: ProductGroup[], request: CanonicalRequest, sellerGroupLimit: number) {
+  // The expansion budget bounds work. All catalogue groups stay eligible; an
+  // early coverage-floor hit cannot hide a less excessive combination.
+  void sellerGroupLimit;
+  return orderByScarcity(groups, request);
 }
 
 function orderByScarcity(groups: ProductGroup[], request: CanonicalRequest) {
@@ -1732,6 +458,8 @@ function orderByScarcity(groups: ProductGroup[], request: CanonicalRequest) {
   }
 
   return [...groups].sort((left, right) => {
+    const retained = Number(request.retainProductIds.includes(right.productId)) - Number(request.retainProductIds.includes(left.productId));
+    if (retained !== 0) return retained;
     const leftRare = Math.min(
       ...request.targets.map((target) =>
         left.variants.some((variant) => variant.contributions.has(target.subjectId))

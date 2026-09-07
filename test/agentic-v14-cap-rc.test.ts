@@ -9,8 +9,6 @@ import {
   setCatalogueInitEnteredForTests,
   setCatalogueInitGateForTests
 } from "../lib/agentic/catalogue/snapshot.ts";
-import { catalogueSnapshotId } from "../lib/agentic/catalogue/freeze.ts";
-import { getCatalogueSnapshot } from "../lib/agentic/catalogue/snapshot.ts";
 import {
   cancelRequest,
   onRequestStageEntered,
@@ -24,6 +22,7 @@ import {
 import { eightTargetRequest } from "../lib/agentic/plan/warm-dev.ts";
 import { goldenPlanRequest } from "../lib/agentic/qa/proofs.ts";
 import {
+  asRecord,
   beginV14Run,
   canonicalHash,
   canonicalJson,
@@ -167,7 +166,15 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
     cluster.setReady("B", true);
     const b = await cluster.asHandler("B", (runtime) => qaCall(runtime, "beginRun", { runId: "coldB" }));
     assert.equal(b.ok, true);
-    assert.equal(catalogueSnapshotId(getCatalogueSnapshot()), catalogueSnapshotId(getCatalogueSnapshot()));
+    // Compare the frozen catalogue actually returned to each worker. An unscoped
+    // getCatalogueSnapshot() call observes neither worker's namespace.
+    const manifests = [a, c, b].map(result => asRecord(asRecord(result.preflight).manifest));
+    assert.match(String(manifests[0]?.catalogueChecksum), /^snap_[a-f0-9]{16}$/);
+    assert.doesNotMatch(String(manifests[0]?.catalogueVersion), /(?:loading|unavailable)$/);
+    assert.deepEqual(manifests[1], manifests[0]);
+    assert.deepEqual(manifests[2], manifests[0]);
+    assert.equal(new Set([a.namespace, c.namespace, b.namespace]).size, 3);
+    assert.equal(enteredCount, 1, "the recovered worker reuses the published catalogue");
   });
 
   it("CAP-RC-RED-04 cancel at admission, dependency and response writing", async () => {

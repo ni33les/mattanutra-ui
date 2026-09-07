@@ -270,15 +270,18 @@ describe("matcher phase 2 oversupply, source, and ontology", () => {
     assert.equal(publicCoveragePercent(result.selected), 50);
   });
 
-  it("M-01 fewest_pills selects G-BASE-COMBO + G-O3-FISH-1000", () => {
+  it("M-01 fewest_pills selects G-BASE-COMBO + G-O3-ALGAE-500", () => {
     const result = match(request({ optimization: "fewest_pills" }), catalog());
     assert.ok(result.selected);
-    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-FISH-1000"]);
+    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
     assert.equal(result.selected?.productCount, 2);
     assert.equal(result.selected?.dailyPills, 4);
     assert.equal(publicCoveragePercent(result.selected), 100);
     assert.equal(result.selected?.productIds.includes("G-HIGH-TRAP"), false);
     assert.equal(result.selected?.incidentalCount, 0);
+    assert.equal(result.selected?.priceMinor, 61000);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 5);
   });
 
   it("M-02 lowest_cost does not select G-HIGH-TRAP", () => {
@@ -288,7 +291,7 @@ describe("matcher phase 2 oversupply, source, and ontology", () => {
     assert.equal(publicCoveragePercent(result.selected) >= 90, true);
   });
 
-  it("M-20 prefers G-C-500 over incidental collagen+C", () => {
+  it("M-20 lowest cost uses two servings of the cheaper measured C pack", () => {
     const result = match(
       request({
         optimization: "lowest_cost",
@@ -297,8 +300,12 @@ describe("matcher phase 2 oversupply, source, and ontology", () => {
       catalog([G_C_500, G_INCIDENTAL_C])
     );
     assert.ok(result.selected);
-    assert.deepEqual(result.selected?.productIds, ["G-C-500"]);
-    assert.equal(result.selected?.productIds.includes("G-INCIDENTAL-C"), false);
+    assert.deepEqual(result.selected?.productIds, ["G-INCIDENTAL-C"]);
+    assert.equal(result.selected?.productIds.includes("G-C-500"), false);
+    assert.equal(result.selected?.priceMinor, 7000);
+    assert.equal(result.selected?.dailyPills, 2);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(publicCoveragePercent(result.selected), 100);
   });
 
   it("fewest_pills ranks 4-pill combo ahead of an 8-SKU pile at the same coverage", () => {

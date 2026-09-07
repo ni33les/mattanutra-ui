@@ -5,7 +5,7 @@ import {
   nextTestUuid,
   type CapabilityScope
 } from "../../lib/agentic/capabilities.ts";
-import { loadAgenticConfig, type AgenticConfig } from "../../lib/agentic/config.ts";
+import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig, type AgenticConfig } from "../../lib/agentic/config.ts";
 import { FIXTURE_PRODUCTS } from "../../lib/agentic/catalogue/fixtures.ts";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "../../lib/agentic/catalogue/market.ts";
 import { resetExecuteLockState } from "../../lib/agentic/commerce/execute.ts";
@@ -331,6 +331,7 @@ function planResult(input: Readonly<{
 }>): PlanResult {
   const selectedOptionId = input.selected?.optionId ?? null;
   return {
+    contractVersion: AGENTIC_CONTRACT_VERSION,
     alternatives: input.alternatives ?? [],
     appliedRequirements: [],
     assumptions: [],

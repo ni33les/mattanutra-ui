@@ -311,12 +311,11 @@ export async function packProof(runtime: AgenticRuntime) {
     payload: {
       idempotencyKey: `qa-pack-block-${stamp}`,
       request: {
-        conditionCodes: ["ckd"],
         destinationCountry: "TH",
         locale: "en",
         optimization: "balanced",
         profile: { ageYears: 60, lifeStage: "adult", sex: "male" },
-        requirements: {},
+        requirements: { maxPriceMinor: 1 },
         targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       }
     },

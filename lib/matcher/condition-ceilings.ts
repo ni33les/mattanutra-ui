@@ -1,5 +1,3 @@
-import type { SafetyCeiling } from "@/lib/matcher/types";
-
 const CKD_CODES = new Set(["ckd", "chronic_kidney_disease"]);
 const MAGNESIUM = /magnesium|\bmag\b|^sup_mag$/i;
 
@@ -19,21 +17,4 @@ export function subjectIsMagnesium(input: Readonly<{ name?: string; subjectId: s
     MAGNESIUM.test(input.subjectId) ||
     MAGNESIUM.test(input.name ?? "")
   );
-}
-
-export function conditionCeilingFor(
-  conditionCodes: readonly string[] | null | undefined,
-  input: Readonly<{ name?: string; subjectId: string }>
-): SafetyCeiling | null {
-  if (!conditionImpliesCkd(conditionCodes) || !subjectIsMagnesium(input)) {
-    return null;
-  }
-
-  return {
-    maxAmount: 0,
-    maxUnit: "mg",
-    name: "Magnesium",
-    sourceScope: "supplemental",
-    subjectId: input.subjectId
-  };
 }

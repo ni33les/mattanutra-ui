@@ -2,7 +2,7 @@ import { withRequestLifetime } from "@/lib/request-lifetime";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { requestCorrelationId } from "@/lib/request-correlation";
-import { loadAgenticConfig } from "@/lib/agentic/config";
+import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "@/lib/agentic/config";
 import { agenticServerInstructions } from "@/lib/agentic/contract";
 import {
   canonicalPublicToolName,
@@ -249,7 +249,7 @@ export async function GET(request: Request) {
 
   const config = loadAgenticConfig(request);
   return mcpReply(request, {
-    contractVersion: "3.0.0",
+    contractVersion: AGENTIC_CONTRACT_VERSION,
     instructions: agenticServerInstructions(config.environment),
     tools: toolList(config.environment),
     transport: "streamable-http"

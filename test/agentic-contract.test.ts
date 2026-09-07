@@ -25,7 +25,7 @@ function rpcResult(response: JsonRpcResponse | null) {
   return response.result;
 }
 
-describe("agentic MCP contract 3.0.0", () => {
+describe("agentic MCP contract 4.0.0", () => {
   it("exposes the public tools including evidence", () => {
     assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], [
       "info",
@@ -43,7 +43,8 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.match(JSON.stringify(PLAN_INPUT_SCHEMA), /"sex"/);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes('"oneOf"'), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes('"$defs"'), false);
-    assert.equal(JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan).includes('"oneOf"'), true);
+    assert.equal(JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan).includes('"anyOf"'), true);
+    assert.deepEqual(AGENTIC_INPUT_SCHEMAS.plan, AGENTIC_TOOL_SCHEMAS.plan);
     assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 7);
     const planRequest = JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan);
     assert.match(planRequest, /info\.medicationCodes/);
@@ -54,7 +55,7 @@ describe("agentic MCP contract 3.0.0", () => {
 
   it("keeps the checked-in contract snapshot in sync", () => {
     const snapshot = JSON.parse(
-      readFileSync(new URL("../contract/mcp/3.0.0/tools.json", import.meta.url), "utf8")
+      readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
     ) as {
       instructions?: string;
       tools: Array<{ description: string; inputSchema: unknown; name: string }>;
@@ -69,7 +70,7 @@ describe("agentic MCP contract 3.0.0", () => {
     for (const tool of snapshot.tools) {
       assert.deepEqual(
         tool.inputSchema,
-        AGENTIC_TOOL_SCHEMAS[tool.name as keyof typeof AGENTIC_TOOL_SCHEMAS]
+        JSON.parse(JSON.stringify(AGENTIC_TOOL_SCHEMAS[tool.name as keyof typeof AGENTIC_TOOL_SCHEMAS]))
       );
       assert.equal(
         tool.description,
@@ -98,7 +99,7 @@ describe("agentic MCP contract 3.0.0", () => {
     assert.equal(/dev-mcp-qa-token/.test(String(result.instructions)), false);
     assert.equal(
       (result.serverInfo as { version: string }).version,
-      "3.0.0"
+      "4.0.0"
     );
     assert.equal((result.serverInfo as { name: string }).name, "mattanutra_dev");
   });
@@ -197,7 +198,7 @@ describe("agentic MCP contract 3.0.0", () => {
     }
   });
 
-  it("tools/list advertises shallow commercial envelopes", async () => {
+  it("tools/list advertises complete operation contracts", async () => {
     const runtime = createAgenticRuntime();
     const response = await handleJsonRpc(runtime, {
       id: 2,

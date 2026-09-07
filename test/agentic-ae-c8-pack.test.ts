@@ -53,7 +53,6 @@ const OPT_FOCUS = "opt_ae_focus";
 const OPT_MULTI = "opt_ae_multi";
 const OPT_BROAD = "opt_ae_broad";
 const OPT_SHAPE = "opt_ae_shape";
-const KEY = "ax8-valid-key-01xx";
 const SUP_BY_NAME: Record<string, string> = {
   Iron: SUP_IRON,
   Manganese: SUP_MN,
@@ -1258,6 +1257,7 @@ if (process.env.NODE_TEST_CONTEXT) {
     it("exports 7 cases and a canonical report", async () => {
       const report = await runAeC8Pack();
       assert.equal(report.totalCases, 7);
+      assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 7);
       assert.deepEqual(
         report.cases.map((item) => item.id),

@@ -224,12 +224,12 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
     assert.deepEqual(result.selected?.productIds, ["G-D3-2000"]);
   });
 
-  it("records ul_exceeded for G-HIGH-TRAP", () => {
+  it("keeps high-dose products eligible and ranks their dose penalty", () => {
     const result = match(
       request({ safetyCeilings: qaCatalogSafetyCeilings() }),
       catalog([G_D3_2000, G_HIGH_TRAP])
     );
-    assert.deepEqual(reasonsFor("G-HIGH-TRAP", result), ["ul_exceeded"]);
+    assert.deepEqual(reasonsFor("G-HIGH-TRAP", result), []);
     assert.equal(result.selected?.productIds.includes("G-HIGH-TRAP"), false);
   });
 
@@ -283,7 +283,7 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
       catalog([G_D3_2000])
     );
     assert.deepEqual(reasonsFor("G-D3-2000", result), ["budget"]);
-    assert.equal(result.selected, null);
+    assert.deepEqual(result.selected?.productIds, []);
   });
 
   it("records max_pills when one serving exceeds maxDailyPills", () => {

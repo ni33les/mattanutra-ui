@@ -1,466 +1,92 @@
-import {
-  businessError,
-  type AgenticErrorResult
-} from "@/lib/agentic/contract/errors";
-import type { JsonSchema } from "@/lib/agentic/contract/schemas";
+import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
+import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
+import { PLAN_OPERATION_SCHEMAS, type JsonSchema } from "@/lib/agentic/contract/schemas";
 
 export type SchemaIssue = Readonly<{
   fieldPath: string;
   message: string;
-  reasonCode:
-    | "required"
-    | "unexpected_property"
-    | "positive_number_required"
-    | "unsupported_unit"
-    | "duplicate_supplement"
-    | "legacy_id"
-    | "too_short";
+  reasonCode: "required" | "unexpected_property" | "positive_number_required" | "unsupported_unit" | "duplicate_supplement" | "legacy_id" | "too_short" | "too_long" | "too_many_items" | "too_few_items" | "invalid_type" | "invalid_enum" | "out_of_range" | "invalid_pattern";
+  permittedLimit?: number | string | readonly unknown[];
+  actual?: number | string;
 }>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+const ajv = new Ajv({ allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true, coerceTypes: false, useDefaults: false, removeAdditional: false, validateFormats: false });
+const validators = new WeakMap<object, ValidateFunction>();
+function validator(schema: JsonSchema) {
+  let compiled = validators.get(schema);
+  if (!compiled) { compiled = ajv.compile(schema); validators.set(schema, compiled); }
+  return compiled;
 }
-
-function schemaType(schema: JsonSchema) {
-  return typeof schema.type === "string" ? schema.type : null;
+function record(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
+function pointerValue(value: unknown, pointer: string) {
+  for (const part of pointer.split("/").slice(1)) {
+    if (!value || typeof value !== "object") return undefined;
+    value = (value as Record<string, unknown>)[part.replace(/~1/g, "/").replace(/~0/g, "~")];
+  }
+  return value;
 }
-
-function resolveRef(
-  root: JsonSchema,
-  schema: JsonSchema
-): JsonSchema {
-  const ref = schema.$ref;
-
-  if (typeof ref !== "string" || !ref.startsWith("#/")) {
-    return schema;
-  }
-
-  const parts = ref.slice(2).split("/");
-  let current: unknown = root;
-
-  for (const part of parts) {
-    if (!isRecord(current) || !(part in current)) {
-      return schema;
-    }
-
-    current = current[part];
-  }
-
-  return isRecord(current) ? (current as JsonSchema) : schema;
+function fieldPath(pointer: string, extra?: string) {
+  const parts = pointer.split("/").slice(1).map(part => part.replace(/~1/g, "/").replace(/~0/g, "~"));
+  if (extra) parts.push(extra);
+  return parts.map((part, i) => /^\d+$/.test(part) ? `[${part}]` : `${i ? "." : ""}${part}`).join("") || "request";
 }
-
-function joinPath(base: string, key: string) {
-  if (!base) {
-    return key.startsWith("[") ? `request${key}` : key;
+function issueFrom(error: ErrorObject, data: unknown): SchemaIssue {
+  const value = pointerValue(data, error.instancePath);
+  const path = fieldPath(error.instancePath, error.keyword === "required" ? error.params.missingProperty : error.keyword === "additionalProperties" ? error.params.additionalProperty : undefined);
+  const base = { fieldPath: path };
+  switch (error.keyword) {
+    case "required": return { ...base, reasonCode: "required", message: `${path} is required.` };
+    case "additionalProperties": return { ...base, reasonCode: "unexpected_property", message: `${path} is not a supported field.` };
+    case "maxLength": return { ...base, reasonCode: "too_long", message: `${path} must contain at most ${error.params.limit} characters.`, permittedLimit: error.params.limit, actual: typeof value === "string" ? [...value].length : undefined };
+    case "minLength": return { ...base, reasonCode: "too_short", message: `${path} must contain at least ${error.params.limit} characters.`, permittedLimit: error.params.limit, actual: typeof value === "string" ? [...value].length : undefined };
+    case "maxItems": case "minItems": return { ...base, reasonCode: error.keyword === "maxItems" ? "too_many_items" : "too_few_items", message: `${path} must contain ${error.keyword === "maxItems" ? "at most" : "at least"} ${error.params.limit} items.`, permittedLimit: error.params.limit, actual: Array.isArray(value) ? value.length : undefined };
+    case "minimum": case "maximum": case "exclusiveMinimum": case "exclusiveMaximum": return { ...base, reasonCode: "out_of_range", message: `${path} must be ${error.params.comparison} ${error.params.limit}.`, permittedLimit: error.params.limit, actual: typeof value === "number" ? value : undefined };
+    case "type": return { ...base, reasonCode: "invalid_type", message: `${path} must be ${error.params.type}.`, permittedLimit: error.params.type };
+    case "enum": case "const": return { ...base, reasonCode: path.endsWith("unit") ? "unsupported_unit" : "invalid_enum", message: `${path} must use a documented value.`, permittedLimit: error.params.allowedValues ?? String(error.params.allowedValue) };
+    case "uniqueItems": return { ...base, reasonCode: "duplicate_supplement", message: `${path} must contain unique items.` };
+    case "pattern": return { ...base, reasonCode: /sup_|prd_/.test(error.params.pattern) ? "legacy_id" : "invalid_pattern", message: `${path} does not match ${error.params.pattern}.`, permittedLimit: error.params.pattern };
+    default: return { ...base, reasonCode: "invalid_type", message: `${path} does not match a documented request variant.` };
   }
-
-  return key.startsWith("[") ? `${base}${key}` : `${base}.${key}`;
 }
-
-function uniqueFailed(values: unknown[]) {
-  const seen = new Set<string>();
-
-  for (const value of values) {
-    const key = JSON.stringify(value);
-
-    if (seen.has(key)) {
-      return true;
-    }
-
-    seen.add(key);
+function branch(schema: JsonSchema, data: unknown): JsonSchema {
+  if (record(data) && typeof data.operation === "string" && data.operation in PLAN_OPERATION_SCHEMAS && (schema.anyOf || schema.oneOf)) {
+    const selected = PLAN_OPERATION_SCHEMAS[data.operation as keyof typeof PLAN_OPERATION_SCHEMAS] as JsonSchema;
+    if (data.operation === "revise" && Array.isArray(selected.anyOf)) return selected.anyOf["requestPatch" in data ? 1 : 0] as JsonSchema;
+    return selected;
   }
-
-  return false;
+  if (record(data) && typeof data.ok === "boolean" && Array.isArray(schema.anyOf)) {
+    const selected = schema.anyOf.find((option: JsonSchema) => record(option.properties) && record(option.properties.ok) && option.properties.ok.const === data.ok);
+    if (selected) return selected as JsonSchema;
+  }
+  return schema;
 }
-
-function validateNode(
-  root: JsonSchema,
-  schema: JsonSchema,
-  value: unknown,
-  path: string
-): SchemaIssue | null {
-  const resolved = resolveRef(root, schema);
-
-  if (Array.isArray(resolved.oneOf)) {
-    const issues: SchemaIssue[] = [];
-
-    for (const option of resolved.oneOf) {
-      if (!isRecord(option)) {
-        continue;
-      }
-
-      const issue = validateNode(root, option as JsonSchema, value, path);
-
-      if (!issue) {
-        return null;
-      }
-
-      issues.push(issue);
-    }
-
-    return (
-      issues.find((item) => item.reasonCode === "unexpected_property") ??
-      issues[0] ?? {
-        fieldPath: path || "request",
-        message: "Request does not match the tool schema.",
-        reasonCode: "required"
-      }
-    );
-  }
-
-  if (Object.prototype.hasOwnProperty.call(resolved, "const")) {
-    if (value !== resolved.const) {
-      return {
-        fieldPath: path || "request",
-        message: "Value is not the required constant.",
-        reasonCode: "required"
-      };
-    }
-  }
-
-  const type = schemaType(resolved);
-
-  if (type === "object" || resolved.properties || resolved.additionalProperties === false) {
-    if (!isRecord(value)) {
-      return {
-        fieldPath: path || "request",
-        message: "Expected an object.",
-        reasonCode: "required"
-      };
-    }
-
-    const properties = isRecord(resolved.properties)
-      ? (resolved.properties as Record<string, JsonSchema>)
-      : {};
-    const required = Array.isArray(resolved.required)
-      ? resolved.required.filter((item): item is string => typeof item === "string")
-      : [];
-
-    for (const key of required) {
-      if (!(key in value) || value[key] === undefined) {
-        return {
-          fieldPath: joinPath(path, key),
-          message: `${key} is required.`,
-          reasonCode: "required"
-        };
+function matchingUnionBranch(schema: JsonSchema, error: ErrorObject, data: unknown) {
+  for (const match of error.schemaPath.matchAll(/\/(?:anyOf|oneOf)\/\d+/g)) {
+    const candidate = pointerValue(schema, error.schemaPath.slice(1, match.index! + match[0].length));
+    if (!record(candidate) || !record(candidate.properties)) continue;
+    for (const tag of ["certainty", "operation", "ok"]) {
+      const tagSchema = candidate.properties[tag];
+      if (!record(tagSchema) || !("const" in tagSchema)) continue;
+      let pointer = error.instancePath;
+      while (true) {
+        const value = pointerValue(data, pointer);
+        if (record(value) && tag in value) { if (value[tag] !== tagSchema.const) return false; break; }
+        if (!pointer) break;
+        pointer = pointer.slice(0, pointer.lastIndexOf("/"));
       }
     }
-
-    if (resolved.additionalProperties === false) {
-      for (const key of Object.keys(value)) {
-        if (!(key in properties)) {
-          return {
-            fieldPath: joinPath(path, key),
-            message: `Unexpected property ${key}.`,
-            reasonCode: "unexpected_property"
-          };
-        }
-      }
-    }
-
-    for (const [key, child] of Object.entries(properties)) {
-      if (!(key in value) || value[key] === undefined) {
-        continue;
-      }
-
-      const issue = validateNode(root, child, value[key], joinPath(path, key));
-
-      if (issue) {
-        return issue;
-      }
-    }
-
-    return null;
   }
-
-  if (type === "array") {
-    if (!Array.isArray(value)) {
-      return {
-        fieldPath: path || "request",
-        message: "Expected an array.",
-        reasonCode: "required"
-      };
-    }
-
-    if (typeof resolved.minItems === "number" && value.length < resolved.minItems) {
-      return {
-        fieldPath: path || "request",
-        message: "Array is too short.",
-        reasonCode: "required"
-      };
-    }
-
-    if (typeof resolved.maxItems === "number" && value.length > resolved.maxItems) {
-      return {
-        fieldPath: path || "request",
-        message: "Array is too long.",
-        reasonCode: "required"
-      };
-    }
-
-    if (resolved.uniqueItems === true && uniqueFailed(value)) {
-      return {
-        fieldPath: path || "request",
-        message: "Array items must be unique.",
-        reasonCode: "duplicate_supplement" as SchemaIssue["reasonCode"]
-      };
-    }
-
-    const itemSchema = isRecord(resolved.items)
-      ? (resolved.items as JsonSchema)
-      : null;
-
-    if (itemSchema) {
-      for (const [index, item] of value.entries()) {
-        const issue = validateNode(root, itemSchema, item, joinPath(path, `[${index}]`));
-
-        if (issue) {
-          return issue;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  if (type === "string") {
-    if (typeof value !== "string") {
-      return {
-        fieldPath: path || "request",
-        message: "Expected a string.",
-        reasonCode: "required"
-      };
-    }
-
-    if (typeof resolved.minLength === "number" && value.length < resolved.minLength) {
-      return {
-        fieldPath: path || "request",
-        message: "String is too short.",
-        reasonCode: "too_short"
-      };
-    }
-
-    if (typeof resolved.maxLength === "number" && value.length > resolved.maxLength) {
-      return {
-        fieldPath: path || "request",
-        message: "String is too long.",
-        reasonCode: "required"
-      };
-    }
-
-    if (typeof resolved.pattern === "string" && !new RegExp(resolved.pattern).test(value)) {
-      const reasonCode = resolved.pattern.includes("sup_") || resolved.pattern.includes("prd_")
-        ? "legacy_id"
-        : "required";
-
-      return {
-        fieldPath: path || "request",
-        message: "Value does not match the required pattern.",
-        reasonCode: reasonCode as SchemaIssue["reasonCode"]
-      };
-    }
-  }
-
-  if (type === "integer" || type === "number") {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      return {
-        fieldPath: path || "request",
-        message: "Expected a number.",
-        reasonCode: "positive_number_required"
-      };
-    }
-
-    if (type === "integer" && !Number.isInteger(value)) {
-      return {
-        fieldPath: path || "request",
-        message: "Expected an integer.",
-        reasonCode: "required"
-      };
-    }
-
-    if (typeof resolved.minimum === "number" && value < resolved.minimum) {
-      return {
-        fieldPath: path || "request",
-        message: "Number is below the minimum.",
-        reasonCode: "positive_number_required"
-      };
-    }
-
-    if (
-      typeof resolved.exclusiveMinimum === "number" &&
-      value <= resolved.exclusiveMinimum
-    ) {
-      return {
-        fieldPath: path || "request",
-        message: "Number must be greater than zero.",
-        reasonCode: "positive_number_required"
-      };
-    }
-
-    if (typeof resolved.maximum === "number" && value > resolved.maximum) {
-      return {
-        fieldPath: path || "request",
-        message: "Number is above the maximum.",
-        reasonCode: "required"
-      };
-    }
-  }
-
-  if (type === "boolean" && typeof value !== "boolean") {
-    return {
-      fieldPath: path || "request",
-      message: "Expected a boolean.",
-      reasonCode: "required"
-    };
-  }
-
-  if (Array.isArray(resolved.enum) && !resolved.enum.includes(value)) {
-    return {
-      fieldPath: path || "request",
-      message: "Value is not an accepted enum member.",
-      reasonCode: path.includes("unit") ? "unsupported_unit" : "required"
-    };
-  }
-
-  return null;
+  return true;
 }
-
-export function validateToolInput(
-  schema: JsonSchema,
-  value: unknown
-): SchemaIssue | null {
-  return validateToolIssues(schema, value)[0] ?? null;
+export function validateToolIssues(schema: JsonSchema, value: unknown): SchemaIssue[] {
+  const selected = branch(schema, value);
+  const check = validator(selected);
+  if (check(value)) return [];
+  const errors = (check.errors ?? []).filter(error => error.keyword !== "anyOf" && error.keyword !== "oneOf" && matchingUnionBranch(selected, error, value));
+  const issues = errors.map(error => issueFrom(error, value));
+  return issues.filter((issue, index) => issues.findIndex(other => other.fieldPath === issue.fieldPath && other.reasonCode === issue.reasonCode) === index).sort((a, b) => a.fieldPath.localeCompare(b.fieldPath));
 }
-
-export function validateToolIssues(
-  schema: JsonSchema,
-  value: unknown
-): SchemaIssue[] {
-  if (Array.isArray(schema.oneOf) && isRecord(value) && typeof value.operation === "string") {
-    for (const option of schema.oneOf) {
-      if (!isRecord(option)) {
-        continue;
-      }
-
-      const properties = isRecord(option.properties)
-        ? (option.properties as Record<string, JsonSchema>)
-        : {};
-      const operation = properties.operation;
-
-      if (isRecord(operation) && operation.const === value.operation) {
-        return collectNode(schema, option as JsonSchema, value, "");
-      }
-    }
-  }
-
-  const issue = validateNode(schema, schema, value, "");
-  return issue ? [issue] : [];
-}
-
-function collectNode(
-  root: JsonSchema,
-  schema: JsonSchema,
-  value: unknown,
-  path: string
-): SchemaIssue[] {
-  const resolved = resolveRef(root, schema);
-  const type = schemaType(resolved);
-
-  if (type === "object" || resolved.properties || resolved.additionalProperties === false) {
-    if (!isRecord(value)) {
-      return [
-        {
-          fieldPath: path || "request",
-          message: "Expected an object.",
-          reasonCode: "required"
-        }
-      ];
-    }
-
-    const properties = isRecord(resolved.properties)
-      ? (resolved.properties as Record<string, JsonSchema>)
-      : {};
-    const required = Array.isArray(resolved.required)
-      ? resolved.required.filter((item): item is string => typeof item === "string")
-      : [];
-    const issues: SchemaIssue[] = [];
-
-    for (const key of required) {
-      if (!(key in value) || value[key] === undefined) {
-        issues.push({
-          fieldPath: joinPath(path, key),
-          message: `${key} is required.`,
-          reasonCode: "required"
-        });
-      }
-    }
-
-    if (resolved.additionalProperties === false) {
-      for (const key of Object.keys(value)) {
-        if (!(key in properties)) {
-          issues.push({
-            fieldPath: joinPath(path, key),
-            message: `Unexpected property ${key}.`,
-            reasonCode: "unexpected_property"
-          });
-        }
-      }
-    }
-
-    for (const [key, child] of Object.entries(properties)) {
-      if (!(key in value) || value[key] === undefined) {
-        continue;
-      }
-
-      issues.push(...collectNode(root, child, value[key], joinPath(path, key)));
-    }
-
-    return issues;
-  }
-
-  const issue = validateNode(root, schema, value, path);
-  return issue ? [issue] : [];
-}
-
-export function schemaIssuesToError(issues: readonly SchemaIssue[]): AgenticErrorResult {
-  const issue = issues[0] ?? {
-    fieldPath: "request",
-    message: "The request is not valid.",
-    reasonCode: "required" as const
-  };
-  return schemaIssueToError(issue, issues);
-}
-
-export function schemaIssueToError(
-  issue: SchemaIssue,
-  extras: readonly SchemaIssue[] = [issue]
-): AgenticErrorResult {
-  const reasonCode =
-    issue.reasonCode === "duplicate_supplement"
-      ? "duplicate_supplement"
-      : issue.reasonCode === "legacy_id"
-        ? "legacy_id"
-        : issue.reasonCode;
-
-  const listed = extras.length > 0 ? extras : [issue];
-  const mappedReason =
-    reasonCode === "unexpected_property" ? "unexpected_property" : "invalid_request";
-  return businessError({
-    fieldPath: issue.fieldPath,
-    issues: listed.map((item) => {
-      const code =
-        item.reasonCode === "duplicate_supplement"
-          ? "duplicate_supplement"
-          : item.reasonCode === "legacy_id"
-            ? "legacy_id"
-            : item.reasonCode;
-      return {
-        fieldPath: item.fieldPath,
-        messageKey: `mcp.errors.${code}`,
-        reasonCode: code
-      };
-    }),
-    message: issue.message,
-    reasonCode: mappedReason
-  });
+export function validateToolInput(schema: JsonSchema, value: unknown): SchemaIssue | null { return validateToolIssues(schema, value)[0] ?? null; }
+export function schemaIssuesToError(issues: readonly SchemaIssue[]): AgenticErrorResult { return schemaIssueToError(issues[0] ?? { fieldPath: "request", message: "The request is not valid.", reasonCode: "invalid_type" }, issues); }
+export function schemaIssueToError(issue: SchemaIssue, extras: readonly SchemaIssue[] = [issue]): AgenticErrorResult {
+  return businessError({ fieldPath: issue.fieldPath, message: issue.message, reasonCode: issue.reasonCode === "unexpected_property" ? "unexpected_property" : "invalid_request", issues: extras.map(item => ({ ...item, messageKey: `mcp.errors.${item.reasonCode}` })) });
 }

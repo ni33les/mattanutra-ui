@@ -229,7 +229,7 @@ describe("agentic DEV flow", () => {
     assert.equal((stolen.error as { reasonCode: string }).reasonCode, "not_found");
   });
 
-  it("blocks CKD plus magnesium without producing a ready execute", async () => {
+  it("keeps CKD magnesium advice visible while allowing confirmed checkout", async () => {
     const runtime = runtimeFor();
     const created = await call(runtime, "plan", {
       idempotencyKey: "ckd-magnesium-000001",
@@ -241,7 +241,7 @@ describe("agentic DEV flow", () => {
       })
     });
 
-    assert.equal(created.status, "blocked");
+    assert.equal(created.status, "ready");
     assert.ok(Array.isArray(created.guidanceIds) && created.guidanceIds.length > 0);
 
     const executed = await call(runtime, "execute", {
@@ -249,8 +249,11 @@ describe("agentic DEV flow", () => {
       idempotencyKey: "ckd-execute-00000001",
       planHandle: created.planHandle
     });
-    assert.equal(executed.ok, false);
-    assert.equal((executed.error as { reasonCode: string }).reasonCode, "plan_not_ready");
+    assert.equal(executed.ok, true, JSON.stringify(executed));
+    assert.ok(executed.orderHandle);
+    assert.ok((created.safetyGuidance as Array<{ code: string; action: string; severity: string }>).some(
+      (item) => item.code === "condition_review_required" && item.action === "review" && item.severity === "high"
+    ));
   });
 
   it("selects algae omega-3 under a plant-based constraint", async () => {

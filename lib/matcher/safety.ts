@@ -1,13 +1,10 @@
-import { GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
-import { OVER_TARGET_THRESHOLD } from "@/lib/matcher/config";
-import { isDoseError, scaleAmount, unitsOrZero } from "@/lib/matcher/dose";
-import {
-  catalogBandRuleId,
-  catalogSubjectHasCeiling,
-  isPediatricSafetyProfile,
-  matcherSafetyCeilingsUnavailable,
-  safetyCeilingFor
-} from "@/lib/matcher/safety-ceilings";
+
+import { conditionImpliesCkd, subjectIsMagnesium } from "@/lib/matcher/condition-ceilings";
+import { doseFitScore, knownLimitProfile } from "@/lib/matcher/dose-fit";
+import { canonicalNutrientKey, normalizeProductFactKey, productKeysMatch } from "@/lib/product-key-matching";
+import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
+import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
+import { catalogSubjectHasCeiling, matcherSafetyCeilingsUnavailable, safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
 import type {
   CanonicalRequest,
   DoseVariant,
@@ -22,24 +19,6 @@ const ZINC = /zinc/i;
 const OMEGA = /omega/i;
 const IRON = /iron/i;
 
-function guidanceId(code: string, family: string) {
-  return ["gdn", code, family].join(":");
-}
-
-function pushFinding(
-  findings: SafetyFinding[],
-  input: Omit<SafetyFinding, "nutrientName" | "unit"> & {
-    nutrientName?: string | null;
-    unit?: string | null;
-  }
-) {
-  findings.push({
-    ...input,
-    nutrientName: input.nutrientName ?? null,
-    unit: input.unit ?? null
-  });
-}
-
 function nameOf(request: CanonicalRequest, subjectId: string | null) {
   if (!subjectId) {
     return "";
@@ -48,6 +27,8 @@ function nameOf(request: CanonicalRequest, subjectId: string | null) {
   return (
     request.targets.find((item) => item.subjectId === subjectId)?.name ??
     request.currentSupplements.find((item) => item.subjectId === subjectId)?.name ??
+    request.dietaryIntake?.find((item) => item.subjectId === subjectId)?.name ??
+    request.safetyCeilings?.find((item) => item.subjectId === subjectId)?.name ??
     subjectId
   );
 }
@@ -60,87 +41,9 @@ function unitOf(request: CanonicalRequest, subjectId: string | null) {
   return (
     request.targets.find((item) => item.subjectId === subjectId)?.requestedUnit ??
     request.currentSupplements.find((item) => item.subjectId === subjectId)?.unit ??
+    request.safetyCeilings?.find((item) => item.subjectId === subjectId)?.maxUnit ??
     null
   );
-}
-
-function subjectIdsMatching(
-  request: CanonicalRequest,
-  pattern: RegExp
-) {
-  const ids = new Set<string>();
-
-  for (const target of request.targets) {
-    if (pattern.test(target.name) || pattern.test(target.subjectId)) {
-      ids.add(target.subjectId);
-    }
-  }
-
-  for (const current of request.currentSupplements) {
-    if (pattern.test(current.name) || pattern.test(current.subjectId)) {
-      ids.add(current.subjectId);
-    }
-  }
-
-  return [...ids].sort();
-}
-
-const thresholdCache = new WeakMap<
-  CanonicalRequest,
-  Map<string, ScaledAmount | null>
->();
-
-function ceilingThreshold(
-  request: CanonicalRequest,
-  subjectId: string
-): ScaledAmount | null {
-  let cached = thresholdCache.get(request);
-
-  if (!cached) {
-    cached = new Map();
-    thresholdCache.set(request, cached);
-  }
-
-  if (cached.has(subjectId)) {
-    return cached.get(subjectId) ?? null;
-  }
-
-  const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
-    conditionCodes: request.conditionCodes,
-    name: nameOf(request, subjectId),
-    profile: request.profile,
-    subjectId
-  });
-
-  if (!ceiling) {
-    cached.set(subjectId, null);
-    return null;
-  }
-
-  const scaled = scaleAmount({
-    amount: ceiling.maxAmount,
-    subjectId,
-    subjectName: ceiling.name || nameOf(request, subjectId) || subjectId,
-    unit: ceiling.maxUnit
-  });
-
-  const resolved = "reason" in scaled ? null : scaled;
-  cached.set(subjectId, resolved);
-  return resolved;
-}
-
-function catalogUlRuleId(
-  request: CanonicalRequest,
-  subjectId: string,
-  fallback: string
-) {
-  const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
-    conditionCodes: request.conditionCodes,
-    name: nameOf(request, subjectId),
-    profile: request.profile,
-    subjectId
-  });
-  return catalogBandRuleId(ceiling) ?? fallback;
 }
 
 export function exposureExceedsCeiling(
@@ -153,16 +56,28 @@ export function exposureExceedsCeiling(
 
 export function labelledSafetyExposure(
   product: MatcherProduct,
-  dailyUnits: number
+  dailyUnits: number,
+  request?: CanonicalRequest
 ) {
   const exposure = new Map<string, ScaledAmount>();
+  const omegaParts = new Map<string, Map<string, ScaledAmount>>();
+  const omegaTotals = new Set<string>();
 
   for (const fact of product.labelledContributions) {
     if (!fact.amount || fact.amount <= 0 || !fact.unit) {
       continue;
     }
 
-    const subjectId = (fact.subjectId || fact.name).trim();
+    const target = request?.targets.find((row) =>
+      nutrientNameMatchesTarget(row.name, fact.name));
+    const current = request?.currentSupplements.find((row) =>
+      nutrientNameMatchesTarget(row.name, fact.name));
+    const reference = request?.safetyCeilings?.find((row) =>
+      row.subjectId === fact.subjectId || productKeysMatch(row.name, fact.name));
+    const resolvedId = target?.subjectId ?? current?.subjectId ?? reference?.subjectId ??
+      (fact.subjectId || canonicalNutrientKey(fact.name)).trim();
+    const conflictsWithTarget = request?.targets.some((row) => row.subjectId === resolvedId && !nutrientNameMatchesTarget(row.name, fact.name));
+    const subjectId = conflictsWithTarget ? `incidental:${canonicalNutrientKey(fact.name)}` : resolvedId;
 
     if (!subjectId) {
       continue;
@@ -179,11 +94,32 @@ export function labelledSafetyExposure(
       continue;
     }
 
+    const nameKey = normalizeProductFactKey(fact.name);
+    const part = nutrientNameMatchesTarget("EPA", fact.name) ? "epa" :
+      nutrientNameMatchesTarget("DHA", fact.name) ? "dha" : null;
+    if (part) {
+      const parts = omegaParts.get(subjectId) ?? new Map<string, ScaledAmount>();
+      const previous = parts.get(part);
+      if (!previous || scaled.units > previous.units) parts.set(part, scaled);
+      omegaParts.set(subjectId, parts);
+      continue;
+    }
+    if (["omega_3", "omega3", "omega_3_fatty_acids"].includes(nameKey)) omegaTotals.add(subjectId);
+
     const previous = exposure.get(subjectId);
     exposure.set(
       subjectId,
-      previous ? { ...scaled, units: previous.units + scaled.units } : scaled
+      // Duplicate alias/total label rows represent the same nutrient, not extra intake.
+      previous && previous.units > scaled.units ? previous : scaled
     );
+  }
+
+  for (const [subjectId, parts] of omegaParts) {
+    if (omegaTotals.has(subjectId)) continue;
+    const values = [...parts.values()];
+    const first = values[0];
+    if (first && values.every((row) => row.dim === first.dim)) exposure.set(subjectId, { ...first,
+      units: values.reduce((sum, row) => sum + row.units, BigInt(0)) });
   }
 
   return exposure;
@@ -238,8 +174,7 @@ export function exposureOvershootsTarget(
   }
 
   return (
-    exposureUnits * BigInt(100) >
-    target.requested.units * BigInt(OVER_TARGET_THRESHOLD)
+    exposureUnits > target.requested.units
   );
 }
 
@@ -299,273 +234,81 @@ export function evaluateSafety(input: Readonly<{
   variants: readonly DoseVariant[];
 }>): SafetyResult {
   const findings: SafetyFinding[] = [];
-  const productIds = [...new Set(input.variants.map((item) => item.productId))].sort();
-
-  if (matcherSafetyCeilingsUnavailable()) {
-    pushFinding(findings, {
-      action: "block",
-      code: "dose_review_required",
-      contributors: productIds,
-      exposureUnits: null,
-      family: "dose",
-      guidanceId: guidanceId("dose_review_required", "dose"),
-      ruleId: "ul:unavailable",
-      subjectId: null,
-      thresholdUnits: null
-    });
-  }
-  const omegaIds = subjectIdsMatching(input.request, OMEGA);
-  const zincIds = subjectIdsMatching(input.request, ZINC);
-  const ironIds = subjectIdsMatching(input.request, IRON);
-  const zincSubject = zincIds[0] ?? null;
-  const zincTotal = zincSubject
-    ? unitsOrZero(input.exposure.totals, zincSubject)
-    : BigInt(0);
-  const zincCurrent = input.request.currentSupplements
-    .filter((item) => ZINC.test(item.name) || zincIds.includes(item.subjectId))
-    .reduce((sum, item) => sum + item.daily.units, BigInt(0));
-  const zincSelected = zincTotal - zincCurrent;
-  const ceilingSubjects = new Set<string>([
-    ...input.request.targets.map((item) => item.subjectId),
-    ...input.request.currentSupplements.map((item) => item.subjectId),
-    ...input.exposure.totals.keys()
-  ]);
-
-  if (
-    input.request.medicationCodes.includes("apixaban") &&
-    omegaIds.length > 0
-  ) {
-    pushFinding(findings, {
-      action: "acknowledge",
-      code: "medication_interaction",
-      contributors: productIds,
-      exposureUnits: omegaIds[0]
-        ? unitsOrZero(input.exposure.totals, omegaIds[0])
-        : null,
-      family: "omega3+anticoagulant",
-      guidanceId: guidanceId("medication_interaction", "omega3+anticoagulant"),
-      ruleId: "omega3+anticoagulant",
-      subjectId: omegaIds[0] ?? null,
-      thresholdUnits: null
-    });
-  }
-
-  for (const subjectId of ceilingSubjects) {
-    const threshold = ceilingThreshold(input.request, subjectId);
-    const total = unitsOrZero(input.exposure.totals, subjectId);
-    const isTarget = input.request.targets.some((item) => item.subjectId === subjectId);
-
-    if (!threshold) {
-      const requested = input.request.targets.find(
-        (item) => item.subjectId === subjectId
-      )?.requested.units;
-      const missingRequiredBand =
-        catalogSubjectHasCeiling(input.request.safetyCeilings ?? [], {
-          name: nameOf(input.request, subjectId),
-          subjectId
-        }) && total > BigInt(0);
-      if (
-        missingRequiredBand ||
-        (isTarget &&
-          requested != null &&
-          requested > BigInt(0) &&
-          total * BigInt(100) > requested * BigInt(125))
-      ) {
-        pushFinding(findings, {
-          action: "block",
-          code: "dose_review_required",
-          contributors: productIds,
-          exposureUnits: total,
-          family: "dose",
-          guidanceId: guidanceId("dose_review_required", "dose"),
-          nutrientName: nameOf(input.request, subjectId) || null,
-          ruleId: catalogUlRuleId(input.request, subjectId, `ul:missing:${subjectId}`),
-          subjectId,
-          thresholdUnits: null,
-          unit: unitOf(input.request, subjectId)
-        });
-      }
-      continue;
-    }
-
-    if (total > threshold.units) {
-      pushFinding(findings, {
-        action: "block",
-        code: "dose_review_required",
-        contributors: productIds,
-        exposureUnits: total,
-        family: "dose",
-        guidanceId: guidanceId("dose_review_required", "dose"),
-        nutrientName: nameOf(input.request, subjectId) || null,
-        ruleId: catalogUlRuleId(input.request, subjectId, `ul:${subjectId}`),
-        subjectId,
-        thresholdUnits: threshold.units,
-        unit: unitOf(input.request, subjectId)
-      });
-    } else if (threshold.units > BigInt(0) && total === threshold.units) {
-      pushFinding(findings, {
-        action: "acknowledge",
-        code: "dose_review_required",
-        contributors: productIds,
-        exposureUnits: total,
-        family: "dose",
-        guidanceId: guidanceId("dose_review_required", "dose"),
-        nutrientName: nameOf(input.request, subjectId) || null,
-        ruleId: catalogUlRuleId(input.request, subjectId, `ul:${subjectId}`),
-        subjectId,
-        thresholdUnits: threshold.units,
-        unit: unitOf(input.request, subjectId)
-      });
-    }
-  }
-
-  const targetIds = new Set(input.request.targets.map((item) => item.subjectId));
-  const productsById = new Map(input.products.map((item) => [item.productId, item]));
-  const incidentalByKey = new Map<string, { name: string; subjectId: string; units: bigint }>();
-
-  for (const variant of input.variants) {
-    const product = productsById.get(variant.productId);
-
-    if (!product) {
-      continue;
-    }
-
-    for (const fact of product.labelledContributions) {
-      if (
-        !fact.amount ||
-        fact.amount <= 0 ||
-        !fact.unit ||
-        (fact.subjectId && targetIds.has(fact.subjectId))
-      ) {
-        continue;
-      }
-
-      const subjectId = fact.subjectId || fact.name;
-      const scaled = scaleAmount({
-        amount: fact.amount * variant.dailyUnits,
-        subjectId,
-        subjectName: fact.name,
-        unit: fact.unit
-      });
-
-      if ("reason" in scaled) {
-        continue;
-      }
-
-      const key = subjectId.trim().toLowerCase();
-      const previous = incidentalByKey.get(key);
-      incidentalByKey.set(key, {
-        name: fact.name,
-        subjectId,
-        units: (previous?.units ?? BigInt(0)) + scaled.units
-      });
-    }
-  }
-
-  for (const incidental of incidentalByKey.values()) {
-    const ceiling = safetyCeilingFor(input.request.safetyCeilings ?? [], {
-      name: incidental.name,
-      profile: input.request.profile,
-      subjectId: incidental.subjectId
-    });
-
-    if (!ceiling) {
-      continue;
-    }
-
-    const threshold = scaleAmount({
-      amount: ceiling.maxAmount,
-      subjectId: incidental.subjectId,
-      subjectName: incidental.name,
-      unit: ceiling.maxUnit
-    });
-
-    if ("reason" in threshold) {
-      continue;
-    }
-
-    if (incidental.units > threshold.units) {
-      const unit =
-        input.products
-          .flatMap((item) => item.labelledContributions)
-          .find((fact) => (fact.subjectId || fact.name) === incidental.subjectId)
-          ?.unit ?? ceiling.maxUnit;
-      pushFinding(findings, {
-        action: "block",
-        code: "dose_review_required",
-        contributors: productIds,
-        exposureUnits: incidental.units,
-        family: "dose",
-        guidanceId: guidanceId("dose_review_required", "dose"),
-        nutrientName: incidental.name,
-        ruleId: catalogBandRuleId(ceiling) ?? `ul:incidental:${incidental.subjectId}`,
-        subjectId: incidental.subjectId,
-        thresholdUnits: threshold.units,
-        unit
-      });
-    }
-  }
-
-  if (zincSubject && zincCurrent > BigInt(0) && zincSelected > BigInt(0)) {
-    pushFinding(findings, {
-      action: "acknowledge",
-      code: "duplicate_or_overlap",
-      contributors: productIds,
-      exposureUnits: zincTotal,
-      family: "overlap",
-      guidanceId: guidanceId("duplicate_or_overlap", "overlap"),
-      ruleId: "zinc-overlap",
-      subjectId: zincSubject,
-      thresholdUnits: null
-    });
-  }
-
-  if (input.request.profile.lifeStage === "child") {
-    const pediatric = [...zincIds, ...ironIds].filter((id) => {
-      const selected = input.variants.some((variant) =>
-        variant.contributions.has(id)
-      );
-      const current = input.request.currentSupplements.some(
-        (item) => item.subjectId === id
-      );
-      return selected || current;
-    });
-
-    if (pediatric.length > 0) {
-      pushFinding(findings, {
-        action: "block",
-        code: "pediatric_review_required",
-        contributors: productIds,
-        exposureUnits: null,
-        family: "pediatric",
-        guidanceId: guidanceId("pediatric_review_required", "pediatric"),
-        ruleId: "pediatric",
-        subjectId: pediatric[0] ?? null,
-        thresholdUnits: null
-      });
-    }
-  }
-
-  const unique = new Map<string, SafetyFinding>();
-
-  for (const finding of findings) {
-    const key = `${finding.ruleId}:${finding.subjectId ?? ""}:${finding.action}`;
-
-    if (!unique.has(key)) {
-      unique.set(key, finding);
-    }
-  }
-
-  const sorted = [...unique.values()].sort((left, right) =>
-    left.guidanceId.localeCompare(right.guidanceId)
-  );
-  void (input.rulesVersion ?? GUIDANCE_RULES_VERSION);
-
-  return {
-    findings: sorted,
-    hardBlocked: sorted.some((item) => item.action === "block"),
-    requiresAck: sorted.some((item) => item.action === "acknowledge")
+  const exposure = new Map([...input.exposure.totals].map(([id, amount]) => [id, amount.units]));
+  const fit = doseFitScore(input.request, exposure);
+  const contributors = [...new Set(input.variants.map((row) => row.productId))].sort();
+  const add = (row: Omit<SafetyFinding, "action" | "guidanceId" | "contributors"> & { contributors?: readonly string[] }) => {
+    const relevant = row.subjectId ? input.variants.filter((variant) =>
+      (variant.contributions.get(row.subjectId!)?.units ?? variant.safetyExposure?.get(row.subjectId!)?.units ?? BigInt(0)) > BigInt(0)).map((variant) => variant.productId) : contributors;
+    findings.push({ ...row, action: "inform", contributors: row.contributors ?? [...new Set(relevant)].sort(),
+      guidanceId: ["gdn", row.code, row.ruleId, row.subjectId ?? "context"].join(":") });
   };
+  for (const row of fit.perTarget) {
+    const possibleExposure = row.exposureMaximum ?? row.exposure;
+    if (possibleExposure <= row.target) continue;
+    const target = input.request.targets.find((item) => item.subjectId === row.subjectId)!;
+    const amount = scaleAmount({ amount: possibleExposure, subjectId: row.subjectId, subjectName: row.name, unit: row.unit });
+    add({ code: "target_exceeded", family: "dose", subjectId: row.subjectId, nutrientName: row.name,
+      ruleId: `target:${row.subjectId}`, thresholdUnits: target.requested.units,
+      exposureUnits: isDoseError(amount) ? null : amount.units, unit: row.unit, severity: "info", comparator: "gt",
+      sourceScope: row.basis === "total_daily" ? "total" : "supplemental", uncertainty: row.certainty === "known" ? [] : [row.certainty + "_intake"] });
+  }
+  for (const row of fit.perLimit) {
+    const possibleExposure = row.exposureMaximum ?? row.exposure;
+    if (possibleExposure < row.limit) continue;
+    const total = scaleAmount({ amount: possibleExposure, subjectId: row.subjectId, subjectName: row.name, unit: row.unit });
+    const threshold = scaleAmount({ amount: row.limit, subjectId: row.subjectId, subjectName: row.name, unit: row.unit });
+    add({ code: "dose_review_required", family: "dose", subjectId: row.subjectId, nutrientName: row.name,
+      ruleId: row.ruleId ?? `ul:${row.sourceScope}:${row.subjectId}`,
+      thresholdUnits: isDoseError(threshold) ? null : threshold.units,
+      exposureUnits: isDoseError(total) ? null : total.units, unit: row.unit, severity: "high",
+      comparator: possibleExposure > row.limit ? "gt" : "gte", sourceScope: row.sourceScope,
+      authorityUrl: row.authorityUrl,
+      uncertainty: row.certainty === "known" ? [] : [row.certainty + "_intake", ...(row.exposureMinimum !== row.exposureMaximum ? ["amount_is_upper_endpoint_of_estimate"] : [])] });
+  }
+  for (const row of fit.perContinuedDose ?? []) {
+    if (row.over <= 0) continue;
+    const exposure = scaleAmount({ amount: row.exposure, subjectId: row.subjectId, subjectName: row.name, unit: row.unit });
+    const reference = scaleAmount({ amount: row.referenceDose, subjectId: row.subjectId, subjectName: row.name, unit: row.unit });
+    add({ code: "continued_dose_increased", family: "dose", subjectId: row.subjectId, nutrientName: row.name,
+      ruleId: `continued_dose:${row.subjectId}`, thresholdUnits: isDoseError(reference) ? null : reference.units,
+      exposureUnits: isDoseError(exposure) ? null : exposure.units, unit: row.unit, severity: "info", comparator: "gt",
+      sourceScope: "supplemental", uncertainty: row.certainty === "known" ? [] : [row.certainty + "_intake"] });
+  }
+  const omegaIds = [...exposure.keys()].filter((id) => OMEGA.test(nameOf(input.request, id)) || OMEGA.test(id));
+  if (input.request.medicationCodes.some((code) => ["apixaban", "warfarin", "anticoagulant", "blood-thinner", "blood_thinner"].includes(code))) {
+    for (const id of omegaIds) {
+      if ((exposure.get(id) ?? BigInt(0)) <= BigInt(0)) continue;
+      add({ code: "medication_interaction", family: "omega3+anticoagulant", subjectId: id,
+        nutrientName: nameOf(input.request, id), ruleId: "omega3+anticoagulant", thresholdUnits: null,
+        exposureUnits: exposure.get(id) ?? null, unit: unitOf(input.request, id), severity: "high",
+        comparator: null, uncertainty: ["possible_interaction_requires_individual_review"] });
+    }
+  }
+  for (const [id, amount] of exposure) {
+    const name = nameOf(input.request, id);
+    if (conditionImpliesCkd(input.request.conditionCodes) && subjectIsMagnesium({ name, subjectId: id }) && amount > BigInt(0)) add({
+      code: "condition_review_required", family: "condition", subjectId: id, nutrientName: name,
+      ruleId: "condition:" + id, thresholdUnits: null, exposureUnits: amount, unit: unitOf(input.request, id),
+      severity: "high", comparator: null, uncertainty: ["clinical_caution_is_not_a_numeric_zero_limit"] });
+    if (input.request.profileKnown?.lifeStage !== false && input.request.profile.lifeStage === "child" && (ZINC.test(name) || IRON.test(name)) && amount > BigInt(0)) add({
+      code: "pediatric_review_required", family: "pediatric", subjectId: id, nutrientName: name,
+      ruleId: "pediatric:" + id, thresholdUnits: null, exposureUnits: amount, unit: unitOf(input.request, id), severity: "high", comparator: null });
+  }
+  const unknownReasons = new Set<string>();
+  if (matcherSafetyCeilingsUnavailable()) unknownReasons.add("reference_limits_unavailable");
+  if (!knownLimitProfile(input.request)) unknownReasons.add("unknown_reference_population");
+  if (input.request.unknownIntakeSubjectIds?.length) unknownReasons.add("unknown_intake");
+  if (input.request.estimatedIntakeSubjectIds?.length) unknownReasons.add("estimated_intake");
+  if (input.variants.some((row) => row.unknownSafetyAmount)) unknownReasons.add("unknown_product_amount");
+  for (const subjectId of new Set([...input.request.targets.map((row) => row.subjectId), ...exposure.keys()])) {
+    if (!fit.perLimit.some((row) => row.subjectId === subjectId)) unknownReasons.add("no_applicable_reference:" + subjectId);
+  }
+  if (unknownReasons.size > 0) add({ code: "incomplete_health_information", family: "uncertainty", subjectId: null,
+    nutrientName: null, ruleId: "health-information", thresholdUnits: null, exposureUnits: null, unit: null,
+    severity: "info", comparator: null, uncertainty: [...unknownReasons].sort() });
+  findings.sort((a, b) => a.guidanceId.localeCompare(b.guidanceId));
+  return { findings, hardBlocked: false, requiresAck: false };
 }
 
 export function safetyFingerprint(findings: readonly SafetyFinding[]) {

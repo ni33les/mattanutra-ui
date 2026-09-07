@@ -5,11 +5,35 @@ import {
 } from "@/lib/agentic/claims/select";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { mergeBySemanticKey } from "@/lib/agentic/plan/merge";
-import type { PlanResult, StackOption } from "@/lib/agentic/plan/types";
+import type { PlanResult, SafetyGuidance, StackOption } from "@/lib/agentic/plan/types";
+import { operationalActionText, operationalDecision, type OperationalDecision } from "@/lib/agentic/value/operational-decision";
+import { canonicalJson } from "@/lib/agentic/value/canonical";
+import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
 
 const COMPACT_LIMIT_BYTES = 4 * 1024;
 
 export type CompactDecision = Readonly<{
+  advice: readonly Readonly<{
+    guidanceId: string;
+    severity: SafetyGuidance["severity"];
+    message: string;
+    nutrientName: string | null;
+    exposure: number | null;
+    threshold: number | null;
+    unit: string | null;
+    contributors: readonly Readonly<{ productName: string; amount: number; unit: string }>[];
+    ruleId: string;
+    rulesVersion: string;
+    sourceScope: SafetyGuidance["sourceScope"];
+    comparator: SafetyGuidance["comparator"];
+    authorityUrl: string | null;
+    evidence: readonly string[];
+    uncertainty: string;
+    uncertaintyCodes: readonly string[];
+    referenceBasis?: "continued_dose";
+  }>[];
+  nextAction: string;
+  operationalDecision: OperationalDecision;
   cost: Readonly<{
     cash30DayMinor: number | null;
     cash90DayMinor: number | null;
@@ -24,6 +48,8 @@ export type CompactDecision = Readonly<{
 }>;
 
 export type CompactPlanView = Readonly<{
+  safetyGuidance?: readonly SafetyGuidance[];
+  questions?: readonly unknown[];
   coverage?: readonly Readonly<{
     deliveredAmount?: number;
     name: string;
@@ -62,11 +88,27 @@ export function buildCompactDecision(result: CompactPlanView): CompactDecision {
   const selected = result.selected;
   const locale = negotiateLocale(result.requestSnapshot?.locale);
   const durationUnknown = Boolean(result.horizon?.durationUnknown);
-  const coverage = selected?.coverage ?? result.coverage ?? [];
-  const names = [
-    ...coverage.map((row) => row.name),
-    ...(result.requestSnapshot?.currentSupplements ?? []).map((item) => item.name)
-  ];
+  const decision = operationalDecision({ status: result.status, hasSelectedOption: selected != null,
+    hasQuestions: result.questions ? result.questions.length > 0 : undefined,
+    purchaseRequiredNow: result.horizon?.purchaseRequiredNow,
+    replenishesLater: (result.horizon?.nextReplenishmentDay ?? 0) > 0 });
+  // Plan and option evaluation can produce the same finding. Keep distinct
+  // details for a shared rule ID; only identical complete rows are duplicates.
+  const guidanceByContent = new Map<string, SafetyGuidance>();
+  for (const finding of [...(result.safetyGuidance ?? []), ...(selected?.safety?.guidance ?? [])]) {
+    guidanceByContent.set(canonicalJson(finding), finding);
+  }
+  const advice = [...guidanceByContent.entries()].sort(([leftKey, left], [rightKey, right]) =>
+    left.guidanceId.localeCompare(right.guidanceId) || leftKey.localeCompare(rightKey)
+  ).map(([, finding]) => ({ guidanceId: finding.guidanceId, severity: finding.severity,
+    message: finding.message, nutrientName: finding.nutrientName, exposure: finding.exposure,
+    threshold: finding.threshold, unit: finding.unit,
+    contributors: finding.contributors.map(({ productName, amount, unit }) => ({ productName, amount, unit })),
+    ruleId: finding.ruleId, rulesVersion: finding.rulesVersion, sourceScope: finding.sourceScope,
+    comparator: finding.comparator ?? null,
+    uncertaintyCodes: finding.uncertaintyCodes ?? [], referenceBasis: finding.referenceBasis,
+    authorityUrl: finding.authorityUrl ?? null, evidence: finding.evidence ?? [],
+    uncertainty: finding.uncertainty ?? "Guidance uses the reported inputs and available evidence; it is not medical approval." }));
   const what = mergeBySemanticKey(
     [
       ...doseLines(result, locale),
@@ -78,6 +120,9 @@ export function buildCompactDecision(result: CompactPlanView): CompactDecision {
   );
 
   return {
+    advice,
+    nextAction: operationalActionText(decision, locale),
+    operationalDecision: decision,
     cost: {
       cash30DayMinor: selected?.economics?.cash30DayMinor ?? null,
       cash90DayMinor: selected?.economics?.cash90DayMinor ?? selected?.cash90DayMinor ?? null,
@@ -87,14 +132,16 @@ export function buildCompactDecision(result: CompactPlanView): CompactDecision {
     optionId: selected?.optionId ?? null,
     status: result.status,
     what,
-    when: durationUnknown
+    when: !decision.purchaseEligible && result.status !== "no_purchase"
+      ? operationalActionText(decision, locale)
+      : durationUnknown
       ? agenticMessage(locale, "plan.compact.when.unknown")
       : result.horizon?.purchaseRequiredNow
         ? agenticMessage(locale, "plan.compact.when.buy_now")
         : result.status === "no_purchase"
           ? agenticMessage(locale, "plan.compact.when.no_purchase")
           : agenticMessage(locale, "plan.compact.when.follow_schedule"),
-    why: whyFor(result, names, locale)
+    why: whyFor(result, locale)
   };
 }
 
@@ -156,13 +203,14 @@ function doseLines(result: CompactPlanView, locale: ReturnType<typeof negotiateL
 
 function whyFor(
   result: CompactPlanView,
-  names: readonly string[],
   locale: ReturnType<typeof negotiateLocale>
 ) {
+  if (result.status !== "ready" && result.status !== "no_purchase") {
+    return agenticMessage(locale, "plan.compact.why.status", { status: result.status });
+  }
   if (result.status === "no_purchase") {
-    return agenticMessage(locale, "plan.compact.why.no_purchase", {
-      name: names[0] ?? "stock"
-    });
+    return [agenticMessage(locale, "plan.summary.no_purchase"),
+      ...(result.horizon?.durationUnknown ? [agenticMessage(locale, "plan.compact.why.duration_unknown")] : [])].join(" ");
   }
 
   if (result.horizon?.durationUnknown) {
@@ -176,9 +224,10 @@ function whyFor(
   }
 
   if (result.selected) {
+    const counts = requestedTargetCoverage(result.selected.coverage);
     return agenticMessage(locale, "plan.compact.why.selected", {
-      names: names.slice(0, 3).join(", ") || "the agreed targets",
-      optionId: result.selected.optionId
+      ...counts,
+      gapCount: counts.requestedCount - counts.coveredCount
     });
   }
 
