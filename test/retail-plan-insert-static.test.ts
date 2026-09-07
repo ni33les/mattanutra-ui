@@ -42,7 +42,9 @@ describe("retail plan insert static wiring", () => {
     assert.match(insert, /renderToBuffer/);
     assert.match(insert, /QRCode\.toDataURL/);
     assert.match(insert, /sharp\(buffer\)\.png\(\)\.toBuffer/);
-    assert.match(insert, /maxProductCards = 4/);
+    assert.match(insert, /productCardsPerPanel = 4/);
+    assert.doesNotMatch(insert, /input\.lines\.slice\(/);
+    assert.match(insert, /continuationPages\.map/);
     assert.match(insert, /maxFoodCards = 2/);
     assert.doesNotMatch(insert, /symptom|diagnosis|medical claim/i);
   });

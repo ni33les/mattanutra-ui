@@ -603,7 +603,12 @@ export function recommendWithMatcher(
       optionId: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
       productIds: [...basket.productIds], dailyServings: basket.productIds.map(id => servingMultiplierFromBasket(id, basket)),
       coveragePercent: marketingCoveragePercentFromNeedCoverage(needDiagnosticsFromBasket(supplementNeeds, basket)),
-      priceMinor: basket.priceMinor, dailyPills: basket.dailyPills, doseFit: basket.doseFit ?? null, advice,
+      priceMinor: basket.priceMinor,
+      dailyPills: basket.productIds.every(id => {
+        const candidate = byId.get(id);
+        return candidate && toMatcherProduct(candidate).pillCountKnown !== false;
+      }) ? basket.dailyPills : null,
+      doseFit: basket.doseFit ?? null, advice,
       recommendations: selectionsFor(basket)
     };
   });

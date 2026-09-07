@@ -1915,7 +1915,6 @@ export function runNextAdminPlanCoverageSimulationSample(
     candidates: [...runner.input.candidates],
     clientSex,
     countryCode: runner.input.countryCode,
-    maxProducts: 6,
     needs,
     stackPreference: "balanced"
   });
@@ -2460,7 +2459,6 @@ function evaluateCatalogueSubset(input: Readonly<{
       candidates,
       clientSex: trace.clientSex,
       countryCode: input.data.countryCode,
-      maxProducts: 6,
       needs: [...trace.needs],
       stackPreference: "balanced"
     });
@@ -2546,7 +2544,6 @@ async function evaluateCatalogueSubsetAsync(input: Readonly<{
       candidates,
       clientSex: trace.clientSex,
       countryCode: input.data.countryCode,
-      maxProducts: 6,
       needs: [...trace.needs],
       stackPreference: "balanced"
     });
@@ -3006,7 +3003,6 @@ function potentialCatalogueTrace(input: Readonly<{
     candidates: [...input.potentialCandidates],
     clientSex: input.trace.clientSex,
     countryCode: input.countryCode,
-    maxProducts: 6,
     needs: [...input.trace.needs],
     stackPreference: "balanced"
   });

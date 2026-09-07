@@ -134,7 +134,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
       dailyServings: readonly number[];
       coveragePercent: number;
       priceMinor: number;
-      dailyPills: number;
+      dailyPills: number | null;
       doseFit: import("@/lib/matcher/types").DoseFitScore | null;
       advice: readonly import("@/lib/formulation-types").WebHealthAdvice[];
       recommendations: readonly ProductRecommendationSelection[];

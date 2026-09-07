@@ -2,6 +2,10 @@ import type { WebHealthAdvice } from "@/lib/formulation-types";
 import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import { webMatchingCopy } from "@/lib/web-health-advice";
 
+export function WebMatchingPillCount({ count, locale }: Readonly<{ count: number | null; locale: Locale }>) {
+  return <span>{webMatchingCopy[locale].pills}: {count == null ? webMatchingCopy[locale].pillsUnknown : count}</span>;
+}
+
 export function WebHealthAdviceText({ advice, locale }: Readonly<{ advice: WebHealthAdvice; locale: Locale }>) {
   const url = advice.evidence.url && /^https?:\/\//i.test(advice.evidence.url) ? advice.evidence.url : null;
   return <div className="mt-3 text-sm leading-relaxed">

@@ -39,7 +39,7 @@ const PdfImageWithAlt = PdfImage as React.ComponentType<
 >;
 
 const panyaInsertExpiryMinutes = 90 * 24 * 60;
-const maxProductCards = 4;
+const productCardsPerPanel = 4;
 const maxFoodCards = 2;
 const imageCache = new Map<string, Promise<string | null>>();
 const noHyphenation = (word: string | null) => [word ?? ""];
@@ -512,14 +512,14 @@ function productWhy(recommendation: RecommendedProduct | null) {
   return splitProductRecommendationText(recommendation).why;
 }
 
-async function productRows(input: Readonly<{
+export async function retailPlanInsertProductRows(input: Readonly<{
   lines: readonly OrderLineRow[];
   locale: Locale;
   result: FormulationResult | null;
 }>) {
   const ingredientMap = ingredientById(input.result);
 
-  return Promise.all(input.lines.slice(0, maxProductCards).map(async (line) => {
+  return Promise.all(input.lines.map(async (line) => {
     const recommendation = recommendationForProduct(input.result, line.product_id);
     const covers = (recommendation?.covers ?? [])
       .map((id) => ingredientMap.get(id))
@@ -668,7 +668,7 @@ export async function loadRetailPlanInsertData(input: Readonly<{
   const [panyaQrDataUri, revealQrDataUri, products, foods] = await Promise.all([
     QRCode.toDataURL(panyaLineUrl, { margin: 1, width: 220 }),
     QRCode.toDataURL(planUrl, { margin: 1, width: 220 }),
-    productRows({ lines, locale, result }),
+    retailPlanInsertProductRows({ lines, locale, result }),
     foodRows(result, locale)
   ]);
 
@@ -1192,6 +1192,12 @@ function ProductPanel({ data }: { data: RetailPlanInsertData }) {
 }
 
 function RetailPlanInsertDocument({ data }: { data: RetailPlanInsertData }) {
+  const panels: RetailPlanInsertProduct[][] = [];
+  for (let index = 0; index < data.productRows.length; index += productCardsPerPanel) {
+    panels.push(data.productRows.slice(index, index + productCardsPerPanel));
+  }
+  const continuationPages: RetailPlanInsertProduct[][][] = [];
+  for (let index = 1; index < panels.length; index += 2) continuationPages.push(panels.slice(index, index + 2));
   return (
     <Document
       author="MattaNutra"
@@ -1204,8 +1210,13 @@ function RetailPlanInsertDocument({ data }: { data: RetailPlanInsertData }) {
       </Page>
       <Page orientation="landscape" size="A4" style={styles.page}>
         <FoodPanel data={data} />
-        <ProductPanel data={data} />
+        <ProductPanel data={{ ...data, productRows: panels[0] ?? [] }} />
       </Page>
+      {continuationPages.map((pagePanels, index) => (
+        <Page key={`products-${index}`} orientation="landscape" size="A4" style={styles.page}>
+          {pagePanels.map((products, panelIndex) => <ProductPanel key={panelIndex} data={{ ...data, productRows: products }} />)}
+        </Page>
+      ))}
     </Document>
   );
 }

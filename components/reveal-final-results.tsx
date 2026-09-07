@@ -1,7 +1,7 @@
 "use client";
 
 import { webMatchingCopy } from "@/lib/web-health-advice";
-import { WebHealthAdviceText } from "@/components/web-health-advice";
+import { WebHealthAdviceText, WebMatchingPillCount } from "@/components/web-health-advice";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1527,7 +1527,7 @@ function RevealProductsFinalSection({
               const subtotal = option.recommendations.reduce((sum, item) => sum + (item.unitPriceAmount ?? item.product.priceAmount ?? 0), 0);
               return <div className="mt-4 rounded-xl border border-[var(--mn-line)] p-5" key={option.optionId}>
                 <p>{option.recommendations.map(item => item.product.title).join(", ")}</p>
-                <p className="mt-2 text-sm">{matchingCopy.coverage}: {option.coveragePercent}% · {matchingCopy.pills}: {option.dailyPills}</p>
+                <p className="mt-2 text-sm">{matchingCopy.coverage}: {option.coveragePercent}% · <WebMatchingPillCount count={option.dailyPills} locale={locale} /></p>
                 <p className="mt-2 text-sm">{matchingCopy.subtotal}: {new Intl.NumberFormat(localeHtmlLang(locale), { style: "currency", currency: option.recommendations[0]?.product.currency ?? "THB" }).format(subtotal)}</p>
                 {option.advice.map((advice, index) => <WebHealthAdviceText key={`${advice.code}:${index}`} advice={advice} locale={locale} />)}
                 {!awaitingReplan && option.productIds.length ? <Link className="mt-3 inline-block underline" href={`/${locale}/basket/checkout?${params}`}>{matchingCopy.choose}</Link> : null}
