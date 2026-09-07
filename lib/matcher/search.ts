@@ -206,17 +206,21 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
     visit(seed);
     return { complete: [...archive.values()], groups, expansionAttempts: used, mode: trimmed ? "bounded" : "exact", trimmed };
   }
+  // Reserve one fifth of bounded work for repairs. Otherwise a large set of
+  // single-product pairs consumes every attempt before any leading basket can
+  // be replaced or completed. This reservation is independent of basket size.
+  const explorationLimit = limit - Math.floor(limit / 5);
   const single: { state: SearchState; group: ProductGroup; variant: DoseVariant }[] = [];
   for (const group of groups) {
     for (const variant of group.variants) {
-      const state = add(seed, variant, group);
+      const state = add(seed, variant, group, explorationLimit);
       if (state) { single.push({ state, group, variant }); remember(state); }
-      if (used >= limit) break;
+      if (used >= explorationLimit) break;
     }
-    if (used >= limit) break;
+    if (used >= explorationLimit) break;
   }
   const width = Math.max(1, Math.min(config.initialBeamWidth, config.maxBeamWidth));
-  const beamLimit = used + Math.floor((limit - used) * 0.55);
+  const beamLimit = used + Math.floor((explorationLimit - used) * 0.55);
   let beam: SearchState[] = [seed];
   for (let index = 0; index < groups.length && used < beamLimit; index += 1) {
     const group = groups[index]!;
@@ -252,11 +256,11 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
   // Every pair of supported single-product quantities gets a deterministic
   // opportunity. This recovers complements without requiring either member
   // to rank highly on its own. Infeasible pairs consume attempts as well.
-  for (let i = 0; i < single.length && used < limit; i += 1) {
-    for (let j = i + 1; j < single.length && used < limit; j += 1) {
+  for (let i = 0; i < single.length && used < explorationLimit; i += 1) {
+    for (let j = i + 1; j < single.length && used < explorationLimit; j += 1) {
       const a = single[i]!, b = single[j]!;
       if (a.group.productId === b.group.productId) continue;
-      const state = add(a.state, b.variant, b.group);
+      const state = add(a.state, b.variant, b.group, explorationLimit);
       if (state) remember(state);
     }
   }
