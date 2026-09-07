@@ -211,7 +211,7 @@ function ensureFbqStub() {
 }
 
 let scriptLoadPromise: Promise<void> | null = null;
-let initializedIds = new Set<string>();
+const initializedIds = new Set<string>();
 
 function loadPixelScript(): Promise<void> {
   if (typeof window === "undefined") {

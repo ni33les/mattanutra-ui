@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useEffect,
   useId,
   useRef,
   useState,
@@ -1597,10 +1596,6 @@ export function ProductFactsEditor({
     derivedPackCount != null ? String(derivedPackCount) : "",
   );
 
-  useEffect(() => {
-    const next = packCountFromFacts(draft.facts);
-    setPackDraft(next != null ? String(next) : "");
-  }, [draft.id]);
 
   function parsedPackCount(value: string) {
     const trimmed = value.trim();

@@ -1,12 +1,57 @@
-// @ts-nocheck
 import { getSql, keepDatabaseWarm } from "@/lib/db";
-import type { AgenticStore } from "@/lib/agentic/store/types";
+import type {
+  AgenticStore,
+  CapabilityRecord,
+  CheckoutSessionRecord,
+  FeedbackRecord,
+  FulfilmentEventRecord,
+  IdempotencyRecord,
+  OrderItemRecord,
+  OrderRecord,
+  OutboxEventRecord,
+  PaymentAttemptRecord,
+  PaymentAuditRecord,
+  PlanRecord,
+  PlanRevisionRecord,
+  ProviderEventRecord,
+  RetailOrderLinkRecord,
+  SupportCaseRecord,
+  SupportMessageRecord
+} from "@/lib/agentic/store/types";
+import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { createMemoryStore } from "@/lib/agentic/store/memory";
 import { asMinor } from "@/lib/agentic/money";
 
 type Sql = NonNullable<ReturnType<typeof getSql>>;
-type AnySql = ((strings: TemplateStringsArray, ...params: unknown[]) => Promise<Array<Record<string, unknown>>>) & {
-  begin: (fn: (tx: AnySql) => Promise<unknown>) => Promise<unknown>;
+type StoreSql = {
+  <Row extends Record<string, unknown> = Record<string, unknown>>(
+    strings: TemplateStringsArray,
+    ...params: unknown[]
+  ): Promise<Row[]>;
+  begin<T>(work: (tx: StoreSql) => Promise<T>): Promise<T>;
+};
+
+type SnakeCase<Key extends string> = Key extends `${infer First}${infer Rest}`
+  ? `${First extends Lowercase<First> ? "" : "_"}${Lowercase<First>}${SnakeCase<Rest>}`
+  : Key;
+type DatabaseTimestamp = Date | string;
+type DatabaseNumber = number | bigint | string;
+/** Query rows retain the store enums/JSON payloads while reflecting PostgreSQL
+ * column names and the driver's timestamp/numeric representations. */
+type DatabaseRow<RecordType> = {
+  [Key in keyof RecordType as SnakeCase<Key & string>]:
+    Key extends `${string}At` | "availabilityAsOf"
+      ? DatabaseTimestamp | Extract<RecordType[Key], null>
+      : Key extends `${string}Minor` | "dailyPills" | "sequence"
+        ? DatabaseNumber | Extract<RecordType[Key], null>
+        : RecordType[Key];
+};
+type CapabilityRow = DatabaseRow<Omit<CapabilityRecord, "hash">> & {
+  capability_hash: string;
+};
+type IdempotencyRow = DatabaseRow<Omit<IdempotencyRecord, "key" | "responseJson">> & {
+  idempotency_key: string;
+  response_json: unknown;
 };
 
 function asJson(value: unknown) {
@@ -14,10 +59,12 @@ function asJson(value: unknown) {
 }
 
 export function createPostgresStore(inputSql: Sql, inTransaction = false): AgenticStore {
-  const sql = inputSql as unknown as AnySql;
-  const store = {
+  // PostgreSQL remains the trusted decoding boundary; each read names its row
+  // shape rather than leaking untyped columns into the store interface.
+  const sql = inputSql as unknown as StoreSql;
+  const store: AgenticStore = {
     async getCatalogueSnapshot(id) {
-      const [row] = await sql`
+      const [row] = await sql<{ snapshot_json: CatalogueSnapshot }>`
         select snapshot_json from public.agentic_catalogue_snapshots where snapshot_id = ${id}
         union all
         select snapshot_json from public.agentic_qa_catalogues where snapshot_id = ${id}
@@ -32,7 +79,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       `;
     },
     async listPlanIdsByPrincipal(principalScope) {
-      const rows = await sql`
+      const rows = await sql<{ id: string }>`
         select id from public.agentic_plans where principal_scope = ${principalScope}
       `;
       return rows.map((row) => String(row.id));
@@ -129,7 +176,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         restart identity cascade`;
     },
     async getCapabilityByHash(hash) {
-      const [row] = await sql`
+      const [row] = await sql<CapabilityRow>`
         select * from public.agentic_capabilities where capability_hash = ${hash} limit 1
       `;
       if (!row) return null;
@@ -149,19 +196,19 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       };
     },
     async getCheckoutByAccessHash(hash) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<CheckoutSessionRecord>>`
         select * from public.agentic_checkout_sessions where access_hash = ${hash} limit 1
       `;
       return row ? mapCheckout(row) : null;
     },
     async getCheckoutByOrderId(orderId) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<CheckoutSessionRecord>>`
         select * from public.agentic_checkout_sessions where order_id = ${orderId}::uuid limit 1
       `;
       return row ? mapCheckout(row) : null;
     },
     async getFeedback(id) {
-      const [row] = await sql`select * from public.agentic_feedback where id = ${id}::uuid`;
+      const [row] = await sql<DatabaseRow<FeedbackRecord>>`select * from public.agentic_feedback where id = ${id}::uuid`;
       if (!row) return null;
       return {
         consentConfirmed: true as const,
@@ -176,7 +223,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       };
     },
     async getIdempotency(operation, ownerScope, key) {
-      const [row] = await sql`
+      const [row] = await sql<IdempotencyRow>`
         select * from public.agentic_idempotency_records
         where operation = ${operation} and owner_scope = ${ownerScope} and idempotency_key = ${key}
       `;
@@ -193,17 +240,17 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       };
     },
     async getOrder(id) {
-      const [row] = await sql`select * from public.agentic_orders where id = ${id}::uuid`;
+      const [row] = await sql<DatabaseRow<OrderRecord>>`select * from public.agentic_orders where id = ${id}::uuid`;
       return row ? mapOrder(row) : null;
     },
     async getOrderByProviderSessionId(id) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<OrderRecord>>`
         select * from public.agentic_orders where provider_session_id = ${id} limit 1
       `;
       return row ? mapOrder(row) : null;
     },
     async getOpenOrderForPlanRevision(planId, planRevision) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<OrderRecord>>`
         select * from public.agentic_orders
         where plan_id = ${planId}::uuid
           and plan_revision = ${planRevision}
@@ -219,7 +266,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       return row ? mapOrder(row) : null;
     },
     async getActiveOrderForPlanRevision(planId, planRevision) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<OrderRecord>>`
         select * from public.agentic_orders
         where plan_id = ${planId}::uuid
           and plan_revision = ${planRevision}
@@ -234,7 +281,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       return row ? mapOrder(row) : null;
     },
     async getExecuteResponseForOrder(orderId) {
-      const [row] = await sql`
+      const [row] = await sql<{ response_json: unknown }>`
         select response_json from public.agentic_idempotency_records
         where operation = 'execute'
           and resource_ids->>'orderId' = ${orderId}
@@ -244,7 +291,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       return row ? (row.response_json ?? null) : null;
     },
     async getOrderItems(orderId) {
-      const rows = await sql`
+      const rows = await sql<DatabaseRow<OrderItemRecord>>`
         select * from public.agentic_order_items where order_id = ${orderId}::uuid
       `;
       return rows.map((row) => ({
@@ -264,14 +311,14 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       }));
     },
     async getOutboxPending() {
-      const rows = await sql`
+      const rows = await sql<DatabaseRow<OutboxEventRecord>>`
         select * from public.agentic_outbox_events where processed_at is null
       `;
       return rows.map(mapOutbox);
     },
     async claimOutboxBatch(limit) {
       if (!inTransaction) throw new Error("Outbox claims require a transaction");
-      const rows = await sql`
+      const rows = await sql<DatabaseRow<OutboxEventRecord>>`
         select * from public.agentic_outbox_events
         where processed_at is null and type = 'OMS_SUBMIT'
         order by created_at, id limit ${Math.max(1, Math.min(50, limit))}
@@ -281,7 +328,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
     },
     async getOrderForUpdate(id) {
       if (!inTransaction) throw new Error("Order locks require a transaction");
-      const [row] = await sql`select * from public.agentic_orders where id = ${id}::uuid for update`;
+      const [row] = await sql<DatabaseRow<OrderRecord>>`select * from public.agentic_orders where id = ${id}::uuid for update`;
       return row ? mapOrder(row) : null;
     },
     async getPlanForUpdate(id) {
@@ -290,7 +337,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       return store.getPlan(id);
     },
     async getPlan(id) {
-      const [row] = await sql`select * from public.agentic_plans where id = ${id}::uuid`;
+      const [row] = await sql<DatabaseRow<PlanRecord>>`select * from public.agentic_plans where id = ${id}::uuid`;
       if (!row) return null;
       return {
         createdAt: toIso(row.created_at),
@@ -303,7 +350,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       };
     },
     async getPlanRevision(planId, revision) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<PlanRevisionRecord>>`
         select * from public.agentic_plan_revisions
         where plan_id = ${planId}::uuid and revision = ${revision}
       `;
@@ -321,7 +368,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       };
     },
     async getProviderEvent(provider, providerEventId) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<ProviderEventRecord>>`
         select * from public.agentic_provider_events
         where provider = ${provider} and provider_event_id = ${providerEventId}
       `;
@@ -336,7 +383,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       };
     },
     async getRetailLink(orderId) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<RetailOrderLinkRecord>>`
         select * from public.agentic_retail_order_links where order_id = ${orderId}::uuid
       `;
       if (!row) return null;
@@ -348,17 +395,17 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       };
     },
     async getSupportCase(id) {
-      const [row] = await sql`select * from public.agentic_support_cases where id = ${id}::uuid`;
+      const [row] = await sql<DatabaseRow<SupportCaseRecord>>`select * from public.agentic_support_cases where id = ${id}::uuid`;
       return row ? mapSupport(row) : null;
     },
     async getSupportCaseByOrderId(orderId) {
-      const [row] = await sql`
+      const [row] = await sql<DatabaseRow<SupportCaseRecord>>`
         select * from public.agentic_support_cases where order_id = ${orderId}::uuid limit 1
       `;
       return row ? mapSupport(row) : null;
     },
     async getSupportMessages(caseId) {
-      const rows = await sql`
+      const rows = await sql<DatabaseRow<SupportMessageRecord>>`
         select * from public.agentic_support_messages
         where case_id = ${caseId}::uuid
         order by sequence asc, id asc
@@ -416,7 +463,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       `;
     },
     async listFulfilmentEvents(orderId) {
-      const rows = await sql`
+      const rows = await sql<DatabaseRow<FulfilmentEventRecord>>`
         select id, order_id, status, payload, created_at
         from public.agentic_fulfilment_events
         where order_id = ${orderId}::uuid
@@ -561,7 +608,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       `;
     },
     async listPaymentAudits(orderId) {
-      const rows = await sql`
+      const rows = await sql<DatabaseRow<PaymentAuditRecord>>`
         select * from public.agentic_payment_audits where order_id = ${orderId}::uuid
       `;
       return rows.map((row) => ({
@@ -572,7 +619,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       }));
     },
     async listPaymentAttempts(orderId) {
-      const rows = await sql`
+      const rows = await sql<DatabaseRow<PaymentAttemptRecord>>`
         select * from public.agentic_payment_attempts where order_id = ${orderId}::uuid
       `;
       return rows.map((row) => ({
@@ -591,7 +638,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
     },
     async transaction<T>(work: (store: AgenticStore) => Promise<T>) {
       if (inTransaction) return work(store);
-      return sql.begin((tx) => work(createPostgresStore(tx as unknown as Sql, true))) as Promise<T>;
+      return sql.begin((tx) => work(createPostgresStore(tx as unknown as Sql, true)));
     },
     async updateCheckout(record) {
       await sql`
@@ -665,7 +712,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
     }
   };
 
-  return store as AgenticStore;
+  return store;
 }
 
 function toIso(value: unknown) {
@@ -685,7 +732,7 @@ function toIsoOrNull(value: unknown) {
   return toIso(value);
 }
 
-function mapCheckout(row: Record<string, any>) {
+function mapCheckout(row: DatabaseRow<CheckoutSessionRecord>): CheckoutSessionRecord {
   return {
     accessHash: String(row.access_hash),
     createdAt: toIso(row.created_at),
@@ -699,7 +746,7 @@ function mapCheckout(row: Record<string, any>) {
   };
 }
 
-function mapOrder(row: Record<string, any>) {
+function mapOrder(row: DatabaseRow<OrderRecord>): OrderRecord {
   return {
     cancelledAt: toIsoOrNull(row.cancelled_at),
     checkoutAccessHash: row.checkout_access_hash ?? null,
@@ -730,7 +777,7 @@ function mapOrder(row: Record<string, any>) {
   };
 }
 
-function mapOutbox(row: Record<string, any>) {
+function mapOutbox(row: DatabaseRow<OutboxEventRecord>): OutboxEventRecord {
   return {
     createdAt: toIso(row.created_at),
     id: row.id,
@@ -741,7 +788,7 @@ function mapOutbox(row: Record<string, any>) {
   };
 }
 
-function mapSupport(row: Record<string, any>) {
+function mapSupport(row: DatabaseRow<SupportCaseRecord>): SupportCaseRecord {
   return {
     caseReference: row.case_reference,
     createdAt: toIso(row.created_at),

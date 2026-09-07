@@ -188,10 +188,8 @@ html:lang(th) .mn-library-visual .nong-card .st{line-height:1.55}
   box-shadow:none !important;
   max-width:100%;
 }
-.mn-library-visual .hero-art{position:relative;background:linear-gradient(160deg,#eef9ff,#edf8e8);border:1px solid #d9e5d3;border-radius:26px;min-height:420px;display:grid;place-items:center;overflow:hidden;box-shadow:var(--shadow)}
+.mn-library-visual .hero-art{position:relative;background:linear-gradient(160deg,#eef9ff,#edf8e8);border:1px solid #d9e5d3;border-radius:26px;overflow:hidden;box-shadow:var(--shadow)}
 .mn-library-visual .hero-art:before{content:"";position:absolute;inset:10%;border-radius:50%;background:radial-gradient(circle,rgba(90,166,63,.22),transparent 60%)}
-.mn-library-visual .hero-art .nong{position:relative;z-index:1;max-height:380px;width:auto;object-fit:contain}
-.mn-library-visual .bubble{position:absolute;right:22px;top:34px;background:#fff;border:3px solid var(--ink);border-radius:20px;padding:16px 18px;max-width:270px;font-weight:800;font-size:.96rem;line-height:1.28;box-shadow:0 6px 0 rgba(13,81,54,.08);z-index:2}
 .mn-library-visual .sticky-note{position:absolute;background:#ffeaa3;border:1px solid #eacb6c;border-radius:8px;padding:8px 12px;font-weight:800;color:#6a4b11;transform:rotate(-5deg);z-index:2;font-size:.9rem}
 .mn-library-visual .n1{left:28px;top:95px}
 .mn-library-visual .n2{left:44px;top:160px;background:#ffd7c9;color:#7b2c20}
@@ -282,19 +280,24 @@ html:lang(th) .mn-library-visual .nong-card .st{line-height:1.55}
 }
 @media(min-width:1000px){
 .mn-library-visual .hero{grid-template-columns:1.02fr .98fr}
-.mn-library-visual .hero-art{min-height:560px;height:560px}
-.mn-library-visual .hero-art .nong{max-height:520px}
 .mn-library-visual .cta{grid-template-columns:260px 1fr 200px}
 .mn-library-visual .cta .nong{display:block;justify-self:end;align-self:end;max-height:170px}
 }
 @media(max-width:640px){
-.mn-library-visual .wrap{padding:18px 16px 42px}
+/* Only the plain-grid hand-off narrows its mobile page gutter. */
+.mn-library-visual:where(
+  [data-library-slug="do-you-need-a-probiotic"],
+  [data-library-slug="food4me-study-personalised-nutrition"],
+  [data-library-slug="gut-absorption-supplements"],
+  [data-library-slug="gut-health-supplements-when-make-sense"],
+  [data-library-slug="l-carnitine-and-your-energy"],
+  [data-library-slug="lions-mane-supplement-worth-it"],
+  [data-library-slug="spicy-food-thailand-supplement-routine"],
+  [data-library-slug="which-supplements-do-vegans-actually-need"]
+) .wrap{padding:18px 16px 42px}
 .mn-library-visual .promise{grid-template-columns:1fr}
 .mn-library-visual .promise div{border-right:0;border-bottom:1px solid var(--line)}
 .mn-library-visual .promise div:last-child{border-bottom:0}
-.mn-library-visual .hero-art{min-height:360px}
-.mn-library-visual .hero-art .nong{max-height:300px}
-.mn-library-visual .bubble{position:relative;right:auto;top:auto;margin:16px;align-self:start;justify-self:center}
 .mn-library-visual .sticky-note{display:none}
 .mn-library-visual .q{align-items:flex-start;flex-direction:column}
 .mn-library-visual .q .opts{width:100%}
@@ -311,8 +314,6 @@ html:lang(th) .mn-library-visual .nong-card .st{line-height:1.55}
 .mn-library-visual .greenline{border-left:5px solid var(--forest);padding-left:14px}
 @media(max-width:720px){
 .mn-library-visual .micro-row{grid-template-columns:1fr}
-.mn-library-visual .hero-art .nong{max-height:330px}
-.mn-library-visual .hero-art{min-height:390px}
 }
 @media(min-width:820px){
 .mn-library-visual .three{grid-template-columns:repeat(3,1fr)}
@@ -1320,6 +1321,10 @@ html:lang(th) .mn-library-visual .cta p {
   }
 }
 
+/* Hero geometry is owned by the slug-aware rules in globals.css.
+ * Keep the plain-grid image/bubble rules there so they cannot shrink staged
+ * illustrations or move absolute speech bubbles. Retain artwork styling here. */
+
 /* =====================================================================
  * Specialty hero stages (zip gradients + Nong treatment)
  * Apply to all staged-hero articles so globals cannot flatten them.
@@ -1402,13 +1407,6 @@ html:lang(th) .mn-library-visual .cta p {
   .mn-library-visual .hero-art.sleep-hero .nong-sleep {
     max-width: 620px !important;
   }
-  .mn-library-visual .hero-art.money-hero .nong,
-  .mn-library-visual .hero-art.brain-hero .nong,
-  .mn-library-visual .hero-art.joint-hero .nong,
-  .mn-library-visual .hero-art.coffee-hero .nong,
-  .mn-library-visual .hero-art.creatine-hero .nong {
-    max-height: 520px;
-  }
 }
 @media (max-width: 640px) {
   .mn-library-visual .hero-art.sleep-hero {
@@ -1417,14 +1415,5 @@ html:lang(th) .mn-library-visual .cta p {
   }
   .mn-library-visual .hero-art.sleep-hero .nong-sleep {
     border-radius: 18px !important;
-  }
-  .mn-library-visual .hero-art.money-hero .nong,
-  .mn-library-visual .hero-art.brain-hero .nong,
-  .mn-library-visual .hero-art.joint-hero .nong,
-  .mn-library-visual .hero-art.coffee-hero .nong,
-  .mn-library-visual .hero-art.creatine-hero .nong,
-  .mn-library-visual .hero-art.curcumin-hero .nong,
-  .mn-library-visual .hero-art.stress-hero .nong {
-    max-height: 320px;
   }
 }

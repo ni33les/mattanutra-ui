@@ -86,6 +86,7 @@ export function proxy(request: NextRequest) {
   if (
     shouldRedirectToHttps({
       host: request.headers.get("host"),
+      requestUrlHost: request.nextUrl.host,
       nodeEnv: process.env.NODE_ENV,
       protocol: request.nextUrl.protocol,
       xForwardedProto: request.headers.get("x-forwarded-proto")

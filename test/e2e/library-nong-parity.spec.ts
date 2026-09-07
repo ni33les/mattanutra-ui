@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "../helpers/offline-browser";
 
 type LibraryArticleSource = Readonly<{
   slug: string;
@@ -346,8 +346,16 @@ async function waitForPage(page: Page) {
   await page.waitForLoadState("domcontentloaded");
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
   await page
-    .evaluate(async () => {
-      const images = Array.from(document.images);
+    .evaluate(async (selectors) => {
+      // Only these landmarks are compared below. Eagerly load their images so
+      // off-screen mascot measurements settle without waiting on unrelated
+      // lazy article images that the browser has no reason to request.
+      const images = [...new Set(selectors.flatMap(selector =>
+        Array.from(document.querySelectorAll(selector)).flatMap(element =>
+          element instanceof HTMLImageElement ? [element] : Array.from(element.querySelectorAll("img"))
+        )
+      ))];
+      for (const image of images) image.loading = "eager";
       await Promise.race([
         Promise.all(
           images.map((img) => {
@@ -365,7 +373,7 @@ async function waitForPage(page: Page) {
           window.setTimeout(resolve, 8_000);
         })
       ]);
-    })
+    }, Object.values(landmarkSelectors))
     .catch(() => undefined);
 }
 
@@ -457,7 +465,7 @@ async function saveMismatchArtifacts(
 test.describe("Library Nong Matta image parity", () => {
   test("matches the zip examples across desktop and mobile", async ({
     baseURL,
-    browser
+    context
   }) => {
     test.setTimeout(900_000);
 
@@ -488,8 +496,10 @@ test.describe("Library Nong Matta image parity", () => {
           ["desktop", desktopViewport],
           ["mobile", mobileViewport]
         ] as const) {
-          const zipPage = await browser.newPage({ viewport });
-          const appPage = await browser.newPage({ viewport });
+          const zipPage = await context.newPage();
+          const appPage = await context.newPage();
+          await zipPage.setViewportSize(viewport);
+          await appPage.setViewportSize(viewport);
 
           try {
             await zipPage.goto(pathToFileURL(sourceHtmlPath).toString());

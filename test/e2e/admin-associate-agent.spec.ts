@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
+import assert from "node:assert/strict";
 import { promisify } from "node:util";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../helpers/offline-browser";
 
 const execFileAsync = promisify(execFile);
 
@@ -17,28 +18,36 @@ async function runAppScript<T>(
   script: string,
   env: NodeJS.ProcessEnv = process.env
 ) {
+  const database = new URL(env.TEST_DB_URL!);
+  assert.equal(database.hostname, "127.0.0.1");
+  assert.match(database.pathname, /^\/mattanutra_lock_review/);
   const { stdout } = await execFileAsync(
     process.execPath,
     [
-      "--env-file-if-exists=.env.local",
       "--experimental-strip-types",
       "--input-type=module",
       "--import",
       "./scripts/register-ts-path-loader.mjs",
+      "--import",
+      "./test/helpers/offline-network.mjs",
       "-e",
       script
     ],
     {
       cwd: process.cwd(),
-      env,
+      env: { ...env, DB_URL: database.href, DB_WORKER_URL: database.href, STRIPE_PAYMENT_MODE: "mock" },
       maxBuffer: 1024 * 1024
     }
   );
 
-  return JSON.parse(stdout.trim()) as T;
+  const result = stdout.split("\n").findLast(line => line.startsWith("E2E_RESULT:"));
+  if (!result) throw new Error("Admin fixture did not return its result");
+  return JSON.parse(result.slice("E2E_RESULT:".length)) as T;
 }
 
 async function createAdminSession() {
+  assert.match(process.env.ADMIN_SESSION_SECRET ?? "", /^fixture-[a-f0-9]{64}$/,
+    "Admin browser fixtures require a fixture-only ADMIN_SESSION_SECRET before creating records");
   return runAppScript<AdminE2ESession>(`
     import { randomUUID } from "node:crypto";
     import { createAdminSession } from "./lib/admin-access.ts";
@@ -92,7 +101,7 @@ async function createAdminSession() {
         personId: owner.person_id
       });
 
-      console.log(JSON.stringify({
+      console.log("E2E_RESULT:" + JSON.stringify({
         csrfToken: session.csrfToken,
         organisationId: owner.organisation_id,
         sessionCookie: session.sessionCookie,
@@ -133,7 +142,7 @@ async function cleanupAdminSession(session: AdminE2ESession | null) {
           delete from public.organisations
           where id = \${process.env.E2E_ORGANISATION_ID}::uuid
         \`;
-        console.log(JSON.stringify({ cleaned: true }));
+        console.log("E2E_RESULT:" + JSON.stringify({ cleaned: true }));
       } finally {
         await closeSqlPool();
       }

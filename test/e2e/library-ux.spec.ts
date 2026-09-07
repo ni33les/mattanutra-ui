@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "../helpers/offline-browser";
 
 const visualKnowledge = JSON.parse(
   readFileSync(
@@ -144,7 +144,16 @@ test.describe("Library UX remediation", () => {
         await expect(header.locator("h1")).toContainText(expected.title);
         await expect(header).toContainText(expected.intro);
         await expect(header).toContainText(expected.guide);
-        await expect(header.locator("img")).toHaveCount(0);
+        const guideImage = header.locator("img");
+        await expect(guideImage).toHaveCount(1);
+        await expect(guideImage).toHaveAttribute("alt", /\S/);
+        if (viewportName === "mobile") await expect(guideImage).toBeHidden();
+        else {
+          await expect(guideImage).toBeVisible();
+          await expect.poll(() => guideImage.evaluate(
+            element => (element as HTMLImageElement).naturalWidth
+          )).toBeGreaterThan(0);
+        }
         await expect(page.locator("[data-library-grid]")).toBeVisible();
         await expect(page.locator("[data-library-card]").first()).toBeVisible();
         await expect(page.locator("[data-library-card]")).toHaveCount(
@@ -216,8 +225,8 @@ test.describe("Library UX remediation", () => {
       baseURL
     );
 
-    const share = page.locator(".mn-library-visual .share.mn-library-fragment");
-    const related = page.locator(".mn-library-visual .related.mn-library-fragment");
+    const share = page.locator(".mn-library-visual .share");
+    const related = page.locator(".mn-library-visual .related");
 
     await expect(share).toBeVisible();
     await expect(related).toBeVisible();
@@ -238,7 +247,12 @@ test.describe("Library UX remediation", () => {
       .poll(async () => related.evaluate((element) => getComputedStyle(element).display))
       .toBe("flex");
 
-    const nongTags = page.locator(".mn-library-visual .nong-card .tags > span");
+    const nongTagContainer = page.locator(".mn-library-visual .nong-card .tags");
+    await expect.poll(() => nongTagContainer.evaluate(element => {
+      const style = getComputedStyle(element);
+      return { display: style.display, flexWrap: style.flexWrap };
+    })).toEqual({ display: "flex", flexWrap: "wrap" });
+    const nongTags = nongTagContainer.locator(":scope > span");
     await expect(nongTags.first()).toBeVisible();
     const nongTagProblems = await nongTags.evaluateAll((tags) => {
       const card = tags[0]?.closest(".nong-card") as HTMLElement | null;
@@ -255,8 +269,11 @@ test.describe("Library UX remediation", () => {
         const style = window.getComputedStyle(element);
         const problems: string[] = [];
 
-        if (!style.display.includes("flex")) {
-          problems.push(`bad display:${style.display}`);
+        // Inline children of the wrapping flex strip compute to block; they
+        // need visible, contained text, not their own flex formatting context.
+        if (!element.textContent?.trim() || rect.width <= 0 || rect.height <= 0 ||
+            style.display === "none" || style.visibility === "hidden") {
+          problems.push("tag text is missing or hidden");
         }
 
         if (rect.left < cardRect.left - 1 || rect.right > cardRect.right + 1) {

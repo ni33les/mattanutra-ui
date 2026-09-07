@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "../helpers/offline-browser";
 
 const mobileViewports = [
   { height: 667, name: "iphone-se", width: 375 },
@@ -141,7 +141,7 @@ test.describe("mobile customer UX", () => {
       await saveMobileScreenshot(page, "home", viewport.name);
     });
 
-    test(`quiz stepper labels stay visible at ${viewport.width}px`, async ({
+    test(`quiz welcome and progress labels stay visible at ${viewport.width}px`, async ({
       baseURL,
       page,
     }) => {
@@ -149,44 +149,26 @@ test.describe("mobile customer UX", () => {
       await page.goto(toTargetUrl("/en/nutrition/quiz", baseURL));
       await waitForCustomerPage(page);
 
-      await expect(page.locator(".mn-questionnaire-meter")).toBeVisible();
-      await expect(page.locator(".mn-section-card")).toBeVisible();
-
-      const stepper = page.getByRole("navigation", { name: "Assessment stages" });
-      const buttons = stepper.getByRole("button");
-      await expect(buttons).toHaveCount(6);
-
-      const stepperLabels = await buttons.evaluateAll((elements) =>
-        elements.map((element) => ({
-          height: element.getBoundingClientRect().height,
-          text: (element.textContent ?? "").replace(/\s+/g, " ").trim(),
-          width: element.getBoundingClientRect().width,
-        })),
-      );
-      const expectedLabels = [
-        "About you",
-        "Goals",
-        "Daily life",
-        "Food",
-        "Safety",
-        "Precision",
-      ];
-
-      for (const label of expectedLabels) {
-        expect(
-          stepperLabels.some((item) => item.text.includes(label)),
-          JSON.stringify(stepperLabels),
-        ).toBe(true);
-      }
-      for (const item of stepperLabels) {
-        expect(item.text, JSON.stringify(stepperLabels)).not.toMatch(/^(?:\d|✓)$/);
-        expect(item.height).toBeGreaterThan(16);
-        expect(item.width).toBeGreaterThan(80);
-      }
+      await expect(page.getByTestId("questionnaire-welcome")).toBeVisible();
+      await expect(page.getByTestId("chat-questionnaire")).toHaveCount(0);
+      await expect.poll(() => page.getByTestId("questionnaire-welcome").locator("img").evaluate(
+        element => (element as HTMLImageElement).naturalWidth
+      )).toBeGreaterThan(0);
+      await page.getByTestId("questionnaire-welcome-cta").click();
+      const progress = page.getByTestId("quiz-progress-header");
+      await expect(progress).toBeVisible();
+      await expect(progress).toContainText("Part 1 of 6");
+      await expect(page.getByTestId("question-answers")).toBeVisible();
+      await expect(page.getByTestId("review-answers-btn")).toBeVisible();
+      const label = progress.locator(".mn-chat-q__vial-pct b");
+      const box = await label.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThan(16);
+      expect(box!.width).toBeGreaterThan(80);
 
       await assertNoHorizontalOverflow(page);
       await assertVisibleInteractiveControlsAreNamed(page);
-      await stepper.scrollIntoViewIfNeeded();
+      await progress.scrollIntoViewIfNeeded();
       await saveMobileScreenshot(page, "quiz", viewport.name);
     });
   }

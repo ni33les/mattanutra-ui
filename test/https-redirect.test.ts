@@ -108,10 +108,38 @@ describe("https redirect policy", () => {
     );
   });
 
+  it("allows headerless internal image requests to the local server", () => {
+    for (const requestUrlHost of ["127.0.0.1:3100", "localhost:3100", "[::1]:3100"]) {
+      assert.equal(shouldRedirectToHttps({
+        host: null,
+        requestUrlHost,
+        nodeEnv: "production",
+        protocol: "http:",
+        xForwardedProto: null
+      }), false);
+    }
+  });
+
+  it("retains HTTPS enforcement for public and unidentified requests", () => {
+    for (const input of [
+      { host: "dev.mattanutra.com", requestUrlHost: "127.0.0.1:3100" },
+      { host: null, requestUrlHost: "dev.mattanutra.com" },
+      { host: null }
+    ]) {
+      assert.equal(shouldRedirectToHttps({
+        ...input,
+        nodeEnv: "production",
+        protocol: "http:",
+        xForwardedProto: null
+      }), true);
+    }
+  });
+
   it("keeps proxy.ts on the shared https-redirect helper", async () => {
     const proxy = await readFile("proxy.ts", "utf8");
     assert.match(proxy, /shouldRedirectToHttps/);
     assert.match(proxy, /x-forwarded-proto/);
+    assert.match(proxy, /requestUrlHost: request\.nextUrl\.host/);
   });
 
   it("does not upgrade local dev assets to https", async () => {

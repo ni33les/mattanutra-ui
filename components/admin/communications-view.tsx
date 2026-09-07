@@ -129,7 +129,7 @@ export function AdminCommunicationsView({
   const [emailContactName, setEmailContactName] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [lineContactName, setLineContactName] = useState("");
-  const [lineCode, setLineCode] = useState<{
+  const [requestedLineCode, setLineCode] = useState<{
     code: string;
     command: string;
     expiresAt: string;
@@ -308,6 +308,9 @@ export function AdminCommunicationsView({
     }
   }
 
+  const lineCode = requestedLineCode && (!requestedLineCode.id || !settings ||
+    settings.pendingLineConnections?.some(pending => pending.id === requestedLineCode.id))
+    ? requestedLineCode : null;
   const pendingLineCount = settings?.pendingLineConnections?.length ?? 0;
   const selectedOrganisationId = settings?.selectedOrganisationId ?? "";
 
@@ -326,19 +329,6 @@ export function AdminCommunicationsView({
     return () => window.clearInterval(timer);
   }, [pendingLineCount, selectedOrganisationId]);
 
-  useEffect(() => {
-    if (!lineCode?.id || !settings) {
-      return;
-    }
-
-    const stillPending = (settings.pendingLineConnections ?? []).some(
-      (pending) => pending.id === lineCode.id
-    );
-
-    if (!stillPending) {
-      setLineCode(null);
-    }
-  }, [lineCode?.id, settings]);
 
   async function postOrganisationAction(body: Record<string, unknown>) {
     if (!settings) {

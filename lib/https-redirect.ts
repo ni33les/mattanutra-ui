@@ -22,6 +22,7 @@ export function isLocalHttpHost(hostHeader: string | null) {
 
 export function shouldRedirectToHttps(input: {
   host: string | null;
+  requestUrlHost?: string;
   nodeEnv?: string;
   protocol: string;
   xForwardedProto: string | null;
@@ -30,7 +31,10 @@ export function shouldRedirectToHttps(input: {
     return false;
   }
 
-  if (isLocalHttpHost(input.host)) {
+  // Next's image optimizer creates an internal request without HTTP headers.
+  // Its constructed URL still identifies the local server. A supplied Host
+  // header takes precedence so public requests keep their HTTPS policy.
+  if (isLocalHttpHost(input.host ?? input.requestUrlHost ?? null)) {
     return false;
   }
 

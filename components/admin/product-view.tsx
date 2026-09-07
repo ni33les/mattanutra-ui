@@ -1850,6 +1850,7 @@ function ProductDetailPanel({
       />
 
       <ProductFactsEditor
+        key={draft.id}
         draft={draft}
         onIncreaseSafetyLimit={onIncreaseSafetyLimit}
         saving={saving}

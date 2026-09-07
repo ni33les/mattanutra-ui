@@ -51,7 +51,7 @@ export function QuestionnaireWelcome({
       data-testid="questionnaire-welcome"
     >
       <div className="mn-quiz-welcome__shell">
-        <main className="mn-quiz-welcome__card">
+        <div className="mn-quiz-welcome__card">
           <section className="mn-quiz-welcome__hero">
             <div className="mn-quiz-welcome__mascot-wrap">
               <div className="mn-quiz-welcome__glow" aria-hidden />
@@ -185,7 +185,7 @@ export function QuestionnaireWelcome({
               {copy.zhNotice}
             </p>
           ) : null}
-        </main>
+        </div>
       </div>
     </section>
   );
