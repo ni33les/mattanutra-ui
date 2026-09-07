@@ -34,6 +34,12 @@ export function publicFixtureDefinition(row) {
 /** Caller supplies the transaction, allowing the integration test to roll back everything. */
 export async function seedPublicMatcherFixtures(tx) {
   const organisationId = id("retailer"), slug = "matcher-v5-isolated-fixture-retailer";
+  const brandId = id("brand"), brandName = "Synthetic Matcher Acceptance Brand";
+  await tx`insert into public.product_brands (id,name,normalized_name,status,country_code,admin_notes)
+    values (${brandId},${brandName},${TAG},'approved','TH',${TAG}) on conflict (id) do nothing`;
+  const [brand] = await tx`select name,normalized_name,status,country_code,admin_notes from public.product_brands where id=${brandId}`;
+  assert.deepEqual(brand, { name: brandName, normalized_name: TAG, status: "approved", country_code: "TH", admin_notes: TAG },
+    "The synthetic brand must satisfy ordinary approval without modifying any existing brand");
   await tx`insert into public.organisations (id,slug,name,organisation_type,status,default_locale,country_code,currency,metadata)
     values (${organisationId},${slug},'Synthetic Matcher Acceptance Retailer','tenant','active','en','TH','THB',${tx.json({ fixture: TAG })}) on conflict (id) do nothing`;
   const [organisation] = await tx`select slug,metadata from public.organisations where id=${organisationId}`;
@@ -46,13 +52,18 @@ export async function seedPublicMatcherFixtures(tx) {
     assert.equal(supplements.length, 1, `Fixture requires one canonical ${row.nutrient} reference`);
     const supplementId = supplements[0].id;
     await tx`insert into public.products (id,platform,region,title,normalized_title,product_url,normalized_url,source_url,image_url,description,source_snapshot,
-      product_kind,product_audience,status,label_status,availability_status,price_amount,currency,source,validation_status,administration)
+      product_kind,product_audience,status,label_status,availability_status,price_amount,currency,source,validation_status,administration,brand_id,brand_name)
       values (${fixture.productId},'manual','TH',${`Synthetic fixture ${row.nutrient} ${row.amount} ${row.unit}`},${`synthetic_fixture_${row.key}`},
       ${fixture.sourceUrl},${fixture.sourceUrl},${fixture.sourceUrl},${fixture.imageUrl},${fixture.sourceText},${tx.json({ fixture: TAG })},'supplement','both','approved','parsed','in_stock',
-      ${row.rrpPriceThb},'THB',${TAG},'pass',${tx.json(fixture.administration)}) on conflict (id) do nothing`;
-    const [product] = await tx`select source,source_snapshot,administration,price_amount,status,validation_status,image_url from public.products where id=${fixture.productId}`;
+      ${row.rrpPriceThb},'THB',${TAG},'pass',${tx.json(fixture.administration)},${brandId},${brandName}) on conflict (id) do nothing`;
+    const [product] = await tx`select source,source_snapshot,administration,price_amount,status,validation_status,image_url,brand_id,brand_name from public.products where id=${fixture.productId}`;
     assert.equal(product.source, TAG, "Synthetic fixture must never upgrade copied catalogue facts");
     assert.equal(product.source_snapshot.fixture, TAG);
+    assert.ok(product.brand_id === null || product.brand_id === brandId, "Fixture brand must never overwrite an unexpected association");
+    assert.ok(product.brand_name === null || product.brand_name === brandName);
+    // Complete only the explicitly tagged early fixture; approval of copied products is unchanged.
+    if (product.brand_id === null) await tx`update public.products set brand_id=${brandId},brand_name=${brandName}
+      where id=${fixture.productId} and source=${TAG} and source_snapshot->>'fixture'=${TAG} and brand_id is null`;
     assert.ok(product.image_url === null || product.image_url === fixture.imageUrl, "Fixture image cannot overwrite an unexpected value");
     // Early v1 preparation lacked its local image; repair only this explicitly identified synthetic field.
     if (product.image_url === null) await tx`update public.products set image_url=${fixture.imageUrl} where id=${fixture.productId} and source=${TAG} and image_url is null`;

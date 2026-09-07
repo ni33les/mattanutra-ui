@@ -42,6 +42,7 @@ import {
 import { normalizeDoseUnit, comparableDoseAmount, parseDoseLimit, doseExceedsLimit } from "@/lib/dose-conversion";
 import { validateProduct, validationCacheMismatchReasons } from "@/lib/product-validation";
 import { defaultLocale, resolveLocalizedText } from "@/lib/i18n";
+import { parseProductAdministration } from "@/lib/product-administration";
 import {
   inferProductFormFromTextParts,
   normalizeProductForm
@@ -458,6 +459,7 @@ export function rowFromDb(
     .filter((item): item is ProductCountryPricing => Boolean(item));
 
   return {
+    administration: parseProductAdministration(row.administration),
     aiCorrectionNotes: aiCorrectionNotesFromSnapshot(row.source_snapshot),
     availabilityStatus: row.availability_status ?? "unknown",
     availableCountryCodes: productCountryCodesFromDb(

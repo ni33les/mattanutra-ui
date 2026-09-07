@@ -101,6 +101,7 @@ export type AdminProductShopAvailability = Readonly<{
 }>;
 
 export type AdminProductRow = Readonly<{
+  administration?: import("@/lib/product-administration").ProductAdministration | null;
   aiCorrectionNotes: string | null;
   availabilityStatus: ProductAvailabilityStatus;
   availableCountryCodes: ProductCountryCode[];
@@ -501,6 +502,7 @@ export function emptyAdminProductListData(
 
 // Internal DB row shapes (moved from god file as part of the split)
 export type ProductDbRow = Readonly<{
+  administration?: unknown;
   availability_status: ProductAvailabilityStatus;
   available_country_codes: string[] | null;
   country_pricing: unknown;

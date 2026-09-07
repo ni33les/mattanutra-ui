@@ -81,6 +81,7 @@ export async function loadProductRows(
       products.product_url,
       products.source_url,
       products.source_snapshot,
+      products.administration,
       products.description,
       products.category,
       coalesce(to_jsonb(products) ->> 'product_audience', 'both') as product_audience,
