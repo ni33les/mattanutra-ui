@@ -12,7 +12,7 @@ import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { toolList } from "../lib/agentic/mcp/rpc.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
-import { createMemoryStore } from "../lib/agentic/store/memory.ts";
+import { createSnapshotMemoryStore } from "./agentic/value/snapshot-store.ts";
 import {
   createAgenticRuntime,
   setAgenticRuntimeForTests
@@ -167,7 +167,7 @@ function primaryRequest(freeze: ValueCatalogueFreeze, extra: Record<string, unkn
 
 async function createPlan(freeze: ValueCatalogueFreeze, request: Record<string, unknown>) {
   replaceCatalogueSnapshot(freeze.snapshot);
-  const store = createMemoryStore();
+  const store = createSnapshotMemoryStore(freeze.snapshot);
   const config = loadAgenticConfig();
   const runtime = createAgenticRuntime({
     config,

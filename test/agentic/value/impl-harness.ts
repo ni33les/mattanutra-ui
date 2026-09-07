@@ -6,7 +6,7 @@ import {
   loadAgenticConfig
 } from "../../../lib/agentic/config.ts";
 import { planTool } from "../../../lib/agentic/plan/service.ts";
-import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
+import { createSnapshotMemoryStore } from "./snapshot-store.ts";
 import {
   createAgenticRuntime,
   setAgenticRuntimeForTests,
@@ -169,7 +169,7 @@ export async function freezeImplCatalogue() {
 export function openSession(freeze: ValueCatalogueFreeze): PlanSession {
   replaceCatalogueSnapshot(freeze.snapshot);
   pinCatalogueSnapshot(freeze.snapshot, GUIDANCE_RULES_VERSION);
-  const store = createMemoryStore();
+  const store = createSnapshotMemoryStore(freeze.snapshot);
   const config = loadAgenticConfig();
   const runtime = createAgenticRuntime({
     config,
