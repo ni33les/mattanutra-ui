@@ -8,7 +8,7 @@ This release implements the approved limited-catalogue plan on `dev`. DEV deploy
 - The previous interrupted v4 acceptance remains incomplete. Its historical results are preserved.
 - Development evidence is outside the checkout at `/tmp/mattanutra-flexible-v5-evidence`.
 - The fresh expanded inventory revealed that HTTP consumers need an isolated local server as well as an isolated database. Offline guards rejected attempts to reach public DEV. That failed baseline is preserved, and the runner must provide the missing local transport prerequisite.
-- An initial root typecheck with a 1400 MB heap exhausted its heap and is not a pass. A subsequent 3072 MB run reported three integration errors; those errors require correction and a fresh complete check.
+- An initial root typecheck with a 1400 MB heap exhausted its heap and is not a pass. A subsequent 3072 MB run reported three integration errors; the three integration errors were corrected. A fresh full 3072 MB typecheck subsequently passed; final unchanged-source validation remains required.
 
 ## Intentional expectation changes
 
@@ -31,7 +31,7 @@ Historical case IDs and fixture prices remain intact. A changed behaviour must r
 
 ## Reviewable implementation slices
 
-The commit history separates inventory/oracle infrastructure, catalogue corrections, count ceilings, physical quantities, scoring/coverage, trade-offs, expanded search, web integration, checkout recovery, and MCP conversation/contract integration. Each has focused RED/GREEN evidence; complete inventory and integrated acceptance remain mandatory before rollout.
+The commit history separates inventory/oracle infrastructure, catalogue corrections, count ceilings, physical quantities, scoring/coverage, trade-offs, expanded search, web integration, checkout recovery, and MCP conversation/contract integration. Each has focused RED/GREEN evidence. Independent slices were developed in parallel; the complete inventory is being run on the integrated source rather than attested independently after each intermediate commit. This is a sequencing deviation from the plan, and focused runs are not claimed as the complete green gate. Complete inventory and integrated acceptance remain mandatory before rollout.
 
 Source-backed catalogue corrections are additive, audited and fingerprint guarded. Unexpected prior data aborts the correction transaction. Missing or contradictory data is not silently upgraded. Existing orders retain frozen products, quantities, prices and payment identities. No additional charge is used for recovery.
 
@@ -39,4 +39,4 @@ Source-backed catalogue corrections are additive, audited and fingerprint guarde
 
 Run `npm run validate:dev:advisory` against isolated PostgreSQL, controlled catalogue fixtures, mock/test payments and an email sink. The release diff starts at the base above. Both complete matcher/MCP acceptance runs and both published-documentation journeys must have identical non-latency results. Actual timeouts, missing cases, skipped cases and incomplete operations are failures.
 
-Store the complete source, schema, catalogue and inventory fingerprints with immutable results outside the checkout. Record final attestation and DEV deployment evidence here only after they exist. Apply additive schemas and reviewed corrections, deploy the exact validated commit, restart the application and workers, and smoke-test the required scenarios. UAT remains unchanged.
+Store the complete source, schema, catalogue and inventory fingerprints with immutable results outside the checkout. Final attestation and DEV deployment records will live with the immutable external evidence, so recording deployment does not change the source that was validated. Apply additive schemas and reviewed corrections, deploy the exact validated commit, restart the application and workers, and smoke-test the required scenarios. UAT remains unchanged.

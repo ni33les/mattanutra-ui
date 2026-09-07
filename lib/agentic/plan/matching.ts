@@ -21,6 +21,7 @@ import { displayCoveragePercent } from "@/lib/marketing-coverage";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
 import { knownLimitProfile } from "@/lib/matcher/dose-fit";
 import { intakeCertaintyFor } from "@/lib/agentic/plan/intake-certainty";
+import { factSupportsQuantifiedExposure } from "@/lib/matcher/fact-provenance";
 import {
   canonicalTargetSetHash,
   canonicalizeCurrents,
@@ -247,6 +248,7 @@ export function coverageFor(
   items: readonly BasketItem[] = []
 ): CoverageRow[] {
   const rows = state.targets.map((target): CoverageRow => {
+    const evaluatedCoverage = basket?.coverageSummary?.find(row => row.subjectId === target.supplementId);
     const knownObservations = (state.intake ?? []).flatMap(item => item.certainty === "known" && item.supplementId === target.supplementId ? [item] : []);
     const intakeCertainty = intakeCertaintyFor(state, target.supplementId);
     const current = [...state.currentSupplements, ...knownObservations.map(item => ({ dailyAmount: item.amount!,
@@ -280,7 +282,7 @@ export function coverageFor(
     const basis = target.basis ?? "supplemental";
     const knownSupplementalAmount = currentContributors.filter(item => item.source !== "diet").reduce((sum, item) => sum + item.amount, 0);
     const knownDietAmount = currentContributors.filter(item => item.source === "diet").reduce((sum, item) => sum + item.amount, 0);
-    const currentAmount = knownSupplementalAmount + (basis === "total_daily" ? knownDietAmount : 0);
+    const currentAmount = evaluatedCoverage?.knownCurrent ?? (knownSupplementalAmount + (basis === "total_daily" ? knownDietAmount : 0));
     const limitProfile = knownLimitProfile(state);
     const ceilings = limitProfile ? matcherSafetyCeilings() : [];
     const ceiling = safetyCeilingFor(ceilings, {
@@ -330,15 +332,15 @@ export function coverageFor(
     const deliveredTotal = deliveredScaled
       ? amountFromScaled(deliveredScaled, target.unit, target.name)
       : 0;
-    const deliveredAmount = items.length > 0
+    const deliveredAmount = evaluatedCoverage?.newContribution ?? (items.length > 0
       ? deliveredFromFacts
-      : basket?.productIds.length ? Math.max(0, (deliveredTotal ?? 0) - knownSupplementalAmount) : 0;
+      : basket?.productIds.length ? Math.max(0, (deliveredTotal ?? 0) - knownSupplementalAmount) : 0);
     const publishedContributors: CoverageContributor[] = [
       ...currentContributors,
       ...contributors
     ];
     const totalExposureAmount = knownSupplementalAmount + knownDietAmount + deliveredAmount;
-    const targetExposureAmount = currentAmount + deliveredAmount;
+    const targetExposureAmount = evaluatedCoverage?.knownTotal ?? (currentAmount + deliveredAmount);
     const exposurePercent =
       target.amount > 0
         ? (targetExposureAmount / target.amount) * 100
@@ -373,9 +375,9 @@ export function coverageFor(
       basis,
       authorityUrl: ceiling?.authorityUrl ?? null,
       contributors: publishedContributors,
-      coveragePercent: displayCoveragePercent(exposurePercent),
+      coveragePercent: evaluatedCoverage?.coveragePercent ?? displayCoveragePercent(exposurePercent),
       intakeCertainty,
-      totalExposureComplete: intakeCertainty === "known",
+      totalExposureComplete: intakeCertainty === "known" && evaluatedCoverage?.unknown !== true,
       currentAmount,
       deliveredAmount,
       importance,
@@ -394,8 +396,8 @@ export function coverageFor(
           ? Math.round((publishedContributors.filter(item => ceiling?.sourceScope !== "supplemental" || item.source !== "diet")
             .reduce((sum, item) => sum + item.amount, 0) / limit) * 100)
           : null,
-      remainingGap: Math.max(0, target.amount - targetExposureAmount),
-      excess: Math.max(0, targetExposureAmount - target.amount),
+      remainingGap: evaluatedCoverage?.remainingGap ?? Math.max(0, target.amount - targetExposureAmount),
+      excess: evaluatedCoverage?.excess ?? Math.max(0, targetExposureAmount - target.amount),
       ...(target.acceptableRange ? { withinAgreedRange: targetExposureAmount >= (convertAmount({ amount: target.acceptableRange.minimum, fromUnit: target.acceptableRange.unit, toUnit: target.unit, subjectId: target.supplementId, subjectName: target.name }) ?? Infinity) && targetExposureAmount <= (convertAmount({ amount: target.acceptableRange.maximum, fromUnit: target.acceptableRange.unit, toUnit: target.unit, subjectId: target.supplementId, subjectName: target.name }) ?? -Infinity) } : {}),
       requestedAmount: target.amount,
       ...(ceiling
@@ -641,7 +643,7 @@ function nutrientSplit(
   }
 
   for (const fact of matcherProduct.labelledContributions) {
-    if (fact.amount == null || fact.amount <= 0 || !fact.name?.trim() || !fact.unit) {
+    if (!factSupportsQuantifiedExposure(matcherProduct, fact) || fact.amount == null || fact.amount <= 0 || !fact.name?.trim() || !fact.unit) {
       continue;
     }
 
