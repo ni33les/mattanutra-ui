@@ -146,7 +146,10 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
         : result.status === "no_purchase"
           ? agenticMessage(locale, "plan.compact.when.no_purchase")
           : agenticMessage(locale, "plan.compact.when.follow_schedule"),
-    why: decision.nextAction === "review_options" ? agenticMessage(locale, "plan.summary.review_options") : whyFor(result, locale)
+    why: decision.nextAction === "review_options"
+      ? [agenticMessage(locale, "plan.summary.review_options"),
+          ...(durationUnknown ? [agenticMessage(locale, "plan.compact.why.duration_unknown")] : [])].join(" ")
+      : whyFor(result, locale)
   };
 }
 
