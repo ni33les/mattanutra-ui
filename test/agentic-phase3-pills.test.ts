@@ -500,7 +500,16 @@ describe("Phase 3 fewest_pills ranking", () => {
     assert.ok(result.selected);
     assert.equal(result.selected.productIds.includes("prd_magnesium"), false);
     assert.equal(result.selected.productIds.includes("prd_magnesium_d3"), true);
-    assert.equal(result.selected.doseFit?.total, 0.7);
+    assert.equal(result.selected.doseFit?.total, ((2000 - (4 * 200 + 400)) * 250 + (250 - 2 * 100) * 2000) / (2000 * 250));
+    assert.ok(result.selected.variantIds.includes("seller_th:prd_bio_calcium_d3:x4"));
+    assert.ok(result.selected.variantIds.includes("seller_th:prd_mega_b:x2"));
+    assert.equal(result.selected.priceMinor, 227000);
+    assert.equal(result.selected.dailyPills, 21);
+    assert.equal(result.selected.doseFit?.weightedLimit, 0, "2400mg calcium stays below the 2500mg reference");
+    const simpler = result.alternatives.find(option => option.roles?.includes("simpler"));
+    assert.deepEqual(simpler?.variantIds, ["seller_th:prd_magnesium_d3:x1"]);
+    assert.equal(simpler?.purchaseEligible, true);
+    assert.equal(simpler?.dailyPills, 1);
     assert.equal(result.selected.productIds.includes("prd_mega_b"), true);
     assert.equal(result.selected.productIds.includes("prd_vistra_omega"), true);
   });
