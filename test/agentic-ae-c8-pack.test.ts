@@ -84,7 +84,7 @@ export type AeC8CaseResult = Readonly<{
 
 export type AeC8PackReport = Readonly<{
   cases: readonly AeC8CaseResult[];
-  packVersion: "agentic-experience-8.0";
+  packVersion: "agentic-experience-8.1";
   passedCases: number;
   totalCases: 7;
 }>;
@@ -602,8 +602,18 @@ function broadOutcome(state: CanonicalPlanState) {
   const includeIron = state.targets.some((item) => item.supplementId === SUP_IRON || item.name === "Iron");
   return {
     alternatives: [],
-    leftovers: broadLeftovers(includeIron),
-    selected: stack(OPT_BROAD, [keepProduct()], broadCoverage())
+    leftovers: broadLeftovers(includeIron).filter(row => {
+      const target = state.targets.find(target => target.name === row.name);
+      const coverage = broadCoverage().find(item => item.name === row.name);
+      return Boolean(target && (!coverage || coverage.deliveredAmount < target.amount));
+    }),
+    selected: stack(OPT_BROAD, [keepProduct()], broadCoverage().flatMap(row => {
+      const target = state.targets.find(target => target.name === row.name);
+      if (!target) return [];
+      return [{ ...row, requestedAmount: target.amount, remainingGap: Math.max(0, target.amount - row.deliveredAmount),
+        coveragePercent: Math.min(100, Math.round(row.deliveredAmount / target.amount * 100)),
+        status: row.deliveredAmount >= target.amount ? "covered" as const : row.deliveredAmount > 0 ? "partial" as const : "uncovered" as const }];
+    }))
   };
 }
 
@@ -697,7 +707,7 @@ function matchFor(state: CanonicalPlanState) {
   ) {
     return multiOutcome();
   }
-  if (names.has("Probiotics") && names.has("Vitamin A") && names.has("Iron")) {
+  if (names.has("Probiotics") && names.has("Vitamin A") && (names.has("Iron") || names.has("Manganese"))) {
     return broadOutcome(state);
   }
   if (names.has("Vitamin D3") && names.has("Vitamin A") && names.has("Vitamin B12")) {
@@ -765,11 +775,13 @@ const SHAPE_TARGETS = [
 type Harness = Readonly<{
   call: (name: string, args: unknown) => Promise<Record<string, unknown>>;
   matchCount: () => number;
+  lastMatchedState: () => CanonicalPlanState;
   store: ReturnType<typeof createMemoryStore>;
 }>;
 
 function createHarness(): Harness {
-  const port = createCountingMatchPort(matchFor);
+  let lastState: CanonicalPlanState | undefined;
+  const port = createCountingMatchPort(state => { lastState = structuredClone(state); return matchFor(state); });
   const store = createMemoryStore();
   const runtime = createAgenticRuntime({
     config: loadAgenticConfig(),
@@ -781,6 +793,7 @@ function createHarness(): Harness {
   return {
     store,
     matchCount: () => port.getCallCount(),
+    lastMatchedState: () => { assert.ok(lastState, "The client operation must reach matching"); return lastState; },
     async call(name, args) {
       const response = await handleJsonRpc(runtime, {
         id: 1,
@@ -809,17 +822,6 @@ function coverageOf(plan: Record<string, unknown>) {
   return Array.isArray(plan.coverage) ? plan.coverage.map(asRecord) : [];
 }
 
-function reviewTargets(plan: Record<string, unknown>) {
-  const review = asRecord(plan.gapReview);
-  if (Array.isArray(review.targets)) {
-    return review.targets.map(asRecord);
-  }
-  const first = questionsOf(plan)[0];
-  if (Array.isArray(first?.targets)) {
-    return first.targets.map(asRecord);
-  }
-  return [];
-}
 
 function explanationClaimsB12(line: Record<string, unknown>) {
   const reason = asRecord(line.selectionReason);
@@ -913,9 +915,13 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
           ? line.requestedNutrients.map(asRecord)
           : [];
         const b12Coverage = coverageOf(plan).find((row) => /vitamin b12/i.test(String(row.name)));
-        const asksB12 = JSON.stringify(plan).includes("Vitamin B12");
+        const b12Advice = leftoversOf(plan).find(row => row.name === "Vitamin B12");
         const ok =
-          plan.status === "needs_input" &&
+          plan.status === "ready" &&
+          stringList(plan.nextActions).includes("confirm_with_user") &&
+          questionsOf(plan).length === 0 &&
+          line.productId === PRD_FOCUS && Number(line.lineTotalMinor) === 18900 &&
+          Number(line.servingsPerDay) === 1 && Number(line.dailyPills) === 1 &&
           names.length === 2 &&
           names.includes("Vitamin B1") &&
           names.includes("Vitamin B6") &&
@@ -924,7 +930,9 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
           stringList(line.incidentalNutrientNames).includes("Vitamin B12") &&
           Number(b12Coverage?.deliveredAmount) === 0 &&
           b12Coverage?.status === "uncovered" &&
-          asksB12 &&
+          b12Advice?.reason === "uncovered" && Number(b12Advice?.remainingGap) === 250 &&
+          details.some(item => item.name === "Vitamin B1" && Number(item.amount) === 1.5 && item.unit === "mg") &&
+          details.some(item => item.name === "Vitamin B6" && Number(item.amount) === 2 && item.unit === "mg") &&
           details.every((item) => !/vitamin b12/i.test(String(item.name))) &&
           nutrients.every((name) => !/vitamin b12/i.test(name));
         return ok
@@ -1004,7 +1012,7 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
             String(item.questionId ?? "").startsWith("q_gap_") ||
             String(item.questionId ?? "") === "q_unresolved_targets"
         );
-        const items = reviewTargets(plan);
+        const items = leftoversOf(plan);
         const names = items.map((item) => String(item.name ?? ""));
         const expected = [
           "Vitamin D3",
@@ -1026,13 +1034,17 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
             Number.isFinite(Number(item.remainingGap))
           );
         });
-        const promptsNameTargets = JSON.stringify(qs).match(/Vitamin |Iron|Manganese|Probiotics/g);
+        const adviceNamesTargets = JSON.stringify(items).match(/Vitamin |Iron|Manganese|Probiotics/g);
         const ok =
           items.length === 7 &&
-          gapQuestions.length <= 1 &&
+          plan.status === "ready" && stringList(plan.nextActions).includes("confirm_with_user") &&
+          gapQuestions.length === 0 && qs.length === 0 &&
           expected.every((name) => names.includes(name)) &&
           labelled &&
-          (promptsNameTargets?.length ?? 0) >= 7 &&
+          (adviceNamesTargets?.length ?? 0) >= 7 &&
+          items.every(item => Number(item.remainingGap) === Number(Math.max(Number(item.requestedAmount) - Number(item.deliveredAmount), 0).toFixed(8))) &&
+          Number(items.find(item => item.name === "Vitamin D3")?.remainingGap) === 800 &&
+          Number(items.find(item => item.name === "Manganese")?.remainingGap) === 0.55 &&
           !/matcherTelemetry|factLedger|lossCertificates/.test(JSON.stringify(plan));
         return ok
           ? pass("AX8-03", { review: names, questions: gapQuestions.length })
@@ -1048,69 +1060,46 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
     cases.push(
       await runCase("AX8-04", async () => {
         const harness = createHarness();
+        const intake = [{ source: "diet", certainty: "unknown", description: "Mixed meals; quantities not measured." }];
         const created = await harness.call("plan", {
-          idempotencyKey: "ax804-broad-00000001",
-          operation: "create",
-          request: planRequest(BROAD_TARGETS)
+          idempotencyKey: "ax804-broad-00000001", operation: "create",
+          request: planRequest(BROAD_TARGETS, { medicationCodes: ["apixaban"], currentSupplements: [], intake })
         });
         const before = harness.matchCount();
-        const answered = await harness.call("plan", {
-          answers: [
-            { choice: `accept_gap:${SUP_D3}`, questionId: "q_unresolved_targets" },
-            { choice: `remove_target:${SUP_IRON}`, questionId: "q_unresolved_targets" },
-            { choice: `accept_gap:${SUP_A}`, questionId: "q_unresolved_targets" }
-          ],
-          expectedRevision: created.revision,
-          idempotencyKey: "ax804-answer-0000001",
-          operation: "answer",
-          planHandle: created.planHandle
-        });
-        const replay = await harness.call("plan", {
-          answers: [
-            { choice: `accept_gap:${SUP_D3}`, questionId: "q_unresolved_targets" },
-            { choice: `remove_target:${SUP_IRON}`, questionId: "q_unresolved_targets" },
-            { choice: `accept_gap:${SUP_A}`, questionId: "q_unresolved_targets" }
-          ],
-          expectedRevision: created.revision,
-          idempotencyKey: "ax804-answer-0000001",
-          operation: "answer",
-          planHandle: created.planHandle
-        });
+        const original = harness.lastMatchedState();
+        // Customer explicitly removes Iron and changes D3 to the offered dose.
+        // Other targets, medications and unmeasured intake must survive a patch.
+        const targets = BROAD_TARGETS.filter(target => target.name !== "Iron")
+          .map(target => ({ ...target, amount: target.name === "Vitamin D3" ? 1200 : target.amount,
+            ...(SUP_BY_NAME[target.name] ? { supplementId: SUP_BY_NAME[target.name] } : {}) }));
+        const revisionRequest = { expectedRevision: created.revision, idempotencyKey: "ax804-revise-0000001",
+          operation: "revise", planHandle: created.planHandle, requestPatch: { targets } };
+        const revised = await harness.call("plan", revisionRequest);
+        const replay = await harness.call("plan", revisionRequest);
+        const after = harness.lastMatchedState();
         const stale = await harness.call("plan", {
-          answers: [{ choice: `accept_gap:${SUP_B12}`, questionId: "q_unresolved_targets" }],
-          expectedRevision: Number(created.revision),
-          idempotencyKey: "ax804-stale-00000001",
-          operation: "answer",
-          planHandle: created.planHandle
+          operation: "revise", planHandle: created.planHandle, expectedRevision: created.revision,
+          idempotencyKey: "ax804-stale-00000001", requestPatch: { requirements: { maxProductCount: 1 } }
         });
-        const remaining = reviewTargets(answered).map((item) => String(item.name ?? ""));
-        const leftoverNames = leftoversOf(answered).map((item) => String(item.name ?? ""));
-        const ok =
-          answered.planHandle === created.planHandle &&
-          Number(answered.revision) === Number(created.revision) + 1 &&
-          harness.matchCount() === before &&
-          answered.optionId === created.optionId &&
-          !remaining.includes("Iron") &&
-          !leftoverNames.includes("Iron") &&
-          !remaining.includes("Vitamin D3") &&
-          leftoverNames.includes("Vitamin A") &&
-          remaining.filter((name) =>
-            ["Vitamin B12", "Vitamin K2", "Manganese", "Probiotics"].includes(name)
-          ).length === 4 &&
-          Number(replay.revision) === Number(answered.revision) &&
-          (asRecord(stale.error).reasonCode === "stale_revision" ||
-            asRecord(stale.error).errorCode === "stale_revision" ||
-            asRecord(stale.error).reasonCode === "revision_conflict" ||
-            asRecord(stale.error).errorCode === "revision_conflict");
-        return ok
-          ? pass("AX8-04", { revision: answered.revision, remaining })
-          : fail("AX8-04", {
-              matchDelta: harness.matchCount() - before,
-              remaining,
-              leftoverNames,
-              revision: answered.revision ?? null,
-              stale: asRecord(stale.error).reasonCode ?? asRecord(stale.error).errorCode ?? null
-            });
+        const remaining = leftoversOf(revised).map(item => String(item.name ?? ""));
+        const d3 = coverageOf(revised).find(row => row.name === "Vitamin D3");
+        const line = basketOf(revised)[0] ?? {};
+        assert.equal(revised.planHandle, created.planHandle);
+        assert.equal(Number(revised.revision), Number(created.revision) + 1);
+        assert.equal(harness.matchCount(), before + 1, "A changed target rematches once; replay and stale revision do not");
+        assert.deepEqual(after.medicationCodes, original.medicationCodes);
+        assert.deepEqual(after.intake, original.intake);
+        assert.deepEqual(after.currentSupplements, original.currentSupplements);
+        assert.deepEqual(after.targets.filter(row => row.name !== "Vitamin D3"), original.targets.filter(row => !["Vitamin D3", "Iron"].includes(row.name)));
+        assert.equal(line.productId, PRD_KEEP); assert.equal(line.lineTotalMinor, 8900);
+        assert.equal(line.servingsPerDay, 1); assert.equal(line.dailyPills, 1);
+        assert.equal(d3?.requestedAmount, 1200); assert.equal(d3?.deliveredAmount, 1200); assert.equal(d3?.remainingGap, 0);
+        assert.equal(coverageOf(revised).some(row => row.name === "Iron"), false);
+        assert.deepEqual(remaining, ["Vitamin B12", "Vitamin A", "Vitamin K2", "Manganese", "Probiotics"]);
+        assert.equal(revised.status, "ready"); assert.equal(questionsOf(revised).length, 0);
+        assert.deepEqual(replay, revised);
+        assert.ok(["stale_revision", "revision_conflict"].includes(String(asRecord(stale.error).reasonCode ?? asRecord(stale.error).errorCode)));
+        return pass("AX8-04", { revision: revised.revision, remaining, matchDelta: harness.matchCount() - before, preservedMedication: after.medicationCodes });
       })
     );
 
@@ -1192,14 +1181,10 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
         });
         const enLine = asRecord(asRecord(basketOf(en)[0]).selectionReason);
         const thLine = asRecord(asRecord(basketOf(th)[0]).selectionReason);
-        const thUser = JSON.stringify(
-          questionsOf(broadTh).map((item) => ({
-            labels: Array.isArray(item.choices)
-              ? item.choices.map((choice) => asRecord(choice).label)
-              : [],
-            prompt: item.prompt
-          }))
-        );
+        const thUser = JSON.stringify(leftoversOf(broadTh).map(item => ({ name: item.name, reason: item.reason, unit: item.unit,
+          requestedAmount: item.requestedAmount, deliveredAmount: item.deliveredAmount, remainingGap: item.remainingGap })));
+        const stableAdvice = (plan: Record<string, unknown>) => leftoversOf(plan).map(item => ({ name: item.name, reason: item.reason,
+          unit: item.unit, requestedAmount: item.requestedAmount, deliveredAmount: item.deliveredAmount, remainingGap: item.remainingGap }));
         const ok =
           !explanationClaimsB12(basketOf(en)[0] ?? {}) &&
           !explanationClaimsB12(basketOf(th)[0] ?? {}) &&
@@ -1211,7 +1196,10 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
           /Vitamin B6|B6/.test(String(thLine.message ?? "")) &&
           String(thLine.messageKey ?? "") === String(enLine.messageKey ?? "") &&
           String(thLine.message ?? "") === String(enLine.message ?? "") &&
-          !/sup_ae_/.test(thUser) &&
+          broadEn.status === "ready" && broadTh.status === "ready" &&
+          questionsOf(broadEn).length === 0 && questionsOf(broadTh).length === 0 &&
+          JSON.stringify(stableAdvice(broadEn)) === JSON.stringify(stableAdvice(broadTh)) &&
+          leftoversOf(broadTh).length === 7 && !/sup_ae_/.test(thUser) &&
           /Vitamin |Iron|Manganese|Probiotics/.test(thUser) &&
           jsonSize(en) <= 16384 &&
           jsonSize(broadEn) <= 32768 &&
@@ -1242,7 +1230,7 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
     );
     return {
       cases: ordered,
-      packVersion: "agentic-experience-8.0",
+      packVersion: "agentic-experience-8.1",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 7
     };

@@ -115,7 +115,7 @@ export type AeC7CaseResult = Readonly<{
 
 export type AeC7PackReport = Readonly<{
   cases: readonly AeC7CaseResult[];
-  packVersion: "agentic-experience-7.1";
+  packVersion: "agentic-experience-7.2";
   passedCases: number;
   totalCases: 6;
 }>;
@@ -740,60 +740,23 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           operation: "create",
           request: planRequest(THIRTY_TARGETS)
         });
-        const controlOk =
-          control.ok === true &&
-          (control.status === "ready" || control.status === "needs_input") &&
-          basketOf(control).length > 0;
-        const named = new Set(
-          [...coverageNames(broad), ...leftoverNames(broad)].filter(Boolean)
-        );
-        const tooBroad =
-          broad.status === "needs_input" &&
-          (broad.reasonCode === "request_too_broad" ||
-            asRecord(broad.error).reasonCode === "request_too_broad" ||
-            String(broad.summary ?? "").toLowerCase().includes("split") ||
-            stringList(broad.nextActions).includes("split_request"));
-        const genuinePlan =
-          (broad.status === "ready" ||
-            broad.status === "needs_input" ||
-            broad.status === "blocked") &&
-          (basketOf(broad).length > 0 ||
-            (broad.status === "blocked" &&
-              Array.isArray(broad.safetyGuidance) &&
-              broad.safetyGuidance.length > 0)) &&
-          named.size >= 30;
-        const misleadingBlock =
-          broad.status === "blocked" &&
-          basketOf(broad).length === 0 &&
-          stringList(broad.nextActions).includes("change_request") &&
-          !tooBroad;
-        const ok =
-          controlOk &&
-          (tooBroad || genuinePlan) &&
-          !misleadingBlock &&
-          JSON.stringify({
-            next: broad.nextActions,
-            status: broad.status,
-            summary: broad.summary
-          }) ===
-            JSON.stringify({
-              next: replay.nextActions,
-              status: replay.status,
-              summary: replay.summary
-            });
+        const controlOk = control.ok === true && control.status === "ready" &&
+          basketOf(control).map(row => row.productId).join("|") === "prd_ae_a_1|prd_ae_a_2|prd_ae_a_3|prd_ae_a_4" &&
+          basketOf(control).reduce((sum, row) => sum + Number(row.lineTotalMinor), 0) === 467300;
+        const named = new Set([...coverageNames(broad), ...leftoverNames(broad)].filter(Boolean));
+        // V5 removes artificial breadth blocks. A completed search with no
+        // purchasable result still returns every requested target and gap.
+        const ok = controlOk && broad.ok === true && broad.status === "no_purchase" &&
+          basketOf(broad).length === 0 && named.size === THIRTY_TARGETS.length &&
+          THIRTY_TARGETS.every(target => named.has(target.name)) &&
+          stringList(broad.nextActions).length === 0 &&
+          broad.reasonCode !== "request_too_broad" &&
+          JSON.stringify({ next: broad.nextActions, status: broad.status, summary: broad.summary, coverage: broad.coverage, leftovers: broad.leftovers }) ===
+            JSON.stringify({ next: replay.nextActions, status: replay.status, summary: replay.summary, coverage: replay.coverage, leftovers: replay.leftovers });
         return ok
-          ? pass("AX7-03", {
-              broad: broad.status ?? null,
-              control: control.status ?? null,
-              tooBroad
-            })
-          : fail("AX7-03", {
-              basket: basketOf(broad).length,
-              broad: broad.status ?? null,
-              control: control.status ?? null,
-              named: named.size,
-              next: broad.nextActions ?? null
-            });
+          ? pass("AX7-03", { broad: broad.status, control: control.status, named: named.size })
+          : fail("AX7-03", { basket: basketOf(broad).length, broad: broad.status ?? null, control: control.status ?? null,
+              controlPrice: basketOf(control).reduce((sum, row) => sum + Number(row.lineTotalMinor), 0), named: named.size, next: broad.nextActions ?? null });
       })
     );
 
@@ -805,131 +768,32 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           operation: "create",
           request: planRequest(THIRTY_TARGETS)
         });
-        const original = THIRTY_TARGETS.map((item) => item.name);
-        const groups = Array.isArray(broad.suggestedGroups)
-          ? broad.suggestedGroups
-          : Array.isArray(broad.targetGroups)
-            ? broad.targetGroups
-            : [];
-        const tooBroad =
-          broad.reasonCode === "request_too_broad" ||
-          stringList(broad.nextActions).includes("split_request");
-        if (!tooBroad) {
-          const named = new Set(
-            [...coverageNames(broad), ...leftoverNames(broad)].filter(Boolean)
-          );
-          const genuine =
-            basketOf(broad).length > 0 ||
-            (broad.status === "blocked" &&
-              Array.isArray(broad.safetyGuidance) &&
-              broad.safetyGuidance.length > 0);
-          const ok =
-            genuine &&
-            original.every((name) => named.has(name)) &&
-            named.size === original.length;
-          return ok
-            ? pass("AX7-04", { mode: "single" })
-            : fail("AX7-04", {
-                mode: "single",
-                basket: basketOf(broad).length,
-                named: named.size,
-                status: broad.status ?? null
-              });
-        }
-        function executableTargets(group: unknown) {
-          const row = asRecord(group);
-          const raw = Array.isArray(group)
-            ? group
-            : Array.isArray(row.targets)
-              ? row.targets
-              : Array.isArray(row.names)
-                ? row.names
-                : [];
-          return raw
-            .map((item) => {
-              if (typeof item === "string") {
-                return null;
-              }
-              const target = asRecord(item);
-              const name = String(target.name ?? "");
-              const amount = Number(target.amount);
-              const unit = String(target.unit ?? "");
-              if (!name || !unit || !Number.isFinite(amount) || amount <= 0) {
-                return null;
-              }
-              return { amount, name, unit };
-            })
-            .filter((item): item is { amount: number; name: string; unit: string } =>
-              Boolean(item)
-            );
-        }
-        const grouped = groups.map(executableTargets);
-        const unsupported = Array.isArray(broad.unsupportedTargets)
-          ? broad.unsupportedTargets.map(asRecord)
-          : [];
-        const unsupportedKeys = unsupported
-          .map((item) => {
-            const name = String(item.name ?? "");
-            const amount = Number(item.amount);
-            const unit = String(item.unit ?? "");
-            if (!name || !unit || !Number.isFinite(amount) || amount <= 0) {
-              return "";
-            }
-            return `${name}|${amount}|${unit}`;
-          })
-          .filter(Boolean);
-        const originalKeys = THIRTY_TARGETS.map(
-          (item) => `${item.name}|${item.amount}|${item.unit}`
-        );
-        const recovered = new Set([
-          ...grouped.flat().map((item) => `${item.name}|${item.amount}|${item.unit}`),
-          ...unsupportedKeys
-        ]);
-        const reconstruct =
-          originalKeys.every((key) => recovered.has(key)) &&
-          recovered.size === originalKeys.length &&
-          grouped.every((group) => group.length > 0) &&
-          grouped.every((group) => group.every((item) => item.name !== "Vitamin A")) &&
-          unsupported.some(
-            (item) =>
-              item.name === "Vitamin A" &&
-              item.reason === "unsupported_unit_conversion"
-          );
-        const followUps = [];
-        for (const [index, targets] of grouped.entries()) {
-          const result = await harness.call("plan", {
-            idempotencyKey: `ax704-group-${String(index).padStart(6, "0")}`,
-            operation: "create",
-            request: planRequest(targets)
-          });
-          followUps.push(result.status ?? null);
-        }
-        const followOk = followUps.every(
-          (status) => status === "ready" || status === "needs_input"
-        );
-        const mixedUnits = canonicalizeTargets({
-          targets: [
-            { amount: 500, name: "Vitamin C", subjectId: "sup_c", unit: "mg" },
-            { amount: 3000, name: "Vitamin A", subjectId: "sup_a", unit: "IU" }
-          ]
+        const rows = [
+          ...(Array.isArray(broad.coverage) ? broad.coverage.map(asRecord) : []),
+          ...(Array.isArray(broad.leftovers) ? broad.leftovers.map(asRecord) : [])
+        ];
+        const reconstructed = THIRTY_TARGETS.every(target => rows.some(row =>
+          row.name === target.name && Number(row.requestedAmount) === target.amount && row.unit === target.unit &&
+          Number(row.deliveredAmount) === 0 && Number(row.remainingGap) === target.amount));
+        // The protocol's documented target-array limit remains ordinary
+        // validation; removing a basket ceiling does not remove this limit.
+        const tooMany = await harness.call("plan", {
+          idempotencyKey: "ax704-thirtyone-00001", operation: "create",
+          request: planRequest([...THIRTY_TARGETS, { name: "Vitamin C", amount: 100, unit: "mg" }])
         });
-        const mixedOk =
-          !("error" in mixedUnits) &&
-          mixedUnits.targets.some((item) => item.name === "Vitamin C") &&
-          mixedUnits.leftovers.some(
-            (item) =>
-              /vitamin a/i.test(item.name) &&
-              item.reason === "unsupported_unit_conversion"
-          );
-        return reconstruct && grouped.length > 0 && followOk && mixedOk
-          ? pass("AX7-04", { groups: grouped.length, unsupported: unsupported.length })
-          : fail("AX7-04", {
-              followUps,
-              groupCount: grouped.length,
-              mixedReason: mixedUnits.leftovers.map((item) => item.reason),
-              reconstruct,
-              unsupported: unsupported.map((item) => item.reason ?? item.name)
-            });
+        const mixedUnits = canonicalizeTargets({ targets: [
+          { amount: 500, name: "Vitamin C", subjectId: "sup_c", unit: "mg" },
+          { amount: 3000, name: "Vitamin A", subjectId: "sup_a", unit: "IU" }
+        ] });
+        const mixedOk = !("error" in mixedUnits) &&
+          mixedUnits.targets.some(item => item.name === "Vitamin C" && item.requestedAmount === 500 && item.requestedUnit === "mg") &&
+          mixedUnits.leftovers.some(item => /vitamin a/i.test(item.name) && item.reason === "unsupported_unit_conversion");
+        const ok = broad.ok === true && broad.status === "no_purchase" && reconstructed && mixedOk &&
+          compactErrorOk(tooMany, ["request.targets"]) &&
+          new Set([...coverageNames(broad), ...leftoverNames(broad)]).size === THIRTY_TARGETS.length;
+        return ok
+          ? pass("AX7-04", { mode: "single", reconstructed: THIRTY_TARGETS.length, rejectsThirtyOne: true })
+          : fail("AX7-04", { status: broad.status ?? null, reconstructed, mixedOk, error: tooMany.error ?? null });
       })
     );
 
@@ -1007,7 +871,7 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-7.1",
+      packVersion: "agentic-experience-7.2",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 6
     };
