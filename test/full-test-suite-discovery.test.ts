@@ -84,3 +84,9 @@ it("V5-INFRA-04 test hygiene detects executable focus, quarantine, todo and empt
   }
   assert.deepEqual(testSourceHygiene("it('a result', () => { assert.equal(output, 'test.only('); });", "fixture.test.ts"), []);
 });
+
+it("V5-INFRA-05 catalogue corrections and new checkout consumers remain in every matcher replay", async () => {
+  const { matcherTestInventory } = await import("../scripts/matcher-test-inventory.mjs");
+  const files = ["test/catalogue-corrections.integration.test.ts", "test/retail-checkout-catalogue-v5.integration.test.ts", "test/retail-checkout-catalogue-v5.test.ts", "test/agentic/v5-pill-certainty.test.ts", "test/dev-validation-fingerprints.test.ts"];
+  assert.deepEqual(matcherTestInventory(files).files, [...files].sort());
+});
