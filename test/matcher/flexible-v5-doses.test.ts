@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { match } from '../../lib/matcher/index.ts';
 import { compileGroups } from '../../lib/matcher/candidates.ts';
+import type { ProductAdministration } from '../../lib/product-administration.ts';
 import { catalog, product, request } from './flexible-v5-fixtures.ts';
-const verified = (unitsPerServing: number, physicalUnit = 'capsule', doseIncrement = 1) => ({ route: 'oral', physicalUnit, unitsPerServing, doseIncrement, packQuantity: 60,
+const verified = (unitsPerServing: number, physicalUnit: ProductAdministration['physicalUnit'] = 'capsule', doseIncrement = 1) => ({ route: 'oral', physicalUnit, unitsPerServing, doseIncrement, packQuantity: 60,
   provenance: { status: 'verified', sourceUrl: 'https://example.test/label', sourceText: 'Verified test label', verifiedAt: '2026-09-07T00:00:00Z' } }) as const;
 it('V5-DOSE-01: four supported units reach the target without a three-serving ceiling', () => {
   const result = match(request(), catalog([product('quarter', { a: 25 }, 100, { administration: verified(1) })]));

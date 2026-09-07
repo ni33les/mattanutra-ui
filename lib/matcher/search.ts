@@ -1,7 +1,9 @@
-import { isDeferredConditional } from "@/lib/matcher/candidates";
+import { knownTargetExposure } from "@/lib/matcher/target-basis";
+import { servingIncrement } from "@/lib/matcher/serving-grid";
+import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
-import { aggregateCoverage, fingerprintState, paretoPrune } from "@/lib/matcher/dominance";
+import { aggregateCoverage, fingerprintState } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
 import { evaluateSafety, labelledSafetyExposure } from "@/lib/matcher/safety";
 import type {
@@ -14,6 +16,8 @@ import type {
 
 export type SearchRun = Readonly<{
   complete: SearchState[];
+  groups: readonly ProductGroup[];
+  expansionAttempts: number;
   mode: "bounded" | "exact";
   trimmed: boolean;
 }>;
@@ -140,53 +144,181 @@ function compareStates(a: SearchState, b: SearchState, request: CanonicalRequest
   return a.price - b.price || a.pills - b.pills || a.count - b.count || fingerprintState(a).localeCompare(fingerprintState(b));
 }
 
+/** Count actual attempted additions, including infeasible additions and repair.
+ * Skipping a listing is not a candidate expansion. There are no untracked
+ * fallback passes outside this budget. */
 export function searchGroups(groups: readonly ProductGroup[], request: CanonicalRequest,
-  config: MatcherConfig = DEFAULT_MATCHER_CONFIG): SearchRun {
+  config: MatcherConfig = DEFAULT_MATCHER_CONFIG, incumbents: readonly SearchState[] = []): SearchRun {
+  // Dynamic residual variants are scoped to this search. Cached catalogue
+  // compilations remain immutable across customers and request revisions.
+  groups = groups.map(group => ({ ...group, variants: [...group.variants] }));
+  const baselineVariants = new Map(groups.map(group => [group.productId, [...group.variants]]));
+  const variantsForState = (group: ProductGroup, state: SearchState): readonly DoseVariant[] => {
+    const initial = baselineVariants.get(group.productId)!;
+    if (request.productDoses?.some(row => row.productId === group.productId) || !initial.length) return initial;
+    const step = servingIncrement(group.product);
+    const result = new Map(initial.map(variant => [variant.variantId, variant]));
+    for (const target of request.targets) {
+      const perServing = initial[0]!.amountPerUnit.get(target.subjectId)?.units;
+      if (!perServing || perServing <= 0 || isDeferredConditional(target)) continue;
+      const exposure = knownTargetExposure(request, target, state.exposure.get(target.subjectId) ?? BigInt(0));
+      const remainder = target.requested.units > exposure ? target.requested.units - exposure : BigInt(0);
+      const floor = remainder * step.den / (perServing * step.num);
+      for (const tick of [floor - BigInt(1), floor, floor + BigInt(1)]) {
+        if (tick <= 0 || tick > BigInt(Number.MAX_SAFE_INTEGER)) continue;
+        const ratio = { num: tick * step.num, den: step.den };
+        const dailyUnits = Number(ratio.num) / Number(ratio.den);
+        const id = `${group.sellerId}:${group.productId}:x${dailyUnits}`;
+        let variant = group.variants.find(row => row.variantId === id);
+        if (!variant) {
+          variant = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }) ?? undefined;
+          if (variant) (group.variants as DoseVariant[]).push(variant);
+        }
+        if (variant) result.set(variant.variantId, variant);
+      }
+    }
+    return [...result.values()];
+  };
   const mustSelect = (group: ProductGroup) => request.productDoses?.some(row => row.productId === group.productId) || (request.retainProductIds.includes(group.productId) &&
     !request.currentSupplements.some((row) => row.productId === group.productId));
+  const limit = Math.max(0, Math.floor(config.expansionBudget));
+  let used = 0, trimmed = false;
+  const archive = new Map<string, SearchState>();
+  const remember = (state: SearchState) => archive.set(fingerprintState({ ...state, nextGroupIndex: groups.length }), state);
+  const seed = seedState(request);
+  remember(seed);
+  for (const state of incumbents) remember(state);
+  const add = (state: SearchState, variant: DoseVariant, group: ProductGroup, phaseLimit = limit) => {
+    if (used >= phaseLimit) { trimmed = true; return null; }
+    used += 1;
+    return tryAddVariant(state, variant, group, request);
+  };
   const variantCount = groups.reduce((sum, group) => sum + group.variants.length, 0);
   const exact = groups.length <= config.exactGroupLimit && variantCount <= config.exactVariantLimit;
-  const complete: SearchState[] = [];
-  let remaining = Math.max(0, Math.floor(config.expansionBudget));
-  let trimmed = false;
   if (exact) {
     const visit = (state: SearchState) => {
-      if (remaining <= 0) { trimmed = true; complete.push(state); return; }
-      remaining -= 1;
-      if (state.nextGroupIndex >= groups.length) { complete.push(state); return; }
+      if (state.nextGroupIndex >= groups.length) { remember(state); return; }
       const group = groups[state.nextGroupIndex]!;
-      // The zero-purchase branch is equally valid and cannot disappear on timeout.
       if (!mustSelect(group)) visit(skipGroup(state));
-      for (const variant of group.variants) {
-        if (remaining <= 0) { trimmed = true; break; }
-        const next = tryAddVariant(state, variant, group, request);
+      for (const variant of variantsForState(group, state)) {
+        if (used >= limit) { trimmed = true; remember(state); break; }
+        const next = add(state, variant, group);
         if (next) visit(next);
       }
     };
-    visit(seedState(request));
-    return { complete, mode: trimmed ? "bounded" : "exact", trimmed };
+    visit(seed);
+    return { complete: [...archive.values()], groups, expansionAttempts: used, mode: trimmed ? "bounded" : "exact", trimmed };
   }
-  let beam: SearchState[] = [seedState(request)];
+  const single: { state: SearchState; group: ProductGroup; variant: DoseVariant }[] = [];
+  for (const group of groups) {
+    for (const variant of group.variants) {
+      const state = add(seed, variant, group);
+      if (state) { single.push({ state, group, variant }); remember(state); }
+      if (used >= limit) break;
+    }
+    if (used >= limit) break;
+  }
   const width = Math.max(1, Math.min(config.initialBeamWidth, config.maxBeamWidth));
-  for (let index = 0; index < groups.length; index += 1) {
+  const beamLimit = used + Math.floor((limit - used) * 0.55);
+  let beam: SearchState[] = [seed];
+  for (let index = 0; index < groups.length && used < beamLimit; index += 1) {
     const group = groups[index]!;
     const expanded: SearchState[] = [];
     for (const state of beam) {
-      if (remaining <= 0) { trimmed = true; expanded.push(state); continue; }
-      remaining -= 1;
-      if (!mustSelect(group)) expanded.push(skipGroup(state));
-      for (const variant of group.variants) {
-        const next = tryAddVariant(state, variant, group, request);
-        if (next) expanded.push(next);
+      if (!mustSelect(group)) expanded.push({ ...state, nextGroupIndex: index + 1 });
+      for (const variant of variantsForState(group, state)) {
+        if (used >= beamLimit) { trimmed = true; break; }
+        const next = add(state, variant, group, beamLimit);
+        if (next) expanded.push({ ...next, nextGroupIndex: index + 1 });
       }
     }
-    const unique = [...new Map(expanded.map((state) => [fingerprintState(state), state])).values()];
-    const layer = paretoPrune(unique, request);
-    if (layer.length > width) trimmed = true;
-    beam = [...layer].sort((a, b) => compareStates(a, b, request)).slice(0, width);
-    if (remaining <= 0) break;
+    const unique = [...new Map(expanded.map(state => [fingerprintState(state), state])).values()];
+    const ranked = unique.sort((a, b) => compareStates(a, b, request));
+    if (ranked.length > width) trimmed = true;
+    // Reserve half the frontier for different remaining-gap patterns, including
+    // weak standalone contributors that complement later products.
+    const chosen = ranked.slice(0, Math.ceil(width / 2));
+    const patterns = new Set(chosen.map(state => residualPattern(state, request)));
+    for (const state of ranked) {
+      const key = residualPattern(state, request);
+      if (patterns.has(key)) continue;
+      chosen.push(state); patterns.add(key);
+      if (chosen.length >= width) break;
+    }
+    for (const state of ranked) {
+      if (chosen.length >= width) break;
+      if (!chosen.includes(state)) chosen.push(state);
+    }
+    beam = chosen;
   }
-  return { complete: beam, mode: "bounded", trimmed };
+  for (const state of beam) remember(state);
+  // Every pair of supported single-product quantities gets a deterministic
+  // opportunity. This recovers complements without requiring either member
+  // to rank highly on its own. Infeasible pairs consume attempts as well.
+  for (let i = 0; i < single.length && used < limit; i += 1) {
+    for (let j = i + 1; j < single.length && used < limit; j += 1) {
+      const a = single[i]!, b = single[j]!;
+      if (a.group.productId === b.group.productId) continue;
+      const state = add(a.state, b.variant, b.group);
+      if (state) remember(state);
+    }
+  }
+  // Bounded replacement and add-pair repair around leading complete baskets.
+  // Remove one selected listing, rebuild the retained portion, then inspect
+  // additions and complements. Reconstruction is counted, not free work.
+  const leaders = [...archive.values()].sort((a, b) => compareStates(a, b, request)).slice(0, 4);
+  for (const leader of leaders) {
+    if (used >= limit) break;
+    const removals: (string | null)[] = [null, ...leader.selectedVariantIds];
+    for (const removed of removals) {
+      let base: SearchState | null = seed;
+      for (const id of leader.selectedVariantIds) {
+        if (id === removed) continue;
+        const group = groups.find(row => row.variants.some(v => v.variantId === id));
+        const variant = group?.variants.find(row => row.variantId === id);
+        if (!base || !group || !variant) { base = null; break; }
+        base = add(base, variant, group);
+      }
+      if (!base) continue;
+      const added: SearchState[] = [];
+      for (const group of groups) {
+        if (base.selectedProductIds?.includes(group.productId)) continue;
+        for (const variant of variantsForState(group, base)) {
+          if (used >= limit) break;
+          const state = add(base, variant, group);
+          if (state) { added.push(state); remember(state); }
+        }
+        if (used >= limit) break;
+      }
+      for (const state of added.sort((a, b) => compareStates(a, b, request)).slice(0, width)) {
+        for (const group of groups) {
+          if (state.selectedProductIds?.includes(group.productId)) continue;
+          for (const variant of variantsForState(group, state)) {
+            if (used >= limit) break;
+            const repaired = add(state, variant, group);
+            if (repaired) remember(repaired);
+          }
+          if (used >= limit) break;
+        }
+      }
+      if (used >= limit) break;
+    }
+  }
+  if (used >= limit) trimmed = true;
+  const all = [...archive.values()];
+  const complete = reviewFrontier(all, request, incumbents);
+  trimmed ||= complete.length < all.length;
+  return { complete, groups, expansionAttempts: used, mode: "bounded", trimmed };
+}
+
+function residualPattern(state: SearchState, request: CanonicalRequest) {
+  return request.targets.map(target => {
+    const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
+    if (target.requested.units <= 0) return "0";
+    // Distinguish absent, partial, exact and excess contributions with ten
+    // proportional bins. This is frontier diversity, never clinical scoring.
+    return String(delivered * BigInt(10) / target.requested.units);
+  }).join("|");
 }
 
 export function reconstructVariants(
@@ -233,4 +365,32 @@ export function revalidateState(
 
 
   return { exposure, safety, variants };
+}
+
+/** Full safety and conversational rendering runs on diverse bounded extrema,
+ * not thousands of losing search states. This changes computational effort,
+ * never the permitted number of products or quantities in a basket. */
+function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[]) {
+  if (states.length <= 192) return [...states];
+  const fitOrder = [...states].sort((a, b) => compareStates(a, b, request));
+  const chosen = new Set<SearchState>([...incumbents, ...fitOrder.slice(0, 64)]);
+  const nonempty = states.filter(row => row.count > 0);
+  for (const compare of [
+    (a: SearchState, b: SearchState) => a.price - b.price || compareStates(a, b, request),
+    (a: SearchState, b: SearchState) => a.count - b.count || a.pills - b.pills || compareStates(a, b, request),
+    (a: SearchState, b: SearchState) => a.pills - b.pills || compareStates(a, b, request)
+  ]) for (const state of [...nonempty].sort(compare).slice(0, 24)) chosen.add(state);
+  const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
+  if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {
+    const protectedFit = (state: SearchState) => doseFitScore(request, state.exposure).perTarget.filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
+    for (const state of [...states].sort((a, b) => protectedFit(a) - protectedFit(b) || compareStates(a, b, request)).slice(0, 48)) chosen.add(state);
+  }
+  const patterns = new Set<string>();
+  for (const state of fitOrder) {
+    const key = residualPattern(state, request);
+    if (patterns.has(key)) continue;
+    patterns.add(key); chosen.add(state);
+    if (patterns.size >= 48) break;
+  }
+  return [...chosen];
 }

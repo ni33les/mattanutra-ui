@@ -348,6 +348,7 @@ export type ScoredBasket = Readonly<{
   safety: SafetyResult;
   sellerId: string;
   variantIds: readonly string[];
+  variantDoses?: readonly Readonly<{ productId: string; dailyUnits: number; dailyPills: number }>[];
 }>;
 
 export type RejectionReason =
@@ -407,6 +408,13 @@ export type TargetFrontier = Readonly<{
 }>;
 
 export type MatchResult = Readonly<{
+  searchSummary?: Readonly<{
+    effort: "standard" | "expanded";
+    expansionAttempts: number;
+    expansionBudget: number;
+    complete: boolean;
+    canExpand: boolean;
+  }>;
   alternatives: readonly ScoredBasket[];
   alternativeSearch?: Readonly<{
     status: "found" | "none_found" | "incomplete" | "not_needed";

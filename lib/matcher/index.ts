@@ -5,9 +5,9 @@ import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
 import { amountFromScaled } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
-import { searchGroups, seedState, tryAddVariant } from "@/lib/matcher/search";
+import { searchGroups, seedState } from "@/lib/matcher/search";
 import { compareBaskets, hasFewerConcerns, scoreState, selectOptions } from "@/lib/matcher/selector";
-import type { CanonicalRequest, CatalogSnapshot, LossCertificate, MatchResult, MatcherConfig, MatcherLeftover, ProductGroup, ScoredBasket } from "@/lib/matcher/types";
+import type { CanonicalRequest, CatalogSnapshot, LossCertificate, MatchResult, MatcherConfig, MatcherLeftover, ProductGroup, ScoredBasket, SearchState } from "@/lib/matcher/types";
 
 /** Evidence about a concrete attempted addition/replacement; never a claim that
  * a health concern makes a product unavailable, or that a bounded winner is optimal. */
@@ -123,29 +123,37 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
   if (empty) scored.push(empty);
   let trimmed = false;
   let mode: MatchResult["searchMode"] = "exact";
-  for (const seller of sellers) {
-    const run = searchGroups(seller.groups, request, config);
-    trimmed ||= run.trimmed;
-    if (run.mode === "bounded") mode = "bounded";
-    for (const state of run.complete) {
-      const basket = scoreState({ groups: seller.groups, request, sellerId: seller.sellerId, state });
-      if (basket && basket.productCount > 0) scored.push(basket);
+  let expansionAttempts = 0;
+  const effort = request.searchEffort ?? "standard";
+  const standardBudget = Math.max(0, Math.floor(config.expansionBudget));
+  const expansionBudget = effort === "expanded" ? Math.max(64_000, standardBudget) : standardBudget;
+  const perSellerStates = new Map<string, readonly SearchState[]>();
+  const perSellerGroups = new Map(sellers.map(seller => [seller.sellerId, seller.groups as readonly ProductGroup[]]));
+  const runPass = (budget: number, expanded: boolean) => {
+    for (const [index, seller] of sellers.entries()) {
+      const allocation = Math.floor(budget / sellers.length) + (index < budget % sellers.length ? 1 : 0);
+      const run = searchGroups(perSellerGroups.get(seller.sellerId)!, request, { ...config, expansionBudget: allocation,
+        ...(expanded ? { initialBeamWidth: config.maxBeamWidth } : {}) }, perSellerStates.get(seller.sellerId));
+      perSellerStates.set(seller.sellerId, run.complete);
+      perSellerGroups.set(seller.sellerId, run.groups);
+      expansionAttempts += run.expansionAttempts;
+      trimmed ||= run.trimmed;
+      if (run.mode === "bounded") mode = "bounded";
     }
-    // Always retain the individually valid options. An exhausted beam must not
-    // hide a labelled choice or make a clinically concerned product unavailable.
-    for (const group of seller.groups) for (const variant of group.variants) {
-      const state = tryAddVariant(seedState(request), variant, group, request);
-      if (!state) continue;
-      const basket = scoreState({ groups: seller.groups, request, sellerId: seller.sellerId, state });
-      if (basket) scored.push(basket);
-    }
+  };
+  runPass(standardBudget, false);
+  if (effort === "expanded" && expansionBudget > standardBudget) runPass(expansionBudget - standardBudget, true);
+  for (const seller of sellers) for (const state of perSellerStates.get(seller.sellerId) ?? []) {
+    const basket = scoreState({ groups: perSellerGroups.get(seller.sellerId)!, request, sellerId: seller.sellerId, state });
+    if (basket && basket.productCount > 0) scored.push(basket);
   }
+  const exploredGroups = [...perSellerGroups.values()].flat();
   const winner = selectOptions({ baskets: scored, request, config });
   const targetFrontiers = request.targets.filter((target) => !isDeferredConditional(target)).map((target) => ({
     subjectId: target.subjectId, name: target.name,
     productIds: [...new Set(scored.filter((row) => (row.coverageBySubject.get(target.subjectId) ?? 0) > 0)
       .sort((a, b) => compareBaskets(a, b, request, config)).flatMap((row) => row.productIds.filter((id) =>
-        groups.some((group) => group.sellerId === row.sellerId && group.productId === id && group.variants.some((variant) =>
+        exploredGroups.some((group) => group.sellerId === row.sellerId && group.productId === id && group.variants.some((variant) =>
           row.variantIds.includes(variant.variantId) && (variant.contributions.get(target.subjectId)?.units ?? BigInt(0)) > BigInt(0))))))].slice(0, 3)
   }));
   const found = winner.alternatives.some((row) => winner.selected && hasFewerConcerns(row, winner.selected, request));
@@ -155,8 +163,8 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
     : !hasConcerns ? { status: "not_needed", reason: "The selected option raises no assessed concerns." }
     : trimmed ? { status: "incomplete", reason: "No qualifying alternative was found within the deterministic search budget; absence is not proven." }
     : { status: "none_found", reason: "No distinct option with fewer concerns and no lower per-target coverage exists among the eligible product and dose combinations." };
-  return { ...winner, alternativeSearch, leftovers: leftoversFor(request, winner.selected),
-    lossCertificates: lossCertificatesFor(request, catalog, groups, winner.selected, trimmed),
+  return { ...winner, alternativeSearch, searchSummary: { effort, expansionAttempts, expansionBudget, complete: !trimmed && mode === "exact", canExpand: effort === "standard" && (trimmed || mode === "bounded") }, leftovers: leftoversFor(request, winner.selected),
+    lossCertificates: lossCertificatesFor(request, catalog, exploredGroups, winner.selected, trimmed),
     rejected: rejectedCandidatesFor(request, catalog, groups), searchMode: mode, targetFrontiers, trimmed };
 }
 

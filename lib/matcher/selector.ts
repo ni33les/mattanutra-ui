@@ -7,7 +7,7 @@ import {
   coverageUnits,
   oversupplyScore
 } from "@/lib/matcher/dominance";
-import { seedState, tryAddVariant, reconstructVariants, revalidateState } from "@/lib/matcher/search";
+import { seedState, tryAddVariant, revalidateState } from "@/lib/matcher/search";
 import { minUnits } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
 import type {
@@ -240,7 +240,8 @@ export function scoreState(input: Readonly<{
     ),
     safety: validated.safety,
     sellerId: input.sellerId,
-    variantIds: input.state.selectedVariantIds
+    variantIds: input.state.selectedVariantIds,
+    variantDoses: validated.variants.map(({ productId, dailyUnits, dailyPills }) => ({ productId, dailyUnits, dailyPills }))
   };
 }
 
@@ -450,7 +451,7 @@ export function selectedProducts(
   groups: readonly ProductGroup[],
   basket: ScoredBasket
 ) {
-  return reconstructVariants(groups, basket.variantIds)
-    .map((variant) => groupProduct(groups, variant.productId))
+  return basket.productIds
+    .map((productId) => groupProduct(groups, productId))
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 }

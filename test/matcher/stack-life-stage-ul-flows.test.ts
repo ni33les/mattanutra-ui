@@ -308,8 +308,11 @@ describe("life-stage stack UL on every live matching flow", () => {
     assert.match(search, /doseFitScore/);
     assert.doesNotMatch(search, /stackUnitsViolateCeiling/);
     assert.match(search, /labelledSafetyExposure/);
-    assert.match(search, /for \(const variant of group\.variants\) \{\s*const next = tryAddVariant/);
-    assert.match(index, /tryAddVariant/);
+    // V5 centralises all attempted additions in the budgeted search pass;
+    // the old index-level untracked fallback is deliberately removed.
+    assert.match(search, /return tryAddVariant\(state, variant, group, request\)/);
+    assert.match(index, /searchGroups\(/);
+    assert.doesNotMatch(index, /tryAddVariant\(/);
     assert.match(selector, /tryAddVariant/);
     assert.match(web, /const result = match\(/);
     assert.match(plan, /const result = match\(request/);
