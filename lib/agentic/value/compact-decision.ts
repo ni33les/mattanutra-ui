@@ -52,6 +52,8 @@ export type CompactPlanView = Readonly<{
   questions?: readonly unknown[];
   coverage?: readonly Readonly<{
     deliveredAmount?: number;
+    currentAmount?: number;
+    remainingGap?: number;
     name: string;
     requestedAmount?: number;
     status: string;
@@ -76,6 +78,7 @@ export type CompactPlanView = Readonly<{
       unit?: string;
     }>[];
   }>;
+  alternatives?: readonly StackOption[];
   selected: StackOption | null;
   status: PlanResult["status"];
 }>;
@@ -88,7 +91,8 @@ export function buildCompactDecision(result: CompactPlanView): CompactDecision {
   const selected = result.selected;
   const locale = negotiateLocale(result.requestSnapshot?.locale);
   const durationUnknown = Boolean(result.horizon?.durationUnknown);
-  const decision = operationalDecision({ status: result.status, hasSelectedOption: selected != null,
+  const decision = operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected?.basket.length),
+    hasPurchaseOptions: result.alternatives?.some(option => option.basket.length > 0 && option.purchaseEligible !== false),
     hasQuestions: result.questions ? result.questions.length > 0 : undefined,
     purchaseRequiredNow: result.horizon?.purchaseRequiredNow,
     replenishesLater: (result.horizon?.nextReplenishmentDay ?? 0) > 0 });
@@ -176,6 +180,9 @@ function doseLines(result: CompactPlanView, locale: ReturnType<typeof negotiateL
       agenticMessage(locale, "plan.compact.what.dose", {
         amount: row.requestedAmount,
         delivered: row.deliveredAmount ?? 0,
+        current: row.currentAmount ?? 0,
+        total: (row.currentAmount ?? 0) + (row.deliveredAmount ?? 0),
+        gap: row.remainingGap ?? Math.max(0, row.requestedAmount - (row.currentAmount ?? 0) - (row.deliveredAmount ?? 0)),
         name: row.name,
         unit: row.unit
       })

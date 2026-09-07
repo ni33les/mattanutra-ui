@@ -1,14 +1,14 @@
 import { siteBaseUrl } from "@/lib/site-url";
 
-export const AGENTIC_CONTRACT_VERSION = "4.0.0";
+export const AGENTIC_CONTRACT_VERSION = "5.0.0";
 export const AGENTIC_SERVICE_NAME = "MattaNutra";
-export const AGENTIC_SERVICE_VERSION = "4.0.0";
+export const AGENTIC_SERVICE_VERSION = "5.0.0";
 export const AGENTIC_MIGRATION_VERSION = "agentic-3.0.0";
 export const AGENTIC_POLL_AFTER_SECONDS = 3;
 export const AGENTIC_CHECKOUT_TTL_MS = 15 * 60 * 1000;
 export const AGENTIC_PLAN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const AGENTIC_IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-export const GUIDANCE_RULES_VERSION = "4.0.0";
+export const GUIDANCE_RULES_VERSION = "5.0.0";
 
 export type AgenticEnvironment = "dev" | "prd" | "uat";
 export type PaymentProviderMode = "mock" | "stripe_test" | "stripe_live";

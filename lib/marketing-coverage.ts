@@ -1,4 +1,4 @@
-export const FORMULA_NEED_COVERED_PERCENT = 0;
+export const FORMULA_NEED_COVERED_PERCENT = 100;
 
 type NeedCoverageRow = Readonly<{
   coveragePercent: number;
@@ -19,13 +19,19 @@ function boundedNeedPercent(value: unknown) {
   return Math.min(100, Math.max(0, percent));
 }
 
+/** Display precision never promotes a partial dose to full coverage. */
+export function displayCoveragePercent(value: number) {
+  const bounded = boundedNeedPercent(value);
+  return Math.min(bounded < 100 ? 99.99 : 100, Math.round(bounded * 100) / 100);
+}
+
 export function formulaNeedCount(needs: readonly NeedCoverageRow[]) {
   return formulaNeedRows(needs).length;
 }
 
 export function coveredFormulaNeedCount(needs: readonly NeedCoverageRow[]) {
   return formulaNeedRows(needs).filter(
-    (need) => boundedNeedPercent(need.coveragePercent) > FORMULA_NEED_COVERED_PERCENT
+    (need) => boundedNeedPercent(need.coveragePercent) >= FORMULA_NEED_COVERED_PERCENT
   ).length;
 }
 
@@ -43,5 +49,5 @@ export function marketingCoveragePercentFromNeedCoverage(
     0
   );
 
-  return Math.max(0, Math.min(100, Math.round(total / rows.length)));
+  return displayCoveragePercent(total / rows.length);
 }

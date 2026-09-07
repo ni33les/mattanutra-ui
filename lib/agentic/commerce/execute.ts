@@ -1,3 +1,4 @@
+import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { AGENTIC_CONTRACT_VERSION, AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { RESPONSIBILITY_VERSION } from "@/lib/agentic/discovery/versions";
@@ -503,6 +504,7 @@ async function executeFresh(
     if (revision.status !== "ready" || !snapshot) return executeError(locale, "plan_not_ready");
 
     const selected = result.selected;
+    if (selected?.snapshotId && selected.snapshotId !== catalogueSnapshotId(snapshot)) return businessError({ fieldPath: "expectedRevision", reasonCode: "availability_changed", message: "Catalogue facts changed after this plan was evaluated. Refresh the unexecuted plan with revise.requestPatch={} and review it before checkout.", nextActions: ["refresh_plan"] });
     const unavailable = Boolean(
       selected?.basket.some((item) => {
         const product = snapshot.products.find((row) => row.productId === item.productId);

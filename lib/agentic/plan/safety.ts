@@ -18,13 +18,11 @@ import type {
   CanonicalPlanState,
   CoverageContributor,
   CoverageRow,
-  GapReviewTarget,
   OptionSafety,
   PlanQuestion,
   SafetyGuidance,
   StackOption
 } from "@/lib/agentic/plan/types";
-import { publicAmount } from "@/lib/agentic/public-mapper";
 import {
   CONDITION_ALIASES,
   MEDICATION_ALIASES
@@ -293,6 +291,12 @@ export function evaluateSafety(input: Readonly<{
   state: CanonicalPlanState;
 }>): readonly SafetyGuidance[] {
   const items: SafetyGuidance[] = [];
+  for (const product of input.selected?.basket ?? []) {
+    const uncertain = product.labelledFacts?.filter(fact => fact.confidence !== "high" || fact.mappingStatus === "conflicting") ?? [];
+    if (!uncertain.length && product.pillCountKnown !== false) continue;
+    const finding = guidance({ action: "review", code: "unverified_product_facts", locale: input.locale, productIds: [product.productId], supplementIds: product.contributionSupplementIds, severity: "high" });
+    items.push({ ...finding, message: `${product.productName}: ${finding.message}`, evidence: uncertain.map(fact => fact.sourceUrl).filter((url): url is string => Boolean(url)), uncertainty: agenticMessage(input.locale, "guidance.unverified_product_facts"), uncertaintyCodes: [ ...(product.pillCountKnown === false ? ["physical_quantity_unknown"] : []), ...uncertain.map(fact => `label_${fact.mappingStatus === "conflicting" ? "conflicting" : "unverified"}:${fact.name}`) ].sort() });
+  }
   const knownProfile = knownLimitProfile(input.state);
   const populationCeilings = knownProfile ? matcherSafetyCeilings() : [];
   const productIds = input.selected?.basket.map((item) => item.productId) ?? [];
@@ -783,109 +787,6 @@ export function safetyQuestions(input: Readonly<{
       ]
     });
   }
-  const omegaTarget = input.state.targets.find((item) => /omega/i.test(item.name));
-
-  if (
-    input.state.requirements.dietaryPreference === "plant_based" &&
-    omegaTarget &&
-    input.state.requirements.omega3SourcePreference !== "algae_only"
-  ) {
-    questions.push({
-      choices: [
-        {
-          choice: "allow_algae_only",
-          effect: "requirements.omega3SourcePreference=algae_only",
-          label: agenticMessage(input.locale, "plan.question.algae_only"),
-          labelKey: "plan.question.algae_only"
-        },
-        {
-          choice: "relax_plant_based",
-          effect: "requirements.dietaryPreference=any",
-          label: agenticMessage(input.locale, "plan.question.relax_plant_based"),
-          labelKey: "plan.question.relax_plant_based"
-        }
-      ],
-      prompt: agenticMessage(input.locale, "plan.question.algae_only"),
-      promptKey: "plan.question.algae_only",
-      questionId: "q_omega3_source"
-    });
-  }
-
-  const blockingDose = input.guidance.some(
-    (item) => item.code === "dose_review_required" && item.action === "block"
-  );
-  const review = unresolvedGapReview(input, blockingDose);
-  const decisionItems = review.filter(
-    (item) =>
-      item.reason === "uncovered" ||
-      item.reason === "unsupported_unit_conversion" ||
-      item.reason === "not_in_catalogue"
-  );
-  const includeDose = decisionItems.length >= 2;
-  const items = includeDose ? review : decisionItems;
-
-  if (items.length >= 2) {
-    const names = items.map((item) => item.name);
-    questions.push({
-      choices: items.flatMap((item) => {
-        const id = item.supplementId || leftoverGapId(item);
-        return [
-          {
-            choice: `accept_gap:${id}`,
-            effect: `acceptedGap=${id}`,
-            label: agenticMessage(input.locale, "plan.question.accept_gap_named", {
-              name: item.name
-            }),
-            labelKey: "plan.question.accept_gap_named"
-          },
-          {
-            choice: `remove_target:${id}`,
-            effect: `remove target ${id}`,
-            label: agenticMessage(input.locale, "plan.question.remove_target_named", {
-              name: item.name
-            }),
-            labelKey: "plan.question.remove_target_named"
-          }
-        ];
-      }),
-      prompt: agenticMessage(input.locale, "plan.question.unresolved_targets", {
-        names: names.join(", ")
-      }),
-      promptKey: "plan.question.unresolved_targets",
-      questionId: "q_unresolved_targets",
-      targets: items
-    });
-  } else {
-    for (const item of items) {
-      const gapId = item.supplementId || leftoverGapId(item);
-      questions.push({
-        choices: [
-          {
-            choice: `accept_gap:${gapId}`,
-            effect: `acceptedGap=${gapId}`,
-            label: agenticMessage(input.locale, "plan.question.accept_gap_named", {
-              name: item.name
-            }),
-            labelKey: "plan.question.accept_gap_named"
-          },
-          {
-            choice: `remove_target:${gapId}`,
-            effect: `remove target ${gapId}`,
-            label: agenticMessage(input.locale, "plan.question.remove_target_named", {
-              name: item.name
-            }),
-            labelKey: "plan.question.remove_target_named"
-          }
-        ],
-        prompt: agenticMessage(input.locale, "plan.question.accept_gap_named", {
-          name: item.name
-        }),
-        promptKey: "plan.question.accept_gap_named",
-        questionId: `q_gap_${gapId}`
-      });
-    }
-  }
-
   const unmet = input.unmetRequirements ?? [];
   const alternatives = input.alternatives ?? [];
 
@@ -1038,7 +939,7 @@ export function planStatus(input: Readonly<{
       return replenishesLater ? "ready" : "no_purchase";
     }
 
-    return "blocked";
+    return "no_purchase";
   }
 
   return "ready";
@@ -1046,118 +947,4 @@ export function planStatus(input: Readonly<{
 
 export function leftoverGapId(item: Readonly<{ name: string; supplementId?: string }>) {
   return item.supplementId || `leftover:${item.name}`;
-}
-
-function unresolvedGapReview(
-  input: Readonly<{
-    selected: StackOption | null;
-    state: CanonicalPlanState;
-  }>,
-  blockingDose: boolean
-): GapReviewTarget[] {
-  const accepted = new Set(input.state.acceptedGaps.map((item) => item.supplementId));
-  const requestedIds = new Set(input.state.targets.map((item) => item.supplementId));
-  const requestedNames = new Set(
-    input.state.targets.map((item) => item.name.trim().toLowerCase())
-  );
-  const items: GapReviewTarget[] = [];
-  const seen = new Set<string>();
-
-  function push(row: GapReviewTarget) {
-    const key = row.supplementId || row.name.trim().toLowerCase();
-    if (!key || seen.has(key) || (row.supplementId && accepted.has(row.supplementId))) {
-      return;
-    }
-    seen.add(key);
-    items.push(row);
-  }
-
-  for (const leftover of input.state.leftovers) {
-    if (leftover.source === "current_supplement") continue;
-    const id = leftoverGapId(leftover);
-    if (accepted.has(id)) {
-      continue;
-    }
-    const stillRequested =
-      leftover.reason === "not_in_catalogue" ||
-      (leftover.supplementId != null && requestedIds.has(leftover.supplementId)) ||
-      requestedNames.has(leftover.name.trim().toLowerCase());
-    if (!stillRequested) {
-      continue;
-    }
-    const coverage = input.selected?.coverage.find(
-      (row) =>
-        (leftover.supplementId && row.supplementId === leftover.supplementId) ||
-        row.name.trim().toLowerCase() === leftover.name.trim().toLowerCase()
-    );
-    const requestedAmount = publicAmount(
-      Number(coverage?.requestedAmount ?? leftover.amount ?? 0)
-    );
-    const deliveredAmount =
-      leftover.reason === "dose_gap"
-        ? publicAmount(Number(coverage?.deliveredAmount ?? 0))
-        : 0;
-    const remainingGap = publicAmount(Math.max(0, requestedAmount - deliveredAmount));
-    if (remainingGap <= 0 || !leftover.unit) {
-      continue;
-    }
-    if (
-      coverage?.status === "optional_omitted" ||
-      coverage?.status === "conditional_deferred" ||
-      coverage?.status === "already_covered"
-    ) {
-      continue;
-    }
-    push({
-      decisions: ["accept_gap", "remove_target"],
-      deliveredAmount,
-      name: leftover.name,
-      reason: leftover.reason,
-      remainingGap,
-      requestedAmount,
-      unit: leftover.unit,
-      ...(leftover.supplementId ? { supplementId: leftover.supplementId } : {})
-    });
-  }
-
-  for (const row of input.selected?.coverage ?? []) {
-    if (blockingDose && row.status === "upper_limit_risk") {
-      continue;
-    }
-    if (
-      row.remainingGap <= 0 ||
-      row.status === "covered" ||
-      row.status === "partial" ||
-      row.status === "optional_omitted" ||
-      row.status === "conditional_deferred" ||
-      row.status === "already_covered" ||
-      accepted.has(row.supplementId) ||
-      !requestedIds.has(row.supplementId)
-    ) {
-      continue;
-    }
-    push({
-      decisions: ["accept_gap", "remove_target"],
-      deliveredAmount: publicAmount(row.deliveredAmount),
-      name: row.name,
-      reason: "uncovered",
-      remainingGap: publicAmount(row.remainingGap),
-      requestedAmount: publicAmount(row.requestedAmount),
-      supplementId: row.supplementId,
-      unit: row.unit
-    });
-  }
-
-  return items;
-}
-
-function leftoverRequiresDecision(
-  item: Readonly<{ reason: string; severity: "high" | "low" | "medium" }>
-) {
-  return (
-    (item.reason === "not_in_catalogue" ||
-      item.reason === "uncovered" ||
-      item.reason === "unsupported_unit_conversion") &&
-    (item.severity === "high" || item.severity === "medium")
-  );
 }

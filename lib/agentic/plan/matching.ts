@@ -17,6 +17,7 @@ import {
   variantPillBurden
 } from "@/lib/matcher/candidates";
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
+import { displayCoveragePercent } from "@/lib/marketing-coverage";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
 import { knownLimitProfile } from "@/lib/matcher/dose-fit";
 import { intakeCertaintyFor } from "@/lib/agentic/plan/intake-certainty";
@@ -112,6 +113,7 @@ function matchPlanCacheKey(
   hash.update(snapshotIdCached(snapshot));
   hash.update("\0");
   hash.update(GUIDANCE_RULES_VERSION);
+  hash.update(MATCHER_VERSION);
   hash.update("\0");
   hash.update(JSON.stringify(state.acceptedGaps));
   hash.update("\0");
@@ -141,8 +143,8 @@ export function toCanonicalRequest(
       unit: item.unit as MatcherUnit | undefined
     })),
     targets: state.targets.map((item) => ({
-      acceptableMaximum: item.acceptableRange?.maximum,
-      acceptableMinimum: item.acceptableRange?.minimum,
+      acceptableMaximum: item.acceptableRange ? convertAmount({ amount: item.acceptableRange.maximum, fromUnit: item.acceptableRange.unit, toUnit: item.unit, subjectId: item.supplementId, subjectName: item.name }) ?? undefined : undefined,
+      acceptableMinimum: item.acceptableRange ? convertAmount({ amount: item.acceptableRange.minimum, fromUnit: item.acceptableRange.unit, toUnit: item.unit, subjectId: item.supplementId, subjectName: item.name }) ?? undefined : undefined,
       amount: item.amount,
       basis: item.basis ?? "supplemental",
       importance: item.importance ?? "required",
@@ -221,6 +223,8 @@ export function toCanonicalRequest(
     maxDailyPills: state.requirements.maxDailyPills ?? null,
     maxPriceMinor: state.requirements.maxPriceMinor ?? null,
     maxProductCount: state.requirements.maxProductCount ?? DEFAULT_MAX_PRODUCT_COUNT,
+    productDoses: state.requirements.productDoses ?? [],
+    searchEffort: state.searchEffort ?? "standard",
     medicationCodes: state.medicationCodes,
     omega3SourcePreference: impliedOmegaPreference(
       dietaryPreference,
@@ -369,7 +373,7 @@ export function coverageFor(
       basis,
       authorityUrl: ceiling?.authorityUrl ?? null,
       contributors: publishedContributors,
-      coveragePercent: Math.min(100, Math.round(exposurePercent)),
+      coveragePercent: displayCoveragePercent(exposurePercent),
       intakeCertainty,
       totalExposureComplete: intakeCertainty === "known",
       currentAmount,
@@ -391,6 +395,8 @@ export function coverageFor(
             .reduce((sum, item) => sum + item.amount, 0) / limit) * 100)
           : null,
       remainingGap: Math.max(0, target.amount - targetExposureAmount),
+      excess: Math.max(0, targetExposureAmount - target.amount),
+      ...(target.acceptableRange ? { withinAgreedRange: targetExposureAmount >= (convertAmount({ amount: target.acceptableRange.minimum, fromUnit: target.acceptableRange.unit, toUnit: target.unit, subjectId: target.supplementId, subjectName: target.name }) ?? Infinity) && targetExposureAmount <= (convertAmount({ amount: target.acceptableRange.maximum, fromUnit: target.acceptableRange.unit, toUnit: target.unit, subjectId: target.supplementId, subjectName: target.name }) ?? -Infinity) } : {}),
       requestedAmount: target.amount,
       ...(ceiling
         ? {
@@ -595,7 +601,7 @@ function nutrientSplit(
   const matcherProduct = toMatcherProduct(product);
   const requested: { amount: number; name: string; unit: string }[] = [];
   const incidental: { amount: number; name: string; unit: string }[] = [];
-  const multiplier = Math.max(1, servingsPerDay);
+  const multiplier = servingsPerDay;
   const requestedKeys = new Set<string>();
 
   for (const target of state.targets) {
@@ -730,7 +736,7 @@ function dailyUnitsForProduct(
     (id) => id.includes(marker) || id.startsWith(`${marker}`)
   );
   const parsed = Number(variantId?.slice((variantId?.lastIndexOf(":x") ?? -1) + 2));
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 function basketFromIds(
@@ -748,22 +754,24 @@ function basketFromIds(
     )
     .filter((item): item is CatalogueProduct => Boolean(item))
     .map((product) => {
-      const servingsPerDay = Math.max(
-        1,
-        dailyUnitsForProduct(product.productId, basket.variantIds)
-      );
+      const variantDose = basket.variantDoses?.find(row => row.productId === product.productId);
+      const servingsPerDay = variantDose?.dailyUnits ?? dailyUnitsForProduct(product.productId, basket.variantIds);
       const purchasedQuantity = 1;
       const nutrients = nutrientSplit(product, state, servingsPerDay);
       const selectionReason = selectionReasonFor(state, product);
 
       return enrichBasketPackFacts({
         availabilityAsOf: snapshot.availabilityAsOf,
+        administration: product.candidate.administration ?? null,
+        labelledFacts: product.candidate.facts.map(fact => ({ name: fact.name, amount: fact.amount ?? null, unit: fact.unit ?? null, confidence: fact.confidence, mappingStatus: fact.mappingStatus ?? "unverified", sourceUrl: fact.sourceUrl ?? null, sourceText: fact.sourceText ?? null })),
+        pillCountKnown: toMatcherProduct(product).pillCountKnown,
         contributionSupplementIds: product.contributionSupplementIds,
         currency: product.candidate.currency || state.currency,
-        dailyPills: variantPillBurden(
+        dailyPills: variantDose?.dailyPills ?? variantPillBurden(
           {
             dailyPillsPerServing: product.dailyPills,
-            form: product.form
+            form: product.form,
+            administration: product.candidate.administration
           },
           servingsPerDay
         ),
@@ -865,6 +873,8 @@ function toStackOption(
     recommended: Boolean(basket.recommended) || basket === recommendedBasket,
     ...(retainedCurrent.length > 0 ? { retainedCurrent } : {}),
     ...(basket.optionRole ? { role: basket.optionRole } : {}),
+    roles: basket.roles,
+    purchaseEligible: basket.purchaseEligible,
     snapshotId: catalogueSnapshotId(snapshot),
     // Daily serving variants determine dose; checkout purchases the packs above.
     totalPriceMinor: items.reduce((sum, item) => sum + item.lineTotalMinor, 0),
@@ -1112,6 +1122,7 @@ export function matchPlan(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): {
+  searchSummary?: import("@/lib/matcher/types").MatchResult["searchSummary"];
   alternativeSearch?: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
   alternatives: StackOption[];
   leftovers: PlanLeftover[];
@@ -1219,6 +1230,7 @@ function computeMatchPlan(input: Readonly<{
   return {
     alternatives,
     alternativeSearch: result.alternativeSearch,
+    searchSummary: result.searchSummary,
     leftovers,
     ...(result.lossCertificates ? { lossCertificates: result.lossCertificates } : {}),
     rejected: [...result.rejected],

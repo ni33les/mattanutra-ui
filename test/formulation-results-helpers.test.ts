@@ -335,7 +335,7 @@ describe("selected stack coverage marketing percent", () => {
     assert.equal(percent, 75);
   });
 
-  it("counts any positive coverage as covered", () => {
+  it("counts only fully met targets as covered", () => {
     assert.equal(
       coveredFormulaNeedCount([
         { coveragePercent: 60, itemType: "supplement" },
@@ -349,7 +349,7 @@ describe("selected stack coverage marketing percent", () => {
         { coveragePercent: 100, itemType: "supplement" },
         { coveragePercent: 100, itemType: "supplement" },
       ]),
-      10,
+      6,
     );
     assert.equal(
       coveredFormulaNeedCount([

@@ -1,5 +1,7 @@
+import { parseProductAdministration } from "@/lib/product-administration";
 import { operationalDecision } from "@/lib/agentic/value/operational-decision";
-import { AGENTIC_CONTRACT_VERSION, AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
+import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
+import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import { payableSnapshot } from "@/lib/agentic/money";
 import { MATCHER_VERSION } from "@/lib/matcher/config";
@@ -49,8 +51,9 @@ function compactPublic(
     if (key === "snapshotId") {
       continue;
     }
+    if (key === "administration" || key === "labelledFacts" || key === "originalRequest") { out[key] = nested; continue; }
     if (nested == null) {
-      if (nested === null && ["totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
+      if (nested === null && ["administration", "pills", "dailyPills", "pillsPerServing", "totalDailyPills", "pillDelta", "dailyPillsDelta", "dailyCostMinor", "supplyDays", "totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
       continue;
     }
     if (stripEmptyArrays && Array.isArray(nested) && nested.length === 0) {
@@ -90,7 +93,10 @@ export type PublicBasketNutrient = Readonly<{
 export type PublicBasketItem = Readonly<{
   availableServings?: number | null;
   currency: string;
-  dailyPills: number;
+  dailyPills: number | null;
+  administration?: BasketItem["administration"];
+  labelledFacts?: BasketItem["labelledFacts"];
+  pillCountKnown?: boolean;
   daysOfSupply?: number | null;
   fixture?: true;
   form: string;
@@ -100,7 +106,7 @@ export type PublicBasketItem = Readonly<{
   leftoverServings30?: number | null;
   leftoverServings90?: number | null;
   lineTotalMinor: number;
-  pillsPerServing: number;
+  pillsPerServing: number | null;
   productId: string;
   productName: string;
   quantity: number;
@@ -113,40 +119,6 @@ export type PublicBasketItem = Readonly<{
   source?: "fixture" | "retail";
   unitPriceMinor: number;
 }>;
-
-function boundedNutrients(items: BasketItem["incidentalNutrients"] | undefined) {
-  if (!Array.isArray(items) || items.length === 0) {
-    return [];
-  }
-
-  const seen = new Set<string>();
-  const out: PublicBasketNutrient[] = [];
-
-  for (const item of items) {
-    const name = String(item?.name ?? "").trim();
-    const unit = String(item?.unit ?? "").trim();
-    const amount = Number(item?.amount);
-
-    if (!name || !unit || !Number.isFinite(amount) || amount <= 0) {
-      continue;
-    }
-
-    const key = name.toLowerCase();
-
-    if (seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    out.push({ amount: publicAmount(amount), name, unit });
-
-    if (out.length >= PUBLIC_NUTRIENT_NAME_LIMIT) {
-      break;
-    }
-  }
-
-  return out;
-}
 
 function boundedNames(names: readonly string[] | undefined) {
   if (!Array.isArray(names) || names.length === 0) {
@@ -180,14 +152,6 @@ function boundedNames(names: readonly string[] | undefined) {
   return out;
 }
 
-const OPTION_REASON_CODES = [
-  "balanced",
-  "best_available",
-  "fewest_pills",
-  "highest_coverage",
-  "lowest_cost",
-  "no_distinct_alternative"
-] as const;
 
 type RequestedTargets = Readonly<{
   nameById: ReadonlyMap<string, string>;
@@ -195,7 +159,7 @@ type RequestedTargets = Readonly<{
   supplementIds: ReadonlySet<string>;
 }>;
 
-type OptionReasonCode = (typeof OPTION_REASON_CODES)[number];
+type OptionReasonCode = "balanced" | "best_available" | "fewest_pills" | "highest_coverage" | "lowest_cost" | "no_distinct_alternative";
 
 function requestedTargetsFrom(
   snapshot: PlanResult["requestSnapshot"] | null | undefined
@@ -219,15 +183,6 @@ function requestedTargetsFrom(
   }
 
   return { nameById, names, supplementIds };
-}
-
-function incidentalNameSet(item: BasketItem) {
-  return new Set(
-    [
-      ...boundedNames(item.incidentalNutrientNames),
-      ...boundedNutrients(item.incidentalNutrients).map((row) => row.name)
-    ].map((name) => name.toLowerCase())
-  );
 }
 
 type PositiveContribution = Readonly<{
@@ -313,41 +268,6 @@ function formatDose(amount: number) {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
-function lineCoverage(
-  item: BasketItem,
-  coverage: readonly CoverageRow[],
-  supplementId?: string
-) {
-  const rows = coverage.filter((row) =>
-    supplementId ? row.supplementId === supplementId : true
-  );
-  for (const row of rows) {
-    const hit = row.contributors?.find(
-      (contributor) => contributor.productId === item.productId
-    );
-    if (hit) {
-      return {
-        amount: hit.amount,
-        name: row.name,
-        remainingGap: row.remainingGap,
-        unit: hit.unit || row.unit
-      };
-    }
-  }
-
-  const row = rows[0];
-  if (!row) {
-    return null;
-  }
-
-  return {
-    amount: row.deliveredAmount,
-    name: row.name,
-    remainingGap: row.remainingGap,
-    unit: row.unit
-  };
-}
-
 function defaultSelectionReason(
   contributions: readonly PositiveContribution[],
   locale: string
@@ -410,6 +330,21 @@ function defaultSelectionReason(
   };
 }
 
+function hasKnownPillCount(item: { pillCountKnown?: boolean; dailyPills?: unknown; pillsPerServing?: unknown }) {
+  return item.pillCountKnown !== false && typeof item.dailyPills === "number" &&
+    Number.isFinite(item.dailyPills) && item.dailyPills >= 0 && item.pillsPerServing !== null;
+}
+
+function optionPillCountKnown(option: StackOption) {
+  return option.basket.every(hasKnownPillCount);
+}
+
+function comparedPillDelta(option: StackOption, selected: StackOption | null) {
+  return optionPillCountKnown(option) && (!selected || optionPillCountKnown(selected))
+    ? selected ? option.dailyPills - selected.dailyPills : 0
+    : null;
+}
+
 function truthfulReasonMap(options: readonly StackOption[]) {
   const assigned = new Map<string, OptionReasonCode>();
   if (options.length === 0) {
@@ -421,7 +356,9 @@ function truthfulReasonMap(options: readonly StackOption[]) {
   const minPills = Math.min(...options.map((item) => item.dailyPills));
   const coverageWinners = options.filter((item) => item.coveragePercent === maxCoverage);
   const costWinners = options.filter((item) => item.totalPriceMinor === minCost);
-  const pillWinners = options.filter((item) => item.dailyPills === minPills);
+  const pillWinners = options.every(optionPillCountKnown)
+    ? options.filter((item) => item.dailyPills === minPills)
+    : [];
 
   if (coverageWinners.length === 1) {
     assigned.set(coverageWinners[0]!.optionId, "highest_coverage");
@@ -522,11 +459,14 @@ export function publicBasketItem(
 
   return {
     currency: item.currency,
-    dailyPills: item.dailyPills,
+    dailyPills: item.pillCountKnown === false ? null : item.dailyPills,
+    administration: item.administration ?? null,
+    ...(item.labelledFacts ? { labelledFacts: item.labelledFacts } : {}),
+    pillCountKnown: item.pillCountKnown !== false,
     daysOfSupply,
     form: item.form,
     lineTotalMinor: item.lineTotalMinor,
-    pillsPerServing: item.pillsPerServing,
+    pillsPerServing: item.pillCountKnown === false ? null : item.pillsPerServing,
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
@@ -556,18 +496,17 @@ export function publicBasketItem(
 
 export function stackSummaryFor(basket: readonly BasketItem[], currency: string) {
   const productCount = basket.length;
-  const totalDailyPills = basket.reduce((sum, item) => sum + (Number(item.dailyPills) || 0), 0);
+  const totalDailyPills = basket.every(hasKnownPillCount) ? basket.reduce((sum, item) => sum + item.dailyPills, 0) : null;
   const totalPriceMinor = basket.reduce((sum, item) => sum + (Number(item.lineTotalMinor) || 0), 0);
   const supplyDays = basket.reduce((min, item) => {
     const days = item.daysOfSupply;
     if (days == null || !Number.isFinite(days) || days <= 0) {
-      return min;
+      return 0;
     }
     return days < min ? days : min;
   }, Number.POSITIVE_INFINITY);
-  const safeSupply = Number.isFinite(supplyDays) && supplyDays > 0 ? supplyDays : 0;
-  const dailyCostMinor =
-    safeSupply > 0 ? Math.round(totalPriceMinor / safeSupply) : 0;
+  const safeSupply = Number.isFinite(supplyDays) && supplyDays > 0 ? supplyDays : null;
+  const dailyCostMinor = safeSupply != null ? Math.round(totalPriceMinor / safeSupply) : null;
 
   return {
     currency,
@@ -590,6 +529,8 @@ export function publicCoverage(row: CoverageRow) {
     deliveredAmount: publicAmount(row.deliveredAmount),
     name: row.name,
     remainingGap: publicAmount(row.remainingGap),
+    excess: publicAmount(row.excess ?? Math.max(0, row.currentAmount + row.deliveredAmount - row.requestedAmount)),
+    ...(row.withinAgreedRange != null ? { withinAgreedRange: row.withinAgreedRange } : {}),
     requestedAmount: publicAmount(row.requestedAmount),
     status: row.status,
     supplementId: row.unresolved ? null : row.supplementId,
@@ -649,7 +590,7 @@ function tradeOffPresentation(
 
   const priceDeltaMinor = option.totalPriceMinor - selected.totalPriceMinor;
   const coverageDeltaPercent = option.coveragePercent - selected.coveragePercent;
-  const pillDelta = option.dailyPills - selected.dailyPills;
+  const pillDelta = comparedPillDelta(option, selected);
   const productCountDelta = option.basket.length - selected.basket.length;
   const parts: Array<{ key: string; text: string }> = [];
 
@@ -660,7 +601,7 @@ function tradeOffPresentation(
       text: agenticMessage(negotiated, key, { baht: formatBaht(priceDeltaMinor) })
     });
   }
-  if (pillDelta !== 0) {
+  if (pillDelta != null && pillDelta !== 0) {
     const count = Math.abs(pillDelta);
     const key =
       pillDelta > 0
@@ -692,6 +633,11 @@ function tradeOffPresentation(
     });
   }
 
+  if (pillDelta == null) {
+    const key = "plan.tradeoff.pills_unknown";
+    parts.push({ key, text: agenticMessage(negotiated, key) });
+  }
+
   if (parts.length === 0) {
     return {
       summary: agenticMessage(negotiated, "plan.tradeoff.same"),
@@ -721,7 +667,7 @@ export function publicTradeOffs(
   if (!selected) {
     return {
       coverageDeltaPercent: 0,
-      pillDelta: 0,
+      pillDelta: comparedPillDelta(option, null),
       priceDeltaMinor: 0,
       productCountDelta: 0,
       summary: copy.summary,
@@ -731,7 +677,7 @@ export function publicTradeOffs(
 
   return {
     coverageDeltaPercent: option.coveragePercent - selected.coveragePercent,
-    pillDelta: option.dailyPills - selected.dailyPills,
+    pillDelta: comparedPillDelta(option, selected),
     priceDeltaMinor: option.totalPriceMinor - selected.totalPriceMinor,
     productCountDelta: productCount - selected.basket.length,
     summary: copy.summary,
@@ -751,8 +697,11 @@ export function publicOption(
     (item, index, list) => list.findIndex((row) => row.optionId === item.optionId) === index
   );
   const reason = optionReasonFields(option, locale, unique);
+  const pillComparisonKnown = comparedPillDelta(option, selected) != null;
+  const counts = requestedTargetCoverage(option.coverage);
   return {
     coveragePercent: option.coveragePercent,
+    coverageSummary: { coveragePercent: counts.coveragePercent, fullyMetCount: counts.coveredCount, requestedCount: counts.requestedCount },
     ...(option.doseFit ? { doseFit: option.doseFit } : {}),
     coverage: option.coverage.map(publicCoverage),
     basket: option.basket.map(item => publicBasketItem(item, locale)),
@@ -761,18 +710,20 @@ export function publicOption(
     reason: reason.message,
     reasonCode: reason.code,
     reasonKey: reason.key,
-    recommended: Boolean(option.recommended || (selected && option.optionId === selected.optionId)),
+    recommended: Boolean(option.recommended),
     selected: Boolean(selected && option.optionId === selected.optionId),
     stackSummary: stackSummaryFor(option.basket, currency),
     tradeOffs: publicTradeOffs(option, selected, locale),
     ...(option.role ? { role: option.role } : {}),
+    roles: option.roles ?? (option.recommended ? ["closest_dose"] : []),
+    purchaseEligible: option.purchaseEligible ?? option.basket.length > 0,
     ...(option.cash90DayMinor != null ? { cash90DayMinor: option.cash90DayMinor } : {}),
-    ...(option.tradeOff ? { tradeOff: option.tradeOff } : {}),
+    ...(option.tradeOff ? { tradeOff: { ...option.tradeOff, dailyPillsDelta: pillComparisonKnown ? option.tradeOff.dailyPillsDelta : null } } : {}),
     ...(option.includedTargetIds ? { includedTargetIds: option.includedTargetIds } : {}),
     ...(option.omittedTargetIds ? { omittedTargetIds: option.omittedTargetIds } : {}),
     ...(option.deferredTargetIds ? { deferredTargetIds: option.deferredTargetIds } : {}),
     ...(option.retainedCurrent ? { retainedCurrent: option.retainedCurrent } : {}),
-    ...(option.economics ? { economics: option.economics } : {})
+    ...(option.economics ? { economics: { ...option.economics, deltas: { ...option.economics.deltas, pills: pillComparisonKnown ? option.economics.deltas.pills : null } } } : {})
   };
 }
 
@@ -889,10 +840,8 @@ function publicLeftovers(
       continue;
     }
     const requestedAmount = publicAmount(Number(row?.requestedAmount ?? item.amount ?? 0));
-    const deliveredAmount = publicAmount(
-      item.reason === "dose_gap" ? Number(row?.deliveredAmount ?? 0) : 0
-    );
-    const remainingGap = publicAmount(Math.max(0, requestedAmount - deliveredAmount));
+    const deliveredAmount = publicAmount(Number(row?.deliveredAmount ?? 0));
+    const remainingGap = publicAmount(row?.remainingGap ?? Math.max(0, requestedAmount - deliveredAmount));
     if (remainingGap <= 0) {
       continue;
     }
@@ -1004,7 +953,7 @@ export function publicPlanFields(result: Pick<
         result.horizon.nextReplenishmentDay > 0 &&
         result.horizon.nextReplenishmentDay < 90)
   );
-  const decision = operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
+  const decision = operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected?.basket.length), hasPurchaseOptions: alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
   const nextActions = decision.nextAction === "no_purchase" ? [] : [decision.nextAction];
   const subtotalMinor =
     result.status === "no_purchase" || result.status === "processing"
@@ -1020,8 +969,7 @@ export function publicPlanFields(result: Pick<
     (item) => item.optionId
   );
   const advertisedOptions = [selected, ...uniqueAlternatives]
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .slice(0, 3);
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const compactApplicable = planCompactApplicable(result.status);
   const compactDecision = compactApplicable ? buildCompactDecision(result) : null;
@@ -1050,6 +998,7 @@ export function publicPlanFields(result: Pick<
     ...(legacy.sourceContractVersion ? { sourceContractVersion: legacy.sourceContractVersion, refreshRequired: Boolean(legacy.refreshRequired) } : {}),
     operationalDecision: decision,
     ...((result as PlanResult).alternativeSearch ? { alternativeSearch: (result as PlanResult).alternativeSearch } : {}),
+    ...((result as PlanResult).searchSummary ? { searchSummary: (result as PlanResult).searchSummary } : {}),
     ...(selected?.doseFit ? { doseFit: selected.doseFit } : {}),
     status: result.status,
     summary: result.summary,
@@ -1365,7 +1314,7 @@ export function publicFrozenOrder(frozen: unknown) {
     countryCode: record.countryCode,
     coveragePercent: record.coveragePercent,
     currency: record.currency,
-    dailyPills: record.dailyPills,
+    dailyPills: rawItems.every(item => item && typeof item === "object" && hasKnownPillCount(item)) ? record.dailyPills : null,
     items: rawItems.map((item) => {
       if (!item || typeof item !== "object") {
         return item;
@@ -1376,6 +1325,9 @@ export function publicFrozenOrder(frozen: unknown) {
         contributionSupplementIds: [],
         currency: typeof row.currency === "string" && row.currency ? row.currency : "THB",
         dailyPills: Number(row.dailyPills) || 0,
+        ...(!hasKnownPillCount(row) ? { pillCountKnown: false } : typeof row.pillCountKnown === "boolean" ? { pillCountKnown: row.pillCountKnown } : {}),
+        administration: parseProductAdministration(row.administration),
+        ...(row.labelledFacts ? { labelledFacts: row.labelledFacts } : {}),
         deliveryWindow: null,
         fixture: Boolean(row.fixture) || row.source === "fixture",
         form: String(row.form ?? ""),

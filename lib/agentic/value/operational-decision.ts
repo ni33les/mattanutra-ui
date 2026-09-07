@@ -1,7 +1,7 @@
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 
-export type OperationalNextAction = "poll_plan" | "answer_questions" | "change_request" | "confirm_with_user" | "replenish_later" | "no_purchase" | "split_request";
+export type OperationalNextAction = "review_options" | "poll_plan" | "answer_questions" | "change_request" | "confirm_with_user" | "replenish_later" | "no_purchase" | "split_request";
 
 export type OperationalDecision = Readonly<{
   status: PlanResult["status"];
@@ -13,6 +13,7 @@ export type OperationalDecision = Readonly<{
 export function operationalDecision(input: Readonly<{
   status: PlanResult["status"];
   hasSelectedOption?: boolean;
+  hasPurchaseOptions?: boolean;
   hasQuestions?: boolean;
   purchaseRequiredNow?: boolean;
   replenishesLater?: boolean;
@@ -23,6 +24,7 @@ export function operationalDecision(input: Readonly<{
     : input.tooBroad ? "split_request"
     : status === "blocked" ? "change_request"
     : status === "needs_input" ? input.hasQuestions === false ? "change_request" : "answer_questions"
+    : status === "no_purchase" && input.hasPurchaseOptions ? "review_options"
     : status === "no_purchase" ? input.replenishesLater ? "replenish_later" : "no_purchase"
     : input.purchaseRequiredNow === false && input.replenishesLater ? "replenish_later"
     : "confirm_with_user";

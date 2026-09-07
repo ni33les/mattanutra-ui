@@ -43,7 +43,8 @@ describe("v4 matching bridge financial and coverage consistency", () => {
     const mag = snapshot.supplements[1]!;
     const before = { ...state, targets: [{ name: mag.name, supplementId: mag.supplementId, amount: 250, unit: "mg" as const }], currentSupplements: [{ name: mag.name, supplementId: mag.supplementId, dailyAmount: 224, unit: "mg" as const }] };
     assert.equal(coverageFor(before, null)[0]!.status, "gap");
-    assert.equal(coverageFor({ ...before, currentSupplements: [{ ...before.currentSupplements[0]!, dailyAmount: 225 }] }, null)[0]!.status, "already_covered");
+    assert.equal(coverageFor({ ...before, currentSupplements: [{ ...before.currentSupplements[0]!, dailyAmount: 225 }] }, null)[0]!.status, "gap");
+    assert.equal(coverageFor({ ...before, currentSupplements: [{ ...before.currentSupplements[0]!, dailyAmount: 250 }] }, null)[0]!.status, "already_covered");
   });
   it("compares complete option cash schedules including both deliveries", () => {
     const result = options(); assert.ok(result.selected); assert.equal(result.alternatives.length, 1);

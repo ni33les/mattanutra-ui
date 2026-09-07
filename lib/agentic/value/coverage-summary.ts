@@ -1,5 +1,8 @@
-/** Every requested row counts, including unresolved nutrients and deferred targets. */
-export function requestedTargetCoverage(coverage: readonly Readonly<{ status: string }>[]) {
+import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
+
+/** Proportional dose coverage and fully met target counts are distinct measures.
+ * Every requested row counts, including unresolved and optional targets. */
+export function requestedTargetCoverage(coverage: readonly Readonly<{ status: string; coveragePercent: number }>[]) {
   const coveredCount = coverage.filter(row => ["covered", "already_covered", "over_target"].includes(row.status)).length;
-  return { coveredCount, requestedCount: coverage.length, coveragePercent: coverage.length ? Math.round(100 * coveredCount / coverage.length) : 0 };
+  return { coveredCount, requestedCount: coverage.length, coveragePercent: marketingCoveragePercentFromNeedCoverage(coverage) };
 }

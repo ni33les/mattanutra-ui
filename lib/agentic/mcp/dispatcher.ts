@@ -189,6 +189,7 @@ async function callTool(
                   typeof params.planHandle === "string" ? params.planHandle : undefined,
                 request: params.request,
                 requestPatch: params.requestPatch,
+                searchEffort: params.searchEffort === "expanded" ? "expanded" : params.searchEffort === "standard" ? "standard" : undefined,
                 safetyAcknowledgement: params.safetyAcknowledgement,
                 selectOptionId:
                   typeof params.optionId === "string"

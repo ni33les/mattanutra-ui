@@ -9,6 +9,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "คำแนะนำนี้ใช้ปริมาณที่อาจได้รับสูงสุด {amount} {unit} จากค่าประมาณที่รายงาน ไม่ใช่ปริมาณรวมที่วัดได้ และปริมาณที่ไม่ทราบยังไม่ถูกนำมาคำนวณ",
     "zh-CN": "此建议使用报告估计值中最高可能达到 {amount} {unit} 的摄入量，并非实测总量；未知摄入量仍未量化。"
   },
+  "guidance.unverified_product_facts": {
+    en: "Some product quantities or label facts are unverified. Treat reported amounts as provisional; missing physical units, pill counts and supply duration remain unknown. Conflicting nutrient mappings do not establish coverage. Review the label evidence before relying on these amounts.",
+    th: "ปริมาณหรือข้อมูลฉลากบางส่วนยังไม่ได้รับการยืนยัน ให้ถือปริมาณที่รายงานเป็นข้อมูลเบื้องต้น หน่วยจริง จำนวนเม็ด และระยะเวลาที่ใช้ได้ซึ่งขาดข้อมูลยังไม่ทราบ การจับคู่สารอาหารที่ขัดแย้งกันไม่ยืนยันความครอบคลุม โปรดตรวจสอบหลักฐานบนฉลากก่อนใช้ปริมาณเหล่านี้",
+    "zh-CN": "部分产品用量或标签资料尚未核实。所列数值仅为暂定信息；缺少的实际单位、药丸数量及可用天数仍属未知。存在冲突的营养素对应关系不计入覆盖。依赖这些数值前请核查标签依据。"
+  },
   "guidance.incomplete_information": {
     en: "Some health or intake information is unknown or estimated. The quantities shown do not establish complete exposure or medical suitability; discuss relevant uncertainties with a clinician or pharmacist before use.",
     th: "ข้อมูลสุขภาพหรือปริมาณที่รับประทานบางส่วนยังไม่ทราบหรือเป็นค่าประมาณ ปริมาณที่แสดงไม่ยืนยันปริมาณรวมทั้งหมดหรือความเหมาะสมทางการแพทย์ ควรปรึกษาแพทย์หรือเภสัชกรเกี่ยวกับความไม่แน่นอนที่เกี่ยวข้องก่อนใช้",
@@ -619,6 +624,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ทบทวนคำแนะนำและกำหนดการเติมสินค้าที่วางไว้",
     "zh-CN": "请查看建议及计划的补货时间。"
   },
+  "plan.next_action.review_options": {
+    en: "The closest dose fit adds no products. Review the available purchase options and their dose, price and pill trade-offs; select one to continue.",
+    th: "ตัวเลือกที่ใกล้เคียงปริมาณเป้าหมายที่สุดไม่เพิ่มสินค้า โปรดเปรียบเทียบตัวเลือกที่ซื้อได้ ทั้งปริมาณ ราคา และจำนวนเม็ด แล้วเลือกเพื่อดำเนินการต่อ",
+    "zh-CN": "最接近目标剂量的建议不添加产品。请比较可购买选项的剂量、价格和药丸数量，选择后继续。"
+  },
   "plan.next_action.no_purchase": {
     en: "Review remaining target gaps and advice; no new purchase is recommended.",
     th: "ทบทวนเป้าหมายที่ยังไม่ครบและคำแนะนำ โดยไม่แนะนำให้ซื้อเพิ่ม",
@@ -643,6 +653,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     en: "No material difference",
     th: "ไม่ต่างจากตัวเลือกที่เลือก",
     "zh-CN": "与已选方案无实质差别"
+  },
+  "plan.tradeoff.pills_unknown": {
+    en: "Daily pill counts cannot yet be compared because physical unit information is incomplete",
+    th: "ยังเปรียบเทียบจำนวนเม็ดต่อวันไม่ได้ เนื่องจากข้อมูลหน่วยของผลิตภัณฑ์ไม่ครบถ้วน",
+    "zh-CN": "由于产品的实际单位信息不完整，目前无法比较每日服用粒数"
   },
   "plan.tradeoff.composed": {
     en: "{parts}",
@@ -745,9 +760,9 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     "zh-CN": "方案状态为 {status}。"
   },
   "plan.compact.what.dose": {
-    en: "{name} {amount} {unit}/day, delivered {delivered} {unit}",
-    th: "{name} {amount} {unit}/วัน ส่งมอบ {delivered} {unit}",
-    "zh-CN": "{name} {amount} {unit}/日，送达 {delivered} {unit}"
+    en: "{name}: target {amount} {unit}/day; known current {current}, new {delivered}, quantified total {total}, gap {gap} {unit}",
+    th: "{name}: เป้าหมาย {amount} {unit}/วัน; ปริมาณเดิมที่ทราบ {current} เพิ่มใหม่ {delivered} รวมที่วัดได้ {total} ขาด {gap} {unit}",
+    "zh-CN": "{name}：目标 {amount} {unit}/日；已知现有量 {current}，新增 {delivered}，量化总量 {total}，缺口 {gap} {unit}"
   },
   "mcp.errors.invalid_request": {
     en: "The request is not valid.",

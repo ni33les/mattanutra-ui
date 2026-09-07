@@ -58,9 +58,10 @@ export type PlanRequirements = Readonly<{
   dietaryPreference?: "any" | "plant_based" | "vegan";
   excludeSupplementIds?: readonly string[];
   excludeProductIds?: readonly string[];
-  maxDailyPills?: number;
-  maxPriceMinor?: number;
-  maxProductCount?: number;
+  maxDailyPills?: number | null;
+  maxPriceMinor?: number | null;
+  maxProductCount?: number | null;
+  productDoses?: readonly Readonly<{ productId: string; servingsPerDay: number }>[];
   omega3SourcePreference?: "algae_only" | "any" | "fish_allowed";
   retainProductIds?: readonly string[];
   retainSupplementIds?: readonly string[];
@@ -158,6 +159,7 @@ export type PlanLeftover = Readonly<{
 }>;
 
 export type CanonicalPlanState = Readonly<{
+  searchEffort?: "standard" | "expanded";
   acceptedGaps: readonly AcceptedGap[];
   acknowledgedUnassessedConditionCodes?: readonly string[];
   acknowledgedUnassessedMedicationCodes?: readonly string[];
@@ -317,7 +319,16 @@ export type SelectionReason = Readonly<{
   requestedSupplementIds: readonly string[];
 }>;
 
+export type PublicLabelFact = Readonly<{
+  name: string; amount: number | null; unit: string | null;
+  confidence: "high" | "moderate" | "low";
+  mappingStatus: "verified" | "unverified" | "conflicting";
+  sourceUrl: string | null; sourceText: string | null;
+}>;
 export type BasketItem = Readonly<{
+  labelledFacts?: readonly PublicLabelFact[];
+  administration?: import("@/lib/product-administration").ProductAdministration | null;
+  pillCountKnown?: boolean;
   availabilityAsOf: string;
   availableServings?: number | null;
   contributionSupplementIds: readonly string[];
@@ -353,6 +364,8 @@ export type BasketItem = Readonly<{
 }>;
 
 export type CoverageRow = Readonly<{
+  excess?: number;
+  withinAgreedRange?: boolean;
   basis?: "total_daily" | "supplemental";
   totalExposureComplete?: boolean;
   intakeCertainty?: "known" | "estimated" | "unknown";
@@ -401,6 +414,7 @@ export type SafetyGuidance = Readonly<{
   referenceBasis?: "continued_dose";
   action: "acknowledge" | "block" | "review";
   code:
+    | "unverified_product_facts"
     | "incomplete_information"
     | "continued_dose_increased"
     | "audience_mismatch"
@@ -449,7 +463,7 @@ export type PlanQuestion = Readonly<{
   targets?: readonly GapReviewTarget[];
 }>;
 
-export type ValueOptionRole = "requested_objective" | "fewer_concerns" | "best_value" | "complete" | "minimum_core";
+export type ValueOptionRole = "lower_cost" | "simpler" | "purchase_fallback" | "requested_objective" | "fewer_concerns" | "best_value" | "complete" | "minimum_core";
 
 export type BurdenLedger = Readonly<{
   administrationEvents: number;
@@ -561,7 +575,7 @@ export type PlanExplanation = Readonly<{
     status: string;
     supplementId: string;
   }>[];
-  pills: number;
+  pills: number | null;
   productCount: number;
   purchases: readonly Readonly<{
     lineTotalMinor: number;
@@ -645,6 +659,8 @@ export type StackOption = Readonly<{
   recommended?: boolean;
   retainedCurrent?: readonly RetainedCurrent[];
   role?: ValueOptionRole;
+  roles?: readonly ("closest_dose" | "lower_cost" | "simpler" | "fewer_concerns" | "purchase_fallback")[];
+  purchaseEligible?: boolean;
   safety?: OptionSafety;
   snapshotId: string;
   totalPriceMinor: number;
@@ -671,6 +687,7 @@ export type PlanBreadth = Readonly<{
 }>;
 
 export type PlanResult = Readonly<{
+  searchSummary?: import("@/lib/matcher/types").MatchResult["searchSummary"];
   alternativeSearch?: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
   contractVersion?: string;
   originalRequest?: PlanRequest;
@@ -702,6 +719,7 @@ export type PlanResult = Readonly<{
   /** Original, unnormalized input retained only while a new plan is processing. */
   pendingInput?: Readonly<{
     request: PlanRequest;
+    searchEffort?: "standard" | "expanded";
     answers: readonly PlanAnswer[];
     safetyAcknowledgement: SafetyAcknowledgement | null;
   }>;

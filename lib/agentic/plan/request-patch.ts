@@ -5,19 +5,22 @@ import type { PlanRequest, PlanRequestPatch, PlanResult } from "@/lib/agentic/pl
 
 function record(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 export function mergeRequestPatch(base: PlanRequest, patch: PlanRequestPatch): PlanRequest | AgenticErrorResult {
-  function merge(original: unknown, incoming: unknown): unknown {
-    if (incoming === null) throw new Error("null");
+  function merge(original: unknown, incoming: unknown, path = ""): unknown {
+    if (incoming === null) {
+      if (["requirements.maxProductCount", "requirements.maxDailyPills", "requirements.maxPriceMinor"].includes(path)) return null;
+      throw new Error(path);
+    }
     if (Array.isArray(incoming)) return structuredClone(incoming);
     if (!record(incoming)) return incoming;
     const result = record(original) ? { ...original } : {};
     for (const [key, value] of Object.entries(incoming)) {
       if (key === "__proto__" || key === "constructor" || key === "prototype") throw new Error("unsafe_key");
-      result[key] = merge(result[key], value);
+      result[key] = merge(result[key], value, path ? `${path}.${key}` : key);
     }
     return result;
   }
   let merged: unknown;
-  try { merged = merge(base, patch); } catch { return businessError({ fieldPath: "requestPatch", reasonCode: "invalid_request", message: "Patch fields cannot be null or use unsafe property names. Omit a field to preserve it or use [] to clear an array." }); }
+  try { merged = merge(base, patch); } catch { return businessError({ fieldPath: "requestPatch", reasonCode: "invalid_request", message: "Only product, pill and price ceilings can be cleared with null; other fields cannot be null or use unsafe property names. Omit a field to preserve it or use [] to clear an array." }); }
   const issues = validateToolIssues(PLAN_REQUEST, merged);
   return issues.length ? schemaIssuesToError(issues) : merged as PlanRequest;
 }
@@ -34,6 +37,6 @@ export function originalRequestFor(result: PlanResult): PlanRequest | AgenticErr
     medicationCodes: state.medicationCodes, conditionCodes: state.conditionCodes,
     currentSupplements: state.currentSupplements.map(item => ({ dailyAmount: item.dailyAmount, name: item.name, supplementId: item.supplementId, unit: item.unit, ...(item.productId ? { productId: item.productId } : {}), ...(item.daysRemaining != null ? { daysRemaining: item.daysRemaining } : {}) })), ...(state.intake ? { intake: state.intake } : {}),
     ...(state.baseline ? { baseline: state.baseline } : {}),
-    targets: [...state.targets.map(item => ({ amount: item.amount, name: item.requestedName ?? item.name, supplementId: item.supplementId, unit: item.unit, ...(item.importance ? { importance: item.importance } : {}), ...(item.acceptableRange ? { acceptableRange: item.acceptableRange } : {}), ...(item.prerequisite ? { prerequisite: item.prerequisite } : {}) })), ...state.leftovers.filter(item => item.source === "target" && item.amount != null && item.unit).map(item => ({ name: item.name, amount: item.amount!, unit: item.unit!, ...(item.supplementId ? { supplementId: item.supplementId } : {}) }))]
+    targets: [...state.targets.map(item => ({ amount: item.amount, name: item.requestedName ?? item.name, supplementId: item.supplementId, unit: item.unit, ...(item.basis ? { basis: item.basis } : {}), ...(item.importance ? { importance: item.importance } : {}), ...(item.acceptableRange ? { acceptableRange: item.acceptableRange } : {}), ...(item.prerequisite ? { prerequisite: item.prerequisite } : {}) })), ...state.leftovers.filter(item => item.source === "target" && item.amount != null && item.unit).map(item => ({ name: item.name, amount: item.amount!, unit: item.unit!, ...(item.supplementId ? { supplementId: item.supplementId } : {}) }))]
   };
 }

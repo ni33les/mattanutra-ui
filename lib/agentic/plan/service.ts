@@ -1,3 +1,6 @@
+import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
+import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
+import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import { mergeRequestPatch, originalRequestFor } from "@/lib/agentic/plan/request-patch";
 import { requestLifetime } from "@/lib/request-lifetime";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -38,6 +41,7 @@ import {
 } from "@/lib/agentic/plan/normalize";
 import {
   coverageFor,
+  toCanonicalRequest,
   leftoversFor,
   matcherTelemetryFor,
   matchPlan,
@@ -51,7 +55,7 @@ import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
-import { queryBudgetSnapshot, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { setQueryNamespace } from "@/lib/agentic/plan/query-budget";
 import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
 import { persistQueryBudget } from "@/lib/agentic/qa/persist";
 import { QA_NAMESPACE_PREFIX } from "@/lib/agentic/qa/session";
@@ -202,6 +206,7 @@ export type PlanToolInput = Readonly<{
   requestPatch?: unknown;
   safetyAcknowledgement?: unknown;
   selectOptionId?: string;
+  searchEffort?: "standard" | "expanded";
 }>;
 
 export type PlanToolSuccess = ReturnType<typeof publicPlanFields> &
@@ -273,6 +278,7 @@ function hasFullRequest(payload: PlanToolInput) {
 
 function composeResult(input: Readonly<{
   alternativeSearch?: PlanResult["alternativeSearch"];
+  searchSummary?: PlanResult["searchSummary"];
   ackMs?: number;
   alternatives: readonly StackOption[];
   catalogueMs?: number;
@@ -291,7 +297,7 @@ function composeResult(input: Readonly<{
   unmetRequirements: readonly string[];
 }>): PlanResult {
   const tooBroad =
-    input.state.targets.length >= 30 &&
+    input.state.targets.length > 30 &&
     (!input.selected || input.selected.basket.length === 0);
   const coverage = tooBroad
     ? []
@@ -377,6 +383,7 @@ function composeResult(input: Readonly<{
   return {
     contractVersion: AGENTIC_CONTRACT_VERSION,
     ...(input.alternativeSearch ? { alternativeSearch: input.alternativeSearch } : {}),
+    ...(input.searchSummary ? { searchSummary: input.searchSummary } : {}),
     originalRequest: input.state.originalRequest,
     alternatives: [...input.alternatives],
     appliedRequirements: Object.entries(pinnedState.requirements)
@@ -524,6 +531,7 @@ async function buildResult(input: Readonly<{
     ackMs,
     alternatives: matched.alternatives,
     alternativeSearch: "alternativeSearch" in matched ? matched.alternativeSearch : undefined,
+    searchSummary: "searchSummary" in matched ? matched.searchSummary : undefined,
     catalogueMs: input.catalogueMs,
     locale: input.locale,
     leftovers: matched.leftovers,
@@ -573,6 +581,7 @@ function buildPinnedResult(input: Readonly<{
   return composeResult({
     alternatives: advertisedAlternatives(input.previous, input.selected),
     alternativeSearch: input.previous.alternativeSearch,
+    searchSummary: input.previous.searchSummary,
     locale: input.locale,
     leftovers,
     previous: input.previous,
@@ -638,26 +647,6 @@ function bindSafetyAcknowledgement(input: Readonly<{
       confirmed: true,
       guidanceIds,
       revision: input.shownRevision
-    }
-  };
-}
-
-function feedbackFields(input: Readonly<{
-  locale: Locale;
-  revision: number;
-  status: PlanResult["status"];
-}>) {
-  if (
-    input.status !== "ready" &&
-    input.revision < PLAN_FEEDBACK_AFTER_REVISIONS
-  ) {
-    return {};
-  }
-
-  return {
-    feedbackInvitation: {
-      prompt: agenticMessage(input.locale, "feedback.invitation"),
-      promptKey: "feedback.invitation"
     }
   };
 }
@@ -746,6 +735,7 @@ function draftStateFromPayload(input: Readonly<{
     return applyPlanAnswers(
       {
         acceptedGaps: [],
+        searchEffort: input.payload.searchEffort ?? input.previous?.requestSnapshot.searchEffort ?? "standard",
         ...(request.baseline ? { baseline: request.baseline } : {}),
         conditionCodes: [...new Set(request.conditionCodes ?? [])],
         currency: "THB",
@@ -771,6 +761,8 @@ function draftStateFromPayload(input: Readonly<{
         safetyAcknowledgement: request.safetyAcknowledgement ?? null,
         targets: request.targets.map((item) => ({
           amount: item.amount,
+          ...(item.basis ? { basis: item.basis } : {}),
+          ...(item.acceptableRange ? { acceptableRange: item.acceptableRange } : {}),
           ...(item.importance ? { importance: item.importance } : {}),
           name: item.name,
           ...(item.prerequisite ? { prerequisite: item.prerequisite } : {}),
@@ -919,6 +911,7 @@ type PreparedPlanCommand = Readonly<{
   resume: boolean;
   revision: number;
   selectOptionId?: string;
+  searchEffort?: "standard" | "expanded";
   shownRevision: number;
   state: CanonicalPlanState;
 }>;
@@ -1270,7 +1263,7 @@ async function executePlanTool(input: Readonly<{
       }
     });
     const pendingInput = hasFullRequest(payload)
-      ? { request: structuredClone(effectiveRequest!), answers, safetyAcknowledgement: null }
+      ? { request: structuredClone(effectiveRequest!), searchEffort: state.searchEffort ?? "standard", answers, safetyAcknowledgement: null }
       : previous?.pendingInput;
     const processing = processingResult({ locale, previous, state, pendingInput });
 
@@ -1496,7 +1489,7 @@ async function completePreparedPlan(
       products: [],
       supplements: []
     };
-  } else if (prepared.previous && prepared.previous.status !== "processing" && !loadLiveCatalogue &&
+  } else if (input.payload.operation === "get" && prepared.previous && prepared.previous.status !== "processing" && !loadLiveCatalogue &&
     prepared.previous.requestSnapshot.destinationCountry === country) {
     const pinned = await restoreCataloguePin(
       pinnedSnapshotIdFromResult(prepared.previous), GUIDANCE_RULES_VERSION, input.store
@@ -1580,6 +1573,9 @@ async function completePreparedPlan(
       });
     }
 
+    if (!isolated && option.snapshotId && option.snapshotId !== catalogueSnapshotId(snapshot)) {
+      return businessError({ fieldPath: "optionId", reasonCode: "availability_changed", message: "Catalogue facts changed after this option was evaluated. Revise with requestPatch={} and the current revision, review the new options, then select a returned option ID.", nextActions: ["refresh_plan"] });
+    }
     const nextResult = buildPinnedResult({
       locale: prepared.locale,
       previous,
@@ -1599,6 +1595,7 @@ async function completePreparedPlan(
       planId: prepared.planId,
       result: nextResult,
       revision,
+      expectedCatalogueRevision: isolated ? undefined : snapshot.runtimeRevision,
       skipSideEffects: isolated
     });
   }
@@ -1611,6 +1608,7 @@ async function completePreparedPlan(
       const merged = applyPlanAnswers(prepared.state, { answers });
       pinPrevious = Boolean(
         previous && previous.contractVersion === AGENTIC_CONTRACT_VERSION &&
+        (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
           planRematchFingerprint(previous.requestSnapshot) ===
             planRematchFingerprint(merged)
       );
@@ -1634,6 +1632,7 @@ async function completePreparedPlan(
     const normalized = await normalizePlanRequest({
       config: input.config,
       request: prepared.effectiveRequest ?? input.payload.request,
+      searchEffort: input.payload.searchEffort ?? prepared.state.searchEffort ?? previous?.requestSnapshot.searchEffort,
       snapshot
     });
 
@@ -1644,6 +1643,7 @@ async function completePreparedPlan(
     const merged = applyPlanAnswers(normalized.state, { answers });
     pinPrevious = Boolean(
       previous && previous.contractVersion === AGENTIC_CONTRACT_VERSION &&
+        (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
         planRematchFingerprint(previous.requestSnapshot) ===
           planRematchFingerprint(merged)
     );
@@ -1678,6 +1678,7 @@ async function completePreparedPlan(
     const normalized = await normalizePlanRequest({
       config: input.config,
       request: pendingInput?.request ?? verifiedLegacyRequest ?? requestFromState(prepared.state),
+      searchEffort: pendingInput?.searchEffort ?? prepared.state.searchEffort,
       snapshot
     });
 
@@ -1688,7 +1689,7 @@ async function completePreparedPlan(
     state = applyPlanAnswers(normalized.state, { answers });
   } else if (previous) {
     const merged = applyPlanAnswers(previous.requestSnapshot, { answers });
-    pinPrevious =
+    pinPrevious = (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
       planRematchFingerprint(previous.requestSnapshot) ===
       planRematchFingerprint(merged);
     state = pinPrevious
@@ -1736,6 +1737,12 @@ async function completePreparedPlan(
     acceptedGaps: state.acceptedGaps.map((gap) => ({ ...gap, revision }))
   };
 
+  if (state.requirements.productDoses?.length) {
+    const canonical = toCanonicalRequest(state);
+    if ("error" in canonical) return businessError({ fieldPath: "request.requirements.productDoses", reasonCode: "invalid_request", message: canonical.error });
+    const issues = validateProductDoseProposals(canonical, { availabilityAsOf: snapshot.availabilityAsOf, catalogueVersion: snapshot.catalogueVersion, products: snapshot.products.map(toMatcherProduct) });
+    if (issues.length) return businessError({ fieldPath: `request.${issues[0]!.field}`, reasonCode: "invalid_request", message: issues[0]!.reason, issues: issues.map(issue => ({ fieldPath: `request.${issue.field}`, reasonCode: "invalid_request", messageKey: "mcp.errors.invalid_request", message: issue.reason, ...(issue.permittedIncrement != null ? { permittedLimit: `positive multiples of ${issue.permittedIncrement} labelled servings per day` } : {}) })) });
+  }
   const locale = negotiateLocale(state.locale);
   const pinnedOption =
     pinPrevious && previous
@@ -1784,6 +1791,7 @@ async function completePreparedPlan(
     planId: prepared.planId,
     result,
     revision,
+    expectedCatalogueRevision: isolated ? undefined : snapshot.runtimeRevision,
     skipSideEffects: isolated
   });
 }
@@ -1802,6 +1810,7 @@ async function persistTerminalPlan(input: Readonly<{
   planId: string;
   result: PlanResult;
   revision: number;
+  expectedCatalogueRevision?: number;
   skipSideEffects?: boolean;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
   let committedResult: PlanResult | null = null;
@@ -1830,6 +1839,16 @@ async function persistTerminalPlan(input: Readonly<{
     }
     planAttempts.getStore()?.signal?.throwIfAborted();
     throwIfAborted(planCorrelationId(key));
+    if (input.expectedCatalogueRevision != null &&
+      (!store.isCatalogueRevisionCurrent || !await store.isCatalogueRevisionCurrent(input.expectedCatalogueRevision))) {
+      // Keep the saved processing request and its idempotency receipt. A retry
+      // or handle poll loads a fresh snapshot and resumes this same revision.
+      return businessError({
+        currentRevision: plan.currentRevision, fieldPath: "planHandle", reasonCode: "availability_changed", retryable: true,
+        message: "Catalogue facts changed while this plan was being matched. Retry with the same idempotency key, or reload the saved plan, to evaluate current products before selecting.",
+        nextActions: ["retry_same_key", "refresh_plan"]
+      });
+    }
     let result = input.result;
     if (planCompactApplicable(result.status) && !result.evidenceHandle) {
       const evidenceHandle = await issueEvidenceCapability({

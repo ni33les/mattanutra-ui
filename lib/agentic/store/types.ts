@@ -230,6 +230,8 @@ export type AgenticStore = {
   claimOutboxBatch(limit: number): Promise<readonly OutboxEventRecord[]>;
   getPlan(id: string): Promise<PlanRecord | null>;
   getPlanForUpdate(id: string): Promise<PlanRecord | null>;
+  /** Verifies and holds the live catalogue epoch through the enclosing transaction. */
+  isCatalogueRevisionCurrent?(expectedRevision: number): Promise<boolean>;
   getPlanRevision(
     planId: string,
     revision: number

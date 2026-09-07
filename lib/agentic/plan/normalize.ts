@@ -5,7 +5,7 @@ import type { CatalogueSnapshot, CatalogueSupplement } from "@/lib/agentic/catal
 import { CONDITION_ALIASES, MEDICATION_ALIASES } from "@/lib/agentic/catalogue/names";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import type { AgenticConfig } from "@/lib/agentic/config";
-import { scaleAmount, isDoseError } from "@/lib/matcher/dose";
+import { scaleAmount, isDoseError, convertAmount } from "@/lib/matcher/dose";
 import type { MatcherUnit } from "@/lib/matcher/types";
 import { DEFAULT_TARGET_BASIS } from "@/lib/agentic/contract/schemas";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
@@ -309,12 +309,12 @@ export function applyPlanAnswers(
     }
 
     if (answer.choice === "relax_max_price") {
-      const { maxPriceMinor: _removed, ...requirements } = next.requirements;
+      const requirements = { ...next.requirements }; delete requirements.maxPriceMinor;
       next = { ...next, requirements };
     }
 
     if (answer.choice === "relax_max_pills") {
-      const { maxDailyPills: _removed, ...requirements } = next.requirements;
+      const requirements = { ...next.requirements }; delete requirements.maxDailyPills;
       next = { ...next, requirements };
     }
 
@@ -341,7 +341,7 @@ export function applyPlanAnswers(
             if (item.supplementId !== supplementId) {
               return item;
             }
-            const { daysRemaining: _ignored, ...rest } = item;
+            const rest = { ...item }; delete rest.daysRemaining;
             return { ...rest, durationUnknown: true };
           })
         };
@@ -354,7 +354,7 @@ export function applyPlanAnswers(
               if (item.supplementId !== supplementId) {
                 return item;
               }
-              const { durationUnknown: _ignored, ...rest } = item;
+              const rest = { ...item }; delete rest.durationUnknown;
               return { ...rest, daysRemaining: days };
             })
           };
@@ -429,6 +429,8 @@ export function planRematchFingerprint(state: CanonicalPlanState) {
     maxDailyPills: state.requirements.maxDailyPills ?? null,
     maxPriceMinor: state.requirements.maxPriceMinor ?? null,
     maxProductCount: state.requirements.maxProductCount ?? null,
+    productDoses: state.requirements.productDoses ?? [],
+    searchEffort: state.searchEffort ?? "standard",
     medicationCodes: state.medicationCodes,
     omega3SourcePreference: state.requirements.omega3SourcePreference ?? null,
     optimization: state.optimization,
@@ -448,6 +450,7 @@ export type NormalizedPlan = Readonly<{
 export async function normalizePlanRequest(input: Readonly<{
   config: AgenticConfig;
   request: unknown;
+  searchEffort?: "standard" | "expanded";
   snapshot: CatalogueSnapshot;
 }>): Promise<NormalizedPlan | AgenticErrorResult> {
   const request = asRequest(input.request);
@@ -508,9 +511,16 @@ export async function normalizePlanRequest(input: Readonly<{
       if (rangePrecision) return rangePrecision;
     }
 
+    let acceptableRange = target.acceptableRange;
+    if (acceptableRange) {
+      const minimum = convertAmount({ amount: acceptableRange.minimum, fromUnit: acceptableRange.unit, toUnit: target.unit, subjectId: supplement.supplementId, subjectName: supplement.name });
+      const maximum = convertAmount({ amount: acceptableRange.maximum, fromUnit: acceptableRange.unit, toUnit: target.unit, subjectId: supplement.supplementId, subjectName: supplement.name });
+      if (minimum == null || maximum == null || minimum > target.amount || maximum < target.amount) return businessError({ fieldPath: `request.targets[${index}].acceptableRange`, reasonCode: "invalid_request", message: "After unit conversion, acceptableRange.minimum must be no greater than the target and maximum must be no less than the target." });
+      acceptableRange = { minimum, maximum, unit: target.unit };
+    }
     targets.push({
       basis: target.basis ?? DEFAULT_TARGET_BASIS,
-      ...(target.acceptableRange ? { acceptableRange: target.acceptableRange } : {}),
+      ...(acceptableRange ? { acceptableRange } : {}),
       amount: target.amount,
       importance: target.importance ?? "required",
       name: resolvedNutrientFormName(target.name, supplement.name),
@@ -648,6 +658,7 @@ export async function normalizePlanRequest(input: Readonly<{
     originalRequest: structuredClone(request),
     intake,
     requirements: { ...request.requirements },
+    searchEffort: input.searchEffort ?? "standard",
     safetyAcknowledgement: request.safetyAcknowledgement ?? null,
     targets
   };

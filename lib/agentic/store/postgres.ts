@@ -63,6 +63,12 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
   // shape rather than leaking untyped columns into the store interface.
   const sql = inputSql as unknown as StoreSql;
   const store: AgenticStore = {
+    async isCatalogueRevisionCurrent(expectedRevision) {
+      if (!inTransaction) throw new Error("Catalogue publication fences require a transaction");
+      const [row] = await sql<{ revision: number | string }>`
+        select revision from public.catalogue_runtime_revision where singleton = true for share`;
+      return row != null && String(row.revision) === String(expectedRevision);
+    },
     async getCatalogueSnapshot(id) {
       const [row] = await sql<{ snapshot_json: CatalogueSnapshot }>`
         select snapshot_json from public.agentic_catalogue_snapshots where snapshot_id = ${id}

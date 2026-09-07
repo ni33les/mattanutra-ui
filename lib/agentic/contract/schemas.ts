@@ -22,15 +22,17 @@ export const PROFILE_SCHEMA = object({
   lifeStage: optional(enumeration(["adult", "child", "pregnant", "breastfeeding", "trying_to_conceive"] as const)),
   sex: optional(enumeration(["female", "male"] as const))
 });
-export const DEFAULT_MAX_PRODUCT_COUNT = 6;
+export const DEFAULT_MAX_PRODUCT_COUNT = null;
+export const SEARCH_EFFORT_SCHEMA = { ...enumeration(["standard", "expanded"] as const), default: "standard", description: "Deterministic search budget: standard 8000 expansion attempts; expanded 64000. Expanded includes the standard incumbent. A revise omission preserves prior effort. Repeating identical inputs reuses work; after expanded exhaustion refine the request." };
 export const REQUIREMENTS_SCHEMA = object({
   allowedForms: optional(Type.Array(enumeration(["capsule", "softgel", "tablet", "powder", "liquid", "gummy", "sachet", "other"] as const), { uniqueItems: true, maxItems: 8 })),
   dietaryPreference: optional(enumeration(["any", "plant_based", "vegan"] as const)),
   excludeProductIds: optional({ ...productIds, description: "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion." }),
   excludeSupplementIds: optional({ ...supplementIds, description: "Exclude products containing these nutrient concepts, not particular product IDs. [] clears this exclusion." }),
-  maxDailyPills: optional(Type.Number({ minimum: 0, maximum: 1000 })),
-  maxPriceMinor: optional(Type.Integer({ minimum: 0, maximum: 1e12, description: "Goods/basket budget in destination currency minor units; applicable delivery cost is quoted separately and included in delivered-cost comparisons." })),
-  maxProductCount: optional(Type.Integer({ minimum: 1, maximum: 30, default: DEFAULT_MAX_PRODUCT_COUNT })),
+  maxDailyPills: optional(nullable(Type.Number({ minimum: 0, maximum: 1000, description: "Explicit daily physical pill ceiling. Omission on create or null means unrestricted; null clears it in a patch." }))),
+  maxPriceMinor: optional(nullable(Type.Integer({ minimum: 0, maximum: 1e12, description: "Goods/basket budget in destination currency minor units; applicable delivery cost is quoted separately and included in delivered-cost comparisons. Null clears this ceiling." }))),
+  maxProductCount: optional({ ...nullable(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })), default: null, description: "Customer maximum distinct new products. No system minimum or maximum basket count. Omitted on create/replacement or null is unrestricted; 0 requests no new products. Patch omission preserves the previous ceiling; null clears it." }),
+  productDoses: optional(Type.Array(object({ productId, servingsPerDay: positiveAmount }), { maxItems: 100, uniqueItems: true, description: "Require returned products at these daily labelled-serving quantities; other products remain optimisable. Use administration metadata to choose physically measurable quantities. [] clears proposals. Revise evaluates a new option; it never purchases directly. Incompatible exclusions, quantities or explicit ceilings return a field error." })),
   omega3SourcePreference: optional(enumeration(["any", "algae_only", "fish_allowed"] as const)),
   retainProductIds: optional(productIds), retainSupplementIds: optional(supplementIds)
 });
@@ -71,18 +73,18 @@ export const PLAN_REQUEST = object({
   safetyAcknowledgement: optional(PLAN_SAFETY_ACK),
   targets: Type.Array(TARGET_SCHEMA, { minItems: 1, maxItems: 30, description: "Agreed targets: name, amount, and unit. Optional importance defaults to required." })
 }, "Complete plan request. Replacement revisions reset omitted optional fields. Agreed targets are not diagnoses. Resolved nutrient amounts must represent at least one nanogram, one CFU, or 0.001 ml/serving; IU precision depends on nutrient form. Below-precision errors report the exact field and permitted minimum.");
-export const PLAN_REQUEST_PATCH = Type.Partial(Type.Object({ ...PLAN_REQUEST.properties, baseline: optional(Type.Partial(Type.Object(PLAN_REQUEST.properties.baseline.properties, { additionalProperties: false }))) }), { additionalProperties: false, description: "Merge supplied object fields; supplied arrays replace completely; [] clears arrays; null is invalid. {} explicitly refreshes contract/policy without changing inputs." });
+export const PLAN_REQUEST_PATCH = Type.Partial(Type.Object({ ...PLAN_REQUEST.properties, baseline: optional(Type.Partial(Type.Object(PLAN_REQUEST.properties.baseline.properties, { additionalProperties: false }))) }), { additionalProperties: false, description: "Merge supplied object fields; supplied arrays replace completely; [] clears arrays; null clears only requirements.maxProductCount, maxDailyPills and maxPriceMinor; null elsewhere is invalid. {} explicitly refreshes contract/policy without changing inputs." });
 export type PlanRequestWire = Static<typeof PLAN_REQUEST>;
 export type PlanRequestPatchWire = Static<typeof PLAN_REQUEST_PATCH>;
 const key = Type.String({ minLength: 16, maxLength: 128 });
 const handle = Type.String({ minLength: 32, maxLength: 4096 });
 const revision = Type.Integer({ minimum: 1 });
 export const PLAN_OPERATION_SCHEMAS = {
-  create: object({ operation: Type.Literal("create"), idempotencyKey: key, request: PLAN_REQUEST }),
+  create: object({ operation: Type.Literal("create"), idempotencyKey: key, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
   get: object({ operation: Type.Literal("get"), planHandle: handle }),
   revise: Type.Union([
-    object({ operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, request: PLAN_REQUEST }),
-    object({ operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, requestPatch: PLAN_REQUEST_PATCH })
+    object({ operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
+    object({ operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), requestPatch: PLAN_REQUEST_PATCH })
   ]),
   answer: object({ operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
   select: object({ operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })

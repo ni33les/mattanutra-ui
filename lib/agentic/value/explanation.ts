@@ -19,7 +19,8 @@ export function buildExplanation(input: Readonly<{
   const deferred = coverage.filter((row) => row.status === "conditional_deferred");
   const decision = operationalDecision({ status: input.status,
     hasQuestions: input.nextActions.includes("answer_questions"),
-    hasSelectedOption: Boolean(input.option),
+    hasSelectedOption: Boolean(input.option.basket.length),
+    hasPurchaseOptions: input.nextActions.includes("review_options"),
     replenishesLater: input.nextActions.includes("replenish_later"),
     purchaseRequiredNow: !input.nextActions.includes("replenish_later") });
   const nextActionKey = `plan.next_action.${decision.nextAction}`;
@@ -43,7 +44,7 @@ export function buildExplanation(input: Readonly<{
       status: row.status,
       supplementId: row.supplementId
     })),
-    pills: input.option.burden?.pills ?? 0,
+    pills: input.option.basket.some(item => item.pillCountKnown === false) ? null : input.option.burden?.pills ?? 0,
     productCount:
       input.option.burden?.productCount ??
       input.option.basket.length + (input.option.retainedCurrent?.length ?? 0),
