@@ -22,6 +22,30 @@ DO $$ DECLARE table_name text; BEGIN
     END IF;
   END LOOP;
 END $$;
+-- Catalogue SQL also depends on retailer eligibility and platform margin, and
+-- brand approval. Only meaningful changes advance the shared identity.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.organisations'::regclass AND tgname='catalogue_runtime_revision_org_insert_delete') THEN
+    CREATE TRIGGER catalogue_runtime_revision_org_insert_delete AFTER INSERT OR DELETE OR TRUNCATE ON public.organisations
+      FOR EACH STATEMENT EXECUTE FUNCTION public.bump_catalogue_runtime_revision();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.organisations'::regclass AND tgname='catalogue_runtime_revision_org_changed') THEN
+    CREATE TRIGGER catalogue_runtime_revision_org_changed AFTER UPDATE ON public.organisations FOR EACH ROW
+      WHEN ((OLD.name, OLD.organisation_type, OLD.status, OLD.country_code, OLD.currency, OLD.slug, OLD.metadata -> 'customerPriceMarginPercent')
+        IS DISTINCT FROM
+        (NEW.name, NEW.organisation_type, NEW.status, NEW.country_code, NEW.currency, NEW.slug, NEW.metadata -> 'customerPriceMarginPercent'))
+      EXECUTE FUNCTION public.bump_catalogue_runtime_revision();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.product_brands'::regclass AND tgname='catalogue_runtime_revision_brand_insert_delete') THEN
+    CREATE TRIGGER catalogue_runtime_revision_brand_insert_delete AFTER INSERT OR DELETE OR TRUNCATE ON public.product_brands
+      FOR EACH STATEMENT EXECUTE FUNCTION public.bump_catalogue_runtime_revision();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.product_brands'::regclass AND tgname='catalogue_runtime_revision_brand_changed') THEN
+    CREATE TRIGGER catalogue_runtime_revision_brand_changed AFTER UPDATE ON public.product_brands FOR EACH ROW
+      WHEN (OLD.status IS DISTINCT FROM NEW.status)
+      EXECUTE FUNCTION public.bump_catalogue_runtime_revision();
+  END IF;
+END $$;
 ALTER TABLE public.product_recommendation_runs ADD COLUMN IF NOT EXISTS catalogue_revision bigint;
 ALTER TABLE public.product_recommendation_runs ADD COLUMN IF NOT EXISTS catalogue_fingerprint text;
 ALTER TABLE public.product_recommendation_runs ADD COLUMN IF NOT EXISTS search_effort text NOT NULL DEFAULT 'standard';

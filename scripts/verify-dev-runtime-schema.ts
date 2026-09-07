@@ -29,11 +29,14 @@ type PrivilegeRow = Readonly<{
 }>;
 
 type TriggerRow = Readonly<{
+  definition: string;
+  enabled: string;
   name: string;
   tableName: string;
 }>;
 
 const requiredTables = [
+  "organisations", "product_brands", "product_facts", "supplements", "supplement_aliases", "supplement_safety_limits", "retail_sellable_products",
   "catalogue_runtime_revision", "catalogue_correction_audit",
   "assessment_product_preferences", "assessments", "formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs",
   "assessment_inputs", "assessment_healthscore_results", "assessment_resume_drafts", "funnel_requests", "healthscore_delivery_requests", "tasks",
@@ -148,11 +151,16 @@ function requireReadWritePrivilege(privileges: Map<string, PrivilegeRow>, tableN
 function requireTrigger(
   triggers: Map<string, TriggerRow>,
   tableName: string,
-  name: string
+  name: string,
+  expectedParts: readonly string[] = []
 ) {
-  if (!triggers.has(tableColumnKey(tableName, name))) {
+  const trigger = triggers.get(tableColumnKey(tableName, name));
+  if (!trigger) {
     addFailure(`${tableName}.${name} trigger is missing`);
+    return;
   }
+  if (!["O", "A"].includes(trigger.enabled)) addFailure(`${tableName}.${name} trigger is disabled for ordinary writes`);
+  for (const part of expectedParts) if (!normalizeDefinition(trigger.definition).includes(part.toLowerCase())) addFailure(`${tableName}.${name} trigger does not include ${part}`);
 }
 
 const sql = getSql();
@@ -214,7 +222,9 @@ try {
       sql<Array<TriggerRow>>`
         select
           class.relname as "tableName",
-          trigger_record.tgname as "name"
+          trigger_record.tgname as "name",
+          trigger_record.tgenabled as "enabled",
+          pg_get_triggerdef(trigger_record.oid) as "definition"
         from pg_trigger trigger_record
         join pg_class class on class.oid = trigger_record.tgrelid
         join pg_namespace namespace on namespace.oid = class.relnamespace
@@ -259,6 +269,13 @@ try {
 
   for (const column of ["catalogue_revision", "catalogue_fingerprint", "search_effort"]) requireColumn(columnMap, "product_recommendation_runs", column);
   requireColumn(columnMap, "catalogue_runtime_revision", "revision", { dataType: "bigint", notNull: true });
+  for (const table of ["products", "product_facts", "supplements", "supplement_aliases", "supplement_safety_limits", "supplement_country_availability", "retail_sellable_products"]) {
+    requireTrigger(triggerMap, table, "catalogue_runtime_revision_changed", ["for each statement", "bump_catalogue_runtime_revision"]);
+  }
+  requireTrigger(triggerMap, "organisations", "catalogue_runtime_revision_org_insert_delete", ["insert", "delete", "truncate", "for each statement", "bump_catalogue_runtime_revision"]);
+  requireTrigger(triggerMap, "organisations", "catalogue_runtime_revision_org_changed", ["for each row", "is distinct from", "customerPriceMarginPercent", "organisation_type", "status", "country_code", "currency", "bump_catalogue_runtime_revision"]);
+  requireTrigger(triggerMap, "product_brands", "catalogue_runtime_revision_brand_insert_delete", ["insert", "delete", "truncate", "for each statement", "bump_catalogue_runtime_revision"]);
+  requireTrigger(triggerMap, "product_brands", "catalogue_runtime_revision_brand_changed", ["for each row", "old.status is distinct from new.status", "bump_catalogue_runtime_revision"]);
   requireColumn(columnMap, "assessment_product_preferences", "search_effort", { dataType: "text", notNull: true });
   requireColumn(columnMap, "products", "administration", { dataType: "jsonb" });
   requireConstraint(constraintMap, "products", "products_administration_object_check", ["jsonb_typeof", "object"]);

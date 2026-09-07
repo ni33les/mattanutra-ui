@@ -31,3 +31,37 @@ test("WEB5-PG-01 catalogue identity exposes only committed facts and survives ro
  await assert.rejects(sql.begin(async tx => { await tx`update public.products set administration=null where id=${id}`; throw new Error("rollback"); }), /rollback/);
  assert.equal(await getCatalogueRuntimeRevision(sql), before + 1);
 });
+
+test("WEB5-PG-02 organisation pricing and eligibility changes advance the epoch, telemetry does not", async () => {
+ await assert.rejects(sql.begin(async tx => {
+  const organisationId = randomUUID();
+  await tx`insert into public.organisations (id,slug,name,organisation_type) values (${organisationId},${organisationId},'Epoch fixture','tenant')`;
+  const initial = await getCatalogueRuntimeRevision(tx);
+  await tx`update public.organisations set updated_at=now(),metadata=metadata || '{"lastViewedAt":"fixture"}'::jsonb where id=${organisationId}`;
+  assert.equal(await getCatalogueRuntimeRevision(tx), initial, "irrelevant metadata must not invalidate all plans");
+  await tx`update public.organisations set metadata=metadata || '{"customerPriceMarginPercent":21}'::jsonb where id=${organisationId}`;
+  assert.equal(await getCatalogueRuntimeRevision(tx), initial + 1, "a changed margin invalidates cached prices");
+  await tx`update public.organisations set metadata=metadata || '{"customerPriceMarginPercent":21}'::jsonb where id=${organisationId}`;
+  assert.equal(await getCatalogueRuntimeRevision(tx), initial + 1, "same-value writes do not cause revision churn");
+  await tx`update public.organisations set country_code='GB',currency='GBP' where id=${organisationId}`;
+  assert.equal(await getCatalogueRuntimeRevision(tx), initial + 2, "market and currency changes invalidate catalogue eligibility");
+  await tx`update public.organisations set status='disabled' where id=${organisationId}`;
+  assert.equal(await getCatalogueRuntimeRevision(tx), initial + 3, "deactivating a retailer invalidates catalogue eligibility");
+  throw new Error("rollback epoch fixture");
+ }), /rollback epoch fixture/);
+});
+
+test("WEB5-PG-03 brand approval changes advance the epoch without administrative-note churn", async () => {
+ await assert.rejects(sql.begin(async tx => {
+  const brandId = randomUUID();
+  await tx`insert into public.product_brands (id,name,normalized_name,status) values (${brandId},${brandId},${brandId},'approved')`;
+  const initial = await getCatalogueRuntimeRevision(tx);
+  await tx`update public.product_brands set updated_at=now(),admin_notes='reviewed fixture' where id=${brandId}`;
+  assert.equal(await getCatalogueRuntimeRevision(tx), initial);
+  await tx`update public.product_brands set status='pending_review' where id=${brandId}`;
+  assert.equal(await getCatalogueRuntimeRevision(tx), initial + 1, "an unapproved brand must invalidate cached sellable products");
+  await tx`update public.product_brands set status='pending_review' where id=${brandId}`;
+  assert.equal(await getCatalogueRuntimeRevision(tx), initial + 1);
+  throw new Error("rollback epoch fixture");
+ }), /rollback epoch fixture/);
+});
