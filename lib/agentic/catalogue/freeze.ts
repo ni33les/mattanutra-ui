@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
-import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
+import { canonicalJson } from "@/lib/agentic/value/canonical";
 
 export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
   const hash = createHash("sha256");
@@ -14,41 +14,25 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
   for (const product of [...snapshot.products].sort((left, right) =>
     `${left.productId}:${left.sellerId}`.localeCompare(`${right.productId}:${right.sellerId}`)
   )) {
-    hash.update(JSON.stringify(product.candidate.administration ?? null));
-    hash.update("\0");
-    hash.update(product.productId);
-    hash.update(":");
-    hash.update(product.sellerId);
-    hash.update(":");
-    hash.update(product.source);
-    hash.update(":");
-    hash.update(String(product.unitPriceMinor));
-    hash.update(":");
-    hash.update(product.stockStatus);
-    hash.update(":");
-    hash.update(product.form);
-    hash.update(":");
-    hash.update(String(product.dailyPills));
-    hash.update(":");
-    hash.update(String(servingsPerPackFromProduct(product) ?? ""));
+    // Fingerprint the complete catalogue inputs. Omitting eligibility or display
+    // facts can make a changed product reuse an earlier evaluated basket.
+    hash.update(canonicalJson({
+      ...product,
+      contributionSupplementIds: [...product.contributionSupplementIds].sort(),
+      candidate: {
+        ...product.candidate,
+        availableCountryCodes: product.candidate.availableCountryCodes
+          ? [...product.candidate.availableCountryCodes].sort() : null,
+        facts: product.candidate.facts.map(canonicalJson).sort()
+      }
+    }));
     hash.update("\n");
-
-    for (const fact of [...product.candidate.facts].sort((left, right) =>
-      `${left.normalizedName}:${left.unit}`.localeCompare(
-        `${right.normalizedName}:${right.unit}`
-      )
-    )) {
-      hash.update(JSON.stringify([fact.confidence, fact.source ?? null, fact.sourceUrl ?? null, fact.sourceText ?? null, fact.mappingStatus ?? null, fact.servingLabel ?? null]));
-      hash.update("\0");
-      hash.update(fact.normalizedName);
-      hash.update(":");
-      hash.update(String(fact.amount ?? ""));
-      hash.update(":");
-      hash.update(fact.unit ?? "");
-      hash.update(":");
-      hash.update(fact.supplementId ?? "");
-      hash.update("\n");
-    }
+  }
+  for (const supplement of [...snapshot.supplements].sort((left, right) =>
+    left.supplementId.localeCompare(right.supplementId))) {
+    hash.update(canonicalJson({ ...supplement, aliases: [...supplement.aliases].sort(),
+      acceptedUnits: [...supplement.acceptedUnits].sort() }));
+    hash.update("\n");
   }
 
   return `snap_${hash.digest("hex").slice(0, 16)}`;
