@@ -265,7 +265,9 @@ export function compileVariant(input: Readonly<{
   }
 
   const safetyExposure = labelledSafetyExposure(input.product, input.dailyUnits, input.request, ratio);
-  if (amountPerUnit.size < 1 && !input.request.retainProductIds.includes(input.product.productId) &&
+  const declaredTarget = input.product.unknownSafetyAmount && input.request.targets.some(row => input.product.contributionSubjectIds.includes(row.subjectId)) &&
+    (!input.product.administration || input.product.administration.route === "oral" || input.product.administration.route === "unknown");
+  if (amountPerUnit.size < 1 && !declaredTarget && !input.request.retainProductIds.includes(input.product.productId) &&
     !input.request.productDoses?.some(row => row.productId === input.product.productId) &&
     !input.request.retainSubjectIds.some((id) => (safetyExposure.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
     return null;

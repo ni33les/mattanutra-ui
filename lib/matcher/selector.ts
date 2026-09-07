@@ -12,6 +12,7 @@ import { minUnits } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
 import type {
   CanonicalRequest,
+  ConversationalOptionRole,
   MatcherConfig,
   MatcherProduct,
   ProductGroup,
@@ -362,21 +363,59 @@ export function protectedReferenceCandidates(baskets: readonly ScoredBasket[], r
   }));
 }
 
+/** A commercially inferior basket is not a useful trade-off when it also has
+ * no better dose fit, coverage or concern profile. Compare actual quantities. */
+function optionDominates(left: ScoredBasket, right: ScoredBasket, request: CanonicalRequest) {
+  const fit = compareDoseFit(fitOf(left, request), fitOf(right, request));
+  if (fit > 0 || left.priceMinor > right.priceMinor || left.dailyPills > right.dailyPills || left.productCount > right.productCount) return false;
+  if (request.targets.some(target => (left.coverageBySubject.get(target.subjectId) ?? 0) < (right.coverageBySubject.get(target.subjectId) ?? 0))) return false;
+  const a = concernMap(left, request), b = concernMap(right, request);
+  if ([...a].some(([key, value]) => value > (b.get(key) ?? 0))) return false;
+  return fit < 0 || left.priceMinor < right.priceMinor || left.dailyPills < right.dailyPills || left.productCount < right.productCount ||
+    [...b].some(([key, value]) => (a.get(key) ?? 0) < value);
+}
+
 export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]; config?: MatcherConfig; request: CanonicalRequest }>) {
   const unique = new Map<string, ScoredBasket>();
   for (const basket of input.baskets) {
     if (!satisfiesRetained(input.request, basket)) continue;
-    const signature = basketSignature(basket);
+    // Equivalent product+dose listings are one conversational choice. Retain
+    // the lowest-priced valid listing without hiding different actual doses.
+    const signature = productDoseSignature(basket);
     const previous = unique.get(signature);
     if (!previous || compareBaskets(basket, previous, input.request, input.config) < 0) unique.set(signature, basket);
   }
-  const ranked = [...unique.values()].sort((a, b) => compareBaskets(a, b, input.request, input.config));
+  const compare = (a: ScoredBasket, b: ScoredBasket) => compareBaskets(a, b, input.request, input.config);
+  const ranked = [...unique.values()].sort(compare);
   const best = protectedReferenceCandidates(ranked, input.request)[0];
   if (!best) return { alternatives: [] as ScoredBasket[], selected: null };
-  const selected = { ...best, optionRole: "requested_objective" as const, recommended: true, reason: selectedReason(input.request) };
-  const alternative = ranked.find((row) => hasFewerConcerns(row, selected, input.request));
-  return { selected, alternatives: alternative ? [{ ...alternative, optionRole: "fewer_concerns" as const, recommended: false,
-    reason: "Fewer concerns without lower requested-target coverage" }] : [] };
+  const nonempty = ranked.filter(row => row.productCount > 0);
+  // These sorted extremal choices are Pareto-valid without quadratic pruning:
+  // any strict dominator sorts before them on that objective then full fit.
+  const lowerCost = [...nonempty].sort((a, b) => a.priceMinor - b.priceMinor || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
+  const simpler = [...nonempty].sort((a, b) => a.productCount - b.productCount || a.dailyPills - b.dailyPills || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
+  const fewerConcerns = nonempty.find(row => hasFewerConcerns(row, best, input.request));
+  const fallback = best.productCount === 0 ? nonempty[0] : undefined;
+  const options = new Map<string, { basket: ScoredBasket; roles: ConversationalOptionRole[] }>();
+  const add = (basket: ScoredBasket | undefined, role: ConversationalOptionRole) => {
+    if (!basket) return;
+    const key = productDoseSignature(basket);
+    const row = options.get(key) ?? { basket, roles: [] };
+    if (!row.roles.includes(role)) row.roles.push(role);
+    options.set(key, row);
+  };
+  add(best, "closest_dose"); add(lowerCost, "lower_cost"); add(simpler, "simpler"); add(fewerConcerns, "fewer_concerns"); add(fallback, "purchase_fallback");
+  const mapped = [...options.values()].map(({ basket, roles }) => {
+    const recommended = roles.includes("closest_dose");
+    const reason = recommended ? selectedReason(input.request) : roles.includes("purchase_fallback")
+      ? "Available to purchase with the disclosed gaps, excesses and health advice; purchasing is not the closest dose fit."
+      : roles.includes("fewer_concerns") ? "Fewer concerns without lower requested-target coverage"
+      : roles.includes("simpler") ? "Fewer products or daily pills with the disclosed coverage trade-off"
+      : "Lower first-order goods price with the disclosed coverage trade-off";
+    return { ...basket, roles, purchaseEligible: basket.productCount > 0, recommended, reason,
+      optionRole: recommended ? "requested_objective" as const : roles.includes("fewer_concerns") ? "fewer_concerns" as const : "best_value" as const };
+  });
+  return { selected: mapped.find(row => row.recommended)!, alternatives: mapped.filter(row => !row.recommended) };
 }
 
 /** Deterministic fallback improves the same score, never just covered-target count. */

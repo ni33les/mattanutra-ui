@@ -42,6 +42,8 @@ export function productRejectionReason(
     return "not_orderable";
   }
 
+  if (request.maxDailyPills != null && product.pillCountKnown === false) return "incomplete_facts";
+
   if (product.incompleteCommercialFacts) {
     return "incomplete_facts";
   }

@@ -181,6 +181,7 @@ export type MatcherProduct = Readonly<{
   contributionSubjectIds: readonly string[];
   currency: string;
   dailyPillsPerServing: number;
+  pillCountKnown?: boolean;
   dietarySource: "algae" | "any" | "fish" | "plant";
   form: string;
   imageUrl: string | null;
@@ -312,6 +313,8 @@ export type DoseFitScore = Readonly<{
   estimatedSubjectIds: readonly string[];
 }>;
 
+export type ConversationalOptionRole = "closest_dose" | "lower_cost" | "simpler" | "fewer_concerns" | "purchase_fallback";
+
 export type ValueOptionRole = "requested_objective" | "fewer_concerns" | "best_value" | "complete" | "minimum_core";
 
 export type CoverageSummaryRow = Readonly<{
@@ -331,6 +334,8 @@ export type ScoredBasket = Readonly<{
   exposure: Exposure;
   incidentalCount: number;
   optionRole?: ValueOptionRole;
+  roles?: readonly ConversationalOptionRole[];
+  purchaseEligible?: boolean;
   oversupplyScore: number;
   doseFit?: DoseFitScore;
   priceMinor: number;

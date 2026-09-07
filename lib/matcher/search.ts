@@ -57,7 +57,7 @@ export function tryAddVariant(
     }
 
 
-    return variant.contributions.has(target.subjectId);
+    return variant.contributions.has(target.subjectId) || (variant.unknownSafetyAmount && group.product.contributionSubjectIds.includes(target.subjectId));
   });
 
   if (!helpsPurchasableTarget && !request.retainProductIds.includes(group.productId) &&
