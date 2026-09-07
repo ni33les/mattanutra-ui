@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { match } from '../../lib/matcher/index.ts';
 import { resolveProfile, withPreferenceWeight } from '../../lib/matcher/experiments/profiles.ts';
-import { basketOfCandidate, rankCandidates, runExperimentSearch, type ExperimentCandidate } from '../../lib/matcher/experiments/search.ts';
+import { basketOfCandidate, rankCandidates, runExperimentSearch, type ExperimentCandidate, type ExperimentCandidateInput } from '../../lib/matcher/experiments/search.ts';
 import { scoreExposure } from '../../lib/matcher/experiments/score.ts';
 import type { CanonicalRequest, SearchState } from '../../lib/matcher/types.ts';
 import { catalog, product, request } from './flexible-v5-fixtures.ts';
@@ -164,4 +164,32 @@ test('EXP-SEARCH-13 an empty complete recommendation preserves the best incompar
   assert.equal(result.purchaseFallback.score.total, null);
   assert.deepEqual(result.purchaseFallback.score.missingComponents, ['daily_pills']);
   assert.ok(result.incompleteCandidates.some(row => row.signature === result.purchaseFallback?.signature));
+});
+
+test('EXP-SEARCH-14 archived candidates retain the same precise uncertainty as their selected projection', () => {
+  const a = request().targets[0]!;
+  const r = request({ targets: [a, { ...a, subjectId: 'b', name: 'B' }] });
+  const result = runExperimentSearch({ request: r, catalog: catalog([product('known-b-unknown-a', { b: 100 }, 100, {
+    contributionSubjectIds: ['a', 'b'], unknownSafetyAmount: false, labelledContributions: [
+      { subjectId: 'a', name: 'A', amount: null, unit: 'mg' }, { subjectId: 'b', name: 'B', amount: 100, unit: 'mg' }
+    ] })]), profile: resolveProfile('nutrient-quadratic__preferences-off') });
+  const stored = result.candidates.find(row => row.signature === result.selected?.signature);
+  assert.ok(stored && stored.state.count > 0);
+  assert.equal(stored.score.perTarget.find(row => row.subjectId === 'a')?.certainty, 'unknown');
+  assert.equal(stored.score.perTarget.find(row => row.subjectId === 'b')?.certainty, 'known');
+  assert.deepEqual(stored.score, result.selected?.score, 'Candidate archive and displayed winner share one factual score');
+});
+
+test('EXP-SEARCH-15 lightweight pool inputs and old ledgers are rescored for the current request', () => {
+  const r = request(), profile = resolveProfile('baseline');
+  const previous = candidate(r, 'one', new Map([['a', r.targets[0]!.requested.units]]));
+  const lightweight: ExperimentCandidateInput = { signature: previous.signature, sellerId: previous.sellerId, state: previous.state, groups: previous.groups };
+  const revised = request({ targets: [{ ...r.targets[0]!, requestedAmount: 200,
+    requested: { ...r.targets[0]!.requested, units: r.targets[0]!.requested.units * BigInt(2) } }] });
+  assert.equal(previous.score.total?.num, BigInt(0));
+  for (const input of [lightweight, previous]) {
+    const score = rankCandidates(profile, revised, [input]).selected?.score;
+    assert.deepEqual(score?.total, { num: BigInt(1), den: BigInt(2) });
+    assert.equal(score?.perTarget[0]?.target.num, revised.targets[0]?.requested.units);
+  }
 });

@@ -16,6 +16,9 @@ export const EXPERIMENT_SEARCH_VERSION = 'offline-scoring-search-1';
 export type ExperimentCandidate = Readonly<{
   signature: string; sellerId: string; state: SearchState; groups: readonly ProductGroup[]; score: ExperimentalScore;
 }>;
+/** Common pools retain the immutable basket inputs and calculate each profile's
+ * score on demand, rather than keeping nine full score ledgers per basket. */
+export type ExperimentCandidateInput = Omit<ExperimentCandidate, 'score'>;
 export type ExperimentSearchResult = Readonly<{
   profile: ScoringProfile; identity: string; inputIdentity: string; baseline: MatchResult;
   selected: ExperimentCandidate | null; purchaseFallback: ExperimentCandidate | null;
@@ -44,10 +47,10 @@ function retained(request: CanonicalRequest, state: SearchState) {
     request.retainProductIds.every(id => state.selectedProductIds?.includes(id) || request.currentSupplements.some(row => row.productId === id)) &&
     request.retainSubjectIds.every(id => (state.exposure.get(id) ?? BigInt(0)) > BigInt(0));
 }
-export function basketOfCandidate(candidate: ExperimentCandidate, request: CanonicalRequest): ScoredBasket | null {
+export function basketOfCandidate(candidate: ExperimentCandidateInput, request: CanonicalRequest): ScoredBasket | null {
   return scoreState({ request, state: candidate.state, sellerId: candidate.sellerId, groups: candidate.groups });
 }
-export function scoreCandidate(profile: ScoringProfile, request: CanonicalRequest, candidate: ExperimentCandidate): ExperimentCandidate {
+export function scoreCandidate(profile: ScoringProfile, request: CanonicalRequest, candidate: ExperimentCandidateInput): ExperimentCandidate {
   const score = scoreExposure(profile, request, candidate.state.exposure, {
     productCount: candidate.state.count, dailyPills: candidate.state.pillCountKnown === false ? null : candidate.state.pills,
     priceMinor: candidate.state.price, currency: request.currency });
@@ -124,7 +127,7 @@ function hasActivePreference(profile: ScoringProfile, request: CanonicalRequest)
     ['productCount', request.maxProductCount], ['dailyPills', request.maxDailyPills], ['priceMinor', request.maxPriceMinor]
   ] as const).some(([metric, preferred]) => preferred != null && profile.preferenceWeights[metric].num > BigInt(0));
 }
-export function rankCandidates(profile: ScoringProfile, request: CanonicalRequest, pool: readonly ExperimentCandidate[]) {
+export function rankCandidates(profile: ScoringProfile, request: CanonicalRequest, pool: readonly ExperimentCandidateInput[]) {
   const scored = pool.filter(row => retained(request, row.state)).map(row => scoreCandidate(profile, request, row));
   const complete = scored.filter(row => row.score.complete);
   const incomplete = scored.filter(row => !row.score.complete).sort((a,b) => a.signature.localeCompare(b.signature));
@@ -183,17 +186,19 @@ export function runExperimentSearch(input: Readonly<{
   // including when the caller has not explicitly run the standard pass.
   const incumbent = input.incumbent ?? (!isBaseline && effort === 'expanded'
     ? runExperimentSearch({ ...input, effort: 'standard', budget: Math.min(8000, budget) }) : undefined);
-  const pool=new Map<string,ExperimentCandidate>();
+  const pool=new Map<string,ExperimentCandidateInput>();
   const scoreStateFor = (state: SearchState) => withProductEvidence(scoreExposure(profile,request,state.exposure,{productCount:state.count,dailyPills:state.pillCountKnown===false?null:state.pills,priceMinor:state.price,currency:request.currency}), state);
-  const cache=new WeakMap<SearchState,ExperimentalScore>();
+  let cache=new WeakMap<SearchState,ExperimentalScore>();
   const stateScore=(state:SearchState)=>{let result=cache.get(state);if(!result){result=scoreStateFor(state);cache.set(state,result);}return result;};
   const observe=(sellerId:string,state:SearchState,groups:readonly ProductGroup[])=>{
     if(!retained(request,state)) return;
     const signature=candidateSignature(sellerId,state);
-    if(!pool.has(signature)) pool.set(signature,{signature,sellerId:state.count?sellerId:'',state,groups,score:stateScore(state)});
+    if(!pool.has(signature)) pool.set(signature,{signature,sellerId:state.count?sellerId:'',state,groups});
   };
   const empty=seedState(request);observe('',empty,[]);
-  for(const candidate of incumbent?.candidates ?? []) pool.set(candidate.signature,candidate);
+  for(const candidate of incumbent?.candidates ?? []) pool.set(candidate.signature,{
+    signature:candidate.signature,sellerId:candidate.sellerId,state:candidate.state,groups:candidate.groups
+  });
   let baseline:MatchResult;
   let used=0, probes=0, complete=true;
   const config={...DEFAULT_MATCHER_CONFIG,expansionBudget:budget};
@@ -239,8 +244,11 @@ export function runExperimentSearch(input: Readonly<{
       used+=run.expansionAttempts; complete&&=!run.trimmed && run.mode==='exact';
     }
   }
-  const candidates=[...pool.values()].sort((a,b)=>a.signature.localeCompare(b.signature));
-  const ranked=rankCandidates(profile,request,candidates);
+  // Search-order scores are no longer needed. Final rescoring refines product
+  // uncertainty from the actual variants and supplies the one returned ledger.
+  cache=new WeakMap<SearchState,ExperimentalScore>();
+  const ranked=rankCandidates(profile,request,[...pool.values()].sort((a,b)=>a.signature.localeCompare(b.signature)));
+  const candidates=ranked.candidates;
   let selected: ExperimentCandidate | null=ranked.selected;
   if(isBaseline && baseline.selected) {
     const signature=baseline.selected.productCount?basketSignature(baseline.selected):'empty';

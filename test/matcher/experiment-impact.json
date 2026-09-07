@@ -1,0 +1,20 @@
+{
+  "version": "matcher-experiment-impact-1",
+  "scope": "offline_scoring_experiment_and_affected_matcher_hooks",
+  "experimentTests": [
+    { "file": "test/matcher/experiment-scoring.test.ts", "reason": "Exact profile definitions, target/continued curvature, fixed safety weighting and numerical preference completeness." },
+    { "file": "test/matcher/experiment-search.test.ts", "reason": "Explicit offline scorer injection, unchanged default matching, search effort and profile-aware candidates." },
+    { "file": "test/matcher/experiment-oracle.test.ts", "reason": "Independent exhaustive explicit-grid arithmetic, constraints, uncertainty, protected priorities and enumeration bounds." },
+    { "file": "test/matcher/experiment-corpus.test.ts", "reason": "Frozen catalogue provenance and synthetic request/catalogue identity without live access." },
+    { "file": "test/matcher/experiment-report.test.ts", "reason": "Neutral winner comparisons retain exact quantities, preference facts, safety scope and uncertainty." },
+    { "file": "test/matcher/experiment-runner.test.ts", "reason": "Reviewed test selection, forbidden test constructs, missing evidence and execution reconciliation." },
+    { "file": "test/matcher/experiment-comparison.test.ts", "reason": "Common candidate pools, explicit-grid materialization and immutable offline comparison arguments." }
+  ],
+  "affectedTests": [
+    { "file": "test/matcher/advisory-dose-fit.test.ts", "changedProductionFiles": ["lib/matcher/index.ts", "lib/matcher/search.ts"], "reason": "Optional experiment hooks must preserve default symmetric dose loss,2x scoped safety penalties, continued-dose arithmetic and advice." },
+    { "file": "test/matcher/flexible-v5-doses.test.ts", "changedProductionFiles": ["lib/matcher/index.ts", "lib/matcher/search.ts"], "reason": "Scorer injection must not change physically supported quantity or fixed-proposal feasibility." },
+    { "file": "test/matcher/flexible-v5-priority.test.ts", "changedProductionFiles": ["lib/matcher/index.ts", "lib/matcher/search.ts"], "reason": "Production default core-target priority and acceptable-range semantics remain unchanged when no experiment hook is supplied." },
+    { "file": "test/matcher/flexible-v5-options.test.ts", "changedProductionFiles": ["lib/matcher/index.ts"], "reason": "Production default option roles, empty recommendations and selectable purchase alternatives remain intact." },
+    { "file": "test/matcher/flexible-v5-search.test.ts", "changedProductionFiles": ["lib/matcher/search.ts", "lib/matcher/index.ts"], "reason": "Existing deterministic expansion budgets, search recovery and catalogue-order invariance remain intact." }
+  ]
+}

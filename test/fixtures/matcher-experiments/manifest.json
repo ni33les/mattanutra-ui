@@ -1,0 +1,19 @@
+{
+  "formatVersion": 1,
+  "files": {
+    "dev": {
+      "filename": "anna-dev.json",
+      "sha256": "b499733107d829ad284b06a839a4a11f46421396a18aa9cec5c9edc57c7cf851"
+    },
+    "uat": {
+      "filename": "anna-uat.json",
+      "sha256": "14d21e9c529ad740590f3d747d53710746e32a39a11d99800b2dd34e2e8fcaa9"
+    }
+  },
+  "originalHistoricalFixtureSha256": "e559d0177134986a47a00e75c04a8cd90f9f4612068875931ede3f294d3cd2c8",
+  "sourceArchive": {
+    "filename": "implementation-evidence-2026-09-07T13-07-25Z.tar.gz",
+    "sha256": "212e478dda464a112776aed80189ee0095a91abb626422dc4a73a58feb5e8107"
+  },
+  "scope": "Offline reconstructed corrected baseline; frozen original prices and stock, not a new live catalogue observation."
+}
