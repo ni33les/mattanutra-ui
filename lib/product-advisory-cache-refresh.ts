@@ -53,7 +53,9 @@ export async function refreshApprovedAdvisoryCaches(tx: postgres.TransactionSql,
   for (const entry of manifest.entries) {
     if (!/^[a-f0-9]{64}$/.test(entry.beforeFingerprint) || entry.expectedValidation.status !== "pass" ||
         entry.correctionId !== `health-advisory-v5:${entry.productId}:${entry.beforeFingerprint.slice(0, 16)}`) throw new Error("Invalid advisory cache entry");
-    if (apply) await tx`select id from public.products where id=${entry.productId}::uuid for update`;
+    // Ordinary product writes hold their row before the AFTER trigger advances
+    // the epoch. Reject maintenance contention instead of waiting in that cycle.
+    if (apply) await tx`select id from public.products where id=${entry.productId}::uuid for update nowait`;
     const state = await readState(tx, entry.productId);
     const [existing] = await tx`select manifest_sha256,after_fingerprint from public.catalogue_correction_audit where correction_id=${entry.correctionId}`;
     if (existing) {

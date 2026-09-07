@@ -240,6 +240,11 @@ describe("database transaction boundaries", () => {
       ]],
       ["lib/web-payment-fulfillment.ts", ["fulfillWebPayment", "fulfillWebPayment"]],
       ["lib/task-result-applier.ts", ["applyTaskCompletionResult", "applyTaskFailureResult"]],
+      // Reviewed rollout-only refresh fences catalogue identity, then each exact
+      // manifest product, within the caller's bounded serializable transaction.
+      ["lib/product-advisory-cache-refresh.ts", [
+        "refreshApprovedAdvisoryCaches", "refreshApprovedAdvisoryCaches"
+      ]],
       [
         "lib/agentic/store/postgres.ts",
         [
@@ -270,6 +275,37 @@ describe("database transaction boundaries", () => {
         `${file} has unexpected row-locking query sites`
       );
     }
+  });
+
+  it("keeps audited advisory cache refresh scoped, serialized and free of external effects", async () => {
+    const source = await readFile("lib/product-advisory-cache-refresh.ts", "utf8");
+    const refresh = functionBody(source, "refreshApprovedAdvisoryCaches");
+    const readState = functionBody(source, "readState");
+    const persist = functionBody(await readFile("lib/admin-product-writes.ts", "utf8"), "refreshAndPersistProductValidation");
+    const caller = await readFile("scripts/refresh-advisory-product-caches.ts", "utf8");
+
+    assert.match(refresh, /show transaction_isolation[\s\S]*transaction_isolation !== "serializable"[\s\S]*throw new Error/,
+      "apply must reject an unprotected transaction before locking or writing");
+    assert.match(refresh, /if \(apply && manifest\.entries\.length\)[\s\S]*catalogue_runtime_revision where singleton=true for update[\s\S]*for \(const entry of manifest\.entries\)[\s\S]*if \(apply\) await tx`select id from public\.products where id=\$\{entry\.productId\}::uuid for update nowait/,
+      "lock the singleton epoch before exact reviewed products, reject product contention immediately, and keep dry-run lock-free");
+    assert.match(refresh, /state\.fingerprint !== entry\.beforeFingerprint[\s\S]*refreshAndPersistProductValidation\(tx, entry\.productId\)[\s\S]*insert into public\.catalogue_correction_audit/,
+      "the prior fingerprint, cache refresh and immutable audit must share one supplied transaction");
+
+    for (const [name, body, expectedCalls] of [
+      ["refreshApprovedAdvisoryCaches", refresh, ["readState", "refreshAndPersistProductValidation", "readState"]],
+      ["readState", readState, ["loadProductRows"]],
+      ["refreshAndPersistProductValidation", persist, ["loadProductRows"]]
+    ] as const) {
+      const calls = [...body.matchAll(/\bawait\s+([A-Za-z_$][\w$.]*)\s*\(/g)].map(match => match[1]);
+      assert.deepEqual(calls, expectedCalls, `${name} must not add unreviewed asynchronous side effects`);
+      assert.doesNotMatch(body, /\b(?:fetch|send\w*Email|queue\w*Email|createTask|flushMatchingCatalogueCaches)\s*\(|\.begin\s*\(/,
+        `${name} must not perform external work or open a nested transaction`);
+    }
+    assert.match(readState, /loadProductRows\(productId, \{ sql \}\)/);
+    assert.match(persist, /loadProductRows\(productId, \{ sql \}\)/);
+    assert.match(caller, /sql\.begin\(readOnly \? "isolation level serializable read only" : "isolation level serializable"/);
+    assert.match(caller, /SET LOCAL statement_timeout = '15s'; SET LOCAL lock_timeout = '2s'; SET LOCAL idle_in_transaction_session_timeout = '10s'[\s\S]*return work\(tx\)/,
+      "the rollout caller must establish statement, lock and idle bounds before any reviewed work");
   });
 
   it("keeps advisory locks limited to task dependency cycle protection", async () => {
