@@ -350,7 +350,7 @@ export function salvagePartialBasket(input: Readonly<{ groups: readonly ProductG
   let state = seedState(input.request);
   let best = scoreState({ ...input, state });
   if (!best) return null;
-  for (let iteration = 0; iteration < input.request.maxProductCount; iteration += 1) {
+  for (let iteration = 0; iteration < (input.request.maxProductCount ?? input.groups.length); iteration += 1) {
     let chosen: { state: SearchState; basket: ScoredBasket } | null = null;
     for (const group of input.groups) for (const variant of group.variants) {
       const next = tryAddVariant(state, variant, group, input.request);

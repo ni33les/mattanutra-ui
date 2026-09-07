@@ -128,7 +128,7 @@ export type CanonicalRequest = Readonly<{
   leftovers: readonly MatcherLeftover[];
   maxDailyPills: number | null;
   maxPriceMinor: number | null;
-  maxProductCount: number;
+  maxProductCount: number | null;
   medicationCodes: readonly string[];
   omega3SourcePreference: OmegaPreference;
   optimization: OptimizationMode;

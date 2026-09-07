@@ -27,7 +27,7 @@ function lossCertificatesFor(request: CanonicalRequest, catalog: CatalogSnapshot
         const price = selected.priceMinor + (existing ? 0 : group.product.unitPriceMinor);
         const count = selected.productCount + (existing ? 0 : 1);
         const rule = request.maxDailyPills != null && pills > request.maxDailyPills ? "max_pills" :
-          request.maxPriceMinor != null && price > request.maxPriceMinor ? "budget" : count > request.maxProductCount ? "max_products" : null;
+          request.maxPriceMinor != null && price > request.maxPriceMinor ? "budget" : request.maxProductCount != null && count > request.maxProductCount ? "max_products" : null;
         if (!rule && !trimmed) continue;
         const amount = (units: bigint) => amountFromScaled({ ...target.requested, units }, target.requestedUnit, target.name);
         certificates.push({ candidate_fact_id: null, candidate_product_id: group.productId, catalogue_id: catalog.catalogueVersion,

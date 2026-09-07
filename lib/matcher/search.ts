@@ -71,7 +71,7 @@ export function tryAddVariant(
   const remainingRetainedCount = request.retainProductIds.filter((id) => id !== group.productId &&
     !state.selectedProductIds?.includes(id) && !request.currentSupplements.some((row) => row.productId === id)).length;
 
-  if (count + remainingRetainedCount > request.maxProductCount) {
+  if (request.maxProductCount != null && count + remainingRetainedCount > request.maxProductCount) {
     return null;
   }
 
