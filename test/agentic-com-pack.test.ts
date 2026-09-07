@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
+import { normalizePublishedClientResult } from "../scripts/published-client-semantics.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -1733,7 +1734,9 @@ export async function runComPack(): Promise<ComPackReport> {
 export function canonicalComReport(report: ComPackReport) {
   return `${JSON.stringify(
     {
-      cases: report.cases,
+      cases: report.cases.map(item => ({ ...item,
+        evidence: normalizePublishedClientResult(item.evidence, "https://fixture.example/api/mcp")
+      })),
       packVersion: report.packVersion,
       passedCases: report.passedCases,
       totalCases: report.totalCases
@@ -1745,6 +1748,54 @@ export function canonicalComReport(report: ComPackReport) {
 
 if (process.env.NODE_TEST_CONTEXT) {
   describe("commercial v1.0 pack", () => {
+    it("preserves actual paired support evidence while normalizing only generated identities", () => {
+      const fixture = JSON.parse(readFileSync(new URL("./fixtures/mcp-commercial-support-pair.json", import.meta.url), "utf8")) as {
+        a: ComPackReport; b: ComPackReport;
+      };
+      const before = JSON.stringify(fixture);
+      assert.deepEqual(fixture.a.cases.map(item => item.id), ["COM-24", "COM-25"]);
+      assert.notDeepEqual(fixture.a, fixture.b, "Raw historical runs retain their independently generated identities");
+      const canonical = canonicalComReport(fixture.a);
+      assert.equal(canonicalComReport(fixture.b), canonical);
+      assert.equal(JSON.stringify(fixture), before, "Canonicalization must not rewrite raw evidence");
+
+      function at(root: unknown, path: readonly (string | number)[]): unknown {
+        return path.reduce<unknown>((value, key) => (value as Record<string | number, unknown>)[key], root);
+      }
+      function changeReply(callIndex: number, path: readonly (string | number)[], value: unknown) {
+        const changed = structuredClone(fixture.b);
+        const call = at(changed.cases[1].evidence, ["mcpTranscript", "calls", callIndex]);
+        const result = at(call, ["response", "result"]) as Record<string, unknown>;
+        const oldBody = JSON.stringify(result.structuredContent);
+        const target = at(result.structuredContent, path.slice(0, -1)) as Record<string | number, unknown>;
+        target[path.at(-1)!] = value;
+        // Mutate both actual wire representations; business drift must fail even when they agree.
+        for (const item of result.content as Array<{ text?: string }>) {
+          if (item.text === oldBody) item.text = JSON.stringify(result.structuredContent);
+        }
+        return changed;
+      }
+      for (const [call, path, value] of [
+        [0, ["frozenPlan", "items", 0, "servingsPerDay"], 2],
+        [0, ["frozenPlan", "items", 0, "unitPriceMinor"], 39001],
+        [0, ["frozenPlan", "coveragePercent"], 99],
+        [0, ["frozenPlan", "planRevision"], 2],
+        [0, ["frozenPlan", "selectedOptionId"], "changed-option"],
+        [0, ["frozenPlan", "items", 0, "productId"], "00000000-0000-0000-0000-000000000099"],
+        [0, ["responsibility", "domains", 0, "text"], "Changed clinical advice"],
+        [0, ["paymentStatus"], "paid"],
+        [1, ["orderContext", "stateVersion"], 2],
+        [1, ["thread", 1, "body"], "Different support answer"],
+        [2, ["caseReference"], "tkt_unrelated"],
+        [2, ["supportHandle"], "cap_unrelated"],
+        [1, ["messageId"], at(fixture.b.cases[1].evidence, ["mcpTranscript", "calls", 1, "response", "result", "structuredContent", "thread", 1, "id"])],
+        [1, ["thread", 1, "id"], at(fixture.b.cases[1].evidence, ["mcpTranscript", "calls", 1, "response", "result", "structuredContent", "thread", 0, "id"])]
+      ] as const) {
+        assert.notEqual(canonicalComReport(changeReply(call, path, value)), canonical,
+          `Same PASS assertions must not hide changed business values or identity relationships: ${path.join(".")}`);
+      }
+    });
+
     it("evaluates COM-01 through COM-50", async () => {
       const report = await runComPack();
       assert.equal(report.totalCases, 50);

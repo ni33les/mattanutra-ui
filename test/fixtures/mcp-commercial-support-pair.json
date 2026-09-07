@@ -1,0 +1,1388 @@
+{
+  "provenance": {
+    "sourceCommit": "1534b28c36830deb1c7389b4e556bf37eab6a1ee",
+    "description": "Unmodified COM-24 and COM-25 cases extracted from the failed immutable full paired report; raw request/response JSON and all assertions retained.",
+    "reportSha256": {
+      "run-a.json": "167fd66b7866aaf1c869e6199938bf1a07fa7e93318204610b39ad6613645368",
+      "run-b.json": "6c44323e560f9349e65b6ec7b00d353f363fe20b454fafcac73b408b94eef632"
+    }
+  },
+  "a": {
+    "cases": [
+      {
+        "evidence": {
+          "changedReason": "idempotency_conflict",
+          "sameHandle": true,
+          "supportHandle": "cap_ae000000000000000000000000000004",
+          "mcpTranscript": {
+            "version": 1,
+            "calls": [
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "expectedRevision": 1,
+                      "idempotencyKey": "com-key-24-execx",
+                      "planHandle": "cap_ae000000000000000000000000000001"
+                    },
+                    "name": "execute"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "Checkout ready for ord_000000000000. Poll the order; the browser is not payment truth.",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"checkoutExpiresAt\":\"2026-08-29T00:15:00.000Z\",\"checkoutUrl\":\"http://127.0.0.1:3100/en/basket/checkout?mode=agentic&order=cap_ae000000000000000000000000000002\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"frozenPlan\":{\"catalogueVersion\":\"dev-3.0.0\",\"channel\":\"agentic\",\"countryCode\":\"TH\",\"coveragePercent\":100,\"currency\":\"THB\",\"dailyPills\":1,\"items\":[{\"currency\":\"THB\",\"dailyPills\":1,\"administration\":null,\"pillCountKnown\":true,\"daysOfSupply\":30,\"form\":\"softgel\",\"lineTotalMinor\":39000,\"pillsPerServing\":1,\"productId\":\"prd_b1111111111111111111111111111111\",\"productName\":\"Vitamin D3 2000 IU\",\"quantity\":1,\"selectionReason\":{\"code\":\"best_available\",\"message\":\"This product is in the selected stack.\",\"messageKey\":\"plan.selection.in_selected_stack\",\"requestedNames\":[\"Vitamin D3\"],\"requestedSupplementIds\":[]},\"servingsPerDay\":1,\"unitPriceMinor\":39000,\"requestedNutrientNames\":[\"Vitamin D3\"],\"fixture\":true,\"source\":\"fixture\"}],\"market\":{\"countryCode\":\"TH\",\"retailerId\":\"retailer_th_delight\",\"retailerName\":\"Thailand retailer\"},\"planRevision\":1,\"safetyGuidanceIds\":[],\"selectedOptionId\":\"opt_com_plan_a\",\"shippingMinor\":5000,\"snapshotId\":\"snap_e9df22bd23a5c2f8\",\"subtotalMinor\":39000,\"taxMinor\":0,\"totalPriceMinor\":44000,\"contribution\":{\"acquisitionMinor\":0,\"attribution\":\"unattributed\",\"currency\":\"THB\",\"paymentFeeMinor\":0,\"paymentMinor\":44000,\"productCostMinor\":39000,\"shippingSubsidyMinor\":0}},\"ok\":true,\"orderHandle\":\"cap_ae000000000000000000000000000003\",\"orderReference\":\"ord_000000000000\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"pollAfterSeconds\":3,\"responsibility\":{\"version\":\"responsibility-4.0.0\",\"domains\":[{\"domain\":\"guidance\",\"semanticId\":\"resp.guidance.wellness_not_clinical\",\"text\":\"MattaNutra provides wellness matching and product facts. It does not diagnose, treat, or replace qualified clinical advice.\"},{\"domain\":\"payment\",\"semanticId\":\"resp.payment.customer_pays_merchant\",\"text\":\"The customer pays the merchant checkout. MattaNutra does not take the card payment itself.\"},{\"domain\":\"fulfilment\",\"semanticId\":\"resp.fulfilment.retailer_delivers\",\"text\":\"The fulfilling retailer ships the order. MattaNutra does not warehouse or deliver the goods.\"},{\"domain\":\"support\",\"semanticId\":\"resp.support.agent_thread\",\"text\":\"Support is an order-linked help thread for payment and fulfilment status, not a clinical or pharmacy counter.\"}]},\"responsibilityVersion\":\"responsibility-4.0.0\",\"stateVersion\":1}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "checkoutExpiresAt": "2026-08-29T00:15:00.000Z",
+                      "checkoutUrl": "http://127.0.0.1:3100/en/basket/checkout?mode=agentic&order=cap_ae000000000000000000000000000002",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "frozenPlan": {
+                        "catalogueVersion": "dev-3.0.0",
+                        "channel": "agentic",
+                        "countryCode": "TH",
+                        "coveragePercent": 100,
+                        "currency": "THB",
+                        "dailyPills": 1,
+                        "items": [
+                          {
+                            "currency": "THB",
+                            "dailyPills": 1,
+                            "administration": null,
+                            "pillCountKnown": true,
+                            "daysOfSupply": 30,
+                            "form": "softgel",
+                            "lineTotalMinor": 39000,
+                            "pillsPerServing": 1,
+                            "productId": "prd_b1111111111111111111111111111111",
+                            "productName": "Vitamin D3 2000 IU",
+                            "quantity": 1,
+                            "selectionReason": {
+                              "code": "best_available",
+                              "message": "This product is in the selected stack.",
+                              "messageKey": "plan.selection.in_selected_stack",
+                              "requestedNames": [
+                                "Vitamin D3"
+                              ],
+                              "requestedSupplementIds": []
+                            },
+                            "servingsPerDay": 1,
+                            "unitPriceMinor": 39000,
+                            "requestedNutrientNames": [
+                              "Vitamin D3"
+                            ],
+                            "fixture": true,
+                            "source": "fixture"
+                          }
+                        ],
+                        "market": {
+                          "countryCode": "TH",
+                          "retailerId": "retailer_th_delight",
+                          "retailerName": "Thailand retailer"
+                        },
+                        "planRevision": 1,
+                        "safetyGuidanceIds": [],
+                        "selectedOptionId": "opt_com_plan_a",
+                        "shippingMinor": 5000,
+                        "snapshotId": "snap_e9df22bd23a5c2f8",
+                        "subtotalMinor": 39000,
+                        "taxMinor": 0,
+                        "totalPriceMinor": 44000,
+                        "contribution": {
+                          "acquisitionMinor": 0,
+                          "attribution": "unattributed",
+                          "currency": "THB",
+                          "paymentFeeMinor": 0,
+                          "paymentMinor": 44000,
+                          "productCostMinor": 39000,
+                          "shippingSubsidyMinor": 0
+                        }
+                      },
+                      "ok": true,
+                      "orderHandle": "cap_ae000000000000000000000000000003",
+                      "orderReference": "ord_000000000000",
+                      "orderStatus": "open",
+                      "paymentStatus": "unpaid",
+                      "pollAfterSeconds": 3,
+                      "responsibility": {
+                        "version": "responsibility-4.0.0",
+                        "domains": [
+                          {
+                            "domain": "guidance",
+                            "semanticId": "resp.guidance.wellness_not_clinical",
+                            "text": "MattaNutra provides wellness matching and product facts. It does not diagnose, treat, or replace qualified clinical advice."
+                          },
+                          {
+                            "domain": "payment",
+                            "semanticId": "resp.payment.customer_pays_merchant",
+                            "text": "The customer pays the merchant checkout. MattaNutra does not take the card payment itself."
+                          },
+                          {
+                            "domain": "fulfilment",
+                            "semanticId": "resp.fulfilment.retailer_delivers",
+                            "text": "The fulfilling retailer ships the order. MattaNutra does not warehouse or deliver the goods."
+                          },
+                          {
+                            "domain": "support",
+                            "semanticId": "resp.support.agent_thread",
+                            "text": "Support is an order-linked help thread for payment and fulfilment status, not a clinical or pharmacy counter."
+                          }
+                        ]
+                      },
+                      "responsibilityVersion": "responsibility-4.0.0",
+                      "stateVersion": 1
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-24-openx",
+                      "message": "Please confirm delivery window.",
+                      "orderHandle": "cap_ae000000000000000000000000000003"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "ok",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"caseReference\":\"tkt_2a7c00b17ac1\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"messageId\":\"6514ea81-a0d2-b3ff-373b-b337c255e964\",\"ok\":true,\"orderContext\":{\"fulfilmentStatus\":\"not_started\",\"nextAction\":\"poll\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"stateVersion\":1,\"timeline\":\"open\"},\"responseExpectation\":\"Your message is recorded. The case is open and has not yet been reviewed.\",\"responseExpectationKey\":\"support.acknowledgement\",\"status\":\"open\",\"supportHandle\":\"cap_ae000000000000000000000000000004\",\"thread\":[{\"author\":\"client\",\"body\":\"Please confirm delivery window.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"6514ea81-a0d2-b3ff-373b-b337c255e964\",\"sequence\":1},{\"author\":\"support\",\"body\":\"The order is open.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"fd108d08-b500-4e2e-df1e-4fd590b46744\",\"sequence\":2}]}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "caseReference": "tkt_2a7c00b17ac1",
+                      "createdAt": "2026-08-29T00:00:00.000Z",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "messageId": "6514ea81-a0d2-b3ff-373b-b337c255e964",
+                      "ok": true,
+                      "orderContext": {
+                        "fulfilmentStatus": "not_started",
+                        "nextAction": "poll",
+                        "orderStatus": "open",
+                        "paymentStatus": "unpaid",
+                        "stateVersion": 1,
+                        "timeline": "open"
+                      },
+                      "responseExpectation": "Your message is recorded. The case is open and has not yet been reviewed.",
+                      "responseExpectationKey": "support.acknowledgement",
+                      "status": "open",
+                      "supportHandle": "cap_ae000000000000000000000000000004",
+                      "thread": [
+                        {
+                          "author": "client",
+                          "body": "Please confirm delivery window.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "6514ea81-a0d2-b3ff-373b-b337c255e964",
+                          "sequence": 1
+                        },
+                        {
+                          "author": "support",
+                          "body": "The order is open.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "fd108d08-b500-4e2e-df1e-4fd590b46744",
+                          "sequence": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-24-openx",
+                      "message": "Please confirm delivery window.",
+                      "orderHandle": "cap_ae000000000000000000000000000003"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "ok",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"caseReference\":\"tkt_2a7c00b17ac1\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"messageId\":\"6514ea81-a0d2-b3ff-373b-b337c255e964\",\"ok\":true,\"orderContext\":{\"fulfilmentStatus\":\"not_started\",\"nextAction\":\"poll\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"stateVersion\":1,\"timeline\":\"open\"},\"responseExpectation\":\"Your message is recorded. The case is open and has not yet been reviewed.\",\"responseExpectationKey\":\"support.acknowledgement\",\"status\":\"open\",\"supportHandle\":\"cap_ae000000000000000000000000000004\",\"thread\":[{\"author\":\"client\",\"body\":\"Please confirm delivery window.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"6514ea81-a0d2-b3ff-373b-b337c255e964\",\"sequence\":1},{\"author\":\"support\",\"body\":\"The order is open.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"fd108d08-b500-4e2e-df1e-4fd590b46744\",\"sequence\":2}]}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "caseReference": "tkt_2a7c00b17ac1",
+                      "createdAt": "2026-08-29T00:00:00.000Z",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "messageId": "6514ea81-a0d2-b3ff-373b-b337c255e964",
+                      "ok": true,
+                      "orderContext": {
+                        "fulfilmentStatus": "not_started",
+                        "nextAction": "poll",
+                        "orderStatus": "open",
+                        "paymentStatus": "unpaid",
+                        "stateVersion": 1,
+                        "timeline": "open"
+                      },
+                      "responseExpectation": "Your message is recorded. The case is open and has not yet been reviewed.",
+                      "responseExpectationKey": "support.acknowledgement",
+                      "status": "open",
+                      "supportHandle": "cap_ae000000000000000000000000000004",
+                      "thread": [
+                        {
+                          "author": "client",
+                          "body": "Please confirm delivery window.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "6514ea81-a0d2-b3ff-373b-b337c255e964",
+                          "sequence": 1
+                        },
+                        {
+                          "author": "support",
+                          "body": "The order is open.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "fd108d08-b500-4e2e-df1e-4fd590b46744",
+                          "sequence": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-24-openx",
+                      "message": "Changed support text.",
+                      "orderHandle": "cap_ae000000000000000000000000000003"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "This idempotency key was already used with a different payload.",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"error\":{\"category\":\"ABORTED\",\"errorCode\":\"ABORTED\",\"error_code\":\"ABORTED\",\"fieldPath\":\"idempotencyKey\",\"message\":\"This idempotency key was already used with a different payload.\",\"messageKey\":\"mcp.errors.idempotency_conflict\",\"reasonCode\":\"idempotency_conflict\",\"retryable\":false},\"ok\":false}"
+                      }
+                    ],
+                    "isError": true,
+                    "structuredContent": {
+                      "error": {
+                        "category": "ABORTED",
+                        "errorCode": "ABORTED",
+                        "error_code": "ABORTED",
+                        "fieldPath": "idempotencyKey",
+                        "message": "This idempotency key was already used with a different payload.",
+                        "messageKey": "mcp.errors.idempotency_conflict",
+                        "reasonCode": "idempotency_conflict",
+                        "retryable": false
+                      },
+                      "ok": false
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "id": "COM-24",
+        "result": "PASS"
+      },
+      {
+        "evidence": {
+          "isolation": "not_found",
+          "replyHandle": "cap_ae000000000000000000000000000004",
+          "sameCase": true,
+          "mcpTranscript": {
+            "version": 1,
+            "calls": [
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "expectedRevision": 1,
+                      "idempotencyKey": "com-key-25-execx",
+                      "planHandle": "cap_ae000000000000000000000000000001"
+                    },
+                    "name": "execute"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "Checkout ready for ord_000000000000. Poll the order; the browser is not payment truth.",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"checkoutExpiresAt\":\"2026-08-29T00:15:00.000Z\",\"checkoutUrl\":\"http://127.0.0.1:3100/en/basket/checkout?mode=agentic&order=cap_ae000000000000000000000000000002\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"frozenPlan\":{\"catalogueVersion\":\"dev-3.0.0\",\"channel\":\"agentic\",\"countryCode\":\"TH\",\"coveragePercent\":100,\"currency\":\"THB\",\"dailyPills\":1,\"items\":[{\"currency\":\"THB\",\"dailyPills\":1,\"administration\":null,\"pillCountKnown\":true,\"daysOfSupply\":30,\"form\":\"softgel\",\"lineTotalMinor\":39000,\"pillsPerServing\":1,\"productId\":\"prd_b1111111111111111111111111111111\",\"productName\":\"Vitamin D3 2000 IU\",\"quantity\":1,\"selectionReason\":{\"code\":\"best_available\",\"message\":\"This product is in the selected stack.\",\"messageKey\":\"plan.selection.in_selected_stack\",\"requestedNames\":[\"Vitamin D3\"],\"requestedSupplementIds\":[]},\"servingsPerDay\":1,\"unitPriceMinor\":39000,\"requestedNutrientNames\":[\"Vitamin D3\"],\"fixture\":true,\"source\":\"fixture\"}],\"market\":{\"countryCode\":\"TH\",\"retailerId\":\"retailer_th_delight\",\"retailerName\":\"Thailand retailer\"},\"planRevision\":1,\"safetyGuidanceIds\":[],\"selectedOptionId\":\"opt_com_plan_a\",\"shippingMinor\":5000,\"snapshotId\":\"snap_e9df22bd23a5c2f8\",\"subtotalMinor\":39000,\"taxMinor\":0,\"totalPriceMinor\":44000,\"contribution\":{\"acquisitionMinor\":0,\"attribution\":\"unattributed\",\"currency\":\"THB\",\"paymentFeeMinor\":0,\"paymentMinor\":44000,\"productCostMinor\":39000,\"shippingSubsidyMinor\":0}},\"ok\":true,\"orderHandle\":\"cap_ae000000000000000000000000000003\",\"orderReference\":\"ord_000000000000\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"pollAfterSeconds\":3,\"responsibility\":{\"version\":\"responsibility-4.0.0\",\"domains\":[{\"domain\":\"guidance\",\"semanticId\":\"resp.guidance.wellness_not_clinical\",\"text\":\"MattaNutra provides wellness matching and product facts. It does not diagnose, treat, or replace qualified clinical advice.\"},{\"domain\":\"payment\",\"semanticId\":\"resp.payment.customer_pays_merchant\",\"text\":\"The customer pays the merchant checkout. MattaNutra does not take the card payment itself.\"},{\"domain\":\"fulfilment\",\"semanticId\":\"resp.fulfilment.retailer_delivers\",\"text\":\"The fulfilling retailer ships the order. MattaNutra does not warehouse or deliver the goods.\"},{\"domain\":\"support\",\"semanticId\":\"resp.support.agent_thread\",\"text\":\"Support is an order-linked help thread for payment and fulfilment status, not a clinical or pharmacy counter.\"}]},\"responsibilityVersion\":\"responsibility-4.0.0\",\"stateVersion\":1}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "checkoutExpiresAt": "2026-08-29T00:15:00.000Z",
+                      "checkoutUrl": "http://127.0.0.1:3100/en/basket/checkout?mode=agentic&order=cap_ae000000000000000000000000000002",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "frozenPlan": {
+                        "catalogueVersion": "dev-3.0.0",
+                        "channel": "agentic",
+                        "countryCode": "TH",
+                        "coveragePercent": 100,
+                        "currency": "THB",
+                        "dailyPills": 1,
+                        "items": [
+                          {
+                            "currency": "THB",
+                            "dailyPills": 1,
+                            "administration": null,
+                            "pillCountKnown": true,
+                            "daysOfSupply": 30,
+                            "form": "softgel",
+                            "lineTotalMinor": 39000,
+                            "pillsPerServing": 1,
+                            "productId": "prd_b1111111111111111111111111111111",
+                            "productName": "Vitamin D3 2000 IU",
+                            "quantity": 1,
+                            "selectionReason": {
+                              "code": "best_available",
+                              "message": "This product is in the selected stack.",
+                              "messageKey": "plan.selection.in_selected_stack",
+                              "requestedNames": [
+                                "Vitamin D3"
+                              ],
+                              "requestedSupplementIds": []
+                            },
+                            "servingsPerDay": 1,
+                            "unitPriceMinor": 39000,
+                            "requestedNutrientNames": [
+                              "Vitamin D3"
+                            ],
+                            "fixture": true,
+                            "source": "fixture"
+                          }
+                        ],
+                        "market": {
+                          "countryCode": "TH",
+                          "retailerId": "retailer_th_delight",
+                          "retailerName": "Thailand retailer"
+                        },
+                        "planRevision": 1,
+                        "safetyGuidanceIds": [],
+                        "selectedOptionId": "opt_com_plan_a",
+                        "shippingMinor": 5000,
+                        "snapshotId": "snap_e9df22bd23a5c2f8",
+                        "subtotalMinor": 39000,
+                        "taxMinor": 0,
+                        "totalPriceMinor": 44000,
+                        "contribution": {
+                          "acquisitionMinor": 0,
+                          "attribution": "unattributed",
+                          "currency": "THB",
+                          "paymentFeeMinor": 0,
+                          "paymentMinor": 44000,
+                          "productCostMinor": 39000,
+                          "shippingSubsidyMinor": 0
+                        }
+                      },
+                      "ok": true,
+                      "orderHandle": "cap_ae000000000000000000000000000003",
+                      "orderReference": "ord_000000000000",
+                      "orderStatus": "open",
+                      "paymentStatus": "unpaid",
+                      "pollAfterSeconds": 3,
+                      "responsibility": {
+                        "version": "responsibility-4.0.0",
+                        "domains": [
+                          {
+                            "domain": "guidance",
+                            "semanticId": "resp.guidance.wellness_not_clinical",
+                            "text": "MattaNutra provides wellness matching and product facts. It does not diagnose, treat, or replace qualified clinical advice."
+                          },
+                          {
+                            "domain": "payment",
+                            "semanticId": "resp.payment.customer_pays_merchant",
+                            "text": "The customer pays the merchant checkout. MattaNutra does not take the card payment itself."
+                          },
+                          {
+                            "domain": "fulfilment",
+                            "semanticId": "resp.fulfilment.retailer_delivers",
+                            "text": "The fulfilling retailer ships the order. MattaNutra does not warehouse or deliver the goods."
+                          },
+                          {
+                            "domain": "support",
+                            "semanticId": "resp.support.agent_thread",
+                            "text": "Support is an order-linked help thread for payment and fulfilment status, not a clinical or pharmacy counter."
+                          }
+                        ]
+                      },
+                      "responsibilityVersion": "responsibility-4.0.0",
+                      "stateVersion": 1
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-25-openx",
+                      "message": "Need a reply.",
+                      "orderHandle": "cap_ae000000000000000000000000000003"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "ok",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"caseReference\":\"tkt_da839ce1d83e\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"messageId\":\"87c7d745-5dc8-68b7-5853-306df8f8975f\",\"ok\":true,\"orderContext\":{\"fulfilmentStatus\":\"not_started\",\"nextAction\":\"poll\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"stateVersion\":1,\"timeline\":\"open\"},\"responseExpectation\":\"Your message is recorded. The case is open and has not yet been reviewed.\",\"responseExpectationKey\":\"support.acknowledgement\",\"status\":\"open\",\"supportHandle\":\"cap_ae000000000000000000000000000004\",\"thread\":[{\"author\":\"client\",\"body\":\"Need a reply.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"87c7d745-5dc8-68b7-5853-306df8f8975f\",\"sequence\":1},{\"author\":\"support\",\"body\":\"The order is open.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"31c209bf-a37c-6712-ee0d-66d3f85aa2a2\",\"sequence\":2}]}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "caseReference": "tkt_da839ce1d83e",
+                      "createdAt": "2026-08-29T00:00:00.000Z",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "messageId": "87c7d745-5dc8-68b7-5853-306df8f8975f",
+                      "ok": true,
+                      "orderContext": {
+                        "fulfilmentStatus": "not_started",
+                        "nextAction": "poll",
+                        "orderStatus": "open",
+                        "paymentStatus": "unpaid",
+                        "stateVersion": 1,
+                        "timeline": "open"
+                      },
+                      "responseExpectation": "Your message is recorded. The case is open and has not yet been reviewed.",
+                      "responseExpectationKey": "support.acknowledgement",
+                      "status": "open",
+                      "supportHandle": "cap_ae000000000000000000000000000004",
+                      "thread": [
+                        {
+                          "author": "client",
+                          "body": "Need a reply.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "87c7d745-5dc8-68b7-5853-306df8f8975f",
+                          "sequence": 1
+                        },
+                        {
+                          "author": "support",
+                          "body": "The order is open.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "31c209bf-a37c-6712-ee0d-66d3f85aa2a2",
+                          "sequence": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-25-reply",
+                      "message": "Follow-up on the same case.",
+                      "orderHandle": "cap_ae000000000000000000000000000003",
+                      "supportHandle": "cap_ae000000000000000000000000000004"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "ok",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"caseReference\":\"tkt_da839ce1d83e\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"messageId\":\"e70ef37a-210c-ee14-07a1-66ad3b8c0cf4\",\"ok\":true,\"orderContext\":{\"fulfilmentStatus\":\"not_started\",\"nextAction\":\"poll\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"stateVersion\":1,\"timeline\":\"open\"},\"responseExpectation\":\"Your message is recorded. The case is open and has not yet been reviewed.\",\"responseExpectationKey\":\"support.acknowledgement\",\"status\":\"open\",\"supportHandle\":\"cap_ae000000000000000000000000000004\",\"thread\":[{\"author\":\"client\",\"body\":\"Need a reply.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"87c7d745-5dc8-68b7-5853-306df8f8975f\",\"sequence\":1},{\"author\":\"support\",\"body\":\"The order is open.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"31c209bf-a37c-6712-ee0d-66d3f85aa2a2\",\"sequence\":2},{\"author\":\"client\",\"body\":\"Follow-up on the same case.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"e70ef37a-210c-ee14-07a1-66ad3b8c0cf4\",\"sequence\":3}]}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "caseReference": "tkt_da839ce1d83e",
+                      "createdAt": "2026-08-29T00:00:00.000Z",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "messageId": "e70ef37a-210c-ee14-07a1-66ad3b8c0cf4",
+                      "ok": true,
+                      "orderContext": {
+                        "fulfilmentStatus": "not_started",
+                        "nextAction": "poll",
+                        "orderStatus": "open",
+                        "paymentStatus": "unpaid",
+                        "stateVersion": 1,
+                        "timeline": "open"
+                      },
+                      "responseExpectation": "Your message is recorded. The case is open and has not yet been reviewed.",
+                      "responseExpectationKey": "support.acknowledgement",
+                      "status": "open",
+                      "supportHandle": "cap_ae000000000000000000000000000004",
+                      "thread": [
+                        {
+                          "author": "client",
+                          "body": "Need a reply.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "87c7d745-5dc8-68b7-5853-306df8f8975f",
+                          "sequence": 1
+                        },
+                        {
+                          "author": "support",
+                          "body": "The order is open.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "31c209bf-a37c-6712-ee0d-66d3f85aa2a2",
+                          "sequence": 2
+                        },
+                        {
+                          "author": "client",
+                          "body": "Follow-up on the same case.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "e70ef37a-210c-ee14-07a1-66ad3b8c0cf4",
+                          "sequence": 3
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-25-isoxx",
+                      "message": "Wrong order.",
+                      "orderHandle": "cap_wrong_order_handle_32chars_xx"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "Not found.",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"error\":{\"category\":\"NOT_FOUND\",\"errorCode\":\"NOT_FOUND\",\"error_code\":\"NOT_FOUND\",\"fieldPath\":null,\"message\":\"Not found.\",\"messageKey\":\"mcp.errors.not_found\",\"reasonCode\":\"not_found\",\"retryable\":false},\"ok\":false}"
+                      }
+                    ],
+                    "isError": true,
+                    "structuredContent": {
+                      "error": {
+                        "category": "NOT_FOUND",
+                        "errorCode": "NOT_FOUND",
+                        "error_code": "NOT_FOUND",
+                        "fieldPath": null,
+                        "message": "Not found.",
+                        "messageKey": "mcp.errors.not_found",
+                        "reasonCode": "not_found",
+                        "retryable": false
+                      },
+                      "ok": false
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "id": "COM-25",
+        "result": "PASS"
+      }
+    ],
+    "packVersion": "commercial-1.0",
+    "passedCases": 2,
+    "totalCases": 2
+  },
+  "b": {
+    "cases": [
+      {
+        "evidence": {
+          "changedReason": "idempotency_conflict",
+          "sameHandle": true,
+          "supportHandle": "cap_ae000000000000000000000000000004",
+          "mcpTranscript": {
+            "version": 1,
+            "calls": [
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "expectedRevision": 1,
+                      "idempotencyKey": "com-key-24-execx",
+                      "planHandle": "cap_ae000000000000000000000000000001"
+                    },
+                    "name": "execute"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "Checkout ready for ord_000000000000. Poll the order; the browser is not payment truth.",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"checkoutExpiresAt\":\"2026-08-29T00:15:00.000Z\",\"checkoutUrl\":\"http://127.0.0.1:3100/en/basket/checkout?mode=agentic&order=cap_ae000000000000000000000000000002\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"frozenPlan\":{\"catalogueVersion\":\"dev-3.0.0\",\"channel\":\"agentic\",\"countryCode\":\"TH\",\"coveragePercent\":100,\"currency\":\"THB\",\"dailyPills\":1,\"items\":[{\"currency\":\"THB\",\"dailyPills\":1,\"administration\":null,\"pillCountKnown\":true,\"daysOfSupply\":30,\"form\":\"softgel\",\"lineTotalMinor\":39000,\"pillsPerServing\":1,\"productId\":\"prd_b1111111111111111111111111111111\",\"productName\":\"Vitamin D3 2000 IU\",\"quantity\":1,\"selectionReason\":{\"code\":\"best_available\",\"message\":\"This product is in the selected stack.\",\"messageKey\":\"plan.selection.in_selected_stack\",\"requestedNames\":[\"Vitamin D3\"],\"requestedSupplementIds\":[]},\"servingsPerDay\":1,\"unitPriceMinor\":39000,\"requestedNutrientNames\":[\"Vitamin D3\"],\"fixture\":true,\"source\":\"fixture\"}],\"market\":{\"countryCode\":\"TH\",\"retailerId\":\"retailer_th_delight\",\"retailerName\":\"Thailand retailer\"},\"planRevision\":1,\"safetyGuidanceIds\":[],\"selectedOptionId\":\"opt_com_plan_a\",\"shippingMinor\":5000,\"snapshotId\":\"snap_e9df22bd23a5c2f8\",\"subtotalMinor\":39000,\"taxMinor\":0,\"totalPriceMinor\":44000,\"contribution\":{\"acquisitionMinor\":0,\"attribution\":\"unattributed\",\"currency\":\"THB\",\"paymentFeeMinor\":0,\"paymentMinor\":44000,\"productCostMinor\":39000,\"shippingSubsidyMinor\":0}},\"ok\":true,\"orderHandle\":\"cap_ae000000000000000000000000000003\",\"orderReference\":\"ord_000000000000\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"pollAfterSeconds\":3,\"responsibility\":{\"version\":\"responsibility-4.0.0\",\"domains\":[{\"domain\":\"guidance\",\"semanticId\":\"resp.guidance.wellness_not_clinical\",\"text\":\"MattaNutra provides wellness matching and product facts. It does not diagnose, treat, or replace qualified clinical advice.\"},{\"domain\":\"payment\",\"semanticId\":\"resp.payment.customer_pays_merchant\",\"text\":\"The customer pays the merchant checkout. MattaNutra does not take the card payment itself.\"},{\"domain\":\"fulfilment\",\"semanticId\":\"resp.fulfilment.retailer_delivers\",\"text\":\"The fulfilling retailer ships the order. MattaNutra does not warehouse or deliver the goods.\"},{\"domain\":\"support\",\"semanticId\":\"resp.support.agent_thread\",\"text\":\"Support is an order-linked help thread for payment and fulfilment status, not a clinical or pharmacy counter.\"}]},\"responsibilityVersion\":\"responsibility-4.0.0\",\"stateVersion\":1}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "checkoutExpiresAt": "2026-08-29T00:15:00.000Z",
+                      "checkoutUrl": "http://127.0.0.1:3100/en/basket/checkout?mode=agentic&order=cap_ae000000000000000000000000000002",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "frozenPlan": {
+                        "catalogueVersion": "dev-3.0.0",
+                        "channel": "agentic",
+                        "countryCode": "TH",
+                        "coveragePercent": 100,
+                        "currency": "THB",
+                        "dailyPills": 1,
+                        "items": [
+                          {
+                            "currency": "THB",
+                            "dailyPills": 1,
+                            "administration": null,
+                            "pillCountKnown": true,
+                            "daysOfSupply": 30,
+                            "form": "softgel",
+                            "lineTotalMinor": 39000,
+                            "pillsPerServing": 1,
+                            "productId": "prd_b1111111111111111111111111111111",
+                            "productName": "Vitamin D3 2000 IU",
+                            "quantity": 1,
+                            "selectionReason": {
+                              "code": "best_available",
+                              "message": "This product is in the selected stack.",
+                              "messageKey": "plan.selection.in_selected_stack",
+                              "requestedNames": [
+                                "Vitamin D3"
+                              ],
+                              "requestedSupplementIds": []
+                            },
+                            "servingsPerDay": 1,
+                            "unitPriceMinor": 39000,
+                            "requestedNutrientNames": [
+                              "Vitamin D3"
+                            ],
+                            "fixture": true,
+                            "source": "fixture"
+                          }
+                        ],
+                        "market": {
+                          "countryCode": "TH",
+                          "retailerId": "retailer_th_delight",
+                          "retailerName": "Thailand retailer"
+                        },
+                        "planRevision": 1,
+                        "safetyGuidanceIds": [],
+                        "selectedOptionId": "opt_com_plan_a",
+                        "shippingMinor": 5000,
+                        "snapshotId": "snap_e9df22bd23a5c2f8",
+                        "subtotalMinor": 39000,
+                        "taxMinor": 0,
+                        "totalPriceMinor": 44000,
+                        "contribution": {
+                          "acquisitionMinor": 0,
+                          "attribution": "unattributed",
+                          "currency": "THB",
+                          "paymentFeeMinor": 0,
+                          "paymentMinor": 44000,
+                          "productCostMinor": 39000,
+                          "shippingSubsidyMinor": 0
+                        }
+                      },
+                      "ok": true,
+                      "orderHandle": "cap_ae000000000000000000000000000003",
+                      "orderReference": "ord_000000000000",
+                      "orderStatus": "open",
+                      "paymentStatus": "unpaid",
+                      "pollAfterSeconds": 3,
+                      "responsibility": {
+                        "version": "responsibility-4.0.0",
+                        "domains": [
+                          {
+                            "domain": "guidance",
+                            "semanticId": "resp.guidance.wellness_not_clinical",
+                            "text": "MattaNutra provides wellness matching and product facts. It does not diagnose, treat, or replace qualified clinical advice."
+                          },
+                          {
+                            "domain": "payment",
+                            "semanticId": "resp.payment.customer_pays_merchant",
+                            "text": "The customer pays the merchant checkout. MattaNutra does not take the card payment itself."
+                          },
+                          {
+                            "domain": "fulfilment",
+                            "semanticId": "resp.fulfilment.retailer_delivers",
+                            "text": "The fulfilling retailer ships the order. MattaNutra does not warehouse or deliver the goods."
+                          },
+                          {
+                            "domain": "support",
+                            "semanticId": "resp.support.agent_thread",
+                            "text": "Support is an order-linked help thread for payment and fulfilment status, not a clinical or pharmacy counter."
+                          }
+                        ]
+                      },
+                      "responsibilityVersion": "responsibility-4.0.0",
+                      "stateVersion": 1
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-24-openx",
+                      "message": "Please confirm delivery window.",
+                      "orderHandle": "cap_ae000000000000000000000000000003"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "ok",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"caseReference\":\"tkt_86a09be72aaf\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"messageId\":\"ca986f12-3298-14b3-b6af-54d6e33ef8d0\",\"ok\":true,\"orderContext\":{\"fulfilmentStatus\":\"not_started\",\"nextAction\":\"poll\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"stateVersion\":1,\"timeline\":\"open\"},\"responseExpectation\":\"Your message is recorded. The case is open and has not yet been reviewed.\",\"responseExpectationKey\":\"support.acknowledgement\",\"status\":\"open\",\"supportHandle\":\"cap_ae000000000000000000000000000004\",\"thread\":[{\"author\":\"client\",\"body\":\"Please confirm delivery window.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"ca986f12-3298-14b3-b6af-54d6e33ef8d0\",\"sequence\":1},{\"author\":\"support\",\"body\":\"The order is open.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"dfecd221-a409-b1a8-32c3-18499f94378b\",\"sequence\":2}]}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "caseReference": "tkt_86a09be72aaf",
+                      "createdAt": "2026-08-29T00:00:00.000Z",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "messageId": "ca986f12-3298-14b3-b6af-54d6e33ef8d0",
+                      "ok": true,
+                      "orderContext": {
+                        "fulfilmentStatus": "not_started",
+                        "nextAction": "poll",
+                        "orderStatus": "open",
+                        "paymentStatus": "unpaid",
+                        "stateVersion": 1,
+                        "timeline": "open"
+                      },
+                      "responseExpectation": "Your message is recorded. The case is open and has not yet been reviewed.",
+                      "responseExpectationKey": "support.acknowledgement",
+                      "status": "open",
+                      "supportHandle": "cap_ae000000000000000000000000000004",
+                      "thread": [
+                        {
+                          "author": "client",
+                          "body": "Please confirm delivery window.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "ca986f12-3298-14b3-b6af-54d6e33ef8d0",
+                          "sequence": 1
+                        },
+                        {
+                          "author": "support",
+                          "body": "The order is open.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "dfecd221-a409-b1a8-32c3-18499f94378b",
+                          "sequence": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-24-openx",
+                      "message": "Please confirm delivery window.",
+                      "orderHandle": "cap_ae000000000000000000000000000003"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "ok",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"caseReference\":\"tkt_86a09be72aaf\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"messageId\":\"ca986f12-3298-14b3-b6af-54d6e33ef8d0\",\"ok\":true,\"orderContext\":{\"fulfilmentStatus\":\"not_started\",\"nextAction\":\"poll\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"stateVersion\":1,\"timeline\":\"open\"},\"responseExpectation\":\"Your message is recorded. The case is open and has not yet been reviewed.\",\"responseExpectationKey\":\"support.acknowledgement\",\"status\":\"open\",\"supportHandle\":\"cap_ae000000000000000000000000000004\",\"thread\":[{\"author\":\"client\",\"body\":\"Please confirm delivery window.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"ca986f12-3298-14b3-b6af-54d6e33ef8d0\",\"sequence\":1},{\"author\":\"support\",\"body\":\"The order is open.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"dfecd221-a409-b1a8-32c3-18499f94378b\",\"sequence\":2}]}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "caseReference": "tkt_86a09be72aaf",
+                      "createdAt": "2026-08-29T00:00:00.000Z",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "messageId": "ca986f12-3298-14b3-b6af-54d6e33ef8d0",
+                      "ok": true,
+                      "orderContext": {
+                        "fulfilmentStatus": "not_started",
+                        "nextAction": "poll",
+                        "orderStatus": "open",
+                        "paymentStatus": "unpaid",
+                        "stateVersion": 1,
+                        "timeline": "open"
+                      },
+                      "responseExpectation": "Your message is recorded. The case is open and has not yet been reviewed.",
+                      "responseExpectationKey": "support.acknowledgement",
+                      "status": "open",
+                      "supportHandle": "cap_ae000000000000000000000000000004",
+                      "thread": [
+                        {
+                          "author": "client",
+                          "body": "Please confirm delivery window.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "ca986f12-3298-14b3-b6af-54d6e33ef8d0",
+                          "sequence": 1
+                        },
+                        {
+                          "author": "support",
+                          "body": "The order is open.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "dfecd221-a409-b1a8-32c3-18499f94378b",
+                          "sequence": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-24-openx",
+                      "message": "Changed support text.",
+                      "orderHandle": "cap_ae000000000000000000000000000003"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "This idempotency key was already used with a different payload.",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"error\":{\"category\":\"ABORTED\",\"errorCode\":\"ABORTED\",\"error_code\":\"ABORTED\",\"fieldPath\":\"idempotencyKey\",\"message\":\"This idempotency key was already used with a different payload.\",\"messageKey\":\"mcp.errors.idempotency_conflict\",\"reasonCode\":\"idempotency_conflict\",\"retryable\":false},\"ok\":false}"
+                      }
+                    ],
+                    "isError": true,
+                    "structuredContent": {
+                      "error": {
+                        "category": "ABORTED",
+                        "errorCode": "ABORTED",
+                        "error_code": "ABORTED",
+                        "fieldPath": "idempotencyKey",
+                        "message": "This idempotency key was already used with a different payload.",
+                        "messageKey": "mcp.errors.idempotency_conflict",
+                        "reasonCode": "idempotency_conflict",
+                        "retryable": false
+                      },
+                      "ok": false
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "id": "COM-24",
+        "result": "PASS"
+      },
+      {
+        "evidence": {
+          "isolation": "not_found",
+          "replyHandle": "cap_ae000000000000000000000000000004",
+          "sameCase": true,
+          "mcpTranscript": {
+            "version": 1,
+            "calls": [
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "expectedRevision": 1,
+                      "idempotencyKey": "com-key-25-execx",
+                      "planHandle": "cap_ae000000000000000000000000000001"
+                    },
+                    "name": "execute"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "Checkout ready for ord_000000000000. Poll the order; the browser is not payment truth.",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"checkoutExpiresAt\":\"2026-08-29T00:15:00.000Z\",\"checkoutUrl\":\"http://127.0.0.1:3100/en/basket/checkout?mode=agentic&order=cap_ae000000000000000000000000000002\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"frozenPlan\":{\"catalogueVersion\":\"dev-3.0.0\",\"channel\":\"agentic\",\"countryCode\":\"TH\",\"coveragePercent\":100,\"currency\":\"THB\",\"dailyPills\":1,\"items\":[{\"currency\":\"THB\",\"dailyPills\":1,\"administration\":null,\"pillCountKnown\":true,\"daysOfSupply\":30,\"form\":\"softgel\",\"lineTotalMinor\":39000,\"pillsPerServing\":1,\"productId\":\"prd_b1111111111111111111111111111111\",\"productName\":\"Vitamin D3 2000 IU\",\"quantity\":1,\"selectionReason\":{\"code\":\"best_available\",\"message\":\"This product is in the selected stack.\",\"messageKey\":\"plan.selection.in_selected_stack\",\"requestedNames\":[\"Vitamin D3\"],\"requestedSupplementIds\":[]},\"servingsPerDay\":1,\"unitPriceMinor\":39000,\"requestedNutrientNames\":[\"Vitamin D3\"],\"fixture\":true,\"source\":\"fixture\"}],\"market\":{\"countryCode\":\"TH\",\"retailerId\":\"retailer_th_delight\",\"retailerName\":\"Thailand retailer\"},\"planRevision\":1,\"safetyGuidanceIds\":[],\"selectedOptionId\":\"opt_com_plan_a\",\"shippingMinor\":5000,\"snapshotId\":\"snap_e9df22bd23a5c2f8\",\"subtotalMinor\":39000,\"taxMinor\":0,\"totalPriceMinor\":44000,\"contribution\":{\"acquisitionMinor\":0,\"attribution\":\"unattributed\",\"currency\":\"THB\",\"paymentFeeMinor\":0,\"paymentMinor\":44000,\"productCostMinor\":39000,\"shippingSubsidyMinor\":0}},\"ok\":true,\"orderHandle\":\"cap_ae000000000000000000000000000003\",\"orderReference\":\"ord_000000000000\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"pollAfterSeconds\":3,\"responsibility\":{\"version\":\"responsibility-4.0.0\",\"domains\":[{\"domain\":\"guidance\",\"semanticId\":\"resp.guidance.wellness_not_clinical\",\"text\":\"MattaNutra provides wellness matching and product facts. It does not diagnose, treat, or replace qualified clinical advice.\"},{\"domain\":\"payment\",\"semanticId\":\"resp.payment.customer_pays_merchant\",\"text\":\"The customer pays the merchant checkout. MattaNutra does not take the card payment itself.\"},{\"domain\":\"fulfilment\",\"semanticId\":\"resp.fulfilment.retailer_delivers\",\"text\":\"The fulfilling retailer ships the order. MattaNutra does not warehouse or deliver the goods.\"},{\"domain\":\"support\",\"semanticId\":\"resp.support.agent_thread\",\"text\":\"Support is an order-linked help thread for payment and fulfilment status, not a clinical or pharmacy counter.\"}]},\"responsibilityVersion\":\"responsibility-4.0.0\",\"stateVersion\":1}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "checkoutExpiresAt": "2026-08-29T00:15:00.000Z",
+                      "checkoutUrl": "http://127.0.0.1:3100/en/basket/checkout?mode=agentic&order=cap_ae000000000000000000000000000002",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "frozenPlan": {
+                        "catalogueVersion": "dev-3.0.0",
+                        "channel": "agentic",
+                        "countryCode": "TH",
+                        "coveragePercent": 100,
+                        "currency": "THB",
+                        "dailyPills": 1,
+                        "items": [
+                          {
+                            "currency": "THB",
+                            "dailyPills": 1,
+                            "administration": null,
+                            "pillCountKnown": true,
+                            "daysOfSupply": 30,
+                            "form": "softgel",
+                            "lineTotalMinor": 39000,
+                            "pillsPerServing": 1,
+                            "productId": "prd_b1111111111111111111111111111111",
+                            "productName": "Vitamin D3 2000 IU",
+                            "quantity": 1,
+                            "selectionReason": {
+                              "code": "best_available",
+                              "message": "This product is in the selected stack.",
+                              "messageKey": "plan.selection.in_selected_stack",
+                              "requestedNames": [
+                                "Vitamin D3"
+                              ],
+                              "requestedSupplementIds": []
+                            },
+                            "servingsPerDay": 1,
+                            "unitPriceMinor": 39000,
+                            "requestedNutrientNames": [
+                              "Vitamin D3"
+                            ],
+                            "fixture": true,
+                            "source": "fixture"
+                          }
+                        ],
+                        "market": {
+                          "countryCode": "TH",
+                          "retailerId": "retailer_th_delight",
+                          "retailerName": "Thailand retailer"
+                        },
+                        "planRevision": 1,
+                        "safetyGuidanceIds": [],
+                        "selectedOptionId": "opt_com_plan_a",
+                        "shippingMinor": 5000,
+                        "snapshotId": "snap_e9df22bd23a5c2f8",
+                        "subtotalMinor": 39000,
+                        "taxMinor": 0,
+                        "totalPriceMinor": 44000,
+                        "contribution": {
+                          "acquisitionMinor": 0,
+                          "attribution": "unattributed",
+                          "currency": "THB",
+                          "paymentFeeMinor": 0,
+                          "paymentMinor": 44000,
+                          "productCostMinor": 39000,
+                          "shippingSubsidyMinor": 0
+                        }
+                      },
+                      "ok": true,
+                      "orderHandle": "cap_ae000000000000000000000000000003",
+                      "orderReference": "ord_000000000000",
+                      "orderStatus": "open",
+                      "paymentStatus": "unpaid",
+                      "pollAfterSeconds": 3,
+                      "responsibility": {
+                        "version": "responsibility-4.0.0",
+                        "domains": [
+                          {
+                            "domain": "guidance",
+                            "semanticId": "resp.guidance.wellness_not_clinical",
+                            "text": "MattaNutra provides wellness matching and product facts. It does not diagnose, treat, or replace qualified clinical advice."
+                          },
+                          {
+                            "domain": "payment",
+                            "semanticId": "resp.payment.customer_pays_merchant",
+                            "text": "The customer pays the merchant checkout. MattaNutra does not take the card payment itself."
+                          },
+                          {
+                            "domain": "fulfilment",
+                            "semanticId": "resp.fulfilment.retailer_delivers",
+                            "text": "The fulfilling retailer ships the order. MattaNutra does not warehouse or deliver the goods."
+                          },
+                          {
+                            "domain": "support",
+                            "semanticId": "resp.support.agent_thread",
+                            "text": "Support is an order-linked help thread for payment and fulfilment status, not a clinical or pharmacy counter."
+                          }
+                        ]
+                      },
+                      "responsibilityVersion": "responsibility-4.0.0",
+                      "stateVersion": 1
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-25-openx",
+                      "message": "Need a reply.",
+                      "orderHandle": "cap_ae000000000000000000000000000003"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "ok",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"caseReference\":\"tkt_f0c336eb79fd\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"messageId\":\"53d091fe-2773-a0bb-e915-6d60e14a51be\",\"ok\":true,\"orderContext\":{\"fulfilmentStatus\":\"not_started\",\"nextAction\":\"poll\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"stateVersion\":1,\"timeline\":\"open\"},\"responseExpectation\":\"Your message is recorded. The case is open and has not yet been reviewed.\",\"responseExpectationKey\":\"support.acknowledgement\",\"status\":\"open\",\"supportHandle\":\"cap_ae000000000000000000000000000004\",\"thread\":[{\"author\":\"client\",\"body\":\"Need a reply.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"53d091fe-2773-a0bb-e915-6d60e14a51be\",\"sequence\":1},{\"author\":\"support\",\"body\":\"The order is open.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"8f2581f4-2b29-bb23-aefa-89205cef573b\",\"sequence\":2}]}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "caseReference": "tkt_f0c336eb79fd",
+                      "createdAt": "2026-08-29T00:00:00.000Z",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "messageId": "53d091fe-2773-a0bb-e915-6d60e14a51be",
+                      "ok": true,
+                      "orderContext": {
+                        "fulfilmentStatus": "not_started",
+                        "nextAction": "poll",
+                        "orderStatus": "open",
+                        "paymentStatus": "unpaid",
+                        "stateVersion": 1,
+                        "timeline": "open"
+                      },
+                      "responseExpectation": "Your message is recorded. The case is open and has not yet been reviewed.",
+                      "responseExpectationKey": "support.acknowledgement",
+                      "status": "open",
+                      "supportHandle": "cap_ae000000000000000000000000000004",
+                      "thread": [
+                        {
+                          "author": "client",
+                          "body": "Need a reply.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "53d091fe-2773-a0bb-e915-6d60e14a51be",
+                          "sequence": 1
+                        },
+                        {
+                          "author": "support",
+                          "body": "The order is open.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "8f2581f4-2b29-bb23-aefa-89205cef573b",
+                          "sequence": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-25-reply",
+                      "message": "Follow-up on the same case.",
+                      "orderHandle": "cap_ae000000000000000000000000000003",
+                      "supportHandle": "cap_ae000000000000000000000000000004"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "ok",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"caseReference\":\"tkt_f0c336eb79fd\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"feedbackInvitation\":{\"prompt\":\"Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.\",\"promptKey\":\"feedback.invitation\"},\"messageId\":\"c46661dc-38bb-d2a7-fe26-327e81046851\",\"ok\":true,\"orderContext\":{\"fulfilmentStatus\":\"not_started\",\"nextAction\":\"poll\",\"orderStatus\":\"open\",\"paymentStatus\":\"unpaid\",\"stateVersion\":1,\"timeline\":\"open\"},\"responseExpectation\":\"Your message is recorded. The case is open and has not yet been reviewed.\",\"responseExpectationKey\":\"support.acknowledgement\",\"status\":\"open\",\"supportHandle\":\"cap_ae000000000000000000000000000004\",\"thread\":[{\"author\":\"client\",\"body\":\"Need a reply.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"53d091fe-2773-a0bb-e915-6d60e14a51be\",\"sequence\":1},{\"author\":\"support\",\"body\":\"The order is open.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"8f2581f4-2b29-bb23-aefa-89205cef573b\",\"sequence\":2},{\"author\":\"client\",\"body\":\"Follow-up on the same case.\",\"createdAt\":\"2026-08-29T00:00:00.000Z\",\"id\":\"c46661dc-38bb-d2a7-fe26-327e81046851\",\"sequence\":3}]}"
+                      }
+                    ],
+                    "isError": false,
+                    "structuredContent": {
+                      "caseReference": "tkt_f0c336eb79fd",
+                      "createdAt": "2026-08-29T00:00:00.000Z",
+                      "feedbackInvitation": {
+                        "prompt": "Would you like me to send MattaNutra a short summary of what worked well and what could be improved? It is optional and will not affect your plan or order.",
+                        "promptKey": "feedback.invitation"
+                      },
+                      "messageId": "c46661dc-38bb-d2a7-fe26-327e81046851",
+                      "ok": true,
+                      "orderContext": {
+                        "fulfilmentStatus": "not_started",
+                        "nextAction": "poll",
+                        "orderStatus": "open",
+                        "paymentStatus": "unpaid",
+                        "stateVersion": 1,
+                        "timeline": "open"
+                      },
+                      "responseExpectation": "Your message is recorded. The case is open and has not yet been reviewed.",
+                      "responseExpectationKey": "support.acknowledgement",
+                      "status": "open",
+                      "supportHandle": "cap_ae000000000000000000000000000004",
+                      "thread": [
+                        {
+                          "author": "client",
+                          "body": "Need a reply.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "53d091fe-2773-a0bb-e915-6d60e14a51be",
+                          "sequence": 1
+                        },
+                        {
+                          "author": "support",
+                          "body": "The order is open.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "8f2581f4-2b29-bb23-aefa-89205cef573b",
+                          "sequence": 2
+                        },
+                        {
+                          "author": "client",
+                          "body": "Follow-up on the same case.",
+                          "createdAt": "2026-08-29T00:00:00.000Z",
+                          "id": "c46661dc-38bb-d2a7-fe26-327e81046851",
+                          "sequence": 3
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "request": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "method": "tools/call",
+                  "params": {
+                    "arguments": {
+                      "idempotencyKey": "com-key-25-isoxx",
+                      "message": "Wrong order.",
+                      "orderHandle": "cap_wrong_order_handle_32chars_xx"
+                    },
+                    "name": "support"
+                  }
+                },
+                "state": "completed",
+                "response": {
+                  "id": 1,
+                  "jsonrpc": "2.0",
+                  "result": {
+                    "content": [
+                      {
+                        "text": "Not found.",
+                        "type": "text"
+                      },
+                      {
+                        "type": "text",
+                        "text": "{\"error\":{\"category\":\"NOT_FOUND\",\"errorCode\":\"NOT_FOUND\",\"error_code\":\"NOT_FOUND\",\"fieldPath\":null,\"message\":\"Not found.\",\"messageKey\":\"mcp.errors.not_found\",\"reasonCode\":\"not_found\",\"retryable\":false},\"ok\":false}"
+                      }
+                    ],
+                    "isError": true,
+                    "structuredContent": {
+                      "error": {
+                        "category": "NOT_FOUND",
+                        "errorCode": "NOT_FOUND",
+                        "error_code": "NOT_FOUND",
+                        "fieldPath": null,
+                        "message": "Not found.",
+                        "messageKey": "mcp.errors.not_found",
+                        "reasonCode": "not_found",
+                        "retryable": false
+                      },
+                      "ok": false
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "id": "COM-25",
+        "result": "PASS"
+      }
+    ],
+    "packVersion": "commercial-1.0",
+    "passedCases": 2,
+    "totalCases": 2
+  }
+}

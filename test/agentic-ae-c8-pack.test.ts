@@ -6,7 +6,7 @@ import {
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
-import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
+import { assertRecordedMcpEvidence, withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
   BasketItem,
@@ -1211,15 +1211,17 @@ export async function runAeC8Pack(): Promise<AeC8PackReport> {
       })
     );
 
-    const byId = new Map(cases.map((item) => [item.id, item]));
-    const firstSix = CASE_IDS.slice(0, 6).map(
-      (id) => byId.get(id) ?? fail(id, { missing: true })
-    );
-    const failedSix = firstSix.filter((item) => item.result !== "PASS").map((item) => item.id);
     cases.push(
-      failedSix.length === 0
-        ? pass("AX8-07", { passed: firstSix.map((item) => item.id) })
-        : fail("AX8-07", { failed: failedSix })
+      await runCase("AX8-07", async () => {
+        const byId = new Map(cases.map((item) => [item.id, item]));
+        const firstSix = CASE_IDS.slice(0, 6).map(
+          (id) => byId.get(id) ?? fail(id, { missing: true })
+        );
+        const failedSix = firstSix.filter((item) => item.result !== "PASS").map((item) => item.id);
+        return failedSix.length === 0
+          ? pass("AX8-07", { passed: firstSix.map((item) => item.id) })
+          : fail("AX8-07", { failed: failedSix });
+      })
     );
 
     const ordered = CASE_IDS.map(
@@ -1241,6 +1243,11 @@ if (process.env.NODE_TEST_CONTEXT) {
   describe("agentic experience cycle 8 pack", () => {
     it("exports 7 cases and a canonical report", async () => {
       const report = await runAeC8Pack();
+      assertRecordedMcpEvidence(report, "AE C8 pack");
+      assert.deepEqual(report.cases.find(item => item.id === "AX8-07")?.evidence.mcpTranscript, {
+        version: 1,
+        calls: []
+      });
       assert.equal(report.totalCases, 7);
       assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 7);

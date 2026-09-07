@@ -57,6 +57,16 @@ it("preserves repeated versus distinct event and handle identities", () => {
   assert.notDeepEqual(normalize(fixture(1), endpoint), normalize(unrelated, endpoint));
 });
 
+it("keeps UUID business IDs and non-support thread IDs meaningful", () => {
+  const left = "00000000-0000-0000-0000-000000000001", right = "00000000-0000-0000-0000-000000000002";
+  for (const make of [
+    (id: string) => ({ id }),
+    (id: string) => ({ thread: [{ id, body: "A business thread" }] }),
+    (id: string) => ({ productId: id, optionId: id }),
+    (id: string) => ({ supportHandle: "cap_support", caseReference: "tkt_case", thread: [{ id: "business-id" }], business: { id } })
+  ]) assert.notDeepEqual(normalize(make(left), endpoint), normalize(make(right), endpoint));
+});
+
 it("preserves distinct URL-only checkout capabilities while normalizing generated tokens", () => {
   const first = fixture(1), second = fixture(2);
   first.receipt.checkoutUrl = "http://127.0.0.1:3100/checkout?order=cap_aaaaaaaaaaaaaaaaaaaaaaaa";

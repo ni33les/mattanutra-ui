@@ -7,7 +7,7 @@ import {
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
-import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
+import { assertRecordedMcpEvidence, withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { DEFAULT_SHIPPING_MINOR } from "../lib/agentic/money.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
@@ -1305,17 +1305,19 @@ export async function runAeC6Pack(): Promise<AeC6PackReport> {
       })
     );
 
-    const byId = new Map(cases.map((item) => [item.id, item]));
-    const firstFive = CASE_IDS.slice(0, 5).map(
-      (id) => byId.get(id) ?? fail(id, { missing: true })
-    );
-    const failedFive = firstFive
-      .filter((item) => item.result !== "PASS")
-      .map((item) => item.id);
     cases.push(
-      failedFive.length === 0
-        ? pass("AX6-06", { passed: firstFive.map((item) => item.id) })
-        : fail("AX6-06", { failed: failedFive })
+      await runCase("AX6-06", async () => {
+        const byId = new Map(cases.map((item) => [item.id, item]));
+        const firstFive = CASE_IDS.slice(0, 5).map(
+          (id) => byId.get(id) ?? fail(id, { missing: true })
+        );
+        const failedFive = firstFive
+          .filter((item) => item.result !== "PASS")
+          .map((item) => item.id);
+        return failedFive.length === 0
+          ? pass("AX6-06", { passed: firstFive.map((item) => item.id) })
+          : fail("AX6-06", { failed: failedFive });
+      })
     );
 
     const ordered = CASE_IDS.map(
@@ -1342,6 +1344,11 @@ if (process.env.NODE_TEST_CONTEXT) {
   describe("agentic experience cycle 6 pack", () => {
     it("exports 6 cases and a canonical report", async () => {
       const report = await runAeC6Pack();
+      assertRecordedMcpEvidence(report, "AE C6 pack");
+      assert.deepEqual(report.cases.find(item => item.id === "AX6-06")?.evidence.mcpTranscript, {
+        version: 1,
+        calls: []
+      });
       assert.equal(report.totalCases, 6);
       assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 6);

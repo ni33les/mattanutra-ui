@@ -7,7 +7,7 @@ import {
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
-import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
+import { assertRecordedMcpEvidence, withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { DEFAULT_SHIPPING_MINOR } from "../lib/agentic/money.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
@@ -1496,17 +1496,19 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
       })
     );
 
-    const byId = new Map(cases.map((item) => [item.id, item]));
-    const firstFourteen = CASE_IDS.slice(0, 14).map(
-      (id) => byId.get(id) ?? fail(id, { missing: true })
-    );
-    const failedFourteen = firstFourteen
-      .filter((item) => item.result !== "PASS")
-      .map((item) => item.id);
     cases.push(
-      failedFourteen.length === 0
-        ? pass("AX3-15", { passed: firstFourteen.map((item) => item.id) })
-        : fail("AX3-15", { failed: failedFourteen })
+      await runCase("AX3-15", async () => {
+        const byId = new Map(cases.map((item) => [item.id, item]));
+        const firstFourteen = CASE_IDS.slice(0, 14).map(
+          (id) => byId.get(id) ?? fail(id, { missing: true })
+        );
+        const failedFourteen = firstFourteen
+          .filter((item) => item.result !== "PASS")
+          .map((item) => item.id);
+        return failedFourteen.length === 0
+          ? pass("AX3-15", { passed: firstFourteen.map((item) => item.id) })
+          : fail("AX3-15", { failed: failedFourteen });
+      })
     );
 
     const ordered = CASE_IDS.map(
@@ -1534,6 +1536,11 @@ if (process.env.NODE_TEST_CONTEXT) {
   describe("agentic experience cycle 3 pack", () => {
     it("exports 15 cases and a canonical report", async () => {
       const report = await runAeC3Pack();
+      assertRecordedMcpEvidence(report, "AE C3 pack");
+      assert.deepEqual(report.cases.find(item => item.id === "AX3-15")?.evidence.mcpTranscript, {
+        version: 1,
+        calls: []
+      });
       assert.equal(report.totalCases, 15);
       assert.equal(report.passedCases, report.totalCases, JSON.stringify(report.cases.filter(item => item.result !== "PASS")));
       assert.equal(report.cases.length, 15);
