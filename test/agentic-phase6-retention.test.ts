@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import {
   AGENTIC_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_DESCRIPTIONS
 } from "../lib/agentic/contract/instructions.ts";
-import { recognisedSupplementNames } from "../lib/agentic/catalogue/fixtures.ts";
+import { fixtureSnapshot, recognisedSupplementNames } from "../lib/agentic/catalogue/fixtures.ts";
+import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import { normalizePlanRequest } from "../lib/agentic/plan/normalize.ts";
+import { CLIENT_GUIDE_URI, readContractResource } from "../lib/agentic/contract/guide.ts";
 import { matcherTelemetryFor } from "../lib/agentic/plan/matching.ts";
 import { publicPlanFields } from "../lib/agentic/public-mapper.ts";
 import { PLAN_MATCH_RETURN_BUDGET_MS } from "../lib/agentic/plan/service.ts";
@@ -120,12 +122,24 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
     assert.equal(names.includes("Vitamin K2"), true);
     assert.equal(names.includes("MK-7"), true);
     assert.equal(names.includes("Menaquinone-7"), true);
-    const copy = await readFile("lib/agentic/contract/instructions.ts", "utf8");
-    assert.doesNotMatch(copy, /K2 becomes leftover not_in_catalogue/i);
-    assert.match(
-      AGENTIC_SERVER_INSTRUCTIONS,
-      /Vitamin K2, MK-7 and Menaquinone-7 resolve through supported explicit catalogue aliases/
-    );
+    assert.ok(AGENTIC_SERVER_INSTRUCTIONS.includes(CLIENT_GUIDE_URI));
+    const guide = readContractResource(CLIENT_GUIDE_URI)?.contents[0]?.text ?? "";
+    assert.match(guide, /Vitamin K2 aliases resolve while nutrient forms and units remain distinct/);
+    assert.doesNotMatch(guide, /K2 becomes leftover not_in_catalogue/i);
+    const snapshot = fixtureSnapshot();
+    const k2 = snapshot.supplements.find(item => item.name === "Vitamin K2");
+    assert.ok(k2);
+    for (const name of ["Vitamin K2", "MK-7", "Menaquinone-7"]) {
+      const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), snapshot, request: {
+        locale: "en", destinationCountry: "TH", optimization: "balanced", profile: {}, requirements: {},
+        targets: [{ name, amount: 100, unit: "mcg" }]
+      } });
+      assert.ok(!("error" in normalized), JSON.stringify(normalized));
+      assert.equal(normalized.state.targets[0]?.supplementId, k2.supplementId);
+      assert.equal(normalized.state.targets[0]?.amount, 100);
+      assert.equal(normalized.state.targets[0]?.unit, "mcg");
+      assert.equal(normalized.state.leftovers.length, 0);
+    }
     assert.doesNotMatch(
       AGENTIC_TOOL_DESCRIPTIONS.plan,
       /Recognised names include[\s\S]*Vitamin K2/

@@ -301,9 +301,11 @@ describe("Phase 6 bounded evidence fields", () => {
     assert.ok(matched.selected);
     const b12Row = matched.selected.coverage.find((row) => row.name === "Vitamin B12");
     assert.ok(b12Row);
-    assert.equal(b12Row.coveragePercent, 3);
+    assert.equal(b12Row.coveragePercent, 2.88);
+    assert.equal(b12Row.requestedAmount, 250);
     assert.ok(Math.abs(b12Row.deliveredAmount - 7.2) < 1e-9);
     assert.equal(b12Row.status, "partial");
+    assert.ok(Math.abs(b12Row.remainingGap - 242.8) < 1e-9);
     assert.ok(b12Row.remainingGap > 0);
     assert.equal(
       Math.max(0, b12Row.requestedAmount - b12Row.totalExposureAmount),
