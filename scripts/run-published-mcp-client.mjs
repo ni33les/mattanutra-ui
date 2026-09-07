@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import Ajv from "ajv";
-import { selectPublishedResources, publishedExample, selectPurchaseTradeOff } from "./published-client-journey.mjs";
+import { selectPublishedResources, publishedExample, selectPurchaseTradeOff, customerTargetConfirmation } from "./published-client-journey.mjs";
 import { CLIENT_NORMALIZATION, normalizePublishedClientResult } from "./published-client-semantics.mjs";
 
 const args = process.argv.slice(2);
@@ -103,9 +103,8 @@ async function exercisePartialMatchAndAnswer(request, baseline) {
   partial = await current(await call("plan", { ...decisionExample.arguments, planHandle: partial.planHandle, expectedRevision: partial.revision, idempotencyKey: `docs-customer-decision-${runKey}` }));
   preserved(partial, "Customer-decision revision");
   check(partial.status === "needs_input" && partial.operationalDecision.nextAction === "answer_questions", "an explicit customer decision returns actionable needs_input");
-  const question = partial.questions.find(item => item.choices.some(choice => choice.label === "Mark the prerequisite satisfied"));
-  check(Boolean(question), "the connector offers a choice to confirm the customer's provisional target");
-  const choice = question.choices.find(item => item.label === "Mark the prerequisite satisfied");
+  const { question, choice } = customerTargetConfirmation(partial);
+  check(Boolean(question && choice), "the connector offers a choice to confirm the customer's provisional target");
   partial = await current(await call("plan", { ...answerExample.arguments, planHandle: partial.planHandle, expectedRevision: partial.revision,
     idempotencyKey: `docs-customer-answer-${runKey}`, answers: [{ questionId: question.questionId, choice: choice.choice }] }));
   honestPartial(partial, "Answered customer decision");
@@ -132,7 +131,7 @@ try {
   contract = JSON.parse((await rpc("resources/read", { uri: selectedResources.schema.uri })).contents[0].text);
   const guide = (await rpc("resources/read", { uri: selectedResources.guide.uri })).contents[0].text;
   check(contract.contractVersion === info.contractVersion, "current resources match capability discovery");
-  check(/requestPatch/.test(guide) && /stale_revision/.test(guide) && /payment/i.test(guide) && /productDoses/.test(guide) && /searchEffort/.test(guide), "guide explains conversational refinement and recovery");
+  check(/plan\.question\.satisfy_prerequisite/.test(guide) && /requestPatch/.test(guide) && /stale_revision/.test(guide) && /payment/i.test(guide) && /productDoses/.test(guide) && /searchEffort/.test(guide), "guide explains conversational refinement and recovery");
   for (const tool of tools) {
     check(JSON.stringify(tool.inputSchema) === JSON.stringify(contract.tools[tool.name].inputSchema), `${tool.name} input matches published contract`);
     check(JSON.stringify(tool.outputSchema) === JSON.stringify(contract.tools[tool.name].outputSchema), `${tool.name} output matches published contract`);

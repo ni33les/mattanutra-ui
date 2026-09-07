@@ -16,3 +16,11 @@ export function selectPurchaseTradeOff(plan) {
   if (!option) throw new Error("The documented fixture did not produce a distinct purchasable trade-off");
   return option;
 }
+
+/** The current guide documents this returned semantic key across translated labels. */
+export function customerTargetConfirmation(plan) {
+  const question = plan.questions.find(row => row.choices.some(choice => choice.labelKey === "plan.question.satisfy_prerequisite"));
+  const choice = question?.choices.find(row => row.labelKey === "plan.question.satisfy_prerequisite");
+  if (!question || !choice) throw new Error("Connector is missing its documented customer confirmation choice");
+  return { question, choice };
+}
