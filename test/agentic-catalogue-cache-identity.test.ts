@@ -39,3 +39,10 @@ it("catalogue identity includes names, source requirements and nutrient resoluti
   ]) assert.notEqual(catalogueSnapshotId(changed), identity);
   assert.equal(catalogueSnapshotId({ ...original, products: [...original.products].reverse(), supplements: [...original.supplements].reverse() }), catalogueSnapshotId(original));
 });
+
+it("an unchanged catalogue observation keeps matching identity while retaining its freshness timestamp", () => {
+  const refreshed = { ...snapshot, availabilityAsOf: "2026-09-08T12:00:00.000Z" };
+  assert.notEqual(refreshed.availabilityAsOf, snapshot.availabilityAsOf);
+  assert.equal(catalogueSnapshotId(refreshed), catalogueSnapshotId(snapshot));
+  assert.deepEqual(matchPlan({ state, snapshot: refreshed }), matchPlan({ state, snapshot }));
+});

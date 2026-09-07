@@ -78,6 +78,16 @@ describe("v5 complete conversational plan mutations and immutable purchase", () 
     assert.deepEqual((await runtime.store.getPlanRevision(savedId, refreshed.revision))!.result.originalRequest.targets, request.targets);
     assert.notEqual(refreshed.optionId, created.optionId);
   });
+  it("allows conversational selection after an unchanged catalogue freshness refresh", async () => {
+    const runtime = runtimeFor(), snapshot = sampleValueSnapshot(); replaceCatalogueSnapshot(snapshot);
+    const created = await call(runtime, "plan", { operation: "create", request, idempotencyKey: "v5-freshness-create1" });
+    assert.equal(created.ok, true); assert.ok(created.optionId);
+    replaceCatalogueSnapshot({ ...snapshot, availabilityAsOf: "2026-09-08T12:00:00.000Z" });
+    const selected = await call(runtime, "plan", { operation: "select", planHandle: created.planHandle,
+      expectedRevision: created.revision, optionId: created.optionId, idempotencyKey: "v5-freshness-select1" });
+    assert.equal(selected.ok, true, JSON.stringify(selected)); assert.equal(selected.status, "ready");
+    assert.equal(selected.optionId, created.optionId);
+  });
   it("keeps every valid requested target in coverage when the catalogue is empty", async () => {
     const runtime = runtimeFor();
     const supplements = Array.from({ length: 30 }, (_, index) => { const uuid = `23456789-1234-1234-1234-${String(index + 1).padStart(12, "0")}`; return { uuid, supplementId: publicSupplementId(uuid), name: `Empty catalogue target ${index}`, aliases: [], acceptedUnits: ["mg"] as const }; });

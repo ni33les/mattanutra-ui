@@ -8,8 +8,8 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
   hash.update("\0");
   hash.update(snapshot.catalogueVersion);
   hash.update("\0");
-  hash.update(snapshot.availabilityAsOf);
-  hash.update("\0");
+  // Observation time is freshness metadata, not a changed matching input.
+  // Actual catalogue epochs, eligibility, prices and facts remain identity inputs.
 
   for (const product of [...snapshot.products].sort((left, right) =>
     `${left.productId}:${left.sellerId}`.localeCompare(`${right.productId}:${right.sellerId}`)
