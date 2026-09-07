@@ -30,6 +30,10 @@ import {
 import { VALUE_ROLE_REQUEST } from "./pack-scenario.ts";
 import { asRecord, stringList } from "./impl-evidence.ts";
 import type { AgenticStore } from "../../../lib/agentic/store/types.ts";
+import { sampleValueSnapshot } from "./sample-catalogue.ts";
+import { candidateSetHash, valueCatalogueFingerprint } from "../../../lib/agentic/value/fingerprint.ts";
+import { matcherSafetyCeilings } from "../../../lib/matcher/safety-ceilings.ts";
+import { refreshAdminSafetyCeilings } from "../../../lib/agentic/catalogue/load-safety-ceilings.ts";
 
 export type PlanSession = Readonly<{
   config: ReturnType<typeof loadAgenticConfig>;
@@ -112,8 +116,8 @@ export function primaryRequest(
         importance: "conditional" as const,
         name: d3?.name ?? "Vitamin D3",
         prerequisite: {
-          nextAction: "Confirm vitamin D status with a clinician.",
-          reasonCode: "vitamin_d_status_unknown",
+          nextAction: "The customer is deciding whether to include this provisional target.",
+          reasonCode: "customer_target_confirmation",
           status: "unsatisfied" as const
         },
         ...(d3 ? { supplementId: d3.supplementId } : {}),
@@ -145,8 +149,8 @@ export function d3OnlyRequest(
         importance: "conditional" as const,
         name: d3?.name ?? "Vitamin D3",
         prerequisite: {
-          nextAction: "Confirm vitamin D status with a clinician.",
-          reasonCode: "vitamin_d_status_unknown",
+          nextAction: "The customer is deciding whether to include this provisional target.",
+          reasonCode: "customer_target_confirmation",
           status
         },
         ...(d3 ? { supplementId: d3.supplementId } : {}),
@@ -164,6 +168,38 @@ export async function freezeImplCatalogue() {
     snapshotId: isUsableLiveFreeze(freeze) ? catalogueSnapshotId(freeze.snapshot) : "",
     usable: isUsableLiveFreeze(freeze)
   };
+}
+
+/** Financial invariants need declared pack facts, independent of retail catalogue completeness.
+ * Reuse the maintained sample prices/doses unchanged; never promote live label guesses.
+ */
+export async function freezeFinancialCatalogue() {
+  await refreshAdminSafetyCeilings();
+  const snapshot = { ...sampleValueSnapshot(), runtimeRevision: 0, catalogueVersion: "controlled-cv-financial-v5" };
+  const freeze: ValueCatalogueFreeze = {
+    buildId: loadAgenticConfig().buildId,
+    candidateSetHash: candidateSetHash(snapshot.products.map(product => product.productId)),
+    catalogueVersion: snapshot.catalogueVersion,
+    countryCode: "TH",
+    currency: "THB",
+    fingerprint: valueCatalogueFingerprint(snapshot, matcherSafetyCeilings()),
+    productCount: snapshot.products.length,
+    retailerId: "retailer_th_delight",
+    snapshot,
+    supplementCount: snapshot.supplements.length
+  };
+  return { freeze, live: false, snapshotId: catalogueSnapshotId(snapshot), usable: true };
+}
+
+export async function withFinancialSession<T>(session: PlanSession, work: (fixture: PlanSession) => Promise<T>) {
+  const previous = installedCatalogueSnapshot();
+  const fixture = openSession((await freezeFinancialCatalogue()).freeze);
+  try {
+    return await work(fixture);
+  } finally {
+    replaceCatalogueSnapshot(previous ?? session.freeze.snapshot);
+    setAgenticRuntimeForTests(session.runtime);
+  }
 }
 
 export function openSession(freeze: ValueCatalogueFreeze): PlanSession {

@@ -29,7 +29,7 @@ import {
   coverageOf,
   createPlan,
   d3OnlyRequest,
-  freezeImplCatalogue,
+  freezeFinancialCatalogue,
   openSession,
   optionsOf,
   safetyGuidanceOf,
@@ -288,13 +288,16 @@ async function runOrd03(session: PlanSession, runIndex: number): Promise<R3CaseR
 }
 
 async function runOrd04(session: PlanSession, runIndex: number): Promise<R3CaseResult> {
-  const plan = await createPlan(session, magPurchaseRequest(session));
+  // The unchanged 90-capsule / 150 mg fixture supplies 45 days at two capsules daily.
+  // This guarantees both the initial purchase and a replenishment inside 90 days.
+  const request = magPurchaseRequest(session, 2);
+  const plan = await createPlan(session, request);
   const in90 = scheduleOf(plan, 90);
-  if (in90.length < 2) {
-    return blocked("R3-ORD-04", { reason: "need_two_events", count: in90.length });
-  }
   const assertions = [
     assertTrue("ORD-04.count", in90.length >= 2),
+    assertEq("ORD-04.dose", 2, basketOf(plan)[0]?.servingsPerDay),
+    assertEq("ORD-04.supply", 45, basketOf(plan)[0]?.daysOfSupply),
+    assertEq("ORD-04.price", 25000, basketOf(plan)[0]?.unitPriceMinor),
     assertTrue("ORD-04.rule", in90.every((event) => String(event.shippingRuleId ?? "").length > 0)),
     assertTrue("ORD-04.shippingOnce", in90.every(eventReconciles)),
     assertEq("ORD-04.cash", cashFromEvents(in90), Number(plan.cash90DayMinor)),
@@ -303,7 +306,7 @@ async function runOrd04(session: PlanSession, runIndex: number): Promise<R3CaseR
       in90.every((event) => Number(event.shippingMinor) >= 0 && Number(event.totalMinor) >= Number(event.subtotalMinor))
     )
   ];
-  return conclude("R3-ORD-04", assertions, envelopeFor(session, magPurchaseRequest(session), plan, assertions, runIndex));
+  return conclude("R3-ORD-04", assertions, envelopeFor(session, request, plan, assertions, runIndex));
 }
 
 async function runOrd05(session: PlanSession, runIndex: number): Promise<R3CaseResult> {
@@ -565,10 +568,10 @@ export function canonicalR3Report(report: R3PackReport) {
 
 export async function runCvR3Pack(
   runIndex = 1,
-  frozenInput?: Awaited<ReturnType<typeof freezeImplCatalogue>>
+  frozenInput?: Awaited<ReturnType<typeof freezeFinancialCatalogue>>
 ): Promise<R3PackReport> {
   closeSession();
-  const frozen = frozenInput ?? (await freezeImplCatalogue());
+  const frozen = frozenInput ?? (await freezeFinancialCatalogue());
   if (!frozen.usable) {
     return {
       cases: PACK_IDS.map((id) => blocked(id, { freeze: "unusable" })),
@@ -608,7 +611,7 @@ export async function runCvR3Pack(
 }
 
 export async function runCvR3PackTwice() {
-  const frozen = await freezeImplCatalogue();
+  const frozen = await freezeFinancialCatalogue();
   const first = await runCvR3Pack(1, frozen);
   const second = await runCvR3Pack(2, frozen);
   return { first, frozen, second };
@@ -616,12 +619,9 @@ export async function runCvR3PackTwice() {
 
 if (process.env.NODE_TEST_CONTEXT) {
 describe("Customer value implementation pack v1.3", () => {
-  it("ORD-01 through ECO-08 pass twice on one freeze", async (t) => {
-    const frozen = await freezeImplCatalogue();
-    if (!frozen.live) {
-      t.skip("live Thailand retail catalogue is not loaded in this runner");
-      return;
-    }
+  it("ORD-01 through ECO-08 pass twice on one freeze", async () => {
+    const frozen = await freezeFinancialCatalogue();
+    assert.equal(frozen.usable, true, "The declared financial fixture must be available");
     const { first, second } = await runCvR3PackTwice();
     assert.equal(first.totalCases, PACK_IDS.length);
     assert.deepEqual(
@@ -635,7 +635,7 @@ describe("Customer value implementation pack v1.3", () => {
       failed.map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.result)}`).join("; ")
     );
     assert.equal(first.snapshotId, second.snapshotId);
-    assert.equal(MATCHER_VERSION, "advisory-dose-fit-2");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-3");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });
