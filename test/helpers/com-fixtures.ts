@@ -6,7 +6,9 @@ import {
   type CapabilityScope
 } from "../../lib/agentic/capabilities.ts";
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig, type AgenticConfig } from "../../lib/agentic/config.ts";
-import { FIXTURE_PRODUCTS } from "../../lib/agentic/catalogue/fixtures.ts";
+import { FIXTURE_PRODUCTS, fixtureSnapshot } from "../../lib/agentic/catalogue/fixtures.ts";
+import { catalogueSnapshotId } from "../../lib/agentic/catalogue/freeze.ts";
+import { replaceCatalogueSnapshot } from "../../lib/agentic/catalogue/snapshot.ts";
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "../../lib/agentic/catalogue/market.ts";
 import { resetExecuteLockState } from "../../lib/agentic/commerce/execute.ts";
 import { createMockPaymentAdapter } from "../../lib/agentic/commerce/payment.ts";
@@ -34,8 +36,9 @@ export const COM_OPT_B_LOW = "opt_com_b_low";
 export const COM_OPT_B_MID = "opt_com_b_mid";
 export const COM_OPT_B_HIGH = "opt_com_b_high";
 export const COM_SAFETY_ID = "sg_com_apixaban";
-export const COM_SNAPSHOT_ID = "snap_com_v1";
-export const COM_CATALOGUE_VERSION = "dev-3.0.0";
+const COM_CATALOGUE = fixtureSnapshot(COM_FIXED_NOW);
+export const COM_SNAPSHOT_ID = catalogueSnapshotId(COM_CATALOGUE);
+export const COM_CATALOGUE_VERSION = COM_CATALOGUE.catalogueVersion;
 
 export const COM_PRD_D3 = FIXTURE_PRODUCTS[0]!;
 export const COM_PRD_O3 = FIXTURE_PRODUCTS[1]!;
@@ -140,6 +143,7 @@ export function beginComRun() {
   resetExecuteLockState();
   beginDeterministicIdsForTests();
   installGoldCatalogue();
+  replaceCatalogueSnapshot(COM_CATALOGUE);
 }
 
 export function endComRun() {

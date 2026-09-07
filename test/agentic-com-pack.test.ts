@@ -15,11 +15,9 @@ import {
   COM_EXPIRED_NOW,
   COM_FIXED_NOW,
   COM_LEAK_NEEDLES,
-  COM_OPT_A,
   COM_OPT_B_LOW,
   COM_PACK_VERSION,
   COM_PRD_B12,
-  COM_PRD_D3,
   COM_PRD_MG,
   COM_SAFETY_ID,
   advancePlanRevision,
@@ -32,7 +30,6 @@ import {
   frozenOf,
   key,
   leakHits,
-  planAResult,
   planBResult,
   seedBlocked,
   seedNeedsInput,
@@ -1054,7 +1051,7 @@ async function com29() {
 }
 
 async function com30() {
-  return withCase(async (runtime) => {
+  return withCase(async () => {
     const missing = parseCheckoutAddress({ country: "TH" }, "TH");
     const badEmail = parseCheckoutAddress(
       {

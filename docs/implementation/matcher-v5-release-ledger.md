@@ -29,6 +29,7 @@ Historical case IDs and fixture prices remain intact. A changed behaviour must r
 | A full valid 30-target request with no products is described as too broad | Keep every target in coverage and return a no-purchase result with advice. The documented request-size validation remains. | `agentic-flexible-v5-journey` empty-catalogue case |
 | Legacy normalized count six cannot distinguish a default from a customer limit | Refresh from the saved original request. Preserve explicit six, remove omitted historical defaults, and request an explicit replacement when count provenance is absent. Frozen paid/unpaid checkout stays unchanged. | `agentic-flexible-v5-legacy` service and commerce journeys |
 | Old catalogue results can be selected or reused for a fresh checkout | Fence current evaluation by catalogue identity/revision. Existing frozen payments and orders remain resumable. | `agentic-flexible-v5-journey`, `retail-checkout-catalogue-v5` Node and PostgreSQL cases |
+| Commercial pack fixtures use a hard-coded catalogue snapshot ID | Install a declared fixed-time fixture catalogue and derive saved option identities from its actual fingerprint. COM-01 through COM-50 retain prices, products, doses and assertions. | `agentic-com-pack` all50cases |
 | PostgreSQL/browser fixtures omit current catalogue identity | Seed explicit current revisions after all catalogue changes. Production stale-result checks remain enforced. | `funnel-readiness.integration`, browser fixture seed and runtime epoch tests |
 
 ## Reviewable implementation slices
