@@ -55,15 +55,21 @@ export function exposureExceedsCeiling(
   return stackUnitsViolateCeiling(request, subjectId, nameOf(request, subjectId), exposureUnits);
 }
 
-export function labelledSafetyExposure(
-  product: MatcherProduct,
-  dailyUnits: number,
-  request?: CanonicalRequest,
-  servingRatio?: Readonly<{ num: bigint; den: bigint }>
-) {
-  const exposure = new Map<string, ScaledAmount>();
-  const omegaParts = new Map<string, Map<string, ScaledAmount>>();
-  const omegaTotals = new Set<string>();
+type ResolvedLabelledFact = Readonly<{
+  labelled: ScaledAmount;
+  omegaPart: "epa" | "dha" | null;
+  omegaTotal: boolean;
+}>;
+
+// Requests and catalogue products are immutable during matching. Keep identity
+// resolution within that lifetime, including revisions and changed fact evidence.
+const labelledFactMemo = new WeakMap<CanonicalRequest, WeakMap<MatcherProduct, readonly ResolvedLabelledFact[]>>();
+
+function resolvedLabelledFacts(product: MatcherProduct, request?: CanonicalRequest): readonly ResolvedLabelledFact[] {
+  let session = request ? labelledFactMemo.get(request) : undefined;
+  const cached = session?.get(product);
+  if (cached) return cached;
+  const facts: ResolvedLabelledFact[] = [];
 
   for (const fact of product.labelledContributions) {
     if (!factSupportsQuantifiedExposure(product, fact) || !fact.amount || fact.amount <= 0 || !fact.unit) {
@@ -92,22 +98,51 @@ export function labelledSafetyExposure(
       unit: fact.unit
     });
 
-    const ratio = servingRatio ?? numberToRational(dailyUnits);
-    if (isDoseError(labelled) || isDoseError(ratio)) continue;
-    const scaled = multiplyScaled(labelled, ratio);
-    if (isDoseError(scaled)) continue;
-
+    if (isDoseError(labelled)) continue;
     const nameKey = normalizeProductFactKey(fact.name);
-    const part = nutrientNameMatchesTarget("EPA", fact.name) ? "epa" :
-      nutrientNameMatchesTarget("DHA", fact.name) ? "dha" : null;
-    if (part) {
+    facts.push({ labelled,
+      omegaPart: nutrientNameMatchesTarget("EPA", fact.name) ? "epa" :
+        nutrientNameMatchesTarget("DHA", fact.name) ? "dha" : null,
+      omegaTotal: ["omega_3", "omega3", "omega_3_fatty_acids"].includes(nameKey)
+    });
+  }
+
+  if (request) {
+    if (!session) {
+      session = new WeakMap();
+      labelledFactMemo.set(request, session);
+    }
+    session.set(product, facts);
+  }
+  return facts;
+}
+
+export function labelledSafetyExposure(
+  product: MatcherProduct,
+  dailyUnits: number,
+  request?: CanonicalRequest,
+  servingRatio?: Readonly<{ num: bigint; den: bigint }>
+) {
+  const exposure = new Map<string, ScaledAmount>();
+  const omegaParts = new Map<string, Map<string, ScaledAmount>>();
+  const omegaTotals = new Set<string>();
+  const ratio = servingRatio ?? numberToRational(dailyUnits);
+  if (isDoseError(ratio)) return exposure;
+
+  for (const fact of resolvedLabelledFacts(product, request)) {
+    // Scale each original fact before deduplication or component aggregation:
+    // rounding a cached combined total would change fractional EPA/DHA doses.
+    const scaled = multiplyScaled(fact.labelled, ratio);
+    if (isDoseError(scaled)) continue;
+    const subjectId = scaled.subjectId;
+    if (fact.omegaPart) {
       const parts = omegaParts.get(subjectId) ?? new Map<string, ScaledAmount>();
-      const previous = parts.get(part);
-      if (!previous || scaled.units > previous.units) parts.set(part, scaled);
+      const previous = parts.get(fact.omegaPart);
+      if (!previous || scaled.units > previous.units) parts.set(fact.omegaPart, scaled);
       omegaParts.set(subjectId, parts);
       continue;
     }
-    if (["omega_3", "omega3", "omega_3_fatty_acids"].includes(nameKey)) omegaTotals.add(subjectId);
+    if (fact.omegaTotal) omegaTotals.add(subjectId);
 
     const previous = exposure.get(subjectId);
     exposure.set(
