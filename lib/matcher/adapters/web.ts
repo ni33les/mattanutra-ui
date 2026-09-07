@@ -18,7 +18,7 @@ import { hasFewerConcerns } from "@/lib/matcher/selector";
 import { ratioForSupportedServings } from "@/lib/matcher/serving-grid";
 import { compareDoseFit } from "@/lib/matcher/dose-fit";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
-import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
+import { displayCoveragePercent, marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
 import { whyProductMatches } from "@/lib/product-recommendation-metrics";
 import {
   normalizeProductFactKey,
@@ -195,7 +195,7 @@ export function matcherNeedCoveragePercent(
     units = Math.max(units, coverageBySubject.get(subjectId) ?? 0);
   }
 
-  return Math.max(0, Math.min(100, Math.round(units / (COVERAGE_SCALE / 100))));
+  return displayCoveragePercent(units / (COVERAGE_SCALE / 100));
 }
 
 export function matcherProductCoversNeed(
@@ -378,6 +378,7 @@ export function recommendWithMatcher(
   const empty: ProductRecommendationResult = {
     clientNeeds: input.needs,
     diagnostics: {
+      catalogueFingerprint: input.catalogueFingerprint,
       algorithmVersion: MATCHER_VERSION,
       blockedProducts: [],
       coverage: {
@@ -610,6 +611,7 @@ export function recommendWithMatcher(
   const recommendationResult: ProductRecommendationResult = {
     clientNeeds: input.needs,
     diagnostics: {
+      catalogueFingerprint: input.catalogueFingerprint,
       matching: { operationalStatus: recommendations.length ? "ready" : options.some(option => option.purchaseEligible) ? "review_options" : "no_purchase", selectedOptionId: options[0]?.optionId ?? null, options, alternativeSearch: result.alternativeSearch, searchSummary: result.searchSummary },
       algorithmVersion: MATCHER_VERSION,
       blockedProducts: [],

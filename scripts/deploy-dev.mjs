@@ -7,10 +7,12 @@ const schemaScripts = [
   "supplements:safety-limit-life-stages:schema:apply",
   "products:soft-delete:schema:apply",
   "products:v9:schema:apply",
+  "products:administration:schema:apply",
   "product-coverage:demand-cache:schema:apply",
   "payments:schema:apply",
   "web-funnel:schema:apply",
-  "agentic:schema:apply"
+  "agentic:schema:apply",
+  "matcher:runtime:schema:apply"
 ];
 const smokeUrls = [
   "http://127.0.0.1:3000/en/admin/login",
@@ -93,6 +95,7 @@ async function applyOrVerifyRuntimeSchema() {
       env: schemaEnv()
     });
   }
+  await npmRun("dev-runtime-schema:verify");
 }
 
 async function main() {

@@ -114,6 +114,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 }>;
 
 export type ProductRecommendationAlgorithmVersion =
+  | "flexible-dose-fit-3"
   | "advisory-dose-fit-2"
   | "pareto-hybrid-1"
   | "v2-exact-shortlist"
@@ -121,6 +122,7 @@ export type ProductRecommendationAlgorithmVersion =
 export type ProductStackPreference = "balanced" | "compact";
 
 export type ProductRecommendationDiagnostics = Readonly<{
+  catalogueFingerprint?: string;
   matching?: Readonly<{
     operationalStatus: "ready" | "review_options" | "no_purchase";
     selectedOptionId: string | null;

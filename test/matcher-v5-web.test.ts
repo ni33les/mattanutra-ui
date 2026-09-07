@@ -36,3 +36,9 @@ test("WEB5-04 supported quantities above three and below one survive web project
  assert.equal(half.stackCoveragePercent, 100);
  assert.equal(toRecommendedProduct(half.recommendations[0], 100, "run").servingMultiplier, 0.5);
 });
+test("WEB5-05 web results retain the task catalogue identity for nonempty and empty evaluations", () => {
+ for (const candidates of [[candidate(names[0])], []]) {
+  const result = recommendWithMatcher({ needs: [needs[0]], candidates, catalogueFingerprint: "valsnap_fixture_current" });
+  assert.equal(result.diagnostics.catalogueFingerprint, "valsnap_fixture_current");
+ }
+});

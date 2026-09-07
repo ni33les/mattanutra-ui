@@ -13,6 +13,8 @@ import { insertFormulationVersion, insertFoodGuidanceVersion } from "../lib/plan
 import { getLiveSaleEligibleRetailerCandidateSets } from "../lib/admin-product-search.ts";
 import { buildProductNeeds } from "../lib/product-recommendation-needs.ts";
 import { recommendWithMatcher } from "../lib/matcher/adapters/web.ts";
+import { warmLiveRetailSnapshot } from "../lib/agentic/catalogue/live.ts";
+import { valueCatalogueFingerprint } from "../lib/agentic/value/fingerprint.ts";
 import { parseDose } from "../lib/dose-conversion.ts";
 import { completeHealthScoreFixture } from "../test/fixtures/healthscore.ts";
 import type { FormulationBlueprint, FormulationResult } from "../lib/formulation-types.ts";
@@ -31,6 +33,7 @@ const planId = randomUUID(), runId = randomUUID(), paymentId = randomUUID(), ord
 const orderNumber = `E2E-${randomUUID().slice(0, 8).toUpperCase()}`;
 const outputPath = resolve(process.argv[2] ?? `/tmp/mattanutra-browser-fixtures-${Date.now()}.json`);
 try {
+  const catalogue = await warmLiveRetailSnapshot("TH");
   const sets = await getLiveSaleEligibleRetailerCandidateSets({ sql, countryCode: "TH", limit: 1000 });
   const choices = sets.flatMap(set => set.candidates.map(product => ({ set, product }))).sort((a, b) =>
     a.set.organisationId.localeCompare(b.set.organisationId) || a.product.id.localeCompare(b.product.id));
@@ -43,7 +46,7 @@ try {
     effectivenessRank: index + 1, rationale: "Browser fixture for current advisory guidance.", status: "add"
   })) };
   const needs = buildProductNeeds({ formulation, foodGuidance: null });
-  const recommendation = recommendWithMatcher({ candidates: [product], needs, countryCode: "TH", clientContext: { ageYears: 40, lifestage: "adult", currentSupplements: "none" }, stackPreference: "balanced" });
+  const recommendation = recommendWithMatcher({ candidates: [product], needs, countryCode: "TH", clientContext: { ageYears: 40, lifestage: "adult", currentSupplements: "none" }, stackPreference: "balanced", catalogueFingerprint: valueCatalogueFingerprint(catalogue) });
   assert.ok(recommendation.recommendations.length, "Browser fixture must contain an actual product basket");
   const selectedIds = recommendation.recommendations.map(item => item.product.id);
   const selectedOptionId = recommendation.diagnostics.matching!.selectedOptionId!;
@@ -66,7 +69,8 @@ try {
     } });
     const [catalogueEpoch] = await tx`select revision from public.catalogue_runtime_revision where singleton=true`;
     assert.ok(catalogueEpoch, "Browser fixture requires the current catalogue revision schema");
-    const catalogueFingerprint = recommendation.diagnostics.trace?.catalogueFingerprint ?? null;
+    assert.equal(Number(catalogueEpoch.revision), catalogue.runtimeRevision, "Catalogue changed while preparing the browser fixture");
+    const catalogueFingerprint = recommendation.diagnostics.catalogueFingerprint ?? null;
     await tx`insert into public.product_recommendation_runs (id, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, catalogue_revision, catalogue_fingerprint, search_effort,
       stack_coverage_percent, supplement_product_coverage_percent, total_coverage_percent, client_needs, diagnostics, notes)
       values (${runId}::uuid, ${planId}::uuid, ${generation.revision}, 'en', ${FUNNEL_GENERATOR_VERSION}, 0, ${Number(catalogueEpoch.revision)}, ${catalogueFingerprint}, 'standard',

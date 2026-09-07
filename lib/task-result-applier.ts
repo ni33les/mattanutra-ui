@@ -2134,7 +2134,7 @@ async function insertProductRecommendationResult({
       created_at
     )
     values (
-      ${Number(objectValue(task.payload).catalogueRevision ?? 0)}, ${String(objectValue(result.diagnostics.trace).catalogueFingerprint ?? "") || null},
+      ${Number(objectValue(task.payload).catalogueRevision ?? 0)}, ${result.diagnostics.catalogueFingerprint ?? (String(objectValue(result.diagnostics.trace).catalogueFingerprint ?? "") || null)},
       ${objectValue(objectValue(task.payload).productPreferences).searchEffort === "expanded" ? "expanded" : "standard"},
       ${Number(objectValue(objectValue(task.payload).productPreferences).revision ?? 0)},
       ${generationInput(task.payload)?.locale ?? null}, ${generationInput(task.payload)?.generatorVersion ?? null},
