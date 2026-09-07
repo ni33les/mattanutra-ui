@@ -53,8 +53,8 @@ try {
         rationale: { [locale]: "Fixture rationale" }, status: "add", supplement: { [locale]: "Vitamin D" } }],
       sectionStatuses: { supplements: "ready", foods: "ready" }, foodGuidance: []
     } });
-    await sql`insert into public.product_recommendation_runs (plan_id, assessment_revision, generation_locale, generator_version, selection_revision, diagnostics)
-      values (${input.planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION},
+    await sql`insert into public.product_recommendation_runs (catalogue_revision, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, diagnostics)
+      values ((select revision from public.catalogue_runtime_revision where singleton=true), ${input.planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION},
         coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0),
         '{"stackPreference":"balanced","matching":{"operationalStatus":"no_purchase","selectedOptionId":null,"options":[],"alternativeSearch":{"status":"not_needed","reason":"No purchase fixture"}}}')`;
     await sql`update public.tasks set status = 'completed' where plan_id = ${input.planId}::uuid and task_type in ('generate_supplement_guidance','generate_product_recommendations')`;

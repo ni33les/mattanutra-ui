@@ -65,8 +65,8 @@ describe("shared revision and locale readiness", { skip: !databaseUrl }, () => {
     assert.equal((await response(id, false)).status, 200);
     assert.equal((await response(id, true)).status, 200);
     assert.equal((await getFunnelReadiness(id))!.status, "product_matching_pending");
-    await getSql()!`insert into public.product_recommendation_runs (plan_id, assessment_revision, generation_locale, generator_version)
-      values (${id}::uuid, 1, 'en', ${FUNNEL_GENERATOR_VERSION})`;
+    await getSql()!`insert into public.product_recommendation_runs (catalogue_revision, plan_id, assessment_revision, generation_locale, generator_version)
+      values ((select revision from public.catalogue_runtime_revision where singleton=true), ${id}::uuid, 1, 'en', ${FUNNEL_GENERATOR_VERSION})`;
     assert.equal((await getFunnelReadiness(id))!.readyForReveal, true);
     assert.equal((await getFunnelReadiness(id, "th"))!.readyForReveal, false);
     assert.equal((await response(id, true, "th")).status, 202);
