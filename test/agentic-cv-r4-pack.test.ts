@@ -15,6 +15,7 @@ import {
   failedIds,
   freshKeyHash,
   rawResponseHash,
+  significantCvEvidence,
   stringList,
   type AssertionRecord,
   type EvidenceEnvelope
@@ -1144,6 +1145,7 @@ export function canonicalR4Report(report: R4PackReport) {
         ? (asRecord(item.evidence).assertions as AssertionRecord[])
         : [];
       return {
+        evidence: significantCvEvidence(item.evidence),
         failed: assertions
           .filter((row) => !row.pass)
           .map((row) => ({ expected: row.expected, id: row.id, observed: row.observed })),
@@ -1221,6 +1223,33 @@ export async function runCvR4PackTwice() {
 }
 
 describe("Customer value implementation pack v1.4", () => {
+  it("V5-CV-R4-EVIDENCE retains business changes despite identical pass flags and historical hashes", () => {
+    const baseline = {
+      coverage: [{ supplementId: "sup_fixture", requestedAmount: 350, totalExposureAmount: 351, remainingGapAmount: 0, excessAmount: 1 }],
+      basket: [{ productId: "prd_fixture", servingsPerDay: 1, unitPriceMinor: 25000 }],
+      advice: [{ code: "above_reference_limit", threshold: 350, exposure: 351 }],
+      requirements: { maxProductCount: null as number | null },
+      nextAction: "review_options"
+    };
+    const reportFor = (response: unknown): R4PackReport => ({
+      contractVersion: AGENTIC_CONTRACT_VERSION, passedCases: 1, totalCases: 1, snapshotId: "snap_fixture",
+      cases: [{ id: "R4-CAN-02", result: "PASS", evidence: {
+        assertions: [assertTrue("same-passing-assertion", true)], freshKeyHash: "historical-hash", requestHash: "historical-request",
+        acceptance: { response }
+      } }]
+    });
+    const changes = [
+      { ...baseline, coverage: [{ ...baseline.coverage[0], totalExposureAmount: 352, excessAmount: 2 }] },
+      { ...baseline, basket: [{ ...baseline.basket[0], servingsPerDay: 2 }] },
+      { ...baseline, basket: [{ ...baseline.basket[0], unitPriceMinor: 25001 }] },
+      { ...baseline, advice: [] },
+      { ...baseline, requirements: { maxProductCount: 1 } },
+      { ...baseline, nextAction: "confirm_selection" }
+    ];
+    for (const changed of changes) {
+      assert.notEqual(canonicalR4Report(reportFor(baseline)), canonicalR4Report(reportFor(changed)));
+    }
+  });
   it("DUR-01 through REG-06 pass twice on one freeze", async (t) => {
     const frozen = await freezeFinancialCatalogue();
     assert.equal(frozen.usable, true, "The declared financial fixture must be available");
