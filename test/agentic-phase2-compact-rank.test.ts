@@ -10,7 +10,11 @@ describe("Phase 2 compactness ranking", () => {
     const product = qaProduct({ id: "partial", facts: [{ amount: 100, key: "d3" }], priceThb: 10 });
     const groups = compileGroups(request, { products: [product], availabilityAsOf: "frozen", catalogueVersion: "partial" });
     assert.deepEqual(groups.map((row) => row.productId), ["partial"]);
-    assert.deepEqual(groups[0]?.variants.map((row) => row.dailyUnits), [1, 2, 3]);
+    const doses = groups[0]!.variants.map(row => row.dailyUnits);
+    assert.ok(doses.every(Number.isSafeInteger), "whole physical units stay whole");
+    for (const supported of [1, 2, 3, 20, 40, 41]) assert.ok(doses.includes(supported));
+    assert.equal(groups[0]!.variants.find(row => row.dailyUnits === 20)?.contributions.get("sup_d3")?.units, 2000n * 25n);
+    assert.equal(groups[0]!.variants.find(row => row.dailyUnits === 41)?.contributions.get("sup_d3")?.units, 4100n * 25n);
   });
 
   it("does not double-count duplicate catalog D3 facts on one SKU", () => {
@@ -99,7 +103,14 @@ describe("Phase 2 compactness ranking", () => {
       id.includes("G-D3-500:x")
     );
     assert.ok(variant);
-    assert.match(variant, /:x[23]$/);
+    assert.equal(variant, "seller_th:G-D3-500:x4");
+    assert.equal(result.selected.doseFit?.total, 0);
+    assert.equal(result.selected.priceMinor, 12000);
+    assert.equal(result.selected.dailyPills, 4);
+    const simpler = result.alternatives.find(option => option.roles?.includes("simpler"));
+    assert.deepEqual(simpler?.variantIds, ["seller_th:G-D3-500:x1"]);
+    assert.equal(simpler?.doseFit?.total, 0.75);
+    assert.equal(simpler?.purchaseEligible, true);
   });
 
   it("does not stuff extra SKUs onto standalone vitamin C", () => {
@@ -553,7 +564,7 @@ describe("Phase 2 compactness ranking", () => {
     );
   });
 
-  it("keeps labelled D3 plus Joint on official when the pair still reaches 90%", () => {
+  it("keeps the labelled D3 contributor and adjusts its quantity before adding collateral C", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-no-covering-d3",
@@ -607,15 +618,16 @@ describe("Phase 2 compactness ranking", () => {
     );
     assert.ok(fewest.selected);
     assert.equal(fewest.selected.productIds.includes("G-D3-400"), true);
-    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), true);
+    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), false);
     assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
     assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
     assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
     const d3 = qaTarget("d3", 2000);
-    assert.equal(
-      Math.round((fewest.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
-      true
-    );
+    assert.equal(fewest.selected.coverageBySubject.get(d3.subjectId), 10000);
+    assert.ok(fewest.selected.variantIds.includes("seller_th:G-D3-400:x5"));
+    assert.equal(fewest.selected.doseFit?.total, 1, "the unavailable B12 target stays in dose loss");
+    assert.equal(fewest.selected.priceMinor, 64000);
+    assert.equal(fewest.selected.dailyPills, 9);
     assert.equal(
       fewest.rejected.some(
         (item) =>
@@ -979,18 +991,20 @@ describe("Phase 2 compactness ranking", () => {
       catalog
     );
     assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("G-B12-ZINC-UL"), true);
-    assert.equal(result.selected.doseFit?.total, 0.5);
-    assert.equal(result.selected.productIds.includes("G-B12-30"), false);
-    const percent = Math.round(
-      (result.selected.coverageBySubject.get(qaTarget("b12", 250).subjectId) ??
-        0) / 100
-    );
-    assert.equal(percent, 100);
-    assert.equal(percent > 0, true);
+    assert.deepEqual(result.selected.variantIds, ["seller_th:G-B12-30:x8"]);
+    assert.equal(result.selected.doseFit?.total, (250 - 8 * 30) / 250);
+    assert.equal(result.selected.priceMinor, 6000);
+    assert.equal(result.selected.dailyPills, 8);
+    assert.equal(result.selected.coverageBySubject.get(qaTarget("b12", 250).subjectId), 9600);
+    const simpler = result.alternatives.find(option => option.roles?.includes("simpler"));
+    assert.deepEqual(simpler?.variantIds, ["seller_th:G-B12-ZINC-UL:x1"]);
+    assert.equal(simpler?.doseFit?.total, 2 * (50 - 40) / 40);
+    assert.equal(simpler?.priceMinor, 9000);
+    assert.equal(simpler?.dailyPills, 1);
+    assert.equal(simpler?.purchaseEligible, true, "the serious zinc advice does not prevent purchase");
   });
 
-  it("keeps dedicated MAG, fish oil, and C instead of a below-floor magnesium+D3 combo", () => {
+  it("compares the complete combo dose loss with dedicated magnesium and C", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-mag-d3-combo",
@@ -1052,18 +1066,20 @@ describe("Phase 2 compactness ranking", () => {
     );
     assert.ok(fewest.selected);
     assert.ok(balanced.selected);
-    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
-    assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
-    assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
-    assert.equal(fewest.selected.productIds.includes("G-MAG-D3"), false);
-    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), true);
-    const d3Target = qaTarget("d3", 2000);
-    assert.equal(
-      (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) > 0,
-      true
-    );
-    assert.equal(balanced.selected.productIds.includes("G-C-500"), true);
-    assert.equal(balanced.selected.productIds.includes("G-MAG-D3"), false);
+    for (const option of [fewest.selected, balanced.selected]) {
+      assert.deepEqual([...option.productIds].sort(), ["G-JOINT-D3-C", "G-MAG-D3", "G-O3-FISH-1000"]);
+      assert.ok(option.variantIds.includes("seller_th:G-JOINT-D3-C:x5"));
+      // B12 is unavailable, C is 310/500, and D3 is 2100/2000.
+      const independentLoss = 1 + (500 - (5 * 50 + 60)) / 500 + (5 * 400 + 100 - 2000) / 2000;
+      assert.equal(option.doseFit?.total, independentLoss);
+      assert.equal(option.priceMinor, 47000);
+      assert.equal(option.dailyPills, 13);
+      assert.ok(option.doseFit!.total < 1 + (750 - 500) / 500, "less loss than the dedicated Mg/C basket");
+    }
+    const simpler = fewest.alternatives.find(option => option.roles?.includes("simpler"));
+    assert.deepEqual(simpler?.variantIds, ["seller_th:G-MAG-D3:x1"]);
+    assert.equal(simpler?.dailyPills, 1);
+    assert.equal(simpler?.purchaseEligible, true);
   });
 
   it("keeps official gold products and pills across 20 target-order permutations", () => {
@@ -1095,7 +1111,7 @@ describe("Phase 2 compactness ranking", () => {
     }
   });
 
-  it("keeps useful contributors when a multi improves total dose fit despite extra pills", () => {
+  it("keeps useful contributors and rescales a retained SKU when removing collateral excess", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-official-no-stuff",
@@ -1168,13 +1184,17 @@ describe("Phase 2 compactness ranking", () => {
     assert.equal(result.selected.productIds.includes("G-C-500"), true);
     assert.equal(result.selected.productIds.includes("G-CALCIUM-D3-200"), true);
     assert.equal(result.selected.productIds.includes("G-MEGA-B-50"), true);
-    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), true);
-    assert.equal(result.selected.productIds.includes("G-MULTI-50PLUS"), true);
-    assert.equal(result.selected.doseFit?.total, 0.72);
+    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), false);
+    assert.equal(result.selected.productIds.includes("G-MULTI-50PLUS"), false);
+    assert.equal(result.selected.doseFit?.total, 0);
+    assert.ok(result.selected.variantIds.includes("seller_th:G-CALCIUM-D3-200:x10"));
+    assert.ok(result.selected.variantIds.includes("seller_th:G-MEGA-B-50:x5"));
+    assert.equal(result.selected.priceMinor, 79200);
+    assert.equal(result.selected.dailyPills, 19);
     const d3 = qaTarget("d3", 2000);
     assert.equal(
-      Math.round((result.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
-      true
+      result.selected.coverageBySubject.get(d3.subjectId),
+      10000
     );
   });
 });

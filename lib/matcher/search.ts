@@ -224,12 +224,15 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
   let beam: SearchState[] = [seed];
   for (let index = 0; index < groups.length && used < beamLimit; index += 1) {
     const group = groups[index]!;
+    // Leave each remaining group a deterministic share. Without this, early
+    // quantity-rich products can exhaust the beam before later targets appear.
+    const groupLimit = used + Math.floor((beamLimit - used) / (groups.length - index));
     const expanded: SearchState[] = [];
     for (const state of beam) {
       if (!mustSelect(group)) expanded.push({ ...state, nextGroupIndex: index + 1 });
       for (const variant of variantsForState(group, state)) {
-        if (used >= beamLimit) { trimmed = true; break; }
-        const next = add(state, variant, group, beamLimit);
+        if (used >= groupLimit) { trimmed = true; break; }
+        const next = add(state, variant, group, groupLimit);
         if (next) expanded.push({ ...next, nextGroupIndex: index + 1 });
       }
     }
@@ -264,52 +267,65 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
       if (state) remember(state);
     }
   }
-  // Bounded replacement and add-pair repair around leading complete baskets.
-  // Remove one selected listing, rebuild the retained portion, then inspect
-  // additions and complements. Reconstruction is counted, not free work.
+  // Give removal/rescaling neighborhoods an opportunity before spending the
+  // remaining work on two additions to one basket. Removing a collateral SKU
+  // can require changing a retained SKU's quantity at the same time.
+  const replacementLimit = used + Math.floor((limit - used) * 0.75);
   const leaders = [...archive.values()].sort((a, b) => compareStates(a, b, request)).slice(0, 4);
+  const repairedBases: SearchState[] = [];
   for (const leader of leaders) {
-    if (used >= limit) break;
-    const removals: (string | null)[] = [null, ...leader.selectedVariantIds];
-    for (const removed of removals) {
+    if (used >= replacementLimit) break;
+    for (const removed of removalSets(leader.selectedVariantIds)) {
       let base: SearchState | null = seed;
       for (const id of leader.selectedVariantIds) {
-        if (id === removed) continue;
+        if (removed.includes(id)) continue;
         const group = groups.find(row => row.variants.some(v => v.variantId === id));
         const variant = group?.variants.find(row => row.variantId === id);
         if (!base || !group || !variant) { base = null; break; }
-        base = add(base, variant, group);
+        base = add(base, variant, group, replacementLimit);
       }
       if (!base) continue;
-      const added: SearchState[] = [];
+      remember(base);
+      repairedBases.push(base);
       for (const group of groups) {
         if (base.selectedProductIds?.includes(group.productId)) continue;
         for (const variant of variantsForState(group, base)) {
-          if (used >= limit) break;
-          const state = add(base, variant, group);
-          if (state) { added.push(state); remember(state); }
+          if (used >= replacementLimit) break;
+          const state = add(base, variant, group, replacementLimit);
+          if (state) { repairedBases.push(state); remember(state); }
         }
-        if (used >= limit) break;
+        if (used >= replacementLimit) break;
       }
-      for (const state of added.sort((a, b) => compareStates(a, b, request)).slice(0, width)) {
-        for (const group of groups) {
-          if (state.selectedProductIds?.includes(group.productId)) continue;
-          for (const variant of variantsForState(group, state)) {
-            if (used >= limit) break;
-            const repaired = add(state, variant, group);
-            if (repaired) remember(repaired);
-          }
-          if (used >= limit) break;
-        }
+      if (used >= replacementLimit) break;
+    }
+  }
+  for (const state of repairedBases.sort((a, b) => compareStates(a, b, request)).slice(0, width)) {
+    for (const group of groups) {
+      if (state.selectedProductIds?.includes(group.productId)) continue;
+      for (const variant of variantsForState(group, state)) {
+        if (used >= limit) break;
+        const repaired = add(state, variant, group);
+        if (repaired) remember(repaired);
       }
       if (used >= limit) break;
     }
+    if (used >= limit) break;
   }
   if (used >= limit) trimmed = true;
   const all = [...archive.values()];
   const complete = reviewFrontier(all, request, incumbents);
   trimmed ||= complete.length < all.length;
   return { complete, groups, expansionAttempts: used, mode: "bounded", trimmed };
+}
+
+/** Generate only neighborhoods the work budget can inspect, including when
+ * customers request large baskets. Do not allocate all pairs in advance. */
+function* removalSets(ids: readonly string[]): Generator<readonly string[]> {
+  yield [];
+  for (const id of ids) yield [id];
+  for (let first = 0; first < ids.length; first += 1) {
+    for (let second = first + 1; second < ids.length; second += 1) yield [ids[first]!, ids[second]!];
+  }
 }
 
 function residualPattern(state: SearchState, request: CanonicalRequest) {
