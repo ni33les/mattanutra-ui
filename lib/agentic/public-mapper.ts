@@ -950,10 +950,6 @@ export function publicPlanFields(result: Pick<
       : "complete";
   const tooBroad = result.breadth?.reasonCode === "request_too_broad";
   const currency = result.basket[0]?.currency ?? "THB";
-  const quoteBasket =
-    result.status === "no_purchase" || result.status === "processing"
-      ? []
-      : (selected?.basket ?? result.basket);
   const horizonUnavailable = result.horizon?.complete === false || Boolean(result.horizon?.durationUnknown);
   const horizonUnavailableReason = result.horizon?.unavailableReasons?.[0]?.reasonCode ?? (result.horizon?.durationUnknown ? "current_inventory_duration_unknown" : "current_inventory_information_incomplete");
   const horizonReasons = [...(result.horizon?.unavailableReasons ?? []), ...(selected?.economics?.unavailableReasons ?? [])].filter((item, index, all) => all.findIndex(other => JSON.stringify(other) === JSON.stringify(item)) === index);
@@ -964,6 +960,12 @@ export function publicPlanFields(result: Pick<
         result.horizon.nextReplenishmentDay < 90)
   );
   const decision = operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected?.basket.length), hasPurchaseOptions: alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
+  if (decision.status !== result.status) result = { ...result, status: decision.status,
+    summary: agenticMessage(negotiateLocale(locale), `plan.summary.${decision.status}`) };
+  const quoteBasket =
+    result.status === "no_purchase" || result.status === "processing"
+      ? []
+      : (selected?.basket ?? result.basket);
   const nextActions = decision.nextAction === "no_purchase" ? [] : [decision.nextAction];
   const subtotalMinor =
     result.status === "no_purchase" || result.status === "processing"
@@ -982,7 +984,7 @@ export function publicPlanFields(result: Pick<
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const compactApplicable = planCompactApplicable(result.status);
-  const compactDecision = compactApplicable ? buildCompactDecision(result) : null;
+  const compactDecision = compactApplicable ? buildCompactDecision(result, decision) : null;
   const claimIds = compactApplicable ? planClaimIds(result) : [];
 
   const payload = {

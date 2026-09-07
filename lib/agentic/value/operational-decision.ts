@@ -19,7 +19,9 @@ export function operationalDecision(input: Readonly<{
   replenishesLater?: boolean;
   tooBroad?: boolean;
 }>): OperationalDecision {
-  const { status } = input;
+  const scheduledForLater = input.purchaseRequiredNow === false && input.replenishesLater;
+  const status = input.status === "ready" && input.hasSelectedOption === false && !scheduledForLater
+    ? "no_purchase" : input.status;
   const nextAction: OperationalNextAction = status === "processing" ? "poll_plan"
     : input.tooBroad ? "split_request"
     : status === "blocked" ? "change_request"

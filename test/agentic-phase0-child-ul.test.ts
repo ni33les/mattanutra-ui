@@ -252,8 +252,20 @@ describe("Phase 0 child and life-stage upper limits", () => {
       state,
       unmetRequirements: matched.unmetRequirements
     });
-    assert.notEqual(status, "ready");
-    assert.ok(status === "blocked" || status === "needs_input");
+    assert.equal(matched.selected?.basket.length, 0);
+    assert.equal(status, "no_purchase");
+    const purchase = matched.alternatives.find(option => option.basket.length > 0);
+    assert.ok(purchase, "The empty closest-dose result must retain a selectable purchase trade-off");
+    assert.equal(purchase.purchaseEligible, true);
+    const purchaseGuidance = evaluateSafety({ locale: "en", selected: purchase, state });
+    const doseAdvice = purchaseGuidance.find(item => item.code === "dose_review_required" && item.threshold === 110);
+    assert.ok(doseAdvice);
+    assert.equal(doseAdvice.action, "review");
+    assert.equal(doseAdvice.severity, "high");
+    assert.equal(doseAdvice.exposure, 300);
+    assert.equal(doseAdvice.unit, "mg");
+    assert.ok(doseAdvice.productIds.includes(purchase.basket[0].productId));
+    assert.equal(planStatus({ guidance: purchaseGuidance, questions: [], selected: purchase, state, unmetRequirements: matched.unmetRequirements }), "ready");
   });
 
   it("prefers the lower-penalty 100 mg dose for a known 8-year-old", () => {

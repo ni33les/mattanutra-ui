@@ -26,6 +26,7 @@ import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { PROFILE_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { engineeringInfo } from "../lib/agentic/info.ts";
+import type { PlanResult } from "../lib/agentic/plan/types.ts";
 
 function supplementId(name: string) {
   const found = FIXTURE_SUPPLEMENTS.find((item) => item.name === name);
@@ -549,30 +550,58 @@ describe("agentic P1 pack fixes", () => {
 
   it("keeps the budget hard and recovers through an explicit budget revision", async () => {
     const runtime = runtimeFor();
+    const request = {
+      destinationCountry: "TH", locale: "en", optimization: "balanced",
+      profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
+      requirements: { maxPriceMinor: 1000, maxProductCount: 1 },
+      medicationCodes: ["apixaban"], currentSupplements: [],
+      targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
+    };
     const result = await call(runtime, "plan", {
       idempotencyKey: "p1-over-budget-0000001",
-      request: {
-        destinationCountry: "TH",
-        locale: "en",
-        optimization: "balanced",
-        profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
-        requirements: { maxPriceMinor: 1000 },
-        targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
-      }
+      request
     });
-    assert.equal(result.status, "needs_input");
-    const questions = (result.questions as Array<{ questionId: string }>) ?? [];
-    assert.ok(questions.length > 0);
+    assert.equal(result.ok, true);
+    assert.equal(result.status, "no_purchase");
+    assert.deepEqual(result.questions ?? [], []);
     assert.ok(!Array.isArray(result.basket) || result.basket.reduce((sum, item) => sum + Number(item.lineTotalMinor), 0) <= 1000);
 
+    const unrelated = await call(runtime, "plan", {
+      operation: "revise", expectedRevision: result.revision, planHandle: result.planHandle,
+      idempotencyKey: "p1-over-budget-locale-01", requestPatch: { locale: "th" }
+    });
+    assert.equal(unrelated.status, "no_purchase");
+    const [planId] = await runtime.store.listPlanIdsByPrincipal("tester");
+    assert.ok(planId);
+    const stored = await runtime.store.getPlanRevision(planId, Number(unrelated.revision));
+    assert.ok(stored);
+    const preserved = stored.result as PlanResult;
+    assert.deepEqual(preserved.originalRequest?.requirements, request.requirements);
+    assert.deepEqual(preserved.originalRequest?.targets, request.targets);
+    assert.deepEqual(preserved.originalRequest?.medicationCodes, request.medicationCodes);
+
     const relaxed = await call(runtime, "plan", {
-      expectedRevision: result.revision,
+      expectedRevision: unrelated.revision,
       idempotencyKey: "p1-over-budget-relax-01",
       planHandle: result.planHandle,
       operation: "revise",
       requestPatch: { requirements: { maxPriceMinor: 100000 } }
     });
     assert.equal(relaxed.status, "ready");
+    assert.ok(Array.isArray(relaxed.basket) && relaxed.basket.length === 1);
+    assert.ok(relaxed.basket.reduce((sum, item) => sum + Number(item.lineTotalMinor), 0) <= 100000);
+    const cleared = await call(runtime, "plan", {
+      operation: "revise", expectedRevision: relaxed.revision, planHandle: result.planHandle,
+      idempotencyKey: "p1-over-budget-clear-01", requestPatch: { requirements: { maxPriceMinor: null } }
+    });
+    assert.equal(cleared.status, "ready");
+    const clearedRow = await runtime.store.getPlanRevision(planId, Number(cleared.revision));
+    assert.ok(clearedRow);
+    const clearedResult = clearedRow.result as PlanResult;
+    assert.equal(clearedResult.requestSnapshot.requirements.maxPriceMinor, null);
+    assert.equal(clearedResult.requestSnapshot.requirements.maxProductCount, 1);
+    assert.deepEqual(clearedResult.originalRequest?.targets, request.targets);
+    assert.deepEqual(clearedResult.originalRequest?.medicationCodes, request.medicationCodes);
   });
 
   it("drops leftover gap questions when selecting a fully covered option", async () => {

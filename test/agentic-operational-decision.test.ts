@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { operationalDecision } from "../lib/agentic/value/operational-decision.ts";
 import { buildCompactDecision } from "../lib/agentic/value/compact-decision.ts";
+import { publicPlanFields } from "../lib/agentic/public-mapper.ts";
 import type { SafetyGuidance, StackOption } from "../lib/agentic/plan/types.ts";
 
 const adviceFixture: SafetyGuidance = {
@@ -15,15 +16,22 @@ const adviceFixture: SafetyGuidance = {
 };
 function adviceOption(guidance: readonly SafetyGuidance[]): StackOption {
   return {
-    optionId: "opt_advice_fixture", basket: [], coverage: [], coveragePercent: 0, dailyPills: 0,
-    matcherVersion: "fixture", snapshotId: "fixture", totalPriceMinor: 0, reason: "fixture",
+    optionId: "opt_advice_fixture", basket: [{
+      availabilityAsOf: "2026-09-07T00:00:00Z", contributionSupplementIds: ["magnesium"], currency: "THB",
+      dailyPills: 1, deliveryWindow: null, fixture: true, form: "capsule", imageUrl: null,
+      incidentalNutrientNames: [], incidentalNutrients: [], incompleteCommercialFacts: false,
+      lineTotalMinor: 100, pillsPerServing: 1, productId: "product-a", productName: "Magnesium 400 mg",
+      quantity: 1, requestedNutrientNames: ["Magnesium"], retailerSku: "magnesium-400-fixture",
+      sellerId: "fixture", sellerName: "Fixture", servingsPerDay: 1, source: "fixture", stockStatus: "in_stock", unitPriceMinor: 100
+    }], coverage: [], coveragePercent: 0, dailyPills: 1,
+    matcherVersion: "fixture", snapshotId: "fixture", totalPriceMinor: 100, reason: "fixture",
     safety: { assessedConditionCodes: [], assessedMedicationCodes: [], guidance }
   };
 }
 
 describe("one operational decision", () => {
   it("concise copy counts unresolved targets instead of claiming their names are covered", () => {
-    const selected = { optionId: "opt_partial_fixture", basket: [], coverage: [
+    const selected = { ...adviceOption([]), optionId: "opt_partial_fixture", coverage: [
       ...[0, 1, 2, 3].map(index => ({ name: `Known ${index}`, status: "covered" })),
       { name: "Unavailable nutrient", status: "uncovered" }
     ] } as StackOption;
@@ -40,6 +48,37 @@ describe("one operational decision", () => {
     assert.equal(result.advice[0]!.threshold, 350);
     assert.deepEqual(result.advice[0]!.uncertaintyCodes, ["estimated_intake"]);
     assert.equal(result.operationalDecision.purchaseEligible, true);
+  });
+  it("keeps identical serious advice visible when an empty basket has no purchase action", () => {
+    const nonempty = adviceOption([adviceFixture]);
+    const empty = buildCompactDecision({ status: "ready", selected: { ...nonempty, basket: [], totalPriceMinor: 0, dailyPills: 0 }, safetyGuidance: [adviceFixture] });
+    const purchasable = buildCompactDecision({ status: "ready", selected: nonempty, safetyGuidance: [adviceFixture] });
+    assert.deepEqual(empty.advice, purchasable.advice);
+    assert.equal(empty.operationalDecision.purchaseEligible, false);
+    assert.notEqual(empty.operationalDecision.nextAction, "confirm_with_user");
+    assert.equal(empty.status, "no_purchase");
+  });
+  it("uses one public status for legacy empty recommendations and their purchasable alternatives", () => {
+    const nonempty = adviceOption([adviceFixture]);
+    const empty = { ...nonempty, optionId: "opt_empty", basket: [], totalPriceMinor: 0, dailyPills: 0 };
+    for (const alternatives of [[], [nonempty]]) {
+      const projected = publicPlanFields({ alternatives, basket: [], selected: empty, status: "ready",
+        coverage: [], questions: [], changeSummary: [], unmetRequirements: [], safetyGuidance: [adviceFixture], summary: "Ready to confirm this basket." });
+      assert.equal(projected.status, "no_purchase");
+      assert.equal(projected.operationalDecision.status, "no_purchase");
+      assert.equal(projected.compactDecision?.status, "no_purchase");
+      assert.equal(projected.operationalDecision.purchaseEligible, false);
+      assert.equal(projected.operationalDecision.nextAction, alternatives.length ? "review_options" : "no_purchase");
+      assert.equal(projected.summaryKey, alternatives.length ? "plan.summary.review_options" : "plan.summary.no_purchase");
+      assert.notEqual(projected.summary, "Ready to confirm this basket.");
+      assert.equal(projected.compactDecision?.advice[0].threshold, 350);
+      if (alternatives.length) assert.ok(projected.options?.some(option => option.optionId === nonempty.optionId && option.purchaseEligible));
+    }
+    const purchasable = publicPlanFields({ alternatives: [], basket: nonempty.basket, selected: nonempty, status: "ready",
+      coverage: [], questions: [], changeSummary: [], unmetRequirements: [], safetyGuidance: [adviceFixture], summary: "Ready with dose advice." });
+    assert.equal(purchasable.status, "ready");
+    assert.equal(purchasable.compactDecision?.status, "ready");
+    assert.equal(purchasable.operationalDecision.purchaseEligible, true);
   });
   it("retains same-rule advice with different exposure, evidence or uncertainty independently of arrival order", () => {
     const changes: Partial<SafetyGuidance>[] = [
@@ -73,5 +112,21 @@ describe("one operational decision", () => {
   it("retains operational confirmation without a health acknowledgement", () => {
     assert.deepEqual(operationalDecision({ status: "ready", hasSelectedOption: true }), { status: "ready", nextAction: "confirm_with_user", purchaseEligible: true });
     assert.equal(operationalDecision({ status: "ready", hasSelectedOption: false }).purchaseEligible, false);
+  });
+  it("preserves explicit future-replenishment readiness without asking for a current purchase", () => {
+    assert.deepEqual(operationalDecision({ status: "ready", hasSelectedOption: false, purchaseRequiredNow: false, replenishesLater: true }),
+      { status: "ready", nextAction: "replenish_later", purchaseEligible: false });
+    for (const scenario of [{ complete: true, day: 30, status: "ready", next: "replenish_later" },
+      { complete: true, day: 120, status: "no_purchase", next: "no_purchase" },
+      { complete: false, day: 30, status: "no_purchase", next: "no_purchase" }]) {
+      const projected = publicPlanFields({ alternatives: [], basket: [], selected: null, status: "ready", summary: "Legacy schedule",
+        coverage: [], questions: [], changeSummary: [], unmetRequirements: [], safetyGuidance: [adviceFixture],
+        horizon: { complete: scenario.complete, durationUnknown: false, nextReplenishmentDay: scenario.day, orders: [],
+          purchaseRequiredNow: false, reasonCode: "current_inventory_covers_now", snapshotId: "fixture" } });
+      assert.equal(projected.status, scenario.status);
+      assert.equal(projected.operationalDecision.nextAction, scenario.next);
+      assert.deepEqual(projected.compactDecision?.operationalDecision, projected.operationalDecision);
+      assert.equal(projected.compactDecision?.status, projected.status);
+    }
   });
 });

@@ -87,15 +87,16 @@ export function compactDecisionBytes(decision: CompactDecision) {
   return Buffer.byteLength(JSON.stringify(decision), "utf8");
 }
 
-export function buildCompactDecision(result: CompactPlanView): CompactDecision {
+export function buildCompactDecision(result: CompactPlanView, resolvedDecision?: OperationalDecision): CompactDecision {
   const selected = result.selected;
   const locale = negotiateLocale(result.requestSnapshot?.locale);
   const durationUnknown = Boolean(result.horizon?.durationUnknown);
-  const decision = operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected?.basket.length),
+  const decision = resolvedDecision ?? operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected?.basket.length),
     hasPurchaseOptions: result.alternatives?.some(option => option.basket.length > 0 && option.purchaseEligible !== false),
     hasQuestions: result.questions ? result.questions.length > 0 : undefined,
     purchaseRequiredNow: result.horizon?.purchaseRequiredNow,
     replenishesLater: (result.horizon?.nextReplenishmentDay ?? 0) > 0 });
+  if (decision.status !== result.status) result = { ...result, status: decision.status };
   // Plan and option evaluation can produce the same finding. Keep distinct
   // details for a shared rule ID; only identical complete rows are duplicates.
   const guidanceByContent = new Map<string, SafetyGuidance>();
