@@ -22,7 +22,28 @@ describe("BUILD identity contract", () => {
     assert.match(source, /AGENTIC_BUILD_ID=\$\{sha\}/);
     const nextConfig = readFileSync(new URL("../next.config.ts", import.meta.url), "utf8");
     assert.match(nextConfig, /AGENTIC_BUILD_ID: gitBuildId\(\)/);
-    assert.equal(pipelineBuildId(), TEST_RELEASE_BUILD_ID);
+  });
+
+  it("BUILD-01.B injected metadata wins before the isolated test fallback", () => {
+    const keys = ["AGENTIC_BUILD_ID", "COMMIT_SHA", "COMMIT_HASH"] as const;
+    const previous = keys.map(key => [key, process.env[key]] as const);
+    try {
+      process.env.AGENTIC_BUILD_ID = `  ${"B".repeat(40)}  `;
+      process.env.COMMIT_SHA = "c".repeat(40);
+      process.env.COMMIT_HASH = "d".repeat(40);
+      assert.equal(pipelineBuildId(), "b".repeat(40));
+      delete process.env.AGENTIC_BUILD_ID;
+      assert.equal(pipelineBuildId(), "c".repeat(40));
+      delete process.env.COMMIT_SHA;
+      assert.equal(pipelineBuildId(), "d".repeat(40));
+      delete process.env.COMMIT_HASH;
+      assert.equal(pipelineBuildId(), TEST_RELEASE_BUILD_ID);
+    } finally {
+      for (const [key, value] of previous) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it("BUILD-02 one instance returns the same buildId for 1,000 calls and after cache eviction", async () => {

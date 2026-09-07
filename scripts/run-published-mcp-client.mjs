@@ -1,0 +1,189 @@
+#!/usr/bin/env node
+/** A client of the published connector only. No application, catalogue or store imports. */
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
+import Ajv from "ajv";
+import { CLIENT_NORMALIZATION, normalizePublishedClientResult } from "./published-client-semantics.mjs";
+
+const args = process.argv.slice(2);
+const arg = (name, fallback) => { const index = args.indexOf(name); return index >= 0 ? args[index + 1] : fallback; };
+const endpoint = new URL(arg("--url", process.env.MCP_URL ?? "http://127.0.0.1:3000/api/mcp"));
+if (!["localhost", "127.0.0.1", "[::1]", "dev.mattanutra.com"].includes(endpoint.hostname)) throw new Error("The documented client journey is restricted to DEV or localhost.");
+const output = resolve(arg("--output", "/tmp/mattanutra-published-client"));
+const runKey = arg("--run-key", randomUUID());
+const resumeFile = arg("--resume", null);
+const transcript = [];
+const assertions = [];
+const ajv = new Ajv({ allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true, coerceTypes: false, useDefaults: false, removeAdditional: false, validateFormats: false });
+let requestId = 0, sessionId;
+const validators = new Map();
+let contract;
+function check(condition, message) { assertions.push({ message, passed: Boolean(condition) }); if (!condition) throw new Error(message); }
+async function rpc(method, params = {}) {
+  const request = { jsonrpc: "2.0", id: ++requestId, method, params };
+  const started = performance.now();
+  const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-06-18", ...(sessionId ? { "mcp-session-id": sessionId } : {}) }, body: JSON.stringify(request), signal: AbortSignal.timeout(30000) });
+  if (response.headers.get("mcp-session-id")) sessionId = response.headers.get("mcp-session-id");
+  const raw = await response.text();
+  let body;
+  if (response.headers.get("content-type")?.includes("text/event-stream")) {
+    const lines = raw.split(/\r?\n/).filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).filter(Boolean);
+    body = lines.map(line => JSON.parse(line)).find(item => item.id === request.id);
+  } else body = JSON.parse(raw);
+  transcript.push({ request, httpStatus: response.status, response: body, latencyMs: Math.round(performance.now() - started) });
+  check(response.ok && body && !body.error, `${method} succeeds`);
+  return body.result;
+}
+function validate(schema, value, name) {
+  let compiled = validators.get(schema);
+  if (!compiled) { compiled = ajv.compile(schema); validators.set(schema, compiled); }
+  check(compiled(value), `${name} conforms to its published schema${compiled.errors ? `: ${JSON.stringify(compiled.errors)}` : ""}`);
+}
+async function call(name, arguments_) {
+  const descriptor = contract.tools[name];
+  check(Boolean(descriptor), `${name} is documented`);
+  validate(descriptor.inputSchema, arguments_, `${name} request`);
+  const result = await rpc("tools/call", { name, arguments: arguments_ });
+  validate(descriptor.outputSchema, result.structuredContent, `${name} response`);
+  const value = result.structuredContent;
+  for (const item of result.content ?? []) {
+    if (item.type !== "text" || typeof item.text !== "string") continue;
+    let parsed;
+    try { parsed = JSON.parse(item.text); } catch { continue; }
+    if (parsed && typeof parsed === "object" && "ok" in parsed) check(isDeepStrictEqual(parsed, value), `${name} JSON text and structured response agree`);
+  }
+  check(result.isError === (value.ok === false), `${name} error envelope agrees`);
+  return value;
+}
+async function current(plan) {
+  for (let i = 0; plan.status === "processing" && i < 90; i++) {
+    await new Promise(done => setTimeout(done, Math.max(1, plan.pollAfterSeconds ?? 1) * 1000));
+    plan = await call("plan", { operation: "get", planHandle: plan.planHandle });
+  }
+  check(plan.status !== "processing", "plan finishes within the published polling window");
+  return plan;
+}
+function checkFrozenMoney(frozen, label) {
+  check(Boolean(frozen && Array.isArray(frozen.items)), `${label} supplies a frozen item ledger`);
+  for (const item of frozen.items) check(Number.isInteger(item.quantity) && item.quantity > 0 && item.lineTotalMinor === item.quantity * item.unitPriceMinor, `${label} line total matches purchased pack quantity`);
+  check(frozen.subtotalMinor === frozen.items.reduce((sum, item) => sum + item.lineTotalMinor, 0), `${label} subtotal equals its line totals`);
+  check(frozen.totalPriceMinor === frozen.subtotalMinor + frozen.shippingMinor + frozen.taxMinor, `${label} total includes the stated items, delivery and tax`);
+}
+async function exercisePartialMatchAndAnswer(request, baseline) {
+  const partialExample = contract.examples.find(item => item.name === "create-partial-coverage");
+  const decisionExample = contract.examples.find(item => item.name === "ask-customer-target-decision");
+  const answerExample = contract.examples.find(item => item.name === "answer-returned-customer-decision");
+  check(partialExample?.tool === "plan" && decisionExample?.tool === "plan" && answerExample?.tool === "plan", "connector publishes partial-coverage and customer-choice examples");
+  const target = partialExample.arguments.request.targets[0];
+  const retained = baseline.basket.find(item => (item.requestedNutrients ?? []).some(nutrient => nutrient.name === target.name && nutrient.unit === target.unit));
+  check(Boolean(retained), "published basket identifies the fixture nutrient and product");
+  const nutrient = retained.requestedNutrients.find(item => item.name === target.name && item.unit === target.unit);
+  check(nutrient.amount / retained.servingsPerDay === 1000 && target.amount === 2500 && target.unit === "IU", "partial example matches the published 1000 IU per-serving product fact");
+  const partialRequest = { ...structuredClone(request), targets: structuredClone(partialExample.arguments.request.targets),
+    requirements: { ...structuredClone(request.requirements), ...structuredClone(partialExample.arguments.request.requirements), retainProductIds: [retained.productId] } };
+  function preserved(plan, label) {
+    check(isDeepStrictEqual(plan.medicationCodes, request.medicationCodes), `${label} preserves the disclosed medication`);
+    const row = plan.coverage.find(item => item.name === target.name);
+    check(row && row.requestedAmount === target.amount && row.unit === target.unit && row.basis === target.basis, `${label} preserves the provisional target amount, unit and basis`);
+    check(plan.basket.length === 1 && plan.basket.every(item => item.productId === retained.productId), `${label} respects the explicitly retained product`);
+    return row;
+  }
+  function honestPartial(plan, label) {
+    const row = preserved(plan, label);
+    check(plan.status === "ready" && row.status === "partial" && row.coveragePercent === 80 && row.deliveredAmount === 2000 && row.remainingGap === 500, `${label} reports genuine 80% per-target dose coverage and a 500 IU gap`);
+    check(plan.acknowledgementStatus === "not_required" && (plan.questions ?? []).length === 0, `${label} introduces no mandatory question or health acknowledgement`);
+  }
+  let partial = await current(await call("plan", { ...partialExample.arguments, request: partialRequest, idempotencyKey: `docs-partial-${runKey}` }));
+  honestPartial(partial, "Partial plan");
+  partial = await current(await call("plan", { ...decisionExample.arguments, planHandle: partial.planHandle, expectedRevision: partial.revision, idempotencyKey: `docs-customer-decision-${runKey}` }));
+  preserved(partial, "Customer-decision revision");
+  check(partial.status === "needs_input" && partial.operationalDecision.nextAction === "answer_questions", "an explicit customer decision returns actionable needs_input");
+  const question = partial.questions.find(item => item.choices.some(choice => choice.label === "Mark the prerequisite satisfied"));
+  check(Boolean(question), "the connector offers a choice to confirm the customer's provisional target");
+  const choice = question.choices.find(item => item.label === "Mark the prerequisite satisfied");
+  partial = await current(await call("plan", { ...answerExample.arguments, planHandle: partial.planHandle, expectedRevision: partial.revision,
+    idempotencyKey: `docs-customer-answer-${runKey}`, answers: [{ questionId: question.questionId, choice: choice.choice }] }));
+  honestPartial(partial, "Answered customer decision");
+}
+
+let receipt;
+let failure;
+try {
+  await mkdir(output, { recursive: true });
+  const initialized = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "published-documentation-client", version: "4.0.0" } });
+  check(typeof initialized.instructions === "string" && /advis/i.test(initialized.instructions), "connector supplies essential advisory instructions");
+  const resources = (await rpc("resources/list")).resources;
+  const schemaResource = resources.find(item => item.mimeType === "application/schema+json");
+  const guideResource = resources.find(item => item.mimeType === "text/markdown");
+  check(schemaResource && guideResource, "connector publishes contract and guide resources");
+  contract = JSON.parse((await rpc("resources/read", { uri: schemaResource.uri })).contents[0].text);
+  const guide = (await rpc("resources/read", { uri: guideResource.uri })).contents[0].text;
+  check(/requestPatch/.test(guide) && /stale_revision/.test(guide) && /payment/i.test(guide), "guide explains refinement and recovery");
+  const tools = (await rpc("tools/list")).tools;
+  check(tools.length === 7, "exactly seven public tools are advertised");
+  for (const tool of tools) {
+    check(JSON.stringify(tool.inputSchema) === JSON.stringify(contract.tools[tool.name].inputSchema), `${tool.name} input matches published contract`);
+    check(JSON.stringify(tool.outputSchema) === JSON.stringify(contract.tools[tool.name].outputSchema), `${tool.name} output matches published contract`);
+  }
+  const info = await call("info", {});
+  check(info.ok && info.contractVersion === "4.0.0", "v4 capability discovery succeeds");
+  if (resumeFile) {
+    receipt = JSON.parse(await readFile(resumeFile, "utf8"));
+    check(receipt.endpoint === endpoint.href, "saved receipt belongs to this environment");
+    receipt.order = await call("order", { orderHandle: receipt.checkout.orderHandle });
+    checkFrozenMoney(receipt.order.frozenOrder, "Recovered order");
+    check(receipt.order.money.totalPriceMinor === receipt.order.frozenOrder.totalPriceMinor, "Recovered order money matches the frozen quote");
+  } else {
+    const example = contract.examples.find(item => item.name === "create");
+    check(example?.tool === "plan", "create uses an example supplied by the connector");
+    const request = structuredClone(example.arguments.request);
+    check(info.supportedCountries.some(country => country.countryCode === request.destinationCountry), "example destination is currently deliverable");
+    check(info.medicationCodes.length > 0, "capabilities supply a medication for the context-preservation fixture");
+    request.medicationCodes = [info.medicationCodes[0]];
+    const create = { ...example.arguments, request, idempotencyKey: `docs-create-${runKey}` };
+    let plan = await current(await call("plan", create));
+    check(plan.ok && Array.isArray(plan.options) && plan.options.length > 0, "fixture produces reviewable options from partial health information");
+    check(JSON.stringify(plan.medicationCodes) === JSON.stringify(request.medicationCodes), "created plan retains the explicitly disclosed medication");
+    check(plan.acknowledgementStatus === "not_required", "health advice requires no acknowledgement");
+    check(plan.operationalDecision.status === plan.status, "operational status is consistent");
+    await exercisePartialMatchAndAnswer(request, plan);
+    const originalTargets = structuredClone(request.targets);
+    const product = plan.basket?.[0] ?? plan.options.flatMap(option => option.basket ?? [])[0];
+    check(product?.productId, "published result identifies a product to reject");
+    const before = plan;
+    const patch = { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-exclude-${runKey}`, requestPatch: { requirements: { excludeProductIds: [product.productId] } } };
+    plan = await current(await call("plan", patch));
+    check(plan.ok && !(plan.basket ?? []).some(item => item.productId === product.productId), "replanning excludes the requested product");
+    check(JSON.stringify(plan.medicationCodes) === JSON.stringify(request.medicationCodes), "replanning retains disclosed medications");
+    const requestedRows = [...(plan.coverage ?? []), ...(plan.leftovers ?? [])];
+    check(originalTargets.every(target => requestedRows.some(row => row.name === target.name && (row.requestedAmount ?? row.amount) === target.amount && row.unit === target.unit && row.basis === (target.basis ?? "total_daily"))), "replanning retains every original target amount, unit and basis");
+    const stale = await call("plan", { ...patch, idempotencyKey: `docs-stale-${runKey}`, expectedRevision: before.revision });
+    check(stale.ok === false && stale.error.reasonCode === "stale_revision", "stale revisions provide an actionable error");
+    plan = await current(await call("plan", { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-clear-${runKey}`, requestPatch: { requirements: { excludeProductIds: [] } } }));
+    check(plan.status === "ready", "clearing the rejection restores a ready fixture option");
+    const option = plan.options.find(item => item.selected) ?? plan.options[0];
+    plan = await current(await call("plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-select-${runKey}`, optionId: option.optionId }));
+    check(plan.status === "ready" && plan.operationalDecision.purchaseEligible, "fixture confirms the exact current purchasable revision");
+    const execute = { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-execute-${runKey}` };
+    const checkout = await call("execute", execute);
+    check(checkout.ok && checkout.orderHandle && checkout.checkoutUrl, "checkout returns a durable public receipt");
+    checkFrozenMoney(checkout.frozenPlan, "Checkout");
+    const retry = await call("execute", execute);
+    const repeated = await call("execute", { ...execute, idempotencyKey: `docs-existing-${runKey}` });
+    check(checkout.orderHandle === retry.orderHandle && checkout.orderHandle === repeated.orderHandle, "same-key retry and existing-checkout recovery reuse one order");
+    const order = await call("order", { orderHandle: checkout.orderHandle });
+    check(order.ok, "order tracking reads authoritative payment state");
+    checkFrozenMoney(order.frozenOrder, "Tracked order");
+    check(order.money.totalPriceMinor === checkout.frozenPlan.totalPriceMinor, "Tracked order money matches the checkout quote");
+    receipt = { endpoint: endpoint.href, runKey, plan, checkout, order, confirmation: { fixture: true, selectedOptionId: plan.optionId, revision: plan.revision }, guideSha256: createHash("sha256").update(guide).digest("hex"), schemaChecksum: info.schemaChecksum };
+  }
+} catch (error) { failure = error instanceof Error ? error.message : String(error); }
+await mkdir(output, { recursive: true });
+if (receipt) await writeFile(resolve(output, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`);
+await writeFile(resolve(output, "transcript.json"), `${JSON.stringify(transcript, null, 2)}\n`);
+await writeFile(resolve(output, "semantic.json"), `${JSON.stringify(normalizePublishedClientResult({ assertions, transcript, receipt, failure: failure ?? null }, endpoint), null, 2)}\n`);
+await writeFile(resolve(output, "normalization.json"), `${JSON.stringify(CLIENT_NORMALIZATION, null, 2)}\n`);
+console.log(JSON.stringify({ passed: !failure, assertions: assertions.length, output, ...(failure ? { failure } : {}), receipt: receipt ? resolve(output, "receipt.json") : null }));
+if (failure) process.exitCode = 1;

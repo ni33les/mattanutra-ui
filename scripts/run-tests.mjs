@@ -10,6 +10,7 @@ import {
 
 const TEST_ARGS = [
   "--test",
+  "--test-concurrency=1",
   "--experimental-strip-types",
   "--import",
   "./scripts/register-ts-path-loader.mjs"

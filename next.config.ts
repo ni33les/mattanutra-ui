@@ -127,6 +127,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  ...(process.env.NEXT_BUILD_CPUS === "1" ? { experimental: { cpus: 1, webpackMemoryOptimizations: true } } : {}),
   allowedDevOrigins: ["localhost", "127.0.0.1", "dev.mattanutra.com"],
   devIndicators: false,
   env: {

@@ -32,13 +32,13 @@ const ROWS = [
     category: "Matcher quality",
     id: "matching",
     purpose:
-      "Live retail catalog covers the official five targets, prefers fewer pills, and does not invent leftovers"
+      "Live retail catalogue minimizes normalized dose penalty before pill count, accounts for all five targets, and reports gaps honestly"
   },
   {
     category: "Matcher quality",
     id: "safety",
     purpose:
-      "Mag at 351 mg hits the catalog ceiling, and Mag plus CKD is a hard stop with real exposure"
+      "Known continued magnesium plus a retained retail product reports the applicable limit and real exposure; CKD advice remains serious and nonblocking"
   },
   {
     category: "Matcher quality",
@@ -84,17 +84,17 @@ const ROWS = [
   {
     category: "MCP contract",
     id: "AE-08",
-    purpose: "Apixaban plus omega-3 asks for a safety acknowledgement before ready"
+    purpose: "Apixaban plus omega-3 returns interaction advice without a mandatory acknowledgement"
   },
   {
     category: "MCP contract",
     id: "AE-09",
-    purpose: "CKD plus magnesium is blocked, not offered as ready to buy"
+    purpose: "CKD plus magnesium returns serious condition advice while operational readiness stays independent"
   },
   {
     category: "MCP contract",
     id: "AE-10",
-    purpose: "After acknowledgement, the safety facts are still on the plan"
+    purpose: "Selecting an option preserves its health advice and evidence"
   },
   {
     category: "MCP contract",
@@ -145,7 +145,7 @@ const ROWS = [
   {
     category: "MCP honesty",
     id: "AX2-01",
-    purpose: "Acknowledging warfarin must not pretend we assessed it"
+    purpose: "Unknown warfarin remains unassessed across refinement"
   },
   {
     category: "MCP honesty",
@@ -155,7 +155,7 @@ const ROWS = [
   {
     category: "MCP honesty",
     id: "AX2-03",
-    purpose: "After a real medicine-interaction ack, the plan can become ready"
+    purpose: "Interaction advice stays visible on a ready plan; obsolete health answers cannot waive it"
   },
   {
     category: "MCP honesty",
@@ -182,7 +182,7 @@ const ROWS = [
   {
     category: "MCP honesty",
     id: "AX2-08",
-    purpose: "Options stay compact (id, reason, summary) and selectable"
+    purpose: "Options expose reviewable basket, coverage and advice within a bounded response and remain selectable"
   },
   {
     category: "MCP honesty",
@@ -229,22 +229,22 @@ const ROWS = [
   {
     category: "MCP planning",
     id: "AX3-04",
-    purpose: "Pending safety ack is one status: pending — never a competing boolean"
+    purpose: "Interaction advice agrees with ready status and requires no health acknowledgement"
   },
   {
     category: "MCP planning",
     id: "AX3-05",
-    purpose: "After the safety answer, ack is acknowledged and get does not rematch"
+    purpose: "Legacy safety-answer input preserves advice and get does not rematch"
   },
   {
     category: "MCP planning",
     id: "AX3-06",
-    purpose: "Acknowledging warfarin does not pretend we assessed it"
+    purpose: "Unknown warfarin remains unassessed after legacy acknowledgement input"
   },
   {
     category: "MCP planning",
     id: "AX3-07",
-    purpose: "Acknowledging diabetes stays a condition, not a medicine"
+    purpose: "Declared diabetes remains a condition across plan refinement"
   },
   {
     category: "MCP planning",
@@ -314,7 +314,7 @@ const ROWS = [
   {
     category: "MCP explanations",
     id: "AX4-06",
-    purpose: "A hard block cannot be acknowledged; the only move is to change the request"
+    purpose: "Limit and condition advice preserve severity, amounts and evidence without blocking confirmation"
   },
   {
     category: "MCP explanations",
@@ -739,7 +739,7 @@ const ROWS = [
   {
     category: "MCP commercial",
     id: "COM-10",
-    purpose: "Acknowledged safety guidance IDs stay on the frozen snapshot"
+    purpose: "Health guidance IDs and their evidence stay on the frozen snapshot"
   },
   {
     category: "MCP commercial",
@@ -959,11 +959,7 @@ export function canonicalPack(run) {
     valueImplementation: JSON.parse(canonicalCvImplReport(run.valueImplementation)),
     valueR2: JSON.parse(canonicalR2Report(run.valueR2)),
     valueR3: JSON.parse(canonicalR3Report(run.valueR3)),
-    matcher: {
-      efficiency: run.matcher.scores.efficiency,
-      matching: run.matcher.scores.matching,
-      safety: run.matcher.scores.safety
-    }
+    matcher: run.matcher
   });
 }
 
