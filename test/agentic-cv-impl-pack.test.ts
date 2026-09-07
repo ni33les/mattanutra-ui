@@ -1,9 +1,10 @@
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import {
   AGENTIC_TOOL_SCHEMAS,
@@ -147,13 +148,9 @@ function blocked(id: string, evidence: Record<string, unknown>): CvImplCaseResul
 }
 
 async function runCase(id: string, work: () => Promise<CvImplCaseResult>): Promise<CvImplCaseResult> {
-  try {
-    return await work();
-  } catch (error) {
-    return fail(id, {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
+  return withRecordedMcpEvidence(work, error => fail(id, {
+    error: error instanceof Error ? error.message : String(error)
+  }));
 }
 
 function envelopeFor(
@@ -1433,7 +1430,7 @@ async function runDevDet05(session: PlanSession, runIndex: number): Promise<CvIm
     return conclude(
       "DEV-DET-05",
       assertions,
-      envelopeFor(session, { det: true }, report.scores, assertions, runIndex)
+      envelopeFor(session, { det: true }, report, assertions, runIndex)
     );
   } finally {
     replaceCatalogueSnapshot(session.freeze.snapshot);

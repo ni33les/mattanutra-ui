@@ -85,6 +85,9 @@ export function significantCvEvidence(evidence: unknown) {
     // Keep complete request/response business values in repeat-run comparisons.
     // Historical raw hashes remain in the evidence but include generated handles.
     ...(record.acceptance !== undefined ? { acceptance: record.acceptance } : {}),
+    ...(record.mcpTranscript !== undefined ? {
+      mcpTranscript: normalizePublishedClientResult(record.mcpTranscript, CV_IMPL_ENDPOINT)
+    } : {}),
     ...(Array.isArray(record.failed) ? { failed: record.failed } : {}),
     ...(typeof record.reason === "string" ? { reason: record.reason } : {}),
     ...(assertions ? { assertions } : {})

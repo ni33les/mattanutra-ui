@@ -5,7 +5,7 @@ import {
   GUIDANCE_RULES_VERSION,
   loadAgenticConfig
 } from "../../../lib/agentic/config.ts";
-import { planTool } from "../../../lib/agentic/plan/service.ts";
+import { planTool } from "../../helpers/recording-mcp-dispatcher.ts";
 import { createSnapshotMemoryStore } from "./snapshot-store.ts";
 import {
   createAgenticRuntime,

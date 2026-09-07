@@ -950,7 +950,7 @@ function matcherResult(score) {
 }
 
 export function canonicalPack(run) {
-  for (const label of ["contract", "honesty", "planning", "explanations", "copy", "state", "boundary", "evidence", "commercial", "valueRemediation", "matcher"]) {
+  for (const label of ["contract", "honesty", "planning", "explanations", "copy", "state", "boundary", "evidence", "commercial", "valueRemediation", "valueImplementation", "valueR2", "valueR3", "matcher"]) {
     assertRecordedMcpEvidence(run[label], label);
   }
   return JSON.stringify({

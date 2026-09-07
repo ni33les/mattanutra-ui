@@ -1,9 +1,10 @@
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
 import {
   AGENTIC_TOOL_SCHEMAS,
   agenticServerInstructions
@@ -120,11 +121,9 @@ function blocked(id: string, evidence: Record<string, unknown>): R2CaseResult {
 }
 
 async function runCase(id: string, work: () => Promise<R2CaseResult>): Promise<R2CaseResult> {
-  try {
-    return await work();
-  } catch (error) {
-    return fail(id, { error: error instanceof Error ? error.message : String(error) });
-  }
+  return withRecordedMcpEvidence(work, error => fail(id, {
+    error: error instanceof Error ? error.message : String(error)
+  }));
 }
 
 function envelopeFor(
@@ -1279,7 +1278,7 @@ async function runDet05(session: PlanSession, runIndex: number): Promise<R2CaseR
       assertTrue("DET-05.matching", Number(report.scores.matching) >= 9),
       assertTrue("DET-05.safety", Number(report.scores.safety) >= 9)
     ];
-    return conclude("R2-DET-05", assertions, envelopeFor(session, { det: true }, report.scores, assertions, runIndex));
+    return conclude("R2-DET-05", assertions, envelopeFor(session, { det: true }, report, assertions, runIndex));
   } finally {
     replaceCatalogueSnapshot(session.freeze.snapshot);
     pinCatalogueSnapshot(session.freeze.snapshot, IMPL_SAFETY_LEDGER_VERSION);

@@ -1,3 +1,4 @@
+import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import assert from "node:assert/strict";
 import { beginDeterministicIdsForTests, endDeterministicIdsForTests } from "../lib/agentic/capabilities.ts";
 import { describe, it } from "node:test";
@@ -104,11 +105,9 @@ function blocked(id: string, evidence: Record<string, unknown>): R4CaseResult {
 }
 
 async function runCase(id: string, work: () => Promise<R4CaseResult>): Promise<R4CaseResult> {
-  try {
-    return await work();
-  } catch (error) {
-    return fail(id, { error: error instanceof Error ? error.message : String(error) });
-  }
+  return withRecordedMcpEvidence(work, error => fail(id, {
+    error: error instanceof Error ? error.message : String(error)
+  }));
 }
 
 function envelopeFor(
