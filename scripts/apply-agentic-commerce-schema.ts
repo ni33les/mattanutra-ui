@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import { readFileSync } from "node:fs";
 
 const schemaSql = `
 create table if not exists public.agentic_catalogue_snapshots (
@@ -260,12 +261,14 @@ create table if not exists public.agentic_matcher_events (
   requested_doses jsonb not null default '[]'::jsonb,
   constraints jsonb not null default '{}'::jsonb,
   selected_option_id text,
-  coverage_percent integer,
+  coverage_percent numeric,
   product_ids jsonb not null default '[]'::jsonb,
   product_skus jsonb not null default '[]'::jsonb,
   leftovers jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
+
+${readFileSync(new URL("../db-rollout/agentic-matcher-telemetry-schema.sql", import.meta.url), "utf8")}
 
 create index if not exists agentic_matcher_events_plan_idx
   on public.agentic_matcher_events (plan_id, revision);

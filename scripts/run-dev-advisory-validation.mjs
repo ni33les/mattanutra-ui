@@ -124,6 +124,7 @@ async function main() {
     writeJson(join(evidence, "test-inventory.json"), inventory);
     await run("administration-schema", process.execPath, [...TS, "scripts/apply-product-administration-schema.ts"]);
     await run("web-schema", process.execPath, [...TS, "scripts/apply-web-funnel-schema.ts"]);
+    await run("agentic-schema", process.execPath, [...TS, "scripts/apply-agentic-commerce-schema.ts"]);
     await run("matcher-runtime-schema", process.execPath, [...TS, "scripts/apply-matcher-v5-runtime-schema.ts"]);
     await run("demand-cache-schema", process.execPath, [...TS, "scripts/apply-product-coverage-demand-cache-schema.ts"]);
     await run("runtime-schema", process.execPath, [...TS, "scripts/verify-dev-runtime-schema.ts"]);

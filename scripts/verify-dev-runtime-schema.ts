@@ -5,6 +5,7 @@ type ColumnRow = Readonly<{
   columnName: string;
   dataType: string;
   isNullable: string;
+  numericScale: number | null;
   tableName: string;
 }>;
 
@@ -36,6 +37,7 @@ type TriggerRow = Readonly<{
 }>;
 
 const requiredTables = [
+  "agentic_matcher_events",
   "organisations", "product_brands", "product_facts", "supplements", "supplement_aliases", "supplement_safety_limits", "retail_sellable_products",
   "catalogue_runtime_revision", "catalogue_correction_audit",
   "assessment_product_preferences", "assessments", "formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs",
@@ -183,6 +185,7 @@ try {
           table_name as "tableName",
           column_name as "columnName",
           data_type as "dataType",
+          numeric_scale as "numericScale",
           is_nullable as "isNullable"
         from information_schema.columns
         where table_schema = 'public'
@@ -267,6 +270,11 @@ try {
     requireReadWritePrivilege(privilegeMap, tableName);
   }
 
+  requireColumn(columnMap, "agentic_matcher_events", "coverage_percent", { dataType: "numeric" });
+  const telemetryCoverage = columnMap.get(tableColumnKey("agentic_matcher_events", "coverage_percent"));
+  if (telemetryCoverage?.dataType === "numeric" && telemetryCoverage.numericScale !== null) {
+    addFailure("agentic_matcher_events.coverage_percent must be unrestricted numeric to preserve fractional coverage");
+  }
   for (const column of ["catalogue_revision", "catalogue_fingerprint", "search_effort"]) requireColumn(columnMap, "product_recommendation_runs", column);
   requireColumn(columnMap, "catalogue_runtime_revision", "revision", { dataType: "bigint", notNull: true });
   for (const table of ["products", "product_facts", "supplements", "supplement_aliases", "supplement_safety_limits", "supplement_country_availability", "retail_sellable_products"]) {
