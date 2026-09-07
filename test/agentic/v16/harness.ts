@@ -26,7 +26,7 @@ import {
   setAgenticRuntimeForTests,
   type AgenticRuntime
 } from "../../../lib/agentic/runtime.ts";
-import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
+import { createSnapshotMemoryStore } from "../value/snapshot-store.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
 import { F_READY_MAG, v16FreshKey } from "./manifest.ts";
 
@@ -138,8 +138,13 @@ export function endV16Run() {
   resetServiceClock();
 }
 
+export function createFrozenCatalogueStore() {
+  if (!frozenReal) throw new Error("Call freezeRealThailandCatalogue before creating a real-catalogue runtime");
+  return createSnapshotMemoryStore(frozenReal);
+}
+
 export function createV16Runtime() {
-  const store = createMemoryStore();
+  const store = createFrozenCatalogueStore();
   const runtime = createAgenticRuntime({
     config: {
       ...loadAgenticConfig(),

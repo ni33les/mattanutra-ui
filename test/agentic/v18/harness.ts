@@ -1,5 +1,6 @@
 import {
   beginV16Run,
+  createFrozenCatalogueStore,
   createV16Runtime,
   endV16Run,
   freezeRealThailandCatalogue,
@@ -9,7 +10,6 @@ import {
 import { handleJsonRpc } from "../../../lib/agentic/mcp/dispatcher.ts";
 import { loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { createAgenticRuntime, setAgenticRuntimeForTests } from "../../../lib/agentic/runtime.ts";
-import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
 import { F_READY_EN, F_READY_TH, V18_CLOCK, v18Key } from "./manifest.ts";
 import { asRecord } from "./diff.ts";
@@ -22,7 +22,7 @@ export {
 };
 
 export function createV18Runtime(namespace: string) {
-  const store = createMemoryStore();
+  const store = createFrozenCatalogueStore();
   const runtime = createAgenticRuntime({
     config: {
       ...loadAgenticConfig(),
