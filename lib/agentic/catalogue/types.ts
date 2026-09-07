@@ -30,6 +30,7 @@ export type CatalogueProduct = Readonly<{
 }>;
 
 export type CatalogueSnapshot = Readonly<{
+  runtimeRevision?: number;
   availabilityAsOf: string;
   catalogueVersion: string;
   products: readonly CatalogueProduct[];

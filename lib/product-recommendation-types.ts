@@ -62,7 +62,7 @@ export type ProductCandidateFact = Readonly<{
 
 export type ProductCandidate = Readonly<{
   administration?: ProductAdministration | null;
-  matchingFacts?: Readonly<{ dailyPillsPerServing: number; form: string; dietarySource: "algae" | "any" | "fish" | "plant"; omegaSource: "algae" | "fish" | "none" }>;
+  matchingFacts?: Readonly<{ pillCountKnown?: boolean; dailyPillsPerServing: number; form: string; dietarySource: "algae" | "any" | "fish" | "plant"; omegaSource: "algae" | "fish" | "none" }>;
   automatedSafetyPassed: boolean;
   availabilityStatus: ProductAvailabilityStatus;
   availableCountryCodes?: readonly string[];
@@ -122,9 +122,11 @@ export type ProductStackPreference = "balanced" | "compact";
 
 export type ProductRecommendationDiagnostics = Readonly<{
   matching?: Readonly<{
-    operationalStatus: "ready" | "no_purchase";
+    operationalStatus: "ready" | "review_options" | "no_purchase";
     selectedOptionId: string | null;
     options: readonly Readonly<{
+      roles?: readonly import("@/lib/matcher/types").ConversationalOptionRole[];
+      purchaseEligible?: boolean;
       optionId: string;
       productIds: readonly string[];
       dailyServings: readonly number[];
@@ -136,6 +138,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
       recommendations: readonly ProductRecommendationSelection[];
     }>[];
     alternativeSearch: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
+    searchSummary?: import("@/lib/matcher/types").MatchResult["searchSummary"];
   }>;
   algorithmVersion?: ProductRecommendationAlgorithmVersion;
   blockedProducts: ProductRecommendationExclusion[];
@@ -213,13 +216,16 @@ export type ProductRecommendationClientContext = Readonly<{
 }>;
 
 export type ProductRecommendationInput = Readonly<{
+  searchEffort?: "standard" | "expanded";
+  productDoses?: readonly Readonly<{ productId: string; servingsPerDay: number }>[];
+  catalogueFingerprint?: string;
   budgetAmount?: number | null;
   candidates: ProductCandidate[];
   clientContext?: ProductRecommendationClientContext | null;
   clientSex?: ProductClientSex | null;
   countryCode?: string | null;
   deadlineAt?: number | null;
-  maxProducts?: number;
+  maxProducts?: number | null;
   needs: ProductRecommendationNeed[];
   stackPreference?: ProductStackPreference | null;
   targetProducts?: number;
@@ -238,7 +244,7 @@ export type ProductRecommendationTrace = Readonly<{
   contextSignals: Record<string, unknown>;
   evaluatedStackCount?: number;
   excludedPredicates: ProductRecommendationExclusion[];
-  maxProducts?: number;
+  maxProducts?: number | null;
   searchMode?: "full-beam" | "shortlist";
   shortfalls: Array<Readonly<{
     coveragePercent: number;

@@ -1,3 +1,4 @@
+import { getCatalogueRuntimeRevision } from "@/lib/catalogue-runtime-revision";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { enqueueReadyHealthScoreDeliveries } from "@/lib/healthscore-delivery";
 import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
@@ -1792,7 +1793,6 @@ async function applyNutritionReportResult(
       updated_at
     )
     values (
-      ${Number(objectValue(objectValue(task.payload).productPreferences).revision ?? 0)},
       ${generationInput(task.payload)?.locale ?? null}, ${generationInput(task.payload)?.generatorVersion ?? null},
       ${generationInput(task.payload)?.revision ?? null},
       ${task.planId}::uuid,
@@ -1903,10 +1903,10 @@ function productRecommendationVariantPayloads(
     const stackPreference = normalizeProductStackPreference(
       record.stackPreference ?? result.diagnostics?.stackPreference
     );
-    const maxProducts = Number(record.maxProducts);
+    const maxProducts = record.maxProducts == null ? null : Number(record.maxProducts);
 
     return [{
-      maxProducts: Number.isFinite(maxProducts) && maxProducts > 0
+      maxProducts: maxProducts != null && Number.isSafeInteger(maxProducts) && maxProducts >= 0
         ? maxProducts
         : null,
       result: {
@@ -2109,12 +2109,13 @@ async function insertProductRecommendationResult({
     stackPreference,
     trace: {
       ...result.diagnostics.trace,
-      ...(maxProducts ? { maxProducts } : {}),
+      ...(maxProducts != null ? { maxProducts } : {}),
       stackPreference
     }
   };
   const runRows = await sql<Array<{ id: string }>>`
     insert into public.product_recommendation_runs (
+      catalogue_revision, catalogue_fingerprint, search_effort,
       selection_revision, generation_locale, generator_version, assessment_revision,
       plan_id,
       task_id,
@@ -2133,6 +2134,9 @@ async function insertProductRecommendationResult({
       created_at
     )
     values (
+      ${Number(objectValue(task.payload).catalogueRevision ?? 0)}, ${String(objectValue(result.diagnostics.trace).catalogueFingerprint ?? "") || null},
+      ${objectValue(objectValue(task.payload).productPreferences).searchEffort === "expanded" ? "expanded" : "standard"},
+      ${Number(objectValue(objectValue(task.payload).productPreferences).revision ?? 0)},
       ${generationInput(task.payload)?.locale ?? null}, ${generationInput(task.payload)?.generatorVersion ?? null},
       ${generationInput(task.payload)?.revision ?? null},
       ${task.planId}::uuid,
@@ -2221,6 +2225,8 @@ async function applyProductRecommendationsResult(
   if (!sql || !task.planId) {
     throw new Error("Product recommendation result is missing plan");
   }
+  const expectedCatalogueRevision = objectValue(task.payload).catalogueRevision;
+  if (expectedCatalogueRevision != null && (Number(expectedCatalogueRevision) !== await getCatalogueRuntimeRevision(sql) || Number(objectValue(resultPayload).catalogueRevision) !== Number(expectedCatalogueRevision))) return { superseded: true, message: "Catalogue changed; old product result was not applied" };
   const preferences = await getAssessmentProductPreferences(sql, task.planId, true);
   const expectedPreferences = objectValue(objectValue(task.payload).productPreferences);
   if (Number(expectedPreferences.revision ?? 0) !== preferences.revision) {
@@ -2240,9 +2246,9 @@ async function applyProductRecommendationsResult(
   );
   let variants = productRecommendationVariantPayloads(resultPayload);
 
-  if (variants.length < 1 && (initialResult.recommendations.length > 0 || initialResult.diagnostics.matching?.operationalStatus === "no_purchase")) {
+  if (variants.length < 1 && (initialResult.recommendations.length > 0 || ["no_purchase", "review_options"].includes(initialResult.diagnostics.matching?.operationalStatus ?? ""))) {
     variants = [{
-      maxProducts: Number(initialResult.diagnostics?.trace?.maxProducts) || null,
+      maxProducts: initialResult.diagnostics?.trace?.maxProducts ?? null,
       result: initialResult,
       stackPreference
     }];

@@ -4,6 +4,8 @@ import { servingsPerPackFromProduct } from "@/lib/agentic/value/pack-facts";
 
 export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
   const hash = createHash("sha256");
+  hash.update(String(snapshot.runtimeRevision ?? "legacy"));
+  hash.update("\0");
   hash.update(snapshot.catalogueVersion);
   hash.update("\0");
   hash.update(snapshot.availabilityAsOf);
@@ -56,6 +58,7 @@ export function freezeCatalogueSnapshot(
   snapshot: CatalogueSnapshot
 ): CatalogueSnapshot {
   return Object.freeze({
+    runtimeRevision: snapshot.runtimeRevision,
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
     products: Object.freeze([...snapshot.products]),

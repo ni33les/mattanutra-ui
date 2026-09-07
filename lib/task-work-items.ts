@@ -1,3 +1,6 @@
+import { getCatalogueRuntimeRevision } from "@/lib/catalogue-runtime-revision";
+import { valueCatalogueFingerprint } from "@/lib/agentic/value/fingerprint";
+import { administrationDailyPills } from "@/lib/product-administration";
 import { assessmentFieldKnown } from "@/lib/assessment-input-provenance";
 import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { computeHealthScore } from "@/lib/health-score";
@@ -350,6 +353,9 @@ export type NutritionPlanRefinementWorkItem = Readonly<{
 }>;
 
 export type ProductRecommendationsWorkItem = Readonly<{
+  searchEffort?: "standard" | "expanded";
+  catalogueFingerprint?: string;
+  catalogueRevision?: number;
   candidateLoadMs?: number;
   clientContext: ProductRecommendationClientContext;
   clientSex: ProductClientSex | null;
@@ -1904,6 +1910,7 @@ async function retailerCandidateSetsFromLiveSnapshot(
     };
 
     retailer.candidates.push({ ...candidate, matchingFacts: {
+      pillCountKnown: administrationDailyPills(candidate.administration) != null,
       dailyPillsPerServing: product.dailyPills, form: product.form,
       dietarySource: product.dietarySource, omegaSource: product.omegaSource
     } });
@@ -1935,6 +1942,7 @@ export function isRetryableMatchingWorkItemError(error: unknown) {
     message.includes(MATCHING_PLAN_NOT_READY_MESSAGE) ||
     message.includes("canceling statement due to statement timeout") ||
     message.includes("Product matching catalogue is not ready") ||
+    message.includes("Catalogue changed during snapshot load") ||
     message.includes("Product matching supplement availability is not ready")
   );
 }
@@ -2033,6 +2041,9 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
 
   return {
     candidateLoadMs,
+    catalogueRevision: requireCachedLiveRetailSnapshot(countryCode).runtimeRevision,
+    catalogueFingerprint: valueCatalogueFingerprint(requireCachedLiveRetailSnapshot(countryCode)),
+    searchEffort: payloadRecord(payloadRecord(task.payload).productPreferences).searchEffort === "expanded" ? "expanded" : "standard",
     clientContext: { ...productRecommendationClientContextFromPlan(row.answers, [], []),
       excludeProductIds: Array.isArray(payloadRecord(payloadRecord(task.payload).productPreferences).excludedProductIds)
         ? payloadRecord(payloadRecord(task.payload).productPreferences).excludedProductIds as string[] : [] },
@@ -2360,6 +2371,7 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     if (!generation || !row || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(row.input_revision) !== generation.revision) {
       return { taskId: task.id, taskType: "superseded_generation" };
     }
+    if (task.taskType === "generate_product_recommendations" && payloadRecord(task.payload).catalogueRevision != null && Number(payloadRecord(task.payload).catalogueRevision) !== await getCatalogueRuntimeRevision(sql)) return { taskId: task.id, taskType: "superseded_generation" };
     if (task.taskType === "generate_product_recommendations" || task.taskType === "generate_food_gap_guidance") {
       const [preferences] = await sql`select revision from public.assessment_product_preferences where plan_id = ${task.planId}::uuid`;
       if (Number(payloadRecord(payloadRecord(task.payload).productPreferences).revision ?? 0) !== Number(preferences?.revision ?? 0)) {

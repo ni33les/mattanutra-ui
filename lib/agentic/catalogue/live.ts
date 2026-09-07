@@ -1,3 +1,4 @@
+import { getCatalogueRuntimeRevision } from "@/lib/catalogue-runtime-revision";
 import { administrationDailyPills, parseProductAdministration } from "@/lib/product-administration";
 import { assessRetailSellability } from "@/lib/retail-sellability";
 import { publicProductId } from "@/lib/agentic/contract/ids";
@@ -431,6 +432,7 @@ export async function loadLiveRetailSnapshot(
     };
   }
 
+  const runtimeRevision = await getCatalogueRuntimeRevision(sql);
   let supplements: CatalogueSnapshot["supplements"] = [];
 
   try {
@@ -562,6 +564,7 @@ export async function loadLiveRetailSnapshot(
     }
   }
 
+  if (await getCatalogueRuntimeRevision(sql) !== runtimeRevision) throw new Error("Catalogue changed during snapshot load; retry matching");
   console.info("[catalogue:snapshot]", {
     countryCode: code,
     ms: Date.now() - startedAt,
@@ -572,6 +575,7 @@ export async function loadLiveRetailSnapshot(
   return {
     availabilityAsOf: new Date().toISOString(),
     catalogueVersion: `retail-${code}-${byListing.size}`,
+    runtimeRevision,
     products: [...byListing.values()],
     supplements
   };
@@ -643,14 +647,15 @@ export async function cachedLiveRetailSnapshot(
   }
 
   const hit = liveCache().get(code);
+  const currentRevision = await getCatalogueRuntimeRevision();
 
-  if (hit && Date.now() - hit.at < LIVE_TTL_MS) {
+  if (hit && hit.snapshot.runtimeRevision === currentRevision && Date.now() - hit.at < LIVE_TTL_MS) {
     return hit.snapshot;
   }
 
   const inflight = startLiveLoad(code);
 
-  if (hit) {
+  if (hit && hit.snapshot.runtimeRevision === currentRevision) {
     return hit.snapshot;
   }
 
@@ -666,13 +671,14 @@ export async function warmLiveRetailSnapshot(
 
   const code = countryCode.trim().toUpperCase() || "TH";
   const hit = liveCache().get(code);
+  const currentRevision = await getCatalogueRuntimeRevision();
 
-  if (hit && Date.now() - hit.at < LIVE_TTL_MS && hit.snapshot.products.length > 0) {
+  if (hit && hit.snapshot.runtimeRevision === currentRevision && Date.now() - hit.at < LIVE_TTL_MS && hit.snapshot.products.length > 0) {
     return hit.snapshot;
   }
 
-  if (warmFailureIsCoolingDown()) {
-    return hit?.snapshot ?? loadingSnapshot(code);
+  if (warmFailureIsCoolingDown() && hit?.snapshot.runtimeRevision === currentRevision) {
+    return hit.snapshot;
   }
 
   try {

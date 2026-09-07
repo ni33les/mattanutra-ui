@@ -1317,13 +1317,14 @@ function RevealProductsFinalSection({
   const removedBasketIdList = removedBasketProducts.map(
     (product) => product.productId ?? product.id,
   );
-  async function replanProducts(clear = false) {
+  async function replanProducts(clear = false, expand = false) {
     setReplanning(true); setReplanError(null);
     try {
       const response = await fetch(`/api/assessment/${encodeURIComponent(planId)}/product-recommendations`, {
         method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
         body: JSON.stringify({ locale, stackPreference: selectedProductStackPreference ?? "balanced", assessmentRevision: result.assessmentRevision,
           selectionRevision: result.selectionRevision ?? 0,
+          ...(expand ? { searchEffort: "expanded" } : {}),
           excludeProductIds: clear ? [] : [...new Set([...(result.excludedProductIds ?? []), ...removedBasketIdList])] })
       });
       const body = await response.json();
@@ -1533,7 +1534,7 @@ function RevealProductsFinalSection({
               </div>;
             })}
             {matching.alternativeSearch?.status === "none_found" ? <p className="mt-3 text-sm">{matchingCopy.none}</p> : null}
-            {matching.alternativeSearch?.status === "incomplete" ? <div className="mt-3 text-sm"><p>{matchingCopy.incomplete}</p><button className="mt-2 underline" disabled={replanning} onClick={() => void replanProducts()}>{matchingCopy.retry}</button></div> : null}
+            {matching.alternativeSearch?.status === "incomplete" ? <div className="mt-3 text-sm"><p>{matchingCopy.incomplete}</p>{matching.searchSummary?.canExpand !== false ? <button className="mt-2 underline" disabled={replanning} onClick={() => void replanProducts(false, true)}>{matchingCopy.retry}</button> : <p className="mt-2">{matchingCopy.replan}</p>}</div> : null}
           </section>
         ) : null}
         {removedBasketIdList.length || result.excludedProductIds?.length ? <div className="mx-auto my-6 flex max-w-[880px] flex-wrap gap-4">

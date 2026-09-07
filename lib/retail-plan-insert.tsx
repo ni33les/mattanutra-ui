@@ -476,7 +476,7 @@ function splitProductRecommendationText(
   const explicit = sentence(recommendation?.description ?? "");
   const servingsFromDescription = dosingServingsFromText(explicit);
   const servings = servingsFromDescription ??
-    Math.max(1, Math.round(recommendation?.servingMultiplier ?? 1));
+    Math.max(0, recommendation?.servingMultiplier ?? 1);
   const take = servingDoseText(servings);
 
   if (!explicit) {

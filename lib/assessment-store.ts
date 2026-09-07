@@ -206,7 +206,8 @@ async function loadStoredRecommendationProductPayloads(
       notes,
       generated_at
     from product_recommendation_runs
-    where plan_id = ${planId}::uuid
+    where catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
+      and plan_id = ${planId}::uuid
       and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
       and selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = ${planId}::uuid), 0)
       and generation_locale = ${locale} and generator_version = ${FUNNEL_GENERATOR_VERSION}
@@ -2022,7 +2023,8 @@ export async function getStoredFormulationResult(
         notes,
         generated_at
       from product_recommendation_runs
-      where product_recommendation_runs.plan_id = assessments.plan_id
+      where product_recommendation_runs.catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
+        and product_recommendation_runs.plan_id = assessments.plan_id
         and product_recommendation_runs.assessment_revision = assessments.input_revision
         and product_recommendation_runs.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = assessments.plan_id), 0)
         and product_recommendation_runs.generation_locale = ${resultLocale} and product_recommendation_runs.generator_version = ${FUNNEL_GENERATOR_VERSION}

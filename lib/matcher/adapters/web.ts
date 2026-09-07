@@ -1,3 +1,4 @@
+import { administrationDailyPills } from "@/lib/product-administration";
 import { sha256Hex } from "@/lib/sha256";
 import { webHealthAdvice } from "@/lib/web-health-advice";
 import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
@@ -14,6 +15,7 @@ import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { match } from "@/lib/matcher";
 import type { CanonicalRequest, CatalogSnapshot, ProductGroup } from "@/lib/matcher/types";
 import { hasFewerConcerns } from "@/lib/matcher/selector";
+import { ratioForSupportedServings } from "@/lib/matcher/serving-grid";
 import { compareDoseFit } from "@/lib/matcher/dose-fit";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
@@ -98,13 +100,16 @@ function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
   }
 
   const price = candidate.unitPriceAmount ?? candidate.priceAmount ?? 0;
-  const labelledContributions = candidate.facts.map((fact) => ({
-    amount: fact.amount ?? 0,
+  const labelledContributions = candidate.facts.filter(fact => fact.amount != null).map((fact) => ({
+    ...{ mappingStatus: fact.mappingStatus, confidence: fact.confidence, source: fact.source, sourceUrl: fact.sourceUrl, sourceText: fact.sourceText },
+    amount: fact.amount!,
     name: fact.name,
     subjectId: labelledSubjectId(fact),
     unit: fact.unit
   }));
   const mapped: MatcherProduct = {
+    administration: candidate.administration ?? null,
+    pillCountKnown: administrationDailyPills(candidate.administration) != null || Boolean(candidate.matchingFacts?.pillCountKnown),
     availableCountryCodes: candidate.availableCountryCodes ?? null,
     contributionSubjectIds: [
       ...new Set(
@@ -114,9 +119,9 @@ function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
       )
     ],
     currency: candidate.currency,
-    dailyPillsPerServing: candidate.matchingFacts?.dailyPillsPerServing ?? 1,
+    dailyPillsPerServing: administrationDailyPills(candidate.administration) ?? candidate.matchingFacts?.dailyPillsPerServing ?? 0,
     dietarySource: candidate.matchingFacts?.dietarySource ?? "any",
-    form: candidate.matchingFacts?.form ?? "capsule",
+    form: candidate.administration?.physicalUnit ?? candidate.matchingFacts?.form ?? "unknown",
     imageUrl: candidate.imageUrl?.trim() || null,
     incompleteCommercialFacts: false,
     labelledContributions,
@@ -146,7 +151,7 @@ function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
           ? "unavailable"
           : "in_stock",
     title: candidate.title,
-    unknownSafetyAmount: false,
+    unknownSafetyAmount: candidate.facts.some(fact => fact.amount == null || fact.confidence !== "high" || fact.mappingStatus === "conflicting"),
     unitPriceMinor: Math.round(price * 100)
   };
 
@@ -257,12 +262,14 @@ function servingMultiplierFromBasket(
   productId: string,
   selected: ScoredBasket | null
 ) {
+  const declared = selected?.variantDoses?.find(dose => dose.productId === productId)?.dailyUnits;
+  if (declared != null) return declared;
   const variantId = selected?.variantIds.find((id) =>
     id.includes(`${productId}:x`) || id.startsWith(`${productId}:x`)
   );
-  const parsed = Number(variantId?.match(/:x(\d+)$/)?.[1]);
+  const parsed = Number(variantId?.split(":x").at(-1));
 
-  return parsed === 2 || parsed === 3 ? parsed : 1;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 function matcherProductOwnCoveragePercent(
@@ -312,7 +319,9 @@ function matcherProductOwnCoveragePercent(
         continue;
       }
 
-      delivered += scaled.units * BigInt(Math.max(1, servingMultiplier));
+      const ratio = ratioForSupportedServings(product, servingMultiplier);
+      if (!ratio) continue;
+      delivered += scaled.units * ratio.num / ratio.den;
     }
 
     weightedUnits += weight * coverageUnits(delivered, requested.units);
@@ -415,7 +424,9 @@ export function recommendWithMatcher(
     maxDailyPills: /^\d+(?:-\d+)?$/.test(input.clientContext?.pillLimit ?? "") ? Number(input.clientContext!.pillLimit!.split("-").at(-1)) : null,
     maxPriceMinor:
       input.budgetAmount != null ? Math.round(input.budgetAmount * 100) : null,
-    maxProductCount: input.maxProducts ?? 6,
+    maxProductCount: input.maxProducts ?? null,
+    productDoses: input.productDoses ?? [],
+    searchEffort: input.searchEffort ?? "standard",
     medicationCodes: [...(input.clientContext?.medicationTypes ?? [])],
     omega3SourcePreference: impliedOmegaPreference(
       dietary,
@@ -449,7 +460,7 @@ export function recommendWithMatcher(
   if (!compiled || compiled.requestKey !== requestKey) {
     const catalog = compiled?.catalog ?? {
       availabilityAsOf: new Date(0).toISOString(),
-      catalogueVersion: "web",
+      catalogueVersion: input.catalogueFingerprint ?? "web",
       products: input.candidates.map(toMatcherProduct)
     };
     compiled = {
@@ -587,6 +598,7 @@ export function recommendWithMatcher(
         evidence: "Medication or condition information is incomplete." }));
     }
     return {
+      roles: basket.roles, purchaseEligible: basket.productIds.length > 0,
       optionId: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
       productIds: [...basket.productIds], dailyServings: basket.productIds.map(id => servingMultiplierFromBasket(id, basket)),
       coveragePercent: marketingCoveragePercentFromNeedCoverage(needDiagnosticsFromBasket(supplementNeeds, basket)),
@@ -598,7 +610,7 @@ export function recommendWithMatcher(
   const recommendationResult: ProductRecommendationResult = {
     clientNeeds: input.needs,
     diagnostics: {
-      matching: { operationalStatus: recommendations.length ? "ready" : "no_purchase", selectedOptionId: options[0]?.optionId ?? null, options, alternativeSearch: result.alternativeSearch },
+      matching: { operationalStatus: recommendations.length ? "ready" : options.some(option => option.purchaseEligible) ? "review_options" : "no_purchase", selectedOptionId: options[0]?.optionId ?? null, options, alternativeSearch: result.alternativeSearch, searchSummary: result.searchSummary },
       algorithmVersion: MATCHER_VERSION,
       blockedProducts: [],
       coverage: {
@@ -675,7 +687,7 @@ export function mergeWebRetailerAlternatives(primary: ProductRecommendationResul
   const alternative = candidates[0]?.option;
   const incomplete = peers.some(peer => peer.diagnostics.matching?.alternativeSearch?.status === "incomplete");
   return { ...primary, diagnostics: { ...primary.diagnostics, matching: { ...matching,
-    options: [matching.options[0], ...(alternative ? [alternative] : [])].filter((option): option is typeof matching.options[number] => Boolean(option)),
+    options: [...matching.options, ...(alternative && !matching.options.some(option => option.optionId === alternative.optionId) ? [alternative] : [])],
     alternativeSearch: alternative ? { status: "found" as const, reason: "Fewer concerns without lower requested-target coverage across eligible retailers" }
       : incomplete ? { status: "incomplete" as const, reason: "Some retailer alternatives could not be fully evaluated" }
         : { status: "none_found" as const, reason: "No distinct option with fewer concerns met the same requirements across eligible retailers" }

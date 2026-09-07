@@ -5,7 +5,7 @@ import { getSql } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
 import type { HealthScoreResult } from "@/lib/health-score";
 
-export const FUNNEL_GENERATOR_VERSION = "web-funnel-v2-advisory";
+export const FUNNEL_GENERATOR_VERSION = "web-funnel-v3-flexible";
 export type GenerationInput = Readonly<{
   revision: number;
   inputHash: string;

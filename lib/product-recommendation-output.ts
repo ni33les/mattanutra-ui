@@ -67,7 +67,7 @@ export function toRecommendedProduct(
     productId: selection.product.id,
     rank: selection.rank,
     recommendationRunId,
-    servingMultiplier: selection.servingMultiplier > 1
+    servingMultiplier: selection.servingMultiplier > 0 && selection.servingMultiplier !== 1
       ? selection.servingMultiplier
       : undefined,
     stackContributionPercent: selection.stackContributionPercent,

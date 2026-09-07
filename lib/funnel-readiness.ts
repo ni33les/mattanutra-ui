@@ -34,7 +34,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
     left join lateral (
       select r.id, r.generated_at, r.status, r.stack_coverage_percent,
         (select count(*)::int from public.product_recommendation_items i where i.run_id = r.id) as product_count
-      from public.product_recommendation_runs r where r.plan_id = a.plan_id and r.assessment_revision = a.input_revision
+      from public.product_recommendation_runs r where r.catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true) and r.plan_id = a.plan_id and r.assessment_revision = a.input_revision
         and r.generation_locale = coalesce(${requestedLocale}, a.locale) and r.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and r.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0)
       order by r.generated_at desc limit 1

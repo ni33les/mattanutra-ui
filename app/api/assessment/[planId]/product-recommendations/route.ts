@@ -61,6 +61,9 @@ export async function POST(
   if (body.locale !== undefined && !isLocale(body.locale)) {
     return Response.json({ message: "locale must be en, th or zh-CN", reasonCode: "invalid_locale" }, { status: 400 });
   }
+  if (body.searchEffort !== undefined && body.searchEffort !== "standard" && body.searchEffort !== "expanded") {
+    return Response.json({ message: "searchEffort must be standard or expanded", reasonCode: "invalid_search_effort" }, { status: 400 });
+  }
   const stackPreference = normalizeProductStackPreference(
     body && typeof body === "object" && "stackPreference" in body
       ? (body as Record<string, unknown>).stackPreference
@@ -76,15 +79,16 @@ export async function POST(
       }
       const previous = await getAssessmentProductPreferences(tx, planId, true);
       let selectionRevision = previous.revision;
-      if (body.excludeProductIds !== undefined) {
-        const excluded = normalizedProductExclusions(body.excludeProductIds);
+      if (body.excludeProductIds !== undefined || body.searchEffort !== undefined) {
+        const excluded = body.excludeProductIds === undefined ? previous.excludedProductIds : normalizedProductExclusions(body.excludeProductIds);
+        const searchEffort = body.searchEffort === undefined ? previous.searchEffort : body.searchEffort;
         if (!Number.isSafeInteger(body.selectionRevision) || body.selectionRevision !== previous.revision) {
           throw new FunnelError("Product preferences changed. Reload before replanning.", 409, "stale_product_selection");
         }
-        if (JSON.stringify(excluded) !== JSON.stringify(previous.excludedProductIds)) {
+        if (JSON.stringify(excluded) !== JSON.stringify(previous.excludedProductIds) || searchEffort !== previous.searchEffort) {
           selectionRevision += 1;
           await tx`update public.assessment_product_preferences set revision = ${selectionRevision},
-            excluded_product_ids = ${excluded}::uuid[], updated_at = now() where plan_id = ${planId}::uuid`;
+            excluded_product_ids = ${excluded}::uuid[], search_effort = ${String(searchEffort)}, updated_at = now() where plan_id = ${planId}::uuid`;
         }
       }
       const generation = await loadGenerationInput(tx, planId, body.locale);
@@ -93,7 +97,7 @@ export async function POST(
         const taskId = await enqueueProductRecommendationsTask({ forceNew: true, planId, stackPreference });
         if (!taskId) throw new FunnelError("Unable to queue product matching", 409, "matching_unavailable");
         await enqueueFoodGapSupportTask({ dependsOnTaskId: taskId, parentTaskId: taskId, planId, source: "product_recommendations_request" });
-        return Response.json({ stackPreference, taskId, selectionRevision });
+        return Response.json({ stackPreference, taskId, selectionRevision, searchEffort: body.searchEffort ?? previous.searchEffort });
       });
     });
   } catch (error) {

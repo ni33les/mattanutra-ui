@@ -2,7 +2,7 @@ import type postgres from "postgres";
 import { FunnelError } from "@/lib/funnel-errors";
 
 type Db = postgres.Sql | postgres.TransactionSql;
-export type AssessmentProductPreferences = Readonly<{ revision: number; excludedProductIds: readonly string[] }>;
+export type AssessmentProductPreferences = Readonly<{ revision: number; excludedProductIds: readonly string[]; searchEffort: "standard" | "expanded" }>;
 
 export function normalizedProductExclusions(value: unknown): string[] {
   if (!Array.isArray(value) || value.length > 100 || value.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
@@ -14,9 +14,9 @@ export function normalizedProductExclusions(value: unknown): string[] {
 export async function getAssessmentProductPreferences(sql: Db, planId: string, lock = false): Promise<AssessmentProductPreferences> {
   if (lock) await sql`insert into public.assessment_product_preferences (plan_id) values (${planId}::uuid) on conflict do nothing`;
   const [row] = lock
-    ? await sql`select revision, excluded_product_ids from public.assessment_product_preferences where plan_id = ${planId}::uuid for update`
-    : await sql`select revision, excluded_product_ids from public.assessment_product_preferences where plan_id = ${planId}::uuid`;
-  return { revision: Number(row?.revision ?? 0), excludedProductIds: row?.excluded_product_ids ?? [] };
+    ? await sql`select revision, excluded_product_ids, search_effort from public.assessment_product_preferences where plan_id = ${planId}::uuid for update`
+    : await sql`select revision, excluded_product_ids, search_effort from public.assessment_product_preferences where plan_id = ${planId}::uuid`;
+  return { revision: Number(row?.revision ?? 0), excludedProductIds: row?.excluded_product_ids ?? [], searchEffort: row?.search_effort === "expanded" ? "expanded" : "standard" };
 }
 
 export function requireCurrentProductSelection(input: Readonly<{ expectedAssessmentRevision?: number | null; assessmentRevision: number; expectedSelectionRevision?: number | null; selectionRevision: number; runSelectionRevision: number; expectedRunId?: string | null; runId: string; optionId?: string | null; availableOptionIds: readonly string[]; selectedIds: readonly string[]; allowedIds: readonly string[]; excludedIds: readonly string[] }>) {

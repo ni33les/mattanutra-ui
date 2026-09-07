@@ -49,7 +49,6 @@ import {
   SAFETY_FLAG_HORMONE_CAUTION,
   SAFETY_FLAG_MEDICATION_INTERACTION,
   SAFETY_FLAG_PREGNANCY_CAUTION,
-  V2_ALGORITHM_VERSION,
   V2_BALANCED_MATERIAL_COVERAGE_DELTA_PERCENT,
   V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE,
   V2_COMPACT_CRITICAL_WEIGHT_FLOOR,
@@ -58,7 +57,6 @@ import {
   V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT,
   V2_EXCESSIVE_EXTRAS_PENALTY_WEIGHT,
   V2_EXTRA_SERVING_SIMPLICITY_PENALTY,
-  V2_FULL_BEAM_ALGORITHM_VERSION,
   V2_FULL_BEAM_WIDTH,
   V2_MATERIAL_COVERAGE_DELTA_PERCENT,
   V2_MAX_SERVING_MULTIPLIER,
@@ -2945,10 +2943,7 @@ function recommendProductStackExact(
 }
 
 export function recommendProductStackV2(input: ProductRecommendationInput) {
-  return recommendProductStackExact(input, {
-    algorithmVersion: V2_ALGORITHM_VERSION,
-    searchMode: "shortlist"
-  });
+  return recommendWithMatcher(input);
 }
 
 export function recommendProductStackFullBeam(input: ProductRecommendationInput) {

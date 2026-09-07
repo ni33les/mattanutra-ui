@@ -1,3 +1,5 @@
+import { getCatalogueRuntimeRevision } from "../lib/catalogue-runtime-revision.ts";
+import { recommendWithMatcher } from "../lib/matcher/adapters/web.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -33,7 +35,7 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     await withDatabaseTransaction(getSql()!, async tx => {
       await tx`set local session_replication_role = replica`;
       for (const table of ["task_events", "task_comments"]) await tx.unsafe(`delete from public.${table} where task_id in (select id from public.tasks where plan_id = any($1::uuid[]))`, [plans]);
-      for (const table of ["tasks", "formulations", "product_recommendation_runs", "assessment_product_preferences", "assessment_healthscore_results", "assessment_inputs", "assessment_versions", "assessment_version_counters", "assessments"]) {
+      for (const table of ["tasks", "formulations", "product_recommendation_runs", "assessment_product_preferences", "assessment_healthscore_results", "assessment_inputs", "recommendations", "assessment_versions", "assessment_version_counters", "assessments"]) {
         await tx.unsafe(`delete from public.${table} where plan_id = any($1::uuid[])`, [plans]);
       }
     });
@@ -63,7 +65,8 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
   it("reuses an active current product refresh when the request is retried", async () => {
     const planId = await seed();
     const { task } = await createTask({ planId, title: "Current product refresh", taskType: "generate_product_recommendations", payload: {
-      productPreferences: { revision: 0, excludedProductIds: [] }, stackPreference: "balanced",
+      catalogueRevision: await getCatalogueRuntimeRevision(getSql()!),
+      productPreferences: { revision: 0, excludedProductIds: [], searchEffort: "standard" }, stackPreference: "balanced",
       matcherAlgorithmVersion: ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION,
       matcherImplementationVersion: ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION
     } });
@@ -102,8 +105,8 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
       } });
       await sql`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result)
         values (${planId}::uuid, 1, ${locale}, ${FUNNEL_GENERATOR_VERSION}, ${sql.json(completeHealthScoreFixture(locale))})`;
-      await sql`insert into public.product_recommendation_runs (plan_id, assessment_revision, generation_locale, generator_version, selection_revision)
-        values (${planId}::uuid, 1, ${locale}, ${FUNNEL_GENERATOR_VERSION}, 0)`;
+      await sql`insert into public.product_recommendation_runs (catalogue_revision, plan_id, assessment_revision, generation_locale, generator_version, selection_revision)
+        values (${await getCatalogueRuntimeRevision(sql)}, ${planId}::uuid, 1, ${locale}, ${FUNNEL_GENERATOR_VERSION}, 0)`;
       assert.equal((await getFunnelReadiness(planId, locale))?.readyForReveal, true);
     }
     const excludeProductIds = [randomUUID()];
@@ -123,7 +126,7 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     for (const task of tasks) {
       assert.equal(generationInput(task.payload)?.locale, "th");
       assert.equal(generationInput(task.payload)?.revision, 1);
-      assert.deepEqual(task.payload.productPreferences, { revision: 1, excludedProductIds: excludeProductIds });
+      assert.deepEqual(task.payload.productPreferences, { revision: 1, excludedProductIds: excludeProductIds, searchEffort: "standard" });
     }
     assert.equal((await getFunnelReadiness(planId, "th"))?.readyForReveal, false);
     assert.equal((await getFunnelReadiness(planId, "en"))?.readyForReveal, false);
@@ -131,8 +134,8 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     const retry = await request("th", 1);
     assert.equal(retry.status, 200);
     assert.equal((await retry.json()).taskId, receipt.taskId);
-    await sql`insert into public.product_recommendation_runs (plan_id, assessment_revision, generation_locale, generator_version, selection_revision)
-      values (${planId}::uuid, 1, 'th', ${FUNNEL_GENERATOR_VERSION}, 1)`;
+    await sql`insert into public.product_recommendation_runs (catalogue_revision, plan_id, assessment_revision, generation_locale, generator_version, selection_revision)
+      values (${await getCatalogueRuntimeRevision(sql)}, ${planId}::uuid, 1, 'th', ${FUNNEL_GENERATOR_VERSION}, 1)`;
     assert.equal((await getFunnelReadiness(planId, "th"))?.readyForReveal, true);
     assert.equal((await getFunnelReadiness(planId, "en"))?.readyForReveal, false);
     const [stored] = await sql`select locale, input_revision, answers from public.assessments where plan_id = ${planId}::uuid`;
@@ -169,6 +172,30 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
       assert.equal((await getSql()!`select count(*)::int as n from public.product_recommendation_runs where plan_id = ${planId}::uuid`)[0].n, 0);
     }
   });
+
+  it("persists an actual current product run and rejects a catalogue edit before completion", async () => {
+    const planId = await seed();
+    const sql = getSql()!;
+    const catalogueRevision = await getCatalogueRuntimeRevision(sql);
+    const generation = (await loadGenerationInput(sql, planId))!;
+    await insertFormulationVersion(sql, { planId, generation, modelVersion: "v5-completion-fixture", formulation: { supplementBreakdown: [], sectionStatuses: { supplements: "ready" } } });
+    const { task } = await createTask({ planId, title: "Actual product completion", taskType: "generate_product_recommendations", payload: { catalogueRevision, productPreferences: { revision: 0, excludedProductIds: [], searchEffort: "standard" } } });
+    const empty = recommendWithMatcher({ needs: [], candidates: [] });
+    const recommendations = { ...empty, diagnostics: { ...empty.diagnostics, matching: { operationalStatus: "no_purchase" as const, selectedOptionId: null, options: [], alternativeSearch: undefined } } };
+    const resultPayload = { catalogueRevision, catalogueFingerprint: "fixture-v5", recommendations, recommendationVariants: [{ stackPreference: "balanced", maxProducts: null, recommendations }] };
+    await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({ task, taskId: task.id, sql: tx, afterCommit: () => {}, resultPayload }));
+    const runs = await sql`select selection_revision,generation_locale,generator_version,assessment_revision,catalogue_revision from public.product_recommendation_runs where plan_id=${planId}::uuid`;
+    assert.equal(runs.length, 1);
+    assert.equal(Number(runs[0].selection_revision), 0);
+    assert.equal(runs[0].generation_locale, "en");
+    assert.equal(runs[0].generator_version, FUNNEL_GENERATOR_VERSION);
+    assert.equal(Number(runs[0].assessment_revision), 1);
+    assert.equal(Number(runs[0].catalogue_revision), catalogueRevision);
+    await sql`update public.catalogue_runtime_revision set revision=revision+1 where singleton=true`;
+    assert.deepEqual(await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({ task, taskId: task.id, sql: tx, afterCommit: () => {}, resultPayload })), { superseded: true, message: "Catalogue changed; old product result was not applied" });
+    assert.equal((await sql`select count(*)::int as n from public.product_recommendation_runs where plan_id=${planId}::uuid`)[0].n, 1);
+  });
+
   it("keeps completed no-purchase results terminal and starts one current copy task for a legacy HealthScore", async () => {
     const planId = await seed(); const generation = (await loadGenerationInput(getSql()!, planId))!;
     await insertFormulationVersion(getSql()!, { planId, generation, modelVersion: "advisory-fixture", formulation: { supplementBreakdown: [], sectionStatuses: { supplements: "ready" } } });

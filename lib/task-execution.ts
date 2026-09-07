@@ -674,7 +674,8 @@ export async function executeTaskWorkItem(
             maxProducts: config.maxProducts,
             needs: workItem.needs,
             stackPreference: config.stackPreference,
-            targetProducts: config.targetProducts
+            searchEffort: workItem.searchEffort ?? "standard",
+            catalogueFingerprint: workItem.catalogueFingerprint
           })
         });
       });
@@ -692,7 +693,8 @@ export async function executeTaskWorkItem(
             maxProducts: config.maxProducts,
             needs: workItem.needs,
             stackPreference: config.stackPreference,
-            targetProducts: config.targetProducts
+            searchEffort: workItem.searchEffort ?? "standard",
+            catalogueFingerprint: workItem.catalogueFingerprint
           });
         })();
       const variantMatcherMs = Date.now() - variantStartedAt;
@@ -712,7 +714,8 @@ export async function executeTaskWorkItem(
               ...recommendations.diagnostics.trace,
               maxProducts: config.maxProducts,
               retailerCandidateSetCount: retailerCandidateSets.length,
-              targetProducts: config.targetProducts,
+              searchEffort: workItem.searchEffort ?? "standard",
+              catalogueFingerprint: workItem.catalogueFingerprint,
               timingMs: {
                 ...(recommendations.diagnostics.trace?.timingMs ?? {}),
                 candidateLoadMs: workItem.candidateLoadMs ?? 0,
@@ -742,6 +745,9 @@ export async function executeTaskWorkItem(
     });
 
     return {
+      catalogueRevision: workItem.catalogueRevision,
+      catalogueFingerprint: workItem.catalogueFingerprint,
+      searchEffort: workItem.searchEffort ?? "standard",
       discovery: {
         diagnostics: [],
         products: []

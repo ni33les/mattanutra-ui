@@ -26,7 +26,7 @@ export const PARETO_HYBRID_ALGORITHM_VERSION = "pareto-hybrid-1" as const;
 export const ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION =
   MATCHER_VERSION;
 export const ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION =
-  "advisory-stack-5";
+  "flexible-stack-6";
 
 export const V2_FULL_BEAM_WIDTH = 32;
 export const V2_SHORTLIST_LIMIT = 32;

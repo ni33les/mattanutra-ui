@@ -34,7 +34,7 @@ type TriggerRow = Readonly<{
 }>;
 
 const requiredTables = [
-  "catalogue_correction_audit",
+  "catalogue_runtime_revision", "catalogue_correction_audit",
   "assessment_product_preferences", "assessments", "formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs",
   "assessment_inputs", "assessment_healthscore_results", "assessment_resume_drafts", "funnel_requests", "healthscore_delivery_requests", "tasks",
   "admin_product_coverage_demand_profile_cache",
@@ -257,6 +257,9 @@ try {
     requireReadWritePrivilege(privilegeMap, tableName);
   }
 
+  for (const column of ["catalogue_revision", "catalogue_fingerprint", "search_effort"]) requireColumn(columnMap, "product_recommendation_runs", column);
+  requireColumn(columnMap, "catalogue_runtime_revision", "revision", { dataType: "bigint", notNull: true });
+  requireColumn(columnMap, "assessment_product_preferences", "search_effort", { dataType: "text", notNull: true });
   requireColumn(columnMap, "products", "administration", { dataType: "jsonb" });
   requireConstraint(constraintMap, "products", "products_administration_object_check", ["jsonb_typeof", "object"]);
   for (const name of ["correction_id", "manifest_sha256", "entity_table", "entity_id", "before_fingerprint", "after_fingerprint", "before_record", "after_record", "evidence", "applied_at"]) requireColumn(columnMap, "catalogue_correction_audit", name, { notNull: true });

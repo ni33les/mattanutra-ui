@@ -1,21 +1,18 @@
 import type { ProductStackPreference } from "@/lib/product-recommendation-types";
 
 export type ProductStackVariantConfig = Readonly<{
-  maxProducts: number;
+  maxProducts: number | null;
   stackPreference: ProductStackPreference;
-  targetProducts: number;
 }>;
 
 export const PRODUCT_STACK_VARIANT_CONFIGS: readonly ProductStackVariantConfig[] = [
   {
-    maxProducts: 3,
-    stackPreference: "compact",
-    targetProducts: 3
+    maxProducts: null,
+    stackPreference: "compact"
   },
   {
-    maxProducts: 6,
-    stackPreference: "balanced",
-    targetProducts: 3
+    maxProducts: null,
+    stackPreference: "balanced"
   }
 ];
 

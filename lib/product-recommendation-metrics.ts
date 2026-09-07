@@ -326,7 +326,7 @@ export function whyProductMatches(
   void product;
 
   const names = coveredNeeds.slice(0, 3).map((need) => need.displayName);
-  const servingPrefix = servingMultiplier > 1
+  const servingPrefix = servingMultiplier > 0 && servingMultiplier !== 1
     ? `Use ${servingMultiplier} servings; `
     : "";
   const prefix = `${servingPrefix}Strong match`;

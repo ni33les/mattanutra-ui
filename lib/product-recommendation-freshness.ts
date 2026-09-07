@@ -264,7 +264,8 @@ export async function loadProductRecommendationFreshnessSnapshot(
     left join lateral (
       select id, status, generated_at
       from public.product_recommendation_runs
-      where plan_id = ${input.planId}::uuid
+      where catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
+        and plan_id = ${input.planId}::uuid
         and selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0)
         and assessment_revision = (select input_revision from public.assessments where plan_id = ${input.planId}::uuid)
         and generation_locale = coalesce(${generationLocale(input.planId)}, (select locale from public.assessments where plan_id = ${input.planId}::uuid))

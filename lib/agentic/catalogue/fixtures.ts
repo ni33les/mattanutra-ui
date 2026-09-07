@@ -141,7 +141,7 @@ function product(input: Readonly<{
 
   return {
     audience: input.audience ?? "adult",
-    candidate: candidate({
+    candidate: { ...candidate({
       amount: input.amount,
       comparableAmount: input.comparableAmount,
       id: uuid,
@@ -153,7 +153,11 @@ function product(input: Readonly<{
       unit: input.unit,
       audience: input.audience === "child" ? "both" : "both",
       availabilityStatus: input.stockStatus === "unavailable" ? "out_of_stock" : "in_stock"
-    }),
+    }), administration: {
+      route: "oral", physicalUnit: input.form === "powder" ? "scoop" : input.form === "softgel" ? "softgel" : input.form === "tablet" ? "tablet" : "capsule",
+      unitsPerServing: input.dailyPills > 0 ? input.dailyPills : 1, doseIncrement: 1, packQuantity: null,
+      provenance: { status: "verified", sourceUrl: `https://catalogue.local/${uuid}`, sourceText: `Synthetic fixture declares ${input.dailyPills || 1} ${input.form} per serving.`, verifiedAt: "2026-09-07T00:00:00.000Z" }
+    } },
     contributionSupplementIds: [supplementId],
     dailyPills: input.dailyPills,
     dietarySource: input.dietarySource,
