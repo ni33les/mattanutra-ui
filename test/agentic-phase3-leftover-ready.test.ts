@@ -4,6 +4,9 @@ import { evaluateSafety, planStatus, safetyQuestions } from "../lib/agentic/plan
 import { aug25PlanState } from "../lib/agentic/plan/mode-d.ts";
 import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
 import type { CoverageRow, StackOption } from "../lib/agentic/plan/types.ts";
+import { coverageFor } from "../lib/agentic/plan/matching.ts";
+import { marketingCoveragePercentFromNeedCoverage } from "../lib/marketing-coverage.ts";
+import { buildCompactDecision } from "../lib/agentic/value/compact-decision.ts";
 
 function vitaminCOption(): StackOption {
   const c = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Vitamin C");
@@ -62,9 +65,9 @@ function vitaminCOption(): StackOption {
   };
 }
 
-describe("Phase 3 unknown leftover blocks ready", () => {
-  it("keeps vitamin C plus an unknown target as needs_input until the leftover is accepted", () => {
-    const selected = vitaminCOption();
+describe("Phase 3 unknown leftover remains advisory", () => {
+  it("keeps vitamin C purchasable while an unknown requested target remains visible without acceptance", () => {
+    const vitaminC = vitaminCOption();
     const c = FIXTURE_SUPPLEMENTS.find((item) => item.name === "Vitamin C");
     assert.ok(c);
     const state = aug25PlanState({
@@ -75,6 +78,8 @@ describe("Phase 3 unknown leftover blocks ready", () => {
           note: "not_in_catalogue",
           reason: "not_in_catalogue",
           severity: "high",
+          source: "target",
+          requestIndex: 1,
           unit: "mg"
         }
       ],
@@ -87,6 +92,8 @@ describe("Phase 3 unknown leftover blocks ready", () => {
         }
       ]
     });
+    const coverage = [...vitaminC.coverage, ...coverageFor(state, null).filter(row => row.unresolved)];
+    const selected = { ...vitaminC, coverage, coveragePercent: marketingCoveragePercentFromNeedCoverage(coverage) };
     const guidance = evaluateSafety({ locale: "en", selected, state });
     const questions = safetyQuestions({
       guidance,
@@ -103,8 +110,20 @@ describe("Phase 3 unknown leftover blocks ready", () => {
       state,
       unmetRequirements: []
     });
-    assert.equal(status, "needs_input");
-    assert.ok(questions.some((item) => item.questionId.includes("Unobtainium")));
+    assert.equal(status, "ready");
+    assert.deepEqual(questions, []);
+    assert.deepEqual(state.acceptedGaps, []);
+    assert.equal(selected.coveragePercent, 50);
+    const missing = selected.coverage.find(row => row.name === "Unobtainium");
+    assert.ok(missing);
+    assert.equal(missing.status, "uncovered");
+    assert.equal(missing.remainingGap, 100);
+    assert.equal(missing.intakeCertainty, "unknown");
+    assert.equal(missing.totalExposureComplete, false);
+    const compact = buildCompactDecision({ status, selected, requestSnapshot: state, safetyGuidance: guidance });
+    assert.equal(compact.operationalDecision.purchaseEligible, true);
+    assert.match(compact.why, /1 of 2/);
+    assert.ok(compact.what.some(line => line.includes("Unobtainium")));
 
     const accepted = {
       ...state,

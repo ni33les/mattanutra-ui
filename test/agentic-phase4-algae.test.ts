@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import {
   AGENTIC_SERVER_INSTRUCTIONS,
@@ -10,6 +9,7 @@ import { matchPlan, toCanonicalRequest } from "../lib/agentic/plan/matching.ts";
 import { normalizePlanRequest } from "../lib/agentic/plan/normalize.ts";
 import { aug25PlanState } from "../lib/agentic/plan/mode-d.ts";
 import type { AgenticConfig } from "../lib/agentic/config.ts";
+import { CLIENT_GUIDE_URI, readContractResource } from "../lib/agentic/contract/guide.ts";
 import { impliedOmegaPreference, targetImpliesAlgaeOmega } from "../lib/matcher/canonicalizer.ts";
 import { match } from "../lib/matcher/index.ts";
 import { QA_GOLD_CATALOG, qaRequest, qaTarget } from "../lib/matcher/qa/index.ts";
@@ -38,12 +38,14 @@ function testConfig(): AgenticConfig {
 }
 
 describe("Phase 4 algae source is intrinsic to the target name", () => {
-  it("keeps algae_only as its own flag and deletes the Omega-3 rewrite copy", async () => {
-    const planCopy = await readFile("lib/agentic/contract/guide.ts", "utf8");
-    assert.match(planCopy, /algae-named omega-3 target implies algae_only/);
+  it("keeps algae_only as its own flag and deletes the Omega-3 rewrite copy", () => {
+    const resource = readContractResource(CLIENT_GUIDE_URI);
+    assert.ok(resource);
+    const planCopy = resource.contents[0].text;
+    assert.match(planCopy, /algae-named omega-3(?: target)? implies algae_only/i);
     assert.doesNotMatch(planCopy, /Algae omega-3 matches Omega-3/);
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /algae-named omega-3 target implies algae_only/);
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /fish DHA\/EPA is wrong_source/);
+    assert.match(planCopy, /plant-based source requirements do not need a redundant question/i);
+    assert.ok(AGENTIC_SERVER_INSTRUCTIONS.includes(CLIENT_GUIDE_URI));
     assert.match(
       AGENTIC_TOOL_DESCRIPTIONS.plan,
       /Preserve constraints/
