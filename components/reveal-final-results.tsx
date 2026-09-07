@@ -1,7 +1,7 @@
 "use client";
 
 import { webMatchingCopy } from "@/lib/web-health-advice";
-import { WebHealthAdviceText, WebMatchingPillCount } from "@/components/web-health-advice";
+import { WebHealthAdviceText, WebMatchingPillCount, WebPreferenceAdvice } from "@/components/web-health-advice";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1512,23 +1512,29 @@ function RevealProductsFinalSection({
           </div>
         </div>
 
+        {selectedMatchingOption?.preferences?.some(row => row.status !== "not_requested") ? (
+          <div className="mx-auto my-6 max-w-[880px] rounded-xl border border-[var(--mn-line)] p-5" data-testid="selected-matching-preferences">
+            <WebPreferenceAdvice preferences={selectedMatchingOption.preferences} locale={locale} />
+          </div>
+        ) : null}
         {selectedMatchingOption?.advice.length ? (
           <aside className="mx-auto my-6 max-w-[880px] rounded-xl border border-[var(--mn-line)] p-5" aria-label={matchingCopy.advice}>
             <h3 className="font-semibold">{matchingCopy.advice}</h3>
             {selectedMatchingOption.advice.map((advice, index) => <WebHealthAdviceText key={`${advice.code}:${index}`} advice={advice} locale={locale} />)}
           </aside>
         ) : null}
-        {matching && matching.alternativeSearch?.status !== "not_needed" ? (
+        {matching && (matching.options.some(option => option.optionId !== matching.selectedOptionId) || matching.alternativeSearch?.status !== "not_needed") ? (
           <section className="mx-auto my-6 max-w-[880px]" aria-label={matchingCopy.alternatives}>
             <h3 className="font-semibold">{matchingCopy.alternatives}</h3>
             {matching.options.filter(option => option.optionId !== matching.selectedOptionId).map(option => {
               const params = new URLSearchParams({ plan: planId, selected: option.productIds.join(","), option: option.optionId,
                 run: activeProductRecommendations?.runId ?? "", revision: String(result.assessmentRevision ?? ""), selectionRevision: String(result.selectionRevision ?? 0) });
               const subtotal = option.recommendations.reduce((sum, item) => sum + (item.unitPriceAmount ?? item.product.priceAmount ?? 0), 0);
-              return <div className="mt-4 rounded-xl border border-[var(--mn-line)] p-5" key={option.optionId}>
+              return <div className="mt-4 rounded-xl border border-[var(--mn-line)] p-5" key={option.optionId} data-testid="matching-option" data-option-id={option.optionId}>
                 <p>{option.recommendations.map(item => item.product.title).join(", ")}</p>
                 <p className="mt-2 text-sm">{matchingCopy.coverage}: {option.coveragePercent}% · <WebMatchingPillCount count={option.dailyPills} locale={locale} /></p>
                 <p className="mt-2 text-sm">{matchingCopy.subtotal}: {new Intl.NumberFormat(localeHtmlLang(locale), { style: "currency", currency: option.recommendations[0]?.product.currency ?? "THB" }).format(subtotal)}</p>
+                <WebPreferenceAdvice preferences={option.preferences} locale={locale} />
                 {option.advice.map((advice, index) => <WebHealthAdviceText key={`${advice.code}:${index}`} advice={advice} locale={locale} />)}
                 {!awaitingReplan && option.productIds.length ? <Link className="mt-3 inline-block underline" href={`/${locale}/basket/checkout?${params}`}>{matchingCopy.choose}</Link> : null}
               </div>;

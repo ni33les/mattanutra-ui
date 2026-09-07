@@ -115,6 +115,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 
 export type ProductRecommendationAlgorithmVersion =
   | "flexible-dose-fit-3"
+  | "flexible-dose-fit-4"
   | "advisory-dose-fit-2"
   | "pareto-hybrid-1"
   | "v2-exact-shortlist"
@@ -127,6 +128,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
     operationalStatus: "ready" | "review_options" | "no_purchase";
     selectedOptionId: string | null;
     options: readonly Readonly<{
+      preferences?: readonly import("@/lib/matcher/preferences").PreferenceAssessment[];
       roles?: readonly import("@/lib/matcher/types").ConversationalOptionRole[];
       purchaseEligible?: boolean;
       optionId: string;
@@ -141,6 +143,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
     }>[];
     alternativeSearch: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
     searchSummary?: import("@/lib/matcher/types").MatchResult["searchSummary"];
+    matchingDiagnostics?: import("@/lib/matcher/diagnostics").MatchingDiagnostics;
   }>;
   algorithmVersion?: ProductRecommendationAlgorithmVersion;
   blockedProducts: ProductRecommendationExclusion[];

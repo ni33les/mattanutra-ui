@@ -31,8 +31,15 @@ describe("v5 complete conversational plan mutations and immutable purchase", () 
     const recommended = plan.options.find(option => option.recommended)!;
     assert.ok(recommended); assert.equal(recommended.basket.length, 0);
     assert.ok(recommended.roles?.includes("closest_dose"));
-    assert.equal(plan.reasonCode, "closest_dose"); assert.equal(recommended.reasonCode, plan.reasonCode);
-    assert.equal(plan.reasonKey, "plan.option.closest_dose"); assert.equal(recommended.reason, plan.reason);
+    assert.equal(plan.reasonCode, "targets_already_covered");
+    const durationCopy = { en: /current stock.*(?:unknown|cannot|duration|timing)/i,
+      th: /ไม่ได้ระบุวันที่เหลือ.*ไม่ทราบ/, "zh-CN": /未给出剩余天数.*未知/ }[locale]!;
+    assert.match(plan.summary, durationCopy);
+    assert.match(plan.compactDecision!.why, durationCopy);
+    assert.equal(plan.reasonKey, "plan.matching.targets_already_covered");
+    assert.equal(plan.matchingDiagnostics?.reasonCode, "targets_already_covered");
+    assert.equal(recommended.reasonCode, "closest_dose");
+    assert.equal(recommended.reasonKey, "plan.option.closest_dose");
   });
   for (const locale of ["en", "th", "zh-CN"]) it(`makes the empty default and selectable purchase trade-off clear in every concise view (${locale})`, async () => {
     const runtime = runtimeFor(), snapshot = sampleValueSnapshot(), target = snapshot.supplements.find(row => /vitamin d/i.test(row.name))!;
@@ -41,7 +48,9 @@ describe("v5 complete conversational plan mutations and immutable purchase", () 
     const plan = await call(runtime, "plan", { operation: "create", idempotencyKey: `v5-review-options-${locale}-01`, request: { ...request, locale, targets: [{ name: target.name, amount: 500, unit: "IU" }] } });
     assert.equal(plan.ok, true, JSON.stringify(plan)); assert.equal(plan.status, "no_purchase");
     assert.equal(plan.operationalDecision.nextAction, "review_options");
-    assert.equal(plan.summaryKey, "plan.summary.review_options");
+    assert.equal(plan.summaryKey, "plan.matching.empty_closest_fit");
+    assert.equal(plan.matchingDiagnostics?.reasonCode, "empty_closest_fit");
+    assert.ok(plan.matchingDiagnostics!.evaluatedNonemptyBaskets > 0);
     assert.equal(plan.compactDecision.when, plan.compactDecision.nextAction);
     assert.equal(plan.compactDecision.why, plan.summary);
     const purchase = plan.options.find(option => option.purchaseEligible && option.basket.length > 0);

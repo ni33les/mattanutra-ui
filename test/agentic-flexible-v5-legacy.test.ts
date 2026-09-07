@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, test } from "node:test";
 import { createAgenticRuntime } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
+import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import type { AgenticStore } from "../lib/agentic/store/types.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { replaceCatalogueSnapshot } from "../lib/agentic/catalogue/snapshot.ts";
 import { publicSupplementId } from "../lib/agentic/contract/ids.ts";
@@ -20,7 +24,25 @@ const products = supplements.map((nutrient, index) => sampleRetailProduct({ id: 
 const request: PlanRequest = { locale: "en", destinationCountry: "TH", optimization: "balanced", profile: {}, requirements: {}, medicationCodes: ["apixaban"],
   intake: [{ source: "diet", certainty: "unknown", description: "Varied diet; exact quantities are unknown." }], currentSupplements: [],
   targets: supplements.map(nutrient => ({ name: nutrient.name, amount: 100, unit: "mg" })) };
-const runtimeFor = () => createAgenticRuntime({ store: createMemoryStore(), scope: { environment: "dev", tenantScope: "mattanutra", principalScope: "legacy-v5" } });
+const fixtureBytes = readFileSync(new URL("./fixtures/anna-v6/legacy-v5-six-product.json", import.meta.url));
+assert.equal(createHash("sha256").update(fixtureBytes).digest("hex"), "46de316fa5cdce9b0e5d055af6c81af9875f59025da8b4c43e889f0625a56424");
+type StoredMutation = { method: keyof AgenticStore; arguments: unknown[] };
+const legacyFixture = JSON.parse(fixtureBytes.toString()) as {
+  sourceCommit: string; contractVersion: string; now: string; capabilitySecret: string;
+  request: PlanRequest; created: PlanSuccessWire; checkout: ExecuteSuccessWire;
+  creationMutations: StoredMutation[]; checkoutMutations: StoredMutation[];
+};
+assert.equal(legacyFixture.sourceCommit, "a659a2292493ccf6f2ef1a2ce0e5e2b346b1ba85");
+assert.deepEqual(legacyFixture.request, request);
+const runtimeFor = () => createAgenticRuntime({ store: createMemoryStore(), now: legacyFixture.now,
+  config: { ...loadAgenticConfig(), capabilitySecret: legacyFixture.capabilitySecret },
+  scope: { environment: "dev", tenantScope: "mattanutra", principalScope: "legacy-v5" } });
+async function restore(store: AgenticStore, mutations: StoredMutation[]) {
+  for (const mutation of mutations) {
+    assert.match(mutation.method, /^(insert|update)/, "Only captured fixture persistence can be replayed");
+    await (store[mutation.method] as (...args: unknown[]) => Promise<unknown>)(...structuredClone(mutation.arguments));
+  }
+}
 type Replies = { plan: PlanSuccessWire; execute: ExecuteSuccessWire; order: OrderSuccessWire };
 async function call<T extends keyof Replies>(runtime: ReturnType<typeof runtimeFor>, name: T, args: unknown): Promise<Replies[T] | PublicErrorWire> {
   const response = await handleJsonRpc(runtime, { id: 1, method: "tools/call", params: { name, arguments: args } });
@@ -32,7 +54,10 @@ afterEach(uninstallGoldCatalogue);
 
 async function legacyPlan(explicit: boolean, retainOriginal = true) {
   const runtime = runtimeFor();
-  const created = await call(runtime, "plan", { operation: "create", idempotencyKey: "legacy-create-0001", request: { ...request, requirements: { maxProductCount: 6 } } });
+  // Genuine persisted v5 computation: the current matcher cannot recreate a
+  // historical hard cap without corrupting the behavior this test protects.
+  await restore(runtime.store, legacyFixture.creationMutations);
+  const created = structuredClone(legacyFixture.created);
   assert.equal(created.ok, true); if (!created.ok) throw new Error(created.error.message);
   assert.equal(created.basket?.length, 6);
   const [planId] = await runtime.store.listPlanIdsByPrincipal("legacy-v5");
@@ -73,12 +98,14 @@ test("LEGACY5-01 omitted v4 count refreshes to eight while preserving original m
   assert.equal(next.requestSnapshot.requirements.maxProductCount ?? null, null);
 });
 
-test("LEGACY5-02 explicit v4 six remains binding during refresh and unrelated patches", async () => {
+test("LEGACY5-02 explicit v4 six remains an advisory preference during refresh and unrelated patches", async () => {
   const { runtime, created, planId } = await legacyPlan(true);
   const refreshed = await call(runtime, "plan", { operation: "revise", planHandle: created.planHandle, expectedRevision: created.revision,
     idempotencyKey: "legacy-explicit-0001", requestPatch: { locale: "th" } });
   assert.equal(refreshed.ok, true); if (!refreshed.ok) throw new Error(refreshed.error.message);
-  assert.equal(refreshed.basket?.length, 6);
+  assert.equal(refreshed.basket?.length, 8);
+  const preference = refreshed.preferenceAssessment?.find(item => item.kind === "product_count");
+  assert.equal(preference?.preferred, 6); assert.equal(preference?.actual, 8); assert.equal(preference?.prominent, true);
   const saved = (await runtime.store.getPlanRevision(planId, refreshed.revision))!.result as PlanResult;
   assert.equal(saved.requestSnapshot.requirements.maxProductCount, 6);
   assert.equal(saved.originalRequest?.requirements?.maxProductCount, 6);
@@ -95,30 +122,41 @@ test("LEGACY5-03 full replacement omission explicitly clears the earlier six-pro
   assert.equal(saved.requestSnapshot.requirements.maxProductCount ?? null, null);
 });
 
-test("LEGACY5-04 absent count provenance requests an explicit replacement without silently reusing six", async () => {
+test("LEGACY5-04 missing numeric provenance does not block refreshing the saved targets", async () => {
   const { runtime, created, planId, historical } = await legacyPlan(false, false);
-  const ambiguous = await call(runtime, "plan", { operation: "revise", planHandle: created.planHandle, expectedRevision: created.revision,
+  const refreshed = await call(runtime, "plan", { operation: "revise", planHandle: created.planHandle, expectedRevision: created.revision,
     idempotencyKey: "legacy-ambiguous-01", requestPatch: {} });
-  assert.equal(ambiguous.ok, false); if (ambiguous.ok) throw new Error("Missing provenance must remain actionable");
-  assert.equal(ambiguous.error.reasonCode, "contract_refresh_required", JSON.stringify(ambiguous));
-  assert.equal(ambiguous.error.fieldPath, "request.requirements.maxProductCount");
-  assert.match(ambiguous.error.message, /replacement request/i);
+  assert.equal(refreshed.ok, true); if (!refreshed.ok) throw new Error(refreshed.error.message);
+  assert.equal(refreshed.basket?.length, 8);
+  const saved = (await runtime.store.getPlanRevision(planId, refreshed.revision))!.result as PlanResult;
+  assert.equal(saved.requestSnapshot.requirements.maxProductCount, null, "An unidentified historical default is not invented as a customer preference");
+  assert.deepEqual(saved.originalRequest?.medicationCodes, request.medicationCodes);
+  assert.deepEqual(saved.originalRequest?.intake, request.intake);
+  assert.deepEqual(saved.originalRequest?.targets.map(item => [item.name, item.amount, item.unit]), request.targets.map(item => [item.name, item.amount, item.unit]));
   assert.deepEqual(await runtime.store.getPlanRevision(planId, created.revision), historical);
+});
+
+test("LEGACY5-06 unknown legacy target provenance still requires the actual requested targets", async () => {
+  const { runtime, created, planId, historical } = await legacyPlan(false, false);
+  const result = historical.result as PlanResult;
+  const requestSnapshot = { ...result.requestSnapshot, leftovers: [{ name: "Unidentified old input", amount: 5, unit: "mg" as const, reason: "unknown_input" }] };
+  await runtime.store.updatePlanRevision({ ...historical, requestSnapshot, result: { ...result, requestSnapshot } });
+  const response = await call(runtime, "plan", { operation: "revise", planHandle: created.planHandle, expectedRevision: created.revision,
+    idempotencyKey: "legacy-target-origin", requestPatch: {} });
+  assert.equal(response.ok, false); if (response.ok) throw new Error("Cannot invent legacy targets");
+  assert.equal(response.error.fieldPath, "request.targets");
   assert.equal((await runtime.store.getPlan(planId))?.currentRevision, created.revision);
-  const recovered = await call(runtime, "plan", { operation: "revise", planHandle: created.planHandle, expectedRevision: created.revision,
-    idempotencyKey: "legacy-resolved-01", request: { ...request, requirements: { maxProductCount: null } } });
-  assert.equal(recovered.ok, true); if (!recovered.ok) throw new Error(recovered.error.message);
-  assert.equal(recovered.basket?.length, 8);
 });
 
 for (const paid of [false, true]) test(`LEGACY5-05 frozen ${paid ? "paid" : "unpaid"} checkout survives v4 marking and catalogue replacement`, async () => {
   const { runtime, created, planId } = await legacyPlan(true);
-  // Freeze an already accepted historical basket before publishing a new catalogue.
+  // Restore the checkout actually frozen by the historical v5 implementation.
   const saved = (await runtime.store.getPlanRevision(planId, created.revision))!;
-  await runtime.store.updatePlanRevision({ ...saved, result: { ...(saved.result as PlanResult), contractVersion: "5.0.0" } });
+  await restore(runtime.store, legacyFixture.checkoutMutations);
   const payload = { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: "legacy-frozen-exec1" };
   const checkout = await call(runtime, "execute", payload); assert.equal(checkout.ok, true); if (!checkout.ok) throw new Error(checkout.error.message);
-  if (paid) await simulatePayment({ config: runtime.config, scope: runtime.scope, store: runtime.store, now: new Date().toISOString(), orderHandle: checkout.orderHandle, scenario: "success" });
+  assert.deepEqual(checkout, legacyFixture.checkout);
+  if (paid) await simulatePayment({ config: runtime.config, scope: runtime.scope, store: runtime.store, now: legacyFixture.now, orderHandle: checkout.orderHandle, scenario: "success" });
   const before = await call(runtime, "order", { orderHandle: checkout.orderHandle }); assert.equal(before.ok, true); if (!before.ok) throw new Error(before.error.message);
   await runtime.store.updatePlanRevision(saved);
   replaceCatalogueSnapshot({ availabilityAsOf: "2026-09-08T00:00:00Z", catalogueVersion: "replaced-empty", products: [], supplements });

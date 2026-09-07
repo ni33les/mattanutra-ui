@@ -75,3 +75,19 @@ test("SURFACE5-04 eight-product customer PDF creates continuation pages", async 
     assert.ok(text.includes(`Take ${index + 1} labelled servings daily.`), `Complete dose instructions for ${name} are present`);
   }
 });
+
+test("SURFACE6-01 preference disclosure uses shared locale copy and emphasizes only prominent deviations", async () => {
+  const { assessPreferences, preferenceMessage } = await import("../lib/matcher/preferences.ts");
+  const preferences = assessPreferences({ maxProductCount: 2, maxDailyPills: 1, maxPriceMinor: 100 }, { productCount: 3, dailyPills: null, firstOrderGoodsPriceMinor: 120, currency: "THB" });
+  for (const locale of ["en", "th", "zh-CN"] as const) {
+    const html = renderToStaticMarkup(React.createElement(adviceComponents.WebPreferenceAdvice, { preferences, locale }));
+    for (const row of preferences) {
+      const display = row.kind === "first_order_goods_price" ? { ...row, actual: 1.2, preferred: 1, unit: "THB" } : row;
+      assert.ok(html.includes(preferenceMessage(display, locale)), `${row.kind} is visible in ${locale}`);
+    }
+    assert.doesNotMatch(html, /THB_minor/);
+    assert.equal((html.match(/data-prominent="true"/g) ?? []).length, 1);
+    assert.equal((html.match(/data-preference=/g) ?? []).length, 3);
+    assert.doesNotMatch(html, /Reference limit unavailable|medical approval/);
+  }
+});

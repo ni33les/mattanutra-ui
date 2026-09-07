@@ -277,16 +277,18 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
     assert.deepEqual(reasonsFor("G-INCIDENTAL-C", result), ["incidental_only"]);
   });
 
-  it("records budget when the SKU alone exceeds maxPriceMinor", () => {
+  it("keeps the exact SKU above the advisory maxPriceMinor", () => {
     const result = match(
       request({ maxPriceMinor: 1000, targets: [d3] }),
       catalog([G_D3_2000])
     );
-    assert.deepEqual(reasonsFor("G-D3-2000", result), ["budget"]);
-    assert.deepEqual(result.selected?.productIds, []);
+    assert.deepEqual(reasonsFor("G-D3-2000", result), []);
+    assert.deepEqual(result.selected?.productIds, ["G-D3-2000"]);
+    assert.equal(result.selected?.priceMinor, G_D3_2000.unitPriceMinor);
+    assert.equal(result.selected?.doseFit?.total, 0);
   });
 
-  it("records max_pills when one serving exceeds maxDailyPills", () => {
+  it("keeps a supported serving above the advisory maxDailyPills", () => {
     const heavy = sku({
       id: "G-HEAVY-D3",
       pills: 8,
@@ -297,7 +299,11 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
       request({ maxDailyPills: 2, targets: [d3] }),
       catalog([heavy])
     );
-    assert.deepEqual(reasonsFor("G-HEAVY-D3", result), ["max_pills"]);
+    assert.deepEqual(reasonsFor("G-HEAVY-D3", result), []);
+    assert.deepEqual(result.selected?.productIds, ["G-HEAVY-D3"]);
+    assert.equal(result.selected?.dailyPills, 8);
+    assert.equal(result.selected?.priceMinor, 16000);
+    assert.equal(result.selected?.doseFit?.total, 0);
   });
 
   it("bounds the public sample and keeps the full dump off the MCP payload", () => {

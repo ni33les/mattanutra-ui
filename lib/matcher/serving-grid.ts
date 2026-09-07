@@ -44,22 +44,16 @@ export function validateProductDoseProposals(request: CanonicalRequest, catalog:
       issues.push({ field: `${field}.servingsPerDay`, reason: 'Quantity must be positive and use a supported whole physical unit or measurable increment.', permittedIncrement: Number(step.num) / Number(step.den) });
     }
   }
-  if (request.maxProductCount != null && seen.size > request.maxProductCount) issues.push({ field: 'requirements.productDoses', reason: `Proposed products exceed maxProductCount ${request.maxProductCount}.` });
   if (!issues.length && seen.size) {
     const sellers = new Set(catalog.products.map(row => row.sellerId));
     const feasible = [...sellers].some(sellerId => {
-      let price = 0, pills = 0;
       for (const dose of request.productDoses ?? []) {
         const p = catalog.products.find(row => row.sellerId === sellerId && row.productId === dose.productId && !productRejectionReason(row, request) && ratioForSupportedServings(row, dose.servingsPerDay));
         if (!p) return false;
-        price += p.unitPriceMinor;
-        const a = p.administration;
-        const verifiedPills = a?.provenance.status === 'verified' && /^(capsule|tablet|softgel|gummy)$/.test(a.physicalUnit) ? (a.unitsPerServing ?? 0) : p.dailyPillsPerServing;
-        pills += verifiedPills * dose.servingsPerDay;
       }
-      return (request.maxPriceMinor == null || price <= request.maxPriceMinor) && (request.maxDailyPills == null || pills <= request.maxDailyPills);
+      return true;
     });
-    if (!feasible) issues.push({ field: 'requirements.productDoses', reason: 'No single eligible seller can supply these quantities within the explicit pill and price ceilings.' });
+    if (!feasible) issues.push({ field: 'requirements.productDoses', reason: 'No single eligible seller can supply these products at the proposed supported quantities.' });
   }
   return issues;
 }

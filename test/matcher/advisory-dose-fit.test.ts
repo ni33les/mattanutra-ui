@@ -139,7 +139,7 @@ describe("advisory dose fit", () => {
     const partialDiet = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 40, unit: "mg", sourceId: "food" }]);
     assert.ok(!("error" in partialDiet)); if ("error" in partialDiet) return;
     assert.equal(productHitsCoverageFloor(product("small", 20), { ...r, dietaryIntake: partialDiet }, r.targets[0]!), true);
-    assert.equal(productHitsCoverageFloor(product("small", 20), request({ dietaryIntake: partialDiet, maxDailyPills: 3 }), request().targets[0]!), false);
+    assert.equal(productHitsCoverageFloor(product("small", 20), request({ dietaryIntake: partialDiet, maxDailyPills: 3 }), request().targets[0]!), true);
     const limits = doseFitScore({ ...r, safetyCeilings: [
       { subjectId: "a", name: "A", maxAmount: 80, maxUnit: "mg", sourceScope: "supplemental" },
       { subjectId: "a", name: "A", maxAmount: 120, maxUnit: "mg", sourceScope: "total" }
@@ -347,7 +347,7 @@ describe("advisory dose fit", () => {
     }
   });
 
-  it("prices one purchased pack at two or three daily servings within the goods budget", () => {
+  it("prices one purchased pack at two or three daily servings even above a budget preference", () => {
     const single = product("one_pack", 100, 0, 48_500);
     for (const dailyServings of [2, 3]) {
       const targets = canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 100 * dailyServings, unit: "mg" }] }).targets;
@@ -358,9 +358,10 @@ describe("advisory dose fit", () => {
       assert.equal(result.selected?.priceMinor, 48_500);
       assert.equal(result.rejected.some(row => row.reason === "budget"), false);
       const belowPrice = run({ ...input, maxPriceMinor: 48_499 }, [single]);
-      assert.deepEqual(belowPrice.selected?.productIds, []);
-      assert.equal(belowPrice.selected?.priceMinor, 0);
-      assert.ok(belowPrice.rejected.some(row => row.productId === "one_pack" && row.reason === "budget"));
+      assert.deepEqual(belowPrice.selected?.variantIds, [`seller:one_pack:x${dailyServings}`]);
+      assert.equal(belowPrice.selected?.priceMinor, 48_500);
+      assert.equal(belowPrice.selected?.doseFit?.total, 0);
+      assert.equal(belowPrice.rejected.some(row => row.reason === "budget"), false);
     }
   });
 
@@ -389,9 +390,11 @@ describe("advisory dose fit", () => {
     assert.equal(result.selected?.priceMinor, 58_500);
     assert.equal(result.selected?.doseFit?.total, 0);
     const constrained = run({ ...input, maxPriceMinor: 58_499 }, products);
-    assert.ok(constrained.selected!.priceMinor <= 58_499);
-    assert.equal(constrained.selected?.productCount, 1);
-    assert.ok(constrained.lossCertificates?.some(row => row.conflicting_rule_id === "budget"));
+    assert.deepEqual(constrained.selected?.variantIds.slice().sort(), ["seller:a_pack:x2", "seller:b_pack:x3"]);
+    assert.equal(constrained.selected?.priceMinor, 58_500);
+    assert.equal(constrained.selected?.productCount, 2);
+    assert.equal(constrained.selected?.doseFit?.total, 0);
+    assert.equal(constrained.lossCertificates?.some(row => row.conflicting_rule_id === "budget"), false);
     const concerned = run(request({ maxPriceMinor: 48_500,
       targets: canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 300, unit: "mg" }] }).targets,
       safetyCeilings: [{ subjectId: "a", name: "A", maxAmount: 250, maxUnit: "mg" }] }), [products[0]!]);
@@ -405,9 +408,8 @@ describe("advisory dose fit", () => {
     // This oracle deliberately does not call matcher scoring, candidate filtering,
     // search, dominance or comparison helpers. Doses and denominators are integers.
     const options = [];
-    for (let i = 0; i <= 3; i++) for (let j = 0; j <= 3; j++) for (let k = 0; k <= 3; k++) {
+    for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) for (let k = 0; k <= 4; k++) {
       const units = [i, j, k], pills = i + j + k;
-      if (pills > 3) continue;
       const a = 70 * i + 30 * j + 100 * k, b = 20 * i + 60 * j + 100 * k;
       const penalty = Math.abs(a - 100) + Math.abs(b - 100) + 2 * (Math.max(a - 100, 0) + Math.max(b - 100, 0));
       const price = (i > 0 ? 7 : 0) + (j > 0 ? 11 : 0) + (k > 0 ? 55 : 0), coverage = Math.min(a, 100) + Math.min(b, 100);
@@ -479,15 +481,18 @@ describe("advisory dose fit", () => {
     assert.equal(result.selected?.sellerId, "seller");
   });
 
-  it("preserves hard constraints and only lists contributing frontier products", () => {
+  it("preserves country eligibility while numeric preferences retain the exact affordable dose fit", () => {
     const targets = canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 100, unit: "mg" }, { subjectId: "b", name: "B", amount: 100, unit: "mg" }] }).targets;
     const r = request({ targets, maxPriceMinor: 20, maxDailyPills: 1, maxProductCount: 1 });
     const result = run(r, [product("a", 100), product("b", 0, 100), product("foreign", 100, 100, 1, { availableCountryCodes: ["US"] }), product("cost", 100, 100, 21), product("heavy", 100, 100, 10, { dailyPillsPerServing: 2 })]);
-    assert.equal(result.selected?.productCount, 1); assert.equal(result.selected?.dailyPills, 1);
-    assert.ok((result.selected?.priceMinor ?? Infinity) <= 20);
-    assert.deepEqual(result.targetFrontiers?.find((row) => row.subjectId === "a")?.productIds, ["a"]);
-    assert.deepEqual(result.targetFrontiers?.find((row) => row.subjectId === "b")?.productIds, ["b"]);
-    assert.ok(result.leftovers.some((row) => row.reason === "uncovered"));
+    assert.deepEqual(result.selected?.productIds, ["heavy"]);
+    assert.equal(result.selected?.productCount, 1); assert.equal(result.selected?.dailyPills, 2);
+    assert.equal(result.selected?.priceMinor, 10);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 2);
+    assert.ok(result.targetFrontiers?.find(row => row.subjectId === "a")?.productIds.every(id => ["a", "cost", "heavy"].includes(id)));
+    assert.ok(result.targetFrontiers?.find(row => row.subjectId === "b")?.productIds.every(id => ["b", "cost", "heavy"].includes(id)));
+    assert.deepEqual(result.leftovers, []);
     assert.ok(result.rejected.some((row) => row.productId === "foreign" && row.reason === "foreign_retailer"));
   });
 

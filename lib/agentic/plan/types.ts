@@ -364,6 +364,8 @@ export type BasketItem = Readonly<{
 }>;
 
 export type CoverageRow = Readonly<{
+  referenceConfidence?: "high" | "moderate" | "low";
+  basisRationale?: string | null;
   excess?: number;
   withinAgreedRange?: boolean;
   basis?: "total_daily" | "supplemental";
@@ -406,6 +408,8 @@ export type CoverageRow = Readonly<{
 }>;
 
 export type SafetyGuidance = Readonly<{
+  referenceConfidence?: "high" | "moderate" | "low";
+  basisRationale?: string | null;
   comparator?: "gt" | "gte" | "lt" | "lte" | "eq" | null;
   authorityUrl?: string | null;
   evidence?: readonly string[];
@@ -687,6 +691,7 @@ export type PlanBreadth = Readonly<{
 }>;
 
 export type PlanResult = Readonly<{
+  matchingDiagnostics?: import("@/lib/matcher/diagnostics").MatchingDiagnostics;
   searchSummary?: import("@/lib/matcher/types").MatchResult["searchSummary"];
   alternativeSearch?: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
   contractVersion?: string;

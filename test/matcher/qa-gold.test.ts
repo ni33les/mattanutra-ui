@@ -86,11 +86,12 @@ describe("QA-GOLD-v1 catalogue", () => {
   it("M-06 maxProductCount=1 does not invent omega coverage", () => {
     const result = match(qaRequest({ maxProductCount: 1 }), QA_GOLD_CATALOG);
     assert.equal(ids(result).includes("G-HIGH-TRAP"), false);
-    assert.ok(result.selected == null || result.selected.productCount <= 1);
-    assert.ok(
-      result.leftovers.some((item) => item.reason === "uncovered" || item.reason === "dose_gap") ||
-        publicCoveragePercent(result.selected) < 100
-    );
+    const unrestricted = match(qaRequest({ maxProductCount: null }), QA_GOLD_CATALOG);
+    assert.deepEqual(result.selected?.variantIds, unrestricted.selected?.variantIds);
+    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.equal(result.selected?.coveredCount, 5);
+    assert.equal(publicCoveragePercent(result.selected), 100);
+    assert.ok(result.selected!.productCount > 1);
   });
 
   it("M-07 budget below the cheapest complete stack never selects the trap", () => {

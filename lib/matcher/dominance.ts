@@ -84,7 +84,10 @@ export function dominatesAtLayer(
     return false;
   }
 
-  if (left.pills > right.pills) {
+  // Unlike a tie-break, dominance needs comparable measured quantities.
+  if ((left.pillCountKnown === false) !== (right.pillCountKnown === false)) return false;
+  const pillDifference = left.pillCountKnown === false ? 0 : left.pills - right.pills;
+  if (pillDifference > 0) {
     return false;
   }
 
@@ -153,7 +156,7 @@ export function dominatesAtLayer(
     }
   }
 
-  if (left.price < right.price || left.pills < right.pills || left.count < right.count) {
+  if (left.price < right.price || pillDifference < 0 || left.count < right.count) {
     strict = true;
   }
 

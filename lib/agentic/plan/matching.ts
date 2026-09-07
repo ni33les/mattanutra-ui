@@ -285,12 +285,15 @@ export function coverageFor(
     const currentAmount = evaluatedCoverage?.knownCurrent ?? (knownSupplementalAmount + (basis === "total_daily" ? knownDietAmount : 0));
     const limitProfile = knownLimitProfile(state);
     const ceilings = limitProfile ? matcherSafetyCeilings() : [];
-    const ceiling = safetyCeilingFor(ceilings, {
+    const referenceSubject = {
       conditionCodes: state.conditionCodes,
       name: target.name,
       profile: limitProfile,
       subjectId: target.supplementId
-    });
+    };
+    const preferredScope = basis === "total_daily" ? "total" : "supplemental";
+    const ceiling = safetyCeilingFor(ceilings, { ...referenceSubject, sourceScope: preferredScope }) ??
+      safetyCeilingFor(ceilings, { ...referenceSubject, sourceScope: preferredScope === "total" ? "supplemental" : "total" });
     const limit = upperLimitAmount(target.name, target.unit, {
       ceilings,
       sourceScope: ceiling?.sourceScope,
@@ -374,6 +377,8 @@ export function coverageFor(
     return {
       basis,
       authorityUrl: ceiling?.authorityUrl ?? null,
+      ...(ceiling?.referenceConfidence ? { referenceConfidence: ceiling.referenceConfidence } : {}),
+      ...(ceiling?.basisRationale ? { basisRationale: ceiling.basisRationale } : {}),
       contributors: publishedContributors,
       coveragePercent: evaluatedCoverage?.coveragePercent ?? displayCoveragePercent(exposurePercent),
       intakeCertainty,
@@ -1124,6 +1129,7 @@ export function matchPlan(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
 }>): {
+  matchingDiagnostics?: import("@/lib/matcher/diagnostics").MatchingDiagnostics;
   searchSummary?: import("@/lib/matcher/types").MatchResult["searchSummary"];
   alternativeSearch?: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
   alternatives: StackOption[];
@@ -1233,6 +1239,7 @@ function computeMatchPlan(input: Readonly<{
     alternatives,
     alternativeSearch: result.alternativeSearch,
     searchSummary: result.searchSummary,
+    matchingDiagnostics: result.matchingDiagnostics,
     leftovers,
     ...(result.lossCertificates ? { lossCertificates: result.lossCertificates } : {}),
     rejected: [...result.rejected],
@@ -1253,14 +1260,6 @@ export function unmetRequirementsFor(input: Readonly<{
   const selected = input.option;
 
   if (!selected) {
-    if (input.state.requirements.maxPriceMinor != null) {
-      unmet.push("maxPriceMinor");
-    }
-
-    if (input.state.requirements.maxDailyPills != null) {
-      unmet.push("maxDailyPills");
-    }
-
     return unmet;
   }
 
@@ -1268,37 +1267,19 @@ export function unmetRequirementsFor(input: Readonly<{
   const selectedIds = new Set(selected.basket.map((item) => item.productId));
 
   for (const productId of retainProducts) {
-    if (!selectedIds.has(productId)) {
+    if (!selectedIds.has(productId) && !input.state.currentSupplements.some(item => item.productId === productId)) {
       unmet.push(`retainProductIds:${productId}`);
     }
   }
 
   for (const supplementId of input.state.requirements.retainSupplementIds ?? []) {
     const row = selected.coverage.find((item) => item.supplementId === supplementId);
-    const accepted = input.state.acceptedGaps.some(
-      (gap) => gap.supplementId === supplementId
-    );
-
-    if (
-      !accepted &&
-      (!row || (row.status !== "covered" && row.status !== "over_target"))
-    ) {
+    // Retaining a nutrient preserves its presence. The requested amount stays
+    // advisory, so a partial contribution is not a missing retention requirement.
+    const continued = input.state.currentSupplements.some(item => item.supplementId === supplementId && item.dailyAmount > 0);
+    if (!continued && (!row || row.deliveredAmount <= 0)) {
       unmet.push(`retainSupplementIds:${supplementId}`);
     }
-  }
-
-  if (
-    input.state.requirements.maxPriceMinor != null &&
-    selected.totalPriceMinor > input.state.requirements.maxPriceMinor
-  ) {
-    unmet.push("maxPriceMinor");
-  }
-
-  if (
-    input.state.requirements.maxDailyPills != null &&
-    selected.dailyPills > input.state.requirements.maxDailyPills
-  ) {
-    unmet.push("maxDailyPills");
   }
 
   return unmet;

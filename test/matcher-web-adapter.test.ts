@@ -812,7 +812,7 @@ describe("matcher web adapter coverage mapping", () => {
     assert.deepEqual(result.diagnostics.blockedProducts, []);
   });
 
-  it("uses a different compact search than balanced", () => {
+  it("keeps closest dose fit in compact and balanced despite different product-count preferences", () => {
     const folate = dosedNeed({
       amount: 400,
       displayName: "Folate",
@@ -925,9 +925,10 @@ describe("matcher web adapter coverage mapping", () => {
     const compactIds = compact.recommendations.map((row) => row.product.id).sort();
     const balancedIds = balanced.recommendations.map((row) => row.product.id).sort();
 
-    assert.ok(compact.recommendations.length <= 3);
-    assert.ok(balanced.recommendations.length > compact.recommendations.length);
-    assert.notDeepEqual(compactIds, balancedIds);
+    assert.deepEqual(compactIds, ["coq10", "creatine-powder", "multi", "omega"]);
+    assert.deepEqual(balancedIds, compactIds);
+    assert.equal(compact.stackCoveragePercent, 100);
+    assert.equal(balanced.stackCoveragePercent, 100);
   });
 
   it("keeps food needs out of marketing coverage", () => {

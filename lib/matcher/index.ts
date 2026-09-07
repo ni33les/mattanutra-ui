@@ -1,3 +1,4 @@
+import { matchingDiagnosticsFor } from "@/lib/matcher/diagnostics";
 import { ProductDoseValidationError, validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { compileGroups, groupsBySeller, isDeferredConditional } from "@/lib/matcher/candidates";
 import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
@@ -12,7 +13,7 @@ import type { CanonicalRequest, CatalogSnapshot, LossCertificate, MatchResult, M
 /** Evidence about a concrete attempted addition/replacement; never a claim that
  * a health concern makes a product unavailable, or that a bounded winner is optimal. */
 function lossCertificatesFor(request: CanonicalRequest, catalog: CatalogSnapshot, groups: readonly ProductGroup[], selected: ScoredBasket | null, trimmed: boolean): LossCertificate[] {
-  if (!selected) return [];
+  if (!selected || !trimmed) return [];
   const certificates: LossCertificate[] = [];
   for (const target of request.targets) {
     if (isDeferredConditional(target)) continue;
@@ -24,17 +25,11 @@ function lossCertificatesFor(request: CanonicalRequest, catalog: CatalogSnapshot
       for (const variant of group.variants) {
         const addition = (variant.contributions.get(target.subjectId)?.units ?? BigInt(0)) - (existing?.contributions.get(target.subjectId)?.units ?? BigInt(0));
         if (addition <= BigInt(0)) continue;
-        const pills = selected.dailyPills - (existing?.dailyPills ?? 0) + variant.dailyPills;
-        const price = selected.priceMinor + (existing ? 0 : group.product.unitPriceMinor);
-        const count = selected.productCount + (existing ? 0 : 1);
-        const rule = request.maxDailyPills != null && pills > request.maxDailyPills ? "max_pills" :
-          request.maxPriceMinor != null && price > request.maxPriceMinor ? "budget" : request.maxProductCount != null && count > request.maxProductCount ? "max_products" : null;
-        if (!rule && !trimmed) continue;
         const amount = (units: bigint) => amountFromScaled({ ...target.requested, units }, target.requestedUnit, target.name);
         certificates.push({ candidate_fact_id: null, candidate_product_id: group.productId, catalogue_id: catalog.catalogueVersion,
-          conflicting_product_ids: selected.productIds.filter((id) => id !== group.productId), conflicting_rule_id: rule ?? "deterministic_search_budget",
-          exposure_before: amount(before), exposure_after: amount(before + addition), limit: rule === "max_pills" ? request.maxDailyPills : rule === "budget" ? request.maxPriceMinor : rule === "max_products" ? request.maxProductCount : null,
-          rejection_class: rule ? "hard_constraint" : "approximate", target_supplement_id: target.subjectId, unit: target.requestedUnit });
+          conflicting_product_ids: selected.productIds.filter((id) => id !== group.productId), conflicting_rule_id: "deterministic_search_budget",
+          exposure_before: amount(before), exposure_after: amount(before + addition), limit: null,
+          rejection_class: "approximate", target_supplement_id: target.subjectId, unit: target.requestedUnit });
         break;
       }
     }
@@ -67,24 +62,9 @@ function leftoversFor(
     const percent = Math.round(coverage / 100);
 
     if (!selected || percent <= 0) {
-      const constraint =
-        selected &&
-        request.maxProductCount != null &&
-        selected.productCount >= request.maxProductCount
-          ? "hard_constraint:maxProductCount"
-          : selected &&
-              request.maxDailyPills != null &&
-              selected.dailyPills >= request.maxDailyPills
-            ? "hard_constraint:maxDailyPills"
-            : selected &&
-                request.maxPriceMinor != null &&
-                selected.priceMinor >= request.maxPriceMinor
-              ? "hard_constraint:maxPriceMinor"
-              : undefined;
       push({
         amount: summary?.remainingGap ?? target.requestedAmount,
         name: target.name,
-        ...(constraint ? { note: constraint } : {}),
         reason: "uncovered",
         severity: "high",
         subjectId: target.subjectId,
@@ -163,9 +143,12 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
     : !hasConcerns ? { status: "not_needed", reason: "The selected option raises no assessed concerns." }
     : trimmed ? { status: "incomplete", reason: "No qualifying alternative was found within the deterministic search budget; absence is not proven." }
     : { status: "none_found", reason: "No distinct option with fewer concerns and no lower per-target coverage exists among the eligible product and dose combinations." };
-  return { ...winner, alternativeSearch, searchSummary: { effort, expansionAttempts, expansionBudget, complete: !trimmed && searchStatus.mode === "exact", canExpand: effort === "standard" && (trimmed || searchStatus.mode === "bounded") }, leftovers: leftoversFor(request, winner.selected),
+  const searchSummary = { effort, expansionAttempts, expansionBudget, complete: !trimmed && searchStatus.mode === "exact", canExpand: effort === "standard" && (trimmed || searchStatus.mode === "bounded") };
+  const rejected = rejectedCandidatesFor(request, catalog, groups);
+  const matchingDiagnostics = matchingDiagnosticsFor({ request, catalog, groups, baskets: scored, selected: winner.selected, searchSummary, rejected });
+  return { ...winner, alternativeSearch, searchSummary, matchingDiagnostics, leftovers: leftoversFor(request, winner.selected),
     lossCertificates: lossCertificatesFor(request, catalog, exploredGroups, winner.selected, trimmed),
-    rejected: rejectedCandidatesFor(request, catalog, groups), searchMode: searchStatus.mode, targetFrontiers, trimmed };
+    rejected, searchMode: searchStatus.mode, targetFrontiers, trimmed };
 }
 
 export { DEFAULT_MATCHER_CONFIG, MATCHER_VERSION } from "@/lib/matcher/config";

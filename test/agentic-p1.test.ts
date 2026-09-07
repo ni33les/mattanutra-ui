@@ -548,7 +548,7 @@ describe("agentic P1 pack fixes", () => {
     assert.equal((result.error as { reasonCode: string }).reasonCode, "unexpected_property");
   });
 
-  it("keeps the budget hard and recovers through an explicit budget revision", async () => {
+  it("keeps budget preferences advisory and preserves them through explicit revisions", async () => {
     const runtime = runtimeFor();
     const request = {
       destinationCountry: "TH", locale: "en", optimization: "balanced",
@@ -562,15 +562,20 @@ describe("agentic P1 pack fixes", () => {
       request
     });
     assert.equal(result.ok, true);
-    assert.equal(result.status, "no_purchase");
+    assert.equal(result.status, "ready");
     assert.deepEqual(result.questions ?? [], []);
-    assert.ok(!Array.isArray(result.basket) || result.basket.reduce((sum, item) => sum + Number(item.lineTotalMinor), 0) <= 1000);
+    assert.ok(Array.isArray(result.basket) && result.basket.length === 1);
+    assert.equal(result.basket.reduce((sum, item) => sum + Number(item.lineTotalMinor), 0), 39000);
+    const preference = (result.preferenceAssessment as Array<Record<string, unknown>>).find(row => row.kind === "first_order_goods_price");
+    assert.equal(preference?.preferred, 1000); assert.equal(preference?.actual, 39000); assert.equal(preference?.prominent, true);
 
     const unrelated = await call(runtime, "plan", {
       operation: "revise", expectedRevision: result.revision, planHandle: result.planHandle,
       idempotencyKey: "p1-over-budget-locale-01", requestPatch: { locale: "th" }
     });
-    assert.equal(unrelated.status, "no_purchase");
+    assert.equal(unrelated.status, "ready");
+    const purchased = (items: unknown) => (items as Array<Record<string, unknown>>).map(item => ({ productId: item.productId, servingsPerDay: item.servingsPerDay, lineTotalMinor: item.lineTotalMinor }));
+    assert.deepEqual(purchased(unrelated.basket), purchased(result.basket));
     const [planId] = await runtime.store.listPlanIdsByPrincipal("tester");
     assert.ok(planId);
     const stored = await runtime.store.getPlanRevision(planId, Number(unrelated.revision));
@@ -589,7 +594,7 @@ describe("agentic P1 pack fixes", () => {
     });
     assert.equal(relaxed.status, "ready");
     assert.ok(Array.isArray(relaxed.basket) && relaxed.basket.length === 1);
-    assert.ok(relaxed.basket.reduce((sum, item) => sum + Number(item.lineTotalMinor), 0) <= 100000);
+    assert.deepEqual(purchased(relaxed.basket), purchased(result.basket));
     const cleared = await call(runtime, "plan", {
       operation: "revise", expectedRevision: relaxed.revision, planHandle: result.planHandle,
       idempotencyKey: "p1-over-budget-clear-01", requestPatch: { requirements: { maxPriceMinor: null } }

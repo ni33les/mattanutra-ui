@@ -402,7 +402,6 @@ function compileProductGroupFresh(
   const variants: DoseVariant[] = [];
   for (const ratio of supportedDoseDomain(product, request)) {
     const dailyUnits = Number(ratio.num) / Number(ratio.den);
-    if (request.maxDailyPills != null && variantPillBurden(product, dailyUnits) > request.maxDailyPills) continue;
     const variant = compileVariant({ dailyUnits, dailyUnitsRatio: ratio, product, request });
     if (variant) variants.push(variant);
   }

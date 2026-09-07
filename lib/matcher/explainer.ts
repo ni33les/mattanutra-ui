@@ -58,24 +58,6 @@ function seedUnusableReason(
     return "incidental_only";
   }
 
-  if (request.maxProductCount != null && request.maxProductCount < 1) {
-    return "max_products";
-  }
-
-  if (
-    request.maxDailyPills != null &&
-    variant.dailyPills > request.maxDailyPills
-  ) {
-    return "max_pills";
-  }
-
-  if (
-    request.maxPriceMinor != null &&
-    group.product.unitPriceMinor > request.maxPriceMinor
-  ) {
-    return "budget";
-  }
-
   return "incidental_only";
 
 }
@@ -116,23 +98,6 @@ export function rejectedCandidatesFor(
       rejected.push(asRejected(product, "incidental_only"));
       continue;
     }
-
-    if (
-      request.maxDailyPills != null &&
-      variant.dailyPills > request.maxDailyPills
-    ) {
-      rejected.push(asRejected(product, "max_pills"));
-      continue;
-    }
-
-    if (
-      request.maxPriceMinor != null &&
-      product.unitPriceMinor > request.maxPriceMinor
-    ) {
-      rejected.push(asRejected(product, "budget"));
-      continue;
-    }
-
 
   }
 

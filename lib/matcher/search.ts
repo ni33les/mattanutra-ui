@@ -1,5 +1,6 @@
 import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
+import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
@@ -42,6 +43,7 @@ export function seedState(request: CanonicalRequest): SearchState {
     exposure,
     nextGroupIndex: 0,
     pills: 0,
+    pillCountKnown: true,
     price: 0,
     selectedVariantIds: [],
     selectedProductIds: []
@@ -54,12 +56,10 @@ export function tryAddVariant(
   group: ProductGroup,
   request: CanonicalRequest
 ): SearchState | null {
-
   const helpsPurchasableTarget = request.targets.some((target) => {
     if (isDeferredConditional(target)) {
       return false;
     }
-
 
     return variant.contributions.has(target.subjectId) || (variant.unknownSafetyAmount &&
       (group.product.contributionSubjectIds.includes(target.subjectId) || variant.unknownSubjectIds?.includes(target.subjectId)));
@@ -71,29 +71,13 @@ export function tryAddVariant(
     return null;
   }
 
-
   if (state.selectedVariantIds.some((id) => group.variants.some((row) => row.variantId === id))) return null;
   const count = state.count + 1;
-  const remainingRetainedCount = request.retainProductIds.filter((id) => id !== group.productId &&
-    !state.selectedProductIds?.includes(id) && !request.currentSupplements.some((row) => row.productId === id)).length;
-
-  if (request.maxProductCount != null && count + remainingRetainedCount > request.maxProductCount) {
-    return null;
-  }
-
   const pills = state.pills + variant.dailyPills;
-
-  if (request.maxDailyPills != null && pills > request.maxDailyPills) {
-    return null;
-  }
 
   // Checkout acquires one pack per selected product. Daily servings affect
   // depletion and replenishment, not the number of packs in this order.
   const price = state.price + group.product.unitPriceMinor;
-
-  if (request.maxPriceMinor != null && price > request.maxPriceMinor) {
-    return null;
-  }
 
   const delivered = cloneMap(state.delivered);
   const exposure = cloneMap(state.exposure);
@@ -123,6 +107,7 @@ export function tryAddVariant(
     exposure,
     nextGroupIndex: state.nextGroupIndex + 1,
     pills,
+    pillCountKnown: state.pillCountKnown !== false && group.product.pillCountKnown !== false,
     price,
     selectedVariantIds: [...state.selectedVariantIds, variant.variantId],
     selectedProductIds: [...(state.selectedProductIds ?? []), group.productId],
@@ -142,7 +127,7 @@ function compareStates(a: SearchState, b: SearchState, request: CanonicalRequest
   // The requested commercial tie-break is applied to the completed candidates.
   const coverage = aggregateCoverage(request, b.delivered) - aggregateCoverage(request, a.delivered);
   if (coverage !== 0) return coverage;
-  return a.price - b.price || a.pills - b.pills || a.count - b.count || fingerprintState(a).localeCompare(fingerprintState(b));
+  return a.price - b.price || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || a.count - b.count || fingerprintState(a).localeCompare(fingerprintState(b));
 }
 
 /** Count actual attempted additions, including infeasible additions and repair.
@@ -394,8 +379,8 @@ function reviewFrontier(states: readonly SearchState[], request: CanonicalReques
   const nonempty = states.filter(row => row.count > 0);
   for (const compare of [
     (a: SearchState, b: SearchState) => a.price - b.price || compareStates(a, b, request),
-    (a: SearchState, b: SearchState) => a.count - b.count || a.pills - b.pills || compareStates(a, b, request),
-    (a: SearchState, b: SearchState) => a.pills - b.pills || compareStates(a, b, request)
+    (a: SearchState, b: SearchState) => a.count - b.count || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || compareStates(a, b, request),
+    (a: SearchState, b: SearchState) => comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || compareStates(a, b, request)
   ]) for (const state of [...nonempty].sort(compare).slice(0, 24)) chosen.add(state);
   const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
   if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {

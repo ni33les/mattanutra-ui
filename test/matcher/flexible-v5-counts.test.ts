@@ -11,11 +11,11 @@ it('V5-COUNT-01: unrestricted baskets preserve all eight required products witho
   assert.equal(result.selected?.coveredCount, 8);
   assert.equal(result.selected?.doseFit?.total, 0);
 });
-it('V5-COUNT-02: one and two products stay valid, and an explicit zero or one ceiling is enforced', () => {
+it('V5-COUNT-02: one and two products stay valid despite an explicit zero or one preference', () => {
   const products = [product('a', { a: 100 }), product('b', { b: 100 })];
   const targets = canonicalizeTargets({ targets: [{ subjectId: 'a', name: 'A', amount: 100, unit: 'mg' }, { subjectId: 'b', name: 'B', amount: 100, unit: 'mg' }] }).targets;
   assert.equal(match(request(), catalog(products)).selected?.productCount, 1);
   assert.equal(match(request({ targets }), catalog(products)).selected?.productCount, 2);
-  assert.equal(match(request({ targets, maxProductCount: 1 }), catalog(products)).selected?.productCount, 1);
-  assert.equal(match(request({ targets, maxProductCount: 0 }), catalog(products)).selected?.productCount, 0);
+  assert.equal(match(request({ targets, maxProductCount: 1 }), catalog(products)).selected?.productCount, 2);
+  assert.equal(match(request({ targets, maxProductCount: 0 }), catalog(products)).selected?.productCount, 2);
 });

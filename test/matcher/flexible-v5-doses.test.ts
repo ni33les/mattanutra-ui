@@ -34,13 +34,15 @@ it('V5-DOSE-04: explicit quantities are mandatory while other products remain op
   assert.deepEqual(result.selected?.variantIds.slice().sort(), ['seller:half:x1', 'seller:quarter:x2']);
   assert.equal(result.selected?.doseFit?.total, 0);
 });
-it('V5-DOSE-05: invalid splitting, excluded proposals and explicit cap conflicts never silently replan', () => {
+it('V5-DOSE-05: invalid splitting and excluded proposals fail while numeric preferences remain advisory', () => {
   const p = product('capsule', { a: 100 }, 100, { administration: verified(1) });
   for (const r of [request({ productDoses: [{ productId: 'capsule', servingsPerDay: 0.5 }] }),
-    request({ excludeProductIds: ['capsule'], productDoses: [{ productId: 'capsule', servingsPerDay: 1 }] }),
-    request({ maxProductCount: 0, productDoses: [{ productId: 'capsule', servingsPerDay: 1 }] })]) {
+    request({ excludeProductIds: ['capsule'], productDoses: [{ productId: 'capsule', servingsPerDay: 1 }] })]) {
     assert.throws(() => match(r, catalog([p])), /productDoses|product dose/i);
   }
+  const proposed = match(request({ maxProductCount: 0, productDoses: [{ productId: 'capsule', servingsPerDay: 1 }] }), catalog([p]));
+  assert.deepEqual(proposed.selected?.variantIds, ['seller:capsule:x1']);
+  assert.equal(proposed.selected?.doseFit?.total, 0);
 });
 it('V5-DOSE-06: health-limit excess stays evaluable when explicitly proposed', () => {
   const r = request({ productDoses: [{ productId: 'large', servingsPerDay: 4 }], safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 150, maxUnit: 'mg' }] });

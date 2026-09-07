@@ -100,6 +100,8 @@ export const MATCHER_SOURCE_SCOPE: SafetySourceScope = "supplemental";
 
 export type SafetyCeiling = Readonly<{
   authorityUrl?: string | null;
+  referenceConfidence?: "high" | "moderate" | "low";
+  basisRationale?: string | null;
   bandId?: string;
   bandVersion?: number;
   lifeStage?: SafetyLimitLifeStage;
@@ -275,6 +277,7 @@ export type SearchState = Readonly<{
   exposure: ReadonlyMap<string, bigint>;
   nextGroupIndex: number;
   pills: number;
+  pillCountKnown?: boolean;
   price: number;
   selectedVariantIds: readonly string[];
   selectedProductIds?: readonly string[];
@@ -332,6 +335,7 @@ export type ScoredBasket = Readonly<{
   coverageBySubject: ReadonlyMap<string, number>;
   coveredCount: number;
   dailyPills: number;
+  pillCountKnown?: boolean;
   dedicatedPartialCount: number;
   exposure: Exposure;
   incidentalCount: number;
@@ -410,6 +414,7 @@ export type TargetFrontier = Readonly<{
 }>;
 
 export type MatchResult = Readonly<{
+  matchingDiagnostics?: import("@/lib/matcher/diagnostics").MatchingDiagnostics;
   searchSummary?: Readonly<{
     effort: "standard" | "expanded";
     expansionAttempts: number;

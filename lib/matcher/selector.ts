@@ -10,6 +10,7 @@ import {
 import { seedState, tryAddVariant, revalidateState } from "@/lib/matcher/search";
 import { minUnits } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
+import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import type {
   CanonicalRequest,
   ConversationalOptionRole,
@@ -214,6 +215,7 @@ export function scoreState(input: Readonly<{
     coverageSummary: coverageSummary(input.request, validated.exposure),
     coveredCount: coveredTargetCount(input.request, coverageBySubject),
     dailyPills: input.state.pills,
+    pillCountKnown: input.state.pillCountKnown !== false && input.groups.filter(group => productIds.includes(group.productId)).every(group => group.product.pillCountKnown !== false),
     dedicatedPartialCount: dedicatedPartialCountFor(
       input.groups,
       productIds,
@@ -259,13 +261,13 @@ export function compareBaskets(left: ScoredBasket, right: ScoredBasket, request:
   const fit = compareDoseFit(fitOf(left, request), fitOf(right, request));
   if (fit !== 0) return fit;
   if (request.optimization === "fewest_pills") {
-    const pills = left.dailyPills - right.dailyPills;
+    const pills = comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown);
     if (pills !== 0) return pills;
   } else if (request.optimization === "best_coverage" || request.optimization === "balanced") {
     const coverage = right.aggregateCoverage - left.aggregateCoverage;
     if (coverage !== 0) return coverage;
   }
-  return left.priceMinor - right.priceMinor || left.dailyPills - right.dailyPills ||
+  return left.priceMinor - right.priceMinor || comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown) ||
     left.productCount - right.productCount || basketSignature(left).localeCompare(basketSignature(right));
 }
 
@@ -368,11 +370,15 @@ export function protectedReferenceCandidates(baskets: readonly ScoredBasket[], r
  * no better dose fit, coverage or concern profile. Compare actual quantities. */
 function optionDominates(left: ScoredBasket, right: ScoredBasket, request: CanonicalRequest) {
   const fit = compareDoseFit(fitOf(left, request), fitOf(right, request));
-  if (fit > 0 || left.priceMinor > right.priceMinor || left.dailyPills > right.dailyPills || left.productCount > right.productCount) return false;
+  // A known count cannot prove that it is smaller than an unknown count.
+  const samePillCertainty = (left.pillCountKnown !== false) === (right.pillCountKnown !== false);
+  if (!samePillCertainty) return false;
+  const pills = left.pillCountKnown === false ? 0 : left.dailyPills - right.dailyPills;
+  if (fit > 0 || left.priceMinor > right.priceMinor || pills > 0 || left.productCount > right.productCount) return false;
   if (request.targets.some(target => (left.coverageBySubject.get(target.subjectId) ?? 0) < (right.coverageBySubject.get(target.subjectId) ?? 0))) return false;
   const a = concernMap(left, request), b = concernMap(right, request);
   if ([...a].some(([key, value]) => value > (b.get(key) ?? 0))) return false;
-  return fit < 0 || left.priceMinor < right.priceMinor || left.dailyPills < right.dailyPills || left.productCount < right.productCount ||
+  return fit < 0 || left.priceMinor < right.priceMinor || pills < 0 || left.productCount < right.productCount ||
     [...b].some(([key, value]) => (a.get(key) ?? 0) < value);
 }
 
@@ -394,7 +400,7 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
   // These sorted extremal choices are Pareto-valid without quadratic pruning:
   // any strict dominator sorts before them on that objective then full fit.
   const lowerCost = [...nonempty].sort((a, b) => a.priceMinor - b.priceMinor || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
-  const simpler = [...nonempty].sort((a, b) => a.productCount - b.productCount || a.dailyPills - b.dailyPills || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
+  const simpler = [...nonempty].sort((a, b) => a.productCount - b.productCount || comparePillCounts(a.dailyPills, a.pillCountKnown, b.dailyPills, b.pillCountKnown) || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
   const fewerConcerns = nonempty.find(row => hasFewerConcerns(row, best, input.request));
   const fallback = best.productCount === 0 ? nonempty[0] : undefined;
   const options = new Map<string, { basket: ScoredBasket; roles: ConversationalOptionRole[] }>();
@@ -424,7 +430,7 @@ export function salvagePartialBasket(input: Readonly<{ groups: readonly ProductG
   let state = seedState(input.request);
   let best = scoreState({ ...input, state });
   if (!best) return null;
-  for (let iteration = 0; iteration < (input.request.maxProductCount ?? input.groups.length); iteration += 1) {
+  for (let iteration = 0; iteration < input.groups.length; iteration += 1) {
     let chosen: { state: SearchState; basket: ScoredBasket } | null = null;
     for (const group of input.groups) for (const variant of group.variants) {
       const next = tryAddVariant(state, variant, group, input.request);

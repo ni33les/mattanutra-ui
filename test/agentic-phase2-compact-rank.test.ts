@@ -403,7 +403,7 @@ describe("Phase 2 compactness ranking", () => {
     );
   });
 
-  it("labels a maxDailyPills miss as hard_constraint max_pills not dominated", () => {
+  it("keeps the full closest fit above maxDailyPills without a hard-constraint certificate", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-max-pills-cert",
@@ -465,23 +465,15 @@ describe("Phase 2 compactness ranking", () => {
       qaRequest({ maxDailyPills: 6, optimization: "fewest_pills" }),
       catalog
     );
-    const certs = result.lossCertificates ?? [];
-    assert.equal(certs.length >= 1, true);
-    assert.equal(
-      certs.some(
-        (item) =>
-          item.rejection_class === "hard_constraint" &&
-          item.conflicting_rule_id === "max_pills"
-      ),
-      true
-    );
-    assert.equal(
-      certs.some((item) => item.rejection_class === "dominated"),
-      false
-    );
+    const unrestricted = match(qaRequest({ optimization: "fewest_pills" }), catalog);
+    assert.deepEqual(result.selected?.variantIds, unrestricted.selected?.variantIds);
+    assert.equal(result.selected?.doseFit?.total, unrestricted.selected?.doseFit?.total);
+    assert.ok(result.selected!.dailyPills > 6);
+    assert.equal(result.selected!.priceMinor, result.selected!.productIds.reduce((sum, id) => sum + catalog.products.find(product => product.productId === id)!.unitPriceMinor, 0));
+    assert.equal(result.lossCertificates?.some(item => item.rejection_class === "hard_constraint" || item.conflicting_rule_id === "max_pills") ?? false, false);
   });
 
-  it("labels a binding maxPriceMinor miss as hard_constraint budget not dominated", () => {
+  it("keeps the full closest fit above maxPriceMinor without a hard-constraint certificate", () => {
     const catalog = {
       availabilityAsOf: "2026-08-26T00:00:00.000Z",
       catalogueVersion: "phase2-budget-cert",
@@ -548,20 +540,11 @@ describe("Phase 2 compactness ranking", () => {
       qaRequest({ maxPriceMinor: 80_000, optimization: "fewest_pills" }),
       catalog
     );
-    const certs = result.lossCertificates ?? [];
-    assert.equal(certs.length >= 1, true);
-    assert.equal(
-      certs.some(
-        (item) =>
-          item.rejection_class === "hard_constraint" &&
-          item.conflicting_rule_id === "budget"
-      ),
-      true
-    );
-    assert.equal(
-      certs.some((item) => item.rejection_class === "dominated"),
-      false
-    );
+    assert.deepEqual(result.selected?.variantIds, unconstrained.selected?.variantIds);
+    assert.equal(result.selected?.doseFit?.total, unconstrained.selected?.doseFit?.total);
+    assert.ok(result.selected!.priceMinor > 80_000);
+    assert.equal(result.selected!.priceMinor, result.selected!.productIds.reduce((sum, id) => sum + catalog.products.find(product => product.productId === id)!.unitPriceMinor, 0));
+    assert.equal(result.lossCertificates?.some(item => item.rejection_class === "hard_constraint" || item.conflicting_rule_id === "budget") ?? false, false);
   });
 
   it("keeps the labelled D3 contributor and adjusts its quantity before adding collateral C", () => {

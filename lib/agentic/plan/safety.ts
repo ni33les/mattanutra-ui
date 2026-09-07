@@ -28,6 +28,13 @@ import {
   MEDICATION_ALIASES
 } from "@/lib/agentic/catalogue/names";
 
+function activeReferenceScope(name: string, subjectId: string, state: Pick<CanonicalPlanState, "profile" | "profileKnown" | "conditionCodes">,
+  preferred: "supplemental" | "total" = "supplemental") {
+  const profile = knownLimitProfile(state);
+  return safetyCeilingFor(profile ? matcherSafetyCeilings() : [], { name, subjectId, profile,
+    conditionCodes: state.conditionCodes, sourceScope: preferred }) ? preferred : preferred === "supplemental" ? "total" : "supplemental";
+}
+
 function catalogRule(
   name: string,
   subjectId: string,
@@ -41,7 +48,7 @@ function catalogRule(
     conditionCodes,
     name,
     profile,
-    sourceScope,
+    sourceScope: sourceScope ?? activeReferenceScope(name, subjectId, { ...state, conditionCodes }),
     subjectId
   });
   return {
@@ -354,7 +361,8 @@ export function evaluateSafety(input: Readonly<{
       ceilings: populationCeilings,
       conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
-      subjectId: target.supplementId
+      subjectId: target.supplementId,
+      sourceScope: activeReferenceScope(target.name, target.supplementId, input.state, target.basis === "total_daily" ? "total" : "supplemental")
     });
 
     if (amountExceedsCeiling(target.amount, limit)) {
@@ -376,7 +384,8 @@ export function evaluateSafety(input: Readonly<{
           target.supplementId,
           input.state,
           `ul:${target.supplementId}`,
-          input.state.conditionCodes
+          input.state.conditionCodes,
+          activeReferenceScope(target.name, target.supplementId, input.state, target.basis === "total_daily" ? "total" : "supplemental")
         )
       }));
     }
@@ -408,7 +417,8 @@ export function evaluateSafety(input: Readonly<{
       ceilings: populationCeilings,
       conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
-      subjectId
+      subjectId,
+      sourceScope: activeReferenceScope(leftover.name, subjectId, input.state)
     });
     if (amountExceedsCeiling(amount, limit)) {
       items.push(guidance({
@@ -688,8 +698,13 @@ export function evaluateSafety(input: Readonly<{
       ceilings: populationCeilings,
       conditionCodes: input.state.conditionCodes,
       profile: input.state.profile,
-      subjectId: nutrient.name
+      subjectId: nutrient.name,
+      sourceScope: activeReferenceScope(nutrient.name, nutrient.name, input.state)
     });
+
+    const referenceRule = catalogRule(nutrient.name, nutrient.name, input.state,
+      `ul:incidental:${nutrient.name}`, input.state.conditionCodes);
+    if (items.some(item => item.code === "dose_review_required" && item.ruleId === referenceRule.ruleId)) continue;
 
     if (amountExceedsCeiling(nutrient.amount, limit)) {
       const incidentalRows = (input.selected?.basket ?? []).flatMap((item) =>
@@ -723,13 +738,7 @@ export function evaluateSafety(input: Readonly<{
         supplementIds: [],
         threshold: limit,
         unit: nutrient.unit,
-        ...catalogRule(
-          nutrient.name,
-          nutrient.name,
-          input.state,
-          `ul:incidental:${nutrient.name}`,
-          input.state.conditionCodes
-        )
+        ...referenceRule
       }));
     }
   }
@@ -762,7 +771,17 @@ export function evaluateSafety(input: Readonly<{
       ...input.state.conditionCodes.filter(code => !CONDITION_ALIASES[code]).map(code => `condition_unassessed:${code}`)
     ].sort() });
   }
-  return items;
+  return items.map(item => {
+    const reference = matcherSafetyCeilings().find(ceiling => ceiling.bandId && ceiling.bandId === item.ruleId);
+    if (!reference?.referenceConfidence) return item;
+    const unverified = reference.referenceConfidence !== "high";
+    return { ...item, referenceConfidence: reference.referenceConfidence,
+      ...(reference.basisRationale ? { basisRationale: reference.basisRationale } : {}),
+      ...(unverified ? {
+        uncertainty: [item.uncertainty, agenticMessage(input.locale, "guidance.reference_unverified_uncertainty")].filter(Boolean).join(" "),
+        uncertaintyCodes: [...new Set([...(item.uncertaintyCodes ?? []), "reference_unverified"])]
+      } : {}) };
+  });
 }
 
 export function safetyQuestions(input: Readonly<{
@@ -788,67 +807,6 @@ export function safetyQuestions(input: Readonly<{
     });
   }
   const unmet = input.unmetRequirements ?? [];
-  const alternatives = input.alternatives ?? [];
-
-  if (unmet.includes("maxPriceMinor")) {
-    const cap = input.state.requirements.maxPriceMinor ?? 0;
-    const choices: PlanQuestion["choices"][number][] = [
-      {
-        choice: "relax_max_price",
-        effect: "requirements.maxPriceMinor=",
-        label: agenticMessage(input.locale, "plan.question.relax_max_price"),
-        labelKey: "plan.question.relax_max_price"
-      }
-    ];
-
-    for (const option of alternatives) {
-      if (option.totalPriceMinor <= cap) {
-        choices.push({
-          choice: `select_option:${option.optionId}`,
-          effect: `selectOptionId=${option.optionId}`,
-          label: agenticMessage(input.locale, "plan.question.select_option"),
-          labelKey: "plan.question.select_option"
-        });
-      }
-    }
-
-    questions.push({
-      choices,
-      prompt: agenticMessage(input.locale, "plan.question.relax_max_price"),
-      promptKey: "plan.question.relax_max_price",
-      questionId: "q_max_price"
-    });
-  }
-
-  if (unmet.includes("maxDailyPills")) {
-    const cap = input.state.requirements.maxDailyPills ?? 0;
-    const choices: PlanQuestion["choices"][number][] = [
-      {
-        choice: "relax_max_pills",
-        effect: "requirements.maxDailyPills=",
-        label: agenticMessage(input.locale, "plan.question.relax_max_pills"),
-        labelKey: "plan.question.relax_max_pills"
-      }
-    ];
-
-    for (const option of alternatives) {
-      if (option.dailyPills <= cap) {
-        choices.push({
-          choice: `select_option:${option.optionId}`,
-          effect: `selectOptionId=${option.optionId}`,
-          label: agenticMessage(input.locale, "plan.question.select_option"),
-          labelKey: "plan.question.select_option"
-        });
-      }
-    }
-
-    questions.push({
-      choices,
-      prompt: agenticMessage(input.locale, "plan.question.relax_max_pills"),
-      promptKey: "plan.question.relax_max_pills",
-      questionId: "q_max_pills"
-    });
-  }
 
   for (const item of unmet) {
     if (!item.startsWith("retainProductIds:")) {

@@ -10,15 +10,14 @@ const products = [product('00-a', { a: 10 }), product('01-b', { b: 10 }),
   ...Array.from({ length: 30 }, (_, index) => product(`d${String(index).padStart(3, '0')}`, { a: 51 + index, b: 1 })),
   product('zz-complement', { a: 90, b: 90 })];
 
-it('V5-REPAIR-01: repair improves a leading pair after a large catalogue exhausts pair exploration', () => {
+it('V5-REPAIR-01: supported quantities preserve the exact two-product fit above pill preferences', () => {
   const result = match(requirements, catalog(products));
-  // Neither low-contribution product is attractive alone. The three one-unit
-  // products uniquely provide A10+90=100 and B10+90=100 within three pills.
-  assert.deepEqual(result.selected?.productIds, ['00-a', '01-b', 'zz-complement']);
+  // Advisory pill preferences cannot discard the cheaper exact fit at ten units each.
+  assert.deepEqual(result.selected?.variantIds, ['seller:00-a:x10', 'seller:01-b:x10']);
   assert.equal(result.selected?.doseFit?.total, 0);
-  assert.equal(result.selected?.priceMinor, 300);
-  assert.equal(result.selected?.dailyPills, 3);
-  assert.equal(result.selected?.productCount, 3);
+  assert.equal(result.selected?.priceMinor, 200);
+  assert.equal(result.selected?.dailyPills, 20);
+  assert.equal(result.selected?.productCount, 2);
   assert.equal(result.selected?.coveredCount, 2);
   assert.ok(result.searchSummary!.expansionAttempts <= 8000);
 });
@@ -34,4 +33,17 @@ it('V5-REPAIR-02: reserved repair remains deterministic, keeps the expanded incu
   assert.ok(excluded.selected!.doseFit!.total > 0);
   assert.ok([excluded.selected!, ...excluded.alternatives].every(option => !option.productIds.includes('01-b')));
   assert.equal(excluded.selected?.purchaseEligible, true);
+});
+
+// Retain the original complementary repair regression using explicit physical
+// proposals, which are still firm, rather than a retired numeric veto.
+it('ADV6-REPAIR-01: large-catalogue complementary repair completes two proposed one-unit products', () => {
+  const result = match({ ...requirements, productDoses: [{ productId: '00-a', servingsPerDay: 1 }, { productId: '01-b', servingsPerDay: 1 }] }, catalog(products));
+  assert.deepEqual(result.selected?.variantIds, ['seller:00-a:x1', 'seller:01-b:x1', 'seller:zz-complement:x1']);
+  assert.equal(result.selected?.doseFit?.total, 0);
+  assert.equal(result.selected?.priceMinor, 300);
+  assert.equal(result.selected?.dailyPills, 3);
+  assert.equal(result.selected?.productCount, 3);
+  assert.equal(result.selected?.coveredCount, 2);
+  assert.ok(result.searchSummary!.expansionAttempts <= 8000);
 });
