@@ -122,7 +122,7 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
   const empty = scoreState({ groups: [], request, sellerId: "", state: seedState(request) });
   if (empty) scored.push(empty);
   let trimmed = false;
-  let mode: MatchResult["searchMode"] = "exact";
+  const searchStatus: { mode: MatchResult["searchMode"] } = { mode: "exact" };
   let expansionAttempts = 0;
   const effort = request.searchEffort ?? "standard";
   const standardBudget = Math.max(0, Math.floor(config.expansionBudget));
@@ -138,7 +138,7 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
       perSellerGroups.set(seller.sellerId, run.groups);
       expansionAttempts += run.expansionAttempts;
       trimmed ||= run.trimmed;
-      if (run.mode === "bounded") mode = "bounded";
+      if (run.mode === "bounded") searchStatus.mode = "bounded";
     }
   };
   runPass(standardBudget, false);
@@ -163,9 +163,9 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
     : !hasConcerns ? { status: "not_needed", reason: "The selected option raises no assessed concerns." }
     : trimmed ? { status: "incomplete", reason: "No qualifying alternative was found within the deterministic search budget; absence is not proven." }
     : { status: "none_found", reason: "No distinct option with fewer concerns and no lower per-target coverage exists among the eligible product and dose combinations." };
-  return { ...winner, alternativeSearch, searchSummary: { effort, expansionAttempts, expansionBudget, complete: !trimmed && mode === "exact", canExpand: effort === "standard" && (trimmed || mode === "bounded") }, leftovers: leftoversFor(request, winner.selected),
+  return { ...winner, alternativeSearch, searchSummary: { effort, expansionAttempts, expansionBudget, complete: !trimmed && searchStatus.mode === "exact", canExpand: effort === "standard" && (trimmed || searchStatus.mode === "bounded") }, leftovers: leftoversFor(request, winner.selected),
     lossCertificates: lossCertificatesFor(request, catalog, exploredGroups, winner.selected, trimmed),
-    rejected: rejectedCandidatesFor(request, catalog, groups), searchMode: mode, targetFrontiers, trimmed };
+    rejected: rejectedCandidatesFor(request, catalog, groups), searchMode: searchStatus.mode, targetFrontiers, trimmed };
 }
 
 export { DEFAULT_MATCHER_CONFIG, MATCHER_VERSION } from "@/lib/matcher/config";
