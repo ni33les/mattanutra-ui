@@ -23,7 +23,7 @@ export function useFormulationPolling(planId: string, locale: Locale, initialRes
       const response = await fetchFunnelJson<FormulationResult & { resultVersion: string }>(`${root}/formulation?locale=${locale}&products=1`,
         { signal: signal ?? lifecycle.current?.signal });
       if (response.status === 202) return false;
-      if (!response.data.supplementBreakdown?.length) return false;
+      if (!Array.isArray(response.data.supplementBreakdown)) return false;
       setResult(response.data);
       hasResult.current = true;
       version.current = response.data.resultVersion;

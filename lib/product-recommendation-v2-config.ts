@@ -2,6 +2,7 @@ import type {
   ProductRecommendationClientContext,
   ProductRecommendationInput
 } from "@/lib/product-recommendation-types";
+import { MATCHER_VERSION } from "@/lib/matcher/config";
 
 export type V2Weights = Readonly<{
   confidence: number;
@@ -23,9 +24,9 @@ export const V2_ALGORITHM_VERSION = "v2-exact-shortlist" as const;
 export const V2_FULL_BEAM_ALGORITHM_VERSION = "v2-full-beam" as const;
 export const PARETO_HYBRID_ALGORITHM_VERSION = "pareto-hybrid-1" as const;
 export const ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION =
-  PARETO_HYBRID_ALGORITHM_VERSION;
+  MATCHER_VERSION;
 export const ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION =
-  "stack-preference-4";
+  "advisory-stack-5";
 
 export const V2_FULL_BEAM_WIDTH = 32;
 export const V2_SHORTLIST_LIMIT = 32;

@@ -265,6 +265,7 @@ export async function loadProductRecommendationFreshnessSnapshot(
       select id, status, generated_at
       from public.product_recommendation_runs
       where plan_id = ${input.planId}::uuid
+        and selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0)
         and assessment_revision = (select input_revision from public.assessments where plan_id = ${input.planId}::uuid)
         and generation_locale = coalesce(${generationLocale(input.planId)}, (select locale from public.assessments where plan_id = ${input.planId}::uuid))
         and generator_version = ${FUNNEL_GENERATOR_VERSION}

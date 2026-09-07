@@ -110,7 +110,6 @@ export function FormulationResults({
   }).format(new Date(result.generatedAt));
   const effectiveResultPlanId = result.planId || effectivePlanId;
   const isPreview = result.access === "preview";
-  const nutritionPending = orderedIngredients.length === 0;
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
   const productRecommendationOptions =
     productRecommendationOptionsForResult(result);
@@ -128,7 +127,7 @@ export function FormulationResults({
     explicitProductStackPreference && !exactSelectedProductRecommendationOption,
   );
   const productStackLoading = Boolean(
-    explicitProductStackPreference &&
+    orderedIngredients.length > 0 && explicitProductStackPreference &&
       (productPollingPreference === explicitProductStackPreference ||
         selectedProductStackUnavailable) &&
       !resultHasProductStackRows(result, explicitProductStackPreference),
@@ -148,10 +147,6 @@ export function FormulationResults({
   const productCoverageBySupplementId = supplementProductCoverageById(
     activeProductRecommendations,
   );
-
-  if (nutritionPending) {
-    return <NutritionGuidancePreparingPanel labels={labels} locale={locale} />;
-  }
 
   return (
     <>

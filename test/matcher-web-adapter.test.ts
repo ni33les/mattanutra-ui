@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { describe, it } from "node:test";
+import { afterEach, describe, it } from "node:test";
 import {
   matcherNeedCoveragePercent,
   matcherProductCoversNeed,
@@ -11,8 +11,12 @@ import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import type { MatcherProduct } from "../lib/matcher/types.ts";
 import type {
   ProductCandidate,
+  ProductRecommendationInput,
   ProductRecommendationNeed
 } from "../lib/product-recommendation-types.ts";
+
+// Restore global reference fixtures even when a behavioral assertion fails.
+afterEach(() => setMatcherSafetyCeilings([]));
 
 function need(
   overrides: Partial<ProductRecommendationNeed> &
@@ -170,7 +174,6 @@ describe("matcher web adapter coverage mapping", () => {
     );
     const candidates = await readFile("lib/matcher/candidates.ts", "utf8");
     assert.match(candidates, /MAX_DAILY_UNITS = 3/);
-    assert.match(candidates, /variantLeavesTargetShortfall/);
     const config = await readFile("lib/matcher/config.ts", "utf8");
     assert.match(config, /WEB_MATCHER_CONFIG/);
     assert.match(config, /WEB_COMPACT_MATCHER_CONFIG/);
@@ -180,12 +183,6 @@ describe("matcher web adapter coverage mapping", () => {
     assert.match(config, /sellerGroupLimit: 48/);
     const adapter = await readFile("lib/matcher/adapters/web.ts", "utf8");
     assert.match(adapter, /WEB_COMPACT_MATCHER_CONFIG/);
-    const search = await readFile("lib/matcher/search.ts", "utf8");
-    assert.match(search, /hasUsefulBasket/);
-    assert.match(
-      search,
-      /if \(!runTrimmed \|\| width === config\.maxBeamWidth \|\| hasUsefulBasket\)/
-    );
     assert.doesNotMatch(candidates, /wanted\.includes\(name\)/);
     assert.doesNotMatch(candidates, /name\.includes\(wanted\)/);
     assert.doesNotMatch(
@@ -704,11 +701,11 @@ describe("matcher web adapter coverage mapping", () => {
     );
   });
 
-  it("does not pick 3 servings when that would exceed a safety ceiling", () => {
+  it("ranks proportional target and reference-limit penalties when the adult profile is known", () => {
     setMatcherSafetyCeilings([
       { maxAmount: 40, maxUnit: "mg", name: "Zinc", subjectId: "zinc" }
     ]);
-    const result = recommendWithMatcher({
+    const input: ProductRecommendationInput = {
       budgetAmount: null,
       candidates: [
         candidate({
@@ -738,11 +735,77 @@ describe("matcher web adapter coverage mapping", () => {
         })
       ],
       stackPreference: "balanced"
-    });
+    };
+    const unknownProfile = recommendWithMatcher(input);
+    const result = recommendWithMatcher({ ...input, clientContext: { ageYears: 40, lifestage: "adult", currentSupplements: "none" } });
     setMatcherSafetyCeilings([]);
 
-    assert.ok((result.recommendations[0]?.servingMultiplier ?? 3) <= 2);
-    assert.notEqual(result.recommendations[0]?.servingMultiplier, 3);
+    assert.equal(unknownProfile.recommendations.length, 1);
+    assert.equal(unknownProfile.recommendations[0].servingMultiplier, 3);
+    const unknownOption = unknownProfile.diagnostics.matching!.options[0];
+    assert.equal(unknownProfile.diagnostics.matching!.operationalStatus, "ready");
+    assert.equal(unknownOption.doseFit!.total, 0);
+    assert.deepEqual(unknownOption.doseFit!.perLimit, []);
+    assert.equal(unknownOption.doseFit!.perTarget[0].certainty, "unknown");
+    assert.ok(unknownOption.advice.some(row => row.code === "incomplete_health_information"));
+    assert.equal(unknownOption.coveragePercent, 100);
+
+    assert.equal(result.recommendations.length, 1);
+    assert.equal(result.recommendations[0].product.id, "zinc-20");
+    assert.equal(result.recommendations[0].servingMultiplier, 2);
+    assert.equal(result.diagnostics.matching!.operationalStatus, "ready");
+    const score = result.diagnostics.matching!.options[0].doseFit!;
+    assert.ok(Math.abs(score.total - 1 / 3) < 1e-12);
+    assert.equal(score.limitWeight, 2);
+    assert.equal(score.weightedLimit, 0);
+    assert.ok(score.perLimit.some(row => row.exposure === 40 && row.limit === 40));
+    assert.ok(result.diagnostics.matchedNeeds.some(row => row.id === "supplement:zinc" && row.coveragePercent > 60 && row.coveragePercent < 70));
+    assert.deepEqual(result.diagnostics.blockedProducts, []);
+    // Three servings remain eligible; their 50% limit excess costs 1,
+    // which is worse than the selected one-third target shortfall.
+    assert.ok(score.total < 2 * ((60 - 40) / 40));
+  });
+
+
+  it("keeps a lower-total-penalty cross-target match ready with explicit above-limit advice", () => {
+    setMatcherSafetyCeilings([{ maxAmount: 40, maxUnit: "mg", name: "Zinc", subjectId: "zinc" }]);
+    const result = recommendWithMatcher({
+      budgetAmount: null,
+      candidates: [
+        candidate({ id: "mag-zinc", title: "Magnesium with Zinc", facts: [
+          { amount: 200, name: "Magnesium", normalizedName: "magnesium", unit: "mg" },
+          { amount: 30, name: "Zinc", normalizedName: "zinc", unit: "mg" }
+        ] }),
+        candidate({ id: "d3-zinc", title: "Vitamin D3 with Zinc", facts: [
+          { amount: 50, name: "Vitamin D3", normalizedName: "vitamin_d3", unit: "mcg" },
+          { amount: 20, name: "Zinc", normalizedName: "zinc", unit: "mg" }
+        ] })
+      ],
+      clientContext: { ageYears: 40, lifestage: "adult", currentSupplements: "none" },
+      clientSex: "male", countryCode: "TH", maxProducts: 6,
+      needs: [
+        dosedNeed({ amount: 200, displayName: "Magnesium", id: "supplement:magnesium", normalizedName: "magnesium", unit: "mg" }),
+        dosedNeed({ amount: 50, displayName: "Vitamin D3", id: "supplement:vitamin-d3", normalizedName: "vitamin_d3", unit: "mcg" })
+      ],
+      stackPreference: "balanced"
+    });
+    setMatcherSafetyCeilings([]);
+    assert.equal(result.diagnostics.matching!.operationalStatus, "ready");
+    assert.deepEqual(result.recommendations.map(row => row.product.id).sort(), ["d3-zinc", "mag-zinc"]);
+    assert.ok(result.recommendations.every(row => row.servingMultiplier === 1));
+    const option = result.diagnostics.matching!.options[0];
+    assert.equal(option.coveragePercent, 100);
+    assert.equal(option.doseFit!.total, 0.5);
+    assert.equal(option.doseFit!.weightedLimit, 0.5);
+    assert.equal(option.doseFit!.under + option.doseFit!.over, 0);
+    const advice = option.advice.find(row => row.code === "reference_limit_exceeded" && row.ingredient === "Zinc");
+    assert.ok(advice);
+    assert.equal(advice.amount, 50);
+    assert.equal(advice.unit, "mg");
+    assert.equal(advice.referenceLimit?.amount, 40);
+    assert.ok(advice.evidence.source);
+    assert.ok(advice.uncertainty.en);
+    assert.deepEqual(result.diagnostics.blockedProducts, []);
   });
 
   it("uses a different compact search than balanced", () => {
@@ -1054,11 +1117,11 @@ describe("matcher web adapter coverage mapping", () => {
     );
   });
 
-  it("does not pick 3 servings when a collateral nutrient would exceed its ceiling", () => {
+  it("includes collateral reference-limit penalties without inventing an unknown adult profile", () => {
     setMatcherSafetyCeilings([
       { maxAmount: 40, maxUnit: "mg", name: "Iron", subjectId: "iron" }
     ]);
-    const result = recommendWithMatcher({
+    const input: ProductRecommendationInput = {
       budgetAmount: null,
       candidates: [
         candidate({
@@ -1094,11 +1157,35 @@ describe("matcher web adapter coverage mapping", () => {
         })
       ],
       stackPreference: "balanced"
-    });
+    };
+    const unknownProfile = recommendWithMatcher(input);
+    const result = recommendWithMatcher({ ...input, clientContext: { ageYears: 40, lifestage: "adult", currentSupplements: "none" } });
     setMatcherSafetyCeilings([]);
 
-    assert.ok((result.recommendations[0]?.servingMultiplier ?? 3) <= 2);
-    assert.notEqual(result.recommendations[0]?.servingMultiplier, 3);
+    assert.equal(unknownProfile.recommendations.length, 1);
+    assert.equal(unknownProfile.recommendations[0].servingMultiplier, 3);
+    const unknownOption = unknownProfile.diagnostics.matching!.options[0];
+    assert.equal(unknownProfile.diagnostics.matching!.operationalStatus, "ready");
+    assert.equal(unknownOption.doseFit!.total, 0);
+    assert.deepEqual(unknownOption.doseFit!.perLimit, []);
+    assert.equal(unknownOption.doseFit!.perTarget[0].certainty, "unknown");
+    assert.ok(unknownOption.advice.some(row => row.code === "incomplete_health_information"));
+    assert.equal(unknownOption.coveragePercent, 100);
+
+    assert.equal(result.recommendations.length, 1);
+    assert.equal(result.recommendations[0].product.id, "mag-iron");
+    assert.equal(result.recommendations[0].servingMultiplier, 2);
+    assert.equal(result.diagnostics.matching!.operationalStatus, "ready");
+    const score = result.diagnostics.matching!.options[0].doseFit!;
+    assert.ok(Math.abs(score.total - 1 / 3) < 1e-12);
+    assert.equal(score.limitWeight, 2);
+    assert.equal(score.weightedLimit, 0);
+    assert.ok(score.perLimit.some(row => row.exposure === 40 && row.limit === 40));
+    assert.ok(result.diagnostics.matchedNeeds.some(row => row.id === "supplement:magnesium" && row.coveragePercent > 60 && row.coveragePercent < 70));
+    assert.deepEqual(result.diagnostics.blockedProducts, []);
+    // Three servings remain eligible; their 50% limit excess costs 1,
+    // which is worse than the selected one-third target shortfall.
+    assert.ok(score.total < 2 * ((60 - 40) / 40));
   });
 
   it("does not recommend a pending leftover SKU", () => {

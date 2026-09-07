@@ -1,3 +1,4 @@
+import { assessmentFieldKnown } from "@/lib/assessment-input-provenance";
 import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { computeHealthScore } from "@/lib/health-score";
 import { normalizeAssessmentPlan, type AssessmentPlan } from "@/lib/assessment-snapshot";
@@ -455,7 +456,7 @@ function payloadRecord(payload: unknown) {
 function productClientSexFromAnswers(value: unknown): ProductClientSex | null {
   const record = payloadRecord(value);
 
-  return record.sex === "female" || record.sex === "male" ? record.sex : null;
+  return assessmentFieldKnown(record, "sex") && (record.sex === "female" || record.sex === "male") ? record.sex : null;
 }
 
 function productCountryCodeFromAnswers(value: unknown) {
@@ -502,7 +503,7 @@ function ageYearsFromQuestionnaire(value: string | null) {
   return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
 }
 
-function productRecommendationClientContextFromPlan(
+export function productRecommendationClientContextFromPlan(
   answers: unknown,
   planFeedback: readonly PlanFeedbackItem[],
   guidanceAdjustments: readonly PlanGuidanceAdjustment[]
@@ -524,14 +525,21 @@ function productRecommendationClientContextFromPlan(
   ].filter(Boolean).join("/");
 
   return {
-    ageYears: ageYearsFromQuestionnaire(textFromRecord(record, "age")),
+    profileKnown: {
+      ageYears: assessmentFieldKnown(record, "age"),
+      lifeStage: ["reproStatus", "menopause", "flow"].some(key => assessmentFieldKnown(record, key)) ||
+        (assessmentFieldKnown(record, "age") && (ageYearsFromQuestionnaire(textFromRecord(record, "age")) ?? 99) < 18),
+      sex: assessmentFieldKnown(record, "sex")
+    },
+    ageYears: assessmentFieldKnown(record, "age") ? ageYearsFromQuestionnaire(textFromRecord(record, "age")) : null,
     budgetPreference: textFromRecord(record, "budget"),
     conditions: cautions,
-    currentSupplements: textFromRecord(record, "supplements"),
+    currentSupplements: assessmentFieldKnown(record, "supplements") ? textFromRecord(record, "supplements") : null,
     guidanceAdjustmentCount: guidanceAdjustments.length,
     lifestage: lifestage || null,
-    medicationTypes: stringArrayFromRecord(record, "medTypes"),
-    medications: textFromRecord(record, "meds"),
+    medicationTypes: textFromRecord(record, "meds") === "yes" ? stringArrayFromRecord(record, "medTypes") : [],
+    medications: assessmentFieldKnown(record, "meds") ? textFromRecord(record, "meds") : null,
+    unknownHealthFields: ["meds", "kidney", "liver", "surgery"].filter(field => !assessmentFieldKnown(record, field)),
     pillLimit: textFromRecord(record, "maxPills"),
     planFeedbackTypes: [
       ...new Set(
@@ -944,6 +952,7 @@ async function loadFoodGapProductVariants(
       ) as recommendation_count
     from public.product_recommendation_runs
     where product_recommendation_runs.plan_id = ${planId}::uuid
+      and selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = ${planId}::uuid), 0)
       and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
       and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
       and generator_version = ${FUNNEL_GENERATOR_VERSION}
@@ -1894,7 +1903,10 @@ async function retailerCandidateSetsFromLiveSnapshot(
       subtotalAmount: 0
     };
 
-    retailer.candidates.push(candidate);
+    retailer.candidates.push({ ...candidate, matchingFacts: {
+      dailyPillsPerServing: product.dailyPills, form: product.form,
+      dietarySource: product.dietarySource, omegaSource: product.omegaSource
+    } });
     retailer.etaDates.push(candidate.retailEtaDate ?? null);
     retailer.subtotalAmount += candidate.priceAmount ?? 0;
     byRetailer.set(retailerId, retailer);
@@ -2021,11 +2033,9 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
 
   return {
     candidateLoadMs,
-    clientContext: productRecommendationClientContextFromPlan(
-      row.answers,
-      [],
-      []
-    ),
+    clientContext: { ...productRecommendationClientContextFromPlan(row.answers, [], []),
+      excludeProductIds: Array.isArray(payloadRecord(payloadRecord(task.payload).productPreferences).excludedProductIds)
+        ? payloadRecord(payloadRecord(task.payload).productPreferences).excludedProductIds as string[] : [] },
     clientSex: productClientSexFromAnswers(row.answers),
     countryCode,
     hydrateMs,
@@ -2349,6 +2359,12 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     const [row] = await sql`select input_revision from public.assessments where plan_id = ${task.planId}::uuid`;
     if (!generation || !row || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(row.input_revision) !== generation.revision) {
       return { taskId: task.id, taskType: "superseded_generation" };
+    }
+    if (task.taskType === "generate_product_recommendations" || task.taskType === "generate_food_gap_guidance") {
+      const [preferences] = await sql`select revision from public.assessment_product_preferences where plan_id = ${task.planId}::uuid`;
+      if (Number(payloadRecord(payloadRecord(task.payload).productPreferences).revision ?? 0) !== Number(preferences?.revision ?? 0)) {
+        return { taskId: task.id, taskType: "superseded_generation" };
+      }
     }
   }
   const handler = taskWorkItemHandlers[task.taskType];

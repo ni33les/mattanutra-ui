@@ -48,7 +48,7 @@ export async function GET(request: Request, { params }: FormulationRouteProps) {
     return jsonNoStore({ message: "Formulation is still being prepared", status: "preparing",
       revision: stored.readiness.revision, resultVersion: stored.readiness.resultVersion, generationStatus: "pending" }, { status: 202 });
   }
-  if (storedResult.supplementBreakdown.length > 0) {
+  if (stored.readiness?.formulationStatus === "ready") {
     return jsonNoStore({ ...storedResult, revision: stored.readiness?.revision, resultVersion: stored.readiness?.resultVersion,
       generationStatus: "ready", fulfillmentStatus: stored.readiness?.fulfillmentStatus });
   }

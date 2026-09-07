@@ -1,14 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { joinedAdviceMessage, webHealthAdvice } from "@/lib/web-health-advice";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
-import { toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
-import { getSql } from "@/lib/db";
-import {
-  doseExceedsLimit,
-  parseDose,
-  parseDoseLimit,
-  type ParsedDose
-} from "@/lib/dose-conversion";
+import { doseExceedsLimit, parseDose, parseDoseLimit } from "@/lib/dose-conversion";
 import type { FormulationBlueprint, FormulationIngredient, LocalizedText } from "@/lib/formulation-types";
 import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import {
@@ -16,7 +9,7 @@ import {
   normalizeProductCountryCode
 } from "@/lib/product-countries";
 import { productFactAliasKeys, productKeysMatch } from "@/lib/product-recommendations";
-import { createTask, type TaskServiceDb } from "@/lib/task-service";
+import { type TaskServiceDb } from "@/lib/task-service";
 
 type SafetyAfterCommit = (effect: () => Promise<void>) => void;
 
@@ -57,12 +50,6 @@ type MatchedSupplement = SupplementRow & {
   requestedName: string;
 };
 
-type ReviewKind =
-  | "client_context_safety"
-  | "dose_reduced"
-  | "dose_unverified"
-  | "unknown_supplement";
-
 type ContextSafetyReview = Readonly<{
   reason: string;
   reviewType: "condition_stop" | "contraindication" | "medication_interaction" | "pregnancy_breastfeeding";
@@ -70,32 +57,8 @@ type ContextSafetyReview = Readonly<{
   severity: "high" | "medium";
 }>;
 
-type SupplementReviewWork = Readonly<{
-  taskId: string;
-}>;
-
 function textFromLocalized(value: LocalizedText) {
   return resolveLocalizedText(value, "en");
-}
-
-function zhSafetyMessage(en: string) {
-  if (en.startsWith("Dose reduced from ")) {
-    return "剂量已降低，以保持在 MattaNutra 配置的安全上限内。";
-  }
-
-  if (en.includes("blocked") || en.includes("blacklisted")) {
-    return "此补充剂未通过 MattaNutra 目录安全规则，因此不会显示为建议。";
-  }
-
-  if (en.includes("not confirmed") || en.includes("health or medication")) {
-    return "此补充剂需要根据您披露的健康或用药情况进行团队安全审核。";
-  }
-
-  return "此补充剂需要经过团队安全审核后才能显示。";
-}
-
-function localized(en: string, th = en, zh = zhSafetyMessage(en)): LocalizedText {
-  return { en, th, "zh-CN": zh };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -129,22 +92,6 @@ function stringArrayFromRecord(record: Record<string, unknown>, key: string) {
 
 function activeContextValue(value: string | null | undefined) {
   return Boolean(value && value !== "none" && value !== "normal" && value !== "no");
-}
-
-function reviewTypeForKind(kind: ReviewKind, contextReview?: ContextSafetyReview) {
-  if (contextReview) {
-    return contextReview.reviewType;
-  }
-
-  if (kind === "client_context_safety") {
-    return "contraindication";
-  }
-
-  if (kind === "dose_unverified") {
-    return "dose_limit";
-  }
-
-  return "ingredient_safety";
 }
 
 export function formulationSafetyContextReview(input: Readonly<{
@@ -231,42 +178,6 @@ function numberOrNull(value: number | string | null) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function formatDose(amount: number, unit: string | null) {
-  const formatted = Number.isInteger(amount)
-    ? String(amount)
-    : amount.toFixed(2).replace(/\.?0+$/g, "");
-
-  return `${formatted} ${unit || "per day"}`.trim();
-}
-
-function reviewTaskType(kind: ReviewKind) {
-  if (kind === "unknown_supplement") {
-    return "classify_supplement";
-  }
-
-  if (kind === "dose_reduced") {
-    return "dose_reduction_notice";
-  }
-
-  return "review_supplement_for_plan";
-}
-
-function reviewTaskBusinessValue(kind: ReviewKind) {
-  if (kind === "dose_unverified") {
-    return 500;
-  }
-
-  if (kind === "client_context_safety") {
-    return 550;
-  }
-
-  if (kind === "unknown_supplement") {
-    return 400;
-  }
-
-  return 350;
 }
 
 function countryCodeFromSafetyInput(input: SafetyInput) {
@@ -381,28 +292,6 @@ function matchSupplement(
   return null;
 }
 
-function withHiddenSafety(
-  ingredient: FormulationIngredient,
-  input: {
-    action: "human_review" | "unknown_supplement";
-    message: LocalizedText;
-    reviewId?: string;
-    reviewTaskId?: string;
-  }
-): FormulationIngredient {
-  return {
-    ...ingredient,
-    safety: {
-      action: input.action,
-      message: input.message,
-      reviewId: input.reviewId,
-      reviewTaskId: input.reviewTaskId,
-      visibility: "hidden"
-    },
-    status: "review"
-  };
-}
-
 function withAutomatedSafetyStatus(
   ingredient: FormulationIngredient
 ): FormulationIngredient {
@@ -417,228 +306,6 @@ function withAutomatedSafetyStatus(
     ...safeIngredient,
     status: ingredient.status === "review" ? "add" : ingredient.status
   };
-}
-
-function withReducedDose(
-  ingredient: FormulationIngredient,
-  dose: string,
-  message: LocalizedText,
-  reviewTaskId?: string
-): FormulationIngredient {
-  return {
-    ...ingredient,
-    dailyDose: localized(dose),
-    safety: {
-      action: "dose_reduced",
-      message,
-      originalDailyDose: ingredient.dailyDose,
-      reviewTaskId,
-      visibility: "visible"
-    },
-    status: ingredient.status === "review" ? "add" : ingredient.status
-  };
-}
-
-async function enqueueSupplementReviewWork(input: {
-  afterCommit?: SafetyAfterCommit;
-  kind: ReviewKind;
-  normalizedSupplementName: string;
-  payload: Record<string, unknown>;
-  planId: string | null;
-  supplementName: string;
-}): Promise<SupplementReviewWork> {
-  const unknownSupplement = input.kind === "unknown_supplement";
-  const globalUnknown = unknownSupplement && !input.planId;
-  const businessValue = reviewTaskBusinessValue(input.kind);
-  const groupLabel = unknownSupplement
-    ? "Review supplement"
-    : "Review plan";
-  const taskTitle = `Review supplement ${input.supplementName}`;
-  const idempotencyKey = `supplement-review:${input.kind}:${globalUnknown ? "global" : input.planId}:${input.normalizedSupplementName}`;
-  const createReviewWork = async () => {
-    const result = await createTask({
-      actorType: "human",
-      businessValue,
-      context: {
-        normalizedSupplementName: input.normalizedSupplementName,
-        reviewKind: input.kind,
-        source: "formulation_safety"
-      },
-      groupLabel,
-      id: randomUUID(),
-      idempotencyKey,
-      idempotencyScopeKey: globalUnknown
-        ? `supplement:${input.normalizedSupplementName}`
-        : `supplement-safety:${input.planId}`,
-      initialComment: {
-        authorName: "MattaNutra safety",
-        authorType: "system",
-        body: `Safety review opened for ${input.supplementName}.`,
-        commentType: "instruction",
-        metadata: {
-          reviewKind: input.kind
-        },
-        visibility: "admin"
-      },
-      maxAttempts: 1,
-      payload: {
-        normalizedSupplementName: input.normalizedSupplementName,
-        reviewKind: input.kind,
-        source: "formulation_safety",
-        supplementName: input.supplementName,
-        ...input.payload
-      },
-      planId: globalUnknown ? null : input.planId,
-      reasoningEffort: "none",
-      requiredCapabilities: ["supplement_review"],
-      taskType: reviewTaskType(input.kind),
-      title: taskTitle
-    });
-
-    return {
-      taskId: result.task.id
-    };
-  };
-
-  return createReviewWork();
-}
-
-async function attachSafetyReviewWork(
-  sql: TaskServiceDb,
-  input: {
-    context?: Record<string, unknown>;
-    reviewId: string;
-    taskId?: string | null;
-  }
-) {
-  try {
-    await sql`
-      update public.safety_reviews
-      set
-        task_id = coalesce(task_id, ${input.taskId ?? null}::uuid),
-        safety_context = safety_context || ${sql.json(
-          toJsonValue(input.context ?? {})
-        )}::jsonb,
-        updated_at = now()
-      where id = ${input.reviewId}::uuid
-    `;
-  } catch (error) {
-    console.warn("Unable to attach task reference to safety review", {
-      error,
-      reviewId: input.reviewId
-    });
-  }
-}
-
-async function attachSafetyReviewWorkAfterCommit(
-  input: Parameters<typeof attachSafetyReviewWork>[1]
-) {
-  const sql = getSql();
-
-  if (!sql) {
-    return;
-  }
-
-  await attachSafetyReviewWork(sql, input);
-}
-
-async function createSafetyReview(
-  sql: TaskServiceDb,
-  input: {
-    afterCommit?: SafetyAfterCommit;
-    aiSuggestion: FormulationIngredient;
-    context: Record<string, unknown>;
-    dose?: ParsedDose | null;
-    flagReason: string;
-    limit?: ParsedDose | null;
-    planId: string;
-    reviewType: string;
-    ruleCode: string;
-    severity: "critical" | "high" | "low" | "medium";
-    supplementName: string;
-    taskId?: string | null;
-  }
-) {
-  const existing = await sql<{ id: string }[]>`
-    select id::text
-    from public.safety_reviews
-    where plan_id = ${input.planId}::uuid
-      and lower(supplement_name) = lower(${input.supplementName})
-      and rule_code = ${input.ruleCode}
-      and status in ('open', 'in_review', 'escalated')
-    order by opened_at asc
-    limit 1
-  `;
-
-  if (existing[0]?.id) {
-    const attachInput = {
-      context: input.context,
-      reviewId: existing[0].id,
-      taskId: input.taskId
-    };
-
-    if (input.afterCommit) {
-      input.afterCommit(() => attachSafetyReviewWorkAfterCommit(attachInput));
-    } else {
-      await attachSafetyReviewWork(sql, attachInput);
-    }
-
-    return existing[0].id;
-  }
-
-  const reviewId = randomUUID();
-  await sql`
-    insert into public.safety_reviews (
-      id,
-      plan_id,
-      review_type,
-      status,
-      severity,
-      supplement_name,
-      suggested_dose_value,
-      suggested_dose_unit,
-      limit_value,
-      limit_unit,
-      rule_code,
-      flag_reason,
-      ai_suggestion,
-      safety_context,
-      opened_at,
-      updated_at
-    )
-    values (
-      ${reviewId}::uuid,
-      ${input.planId}::uuid,
-      ${input.reviewType},
-      'open',
-      ${input.severity},
-      ${input.supplementName},
-      ${input.dose?.amount ?? null},
-      ${input.dose?.unit ?? null},
-      ${input.limit?.amount ?? null},
-      ${input.limit?.originalText ?? input.limit?.unit ?? null},
-      ${input.ruleCode},
-      ${input.flagReason},
-      ${sql.json(toJsonValue(input.aiSuggestion))},
-      ${sql.json(toJsonValue(input.context))},
-      now(),
-      now()
-    )
-  `;
-
-  const attachInput = {
-    context: input.context,
-    reviewId,
-    taskId: input.taskId
-  };
-
-  if (input.afterCommit) {
-    input.afterCommit(() => attachSafetyReviewWorkAfterCommit(attachInput));
-  } else {
-    await attachSafetyReviewWork(sql, attachInput);
-  }
-
-  return reviewId;
 }
 
 async function audit(input: SafetyInput, event: Parameters<SafetyAudit>[0]) {
@@ -676,95 +343,6 @@ async function logSafetyBpm(
   await effect();
 }
 
-async function hideForReview(
-  sql: TaskServiceDb,
-  input: SafetyInput,
-  ingredient: FormulationIngredient,
-  match: MatchedSupplement | null,
-  kind: ReviewKind,
-  reason: string,
-  severity: "critical" | "high" | "low" | "medium",
-  dose: ParsedDose | null,
-  limit: ParsedDose | null,
-  contextReview?: ContextSafetyReview
-) {
-  const supplementName = match?.name ?? textFromLocalized(ingredient.supplement);
-  const normalizedSupplementName = match?.normalized_name ?? normalizeName(supplementName);
-  const reviewWork = await enqueueSupplementReviewWork({
-    afterCommit: input.afterCommit,
-    kind,
-    normalizedSupplementName,
-    payload: {
-      actionOptions:
-        kind === "unknown_supplement"
-          ? ["add_active", "block", "ignore"]
-          : ["accept", "revise", "block", "ignore"],
-      confidence: match?.confidence,
-      maxAmount: numberOrNull(match?.max_amount ?? null),
-      maxUnit: match?.max_unit,
-      requiredFields: ["status", "maxAmount", "maxUnit", "confidence"],
-      source: "formulation_safety",
-      supplementId: match?.id,
-      supplementName
-    },
-    planId: input.planId,
-    supplementName
-  });
-  const reviewId = await createSafetyReview(sql, {
-    afterCommit: input.afterCommit,
-    aiSuggestion: ingredient,
-    context: {
-      matchedSupplementId: match?.id,
-      normalizedSupplementName,
-      reviewTaskId: reviewWork.taskId,
-      safetyFlags: match?.safety_flags ?? [],
-      safetyNotes: match?.safety_notes,
-      ...(contextReview
-        ? {
-            contextRuleCode: contextReview.ruleCode,
-            contextReviewType: contextReview.reviewType
-          }
-        : {}),
-      taskId: reviewWork.taskId
-    },
-    dose,
-    flagReason: reason,
-    limit,
-    planId: input.planId,
-    reviewType: reviewTypeForKind(kind, contextReview),
-    ruleCode: contextReview?.ruleCode ?? kind,
-    severity,
-    supplementName,
-    taskId: reviewWork.taskId
-  });
-
-  await audit(input, {
-    eventType: "formulation_safety_review_opened",
-    level: severity,
-    payload: {
-      reason,
-      reviewId,
-      reviewKind: kind,
-      reviewTaskId: reviewWork.taskId,
-      supplementName
-    }
-  });
-  await logSafetyBpm(input, "formulation_safety_review_opened", severity, {
-    reason,
-    reviewId,
-    reviewKind: kind,
-    reviewTaskId: reviewWork.taskId,
-    supplementName
-  });
-
-  return withHiddenSafety(ingredient, {
-    action: kind === "unknown_supplement" ? "unknown_supplement" : "human_review",
-    message: localized(reason),
-    reviewId,
-    reviewTaskId: reviewWork.taskId ?? undefined
-  });
-}
-
 async function logRemoved(
   input: SafetyInput,
   ingredient: FormulationIngredient,
@@ -790,81 +368,6 @@ async function logRemoved(
   });
 }
 
-async function reduceDose(
-  sql: TaskServiceDb,
-  input: SafetyInput,
-  ingredient: FormulationIngredient,
-  match: MatchedSupplement,
-  dose: ParsedDose,
-  limit: ParsedDose
-) {
-  const reason = `Dose reduced from ${dose.amount} ${dose.unit} to the configured maximum of ${formatDose(limit.amount, match.max_unit)}.`;
-  const normalizedSupplementName = match.normalized_name;
-  const reviewWork = await enqueueSupplementReviewWork({
-    afterCommit: input.afterCommit,
-    kind: "dose_reduced",
-    normalizedSupplementName,
-    payload: {
-      actionOptions: ["dismiss"],
-      maxAmount: numberOrNull(match.max_amount),
-      maxUnit: match.max_unit,
-      newDose: formatDose(limit.amount, match.max_unit),
-      originalDose: dose.originalText,
-      source: "formulation_safety",
-      supplementId: match.id,
-      supplementName: match.name
-    },
-    planId: input.planId,
-    supplementName: match.name
-  });
-
-  await createSafetyReview(sql, {
-    afterCommit: input.afterCommit,
-    aiSuggestion: ingredient,
-    context: {
-      normalizedSupplementName,
-      reviewTaskId: reviewWork.taskId,
-      safetyFlags: match.safety_flags ?? [],
-      safetyNotes: match.safety_notes,
-      taskId: reviewWork.taskId
-    },
-    dose,
-    flagReason: reason,
-    limit,
-    planId: input.planId,
-    reviewType: "dose_limit",
-    ruleCode: "dose_reduced",
-    severity: "low",
-    supplementName: match.name,
-    taskId: reviewWork.taskId
-  });
-  await audit(input, {
-    eventType: "formulation_safety_dose_reduced",
-    level: "medium",
-    payload: {
-      maxAmount: numberOrNull(match.max_amount),
-      maxUnit: match.max_unit,
-      originalDose: dose.originalText,
-      reviewTaskId: reviewWork.taskId,
-      supplementName: match.name
-    }
-  });
-  await logSafetyBpm(input, "formulation_safety_dose_reduced", "medium", {
-    maxAmount: numberOrNull(match.max_amount),
-    maxUnit: match.max_unit,
-    originalDose: dose.originalText,
-    reviewTaskId: reviewWork.taskId,
-    supplementName: match.name
-  });
-
-  return withReducedDose(
-    ingredient,
-    formatDose(limit.amount, match.max_unit),
-    localized(reason),
-    reviewWork.taskId ?? undefined
-  );
-}
-
 export async function applyFormulationSafety(
   sql: TaskServiceDb,
   input: SafetyInput
@@ -881,139 +384,34 @@ export async function applyFormulationSafety(
 
   for (const ingredient of input.formulation.supplementBreakdown) {
     const match = matchSupplement(lookup, ingredient);
-    const dose = parseDose(
-      textFromLocalized(ingredient.dailyDose),
-      match?.normalized_name
-    );
-    const limit = match
-      ? parseDoseLimit(numberOrNull(match.max_amount), match.max_unit)
-      : null;
-
-    if (!match) {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      supplementBreakdown.push(
-        await hideForReview(
-          sql,
-          input,
-          ingredient,
-          null,
-          "unknown_supplement",
-          "This supplement is not yet in the MattaNutra supplement catalogue.",
-          "medium",
-          dose,
-          null
-        )
-      );
-      continue;
-    }
-
-    if (match.list_status === "blocked") {
+    const dose = parseDose(textFromLocalized(ingredient.dailyDose), match?.normalized_name);
+    const limit = match ? parseDoseLimit(numberOrNull(match.max_amount), match.max_unit) : null;
+    // Catalogue availability is operational; clinical findings are advice only.
+    if (match?.list_status === "blocked") {
       summary.removedCount += 1;
-      await logRemoved(
-        input,
-        ingredient,
-        match,
-        "Supplement is blocked in the MattaNutra supplement catalogue."
-      );
+      await logRemoved(input, ingredient, match, "Supplement is unavailable in the MattaNutra catalogue for this country.");
       continue;
     }
-
-    const contextReview = formulationSafetyContextReview({
-      answers: input.answers,
-      safetyFlags: match.safety_flags
-    });
-
-    if (contextReview) {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      supplementBreakdown.push(
-        await hideForReview(
-          sql,
-          input,
-          ingredient,
-          match,
-          "client_context_safety",
-          contextReview.reason,
-          contextReview.severity,
-          dose,
-          limit,
-          contextReview
-        )
-      );
-      continue;
+    const context = formulationSafetyContextReview({ answers: input.answers, safetyFlags: match?.safety_flags });
+    const common = {
+      ingredient: match?.name ?? textFromLocalized(ingredient.supplement),
+      amount: dose?.amount ?? null, unit: dose?.unit ?? null,
+      limit: limit && limit.amount > 0 ? { amount: limit.amount, unit: limit.unit } : null,
+      evidence: match?.safety_notes, confidence: match?.confidence
+    };
+    const advice = [];
+    if (context) advice.push(webHealthAdvice({ ...common, code: context.ruleCode, kind: "context" }));
+    const comparable = dose && limit && limit.amount > 0 ? doseExceedsLimit(dose, limit, match?.normalized_name) : null;
+    if (comparable === true) advice.push(webHealthAdvice({ ...common, code: "reference_limit_exceeded", kind: "limit" }));
+    if (!match || !dose || !limit || limit.amount <= 0 || comparable === null) {
+      advice.push(webHealthAdvice({ ...common, code: !match ? "unknown_supplement" : "intake_or_limit_unknown", kind: "unknown" }));
     }
-
-    if (limit && limit.amount <= 0) {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      supplementBreakdown.push(
-        await hideForReview(
-          sql,
-          input,
-          ingredient,
-          match,
-          "dose_unverified",
-          "This supplement has no automated safe dose configured yet.",
-          "high",
-          dose,
-          limit
-        )
-      );
-      continue;
-    }
-
-    if (limit && !dose) {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      supplementBreakdown.push(
-        await hideForReview(
-          sql,
-          input,
-          ingredient,
-          match,
-          "dose_unverified",
-          "The suggested dose could not be checked automatically.",
-          "medium",
-          null,
-          limit
-        )
-      );
-      continue;
-    }
-
-    if (dose && limit) {
-      const exceedsLimit = doseExceedsLimit(dose, limit, match.normalized_name);
-
-      if (exceedsLimit === null) {
-        summary.hiddenCount += 1;
-        summary.reviewCount += 1;
-        supplementBreakdown.push(
-          await hideForReview(
-            sql,
-            input,
-            ingredient,
-            match,
-            "dose_unverified",
-            "The suggested dose uses a unit we could not compare automatically.",
-            "medium",
-            dose,
-            limit
-          )
-        );
-        continue;
-      }
-
-      if (exceedsLimit) {
-        summary.adjustedCount += 1;
-        supplementBreakdown.push(
-          await reduceDose(sql, input, ingredient, match, dose, limit)
-        );
-        continue;
-      }
-    }
-
-    supplementBreakdown.push(withAutomatedSafetyStatus(ingredient));
+    summary.reviewCount += advice.length > 0 ? 1 : 0;
+    const visible = withAutomatedSafetyStatus(ingredient);
+    supplementBreakdown.push(advice.length ? {
+      ...visible,
+      safety: { action: "advisory", advice, message: joinedAdviceMessage(advice), visibility: "visible" }
+    } : visible);
   }
 
   await audit(input, {

@@ -2,23 +2,21 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
-describe("reveal does not poll formulation when last-known is on the page", () => {
-  it("skips mount fetch when SSR already has a formula", async () => {
+describe("reveal preserves completed results during version polling", () => {
+  it("keeps initial results visible and delegates cancellable refresh to the shared polling hook", async () => {
     const source = await readFile(
       "components/formulation-results.tsx",
       "utf8"
     );
 
-    assert.match(source, /function hasRenderableFormula/);
-    assert.match(
-      source,
-      /if \(!hasRenderableFormula\(initialResult\)\) \{\s*void fetchFormulation\("until-formula"\)/
-    );
-    assert.match(source, /else if \(productPollingPreference\) \{\s*void fetchFormulation\("once"\)/);
-    assert.match(
-      source,
-      /formulationUrl\(effectivePlanId, locale, true\)/
-    );
+    const polling = await readFile("components/nutrition-flow/use-formulation-polling.ts", "utf8");
+    assert.match(source, /useFormulationPolling\([\s\S]*effectivePlanId, locale, initialResult/);
+    assert.match(polling, /useState\(initialResult\)/);
+    assert.match(polling, /snapshot\.resultVersion !== version\.current/);
+    assert.match(polling, /formulationStatus === "ready"/);
+    assert.match(polling, /controller\.abort\(\)/);
+    assert.match(source, /data-testid="formulation-retry"/);
+    assert.doesNotMatch(source, /nutritionPending|orderedIngredients\.length === 0/);
     assert.doesNotMatch(source, /MAX_PRODUCT_MATCHING_POLLS/);
     assert.doesNotMatch(source, /PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS/);
     assert.doesNotMatch(source, /PENDING_SECTION_POLL_INTERVAL_MS/);

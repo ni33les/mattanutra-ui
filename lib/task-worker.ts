@@ -1,3 +1,4 @@
+import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { generationLocale, ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { deferUntilDatabaseCommit } from "@/lib/db";
 import type postgres from "postgres";
@@ -1416,6 +1417,7 @@ export async function enqueueProductRecommendationsTask({
     return null;
   }
 
+  const productPreferences = await getAssessmentProductPreferences(sql, planId);
   const matcherAlgorithmVersion =
     ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION;
   const matcherImplementationVersion =
@@ -1425,12 +1427,14 @@ export async function enqueueProductRecommendationsTask({
   const dependencyTaskId =
     dependsOnTaskId && isUuid(dependsOnTaskId) ? dependsOnTaskId : null;
 
-  if (!forceNew) {
+  // A refresh may supersede a completed run, but repeating it must reuse current work.
+  {
     const activeRows = await sql<Array<{ id: string }>>`
       select id::text
       from public.tasks
       where plan_id = ${planId}::uuid
         and task_type = 'generate_product_recommendations'
+        and coalesce((payload #>> '{productPreferences,revision}')::bigint, 0) = ${productPreferences.revision}
         and payload #>> '{generation,revision}' = (select input_revision::text from public.assessments where plan_id = ${planId}::uuid)
         and payload #>> '{generation,locale}' = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
         and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
@@ -1465,6 +1469,7 @@ export async function enqueueProductRecommendationsTask({
   }
 
   const inputHash = stableHash({
+    productPreferences,
     dependencyTaskId: row.formulationVersion < 1 ? dependencyTaskId : null,
     matcherAlgorithmVersion,
     matcherImplementationVersion,
@@ -1497,6 +1502,7 @@ export async function enqueueProductRecommendationsTask({
       ? `product-recommendations:${planId}:${inputHash}:${forcedRunKey}`
       : `product-recommendations:${planId}:${inputHash}`,
     payload: {
+      productPreferences,
       inputHash,
       dependsOnTaskId: dependencyTaskId,
       refreshReason: row.reason,
@@ -1561,6 +1567,7 @@ export async function enqueueFoodGapSupportTask({
     return null;
   }
 
+  const productPreferences = await getAssessmentProductPreferences(sql, planId);
   const dependencyTaskId =
     dependsOnTaskId && isUuid(dependsOnTaskId) ? dependsOnTaskId : null;
   const rows = await sql<Array<{
@@ -1616,6 +1623,7 @@ export async function enqueueFoodGapSupportTask({
         and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
         and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
         and generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and selection_revision = ${productPreferences.revision}
             and status in ('completed', 'partial')
             and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
           order by
@@ -1630,6 +1638,7 @@ export async function enqueueFoodGapSupportTask({
         and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
         and generation_locale = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
         and generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and selection_revision = ${productPreferences.revision}
           and status in ('completed', 'partial')
       ), 0)::int as product_run_count,
       coalesce((
@@ -1654,6 +1663,7 @@ export async function enqueueFoodGapSupportTask({
   }
 
   const inputHash = stableHash({
+    productPreferences,
     dependencyTaskId,
     foodCatalogRevision: row.food_catalog_revision,
     foodGuidanceVersion: row.food_guidance_version,
@@ -1669,6 +1679,10 @@ export async function enqueueFoodGapSupportTask({
       from public.tasks
       where plan_id = ${planId}::uuid
         and task_type = 'generate_food_gap_guidance'
+        and coalesce((payload #>> '{productPreferences,revision}')::bigint, 0) = ${productPreferences.revision}
+        and payload #>> '{generation,revision}' = (select input_revision::text from public.assessments where plan_id = ${planId}::uuid)
+        and payload #>> '{generation,locale}' = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+        and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
         and status not in ('completed', 'failed', 'cancelled', 'skipped')
       order by business_value desc, scheduled_for asc, created_at asc
       limit 1
@@ -1703,6 +1717,7 @@ export async function enqueueFoodGapSupportTask({
       ? `food-gap-support:${planId}:${inputHash}:${forcedRunKey}`
       : `food-gap-support:${planId}:${inputHash}`,
     payload: {
+      productPreferences,
       dependsOnTaskId: dependencyTaskId,
       inputHash,
       parentTaskId,

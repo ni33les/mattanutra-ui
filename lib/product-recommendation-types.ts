@@ -56,6 +56,7 @@ export type ProductCandidateFact = Readonly<{
 }>;
 
 export type ProductCandidate = Readonly<{
+  matchingFacts?: Readonly<{ dailyPillsPerServing: number; form: string; dietarySource: "algae" | "any" | "fish" | "plant"; omegaSource: "algae" | "fish" | "none" }>;
   automatedSafetyPassed: boolean;
   availabilityStatus: ProductAvailabilityStatus;
   availableCountryCodes?: readonly string[];
@@ -97,6 +98,7 @@ export type ProductRecommendationExclusion = Readonly<{
 }>;
 
 export type ProductRecommendationNeedDiagnostic = Readonly<{
+  targetBasis?: "supplemental";
   bestRejectedProductId: string | null;
   bestRejectedReason: string | null;
   displayName: string;
@@ -106,12 +108,29 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 }>;
 
 export type ProductRecommendationAlgorithmVersion =
+  | "advisory-dose-fit-2"
   | "pareto-hybrid-1"
   | "v2-exact-shortlist"
   | "v2-full-beam";
 export type ProductStackPreference = "balanced" | "compact";
 
 export type ProductRecommendationDiagnostics = Readonly<{
+  matching?: Readonly<{
+    operationalStatus: "ready" | "no_purchase";
+    selectedOptionId: string | null;
+    options: readonly Readonly<{
+      optionId: string;
+      productIds: readonly string[];
+      dailyServings: readonly number[];
+      coveragePercent: number;
+      priceMinor: number;
+      dailyPills: number;
+      doseFit: import("@/lib/matcher/types").DoseFitScore | null;
+      advice: readonly import("@/lib/formulation-types").WebHealthAdvice[];
+      recommendations: readonly ProductRecommendationSelection[];
+    }>[];
+    alternativeSearch: import("@/lib/matcher/types").MatchResult["alternativeSearch"];
+  }>;
   algorithmVersion?: ProductRecommendationAlgorithmVersion;
   blockedProducts: ProductRecommendationExclusion[];
   coverage: {
@@ -166,6 +185,13 @@ export type ProductRecommendationResult = Readonly<{
 }>;
 
 export type ProductRecommendationClientContext = Readonly<{
+  profileKnown?: Readonly<{ ageYears: boolean; lifeStage: boolean; sex: boolean }>;
+  excludeProductIds?: readonly string[];
+  excludeSupplementIds?: readonly string[];
+  continuedIntake?: readonly Readonly<{ name: string; subjectId: string; dailyAmount: number; minimumDailyAmount?: number; maximumDailyAmount?: number; unit: import("@/lib/matcher/types").MatcherUnit; sourceId: string }>[];
+  unknownIntakeSubjectIds?: readonly string[];
+  estimatedIntakeSubjectIds?: readonly string[];
+  unknownHealthFields?: readonly string[];
   ageYears?: number | null;
   budgetAmount?: number | null;
   budgetPreference?: string | null;

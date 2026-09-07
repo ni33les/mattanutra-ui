@@ -18,6 +18,18 @@ const formulationRoute = readFileSync(
   new URL("../app/api/assessment/[planId]/formulation/route.ts", import.meta.url),
   "utf8",
 );
+const formulationPolling = readFileSync(
+  new URL("../components/nutrition-flow/use-formulation-polling.ts", import.meta.url),
+  "utf8",
+);
+const formulationRefreshRoute = readFileSync(
+  new URL("../app/api/assessment/[planId]/formulation/refresh/route.ts", import.meta.url),
+  "utf8",
+);
+const formulationRecovery = readFileSync(
+  new URL("../lib/funnel-recovery.ts", import.meta.url),
+  "utf8",
+);
 const revealEnsureHelper = taskWorker.slice(
   taskWorker.indexOf("export async function ensureFreshProductRecommendationsForReveal"),
   taskWorker.indexOf("export async function enqueueFoodGapSupportTask"),
@@ -117,18 +129,15 @@ describe("product recommendation freshness", () => {
     assert.match(revealPage, /export const dynamic = "force-dynamic"/);
     assert.match(revealPage, /export const fetchCache = "force-no-store"/);
     assert.match(revealPage, /export const revalidate = 0/);
-    assert.match(
-      revealPage,
-      /setTimeout\(\(\) => \{[\s\S]*ensureFreshProductRecommendationsForReveal\([\s\S]*planId,[\s\S]*initialStackPreference/,
-    );
     assert.doesNotMatch(revealPage, /getStoredFormulationResult/);
     assert.doesNotMatch(revealPage, /detail:\s*"page"/);
     assert.doesNotMatch(revealPage, /await ensureFreshProductRecommendationsForReveal/);
-    assert.match(
-      revealPage,
-      /setTimeout\(\(\) => \{[\s\S]*ensureFreshProductRecommendationsForReveal/,
-    );
+    assert.doesNotMatch(revealPage, /setTimeout/);
+    assert.match(formulationPolling, /\/formulation\/refresh[\s\S]*method: "POST"/);
+    assert.match(formulationRefreshRoute, /recoverFunnelWork\(planId, body\?\.locale, true\)/);
+    assert.match(formulationRecovery, /ensureFreshProductRecommendationsForReveal/);
+    assert.match(formulationRefreshRoute, /Cache-Control": "no-store"/);
     assert.match(formulationRoute, /Cache-Control", "no-store, max-age=0"/);
-    assert.match(formulationRoute, /jsonNoStore\(storedResult\)/);
+    assert.match(formulationRoute, /jsonNoStore\(\{ \.\.\.storedResult/);
   });
 });

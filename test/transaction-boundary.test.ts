@@ -224,6 +224,12 @@ describe("database transaction boundaries", () => {
       ["lib/funnel-idempotency.ts", ["claimFunnelRequest"]],
       ["lib/assessment-capture.ts", ["captureAssessment", "retryAssessmentHealthScore"]],
       ["lib/funnel-recovery.ts", ["recoverFunnelWork", "recoverFunnelWork"]],
+      ["lib/funnel-generation-recovery.ts", ["recoverMissingFunnelGeneration"]],
+      // Selection revisions use the same assessment -> preferences lock order as
+      // generation completion. Checkout revalidates its option under that fence.
+      ["app/api/assessment/[planId]/product-recommendations/route.ts", ["POST"]],
+      ["lib/assessment-product-preferences.ts", ["getAssessmentProductPreferences"]],
+      ["lib/retail-product-checkout.ts", ["createRetailCheckoutSession"]],
       ["lib/healthscore-delivery.ts", [
         "enqueueReadyHealthScoreDeliveries", "requestHealthScoreDelivery",
         "deliverHealthScore", "deliverHealthScore"

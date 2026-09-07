@@ -75,6 +75,10 @@ type ProductBasketCheckoutPanelProps = Readonly<{
   removedItemIds: readonly string[];
   selectedRetailerOrganisationId?: string | null;
   selectedItemIds: readonly string[];
+  recommendationRunId?: string | null;
+  optionId?: string | null;
+  assessmentRevision?: number | null;
+  selectionRevision?: number | null;
   selectedProducts: readonly ProductBasketProduct[];
   shippingAmount?: number | null;
 }>;
@@ -411,6 +415,7 @@ export function ProductBasketCheckoutPanel({
   removedItemIds,
   selectedRetailerOrganisationId = null,
   selectedItemIds,
+  recommendationRunId, optionId, assessmentRevision, selectionRevision,
   selectedProducts,
   shippingAmount: shippingAmountFrozen = null
 }: ProductBasketCheckoutPanelProps) {
@@ -714,6 +719,7 @@ export function ProductBasketCheckoutPanel({
           removedItemIds,
           selectedRetailerOrganisationId,
           selectedItemIds,
+          recommendationRunId, optionId, assessmentRevision, selectionRevision,
           shippingAmount:
             shippingAmountFrozen ?? activeQuotePreview.shippingAmount ?? null
         }),
@@ -726,7 +732,14 @@ export function ProductBasketCheckoutPanel({
         clientSecret?: string;
         mock?: boolean;
         paymentId?: string;
+        recovery?: boolean;
+        returnUrl?: string;
       };
+
+      if (response.ok && body.paymentId && body.recovery && body.returnUrl) {
+        window.location.assign(body.returnUrl);
+        return null;
+      }
 
       if (!response.ok || !body.paymentId || (!body.clientSecret && !body.mock)) {
         throw new Error((body as { message?: string }).message || labels.error);
@@ -756,6 +769,7 @@ export function ProductBasketCheckoutPanel({
   }, [
     agenticOrderId,
     checkout.address,
+    checkout.agentAuthorized,
     checkout.billingAddress,
     checkout.billingSameAsShipping,
     checkoutMode,
@@ -771,6 +785,7 @@ export function ProductBasketCheckoutPanel({
     removedItemIds,
     selectedRetailerOrganisationId,
     selectedItemIds,
+    recommendationRunId, optionId, assessmentRevision, selectionRevision,
     shippingAmountFrozen,
     touchInvalidFields
   ]);

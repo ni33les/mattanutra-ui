@@ -1,4 +1,5 @@
 import { assessmentInputHash } from "@/lib/assessment-revisions";
+import { captureInputProvenance, inputProvenance } from "@/lib/assessment-input-provenance";
 import { toAssessmentAnswers } from "@/lib/questionnaire/normalize";
 import { deserializeState } from "@/lib/questionnaire/engine";
 import { buildInitialAnswers } from "@/components/assessment-flow-state";
@@ -35,6 +36,10 @@ export function validateCaptureAnswers(value: unknown) {
   if (!Object.keys(answers).length || JSON.stringify(answers).length > 65_536) throw new FunnelError("Assessment answers are required", 400, "invalid_answers");
   const shape = { ...buildInitialAnswers(), reassessmentEmail: "" } as Record<string, unknown>;
   for (const [key, answer] of Object.entries(answers)) {
+    if (key === "inputProvenance") {
+      if (!inputProvenance(answer)) throw new FunnelError("Invalid assessment input provenance", 400, "invalid_answers");
+      continue;
+    }
     if (!(key in shape)) throw new FunnelError(`Unknown assessment answer: ${key}`, 400, "invalid_answers");
     const expected = shape[key];
     const valid = Array.isArray(expected)
@@ -44,7 +49,7 @@ export function validateCaptureAnswers(value: unknown) {
         : typeof answer === typeof expected && (typeof answer !== "string" || answer.length <= 5000);
     if (!valid) throw new FunnelError(`Invalid assessment answer: ${key}`, 400, "invalid_answers");
   }
-  return { ...buildInitialAnswers(answers), ...(answers.reassessmentEmail ? { reassessmentEmail: answers.reassessmentEmail } : {}) };
+  return { ...buildInitialAnswers(answers), inputProvenance: inputProvenance(answers.inputProvenance) ?? captureInputProvenance(answers), ...(answers.reassessmentEmail ? { reassessmentEmail: answers.reassessmentEmail } : {}) };
 }
 
 /** Shared HTTP and server-coordinator capture. The receipt, revision, binding and jobs commit together. */

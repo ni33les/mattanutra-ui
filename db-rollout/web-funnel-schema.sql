@@ -94,3 +94,17 @@ create index if not exists tasks_funnel_generation_idx on public.tasks
   (plan_id, (payload #>> '{generation,revision}'), (payload #>> '{generation,locale}'),
    (payload #>> '{generation,generatorVersion}'), task_type, created_at desc)
   where task_type in ('analyze_healthscore', 'generate_supplement_guidance', 'generate_product_recommendations');
+
+-- Product replanning has its own revision and never invalidates HealthScore inputs.
+create table if not exists public.assessment_product_preferences (
+  plan_id uuid primary key references public.assessments(plan_id),
+  revision bigint not null default 0 check (revision >= 0),
+  excluded_product_ids uuid[] not null default '{}',
+  updated_at timestamptz not null default now()
+);
+alter table public.product_recommendation_runs add column if not exists selection_revision bigint not null default 0;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'mn') then
+    grant select, insert, update, delete on public.assessment_product_preferences to mn;
+  end if;
+end $$;

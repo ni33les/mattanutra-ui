@@ -1,3 +1,4 @@
+import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { enqueueReadyHealthScoreDeliveries } from "@/lib/healthscore-delivery";
 import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { hasHealthScoreAiCopy, isUuid, toJsonValue } from "@/lib/assessment-store";
@@ -798,7 +799,7 @@ async function applyFoodGapSupportResult(
   const previousFoodGuidance = rows[0]?.guidance ?? { foodGuidance: [] };
   const nextFoodGuidance = {
     ...previousFoodGuidance,
-    foodGapSupport
+    foodGapSupport: { ...foodGapSupport, selectionRevision: Number(objectValue(objectValue(task.payload).productPreferences).revision ?? 0) }
   } satisfies FoodGuidanceBlueprint;
   const version = await insertFoodGuidanceVersion(sql, {
     generation: generationInput(task.payload),
@@ -1791,6 +1792,7 @@ async function applyNutritionReportResult(
       updated_at
     )
     values (
+      ${Number(objectValue(objectValue(task.payload).productPreferences).revision ?? 0)},
       ${generationInput(task.payload)?.locale ?? null}, ${generationInput(task.payload)?.generatorVersion ?? null},
       ${generationInput(task.payload)?.revision ?? null},
       ${task.planId}::uuid,
@@ -2113,7 +2115,7 @@ async function insertProductRecommendationResult({
   };
   const runRows = await sql<Array<{ id: string }>>`
     insert into public.product_recommendation_runs (
-      generation_locale, generator_version, assessment_revision,
+      selection_revision, generation_locale, generator_version, assessment_revision,
       plan_id,
       task_id,
       ray_id,
@@ -2219,6 +2221,11 @@ async function applyProductRecommendationsResult(
   if (!sql || !task.planId) {
     throw new Error("Product recommendation result is missing plan");
   }
+  const preferences = await getAssessmentProductPreferences(sql, task.planId, true);
+  const expectedPreferences = objectValue(objectValue(task.payload).productPreferences);
+  if (Number(expectedPreferences.revision ?? 0) !== preferences.revision) {
+    return { superseded: true, message: "Product preferences changed; old result was not applied" };
+  }
   const [localeRow] = await sql<{ locale: string | null }[]>`
     select locale
     from public.assessments
@@ -2233,7 +2240,7 @@ async function applyProductRecommendationsResult(
   );
   let variants = productRecommendationVariantPayloads(resultPayload);
 
-  if (variants.length < 1 && initialResult.recommendations.length > 0) {
+  if (variants.length < 1 && (initialResult.recommendations.length > 0 || initialResult.diagnostics.matching?.operationalStatus === "no_purchase")) {
     variants = [{
       maxProducts: Number(initialResult.diagnostics?.trace?.maxProducts) || null,
       result: initialResult,
@@ -2458,6 +2465,12 @@ export async function applyTaskCompletionResult({
     if (!generation || !current || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(current.input_revision) !== generation.revision ||
         (current.input_hash && current.input_hash !== generation.inputHash)) {
       return { superseded: true, message: "Assessment inputs changed; old result was not applied" };
+    }
+    if (task.taskType === "generate_food_gap_guidance") {
+      const preferences = await getAssessmentProductPreferences(db, task.planId, true);
+      if (Number(objectValue(objectValue(task.payload).productPreferences).revision ?? 0) !== preferences.revision) {
+        return { superseded: true, message: "Product preferences changed; old result was not applied" };
+      }
     }
   }
   const handler = taskCompletionResultHandlers[task.taskType];

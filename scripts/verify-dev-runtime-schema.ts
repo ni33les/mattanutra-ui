@@ -34,7 +34,7 @@ type TriggerRow = Readonly<{
 }>;
 
 const requiredTables = [
-  "assessments", "formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs",
+  "assessment_product_preferences", "assessments", "formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs",
   "assessment_inputs", "assessment_healthscore_results", "assessment_resume_drafts", "funnel_requests", "healthscore_delivery_requests", "tasks",
   "admin_product_coverage_demand_profile_cache",
   "payment_versions",
@@ -256,6 +256,9 @@ try {
     requireReadWritePrivilege(privilegeMap, tableName);
   }
 
+  requireColumn(columnMap, "assessment_product_preferences", "revision", { dataType: "bigint", notNull: true });
+  requireColumn(columnMap, "assessment_product_preferences", "excluded_product_ids", { notNull: true });
+  requireColumn(columnMap, "product_recommendation_runs", "selection_revision", { dataType: "bigint", notNull: true });
   requireColumn(columnMap, "assessments", "input_revision", { dataType: "bigint", notNull: true });
   requireColumn(columnMap, "assessments", "input_hash");
   requireColumn(columnMap, "assessments", "questionnaire_state", { dataType: "jsonb" });

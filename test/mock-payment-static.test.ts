@@ -3,28 +3,19 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 describe("DEV mock payment completion", () => {
-  it("returns the paid destination without waiting on mock Stripe follow-up", async () => {
+  it("returns the paid destination after durable fulfillment scheduling, without running optional Stripe follow-up", async () => {
     const source = await readFile("lib/stripe-payments.ts", "utf8");
     const panel = await readFile(
       "components/nutrition-flow/stripe-checkout-panel.tsx",
       "utf8"
     );
 
-    assert.match(
-      source,
-      /status: "paid"[\s\S]*void finishMockPaymentSideEffects\([\s\S]*return \{[\s\S]*destination/
-    );
-    assert.match(source, /async function finishMockPaymentSideEffects/);
-    assert.match(
-      source,
-      /finishMockPaymentSideEffects[\s\S]*recordMockStripePayoutLifecycle/
-    );
-    assert.match(source, /currentPayment\.stripe_mode !== "mock"/);
-    assert.match(source, /Unable to complete mock payment/);
-    assert.match(
-      source,
-      /setTimeout\(\(\) => \{[\s\S]*finishMockPaymentSideEffects/
-    );
+    const completion = source.slice(source.indexOf("export async function completeMockPayment"), source.indexOf("export async function notifyWebPaymentFulfilled"));
+    assert.match(completion, /withDatabaseTransaction[\s\S]*status: "paid"[\s\S]*await enqueueWebPaymentFulfillment\(tx, paid\)[\s\S]*destination/);
+    assert.match(completion, /current\.stripe_mode !== "mock"/);
+    assert.match(completion, /only available in dev mock mode/);
+    assert.doesNotMatch(completion, /setTimeout|recordMockStripePayoutLifecycle|queuePlatformPaymentNotification/);
+    assert.match(source, /notifyWebPaymentFulfilled[\s\S]*recordMockStripePayoutLifecycle/);
     assert.match(panel, /signal: controller.signal/);
     assert.match(
       panel,

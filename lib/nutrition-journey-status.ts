@@ -76,16 +76,12 @@ export function nutritionJourneyStatus({
       : "healthscore_only";
   }
 
-  if (visibleSupplementRecommendationCount(formula) < 1) {
-    return "formulation_pending";
-  }
-
   const productStatus = formula.sectionStatuses?.supplements;
   const productCount = formula.recommendations?.length ?? 0;
   const stackCoverage = formula.productRecommendations?.stackCoveragePercent;
   const productMatchingPending =
     productStatus === "pending" ||
-    (productCount < 1 && (stackCoverage === null || stackCoverage === undefined));
+    (productStatus !== "ready" && productCount < 1 && (stackCoverage === null || stackCoverage === undefined));
 
   if (productMatchingPending) {
     return "product_matching_pending";
@@ -187,6 +183,7 @@ export function nutritionJourneyStatusFromCounts({
   productSectionStatus,
   stackCoveragePercent,
   taskStatuses,
+  formulationComplete = false,
   visibleSupplementCount
 }: Readonly<{
   assessmentStatus?: string | null;
@@ -196,10 +193,11 @@ export function nutritionJourneyStatusFromCounts({
   productSectionStatus?: string | null;
   stackCoveragePercent?: number | null;
   taskStatuses?: readonly string[];
+  formulationComplete?: boolean;
   visibleSupplementCount?: number;
 }>): NutritionJourneyStatus {
   const formula =
-    (visibleSupplementCount ?? 0) > 0
+    formulationComplete || (visibleSupplementCount ?? 0) > 0
       ? {
           productRecommendations:
             stackCoveragePercent === null || stackCoveragePercent === undefined

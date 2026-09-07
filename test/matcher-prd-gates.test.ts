@@ -84,7 +84,7 @@ function recommendMag(conditions: readonly string[]) {
 }
 
 describe("PRD matcher gates", () => {
-  it("hard-blocks a magnesium stack for a CKD profile", () => {
+  it("keeps magnesium matching available with serious CKD advice", () => {
     const result = match(
       qaRequest({
         conditionCodes: ["ckd"],
@@ -93,10 +93,12 @@ describe("PRD matcher gates", () => {
       QA_GOLD_CATALOG
     );
 
-    assert.equal(result.selected, null);
+    assert.ok(result.selected);
+    assert.equal(result.selected.safety.hardBlocked, false);
+    assert.ok(result.selected.safety.findings.some((row) => row.code === "condition_review_required"));
   });
 
-  it("blocks a magnesium variant for CKD at remaining allowed 0", () => {
+  it("reports CKD as clinical advice without a numeric zero-dose limit", () => {
     const mag = scaleAmount({
       amount: 300,
       subjectId: "sup_mag",
@@ -132,18 +134,19 @@ describe("PRD matcher gates", () => {
       variants: [variant]
     });
     const block = safety.findings.find(
-      (item) => item.code === "dose_review_required" && item.action === "block"
+      (item) => item.code === "condition_review_required" && item.action === "inform"
     );
 
-    assert.equal(safety.hardBlocked, true);
+    assert.equal(safety.hardBlocked, false);
+    assert.equal(safety.requiresAck, false);
     assert.ok(block);
-    assert.equal(block?.thresholdUnits, BigInt(0));
+    assert.equal(block?.thresholdUnits, null);
   });
 
-  it("does not recommend magnesium to a CKD client on the website matcher", () => {
+  it("returns the requested magnesium match for a CKD web client", () => {
     const result = recommendMag(["ckd"]);
 
-    assert.equal(result.recommendations.length, 0);
+    assert.equal(result.recommendations[0]?.product.id, "mag-200");
   });
 
   it("maps quiz kidney disease and reduced to ckd", () => {
@@ -158,7 +161,7 @@ describe("PRD matcher gates", () => {
     assert.equal(result.recommendations[0]?.product.id, "mag-200");
   });
 
-  it("returns remaining allowed 0 mg magnesium for CKD from upperLimitAmount", () => {
+  it("keeps the population magnesium limit separate from CKD advice", () => {
     assert.equal(
       upperLimitAmount("Magnesium", "mg", {
         ceilings: qaCatalogSafetyCeilings(),
@@ -166,7 +169,7 @@ describe("PRD matcher gates", () => {
         profile: { ageYears: 52, lifeStage: "adult" },
         subjectId: "sup_mag"
       }),
-      0
+      350
     );
     assert.equal(
       upperLimitAmount("Magnesium", "mg", {

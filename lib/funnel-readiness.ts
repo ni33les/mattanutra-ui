@@ -2,6 +2,7 @@ import { getSql } from "@/lib/db";
 import { isUuid, hasHealthScoreAiCopy } from "@/lib/assessment-store";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
+import { recoverMissingFunnelGeneration } from "@/lib/funnel-generation-recovery";
 import { nutritionJourneyStatusFromCounts, nutritionJourneyWorkTimeline } from "@/lib/nutrition-journey-status";
 
 /** One projection for copy gates, journey polling, formulation responses and reveal rendering. */
@@ -35,6 +36,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
         (select count(*)::int from public.product_recommendation_items i where i.run_id = r.id) as product_count
       from public.product_recommendation_runs r where r.plan_id = a.plan_id and r.assessment_revision = a.input_revision
         and r.generation_locale = coalesce(${requestedLocale}, a.locale) and r.generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and r.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0)
       order by r.generated_at desc limit 1
     ) products on true
     left join lateral (select p.status, p.fulfillment_status, p.fulfillment_error from public.payments p
@@ -47,6 +49,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
         max(latest.status) filter (where latest.task_type = 'generate_product_recommendations') as product_task_status
       from (select distinct on (t.task_type) t.task_type, t.status::text from public.tasks t where t.plan_id = a.plan_id
         and t.task_type in ('analyze_healthscore','generate_supplement_guidance','generate_product_recommendations')
+        and (t.task_type <> 'generate_product_recommendations' or coalesce((t.payload #>> '{productPreferences,revision}')::bigint, 0) = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0))
         and t.payload #>> '{generation,revision}' = a.input_revision::text
         and t.payload #>> '{generation,locale}' = coalesce(${requestedLocale}, a.locale)
         and t.payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
@@ -64,18 +67,21 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
   const hasPaidPlan = Boolean(row.selected_plan || row.payment_status);
   const fulfillmentStatus = row.fulfillment_status ?? (row.selected_plan ? "complete" : "not_started");
   const fulfillmentPending = Boolean(row.payment_status && fulfillmentStatus !== "complete");
-  const taskStatuses = [Number(row.visible_count) > 0 ? null : row.formula_status, row.product_version ? null : row.product_task_status].filter((s): s is string => typeof s === "string");
+  await recoverMissingFunnelGeneration({ planId, locale,
+    healthScoreMissing: !copyReady && !row.copy_status,
+    formulationMissing: Boolean(row.selected_plan) && !fulfillmentPending && !row.formula_version && !row.formula_status });
+  const taskStatuses = [row.formula_version ? null : row.formula_status, row.product_version ? null : row.product_task_status].filter((s): s is string => typeof s === "string");
   // A failed older projection does not override a current retry or an available current result.
   const status = fulfillmentPending ? (fulfillmentStatus === "failed" ? "failed" : "formulation_pending")
     : !copyReady ? (copyFailed ? "failed" : hasPaidPlan ? "formulation_pending" : "healthscore_only")
-    : nutritionJourneyStatusFromCounts({ hasPaidPlan,
+    : nutritionJourneyStatusFromCounts({ hasPaidPlan, formulationComplete: Boolean(row.formula_version),
       productCount: Number(row.product_count ?? 0), visibleSupplementCount: Number(row.visible_count ?? 0),
-      productSectionStatus: row.product_version ? "ready" : row.section_status,
+      productSectionStatus: row.product_version || (row.formula_version && Number(row.visible_count) === 0) ? "ready" : row.section_status,
       stackCoveragePercent: row.stack_coverage_percent == null ? null : Number(row.stack_coverage_percent),
       taskStatuses: taskStatuses.filter(s => s !== "completed") });
   const timeline = nutritionJourneyWorkTimeline({ status, hasHealthScore: copyReady });
   const formulationStatus = fulfillmentPending || !copyReady ? "pending"
-    : Number(row.visible_count) > 0 ? "ready"
+    : row.formula_version ? "ready"
     : row.formula_status === "completed" ? "inconsistent"
     : ["failed", "cancelled"].includes(row.formula_status ?? "") ? "failed" : "pending";
   return { ...timeline, planId, locale, revision: Number(row.input_revision), inputHash: row.input_hash as string | null,

@@ -1,3 +1,5 @@
+import { sha256Hex } from "@/lib/sha256";
+import { webHealthAdvice } from "@/lib/web-health-advice";
 import { isPrenatalOrFertilitySku } from "@/lib/agentic/catalogue/product-fit";
 import { COVERAGE_SCALE, MATCHER_VERSION } from "@/lib/matcher/config";
 import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
@@ -10,7 +12,9 @@ import {
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { match } from "@/lib/matcher";
-import type { CatalogSnapshot, ProductGroup } from "@/lib/matcher/types";
+import type { CanonicalRequest, CatalogSnapshot, ProductGroup } from "@/lib/matcher/types";
+import { hasFewerConcerns } from "@/lib/matcher/selector";
+import { compareDoseFit } from "@/lib/matcher/dose-fit";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
 import { whyProductMatches } from "@/lib/product-recommendation-metrics";
@@ -64,6 +68,7 @@ function unitFromNeed(unit: string | null | undefined): MatcherUnit {
 }
 
 const matcherProductByCandidate = new WeakMap<ProductCandidate, MatcherProduct>();
+const searchContextByResult = new WeakMap<ProductRecommendationResult, { request: CanonicalRequest; baskets: ScoredBasket[] }>();
 const compiledGroupsByCandidates = new WeakMap<
   readonly ProductCandidate[],
   { catalog: CatalogSnapshot; groups: ProductGroup[]; requestKey: string }
@@ -109,13 +114,13 @@ function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
       )
     ],
     currency: candidate.currency,
-    dailyPillsPerServing: 1,
-    dietarySource: "any",
-    form: "capsule",
+    dailyPillsPerServing: candidate.matchingFacts?.dailyPillsPerServing ?? 1,
+    dietarySource: candidate.matchingFacts?.dietarySource ?? "any",
+    form: candidate.matchingFacts?.form ?? "capsule",
     imageUrl: candidate.imageUrl?.trim() || null,
     incompleteCommercialFacts: false,
     labelledContributions,
-    omegaSource: "none",
+    omegaSource: candidate.matchingFacts?.omegaSource ?? "none",
     orderable:
       candidate.status === "approved" &&
       candidate.availabilityStatus !== "unavailable" &&
@@ -328,6 +333,7 @@ function needDiagnosticsFromBasket(
   selected: ScoredBasket | null
 ): ProductRecommendationNeedDiagnostic[] {
   return needs.map((need) => ({
+    targetBasis: need.itemType === "supplement" || need.itemType === "nutrient" ? "supplemental" as const : undefined,
     bestRejectedProductId: null,
     bestRejectedReason: null,
     coveragePercent: matcherNeedCoveragePercent(
@@ -352,6 +358,7 @@ export function recommendWithMatcher(
         need.targetDose?.amount ??
         need.targetComparableAmount ??
         0,
+      basis: "supplemental",
       name: need.displayName,
       subjectId: need.normalizedName || need.sourceId || need.id,
       unit: need.targetDose
@@ -383,7 +390,7 @@ export function recommendWithMatcher(
     totalPlanCoveragePercent: 0
   };
 
-  const currents = canonicalizeCurrents([]);
+  const currents = canonicalizeCurrents(input.clientContext?.continuedIntake ?? []);
 
   if ("error" in currents) {
     return empty;
@@ -399,9 +406,13 @@ export function recommendWithMatcher(
     currentSupplements: currents,
     destinationCountry: (input.countryCode ?? "TH").toUpperCase(),
     dietaryPreference: dietary,
-    excludeSubjectIds: [],
+    excludeSubjectIds: [...(input.clientContext?.excludeSupplementIds ?? [])],
+    excludeProductIds: [...(input.clientContext?.excludeProductIds ?? [])],
+    profileKnown: input.clientContext?.profileKnown ?? { ageYears: input.clientContext?.ageYears != null, lifeStage: Boolean(input.clientContext?.lifestage), sex: Boolean(input.clientSex) },
+    unknownIntakeSubjectIds: input.clientContext?.unknownIntakeSubjectIds ?? (input.clientContext?.currentSupplements === "none" || input.clientContext?.continuedIntake ? [] : targets.targets.map(target => target.subjectId)),
+    estimatedIntakeSubjectIds: input.clientContext?.estimatedIntakeSubjectIds ?? [],
     leftovers: targets.leftovers,
-    maxDailyPills: null,
+    maxDailyPills: /^\d+(?:-\d+)?$/.test(input.clientContext?.pillLimit ?? "") ? Number(input.clientContext!.pillLimit!.split("-").at(-1)) : null,
     maxPriceMinor:
       input.budgetAmount != null ? Math.round(input.budgetAmount * 100) : null,
     maxProductCount: input.maxProducts ?? 6,
@@ -483,8 +494,9 @@ export function recommendWithMatcher(
   );
   const coverage = marketingCoveragePercentFromNeedCoverage(needDiagnostics);
   const byId = new Map(input.candidates.map((item) => [item.id, item]));
-  const recommendations: ProductRecommendationSelection[] = [];
-  for (const [index, productId] of (result.selected?.productIds ?? []).entries()) {
+  function selectionsFor(basket: ScoredBasket | null): ProductRecommendationSelection[] {
+    const recommendations: ProductRecommendationSelection[] = [];
+  for (const [index, productId] of (basket?.productIds ?? []).entries()) {
     const product = byId.get(productId);
     if (!product) {
       continue;
@@ -492,7 +504,7 @@ export function recommendWithMatcher(
     const matcherProduct = toMatcherProduct(product);
     const servingMultiplier = servingMultiplierFromBasket(
       product.id,
-      result.selected
+      basket
     );
     const skuCoverage = matcherProductOwnCoveragePercent(
       matcherProduct,
@@ -530,10 +542,63 @@ export function recommendWithMatcher(
       )
     });
   }
+    return recommendations;
+  }
+  const recommendations = selectionsFor(result.selected);
+  const options = [result.selected, ...result.alternatives].filter((basket): basket is ScoredBasket => Boolean(basket)).map(basket => {
+    const limitRows = (basket.doseFit?.perLimit ?? []).filter(row => (row.exposureMaximum ?? row.exposure) >= row.limit);
+    const advice = limitRows.map(row => webHealthAdvice({
+      code: "reference_limit_exceeded", kind: "limit", ingredient: row.name,
+      amount: row.exposureMaximum ?? row.exposure, unit: row.unit,
+      amountRange: row.exposureMinimum != null && row.exposureMaximum != null && row.exposureMinimum !== row.exposureMaximum
+        ? { minimum: row.exposureMinimum, maximum: row.exposureMaximum } : null,
+      limit: { amount: row.limit, unit: row.unit, sourceScope: row.sourceScope },
+      authorityUrl: row.authorityUrl, evidence: row.ruleId
+    }));
+    for (const row of basket.doseFit?.perTarget ?? []) {
+      if ((row.exposureMaximum ?? row.exposure) <= row.target) continue;
+      advice.push(webHealthAdvice({ code: "target_exceeded", kind: "target", ingredient: row.name,
+        amount: row.exposure, unit: row.unit,
+        amountRange: row.exposureMinimum != null && row.exposureMaximum != null && row.exposureMinimum !== row.exposureMaximum
+          ? { minimum: row.exposureMinimum, maximum: row.exposureMaximum } : null,
+        referenceDose: { amount: row.target, unit: row.unit, basis: "agreed_target" }, evidence: "Agreed supplemental target" }));
+    }
+    for (const row of basket.doseFit?.perContinuedDose ?? []) {
+      if (row.over <= 0) continue;
+      advice.push(webHealthAdvice({ code: "continued_dose_increased", kind: "continued", ingredient: row.name,
+        amount: row.exposure, unit: row.unit,
+        amountRange: row.exposureMinimum !== row.exposureMaximum ? { minimum: row.exposureMinimum, maximum: row.exposureMaximum } : null,
+        referenceDose: { amount: row.referenceDose, unit: row.unit, basis: "continued_dose" },
+        evidence: `Reported continued supplement intake: ${row.sourceIds.join(", ")}` }));
+    }
+    for (const finding of basket.safety.findings) {
+      if (finding.code === "target_exceeded" || finding.code === "continued_dose_increased" || limitRows.some(row => row.ruleId === finding.ruleId)) continue;
+      const scale = finding.unit ? scaleAmount({ amount: 1, unit: finding.unit, subjectId: finding.subjectId ?? "", subjectName: finding.nutrientName ?? "" }) : null;
+      const amount = scale && !isDoseError(scale) && scale.units > BigInt(0) && finding.exposureUnits != null
+        ? Number(finding.exposureUnits) / Number(scale.units) : null;
+      advice.push(webHealthAdvice({ code: finding.code, kind: /unknown|incomplete|unverified/.test(finding.code) ? "unknown" : "context", amount,
+        unit: finding.unit, ingredient: finding.nutrientName ?? finding.subjectId ?? "Ingredient", authorityUrl: finding.authorityUrl, evidence: finding.ruleId }));
+    }
+    for (const subjectId of basket.doseFit?.unknownSubjectIds ?? []) {
+      advice.push(webHealthAdvice({ code: "intake_unknown", kind: "unknown", ingredient: supplementNeeds.find(need => need.normalizedName === subjectId)?.displayName ?? subjectId }));
+    }
+    if (input.clientContext?.unknownHealthFields?.length && !advice.some(row => row.code === "incomplete_health_information")) {
+      advice.push(webHealthAdvice({ code: "incomplete_health_information", kind: "unknown", ingredient: "Health information",
+        evidence: "Medication or condition information is incomplete." }));
+    }
+    return {
+      optionId: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
+      productIds: [...basket.productIds], dailyServings: basket.productIds.map(id => servingMultiplierFromBasket(id, basket)),
+      coveragePercent: marketingCoveragePercentFromNeedCoverage(needDiagnosticsFromBasket(supplementNeeds, basket)),
+      priceMinor: basket.priceMinor, dailyPills: basket.dailyPills, doseFit: basket.doseFit ?? null, advice,
+      recommendations: selectionsFor(basket)
+    };
+  });
 
-  return {
+  const recommendationResult: ProductRecommendationResult = {
     clientNeeds: input.needs,
     diagnostics: {
+      matching: { operationalStatus: recommendations.length ? "ready" : "no_purchase", selectedOptionId: options[0]?.optionId ?? null, options, alternativeSearch: result.alternativeSearch },
       algorithmVersion: MATCHER_VERSION,
       blockedProducts: [],
       coverage: {
@@ -588,4 +653,31 @@ export function recommendWithMatcher(
     supplementProductCoveragePercent: coverage,
     totalPlanCoveragePercent: coverage
   };
+  searchContextByResult.set(recommendationResult, { request, baskets: [result.selected, ...result.alternatives].filter((basket): basket is ScoredBasket => Boolean(basket)) });
+  return recommendationResult;
+}
+
+/** Preserve the selected retailer while comparing explicit alternatives across all eligible retailers. */
+export function mergeWebRetailerAlternatives(primary: ProductRecommendationResult, peers: readonly ProductRecommendationResult[]) {
+  const context = searchContextByResult.get(primary);
+  const selected = context?.baskets[0];
+  const matching = primary.diagnostics.matching;
+  if (!context || !selected || !matching || matching.alternativeSearch?.status === "not_needed") return primary;
+  const candidates = peers.flatMap(peer => {
+    const other = searchContextByResult.get(peer);
+    if (!other || other.request.currency !== context.request.currency) return [];
+    return other.baskets.flatMap((basket, index) => {
+      const option = peer.diagnostics.matching?.options[index];
+      return option && hasFewerConcerns(basket, selected, context.request) ? [{ basket, option }] : [];
+    });
+  }).sort((a, b) => a.basket.doseFit && b.basket.doseFit ? compareDoseFit(a.basket.doseFit, b.basket.doseFit) ||
+    a.basket.priceMinor - b.basket.priceMinor || a.option.optionId.localeCompare(b.option.optionId) : a.option.optionId.localeCompare(b.option.optionId));
+  const alternative = candidates[0]?.option;
+  const incomplete = peers.some(peer => peer.diagnostics.matching?.alternativeSearch?.status === "incomplete");
+  return { ...primary, diagnostics: { ...primary.diagnostics, matching: { ...matching,
+    options: [matching.options[0], ...(alternative ? [alternative] : [])].filter((option): option is typeof matching.options[number] => Boolean(option)),
+    alternativeSearch: alternative ? { status: "found" as const, reason: "Fewer concerns without lower requested-target coverage across eligible retailers" }
+      : incomplete ? { status: "incomplete" as const, reason: "Some retailer alternatives could not be fully evaluated" }
+        : { status: "none_found" as const, reason: "No distinct option with fewer concerns met the same requirements across eligible retailers" }
+  } } };
 }

@@ -1,3 +1,7 @@
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("web-funnel");
+
 export class FunnelError extends Error {
   readonly status: number;
   readonly code: string;
@@ -11,7 +15,7 @@ export class FunnelError extends Error {
 
 export function funnelErrorResponse(error: unknown) {
   if (error instanceof SyntaxError) error = new FunnelError("Invalid JSON request", 400, "invalid_json");
-  if (!(error instanceof FunnelError)) console.error("[web-funnel] request failed", error);
+  if (!(error instanceof FunnelError)) log.error("request_failed", { error });
   return Response.json({
     message: error instanceof FunnelError ? error.message : "Unable to complete this request. Please retry.",
     code: error instanceof FunnelError ? error.code : "request_failed"

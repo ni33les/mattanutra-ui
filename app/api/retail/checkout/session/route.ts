@@ -1,3 +1,4 @@
+import { FunnelError } from "@/lib/funnel-errors";
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { queuePlatformAdminCommunication } from "@/lib/communications";
@@ -89,6 +90,15 @@ export async function POST(request: Request) {
   const shippingAmount =
     body.shippingAmount == null ? null : Number(body.shippingAmount);
 
+  for (const field of ["assessmentRevision", "selectionRevision"] as const) {
+    if (body[field] != null && (!Number.isSafeInteger(body[field]) || Number(body[field]) < (field === "assessmentRevision" ? 1 : 0))) {
+      return NextResponse.json({ message: `${field} must be an integer at least ${field === "assessmentRevision" ? 1 : 0}`, field, reasonCode: "invalid_revision" }, { status: 400 });
+    }
+  }
+  if (body.recommendationRunId != null && (typeof body.recommendationRunId !== "string" || !isUuid(body.recommendationRunId))) {
+    return NextResponse.json({ message: "recommendationRunId must be a UUID", field: "recommendationRunId", reasonCode: "invalid_run" }, { status: 400 });
+  }
+
   if (
     !locale ||
     !isUuid(planId) ||
@@ -117,6 +127,10 @@ export async function POST(request: Request) {
       billingSameAsShipping: body.billingSameAsShipping !== false,
       frozenLines,
       locale,
+      recommendationRunId: typeof body.recommendationRunId === "string" ? body.recommendationRunId : null,
+      optionId: typeof body.optionId === "string" ? body.optionId : null,
+      assessmentRevision: typeof body.assessmentRevision === "number" ? body.assessmentRevision : null,
+      selectionRevision: typeof body.selectionRevision === "number" ? body.selectionRevision : null,
       mode,
       planId,
       removedItemIds: stringArray(body.removedItemIds),
@@ -160,12 +174,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
+        reasonCode: error instanceof FunnelError ? error.code : "checkout_failed",
         message:
           error instanceof Error
             ? error.message
             : "Unable to create basket checkout"
       },
-      { headers: { "Cache-Control": "no-store" }, status: 400 }
+      { headers: { "Cache-Control": "no-store" }, status: error instanceof FunnelError ? error.status : 400 }
     );
   }
 }

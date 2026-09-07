@@ -1,9 +1,14 @@
+import { requireCurrentProductSelection } from "@/lib/assessment-product-preferences";
+import { FunnelError } from "@/lib/funnel-errors";
+import { ensureRetailProviderSession, recordRetailProviderSession, retailPaymentConfirmed } from "@/lib/retail-checkout-provider-session";
+import { FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
+import type { ProductRecommendationDiagnostics } from "@/lib/product-recommendation-types";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import type postgres from "postgres";
 import { isUuid } from "@/lib/assessment-store";
 import { parsePublicId } from "@/lib/agentic/contract/ids";
-import { getSql } from "@/lib/db";
+import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { FINANCE_ACCOUNT_IDS, recordFinanceTransaction } from "@/lib/finance-ledger";
 import { createPendingRetailOrderSettlement } from "@/lib/admin-retail-financials";
 import { resolveUsdRateForCurrency } from "@/lib/finance-fx";
@@ -75,6 +80,10 @@ export type RetailCheckoutQuoteInput = Readonly<{
   request?: Request;
   selectedRetailerOrganisationId?: string | null;
   selectedItemIds: readonly string[];
+  recommendationRunId?: string | null;
+  optionId?: string | null;
+  assessmentRevision?: number | null;
+  selectionRevision?: number | null;
   shippingAmount?: number | null;
 }>;
 
@@ -88,6 +97,7 @@ type CheckoutPaymentRow = Readonly<{
   id: string;
   locale: string;
   metadata: unknown;
+  paid_at: Date | string | null;
   plan_id: string;
   quote_lines: unknown;
   recommendation_run_id: string | null;
@@ -349,76 +359,49 @@ async function recordVersion(
   `;
 }
 
-async function latestRecommendations(
+export async function currentWebCheckoutRecommendations(
   sql: RetailCheckoutDb,
-  planId: string,
-  selectedProductIds: readonly string[]
+  input: Pick<RetailCheckoutQuoteInput, "planId" | "locale" | "selectedItemIds" | "recommendationRunId" | "optionId" | "assessmentRevision" | "selectionRevision">
 ) {
-  const rows = await sql<Array<{
-    currency: string | null;
-    image_url: string | null;
-    price_amount: number | string | null;
-    product_id: string;
-    rank: number | string | null;
-    run_id: string;
-    title: string;
-  }>>`
-    select
-      product_recommendation_items.run_id::text,
-      product_recommendation_items.product_id::text,
-      product_recommendation_items.rank,
-      product_recommendation_items.price_amount,
-      product_recommendation_items.currency,
-      coalesce(
-        nullif(product_translation_en.title, ''),
-        nullif(products.title, ''),
-        'Product'
-      ) as title,
-      coalesce(products.image_url, product_recommendation_items.image_url) as image_url
-    from public.product_recommendation_items
-    join public.product_recommendation_runs
-      on product_recommendation_runs.id = product_recommendation_items.run_id
-    join public.products
-      on products.id = product_recommendation_items.product_id
-    left join public.product_translations product_translation_en
-      on product_translation_en.product_id = products.id
-      and product_translation_en.locale = 'en'
-      and product_translation_en.status <> 'missing'
-    where product_recommendation_runs.plan_id = ${planId}::uuid
-      and product_recommendation_items.run_id = (
-        select candidate_runs.id
-        from public.product_recommendation_runs candidate_runs
-        where candidate_runs.plan_id = ${planId}::uuid
-          and candidate_runs.status in ('completed', 'partial')
-          and coalesce(candidate_runs.diagnostics ->> 'stackPreference', 'balanced') in ('balanced', 'compact')
-          and not exists (
-            select 1
-            from unnest(${[...selectedProductIds]}::uuid[]) as selected(product_id)
-            where not exists (
-              select 1
-              from public.product_recommendation_items selected_items
-              where selected_items.run_id = candidate_runs.id
-                and selected_items.product_id = selected.product_id
-            )
-          )
-        order by
-          case coalesce(candidate_runs.diagnostics ->> 'stackPreference', 'balanced')
-            when 'balanced' then 1
-            when 'compact' then 2
-            else 3
-          end,
-          candidate_runs.generated_at desc
-        limit 1
-      )
-      and product_recommendation_items.product_id = any(${[...selectedProductIds]}::uuid[])
-    order by product_recommendation_items.rank asc
-  `;
-
-  if (rows.length !== selectedProductIds.length) {
-    throw new Error("Selected basket contains products outside the current recommendation stack");
+  const runs = await sql`select distinct on (coalesce(r.diagnostics ->> 'stackPreference', 'balanced'))
+      r.id::text, r.diagnostics, r.selection_revision, a.input_revision,
+      coalesce(p.revision, 0) as current_selection_revision, coalesce(p.excluded_product_ids, '{}'::uuid[]) as excluded_product_ids
+    from public.product_recommendation_runs r join public.assessments a on a.plan_id = r.plan_id
+    left join public.assessment_product_preferences p on p.plan_id = a.plan_id
+    where r.plan_id = ${input.planId}::uuid and r.assessment_revision = a.input_revision
+      and r.generation_locale = ${input.locale} and r.generator_version = ${FUNNEL_GENERATOR_VERSION}
+      and r.selection_revision = coalesce(p.revision, 0) and r.status in ('completed', 'partial')
+    order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc, r.id desc`;
+  for (const run of runs) {
+    if (input.recommendationRunId && input.recommendationRunId !== run.id) continue;
+    const matching = objectValue(run.diagnostics).matching as ProductRecommendationDiagnostics["matching"];
+    const option = matching?.options.find(item => item.optionId === (input.optionId ?? matching.selectedOptionId));
+    const rows = await sql`select i.product_id::text, i.rank, i.price_amount, i.currency,
+        p.title, coalesce(p.image_url, i.image_url) as image_url
+      from public.product_recommendation_items i join public.products p on p.id = i.product_id
+      where i.run_id = ${run.id}::uuid order by i.rank`;
+    const allowedIds = option?.productIds ?? rows.map(row => String(row.product_id));
+    if (!input.recommendationRunId && input.selectedItemIds.some(id => !allowedIds.includes(id))) continue;
+    requireCurrentProductSelection({
+      assessmentRevision: Number(run.input_revision), expectedAssessmentRevision: input.assessmentRevision,
+      selectionRevision: Number(run.current_selection_revision), expectedSelectionRevision: input.selectionRevision,
+      runSelectionRevision: Number(run.selection_revision), runId: String(run.id), expectedRunId: input.recommendationRunId,
+      optionId: input.optionId, availableOptionIds: matching?.options.map(item => item.optionId) ?? [],
+      selectedIds: input.selectedItemIds, allowedIds, excludedIds: run.excluded_product_ids
+    });
+    return input.selectedItemIds.map((id, index) => {
+      const row = rows.find(item => item.product_id === id);
+      const alternative = option?.recommendations.find(item => item.product.id === id);
+      return {
+        run_id: String(run.id), product_id: id, rank: index + 1,
+        title: String(row?.title ?? alternative?.product.title ?? "Product"),
+        image_url: row?.image_url as string | null ?? alternative?.product.imageUrl ?? null,
+        price_amount: row?.price_amount ?? alternative?.unitPriceAmount ?? null,
+        currency: String(row?.currency ?? alternative?.product.currency ?? "THB")
+      };
+    });
   }
-
-  return rows;
+  throw new FunnelError("Product options changed. Reload and confirm the current recommendation stack.", 409, "stale_product_selection");
 }
 
 /** Pharmacy payable basis is RRP (list price), not wholesale. */
@@ -836,11 +819,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       throw new Error("Select at least one product before checkout");
     }
 
-    const recommendations = await latestRecommendations(
-      sql,
-      input.planId,
-      selectedProductIds
-    );
+    const recommendations = await currentWebCheckoutRecommendations(sql, { ...input, selectedItemIds: selectedProductIds });
     runId = recommendations[0]?.run_id ?? null;
     const resolved = await resolveRegionalBasketAvailability({
       lines: selectedProductIds.map((productId) => ({ productId, quantity: 1 })),
@@ -917,96 +896,116 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     channel: checkoutMode === "agentic" ? "mcp" : "web",
     planId: input.planId,
     runId,
+    optionId: input.optionId ?? null,
+    assessmentRevision: input.assessmentRevision ?? null,
+    selectionRevision: input.selectionRevision ?? null,
     selectedRetailerOrganisationId: input.selectedRetailerOrganisationId ?? null,
     shippingAmount,
     selectedProductIds
   });
   const config = stripePaymentConfig(input.request);
-  const existing = await sql<CheckoutPaymentRow[]>`
-    select *
-    from public.retail_checkout_payments
-    where idempotency_key = ${idempotencyKey}
-      and status not in ('paid', 'fulfilled', 'failed', 'cancelled', 'expired', 'fulfillment_failed')
-    order by created_at desc
-    limit 1
-  `;
-
-  let payment = existing[0] ?? null;
-
-  if (!payment) {
-    const rows = await sql<CheckoutPaymentRow[]>`
-      insert into public.retail_checkout_payments (
-        id,
-        plan_id,
-        recommendation_run_id,
-        selected_retailer_organisation_id,
-        locale,
-        status,
-        amount,
-        amount_unit,
-        currency,
-        stripe_mode,
-        customer_email,
-        customer_name,
-        customer_phone,
-        shipping_address,
-        selected_item_ids,
-        removed_item_ids,
-        quote_lines,
-        routing_snapshot,
-        metadata,
-        idempotency_key,
-        created_at,
-        updated_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${input.planId}::uuid,
-        ${runId}::uuid,
-        ${retailerId}::uuid,
-        ${input.locale},
-        'created',
-        ${amountMicros(totalAmount)},
-        'micros',
-        ${currency},
-        ${config.mode},
-        ${address.customerEmail},
-        ${address.customerName},
-        ${address.phone},
-        ${sql.json(toJsonValue(address))}::jsonb,
-        ${selectedProductIds}::text[],
-        ${removedItemIds}::text[],
-        ${sql.json(toJsonValue(quoteLines))}::jsonb,
-        ${sql.json(toJsonValue(availability))}::jsonb,
-        ${sql.json(toJsonValue({
-          agenticOrderId: checkoutMode === "agentic" ? input.agenticOrderId : null,
-          billingAddress,
-          billingSameAsShipping,
-          channel: checkoutMode === "agentic" ? "mcp" : "web",
-          freeShipping: shippingAmount <= 0,
-          shippingAmount,
-          shippingSource,
-          subtotalAmount,
-          taxAmount: 0,
-          taxDisplay: "included",
-          totalAmount
-        }))}::jsonb,
-        ${idempotencyKey},
-        now(),
-        now()
-      )
-      returning *
-    `;
-    payment = rows[0] ?? null;
-
-    if (payment) {
-      await recordVersion(sql, payment.id, "retail_checkout_created", "visitor", "basket_checkout_requested");
+  const payment = await withDatabaseTransaction(sql, async tx => {
+    // Both web and MCP retries serialize intent creation before contacting the provider.
+    await tx`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for no key update`;
+    if (checkoutMode === "web") {
+      // Serialize the checkout intent with answer edits, matching completion and exclusions.
+      await currentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds });
     }
-  }
+    const existing = await tx<CheckoutPaymentRow[]>`
+      select *
+      from public.retail_checkout_payments
+      where idempotency_key = ${idempotencyKey}
+        and (paid_at is not null or status not in ('failed', 'cancelled', 'expired'))
+      order by created_at desc
+      limit 1
+    `;
+
+    let payment = existing[0] ?? null;
+
+    if (!payment) {
+      const rows = await tx<CheckoutPaymentRow[]>`
+        insert into public.retail_checkout_payments (
+          id,
+          plan_id,
+          recommendation_run_id,
+          selected_retailer_organisation_id,
+          locale,
+          status,
+          amount,
+          amount_unit,
+          currency,
+          stripe_mode,
+          customer_email,
+          customer_name,
+          customer_phone,
+          shipping_address,
+          selected_item_ids,
+          removed_item_ids,
+          quote_lines,
+          routing_snapshot,
+          metadata,
+          idempotency_key,
+          created_at,
+          updated_at
+        )
+        values (
+          ${randomUUID()}::uuid,
+          ${input.planId}::uuid,
+          ${runId}::uuid,
+          ${retailerId}::uuid,
+          ${input.locale},
+          'created',
+          ${amountMicros(totalAmount)},
+          'micros',
+          ${currency},
+          ${config.mode},
+          ${address.customerEmail},
+          ${address.customerName},
+          ${address.phone},
+          ${tx.json(toJsonValue(address))}::jsonb,
+          ${selectedProductIds}::text[],
+          ${removedItemIds}::text[],
+          ${tx.json(toJsonValue(quoteLines))}::jsonb,
+          ${tx.json(toJsonValue(availability))}::jsonb,
+          ${tx.json(toJsonValue({
+            agenticOrderId: checkoutMode === "agentic" ? input.agenticOrderId : null,
+            billingAddress,
+            billingSameAsShipping,
+            channel: checkoutMode === "agentic" ? "mcp" : "web",
+            stripeSessionAttemptState: "not_started",
+            freeShipping: shippingAmount <= 0,
+            shippingAmount,
+            shippingSource,
+            subtotalAmount,
+            taxAmount: 0,
+            taxDisplay: "included",
+            totalAmount
+          }))}::jsonb,
+          ${idempotencyKey},
+          now(),
+          now()
+        )
+        returning *
+      `;
+      payment = rows[0] ?? null;
+
+      if (payment) {
+        await recordVersion(tx, payment.id, "retail_checkout_created", "visitor", "basket_checkout_requested");
+      }
+    }
+    return payment;
+  });
 
   if (!payment) {
     throw new Error("Unable to create product checkout");
   }
+
+  async function resumeExistingPayment() {
+    const recovered = await fulfillRetailCheckoutSession({ paymentId: payment!.id, request: input.request });
+    return { recovery: true as const, mock: false, paymentId: payment!.id,
+      returnUrl: recovered?.destination ?? retailCheckoutReturnUrl(input.locale, payment!.id) };
+  }
+  if (retailPaymentConfirmed(payment)) return resumeExistingPayment();
 
   void writeBpmEvent({
     actorType: "visitor",
@@ -1033,13 +1032,21 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   if (config.mode === "mock") {
     const mockSessionId = payment.stripe_checkout_session_id ?? `mock_rcs_${payment.id}`;
 
-    await sql`
+    const updated = await sql<CheckoutPaymentRow[]>`
       update public.retail_checkout_payments
       set status = 'checkout_session_created',
         stripe_checkout_session_id = ${mockSessionId},
         updated_at = now()
       where id = ${payment.id}::uuid
+        and paid_at is null and fulfilled_at is null
+        and status in ('created', 'checkout_session_created', 'checkout_opened', 'processing')
+      returning *
     `;
+    if (!updated[0]) {
+      const [latest] = await sql<CheckoutPaymentRow[]>`select * from public.retail_checkout_payments where id = ${payment.id}::uuid`;
+      if (latest && retailPaymentConfirmed(latest)) return resumeExistingPayment();
+      throw new FunnelError("Checkout expired or was cancelled. Start checkout again.", 409, "checkout_inactive");
+    }
     await recordVersion(sql, payment.id, "mock_checkout_session_created", "system", "mock_product_checkout");
 
     void writeBpmEvent({
@@ -1066,13 +1073,18 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   }
 
   const stripe = stripeClient(config.secretKey);
-  const session = await stripe.checkout.sessions.create({
+  const frozenLines = arrayValue<QuoteLine>(payment.quote_lines);
+  const frozenMetadata = objectValue(payment.metadata);
+  const frozenShippingAmount = Number(frozenMetadata.shippingAmount) || 0;
+  const frozenChannel = orderCheckoutChannelFromPayment(payment.metadata);
+  const frozenAgenticOrderId = cleanText(frozenMetadata.agenticOrderId);
+  const parameters: Stripe.Checkout.SessionCreateParams = {
     client_reference_id: payment.id,
-    customer_email: address.customerEmail,
+    customer_email: payment.customer_email ?? undefined,
     line_items: [
-      ...quoteLines.map((line) => ({
+      ...frozenLines.map((line) => ({
         price_data: {
-          currency: currency.toLowerCase(),
+          currency: payment.currency.toLowerCase(),
           product_data: {
             images: line.imageUrl ? [line.imageUrl] : undefined,
             name: line.productTitle
@@ -1081,53 +1093,52 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
         },
         quantity: line.quantity
       })),
-      ...(shippingAmount > 0
+      ...(frozenShippingAmount > 0
         ? [{
             price_data: {
-              currency: currency.toLowerCase(),
+              currency: payment.currency.toLowerCase(),
               product_data: {
                 name: "Flat-rate shipping"
               },
-              unit_amount: stripeMinorAmountFromMicros(amountMicros(shippingAmount))
+              unit_amount: stripeMinorAmountFromMicros(amountMicros(frozenShippingAmount))
             },
             quantity: 1
           }]
         : [])
     ],
-    locale: stripeLocale(input.locale),
+    locale: stripeLocale(isLocale(payment.locale) ? payment.locale : input.locale),
     metadata: {
-      channel: checkoutChannel,
+      channel: frozenChannel,
       kind: "retail_product_checkout",
-      locale: input.locale,
+      locale: payment.locale,
       paymentId: payment.id,
-      planId: input.planId,
-      ...(input.agenticOrderId ? { agenticOrderId: input.agenticOrderId } : {})
+      planId: payment.plan_id,
+      ...(frozenAgenticOrderId ? { agenticOrderId: frozenAgenticOrderId } : {})
     },
     mode: "payment",
     payment_intent_data: {
       metadata: {
-        channel: checkoutChannel,
+        channel: frozenChannel,
         kind: "retail_product_checkout",
         paymentId: payment.id,
-        planId: input.planId,
-        ...(input.agenticOrderId ? { agenticOrderId: input.agenticOrderId } : {})
+        planId: payment.plan_id,
+        ...(frozenAgenticOrderId ? { agenticOrderId: frozenAgenticOrderId } : {})
       }
     },
-    return_url: `${siteBaseUrl()}/${input.locale}/basket/return?session_id={CHECKOUT_SESSION_ID}`,
+    return_url: `${siteBaseUrl()}/${payment.locale}/basket/return?session_id={CHECKOUT_SESSION_ID}`,
     ui_mode: "embedded_page"
-  });
+  };
+  const resumed = await ensureRetailProviderSession({ sql, payment, parameters, provider: {
+    create: (params, options) => stripe.checkout.sessions.create(params, options),
+    retrieve: id => stripe.checkout.sessions.retrieve(id)
+  } });
+  const session = resumed.session;
+  if (retailPaymentConfirmed(resumed.payment) || session?.status === "complete") return resumeExistingPayment();
 
-  if (!session.client_secret) {
+  if (!session?.client_secret) {
     throw new Error("Stripe did not return an embedded Checkout client secret");
   }
 
-  await sql`
-    update public.retail_checkout_payments
-    set status = 'checkout_session_created',
-      stripe_checkout_session_id = ${session.id},
-      updated_at = now()
-    where id = ${payment.id}::uuid
-  `;
   await recordVersion(sql, payment.id, "checkout_session_created", "system", "stripe_product_checkout");
 
   void writeBpmEvent({
@@ -1476,7 +1487,10 @@ async function fulfillRetailCheckoutPayment(
         existingOrder[0]?.order_number ?? payment.retail_customer_order_id,
       payment
     });
-    return payment;
+    return {
+      ...payment,
+      metadata: { ...objectValue(payment.metadata), trackingReference: existingOrder[0]?.order_number ?? payment.retail_customer_order_id }
+    };
   }
 
   const { orderId, orderNumber, orderStatus } =
@@ -1766,16 +1780,10 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
     const stripe = stripeClient(config.secretKey);
     const session = await stripe.checkout.sessions.retrieve(input.sessionId);
     const rows = await sql<CheckoutPaymentRow[]>`
-      update public.retail_checkout_payments
-      set status = case when ${session.payment_status} = 'paid' then 'paid' else 'processing' end,
-        stripe_customer_id = ${typeof session.customer === "string" ? session.customer : null},
-        stripe_payment_intent_id = ${typeof session.payment_intent === "string" ? session.payment_intent : null},
-        paid_at = case when ${session.payment_status} = 'paid' then coalesce(paid_at, now()) else paid_at end,
-        updated_at = now()
+      select * from public.retail_checkout_payments
       where stripe_checkout_session_id = ${input.sessionId}
-      returning *
     `;
-    payment = rows[0] ?? null;
+    payment = rows[0] ? await recordRetailProviderSession(sql, rows[0], session) : null;
   } else if (input.paymentId && isUuid(input.paymentId)) {
     const rows = await sql<CheckoutPaymentRow[]>`
       select *
@@ -1790,7 +1798,7 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
     return null;
   }
 
-  if (payment.status === "paid" || payment.status === "fulfilled") {
+  if (retailPaymentConfirmed(payment)) {
     void writeBpmEvent({
       actorType: "system",
       emittedBy: "retail_product_checkout",

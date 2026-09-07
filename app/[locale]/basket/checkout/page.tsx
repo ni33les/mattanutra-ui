@@ -1,3 +1,5 @@
+import { currentWebCheckoutRecommendations } from "@/lib/retail-product-checkout";
+import { FunnelError } from "@/lib/funnel-errors";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -27,6 +29,7 @@ type BasketCheckoutPageProps = Readonly<{
     removed?: string;
     retailer?: string;
     selected?: string;
+    run?: string; option?: string; revision?: string; selectionRevision?: string;
     stateVersion?: string;
   }>;
 }>;
@@ -51,70 +54,17 @@ function parseIds(value: unknown) {
 }
 
 async function selectedProductsForCheckout(
-  planId: string,
-  selectedItemIds: readonly string[],
-  locale: Locale
+  planId: string, selectedItemIds: readonly string[], locale: Locale,
+  selection: { recommendationRunId?: string | null; optionId?: string | null; assessmentRevision?: number | null; selectionRevision?: number | null }
 ) {
   const sql = getSql();
-
-  if (!sql || selectedItemIds.length < 1) {
-    return [];
-  }
-
-  const rows = await sql<Array<{
-    currency: string | null;
-    image_url: string | null;
-    product_id: string;
-    title: string;
-    unit_price_amount: string | number | null;
-  }>>`
-    select distinct on (product_recommendation_items.product_id)
-      product_recommendation_items.product_id::text,
-      coalesce(
-        nullif(product_translation_locale.title, ''),
-        nullif(product_translation_en.title, ''),
-        nullif(products.title, '')
-      ) as title,
-      coalesce(products.image_url, product_recommendation_items.image_url) as image_url,
-      coalesce(
-        product_recommendation_items.unit_price_amount,
-        product_recommendation_items.price_amount
-      ) as unit_price_amount,
-      product_recommendation_items.currency
-    from public.product_recommendation_items
-    join public.product_recommendation_runs
-      on product_recommendation_runs.id = product_recommendation_items.run_id
-    join public.products
-      on products.id = product_recommendation_items.product_id
-    left join public.product_translations product_translation_locale
-      on product_translation_locale.product_id = products.id
-      and product_translation_locale.locale = ${locale}
-      and product_translation_locale.status <> 'missing'
-    left join public.product_translations product_translation_en
-      on product_translation_en.product_id = products.id
-      and product_translation_en.locale = 'en'
-      and product_translation_en.status <> 'missing'
-    where product_recommendation_runs.plan_id = ${planId}::uuid
-      and product_recommendation_items.product_id = any(${selectedItemIds}::uuid[])
-    order by product_recommendation_items.product_id,
-      product_recommendation_runs.generated_at desc,
-      product_recommendation_items.rank asc
-  `;
-  const byId = new Map(rows.map((row) => [row.product_id, row]));
-
-  return selectedItemIds.map((id) => {
-    const row = byId.get(id);
-    const amount = row?.unit_price_amount == null ? null : Number(row.unit_price_amount);
-
-    return {
-      currency: row?.currency ?? null,
-      id,
-      imageUrl: row?.image_url ?? null,
-      name: row?.title?.trim() || "",
-      unitPriceAmount:
-        amount != null && Number.isFinite(amount) && amount > 0 ? amount : null
-    };
+  if (!sql || !selectedItemIds.length) return [];
+  const rows = await currentWebCheckoutRecommendations(sql, { planId, selectedItemIds, locale, ...selection }).catch(error => {
+    if (error instanceof FunnelError && error.status === 409) redirect(`${nutritionRevealPath(locale, planId)}&reason=stale_product_selection`);
+    throw error;
   });
+  return rows.map(row => ({ id: row.product_id, name: row.title, imageUrl: row.image_url,
+    currency: row.currency, unitPriceAmount: row.price_amount == null ? null : Number(row.price_amount) }));
 }
 
 export function generateStaticParams() {
@@ -186,15 +136,18 @@ export default async function BasketCheckoutPage({
     redirect(`/${locale}/nutrition`);
   }
 
+  const selection = { recommendationRunId: query.run ?? null, optionId: query.option ?? null,
+    assessmentRevision: query.revision ? Number(query.revision) : null, selectionRevision: query.selectionRevision ? Number(query.selectionRevision) : null };
   const dictionary = getDictionary(locale);
   const labels = getNamespace<BasketCheckoutCopy>(locale, "customer.basketCheckout");
-  const currentPath = `/${locale}/basket/checkout`;
+  const currentQuery = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const currentPath = `/${locale}/basket/checkout?${currentQuery}`;
   const selectedProducts = agenticBasket
     ? agenticBasket.selectedProducts
     : await selectedProductsForCheckout(
         planId,
         selectedItemIds,
-        locale
+        locale, selection
       );
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -226,6 +179,7 @@ export default async function BasketCheckoutPage({
         </div>
         {selectedItemIds.length < 1 ? null : (
           <ProductBasketCheckoutPanel
+            {...selection}
             agenticOrderId={agenticBasket?.agenticOrderId ?? null}
             destinationCountry={agenticBasket?.destinationCountry ?? null}
             frozenLines={agenticBasket?.frozenLines ?? []}

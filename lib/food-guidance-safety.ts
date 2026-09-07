@@ -1,21 +1,13 @@
-import { randomUUID } from "node:crypto";
-import { toJsonValue } from "@/lib/assessment-store";
+import { joinedAdviceMessage, webHealthAdvice } from "@/lib/web-health-advice";
 import { writeBpmEvent } from "@/lib/bpm";
-import { getSql } from "@/lib/db";
 import {
   buildFoodNutrientFacts,
   completeFoodNutrientProfile,
   normalizeFoodServingSize
 } from "@/lib/food-nutrients";
-import type {
-  FoodGuidanceBlueprint,
-  FoodGuidanceItem,
-  FoodGuidanceSafetyAction,
-  LocalizedText
-} from "@/lib/formulation-types";
+import type { FoodGuidanceBlueprint, FoodGuidanceItem, LocalizedText } from "@/lib/formulation-types";
 import { resolveLocalizedText, type Locale } from "@/lib/i18n";
-import { safetyReviewItemColumnsAvailable } from "@/lib/safety-review-schema";
-import { createTask, type TaskServiceDb } from "@/lib/task-service";
+import { type TaskServiceDb } from "@/lib/task-service";
 
 type SafetyAfterCommit = (effect: () => Promise<void>) => void;
 
@@ -58,30 +50,8 @@ type MatchedFood = FoodRow & {
   requestedName: string;
 };
 
-type ReviewKind = "condition_review" | "review_required" | "unknown_food";
-
 function textFromLocalized(value: LocalizedText) {
   return resolveLocalizedText(value, "en");
-}
-
-function zhSafetyMessage(en: string) {
-  if (en.includes("blocked") || en.includes("blacklisted")) {
-    return "此食物未通过 MattaNutra 食物目录安全规则，因此不会显示为建议。";
-  }
-
-  if (en.includes("acknowledgement was not confirmed")) {
-    return "生成建议前尚未确认食物安全声明，此食物需要团队审核。";
-  }
-
-  if (en.includes("health or medication")) {
-    return "此食物需要根据您披露的健康或用药情况进行团队安全审核。";
-  }
-
-  return "此食物需要经过团队安全审核后才能显示。";
-}
-
-function localized(en: string, th = en, zh = zhSafetyMessage(en)): LocalizedText {
-  return { en, th, "zh-CN": zh };
 }
 
 export function normalizeFoodName(value: string) {
@@ -148,7 +118,6 @@ function safetyIntake(answers: unknown) {
   ];
 
   return {
-    acknowledged: record.disclosure === true || record.foodSafetyAcknowledged === true,
     allergens: allergenInputs.map(normalizeFoodName).filter(Boolean),
     avoidances: avoidances.map(normalizeFoodName).filter(Boolean),
     conditionFlags: deriveConditionFlags(record)
@@ -369,28 +338,6 @@ function foodMatchesTokens(food: MatchedFood | null, item: FoodGuidanceItem, tok
   );
 }
 
-function withHiddenSafety(
-  item: FoodGuidanceItem,
-  input: {
-    action: FoodGuidanceSafetyAction;
-    message: LocalizedText;
-    reviewId?: string;
-    reviewTaskId?: string;
-  }
-): FoodGuidanceItem {
-  return {
-    ...item,
-    safety: {
-      action: input.action,
-      message: input.message,
-      reviewId: input.reviewId,
-      reviewTaskId: input.reviewTaskId,
-      visibility: "hidden"
-    },
-    status: "review"
-  };
-}
-
 function withAutomatedSafetyStatus(item: FoodGuidanceItem): FoodGuidanceItem {
   return item.status === "review" ? { ...item, status: "add" } : item;
 }
@@ -446,314 +393,6 @@ async function logSafetyBpm(
   }
 
   await effect();
-}
-
-async function enqueueFoodReviewWork(input: {
-  afterCommit?: SafetyAfterCommit;
-  foodName: string;
-  kind: ReviewKind;
-  normalizedFoodName: string;
-  payload: Record<string, unknown>;
-  planId: string | null;
-}) {
-  const globalUnknown = input.kind === "unknown_food" && !input.planId;
-  const taskTitle = `Review food ${input.foodName}`;
-  const idempotencyKey = `food-review:${input.kind}:${globalUnknown ? "global" : input.planId}:${input.normalizedFoodName}`;
-  const createReviewWork = async () => {
-    const result = await createTask({
-      actorType: "human",
-      businessValue: globalUnknown ? 350 : 400,
-      context: {
-        normalizedFoodName: input.normalizedFoodName,
-        reviewKind: input.kind,
-        source: "food_guidance_safety"
-      },
-      groupLabel: globalUnknown ? "Review food" : "Review food guidance",
-      id: randomUUID(),
-      idempotencyKey,
-      idempotencyScopeKey: globalUnknown
-        ? `food:${input.normalizedFoodName}`
-        : `food-safety:${input.planId}`,
-      initialComment: {
-        authorName: "MattaNutra food safety",
-        authorType: "system",
-        body: `Food safety review opened for ${input.foodName}.`,
-        commentType: "instruction",
-        metadata: {
-          reviewKind: input.kind
-        },
-        visibility: "admin"
-      },
-      maxAttempts: 1,
-      payload: {
-        foodName: input.foodName,
-        normalizedFoodName: input.normalizedFoodName,
-        reviewKind: input.kind,
-        source: "food_guidance_safety",
-        ...input.payload
-      },
-      planId: globalUnknown ? null : input.planId,
-      reasoningEffort: "none",
-      requiredCapabilities: ["food_review"],
-      taskType: input.kind === "unknown_food" ? "classify_food" : "review_food_for_plan",
-      title: taskTitle
-    });
-
-    return { taskId: result.task.id };
-  };
-
-  return createReviewWork();
-}
-
-async function attachSafetyReviewWork(
-  sql: TaskServiceDb,
-  input: {
-    context?: Record<string, unknown>;
-    reviewId: string;
-    taskId?: string | null;
-  }
-) {
-  await sql`
-    update public.safety_reviews
-    set
-      task_id = coalesce(task_id, ${input.taskId ?? null}::uuid),
-      safety_context = safety_context || ${sql.json(
-        toJsonValue(input.context ?? {})
-      )}::jsonb,
-      updated_at = now()
-    where id = ${input.reviewId}::uuid
-  `;
-}
-
-async function attachSafetyReviewWorkAfterCommit(
-  input: Parameters<typeof attachSafetyReviewWork>[1]
-) {
-  const sql = getSql();
-
-  if (!sql) {
-    return;
-  }
-
-  await attachSafetyReviewWork(sql, input);
-}
-
-async function createFoodSafetyReview(
-  sql: TaskServiceDb,
-  input: {
-    afterCommit?: SafetyAfterCommit;
-    aiSuggestion: FoodGuidanceItem;
-    context: Record<string, unknown>;
-    flagReason: string;
-    foodName: string;
-    planId: string;
-    reviewType: string;
-    ruleCode: string;
-    severity: "critical" | "high" | "low" | "medium";
-    taskId?: string | null;
-  }
-) {
-  const itemColumnsAvailable = await safetyReviewItemColumnsAvailable(sql);
-  const existing = itemColumnsAvailable
-    ? await sql<{ id: string }[]>`
-        select id::text
-        from public.safety_reviews
-        where plan_id = ${input.planId}::uuid
-          and item_type = 'food'
-          and lower(item_name) = lower(${input.foodName})
-          and rule_code = ${input.ruleCode}
-          and status in ('open', 'in_review', 'escalated')
-        order by opened_at asc
-        limit 1
-      `
-    : await sql<{ id: string }[]>`
-        select id::text
-        from public.safety_reviews
-        where plan_id = ${input.planId}::uuid
-          and lower(supplement_name) = lower(${input.foodName})
-          and rule_code = ${input.ruleCode}
-          and status in ('open', 'in_review', 'escalated')
-        order by opened_at asc
-        limit 1
-      `;
-
-  if (existing[0]?.id) {
-    const attachInput = {
-      context: input.context,
-      reviewId: existing[0].id,
-      taskId: input.taskId
-    };
-
-    if (input.afterCommit) {
-      input.afterCommit(() => attachSafetyReviewWorkAfterCommit(attachInput));
-    } else {
-      await attachSafetyReviewWork(sql, attachInput);
-    }
-
-    return existing[0].id;
-  }
-
-  const reviewId = randomUUID();
-  if (itemColumnsAvailable) {
-    await sql`
-      insert into public.safety_reviews (
-        id,
-        plan_id,
-        review_type,
-        status,
-        severity,
-        item_type,
-        item_name,
-        supplement_name,
-        rule_code,
-        flag_reason,
-        ai_suggestion,
-        safety_context,
-        opened_at,
-        updated_at
-      )
-      values (
-        ${reviewId}::uuid,
-        ${input.planId}::uuid,
-        ${input.reviewType},
-        'open',
-        ${input.severity},
-        'food',
-        ${input.foodName},
-        ${input.foodName},
-        ${input.ruleCode},
-        ${input.flagReason},
-        ${sql.json(toJsonValue(input.aiSuggestion))},
-        ${sql.json(toJsonValue(input.context))},
-        now(),
-        now()
-      )
-    `;
-  } else {
-    await sql`
-      insert into public.safety_reviews (
-        id,
-        plan_id,
-        review_type,
-        status,
-        severity,
-        supplement_name,
-        rule_code,
-        flag_reason,
-        ai_suggestion,
-        safety_context,
-        opened_at,
-        updated_at
-      )
-      values (
-        ${reviewId}::uuid,
-        ${input.planId}::uuid,
-        ${input.reviewType},
-        'open',
-        ${input.severity},
-        ${input.foodName},
-        ${input.ruleCode},
-        ${input.flagReason},
-        ${sql.json(toJsonValue(input.aiSuggestion))},
-        ${sql.json(toJsonValue(input.context))},
-        now(),
-        now()
-      )
-    `;
-  }
-
-  const attachInput = {
-    context: input.context,
-    reviewId,
-    taskId: input.taskId
-  };
-
-  if (input.afterCommit) {
-    input.afterCommit(() => attachSafetyReviewWorkAfterCommit(attachInput));
-  } else {
-    await attachSafetyReviewWork(sql, attachInput);
-  }
-
-  return reviewId;
-}
-
-async function hideForReview(
-  sql: TaskServiceDb,
-  input: SafetyInput,
-  item: FoodGuidanceItem,
-  match: MatchedFood | null,
-  kind: ReviewKind,
-  reason: string,
-  severity: "critical" | "high" | "low" | "medium",
-  context: Record<string, unknown> = {}
-) {
-  const foodName = match?.name ?? textFromLocalized(item.food);
-  const normalizedFoodName = match?.normalized_name ?? normalizeFoodName(foodName);
-  const reviewWork = await enqueueFoodReviewWork({
-    afterCommit: input.afterCommit,
-    foodName,
-    kind,
-    normalizedFoodName,
-    payload: {
-      actionOptions:
-        kind === "unknown_food"
-          ? ["whitelist", "review_required", "blacklist", "ignore"]
-          : ["accept", "revise", "blacklist", "ignore"],
-      conditionFlags: match?.condition_flags ?? [],
-      confidence: match?.confidence,
-      foodId: match?.id,
-      foodName,
-      requiredFields: ["status", "confidence", "conditionFlags", "allergenFlags"],
-      source: "food_guidance_safety"
-    },
-    planId: input.planId
-  });
-  const reviewId = await createFoodSafetyReview(sql, {
-    afterCommit: input.afterCommit,
-    aiSuggestion: item,
-    context: {
-      allergenFlags: match?.allergen_flags ?? [],
-      conditionFlags: match?.condition_flags ?? [],
-      foodId: match?.id,
-      normalizedFoodName,
-      reviewTaskId: reviewWork.taskId,
-      safetyNotes: match?.safety_notes,
-      taskId: reviewWork.taskId,
-      ...context
-    },
-    flagReason: reason,
-    foodName,
-    planId: input.planId,
-    reviewType: kind === "condition_review" ? "condition_stop" : "ingredient_safety",
-    ruleCode: kind,
-    severity,
-    taskId: reviewWork.taskId
-  });
-
-  await audit(input, {
-    eventType: "food_guidance_safety_review_opened",
-    level: severity,
-    payload: {
-      foodName,
-      reason,
-      reviewId,
-      reviewKind: kind,
-      reviewTaskId: reviewWork.taskId
-    }
-  });
-  await logSafetyBpm(input, "food_guidance_safety_review_opened", severity, {
-    foodName,
-    reason,
-    reviewId,
-    reviewKind: kind,
-    reviewTaskId: reviewWork.taskId
-  });
-
-  return withHiddenSafety(item, {
-    action: kind === "unknown_food" ? "unknown_food" : "human_review",
-    message: localized(reason),
-    reviewId,
-    reviewTaskId: reviewWork.taskId ?? undefined
-  });
 }
 
 async function logRemoved(
@@ -824,89 +463,21 @@ export async function applyFoodGuidanceSafety(
       continue;
     }
 
-    if (!match) {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      foodGuidance.push(
-        await hideForReview(
-          sql,
-          input,
-          item,
-          null,
-          "unknown_food",
-          "This food is not yet in the MattaNutra food list.",
-          "medium",
-          { acknowledged: intake.acknowledged }
-        )
-      );
-      continue;
-    }
-
-    if (match.list_status === "blacklisted" || match.list_status === "inactive") {
+    if (match?.list_status === "blacklisted" || match?.list_status === "inactive") {
       summary.removedCount += 1;
-      await logRemoved(
-        input,
-        item,
-        `Food is ${match.list_status} in the MattaNutra food list.`,
-        "high"
-      );
+      await logRemoved(input, item, `Food is ${match.list_status} in the MattaNutra food list.`, "high");
       continue;
     }
-
-    if (!intake.acknowledged) {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      foodGuidance.push(
-        await hideForReview(
-          sql,
-          input,
-          withKnownFoodTags(item, match),
-          match,
-          "condition_review",
-          "Food safety acknowledgement was not confirmed before guidance generation.",
-          "high",
-          { acknowledged: false }
-        )
-      );
-      continue;
+    const known = withAutomatedSafetyStatus(match ? withKnownFoodTags(item, match) : item);
+    const advice = [];
+    if (triggeredConditions.length) {
+      advice.push(webHealthAdvice({ code: "food_health_context", kind: "context", ingredient: match?.name ?? textFromLocalized(item.food), evidence: match?.safety_notes, confidence: match?.confidence }));
     }
-
-    if (triggeredConditions.length > 0) {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      foodGuidance.push(
-        await hideForReview(
-          sql,
-          input,
-          withKnownFoodTags(item, match),
-          match,
-          "condition_review",
-          "This food needs review against disclosed health or medication context.",
-          "medium",
-          { triggeredConditions }
-        )
-      );
-      continue;
+    if (!match || match.list_status === "review_required") {
+      advice.push(webHealthAdvice({ code: !match ? "unknown_food" : "food_evidence_incomplete", kind: "unknown", ingredient: match?.name ?? textFromLocalized(item.food), evidence: match?.safety_notes, confidence: match?.confidence }));
     }
-
-    if (match.list_status === "review_required") {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      foodGuidance.push(
-        await hideForReview(
-          sql,
-          input,
-          withKnownFoodTags(item, match),
-          match,
-          "review_required",
-          "This food needs human review before we show it.",
-          "medium"
-        )
-      );
-      continue;
-    }
-
-    foodGuidance.push(withAutomatedSafetyStatus(withKnownFoodTags(item, match)));
+    summary.reviewCount += advice.length ? 1 : 0;
+    foodGuidance.push(advice.length ? { ...known, safety: { action: "advisory", advice, message: joinedAdviceMessage(advice), visibility: "visible" } } : known);
   }
 
   await audit(input, {

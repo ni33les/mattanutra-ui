@@ -40,10 +40,9 @@ describe("consistency r2 formulation read", () => {
     assert.doesNotMatch(reveal, /getStoredFormulationResult/);
     assert.doesNotMatch(reveal, /detail:\s*"page"/);
     assert.doesNotMatch(reveal, /await ensureFreshProductRecommendationsForReveal/);
-    assert.match(
-      reveal,
-      /setTimeout\(\(\) => \{[\s\S]*ensureFreshProductRecommendationsForReveal/
-    );
+    assert.doesNotMatch(reveal, /setTimeout|ensureFreshProductRecommendationsForReveal/);
+    assert.match(reveal, /getFunnelReadiness\(planId, locale\)/);
+    assert.match(reveal, /!readiness\?\.readyForReveal.*nutritionProgressPath/);
     assert.doesNotMatch(formulation, /jsonb_to_recordset/);
     assert.doesNotMatch(formulation, /blocked_product_facts/);
     assert.doesNotMatch(formulation, /getStoredAssessmentSnapshot/);
@@ -78,18 +77,15 @@ describe("consistency r2 formulation read", () => {
     assert.match(formulation, /products"\) === "1"/);
   });
 
-  it("loads stored products on the first reveal formulation fetch", async () => {
-    const source = await readFile(
-      "components/formulation-results.tsx",
-      "utf8"
-    );
-
-    assert.match(source, /formulationUrl\(effectivePlanId, locale, true\)/);
-    assert.match(source, /waitingForProducts/);
-    assert.doesNotMatch(
-      source,
-      /formulationUrl\(effectivePlanId, locale, mode === "once"\)/
-    );
+  it("polls lightweight versions and loads the current full payload only when that version changes", async () => {
+    const source = await readFile("components/nutrition-flow/use-formulation-polling.ts", "utf8");
+    assert.match(source, /pollFunnelStatus/);
+    assert.match(source, /formulation\?locale=\$\{locale\}&products=1/);
+    assert.match(source, /snapshot\.resultVersion !== version\.current/);
+    assert.match(source, /if \(request\.current\) return request\.current/);
+    assert.match(source, /controller\.abort\(\)/);
+    assert.match(source, /Array\.isArray\(response\.data\.supplementBreakdown\)/);
+    assert.doesNotMatch(source, /!response\.data\.supplementBreakdown\?\.length/);
   });
 
   it("does not insert an empty recommendations row with the formula", async () => {

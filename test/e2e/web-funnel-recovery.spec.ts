@@ -1,14 +1,17 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "../helpers/offline-browser";
 const execute = promisify(execFile);
 const databaseUrl = process.env.TEST_DB_URL;
 test.skip(!databaseUrl, "Requires the isolated PostgreSQL funnel fixture database and matching app server");
-test.setTimeout(90_000);
+// Fixture process startup is outside the product's 90-second foreground wait.
+// Keep each fixture bounded while allowing the complete multi-stage journey.
+test.setTimeout(240_000);
 async function fixture(input: Record<string, unknown>) {
   const { stdout } = await execute(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./test/helpers/offline-network.mjs", "test/helpers/web-funnel-fixture.ts", JSON.stringify(input)], {
-    env: { ...process.env, TEST_DB_URL: databaseUrl }, maxBuffer: 1024 * 1024
+    env: { ...process.env, TEST_DB_URL: databaseUrl }, maxBuffer: 1024 * 1024,
+    timeout: 60_000, killSignal: "SIGKILL"
   });
   return JSON.parse(stdout.split("\n").find(line => line.startsWith("FIXTURE:"))!.slice(8));
 }
@@ -20,15 +23,6 @@ async function fill(page: Page) {
   expect(response.status()).toBe(200);
   return response.json();
 }
-test.beforeEach(async ({ context, baseURL }) => {
-  expect(new URL(baseURL!).hostname).toBe("127.0.0.1");
-  // Block all external browser traffic, including third-party payments and analytics.
-  await context.route("**/*", route => {
-    const url = new URL(route.request().url());
-    return ["127.0.0.1", "localhost"].includes(url.hostname) ? route.continue() : route.abort();
-  });
-});
-
 test("fresh browser resumes server answers; unrelated drafts and previous contact are ignored", async ({ page }) => {
   const resumed = await fixture({ action: "resume" });
   await page.addInitScript(() => {
@@ -175,4 +169,17 @@ test("progress and reveal expose working recovery actions without another captur
   expect(stored.payments).toBe(1); expect(stored.revenues).toBe(1); expect(Number(stored.input_revision)).toBe(1);
   await page.goto(`/en/nutrition/quiz?plan=${capture.planId}&reassessment=1`);
   await expect(page.locator(".mn-chat-q__review-edit").first()).toBeVisible();
+});
+
+
+test("a completed no-purchase formulation opens reveal without an endless analysis loop", async ({ page }) => {
+  const capture = await fixture({ action: "capture" });
+  await fixture({ action: "copy", planId: capture.planId });
+  const payment = await page.request.post("/api/payments/mock-pay", { data: { locale: "en", plan: "precision", planId: capture.planId, sourceSurface: "healthscore", attemptId: randomUUID() } });
+  expect(payment.ok()).toBe(true);
+  await fixture({ action: "fulfill", planId: capture.planId });
+  await fixture({ action: "ready", planId: capture.planId, empty: true });
+  await page.goto(`/en/nutrition/reveal?plan=${capture.planId}`);
+  await expect(page.locator(".mn-reveal-final")).toBeVisible({ timeout: 30_000 });
+  expect((await fixture({ action: "state", planId: capture.planId })).payments).toBe(1);
 });

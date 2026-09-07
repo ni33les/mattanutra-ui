@@ -41,6 +41,7 @@ describe("Phase 4 T09/T15/T16", () => {
       pharmacy,
       search,
       workItems,
+      captureRoute,
       capture,
       quiz,
       inStorePage,
@@ -51,6 +52,7 @@ describe("Phase 4 T09/T15/T16", () => {
       readFile("lib/admin-product-search.ts", "utf8"),
       readFile("lib/task-work-items.ts", "utf8"),
       readFile("app/api/assessment/route.ts", "utf8"),
+      readFile("lib/assessment-capture.ts", "utf8"),
       readFile("components/chat-questionnaire/chat-questionnaire.tsx", "utf8"),
       readFile("app/[locale]/p/[pharmacyId]/page.tsx", "utf8"),
       readFile("app/p/[pharmacyId]/page.tsx", "utf8"),
@@ -65,9 +67,10 @@ describe("Phase 4 T09/T15/T16", () => {
     assert.match(search, /organisations.id = \$\{organisationId\}::uuid/);
     assert.match(workItems, /inStorePharmacyFromAnswers\(row\.answers\)/);
     assert.match(pharmacy, /export async function loadInStorePharmacyOrganisationId/);
+    assert.match(captureRoute, /captureAssessment\(body/);
     assert.match(capture, /skipHealthScore/);
     assert.match(capture, /healthScore: skipHealthScore/);
-    assert.match(capture, /selectedPlan: skipHealthScore \? DEFAULT_ASSESSMENT_PLAN : null/);
+    assert.match(capture, /selectedPlan = current\?\.selected_plan \?\? \(skipHealthScore \? DEFAULT_ASSESSMENT_PLAN : null\)/);
     assert.match(quiz, /skipHealthScoreStep/);
     assert.match(quiz, /nutritionRevealPath/);
     assert.match(inStorePage, /ChatQuestionnaire/);

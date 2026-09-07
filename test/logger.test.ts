@@ -101,7 +101,14 @@ describe("structured logger", () => {
 
     for (const route of priorityRoutes) {
       const text = source(route);
-      assert.match(text, /createLogger/, route);
+      if (text.includes("funnelErrorResponse")) {
+        const errorHandler = source("../lib/funnel-errors.ts");
+        assert.match(errorHandler, /createLogger/, route);
+        assert.match(errorHandler, /log\.error\("request_failed"/, route);
+        assert.doesNotMatch(errorHandler, /console\.(log|info|warn|error|debug)\(/, route);
+      } else {
+        assert.match(text, /createLogger/, route);
+      }
       assert.doesNotMatch(text, /console\.(log|info|warn|error|debug)\(/, route);
     }
   });

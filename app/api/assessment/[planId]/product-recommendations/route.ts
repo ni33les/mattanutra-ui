@@ -1,6 +1,9 @@
-import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
-import { getSql } from "@/lib/db";
+import { getSql, withDatabaseTransaction } from "@/lib/db";
+import { getAssessmentProductPreferences, normalizedProductExclusions } from "@/lib/assessment-product-preferences";
+import { FunnelError } from "@/lib/funnel-errors";
+import { loadGenerationInput, withGenerationInput } from "@/lib/assessment-revisions";
+import { isLocale } from "@/lib/i18n";
 import { normalizeProductStackPreference } from "@/lib/product-recommendations";
 import {
   enforceRateLimit,
@@ -34,7 +37,7 @@ export async function POST(
   const sql = getSql();
 
   if (!sql || !isUuid(planId)) {
-    return NextResponse.json({ message: "Plan not found" }, { status: 404 });
+    return Response.json({ message: "Plan not found" }, { status: 404 });
   }
 
   const planRows = await sql<Array<{ exists: boolean }>>`
@@ -47,38 +50,55 @@ export async function POST(
   `;
 
   if (planRows[0]?.exists !== true) {
-    return NextResponse.json({ message: "Plan not found" }, { status: 404 });
+    return Response.json({ message: "Plan not found" }, { status: 404 });
   }
 
-  const body = await request.json().catch(() => ({}));
+  const rawBody = await request.json().catch(() => ({}));
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+    return Response.json({ message: "Request body must be an object", reasonCode: "invalid_request" }, { status: 400 });
+  }
+  const body = rawBody as Record<string, unknown>;
+  if (body.locale !== undefined && !isLocale(body.locale)) {
+    return Response.json({ message: "locale must be en, th or zh-CN", reasonCode: "invalid_locale" }, { status: 400 });
+  }
   const stackPreference = normalizeProductStackPreference(
     body && typeof body === "object" && "stackPreference" in body
       ? (body as Record<string, unknown>).stackPreference
       : null
   );
-  const taskId = await enqueueProductRecommendationsTask({
-    forceNew: true,
-    planId,
-    stackPreference
-  });
-
-  if (!taskId) {
-    return NextResponse.json(
-      { message: "Unable to queue product matching" },
-      { status: 409 }
-    );
+  try {
+    return await withDatabaseTransaction(sql, async tx => {
+      // Match the assessment/result lock order while committing preferences and work together.
+      const [assessment] = await tx`select input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`;
+      if (!assessment) throw new FunnelError("Plan not found", 404, "assessment_not_found");
+      if (body.assessmentRevision != null && Number(body.assessmentRevision) !== Number(assessment.input_revision)) {
+        throw new FunnelError("Assessment changed. Reload before replanning.", 409, "assessment_changed");
+      }
+      const previous = await getAssessmentProductPreferences(tx, planId, true);
+      let selectionRevision = previous.revision;
+      if (body.excludeProductIds !== undefined) {
+        const excluded = normalizedProductExclusions(body.excludeProductIds);
+        if (!Number.isSafeInteger(body.selectionRevision) || body.selectionRevision !== previous.revision) {
+          throw new FunnelError("Product preferences changed. Reload before replanning.", 409, "stale_product_selection");
+        }
+        if (JSON.stringify(excluded) !== JSON.stringify(previous.excludedProductIds)) {
+          selectionRevision += 1;
+          await tx`update public.assessment_product_preferences set revision = ${selectionRevision},
+            excluded_product_ids = ${excluded}::uuid[], updated_at = now() where plan_id = ${planId}::uuid`;
+        }
+      }
+      const generation = await loadGenerationInput(tx, planId, body.locale);
+      if (!generation) throw new FunnelError("Assessment changed. Reload before replanning.", 409, "assessment_changed");
+      return withGenerationInput(planId, generation, async () => {
+        const taskId = await enqueueProductRecommendationsTask({ forceNew: true, planId, stackPreference });
+        if (!taskId) throw new FunnelError("Unable to queue product matching", 409, "matching_unavailable");
+        await enqueueFoodGapSupportTask({ dependsOnTaskId: taskId, parentTaskId: taskId, planId, source: "product_recommendations_request" });
+        return Response.json({ stackPreference, taskId, selectionRevision });
+      });
+    });
+  } catch (error) {
+    return Response.json({ message: error instanceof Error ? error.message : "Unable to queue product matching",
+      reasonCode: error instanceof FunnelError ? error.code : "matching_unavailable" },
+      { status: error instanceof FunnelError ? error.status : 500 });
   }
-
-  await enqueueFoodGapSupportTask({
-    dependsOnTaskId: taskId,
-    forceNew: true,
-    parentTaskId: taskId,
-    planId,
-    source: "product_recommendations_request"
-  });
-
-  return NextResponse.json({
-    stackPreference,
-    taskId
-  });
 }

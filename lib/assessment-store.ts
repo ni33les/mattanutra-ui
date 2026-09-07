@@ -1,3 +1,4 @@
+import type { ProductRecommendationSummary } from "@/lib/formulation-types";
 import { getFunnelReadiness } from "@/lib/funnel-readiness";
 import { assessmentInputHash, FUNNEL_GENERATOR_VERSION, getRevisionHealthScore } from "@/lib/assessment-revisions";
 import { withDatabaseTransaction, deferUntilDatabaseCommit } from "@/lib/db";
@@ -207,6 +208,7 @@ async function loadStoredRecommendationProductPayloads(
     from product_recommendation_runs
     where plan_id = ${planId}::uuid
       and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
+      and selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = ${planId}::uuid), 0)
       and generation_locale = ${locale} and generator_version = ${FUNNEL_GENERATOR_VERSION}
       and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
     order by
@@ -313,13 +315,14 @@ function asRecord(value: unknown): Record<string, unknown> {
   return toJsonRecord(value);
 }
 
-function asFoodGapSupport(value: unknown): FoodGapSupport | undefined {
+function asFoodGapSupport(value: unknown, selectionRevision?: number): FoodGapSupport | undefined {
   const record = asRecord(value);
   const variants = asRecord(record.variants);
   const balanced = asRecord(variants.balanced);
   const compact = asRecord(variants.compact);
 
   return record.version === "food-gap:v1" &&
+    (selectionRevision == null || Number(record.selectionRevision ?? 0) === selectionRevision) &&
     Array.isArray(balanced.items) &&
     Array.isArray(compact.items)
     ? (record as FoodGapSupport)
@@ -580,7 +583,7 @@ function weightedContributionPercent(
   denominatorNeeds: readonly ProductRecommendationNeed[],
   coverageLookup: ReadonlyMap<string, number>
 ) {
-  const totalWeight = denominatorNeeds.reduce((total, need) => total + need.weight, 0);
+  const totalWeight = denominatorNeeds.length;
 
   if (totalWeight <= 0) {
     return 0;
@@ -593,7 +596,7 @@ function weightedContributionPercent(
       coverageLookup.get(normalizeReviewName(need.displayName)) ??
       0;
 
-    return total + need.weight * Math.min(1, Math.max(0, coveragePercent / 100));
+    return total + Math.min(1, Math.max(0, coveragePercent / 100));
   }, 0);
 
   return Math.min(100, Math.max(0, Math.round((coveredWeight / totalWeight) * 100)));
@@ -1704,7 +1707,7 @@ function mapSlimFormulationResult(
     storedFoodGuidanceRecord.foodGuidance
   );
   const storedFoodGapSupport = asFoodGapSupport(
-    storedFoodGuidanceRecord.foodGapSupport
+    storedFoodGuidanceRecord.foodGapSupport, Number(row.selection_revision ?? 0)
   );
   const safetySummary = safetySummaryFromRecord(
     storedFormulation.safetySummary
@@ -1778,6 +1781,9 @@ async function loadStoredFormulationFormulaRead(
     select
       assessments.status::text,
       assessments.answers,
+      assessments.input_revision,
+      coalesce((select revision from public.assessment_product_preferences where plan_id = assessments.plan_id), 0) as selection_revision,
+      coalesce((select excluded_product_ids from public.assessment_product_preferences where plan_id = assessments.plan_id), '{}'::uuid[]) as excluded_product_ids,
       assessments.first_name,
       assessments.locale,
       assessments.selected_plan::text,
@@ -1902,6 +1908,9 @@ export async function getStoredFormulationResult(
   const rows = await sql`
     select
       assessments.answers,
+      assessments.input_revision,
+      coalesce((select revision from public.assessment_product_preferences where plan_id = assessments.plan_id), 0) as selection_revision,
+      coalesce((select excluded_product_ids from public.assessment_product_preferences where plan_id = assessments.plan_id), '{}'::uuid[]) as excluded_product_ids,
       assessments.first_name,
       assessments.locale,
       assessments.selected_plan::text,
@@ -2015,6 +2024,7 @@ export async function getStoredFormulationResult(
       from product_recommendation_runs
       where product_recommendation_runs.plan_id = assessments.plan_id
         and product_recommendation_runs.assessment_revision = assessments.input_revision
+        and product_recommendation_runs.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = assessments.plan_id), 0)
         and product_recommendation_runs.generation_locale = ${resultLocale} and product_recommendation_runs.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
       order by
@@ -2037,6 +2047,7 @@ export async function getStoredFormulationResult(
       from tasks
       where tasks.plan_id = assessments.plan_id
         and task_type = 'generate_product_recommendations'
+        and coalesce((tasks.payload #>> '{productPreferences,revision}')::bigint, 0) = coalesce((select revision from public.assessment_product_preferences where plan_id = assessments.plan_id), 0)
         and tasks.payload #>> '{generation,revision}' = assessments.input_revision::text
         and tasks.payload #>> '{generation,locale}' = ${resultLocale}
         and tasks.payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
@@ -2102,7 +2113,7 @@ export async function getStoredFormulationResult(
     storedFoodGuidanceRecord.foodGuidance
   );
   const storedFoodGapSupport = asFoodGapSupport(
-    storedFoodGuidanceRecord.foodGapSupport
+    storedFoodGuidanceRecord.foodGapSupport, Number(row.selection_revision ?? 0)
   );
   const storedSafety = {
     foodGuidance: storedFoodGuidance,
@@ -2133,7 +2144,7 @@ export async function getStoredFormulationResult(
   const recommendations =
     hasStructuredProductRecommendationRun
       ? productRecommendationItems
-      : legacyRecommendations;
+      : Number(row.selection_revision ?? 0) > 0 ? [] : legacyRecommendations;
   const productRecommendationCoverage = reconcileProductRecommendationCoverage({
     foodGuidance,
     rawNeedCoverage: productNeedCoverageFromDiagnostics(
@@ -2297,6 +2308,7 @@ export async function getStoredFormulationResult(
           ? { maxProducts }
           : {}),
         productRecommendations: {
+          matching: asRecord(diagnostics).matching as ProductRecommendationSummary["matching"],
           ...(generatedAt ? { generatedAt } : {}),
           matchedCount: coverage.recommendations.length,
           needsCount:
@@ -2442,10 +2454,14 @@ export async function getStoredFormulationResult(
     generatedAt,
     firstName,
     planId,
+    assessmentRevision: Number(row.input_revision),
+    selectionRevision: Number(row.selection_revision ?? 0),
+    excludedProductIds: row.excluded_product_ids ?? [],
     nutritionReport,
     ...(productRecommendationStatus
       ? {
           productRecommendations: {
+            matching: asRecord(row.product_recommendation_diagnostics).matching as ProductRecommendationSummary["matching"],
             ...(productRecommendationGeneratedAt
               ? { generatedAt: productRecommendationGeneratedAt }
               : {}),

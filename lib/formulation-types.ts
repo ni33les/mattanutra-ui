@@ -2,11 +2,13 @@ import type { LocaleCode } from "@/lib/i18n";
 
 export type FormulationStatus = "covered" | "add" | "review";
 export type FormulationSafetyAction =
+  | "advisory"
   | "dose_reduced"
   | "human_review"
   | "unknown_supplement";
 export type FormulationSafetyVisibility = "hidden" | "visible";
 export type FoodGuidanceSafetyAction =
+  | "advisory"
   | "allergen_blocked"
   | "avoidance_blocked"
   | "condition_review"
@@ -14,6 +16,21 @@ export type FoodGuidanceSafetyAction =
   | "unknown_food";
 
 export type LocalizedText = string | Partial<Record<LocaleCode, string>>;
+
+/** Informational health findings never authorize or prevent a purchase. */
+export type WebHealthAdvice = Readonly<{
+  code: string;
+  severity: "high" | "medium" | "info";
+  ingredient: string;
+  amount: number | null;
+  amountRange?: { minimum: number; maximum: number } | null;
+  unit: string | null;
+  referenceDose?: { amount: number; unit: string; basis: "agreed_target" | "continued_dose" } | null;
+  referenceLimit: { amount: number; unit: string; sourceScope: string; population: string } | null;
+  evidence: { source: string; url: string | null; confidence: string | null };
+  uncertainty: LocalizedText;
+  message: LocalizedText;
+}>;
 
 export type FormulationCaution = {
   body: LocalizedText;
@@ -35,6 +52,7 @@ export type FormulationIngredient = {
   rationale: LocalizedText;
   safety?: {
     action: FormulationSafetyAction;
+    advice?: readonly WebHealthAdvice[];
     message: LocalizedText;
     originalDailyDose?: LocalizedText;
     reviewId?: string;
@@ -72,6 +90,7 @@ export type FoodGuidanceItem = {
   rationale: LocalizedText;
   safety?: {
     action: FoodGuidanceSafetyAction;
+    advice?: readonly WebHealthAdvice[];
     message: LocalizedText;
     reviewId?: string;
     reviewTaskId?: string;
@@ -101,6 +120,7 @@ export type FoodGapSupportVariant = {
 };
 
 export type FoodGapSupport = {
+  selectionRevision?: number;
   generatedAt?: string;
   version: "food-gap:v1";
   variants: {
@@ -267,6 +287,7 @@ export type ProductNeedCoverage = {
 };
 
 export type ProductRecommendationSummary = {
+  matching?: import("@/lib/product-recommendation-types").ProductRecommendationDiagnostics["matching"];
   generatedAt?: string;
   matchedCount: number;
   needCoverage?: ProductNeedCoverage[];
@@ -345,6 +366,9 @@ export type FormulationResult = FormulationBlueprint & FoodGuidanceBlueprint & {
   lockedSupplementCount?: number;
   nutritionReport?: NutritionReport | null;
   planId: string;
+  assessmentRevision?: number;
+  selectionRevision?: number;
+  excludedProductIds?: readonly string[];
   previewLimit?: number;
   productRecommendationOptions?: ProductRecommendationOption[];
   productRecommendations?: ProductRecommendationSummary;

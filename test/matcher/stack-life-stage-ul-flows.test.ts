@@ -133,7 +133,7 @@ function webNeed(input: Readonly<{
     normalizedName: input.normalizedName,
     sourceId: input.id,
     targetComparableAmount: input.amount,
-    targetDose: `${input.amount} ${input.unit}`,
+    targetDose: { amount: input.amount, unit: input.unit as "mg" | "IU", originalText: `${input.amount} ${input.unit}` },
     targetText: `${input.amount} ${input.unit}`,
     weight: 1
   };
@@ -215,7 +215,7 @@ function zincStackSnapshot(): CatalogueSnapshot {
 }
 
 describe("life-stage stack UL on every live matching flow", () => {
-  it("refuses the over-UL zinc combo in exact, web, compact, and beam search", () => {
+  it("penalizes the over-UL zinc combo consistently across search configurations", () => {
     const catalog = zincStackCatalog();
     const request = zincStackRequest();
     const beamConfig: MatcherConfig = {
@@ -237,7 +237,7 @@ describe("life-stage stack UL on every live matching flow", () => {
     }
   });
 
-  it("refuses the over-UL zinc combo on the quiz/web adapter and FullBeam", () => {
+  it("allows an over-UL zinc combo with advice on the quiz/web adapter and FullBeam", () => {
     setMatcherSafetyCeilings(qaCatalogSafetyCeilings());
     try {
       const input = webZincStackInput();
@@ -247,17 +247,16 @@ describe("life-stage stack UL on every live matching flow", () => {
         ["recommendProductStackFullBeam", recommendProductStackFullBeam(input)],
         ["recommendProductStack", recommendProductStack(input)]
       ] as const) {
-        assertStackRespectsZincUl(
-          result.recommendations.map((row) => row.product.id),
-          label
-        );
+        const ids = result.recommendations.map((row) => row.product.id);
+        assert.ok(ids.includes(MULTI_ID) && ids.includes(D3_ID), label);
+        assert.equal(result.diagnostics.matching?.options[0]?.doseFit?.total, 0.5, label);
       }
     } finally {
       resetMatcherSafetyCeilings();
     }
   });
 
-  it("refuses the over-UL zinc combo on the agentic matchPlan rail", () => {
+  it("allows the same lower-penalty zinc tradeoff on the agentic matchPlan rail", () => {
     setMatcherSafetyCeilings(qaCatalogSafetyCeilings());
     try {
       const matched = matchPlan({
@@ -282,16 +281,18 @@ describe("life-stage stack UL on every live matching flow", () => {
           ]
         }
       });
-      assertStackRespectsZincUl(
-        (matched.selected?.basket ?? []).map((item) => item.productId),
-        "matchPlan"
-      );
+      const ids = (matched.selected?.basket ?? []).map((item) => item.productId);
+      assert.ok(ids.includes(MULTI_ID) && ids.includes(D3_ID));
+      const zinc = matched.selected?.doseFit?.perLimit.find((row) => /zinc/i.test(row.name));
+      assert.equal(zinc?.limit, 40);
+      assert.equal(zinc?.exposure, 50);
+      assert.equal(zinc?.excess, 0.25);
     } finally {
       resetMatcherSafetyCeilings();
     }
   });
 
-  it("wires every live caller through tryAddVariant stack UL", () => {
+  it("wires every live caller through shared dose-fit scoring", () => {
     const search = readFileSync(new URL("../../lib/matcher/search.ts", import.meta.url), "utf8");
     const index = readFileSync(new URL("../../lib/matcher/index.ts", import.meta.url), "utf8");
     const selector = readFileSync(new URL("../../lib/matcher/selector.ts", import.meta.url), "utf8");
@@ -304,7 +305,8 @@ describe("life-stage stack UL on every live matching flow", () => {
       "utf8"
     );
 
-    assert.match(search, /stackUnitsViolateCeiling/);
+    assert.match(search, /doseFitScore/);
+    assert.doesNotMatch(search, /stackUnitsViolateCeiling/);
     assert.match(search, /labelledSafetyExposure/);
     assert.match(search, /for \(const variant of group\.variants\) \{\s*const next = tryAddVariant/);
     assert.match(index, /tryAddVariant/);

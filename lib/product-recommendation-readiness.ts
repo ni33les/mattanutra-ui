@@ -31,6 +31,7 @@ function productRecommendationSummaryExpectsRows(
   if (!summary || !["partial", "ready"].includes(summary.status)) {
     return false;
   }
+  if (summary.matching?.operationalStatus === "no_purchase") return false;
 
   if (summary.matchedCount > 0) {
     return true;
@@ -98,6 +99,7 @@ export function resultHasPendingProductRecommendations(
 
   return Boolean(
     !productStatus &&
+      result.supplementBreakdown.length > 0 &&
       result.sectionStatuses?.foods === "ready" &&
       result.sectionStatuses?.supplements === "ready",
   );

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION,
   buildProductNeeds,
   buildProductSearchQueries,
   normalizeProductFactKey,
@@ -174,7 +175,7 @@ describe("product recommendation scoring", () => {
       needs: [need("magnesium", "Magnesium", 5)]
     });
 
-    assert.equal(result.diagnostics.algorithmVersion, "pareto-hybrid-1");
+    assert.equal(result.diagnostics.algorithmVersion, ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION);
     assert.equal(result.recommendations[0]?.product.id, "magnesium");
   });
 
@@ -394,7 +395,7 @@ describe("product recommendation scoring", () => {
         product({
           amount: 0.14,
           id: "dha-form",
-          name: "Docosahexaenoic acid (DHA)-rich oil"
+          name: "Docosahexaenoic acid (DHA)"
         }),
         product({ amount: 1, id: "typo", name: "Magnesum" })
       ],
@@ -436,6 +437,15 @@ describe("product recommendation scoring", () => {
       result.recommendations.some((item) => item.product.id === "typo"),
       true
     );
+  });
+
+  it("does not count a gross DHA-rich oil amount as measured omega-3", () => {
+    const result = recommendProductStack({
+      candidates: [product({ amount: 0.14, id: "oil-weight", name: "Docosahexaenoic acid (DHA)-rich oil" })],
+      needs: [need("omega_3", "Omega-3", 4, 140)]
+    });
+    assert.equal(result.recommendations.length, 0);
+    assert.equal(result.stackCoveragePercent, 0);
   });
 
   it("does not let fuzzy matching confuse compound salts with a different mineral need", () => {

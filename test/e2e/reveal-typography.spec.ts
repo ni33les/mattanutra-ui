@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../helpers/offline-browser";
 
 const revealSmokeUrl = process.env.REVEAL_VISUAL_SMOKE_URL;
 

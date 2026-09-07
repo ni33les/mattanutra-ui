@@ -238,6 +238,19 @@ describe("formulation results product recommendation readiness", () => {
     assert.equal(resultHasTransientEmptyProductRecommendations(payload), false);
     assert.equal(resultHasPendingProductRecommendations(payload), false);
   });
+  it("keeps a no-purchase result terminal when continued intake already covers targets", () => {
+    const payload = result({
+      productRecommendations: {
+        matchedCount: 0, needsCount: 1, stackCoveragePercent: 100, stackPreference: "balanced", status: "ready",
+        matching: { operationalStatus: "no_purchase", selectedOptionId: null, options: [], alternativeSearch: { status: "not_needed", reason: "No additional product is needed." } }
+      }
+    });
+    assert.equal(resultHasTransientEmptyProductRecommendations(payload), false);
+    assert.equal(resultHasPendingProductRecommendations(payload), false);
+  });
+  it("does not wait for product matching when a completed formula has no supplement targets", () => {
+    assert.equal(resultHasPendingProductRecommendations(result()), false);
+  });
 });
 
 describe("selected stack coverage marketing percent", () => {

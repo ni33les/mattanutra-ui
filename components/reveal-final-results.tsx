@@ -1,5 +1,7 @@
 "use client";
 
+import { webMatchingCopy } from "@/lib/web-health-advice";
+import { WebHealthAdviceText } from "@/components/web-health-advice";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1156,6 +1158,13 @@ function RevealProductsFinalSection({
   supplementSelectedCount: number;
 }>) {
   const labels = productRecommendationCopy[locale];
+  const matchingCopy = webMatchingCopy[locale];
+  const matching = activeProductRecommendations?.matching;
+  const selectedMatchingOption = matching?.options.find(option => option.optionId === matching.selectedOptionId);
+  const [requestedSelectionRevision, setRequestedSelectionRevision] = useState<number | null>(null);
+  const [replanError, setReplanError] = useState<string | null>(null);
+  const [replanning, setReplanning] = useState(false);
+
   const selectedCoverage = selectedStackCoverage(
     activeProductRecommendations,
     products,
@@ -1308,13 +1317,36 @@ function RevealProductsFinalSection({
   const removedBasketIdList = removedBasketProducts.map(
     (product) => product.productId ?? product.id,
   );
+  async function replanProducts(clear = false) {
+    setReplanning(true); setReplanError(null);
+    try {
+      const response = await fetch(`/api/assessment/${encodeURIComponent(planId)}/product-recommendations`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        body: JSON.stringify({ locale, stackPreference: selectedProductStackPreference ?? "balanced", assessmentRevision: result.assessmentRevision,
+          selectionRevision: result.selectionRevision ?? 0,
+          excludeProductIds: clear ? [] : [...new Set([...(result.excludedProductIds ?? []), ...removedBasketIdList])] })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message || matchingCopy.error);
+      setRequestedSelectionRevision(body.selectionRevision);
+      onProductStackPollingStart(selectedProductStackPreference ?? "balanced");
+      await onProductStackRefresh();
+    } catch (error) { setReplanError(error instanceof Error ? error.message : matchingCopy.error); }
+    finally { setReplanning(false); }
+  }
+  const awaitingReplan = replanning || (requestedSelectionRevision != null &&
+    (Number(result.selectionRevision ?? 0) < requestedSelectionRevision || productCoveragePending));
   const basketCheckoutHref =
-    selectedBasketIdList.length > 0
+    selectedBasketIdList.length > 0 && removedBasketIdList.length === 0 && !awaitingReplan
       ? (() => {
           const params = new URLSearchParams({
             plan: planId,
             selected: selectedBasketIdList.join(","),
             removed: removedBasketIdList.join(","),
+            ...(activeProductRecommendations?.runId ? { run: activeProductRecommendations.runId } : {}),
+            ...(activeProductRecommendations?.matching?.selectedOptionId ? { option: activeProductRecommendations.matching.selectedOptionId } : {}),
+            ...(result.assessmentRevision != null ? { revision: String(result.assessmentRevision) } : {}),
+            ...(result.selectionRevision != null ? { selectionRevision: String(result.selectionRevision) } : {}),
           });
 
           if (selectedRetailerOrganisationId) {
@@ -1401,7 +1433,7 @@ function RevealProductsFinalSection({
       const response = await fetch(
         `/api/assessment/${encodeURIComponent(planId)}/product-recommendations`,
         {
-          body: JSON.stringify({ stackPreference: preference }),
+          body: JSON.stringify({ locale, stackPreference: preference, assessmentRevision: result.assessmentRevision }),
           cache: "no-store",
           headers: {
             "Content-Type": "application/json",
@@ -1479,6 +1511,36 @@ function RevealProductsFinalSection({
           </div>
         </div>
 
+        {selectedMatchingOption?.advice.length ? (
+          <aside className="mx-auto my-6 max-w-[880px] rounded-xl border border-[var(--mn-line)] p-5" aria-label={matchingCopy.advice}>
+            <h3 className="font-semibold">{matchingCopy.advice}</h3>
+            {selectedMatchingOption.advice.map((advice, index) => <WebHealthAdviceText key={`${advice.code}:${index}`} advice={advice} locale={locale} />)}
+          </aside>
+        ) : null}
+        {matching && matching.alternativeSearch?.status !== "not_needed" ? (
+          <section className="mx-auto my-6 max-w-[880px]" aria-label={matchingCopy.alternatives}>
+            <h3 className="font-semibold">{matchingCopy.alternatives}</h3>
+            {matching.options.filter(option => option.optionId !== matching.selectedOptionId).map(option => {
+              const params = new URLSearchParams({ plan: planId, selected: option.productIds.join(","), option: option.optionId,
+                run: activeProductRecommendations?.runId ?? "", revision: String(result.assessmentRevision ?? ""), selectionRevision: String(result.selectionRevision ?? 0) });
+              const subtotal = option.recommendations.reduce((sum, item) => sum + (item.unitPriceAmount ?? item.product.priceAmount ?? 0), 0);
+              return <div className="mt-4 rounded-xl border border-[var(--mn-line)] p-5" key={option.optionId}>
+                <p>{option.recommendations.map(item => item.product.title).join(", ")}</p>
+                <p className="mt-2 text-sm">{matchingCopy.coverage}: {option.coveragePercent}% · {matchingCopy.pills}: {option.dailyPills}</p>
+                <p className="mt-2 text-sm">{matchingCopy.subtotal}: {new Intl.NumberFormat(localeHtmlLang(locale), { style: "currency", currency: option.recommendations[0]?.product.currency ?? "THB" }).format(subtotal)}</p>
+                {option.advice.map((advice, index) => <WebHealthAdviceText key={`${advice.code}:${index}`} advice={advice} locale={locale} />)}
+                {!awaitingReplan && option.productIds.length ? <Link className="mt-3 inline-block underline" href={`/${locale}/basket/checkout?${params}`}>{matchingCopy.choose}</Link> : null}
+              </div>;
+            })}
+            {matching.alternativeSearch?.status === "none_found" ? <p className="mt-3 text-sm">{matchingCopy.none}</p> : null}
+            {matching.alternativeSearch?.status === "incomplete" ? <div className="mt-3 text-sm"><p>{matchingCopy.incomplete}</p><button className="mt-2 underline" disabled={replanning} onClick={() => void replanProducts()}>{matchingCopy.retry}</button></div> : null}
+          </section>
+        ) : null}
+        {removedBasketIdList.length || result.excludedProductIds?.length ? <div className="mx-auto my-6 flex max-w-[880px] flex-wrap gap-4">
+          {removedBasketIdList.length ? <button className="underline" disabled={replanning} onClick={() => void replanProducts()}>{matchingCopy.replan}</button> : null}
+          {result.excludedProductIds?.length ? <button className="underline" disabled={replanning} onClick={() => void replanProducts(true)}>{matchingCopy.clear}</button> : null}
+        </div> : null}
+        {replanError ? <p className="mx-auto my-4 max-w-[880px]" role="alert">{replanError}</p> : null}
         {controlPreferences.length > 1 ? (
           <div className="basket-tabs-wrap my-10 flex items-center justify-center gap-3 text-center" data-reveal>
             <div className="inline-flex rounded-full border border-[var(--mn-line)] bg-[var(--mn-paper)] p-1">
@@ -1821,7 +1883,7 @@ function RevealProductsFinalSection({
             </p>
           </div>
           {selectedBasketIdList.length > 0 ? (
-            <Link className="mn-reveal-final-button" href={basketCheckoutHref}>
+            <Link aria-disabled={!basketCheckoutHref} className="mn-reveal-final-button" href={basketCheckoutHref || "#"} onClick={event => { if (!basketCheckoutHref) event.preventDefault(); }}>
               {finalCopy.checkout}
             </Link>
           ) : (

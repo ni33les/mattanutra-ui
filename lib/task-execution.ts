@@ -28,6 +28,8 @@ import {
   recommendProductStackFullBeam,
   type ProductRecommendationResult
 } from "@/lib/product-recommendations";
+import { compareDoseFit } from "@/lib/matcher/dose-fit";
+import { mergeWebRetailerAlternatives } from "@/lib/matcher/adapters/web";
 import type { ProductRecommendationRetailerCandidateSet } from "@/lib/admin-products";
 import { isRetailAgentExecutableTaskType } from "@/lib/retail-task-policy";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
@@ -176,6 +178,7 @@ function retailerOptionSummary(option: RetailerRecommendationOption) {
     organisationId: option.organisationId,
     organisationName: option.organisationName,
     productCount: option.productCount,
+    doseFit: selectedRetailerMatchingOption(option)?.doseFit ?? null,
     subtotalAmount: option.subtotalAmount,
     supplementProductCoveragePercent: option.supplementProductCoveragePercent,
     totalPlanCoveragePercent: option.totalPlanCoveragePercent,
@@ -183,14 +186,28 @@ function retailerOptionSummary(option: RetailerRecommendationOption) {
   };
 }
 
+function selectedRetailerMatchingOption(option: RetailerRecommendationOption) {
+  const matching = option.recommendations.diagnostics.matching;
+  return matching?.options.find(item => item.optionId === matching.selectedOptionId);
+}
+
+function compareRetailerDoseFit(left: RetailerRecommendationOption, right: RetailerRecommendationOption) {
+  const a = selectedRetailerMatchingOption(left)?.doseFit;
+  const b = selectedRetailerMatchingOption(right)?.doseFit;
+  return a && b ? compareDoseFit(a, b) : a ? -1 : b ? 1 : 0;
+}
+
 function selectRetailerRecommendationOption(
   options: readonly RetailerRecommendationOption[]
 ) {
   return [...options].sort((left, right) =>
+    compareRetailerDoseFit(left, right) ||
+    (left.recommendations.diagnostics.stackPreference === "compact"
+      ? (selectedRetailerMatchingOption(left)?.dailyPills ?? Infinity) - (selectedRetailerMatchingOption(right)?.dailyPills ?? Infinity) : 0) ||
     right.supplementProductCoveragePercent - left.supplementProductCoveragePercent ||
     right.totalPlanCoveragePercent - left.totalPlanCoveragePercent ||
     left.subtotalAmount - right.subtotalAmount ||
-    compareNullableEta(left.etaDate, right.etaDate)
+    compareNullableEta(left.etaDate, right.etaDate) || left.organisationId.localeCompare(right.organisationId)
   )[0] ?? null;
 }
 
@@ -663,7 +680,7 @@ export async function executeTaskWorkItem(
       });
       const selectedRetailerOption =
         selectRetailerRecommendationOption(retailerOptions);
-      const recommendations = selectedRetailerOption?.recommendations ??
+      const recommendations = selectedRetailerOption ? mergeWebRetailerAlternatives(selectedRetailerOption.recommendations, retailerOptions.map(option => option.recommendations)) :
         (() => {
           matchCalls += 1;
 

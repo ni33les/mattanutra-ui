@@ -1,4 +1,4 @@
-import { ASSESSMENT_GENERATION_TASKS, generationInput, loadGenerationInput } from "@/lib/assessment-revisions";
+import { ASSESSMENT_GENERATION_TASKS, generationInput, generationTaskId, loadGenerationInput } from "@/lib/assessment-revisions";
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { toJsonValue } from "@/lib/assessment-store";
@@ -816,6 +816,7 @@ export async function createTask(input: CreateTaskInput, sqlOverride?: Db) {
     if (input.planId && ASSESSMENT_GENERATION_TASKS.has(input.taskType) && !generationInput(input.payload)) {
       const generation = await loadGenerationInput(tx, input.planId, payloadRecord(input.payload).locale);
       if (generation) return createTaskRecord(tx, { ...input,
+        id: input.id ? generationTaskId(input.id, generation) : undefined,
         payload: { ...payloadRecord(input.payload), generation },
         idempotencyKey: input.idempotencyKey ? `${input.idempotencyKey}:${generation.revision}:${generation.locale}:${generation.generatorVersion}` : undefined
       });

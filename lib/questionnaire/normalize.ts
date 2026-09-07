@@ -5,6 +5,7 @@ import {
   type FoodFrequencyKey
 } from "@/components/assessment-flow-state";
 import type { QuestionnaireAnswers } from "@/lib/questionnaire/types";
+import { captureInputProvenance } from "@/lib/assessment-input-provenance";
 
 const SKIN_MAP: Record<string, string> = {
   "1": "I",
@@ -267,7 +268,8 @@ export function toAssessmentAnswers(
   // Free-text avoid / otherSupp live outside Answers; keep on answers via cast if needed later.
   // otherMed / otherTracker already mapped.
 
-  return answers;
+  // Preserve what was supplied before HealthScore's established defaults are applied.
+  return Object.assign(answers, { inputProvenance: captureInputProvenance(raw) });
 }
 
 /** Extra chat fields preserved for analytics (not Health Score). */

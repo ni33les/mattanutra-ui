@@ -5,7 +5,7 @@ import { getSql } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
 import type { HealthScoreResult } from "@/lib/health-score";
 
-export const FUNNEL_GENERATOR_VERSION = "web-funnel-v1";
+export const FUNNEL_GENERATOR_VERSION = "web-funnel-v2-advisory";
 export type GenerationInput = Readonly<{
   revision: number;
   inputHash: string;
@@ -13,6 +13,14 @@ export type GenerationInput = Readonly<{
   locale: Locale;
   generatorVersion: string;
 }>;
+
+/** A new input, language or generator must never collide with a historical task ID. */
+export function generationTaskId(taskId: string, generation: GenerationInput) {
+  const hex = createHash("sha256").update(JSON.stringify([
+    taskId, generation.revision, generation.inputHash, generation.locale, generation.generatorVersion
+  ])).digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
 
 const generationScope = new AsyncLocalStorage<{ planId: string; input: GenerationInput }>();
 export function withGenerationInput<T>(planId: string, input: GenerationInput, work: () => T): T {
@@ -51,7 +59,7 @@ export async function loadGenerationInput(sql: postgres.Sql | postgres.Transacti
   if (!row) return null;
   const scope = generationScope.getStore();
   if (scope?.planId === planId) {
-    if (scope.input.revision !== Number(row.input_revision) || (row.input_hash && scope.input.inputHash !== row.input_hash)) return null;
+    if (scope.input.generatorVersion !== FUNNEL_GENERATOR_VERSION || scope.input.revision !== Number(row.input_revision) || (row.input_hash && scope.input.inputHash !== row.input_hash)) return null;
     return scope.input;
   }
   return {

@@ -36,6 +36,8 @@ try {
       paymentId: input.paymentId, questionnaireState: state });
   } else if (input.action === "copy") {
     const [record] = await sql`select id from public.tasks where plan_id = ${input.planId}::uuid and task_type = 'analyze_healthscore'
+      and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
+      and payload #>> '{generation,revision}' = (select input_revision::text from public.assessments where plan_id = ${input.planId}::uuid)
       and payload #>> '{generation,locale}' = ${locale} order by created_at desc limit 1`;
     assert.ok(record);
     const { task } = await getTaskBundle({ taskId: record.id });
@@ -47,12 +49,14 @@ try {
   } else if (input.action === "ready") {
     const generation = (await loadGenerationInput(sql, input.planId, locale))!;
     await insertFormulationVersion(sql, { planId: input.planId, generation, modelVersion: "browser-fixture", formulation: {
-      supplementBreakdown: [{ id: "vitamin-d", category: "vitamin", dailyDose: { [locale]: "1000 IU" }, effectivenessRank: 1,
+      supplementBreakdown: input.empty ? [] : [{ id: "vitamin-d", category: "vitamin", dailyDose: { [locale]: "1000 IU" }, effectivenessRank: 1,
         rationale: { [locale]: "Fixture rationale" }, status: "add", supplement: { [locale]: "Vitamin D" } }],
       sectionStatuses: { supplements: "ready", foods: "ready" }, foodGuidance: []
     } });
-    await sql`insert into public.product_recommendation_runs (plan_id, assessment_revision, generation_locale, generator_version, diagnostics)
-      values (${input.planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION}, '{"stackPreference":"balanced"}')`;
+    await sql`insert into public.product_recommendation_runs (plan_id, assessment_revision, generation_locale, generator_version, selection_revision, diagnostics)
+      values (${input.planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION},
+        coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0),
+        '{"stackPreference":"balanced","matching":{"operationalStatus":"no_purchase","selectedOptionId":null,"options":[],"alternativeSearch":{"status":"not_needed","reason":"No purchase fixture"}}}')`;
     await sql`update public.tasks set status = 'completed' where plan_id = ${input.planId}::uuid and task_type in ('generate_supplement_guidance','generate_product_recommendations')`;
     output = { ready: true };
   } else if (input.action === "fulfill") {

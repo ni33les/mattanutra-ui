@@ -274,7 +274,9 @@ describe("system agents", () => {
     assert.match(resultApplier, /const taskCompletionResultHandlers: Readonly<Record<string, TaskCompletionResultApplier>> = \{/);
     assert.match(buildTaskWorkItemBody, /taskWorkItemHandlers\[task\.taskType\]/);
     assert.match(applyTaskCompletionResultBody, /taskCompletionResultHandlers\[task\.taskType\]/);
-    assert.doesNotMatch(buildTaskWorkItemBody, /task\.taskType ===/);
-    assert.doesNotMatch(applyTaskCompletionResultBody, /task\.taskType ===/);
+    // Generation and preference guards may distinguish task families before dispatch.
+    // Every work/result handler still comes from its registry.
+    assert.doesNotMatch(buildTaskWorkItemBody.slice(buildTaskWorkItemBody.indexOf("const handler =")), /task\.taskType ===/);
+    assert.doesNotMatch(applyTaskCompletionResultBody.slice(applyTaskCompletionResultBody.indexOf("const handler =")), /task\.taskType ===/);
   });
 });
