@@ -5,6 +5,7 @@ import { AGENTIC_SCHEMA_CHECKSUM } from "../../../lib/agentic/info.ts";
 import { MATCHER_VERSION } from "../../../lib/matcher/config.ts";
 import { canonicalHash, canonicalJson } from "../../../lib/agentic/value/canonical.ts";
 import { CUSTOMER_VALUE_PACK_VERSION } from "../../../lib/agentic/value/canonical-plan.ts";
+import { normalizePublishedClientResult } from "../../../scripts/published-client-semantics.mjs";
 
 export const CV_IMPL_ENDPOINT = "https://dev.mattanutra.com/api/mcp";
 export const CV_IMPL_ENVIRONMENT = "dev";
@@ -19,6 +20,7 @@ export type AssertionRecord = Readonly<{
 }>;
 
 export type EvidenceEnvelope = Readonly<{
+  acceptance: unknown;
   assertions: readonly AssertionRecord[];
   buildId: string;
   canonicalResponseHash: string;
@@ -80,6 +82,9 @@ export function significantCvEvidence(evidence: unknown) {
       })
     : undefined;
   return {
+    // Keep complete request/response business values in repeat-run comparisons.
+    // Historical raw hashes remain in the evidence but include generated handles.
+    ...(record.acceptance !== undefined ? { acceptance: record.acceptance } : {}),
     ...(Array.isArray(record.failed) ? { failed: record.failed } : {}),
     ...(typeof record.reason === "string" ? { reason: record.reason } : {}),
     ...(assertions ? { assertions } : {})
@@ -125,6 +130,7 @@ export function buildEvidence(input: Readonly<{
   snapshotId: string;
 }>): EvidenceEnvelope {
   return {
+    acceptance: normalizePublishedClientResult({ request: input.request, response: input.response }, CV_IMPL_ENDPOINT),
     assertions: input.assertions,
     buildId: input.buildId,
     canonicalResponseHash:
