@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { beginDeterministicIdsForTests, endDeterministicIdsForTests } from "../lib/agentic/capabilities.ts";
 import { describe, it } from "node:test";
 
+import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { MATCHER_VERSION } from "../lib/matcher/config.ts";
 import { packFactsFromProduct } from "../lib/agentic/value/pack-facts.ts";
 import { canonicalHash } from "../lib/agentic/value/canonical.ts";
@@ -25,7 +26,7 @@ import {
   coverageOf,
   createPlan,
   d3OnlyRequest,
-  freezeImplCatalogue,
+  freezeFinancialCatalogue,
   IMPL_SAFETY_LEDGER_VERSION,
   openSession,
   optionsOf,
@@ -1162,14 +1163,14 @@ export function canonicalR4Report(report: R4PackReport) {
 
 export async function runCvR4Pack(
   runIndex = 1,
-  frozenInput?: Awaited<ReturnType<typeof freezeImplCatalogue>>
+  frozenInput?: Awaited<ReturnType<typeof freezeFinancialCatalogue>>
 ): Promise<R4PackReport> {
   closeSession();
-  const frozen = frozenInput ?? (await freezeImplCatalogue());
+  const frozen = frozenInput ?? (await freezeFinancialCatalogue());
   if (!frozen.usable) {
     return {
       cases: PACK_IDS.map((id) => blocked(id, { freeze: "unusable" })),
-      contractVersion: "4.0.0",
+      contractVersion: AGENTIC_CONTRACT_VERSION,
       passedCases: 0,
       snapshotId: "",
       totalCases: PACK_IDS.length
@@ -1201,7 +1202,7 @@ export async function runCvR4Pack(
     cases.push(await runCase("R4-REG-06", () => runReg06(session, runIndex, commerce, responses)));
     return {
       cases,
-      contractVersion: "4.0.0",
+      contractVersion: AGENTIC_CONTRACT_VERSION,
       passedCases: cases.filter((item) => item.result === "PASS").length,
       snapshotId: session.snapshotId,
       totalCases: PACK_IDS.length
@@ -1213,7 +1214,7 @@ export async function runCvR4Pack(
 }
 
 export async function runCvR4PackTwice() {
-  const frozen = await freezeImplCatalogue();
+  const frozen = await freezeFinancialCatalogue();
   const first = await runCvR4Pack(1, frozen);
   const second = await runCvR4Pack(2, frozen);
   return { first, frozen, second };
@@ -1221,11 +1222,8 @@ export async function runCvR4PackTwice() {
 
 describe("Customer value implementation pack v1.4", () => {
   it("DUR-01 through REG-06 pass twice on one freeze", async (t) => {
-    const frozen = await freezeImplCatalogue();
-    if (!frozen.live) {
-      t.skip("live Thailand retail catalogue is not loaded in this runner");
-      return;
-    }
+    const frozen = await freezeFinancialCatalogue();
+    assert.equal(frozen.usable, true, "The declared financial fixture must be available");
     const { first, second } = await runCvR4PackTwice();
     assert.equal(first.totalCases, PACK_IDS.length);
     assert.deepEqual(
@@ -1237,7 +1235,7 @@ describe("Customer value implementation pack v1.4", () => {
       t.diagnostic(JSON.stringify({ first, second }));
     }
     assert.equal(canonicalR4Report(first), canonicalR4Report(second), "v1.4 runs diverged");
-    assert.equal(MATCHER_VERSION, "advisory-dose-fit-2");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-3");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
     const failed = [...first.cases, ...second.cases].filter((item) => item.result !== "PASS");
     assert.equal(

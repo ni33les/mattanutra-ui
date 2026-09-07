@@ -635,6 +635,7 @@ describe("Customer value implementation pack v1.3", () => {
       failed.map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.result)}`).join("; ")
     );
     assert.equal(first.snapshotId, second.snapshotId);
+    assert.equal(canonicalR3Report(first), canonicalR3Report(second), "R3 non-latency results diverged");
     assert.equal(MATCHER_VERSION, "flexible-dose-fit-3");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
