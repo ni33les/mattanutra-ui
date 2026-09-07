@@ -199,7 +199,7 @@ const LINE_REASON_CODES = new Set([
   "retained_by_user"
 ]);
 const OPTION_ONLY_KEYS = new Set([
-  "basket", "coverage", "advice", "doseFit",
+  "basket", "coverage", "coverageSummary", "advice", "doseFit", "roles", "purchaseEligible",
   "cash90DayMinor",
   "coveragePercent",
   "deferredTargetIds",
@@ -238,7 +238,7 @@ export type AeC3CaseResult = Readonly<{
 
 export type AeC3PackReport = Readonly<{
   cases: readonly AeC3CaseResult[];
-  packVersion: "agentic-experience-3.1";
+  packVersion: "agentic-experience-3.2";
   passedCases: number;
   totalCases: 15;
 }>;
@@ -1519,7 +1519,7 @@ export async function runAeC3Pack(): Promise<AeC3PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-3.1",
+      packVersion: "agentic-experience-3.2",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 15
     };

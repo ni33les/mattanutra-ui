@@ -18,6 +18,21 @@ async function call<T extends keyof SuccessByTool>(runtime: ReturnType<typeof ru
 const request = { locale: "en", destinationCountry: "TH", optimization: "balanced", profile: {}, requirements: {}, medicationCodes: ["apixaban"], targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU" }] };
 beforeEach(installGoldCatalogue); afterEach(uninstallGoldCatalogue);
 describe("v5 complete conversational plan mutations and immutable purchase", () => {
+  for (const locale of ["en", "th", "zh-CN"]) it(`makes the empty default and selectable purchase trade-off clear in every concise view (${locale})`, async () => {
+    const runtime = runtimeFor(), snapshot = sampleValueSnapshot(), target = snapshot.supplements.find(row => /vitamin d/i.test(row.name))!;
+    const product = sampleRetailProduct({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee18", title: "Whole-unit vitamin D fixture", supplementId: target.supplementId, name: target.name, amount: 2000, unit: "IU", unitPriceMinor: 10000, form: "capsule", servingLabel: "1 capsule; 30 capsules per bottle" });
+    replaceCatalogueSnapshot({ ...snapshot, products: [product] });
+    const plan = await call(runtime, "plan", { operation: "create", idempotencyKey: `v5-review-options-${locale}-01`, request: { ...request, locale, targets: [{ name: target.name, amount: 500, unit: "IU" }] } });
+    assert.equal(plan.ok, true, JSON.stringify(plan)); assert.equal(plan.status, "no_purchase");
+    assert.equal(plan.operationalDecision.nextAction, "review_options");
+    assert.equal(plan.summaryKey, "plan.summary.review_options");
+    assert.equal(plan.compactDecision.when, plan.compactDecision.nextAction);
+    assert.equal(plan.compactDecision.why, plan.summary);
+    const purchase = plan.options.find(option => option.purchaseEligible && option.basket.length > 0);
+    assert.ok(purchase);
+    const selected = await call(runtime, "plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: plan.revision, optionId: purchase.optionId, idempotencyKey: `v5-review-select-${locale}-01` });
+    assert.equal(selected.ok, true); assert.equal(selected.status, "ready");
+  });
   it("evaluates quantity proposals, retains context, rejects unsupported quantities and clears only the intended constraints", async () => {
     const runtime = runtimeFor();
     const created = await call(runtime, "plan", { operation: "create", request, idempotencyKey: "v5-journey-create-01" }); assert.equal(created.ok, true);

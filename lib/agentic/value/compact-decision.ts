@@ -136,7 +136,7 @@ export function buildCompactDecision(result: CompactPlanView): CompactDecision {
     optionId: selected?.optionId ?? null,
     status: result.status,
     what,
-    when: !decision.purchaseEligible && result.status !== "no_purchase"
+    when: decision.nextAction === "review_options" || (!decision.purchaseEligible && result.status !== "no_purchase")
       ? operationalActionText(decision, locale)
       : durationUnknown
       ? agenticMessage(locale, "plan.compact.when.unknown")
@@ -145,7 +145,7 @@ export function buildCompactDecision(result: CompactPlanView): CompactDecision {
         : result.status === "no_purchase"
           ? agenticMessage(locale, "plan.compact.when.no_purchase")
           : agenticMessage(locale, "plan.compact.when.follow_schedule"),
-    why: whyFor(result, locale)
+    why: decision.nextAction === "review_options" ? agenticMessage(locale, "plan.summary.review_options") : whyFor(result, locale)
   };
 }
 

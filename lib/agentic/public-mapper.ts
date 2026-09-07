@@ -1001,7 +1001,7 @@ export function publicPlanFields(result: Pick<
     ...((result as PlanResult).searchSummary ? { searchSummary: (result as PlanResult).searchSummary } : {}),
     ...(selected?.doseFit ? { doseFit: selected.doseFit } : {}),
     status: result.status,
-    summary: result.summary,
+    summary: decision.nextAction === "review_options" ? agenticMessage(negotiateLocale(locale), "plan.summary.review_options") : result.summary,
     ...(snapshot?.currentSupplements
       ? {
           comparisonBasis: {
@@ -1076,7 +1076,7 @@ export function publicPlanFields(result: Pick<
             : {})
         }
       : {}),
-    summaryKey: tooBroad ? "plan.summary.request_too_broad" : `plan.summary.${result.status}`,
+    summaryKey: tooBroad ? "plan.summary.request_too_broad" : decision.nextAction === "review_options" ? "plan.summary.review_options" : `plan.summary.${result.status}`,
     locale,
     nextActions,
     ...(tooBroad

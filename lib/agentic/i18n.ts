@@ -474,6 +474,11 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ผลลัพธ์นี้ไม่แนะนำให้ซื้อเพิ่ม โปรดทบทวนเป้าหมายที่ยังไม่ครบและคำแนะนำกับผู้ใช้",
     "zh-CN": "此结果不建议新增购买。请与用户查看尚未满足的目标及建议。"
   },
+  "plan.summary.review_options": {
+    en: "The closest dose fit adds no product. Purchasable alternatives are available; review their gaps, excess doses and advice before choosing.",
+    th: "ตัวเลือกที่ใกล้ขนาดเป้าหมายที่สุดไม่เพิ่มผลิตภัณฑ์ มีทางเลือกที่ซื้อได้ โปรดทบทวนส่วนที่ยังขาด ปริมาณที่เกิน และคำแนะนำก่อนเลือก",
+    "zh-CN": "最接近目标剂量的方案不新增产品。另有可购买的选项；请选择前查看缺口、超出剂量及建议。"
+  },
   "plan.summary.current_inventory_covers_now": {
     en: "Nothing needs to be bought now. Current stock covers today; replenish later in the requested horizon.",
     th: "ตอนนี้ยังไม่ต้องซื้อ สต็อกปัจจุบันครอบคลุมวันนี้ และต้องเติมภายหลังในช่วงเวลาที่ขอ",

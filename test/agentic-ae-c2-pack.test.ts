@@ -5,7 +5,7 @@ import {
   beginDeterministicIdsForTests,
   endDeterministicIdsForTests
 } from "../lib/agentic/capabilities.ts";
-import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../lib/agentic/config.ts";
 import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
@@ -136,7 +136,7 @@ const LINE_REASON_CODES = new Set([
   "retained_by_user"
 ]);
 const OPTION_ONLY_KEYS = new Set([
-  "basket", "coverage", "advice", "doseFit",
+  "basket", "coverage", "coverageSummary", "advice", "doseFit", "roles", "purchaseEligible",
   "cash90DayMinor",
   "coveragePercent",
   "deferredTargetIds",
@@ -169,7 +169,7 @@ export type AeC2CaseResult = Readonly<{
 
 export type AeC2PackReport = Readonly<{
   cases: readonly AeC2CaseResult[];
-  packVersion: "agentic-experience-2.1";
+  packVersion: "agentic-experience-2.2";
   passedCases: number;
   totalCases: 13;
 }>;
@@ -1236,8 +1236,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           : [];
         const ok =
           !("alternatives" in created) &&
-          options.length >= 2 &&
-          options.length <= 3 &&
+          options.length === 3 && // This fixture deliberately returns three distinct options.
           new Set(ids.filter(Boolean)).size === ids.filter(Boolean).length &&
           selectedRows.length === 1 &&
           compact &&
@@ -1519,7 +1518,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           extra.length === 0 &&
           missing.length === 0 &&
           first.serviceName === "MattaNutra" &&
-          first.contractVersion === "4.0.0" &&
+          first.contractVersion === AGENTIC_CONTRACT_VERSION &&
           first.supportAvailable === true &&
           first.userAccountRequired === false &&
           first.continuation === "polling_only" &&
@@ -1556,7 +1555,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
 
     return {
       cases: ordered,
-      packVersion: "agentic-experience-2.1",
+      packVersion: "agentic-experience-2.2",
       passedCases: ordered.filter((item) => item.result === "PASS").length,
       totalCases: 13
     };
