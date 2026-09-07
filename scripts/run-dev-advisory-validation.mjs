@@ -17,6 +17,20 @@ const ORIGIN = "http://127.0.0.1:3100";
 const PRELOAD = join(ROOT, "test/helpers/offline-network.mjs");
 const TS = ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs"];
 const sha = value => createHash("sha256").update(value).digest("hex");
+export function spawnValidationProcess(command, args, options) {
+  return spawn(command, args, { ...options, detached: process.platform !== "win32" });
+}
+export function signalValidationProcess(child, signal = "SIGTERM", platform = process.platform) {
+  if (!child?.pid) return false;
+  try {
+    // A stage may be an npm wrapper. Its coordinator must receive the signal
+    // so its own handler can stop any separately detached test batch.
+    return platform === "win32" ? child.kill(signal) : process.kill(-child.pid, signal);
+  } catch (error) {
+    if (error.code === "ESRCH") return false;
+    throw error;
+  }
+}
 export function isolatedValidationEnvironment(input = process.env) {
   let database;
   try { database = new URL(input.TEST_DB_URL); } catch { throw new Error("TEST_DB_URL must identify the pre-seeded isolated PostgreSQL database."); }
@@ -83,14 +97,14 @@ async function main() {
   mkdirSync(dirname(evidence), { recursive: true }); mkdirSync(evidence, { mode: 0o700 });
   const steps = [];
   let candidate, candidateExit, candidateError, candidateLog, active, interrupted = false, before, buildId, schemaChecksum, failure, releaseLint, dataBefore, dataAfter, inventory;
-  const interrupt = () => { interrupted = true; active?.kill("SIGTERM"); candidate?.kill("SIGTERM"); };
+  const interrupt = () => { interrupted = true; signalValidationProcess(active); signalValidationProcess(candidate); };
   process.on("SIGINT", interrupt); process.on("SIGTERM", interrupt);
   async function run(label, command, args, stageEnv = env, required = true) {
     if (interrupted) throw new Error("Validation interrupted.");
     const startedAt = new Date().toISOString();
     const log = createWriteStream(join(evidence, `${label}.log`), { flags: "wx", mode: 0o600 });
     console.log(`Validation: ${label}`);
-    active = spawn(command, args, { cwd: ROOT, env: stageEnv, stdio: ["ignore", "pipe", "pipe"] });
+    active = spawnValidationProcess(command, args, { cwd: ROOT, env: stageEnv, stdio: ["ignore", "pipe", "pipe"] });
     active.stdout.pipe(log, { end: false }); active.stderr.pipe(log, { end: false });
     const status = await new Promise(done => { active.once("error", error => done({ code: null, error: error.message })); active.once("close", (code, signal) => done({ code, signal })); });
     active = null; await new Promise(done => log.end(done));
@@ -140,7 +154,7 @@ async function main() {
     if (built.config?.env?.AGENTIC_BUILD_ID !== buildId) throw new Error("Production build did not bake the validated source identity.");
     writeJson(join(evidence, "build-identity.json"), { buildId, nextBuildId: readFileSync(join(ROOT, ".next/BUILD_ID"), "utf8").trim(), requiredServerFilesSha256: sha(JSON.stringify(built)) });
     candidateLog = createWriteStream(join(evidence, "candidate.log"), { flags: "wx", mode: 0o600 });
-    candidate = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", "3100"], { cwd: ROOT, env: { ...env, NODE_ENV: "production" }, stdio: ["ignore", "pipe", "pipe"] });
+    candidate = spawnValidationProcess(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", "3100"], { cwd: ROOT, env: { ...env, NODE_ENV: "production" }, stdio: ["ignore", "pipe", "pipe"] });
     candidateExit = new Promise(done => { candidate.once("exit", done); candidate.once("error", error => { candidateError = error; done(); }); });
     candidate.stdout.pipe(candidateLog, { end: false }); candidate.stderr.pipe(candidateLog, { end: false });
     await waitForCandidate();
@@ -176,9 +190,9 @@ async function main() {
   } catch (error) { failure = error instanceof Error ? error.message : String(error); }
   finally {
     if (candidate && candidate.exitCode === null && candidate.signalCode === null) {
-      candidate.kill("SIGTERM");
+      signalValidationProcess(candidate);
       await Promise.race([candidateExit, new Promise(done => setTimeout(done, 5000))]);
-      if (candidate.exitCode === null && candidate.signalCode === null) { candidate.kill("SIGKILL"); await candidateExit; }
+      if (candidate.exitCode === null && candidate.signalCode === null) { signalValidationProcess(candidate, "SIGKILL"); await candidateExit; }
     }
     if (candidateLog) await new Promise(done => candidateLog.end(done));
     process.off("SIGINT", interrupt); process.off("SIGTERM", interrupt);

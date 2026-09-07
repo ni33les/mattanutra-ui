@@ -68,3 +68,76 @@ it("V5-GATE-04 requires the existing demand-cache schema before full runtime ver
   assert.ok(REQUIRED_VALIDATION_STAGES.includes("demand-cache-schema"));
   assert.ok(REQUIRED_VALIDATION_STAGES.indexOf("demand-cache-schema") < REQUIRED_VALIDATION_STAGES.indexOf("runtime-schema"));
 });
+
+it("V5-GATE-05 cancelling a wrapped stage stops its coordinator and detached batch without later mutations", { timeout: 20000 }, async () => {
+  const { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const { setTimeout: delay } = await import("node:timers/promises");
+  const { spawnValidationProcess, signalValidationProcess } = await import("../scripts/run-dev-advisory-validation.mjs");
+  const directory = mkdtempSync(join(tmpdir(), "matcher-gate-cancel-"));
+  const coordinator = join(directory, "coordinator.mjs"), worker = join(directory, "worker.mjs");
+  const wrapper = join(directory, "wrapper.mjs"), mutations = join(directory, "mutations.txt");
+  const done = join(directory, "coordinator-done.json"), nextMutation = join(directory, "unexpected-next.txt");
+  const fullSuite = new URL("../scripts/run-full-test-suite.mjs", import.meta.url).href;
+  writeFileSync(worker, `import { appendFileSync, writeFileSync } from "node:fs";
+    writeFileSync(process.argv[3], String(process.pid));
+    appendFileSync(process.argv[2], "tick\\n");
+    setInterval(() => appendFileSync(process.argv[2], "tick\\n"), 20);
+  `);
+  writeFileSync(coordinator, `import { writeFileSync } from "node:fs";
+    import { runBatch } from ${JSON.stringify(fullSuite)};
+    writeFileSync(process.argv[2], String(process.pid));
+    const first = await runBatch("fixture-batch", [process.argv[3], process.argv[4], process.argv[5]], process.env, process.argv[6]);
+    const next = await runBatch("fixture-next", [process.argv[3], process.argv[7], process.argv[5]], process.env, process.argv[6]);
+    process.on("exit", () => writeFileSync(process.argv[8], JSON.stringify({ first, next })));
+  `);
+  writeFileSync(wrapper, `import { spawn } from "node:child_process";
+    const child = spawn(process.execPath, process.argv.slice(2), { stdio: "inherit" });
+    child.on("exit", (code) => { process.exitCode = code ?? 1; });
+  `);
+  const coordinatorPidFile = join(directory, "coordinator.pid"), workerPidFile = join(directory, "worker.pid");
+  const stage = spawnValidationProcess(process.execPath,
+    [wrapper, coordinator, coordinatorPidFile, worker, mutations, workerPidFile, directory, nextMutation, done],
+    { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+  stage.stdout.resume(); stage.stderr.resume();
+  const closed = new Promise(resolve => stage.once("close", resolve));
+  async function eventually(condition: () => boolean, message: string) {
+    const deadline = Date.now() + 5000;
+    while (!condition() && Date.now() < deadline) await delay(10);
+    assert.ok(condition(), message);
+  }
+  try {
+    await eventually(() => existsSync(workerPidFile) && existsSync(mutations), "The detached batch must actually start before cancellation");
+    signalValidationProcess(stage);
+    await eventually(() => existsSync(done), "Cancellation must reach the coordinator so its own handler stops the detached batch");
+    await closed;
+    const result = JSON.parse(readFileSync(done, "utf8"));
+    assert.equal(result.first.signal, "SIGTERM");
+    assert.equal(result.first.passed, false);
+    assert.equal(result.next.interrupted, true);
+    assert.equal(result.next.passed, false);
+    const stopped = readFileSync(mutations, "utf8");
+    assert.ok(stopped.length > 0, "The worker must perform real fixture work before cancellation");
+    await delay(100);
+    assert.equal(readFileSync(mutations, "utf8"), stopped, "No detached worker mutation may occur after cancellation completes");
+    assert.equal(existsSync(nextMutation), false, "The interrupted coordinator must not launch another stage");
+  } finally {
+    for (const file of [coordinatorPidFile, workerPidFile]) {
+      if (existsSync(file)) try { process.kill(Number(readFileSync(file, "utf8")), "SIGTERM"); } catch { /* fixture already exited */ }
+    }
+    stage.kill("SIGTERM");
+    await Promise.race([closed, delay(1000)]);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+it("V5-GATE-06 cancellation handles an unstarted stage and uses direct child signals on Windows", async () => {
+  const { signalValidationProcess } = await import("../scripts/run-dev-advisory-validation.mjs");
+  const signals: string[] = [];
+  const child = { pid: 123, kill(signal: string) { signals.push(signal); return true; } };
+  assert.equal(signalValidationProcess(undefined), false);
+  assert.equal(signalValidationProcess(child, "SIGTERM", "win32"), true);
+  assert.equal(signalValidationProcess(child, "SIGKILL", "win32"), true);
+  assert.deepEqual(signals, ["SIGTERM", "SIGKILL"]);
+});
