@@ -1,3 +1,5 @@
+import type { ProductAdministration } from "@/lib/product-administration";
+
 export type MatcherUnit = "CFU" | "IU" | "g" | "mcg" | "mg" | "ml" | "serving";
 
 export type DoseDimension = "cfu" | "iu" | "mass_ng" | "serving_milli";
@@ -119,6 +121,8 @@ export type CanonicalRequest = Readonly<{
   excludeSubjectIds: readonly string[];
   /** Explicit product exclusions are distinct from nutrient exclusions. */
   excludeProductIds?: readonly string[];
+  productDoses?: readonly Readonly<{ productId: string; servingsPerDay: number }>[];
+  searchEffort?: "standard" | "expanded";
   /** Quantified food intake is used only for total-source reference limits. */
   dietaryIntake?: readonly CanonicalCurrent[];
   unknownIntakeSubjectIds?: readonly string[];
@@ -160,6 +164,11 @@ export type MatcherLeftover = Readonly<{
 }>;
 
 export type MatcherContribution = Readonly<{
+  mappingStatus?: "verified" | "unverified" | "conflicting";
+  confidence?: "high" | "moderate" | "low";
+  source?: string | null;
+  sourceUrl?: string | null;
+  sourceText?: string | null;
   amount: number;
   name: string;
   subjectId: string | null;
@@ -167,6 +176,7 @@ export type MatcherContribution = Readonly<{
 }>;
 
 export type MatcherProduct = Readonly<{
+  administration?: ProductAdministration | null;
   availableCountryCodes: readonly string[] | null;
   contributionSubjectIds: readonly string[];
   currency: string;
@@ -242,6 +252,7 @@ export type DoseVariant = Readonly<{
   contributions: ReadonlyMap<string, ScaledAmount>;
   dailyPills: number;
   dailyUnits: number;
+  dailyUnitsRatio?: Readonly<{ num: bigint; den: bigint }>;
   productId: string;
   safetyExposure?: ReadonlyMap<string, ScaledAmount>;
   unknownSafetyAmount: boolean;

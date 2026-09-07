@@ -99,6 +99,7 @@ function compareCurrentOrder(left: CanonicalCurrent, right: CanonicalCurrent) {
 export function orderInvariantRequest(request: CanonicalRequest): CanonicalRequest {
   return {
     ...request,
+    productDoses: [...(request.productDoses ?? [])].sort((a, b) => a.productId.localeCompare(b.productId)),
     acceptedGapSubjectIds: [...request.acceptedGapSubjectIds].sort(compareStrings),
     allowedForms: request.allowedForms
       ? [...request.allowedForms].sort(compareStrings)
@@ -151,6 +152,8 @@ export function canonicalTargetSetHash(request: CanonicalRequest): string {
         dietaryIntake: canonical.dietaryIntake?.map((row) => ({ subjectId: row.subjectId, amount: row.dailyAmount, minimum: row.minimumDailyAmount, maximum: row.maximumDailyAmount, unit: row.unit, certainty: row.certainty })),
         profileKnown: canonical.profileKnown,
         doseFitVersion: DOSE_FIT_VERSION,
+        productDoses: canonical.productDoses,
+        searchEffort: canonical.searchEffort ?? "standard",
         maxDailyPills: canonical.maxDailyPills,
         maxPriceMinor: canonical.maxPriceMinor,
         maxProductCount: canonical.maxProductCount,
@@ -164,6 +167,8 @@ export function canonicalTargetSetHash(request: CanonicalRequest): string {
         targets: canonical.targets.map((item) => ({
           basis: item.basis ?? "supplemental",
           amount: item.requestedAmount,
+          acceptableMinimum: item.acceptableMinimum,
+          acceptableMaximum: item.acceptableMaximum,
           importance: item.importance,
           prerequisite: item.prerequisite,
           name: item.name,

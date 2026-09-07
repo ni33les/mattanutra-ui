@@ -61,6 +61,7 @@ export function tryAddVariant(
   });
 
   if (!helpsPurchasableTarget && !request.retainProductIds.includes(group.productId) &&
+    !request.productDoses?.some(row => row.productId === group.productId) &&
     !request.retainSubjectIds.some((id) => (variant.safetyExposure?.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
     return null;
   }
@@ -141,8 +142,8 @@ function compareStates(a: SearchState, b: SearchState, request: CanonicalRequest
 
 export function searchGroups(groups: readonly ProductGroup[], request: CanonicalRequest,
   config: MatcherConfig = DEFAULT_MATCHER_CONFIG): SearchRun {
-  const mustSelect = (group: ProductGroup) => request.retainProductIds.includes(group.productId) &&
-    !request.currentSupplements.some((row) => row.productId === group.productId);
+  const mustSelect = (group: ProductGroup) => request.productDoses?.some(row => row.productId === group.productId) || (request.retainProductIds.includes(group.productId) &&
+    !request.currentSupplements.some((row) => row.productId === group.productId));
   const variantCount = groups.reduce((sum, group) => sum + group.variants.length, 0);
   const exact = groups.length <= config.exactGroupLimit && variantCount <= config.exactVariantLimit;
   const complete: SearchState[] = [];

@@ -3,7 +3,7 @@ import { conditionImpliesCkd, subjectIsMagnesium } from "@/lib/matcher/condition
 import { doseFitScore, knownLimitProfile } from "@/lib/matcher/dose-fit";
 import { canonicalNutrientKey, normalizeProductFactKey, productKeysMatch } from "@/lib/product-key-matching";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
-import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
+import { isDoseError, scaleAmount, multiplyScaled, numberToRational } from "@/lib/matcher/dose";
 import { catalogSubjectHasCeiling, matcherSafetyCeilingsUnavailable, safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
 import type {
   CanonicalRequest,
@@ -57,7 +57,8 @@ export function exposureExceedsCeiling(
 export function labelledSafetyExposure(
   product: MatcherProduct,
   dailyUnits: number,
-  request?: CanonicalRequest
+  request?: CanonicalRequest,
+  servingRatio?: Readonly<{ num: bigint; den: bigint }>
 ) {
   const exposure = new Map<string, ScaledAmount>();
   const omegaParts = new Map<string, Map<string, ScaledAmount>>();
@@ -83,16 +84,17 @@ export function labelledSafetyExposure(
       continue;
     }
 
-    const scaled = scaleAmount({
-      amount: fact.amount * dailyUnits,
+    const labelled = scaleAmount({
+      amount: fact.amount,
       subjectId,
       subjectName: fact.name,
       unit: fact.unit
     });
 
-    if (isDoseError(scaled)) {
-      continue;
-    }
+    const ratio = servingRatio ?? numberToRational(dailyUnits);
+    if (isDoseError(labelled) || isDoseError(ratio)) continue;
+    const scaled = multiplyScaled(labelled, ratio);
+    if (isDoseError(scaled)) continue;
 
     const nameKey = normalizeProductFactKey(fact.name);
     const part = nutrientNameMatchesTarget("EPA", fact.name) ? "epa" :

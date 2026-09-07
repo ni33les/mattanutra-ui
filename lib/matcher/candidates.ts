@@ -1,7 +1,7 @@
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { coverageUnits } from "@/lib/matcher/dominance";
 import { productEligible } from "@/lib/matcher/eligibility";
-import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
+import { isDoseError, scaleAmount, multiplyScaled } from "@/lib/matcher/dose";
 import { isFalseOmegaAttribution } from "@/lib/agentic/catalogue/product-fit";
 import { canonicalNutrientKey, normalizeProductFactKey, productKeysMatch } from "@/lib/product-key-matching";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
@@ -17,7 +17,8 @@ import type {
   ScaledAmount
 } from "@/lib/matcher/types";
 
-const MAX_DAILY_UNITS = 3;
+import { ratioForSupportedServings, servingIncrement, type ServingRatio } from "@/lib/matcher/serving-grid";
+
 const NON_PILL_FORM = /powder|liquid|sachet|oil|drops|\bml\b/i;
 
 function listingId(product: Readonly<{ productId: string; sellerId: string }>) {
@@ -29,9 +30,14 @@ export function isCountablePillForm(form: string) {
 }
 
 export function variantPillBurden(
-  product: Readonly<{ dailyPillsPerServing: number; form: string }>,
+  product: Readonly<Pick<MatcherProduct, "dailyPillsPerServing" | "form" | "administration">>,
   dailyUnits: number
 ) {
+  const administration = product.administration;
+  if (administration?.provenance.status === "verified") {
+    if (administration.route !== "oral" || !/^(capsule|tablet|softgel|gummy)$/.test(administration.physicalUnit)) return 0;
+    return (administration.unitsPerServing ?? 0) * dailyUnits;
+  }
   if (!isCountablePillForm(product.form)) {
     return 0;
   }
@@ -153,6 +159,7 @@ function contributionForFresh(
   targetName: string,
   targetSubjectId: string
 ) {
+  if (product.administration && product.administration.route !== "oral" && product.administration.route !== "unknown") return [];
   const targetIds = subjectKeyVariants(targetSubjectId);
 
   if (
@@ -163,7 +170,7 @@ function contributionForFresh(
   }
 
   const hits = product.labelledContributions.filter((item) => {
-    if (item.amount == null || item.amount <= 0) {
+    if (item.mappingStatus === "conflicting" || item.amount == null || item.amount <= 0) {
       return false;
     }
     if (item.name?.trim() && targetName.trim() && !nutrientNameMatchesTarget(targetName, item.name)) return false;
@@ -198,11 +205,15 @@ function contributionForFresh(
 
 export function compileVariant(input: Readonly<{
   dailyUnits: number;
+  dailyUnitsRatio?: ServingRatio;
   product: MatcherProduct;
   request: CanonicalRequest;
 }>): DoseVariant | null {
+  const ratio = input.dailyUnitsRatio ?? ratioForSupportedServings(input.product, input.dailyUnits);
+  if (!ratio) return null;
   const amountPerUnit = new Map<string, ScaledAmount>();
-  let unknown = input.product.unknownSafetyAmount;
+  let unknown = input.product.unknownSafetyAmount || input.product.labelledContributions.some(row =>
+    row.mappingStatus === "conflicting" || row.confidence === "low" || row.confidence === "moderate");
 
   for (const target of input.request.targets) {
     const labelled = contributionFor(
@@ -253,8 +264,9 @@ export function compileVariant(input: Readonly<{
     }
   }
 
-  const safetyExposure = labelledSafetyExposure(input.product, input.dailyUnits, input.request);
+  const safetyExposure = labelledSafetyExposure(input.product, input.dailyUnits, input.request, ratio);
   if (amountPerUnit.size < 1 && !input.request.retainProductIds.includes(input.product.productId) &&
+    !input.request.productDoses?.some(row => row.productId === input.product.productId) &&
     !input.request.retainSubjectIds.some((id) => (safetyExposure.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
     return null;
   }
@@ -262,10 +274,9 @@ export function compileVariant(input: Readonly<{
   const contributions = new Map<string, ScaledAmount>();
 
   for (const [subjectId, perUnit] of amountPerUnit) {
-    contributions.set(subjectId, {
-      ...perUnit,
-      units: perUnit.units * BigInt(input.dailyUnits)
-    });
+    const scaled = multiplyScaled(perUnit, ratio);
+    if (isDoseError(scaled)) return null;
+    contributions.set(subjectId, scaled);
   }
 
   return {
@@ -273,6 +284,7 @@ export function compileVariant(input: Readonly<{
     contributions,
     dailyPills: variantPillBurden(input.product, input.dailyUnits),
     dailyUnits: input.dailyUnits,
+    dailyUnitsRatio: ratio,
     productId: input.product.productId,
     safetyExposure,
     unknownSafetyAmount: unknown,
@@ -384,22 +396,11 @@ function compileProductGroupFresh(
   }
 
   const variants: DoseVariant[] = [];
-  for (let dailyUnits = 1; dailyUnits <= MAX_DAILY_UNITS; dailyUnits += 1) {
-    if (
-      request.maxDailyPills != null &&
-      variantPillBurden(product, dailyUnits) > request.maxDailyPills
-    ) {
-      break;
-    }
-
-    const variant = compileVariant({ dailyUnits, product, request });
-
-    if (!variant) {
-      break;
-    }
-
-    variants.push(variant);
-
+  for (const ratio of supportedDoseDomain(product, request)) {
+    const dailyUnits = Number(ratio.num) / Number(ratio.den);
+    if (request.maxDailyPills != null && variantPillBurden(product, dailyUnits) > request.maxDailyPills) continue;
+    const variant = compileVariant({ dailyUnits, dailyUnitsRatio: ratio, product, request });
+    if (variant) variants.push(variant);
   }
 
   const kept = variants;
@@ -502,4 +503,44 @@ export function groupsBySeller(
       groups: seedPriorityGroups(sellerGroups, request, sellerGroupLimit),
       sellerId
     }));
+}
+
+/** A finite breakpoint domain bounds search effort without imposing a dose cap.
+ * Neighbours retain valid choices on both sides of each target/reference limit. */
+export function supportedDoseDomain(product: MatcherProduct, request: CanonicalRequest): ServingRatio[] {
+  const proposed = request.productDoses?.find(row => row.productId === product.productId);
+  if (proposed) { const ratio = ratioForSupportedServings(product, proposed.servingsPerDay); return ratio ? [ratio] : []; }
+  const step = servingIncrement(product);
+  const ticks = new Set<bigint>([BigInt(1)]);
+  // Preserve labelled quantities, including the historical domain, as choices.
+  for (const value of [1, 2, 3]) { const units = (BigInt(value) * step.den) / step.num; if (units > 0) ticks.add(units); }
+  const compiled = compileVariant({ product, request, dailyUnits: Number(step.num) / Number(step.den), dailyUnitsRatio: step });
+  for (const target of request.targets) {
+    if (isDeferredConditional(target)) continue;
+    const increment = compiled?.contributions.get(target.subjectId)?.units;
+    if (!increment || increment <= 0) continue;
+    const remaining = remainingRequestedUnits(request, target.subjectId);
+    const floor = remaining / increment;
+    for (const value of [floor - BigInt(1), floor, floor + BigInt(1)]) if (value > 0 && value <= BigInt(Number.MAX_SAFE_INTEGER)) ticks.add(value);
+    for (const bound of [target.acceptableMinimum, target.acceptableMaximum]) {
+      if (bound == null) continue;
+      const scaled = scaleAmount({ amount: bound, subjectId: target.subjectId, subjectName: target.name, unit: target.requestedUnit });
+      if (!isDoseError(scaled)) {
+        const current = knownCurrentTargetExposure(request, target);
+        const value = (scaled.units > current ? scaled.units - current : BigInt(0)) / increment;
+        for (const neighbor of [value, value + BigInt(1)]) if (neighbor > 0 && neighbor <= BigInt(Number.MAX_SAFE_INTEGER)) ticks.add(neighbor);
+      }
+    }
+  }
+  const labelled = labelledSafetyExposure(product, Number(step.num) / Number(step.den), request, step);
+  for (const ceiling of request.safetyCeilings ?? []) {
+    const increment = labelled.get(ceiling.subjectId)?.units;
+    if (!increment || increment <= 0) continue;
+    const limit = scaleAmount({ amount: ceiling.maxAmount, subjectId: ceiling.subjectId, subjectName: ceiling.name, unit: ceiling.maxUnit });
+    if (isDoseError(limit)) continue;
+    const current = request.currentSupplements.filter(row => row.subjectId === ceiling.subjectId).reduce((sum, row) => sum + row.daily.units, BigInt(0));
+    const floor = (limit.units > current ? limit.units - current : BigInt(0)) / increment;
+    for (const value of [floor, floor + BigInt(1)]) if (value > 0 && value <= BigInt(Number.MAX_SAFE_INTEGER)) ticks.add(value);
+  }
+  return [...ticks].sort((a, b) => a < b ? -1 : a > b ? 1 : 0).map(value => ({ num: step.num * value, den: step.den }));
 }

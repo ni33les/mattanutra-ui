@@ -414,3 +414,16 @@ export function isDoseError(value: unknown): value is DoseError {
         (value as DoseError).reason === "unsupported_unit")
   );
 }
+
+/** Multiply an already-scaled dose by an exact supported serving fraction.
+ * Round once, at the canonical dose resolution, rather than rounding servings. */
+export function multiplyScaled(amount: ScaledAmount, ratio: Readonly<{ num: bigint; den: bigint }>): ScaledAmount | DoseError {
+  if (ratio.den <= BigInt(0)) return { message: "Serving denominator must be positive.", reason: "unsupported_unit" };
+  const product = checkedMul(amount.units, ratio.num);
+  if (isDoseError(product)) return product;
+  const quotient = product / ratio.den;
+  const remainder = product % ratio.den;
+  const increment = (remainder < BigInt(0) ? -remainder : remainder) * BigInt(2) >= ratio.den
+    ? (product < BigInt(0) ? -BigInt(1) : BigInt(1)) : BigInt(0);
+  return { ...amount, units: quotient + increment };
+}

@@ -288,7 +288,8 @@ function selectedReason(request: CanonicalRequest) {
 }
 
 function satisfiesRetained(request: CanonicalRequest, basket: ScoredBasket) {
-  return request.retainProductIds.every((id) => basket.productIds.includes(id) || request.currentSupplements.some((row) => row.productId === id)) &&
+  return (request.productDoses ?? []).every(row => basket.productIds.includes(row.productId)) &&
+    request.retainProductIds.every((id) => basket.productIds.includes(id) || request.currentSupplements.some((row) => row.productId === id)) &&
     request.retainSubjectIds.every((id) => (basket.exposure.totals.get(id)?.units ?? BigInt(0)) > BigInt(0));
 }
 

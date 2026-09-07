@@ -139,7 +139,7 @@ describe("advisory dose fit", () => {
     const partialDiet = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 40, unit: "mg", sourceId: "food" }]);
     assert.ok(!("error" in partialDiet)); if ("error" in partialDiet) return;
     assert.equal(productHitsCoverageFloor(product("small", 20), { ...r, dietaryIntake: partialDiet }, r.targets[0]!), true);
-    assert.equal(productHitsCoverageFloor(product("small", 20), request({ dietaryIntake: partialDiet }), request().targets[0]!), false);
+    assert.equal(productHitsCoverageFloor(product("small", 20), request({ dietaryIntake: partialDiet, maxDailyPills: 3 }), request().targets[0]!), false);
     const limits = doseFitScore({ ...r, safetyCeilings: [
       { subjectId: "a", name: "A", maxAmount: 80, maxUnit: "mg", sourceScope: "supplemental" },
       { subjectId: "a", name: "A", maxAmount: 120, maxUnit: "mg", sourceScope: "total" }

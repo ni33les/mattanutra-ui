@@ -1,3 +1,4 @@
+import { ProductDoseValidationError, validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { compileGroups, groupsBySeller, isDeferredConditional } from "@/lib/matcher/candidates";
 import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
@@ -111,6 +112,8 @@ function leftoversFor(
  */
 export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
   config: MatcherConfig = DEFAULT_MATCHER_CONFIG, compiledGroups?: readonly ProductGroup[]): MatchResult {
+  const proposalIssues = validateProductDoseProposals(request, catalog);
+  if (proposalIssues.length) throw new ProductDoseValidationError(proposalIssues);
   request = orderInvariantRequest(request);
   const groups = compiledGroups ? [...compiledGroups] : compileGroups(request, catalog);
   const sellers = groupsBySeller(groups, request, config.sellerGroupLimit);
@@ -177,3 +180,5 @@ export {
 export { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 export { productRejectionReason } from "@/lib/matcher/eligibility";
 export type * from "@/lib/matcher/types";
+
+export { validateProductDoseProposals, ProductDoseValidationError } from "@/lib/matcher/serving-grid";
