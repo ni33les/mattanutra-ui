@@ -14,6 +14,7 @@ import { isFirstPartyImageUrl } from "@/lib/first-party-image-rules";
 export type ValidationStatus = "failed" | "needs_review" | "pass";
 
 export type ValidationReason =
+  | "blocked_supplement"
   | "concentration_only"
   | "dirty_name"
   | "external_image_url"
@@ -246,38 +247,12 @@ export function productFactLooksDirtyForMatching(fact: ValidationFact) {
     tokens.length > 1;
 }
 
-function unsafeDose(fact: ValidationFact) {
-  if (fact.supplementStatus === "blocked") {
-    return true;
-  }
-
-  const amount = numberOrNull(fact.amount);
-  const unit = hasUsableText(fact.unit) ? normalizeDoseUnit(fact.unit!) : null;
-  const maxAmount = numberOrNull(fact.maxAmount);
-  const maxUnit = hasUsableText(fact.maxUnit) ? fact.maxUnit! : null;
-  const limit = parseDoseLimit(maxAmount, maxUnit);
-
-  if (amount === null || !unit || !limit || productFactLooksLikeConcentration(factName(fact))) {
-    return false;
-  }
-
-  return doseExceedsLimit(
-    {
-      amount,
-      originalText: `${amount} ${unit}`,
-      unit
-    },
-    limit,
-    normalizeProductFactKey(factName(fact))
-  ) === true;
-}
-
 function matchableFact(fact: ValidationFact) {
   if (!hasCanonicalMatch(fact) || !hasDose(fact)) {
     return false;
   }
 
-  if (productFactLooksDirtyForMatching(fact) || unsafeDose(fact)) {
+  if (productFactLooksDirtyForMatching(fact) || fact.supplementStatus === "blocked") {
     return false;
   }
 
@@ -327,6 +302,10 @@ function validationSummary(
 
   if (reasons.includes("unsafe_dose")) {
     return "One or more facts exceed safety limits.";
+  }
+
+  if (reasons.includes("blocked_supplement")) {
+    return "One or more canonical supplements are explicitly excluded from matching.";
   }
 
   return "Product data needs review before matching.";
@@ -459,8 +438,8 @@ export function validateProduct(input: ValidationInput): ValidationResult {
     reasons.add("dirty_name");
   }
 
-  if (facts.some(unsafeDose)) {
-    reasons.add("unsafe_dose");
+  if (facts.some(fact => fact.supplementStatus === "blocked")) {
+    reasons.add("blocked_supplement");
   }
 
   const matchableFactCount = facts.filter(matchableFact).length;
@@ -487,7 +466,7 @@ export function validateProduct(input: ValidationInput): ValidationResult {
 
   const reasonList = [...reasons].sort();
   const hardFailed =
-    reasonList.includes("unsafe_dose") ||
+    reasonList.includes("blocked_supplement") ||
     (reasonList.includes("no_dosed_facts") && facts.length < 1);
   const status: ValidationStatus =
     reasonList.length < 1 && matchableFactCount > 0

@@ -10,6 +10,7 @@
 
 import { flushMatchingCatalogueCaches } from "@/lib/agentic/catalogue/flush";
 import { getSql } from "@/lib/db";
+import type postgres from "postgres";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   mirrorImageToFirstParty,
@@ -471,7 +472,7 @@ async function recordProductVersion(
 // ---------------------------------------------------------------------------
 
 export async function refreshAndPersistProductValidation(
-  sql: NonNullable<ReturnType<typeof getSql>>,
+  sql: postgres.Sql | postgres.TransactionSql,
   productId: string
 ) {
   const rows = await loadProductRows(productId, { sql });

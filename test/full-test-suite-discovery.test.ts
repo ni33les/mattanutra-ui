@@ -90,3 +90,11 @@ it("V5-INFRA-05 catalogue corrections and new checkout consumers remain in every
   const files = ["test/catalogue-corrections.integration.test.ts", "test/retail-checkout-catalogue-v5.integration.test.ts", "test/retail-checkout-catalogue-v5.test.ts", "test/agentic/v5-pill-certainty.test.ts", "test/dev-validation-fingerprints.test.ts"];
   assert.deepEqual(matcherTestInventory(files).files, [...files].sort());
 });
+
+it("V5-INFRA-06 pre-matcher health advice and cache refresh regressions remain in every matcher replay", () => {
+  const inventory = fullTestInventory();
+  for (const file of ["test/product-health-advisory.test.ts", "test/product-health-advisory.integration.test.ts", "test/product-advisory-cache-refresh.integration.test.ts"]) {
+    assert.ok(inventory.mcp.includes(file), file);
+    if (file.includes(".integration.")) assert.ok(inventory.integration.includes(file), file);
+  }
+});

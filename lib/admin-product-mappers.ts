@@ -39,7 +39,7 @@ import {
   productFactLooksLikeConcentration,
   productFactAliasKeys
 } from "@/lib/product-recommendations";
-import { normalizeDoseUnit, comparableDoseAmount, parseDoseLimit, doseExceedsLimit } from "@/lib/dose-conversion";
+import { normalizeDoseUnit, comparableDoseAmount } from "@/lib/dose-conversion";
 import { validateProduct, validationCacheMismatchReasons } from "@/lib/product-validation";
 import { defaultLocale, resolveLocalizedText } from "@/lib/i18n";
 import { parseProductAdministration } from "@/lib/product-administration";
@@ -106,46 +106,10 @@ export function normalizeFact(fact: FactDbPayload): AdminProductFact {
 
 export function productSafetyPasses(facts: readonly AdminProductFact[], rawFacts: unknown) {
   const payloads = arrayPayload(rawFacts) as FactDbPayload[];
-
-  for (const [index, fact] of facts.entries()) {
-    const payload = payloads[index];
-
-    if (payload?.supplementStatus === "blocked") {
-      return false;
-    }
-
-    const amount = numberOrNull(payload?.amount);
-    const unit = typeof payload?.unit === "string" ? payload.unit : null;
-    const rawName = String(payload?.name ?? fact.name ?? fact.normalizedName ?? "");
-
-    if (productFactLooksLikeConcentration(rawName)) {
-      continue;
-    }
-
-    const maxAmount = numberOrNull(payload?.maxAmount);
-    const maxUnit =
-      typeof payload?.maxUnit === "string" ? payload.maxUnit : null;
-    const doseUnit = unit ? normalizeDoseUnit(unit) : null;
-    const limit = parseDoseLimit(maxAmount, maxUnit);
-
-    if (amount !== null && doseUnit && limit) {
-      const exceeds = doseExceedsLimit(
-        {
-          amount,
-          originalText: `${amount} ${doseUnit}`,
-          unit: doseUnit
-        },
-        limit,
-        fact.normalizedName
-      );
-
-      if (exceeds === true) {
-        return false;
-      }
-    }
-  }
-
-  return true;
+  // Reference limits are advice evaluated against the customer's total exposure.
+  // Only an explicit catalogue exclusion belongs in this legacy eligibility field.
+  return !facts.some(fact => fact.supplementStatus === "blocked") &&
+    !payloads.some(payload => payload.supplementStatus === "blocked");
 }
 
 export function roundedDoseAmount(value: number) {
